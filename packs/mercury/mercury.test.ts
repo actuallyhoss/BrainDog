@@ -40,6 +40,10 @@
  * The key's label and how often it asks are `grant` and `every` beside `book`, filled by the record's own door when it
  * is planned and installed, and read by the ledger from `ctx.config`. A setting holds no id, so a record holds one
  * Mercury, and `mercury-company` is yanked from the catalogue with the reason "Replaced by Mercury".
+ *
+ * `mercury` 1.1.0 KEEPS THE PAYEE. Each transaction carries `counterpartyName` in `counterparty_text`, the field
+ * money-core 3.10.0 declares on its ledger, so the floor moves to 3.10.0 and the pack lays only `mercury_id`, and the
+ * record can resolve the payee to one organisation by its key. The two tests after "ONE ROW TYPED BY HAND" hold it, and the whole path holds the record's own field taking it.
  */
 
 import { test } from 'node:test';
@@ -467,8 +471,9 @@ test('THE PACK NAMES A KEY AND CARRIES NONE, and both intervals agree', () => {
   /* BELOW 4.0.0 AND NOT A CARET ON 1.x: money-core 2.0.0 took `holdings` away, which nothing here writes into, and a
      `^1.0.0` refused this pack beside it (`packages/seed/test/money-core-major.test.ts` plans it on both). 3.0.0 took
      pages and card wordings and kept the accounts and transactions this pack writes, so 1.1.1 widened to it. The floor
-     moved in 1.3.0, to 3.1.0, whose `books` the `book` setting files each row in. */
-  assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.1.0 <4.0.0' });
+     moved in 1.3.0, to 3.1.0, whose `books` the `book` setting files each row in, and in 1.1.0 of this id to 3.10.0, whose
+     ledger declares the `counterparty_text` the script writes. */
+  assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.10.0 <4.0.0' });
 
   const decl = doc.declarations[0] as {
     ingest: string; every: string; dedupe: string[]; on_conflict: string;
@@ -620,8 +625,17 @@ test('THE PACK CARRIES ledger.js AS ITS SOURCE, byte for byte, beside the pull, 
   /* THE SCRIPT STOPS QUEUING AT ITS OWN LIMIT, so the two numbers are one. A limit lower than the script's constant
      would refuse the whole run past it, and every row with it. */
   assert.ok(s.source.includes(`const WRITES = ${s.limits?.writes};`), `limits.writes is ${s.limits?.writes} and ledger.js stops at another number`);
-  /* AND IT LAYS THE ONE FIELD IT FINDS A TRANSACTION AGAIN BY. */
-  assert.deepEqual((doc.extends as Record<string, { fields: { id: string }[] }>)['register.transactions']?.fields.map((f) => f.id), ['mercury_id']);
+  /* AND IT LAYS THE ONE FIELD IT FINDS A TRANSACTION AGAIN BY, and not the payee it writes since 1.1.0: money-core 3.10.0
+     declares `counterparty_text` itself, and every bank door laying it too made two fields under one id, or, in Money's
+     own shape, a ledger staged as the record's own list that refused Money's next update. */
+  const payee = (REGISTERS.transactions as { fields: readonly { id: string }[] }).fields.find((f) => f.id === 'counterparty_text');
+  assert.ok(payee, 'Money declares no payee field to write');
+  assert.deepEqual((doc.extends as Record<string, { fields: Record<string, unknown>[] }>)['register.transactions']?.fields, [
+    { id: 'mercury_id', label: 'Mercury transaction', type: 'text' },
+  ]);
+  const cards = JSON.parse(readFileSync(new URL('../card-alerts/card-alerts.pack.json', import.meta.url), 'utf8')) as { extends?: unknown };
+  assert.equal(cards.extends, undefined, 'another bank door lays the payee field again');
+  assert.deepEqual([doc.version, typeof doc.changes], ['1.1.0', 'string']);
 });
 
 type Row = { id: string; register: string; seq: number; fields: Record<string, Json>; version: number; updated_at: string; deleted_at?: string };
@@ -737,13 +751,13 @@ test('EACH TRANSACTION IS ONE LEDGER ROW, WITH ITS DIRECTION FROM THE SIGN, on t
       register: 'transactions',
       /* MINUS 1,240.75 IS 124,075 CENTS OUT, dated the day it posted and not the day it was started, and filed under
          Mercury's own category because the record has a live one of that name facing out. */
-      fields: { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: { amount: 124_075, currency: 'USD' }, account: ops.id, state: 'cleared', mercury_id: 'txn_1', category: software.id },
+      fields: { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: { amount: 124_075, currency: 'USD' }, account: ops.id, state: 'cleared', counterparty_text: 'Fenwick Cloud', mercury_id: 'txn_1', category: software.id },
     },
     {
       op: 'create',
       register: 'transactions',
       /* PENDING HAS NO POSTED DAY, so it is dated the day it was started, and it is not counted as cleared. */
-      fields: { what: 'Halden Studio', on: '2026-09-20', direction: 'in', amount: { amount: 500_000, currency: 'USD' }, account: ops.id, state: 'pending', mercury_id: 'txn_2' },
+      fields: { what: 'Halden Studio', on: '2026-09-20', direction: 'in', amount: { amount: 500_000, currency: 'USD' }, account: ops.id, state: 'pending', counterparty_text: 'Halden Studio', mercury_id: 'txn_2' },
     },
   ]);
   assert.deepEqual(
@@ -764,10 +778,10 @@ test('A CATEGORY SOMEBODY PINNED IS KEPT: the next hour moves the bank’s facts
      description the person tidied. */
   const fenwick = rowOf(
     'transactions',
-    { what: 'Fenwick hosting', on: '2026-09-19', direction: 'out', amount: { amount: 124_075, currency: 'USD' }, account: ops.id, state: 'pending', mercury_id: 'txn_1', category: 'cat_hosting' },
+    { what: 'Fenwick hosting', on: '2026-09-19', direction: 'out', amount: { amount: 124_075, currency: 'USD' }, account: ops.id, state: 'pending', counterparty_text: 'Fenwick Cloud', mercury_id: 'txn_1', category: 'cat_hosting' },
     4,
   );
-  const halden = rowOf('transactions', { what: 'Halden Studio', on: '2026-09-20', direction: 'in', amount: { amount: 500_000, currency: 'USD' }, account: ops.id, state: 'pending', mercury_id: 'txn_2' }, 1);
+  const halden = rowOf('transactions', { what: 'Halden Studio', on: '2026-09-20', direction: 'in', amount: { amount: 500_000, currency: 'USD' }, account: ops.id, state: 'pending', counterparty_text: 'Halden Studio', mercury_id: 'txn_2' }, 1);
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [fenwick, halden], categories: [software] }));
   /* ONE WRITE. The Fenwick payment cleared, so its state moves; its category, its description and everything else
      a person set are not in the patch. Halden is unchanged and is not written at all.
@@ -782,7 +796,7 @@ test('A CATEGORY SOMEBODY PINNED IS KEPT: the next hour moves the bank’s facts
 
 test('A TRANSACTION MERCURY CANCELS AFTER IT WAS HELD IS VOID, and a status nobody has heard of is said, not guessed', async () => {
   const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
-  const held = rowOf('transactions', { what: 'Coffee Stall', on: '2026-09-20', direction: 'out', amount: { amount: 6_000, currency: 'USD' }, account: ops.id, state: 'pending', mercury_id: 'txn_3' }, 2);
+  const held = rowOf('transactions', { what: 'Coffee Stall', on: '2026-09-20', direction: 'out', amount: { amount: 6_000, currency: 'USD' }, account: ops.id, state: 'pending', counterparty_text: 'Coffee Stall', mercury_id: 'txn_3' }, 2);
   const txns = [OPS_TXNS[2], txn('txn_9', -10, 'blocked', 'Tollgate', '2026-09-21T09:00:00Z', null)];
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [held], categories: [], txns }));
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${held.seq}`, patch: { state: 'void' }, version: 2 }]);
@@ -797,7 +811,7 @@ test('A TRANSACTION A PERSON VOIDED STAYS VOID, because Mercury never sends one 
      this script, which Mercury will not contradict, or by a person, whom it must not. The rest of the bank's facts
      still move. */
   const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
-  const voided = rowOf('transactions', { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: { amount: 124_000, currency: 'USD' }, account: ops.id, state: 'void', mercury_id: 'txn_1' }, 3);
+  const voided = rowOf('transactions', { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: { amount: 124_000, currency: 'USD' }, account: ops.id, state: 'void', counterparty_text: 'Fenwick Cloud', mercury_id: 'txn_1' }, 3);
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [voided], categories: [], txns: [OPS_TXNS[0]] }));
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${voided.seq}`, patch: { amount: { amount: 124_075, currency: 'USD' } }, version: 3 }]);
 });
@@ -810,6 +824,7 @@ const haldenOn = (account: string): Record<string, Json> => ({
   amount: { amount: 500_000, currency: 'USD' },
   account,
   state: 'pending',
+  counterparty_text: 'Halden Studio',
   mercury_id: 'txn_2',
 });
 
@@ -843,7 +858,7 @@ test('A ROW TYPED IN BY HAND BEFORE THE PACK IS TAKEN, NOT WRITTEN AGAIN: what t
   const early = rowOf('transactions', { what: 'Hosting', on: '2026-09-16', direction: 'out', amount: money, account: ops.id, state: 'cleared' });
   const voided = rowOf('transactions', { what: 'Fenwick', on: '2026-09-19', direction: 'out', amount: money, account: ops.id, state: 'void' });
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [typed, refund, early, voided], categories: [], txns: [OPS_TXNS[0]] }));
-  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${typed.seq}`, patch: { on: '2026-09-19', mercury_id: 'txn_1' }, version: 2 }]);
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${typed.seq}`, patch: { on: '2026-09-19', counterparty_text: 'Fenwick Cloud', mercury_id: 'txn_1' }, version: 2 }]);
   assert.match(a.log, /1 row typed in by hand was the same money as a Mercury transaction/);
 });
 
@@ -854,7 +869,7 @@ test('TWO ROWS THAT COULD BE THE SAME MONEY ARE NOT GUESSED BETWEEN: the transac
   const two = rowOf('transactions', { what: 'Fenwick Cloud', on: '2026-09-20', direction: 'out', amount: money, account: ops.id, state: 'pending' });
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [one, two], categories: [], txns: [OPS_TXNS[0]] }));
   assert.deepEqual(writesOf(a), [
-    { op: 'create', register: 'transactions', fields: { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: money, account: ops.id, state: 'cleared', mercury_id: 'txn_1' } },
+    { op: 'create', register: 'transactions', fields: { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: money, account: ops.id, state: 'cleared', counterparty_text: 'Fenwick Cloud', mercury_id: 'txn_1' } },
   ]);
   assert.match(a.log, /2 rows typed in by hand could be Mercury's 1,240\.75 USD out on 2026-09-19, so none was taken/);
 });
@@ -870,9 +885,54 @@ test('ONE ROW TYPED BY HAND IS TAKEN ONCE: two Mercury transactions of the same 
   ];
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [typed], categories: [], txns }));
   assert.deepEqual(writesOf(a), [
-    { op: 'update', spoken: `transactions#${typed.seq}`, patch: { mercury_id: 'txn_a' }, version: 1 },
-    { op: 'create', register: 'transactions', fields: { what: 'Coffee Stall', on: '2026-09-19', direction: 'out', amount: { amount: 6_000, currency: 'USD' }, account: ops.id, state: 'cleared', mercury_id: 'txn_b' } },
+    { op: 'update', spoken: `transactions#${typed.seq}`, patch: { counterparty_text: 'Coffee Stall', mercury_id: 'txn_a' }, version: 1 },
+    { op: 'create', register: 'transactions', fields: { what: 'Coffee Stall', on: '2026-09-19', direction: 'out', amount: { amount: 6_000, currency: 'USD' }, account: ops.id, state: 'cleared', counterparty_text: 'Coffee Stall', mercury_id: 'txn_b' } },
   ]);
+});
+
+/**
+ * THE PAYEE IS KEPT AS MERCURY NAMES IT (1.1.0), in `counterparty_text`, so the record can make it a payee key and find
+ * the shop or the person it was. Spellings are not folded here: case, a processor's prefix and a trailing city are the
+ * kernel's key to fold, so the text stays what the bank said and a person can see where a match came from.
+ */
+test('THE PAYEE IS KEPT AS MERCURY NAMES IT, and a transaction that names nobody gets none, never the nickname or the bank line', async () => {
+  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const named = (id: string, counterpartyName: string | undefined, extra: Record<string, string> = {}) => {
+    const t: Record<string, unknown> = { ...txn(id, -18.5, 'sent', counterpartyName ?? '', '2026-09-19T08:00:00Z', '2026-09-19T09:00:00Z'), ...extra };
+    if (counterpartyName === undefined) delete t.counterpartyName;
+    return t;
+  };
+  const txns = [
+    /* TWO SPELLINGS OF ONE SHOP, each kept as printed; that they are one shop is the kernel's to say. */
+    named('txn_t1', 'Talabat'),
+    named('txn_t2', 'talabat.com'),
+    /* SPACES AROUND IT ARE NOT PART OF A NAME. */
+    named('txn_s', '  Halden Studio '),
+    /* NO NAME: the description falls back on the nickname a person gave, and no payee is made up from it. */
+    named('txn_n', undefined, { counterpartyNickname: 'Our landlord', bankDescription: 'ACH DEBIT 0042' }),
+  ];
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [], categories: [], txns }));
+  const made = writesOf(a).map((w) => (w as { fields: Record<string, Json> }).fields);
+  assert.deepEqual(
+    made.map((f) => [f.mercury_id, f.what, f.counterparty_text]),
+    [
+      ['txn_t1', 'Talabat', 'Talabat'],
+      ['txn_t2', 'talabat.com', 'talabat.com'],
+      ['txn_s', '  Halden Studio ', 'Halden Studio'],
+      ['txn_n', 'Our landlord', undefined],
+    ],
+  );
+  assert.ok(!('counterparty_text' in made[3]!), 'a transaction that names nobody was given a payee');
+});
+
+test('A ROW HELD BEFORE 1.1.0 GAINS ITS PAYEE THE NEXT HOUR, and a payee a person corrected is kept', async () => {
+  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  /* WRITTEN BY 1.0.x, with no payee, and nothing else to move: the payee is the whole patch. */
+  const before = rowOf('transactions', { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: { amount: 124_075, currency: 'USD' }, account: ops.id, state: 'cleared', mercury_id: 'txn_1' }, 5);
+  /* A PAYEE A PERSON PUT RIGHT, which the bank's own spelling does not undo. */
+  const corrected = rowOf('transactions', { what: 'Halden Studio', on: '2026-09-20', direction: 'in', amount: { amount: 500_000, currency: 'USD' }, account: ops.id, state: 'pending', counterparty_text: 'Halden Studio Ltd', mercury_id: 'txn_2' }, 2);
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [before, corrected], categories: [], txns: [OPS_TXNS[0], OPS_TXNS[1]] }));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${before.seq}`, patch: { counterparty_text: 'Fenwick Cloud' }, version: 5 }]);
 });
 
 test('A KEY MERCURY REFUSES STOPS THE RUN WITH A SENTENCE AND WRITES NOTHING', async () => {
@@ -982,6 +1042,19 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, a
         { what: 'Fenwick Cloud', direction: 'out', amount: 124_075, state: 'cleared', mercury_id: 'txn_1', category: software },
         /* THE ROW HE TYPED, CARRYING MERCURY'S TRANSACTION, with his words kept: two rows and not three. */
         { what: 'Halden, September invoice', direction: 'in', amount: 500_000, state: 'pending', mercury_id: 'txn_2', category: null },
+      ],
+    );
+
+    /* EACH CARRIES THE PAYEE AS MERCURY NAMES IT, the one he typed included, so the record's own field took it. */
+    assert.deepEqual(
+      running.sql
+        .all<{ id: string; payee: string | null }>(
+          "SELECT json_extract(fields, '$.mercury_id') AS id, json_extract(fields, '$.counterparty_text') AS payee FROM entry WHERE register = 'transactions' AND deleted_at IS NULL ORDER BY id",
+        )
+        .map((r) => [r.id, r.payee]),
+      [
+        ['txn_1', 'Fenwick Cloud'],
+        ['txn_2', 'Halden Studio'],
       ],
     );
 

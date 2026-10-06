@@ -101,6 +101,12 @@ export type RenderOptions = InlineOptions & {
    */
   scenario?: boolean;
   /**
+   * Asks the host to walk a forecast further: a length its horizon knob offers past how far the walk reaches, in days,
+   * or `last`. Only the Svelte drawer calls it, as a person picks the length, and the chart draws it once the host
+   * sends the longer walk. Absent, the knob offers only what the walk already reaches.
+   */
+  walk?: (length: number | 'last') => void;
+  /**
    * Where an address this renderer draws goes, as the host serves it. Absent, it is drawn as written.
    *
    * THE RECORD WRITES ITS ADDRESSES RECORD-RELATIVE AND THE HOST MAY NOT LIVE AT THE ROOT. A queue's "N more"

@@ -83,8 +83,9 @@ test('EACH FIRST-PARTY PACK IS A LEGAL PACK, and needs what its fields, pages an
   assert.deepEqual(Object.fromEntries(FIRST_PARTY.map((id) => [id, firstPartyManifest(id).links])), {
     portfolio: [],
     people: ['register.things'],
-    /* MONEY ONLY LINKS TO PEOPLE since 3.0.0: who a row is with is left out of a record without them. */
-    'money-core': ['register.people'],
+    /* MONEY ONLY LINKS TO PEOPLE'S LISTS since 3.0.0: who a row is with is left out of a record without them. A ledger
+       row names an organisation since 3.10.0, and a bill still names a person. */
+    'money-core': ['register.organisations', 'register.people'],
     estate: [],
     /* WORK ONLY LINKS TO PEOPLE AND PROJECTS: who holds a task and what it is for are left out of a record without them. */
     work: ['register.people', 'register.things'],

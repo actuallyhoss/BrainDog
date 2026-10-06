@@ -1,16 +1,16 @@
 {
   "pack": "bank-hsbc-eg",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "title": "HSBC Egypt alerts",
   "summary": "Reads HSBC Egypt alert mails and text messages into Money as transactions, each with the balance it prints, and a message that only prints a balance as a balance check.",
-  "changes": "Nothing it reads or writes changed. The add-on has a title of its own now, and each version says what it changed in a line like this one.",
+  "changes": "A card charge and an InstaPay transfer keep the shop or the person as the bank wrote it, in a new Paid to or from field, so the same payee is recognised however it is spelled.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
     "format": 1,
     "primitives": 1,
     "packs": {
-      "money-core": ">=3.0.0 <4.0.0"
+      "money-core": ">=3.10.0 <4.0.0"
     }
   },
   "declarations": [
@@ -91,6 +91,14 @@
             "OPAY*",
             "OPAY-*"
           ]
+        },
+        "counterparty_text": {
+          "text": {
+            "between": [
+              " at ",
+              ". Your available"
+            ]
+          }
         },
         "direction": {
           "enum": {
@@ -234,6 +242,26 @@
             "OPAY-*"
           ]
         },
+        "counterparty_text": {
+          "first": [
+            {
+              "text": {
+                "between": [
+                  " to ",
+                  " with reference"
+                ]
+              }
+            },
+            {
+              "text": {
+                "between": [
+                  " from ",
+                  " with reference"
+                ]
+              }
+            }
+          ]
+        },
         "direction": {
           "enum": {
             "map": {
@@ -356,6 +384,14 @@
             "OPAY*",
             "OPAY-*"
           ]
+        },
+        "counterparty_text": {
+          "text": {
+            "between": [
+              " from ",
+              " with reference"
+            ]
+          }
         },
         "direction": {
           "enum": {
@@ -1120,6 +1156,14 @@
             "OPAY-*"
           ]
         },
+        "counterparty_text": {
+          "text": {
+            "between": [
+              " at ",
+              ". Your available"
+            ]
+          }
+        },
         "direction": {
           "enum": {
             "map": {
@@ -1266,6 +1310,26 @@
             "OPAY-*"
           ]
         },
+        "counterparty_text": {
+          "first": [
+            {
+              "text": {
+                "between": [
+                  " to ",
+                  " with reference"
+                ]
+              }
+            },
+            {
+              "text": {
+                "between": [
+                  " from ",
+                  " with reference"
+                ]
+              }
+            }
+          ]
+        },
         "direction": {
           "enum": {
             "map": {
@@ -1392,6 +1456,14 @@
             "OPAY*",
             "OPAY-*"
           ]
+        },
+        "counterparty_text": {
+          "text": {
+            "between": [
+              " from ",
+              " with reference"
+            ]
+          }
         },
         "direction": {
           "enum": {

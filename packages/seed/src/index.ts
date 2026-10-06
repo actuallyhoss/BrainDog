@@ -30,7 +30,7 @@ export * from './modules/base.ts';
 export { ACCOUNTS, CATEGORIES, INSTALLMENTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, nightOf, snapshotRows } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
 export { PROJECTS_SAID, THINGS } from './modules/portfolio.ts';
-export { PEOPLE } from './modules/people.ts';
+export { ORGANISATIONS, PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES, openTasksSeries } from './modules/work.ts';
 
 import { NOW, day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
@@ -54,7 +54,7 @@ export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './mod
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { ESTATE_AUTOMATIONS, estateTargetConfig } from './modules/estate.ts';
 import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
-import { PEOPLE, PEOPLE_AUTOMATIONS, PEOPLE_METRICS, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
+import { ORGANISATIONS, PEOPLE, PEOPLE_AUTOMATIONS, PEOPLE_METRICS, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
 import { RUNS, TASKS, TRACKS, UPDATES, WORK_AUTOMATIONS, WORK_METRICS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
 
 /* ── registers ────────────────────────────────────────────────────────────── */
@@ -148,6 +148,7 @@ export const ROWS: Record<string, readonly Fields[]> = {
   snapshots: SNAPSHOTS,
   services: SERVICES,
   things: THINGS,
+  organisations: ORGANISATIONS,
   people: PEOPLE,
   tasks: TASKS,
   session: RUNS,
@@ -353,7 +354,8 @@ const needsARef = (register: string): boolean =>
   (REGISTERS[register]?.fields ?? []).some((f) => f.type === 'ref' && f.required === true);
 
 const exampleRow = (register: string): Fields => {
-  const refs = new Set((REGISTERS[register]?.fields ?? []).filter((f) => f.type === 'ref').map((f) => f.id));
+  /* A LIST OF REFS TOO, since an organisation's first row lists the projects it is part of (People 3.0.0). */
+  const refs = new Set((REGISTERS[register]?.fields ?? []).filter((f) => f.type === 'ref' || (f.type === 'list' && f.of === 'ref')).map((f) => f.id));
   const first = (ROWS[register] ?? [])[0] ?? {};
   return Object.fromEntries(Object.entries(first).filter(([key]) => !refs.has(key)));
 };
@@ -372,9 +374,13 @@ export type Seeded = { registers: number; rows: number; pages: number; metrics: 
  * `categories` BEFORE `transactions`, AND `obligations` BEFORE IT TOO, for the same reason: a ledger
  * row points at the category it is for and at the promise it settled. `snapshots` last of Money's,
  * because nothing points at one.
+ *
+ * `organisations` BETWEEN THE TWO, SINCE People 3.0.0: an organisation lists the projects it is part of, and a person
+ * and a ledger row point at the organisation they are with.
  */
 export const ORDER = [
   'things',
+  'organisations',
   'people',
   'tracks',
   'obligations',

@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.14.0',
+      notes: 'A project keeps the domains it lives at, so mail and renewals about one are read as about the project. Repositories take a remote as git prints it.',
+    },
+    {
       version: '1.13.0',
       notes:
         'Projects says in its first line when nothing is in play and how to start, and no part of the page says it is empty. Parked and finished counts what is folded under it without loading every project.',
@@ -57,6 +61,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    {
+      version: '3.0.0',
+      notes:
+        'Organisations live here now: the companies, clients, vendors, shops and banks you deal with, each with its own page and the people who are with it. A person keeps every address and handle they are known by, the organisation they are with and where they were seen. Mail from a no-reply address, or one a pattern reads, meets the company behind it, not a person, and the payee on a bank text is known as the one shop or company however the bank spells it.',
+    },
     { version: '2.7.0', notes: 'People opens on who has gone quiet and since when, by name, and otherwise on who you have been in touch with lately.' },
     { version: '2.6.0', notes: 'Nothing changes on screen: In touch, 12 weeks is written the way the app now reads it.' },
     { version: '2.5.0', notes: 'In touch, 12 weeks names each person beside the weeks they were in touch, the latest first.' },
@@ -76,6 +85,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    {
+      version: '3.10.0',
+      notes:
+        'A payment says which organisation it was with, a shop, a supplier or a client, where it could only name a person, and keeps the payee as the bank wrote it, so the same shop is known however it is spelled. Cash ahead offers five years and To the end again, worked out when you pick them, so Money still opens fast.',
+    },
     {
       version: '3.9.0',
       notes: 'Cash ahead goes as far as two years, so Money opens faster. Five years and To the end are no longer offered.',

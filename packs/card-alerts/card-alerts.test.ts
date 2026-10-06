@@ -17,7 +17,8 @@
  * ON money-core 3.0.0 OR LATER, AND NOT BEFORE, because a money-core before 3.0.0 declares these four ids itself and
  * the two would collide on the record.
  *
- * EVERY LINE BELOW IS INVENTED: the card digits, the merchants, the amounts and the days are made up.
+ * EVERY LINE BELOW IS INVENTED: the card digits, the merchants, the amounts and the days are made up, save two public
+ * shop names, Chillout and Talabat, whose spellings 1.2.0's test holds. The person named is invented.
  */
 
 import { test } from 'node:test';
@@ -88,12 +89,23 @@ const mail = (k: Kernel, body: string, sha256: string): Arrived =>
 const text = (k: Kernel, ingest: string, body: string, sha256: string): Arrived =>
   said<Arrived>(k.arrive({ channel: 'webhook', ingest, body, sha256, verified: true }));
 
+/** Money's own payee field (money-core 3.10.0), which every bank door writes and none lays. */
+const moneysPayee = (): unknown =>
+  ((firstPartyDocument('money-core') as { declarations: { register?: string; fields?: { id: string }[] }[] }).declarations
+    .find((d) => d.register === 'transactions')?.fields ?? []).find((f) => f.id === 'counterparty_text');
+
 /* ── the file ────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
-test('THE FILE IS card-alerts 1.1.0, on money-core 3.0.0 or later, with the two wordings and their twins', async () => {
+/* 1.2.0 IS A MINOR STEP: each wording keeps the shop or the sender as printed in `counterparty_text`, which money-core
+   3.10.0 declares on its ledger, so the floor moves to 3.10.0 and the pack lays nothing. Laid by the pack, even in
+   Money's own shape, the ledger was staged as the record's own list, and a record that took the pack on an older Money
+   was refused money-core 3.10.0 itself ("register.transactions was written in this record"), so the field is Money's
+   alone. */
+test('THE FILE IS card-alerts 1.2.0, on money-core 3.10.0 or later, with the two wordings and their twins', async () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version], ['card-alerts', '1.1.0']);
-  assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=3.0.0 <4.0.0' });
+  assert.deepEqual([doc.pack, doc.version], ['card-alerts', '1.2.0']);
+  assert.equal(doc.extends, undefined, 'the payee field is Money\'s, and a pack laying it blocks Money\'s own update');
+  assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=3.10.0 <4.0.0' });
   assert.deepEqual(doc.declarations.map((d) => `ingest.${String(d.ingest)}`).sort(), FOUR);
   /* EACH TWIN IS ITS MAIL PATTERN BEHIND A PATH TOKEN, and nothing else, so a wording fixed in one is fixed in both. */
   for (const twin of doc.declarations.filter((d) => d.channel === 'webhook')) {
@@ -132,7 +144,7 @@ test('INSTALLED FROM THE FILE: four patterns, nothing refused, and the text door
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), FOUR);
   await put(api, file());
-  assert.equal(api.kernel.packs().find((p) => p.id === 'card-alerts')?.version, '1.1.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'card-alerts')?.version, '1.2.0');
   /* A TWIN WITH NO TOKEN MINTED IS A DOOR THAT MATCHES NOTHING YET, which is `none` and not `null`. */
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-card-out-sms' }), { kind: 'none' });
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-card-in-sms' }), { kind: 'none' });
@@ -150,15 +162,15 @@ test('A CHARGE AND A CREDIT BECOME ROWS at exact, each in its own direction, on 
   assert.deepEqual([out.state, out.ingest, out.confidence], ['matched', 'bank-card-out', 'exact'], out.reason);
   const charge = k.get(out.wrote[0]!)!.fields;
   assert.deepEqual(
-    [charge.what, charge.direction, charge.on, charge.account, charge.amount],
-    ['FENWICK CLOUD', 'out', '2026-09-18', card, { amount: 4_299, currency: 'GBP' }],
+    [charge.what, charge.counterparty_text, charge.direction, charge.on, charge.account, charge.amount],
+    ['FENWICK CLOUD', 'FENWICK CLOUD', 'out', '2026-09-18', card, { amount: 4_299, currency: 'GBP' }],
     'the card digits were read as the amount, or the money is not in minor units',
   );
 
   const back = mail(k, CREDIT, 'credit');
   assert.deepEqual([back.state, back.ingest, back.confidence], ['matched', 'bank-card-in', 'exact'], back.reason);
   const paid = k.get(back.wrote[0]!)!.fields;
-  assert.deepEqual([paid.what, paid.direction, paid.on, paid.amount], ['ALDER REALTY', 'in', '2026-08-29', { amount: 500_500, currency: 'GBP' }]);
+  assert.deepEqual([paid.what, paid.counterparty_text, paid.direction, paid.on, paid.amount], ['ALDER REALTY', 'ALDER REALTY', 'in', '2026-08-29', { amount: 500_500, currency: 'GBP' }]);
 
   assert.equal(k.count('transactions'), before + 2);
   sql.close();
@@ -213,6 +225,52 @@ test('THE SAME ALERT FORWARDED AGAIN IS ONE ROW, because the near key reads the 
   sql.close();
 });
 
+/* ── the payee, kept as printed (1.2.0) ─────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * ONE CAFE, FIVE SPELLINGS, as an Egyptian card alert prints them: as itself and behind each acquirer's prefix. This
+ * pack strips nothing, so `what` and `counterparty_text` are both the name as printed; folding the five into one payee is
+ * the kernel's key (`keyOf('bank', ...)`), which takes the prefixes off there, once, for every bank door. Each charge has
+ * its own amount, so the near rule sees five payments and not one alert sent five times.
+ */
+const CHILLOUT = ['CHILLOUT', 'GEIDEA*CHILLOUT', 'PAYMOB-CHILLOUT', 'FAWRY*Chillout', 'KASHIER*CHILLOUT'] as const;
+const spentAt = (merchant: string, n: number): string => `Your card ending ${DIGITS} was debited EGP ${85 + n}.00 at ${merchant} on 1${n}/09/26.`;
+
+test('EACH ALERT KEEPS THE PAYEE AS PRINTED: five spellings of one cafe, Talabat two ways, and a sender by name', async () => {
+  const { api, sql } = await withReaders();
+  const k = api.kernel;
+  const payees = [...CHILLOUT, 'TALABAT', 'talabat.com'].map((merchant, n) => {
+    const out = mail(k, spentAt(merchant, n), `payee-${n}`);
+    assert.deepEqual([out.state, out.ingest], ['matched', 'bank-card-out'], `${merchant}: ${out.reason}`);
+    const row = k.get(out.wrote[0]!)!.fields;
+    assert.equal(row.what, merchant);
+    return row.counterparty_text;
+  });
+  assert.deepEqual(payees, [...CHILLOUT, 'TALABAT', 'talabat.com']);
+
+  /* A CREDIT FROM A PERSON, in the capitals and the four names a transfer prints: the sender is the payee. */
+  const back = mail(k, `Your card ending ${DIGITS} was credited EGP 1,500.00 from NOURA SAMIR ABDEL HAMID on 19/09/26.`, 'payee-person');
+  assert.deepEqual([back.state, back.ingest], ['matched', 'bank-card-in'], back.reason);
+  assert.equal(k.get(back.wrote[0]!)!.fields.counterparty_text, 'NOURA SAMIR ABDEL HAMID');
+  sql.close();
+});
+
+/**
+ * NO BANK DOOR LAYS THE PAYEE, so a record that takes card alerts and a bank's own pack holds one field, Money's, and not
+ * a refusal: two packs laying `counterparty_text` in two shapes was `PROVIDES_CONFLICT` for the second.
+ */
+test('BESIDE ANOTHER BANK DOOR: the payee field is Money\'s once and both packs install', async () => {
+  const { api, sql } = await withReaders();
+  const hsbc = JSON.parse(readFileSync(new URL('../bank-hsbc-eg/bank-hsbc-eg.pack.json', import.meta.url), 'utf8')) as Body;
+  assert.deepEqual([hsbc.extends, file().extends], [undefined, undefined], 'a bank door lays the payee field again');
+  await put(api, hsbc);
+  const ledger = api.kernel.declarations().find((d) => d.id === 'register.transactions');
+  /* THE BODY IS STORED AS ITS JSON TEXT. */
+  const body = (typeof ledger?.body === 'string' ? JSON.parse(ledger.body) : ledger?.body) as { fields?: Body[] } | undefined;
+  assert.deepEqual((body?.fields ?? []).filter((f) => f.id === 'counterparty_text'), [moneysPayee()]);
+  sql.close();
+});
+
 /* ── the Shortcut's door ─────────────────────────────────────────────────────────────────────────────────────────── */
 
 test('A TEXT POSTED AT A TWIN IS READ AS ITS MAIL PATTERN READS IT', async () => {
@@ -221,7 +279,7 @@ test('A TEXT POSTED AT A TWIN IS READ AS ITS MAIL PATTERN READS IT', async () =>
   const out = text(k, 'bank-card-out-sms', CHARGE, 'charge-text');
   assert.deepEqual([out.state, out.ingest, out.confidence], ['matched', 'bank-card-out-sms', 'exact'], out.reason);
   const row = k.get(out.wrote[0]!)!.fields;
-  assert.deepEqual([row.what, row.direction, row.account, row.amount], ['FENWICK CLOUD', 'out', card, { amount: 4_299, currency: 'GBP' }]);
+  assert.deepEqual([row.what, row.counterparty_text, row.direction, row.account, row.amount], ['FENWICK CLOUD', 'FENWICK CLOUD', 'out', card, { amount: 4_299, currency: 'GBP' }]);
   const back = text(k, 'bank-card-in-sms', CREDIT, 'credit-text');
   assert.deepEqual([back.state, back.ingest], ['matched', 'bank-card-in-sms'], back.reason);
   sql.close();

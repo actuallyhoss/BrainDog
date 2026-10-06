@@ -130,13 +130,16 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
      bank-hsbc-eg IS 1.5.0 NOW, another minor step, because two new twin doors, `bank-ipn-out` and its
      `bank-ipn-out-sms` twin, gained `door: 'bank-from-out-sms'` beside the five already there; the range did not
      move with them either. */
-  assert.equal(bankHsbcEgFile().version, '1.5.0');
-  assert.equal(mercuryFile().version, '1.0.1');
+  /* AND IN BATCH 17 EACH KEEPS THE PAYEE AS ITS SOURCE WROTE IT, bank-hsbc-eg 1.6.0 and mercury 1.1.0, minor steps. Both
+     floors move to money-core 3.10.0, which declares `counterparty_text` on the ledger that each now writes: laid by
+     each pack it was `PROVIDES_CONFLICT` against money-core and between any two of them. */
+  assert.equal(bankHsbcEgFile().version, '1.6.0');
+  assert.equal(mercuryFile().version, '1.1.0');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
     assert.deepEqual(
-      ['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0', '3.9.0', '4.0.0'].filter((v) => satisfies(v, range)),
-      name === 'mercury' ? ['3.9.0'] : ['3.0.0', '3.9.0'],
+      ['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0', '3.9.0', '3.10.0', '4.0.0'].filter((v) => satisfies(v, range)),
+      ['3.10.0'],
       name,
     );
   }

@@ -66,7 +66,7 @@ function rng(seed: number) {
 
 /**
  * How many days after its due date each party pays, by the number a person says. Halden pays on 45
- * days whatever the terms say, which is what its person row's note says too.
+ * days whatever the terms say, which is what Halden Type Co's own row says too (`ORGANISATIONS` in `people.ts`).
  */
 const LATE_BY: Record<number, number> = { 1: 45, 2: 12, 3: 3, 4: 0, 5: 0, 6: 5 };
 
@@ -184,13 +184,17 @@ export const CATEGORIES: Fields[] = [
  * discharged it, and the two paid invoices below are the same two amounts `cashSeries` walks back over.
  * Two more are the legs of one transfer, on one day, the same amount both ways, so the page has a
  * worked example of the thing a total must not count twice.
+ *
+ * WHO EACH ONE WAS WITH IS AN ORGANISATION, SINCE money-core 3.10.0 (`party`, by its place in `ORGANISATIONS` in
+ * `people.ts`), and the payee as the bank wrote it is `counterparty_text`. A payment to a contractor names nobody in
+ * `party`: a person is not an organisation, and the bill it settles already says who it was with.
  */
 const HAND_TRANSACTIONS: Fields[] = [
-  { what: 'HALDEN TYPE CO INV 2026-035', on: day(-51), direction: 'in', amount: gbp(620_000), account: 1, party: 1, category: 1, thing: 2, state: 'cleared', settles: 9, note: 'Matched to the invoice by its reference.' },
-  { what: 'RAVENSWORTH LTD INV 2026-038', on: day(-41), direction: 'in', amount: gbp(180_000), account: 1, party: 2, category: 1, thing: 2, state: 'cleared', settles: 8, note: '' },
-  { what: 'J OKONKWO JUNE SET', on: day(-63), direction: 'out', amount: gbp(126_000), account: 1, party: 3, category: 3, thing: 1, state: 'cleared', note: '' },
+  { what: 'HALDEN TYPE CO INV 2026-035', on: day(-51), direction: 'in', amount: gbp(620_000), account: 1, party: 1, counterparty_text: 'HALDEN TYPE CO', category: 1, thing: 2, state: 'cleared', settles: 9, note: 'Matched to the invoice by its reference.' },
+  { what: 'RAVENSWORTH LTD INV 2026-038', on: day(-41), direction: 'in', amount: gbp(180_000), account: 1, party: 2, counterparty_text: 'RAVENSWORTH LTD', category: 1, thing: 2, state: 'cleared', settles: 8, note: '' },
+  { what: 'J OKONKWO JUNE SET', on: day(-63), direction: 'out', amount: gbp(126_000), account: 1, counterparty_text: 'J OKONKWO', category: 3, thing: 1, state: 'cleared', note: '' },
   { what: 'HMRC VAT QUARTER TO 31 MAY', on: day(-84), direction: 'out', amount: gbp(688_000), account: 2, category: 6, state: 'cleared', note: 'Out of the reserve, which is what the reserve is for.' },
-  { what: 'PELL & VINE, HALF THE YEAR-END FEE', on: day(-72), direction: 'out', amount: gbp(72_500), account: 1, party: 4, category: 7, state: 'cleared', note: 'The other half is owed on the 22nd.' },
+  { what: 'PELL & VINE, HALF THE YEAR-END FEE', on: day(-72), direction: 'out', amount: gbp(72_500), account: 1, party: 3, counterparty_text: 'PELL & VINE', category: 7, state: 'cleared', note: 'The other half is owed on the 22nd.' },
   /* ONE TRANSFER, TWO ROWS, ONE DAY. Nothing was earned and nothing was spent; the money is in a
      different account. Both legs are marked, and every figure over the ledger leaves them out.
 
@@ -206,7 +210,7 @@ const HAND_TRANSACTIONS: Fields[] = [
   { what: 'TRANSFER TO TAX RESERVE', on: day(-30), direction: 'out', amount: gbp(400_000), account: 1, transfer: true, state: 'cleared', note: '' },
   { what: 'TRANSFER FROM CURRENT', on: day(-30), direction: 'in', amount: gbp(400_000), account: 2, transfer: true, state: 'cleared', note: '' },
   { what: 'COMPANY CARD, AUGUST BILL', on: day(-12), direction: 'out', amount: gbp(96_400), account: 1, transfer: true, state: 'cleared', note: 'Clears the card, so the card is not a second spend of what the card bought.' },
-  { what: 'S MARCHETTI, AUGUST', on: day(-8), direction: 'out', amount: gbp(496_000), account: 1, party: 6, category: 3, thing: 3, state: 'cleared', note: '' },
+  { what: 'S MARCHETTI, AUGUST', on: day(-8), direction: 'out', amount: gbp(496_000), account: 1, counterparty_text: 'S MARCHETTI', category: 3, thing: 3, state: 'cleared', note: '' },
   /* THE ONE ROW THAT HAS NOT LANDED, so Status means something on the list and in the figures: a
      pending row is money the bank has taken and not yet settled, and it is not in what was spent. */
   { what: 'GRANGEMOOR EVENTS, STAND DEPOSIT', on: day(-1), direction: 'out', amount: gbp(250_000), account: 1, category: 8, thing: 1, state: 'pending', note: 'Refundable to 30 days out.' },
@@ -222,9 +226,11 @@ const HAND_TRANSACTIONS: Fields[] = [
  */
 function generatedTransactions(count: number): Fields[] {
   const r = rng(20260904);
-  const merchants = [
-    { what: 'FENWICK CLOUD', direction: 'out', account: 3, low: 3_800, high: 5_200 },
-    { what: 'BRIDGE STREET COFFEE', direction: 'out', account: 3, low: 320, high: 1_140 },
+  /* `party` IS THE ORGANISATION THE RECORD KNOWS IT AS, where it knows one (`ORGANISATIONS` in `people.ts`), and the rest
+     are a payee as the bank wrote it and nothing more, which is what a bank door leaves for the record to resolve. */
+  const merchants: { what: string; direction: string; account: number; low: number; high: number; party?: number }[] = [
+    { what: 'FENWICK CLOUD', direction: 'out', account: 3, low: 3_800, high: 5_200, party: 5 },
+    { what: 'BRIDGE STREET COFFEE', direction: 'out', account: 3, low: 320, high: 1_140, party: 6 },
     { what: 'PAPERHAUS SUPPLIES', direction: 'out', account: 3, low: 2_400, high: 18_600 },
     { what: 'NORTHERN RAIL', direction: 'out', account: 3, low: 1_900, high: 12_400 },
     { what: 'LEDGER POST', direction: 'out', account: 3, low: 3_900, high: 3_900 },
@@ -241,6 +247,8 @@ function generatedTransactions(count: number): Fields[] {
       direction: m.direction,
       amount: gbp(Math.round(m.low + r() * (m.high - m.low))),
       account: m.account,
+      ...(m.party === undefined ? {} : { party: m.party }),
+      counterparty_text: m.what,
       state: 'cleared',
       note: '',
     });
@@ -863,8 +871,20 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
          counts `index: true` and `unique: true` alike; the eight spent here are `on`, `direction`,
          `account`, `category`, `thing`, `state`, `transfer` and `settles`, which are the eight every
          page and every figure below filters on. `party` is the one nothing filters on, so it pays
-         no write cost. A ninth would come back as INDEXES_OVER_CAP at the door. */
-      { id: 'party', label: 'Who', type: 'ref', to: 'people' },
+         no write cost. A ninth would come back as INDEXES_OVER_CAP at the door.
+
+         AN ORGANISATION, SINCE money-core 3.10.0, AND IT WAS A PERSON. Money moves through a company far more often than
+         through a person: a shop, a supplier, a client's accounts, a bank. With `party` a person, a card payment could
+         only name nobody or file a coffee shop as somebody met, so it named nobody, and none of a real ledger's 217 rows
+         carried one. Still a link (`LINKS` in `packs/first-party.ts`), so Money installs with People off. */
+      { id: 'party', label: 'Who', type: 'ref', to: 'organisations' },
+      /* THE PAYEE AS THE BANK WROTE IT, SINCE money-core 3.10.0 (`loop/contract-17.md`): `GEIDEA*BRIDGE ST COFFEE`,
+         which a bank door fills and the record resolves to an organisation by its `bank:` key, kept beside `party` so
+         the words a match was made on are never lost. MONEY'S AND NOT EACH BANK'S: three bank add-ons laying a field of
+         this one id on this one list (`extends`) is `PROVIDES_CONFLICT` for the second of them on any record that keeps
+         two banks, so the list declares it once and every door writes it. Searchable, because it is what a person
+         remembers off a statement. */
+      { id: 'counterparty_text', label: 'Paid to or from', type: 'text', search: true },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
       /* NOT INDEXED, FOR THE REASON `party` IS NOT: the list's eight are spent, and a ninth is refused at the door. A
          book's page reads it with the day and the state beside it. */
@@ -2318,11 +2338,14 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            90 days was tried for 3.6.0 and took the knob away with it, because the record walked only as far as the chart
            opened; it now walks to the longest of `horizons:` and says so (`reach`), and the renderer offers every length
            up to that (`horizonChoices` in `packages/render/src/forecast.ts`), so 180, 365 and 730 days are a press away.
-           TWO YEARS AT MOST, SINCE money-core 3.9.0: the longest length is what a walk may cost, and the record walked it
-           on every load, so five years and `last` (as far as ten) made each opening of Money walk twenty times the three
-           months it draws, for two choices nobody plans cash by (research audit 11-13). */
+           TWO YEARS AT MOST at 3.9.0, since the record walked the longest length on every load, so five years and `last`
+           (as far as ten) made each opening of Money walk twenty times the three months it draws (research audit 11-13).
+           FIVE YEARS AND TO THE END AGAIN SINCE money-core 3.10.0, because the record now walks two years at most unasked
+           (`WALK_UNASKED` in `packages/kernel/src/pages.ts`) and walks further only when a reader picks a longer length,
+           which the page asks for (`RenderOptions.walk`). So a load still walks two years, and a plan that runs past them
+           can be read to its end (research audit 16, H1). */
         horizon: 90,
-        horizons: [90, 180, 365, 730],
+        horizons: [90, 180, 365, 730, 1825, 'last'],
         /* COUNTING A PLAN OR A STREAM IN OR OUT IS ONE CONTROL, `count`, and `leave` is folded into it: two controls over
            the same streams with opposite meanings was one question asked two ways. Drift draws a slider only for a pair
            some step was converted through, so a record in one currency sees none. `sell` offers what a pack declares
@@ -2595,8 +2618,9 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         opening: { metric: 'book-cash:{{name}}' },
         from: BOOK_LEGS,
         horizon: 365,
-        /* TWO YEARS AT MOST, SINCE money-core 3.9.0, as Money's own Cash ahead: the longest length is what a walk may cost. */
-        horizons: [90, 180, 365, 730],
+        /* FIVE YEARS AND TO THE END, SINCE money-core 3.10.0, as Money's own Cash ahead: a load walks two years and a
+           longer length is walked when a reader picks it. */
+        horizons: [90, 180, 365, 730, 1825, 'last'],
         knobs: ['horizon', 'late', 'spend', 'count', 'grow', 'drift'],
         late: 'days-late-in',
         under: 30,

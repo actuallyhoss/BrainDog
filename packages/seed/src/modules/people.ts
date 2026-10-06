@@ -1,5 +1,6 @@
 /**
- * People: clients, contractors and accountants, and where each one was met.
+ * People and organisations: clients, contractors and accountants, the companies, vendors and banks they are with, and
+ * where each one was seen.
  *
  * One module of the sample record, split out of `index.ts` so each first-party module's registers, rows,
  * figures and pages sit in one file. `index.ts` composes them and keeps every export it had.
@@ -10,52 +11,162 @@
  * which is every record People reaches before Money or Work (`PEOPLE_PAGES.someone` says why).
  */
 
-import type { MeetsFields } from '@braindog/kernel';
+import type { MeetsFields, OrgFields } from '@braindog/kernel';
 
 import { day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './base.ts';
 
 /**
- * People's one list, which also says it is the list `meet` writes, and keeps a person other rows still name.
+ * People's two lists, each saying which list `meet` writes for its kind (`meets:` a person, `org:` an organisation), and
+ * each keeping a row other rows still name.
  *
- * `delete` IS TYPED HERE AND NOT ON `SeedRegister`, because this is the one list in this file that declares it, and the
+ * `delete` IS TYPED HERE AND NOT ON `SeedRegister`, because these are the lists in this file that declare it, and the
  * kernel's own list of the values it takes (`DELETE_RULES` in `packages/kernel/src/referenced.ts`) has this one member.
  */
-type PeopleRegister = SeedRegister & { meets: MeetsFields; delete: 'refuse_while_referenced' };
+type PeopleRegister = SeedRegister & ({ meets: MeetsFields } | { org: OrgFields }) & { delete: 'refuse_while_referenced' };
+
+/* ── organisations ────────────────────────────────────────────────────────── */
+
+/**
+ * THE COMPANIES THE SAMPLE'S PEOPLE ARE WITH, AND THE ONES ITS MONEY MOVES THROUGH, since People 3.0.0. Halden Type Co,
+ * Ravensworth Ltd, Pell & Vine and Nordhaven Registry were rows of People until then, each a company filed as a person,
+ * so the People page counted a registry among the contacts and meeting the accountant's second address could only make
+ * a second accountant. Each is an organisation now, met by its domain, and the person who writes from it points at it.
+ * Fenwick Cloud and Bridge Street Coffee are where the ledger's card spend goes (`TRANSACTIONS` in `money.ts`), so a
+ * payment names who it went to and not only what the bank wrote.
+ *
+ * `keys` ARE `kind:value`, as the kernel normalises them (`packages/kernel/src/identity-keys.ts`): the domain a mail
+ * comes from, and the payee a bank text writes. `met` is the evidence, one dated line a sighting with where it was.
+ */
+export const ORGANISATIONS: Fields[] = [
+  { name: 'Halden Type Co', kind: 'client', domain: 'halden.example', keys: ['domain:halden.example'], projects: [2], note: 'Pays on 45 days, always.', met: ['2026-08-28 · mail from halden.example'] },
+  { name: 'Ravensworth Ltd', kind: 'client', domain: 'ravensworth.example', keys: ['domain:ravensworth.example'], projects: [2, 3], note: '', met: ['2026-07-27 · mail from ravensworth.example'] },
+  { name: 'Pell & Vine', kind: 'vendor', domain: 'pellvine.example', keys: ['domain:pellvine.example', 'bank:pellvine'], projects: [], note: 'The studio\'s accountants. Year end is 31 March.', met: ['2026-04-28 · mail from pellvine.example'] },
+  { name: 'Nordhaven Registry', kind: 'vendor', domain: 'nordhaven.example', keys: ['domain:nordhaven.example'], projects: [1, 2], note: 'Where every domain the studio holds is registered.', met: [] },
+  { name: 'Fenwick Cloud', kind: 'vendor', domain: 'fenwick.example', keys: ['domain:fenwick.example', 'bank:fenwickcloud'], projects: [1, 3], note: '', met: ['2026-09-02 · bank text'] },
+  { name: 'Bridge Street Coffee', kind: 'merchant', keys: ['bank:bridgestreetcoffee'], note: '', met: ['2026-09-01 · bank text'] },
+];
 
 /* ── people ───────────────────────────────────────────────────────────────── */
 
 /* `in_touch` IS THE LAST DAY EACH ONE WAS HEARD FROM OR WRITTEN TO, since People 2.4.0, and the shape of the set is
-   the point: three this month, one five weeks back, one quiet since the spring, and a registry nobody has written to
-   at all, so the page's line has a quiet person to name and its chart has days that are busy and days that are not. */
+   the point: three this month, one five weeks back, one quiet since the spring, and a registry contact nobody has
+   written to at all, so the page's line has a quiet person to name and its chart has days that are busy and days that
+   are not.
+
+   PEOPLE, SINCE People 3.0.0, AND THE COMPANIES MOVED TO `ORGANISATIONS` ABOVE. Each place in this list is the one it
+   had, because a bill's `party` and a task's `owner` name a person by it (`OBLIGATIONS` in `money.ts`, `TASKS` in
+   `work.ts`): the bill that was with Halden Type Co is with the person who sends Halden's invoices, who is with Halden.
+   `keys` are every way each one is known, as `kind:value`; `org` is the place of their organisation above. */
 export const PEOPLE: Fields[] = [
-  { name: 'Halden Type Co', role: 'client', rate: null, email: 'ap@halden.example', note: 'Pays on 45 days, always', in_touch: day(-6) },
-  { name: 'Ravensworth Ltd', role: 'client', rate: null, email: 'accounts@ravensworth.example', note: '', in_touch: day(-38) },
-  { name: 'J. Okonkwo', role: 'contractor', rate: gbp(45_000), email: 'jo@okonkwo.example', note: 'Illustration, invoices monthly', handles: ['git:jokonkwo'], met: ['2026-08-20 · commit 3f2a91c in kiln-site'], in_touch: day(-2) },
-  { name: 'Pell & Vine', role: 'accountant', rate: null, email: 'hello@pellvine.example', note: 'Year end is 31 March', in_touch: day(-128) },
-  { name: 'Nordhaven Registry', role: 'other', rate: null, email: 'support@nordhaven.example', note: '' },
-  { name: 'S. Marchetti', role: 'contractor', rate: gbp(62_000), email: 'sm@marchetti.example', note: 'Backend, two days a week', handles: ['git:smarchetti'], met: ['2026-08-27 · commit 8b1e4d0 in portage', '2026-09-02 · commit c47d19e in portage'], in_touch: day(-1) },
+  { name: 'Mara Lindqvist', role: 'client', rate: null, email: 'mara@halden.example', keys: ['email:mara@halden.example'], org: 1, note: 'Runs accounts payable at Halden.', met: ['2026-08-28 · mail from halden.example'], in_touch: day(-6) },
+  { name: 'Tom Ashby', role: 'client', rate: null, email: 'tom.ashby@ravensworth.example', keys: ['email:tom.ashby@ravensworth.example'], org: 2, note: '', met: ['2026-07-27 · mail from ravensworth.example'], in_touch: day(-38) },
+  { name: 'J. Okonkwo', role: 'contractor', rate: gbp(45_000), email: 'jo@okonkwo.example', keys: ['email:jo@okonkwo.example', 'github:jokonkwo'], note: 'Illustration, invoices monthly', handles: ['git:jokonkwo'], met: ['2026-08-20 · commit 3f2a91c in kiln-site'], in_touch: day(-2) },
+  { name: 'Ada Vine', role: 'accountant', rate: null, email: 'ada@pellvine.example', keys: ['email:ada@pellvine.example'], aliases: ['A. Vine'], org: 3, note: 'Year end is 31 March', met: ['2026-04-28 · mail from pellvine.example'], in_touch: day(-128) },
+  { name: 'Lars Holm', role: 'other', rate: null, email: 'lars@nordhaven.example', keys: ['email:lars@nordhaven.example'], org: 4, note: 'Support at the registry.' },
+  { name: 'S. Marchetti', role: 'contractor', rate: gbp(62_000), email: 'sm@marchetti.example', keys: ['email:sm@marchetti.example', 'github:smarchetti'], note: 'Backend, two days a week', handles: ['git:smarchetti'], met: ['2026-08-27 · commit 8b1e4d0 in portage', '2026-09-02 · commit c47d19e in portage'], in_touch: day(-1) },
 ];
 
 /**
  * PEOPLE'S ONE RULE, ON BY DEFAULT SINCE People 2.3.0: an agent's `meet` already writes a dated `met` line for a
  * commit, and this is the same write for a mail sender, so a record with an inbox reads who wrote in the way it reads
- * who committed. `{{trigger.body.from}}` and `{{trigger.body.subject}}` are the arrival's own words, as an ingest's
- * `where:` reads them elsewhere in this seed; a channel with neither fills nothing, `meet` skips the step and the run
- * goes on rather than meeting nobody under a blank name (`people.ts`'s `normalise`, `07 §4`).
+ * who committed. A channel that fills nothing makes `meet` skip the step and the run goes on rather than meeting nobody
+ * under a blank name (`people.ts`'s `normalise`, `07 §4`).
  *
- * NOT AN INVOICE PARTY'S RULE, WHICH THIS UNIT ALSO ASKED FOR. No first-party ingest writes `register.obligations`
+ * THE ADDRESS AND THE NAME, READ ONCE BY THE DOOR, SINCE People 3.0.0. The rule passed `{{trigger.body.from}}` as an
+ * email, and that is the raw header, `"Sara Ali" <sara@…>`, which `meet` refuses as an address, so the rule failed on
+ * most real mail; and it met every sender as a person, a bank's alert address among them. The mail door now hands the
+ * header over in parts (`from_address`, `from_name`, `from_domain`, `senderOf` in `packages/kernel/src/ingest.ts`), and:
+ *
+ * - A MAIL NO DOOR'S PATTERN CLAIMED (`untriaged`) IS FROM SOMEBODY, unless its address says nobody reads replies to it
+ *   (noreply, no-reply, donotreply, mailer-daemon). The person is met by address and name; a no-reply sender is the
+ *   organisation behind it, met by its domain.
+ * - A MAIL A DOOR'S PATTERN CLAIMED IS FROM A SYSTEM: a bank's alert, a shop's receipt. Meeting it as a person made a
+ *   person called "Alerts" one mail at a time, so it meets the organisation by its domain, the rule below.
+ *
+ * `source` IS THE EVIDENCE'S WORDS, `mail from halden.example`, which the person's page lists under Seen in.
+ *
+ * NOT AN INVOICE PARTY'S RULE, WHICH AN EARLIER UNIT ALSO ASKED FOR. No first-party ingest writes `register.obligations`
  * or `register.transactions` from a matched arrival yet, so `on: { arrival: { state: ['matched'] } }` would fire on
- * any matched arrival at all, of any pack's own ingests; and the one field named `party` on those two lists is
- * `type: 'ref'`, an id `meet`'s `name` would write into a person's name rather than a word anybody typed. Left for
- * whichever unit lands that ingest, to name the raw field it actually extracts.
+ * any matched arrival at all, of any pack's own ingests. A ledger row's `party` is an organisation since money-core
+ * 3.10.0, and a bank door fills the ledger's `counterparty_text` with the payee as the bank wrote it, for the record to
+ * resolve.
+ *
+ * THE PAYEE A BANK DOOR READ IS MET AS AN ORGANISATION, `rule.meet-payees`, by its `bank:` key and never by name, so
+ * `GEIDEA*CHILLOUT 0423 CAIRO EG` and `Chillout` are one shop. It reads `{{trigger.counterparty}}`, which the arrival
+ * keeps whatever became of the row (filed, held for a person, or near another; `Arrived.counterparty` in
+ * `packages/kernel/src/ingest.ts`), and not the row's own field, which a held charge has not written yet. An arrival no
+ * bank door read fills the key with nothing, and `meet` then meets nobody and the run goes on. Here and not in Money,
+ * because Money installs with People off and a rule meeting an organisation needs the list that keeps them. No `role`:
+ * a payee is as often a client paying in as a shop. A PAYEE WRITTEN AS AN ADDRESS IS NOBODY MET: an InstaPay transfer in
+ * prints who sent it as `quill.harbour@instapay`, most often a person's, and an organisation called by that address is
+ * a name nobody reads as one.
  */
+const NO_REPLY = ['noreply', 'no-reply', 'donotreply', 'do-not-reply', 'mailer-daemon'];
+
+/** The organisation a mail came from, by its domain, with the name the mail went out under. */
+const MEET_SENDER_ORG = {
+  meet: {
+    kind: 'organisation',
+    domain: '{{trigger.body.from_domain}}',
+    name: '{{trigger.body.from_name}}',
+    where: 'mail: {{trigger.body.subject}}',
+    source: 'mail from {{trigger.body.from_domain}}',
+  },
+};
+
 export const PEOPLE_AUTOMATIONS: Record<string, unknown>[] = [
   {
     rule: 'meet-senders',
     name: 'Meet whoever writes in',
     pack: 'people',
-    on: { arrival: { channel: 'email' } },
-    steps: [{ meet: { email: '{{trigger.body.from}}', where: 'mail: {{trigger.body.subject}}' } }],
+    on: { arrival: { channel: 'email', state: ['untriaged'] } },
+    steps: [
+      { set_var: { name: 'sender', to: '{{trigger.body.from_address}}' } },
+      {
+        if: { any: NO_REPLY.map((word) => ({ field: 'sender', contains: word })) },
+        then: [MEET_SENDER_ORG],
+        else: [
+          {
+            meet: {
+              email: '{{trigger.body.from_address}}',
+              name: '{{trigger.body.from_name}}',
+              where: 'mail: {{trigger.body.subject}}',
+              source: 'mail from {{trigger.body.from_domain}}',
+            },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    rule: 'meet-sender-organisations',
+    name: 'Know who sends the mail a pattern reads',
+    pack: 'people',
+    on: { arrival: { channel: 'email', state: ['matched', 'review', 'proposed', 'skipped'] } },
+    steps: [MEET_SENDER_ORG],
+  },
+  {
+    rule: 'meet-payees',
+    name: 'Know who each payment was with',
+    pack: 'people',
+    on: { arrival: { state: ['matched', 'review', 'proposed'] } },
+    steps: [
+      { set_var: { name: 'payee', to: '{{trigger.counterparty}}' } },
+      {
+        if: { none: [{ field: 'payee', contains: '@' }] },
+        then: [
+          {
+            meet: {
+              kind: 'organisation',
+              name: '{{trigger.counterparty}}',
+              keys: ['bank:{{trigger.counterparty}}'],
+              where: 'bank text',
+              source: 'bank text',
+            },
+          },
+        ],
+      },
+    ],
   },
 ];
 
@@ -77,7 +188,23 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
        `projects` field it names, so a student's People still installs and `meet` records a person and links nobody.
        `in_touch` SINCE People 2.4.0: `meet` moves Last in touch to the day of the line it writes, so an agent meeting
        someone or a mail arriving from them keeps the People page's figures current without anyone typing a day. */
-    meets: { name: 'name', email: 'email', handles: 'handles', projects: 'projects', met: 'met', merged_into: 'merged_into', in_touch: 'in_touch' },
+    /* `keys`, `org`, `self` AND `aliases` SINCE People 3.0.0 (`loop/contract-17.md`): every way a person is known as
+       `kind:value` (an address, a login, a phone), the organisation they are with, whether this is the record's own
+       person, and the other names they go by. `meet` matches on any key and adds the new ones it hears, so the second
+       address of somebody already met finds them, where one unique `email` could only make a second row. */
+    meets: {
+      name: 'name',
+      email: 'email',
+      handles: 'handles',
+      projects: 'projects',
+      met: 'met',
+      merged_into: 'merged_into',
+      in_touch: 'in_touch',
+      keys: 'keys',
+      org: 'org',
+      self: 'self',
+      aliases: 'aliases',
+    },
     /* A CLIENT WITH BILLS AGAINST THEIR NAME IS NOT DELETED OUT FROM UNDER THEM, since People 2.2.0. A payment's or a
        bill's `party` and a task's `owner` point here, and deleting the person they name left each one pointing at a row
        nobody could open, so the money and the work belonged to nobody. The write path now refuses that delete and says
@@ -94,9 +221,21 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
          (`test/lists-opened.test.ts` drives one), and a record that never used it is no longer offered it. */
       { id: 'role', type: 'enum', values: ['client', 'contractor', 'accountant', 'collaborator', 'other'], index: true },
       { id: 'rate', type: 'money' },
-      /* Unique, because an email is how a person met twice is known to be one person. */
+      /* Unique, because an email is how a person met twice is known to be one person. KEPT SINCE People 3.0.0 for every
+         reader that already asks it; `keys` below holds it again with every other address. */
       { id: 'email', type: 'email', unique: true, index: true },
+      /* THE ORGANISATION THEY ARE WITH, SINCE People 3.0.0: a client's accounts contact is with the client. */
+      { id: 'org', label: 'Organisation', type: 'ref', to: 'organisations', index: true },
       { id: 'note', type: 'text' },
+      /* EVERY WAY THEY ARE KNOWN, SINCE People 3.0.0, as `kind:value` (`email:`, `github:`, `phone:`): what `meet`
+         matches on, kept by the kernel in one place so no two people hold one key. */
+      { id: 'keys', label: 'Known by', type: 'list', of: 'text' },
+      /* THE OTHER NAMES THEY GO BY, SINCE People 3.0.0, "A. Vine" beside Ada Vine: read when a name is matched, never
+         enough alone to merge two people. */
+      { id: 'aliases', label: 'Also called', type: 'list', of: 'text' },
+      /* THE RECORD'S OWN PERSON, SINCE People 3.0.0: whoever keeps the record, so a commit or a mail of their own is never
+         met as somebody new. Any record's, never one record's by name. */
+      { id: 'self', label: 'This is you', type: 'bool', default: false },
       /* Not `search: true` yet: the search box asks every searchable field `matches`, and the kernel
          refuses that on a list, so People could not be searched at all. */
       { id: 'handles', label: 'Handles', type: 'list', of: 'text' },
@@ -109,6 +248,57 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
          from. A day and not an instant, because "in touch on Tuesday" is what a person says. Empty is never, and a
          person with no day is in no count below but Everyone's. */
       { id: 'in_touch', label: 'Last in touch', type: 'day', index: true },
+    ],
+  },
+
+  /**
+   * THE ORGANISATIONS, MOVED HERE FROM THE FOUNDER USE CASE AT People 3.0.0, under the same id, so a founder's rows stay
+   * where they are. Every record meets companies, not only a founder's: the client a contact is with, the vendor a bill
+   * is from, the shop a card payment went to, the bank an alert came from. Founder declared the list as the companies a
+   * founder runs and nothing wrote to it; it is now the list `meet` writes an organisation into (`org:`), matched by
+   * its domain or by a payee as a bank writes it, so an alert from a bank is never filed as a person.
+   *
+   * WHAT FOUNDER'S COPY HELD AND THIS DOES NOT: `country` and `currency`, which no page but Founder's own Dashboard
+   * drew, and `accounts`, a list of Money's accounts. A People list cannot point at Money's, because People installs
+   * before Money on every record and would be refused for a list that is not there yet; and books already keep a
+   * company's money apart (`register.books` in `money.ts`). So the step is a major one.
+   */
+  organisations: {
+    id: 'organisations',
+    name: 'Organisations',
+    icon: 'grid',
+    one: 'organisation',
+    holds: 'the companies, clients, vendors, shops and banks you deal with, and the projects each is part of',
+    title: 'name',
+    mobile: ['name', 'kind', 'domain'],
+    pack: 'people',
+    /* THE LIST `meet` WRITES AN ORGANISATION INTO (`packages/kernel/src/roles.ts`, `org`). `projects` goes on a record
+       with no Projects, as a person's does (`LINKS` in `packs/first-party.ts`). */
+    org: { name: 'name', keys: 'keys', kind: 'kind', domain: 'domain', merged_into: 'merged_into', met: 'met', projects: 'projects' },
+    /* A PERSON OR A PAYMENT NAMES ITS ORGANISATION, so it is not deleted out from under them, as a person is not. */
+    delete: 'refuse_while_referenced',
+    fields: [
+      { id: 'name', label: 'Organisation', type: 'text', required: true, search: true },
+      /* WHAT IT IS TO YOU, which is what decides how it is met: a bank's alert, a shop's receipt, a client's mail. A
+         founder's row written under Founder's own words (sole trader, nonprofit, venture) keeps its word, as the plan lays
+         back a value a row holds. */
+      {
+        id: 'kind',
+        label: 'Kind',
+        type: 'enum',
+        values: ['company', 'employer', 'client', 'vendor', 'merchant', 'bank', 'other'],
+        labels: { company: 'Company', employer: 'Employer', client: 'Client', vendor: 'Vendor', merchant: 'Shop', bank: 'Bank', other: 'Other' },
+        index: true,
+      },
+      /* THE ADDRESS ITS MAIL COMES FROM, `halden.example`, and never a public one such as a free mail service. */
+      { id: 'domain', label: 'Website', type: 'text', index: true },
+      { id: 'keys', label: 'Known by', type: 'list', of: 'text' },
+      { id: 'projects', label: 'Projects', type: 'list', of: 'ref', to: 'things', scope: { links: true } },
+      /* WHERE IT WAS SEEN, one dated line each with where: the evidence a match was made on. */
+      { id: 'met', label: 'Seen in', type: 'list', of: 'text' },
+      { id: 'merged_into', label: 'Merged into', type: 'ref', to: 'organisations' },
+      /* A DOCUMENT, AS FOUNDER'S WAS, so a row written under it reads the same. */
+      { id: 'note', label: 'Notes', type: 'document' },
     ],
   },
 };
@@ -155,6 +345,19 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  /* HOW MANY ORGANISATIONS, SINCE People 3.0.0, which the page's list of them is drawn on, so a record that has met no
+     company draws no heading over nothing. */
+  'organisations-count': {
+    metric: 'organisations-count',
+    name: 'Organisations',
+    source: 'register.organisations',
+    where: 'merged_into is empty',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
   /* NOT A VERDICT: an accountant you speak to once a year is quiet and fine. The line names how many, and the cards say who. */
   'people-quiet': {
     metric: 'people-quiet',
@@ -183,7 +386,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
     title: 'People',
     nav: { section: 'People', order: 10 },
     icon: 'people',
-    requires: ['register.people'],
+    requires: ['register.people', 'register.organisations'],
     blocks: [
       {
         /* THE PAGE'S ONE LINE, said from the figures, so the line and the chart under it cannot disagree. A clause whose
@@ -243,9 +446,12 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         icon: 'people',
         span: 12,
         source: 'register.people',
+        /* THE ORGANISATION THEY ARE WITH, SINCE People 3.0.0, as the second of a card's three facts: "Client · Halden
+           Type Co" says who somebody is where a role alone said only what they are. */
         columns: [
           { field: 'name', label: 'Name', as: 'who' },
           { field: 'role', label: 'Role', as: 'fact' },
+          { field: 'org', label: 'Organisation', as: 'fact' },
           { field: 'projects', label: 'Met in', as: 'fact' },
           { field: 'in_touch', label: 'Last in touch', as: 'when' },
         ],
@@ -254,6 +460,24 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
           { field: 'seq', dir: 'desc' },
         ],
         empty: 'Nobody yet. Add someone, or an agent adds whoever it meets in a commit or a mail.',
+      },
+      {
+        /* THE ORGANISATIONS, SINCE People 3.0.0, under the people and as a list of names, each opening its own page: the
+           companies people are with and the ones the money moves through. Drawn only while there is one, and never one
+           folded into another. */
+        kind: 'cards',
+        heading: 'Organisations',
+        icon: 'building',
+        span: 12,
+        source: 'register.organisations',
+        where: 'merged_into is empty',
+        when: { metric: 'organisations-count', gt: 0 },
+        columns: [
+          { field: 'name', label: 'Organisation', as: 'who' },
+          { field: 'kind', label: 'Kind', as: 'fact' },
+          { field: 'domain', label: 'Website', as: 'fact' },
+        ],
+        order: [{ field: 'name', dir: 'asc' }],
       },
     ],
   },
@@ -291,7 +515,8 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
     blocks: [
       {
         /* THE PERSON, AS THE PAGE'S HEADLINE TILE since People 2.4.0: one card drawn wide (`lead`), with the day you
-           were last in touch beside who they are. */
+           were last in touch beside who they are. THE ORGANISATION THEY ARE WITH IN PLACE OF THE EMAIL, SINCE People
+           3.0.0: a card takes three facts, and who somebody is with says more than one of their addresses. */
         kind: 'cards',
         lead: true,
         span: 12,
@@ -300,32 +525,109 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         columns: [
           { field: 'name', label: 'Name', as: 'who' },
           { field: 'role', label: 'Role', as: 'fact' },
+          { field: 'org', label: 'Organisation', as: 'fact' },
           { field: 'projects', label: 'Met in', as: 'fact' },
-          { field: 'email', label: 'Email', as: 'fact' },
           { field: 'in_touch', label: 'Last in touch', as: 'when' },
         ],
         limit: 1,
         empty: 'Nothing is kept about {{name}} yet.',
       },
+      /* NO "Known by" NOTE OVER `keys`. A key is `kind:value`, a handle the record joins on and never shown to a person
+         (`packages/kernel/src/identity-keys.ts`), and a note fills a list as its values joined by commas, so the page
+         read "email:jo@okonkwo.example,github:jokonkwo". The app's own page for a person says each one in words
+         ("Email", "GitHub", `knownOf` in `apps/web/src/routes/r/[register]/people.ts`). */
       {
-        /* THE MET LINES THE CARDS LEAVE OUT, since this is the one page about one person and not a list of everyone
-           (`someone` above the fold says why `page.people`'s cards do not draw them; a card also takes at most three
-           facts, and `role`, `projects` and `email` already fill that). Each dated line reads as `meet` wrote it,
-           "2026-08-27 · commit 8b1e4d0 in portage" or, since People 2.3.0, "2026-09-28 · mail: Renewal quote" for a
-           person `rule.meet-senders` met. NOT `document: true`: that reads one text field as a document body, and
-           `met` is a list, one line per meeting. */
+        /* WHERE THEY WERE SEEN, SINCE People 3.0.0, AND IT WAS "Met": the evidence, one dated line a sighting with where
+           it was, "2026-08-27 · commit 8b1e4d0 in portage" or "2026-08-28 · mail from halden.example". The cards leave
+           them out (`page.people` says why), and a card takes at most three facts. NOT `document: true`: that reads one
+           text field as a document body, and `met` is a list, one line per sighting. */
         kind: 'note',
-        heading: 'Met',
+        heading: 'Seen in',
         icon: 'handshake',
         span: 12,
         body: '{{met}}',
-        empty: 'Nothing is kept about how {{name}} was met yet.',
+        empty: 'Nothing is kept about where {{name}} was seen yet.',
       },
       {
         /* A DOCUMENT, AS A PROJECT'S NOTES ARE, because a person `meet` recorded has no `note` at all, so the body stays
            `{{note}}`, and a sample client's is empty. A document note reads a body that is empty or still its
            placeholder as nothing written and draws nothing, so the `empty:` below is what the page says
            (`drawSegments` in `apps/web/src/lib/record/blocks.ts`). */
+        kind: 'note',
+        document: true,
+        heading: 'Notes',
+        icon: 'doc',
+        span: 12,
+        body: '{{note}}',
+        empty: 'Nothing is written about {{name}} yet.',
+      },
+    ],
+  },
+
+  /**
+   * ONE PAGE PER ORGANISATION, SINCE People 3.0.0: what it is, the people who are with it, the projects it is part of,
+   * where it was seen and what is written about it. Only what the rows say, as a person's page.
+   *
+   * CALLED `relation` AND NOT `organisation`, BECAUSE THE NAME DECIDES WHO KEEPS A SHARED ADDRESS (`someone` above says
+   * how): a company and the project made for it are often called one thing, Encore and Encore, and the project is the
+   * page somebody opens most. `relation` sorts after `project` and before `someone`, so the project keeps the bare name,
+   * then the organisation, then a person. Founder's own `organisation` page went at Founder 2.0.0, and the numbers it
+   * drew are added to this page by Founder (`adds` in `usecases/founder.ts`).
+   *
+   * NO MONEY HERE, for the reason a person's page has none: a block over Money's lists would refuse People's install
+   * on every record without Money.
+   */
+  relation: {
+    page: 'relation',
+    title: '{{name}}',
+    for: { register: 'organisations' },
+    icon: 'grid',
+    pack: 'people',
+    requires: ['register.organisations', 'register.people'],
+    blocks: [
+      {
+        kind: 'cards',
+        lead: true,
+        span: 12,
+        source: 'register.organisations',
+        where: 'name is {{name}}',
+        columns: [
+          { field: 'name', label: 'Organisation', as: 'who' },
+          { field: 'kind', label: 'Kind', as: 'fact' },
+          { field: 'domain', label: 'Website', as: 'fact' },
+          { field: 'projects', label: 'Projects', as: 'fact' },
+        ],
+        limit: 1,
+        empty: 'Nothing is kept about {{name}} yet.',
+      },
+      {
+        /* WHO IS WITH IT, the one last in touch first, each opening their own page. */
+        kind: 'cards',
+        heading: 'People',
+        icon: 'people',
+        span: 12,
+        source: 'register.people',
+        where: 'org is {{name}}, merged_into is empty',
+        columns: [
+          { field: 'name', label: 'Name', as: 'who' },
+          { field: 'role', label: 'Role', as: 'fact' },
+          { field: 'in_touch', label: 'Last in touch', as: 'when' },
+        ],
+        order: [
+          { field: 'in_touch', dir: 'desc' },
+          { field: 'seq', dir: 'desc' },
+        ],
+        empty: 'Nobody here is known to be with {{name}} yet.',
+      },
+      {
+        kind: 'note',
+        heading: 'Seen in',
+        icon: 'handshake',
+        span: 12,
+        body: '{{met}}',
+        empty: 'Nothing is kept about where {{name}} was seen yet.',
+      },
+      {
         kind: 'note',
         document: true,
         heading: 'Notes',

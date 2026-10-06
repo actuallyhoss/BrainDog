@@ -713,9 +713,9 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   for (const b of (out.value as { blocks: readonly DrawnBlock[] }).blocks) assert.deepEqual(b.refusals, [], `${String(b.heading)} is refused`);
   assert.ok(!k.page('ledger').ok, 'the Ledger page is still on the record');
 
-  /* THE CASH WALK OFFERS UP TO TWO YEARS, SINCE money-core 3.9.0, AND COUNTING IS ONE CONTROL. */
+  /* THE CASH WALK OFFERS FIVE YEARS AND TO THE END AGAIN, SINCE money-core 3.10.0, AND COUNTING IS ONE CONTROL. */
   const ahead = (page.blocks as { heading?: string; horizons?: unknown; knobs?: unknown }[]).find((b) => b.heading === 'Cash ahead')!;
-  assert.deepEqual(ahead.horizons, [90, 180, 365, 730]);
+  assert.deepEqual(ahead.horizons, [90, 180, 365, 730, 1825, 'last']);
   assert.ok(!(ahead.knobs as string[]).includes('leave'), '`leave` is a second control over the streams `count` moves');
 
   /* AND IT LEAVES ITS OWN SENTENCE TO THE LINE OVER THE PAGE, while that line is drawn (money-core 3.6.0). */
@@ -1174,7 +1174,10 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
   made('Home');
   const two = drawn();
   assert.ok(!two.includes(undefined), 'one Cash now over two books is still said');
-  assert.deepEqual(two.slice(0, 2), ['What you have, by book', 'Cash ahead']);
+  /* WHAT IS WAITING ON THE PERSON MAY LEAD, wherever the page declares it: the record's own look puts the questions
+     first while there are any (`look.<page>`'s `lead`, `loop/contract-17.md`), so the books' figure is held beside the
+     walk among the rest. */
+  assert.deepEqual(two.filter((h) => h !== 'Waiting on you').slice(0, 2), ['What you have, by book', 'Cash ahead']);
 });
 
 test('CASH AHEAD OPENS ON THREE MONTHS AND WALKS TO THE LONGEST LENGTH IT OFFERS, so a year and two are a press away', async () => {
@@ -1186,19 +1189,27 @@ test('CASH AHEAD OPENS ON THREE MONTHS AND WALKS TO THE LONGEST LENGTH IT OFFERS
   const ahead = out.value.blocks.find((b) => b.heading === 'Cash ahead') as { walk?: { horizon?: number; reach?: number; steps?: { day: string }[] } } | undefined;
   assert.ok(ahead?.walk, 'Cash ahead drew no walk');
   assert.equal(ahead.walk.horizon, 90);
-  /* AND NO FURTHER THAN TWO YEARS, SINCE money-core 3.9.0: five years or "to the end" made every opening of Money walk
-     twenty times the chart it opens on. How far short of the longest length a load stops is the kernel's call
-     (`walkReach`), so this holds only the ends: past the opening, and never past what the block offers. */
+  /* AND A LOAD WALKS NO FURTHER THAN TWO YEARS AND A DAY, though the block offers five years and "to the end" again since
+     money-core 3.10.0: those made every opening of Money walk twenty times the chart it opens on (3.9.0), and the kernel
+     now walks them only when a reader asks (`WALK_UNASKED`, `walkReach`). How far short of that a load stops is the
+     kernel's call, so this holds only the ends: past the opening, and never past two years and a day. */
   const reach = ahead.walk.reach ?? 0;
-  assert.ok(reach > 90 && reach <= 730, `the walk reaches ${reach} days`);
+  assert.ok(reach > 90 && reach <= 731, `the walk reaches ${reach} days`);
   const steps = ahead.walk.steps ?? [];
   assert.ok(steps.some((s) => s.day > day(90)), 'the walk stops at the length it opens on');
-  assert.ok(steps.every((s) => s.day <= day(730)), 'the walk goes past the longest length it offers');
+  assert.ok(steps.every((s) => s.day <= day(731)), 'a load walks five years');
+
+  /* FIVE YEARS IS WALKED WHEN A READER PICKS IT. */
+  const asked = k.page('money', undefined, { walk: 1825 });
+  assert.ok(asked.ok, sayOf(asked));
+  const longer = asked.value.blocks.find((b) => b.heading === 'Cash ahead') as { walk?: { horizon?: number; reach?: number } } | undefined;
+  assert.equal(longer?.walk?.horizon, 90, 'it still opens on three months');
+  assert.ok((longer?.walk?.reach ?? 0) >= 1825, `five years asked for walks ${String(longer?.walk?.reach)} days`);
 });
 
-test("A BOOK'S CASH AHEAD OFFERS NO LENGTH PAST TWO YEARS either, since money-core 3.9.0", () => {
+test("A BOOK'S CASH AHEAD OFFERS FIVE YEARS AND TO THE END as Money's own does, since money-core 3.10.0", () => {
   const book = MONEY_PAGES['money-book']!;
   const ahead = (book.blocks as { heading?: string; horizon?: unknown; horizons?: unknown }[]).find((b) => b.heading === 'Cash ahead')!;
   assert.equal(ahead.horizon, 365);
-  assert.deepEqual(ahead.horizons, [90, 180, 365, 730]);
+  assert.deepEqual(ahead.horizons, [90, 180, 365, 730, 1825, 'last']);
 });

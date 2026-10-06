@@ -174,13 +174,16 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
      counted nothing. */
   const drawnBlocks = blocks.filter((b) => (b as { drawn?: boolean }).drawn !== false);
   /* SINCE FOUNDER 1.11.0 THE LINE LEADS, and Due this week and Lapsing are drawn only while they hold something: on a
-     new record neither does, so neither is drawn. SINCE FOUNDER 1.16.0 each organisation's money waits for one to list
-     an account, the way in for money for a record with no cash, and the week's numbers for one, so a new record reads
-     its line, how to bring its numbers in, and who is working. */
-  assert.deepEqual(drawnBlocks.map((b) => b.heading), [undefined, 'Bring your numbers in', 'Working now']);
+     new record neither does, so neither is drawn. SINCE FOUNDER 1.16.0 the way in for money waits for a record with no
+     cash, and the week's numbers for one, so a new record reads its line and how to bring its numbers in. Working now
+     is left out while no run is working, by the record's own look, which hides a block that drew nothing
+     (`composeLook` in `packages/kernel/src/compose.ts`, `loop/contract-17.md`). */
+  assert.deepEqual(drawnBlocks.map((b) => b.heading), [undefined, 'Bring your numbers in']);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   const hidden = blocks.filter((b) => (b as { drawn?: boolean }).drawn === false).map((b) => b.heading);
-  for (const heading of ['Due this week', 'Lapsing', 'What you have, by organisation', 'Bring your money in', 'Numbers this week']) assert.ok(hidden.includes(heading), hidden.join(', '));
+  /* NO MONEY BY ORGANISATION SINCE FOUNDER 2.0.0: the organisations are People's, which names no account. */
+  for (const heading of ['Due this week', 'Lapsing', 'Bring your money in', 'Numbers this week', 'Working now']) assert.ok(hidden.includes(heading), hidden.join(', '));
+  assert.ok(!blocks.some((b) => b.heading === 'What you have, by organisation'), 'Home still adds up an organisation\'s accounts');
   founder.sql.close();
 });
 

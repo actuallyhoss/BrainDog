@@ -1117,6 +1117,63 @@ const DECLARED: Record<string, Version> = {
       "`page.money`'s and `page.money-book`'s Cash ahead offer 90, 180, 365 and 730 days, where 1825 and `last` made every load of Money walk at least five years for a chart that opens on three months -> c0965e05d708483d",
     ],
   },
+  /* THE UNDERSTANDING LAYER (batch 17, `loop/contract-17.md`): each module's last version is live, so these are versions
+     and not resets. */
+  'portfolio@1.14.0': {
+    holds: `
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-live
+      metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked
+      metric.projects-past-aim metric.projects-retired metric.projects-with-agent
+      page.portfolio
+      register.things
+      rule.project-past-aim
+    `,
+    declares: '51a2d8569a7b35e3',
+    history: ["`register.things` gains `domains`, the domains a project lives at, so a mail or a renewal naming one is read as about it -> 51a2d8569a7b35e3"],
+  },
+  /** A MAJOR STEP: the organisations move here from Founder without its `country`, `currency` and `accounts`. */
+  'people@3.0.0': {
+    holds: `
+      metric.organisations-count metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '3178b75f133dbcaf',
+    history: [
+      "`register.organisations` moves here from Founder under its id and declares `org:`, with `page.relation` a page each; `register.people` names `keys`, `org`, `self` and `aliases` in `meets:`; `page.someone` lists the keys and where a person was seen; `rule.meet-senders` meets the parsed address and `rule.meet-sender-organisations` the organisation behind a claimed mail -> ad6105a9acea6d51",
+      "`page.someone` no longer draws Known by, which printed each key as `kind:value` joined by commas -> 3409c19c5f73a2be",
+      "`rule.meet-payees` meets the payee a bank door read as an organisation by its `bank:` key, off the arrival, so a held charge meets it too -> d92d98f8624d5db7",
+      "`rule.meet-payees` meets nobody for a payee written as an address, an InstaPay sender's `name@instapay` -> 3178b75f133dbcaf",
+    ],
+  },
+  /** A MINOR STEP THOUGH `party` POINTS ELSEWHERE: `FIRST_PARTY_VERSIONS`' note says why. */
+  'money-core@3.10.0': {
+    holds: `
+      metric.arriving-30d metric.balances-stale metric.book-cash metric.book-spent-month metric.books-held metric.cash-accounts
+      metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-now metric.chasing metric.days-late-in metric.due-30d
+      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.in-30d
+      metric.in-by-month metric.in-due-by-month metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d
+      metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
+      metric.owed-to-you metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
+      metric.project-out-month metric.project-owed metric.received-30d metric.runway-days metric.spent-30d
+      metric.spent-by-category-month metric.txn-uncategorised
+      page.money page.money-book
+      register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
+      rule.recurring-stopped rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+    `,
+    declares: '23feae99ca56ae69',
+    history: [
+      "`register.transactions` names an organisation in `party`, where it named a person, and gains `counterparty_text`, the payee as the bank wrote it, which every bank door writes -> dd5115760bcaef7b",
+      "`page.money`'s and `page.money-book`'s Cash ahead offer 1825 and `last` again, since a load walks two years at most and a longer length only when a reader picks it (research audit 16, H1) -> 23feae99ca56ae69",
+    ],
+  },
   'work@1.14.0': {
     holds: `
       metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon

@@ -162,10 +162,11 @@ test("A FOUNDER'S EXAMPLES ARE LINKED INTO ONE PICTURE, and still clear together
       k.update(register, `${register}#${seq}`, { [field]: spoken as never }, { actor: 'p_1', cascade: false }).ok,
   };
   const made = await linkExamples(io, 'founder');
-  assert.equal(made, 4, 'the organisation names its account and project, and the number its project and organisation');
+  /* NO ACCOUNT SINCE FOUNDER 2.0.0: the organisations are People's, which names none (`ORGANISATIONS` in `people.ts`). */
+  assert.equal(made, 3, 'the organisation names its project, and the number its project and organisation');
   const org = exampleIn(k, 'organisations')!;
   const point = exampleIn(k, 'datapoints')!;
-  assert.equal((org.fields.accounts as unknown[]).length, 1);
+  assert.equal(org.fields.accounts, undefined);
   assert.equal((org.fields.projects as unknown[]).length, 1);
   assert.ok(point.fields.thing && point.fields.organisation);
   assert.deepEqual(k.examples(), before, 'linking one example to another leaves every one untouched');

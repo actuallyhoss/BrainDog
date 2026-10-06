@@ -37,12 +37,13 @@ const liveField = (k: Kernel, register: string, id: string): Field =>
 
 const OWNER = { actor: 'p_owner' };
 
-test('PEOPLE OFFERS NO REGISTRAR, and the sample registry is filed under `other`', () => {
+test('PEOPLE OFFERS NO REGISTRAR, and the sample registry\'s contact is filed under `other`', () => {
   const role = fieldOf(firstPartyDocument('people'), 'people', 'role');
   assert.equal(role.type, 'enum');
   assert.ok(!role.values!.includes('registrar'), `People still ships ${role.values!.join(', ')}`);
   assert.deepEqual(role.values, ['client', 'contractor', 'accountant', 'collaborator', 'other']);
-  assert.equal(PEOPLE.find((p) => p.name === 'Nordhaven Registry')?.role, 'other');
+  /* THE REGISTRY IS AN ORGANISATION SINCE People 3.0.0, and the person who answers its support mail is the `other`. */
+  assert.equal(PEOPLE.find((p) => p.name === 'Lars Holm')?.role, 'other');
   assert.ok(PEOPLE.every((p) => p.role === null || p.role === undefined || role.values!.includes(String(p.role))), 'a sample row holds a role People no longer offers');
 });
 

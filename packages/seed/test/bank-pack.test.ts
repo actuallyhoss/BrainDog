@@ -139,15 +139,17 @@ test('MONEY-CORE DECLARES NO BANK WORDING, and the twelve it handed until 2.4.0 
   assert.equal(firstPartyDocument('money-core')!.hands, undefined);
 });
 
-test('THE PACK DECLARES THE TWELVE AND THE BALANCE READING, needs money-core 3.0.0 or later before 4.0.0, and is not a first-party module', async () => {
+test('THE PACK DECLARES THE TWELVE AND THE BALANCE READING, needs money-core 3.10.0 or later before 4.0.0, and is not a first-party module', async () => {
   const doc = bankHsbcEgFile() as unknown as Doc;
   assert.equal(doc.pack, 'bank-hsbc-eg');
-  assert.equal(doc.version, '1.5.0');
+  /* 1.6.0 IN BATCH 17, a minor step: a card charge and an InstaPay transfer keep the payee as the bank wrote it. */
+  assert.equal(doc.version, '1.6.0');
   assert.deepEqual(ingestsOf(doc), [...HSBC, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort());
   /* `<3.0.0` SINCE 1.0.1, because the caret it had at 1.0.0 admits no 2.0.0. THE FLOOR MOVES TO 3.0.0 AT 1.4.0, because
      `bank-balance` and its webhook twin read `register.accounts`' `balance_after` and money-core's own balances,
-     which exist only from 3.0.0 (`test/money-core-major.test.ts`). */
-  assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.0.0 <4.0.0' });
+     which exist only from 3.0.0 (`test/money-core-major.test.ts`). AND TO 3.10.0 AT 1.6.0, whose ledger declares the
+     `counterparty_text` the card charge and the InstaPay wordings write. */
+  assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.10.0 <4.0.0' });
   for (const d of doc.declarations) assert.equal(d.pack, 'bank-hsbc-eg', `${String(d.ingest)} still says it is money-core's`);
   const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
   assert.deepEqual([...pack.manifest.provides].sort(), [...HSBC, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort());
@@ -172,7 +174,7 @@ test('A RECORD ON 1.7.0 UPDATES WITHOUT A REFUSAL, then takes the pack, and ends
      so the plan also has to carry the missing step, which is what the floor of 1.8.0 is for. */
   const early = (await planOf(k, bankHsbcEgFile())).diff;
   assert.deepEqual(early.conflicts.map((c) => c.id).sort(), HSBC);
-  assert.deepEqual(early.requires.packs, [{ id: 'money-core', range: '>=3.0.0 <4.0.0', installed: '1.7.0', ok: false }]);
+  assert.deepEqual(early.requires.packs, [{ id: 'money-core', range: '>=3.10.0 <4.0.0', installed: '1.7.0', ok: false }]);
 
   /* THE UPDATE HANDS THE TWELVE TO THE BANK PACK AND IS NOT REFUSED. An ingest has no rows, so nothing is orphaned. The
      update is today's 2.0.0, straight from 1.7.0, so it also hands `holdings` on: this plan names no `used`, and a plan
@@ -326,3 +328,52 @@ test('money-core AS IT SHIPS NOW RETIRES THE TWELVE ON A 1.7.0 RECORD, USED OR N
   );
   sql.close();
 });
+
+/**
+ * THE PAYEE A CARD ALERT READ IS MET AS ONE ORGANISATION, by People's `rule.meet-payees` and its `bank:` key, so the
+ * shop is known the second time however the bank prints it, and is never a person. Driven end to end on today's
+ * modules with the bank file installed, because the rule reads `{{trigger.counterparty}}`, which only the kernel's
+ * arrival fills.
+ */
+test('A CARD CHARGE MEETS ITS SHOP AS ONE ORGANISATION, and a second charge there meets the same one', async () => {
+  const { k, sql } = await record();
+  for (const id of FIRST_PARTY) await put(k, firstPartyDocument(id));
+  await put(k, bankHsbcEgFile());
+  value(k.create('accounts', { name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: false, last4: '2291' }, { actor: 'p_seed' }));
+  const alert = (amount: string, day: string, n: number) =>
+    value<{ state: string; reason?: string }>(
+      k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: `Your Credit Card ending with *** 2291 has been used for EGP ${amount} on ${day}/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50`, sha256: `payee-${n}`, verified: true }),
+    );
+  assert.equal(alert('1,284.50', '14', 1).state, 'matched');
+  assert.equal(alert('96.00', '15', 2).state, 'matched');
+  await k.drain();
+  const orgs = value<{ rows: { fields: Record<string, unknown> }[] }>(k.list({ register: 'organisations' })).rows.filter((r) => listed(r.fields.keys).includes('bank:cedarlanebakery'));
+  assert.equal(orgs.length, 1, 'the shop is met once, or not at all');
+  assert.equal(orgs[0]!.fields.name, 'CEDAR LANE BAKERY');
+  assert.ok(!value<{ rows: { fields: Record<string, unknown> }[] }>(k.list({ register: 'people' })).rows.some((r) => /cedar/i.test(String(r.fields.name))), 'the shop was made a person');
+  sql.close();
+});
+
+/**
+ * AN INSTAPAY ADDRESS IS NOT A NAME. An inward transfer prints who sent it as their InstaPay address
+ * (`quill.harbour@instapay`), most often a person's, so meeting it would add an organisation called by an address.
+ * Nobody is met; the transfer still files, and a named payee on the next transfer out is met as usual.
+ */
+test('A TRANSFER FROM AN INSTAPAY ADDRESS MEETS NOBODY, and one to a named payee meets its organisation', async () => {
+  const { k, sql } = await record();
+  for (const id of FIRST_PARTY) await put(k, firstPartyDocument(id));
+  await put(k, bankHsbcEgFile());
+  value(k.create('accounts', { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: true, last4: '918' }, { actor: 'p_seed' }));
+  const arrive = (body: string, n: number) =>
+    value<{ state: string }>(k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body, sha256: `ipn-${n}`, verified: true })).state;
+  /* FILED OR HELD FOR A PERSON, both of which the rule reads: a transfer with no account balance may be held. */
+  assert.equal(arrive('Your HSBC Account ***918 was credited with IPN inward transfer for EGP 12,400.00 on 11-08-2026 08:05 from quill.harbour@instapay with reference 5d0b33e8aa', 1) !== 'skipped', true);
+  assert.equal(arrive('Your HSBC Account ***918 was debited with IPN outward transfer for EGP 3,250.00 on 07-08-2026 16:42 to MARLOW JOINERY with reference 9c4e1f7a2b', 2) !== 'skipped', true);
+  await k.drain();
+  const names = value<{ rows: { fields: Record<string, unknown> }[] }>(k.list({ register: 'organisations' })).rows.map((r) => String(r.fields.name));
+  assert.ok(!names.some((n) => n.includes('@')), `an organisation is named by an address: ${names.join(', ')}`);
+  assert.ok(names.includes('MARLOW JOINERY'), 'the named payee was not met');
+  sql.close();
+});
+
+const listed = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);

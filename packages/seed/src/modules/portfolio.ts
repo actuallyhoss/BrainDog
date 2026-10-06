@@ -110,7 +110,10 @@ export const THINGS: Fields[] = [
      and the fourth did not, and the fourth is the one the register sorts, the grid shows and any
      future roll-up reads. */
   /* Where each project's work happens. Kiln is on a Mac and Portage on a Windows desktop, so both
-     path shapes are placed; Portage's repository is named bare, as its runs report it. */
+     path shapes are placed; Portage's repository is named bare, as its runs report it.
+     A REMOTE IS WRITTEN WHOLE, SINCE portfolio 1.14.0, as `git remote -v` prints it, over https or ssh: the record
+     reads either as `host/owner/name` (`remoteKey` in `packages/kernel/src/scope.ts`), and an owner pasting what git
+     printed should never have to trim it. And the domains each project lives at, which a mail from one is matched by. */
   /* HOW EACH ONE IS GOING, WHAT IS NEXT AND HOW FAR ALONG, kept current by whoever works on it: a person, or the agent named
      on the row. Kiln waits on how it is licensed and Portage on where it sends from, so both are the ones that need a call. */
   /* AND WHAT EACH ONE EARNED THE YEAR BEFORE, so the Overview's comparison is over four projects going four
@@ -121,10 +124,10 @@ export const THINGS: Fields[] = [
      looks like as a pair of numbers, and it is out of every figure below because it is out of play. */
   /* AND WHAT EACH ONE IS, IN A LINE, since portfolio 1.6.0: the words under a project's name on the Overview's cards, so a
      list of names says which is the type family and which is the client's site without opening any of them. */
-  { name: 'Kiln', about: 'A variable type family, licensed direct', lane: 'earning', health: 'at_risk', next: 'Settle how Kiln is licensed, before the September issue announces it', progress: 60, aim: day(17), agent: 'claude', revenue: gbp(1_840_000), earned_before: gbp(1_412_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE, repos: ['git.kiln.example/type/kiln-type', 'git.kiln.example/type/kiln-site'], folders: ['/Users/studio/Code/kiln-type', '/Users/studio/Code/kiln-site'] },
-  { name: 'Marlow & Co', about: 'A brand system and site, made for a client', lane: 'earning', health: 'on_track', next: 'Chase Halden on invoice 2026-041 once its terms run out', progress: 85, agent: 'cursor', revenue: gbp(420_000), earned_before: gbp(510_000), since: '2023-01-08', mark: '▲', hue: 305, repos: ['git.marlow.example/brand/marlow-site'], folders: ['/Users/studio/Clients/marlow'] },
-  { name: 'Portage', about: 'A newsletter, and the site it sends from', lane: 'building', health: 'off_track', next: 'Choose where the newsletter sends from, then wire the domain', progress: 35, aim: day(28), revenue: gbp(0), earned_before: gbp(0), since: '2026-05-02', mark: '●', hue: 176, repos: ['portage'], folders: ['D:\\Studio\\portage'] },
-  { name: 'Tallow', about: 'A display face that never shipped', lane: 'parked', next: 'Retire it or park it another year', revenue: gbp(0), earned_before: gbp(21_000), since: '2025-02-20', mark: '◼', hue: 261, repos: ['git.kiln.example/type/tallow'] },
+  { name: 'Kiln', about: 'A variable type family, licensed direct', lane: 'earning', health: 'at_risk', next: 'Settle how Kiln is licensed, before the September issue announces it', progress: 60, aim: day(17), agent: 'claude', revenue: gbp(1_840_000), earned_before: gbp(1_412_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE, repos: ['https://git.kiln.example/type/kiln-type.git', 'git@git.kiln.example:type/kiln-site.git'], folders: ['/Users/studio/Code/kiln-type', '/Users/studio/Code/kiln-site'], domains: ['kiln.example', 'kilnfonts.example'] },
+  { name: 'Marlow & Co', about: 'A brand system and site, made for a client', lane: 'earning', health: 'on_track', next: 'Chase Halden on invoice 2026-041 once its terms run out', progress: 85, agent: 'cursor', revenue: gbp(420_000), earned_before: gbp(510_000), since: '2023-01-08', mark: '▲', hue: 305, repos: ['https://git.marlow.example/brand/marlow-site.git'], folders: ['/Users/studio/Clients/marlow'], domains: ['marlow.example'] },
+  { name: 'Portage', about: 'A newsletter, and the site it sends from', lane: 'building', health: 'off_track', next: 'Choose where the newsletter sends from, then wire the domain', progress: 35, aim: day(28), revenue: gbp(0), earned_before: gbp(0), since: '2026-05-02', mark: '●', hue: 176, repos: ['portage'], folders: ['D:\\Studio\\portage'], domains: ['portage.example'] },
+  { name: 'Tallow', about: 'A display face that never shipped', lane: 'parked', next: 'Retire it or park it another year', revenue: gbp(0), earned_before: gbp(21_000), since: '2025-02-20', mark: '◼', hue: 261, repos: ['git@git.kiln.example:type/tallow.git'] },
 ];
 
 /**
@@ -218,6 +221,10 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
       { id: 'note', type: 'document' },
       { id: 'repos', label: 'Repositories', type: 'list', of: 'text' },
       { id: 'folders', label: 'Folders', type: 'list', of: 'text' },
+      /* THE DOMAINS IT LIVES AT, SINCE portfolio 1.14.0: `kiln.example`, so a mail, a deploy or a renewal naming one is
+         read as about the project. A list of text, as an owner who added it by hand already had it, so the update lays
+         the pack's field over theirs and keeps every row. */
+      { id: 'domains', label: 'Domains', type: 'list', of: 'text' },
     ],
   },
 };

@@ -80,6 +80,7 @@
     type ForecastPlan,
     type GroupKnobs,
     type Growth,
+    type HorizonChoice,
     type Scenario,
     type SpendRange,
   } from '../src/forecast.ts';
@@ -129,7 +130,29 @@
   /* EVERY MOVEMENT SITS INSIDE ADJUST WHERE ADJUST IS DRAWN, and stood alone under the chart as an orphan line of grey
      (the money review). Without Adjust it stays under the chart, as `toHTML` draws it, so a reader can still open it. */
   const inside = $derived(Boolean(opts.scenario) && controls);
-  const choices = $derived(drawn ? horizonChoices(drawn) : []);
+  const choices = $derived(drawn ? horizonChoices(drawn, Boolean(opts.walk)) : []);
+
+  /* A LENGTH PAST THE WALK IS ASKED FOR AND HELD (`opts.walk`): the chart keeps drawing as far as the walk reaches until
+     the longer walk lands, then draws the length picked. Each length is asked for once while the chart is drawn, since
+     the host keeps asking for it on every read after. "To the end" has no length until the walk lands, so the reach it
+     was asked from is kept, and once the walk the host sends reaches elsewhere the knob moves to its new end. */
+  const asked = new Set<number | 'last'>();
+  let ending = $state<number | null>(null);
+  const pick = (c: HorizonChoice) => {
+    held.horizon = c.days;
+    ending = c.walk === 'last' && drawn ? drawn.reach : null;
+    if (c.walk === undefined || !opts.walk || asked.has(c.walk)) return;
+    asked.add(c.walk);
+    opts.walk(c.walk);
+  };
+  $effect(() => {
+    if (ending === null || !drawn || drawn.reach === ending) return;
+    const end = choices.find((c) => c.end);
+    if (end) held.horizon = end.days;
+    ending = null;
+  });
+  /* THE LENGTH PRESSED: the one held, while a longer walk is on its way, when the knob offers it, else the one drawn. */
+  const pressed = (s: Scenario): number => (held.horizon !== null && choices.some((c) => c.days === held.horizon) ? held.horizon : s.horizon);
   /* THE CONTROLS OF A GROUP OFFER WHAT EVERY WALK MAY COUNT, and spending in each walk's currency. */
   const members = $derived(group ? (Object.entries(group.members) as [string, Member][]).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)) : []);
   const counts = $derived.by((): { in: Counted[]; out: Counted[] } => {
@@ -171,6 +194,7 @@
 
   const reset = () => {
     held.horizon = null;
+    ending = null;
     held.late = 0;
     held.spend = {};
     held.leave = [];
@@ -389,7 +413,7 @@
         <span class="forecast-knob-name" aria-hidden="true">{FORECAST_HORIZON}</span>
         <div class="segmented forecast-segs">
           {#each choices as c (c.days)}
-            <button type="button" class="segment" data-on={s.horizon === c.days ? '' : undefined} aria-pressed={s.horizon === c.days} onclick={() => (held.horizon = c.days)}>{c.label}</button>
+            <button type="button" class="segment" data-on={pressed(s) === c.days ? '' : undefined} aria-pressed={pressed(s) === c.days} onclick={() => pick(c)}>{c.label}</button>
           {/each}
         </div>
       </div>

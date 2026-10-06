@@ -470,3 +470,23 @@ test('A CHART CAN OPEN ON THREE MONTHS OVER A LONGER WALK, and the knob offers e
   assert.equal(model().reach, 60);
   assert.equal(forecastModel([...rows.filter((r) => r[0] !== 'reach'), ['reach', '30', '', '']])!.reach, 90);
 });
+
+test('A LENGTH PAST THE WALK IS OFFERED WHERE THE HOST CAN WALK IT, with the length to ask for, and "To the end" asks while the walk may stop short', () => {
+  const rows = [...ROWS.filter((r) => r[0] !== 'horizon'), ['horizon', '90', '', ''], ['reach', '731', '', ''], ['horizons', '90 180 365 730 1825 last', '', '']];
+  const m = forecastModel(rows)!;
+  const walked = horizonChoices(m, true);
+  assert.deepEqual(
+    walked.map((c) => c.label),
+    ['3 months', '6 months', '1 year', '2 years', '5 years', 'To the end'],
+  );
+  assert.deepEqual(walked.find((c) => c.label === '5 years'), { days: 1825, label: '5 years', walk: 1825 }, 'five years is asked for');
+  assert.equal(walked.find((c) => c.label === '2 years')!.walk, undefined, 'two years is walked already');
+  assert.deepEqual(walked.at(-1), { days: 104, label: 'To the end', end: true, walk: 'last' }, 'the end asks while a declared length lies past the walk');
+  /* Once the longer walk lands, nothing is asked: the plan ends well inside it. */
+  const landed = forecastModel([...rows.filter((r) => r[0] !== 'reach'), ['reach', '1825', '', '']])!;
+  assert.ok(horizonChoices(landed, true).every((c) => c.walk === undefined));
+  /* A walk still moving money in its last month may have been cut off, so the end asks for the rest. */
+  const cut = forecastModel([...ROWS.filter((r) => r[0] !== 'horizon'), ['horizon', '90', '', ''], ['reach', '110', '', ''], ['horizons', '90 last', '', '']])!;
+  assert.equal(horizonChoices(cut, true).at(-1)!.walk, 'last');
+  assert.equal(horizonChoices(cut).at(-1)!.walk, undefined, 'a host that cannot walk further is asked nothing');
+});

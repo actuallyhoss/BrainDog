@@ -3,8 +3,12 @@
  * reports or is polled for.
  *
  * IT BUILDS ON FIVE FIRST-PARTY MODULES. Projects, People, Money, Estate and Work are installed first, and
- * this pack adds what they do not hold: the organisations a founder runs, and datapoints, one number from
- * one project at one moment, written by the project itself over the API or by a poll the record runs.
+ * this pack adds what they do not hold: datapoints, one number from one project at one moment, written by the project
+ * itself over the API or by a poll the record runs.
+ *
+ * THE ORGANISATIONS ARE PEOPLE'S SINCE 2.0.0 (People 3.0.0), under the same id, so a founder's rows stay where they are:
+ * every record meets companies, and `meet` writes them there. This pack hands the list over (`hands`), and adds the
+ * numbers an organisation reports to People's page for it (`adds`), where it drew a page of its own.
  *
  * ESTATE IS ONE OF THEM SINCE 1.4.0, AND IT WAS NOT BEFORE. A founder running several companies holds
  * domains, hosting and subscriptions, which is what Estate's services are. Without it an owner's
@@ -224,8 +228,15 @@ export const FOUNDER = {
      added to draw on, so a minor step. 1.15.0 is live.
      1.16.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name
      of the Ledger list"), not by its id ("Label: transactions"), and every list's name is declared before any
-     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step. */
-  version: '1.16.1',
+     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step.
+
+     2.0.0 BECAUSE THE ORGANISATIONS ARE PEOPLE'S (People 3.0.0, `loop/contract-17.md`). The list keeps its id and its
+     rows and is handed to People, which declares it as the list `meet` writes a company into. People's list has no
+     `country`, `currency` or `accounts`, so What you have, by organisation and the organisation's Balance go (books keep
+     a company's money apart, and What you have, by book stays), the Dashboard lists each organisation by kind and
+     website, and the numbers an organisation reports are added to People's page for it rather than drawn on a page of
+     this pack's own. A list and a page taken away, so a major step. */
+  version: '2.0.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -266,35 +277,6 @@ export const FOUNDER = {
     pack: 'usecase-founder',
     requires: { format: 1, primitives: 1, packs: {} },
     declarations: [
-      {
-        register: 'organisations',
-        name: 'Organisations',
-        one: 'organisation',
-        icon: 'grid',
-        holds: 'the companies and ventures you run, where each is registered and the currency it keeps',
-        title: 'name',
-        mobile: ['name', 'kind', 'currency'],
-        fields: [
-          { id: 'name', label: 'Organisation', type: 'text', required: true, search: true },
-          {
-            id: 'kind',
-            label: 'Kind',
-            type: 'enum',
-            values: ['company', 'sole_trader', 'nonprofit', 'venture', 'other'],
-            labels: { company: 'Company', sole_trader: 'Sole trader', nonprofit: 'Nonprofit', venture: 'Venture', other: 'Other' },
-            index: true,
-          },
-          { id: 'country', label: 'Registered in', type: 'text' },
-          { id: 'currency', label: 'Currency', type: 'text' },
-          /* WHAT IT HOLDS AND WHAT IT RUNS. Money's accounts and Projects cannot name an organisation, because a use
-             case adds no field to another pack's list, so the organisation names them: its balance is the money in the
-             accounts it lists, and a project it lists reports its numbers here. */
-          { id: 'accounts', label: 'Accounts', type: 'list', of: 'ref', to: 'accounts' },
-          { id: 'projects', label: 'Projects', type: 'list', of: 'ref', to: 'things' },
-          { id: 'note', label: 'Notes', type: 'document' },
-          { id: 'tags', type: 'list', of: 'text' },
-        ],
-      },
       {
         register: 'datapoints',
         /* "NUMBERS" AND NOT "DATAPOINTS", which is a word from a database and not from a founder. The list's id stays
@@ -340,11 +322,10 @@ export const FOUNDER = {
       counted('datapoints-held', 'Numbers', 'register.datapoints'),
       counted('organisations-held', 'Organisations', 'register.organisations'),
       counted('due-this-week', 'Due this week', 'register.obligations', 'state is open or part, due before +8d'),
-      /* AND SINCE 1.16.0: the week Numbers this week draws, every number a project ever sent, the organisations whose
-         money there is to add up, and what Lapsing lists, each over its block's own clauses. */
+      /* AND SINCE 1.16.0: the week Numbers this week draws, every number a project ever sent, and what Lapsing lists,
+         each over its block's own clauses. */
       counted('datapoints-7d', 'Numbers reported, 7 days', 'register.datapoints', 'at after -7d, source is not example'),
       counted('datapoints-reported', 'Numbers reported', 'register.datapoints', 'source is not example'),
-      counted('organisations-with-accounts', 'Organisations that list an account', 'register.organisations', 'accounts is set'),
       counted('lapsing-30d', 'Lapsing within 30 days', 'register.services', LAPSING_SOON),
       {
         /* HOME, AS THIS USE CASE ANSWERS IT: the money across every organisation and
@@ -353,28 +334,15 @@ export const FOUNDER = {
 
            WHAT YOU HAVE LEADS SINCE 1.7.0, THEN THE NUMBERS, THEN WHAT TO ACT ON. The figures were Cash now beside
            "Owed to you" and "Owed by you", which framed a founder's money as who owes whom; now it is the money there
-           is, by book or by organisation, and how long it lasts. Due this week and Lapsing stay, the two lists
+           is, by book, and how long it lasts. Due this week and Lapsing stay, the two lists
            somebody has to act on this week, and the latest-numbers and organisations tables went to the Dashboard,
            which already drew both. */
         page: 'home-founder',
         title: 'Overview',
         icon: 'home',
-        requires: ['register.datapoints', 'register.organisations', 'register.accounts', 'register.obligations', 'register.services', 'register.books'],
+        requires: ['register.datapoints', 'register.accounts', 'register.obligations', 'register.services', 'register.books'],
         blocks: [
           ...WHAT_YOU_HAVE,
-          {
-            /* EACH ORGANISATION'S MONEY, the accounts it lists added up. ONLY WHILE ONE LISTS AN ACCOUNT, SINCE 1.16.0, and
-               only the ones that do: it said "No organisation lists an account yet" over a record with no organisation
-               at all. The whole width since the box beside it is drawn on another figure, so neither leaves a hole. */
-            kind: 'bar',
-            heading: 'What you have, by organisation',
-            icon: 'building-2',
-            span: 12,
-            source: 'register.organisations',
-            where: 'accounts is set',
-            columns: [{ field: 'name' }, { field: 'accounts' }],
-            when: { metric: 'organisations-with-accounts', gt: 0 },
-          },
           {
             /* THE ONE WAY IN FOR A BANK OR A PAYMENTS FEED, ONLY WHILE NO ACCOUNT COUNTS AS CASH, SINCE 1.16.0: it was
                drawn on a record holding thirteen accounts and its bank's own add-on. Browse is searched for "money"
@@ -499,70 +467,16 @@ export const FOUNDER = {
             span: 12,
             source: 'register.organisations',
             when: { metric: 'organisations-held', gt: 0 },
+            /* BY KIND AND WEBSITE SINCE 2.0.0, where it said where each was registered and its currency, which People's
+               list does not keep. Each opens People's page for it. */
+            where: 'merged_into is empty',
             columns: [
               { field: 'name', label: 'Organisation', width: 'minmax(20ch,1fr)' },
               { field: 'kind', label: 'Kind', width: '14ch' },
-              { field: 'country', label: 'Registered in', width: '18ch' },
-              { field: 'currency', label: 'Currency', width: '10ch' },
+              { field: 'domain', label: 'Website', width: 'minmax(14ch,22ch)' },
             ],
             empty: 'No organisations yet.',
           },
-        ],
-      },
-      {
-        /* ONE DASHBOARD AN ORGANISATION, from the same declaration, with the organisation's own name in every predicate.
-           Its last section is where a project is given a key to send numbers here, which the app draws under it. */
-        page: 'organisation',
-        title: '{{name}}',
-        for: { register: 'organisations' },
-        nav: { section: 'Dashboard', order: 20 },
-        icon: 'grid',
-        requires: ['register.datapoints', 'register.organisations', 'register.accounts'],
-        blocks: [
-          {
-            kind: 'bar',
-            heading: 'Balance',
-            icon: 'wallet',
-            span: 12,
-            source: 'register.organisations',
-            where: 'name is {{name}}',
-            columns: [{ field: 'name' }, { field: 'accounts' }],
-            empty: '{{name}} lists no account yet. Add the accounts it holds and its balance shows here.',
-          },
-          numbers('organisation is {{name}}'),
-          {
-            /* THE PROJECTS IT RUNS, as the organisation lists them: a project cannot name its organisation (a use case
-               adds no field to another pack's list), so the organisation's own list is the one answer. */
-            kind: 'table',
-            heading: 'Projects',
-            icon: 'rocket',
-            span: 12,
-            source: 'register.organisations',
-            where: 'name is {{name}}',
-            columns: [{ field: 'projects', label: 'Projects', width: 'minmax(20ch,1fr)' }],
-            empty: '{{name}} lists no project yet.',
-          },
-          {
-            kind: 'table',
-            heading: 'Latest numbers',
-            icon: 'list',
-            span: 12,
-            source: 'register.datapoints',
-            where: 'organisation is {{name}}',
-            columns: [
-              { field: 'name', label: 'Measure', width: 'minmax(16ch,1fr)' },
-              { field: 'value', label: 'Value', width: '14ch', align: 'end' },
-              { field: 'unit', label: 'Unit', width: '8ch' },
-              { field: 'source', label: 'Source', width: '11ch' },
-              { field: 'at', label: 'When', width: '12ch', align: 'end' },
-            ],
-            order: [{ field: 'at', dir: 'desc' }],
-            limit: 10,
-            empty: 'Nothing has been reported for {{name}} yet.',
-          },
-          /* `panel: reporting` NAMES THE KEY AND THE POLL FORM the app draws under this section (`panel-of.ts`), so a
-             person or Slash renaming the heading keeps them. */
-          { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' },
         ],
       },
       {
@@ -587,9 +501,37 @@ export const FOUNDER = {
         ],
       },
     ],
-    seeds: [
-      { register: 'organisations', fields: { name: 'Northwind Labs Ltd', kind: 'company', country: 'United Kingdom', currency: 'GBP' } },
-      { register: 'datapoints', fields: { name: 'Monthly recurring revenue', value: 4200, unit: 'GBP', source: 'example', at: '-1d' } },
+    seeds: [{ register: 'datapoints', fields: { name: 'Monthly recurring revenue', value: 4200, unit: 'GBP', source: 'example', at: '-1d' } }],
+    /* THE ORGANISATIONS GO TO PEOPLE WITH THEIR ROWS, SINCE 2.0.0: People 3.0.0 declares the list under the same id. */
+    hands: { 'register.organisations': 'people' },
+    /* WHAT AN ORGANISATION REPORTS, ON PEOPLE'S PAGE FOR IT, SINCE 2.0.0, where it was a page of this pack's own (the
+       numbers, the latest of them, and where a project sends them), after its people: two pages for one organisation
+       would have been two addresses for one name. */
+    adds: [
+      { page: 'page.relation', after: 'People', block: numbers('organisation is {{name}}') },
+      {
+        page: 'page.relation',
+        after: 'People',
+        block: {
+          kind: 'table',
+          heading: 'Latest numbers',
+          icon: 'list',
+          span: 12,
+          source: 'register.datapoints',
+          where: 'organisation is {{name}}',
+          columns: [
+            { field: 'name', label: 'Measure', width: 'minmax(16ch,1fr)' },
+            { field: 'value', label: 'Value', width: '14ch', align: 'end' },
+            { field: 'unit', label: 'Unit', width: '8ch' },
+            { field: 'at', label: 'When', width: '12ch', align: 'end' },
+          ],
+          order: [{ field: 'at', dir: 'desc' }],
+          limit: 10,
+        },
+      },
+      /* `panel: reporting` NAMES THE KEY AND THE POLL FORM the app draws under this section (`panel-of.ts`), so a person
+         or Slash renaming the heading keeps them. */
+      { page: 'page.relation', after: 'People', block: { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' } },
     ],
   },
 };
@@ -597,10 +539,12 @@ export const FOUNDER = {
 /**
  * THE EXAMPLE ROWS THE FOUR MODULES GET IN A FOUNDER'S RECORD, in place of the sample studio's Kiln, Halden Type Co
  * and brand-system invoice. One per list at most, no refs, and a day written `+5d` is counted from the day the
- * record is made (`install.ts`). People gets none: onboarding writes the founder's own row there.
+ * record is made (`install.ts`). People's own list gets none: onboarding writes the founder's own row there.
  */
 export const FOUNDER_EXAMPLES = [
   { register: 'things', fields: { name: 'Northwind app', lane: 'earning', since: '-400d' } },
+  /* PEOPLE'S EXAMPLE SINCE 2.0.0, where it was this pack's own seed: the company the founder runs. */
+  { register: 'organisations', fields: { name: 'Northwind Labs Ltd', kind: 'company', domain: 'northwind.example' } },
   { register: 'accounts', fields: { name: 'Northwind current account', kind: 'bank', balance: { amount: 2_480_000, currency: 'GBP' }, as_of: '0d', liquid: true } },
   {
     register: 'obligations',

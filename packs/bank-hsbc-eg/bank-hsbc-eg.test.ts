@@ -14,7 +14,9 @@
  * here the record is the one a person has when they install this pack, the first-party packs and then this file.
  *
  * EVERY LINE BELOW IS INVENTED, in the shapes real bank alerts take. The card digits, the account, the
- * branch code, the merchants, the amounts and the references are made up, and none of them is anybody's.
+ * branch code, the merchants, the amounts and the references are made up, and none of them is anybody's. The two
+ * exceptions are public shop names, Chillout and Talabat, because how a bank spells a shop is what 1.6.0's tests hold;
+ * the people named are invented.
  *
  * RED FIRST, MEASURED. With no file, twelve of the thirteen failed ENOENT, and the thirteenth is the
  * one that holds a record with every first-party pack to leaving this bank's card alert `untriaged`, so nothing here
@@ -28,7 +30,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { readPackFile } from '../../packages/declare/src/catalogue.ts';
-import { openRecord, type Arrived, type Kernel } from '../../packages/kernel/src/index.ts';
+import { keyOf, openRecord, type Arrived, type Kernel } from '../../packages/kernel/src/index.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../packages/kernel/test/sqlite.ts';
 import { FIRST_PARTY, firstPartyDocument } from '../../packages/seed/src/index.ts';
@@ -155,6 +157,11 @@ const mail = (k: Kernel, body: string, sha256: string): Arrived =>
 /* THROUGH THE SHORTCUT'S DOOR, VERIFIED, which is how the host hands the record a text whose path token checked out. */
 const text = (k: Kernel, body: string, sha256: string): Arrived => said<Arrived>(k.arrive({ channel: 'webhook', ingest: door(), body, sha256, verified: true }));
 
+/** Money's own payee field (money-core 3.10.0), which a bank door lays field for field or not at all. */
+const moneysPayee = (): unknown =>
+  ((firstPartyDocument('money-core') as { declarations: { register?: string; fields?: { id: string }[] }[] }).declarations
+    .find((d) => d.register === 'transactions')?.fields ?? []).find((f) => f.id === 'counterparty_text');
+
 /* ── the file ────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
 /* 1.4.0 IS A MINOR STEP (contracts §7.6): two patterns added for a message that only prints a balance, which
@@ -162,13 +169,19 @@ const text = (k: Kernel, body: string, sha256: string): Arrived => said<Arrived>
    merchant name loses its acquirer's prefix (`strip`). So the floor moves to 3.0.0, the first Money with both lists.
    1.3.1 IS KEPT BESIDE THIS FILE as `bank-hsbc-eg-1.3.1.json`, byte for byte as it shipped, because the tests that drive a
    record on money-core 1.8.0 taking the bank's wordings need the last version that installs there.
-   1.5.0 ADDS A TITLE AND A `changes` LINE and nothing a record reads, so every pattern here is 1.4.0's. */
-test('THE FILE IS bank-hsbc-eg 1.5.0, on money-core 3.0.0 or later before 4.0.0, with the fifteen', () => {
+   1.5.0 ADDS A TITLE AND A `changes` LINE and nothing a record reads.
+   1.6.0 IS A MINOR STEP: the card charge and the two InstaPay wordings keep the payee as printed in `counterparty_text`,
+   which money-core 3.10.0 declares on its ledger, so the floor moves to 3.10.0 and the pack lays nothing. Laid by the
+   pack, even in Money's own shape, the ledger was staged as the record's own list, and a record that took the pack on
+   an older Money was refused money-core 3.10.0 itself. */
+test('THE FILE IS bank-hsbc-eg 1.6.0, on money-core 3.10.0 or later before 4.0.0, with the fifteen', () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.5.0']);
+  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.6.0']);
+  assert.equal(doc.extends, undefined, 'the payee field is Money\'s, and a pack laying it blocks Money\'s own update');
+  assert.equal((moneysPayee() as { type?: string } | undefined)?.type, 'text', 'Money declares no payee field to write');
   const frozen = JSON.parse(readFileSync(new URL('./bank-hsbc-eg-1.3.1.json', import.meta.url), 'utf8')) as { version: string; requires: { packs: unknown } };
   assert.deepEqual([frozen.version, frozen.requires.packs], ['1.3.1', { 'money-core': '>=1.8.0 <4.0.0' }]);
-  assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=3.0.0 <4.0.0' });
+  assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=3.10.0 <4.0.0' });
   assert.deepEqual(doc.declarations.map((d) => `ingest.${String(d.ingest)}`).sort(), FIFTEEN);
 });
 
@@ -189,7 +202,7 @@ test('INSTALLED FROM THE FILE: fifteen patterns, nothing refused, and the same f
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), FIFTEEN);
   await put(api, file());
-  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.5.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.6.0');
   const opened = said<{ pack: { manifest: { pack: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
   assert.equal(opened.pack.manifest.pack, 'bank-hsbc-eg');
   sql.close();
@@ -277,6 +290,102 @@ test('AN ACQUIRER\'S PREFIX COMES OFF THE MERCHANT (1.4.0): a card charge at FAW
   assert.deepEqual([out.state, out.ingest], ['matched', 'bank-card-used'], out.reason);
   assert.equal(api.kernel.get(out.wrote[0]!)!.fields.what, 'Vodafone');
   sql.close();
+});
+
+/* ── the payee, kept as printed (1.6.0) ─────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * ONE CAFE, FIVE SPELLINGS, in the shapes the bank prints them: as itself, and behind each of the four acquirers' prefixes
+ * the alerts carry. `what` is the name with the prefix off, as since 1.4.0; `counterparty_text` is the name as printed,
+ * prefix and case and all, because folding them into one payee key is the kernel's (`keyOf('bank', ...)`), and a person
+ * looking at why two payments were matched sees what the bank wrote. Amounts and limits differ so no two are one alert.
+ */
+const CHILLOUT = ['CHILLOUT', 'GEIDEA*CHILLOUT', 'PAYMOB-CHILLOUT', 'FAWRY*Chillout', 'KASHIER*CHILLOUT'] as const;
+const chargedAt = (merchant: string, n: number): string =>
+  `Your Credit Card ending with *** ${CARD_DIGITS} has been used for EGP ${85 + n}.00 on 14/08/2026 at ${merchant}. Your available limit is EGP ${19_000 + n * 100}.00`;
+
+test('A CARD CHARGE KEEPS THE PAYEE AS PRINTED: five spellings of one cafe, each with its prefix, and the description with the prefixes it strips taken off', async () => {
+  const { api, sql, card } = await withReaders();
+  const got = CHILLOUT.map((merchant, n) => {
+    const out = mail(api.kernel, chargedAt(merchant, n), `chillout-${n}`);
+    assert.deepEqual([out.state, out.ingest], ['matched', 'bank-card-used'], `${merchant}: ${out.reason}`);
+    const row = api.kernel.get(out.wrote[0]!)!.fields;
+    assert.equal(row.account, card);
+    return [row.what, row.counterparty_text];
+  });
+  assert.deepEqual(got, [
+    ['CHILLOUT', 'CHILLOUT'],
+    ['CHILLOUT', 'GEIDEA*CHILLOUT'],
+    /* `strip:` CUTS THE PREFIXES IT LISTS LETTER FOR LETTER, star included, so a bare hyphen after PAYMOB is not one of
+       them and stays in the description. The payee is kept whole either way, and the kernel's key folds it. */
+    ['PAYMOB-CHILLOUT', 'PAYMOB-CHILLOUT'],
+    ['Chillout', 'FAWRY*Chillout'],
+    ['CHILLOUT', 'KASHIER*CHILLOUT'],
+  ]);
+  sql.close();
+});
+
+test('A SHOP NAMED TWO WAYS IS KEPT BOTH WAYS: Talabat and talabat.com, each as the alert printed it', async () => {
+  const { api, sql } = await withReaders();
+  const got = ['TALABAT', 'talabat.com'].map((merchant, n) => {
+    const out = mail(api.kernel, chargedAt(merchant, 10 + n), `talabat-${n}`);
+    assert.deepEqual([out.state, out.ingest], ['matched', 'bank-card-used'], `${merchant}: ${out.reason}`);
+    const row = api.kernel.get(out.wrote[0]!)!.fields;
+    return [row.what, row.counterparty_text];
+  });
+  assert.deepEqual(got, [
+    ['TALABAT', 'TALABAT'],
+    ['talabat.com', 'talabat.com'],
+  ]);
+  sql.close();
+});
+
+/**
+ * AN INSTAPAY TRANSFER NAMES A PERSON, NOT A SHOP: outward to the full name the receiving bank holds, in capitals and
+ * often four names long, and inward from the sender's InstaPay address. Both are kept as printed; whether that person is
+ * somebody in the record is one question for the owner, never a person made here.
+ */
+test('AN INSTAPAY TRANSFER KEEPS THE NAME OR ADDRESS IT PRINTS, in each direction, and a purchase its shop', async () => {
+  const { api, sql } = await withReaders();
+  const out = IPN_OUT.replace('MARLOW JOINERY', 'NOURA SAMIR ABDEL HAMID');
+  const back = IPN_IN.replace('quill.harbour@instapay', 'noura.samir@instapay');
+  const got = [
+    [out, 'ipn-name-out'],
+    [back, 'ipn-name-in'],
+    [IPN_BUY, 'ipn-name-buy'],
+  ].map(([body, sha]) => {
+    const arrived = mail(api.kernel, body!, sha!);
+    assert.equal(arrived.state, 'matched', `${sha}: ${arrived.reason}`);
+    const row = api.kernel.get(arrived.wrote[0]!)!.fields;
+    return [row.direction, row.what, row.counterparty_text];
+  });
+  assert.deepEqual(got, [
+    ['out', 'NOURA SAMIR ABDEL HAMID', 'NOURA SAMIR ABDEL HAMID'],
+    ['in', 'noura.samir@instapay', 'noura.samir@instapay'],
+    ['out', 'GRANARY MARKET', 'GRANARY MARKET'],
+  ]);
+  sql.close();
+});
+
+test('A `From HSBC:` LINE NAMES NO PAYEE, so it keeps none: a cash withdrawal is not a shop', async () => {
+  const { api, sql } = await withReaders();
+  const out = mail(api.kernel, FROM_OUT, 'from-out-payee');
+  assert.equal(out.state, 'matched', out.reason);
+  assert.equal(api.kernel.get(out.wrote[0]!)!.fields.counterparty_text, undefined);
+  sql.close();
+});
+
+/**
+ * AND THE FIVE ARE ONE PAYEE ONCE THE KERNEL FOLDS THEM, which is why they are kept as printed. The normaliser is the
+ * kernel's (contract 17, `keyOf`), one for every bank door.
+ */
+test('THE FIVE SPELLINGS FOLD TO ONE PAYEE KEY, and Talabat\'s two to another', () => {
+  for (const spellings of [CHILLOUT, ['TALABAT', 'talabat.com']]) {
+    const keys = new Set(spellings.map((spelling) => keyOf('bank', spelling)));
+    assert.equal(keys.size, 1, `${spellings.join(', ')} made ${[...keys].join(', ')}`);
+    assert.notEqual([...keys][0], null);
+  }
+  assert.notEqual(keyOf('bank', 'CHILLOUT'), keyOf('bank', 'TALABAT'));
 });
 
 /* ── what each wording claims, on a bare kernel ──────────────────────────────────────────────────────────────────── */

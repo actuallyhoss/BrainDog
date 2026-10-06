@@ -84,7 +84,9 @@ export function pollPack(spec: PollSpec): Record<string, unknown> {
     summary: `Polls ${hostOf(spec.url)} every ${spec.every} for ${spec.measures.map((m) => m.name).join(', ')}.`,
     author: 'BrainDog',
     license: 'MIT',
-    requires: { format: 1, primitives: 1, packs: { 'usecase-founder': '^1.0.0' } },
+    /* ANY FOUNDER FROM 1.0.0 TO 2.x: Founder 2.0.0 handed its organisations to People and kept `datapoints` exactly as
+       it was, and a poll writes nothing else. A range that stopped at 2.0.0 refused every poll a founder made since. */
+    requires: { format: 1, primitives: 1, packs: { 'usecase-founder': '>=1.0.0 <3.0.0' } },
     declarations,
   };
 }

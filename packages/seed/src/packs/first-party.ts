@@ -33,7 +33,7 @@ export const FIRST_PARTY: readonly FirstPartyId[] = ['portfolio', 'people', 'mon
 
 const SUMMARIES: Record<FirstPartyId, string> = {
   portfolio: 'The things you run, and the plan for each.',
-  people: 'Clients, contractors and accountants, and what each one is for.',
+  people: 'Clients, contractors and accountants, the organisations they are with, and where each one was seen.',
   'money-core': 'Cash, what comes in and what goes out, with a date and a currency.',
   estate: 'Domains, hosting, subscriptions, memberships, insurance and bills, and when each one renews.',
   work: 'Tasks, the threads of work they belong to, and how each thread is going.',
@@ -362,11 +362,29 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   for a chart that opens on 90, and as far as ten years over a long plan (research audit 11-13). The longest length
  *   is still what a walk may cost, whether a load walks it or a reader asks for it. Two lengths taken off a control, no
  *   list, field or figure, so the step is a minor one.
+ * - people 3.0.0, money-core 3.10.0 and portfolio 1.14.0: the record understands who and what it meets
+ *   (`loop/contract-17.md`, DIRECTION §38). People gains Organisations, moved from the Founder use case under the same
+ *   id so a founder's rows stay, declared as the list `meet` writes a company into (`org:`), with a page each
+ *   (`page.relation`) listing its people. A person gains every key they are known by, the organisation they are with,
+ *   the other names they go by and whether they are the record's own person, all named in `meets:`, and their page
+ *   lists where they were seen. `rule.meet-senders` meets a mail's sender by its parsed address and name,
+ *   and a no-reply sender or one a door's pattern claims (`rule.meet-sender-organisations`) as the organisation behind
+ *   the domain. Founder's list loses `country`, `currency` and `accounts` here, so People's step is a major one.
+ *   Money's ledger names an organisation in `party`, where it named a person. A MINOR STEP, THOUGH A FIELD POINTS
+ *   ELSEWHERE: no list or field is taken away, no row on a record we know of held a `party` (none of 217 on the
+ *   owner's), the plan does not count a ref's target as a retype, and a major step would put money-core outside the
+ *   `<4.0.0` every money add-on asks for, refusing their next install for a change none of them reads. The ledger
+ *   gains `counterparty_text`, the payee as the bank wrote it, which every bank door writes: Money's list declares it
+ *   once, where each bank add-on laying its own was a conflict between any two of them. Cash ahead, on Money and on a
+ *   book's page, offers five years and `last` again (research audit 16, H1): the kernel now walks two years at most
+ *   unasked (`WALK_UNASKED`) and further only when a reader picks a longer length, which the page asks for, so the cost
+ *   3.9.0 took them off for is gone. Two lengths put back on a control, so it is no step of its own. Projects gain
+ *   `domains`, a field added, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.13.0',
-  people: '2.7.0',
-  'money-core': '3.9.0',
+  portfolio: '1.14.0',
+  people: '3.0.0',
+  'money-core': '3.10.0',
   estate: '2.1.0',
   work: '1.14.0',
 };
@@ -383,6 +401,8 @@ type Body = Record<string, unknown>;
  * a payment, a repeating item or an instalment is with the same way since money-core 3.0.0, so Money installs and
  * draws on a record with People off.
  */
+/* An organisation's `projects` is a link by the same id as a person's, since People 3.0.0, and the ledger's `party`
+   points at People's organisations since money-core 3.10.0, where a bill's still points at its people. */
 const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], 'money-core': ['party'], work: ['owner', 'thing'] };
 
 /**
@@ -485,7 +505,7 @@ const GROUPED = new Set(['bar', 'split']);
  * part must go with it: the kernel refuses a role naming a field the list does not have (`FIELD_UNKNOWN`), and
  * `projects` is a part `meet` does without, recording the person and linking nobody.
  */
-const ROLE_KEYS = ['meets', 'rates', 'hand'] as const;
+const ROLE_KEYS = ['meets', 'rates', 'hand', 'org'] as const;
 
 /**
  * A declaration with the fields in `gone` taken out, and every column and phone field drawn over them. A bar grouped by
@@ -545,11 +565,19 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
   const whole = every.packs.get(id as FirstPartyId)!;
   const links = LINKS[id as FirstPartyId] ?? [];
   const gone = new Set<string>();
+  /* A LIST'S OWN LINK FIELDS THAT GO, BY LIST, SINCE money-core 3.10.0: two of its lists share the link `party` and point
+     it at different lists, the ledger at People's organisations and a bill at People's people. Gone by its id alone,
+     a record holding people and not yet organisations (People 2.x) would lose a bill's `party` as well as the ledger's.
+     A page or a figure still reads the union, since a column names a field and not the list it came from. */
+  const goneIn = new Map<string, Set<string>>();
   if (options.holds !== undefined) {
     const held = new Set(options.holds);
     for (const d of whole.declarations)
       for (const f of Array.isArray(d.fields) ? (d.fields as Body[]) : [])
-        if (links.includes(String(f.id)) && f.to !== d.register && !held.has(String(f.to))) gone.add(String(f.id));
+        if (links.includes(String(f.id)) && f.to !== d.register && !held.has(String(f.to))) {
+          gone.add(String(f.id));
+          if (typeof d.register === 'string') goneIn.set(d.register, (goneIn.get(d.register) ?? new Set<string>()).add(String(f.id)));
+        }
   }
   /* A WALK'S LEG OVER A LIST THE RECORD WILL NOT HOLD IS LEFT OUT, as a link field is: Money's cash walk reads Estate's
      services when they are there, and a person's or a founder's record without Estate still has a walk.
@@ -594,12 +622,14 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
       : { ...d, blocks: (d.blocks as Body[]).map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter(drawable) } : b)) };
   const pack = {
     declarations: whole.declarations.flatMap((d) => {
-      const kept = without(d, gone);
+      const kept = without(d, typeof d.register === 'string' ? (goneIn.get(d.register) ?? new Set<string>()) : gone);
       return kept === null ? [] : [trends(legs(kept))];
     }),
     seeds: (options.seeds ?? whole.seeds).map((s) => ({
       ...s,
-      fields: Object.fromEntries(Object.entries(s.fields as Body).filter(([k]) => !gone.has(k))),
+      /* BY ITS OWN LIST'S GONE FIELDS, as its declaration is cut: falling back to every list's, a bill's example lost its
+         `party` on a record without organisations though bills keep the field. */
+      fields: Object.fromEntries(Object.entries(s.fields as Body).filter(([k]) => !(goneIn.get(String(s.register)) ?? new Set<string>()).has(k))),
     })),
   };
   return {

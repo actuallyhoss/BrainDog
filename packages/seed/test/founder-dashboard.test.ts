@@ -71,8 +71,8 @@ const OWNER = { actor: 'p_1' };
 
 test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a project sent are their rows', async () => {
   const k = await founder();
-  const account = value<{ id: string }>(k.create('accounts', { name: 'Harbour current account', kind: 'bank', balance: { amount: 910_000, currency: 'GBP' }, as_of: TODAY }, OWNER));
-  const org = value<{ id: string }>(k.create('organisations', { name: 'Harbour Studio', kind: 'company', currency: 'GBP', accounts: [account.id] }, OWNER));
+  /* PEOPLE'S LIST SINCE founder 2.0.0, which names no account (`ORGANISATIONS` in `modules/people.ts`). */
+  const org = value<{ id: string }>(k.create('organisations', { name: 'Harbour Studio', kind: 'company', domain: 'harbour.example' }, OWNER));
   for (let d = 0; d < 40; d += 1)
     value(k.create('datapoints', { name: 'Sign-ups', value: 10 + d, organisation: org.id, source: 'reported', at: new Date(NOW - d * DAY).toISOString() }, OWNER));
 
@@ -99,30 +99,29 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
   const pages = k.pages() as unknown as { slug: string; title: string }[];
   const harbour = pages.find((p) => p.title === 'Harbour Studio');
   assert.ok(harbour, 'an organisation has its own page');
+  /* PEOPLE'S PAGE FOR IT SINCE founder 2.0.0, with this pack's numbers added after its people (`adds`). */
   const own = value<{ blocks: Drawn[] }>(k.page(harbour.slug)).blocks;
-  assert.deepEqual(own.map((b) => b.heading), ['Balance', 'Numbers, 30 days', 'Projects', 'Latest numbers', 'Send numbers here']);
+  assert.deepEqual(own.map((b) => b.heading), [undefined, 'People', 'Numbers, 30 days', 'Latest numbers', 'Send numbers here', 'Seen in', 'Notes']);
   for (const b of own) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.equal(own[0]!.rows?.length, 1, 'its balance reads its own row');
-  assert.equal(own[1]!.matched, 40, 'only its own numbers, the example one left out');
+  assert.equal(own[0]!.rows?.length, 1, 'its card reads its own row');
+  assert.equal(own[2]!.matched, 40, 'only its own numbers, the example one left out');
+  assert.equal(own[3]!.rows?.length, 10, 'its latest numbers are its own');
 });
 
 /**
- * A FOUNDER'S HOME SAYS ONLY WHAT IS TRUE OF THIS RECORD, SINCE founder 1.16.0 (DIRECTION §37): each organisation's money
- * only while one lists an account, the way to bring money in only while no account counts as cash, and the week's
- * numbers over the week, six lines at most and the projects they are about named beside them.
+ * A FOUNDER'S HOME SAYS ONLY WHAT IS TRUE OF THIS RECORD, SINCE founder 1.16.0 (DIRECTION §37): the way to bring money
+ * in only while no account counts as cash, and the week's numbers over the week, six lines at most and the projects they
+ * are about named beside them. NO MONEY BY ORGANISATION SINCE founder 2.0.0: the organisations are People's, which names
+ * no account, and What you have, by book keeps a company's money apart.
  */
-test('HOME DRAWS EACH ORGANISATION’S MONEY ONLY WHILE ONE LISTS AN ACCOUNT, and the way in for money only while none is cash', async () => {
+test('HOME DRAWS NO MONEY BY ORGANISATION, and the way in for money only while none is cash', async () => {
   const k = await founder();
-  const drawn = (heading: string) => value<{ blocks: Drawn[] }>(k.page('home-founder')).blocks.find((b) => b.heading === heading);
-  /* A NEW RECORD: the example organisation lists no account, and the example account counts as cash. */
-  assert.equal(drawn('What you have, by organisation')?.drawn, false, 'an organisation with no account draws a bar of nothing');
+  const home = () => value<{ blocks: Drawn[] }>(k.page('home-founder')).blocks;
+  const drawn = (heading: string) => home().find((b) => b.heading === heading);
+  assert.equal(drawn('What you have, by organisation'), undefined, 'Home still adds up an organisation\'s accounts');
+  /* A NEW RECORD: the example account counts as cash. */
   assert.equal(drawn('Bring your money in')?.drawn, false, 'the way in for money is drawn beside an account that counts as cash');
-
-  const account = value<{ id: string }>(k.create('accounts', { name: 'Harbour current account', kind: 'bank', balance: { amount: 910_000, currency: 'GBP' }, as_of: TODAY, liquid: true }, OWNER));
-  value(k.create('organisations', { name: 'Harbour Studio', kind: 'company', currency: 'GBP', accounts: [account.id] }, OWNER));
-  const bar = drawn('What you have, by organisation');
-  assert.notEqual(bar?.drawn, false, 'an organisation that lists an account draws no bar');
-  assert.deepEqual(bar?.rows?.map((r) => r.fields.name), ['Harbour Studio'], 'an organisation with no account is a bar of nothing');
+  for (const b of home()) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
 
   /* AND WITH NO ACCOUNT THAT COUNTS AS CASH, THE WAY IN IS THE ONE THING TO DO. */
   for (const r of value<{ rows: { seq: number | null; fields: Record<string, unknown> }[] }>(k.list({ register: 'accounts', limit: 50 })).rows)

@@ -41,5 +41,7 @@ test('EVERY MODULE LIST WITHOUT WORDS IS ONE NOBODY RENAMES, and every list with
   const manifests = declared();
   const lists = Object.values(MODULE_LISTS).flatMap((m) => m.lists);
   assert.deepEqual(lists.filter((l) => !manifests.has(l)), [], 'MODULE_LISTS names a list no manifest declares');
-  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'fx', 'snapshots']);
+  /* `organisations` SINCE People 3.0.0, which took it from Founder: words for it would give every use case holding People
+     two more settings, and each of them a version, for a list no use case has asked to rename. */
+  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'fx', 'organisations', 'snapshots']);
 });

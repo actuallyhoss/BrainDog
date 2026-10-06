@@ -1166,6 +1166,27 @@ const DECLARED: Record<string, Version> = {
       "Each list's name and one of it, `setting.label_transactions` and `setting.one_transactions` among them, are titled by what the list is called where they read its id, \"Label: transactions\", and every name is declared before any singular -> 561406a155a3a30c",
     ],
   },
+  /* A VERSION AND NOT A RESET: 1.16.1 is live. The organisations went to People 3.0.0. */
+  'founder@2.0.0': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported metric.due-this-week
+      metric.lapsing-30d metric.organisations-held page.dashboard page.home-founder page.project register.datapoints
+      setting.label_accounts setting.label_books setting.label_categories setting.label_datapoints
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories setting.one_datapoints
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: 'ccc436f460b15b32',
+    history: [
+      "`register.organisations` is People's under the same id and is handed to it, `page.organisation` and `metric.organisations-with-accounts` go with the list's accounts, `page.home-founder` draws no money by organisation, and `page.dashboard` lists each organisation by kind and website -> ccc436f460b15b32",
+    ],
+  },
   'business@1.5.0': {
     holds: `
       page.home-business setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with

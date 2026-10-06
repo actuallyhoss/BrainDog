@@ -389,7 +389,9 @@ test('A PART\'S PAGE ANSWERS EVERY BLOCK: its path, its calls, its pad and its h
   const ring = page.blocks.find((b) => b.kind === 'cards')!;
   assert.deepEqual(ring.rings, [33]);
   assert.equal(ring.area, 'rail');
-  assert.equal(page.blocks.find((b) => b.area === 'rail'), ring, 'the part\'s card is not the first thing in the rail');
+  /* WHAT IS WAITING ON THE PERSON MAY GO FIRST, wherever the page declares it: the record's own look puts a call that is
+     waiting ahead of the rest of its column (`look.<page>`, `loop/contract-17.md`), so the card heads what is left. */
+  assert.equal(page.blocks.find((b) => b.area === 'rail' && b.kind !== 'queue'), ring, 'the part\'s card is not the first thing in the rail');
   const calls = page.blocks.find((b) => b.kind === 'queue')!;
   assert.deepEqual(calls.queue?.map((q) => q.question), ['Which card stock for the box?']);
   assert.deepEqual(page.blocks.find((b) => b.heading === 'Who helps')!.rows.map((r) => r.fields.name), ['The box printer']);

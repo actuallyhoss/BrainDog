@@ -11,7 +11,7 @@ import { openRecord, type Kernel, type PageResult } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
 
-import { METRICS, NOW, PEOPLE, firstPartyManifest, installSeed } from '../src/index.ts';
+import { AUTOMATIONS, METRICS, NOW, ORGANISATIONS, PAGES, PEOPLE, REGISTERS, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
 
 function openSqlite(): Sql {
   const db = new DatabaseSync(':memory:');
@@ -141,10 +141,88 @@ test('PEOPLE STILL NEEDS NO OTHER LIST: its figures read People alone', () => {
 
 test('MEETING SOMEONE MOVES THEIR LAST IN TOUCH TO TODAY, so the page stays current without anyone typing a day', async () => {
   const k = await seeded();
-  const quiet = PEOPLE.find((p) => p.name === 'Pell & Vine')!;
+  const quiet = PEOPLE.find((p) => p.name === 'Ada Vine')!;
   const met = k.meet({ email: String(quiet.email), where: 'mail about the year-end pack' }, { actor: 'agent:claude' });
   assert.ok(met.ok, sayOf(met));
   const listed = k.list({ register: 'people', limit: 50 });
   assert.ok(listed.ok, sayOf(listed));
   assert.equal(listed.value.rows.find((r) => r.fields.name === quiet.name)?.fields.in_touch, on(0));
+});
+
+/* ── People 3.0.0: organisations, keys and evidence (`loop/contract-17.md`) ─────────────────────────────────────── */
+
+test('ORGANISATIONS ARE PEOPLE\'S LIST, declared as the one `meet` writes a company into, and a person names theirs', () => {
+  const orgs = REGISTERS.organisations as unknown as Record<string, unknown> & { fields: { id: string; values?: string[]; to?: string }[] };
+  assert.equal(orgs.pack, 'people');
+  assert.deepEqual(orgs.org, { name: 'name', keys: 'keys', kind: 'kind', domain: 'domain', merged_into: 'merged_into', met: 'met', projects: 'projects' });
+  assert.deepEqual(orgs.fields.find((f) => f.id === 'kind')?.values, ['company', 'employer', 'client', 'vendor', 'merchant', 'bank', 'other']);
+  const people = REGISTERS.people as unknown as Record<string, unknown> & { meets: Record<string, string>; fields: { id: string; type: string; of?: string; to?: string }[] };
+  for (const part of ['keys', 'org', 'self', 'aliases', 'email']) assert.equal(people.meets[part], part, `meets: names no ${part}`);
+  assert.equal(people.fields.find((f) => f.id === 'org')?.to, 'organisations');
+  assert.equal(people.fields.find((f) => f.id === 'self')?.type, 'bool');
+  /* A COMPANY IS NEVER FILED AS A PERSON AGAIN: every sample person has a first name, and every company is an organisation. */
+  for (const company of ['Halden Type Co', 'Ravensworth Ltd', 'Pell & Vine', 'Nordhaven Registry'])
+    assert.ok(ORGANISATIONS.some((o) => o.name === company) && !PEOPLE.some((p) => p.name === company), company);
+  /* STILL NO OTHER MODULE'S LIST: an organisation's projects are a link, as a person's are. */
+  assert.deepEqual(firstPartyManifest('people').requires, []);
+  assert.ok(firstPartyManifest('people').provides.includes('register.organisations'));
+  const bare = firstPartyDocument('people', { holds: ['people', 'organisations'] }) as { declarations: Record<string, unknown>[] };
+  const list = bare.declarations.find((d) => d.register === 'organisations') as { org: Record<string, string>; fields: { id: string }[] };
+  assert.ok(!list.fields.some((f) => f.id === 'projects'), 'a record with no Projects is handed an organisation pointing at them');
+  assert.equal(list.org.projects, undefined, 'the role still names the field that went');
+});
+
+test('A SENDER IS MET BY THE ADDRESS AND NAME THE DOOR READ, and a no-reply or claimed sender as its organisation', () => {
+  const senders = AUTOMATIONS.find((a) => a.rule === 'meet-senders') as { on: { arrival: { state?: string[] } }; steps: Record<string, unknown>[] };
+  assert.deepEqual(senders.on.arrival.state, ['untriaged'], 'mail a pattern claimed is met as a person');
+  const said = JSON.stringify(senders.steps);
+  assert.ok(said.includes('{{trigger.body.from_address}}') && said.includes('{{trigger.body.from_name}}'));
+  assert.ok(!said.includes('{{trigger.body.from}}'), 'the raw header is passed as an email again');
+  const branch = senders.steps.find((s) => 'if' in s) as { if: { any: { contains: string }[] }; then: { meet: Record<string, string> }[] };
+  assert.ok(branch.if.any.some((c) => c.contains === 'noreply'));
+  assert.equal(branch.then[0]!.meet.kind, 'organisation');
+  assert.equal(branch.then[0]!.meet.domain, '{{trigger.body.from_domain}}');
+  const claimed = AUTOMATIONS.find((a) => a.rule === 'meet-sender-organisations') as { on: { arrival: { state: string[] } }; steps: { meet: Record<string, string> }[] };
+  assert.ok(claimed.on.arrival.state.includes('matched'));
+  assert.equal(claimed.steps[0]!.meet.kind, 'organisation');
+  /* A PAYEE IS AN ORGANISATION MET BY ITS bank: KEY, read off the arrival, so a held charge meets it too. */
+  const payees = AUTOMATIONS.find((a) => a.rule === 'meet-payees') as { on: { arrival: { state: string[]; channel?: string } }; steps: Record<string, unknown>[] };
+  assert.deepEqual(payees.on.arrival.state, ['matched', 'review', 'proposed']);
+  assert.equal(payees.on.arrival.channel, undefined, 'a bank text comes by SMS, mail or a webhook');
+  /* AN ADDRESS IS NOT MET: an InstaPay sender printed as `name@instapay` is no organisation's name. */
+  const unless = payees.steps.find((s) => 'if' in s) as { if: { none: { contains: string }[] }; then: { meet: Record<string, unknown> }[] };
+  assert.deepEqual(unless.if.none.map((c) => c.contains), ['@']);
+  const meet = unless.then[0]!.meet;
+  assert.equal(meet.kind, 'organisation');
+  assert.deepEqual(meet.keys, ['bank:{{trigger.counterparty}}']);
+  assert.equal(meet.role, undefined, 'a payee paying in is not a shop');
+});
+
+test('A PERSON\'S PAGE SAYS THEIR ORGANISATION AND WHERE THEY WERE SEEN, NEVER A KEY, and an organisation\'s lists its people', async () => {
+  const k = await seeded();
+  const ada = opened(k, 'ada-vine');
+  for (const b of ada.blocks) assert.deepEqual(b.refusals, [], String(b.heading));
+  const card = ada.blocks[0]!;
+  assert.equal(card.rows[0]?.fields.name, 'Ada Vine');
+  assert.ok((card.columns ?? []).some((c) => c.field === 'org'), 'the card does not say the organisation');
+  assert.deepEqual(
+    ada.blocks.filter((b) => b.kind === 'note').map((b) => b.heading),
+    ['Seen in', 'Notes'],
+  );
+  /* NO KEY ON THE PAGE: `email:ada@…` is the record's handle, and a note filled from `keys` printed them joined by commas. */
+  for (const b of ada.blocks) assert.doesNotMatch(String((b as { body?: unknown }).body ?? ''), /\b(email|github|bank|domain):/, String(b.heading));
+  assert.ok(!(PAGES.someone!.blocks as { heading?: string }[]).some((b) => b.heading === 'Met'), 'the evidence is still headed Met');
+
+  const pell = opened(k, 'pell-vine');
+  for (const b of pell.blocks) assert.deepEqual(b.refusals, [], String(b.heading));
+  const people = pell.blocks.find((b) => b.heading === 'People');
+  assert.ok(people, 'an organisation\'s page lists nobody');
+  assert.deepEqual(people.rows.map((r) => r.fields.name), ['Ada Vine']);
+  const bare = pell.blocks.filter((b) => typeof b.heading === 'string' && typeof (b as { icon?: unknown }).icon !== 'string').map((b) => b.heading);
+  assert.deepEqual(bare, [], 'a heading with no glyph');
+
+  /* THE PEOPLE PAGE LISTS THE ORGANISATIONS UNDER EVERYONE. */
+  const list = opened(k, 'people').blocks.find((b) => b.heading === 'Organisations');
+  assert.ok(list && list.drawn !== false);
+  assert.equal(list.rows.length, ORGANISATIONS.length);
 });

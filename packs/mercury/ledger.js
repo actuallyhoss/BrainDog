@@ -14,6 +14,12 @@
  * ledger, and every hour re-reads the last thirty days: a transaction already held is updated in place, never
  * written twice, and a pending one becomes cleared when Mercury says `sent`.
  *
+ * THE PAYEE AS MERCURY NAMES IT, SINCE 1.1.0, in `counterparty_text`: `counterpartyName` as it came, and nothing when
+ * Mercury names nobody, never the nickname or the bank's own line, which are a person's words and the bank's. It is the
+ * text the record turns into a payee key (`bank:`, prefixes and case folded by the kernel, not here), so the same shop
+ * is one organisation however it is spelled, and linking the row to that organisation is the record's rule, not this
+ * script's. A row held before 1.1.0 gains it the next hour; one that has it already keeps it, whoever wrote it.
+ *
  * ONLY THE BANK'S FACTS ARE UPDATED: the day, the direction, the amount and the state. What a person or a rule set on a
  * row, its category above all, and its description, project, person or note, is never in the patch. So a category
  * somebody pinned stays pinned however many times Mercury restates the transaction, and a row somebody voided stays
@@ -134,6 +140,10 @@ function patchOf(row, fields) {
   if (row.fields.direction !== fields.direction) patch.direction = fields.direction;
   const was = row.fields.amount;
   if (was === null || typeof was !== 'object' || was.amount !== fields.amount.amount || was.currency !== fields.amount.currency) patch.amount = fields.amount;
+  /* THE PAYEE ONLY WHERE THE ROW HAS NONE: a row from before 1.1.0, or one typed in by hand, gains it, and one a person
+     corrected is left as they wrote it. */
+  const payee = row.fields.counterparty_text;
+  if (fields.counterparty_text !== undefined && (payee === undefined || payee === null || payee === '')) patch.counterparty_text = fields.counterparty_text;
   return patch;
 }
 
@@ -141,6 +151,7 @@ function patchOf(row, fields) {
 export function ledgerOf(t, account) {
   const state = STATES[t.status];
   if (state === undefined) return null;
+  const payee = typeof t.counterpartyName === 'string' ? t.counterpartyName.trim() : '';
   return {
     what: String(t.counterpartyName || t.counterpartyNickname || t.bankDescription || 'Mercury'),
     on: String(t.postedAt || t.createdAt).slice(0, 10),
@@ -148,6 +159,7 @@ export function ledgerOf(t, account) {
     amount: { amount: Math.round(Math.abs(t.amount) * 100), currency: 'USD' },
     account,
     state,
+    ...(payee === '' ? {} : { counterparty_text: payee }),
     mercury_id: t.id,
   };
 }

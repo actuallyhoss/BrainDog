@@ -81,7 +81,7 @@ const SPEC = {
 test('THE POLL PACK IS ONE POLL PER ADDRESS, a map a measure, each writing a datapoint by paths', () => {
   const doc = pollPack(SPEC) as { pack: string; requires: { packs: Record<string, string> }; declarations: Record<string, unknown>[] };
   assert.equal(doc.pack, 'poll-northwind');
-  assert.deepEqual(doc.requires.packs, { 'usecase-founder': '^1.0.0' });
+  assert.deepEqual(doc.requires.packs, { 'usecase-founder': '>=1.0.0 <3.0.0' });
   assert.equal(doc.declarations.length, 1);
   assert.deepEqual(doc.declarations[0], {
     ingest: 'poll_northwind',

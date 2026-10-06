@@ -519,8 +519,12 @@ export function scenario(model: ForecastModel, knobs: Knobs): Scenario {
   return { horizon, days, steps: after, crossed, lowest };
 }
 
-/** One length the horizon knob offers: how many days it walks, and how a person says it. */
-export type HorizonChoice = { days: number; label: string };
+/**
+ * One length the horizon knob offers: how many days it walks, and how a person says it. `walk` is the length the host is
+ * asked to walk when it is picked, for a choice past how far the walk reaches (`horizonChoices` with `walks`), and
+ * `end` marks "To the end", whose days move with the walk the host sends.
+ */
+export type HorizonChoice = { days: number; label: string; walk?: number | 'last'; end?: true };
 
 /** What the knob offers when the block declared no `horizons:`: a quarter, half a year and a year, in days. */
 const HORIZONS_SAID = [91, 183, 365] as const;
@@ -532,19 +536,30 @@ const HORIZONS_SAID = [91, 183, 365] as const;
 const HORIZON_SLACK = 7;
 
 /**
- * The horizon choices that fit inside the walk the host made, in the order the block declared them, each once.
+ * The horizon choices the walk the host made can draw, in the order the block declared them, each once.
  *
- * NO CHOICE REACHES PAST THE WALK. The host walks as far as it says (`reach`, else `horizon`) and no further, so a
+ * NO CHOICE DRAWS PAST THE WALK. The host walks as far as it says (`reach`, else `horizon`) and no further, so a
  * five-year choice over a one-year walk would draw the same year under a longer name. But every length up to the walk's
  * reach is offered, and not only up to the length the chart opens on: a chart opening on three months over a two-year
  * walk still offers half a year, a year and two (visual review 4). `last` is the day of the walk's last dated movement,
  * which the walk itself holds.
+ *
+ * A LONGER LENGTH IS ASKED FOR, WHERE THE HOST CAN WALK IT (`walks`, `RenderOptions.walk`). The record walks two years
+ * at most unasked and further when a reader picks a longer length, so with `walks` every declared length past the reach
+ * is offered with `walk`, the length to ask the host for, and "To the end" asks for `last` while the walk may have
+ * stopped short of the plan's end (`mayRunOn`). Without `walks` they are left off, as before, since nothing could draw
+ * them.
  */
-export function horizonChoices(model: ForecastModel): HorizonChoice[] {
+export function horizonChoices(model: ForecastModel, walks = false): HorizonChoice[] {
   const out: HorizonChoice[] = [];
   const reach = reachOf(model);
   for (const h of model.horizons ?? HORIZONS_SAID) {
-    const choice = h === 'last' ? lastChoice(model) : h - HORIZON_SLACK <= reach ? { days: Math.min(h, reach), label: spanWords(h) } : null;
+    let choice: HorizonChoice | null;
+    if (h === 'last') {
+      choice = lastChoice(model);
+      if (choice && walks && mayRunOn(model)) choice = { ...choice, walk: 'last' };
+    } else if (h - HORIZON_SLACK <= reach) choice = { days: Math.min(h, reach), label: spanWords(h) };
+    else choice = walks ? { days: h, label: spanWords(h), walk: h } : null;
     if (choice && !out.some((c) => c.days === choice.days)) out.push(choice);
   }
   return out;
@@ -554,7 +569,19 @@ export function horizonChoices(model: ForecastModel): HorizonChoice[] {
 function lastChoice(model: ForecastModel): HorizonChoice | null {
   const last = model.steps.reduce((most, s) => (s.day > most ? s.day : most), model.today);
   const days = Math.min(daysBetween(model.today, last), reachOf(model));
-  return days >= 1 ? { days, label: FORECAST_TO_END } : null;
+  return days >= 1 ? { days, label: FORECAST_TO_END, end: true } : null;
+}
+
+/**
+ * Whether the plan may run on past the walk the host sent: it stopped short of a length the block declares, or it still
+ * moved money in its last month, which is what a walk the host cut off looks like. A plan that ended well inside the
+ * walk asks nothing.
+ */
+function mayRunOn(model: ForecastModel): boolean {
+  const reach = reachOf(model);
+  if ((model.horizons ?? []).some((h) => typeof h === 'number' && h - HORIZON_SLACK > reach)) return true;
+  const last = model.steps.reduce((most, s) => (s.day > most ? s.day : most), model.today);
+  return daysBetween(model.today, last) > reach - Math.ceil(MONTH_DAYS);
 }
 
 /** How near a length must be to whole months or whole years, in days, to be said in them. */

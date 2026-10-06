@@ -51,10 +51,10 @@ const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
   ],
   /* A TEAM'S PLANNED TICKETS POINT AT THE TICKET, one of Work's tasks, and at the example cycle. */
   team: TEAM_PLAN_LINKS,
-  /* A FOUNDER'S ORGANISATION HOLDS THE EXAMPLE ACCOUNT AND RUNS THE EXAMPLE PROJECT, and the example number is that
-     project's, so the Dashboard's balance by organisation and an organisation's own page agree with the rows beside them. */
+  /* A FOUNDER'S ORGANISATION RUNS THE EXAMPLE PROJECT, and the example number is that project's, so an organisation's own
+     page agrees with the rows beside it. It held the example account too until Founder 2.0.0, when the list became
+     People's, which names no account (`ORGANISATIONS` in `modules/people.ts` says why). */
   founder: [
-    { register: 'organisations', title: 'Northwind Labs Ltd', field: 'accounts', to: 'accounts', target: 'Northwind current account', list: true },
     { register: 'organisations', title: 'Northwind Labs Ltd', field: 'projects', to: 'things', target: 'Northwind app', list: true },
     { register: 'datapoints', title: 'Monthly recurring revenue', field: 'thing', to: 'things', target: 'Northwind app' },
     { register: 'datapoints', title: 'Monthly recurring revenue', field: 'organisation', to: 'organisations', target: 'Northwind Labs Ltd' },
