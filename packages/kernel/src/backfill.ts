@@ -29,11 +29,13 @@
  *   2. A run with no project is placed only when its place is sure (`placedFor`): a remote a project lists, or a folder
  *      a project lists that the run worked in itself, or one whose project lists the run's repository too, and not
  *      contradicted by the run's own repository. A bare name, a run further down a folder, a broad folder like
- *      `~/Developer`, or a last name is one question per place and guess, a single guess
- *      included ("Is that BrainDog?"). A run whose place guesses nothing better, in a repository whose owner on its host
- *      holds the repositories of exactly one project, is one question per owner ("Is that Crumb.gg?"). Each question
- *      carries `wheres`, the whole place of every run it is about, so a yes places exactly those. Once, and never a run
- *      already placed, nor one still working, which the ladder places itself.
+ *      `~/Developer`, or a last name is one question per whole place (its remote, else its folder) and guess, a single
+ *      guess included ("Is that BrainDog?"), so `sam/lantern` and somebody else's `lantern` are never one question and
+ *      one yes (research-audit-23 item 6). Two places of one name in a walk are each said with their owner or their
+ *      folder ("acme/Lantern", "lantern in Code"). A run whose place guesses nothing better, in a repository whose owner
+ *      on its host holds the repositories of exactly one project, is one question per owner ("Is that Crumb.gg?"). Each
+ *      question carries `wheres`, the whole place of every run it is about, so a yes places exactly those. Once, and
+ *      never a run already placed, nor one still working, which the ladder places itself.
  *   3. A service with no project is linked when its name, the first word of its name, its domain, or the label of its
  *      domain matches exactly one project's name (with any domain ending left off) or domain. Linked, a domain of it
  *      that spells the project's name is written into the project's domains, so mail from it is matched later.
@@ -182,7 +184,10 @@ export function understandBackfill(deps: BackfillDeps, opts: BackfillOptions = {
   const limit = Math.max(1, Math.floor(opts.limit ?? BACKFILL_LIMIT));
   const lists: Lists = [...deps.registers().values()];
   const suggestions = new Map<string, BackfillSuggestion>();
-  const suggest = (s: BackfillSuggestion): void => {
+  /* EACH RUN QUESTION'S PLACE SAID WITH ITS OWNER OR ITS FOLDER, for when two places of one name are asked about. */
+  const longer = new Map<string, string>();
+  const suggest = (s: BackfillSuggestion, long?: string): void => {
+    if (long !== undefined && !longer.has(s.key)) longer.set(s.key, long);
     const held = suggestions.get(s.key);
     /* THE SAME QUESTION FROM TWO ROWS IS ONE, counting both. */
     if (held?.kind === 'run-project' && s.kind === 'run-project') {
@@ -198,6 +203,18 @@ export function understandBackfill(deps: BackfillDeps, opts: BackfillOptions = {
   const runs = deps.transaction(() => runsSlice(deps, lists, limit, opts.after?.runs ?? '', suggest));
   const services = deps.transaction(() => servicesSlice(deps, lists, limit, opts.after?.services ?? '', suggest));
   for (const s of remoteSuggestions(deps.sql, lists)) suggest(s);
+  /* TWO PLACES OF ONE NAME ARE TWO QUESTIONS THAT WOULD READ ALIKE, so each says whose or where it is. */
+  const byName = new Map<string, string[]>();
+  for (const s of suggestions.values())
+    if (s.kind === 'run-project' && !s.key.startsWith(OWNER_KEY)) byName.set(s.place.toLowerCase(), [...(byName.get(s.place.toLowerCase()) ?? []), s.key]);
+  for (const keys of byName.values()) {
+    if (keys.length < 2) continue;
+    for (const key of keys) {
+      const s = suggestions.get(key);
+      const place = longer.get(key);
+      if (s?.kind === 'run-project' && place !== undefined) suggestions.set(key, { ...s, place, question: runQuestion(place, s.runs, s.projects) });
+    }
+  }
   return { ledger, runs, services, suggestions: [...suggestions.values()], held: [...asks.values()] };
 }
 
@@ -915,7 +932,23 @@ function ownersOf(sql: Sql, projects: ProjectsList): Map<string, Set<string>> {
   return out;
 }
 
-function runsSlice(deps: BackfillDeps, lists: Lists, limit: number, after: string, suggest: (s: BackfillSuggestion) => void): Slice {
+/**
+ * A place as a person tells it from another of its name: a remote by its owner, `acme/Lantern`, and a folder by the one
+ * it sits in, `lantern in Code`. Never a host or a path. `undefined` when the place says nothing more than its name.
+ */
+function placeAt(where: Whereabouts, place: string): string | undefined {
+  if (where.remote !== undefined) {
+    const owner = ownerOf(where.remote);
+    return owner === null ? undefined : `${owner.spelled}/${lastSpelled(where.remote)}`;
+  }
+  if (where.cwd === undefined) return undefined;
+  const parts = pathOf(where.cwd).split('/').filter((p) => p !== '' && !/^[a-z]:$/iu.test(p));
+  const at = parts.findLastIndex((p) => p.toLowerCase() === place.toLowerCase());
+  const parent = at > 0 ? parts[at - 1] : at === -1 ? parts.at(-1) : undefined;
+  return parent === undefined ? undefined : `${place} in ${parent}`;
+}
+
+function runsSlice(deps: BackfillDeps, lists: Lists, limit: number, after: string, suggest: (s: BackfillSuggestion, long?: string) => void): Slice {
   const { sql } = deps;
   const projects = projectsOf(sql, lists);
   if (!projects || projects.candidates.length === 0 || !lists.some((l) => l.id === SESSION)) return idle();
@@ -958,12 +991,14 @@ function runsSlice(deps: BackfillDeps, lists: Lists, limit: number, after: strin
     }
     if (ids.length === 0) continue;
     /* THE PLACE AS A PERSON SAYS IT: the repository's name, never its host or a folder's path. One question for each
-       place and guess, however many runs worked there, a single guess included. */
+       WHOLE place and guess, however many runs worked there, a single guess included: kept by the remote, else the
+       folder, and never by the last name alone, which `sam/lantern` shares with every other `lantern` (research-audit-23
+       item 6). A run that says only a bare name is kept by it, and the record files no question that places nothing. */
     const place = where.repo ?? (where.remote ? lastSpelled(where.remote) : lastSpelled(where.cwd ?? ''));
     if (place === '') continue;
-    const key = `run-project:${place.toLowerCase()}:${[...ids].sort().join(',')}`;
+    const key = `run-project:${at ?? place.toLowerCase()}:${[...ids].sort().join(',')}`;
     const these = named(projects, ids);
-    suggest({ kind: 'run-project', key, place, runs: 1, projects: these, question: runQuestion(place, 1, these), wheres });
+    suggest({ kind: 'run-project', key, place, runs: 1, projects: these, question: runQuestion(place, 1, these), wheres }, placeAt(where, place));
   }
   return { batch: writes.batch(), looked: rows.length, wrote, refused, next: rows.length === limit ? rows.at(-1)!.id : null };
 }

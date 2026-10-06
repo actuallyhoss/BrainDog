@@ -1020,8 +1020,10 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
     const whole = skipped.length === 0 && (rest === null || (rest.ok && rest.value.plan.steps.length === 0 && rest.value.plan.skipped.length === 0));
     for (const q of asked) {
       if (!whole && q.as === 'undone') continue;
-      if (whole) sql.exec("UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL WHERE id = ?", q.id);
-      else sql.exec("UPDATE suggestion SET resolved_as = 'undone' WHERE id = ?", q.id);
+      if (whole) {
+        sql.exec("UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL WHERE id = ?", q.id);
+        readAgain(sql, q.id, every);
+      } else sql.exec("UPDATE suggestion SET resolved_as = 'undone' WHERE id = ?", q.id);
       governLine(sql, parts.mint(), at, actor, whole ? 'suggest' : 'resolve', q.id, whole ? 'reopened' : 'undone', batch);
     }
     const again = asked.length > 0 && whole ? [ASKED_AGAIN] : [];
@@ -1062,6 +1064,70 @@ function answered(sql: Sql, lines: readonly Line[]): { id: string; as: string }[
     const q = sql.one<{ r: string }>("SELECT resolved_as AS r FROM suggestion WHERE id = ? AND status = 'resolved' AND resolved_as IN ('addressed', 'undone')", id);
     return q ? [{ id, as: q.r }] : [];
   });
+}
+
+/**
+ * A rowset question asked again, read at the versions its rows hold now, so a yes to it can land.
+ *
+ * WITHOUT THIS EVERY REOPENED ROWSET WAS STALE. Each update row carries the version it was read at, the decision's
+ * writes moved it on, and so did the undo's, so accepting the question again was refused as changed since, with nothing
+ * the person could do but wait for it to be asked anew. A row is read again only when the decision wrote it and it holds
+ * now, field by field of the patch, what it held before the decision: what the decision changed is back to what it was
+ * before, a list it tagged or untagged is whole what it was before, and a field it left alone still holds the value the
+ * patch asks for. A row somebody has changed in a way the question never saw keeps its old version, and stays refused.
+ */
+function readAgain(sql: Sql, id: string, lines: readonly Line[]): void {
+  const asked = sql.one<{ kind: string; body: string }>('SELECT body_kind AS kind, body FROM suggestion WHERE id = ?', id);
+  const body = asked?.kind === 'rowset' ? parse(asked.body) : null;
+  if (!isMap(body) || typeof body.register !== 'string' || !Array.isArray(body.rows)) return;
+  const answer = lines.find((l) => l.kind === 'resolve' && l.to_v === 'addressed' && l.target === `suggestion:${id}`);
+  if (!answer) return;
+  const key = keyOf(answer);
+  const theirs = lines.filter((l) => keyOf(l) === key && l.target?.startsWith('entry:'));
+  const rows = [...rowsOf(sql, [...new Set(theirs.map((l) => l.target!.slice('entry:'.length)))]).values()].filter((r) => r.register === body.register);
+  if (rows.length === 0) return;
+  /* A ROW AS A BODY NAMES ONE: its id, `tasks#3`, or its list's own prefix, `LN3`. */
+  const prefix = sql.one<{ p: string | null }>(
+    "SELECT json_extract(body, '$.seq_prefix') AS p FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND json_extract(body, '$.id') = ? ORDER BY version DESC LIMIT 1",
+    body.register,
+  )?.p;
+  const named = (at: string): Held | undefined =>
+    rows.find((r) => at === r.id || at === `${r.register}#${r.seq}` || (typeof prefix === 'string' && prefix !== '#' && at === `${prefix}${r.seq}`));
+
+  let moved = false;
+  const fresh = body.rows.map((one: unknown) => {
+    if (!isMap(one) || typeof one.at !== 'string' || !isMap(one.patch)) return one;
+    const row = named(one.at.trim());
+    if (!row || row.deleted_at !== null || row.version === one.version) return one;
+    const wrote = theirs.filter((l) => l.target === `entry:${row.id}`);
+    const holds = Object.entries(one.patch).every(([field, asks]) => {
+      /* A DELETE THE DECISION MADE is put back by the row being live, which it is. */
+      if (field === 'deleted_at') return true;
+      const held = row.fields[field] ?? null;
+      const on = wrote.filter((l) => l.field === field);
+      if (on.length === 0) return same(held, asks);
+      const valued = on.find((l) => l.kind === 'edit' || l.kind === 'state' || l.kind === 'link');
+      if (valued) return !erasedOrWithheld(valued.from_v) && same(held, parse(valued.from_v));
+      /* A LIST IS BACK WHEN IT IS WHOLE WHAT IT WAS: the patch less what the decision tagged, plus what it took off. Only
+         its own elements gone is not enough, since a yes writes the patch's whole list over anything added since. */
+      if (!Array.isArray(asks)) return false;
+      const was = asks.map((x) => jcs(x as Json));
+      for (const l of on) {
+        const said = l.kind === 'tag' ? l.to_v : l.kind === 'untag' ? l.from_v : null;
+        if (said === null || erasedOrWithheld(said)) return false;
+        const one = jcs(parse(said) as Json);
+        if (l.kind === 'untag') was.push(one);
+        else if (was.includes(one)) was.splice(was.indexOf(one), 1);
+        else return false;
+      }
+      const list = Array.isArray(held) ? held.map((x) => jcs(x as Json)) : [];
+      return jcs(list.sort() as Json) === jcs(was.sort() as Json);
+    });
+    if (!holds) return one;
+    moved = true;
+    return { ...one, version: row.version };
+  });
+  if (moved) sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...body, rows: fresh }), id);
 }
 
 /** A question's line in the log, as `govern.ts` writes a reopen (`suggest`, `reopened`) and a verdict (`resolve`). */

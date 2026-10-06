@@ -443,6 +443,66 @@ test('THE RECORD’S OWN PERSON KEEPS EVERY SPELLING OF THEM: a name their handl
   sql.close();
 });
 
+test('THE OWNER HELD TWICE IS ONE QUESTION, "Are Kas and Kas both you?", never a fold: even a row no meeting ever touches', async () => {
+  const { k, sql } = await record();
+  const self = value<Entry>(k.create('people', { name: 'Kas', email: 'kas@kas.example', self: true }, OWNER));
+  const second = value<Entry>(k.create('people', { name: 'Kas', note: 'Founder, Tidepool Apps' }, OWNER));
+  /* Somebody else entirely is met: the second Kas, whom no key will ever meet, is asked about all the same. */
+  value(k.meet({ name: 'Ada Lovelace', email: 'ada@example.com', where: 'commit 1 in braindog' }, AGENT));
+  const [asked] = open(sql);
+  assert.ok(asked, 'nothing asked about the owner held twice');
+  assert.equal(k.question(asked), "Are Kas (an address at kas.example) and Kas both you? Yes keeps Kas and carries over the other's addresses, handles and where they were met.");
+  assert.equal(k.count('people'), 3, 'the owner was folded without asking');
+  /* Asked once, however much more is met. */
+  value(k.meet({ name: 'Grace Hopper', email: 'grace@example.com', where: 'commit 2 in braindog' }, AGENT));
+  assert.deepEqual(open(sql), [asked]);
+  value(k.decide(asked!, { decide: { option: 'accept', reason: 'both me' } }, 'p_owner'));
+  assert.equal(k.get(second.id, { includeDeleted: true })!.fields.merged_into, self.id);
+  assert.equal(k.get(self.id)!.fields.note, 'Founder, Tidepool Apps');
+  sql.close();
+});
+
+test('ONE WHO GOES BY THE OWNER’S OTHER NAME IS ASKED ABOUT AS HIM, and what he is met by after lands on his row by key', async () => {
+  const { k, sql } = await record();
+  const self = value<Entry>(k.create('people', { name: 'Kas', email: 'kas@kas.example', aliases: ['Karim Assaf'], self: true }, OWNER));
+  const met = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karim@karimassaf.example', where: 'commit 1 in lumacraft' }, AGENT));
+  assert.equal(met.created, true);
+  assert.notEqual(met.row?.id, self.id, 'a commit was folded into the owner on its own');
+  const [asked] = open(sql);
+  assert.match(k.question(asked!) ?? '', /^Are Kas .*and Karim Assaf .*both you\? Yes keeps Kas /u);
+  assert.doesNotMatch(k.question(asked!) ?? '', /people#|@/u);
+  value(k.decide(asked!, { decide: { option: 'accept', reason: 'me' } }, 'p_owner'));
+  assert.equal(k.count('people'), 1);
+  const again = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karim@karimassaf.example', where: 'commit 2 in lumacraft' }, AGENT));
+  assert.equal(again.matched_by, 'key');
+  assert.equal(again.row?.id, self.id);
+  sql.close();
+});
+
+test('THE OWNER’S NAME IN A MAIL IS NOBODY’S EVIDENCE, a no is never asked again, and two rows marked as him ask nothing', async () => {
+  const { k, sql } = await record();
+  value(k.create('people', { name: 'Kas', email: 'kas@kas.example', self: true }, OWNER));
+  /* Mail only: a stranger signing as Kas is not asked about as the owner. */
+  value(k.meet({ email: '"Kas" <kas@stranger.test>', source: 'mail from stranger.test' }, AGENT));
+  assert.deepEqual(open(sql).filter((id) => /both you/u.test(k.question(id) ?? '')), []);
+
+  /* A commit author by the owner's name is asked about once; a no stands. */
+  value(k.meet({ name: 'Kas', email: 'kas@elsewhere.example', where: 'commit 1 in braindog' }, AGENT));
+  const asked = open(sql).filter((id) => /both you/u.test(k.question(id) ?? ''));
+  assert.equal(asked.length, 1);
+  value(k.decide(asked[0]!, { decide: { option: 'reject', reason: 'not me' } }, 'p_owner'));
+  value(k.meet({ name: 'Ada Lovelace', email: 'ada@example.com', where: 'commit 2 in braindog' }, AGENT));
+  assert.deepEqual(open(sql).filter((id) => /both you|all you/u.test(k.question(id) ?? '')), []);
+  sql.close();
+
+  const two = await record();
+  value(two.k.create('people', { name: 'Kas', email: 'kas@kas.example', self: true }, OWNER));
+  value(two.k.create('people', { name: 'Kas', email: 'kas@other.example', self: true }, OWNER));
+  value(two.k.meet({ name: 'Ada Lovelace', email: 'ada@example.com', where: 'commit 1 in braindog' }, AGENT));
+  assert.deepEqual(open(two.sql), []);
+  two.sql.close();
+});
+
 test('A QUESTION WHOSE PEOPLE BECAME ONE IS TAKEN OFF THE LIST', async () => {
   const { k, sql } = await record();
   value(k.create('people', { name: 'Owen Hartley', email: 'owen@fanline.example', keys: ['email:ohartley@old.example'] }, OWNER));

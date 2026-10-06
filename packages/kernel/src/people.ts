@@ -589,6 +589,9 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   const fresh = reask(deps, list, [person.id, ...touched]);
   if (!fresh.ok) return fresh as Result<Met>;
   const final = kept ?? rowById(deps.sql, person.id) ?? person;
+  /* AND THE OWNER HELD TWICE IS ASKED ABOUT, whoever this meeting was. */
+  const me = askSelf(deps, list);
+  if (!me.ok) return me as Result<Met>;
   /* SOMEBODY THE RECORD VOUCHES FOR AT A DOMAIN NOBODY HOLDS may make it a company worth asking about. Mail never does. */
   if (!s.untrusted) {
     const company = askDomainOrgs(deps, list, final);
@@ -875,8 +878,9 @@ const keysOfOrg = (orgs: DeclaredList<OrgFields>, row: Row): string[] => {
 
 /**
  * What a meeting the record does not believe would have given an organisation it already holds (`fresh`), asked once
- * (research-audit-21 H1, M12): "Is the Stripe met in mail from evil.test the Stripe you already know?". Nothing is
- * written until the owner says yes, and an address or a key offered before is never offered again.
+ * (research-audit-21 H1, M12): "Is mail from evil.test the Stripe you already know?", the domain said plainly so he sees
+ * what a yes files (research-audit-23 M5). Nothing is written until the owner says yes, and an address or a key offered
+ * before is never offered again.
  *
  * WHAT THE ORGANISATION ALREADY ANSWERS TO IS NOT ASKED ABOUT: a shared inbox at a domain it holds, and the payee key a
  * bank text spells with the very name it was matched by, which the name files there anyway.
@@ -907,13 +911,26 @@ function offerOrg(deps: PeopleDeps, orgs: DeclaredList<OrgFields>, row: Row, s: 
   const patch = orgOfferPatch(orgs, row, offered);
   if (Object.keys(patch).length === 0) return ok(null);
   const known = orgNameOf(deps, orgs, row);
-  const what = offered.some((k) => kindOfKey(k) === 'domain')
-    ? 'mail from that domain'
-    : offered.every((k) => kindOfKey(k) === 'bank')
-      ? 'payments written that way'
-      : 'what it was met by';
   const said = name === undefined || orgNameKey(name) === orgNameKey(known) ? known : name;
-  const question = `Is the ${said} met in ${s.source} the ${known} you already know? Yes files ${what} under ${known}.`;
+  /* THE DOMAIN IS THE QUESTION (research-audit-23 M5): the name and the source are whatever the sender wrote, so the
+     sentence leads with the domain a yes files, and what it called itself comes after, never in its place. */
+  /* AN ADDRESS IS NOT ITS DOMAIN: a yes on billing@gmail.com files that one address, never all of gmail.com's mail. */
+  const hostOf = (k: string): string => {
+    const host = valueOfKey(k).split('@')[1] ?? '';
+    return registrable(host) ?? host;
+  };
+  const whole = [...new Set(offered.filter((k) => kindOfKey(k) === 'domain').map(valueOfKey))];
+  const loose = offered.filter((k) => kindOfKey(k) === 'email' && hostOf(k) !== '' && !whole.includes(hostOf(k)));
+  const hosts = [...new Set(loose.map(hostOf))];
+  let question: string;
+  if (whole.length + hosts.length > 0) {
+    const from = listed([...whole, ...hosts.map((h) => `an address at ${h}`)]);
+    const files = listed([...(whole.length > 0 ? [`mail from ${listed(whole)}`] : []), ...(loose.length === 0 ? [] : [loose.length === 1 ? 'that address' : 'those addresses'])]);
+    question = `Is mail from ${from} the ${known} you already know? Yes files ${files} under ${known}.${said === known ? '' : ` It was met as ${said}.`}`;
+  } else {
+    const what = offered.every((k) => kindOfKey(k) === 'bank') ? 'payments written that way' : 'what it was met by';
+    question = `Is the ${said} met in ${s.source} the ${known} you already know? Yes files ${what} under ${known}.`;
+  }
   const opened = deps.propose({ question, body_kind: 'rowset', body: { register: orgs.register, rows: [{ at: spoken, version: row.version, patch }], offer: { keys: offered } } });
   return opened.ok ? ok(opened.value.id) : (opened as Result<never>);
 }
@@ -1097,6 +1114,10 @@ function peopleAt(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>
     .filter((r) => textOf(r.fields[list.fields.merged_into]) === undefined);
 }
 
+/** Whether a person holds an address at this very domain, not at a part of it (`ops@mail.acme.example` is not). */
+const holdsAt = (list: DeclaredList<MeetsFields>, row: Row, domain: string): boolean =>
+  keysOfRow(list, row).some((k) => kindOfKey(k) === 'email' && valueOfKey(k).split('@')[1] === domain);
+
 /** The fewest people vouched for at one domain that make it worth asking whether it is an organisation. */
 const DOMAIN_PEOPLE_LEAST = 2;
 
@@ -1148,7 +1169,9 @@ function askDomainOrgs(deps: PeopleDeps, list: DeclaredList<MeetsFields>, row: R
       domain,
     );
     if (asked !== undefined) continue;
-    const people = peopleAt(deps, list, domain).filter((r) => vouched(deps, list, r));
+    /* ONLY WHO THE QUESTION CAN NAME: vouched for, with an address at the domain itself. A subdomain's address is said
+       by its own host, and a yes links exactly these (`joinOrganisation`), never one the sentence left out. */
+    const people = peopleAt(deps, list, domain).filter((r) => vouched(deps, list, r) && holdsAt(list, r, domain));
     /* ONE PERSON HELD TWICE IS ONE: two rows of one name, or two an open question asks about as one person, count once,
        so the owner and his own other name are never "two people" at his own domain. */
     const together = openAsked(deps, list)
@@ -1189,9 +1212,12 @@ function askDomainOrgs(deps: PeopleDeps, list: DeclaredList<MeetsFields>, row: R
 }
 
 /**
- * After the owner accepts a question that asked about an organisation from its people's domain: everybody at that domain
- * who is with nobody yet is put in the organisation that now holds it. For the kernel to run after every decision, in
- * its transaction; a question not accepted, not one of these, or one whose domain nobody holds, links nobody.
+ * After the owner accepts a question that asked about an organisation from its people's domain: the people it named
+ * (`join.people`, kept when it was filed) are put in the organisation that now holds the domain, each only while they
+ * are with nobody yet, still vouched for, and still hold an address at the domain itself (research-audit-23 M4). Nobody
+ * who arrived after it was asked, nobody only mail vouches for, and no subdomain's address. For the kernel to run after
+ * every decision, in its transaction; a question not accepted, not one of these, or one whose domain nobody holds,
+ * links nobody.
  */
 export function joinOrganisation(deps: PeopleDeps, suggestion: string): Result<string[]> {
   const list = deps.list;
@@ -1201,10 +1227,12 @@ export function joinOrganisation(deps: PeopleDeps, suggestion: string): Result<s
   const q = deps.sql.one<{ body: string }>("SELECT body FROM suggestion WHERE id = ? AND body_kind = 'rowset' AND status = 'resolved' AND resolved_as = 'addressed'", suggestion);
   if (!q) return ok([]);
   let domain: unknown;
+  let named: string[];
   try {
-    const body = JSON.parse(q.body) as { register?: unknown; join?: { domain?: unknown } };
+    const body = JSON.parse(q.body) as { register?: unknown; join?: { domain?: unknown; people?: unknown } };
     if (body.register !== orgs.register) return ok([]);
     domain = body.join?.domain;
+    named = listOf(body.join?.people);
   } catch {
     return ok([]);
   }
@@ -1212,8 +1240,12 @@ export function joinOrganisation(deps: PeopleDeps, suggestion: string): Result<s
   const held = holderOf(deps.sql, `domain:${domain}`);
   if (held === null || held.register !== orgs.register) return ok([]);
   const linked: string[] = [];
-  for (const person of peopleAt(deps, list, domain)) {
-    if (textOf(person.fields[list.fields.org]) !== undefined) continue;
+  for (const at of named) {
+    /* THE PERSON AS THEY ARE NOW: one folded since is the row they were folded into, which is them. */
+    const raw = rowAt(deps, list, at);
+    const person = raw === null ? null : liveEnd(deps, list, raw);
+    if (person === null || linked.includes(person.id)) continue;
+    if (textOf(person.fields[list.fields.org]) !== undefined || !vouched(deps, list, person) || !holdsAt(list, person, domain)) continue;
     const wrote = deps.write(list.register, person.id, { [list.fields.org]: held.id }, { version: person.version });
     if (!wrote.ok) return wrote as Result<never>;
     linked.push(person.id);
@@ -1327,16 +1359,7 @@ const WROTE_READ = 50;
  * is what the verification is for, so an unverified mail says nothing.
  */
 function wroteTo(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, mails: readonly string[]): boolean {
-  const self = list.fields.self;
-  if (self === undefined) return false;
-  const own = deps.sql
-    .all<{ id: string; seq: number | null; version: number; fields: string }>(
-      `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} AND json_extract(fields, ?) = 1`,
-      ...live(list.register, list.fields.merged_into),
-      path(self),
-    )
-    .map(hydrate);
-  const mine = new Set(own.flatMap((r) => keysOfRow(list, r)).filter((k) => kindOfKey(k) === 'email'));
+  const mine = new Set(selfRows(deps, list).flatMap((r) => keysOfRow(list, r)).filter((k) => kindOfKey(k) === 'email'));
   if (mine.size === 0) return false;
   const wanted = new Set(mails.map((m) => keyOf('email', m)).filter((k): k is string => k !== null));
   for (const mail of mails) {
@@ -1393,6 +1416,12 @@ function alike(x: string, y: string): boolean {
   return lx === ly || (lx.length === 1 && ly.startsWith(lx)) || (ly.length === 1 && lx.startsWith(ly));
 }
 
+/** Whether one of these handles spells a name, whole or in its short form: `karimassaf91` spells Karim Assaf. */
+const spelled = (handles: ReadonlySet<string>, name: string): boolean => {
+  const run = stem(compact(name));
+  return (run.length >= STEM_LEAST && handles.has(run)) || shortForms(name).some((f) => handles.has(f));
+};
+
 /**
  * Whether two people may be one, worth a question: names that are `alike`, by name or alias; one handle held by both
  * under two names; or one's handle spelling the other's name, whole or in its short form ("rohanmehta" and Rohan
@@ -1403,12 +1432,7 @@ function similar(list: DeclaredList<MeetsFields>, a: Row, b: Row): boolean {
   const [sa, sb] = [stemsOf(list, a), stemsOf(list, b)];
   if ([...sa].some((s) => sb.has(s))) return true;
   if (xs.some((x) => ys.some((y) => alike(x, y)))) return true;
-  const spells = (stems: Set<string>, names: readonly string[]): boolean =>
-    names.some((n) => {
-      const run = stem(compact(n));
-      return (run.length >= STEM_LEAST && stems.has(run)) || shortForms(n).some((f) => stems.has(f));
-    });
-  return spells(sa, ys) || spells(sb, xs);
+  return ys.some((n) => spelled(sa, n)) || xs.some((n) => spelled(sb, n));
 }
 
 /** A text as `candidates` searches a row's fields for it: lower case, with no spaces, dots, dashes or underscores. */
@@ -1677,9 +1701,63 @@ function askCluster(deps: PeopleDeps, list: DeclaredList<MeetsFields>, rows: rea
   const named = (r: Row) => `${nameOfRow(list, r) || 'someone unnamed'}${evidence(deps, list, r)}`;
   const one = nameOfRow(list, keep) || 'the first';
   const likely = confidence === undefined ? '' : ' They look likely to be.';
-  const question = `Are ${listed(sorted.map(named))} one person?${likely} Yes keeps ${one} and carries over the other${folds.length === 1 ? "'s" : "s'"} addresses, handles and where they were met.`;
+  /* THE OWNER IS ASKED ABOUT HIMSELF AS HIMSELF: kept is always his own row, so the question says "you". */
+  const mine = list.fields.self !== undefined && keep.fields[list.fields.self] === true;
+  const who = mine ? (sorted.length === 2 ? 'both you' : 'all you') : 'one person';
+  const question = `Are ${listed(sorted.map(named))} ${who}?${likely} Yes keeps ${one} and carries over the other${folds.length === 1 ? "'s" : "s'"} addresses, handles and where they were met.`;
   const opened = deps.propose({ question, body_kind: 'rowset', body });
   return opened.ok ? ok(opened.value.id) : (opened as Result<never>);
+}
+
+/** The live rows marked as the record's own person, oldest first. */
+function selfRows(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>): Row[] {
+  const self = list.fields.self;
+  if (self === undefined) return [];
+  return deps.sql
+    .all<{ id: string; seq: number | null; version: number; fields: string }>(
+      `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} AND json_extract(fields, ?) = 1 ORDER BY seq`,
+      ...live(list.register, list.fields.merged_into),
+      path(self),
+    )
+    .map(hydrate);
+}
+
+/**
+ * THE OWNER HELD TWICE: once one row is marked as his own, every other person who goes by his name or one of his other
+ * names, whose name one of his handles spells, or who holds one of his handles, is one question, "Are Kas and Karim Assaf both you?", never a fold made on its
+ * own. Only somebody the record vouches for (a mailed name is nobody's evidence), never a row another member made, and
+ * asked once: a pair he answered or undid is not asked again, and one already waiting is joined, not asked twice.
+ * Accepting carries their addresses and handles onto his row, so what he is met by after lands there by key.
+ *
+ * A ROW NO MEETING EVER TOUCHES IS FOUND HERE: the second "Kas" he typed is never met by any key, so a question that
+ * waited for a meeting of it would never come.
+ */
+function askSelf(deps: PeopleDeps, list: DeclaredList<MeetsFields>): Result<string | null> {
+  const self = list.fields.self;
+  if (self === undefined) return ok(null);
+  const own = selfRows(deps, list);
+  /* TWO ROWS MARKED AS HIM IS NOT A QUESTION THIS CAN WORD: which is him is his to say first. */
+  if (own.length !== 1) return ok(null);
+  const me = own[0]!;
+  const names = new Set(namesOf(list, me));
+  const handles = stemsOf(list, me);
+  const near = candidates(deps, list, me)
+    .filter(
+      (r) =>
+        r.fields[self] !== true &&
+        deps.othersRow?.(r.id) !== true &&
+        (namesOf(list, r).some((n) => names.has(n) || spelled(handles, n)) || [...stemsOf(list, r)].some((h) => handles.has(h))) &&
+        vouched(deps, list, r) &&
+        !refused(deps, list, me, r),
+    )
+    .slice(0, CLUSTER_MOST - 1);
+  if (near.length === 0) return ok(null);
+  const ids = [me.id, ...near.map((r) => r.id)];
+  const waiting = openAsked(deps, list).filter((q) => q.offer === null && q.members.some((m) => ids.includes(m.id)));
+  if (waiting.length === 0) return askCluster(deps, list, [me, ...near]);
+  /* ONE QUESTION ALREADY WAITING ON ALL OF THEM is the answer, without searching the cluster again at every meeting. */
+  if (waiting.some((q) => ids.every((id) => q.members.some((m) => m.id === id)))) return ok(null);
+  return askOrExtend(deps, list, [me, ...near]);
 }
 
 /* ── the questions waiting on the owner ──────────────────────────────── */

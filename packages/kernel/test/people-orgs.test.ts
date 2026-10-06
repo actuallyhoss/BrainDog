@@ -136,7 +136,7 @@ test('A MAIL NAMING AN ORGANISATION ALREADY HELD WRITES ITS LINE AND NOTHING ELS
   assert.equal(sql.one("SELECT 1 AS n FROM entity_key WHERE key = 'domain:evil.test'"), undefined);
   assert.ok(met.question);
   const question = k.question(met.question) ?? '';
-  assert.match(question, /^Is the Stripe met in mail from evil\.test the Stripe you already know\? Yes files mail from that domain under Stripe\./u);
+  assert.equal(question, 'Is mail from evil.test the Stripe you already know? Yes files mail from evil.test under Stripe.');
   assert.doesNotMatch(question, /organisations#|@/u);
 
   /* Asked once: the same mail again opens nothing, and a no is never asked again. */
@@ -175,6 +175,7 @@ test('A COMMIT NAMING AN ORGANISATION IS ASKED ABOUT TOO, and accepting gives it
   assert.equal(k.get(acme.id)!.fields.domain, undefined);
   /* A later line on the organisation keeps the question one he can still accept. */
   value(k.meet({ kind: 'organisation', name: 'Acme Labs', where: 'commit 2 in braindog' }, AGENT));
+  assert.match(k.question(met.question!) ?? '', /^Is mail from acmelabs\.example the Acme Labs you already know\? /u);
   accept(k, met.question!);
   assert.equal(k.get(acme.id)!.fields.domain, 'acmelabs.example');
   assert.equal(value<Met>(k.meet({ email: 'billing@acmelabs.example', source: 'mail from acmelabs.example' }, AGENT)).row?.id, acme.id);
@@ -310,7 +311,7 @@ test('A PAIR HE SAID NO TO IS NEVER ASKED AGAIN, and names that only share a wor
 });
 
 test(
-  'ACCEPTING "Add Acme?" PUTS EVERYBODY AT ITS DOMAIN IN IT AT ONCE, not only whoever is met next',
+  'ACCEPTING "Add Acme?" PUTS THE PEOPLE IT NAMED IN IT AT ONCE, not only whoever is met next',
   async () => {
     const { k, sql } = await record();
     const ada = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'ada@acme.example', where: 'commit 1 in braindog' }, AGENT));
@@ -320,6 +321,50 @@ test(
     const acme = sql.one<{ id: string }>("SELECT id FROM entry WHERE register = 'organisations' AND deleted_at IS NULL")!.id;
     assert.equal(k.get(ada.row!.id)!.fields.org, acme);
     assert.equal(k.get(grace.row!.id)!.fields.org, acme);
+    sql.close();
+  },
+);
+
+test('THE DOMAIN IS SAID PLAINLY, and what a sender called itself comes after it, never in its place (research-audit-23 M5)', async () => {
+  const { k, sql } = await record();
+  value(k.create('organisations', { name: 'Stripe', keys: ['bank:stripe'] }, OWNER));
+  /* Found by its payee key, under a name the sender chose and a source that says nothing of the domain. */
+  const met = value<Met>(k.meet({ kind: 'organisation', name: 'Stripe Billing', keys: ['bank:STRIPE'], domain: 'evil.test', source: 'a calendar invite' }, AGENT));
+  assert.ok(met.question);
+  assert.equal(k.question(met.question) ?? '', 'Is mail from evil.test the Stripe you already know? Yes files mail from evil.test under Stripe. It was met as Stripe Billing.');
+  sql.close();
+
+  /* An address at a public mailbox is that one address: a yes never files all of gmail.com's mail. */
+  const two = await record();
+  value(two.k.create('organisations', { name: 'Stripe', domain: 'stripe.example' }, OWNER));
+  const mailed = value<Met>(two.k.meet({ kind: 'organisation', name: 'Stripe', email: 'stripe.billing@gmail.com', source: 'mail from gmail.com' }, AGENT));
+  assert.equal(two.k.question(mailed.question!), 'Is mail from an address at gmail.com the Stripe you already know? Yes files that address under Stripe.');
+  two.sql.close();
+});
+
+test(
+  'A YES ON "Add Acme?" LINKS ONLY WHO IT NAMED: nobody who came later, nobody only mail vouches for, no subdomain address (research-audit-23 M4)',
+  async () => {
+    const { k, sql } = await record();
+    const ada = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'ada@acme.example', where: 'commit 1 in braindog' }, AGENT));
+    /* At a part of the domain: its own host, so neither counted nor named. */
+    const omar = value<Met>(k.meet({ name: 'Omar Said', email: 'omar@mail.acme.example', where: 'commit 2 in braindog' }, AGENT));
+    assert.deepEqual(open(sql), [], 'a subdomain address counted as a second person at the domain');
+    /* Mail vouches for nobody. */
+    const eve = value<Met>(k.meet({ name: 'Eve Mallory', email: 'eve@acme.example', source: 'mail from acme.example' }, AGENT));
+    const grace = value<Met>(k.meet({ name: 'Grace Hopper', email: 'grace@acme.example', where: 'commit 3 in braindog' }, AGENT));
+    const [asked] = open(sql);
+    assert.equal(k.question(asked!), 'Add Acme? Ada Lovelace and Grace Hopper have an address at acme.example. Yes adds Acme and puts them in it.');
+    /* Arrived after it was asked. */
+    const linus = value<Met>(k.meet({ name: 'Linus Torvalds', email: 'linus@acme.example', where: 'commit 4 in braindog' }, AGENT));
+
+    accept(k, asked!);
+    const acme = sql.one<{ id: string }>("SELECT id FROM entry WHERE register = 'organisations' AND deleted_at IS NULL")!.id;
+    assert.equal(k.get(ada.row!.id)!.fields.org, acme);
+    assert.equal(k.get(grace.row!.id)!.fields.org, acme);
+    assert.equal(k.get(linus.row!.id)!.fields.org, undefined, 'somebody who arrived after the question was put in it');
+    assert.equal(k.get(eve.row!.id)!.fields.org, undefined, 'somebody only mail vouches for was put in it');
+    assert.equal(k.get(omar.row!.id)!.fields.org, undefined, 'a subdomain address was put in it');
     sql.close();
   },
 );

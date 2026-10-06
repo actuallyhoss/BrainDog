@@ -227,9 +227,14 @@ test('A RUN IS PLACED BY ITS REMOTE OR ITS FOLDER, AND A BARE NAME OR TWO PROJEC
   assert.equal(placed[9], null, 'a scratch folder is in no project');
   assert.equal(done.runs.wrote, 2);
 
-  /* One question for each place and guess, counting every run that worked there. */
+  /* One question for each whole place and guess, counting every run that worked there: the remote and the folder that
+     says no remote are two places, each said with its owner or its folder since they share a name. */
   const asked = kinds(done.suggestions, 'run-project').map((s) => s.question).sort();
-  assert.deepEqual(asked, ['2 runs worked in tallow. Is that Tallow or Tallow Site?', '4 runs worked in lantern. Is that Lantern?']);
+  assert.deepEqual(asked, [
+    '2 runs worked in tallow. Is that Tallow or Tallow Site?',
+    '3 runs worked in acme/Lantern. Is that Lantern?',
+    'A run worked in lantern in Code. Is that Lantern?',
+  ]);
   sql.close();
 });
 
@@ -464,7 +469,7 @@ test('A BROAD FOLDER, OR A FOLDER THE RUN’S OWN REPOSITORY CONTRADICTS, IS A Q
 
   const asked = kinds(done.suggestions, 'run-project').map((s) => s.question);
   assert.ok(asked.includes('A run worked in notes. Is that Workbench?'), asked.join(' / '));
-  assert.ok(asked.includes('A run worked in lantern. Is that Brightside or Lantern?'), asked.join(' / '));
+  assert.ok(asked.includes('A run worked in lantern in brightside. Is that Brightside or Lantern?'), asked.join(' / '));
   assert.equal(k.get(game)?.fields.project, '');
   assert.ok(asked.includes('A run worked in Game. Is that Coinfish?'), 'the broad folder set aside, its own folder’s name is the guess');
   assert.ok(!asked.some((q) => q.includes('Game') && q.includes('Workbench')), asked.join(' / '));
