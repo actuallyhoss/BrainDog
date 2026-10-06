@@ -273,3 +273,16 @@ test('TWO PROJECTS’ MEASURES OF ONE NAME ARE TWO MEASURES, each named for its 
   );
   assert.deepEqual(plain.map((m) => [m.name, m.of]), [['AOV', undefined]]);
 });
+
+test('TWO UNTITLED PROJECTS’ MEASURES OF ONE NAME ARE STILL TWO MEASURES, kept apart by the project and named by neither (audit 16, L9)', () => {
+  /* A project with no title has no name to draw, so `of` is left out, and before this the two were one line. */
+  const readings = [
+    { name: 'Orders', value: 3, at: '2026-09-16T08:00:00.000Z', project: 'P_ONE' },
+    { name: 'Orders', value: 4, at: '2026-09-17T08:00:00.000Z', project: 'P_ONE' },
+    { name: 'Orders', value: 80, at: '2026-09-16T09:00:00.000Z', project: 'P_TWO' },
+    { name: 'Orders', value: 90, at: '2026-09-17T09:00:00.000Z', project: 'P_TWO' },
+  ];
+  const series = measureSeries(readings, { nowMs: NOW, back: 7, fallback: '' });
+  assert.deepEqual(series.map((m) => [m.name, m.of ?? null, m.latest?.value]).sort(), [['Orders', null, 4], ['Orders', null, 90]]);
+  assert.doesNotMatch(JSON.stringify(series), /P_ONE|P_TWO/, 'the project id was drawn');
+});

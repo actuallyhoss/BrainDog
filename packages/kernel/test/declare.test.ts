@@ -1794,7 +1794,8 @@ test('A MATCH IS ABOUT WHAT AN ARRIVAL HOLDS, and a field it does not hold match
   const said = validateDeclaration(ingest({ match: { all: [{ field: 'amount', gt: 0 }] } }));
   assert.equal(said?.code, 'MATCH_FIELD_UNKNOWN');
   assert.equal(said?.at, 'match');
-  assert.deepEqual(said?.allowed, ['from', 'to', 'subject', 'body', 'channel', 'state', 'ts']);
+  /* AND THE SENDER IN ITS THREE PARTS beside `from` (batch 17, `senderOf` in `ingest.ts`), which a pattern can match by. */
+  assert.deepEqual(said?.allowed, ['from', 'from_name', 'from_address', 'from_domain', 'to', 'subject', 'body', 'channel', 'state', 'ts']);
 
   /* A VALUE THE FIELD CAN ACTUALLY HOLD, PER FIELD, and that is the assertion rather than a chore. This
      loop used to ask every one of the seven `is: 'x'`, which is a legal question of the four text ones and
@@ -1802,7 +1803,7 @@ test('A MATCH IS ABOUT WHAT AN ARRIVAL HOLDS, and a field it does not hold match
      passed because nothing compiled the predicate at install. It does now, so the loop has to name a real
      value, which is the same thing the check is there to make authors do. */
   const legal: Record<string, string> = {
-    from: 'x', to: 'x', subject: 'x', body: 'x',
+    from: 'x', from_name: 'x', from_address: 'x', from_domain: 'x', to: 'x', subject: 'x', body: 'x',
     channel: 'email', state: 'untriaged', ts: '2026-01-01T00:00:00.000Z',
   };
   for (const [field, is] of Object.entries(legal))
@@ -2359,9 +2360,10 @@ test('THE CLOSED LISTS ARE `42 §4.4`’s OWN, and this is the test that stops t
    *   `icon` · `holds` · `label` · `deadline` · `qualifies` · `unit`  drawn by `apps/web`.
    *   `search`           on a FIELD, which is what `fts.ts` actually reads.
    *   `derived`          the kernel's own flag, which refuses a write and skips validation.
+   *   `org`              the organisations `meet` writes (`roles.ts`), batch 17, beside `rates` and `meets`.
    */
   const undocumented = (mine: readonly string[], theirs: readonly string[]) => mine.filter((k) => !theirs.includes(k)).sort();
-  assert.deepEqual(undocumented(register, REG), ['done', 'finished', 'holds', 'icon', 'id', 'state', 'steps']);
+  assert.deepEqual(undocumented(register, REG), ['done', 'finished', 'holds', 'icon', 'id', 'org', 'state', 'steps']);
   assert.deepEqual(undocumented(field, FLD), ['deadline', 'derived', 'label', 'qualifies', 'search', 'to', 'unit']);
 });
 

@@ -690,10 +690,10 @@ test('A `match:` ON `ts` OR `state` FIRES, and it used to install cleanly and ne
   const other = openSqlite();
   const bad = await openRecord(other, fixedClock(NOW));
   const said = await bad.install([ACCOUNTS, TRANSACTIONS, scoped({ field: 'cc', is: 'x' }, 'by-cc')]);
-  assert.equal(said.ok, false, 'a field outside the seven installed');
+  assert.equal(said.ok, false, 'a field outside the ten installed');
   const why = (said as { refusal: { code: string; fix: string } }).refusal;
   assert.equal(why.code, 'MATCH_FIELD_UNKNOWN');
-  assert.match(why.fix, /from, to, subject, body, channel, state, ts/);
+  assert.match(why.fix, /from, from_name, from_address, from_domain, to, subject, body, channel, state, ts/);
   other.close();
 });
 
@@ -724,7 +724,10 @@ test('A REGISTER REFUSING WHAT A PATTERN READ DOWNGRADES IT, and never discards 
   assert.deepEqual(JSON.parse(sg.body), {
     register: 'transactions',
     rows: [{ amount: { amount: 131_624, currency: 'EGP' } }],
+    count: 1,
     ingest: 'hsbc-sms',
+    /* NO PAYEE WAS READ, so the row is keyed on the way its money moved alone. */
+    joins_on: '["","amount:+"]',
     context: 'The part it would not take is its merchant.',
   });
   /* AND IT IS ASKED IN A PERSON'S WORDS: the list by its name, the field by its label, and neither id. */

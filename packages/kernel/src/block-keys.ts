@@ -29,9 +29,14 @@ const own = <T>(table: Readonly<Record<string, T>>, key: string): T | undefined 
  * on a page without one). `icon` is the glyph in the well beside a block's heading, so every tile wears one; it was a
  * section's alone, and a page that gave its stat tile a glyph was refused at install while the host drew it fine.
  */
+/*
+ * `key` IS THE BLOCK'S NAME FOR THE ENGINE (DIRECTION §38), what a page's look (`compose.ts`) leads with, orders, hides
+ * and pins by. A block may declare one; one that does not is named by `defaultBlockKey` below, so every block a read
+ * answers carries one and a host keys what it draws by it rather than by its place.
+ */
 const GENERAL = [
   'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit', 'target', 'authored', 'empty',
-  'tone', 'body', 'when', 'opening', 'from', 'horizon', 'inherit', 'working', 'area', 'icon',
+  'tone', 'body', 'when', 'opening', 'from', 'horizon', 'inherit', 'working', 'area', 'icon', 'key',
 ] as const;
 
 /**
@@ -232,3 +237,77 @@ const PAGE_INSTEAD: Readonly<Record<string, string>> = {
 /** The sentence for a page key this record does not read. */
 export const unreadPageKey = (key: string): string =>
   `${key}: is not a key a page has. ${own(PAGE_INSTEAD, key) ?? 'Take it off; the keys a page reads are listed with this refusal.'}`;
+
+/* ── a block's key ───────────────────────────────────────────────────────── */
+
+/**
+ * What a declared `key:` looks like: lower-case letters, digits, `_` and `-`, starting with a letter. No `{{`, so a
+ * template's fill never touches one, and short, because it is a handle and never words a person reads.
+ */
+export const BLOCK_KEY = /^[a-z][a-z0-9_-]{0,47}$/u;
+
+/**
+ * 32-bit FNV-1a over the UTF-16 units of `text`, in base 36. Not a digest: two blocks on one page that hash alike are
+ * told apart by `keyedBlocks`, so all this needs is to be quick, synchronous and the same on every host. A look's
+ * `basis` is one too (`compose.ts`).
+ */
+export function shortHash(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36).padStart(7, '0');
+}
+
+/** Whether a block declares a key this record reads: a string of `BLOCK_KEY`'s shape. */
+const declaredKey = (block: unknown): string | null => {
+  const key = block !== null && typeof block === 'object' ? (block as { key?: unknown }).key : undefined;
+  return typeof key === 'string' && BLOCK_KEY.test(key) ? key : null;
+};
+
+/**
+ * THE KEY A BLOCK HAS WHEN IT DECLARES NONE: a hash of its kind, its source and its heading, as written.
+ *
+ * THOSE THREE AND NOTHING ELSE, because they are what a person means by "that block": the same list under the same
+ * heading is the same block after its columns, its limit or its `where:` change, and a look that pinned it still holds.
+ * A template's block is keyed before its row fills it (`resolvePages`), so every project's page answers one key for
+ * "Steps" and one look covers them all.
+ */
+export function defaultBlockKey(block: unknown): string {
+  const b = block !== null && typeof block === 'object' ? (block as { kind?: unknown; source?: unknown; heading?: unknown }) : {};
+  const part = (v: unknown): string => (typeof v === 'string' ? v : '');
+  return `k${shortHash(JSON.stringify([part(b.kind), part(b.source), part(b.heading)]))}`;
+}
+
+/** A block's key: the one it declares, or its default. Two blocks of one page may share it; `keyedBlocks` parts them. */
+export const blockKeyOf = (block: unknown): string => declaredKey(block) ?? defaultBlockKey(block);
+
+/**
+ * THE PAGE'S BLOCKS, EACH WITH A KEY NO OTHER BLOCK OF IT HAS.
+ *
+ * DECLARED KEYS ARE TAKEN FIRST, so a default never takes a key an author wrote further down the page. Then each block
+ * in order takes its own, and a second block of one kind, source and heading (two notes with neither, say) takes it with
+ * `-2`, the third `-3`, so the parting follows the declared order and a look that reorders the page does not move it.
+ * `taken` is the keys already given out on this page, so the blocks other packs add are parted from the page's own.
+ */
+export function keyedBlocks<T>(blocks: readonly T[], taken: Set<string> = new Set()): (T & { key: string })[] {
+  const declared = new Set<string>();
+  for (const b of blocks) {
+    const key = declaredKey(b);
+    if (key !== null && !taken.has(key)) declared.add(key);
+  }
+  const given = new Set<string>();
+  return blocks.map((b) => {
+    if (b === null || typeof b !== 'object') return b as T & { key: string };
+    const own = declaredKey(b);
+    let key = own ?? defaultBlockKey(b);
+    if (given.has(key) || taken.has(key) || (key !== own && declared.has(key))) {
+      const base = key;
+      for (let n = 2; given.has(key) || taken.has(key) || declared.has(key); n += 1) key = `${base}-${n}`;
+    }
+    given.add(key);
+    taken.add(key);
+    return { ...b, key };
+  });
+}

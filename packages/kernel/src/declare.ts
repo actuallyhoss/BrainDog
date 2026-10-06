@@ -43,7 +43,7 @@ import { MAP_TYPES } from './map.ts';
 import { ON_CONFLICTS } from './ingest.ts';
 import { STRIP_MOST } from './ingest.ts';
 import { HOME_CURRENCY_SETTING, convertMinor, homeFrom, rateFor } from './fx.ts';
-import { HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, type RoleKey, type RoleList } from './roles.ts';
+import { HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, type RoleKey, type RoleList, type RoleName } from './roles.ts';
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
    can read. A copy of its regular expression here would be a second list, and `MATCH_FIELDS` above
    is what two lists that disagree cost. */
@@ -53,7 +53,8 @@ import { pairsFault } from './pairs.ts';
 import { DELETE_RULES } from './referenced.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
-import { BLOCK_INSTALLS, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
+import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, keyedBlocks, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
+import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES } from './compose.ts';
 /* THE KINDS THAT READ THEMSELVES, admitted into `BLOCK_KINDS` and asked to check their own blocks at install. */
 import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
 /* THE PAGE WORDS THE INSTALL AND THE READ REFUSE IN ONE SENTENCE: a section's host panel, a path's short view and a roadmap's columns. */
@@ -78,8 +79,11 @@ const IDENT = /^(?!.*__)[a-z][a-z0-9_]{0,31}$/;
 /* `script` IS THE NINTH, and migration 12 rebuilds the CHECK that holds the database to this list. A person's or an
    agent's code, run by a host in a sandbox and never by the record (`script.ts`).
    `job` IS THE TENTH, and migration 18 rebuilds the same CHECK again: what one run of Claude Code on the owner's own
-   machine may do, approved once in Decide and claimed from the record's queue by a runner (`jobs.ts`). */
-export const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest', 'script', 'job'] as const;
+   machine may do, approved once in Decide and claimed from the record's queue by a runner (`jobs.ts`).
+   `look` IS THE ELEVENTH (DIRECTION §38): what a page leads with, its order, what it hides and its next action, laid
+   over the page as it is read (`compose.ts`). The CHECK that holds the database to this list takes it in the migration
+   after 23. */
+export const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest', 'script', 'job', 'look'] as const;
 export type DeclKind = (typeof KINDS)[number];
 
 export type Declaration = {
@@ -875,6 +879,114 @@ function textFault(value: unknown, ceiling: number, at: string, said: string, wh
   return null;
 }
 
+/* ── a page's look ──────────────────────────────────────────────────────── */
+
+/** What a look's lists are called in a sentence. */
+const LOOK_LISTS = ['order', 'hide', 'pinned'] as const;
+
+/**
+ * A `look.<page>` declaration (`compose.ts`), checked against contract 17: `{ look, basis, by, lead?, order?, hide?,
+ * headline?, next?: { row, text }, pinned? }`.
+ *
+ * WHAT IS CHECKED HERE IS THE LOOK ON ITS OWN AND AGAINST ITS PAGE'S DECLARATION. Each list names a key once; `hide`
+ * never names the lead or a pinned block; `by: owner` is the record's own and never a pack's, since a pack writing one
+ * would hold the owner's pins against him. The page must be installed when the record is known.
+ *
+ * A KEY THE PAGE'S OWN BLOCKS DO NOT HAVE IS LET THROUGH HERE, because another pack may add the block it names
+ * (`page-adds.ts`) and the adds are in the packs' manifests, which no declaration carries. The read drops a key the page
+ * does not have (`applyLook`), and a writer holding the page as read checks against it whole with `lookFault`.
+ */
+function lookBody(decl: Declaration, installed?: Known): Refusal | null {
+  const body = decl.body as Record<string, unknown>;
+  const id = decl.id;
+  for (const key of Object.keys(body))
+    if (!LOOK_KEYS.has(key))
+      return bad('DECLARATION_INVALID', `${id}: ${key}: is not a key a look has. A look is { look, basis, by, lead, order, hide, headline, next, pinned }.`, key, [...LOOK_KEYS]);
+  if (typeof body.look !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/u.test(body.look))
+    return bad('DECLARATION_INVALID', `${id} names ${JSON.stringify(body.look ?? null)} as its page; a look names the page it is laid over by its id.`, 'look');
+  if (!(LOOK_BY as readonly unknown[]).includes(body.by))
+    return bad('DECLARATION_INVALID', `${id} says it was arranged by ${JSON.stringify(body.by ?? null)}; a look is by ${LOOK_BY.join(', ')}.`, 'by', [...LOOK_BY]);
+  if (body.by === 'owner' && decl.pack !== undefined && decl.pack !== null)
+    return bad('DECLARATION_INVALID', `${id} comes with ${decl.pack} and says the owner arranged it. A pack's look is by rule or by slash; only the record's own is by owner.`, 'by', ['rule', 'slash']);
+  const basis = textFault(body.basis, LOOK_BASIS_BYTES, 'basis', `${id}'s basis`, 'It is what the look was composed from, so a writer knows when that moved.');
+  if (basis) return basis;
+  if (body.lead !== undefined && (typeof body.lead !== 'string' || !BLOCK_KEY.test(body.lead)))
+    return bad('DECLARATION_INVALID', `${id} leads with ${JSON.stringify(body.lead)}; the lead is one block's key.`, 'lead');
+  const lists: Partial<Record<(typeof LOOK_LISTS)[number], string[]>> = {};
+  for (const name of LOOK_LISTS) {
+    const list = body[name];
+    if (list === undefined) continue;
+    if (!Array.isArray(list) || list.length > LOOK_KEYS_MOST)
+      return bad('DECLARATION_INVALID', `${id}'s ${name} is a list of at most ${LOOK_KEYS_MOST} block keys.`, name);
+    for (const [i, key] of list.entries()) {
+      if (typeof key !== 'string' || !BLOCK_KEY.test(key))
+        return bad('DECLARATION_INVALID', `${id}'s ${name} names ${JSON.stringify(key)}, which is not a block's key.`, `${name}[${i}]`);
+      if (list.indexOf(key) !== i) return bad('DECLARATION_INVALID', `${id}'s ${name} names ${key} twice. Keep one.`, `${name}[${i}]`);
+    }
+    lists[name] = list as string[];
+  }
+  const pinned = new Set(lists.pinned ?? []);
+  for (const [i, key] of (lists.hide ?? []).entries()) {
+    if (pinned.has(key)) return bad('DECLARATION_INVALID', `${id} pins ${key} and hides it. A pinned block stays drawn; take it out of hide.`, `hide[${i}]`);
+    if (key === body.lead) return bad('DECLARATION_INVALID', `${id} leads with ${key} and hides it. Take it out of hide, or lead with another.`, `hide[${i}]`);
+  }
+  if (body.headline !== undefined) {
+    const said = textFault(body.headline, LOOK_HEADLINE_BYTES, 'headline', `${id}'s headline`, 'It is the page\'s one line, in words.');
+    if (said) return said;
+  }
+  if (body.next !== undefined) {
+    const next = body.next as { row?: unknown; text?: unknown } | null;
+    if (next === null || typeof next !== 'object' || Array.isArray(next) || Object.keys(next).some((k) => k !== 'row' && k !== 'text'))
+      return bad('DECLARATION_INVALID', `${id}'s next is { row, text }: the row it is about, and what it says.`, 'next', ['row', 'text']);
+    if (typeof next.row !== 'string' || !/^[^\s]{1,64}$/u.test(next.row))
+      return bad('DECLARATION_INVALID', `${id}'s next names ${JSON.stringify(next.row ?? null)} as its row; it is one row of the page.`, 'next.row');
+    const said = textFault(next.text, LOOK_NEXT_BYTES, 'next.text', `${id}'s next action`, 'It says what to do, in words.');
+    if (said) return said;
+  }
+  if (installed && !installed.has(`page.${body.look}`))
+    return bad('PAGE_UNKNOWN', `${id} is laid over ${body.look}, and there is no page called ${body.look}.`, 'look');
+  return null;
+}
+
+/**
+ * WHETHER A LOOK FITS A PAGE AS READ, for a writer holding the page whole (its adds laid in): the record before it
+ * writes the model's look, and a host before it saves a pin. Every key it names is a key the page has; `hide` touches
+ * no block that was refused or leads (`lead: true`, or the look's own lead); `next` names a row the page handed.
+ * `null` when it fits.
+ */
+export function lookFault(
+  look: { lead?: unknown; order?: unknown; hide?: unknown; pinned?: unknown; next?: unknown },
+  blocks: readonly { key?: unknown; kind?: unknown; lead?: unknown; refusals?: readonly unknown[]; rows?: readonly { id?: unknown; register?: unknown; seq?: unknown; fields?: Record<string, unknown> }[]; queue?: readonly { id?: unknown }[] }[],
+): Refusal | null {
+  const keys = keyedBlocks(blocks).map((b) => b.key);
+  const has = new Set(keys);
+  const said = (v: unknown): string[] => (Array.isArray(v) ? v.filter((k): k is string => typeof k === 'string') : []);
+  if (typeof look.lead === 'string' && !has.has(look.lead))
+    return bad('DECLARATION_INVALID', `The look leads with ${look.lead}, and the page has no block of that key.`, 'lead', keys);
+  for (const name of LOOK_LISTS)
+    for (const [i, key] of said(look[name]).entries())
+      if (!has.has(key)) return bad('DECLARATION_INVALID', `The look's ${name} names ${key}, and the page has no block of that key. A look only reorders, hides and pins what is there.`, `${name}[${i}]`, keys);
+  for (const [i, key] of said(look.hide).entries()) {
+    const b = blocks[keys.indexOf(key)]!;
+    if ((b.refusals?.length ?? 0) > 0) return bad('DECLARATION_INVALID', `The look hides ${key}, which could not be drawn. A refused block stays, so the person sees what broke.`, `hide[${i}]`);
+    if (b.lead === true) return bad('DECLARATION_INVALID', `The look hides ${key}, which leads the page. Take it out of hide.`, `hide[${i}]`);
+  }
+  const next = look.next as { row?: unknown } | undefined;
+  if (next !== undefined && next !== null && typeof next.row === 'string') {
+    const handles = new Set<string>();
+    for (const b of blocks) {
+      for (const r of b.rows ?? []) {
+        if (typeof r.id === 'string') handles.add(r.id);
+        if (typeof r.register === 'string' && typeof r.seq === 'number') handles.add(`${r.register}#${r.seq}`);
+        if (typeof r.fields?.row === 'string') handles.add(r.fields.row);
+      }
+      for (const q of b.queue ?? []) if (typeof q.id === 'string') handles.add(q.id);
+    }
+    if (!handles.has(next.row)) return bad('DECLARATION_INVALID', `The look's next action is about ${next.row}, and the page did not hand that row.`, 'next.row');
+  }
+  return null;
+}
+
 /**
  * What is already in the record, plus what is arriving with this declaration, by id.
  *
@@ -1175,6 +1287,19 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       const value = (raw as Record<string, unknown>)[flag];
       if (value !== undefined && typeof value !== 'boolean')
         return bad('DECLARATION_INVALID', `${id}.${at}'s ${flag} is ${JSON.stringify(value)}; it is true or false.`, at);
+    }
+    /* A BLOCK'S `key:` IS ITS NAME FOR THE ENGINE (`compose.ts`), so it has one shape and no two blocks of a page share
+       it: a look that pins one of two blocks of one key would pin whichever the read reached first. */
+    const key = (raw as { key?: unknown }).key;
+    if (key !== undefined) {
+      if (typeof key !== 'string' || !BLOCK_KEY.test(key))
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}.${at}'s key is ${JSON.stringify(key)}; a key is lower-case letters, digits, _ and -, starting with a letter, at most 48 of them.`,
+          `${at}.key`,
+        );
+      if ((blocks as unknown[]).slice(0, i).some((b) => b !== null && typeof b === 'object' && (b as { key?: unknown }).key === key))
+        return bad('DECLARATION_INVALID', `${id} names two blocks ${key}. Give each its own key, or take one off.`, `${at}.key`);
     }
     /* A FORECAST'S `headline:` SAYS WHAT THE PAGE'S OPENING LINE ALREADY SAYS OF IT, and the one thing it can say is when
        the money runs out. */
@@ -3530,6 +3655,7 @@ function createFault(
  *             and folders; `resolveProject` places a run by them.
  *   `rates` · `meets`  on the one register holding the rates a money figure converts by, and the one
  *             `meet` writes, each part naming the field that plays it (`roles.ts`, `roleBody` below).
+ *   `org`     the one register `meet` writes organisations into, its parts named the same way (batch 17).
  *   `pairs`   `02 §5`'s transfer detection: the write path finds a row's other leg and marks both
  *             (`pairs.ts`). It once sat on the unbuilt list below, refused at install, so his
  *             ledger counted every move between two of his accounts as spend and as income.
@@ -3554,7 +3680,7 @@ function createFault(
  */
 const REGISTER_KEYS = [
   'register', 'name', 'one', 'pack', 'series', 'fields', 'search', 'title', 'mobile', 'identity',
-  'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes', 'steps', 'rates', 'meets', 'pairs',
+  'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes', 'steps', 'rates', 'meets', 'org', 'pairs',
   'delete',
   'owner_only',
   'hand',
@@ -4066,7 +4192,7 @@ function scopesBody(decl: Declaration, fields: readonly FieldLike[], scopes: unk
  * nothing (driven in `test/roles.test.ts`). The fix names the pack that owns the named list when the record knows it,
  * read from the record, so this file names no pack.
  */
-function roleBody(key: RoleKey, decl: Declaration, fields: readonly RoleField[], installed?: Known, owners?: Owners): Refusal | null {
+function roleBody(key: RoleName, decl: Declaration, fields: readonly RoleField[], installed?: Known, owners?: Owners): Refusal | null {
   const id = decl.id;
   const self = String(ownId(decl));
   const parts = ROLE_PARTS[key];
@@ -4123,7 +4249,7 @@ function roleBody(key: RoleKey, decl: Declaration, fields: readonly RoleField[],
       const pack = owners?.get(other) ?? null;
       return bad(
         'DECLARATION_INVALID',
-        `${other} holds this record's ${key === 'rates' ? 'rates' : 'people'} and declares no ${key}:, and one list holds ${HOLDS[key]}. ` +
+        `${other} holds this record's ${HELD[key]} and declares no ${key}:, and one list holds ${HOLDS[key]}. ` +
           (pack === null
             ? `Declare ${key}: on ${list.id} instead, and keep ${HOLDS[key]} there.`
             : `Update ${pack}, which owns ${list.id}, to a version that declares ${key}: on it, and keep ${HOLDS[key]} there.`),
@@ -4133,6 +4259,9 @@ function roleBody(key: RoleKey, decl: Declaration, fields: readonly RoleField[],
   }
   return null;
 }
+
+/** What a list holding a role holds, in one word, for `roleBody`'s sentence. */
+const HELD: Readonly<Record<RoleName, string>> = { rates: 'rates', meets: 'people', org: 'organisations' };
 
 /** What a keyless list shaped like a role would hold beside the list declaring it, for `keylessBeside`'s sentence. */
 const UNREAD: Readonly<Record<RoleKey, string>> = { rates: 'rates no figure converts by', meets: 'people meet never finds' };
@@ -4322,6 +4451,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
   if (decl.kind === 'digest') return digestBody(decl);
   if (decl.kind === 'metric') return metricBody(decl, installed);
   if (decl.kind === 'page') return pageBody(decl, installed);
+  if (decl.kind === 'look') return lookBody(decl, installed);
   if (decl.kind === 'theme') return themeBody(decl);
   if (decl.kind === 'ingest') return ingestBody(decl, installed);
   if (decl.kind === 'script') return scriptBody(decl);
@@ -4849,7 +4979,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
     const fault = scopesBody(decl, fields as unknown as FieldLike[], scopes, installed);
     if (fault) return fault;
   }
-  for (const key of ['rates', 'meets'] as const) {
+  for (const key of ['rates', 'meets', 'org'] as const) {
     if (decl.body[key] === undefined) continue;
     const fault = roleBody(key, decl, fields as unknown as RoleField[], installed, owners);
     if (fault) return fault;
@@ -5974,13 +6104,14 @@ export function liveTarget<T extends { metric: string; format?: unknown; target?
     else if (typeof money.amount === 'number' && typeof money.currency === 'string' && money.currency === home) {
       bound = money.amount;
       typedIn = money.currency;
-    } else if (typeof money.amount === 'number' && homeFrom(money.currency) !== null) {
+    } else if (typeof money.amount === 'number' && home !== null && homeFrom(money.currency) !== null && homeFrom(money.currency) === homeBefore(sql, home)) {
       const was = homeFrom(money.currency)!;
       /* OR IN THE HOME CURRENCY AS IT WAS, a ceiling typed in pounds before the record moved to dollars: converted at the
          day's rate into the currency the figure is held in, the one it declares or else the home one. It was dropped, and
          the figure was held to the number written beside the setting instead, whatever the person had typed. With no
          rate, or no currency to hold it in, that number still stands, since a sum in one currency is never read as
-         another's. */
+         another's. ONLY THE HOME CURRENCY THE RECORD RECORDED BEFORE THIS ONE (`homeBefore`, audit 16 M6): a limit
+         typed in a third currency, which was never the record's, is not floated with the day's rate either. */
       const into = currency ?? home;
       const fx = ctx?.fx?.();
       const day = ctx ? new Date(clockOf(ctx)).toISOString().slice(0, 10) : null;
@@ -5992,6 +6123,21 @@ export function liveTarget<T extends { metric: string; format?: unknown; target?
   }
   if (bound === null) return decl;
   return { ...decl, target: { ...target, [typeof target.gte === 'number' ? 'gte' : 'lte']: bound, ...(typedIn ? { currency: typedIn } : {}) } };
+}
+
+/**
+ * The home currency the record had before `home`, as its log recorded the change, or `null`: the `from` of the newest
+ * edit of a pack's settings that moved `home_currency` to `home` from another code (`writePackConfig`'s event).
+ */
+export function homeBefore(sql: Sql, home: string): string | null {
+  const row = sql.one<{ was: unknown }>(
+    `SELECT json_extract(from_v, '$.${HOME_CURRENCY_SETTING}') AS was FROM event
+     WHERE kind = 'edit' AND target_kind = 'pack' AND json_valid(to_v) AND json_valid(from_v) AND json_extract(to_v, '$.${HOME_CURRENCY_SETTING}') = ?
+     ORDER BY rowid DESC LIMIT 1`,
+    home,
+  );
+  const was = homeFrom(row?.was ?? null);
+  return was !== null && was !== home ? was : null;
 }
 
 /**

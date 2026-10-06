@@ -93,3 +93,18 @@ test('WITH NO RATE BETWEEN THE TWO, the declared number stands: a sum in pounds 
   value(k.setPackConfig('money-core', { home_currency: 'EGP' }, OWNER));
   assert.deepEqual(target(k), { lte: 1, setting: 'most_spent' });
 });
+
+test('A CEILING TYPED IN A CURRENCY THE RECORD NEVER HAD AS HOME IS NOT FLOATED WITH THE DAY’S RATE (audit 16, M6)', async () => {
+  const k = await record();
+  /* Dollars were never this record's home: converting them each day moved a ceiling nobody had changed. */
+  value(k.create('fx', { currency: 'USD', base: 'GBP', rate: 0.8, as_of: '2026-10-06' }, OWNER));
+  value(k.setPackConfig('money-core', { most_spent: { amount: 10_000, currency: 'USD' } }, OWNER));
+  assert.deepEqual(target(k), { lte: 1, setting: 'most_spent' }, 'a third currency was converted as if it had been the home one');
+
+  /* And once the record moves from pounds, a ceiling in pounds is converted again, and one in dollars still is not. */
+  value(k.create('fx', { currency: 'GBP', base: 'EGP', rate: 60, as_of: '2026-10-06' }, OWNER));
+  value(k.setPackConfig('money-core', { home_currency: 'EGP', most_spent: { amount: 50_000, currency: 'GBP' } }, OWNER));
+  assert.deepEqual(target(k), { lte: 3_000_000, setting: 'most_spent', currency: 'EGP' });
+  value(k.setPackConfig('money-core', { most_spent: { amount: 10_000, currency: 'USD' } }, OWNER));
+  assert.deepEqual(target(k), { lte: 1, setting: 'most_spent' });
+});

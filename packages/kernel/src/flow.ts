@@ -67,6 +67,7 @@ import { calendarOf, nextCalendar } from './clock.ts';
 import { dayIn } from './finished.ts';
 import { liveTarget } from './declare.ts';
 import { localParts, nextOccurrence } from './digest.ts';
+import { senderOf } from './ingest.ts';
 import { RELATIVE_DAY, RUN_PATH, RUNS_PER_DAY_CEILING, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
 import type { Entry } from './index.ts';
 import { instant } from './migrate.ts';
@@ -154,8 +155,8 @@ export const RUN_JOB_LOOK_MS = 5 * 60_000;
 const JOB_ANSWERS: Readonly<Record<string, string>> = { ok: 'ok', needs_decision: 'needs_decision' };
 /** A job still going, whose run keeps waiting on it. */
 const JOB_GOING: readonly string[] = ['queued', 'claimed'];
-/** The keys of a `meet` step, which are `people.ts`'s `MeetArgs`. */
-const MEET_KEYS = ['name', 'email', 'handle', 'where'] as const;
+/** The text keys of a `meet` step, which are `people.ts`'s `MeetArgs`. `keys` is the one list beside them. */
+const MEET_KEYS = ['name', 'email', 'handle', 'where', 'kind', 'org', 'domain', 'role', 'source'] as const;
 
 /** The keys of the two kinds of `rule` schedule row this file owns. A rule's own reminders are `<rule>:<row>`. */
 export const runKey = (run: string): string => `flow.run:${run}`;
@@ -258,6 +259,11 @@ export type RunTrigger = {
   arrival?: string;
   channel?: string;
   ingest?: string | null;
+  /**
+   * The payee a bank door's pattern read, as it was printed, kept whatever became of the row (`Arrived.counterparty`),
+   * so `{{trigger.counterparty}}` meets the organisation by its `bank:` key on a list with no field for it.
+   */
+  counterparty?: string;
   /** Whether anything proved an arrival came from its sender. Only a rule that says `unverified: true` sees `false`. */
   verified?: boolean;
   /**
@@ -882,7 +888,7 @@ export function onWritten(
 export function onArrival(
   deps: FlowDeps,
   rules: readonly Installed[],
-  a: { raw: string; channel: string; ingest: string | null; state: string; wrote: readonly string[]; verified: boolean; redelivered?: true },
+  a: { raw: string; channel: string; ingest: string | null; state: string; wrote: readonly string[]; verified: boolean; redelivered?: true; counterparty?: string },
 ): void {
   if (a.redelivered) return;
   for (const rule of rules) {
@@ -906,7 +912,15 @@ export function onArrival(
     startRun(
       deps,
       rule,
-      { kind: 'arrival', arrival: a.raw, channel: a.channel, ingest: a.ingest, verified: a.verified, ...(row ? { entry: row.id, register: row.register } : {}) },
+      {
+        kind: 'arrival',
+        arrival: a.raw,
+        channel: a.channel,
+        ingest: a.ingest,
+        verified: a.verified,
+        ...(row ? { entry: row.id, register: row.register } : {}),
+        ...(a.counterparty === undefined ? {} : { counterparty: a.counterparty }),
+      },
       { actor: `ingest:${a.ingest ?? a.channel}` },
     );
   }
@@ -1823,13 +1837,44 @@ function meetOne(
     const clean = filled.text.trim();
     if (clean !== '') named[key] = clean;
   }
-  if (named.name === undefined && named.email === undefined && named.handle === undefined)
-    return { ok: true, person: null, said: 'Nobody: the name, email and handle it names were all empty.' };
+  /* `keys`, ONE TEMPLATE OR A LIST OF THEM, each `kind:value` (`bank:{{trigger.row.counterparty_text}}`). One that fills
+     with nothing, or with a kind and no value (`bank:` on a row with no payee), identifies nobody and is dropped. */
+  const keys: string[] = [];
+  for (const text of typeof spec.keys === 'string' ? [spec.keys] : Array.isArray(spec.keys) ? spec.keys : []) {
+    if (typeof text !== 'string' || nothingIn(text, scope, row)) continue;
+    const colon = text.indexOf(':');
+    if (colon > 0 && /^[a-z]+$/u.test(text.slice(0, colon)) && nothingIn(text.slice(colon + 1), scope, row)) continue;
+    const filled = handedText(text, row, by, sealed, deps.nowMs);
+    if (filled.secret !== null)
+      return {
+        ok: false,
+        say: `rule.${rule}'s meet at step ${n + 1} reads ${filled.secret} into the person's keys, which holds what a secret or file field holds, and such a field is copied only into another secret or file field. Nobody was met; the steps before it were taken.`,
+      };
+    const clean = filled.text.trim();
+    if (clean !== '' && !/^[a-z]+:\s*$/u.test(clean)) keys.push(clean);
+  }
+  const organisation = named.kind === 'organisation';
+  if (named.name === undefined && named.email === undefined && named.handle === undefined && keys.length === 0 && !(organisation && named.domain !== undefined))
+    return { ok: true, person: null, said: 'Nobody: the name, email, handle and keys it names were all empty.' };
+  if (named.kind !== undefined && named.kind !== 'person' && !organisation)
+    return { ok: false, say: `rule.${rule}'s meet at step ${n + 1} met nobody: kind is person or organisation, and it filled with ${named.kind}.` };
   if (!deps.meet) return { ok: false, say: `rule.${rule} reached a meet step, and this host wired no way to meet a person (NOT_IN_THIS_BUILD). The steps before it were taken.` };
-  const met = deps.meet({ ...named, where: named.where ?? `rule.${rule}` }, { actor, project });
+  const { kind, ...rest } = named;
+  const met = deps.meet(
+    {
+      ...rest,
+      ...(kind === undefined ? {} : { kind: organisation ? 'organisation' : 'person' }),
+      ...(keys.length === 0 ? {} : { keys }),
+      where: named.where ?? `rule.${rule}`,
+    },
+    { actor, project },
+  );
   if (!met.ok) return { ok: false, say: `rule.${rule}'s meet at step ${n + 1} met nobody: ${fixOf(met)}` };
+  if (met.value.mention === true) return { ok: true, person: null, said: 'Nobody added: a name alone is kept until an address or a handle comes with it.' };
   const { person, created, merge } = met.value;
-  return { ok: true, person, said: `${person}${created ? ', added' : ''}${merge === null ? '' : `, and ${merge} asks whether to merge them`}` };
+  /* THE NAME AND NOT THE ID, since the run's history is read by a person. */
+  const who = met.value.row?.name || person;
+  return { ok: true, person, said: `${who}${created ? ', added' : ''}${merge === null ? '' : ', and a question asks whether to merge them'}` };
 }
 
 /**
@@ -2239,16 +2284,43 @@ function context(deps: FlowDeps, trigger: RunTrigger, subject: Entry | null): Re
   if (Number.isFinite(turn)) out.day = dayIn(turn, deps.tz);
   if (subject) out.row = subject.fields;
   if (trigger.arrival) {
-    const raw = deps.sql.one<{ body: string | null }>('SELECT body FROM inbox_raw WHERE id = ?', trigger.arrival);
+    const raw = deps.sql.one<{ body: string | null; channel: string; headers: string | null }>('SELECT body, channel, headers FROM inbox_raw WHERE id = ?', trigger.arrival);
     let body: unknown = raw?.body ?? null;
     try {
       body = typeof body === 'string' ? JSON.parse(body) : body;
     } catch {
-      /* Text stays text. A mail or an SMS is read by its words, and only JSON has paths. */
+      /* Text stays text. An SMS is read by its words, and only JSON has paths. */
     }
+    /* A MAIL IS READ IN THE PARTS A PATTERN MATCHES IT BY (`ingest.ts`'s match fields): `from` word for word, the
+       sender read once into `from_name`, `from_address` and `from_domain`, `to`, `subject`, and its words as `body`.
+       As text it had no paths, so `{{trigger.body.from_address}}` filled with nothing and the People rule meeting
+       whoever writes in met nobody on every mail. */
+    if (raw?.channel === 'email' && (body === null || typeof body !== 'object')) body = mailParts(raw.headers, typeof body === 'string' ? body : '');
     out.body = body;
   }
   return out;
+}
+
+/** A mail as the run reads it, from the headers its arrival kept and its words. */
+function mailParts(headers: string | null, text: string): Record<string, string> {
+  let held: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(headers ?? '{}') as unknown;
+    if (isObject(parsed)) held = parsed;
+  } catch {
+    /* headers nobody can read say nothing */
+  }
+  const header = (name: string): string => (typeof held[name] === 'string' ? (held[name] as string) : '');
+  const sender = senderOf(header('from'));
+  return {
+    from: header('from'),
+    from_name: sender.name,
+    from_address: sender.address,
+    from_domain: sender.domain,
+    to: header('to'),
+    subject: header('subject'),
+    body: text,
+  };
 }
 
 /**

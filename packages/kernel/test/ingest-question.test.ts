@@ -185,8 +185,8 @@ test('THE SAME QUESTION IS ASKED ONCE while it is open, and the arrival asked it
   const { k, sql } = await record(CARD());
   const first = arrive(k, said('Halden Coffee', '9999'), 's1');
   assert.ok(first.suggestion);
-  /* A SECOND CARD NOBODY ADDED, ANOTHER CHARGE: the same words, the same list, the same detail. */
-  const second = arrive(k, said('Cedar Lane Bakery', '8888', '40.00'), 's2');
+  /* A SECOND CARD NOBODY ADDED, ANOTHER CHARGE AT THE SAME SHOP: the same words, the same list, the same detail. */
+  const second = arrive(k, said('HALDEN Coffee', '8888', '40.00'), 's2');
   assert.equal(second.state, 'review');
   assert.equal(second.suggestion, first.suggestion, 'the same question was filed twice');
   assert.equal(second.reason, 'bank-card-used could not read account out of this one.');
@@ -196,17 +196,38 @@ test('THE SAME QUESTION IS ASKED ONCE while it is open, and the arrival asked it
   assert.equal(open(), 1);
   /* AND ITS CHARGE IS IN THE QUESTION, a row under the one heading: left out of every question, accepting the first added
      one charge and the second was in the inbox alone, where nothing reads it again. */
-  const merchants = (id: string): unknown[] =>
-    (JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', id)!.body) as { rows: { merchant?: unknown }[] }).rows.map((r) => r.merchant);
-  assert.deepEqual(merchants(first.suggestion!), ['Halden Coffee', 'Cedar Lane Bakery']);
+  const body = (id: string) => JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', id)!.body) as { rows: { merchant?: unknown }[]; count?: number };
+  const merchants = (id: string): unknown[] => body(id).rows.map((r) => r.merchant);
+  assert.deepEqual(merchants(first.suggestion!), ['Halden Coffee', 'HALDEN Coffee']);
+  assert.equal(body(first.suggestion!).count, 2, 'the heading cannot say how many it asks about');
   assert.equal(k.question(first.suggestion!), 'Add this email to Transactions? Its account could not be read.');
+
+  /* THE JOIN IS IN THE LOG: growing a question changes what one press accepts, so it is never silent. */
+  const joined = sql.all<{ actor: string; field: string; from_v: string; to_v: string; note: string }>(
+    "SELECT actor, field, from_v, to_v, note FROM event WHERE kind = 'suggest' AND target = ? AND field = 'rows' ORDER BY rowid",
+    `suggestion:${first.suggestion}`,
+  );
+  assert.deepEqual(
+    joined.map((e) => ({ ...e })),
+    [{ actor: 'ingest:bank-card-used', field: 'rows', from_v: '1', to_v: '2', note: 'One more like it joined this question, 2 in all.' }],
+  );
+  assert.doesNotMatch(joined[0]!.note, /SG\d|inbox_raw|bank-card-used/u, 'the note names an id');
+
+  /* A CHARGE AT ANOTHER SHOP IS ITS OWN QUESTION, though the words are the same: one card of a hundred unrelated charges
+     is read by its first row and accepted whole. */
+  const bakery = arrive(k, said('Cedar Lane Bakery', '8888', '40.00'), 's2b');
+  assert.ok(bakery.suggestion);
+  assert.notEqual(bakery.suggestion, first.suggestion, 'an unrelated charge joined the open question');
+  assert.equal(k.question(bakery.suggestion!), k.question(first.suggestion!), 'the premise: the same words');
+  assert.deepEqual(merchants(bakery.suggestion!), ['Cedar Lane Bakery']);
+  assert.equal(open(), 2);
 
   /* A DIFFERENT CAUSE IS A DIFFERENT QUESTION. */
   const unpriced = arrive(k, 'Your card ending 9999 was used at Halden Coffee for a coffee today.', 's3');
   assert.ok(unpriced.suggestion, 'a different question was taken for the same one');
   assert.notEqual(unpriced.suggestion, first.suggestion);
   assert.equal(k.question(unpriced.suggestion!), 'Add this email to Transactions? Its amount and account could not be read.');
-  assert.equal(open(), 2);
+  assert.equal(open(), 3);
 
   /* ACCEPTED, IT ADDS EVERY CHARGE IT HOLDS, and once it is answered the next one is asked again: a new question. */
   const yes = k.decide(first.suggestion!, { decide: { option: 'accept', reason: 'both are mine' } }, 'p_1');
@@ -219,9 +240,24 @@ test('THE SAME QUESTION IS ASKED ONCE while it is open, and the arrival asked it
 
   /* A QUESTION HOLDING AS MANY ROWS AS ONE MAY is asked again beside it, rather than grown past what can be accepted. */
   sql.exec("UPDATE suggestion SET body = json_set(body, '$.rows', json(?)) WHERE id = ?", JSON.stringify(Array.from({ length: 200 }, () => ({ merchant: 'Nile Books' }))), third.suggestion);
-  const full = arrive(k, said('Tarboush Cafe', '6666', '7.00'), 's5');
+  const full = arrive(k, said('Nile Books', '6666', '7.00'), 's5');
   assert.ok(full.suggestion && full.suggestion !== third.suggestion, 'a full question was grown past two hundred rows');
-  assert.deepEqual(merchants(full.suggestion!), ['Tarboush Cafe']);
+  assert.deepEqual(merchants(full.suggestion!), ['Nile Books']);
+  sql.close();
+});
+
+test('A REFUND IS NEVER ASKED UNDER A CHARGE: the way the money moved is part of what a row is about', async () => {
+  /* A PATTERN THAT HOLDS EVERYTHING FOR A PERSON asks one question in the same words about every row it reads. */
+  const { k, sql } = await record(CARD({ writes: { register: 'transactions', confidence: 'needs-review' } }));
+  const charge = arrive(k, said('Halden Coffee', '6518'), 'r1');
+  const again = arrive(k, said('Halden Coffee', '6518', '12.00'), 'r2');
+  assert.equal(again.suggestion, charge.suggestion, 'two charges at one shop are one question');
+  const refund = arrive(k, said('Halden Coffee', '6518', '-12.00'), 'r3');
+  assert.equal(k.question(refund.suggestion!), k.question(charge.suggestion!), 'the premise: the same words');
+  assert.notEqual(refund.suggestion, charge.suggestion, 'money moving the other way joined the question');
+  const elsewhere = arrive(k, said('Nile Books', '6518'), 'r4');
+  assert.notEqual(elsewhere.suggestion, charge.suggestion, 'a charge at another shop joined the question');
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM suggestion WHERE status = 'open'")!.n, 3);
   sql.close();
 });
 
@@ -290,12 +326,15 @@ test('AN ACCOUNT READ FROM ITS LAST DIGITS IS ASKED BY ITS NAME, and the detail 
   assert.equal(t.context, 'It was matched to Cairo savings by its last digits, 518. Say yes once and later ones are added straight away.');
   inWords(t.question);
 
-  /* A SECOND CHARGE ON THE SAME CARD BEFORE ANYBODY SAID YES is the same question, its tail said once; and yes to it adds
-     both and confirms the card, so the next one is filed straight away. */
-  const again = arrive(k, said('Nile Books', '***518', '12.00'), 't2');
+  /* A SECOND CHARGE AT THE SAME SHOP ON THE SAME CARD BEFORE ANYBODY SAID YES is the same question, its tail said once;
+     one at another shop is a question of its own; and yes to the first adds both its charges and confirms the card, so
+     the next one is filed straight away. */
+  const again = arrive(k, said('Halden Coffee', '***518', '12.00'), 't2');
   assert.equal(again.suggestion, out.suggestion);
   const body = JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', out.suggestion!)!.body) as { rows: unknown[]; tails: unknown[] };
   assert.deepEqual([body.rows.length, body.tails.length], [2, 1]);
+  const books = arrive(k, said('Nile Books', '***518', '12.00'), 't2b');
+  assert.notEqual(books.suggestion, out.suggestion, 'a charge at another shop joined the question');
   const yes = k.decide(out.suggestion!, { decide: { option: 'accept', reason: 'my card' } }, 'p_1');
   assert.ok(yes.ok, JSON.stringify(yes));
   assert.equal(yes.value.wrote.length, 2);

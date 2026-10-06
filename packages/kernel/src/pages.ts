@@ -24,7 +24,8 @@ import { clausesOf, evaluate, quoteValue } from '@braindog/where';
 import { unquoted } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
-import { BLOCK_READS, FILTER_TYPES, kindsReading, wrongKindKey } from './block-keys.ts';
+import { BLOCK_READS, FILTER_TYPES, blockKeyOf, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
+import { applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
 import { builtInFigure } from './built-in-figures.ts';
 import { kindModule } from './kinds/index.ts';
 import { fileLists } from './kinds/gallery.ts';
@@ -47,6 +48,12 @@ import { localDays } from './measures.ts';
 
 export type PageBlock = {
   kind: string;
+  /**
+   * The block's name for the engine: what a page's look (`compose.ts`) leads with, orders, hides and pins by. Declared,
+   * or a hash of its kind, source and heading (`block-keys.ts` `defaultBlockKey`), and answered on every block a read
+   * hands back, so a host keys what it draws by it rather than by its place.
+   */
+  key?: string;
   heading?: string;
   span?: number;
   source?: string;
@@ -449,10 +456,20 @@ export type QueueQuestion = {
    */
   body_kind?: string;
   does?: string;
+  /**
+   * On a question about who may be one person or organisation (`people.ts`'s cluster question): each name it is about,
+   * by the handle beside it, with where they were seen and which is kept, so the queue draws the merge card itself.
+   */
+  candidates?: QueueCandidate[];
+  /** How many rows a question about rows holds, for the count in its card's heading. */
+  held?: number;
   /** On a question put off (`governance.later`): the day it comes back, and why it was put off. */
   until?: string;
   until_why?: string;
 };
+
+/** One name a merge question is about: its handle (`people#4`), its name, where it was seen, and whether it is kept. */
+export type QueueCandidate = { at: string; name: string; seen: string[]; kept?: true };
 
 /** What a queue's `where:` reads of an open question: who asked, what kind and band it is, and what it is about. */
 export type OpenFacts = { who: string; kind: string; cost: Cost; about: string | null };
@@ -497,7 +514,11 @@ export type ActivityEvent = { ts: string; actor: string; kind: string; target: s
 export type RowEvent = { ts: string; actor: string; kind: string; field: string | null; to: Json | null };
 
 /** `read_at` is the record's clock when it read the page, which a host draws "today" and "out of date" against. */
-export type PageResult = { page: string; title: string; blocks: BlockResult[]; read_at?: string; [key: string]: unknown };
+/**
+ * `look` is the look the page was read under (`compose.ts`): who arranged it, what leads, what was hidden and the one next
+ * action. Answered when the host reads looks (`PageDeps.look`).
+ */
+export type PageResult = { page: string; title: string; blocks: BlockResult[]; read_at?: string; look?: LookBody; [key: string]: unknown };
 
 export type PageDeps = {
   /** Every live page declaration. */
@@ -614,6 +635,12 @@ export type PageDeps = {
    * kind module, and by nothing else: a host leaves it out, and whatever a host put here is replaced.
    */
   kit?: KindKit;
+  /**
+   * The live `look.<page>` declaration's body for a page's declaration id without `page.`, or `null` when none is
+   * stored. A HOST THAT HANDS THIS TURNS THE ENGINE ON: each page is read under its stored look, or the rules' look
+   * (`composeLook`) when it has none, and the answer says which in `look`. Absent, a page reads as declared.
+   */
+  look?: (page: string) => unknown;
 };
 
 /**
@@ -907,7 +934,10 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
       const place = (counts.get(slugify(name)) ?? 0) > 1 ? placeOf(row) : null;
       slugs.set(row, claim(place === null ? name : `${name} ${place}`, decl.for.register, row.seq));
     }
-    for (const row of rows) here.push({ slug: slugs.get(row)!, decl: fill(decl, row) as PageDecl, row });
+    /* KEYED BEFORE IT IS FILLED, so every page out of one template answers one key for one block whatever its row
+       wrote into the heading, and one look covers them all (`block-keys.ts`). */
+    const keyed: PageDecl = Array.isArray(decl.blocks) ? { ...decl, blocks: keyedBlocks(decl.blocks) } : decl;
+    for (const row of rows) here.push({ slug: slugs.get(row)!, decl: fill(keyed, row) as PageDecl, row });
   }
   return made.flat();
 }
@@ -989,15 +1019,29 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
   /* THE RECORD'S CLOCK, WHEN IT READ THE PAGE. What is out of date, what is late and which day is today on this page are
      the record's answers, so a host draws them against this rather than against its own clock. */
   const read_at = new Date(deps.ctx.nowMs).toISOString();
-  if (found.refusal)
-    return ok({ ...found.decl, page: found.slug, read_at, blocks: [{ kind: 'note', rows: [], matched: 0, refusals: [found.refusal] }] });
+  if (found.refusal) {
+    const note = { kind: 'note', rows: [], matched: 0, refusals: [found.refusal] };
+    return ok({ ...found.decl, page: found.slug, read_at, blocks: [{ ...note, key: blockKeyOf(note) }] });
+  }
 
   /* AN EXPANDED PAGE SAYS WHICH ROW IT IS ABOUT, so a host can name the project without guessing it
      from the title. The title is already the row's, so this says nothing the page did not. */
   const title = found.row ? deps.titleOf(found.row.register) : null;
+  /* EVERY BLOCK TAKES ITS KEY HERE, the page's own first, so a block another pack adds never takes a key the page's
+     own has; each addition is keyed before its row fills it, as the template's own were (`resolvePages`). */
+  const taken = new Set<string>();
+  const own = keyedBlocks(found.decl.blocks, taken);
+  const adds = deps.adds?.(`page.${found.decl.page}`) ?? [];
+  const addKeys = keyedBlocks(
+    adds.map((a) => a.block),
+    taken,
+  ).map((b) => b.key);
   const laid = withAdds(
-    found.decl.blocks,
-    (deps.adds?.(`page.${found.decl.page}`) ?? []).map((a) => (found.row ? { ...a, block: fill(a.block, found.row) as PageBlock } : a)),
+    own,
+    adds.map((a, i) => {
+      const block = { ...a.block, key: addKeys[i]! };
+      return { ...a, block: found.row ? (fill(block, found.row) as PageBlock) : block };
+    }),
   );
   const filters = readerFilters(deps, found.decl, laid.map((l) => l.block), filter);
   /* A SECTION WHOSE `when:` SAYS NO HIDES WHAT IT HOLDS, the blocks after it in its column up to the next section. It
@@ -1019,6 +1063,7 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
     const drawn = astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
     return added === undefined ? drawn : { ...drawn, added };
   });
+  const looked = lookedAt(deps, found.decl.page, blocks);
   return ok({
     ...found.decl,
     page: found.slug,
@@ -1030,9 +1075,34 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
        because the page is in hand here; the word itself was checked with the block (`kinds/words.ts` `panelFault`). */
     /* AND WHAT OTHER PACKS ADD TO IT, laid among its own blocks as it is read and never written into its declaration
        (`page-adds.ts`). A page made from a template fills each addition from its row, as `resolvePages` filled its own. */
-    blocks: headlineHeld(emptyBoxesShut(blocks)),
+    blocks: headlineHeld(emptyBoxesShut(looked?.blocks ?? blocks)),
     ...(filters ? { filters: filters.answer } : {}),
+    ...(looked ? { look: looked.look } : {}),
   });
+}
+
+/**
+ * THE PAGE UNDER ITS LOOK (DIRECTION §38), or `null` when the host reads no looks.
+ *
+ * The stored look wins as it is, unless it is the owner's: then the rules fill what he left unset, never over what he
+ * pinned (`mergeLook`). With none stored, the rules' look is the page's. Read after the page's own blocks and its adds,
+ * so the look can name either, and before the boxes are shut and the headline is held, so a box the look emptied is
+ * shut and a hidden lead note says no line.
+ */
+function lookedAt(deps: PageDeps, page: string, blocks: readonly BlockResult[]): { blocks: BlockResult[]; look: LookBody } | null {
+  if (!deps.look) return null;
+  const stored = lookOf(deps.look(page));
+  if (stored !== null && stored.by !== 'owner') return applyLook(blocks, stored);
+  const composed = composeLook({
+    page,
+    blocks,
+    today: localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs),
+    seen: deps.activity?.(0).seen ?? null,
+    ...(deps.lists ? { lists: deps.lists() } : {}),
+    titleOf: deps.titleOf,
+    ...(stored?.pinned ? { pinned: stored.pinned } : {}),
+  });
+  return applyLook(blocks, stored === null ? composed : mergeLook(stored, composed));
 }
 
 /**
@@ -1353,11 +1423,15 @@ const kitOf = (deps: PageDeps): KindKit => ({
  * technical reason under `detail` where a screen folds it away, so the page around it still draws.
  */
 export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
+  /* AND EVERY ANSWER CARRIES ITS KEY, the one it declares or its default (`block-keys.ts`), so a block read on its own
+     is named as the page would name it. */
+  const key = blockKeyOf(block);
   try {
-    return leanRows(deps, readBlockAsWritten(deps, renamed(block)));
+    return { ...leanRows(deps, readBlockAsWritten(deps, renamed(block))), key };
   } catch (e) {
     return {
       ...(block !== null && typeof block === 'object' ? shorn(block) : block),
+      key,
       rows: [],
       matched: 0,
       refusals: [

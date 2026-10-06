@@ -10,7 +10,7 @@
  * (`--redacted--`). What stays is every row's existence, position, time, actor, kind, target and field name.
  *
  * DELETED OUTRIGHT, because a row of them is nothing but the subject: `observation` rows whose `subject` is the value,
- * the erased entries' `entry_fts` and `entry_vec` lines, and the person's `member` rows. Pending `schedule` and
+ * the erased entries' `entry_fts`, `entry_vec` and `entity_key` lines, and the person's `member` rows. Pending `schedule` and
  * `outbox` work that names the subject is cancelled, `done` with its payload erased.
  *
  * THE TWENTIETH STORE IS NOT HERE. An attachment's bytes are outside the object, so each key goes on the outbox as one
@@ -121,9 +121,27 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
     sql.exec('UPDATE entry SET fields = ?, deleted_at = COALESCE(deleted_at, ?) WHERE id = ?', JSON.stringify(fields), at, row.id);
     sql.exec('DELETE FROM entry_fts WHERE rowid = ?', row.rowid);
     sql.exec('DELETE FROM entry_vec WHERE id = ?', row.id);
+    /* AND THE IDENTITIES THE ROW ANSWERED TO, which hold its addresses and logins (`entities.ts`). */
+    sql.exec('DELETE FROM entity_key WHERE row_id = ?', row.id);
     erasedEntries.push(row.id);
   }
   bump('entry', erasedEntries.length);
+
+  /* ── entity_key, entity_mention: any identity or bare name still saying who they were ──
+     A key folded into a survivor that was not erased, or a name met with nothing that identified it, names the subject
+     in a table no row holds. Matched on the text, as every other table here is. */
+  let identities = 0;
+  for (const { key } of sql.all<{ key: string }>('SELECT key FROM entity_key')) {
+    if (!names(key, subjects)) continue;
+    sql.exec('DELETE FROM entity_key WHERE key = ?', key);
+    identities++;
+  }
+  for (const m of sql.all<{ name_key: string; kind: string; project: string; source: string; name: string }>('SELECT name_key, kind, project, source, name FROM entity_mention')) {
+    if (!names(`${m.name} ${m.source}`, subjects)) continue;
+    sql.exec('DELETE FROM entity_mention WHERE name_key = ? AND kind = ? AND project = ? AND source = ?', m.name_key, m.kind, m.project, m.source);
+    identities++;
+  }
+  if (identities > 0) bump('entity_key', identities);
   /* A DELETE LEAVES THE TERM IN THE INDEX'S SEGMENTS until they merge, so they are merged now. */
   if (erasedEntries.length > 0) sql.exec("INSERT INTO entry_fts (entry_fts) VALUES ('optimize')");
 

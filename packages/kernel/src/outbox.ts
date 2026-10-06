@@ -34,6 +34,9 @@ import { finishPull, pullFinishOf, type PullFinished } from './pull.ts';
  * `infer.ask` IS AN AUTOMATION'S QUESTION TO SLASH (`flow.ts`): `{ run, rule, step, question, shape, choices?,
  * about? }`, answered by an ack whose `result.text` is the answer, or whose `result.failed` is the sentence the run
  * ends on when the host refused to ask. The `CHECK` that admits it is a migration of its own.
+ *
+ * `infer.resolve` IS MIGRATION 23'S: one night's doubtful pairs of people or organisations, `{ pairs: [{ hash, a, b }] }`,
+ * answered `{ verdicts: [{ hash, same, confidence }] }` and read by the record's ack (`people.ts`).
  */
 export const OUTBOX_KINDS = [
   'notify.email',
@@ -47,6 +50,7 @@ export const OUTBOX_KINDS = [
   'infer.draft',
   'script.run',
   'infer.ask',
+  'infer.resolve',
 ] as const;
 
 export type OutboxKind = (typeof OUTBOX_KINDS)[number];

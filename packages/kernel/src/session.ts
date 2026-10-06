@@ -157,6 +157,8 @@ export type SessionHints = {
   host?: string | undefined;
   branch?: string | undefined;
   head?: string | undefined;
+  /** `S42`: the run a subagent works for, which places the subagent's run where its parent is when nothing else does. */
+  parent?: string | undefined;
 };
 
 /**
@@ -234,24 +236,31 @@ export function findSession(sql: Sql, hints: SessionHints, nowMs: number, token?
   if (typeof token === 'string') {
     const host = hints.host || null;
     const repo = hints.repo || null;
-    const said = agentOf(hints).agent;
-    const kind = said === undefined || said === 'other' ? null : said;
-    return pick(
-      'adopted',
-      `state IN ('active', 'idle') AND json_extract(fields, '$.last_seen') > ? AND json_extract(fields, '$.token_id') = ?
-       AND coalesce(json_extract(fields, '$.host') = ?, 1) AND coalesce(json_extract(fields, '$.repo') = ?, 1)
-       AND coalesce(json_extract(fields, '$.agent') IN ('other', ?), 1)
+    const kind = kindSaid(hints);
+    const client = appKey(hints.client);
+    /* THE APP AND THE KIND ARE FILTERS TOO, and read in code because an app's name is matched as `clientOf` reads it.
+       `other` is every ChatGPT, VS Code and unknown run, so as a kind it said nothing: a ChatGPT call on a key Claude
+       also holds joined Claude's open run, and the run's app and name flipped with every call after. Now a run of
+       another kind, or of another app, where both sides say which, is another host session; and a run that is `other`
+       is taken for an agent of a known kind only while it names no app. */
+    const rows = sql.all<{ id: string; seq: number; state: string | null; project: string | null; agent: string | null; client: string | null }>(
+      `SELECT id, seq, state, json_extract(fields, '$.project') AS project, json_extract(fields, '$.agent') AS agent,
+         json_extract(fields, '$.client') AS client FROM entry
+       WHERE register = '${SESSION}' AND deleted_at IS NULL
+         AND state IN ('active', 'idle') AND json_extract(fields, '$.last_seen') > ? AND json_extract(fields, '$.token_id') = ?
+         AND coalesce(json_extract(fields, '$.host') = ?, 1) AND coalesce(json_extract(fields, '$.repo') = ?, 1)
        ORDER BY (json_extract(fields, '$.host') IS ? AND json_extract(fields, '$.repo') IS ?) DESC,
-         (json_extract(fields, '$.host') IS ?) DESC, json_extract(fields, '$.last_seen') DESC LIMIT 1`,
+         (json_extract(fields, '$.host') IS ?) DESC, json_extract(fields, '$.last_seen') DESC LIMIT 32`,
       since,
       token,
       host,
       repo,
-      kind,
       host,
       repo,
       host,
     );
+    const run = rows.find((r) => sameAgent(kind, client, r.agent, r.client));
+    return run ? { id: run.id, seq: run.seq, state: run.state, project: run.project ?? null, by: 'adopted', foreign: false } : null;
   }
 
   if (hints.host && hints.repo)
@@ -266,6 +275,35 @@ export function findSession(sql: Sql, hints: SessionHints, nowMs: number, token?
     );
 
   return null;
+}
+
+/**
+ * The kind of agent a caller definitely is, or `null` when it does not say. `other` counts only when an app the record
+ * knows implies it, as ChatGPT's does: an agent that says `other` of itself has said nothing.
+ */
+function kindSaid(hints: Pick<SessionHints, 'agent' | 'client'>): string | null {
+  const { agent } = agentOf(hints);
+  if (agent === undefined || agent === '') return null;
+  return agent !== 'other' || clientOf(hints.client) !== undefined ? agent : null;
+}
+
+/** The app a caller or a run names, as one key for every way it spells itself: what a person calls it, lower case. */
+function appKey(said: unknown): string | null {
+  const name = typeof said === 'string' ? said.trim().toLowerCase() : '';
+  return name === '' ? null : (clientOf(name)?.called.toLowerCase() ?? name);
+}
+
+/**
+ * Whether a run of kind `agent` in app `runClient` can be the session of a caller of kind `kind` in app `client`
+ * (`appKey`). A side that says nothing lets the
+ * other through; a run that is `other` passes a caller of a known kind only while it names no app, because then nothing
+ * says which agent it is.
+ */
+function sameAgent(kind: string | null, client: string | null, agent: string | null, runClient: string | null): boolean {
+  const app = appKey(runClient);
+  if (client !== null && app !== null && client !== app) return false;
+  if (kind === null || agent === null || agent === '' || agent === kind) return true;
+  return agent === 'other' && app === null;
 }
 
 /**
@@ -396,22 +434,25 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
  * in BrainDog" and "Claude run" now, and before them "Claude run, 1 Oct" and "Lanternly, 1 Oct" on the day the run
  * opened, and "braindog on master" or "braindog" after its repository. A run with no name at all is the record's to
  * name too. `project` is the name of the project the run is in, which is the only project an old "Lanternly, 1 Oct"
- * is read as.
+ * is read as; `known` the names of the record's other projects, so a name the record gave in a project the run has
+ * since left is still the record's.
  *
  * AND ONLY THOSE SHAPES, because what is taken for the record's is written over on the run's next call, silently. Read
- * looser, "Standup notes, 2 Oct", "Claude in the loop: fix the sweep" and "braindog on fire: the build", each an agent's
- * own `doing`, would all become "Claude in braindog". So a place is a name and never a sentence, a branch is one word,
- * and a day follows only an agent's run or the run's own project.
+ * looser, "Standup notes, 2 Oct", "Claude in the loop" and "Cursor in dark mode", each an agent's or a person's own
+ * `doing`, would all become "Claude in braindog". So the place after "in" is a project the record knows or the run's own
+ * repository, exactly as the record wrote it, a branch is one word, and a day follows only an agent's run or the run's own project.
  */
-export function recordNamed(run: { fields: Record<string, Json>; created_at: string }, project: string | null = null): { name: string | null } | null {
+export function recordNamed(
+  run: { fields: Record<string, Json>; created_at: string },
+  project: string | null = null,
+  known: readonly string[] = [],
+): { name: string | null } | null {
   const doing = run.fields.doing;
   if (typeof doing !== 'string' || doing.trim() === '') return { name: null };
   const real = (name: string): string | null => (name === KIND_NAMES.other ? null : name);
-  for (const name of NAMES) {
-    if (doing === `${name} run`) return { name: real(name) };
-    const place = doing.startsWith(`${name} in `) ? doing.slice(name.length + 4) : '';
-    if (place.trim() !== '' && !/[:;?!]/u.test(place)) return { name: real(name) };
-  }
+  const repo = typeof run.fields.repo === 'string' && run.fields.repo.trim() !== '' ? run.fields.repo : null;
+  const places = [project, repo, ...known].filter((p): p is string => p !== null && p.trim() !== '');
+  for (const name of NAMES) if (doing === `${name} run` || places.some((place) => doing === titled(name, place))) return { name: real(name) };
   const day = `${String(Number(run.created_at.slice(8, 10)))} ${MONTHS[Number(run.created_at.slice(5, 7)) - 1] ?? ''}`;
   if (doing.endsWith(`, ${day}`)) {
     const head = doing.slice(0, -(day.length + 2));
@@ -419,9 +460,8 @@ export function recordNamed(run: { fields: Record<string, Json>; created_at: str
     if (name !== null && NAMES.includes(name)) return { name: real(name) };
     return project !== null && head === project ? { name: null } : null;
   }
-  const repo = run.fields.repo;
-  const branch = typeof repo === 'string' && repo !== '' && doing.startsWith(`${repo} on `) ? doing.slice(repo.length + 4) : '';
-  if ((typeof repo === 'string' && repo !== '' && doing === repo) || /^\S+$/u.test(branch)) return { name: null };
+  const branch = repo !== null && doing.startsWith(`${repo} on `) ? doing.slice(repo.length + 4) : '';
+  if ((repo !== null && doing === repo) || /^\S+$/u.test(branch)) return { name: null };
   return null;
 }
 
@@ -430,8 +470,9 @@ export function recordNamed(run: { fields: Record<string, Json>; created_at: str
  * changes: the kind of agent when the run said none, the client's name and version where the register keeps them, and
  * the name that follows while the run's name is still the record's own.
  *
- * `project` is the name of the project the run is in now, and `keep` the fields the call writes itself, which are left
- * as it wrote them: an agent saying what it is doing has named its run.
+ * `project` is the name of the project the run is in now, `keep` the fields the call writes itself, which are left
+ * as it wrote them: an agent saying what it is doing has named its run, and `known` the names of the record's projects
+ * (`recordNamed`).
  *
  * THE RECORD NOTING WHO A RUN IS IS NOT AN EDIT ANYBODY MADE, so the ladder writes this the way it writes the heartbeat
  * and the project, with no event (`attribute` in `index.ts`). Without it a run opened by a hook that could not read git
@@ -443,18 +484,25 @@ export function learned(
   project: string | null,
   register: RunRegister = RUNS,
   keep: readonly string[] = [],
+  known: readonly string[] = [],
 ): Record<string, string> {
   const out: Record<string, string> = {};
   const was = typeof run.fields.agent === 'string' && run.fields.agent !== '' ? run.fields.agent : 'other';
   const { agent } = agentOf(hints, register.kinds);
   if (!keep.includes('agent') && was === 'other' && agent !== undefined && agent !== 'other' && register.kinds.includes(agent)) out.agent = agent;
+  /* A RUN'S APP IS LEARNED ONCE, NEVER SWAPPED: written while the run names none, and its version kept up while the
+     caller is the same app, however it spells itself. A call from another app naming the run outright does not turn
+     Claude's run into ChatGPT's. */
+  const app = appKey(run.fields.client);
+  const same = app === null || appKey(hints.client) === app;
   for (const key of ['client', 'client_version'] as const) {
     const said = hints[key];
-    if (!keep.includes(key) && register.has(key) && typeof said === 'string' && said !== '' && said !== run.fields[key]) out[key] = said;
+    const open = key === 'client' ? app === null : same;
+    if (open && !keep.includes(key) && register.has(key) && typeof said === 'string' && said !== '' && said !== run.fields[key]) out[key] = said;
   }
-  const made = keep.includes('doing') ? null : recordNamed(run, project);
+  const made = keep.includes('doing') ? null : recordNamed(run, project, known);
   if (made) {
-    const client = clientOf(hints.client ?? run.fields.client);
+    const client = clientOf(app === null ? hints.client : run.fields.client);
     const name = client?.called ?? made.name ?? KIND_NAMES[out.agent ?? was] ?? KIND_NAMES.other!;
     const repo = typeof run.fields.repo === 'string' && run.fields.repo !== '' ? run.fields.repo : null;
     const title = titled(name, project ?? repo);

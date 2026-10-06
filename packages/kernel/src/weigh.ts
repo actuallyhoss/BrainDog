@@ -129,3 +129,37 @@ export function costOf(bodyKind: string, body: unknown): Cost {
       return 'call';
   }
 }
+
+/**
+ * `costOf` as SQL over a `suggestion` row's `body_kind` and `body` columns, so a queue counts and ranks every open
+ * question without reading one body into this process (audit 16, M5). Each arm is `costOf`'s own, in its order, and
+ * `test/weigh-sql.test.ts` holds the two to the same answer over every shape `costOf` reads.
+ *
+ * A BODY THAT IS NOT A JSON OBJECT IS READ AS `{}`, as `obj` reads it, and never handed to `json_extract`, which throws
+ * on text that is not JSON. `json_array_length` answers 0 for a value that is not an array, which is `arr`'s `[]`.
+ */
+export const COST_SQL = `(CASE
+  WHEN json_valid(body) AND json_type(body) = 'object' THEN (CASE body_kind
+    WHEN 'rowset' THEN (CASE
+      WHEN json_type(body, '$.rows') = 'array'
+        AND EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r WHERE r.type = 'object' AND json_type(r.value, '$.at') = 'text') THEN 'undo'
+      WHEN COALESCE(json_array_length(body, '$.rows'), 0) >= ${MANY_ROWS} THEN 'shape'
+      ELSE 'rows' END)
+    WHEN 'change' THEN (CASE WHEN COALESCE(json_type(body, '$.from'), 'null') = 'null' THEN 'shape' ELSE 'undo' END)
+    WHEN 'pack' THEN (CASE WHEN json_type(body, '$.disable') = 'text' THEN 'undo' ELSE 'shape' END)
+    WHEN 'settings' THEN 'shape'
+    WHEN 'arrange' THEN (CASE
+      WHEN json_type(body, '$.packs') = 'object' AND COALESCE(json_array_length(body, '$.packs.disable'), 0) > 0 THEN 'undo'
+      WHEN (json_type(body, '$.packs') = 'object' AND (COALESCE(json_array_length(body, '$.packs.install'), 0) > 0 OR COALESCE(json_array_length(body, '$.packs.enable'), 0) > 0))
+        OR COALESCE(json_array_length(body, '$.pages'), 0) > 0
+        OR COALESCE(json_array_length(body, '$.settings'), 0) > 0
+        OR COALESCE(json_array_length(body, '$.rows'), 0) >= ${MANY_ROWS} THEN 'shape'
+      ELSE 'rows' END)
+    WHEN 'pattern' THEN 'rows'
+    ELSE 'call' END)
+  ELSE (CASE body_kind WHEN 'rowset' THEN 'rows' WHEN 'change' THEN 'shape' WHEN 'pack' THEN 'shape' WHEN 'settings' THEN 'shape'
+    WHEN 'arrange' THEN 'rows' WHEN 'pattern' THEN 'rows' ELSE 'call' END)
+END)`;
+
+/** A band's place in the order, as SQL over `COST_SQL`'s answer, for an `ORDER BY` that ranks as `costRank` does. */
+export const COST_RANK_SQL = `(CASE ${COST_SQL} ${COSTS.map((c, i) => `WHEN '${c}' THEN ${i}`).join(' ')} ELSE ${COSTS.length} END)`;

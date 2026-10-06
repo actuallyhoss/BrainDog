@@ -31,7 +31,11 @@ export const MEASURES_MOST = 12;
  * One reading as the record holds it: the fields a block named, unconverted, and `of`, the name of the project it was
  * reported for when its list says (`readings` in `index.ts`).
  */
-export type RawReading = { at: unknown; value: unknown; name?: unknown; unit?: unknown; of?: unknown };
+/**
+ * One reading as a list holds it. `of` is the project's name, which is drawn; `project` is the project itself, by its id,
+ * which only keeps two projects apart and is never drawn, so two projects with no name (or one name) are two measures.
+ */
+export type RawReading = { at: unknown; value: unknown; name?: unknown; unit?: unknown; of?: unknown; project?: unknown };
 
 export type MeasureSeries = {
   name: string;
@@ -238,7 +242,7 @@ function seriesOf(readings: Iterable<RawReading>, opts: MeasureOpts): (MeasureSe
     if (reading === null) continue;
     const said = typeof r.name === 'string' && r.name.trim() !== '' ? r.name.trim() : opts.fallback;
     const of = typeof r.of === 'string' && r.of.trim() !== '' ? r.of.trim() : null;
-    const id = JSON.stringify([said, of]);
+    const id = JSON.stringify([said, of, typeof r.project === 'string' ? r.project : null]);
     let group = groups.get(id);
     if (!group) groups.set(id, (group = { name: said, of, unit: reading.unit, last: new Map(), latest: null }));
     if (!group.unit && reading.unit) group.unit = reading.unit;

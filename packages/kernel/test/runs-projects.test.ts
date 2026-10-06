@@ -71,27 +71,30 @@ const placed = (k: Awaited<ReturnType<typeof record>>['k'], where: Parameters<Aw
   return r.project ? `${r.project.spoken} by ${r.project.how}` : r.ambiguous.length ? `between ${r.ambiguous.join(' and ')}` : null;
 };
 
-test('THE OWNER’S BRAINDOG ROW IS FOUND FROM THE MAC by the remote’s name, though it lists only the folder Windows wrote', async () => {
-  const { k, sql, ids } = await record();
+test('THE OWNER’S BRAINDOG ROW, LISTING ONLY THE FOLDER WINDOWS WROTE, IS A QUESTION FROM THE MAC and never a guess', async () => {
+  const { k, sql } = await record();
+  /* A last name alone ties the Mac's checkout to the row (batch 17, M1), so it is asked ("Is this BrainDog?") and the run
+     stays global until the row lists its remote, which is DIRECTION 37's one-field fix. */
   const mac = { remote: 'https://github.com/actuallyhoss/BrainDog.git', repo: 'braindog', cwd: '/Users/sam/Developer/braindog' };
-  assert.equal(placed(k, mac), 'things#1 by repo');
-  assert.equal(placed(k, { remote: 'git@github.com:actuallyhoss/BrainDog' }), 'things#1 by repo', 'the remote alone does not find it');
-  assert.equal(placed(k, { repo: 'BrainDog' }), 'things#1 by repo');
+  assert.equal(placed(k, mac), 'between things#1');
+  assert.equal(placed(k, { remote: 'git@github.com:actuallyhoss/BrainDog' }), 'between things#1', 'the remote alone does not find it');
+  assert.equal(placed(k, { repo: 'BrainDog' }), 'between things#1');
 
-  /* And the run that opens there is in it: what it adds lands in BrainDog, and it is named for it. */
+  /* And the run that opens there is in no project yet, named for its repository. */
   const task = value<Entry>(k.create('tasks', { what: 'Ship the brief' }, as({ ...mac, client_id: 'cc-1', host: 'mbp', agent: 'claude' })));
-  assert.equal(task.fields.thing, ids[0]);
-  assert.deepEqual([k.get('S1')!.fields.project, k.get('S1')!.fields.doing], ['things#1', 'Claude in BrainDog']);
+  assert.equal(task.fields.thing, undefined);
+  assert.deepEqual([k.get('S1')!.fields.project, k.get('S1')!.fields.doing], [undefined, 'Claude in braindog']);
   sql.close();
 });
 
 test('A RUN IN A SUBFOLDER OR A WORKTREE IS FOUND BY THE NEAREST FOLDER THAT CARRIES A PROJECT’S NAME', async () => {
   const { k, sql } = await record();
   /* The hook in a subfolder, with git too slow to answer: no remote and no repository, only the folder. */
-  assert.equal(placed(k, { cwd: '/Users/sam/Developer/braindog/loop' }), 'things#1 by repo');
-  assert.equal(placed(k, { cwd: '/Users/sam/Developer/braindog/.claude/worktrees/agent-aad7846157cdaa3ef' }), 'things#1 by repo');
+  /* Found by the name a folder carries, which is a question and not a placing (M1), the same as the checkout's own. */
+  assert.equal(placed(k, { cwd: '/Users/sam/Developer/braindog/loop' }), 'between things#1');
+  assert.equal(placed(k, { cwd: '/Users/sam/Developer/braindog/.claude/worktrees/agent-aad7846157cdaa3ef' }), 'between things#1');
   /* A worktree whose folder is its repository's name still has the remote it was cut from. */
-  assert.equal(placed(k, { repo: 'agent-aad7846157cdaa3ef', remote: 'github.com/actuallyhoss/BrainDog' }), 'things#1 by repo');
+  assert.equal(placed(k, { repo: 'agent-aad7846157cdaa3ef', remote: 'github.com/actuallyhoss/BrainDog' }), 'between things#1');
   /* A scratch folder carries no project's name, and a run there is global, as it was. */
   assert.equal(placed(k, { cwd: '/private/tmp/claude-501/-Users-sam-Developer/044b77b1/scratchpad' }), null);
   assert.equal(placed(k, { cwd: 'C:\\Users\\sam\\AppData\\Local\\Temp' }), null);
@@ -117,6 +120,7 @@ test('NAMES ARE MATCHED LAST AND NEVER GUESSED: an exact remote or folder wins, 
   };
   assert.equal(at({ remote: 'https://github.com/acme/site.git' }), 'things#1 by remote');
   assert.equal(at({ remote: 'https://github.com/third/site', cwd: '/home/sam/site/src' }), 'things#3 by folder');
-  assert.deepEqual(at({ remote: 'https://github.com/third/site' }), ['things#1', 'things#2', 'things#3']);
+  /* A remote whose owner is a third one matches nobody's remote by its last name (M1); only the folder of that name asks. */
+  assert.deepEqual(at({ remote: 'https://github.com/third/site' }), ['things#3']);
   assert.deepEqual(at({ repo: 'elsewhere' }), []);
 });

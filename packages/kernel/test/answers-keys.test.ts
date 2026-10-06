@@ -37,7 +37,9 @@ test('A LINES BLOCK’S latest AND A LIVE BLOCK’S quiet ARE ANSWER KEYS, so a 
     [lines, ['kind', 'source', 'columns']],
     [live, ['kind', 'source', 'columns']],
   ] as const) {
-    const answered = Object.keys(drawn).filter((key) => !declared.includes(key as never));
+    /* `key` IS DECLARED ON EVERY BLOCK, written by the author or answered as its stable hash (`blockKeyOf`), and not
+       computed from rows, so the record keeps it on a held block and it is no answer key. */
+    const answered = Object.keys(drawn).filter((key) => !declared.includes(key as never) && key !== 'key');
     assert.deepEqual(answered.filter((key) => !ANSWER_KEYS.includes(key)), [], `${drawn.source} answered a key ANSWER_KEYS does not hold`);
     assert.deepEqual(k.block(drawn as never).refusals, [], `${drawn.source} read back was refused for a key its own read answered`);
   }

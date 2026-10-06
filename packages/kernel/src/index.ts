@@ -120,9 +120,9 @@ import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provis
 import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
-import { costOf, costRank } from './weigh.ts';
+import { COST_RANK_SQL, COST_SQL, costOf, costRank, type Cost } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageResult, type QueueQuestion } from './pages.ts';
+import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageResult, type QueueCandidate, type QueueQuestion } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -221,8 +221,9 @@ import {
   type VaultDeps,
 } from './vault.ts';
 import { slashMayWrite } from './slash.ts';
-import { meet as meetPerson, type MeetArgs, type Met } from './people.ts';
-import { meetsRole, ratesRole, type MeetsFields } from './roles.ts';
+import { answeredOnly, fileVerdicts, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
+import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
+import { keyedLists, mergeFieldOf, rebuildKeys, rekey, type KeyedList } from './entities.ts';
 import { builtInFigure } from './built-in-figures.ts';
 import {
   FINISHED,
@@ -259,9 +260,12 @@ import {
   type Waiting,
 } from './device.ts';
 import {
+  placeOnce,
+  projectSuggestions,
   resolveProject,
   scopeFault,
   scopeFieldOf,
+  type ProjectSuggestion,
   type Resolved,
   type ScopeDecl,
   type ScopesDecl,
@@ -277,6 +281,7 @@ export { KERNEL_WRITTEN, QUIET_MS, STALE_MS, TITLE_MAX, agentOf, clipTitle, isQu
 export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type VaultGrant, type Waiting } from './device.ts';
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
+export { placeOnce, projectSuggestions, suggestProjects, remoteKey, SUGGEST_AFTER, type ProjectSuggestion, type SeenRun, type Candidate } from './scope.ts';
 export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { misread, sentencesOver, widens, type TypeShape } from './widen.ts';
@@ -333,7 +338,10 @@ export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pair
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
 export { RAIL_PAGES, REDUCES, ROW_TEXT_MOST, SEED_ACTOR, byOf, fill, railRoom, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 /* WHAT A READ ANSWERS ON A BLOCK, which the record takes off a block it holds from a reader (`packages/record` `DRAWN`). */
-export { ANSWER_KEYS } from './block-keys.ts';
+export { ANSWER_KEYS, BLOCK_KEY, blockKeyOf, defaultBlockKey, keyedBlocks } from './block-keys.ts';
+/* THE LOOK OVERLAY (DIRECTION §38, `compose.ts`): what Slash and the owner write over a page, and the rules' own look. */
+export { applyLook, composeLook, drewNothing, lookOf, mergeLook, LOOK_BY, RANK, type ComposeInput, type LookBody, type LookBy, type LookNext } from './compose.ts';
+export { lookFault } from './declare.ts';
 export {
   CHANNELS,
   carryingOf,
@@ -355,9 +363,14 @@ export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
 export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
 export { ARRANGING, BODY_KINDS, GOVERNANCE, OPEN_ARRANGEMENTS, PACK_VERBS, pressedOnly } from './govern.ts';
-export { MET_CAP, PEOPLE } from './people.ts';
-export type { MeetArgs, Met } from './people.ts';
-export type { MeetsFields, RatesFields } from './roles.ts';
+export { MET_CAP, PEOPLE, RESOLVE_PAIRS_NIGHT, pairHash } from './people.ts';
+export type { MeetArgs, Met, MetRow, ResolveJob, ResolveSide } from './people.ts';
+export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
+/* THE IDENTITY KEYS (`identity-keys.ts`), for every door that reads who something is about: one normaliser, so a key
+   the CLI harvests from a commit and one the record holds are the same string. */
+export { KEY_KINDS, PUBLIC_MAIL, githubOfAddress, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
+export type { KeyInput, KeyKind } from './identity-keys.ts';
+export { nameKey } from './entities.ts';
 export { SCOPES, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
 export { cutOffReadable, endedByCutOff } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
@@ -426,7 +439,7 @@ export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, 
 export type { ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
-export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, QueueOption, QueueQuestion } from './pages.ts';
+export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, QueueCandidate, QueueOption, QueueQuestion } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
 export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
@@ -1138,12 +1151,6 @@ function requiresOf(manifest: string): Record<string, string> {
   if (packs === null || typeof packs !== 'object' || Array.isArray(packs)) return {};
   return Object.fromEntries(Object.entries(packs).filter((e): e is [string, string] => typeof e[1] === 'string'));
 }
-
-/**
- * The most open questions a queue ranks, the oldest kept. Far past what anybody answers, and few enough that reading
- * each one's band off its body is a few milliseconds on a page load.
- */
-const OPEN_RANKED = 2_000;
 
 export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {}): Promise<Kernel> {
   const { state } = await applyMigrations(sql, clock);
@@ -3663,6 +3670,21 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           return no<Entry>('REQUIRED_MISSING', `${nameOf(current.id)} leaves ${from} only with ${missing} filled.`, { at: missing });
       }
 
+      /* ── a merge: a row of a list that plays `meets:` or `org:` pointed at the row it is folded into ──
+         Every live row that pointed at it is pointed at the survivor, in this write's batch, so the person or the
+         organisation keeps every link, the fold's delete is not refused by `delete: refuse_while_referenced` below or in
+         the write that follows, and undoing the merge (`undoMerge`) puts each link back. Before the delete check, since a
+         caller may fold and delete in one write. */
+      const keyedHere = keyedOf(register);
+      const foldField = keyedHere === undefined ? undefined : mergeFieldOf(keyedHere);
+      if (current && foldField !== undefined && touched.includes(foldField)) {
+        const into = merged[foldField];
+        if (typeof into === 'string' && into !== current.id && into !== current.fields[foldField]) {
+          const moved = repointRefs(register, current.id, into, w);
+          if (!moved.ok) return moved as Result<Entry>;
+        }
+      }
+
       /* `delete: refuse_while_referenced` (`referenced.ts`): a live row that other live rows point at is not taken out
          from under them. A restore and a row already deleted are never asked. `parts` is declared below, and read here
          only when a write runs, which is after the record has opened. */
@@ -3739,6 +3761,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         );
         const entry = byId(id, true)!;
         reproject(entry);
+        rekeyEntry(null, entry, w);
         rediary(entry);
         /* A `create` ROW CARRIES THE WHOLE SHAPE, with `field` null and `to_v` the row as JCS — so
            a replay reconstructs what was written without joining anything, and the redacted fields
@@ -3771,6 +3794,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       );
       const entry = byId(current.id, true)!;
       reproject(entry);
+      rekeyEntry(current, entry, w);
       rediary(entry);
 
       /* THE GRACE WINDOW: the creator's own edits in a row's first three minutes replace each other in history instead
@@ -4047,10 +4071,38 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const hints = w.session ?? {};
     const found = findSession(sql, hints, clock.now(), w.principal?.token ?? null);
     if (found?.foreign) return { found, place: false, project: null };
-    if (!found || (found.by === 'client' && Boolean(hints.remote || hints.repo || hints.cwd)))
-      return { found, place: true, project: resolveProject(sql, registers, hints).project };
+    const resolve = (where: Whereabouts): Resolved => resolveProject(sql, registers, where);
+    if (!found) return { found, place: true, project: resolve(hints).project ?? parentProject(hints) };
+    /* PLACED ONCE AND NEVER MOVED (`placeOnce`): a run with a project keeps it wherever it is re-attached from, and one
+       with none takes the first place a hint settles on, or its parent run's. */
+    const placed = placeOnce(found.project, hints, resolve) ?? (found.project ? null : parentProject(hints));
+    if (placed) return { found, place: true, project: placed };
     const row = found.project ? get(found.project) : null;
     return { found, place: false, project: row && found.project ? { id: row.id, spoken: found.project } : null };
+  }
+
+  /**
+   * The project of the run a subagent works for, by the `parent` hint (`S42`), or `null`. A subagent started in a scratch
+   * folder is still doing its parent's work, so it is placed where its parent is when nothing else places it.
+   */
+  function parentProject(hints: SessionHints): { id: string; spoken: string } | null {
+    const said = hints.parent?.trim();
+    if (!said || !isRunName(said)) return null;
+    const run = bySeq(SESSION, Number(said.slice((registers.get(SESSION)?.seq_prefix ?? 'S').length)));
+    const spoken = run?.fields.project;
+    if (typeof spoken !== 'string' || spoken === '') return null;
+    const row = get(spoken);
+    return row ? { id: row.id, spoken } : null;
+  }
+
+  /** The names of every live project, which a run's old record-given names may have been made from. */
+  function knownProjects(): string[] {
+    const list = [...registers.values()].find((r) => r.scopes !== undefined);
+    if (!list) return [];
+    return sql
+      .all<{ id: string }>('SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL', list.id)
+      .map((r) => titleOfRow(r.id))
+      .filter((t): t is string => t !== null);
   }
 
   function attribute(w: WriteContext, at: Located, target: string | null, now: string): { actor: string; own: boolean } {
@@ -4153,7 +4205,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   function learnRun(id: string, hints: SessionHints): void {
     const run = byId(id);
     if (!run) return;
-    const said = learned(run, hints, projectNamed(run.fields.project), runRegister());
+    const said = learned(run, hints, projectNamed(run.fields.project), runRegister(), [], knownProjects());
     if (Object.keys(said).length === 0) return;
     for (const [key, value] of Object.entries(said)) sql.exec('UPDATE entry SET fields = json_set(fields, ?, ?) WHERE id = ?', `$.${key}`, value, id);
     if (said.doing !== undefined) {
@@ -4163,18 +4215,20 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * A run's first proposal names it, while the name it has is still the record's own: the question is what the run is
-   * about, in the agent's words, where "Claude Code in BrainDog" says only who and where. In place, as `learnRun`
-   * writes. A question from anybody who is not a run, from a run already named, or from a key that named a run another
-   * key opened, changes nothing.
+   * A run's first proposal names it, while the name it has is still the record's own, BY THE TITLE THE AGENT GAVE IT and
+   * never by the question's own words (audit M7): a question such as "Merge Sara into Sarah?" copied into the run's name
+   * was readable on the Agents board by anybody who can read runs and not People. In place, as `learnRun` writes. A
+   * proposal with no title, from anybody who is not a run, from a run already named, or from a key that named a run
+   * another key opened, changes nothing.
    */
-  function nameRunBy(suggestion: string, w: WriteContext): void {
+  function nameRunBy(suggestion: string, w: WriteContext, title: string | undefined): void {
+    const asked = title?.trim();
+    if (!asked) return;
     const by = getGovernance(sql, 'suggestion', suggestion)?.opened_by;
     if (typeof by !== 'string' || !isRunName(by)) return;
     const run = bySeq(SESSION, Number(by.slice((registers.get(SESSION)?.seq_prefix ?? 'S').length)));
-    const asked = questionOf(sql, suggestion)?.trim();
-    if (!run || !asked || (w.principal?.kind === 'token' && owned(run.fields.token_id, w.principal.token ?? null))) return;
-    if (recordNamed(run, projectNamed(run.fields.project)) === null) return;
+    if (!run || (w.principal?.kind === 'token' && owned(run.fields.token_id, w.principal.token ?? null))) return;
+    if (recordNamed(run, projectNamed(run.fields.project), knownProjects()) === null) return;
     sql.exec("UPDATE entry SET fields = json_set(fields, '$.doing', ?) WHERE id = ?", clipTitle(asked), run.id);
     const now = byId(run.id);
     if (now) reproject(now);
@@ -4527,6 +4581,205 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if ((leg.fields._pair ?? null) !== to) appendEvent({ ...said, field: '_pair', from: (leg.fields._pair as Json | undefined) ?? null, to });
   }
 
+  /** The list whose rows carry identity keys, if `register` is one (`entities.ts`). */
+  function keyedOf(register: string): KeyedList | undefined {
+    return keyedLists(registers.values()).find((l) => l.register === register);
+  }
+
+  /**
+   * `entity_key` brought up to one row as it now is, in the write's transaction, the way `reproject` keeps the index.
+   * The source is who wrote it; `meet` says where it came from once the write is back (`sourceKeys`).
+   */
+  function rekeyEntry(before: Entry | null, after: Entry, w: WriteContext): void {
+    const list = keyedOf(after.register);
+    if (list) rekey(sql, list, before, after, w.actor, instant(clock.now()));
+  }
+
+  /**
+   * Every live row pointing at `from` through a `ref` or a `list<ref>` to its list, pointed at `to` instead: a merge's
+   * second half. Written through the write path, so each move is a line in the history under the merge's batch, and a
+   * move the write path refuses refuses the merge.
+   */
+  function repointRefs(register: string, from: string, to: string, w: WriteContext): Result<null> {
+    const named = titleOfRow(to);
+    for (const decl of registers.values()) {
+      if (decl.series) continue;
+      const refs = decl.fields.filter((f) => !f.retired && !f.derived && f.to === register && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')));
+      if (refs.length === 0) continue;
+      for (const { id } of sql.all<{ id: string }>('SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND id <> ? AND instr(fields, ?) > 0', decl.id, from, from)) {
+        const row = byId(id);
+        if (!row) continue;
+        const patch: Patch = {};
+        for (const f of refs) {
+          const held = row.fields[f.id];
+          if (held === from) patch[f.id] = to;
+          else if (Array.isArray(held) && held.includes(from)) patch[f.id] = [...new Set(held.map((v) => (v === from ? to : v)))];
+        }
+        if (Object.keys(patch).length === 0) continue;
+        const out = write(decl.id, id, patch, {
+          actor: w.actor,
+          cascade: false,
+          note: `Pointed at ${named ?? 'the one kept'} after a merge.`,
+          ...(w.batch === undefined ? {} : { batch: w.batch }),
+        });
+        if (!out.ok) return out as Result<never>;
+      }
+    }
+    return ok(null);
+  }
+
+  /**
+   * What `people.ts`'s `meet` writes with: the two keyed lists as the record declares them, the caller as the writer,
+   * the project the caller is in, and the gate for a question.
+   */
+  function peopleDeps(as: WriteContext, project: () => string | null, propose: PeopleDeps['propose']): PeopleDeps {
+    const people = meetsRole(registers.values());
+    const orgs = orgRole(registers.values());
+    return {
+      sql,
+      nowMs: clock.now(),
+      mint,
+      list: people === null ? undefined : { ...people, declaredFields: registers.get(people.register)?.fields ?? [] },
+      orgs: orgs === null || orgs.register === people?.register ? undefined : { ...orgs, declaredFields: registers.get(orgs.register)?.fields ?? [] },
+      project,
+      nameOf,
+      titleOf: titleOfRow,
+      write: (register, ref, patch, o = {}) =>
+        write(register, ref, patch, {
+          ...as,
+          ...(o.version === undefined ? {} : { version: o.version }),
+          ...(o.batch === undefined ? {} : { batch: o.batch }),
+          ...(o.note === undefined ? {} : { note: o.note }),
+        }),
+      propose,
+      othersRow,
+      moneyAt,
+      attempt: (fn) => attempt(sql, transaction, fn),
+    };
+  }
+
+  /**
+   * Whether a member other than an owner made this row: then no merge folds it without asking them, and `meet` leaves
+   * it out of every question it opens. A row made by a run, a rule or an import is the record's.
+   */
+  function othersRow(id: string): boolean {
+    const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = ? AND kind = 'create' ORDER BY rowid LIMIT 1", `entry:${id}`)?.actor;
+    if (by === undefined || !by.startsWith('p_')) return false;
+    const levels = sql.all<{ level: string }>('SELECT level FROM member WHERE person_id = ?', by).map((m) => m.level);
+    return levels.length > 0 && !levels.includes('owner');
+  }
+
+  /** Whether a live row of a list that holds money points at this one: a merge of two such is always asked. */
+  function moneyAt(id: string): boolean {
+    for (const decl of registers.values()) {
+      if (decl.series || !decl.fields.some((f) => !f.retired && (f.type === 'money' || (f.type === 'list' && f.of === 'money')))) continue;
+      if (!decl.fields.some((f) => !f.retired && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')))) continue;
+      if (sql.one('SELECT 1 AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND instr(fields, ?) > 0 LIMIT 1', decl.id, id)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Put a merge back (`kernel.undoMerge`). In a transaction only.
+   *
+   * BY THE MERGE'S OWN LINES, read from the log under its batch: a delete is restored, and a field is put back to what
+   * it held before, only while it still holds what the merge wrote. The order is the one that keeps every unique field
+   * free: the kept row gives back what it was carried first, then the folded row comes back and unfolds, then every
+   * link that moved is pointed back at it.
+   */
+  function undoMerge(ref: string, w: WriteContext): Result<{ restored: string[] }> {
+    const row = get(ref, { includeDeleted: true });
+    let batch: string | null = null;
+    if (row) {
+      const list = keyedOf(row.register);
+      const field = list === undefined ? undefined : mergeFieldOf(list);
+      const set =
+        field === undefined || typeof row.fields[field] !== 'string'
+          ? null
+          : sql.one<{ id: string; batch: string | null }>(
+              'SELECT id, batch FROM event WHERE target = ? AND field = ? AND to_v IS NOT NULL ORDER BY rowid DESC LIMIT 1',
+              `entry:${row.id}`,
+              field,
+            );
+      if (!set) return no('VALUE_MALFORMED', `${titleOfRow(row.id) ?? 'That one'} was not merged into anybody, so there is no merge to undo.`, { at: 'ref' });
+      batch = set.batch ?? set.id;
+    } else if (sql.one("SELECT 1 AS n FROM event WHERE batch = ? AND kind = 'edit' LIMIT 1", ref)) batch = ref;
+    if (batch === null) return no('VALUE_MALFORMED', `Nothing called ${ref} was merged, so there is no merge to undo.`, { at: 'ref' });
+
+    const lines = sql.all<{ target: string; kind: string; field: string | null; from_v: string | null; to_v: string | null }>(
+      'SELECT target, kind, field, from_v, to_v FROM event WHERE batch = ? OR id = ? ORDER BY rowid',
+      batch,
+      batch,
+    );
+    /* THE FOLDED ROWS ARE THE ONES WHOSE `merged_into` THIS BATCH SET. */
+    const folded = (l: (typeof lines)[number]): boolean => {
+      if (l.field === null || l.to_v === null) return false;
+      const list = keyedOf(byId(l.target.replace(/^entry:/, ''), true)?.register ?? '');
+      return list !== undefined && mergeFieldOf(list) === l.field;
+    };
+    const folds = new Set(lines.filter(folded).map((l) => l.target.replace(/^entry:/, '')));
+    if (folds.size === 0) return no('VALUE_MALFORMED', 'That change was not a merge, so there is no merge to undo.', { at: 'ref' });
+    type Undo = { restore: boolean; from: Map<string, string | null>; to: Map<string, string | null>; tagged: Map<string, unknown[]>; untagged: Map<string, unknown[]> };
+    const plan = new Map<string, Undo>();
+    for (const l of lines) {
+      const id = l.target.replace(/^entry:/, '');
+      const p = plan.get(id) ?? { restore: false, from: new Map(), to: new Map(), tagged: new Map(), untagged: new Map() };
+      plan.set(id, p);
+      if (l.kind === 'delete') p.restore = true;
+      else if ((l.kind === 'edit' || l.kind === 'state') && l.field !== null) {
+        if (!p.from.has(l.field)) p.from.set(l.field, l.from_v);
+        p.to.set(l.field, l.to_v);
+      } else if ((l.kind === 'tag' || l.kind === 'untag') && l.field !== null) {
+        /* A LIST OF TEXT CHANGES BY ELEMENT, one line per element added or taken away, so it is undone by element. */
+        const into = l.kind === 'tag' ? p.tagged : p.untagged;
+        const said = l.kind === 'tag' ? l.to_v : l.from_v;
+        if (said !== null) into.set(l.field, [...(into.get(l.field) ?? []), JSON.parse(said) as unknown]);
+      }
+    }
+    const parse = (v: string | null): unknown => (v === null ? null : (JSON.parse(v) as unknown));
+    const redacted = (v: string | null): boolean => v !== null && v.includes('--redacted--');
+    const undone: string[] = [];
+    const as: WriteContext = { actor: w.actor, cascade: false, batch: mint(), note: 'Undid a merge.' };
+    const revert = (id: string, p: Undo): Result<null> => {
+      if (p.restore) {
+        const back = write(byId(id, true)!.register, id, { deleted_at: null }, as);
+        if (!back.ok) return back as Result<never>;
+      }
+      const now = byId(id, true);
+      if (!now) return ok(null);
+      const patch: Patch = {};
+      for (const [field, from] of p.from) {
+        const to = p.to.get(field) ?? null;
+        if (redacted(from) || redacted(to)) continue;
+        if (JSON.stringify(now.fields[field] ?? null) !== JSON.stringify(parse(to))) continue;
+        patch[field] = parse(from);
+      }
+      for (const field of new Set([...p.tagged.keys(), ...p.untagged.keys()])) {
+        if (field in patch) continue;
+        const held = Array.isArray(now.fields[field]) ? (now.fields[field] as unknown[]) : [];
+        const added = (p.tagged.get(field) ?? []).map((v) => JSON.stringify(v));
+        const back = (p.untagged.get(field) ?? []).filter((v) => !held.some((h) => JSON.stringify(h) === JSON.stringify(v)));
+        const list = [...held.filter((h) => !added.includes(JSON.stringify(h))), ...back];
+        if (JSON.stringify(list) !== JSON.stringify(held)) patch[field] = list.length === 0 ? null : list;
+      }
+      if (Object.keys(patch).length === 0) return ok(null);
+      const out = write(now.register, id, patch, as);
+      return out.ok ? ok(null) : (out as Result<never>);
+    };
+    const foldRegister = byId([...folds][0]!, true)?.register;
+    const ordered = [
+      ...[...plan].filter(([id]) => !folds.has(id) && byId(id, true)?.register === foldRegister),
+      ...[...plan].filter(([id]) => folds.has(id)),
+      ...[...plan].filter(([id]) => !folds.has(id) && byId(id, true)?.register !== foldRegister),
+    ];
+    for (const [id, p] of ordered) {
+      const out = revert(id, p);
+      if (!out.ok) return out as Result<never>;
+      if (folds.has(id)) undone.push(titleOfRow(id) ?? nameOf(id));
+    }
+    return ok({ restored: undone });
+  }
+
   function reproject(entry: Entry): void {
     const decl = registers.get(entry.register);
     if (!decl || decl.series) return;
@@ -4797,6 +5050,15 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true, ...(shows ? { shows } : {}) }];
     });
     const does = doesOf(kind, body, { list: (id) => registers.get(id)?.name ?? null, pack: packName, row: titleOfRow });
+    /* THE NAMES A MERGE QUESTION IS ABOUT, each checked on the way out as an option is: a handle, a name, and at most a
+       few words of where they were seen. */
+    const candidates: QueueCandidate[] = (Array.isArray(body.candidates) ? (body.candidates as unknown[]) : []).flatMap((c) => {
+      if (c === null || typeof c !== 'object' || Array.isArray(c)) return [];
+      const one = c as Record<string, unknown>;
+      if (typeof one.at !== 'string' || typeof one.name !== 'string') return [];
+      const seen = Array.isArray(one.seen) ? one.seen.filter((w): w is string => typeof w === 'string').slice(0, 5) : [];
+      return [{ at: one.at, name: one.name, seen, ...(one.kept === true ? { kept: true as const } : {}) }];
+    });
     return {
       id: String(r.id),
       who: String(r.opened_by ?? ''),
@@ -4809,6 +5071,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),
       body_kind: kind,
       ...(does ? { does } : {}),
+      ...(candidates.length > 0 ? { candidates } : {}),
+      ...(Array.isArray(body.rows) ? { held: body.rows.length } : {}),
     };
   };
 
@@ -4846,6 +5110,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        optional and this is the one host that hands it: `additionsOf` reads every installed pack's manifest for
        what it adds to this page's declaration id. */
     adds: (page) => additionsOf(sql.all<{ id: string; manifest: string }>('SELECT id, manifest FROM pack WHERE disabled_at IS NULL ORDER BY id'), page),
+    /* AND THIS LINE TURNS THE ENGINE ON (DIRECTION §38): every page is read under its live `look.<page>`, or the rules'
+       look when none is stored (`compose.ts`, `lookedAt` in `pages.ts`). */
+    look: (page) => {
+      const row = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'look' AND superseded_at IS NULL AND retired = 0", `look.${page}`);
+      return row ? (JSON.parse(row.body) as unknown) : null;
+    },
     /* `into` GOES THROUGH, so a walk opened from one book walks in the book's own currency. Dropped here, the page asked
        for the book's currency and this host walked the home one, drawn once per currency instead. */
     runway: (opening, legs, horizon, only, into) => {
@@ -4883,12 +5153,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const from = `FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`;
       type Read = { at: unknown; value: unknown; name: unknown; unit: unknown; thing: unknown };
       const titles = new Map<string, string | null>();
-      /* THE PROJECT BY ITS NAME, never its id: a reading of a project with no title is of no project a person can name. */
+      /* THE PROJECT BY ITS NAME, never its id: a reading of a project with no title is of no project a person can name.
+         ITS ID STILL KEEPS IT APART (`project`, never drawn): two untitled projects' "Orders" were one line through both
+         projects' numbers (audit 16, L9). */
       const named = ({ thing: of, ...r }: Read): RawReading => {
         if (typeof of !== 'string' || of === '') return r;
         if (!titles.has(of)) titles.set(of, titleOfRow(of));
         const title = titles.get(of);
-        return title ? { ...r, of: title } : r;
+        return title ? { ...r, of: title, project: of } : { ...r, project: of };
       };
       const readings = sql.all<Read>(`SELECT ${cols} ${from} AND ${at} >= ?`, q.register, ...c.params, q.since).map(named);
       const latest = sql
@@ -4966,44 +5238,67 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     openQuestions: (limit, keep) => {
       const nowMs = clock.now();
       const now = instant(nowMs);
-      /* EVERY OPEN QUESTION IS RANKED, NOT THE NEWEST FEW. The band is read off each body here, which is cheap, and only
-         the ones drawn are read whole (`questionFrom`, which reads each one's question). Ranked over the newest twenty, the expensive
-         question that had waited a month never reached the top, and the counts beside it were counts of twenty.
-         BOUNDED at `OPEN_RANKED`, the oldest kept, since within a band the oldest leads. */
-      const lean = sql
-        .all<{ id: string; body_kind: string; body: string; opened_by: string | null; opened_at: string | null }>(
-          `SELECT id, body_kind, body, opened_by, opened_at FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?)
-           ORDER BY opened_at ASC, rowid ASC LIMIT ?`,
-          now,
-          OPEN_RANKED,
-        )
-        .map((r) => {
-          const body = parsedBody(r.body);
-          return {
-            r,
-            at: String(r.opened_at ?? ''),
-            facts: { who: String(r.opened_by ?? ''), kind: String(r.body_kind ?? ''), cost: costOf(String(r.body_kind ?? ''), body), about: typeof body.about === 'string' && body.about !== '' ? body.about : null },
-          };
-        });
-      const kept = keep ? lean.filter((q) => keep(q.facts)) : lean;
-      /* A STABLE SORT, and `opened_at` is the tie-break the band needs: two questions in one band
-         come back in the order they were asked, oldest first. `id` settles a tie on the instant,
-         because two proposals written in the same millisecond must not swap places between reads. */
-      kept.sort((a, b) => costRank(a.facts.cost) - costRank(b.facts.cost) || a.at.localeCompare(b.at) || a.r.id.localeCompare(b.r.id));
-      const questions = kept.slice(0, Math.max(0, Math.floor(limit))).map((q) => questionFrom(q.r));
-      const open = countOpenQuestions({ sql, nowMs });
-      /* THE COUNTS ARE OF EVERY QUESTION THE FILTER ADMITS. With none, how many waited past two weeks is the record's own
-         count, read in SQL over every open question, bound or no bound; how many are hard to undo is read off the bodies. */
+      const drawn = Math.max(0, Math.floor(limit));
       const staleBefore = instant(nowMs - STALE_DAYS * 86_400_000);
-      const stale = keep
-        ? kept.filter((q) => staleAt(q.at, nowMs)).length
-        : (sql.one<{ n: number }>(
-            "SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?) AND opened_at < ?",
-            now,
-            staleBefore,
-          )?.n ?? 0);
+      const OPEN = "status = 'open' AND (defer_until IS NULL OR defer_until <= ?)";
+      /* ONLY THE QUESTIONS DRAWN ARE READ WHOLE (`questionFrom`). Every other one is ranked and counted by its band in SQL
+         (`COST_SQL`), so no body is read into this process to be counted (audit 16, M5): before, the newest past two
+         thousand were dropped, and the counts beside the queue were counts of the two thousand. */
+      const whole = (ids: readonly string[]): Map<string, Record<string, unknown>> =>
+        new Map(
+          ids.length === 0
+            ? []
+            : sql
+                .all<Record<string, unknown>>(
+                  `SELECT id, body_kind, body, opened_by, opened_at FROM suggestion WHERE id IN (${ids.map(() => '?').join(', ')})`,
+                  ...ids,
+                )
+                .map((r) => [String(r.id), r]),
+        );
+      const open = countOpenQuestions({ sql, nowMs });
+      if (!keep) {
+        /* A STABLE ORDER: the band, then the oldest first within it, since the expensive question that has been sitting is
+           the one worth meeting, and the id when two were asked in the same millisecond, so two reads never swap them. */
+        const ids = sql
+          .all<{ id: string }>(`SELECT id FROM suggestion WHERE ${OPEN} ORDER BY ${COST_RANK_SQL} ASC, opened_at ASC, id ASC LIMIT ?`, now, drawn)
+          .map((r) => r.id);
+        const rows = whole(ids);
+        const questions = ids.flatMap((id) => {
+          const r = rows.get(id);
+          return r ? [questionFrom(r)] : [];
+        });
+        const counted = sql.one<{ stale: number; hard: number }>(
+          `SELECT COALESCE(SUM(opened_at < ?), 0) AS stale, COALESCE(SUM(${COST_SQL} = 'undo'), 0) AS hard FROM suggestion WHERE ${OPEN}`,
+          staleBefore,
+          now,
+        );
+        return { questions, open, matched: open, stale: counted?.stale ?? 0, hardToUndo: counted?.hard ?? 0 };
+      }
+      /* A `where:` IS READ OVER THE FACTS OF EVERY OPEN QUESTION, each fact read in SQL: who asked, the kind, the band,
+         and what it is about. */
+      const lean = sql
+        .all<{ id: string; body_kind: string | null; opened_by: string | null; opened_at: string | null; cost: string; about: string | null }>(
+          `SELECT id, body_kind, opened_by, opened_at, ${COST_SQL} AS cost,
+             CASE WHEN json_valid(body) AND json_type(body) = 'object' AND json_type(body, '$.about') = 'text' THEN json_extract(body, '$.about') END AS about
+           FROM suggestion WHERE ${OPEN}`,
+          now,
+        )
+        .map((r) => ({
+          id: r.id,
+          at: String(r.opened_at ?? ''),
+          facts: { who: String(r.opened_by ?? ''), kind: String(r.body_kind ?? ''), cost: r.cost as Cost, about: r.about !== null && r.about !== '' ? r.about : null },
+        }));
+      const kept = lean.filter((q) => keep(q.facts));
+      kept.sort((a, b) => costRank(a.facts.cost) - costRank(b.facts.cost) || a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+      const ids = kept.slice(0, drawn).map((q) => q.id);
+      const rows = whole(ids);
+      const questions = ids.flatMap((id) => {
+        const r = rows.get(id);
+        return r ? [questionFrom(r)] : [];
+      });
+      const stale = kept.filter((q) => staleAt(q.at, nowMs)).length;
       const hardToUndo = kept.filter((q) => q.facts.cost === 'undo').length;
-      return { questions, open, matched: keep ? kept.length : open, stale, hardToUndo };
+      return { questions, open, matched: kept.length, stale, hardToUndo };
     },
     /*
      * THE QUESTIONS PUT OFF, for a page's Later: still open, with a day to come back that has not come, soonest back
@@ -5381,22 +5676,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }),
     withdraw: (suggestion, actor, why) => void decide(governDeps(), suggestion, { resolved_as: 'wont-fix', reason: why }, actor),
     /* A RUN'S `meet` IS `people.ts`'s `meet`, the one `kernel.meet` calls, as the rule and in the run's project, so a person a rule met is matched, dated and offered for merging as one an agent met. */
-    meet: (args, a) => {
-      const role = meetsRole(registers.values());
-      const list = role === null ? undefined : { ...role, declaredFields: registers.get(role.register)?.fields ?? [] };
-      return meetPerson(
-        {
-          sql,
-          nowMs: clock.now(),
-          list,
-          project: () => a.project,
-          nameOf,
-          write: (ref, patch, version) => write(role?.register ?? '', ref, patch, version === undefined ? { actor: a.actor } : { actor: a.actor, version }),
-          propose: (p) => openSuggestion(governDeps(), a.actor, p),
-        },
-        args,
-      );
-    },
+    meet: (args, a) => meetPerson(peopleDeps({ actor: a.actor }, () => a.project, (p) => openSuggestion(governDeps(), a.actor, p)), args),
     /* A RUN'S `run_job` IS THE JOBS DOOR'S OWN `createJob` (`api/jobs.ts`), with the same check that `about` is a row. */
     job: (a) => createJob(tokenDeps(), { kind: a.kind, args: a.args, ...(a.about === null ? {} : { about: a.about }) }, (spoken) => get(spoken) !== null),
     answersSlash: opts.answersSlash === true,
@@ -5816,6 +6096,19 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     transaction(() => {
       const job = embedJob(sql, clock.now());
       if (job) enqueue(sql, mint, clock.now(), 'infer.embed', job);
+    });
+    /* AND ONCE A NIGHT, THE PEOPLE WHO MAY BE ONE, twenty pairs at most in one `infer.resolve` job, by name and where
+       they were seen and never an address (`people.ts`'s `resolveJob`). The answer comes back through `ackOutbox`. */
+    transaction(() => {
+      const people = meetsRole(registers.values());
+      const job = resolveJob({
+        sql,
+        nowMs: clock.now(),
+        list: people === null ? undefined : { ...people, declaredFields: registers.get(people.register)?.fields ?? [] },
+        nameOf,
+        titleOf: titleOfRow,
+      });
+      if (job) enqueue(sql, mint, clock.now(), 'infer.resolve', job);
     });
     return { ...out, sessions };
   }
@@ -6559,6 +6852,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
               wrote: out.value.wrote,
               /* ABSENT IS VERIFIED, as `Arrival.verified` says: only a public door can answer the question at all. */
               verified: arrival.verified !== false,
+              ...(out.value.counterparty === undefined ? {} : { counterparty: out.value.counterparty }),
             }),
           );
       }
@@ -7420,12 +7714,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * Slash's rules or a model, kept on `suggestion.drafted_by`. A run's first question names the run while the
      * record's own name still stands (`nameRunBy`).
      */
-    propose: (p: Proposal, w: WriteContext | string, drafted?: string): Result<{ id: string }> =>
+    propose: (p: Proposal & { title?: string }, w: WriteContext | string, drafted?: string): Result<{ id: string }> =>
       transaction(() => {
         const theirs = typeof w === 'string' ? null : foreignRun<{ id: string }>(w);
         if (theirs) return theirs;
-        const out = openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), p, drafted);
-        if (out.ok) nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w);
+        /* THE TITLE IS THE RUN'S, NOT THE QUESTION'S: taken off before the body is checked, and kept nowhere else. */
+        const { title, ...asked } = p;
+        const out = openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), asked, drafted);
+        if (out.ok) nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w, typeof title === 'string' ? title : undefined);
         return out;
       }),
 
@@ -7454,8 +7750,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       transaction(() => keepApplied(governDeps(), decision, applied, actor)),
 
     /**
-     * Someone met in the work: matched by email or handle, or added, and linked to the project of the
-     * caller's run (`people.ts`). One transaction, so a refusal anywhere writes nothing, a run included.
+     * Someone or some organisation met in the work: resolved by any key it carries (`entity_key`), added when it
+     * carries one nobody holds, kept as a mention when it is only a name, folded by the strong rules or asked about once,
+     * and linked to the project of the caller's run (`people.ts`). One transaction, so a refusal anywhere writes nothing,
+     * a run included.
      * The caller's `version` and `opId` are not carried, because they describe no row meet writes.
      */
     meet: (args: MeetArgs, w: WriteContext): Result<Met> => {
@@ -7469,24 +7767,33 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* A KEY MEETS SOMEBODY AS ITS OWN RUN, never as one another key opened, as its writes and notes do (`foreignRun`). */
       const theirs = foreignRun<Met>(as);
       if (theirs) return theirs;
-      /* THE LIST DECLARING meets:, or `people` on a record older than the key (`roles.ts`). */
-      const role = meetsRole(registers.values());
-      const list = role === null ? undefined : { ...role, declaredFields: registers.get(role.register)?.fields ?? [] };
+      /* THE LISTS DECLARING meets: AND org:, or `people` and `organisations` on a record older than the keys (`roles.ts`). */
       return attempt(sql, transaction, () =>
         meetPerson(
-          {
-            sql,
-            nowMs: clock.now(),
-            list,
-            project: () => (as.principal?.kind === 'token' ? (locateRun(as).project?.id ?? null) : null),
-            nameOf,
-            write: (ref, patch, version) => write(role?.register ?? '', ref, patch, version === undefined ? as : { ...as, version }),
-            propose: (p) => openSuggestion(governDeps(), () => signedBy(as), p),
-          },
+          peopleDeps(
+            as,
+            () => (as.principal?.kind === 'token' ? (locateRun(as).project?.id ?? null) : null),
+            (p) => openSuggestion(governDeps(), () => signedBy(as), p),
+          ),
           args,
         ),
       );
     },
+
+    /**
+     * Undo a merge: the batch a merge was written in, or a row that was folded into another. Every line of that batch is
+     * put back where nothing has changed it since: the folded row restored and unfolded (it takes its own keys back),
+     * the kept row's carried fields emptied again, and every link that moved pointed back. One transaction; a refusal
+     * anywhere puts nothing back. A field changed after the merge is left as it now is.
+     */
+    undoMerge: (ref: string, w: WriteContext): Result<{ restored: string[] }> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      return attempt(sql, transaction, () => undoMerge(ref, { actor: w.actor }));
+    },
+
+    /** Every identity key again, from the rows: what an import runs, and a repair. */
+    rebuildKeys: (): number => transaction(() => rebuildKeys(sql, instant(clock.now()))),
 
     /**
      * The list `meet` writes and the field playing each part, or `null` when there is none.
@@ -7497,6 +7804,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     meetsList: (): { register: string; fields: MeetsFields } | null => {
       const role = meetsRole(registers.values());
       return role === null ? null : { register: role.register, fields: role.fields };
+    },
+
+    /** The list `meet` writes organisations into (`org:`, or `organisations` by name), or `null`: the record's guard for `kind: organisation`. */
+    orgsList: (): { register: string; fields: OrgFields } | null => {
+      const role = orgRole(registers.values());
+      return role === null || role.register === meetsRole(registers.values())?.register ? null : { register: role.register, fields: role.fields };
     },
 
     /* ── the outbox: work that must leave the record ────────────────── */
@@ -7554,7 +7867,23 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           args.state === 'done'
             ? sql.one<{ payload: string }>("SELECT payload FROM outbox WHERE id = ? AND kind = 'notify.push' AND state = 'leased'", args.id)
             : undefined;
+        /* AND A MODEL'S ANSWER ABOUT WHO MAY BE ONE PERSON, filed as questions once the ack has passed the fence, so a
+           stale lease files nothing (`fileVerdicts`). A model only ever proposes: nothing is merged on its word. */
+        const resolving =
+          args.state === 'done'
+            ? sql.one<{ payload: string }>("SELECT payload FROM outbox WHERE id = ? AND kind = 'infer.resolve' AND state = 'leased'", args.id)
+            : undefined;
         const out = ack(sql, ackDeps(), args);
+        if (out.ok && resolving) {
+          /* AND A PAIR THE ANSWER LEFT OUT IS ASKED AGAIN ANOTHER NIGHT: the done job keeps only the pairs it was told about.
+             FIRST, because the job is done whatever its answer was, as an embedding's is (`outbox.ts`): an answer with no
+             verdicts, or none at all, spoke of no pair, and filed after a refusal it left every pair spent unasked. */
+          sql.exec('UPDATE outbox SET payload = ? WHERE id = ?', answeredOnly(resolving.payload, args.result), args.id);
+          if (args.result !== undefined) {
+            const filed = fileVerdicts(peopleDeps({ actor: 'slash' }, () => null, (p) => openSuggestion(governDeps(), 'slash', p, 'slash')), resolving.payload, args.result);
+            if (!filed.ok) return filed as Result<never>;
+          }
+        }
         const sub = out.ok && push ? pushSubOf(push.payload) : null;
         if (sub !== null) {
           const gone = (args.result as { gone?: unknown } | undefined)?.gone === true;
@@ -7699,6 +8028,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           await renameDeclarations(sql);
           reload();
           rebuildFts();
+          transaction(() => rebuildKeys(sql, instant(clock.now())));
         }
         return out;
       }
@@ -7774,6 +8104,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       await renameDeclarations(sql);
       reload();
       rebuildFts();
+      transaction(() => rebuildKeys(sql, instant(clock.now())));
       return out;
     },
 
@@ -8507,6 +8838,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     history,
     /** Which project a run in this place belongs to, and how it was told (`scope.ts`). Reads only. */
     resolveProject: (where: Whereabouts): Resolved => resolveProject(sql, registers, where),
+    /** The repositories runs keep turning up in that no project lists, each asked about once by its `key` (`scope.ts`). Reads only. */
+    projectSuggestions: (): ProjectSuggestion[] => projectSuggestions(sql, registers),
     inScope,
     runFor,
     findRun,

@@ -1,0 +1,224 @@
+/**
+ * The identities the record knows: `entity_key`, kept beside the rows of the lists that play `meets:` or `org:`.
+ *
+ * KEPT IN THE WRITE PATH, IN THE ROW'S OWN TRANSACTION, as `entry_fts` is (`fts.ts`). A key table updated afterwards is
+ * wrong for however long "afterwards" takes, and that window is exactly when an agent meets the person it just met. So
+ * `rekey` runs on every create and update of a keyed list (`index.ts`'s `writing`), `rebuildKeys` on an import and once
+ * when migration 23 lands, and erase removes a row's keys with the row (`erase.ts`).
+ *
+ * ONE LIVE ROW PER KEY, AND THE FIRST TO CLAIM IT KEEPS IT. A second live row whose fields carry a key the first holds
+ * does not take it: the record refuses that write at its own door (D3), and a row written past it simply does not
+ * answer to the key. A key whose holder is gone (deleted, erased, purged) is free again.
+ *
+ * A MERGED ROW'S KEYS POINT AT THE ROW IT WAS FOLDED INTO. The row stays in the file, deleted, with `merged_into` naming
+ * the survivor, and every key it held moves to the survivor, so the folded row's second address still finds the one
+ * person. Undoing the merge takes back the keys its own fields carry.
+ *
+ * NOTHING HERE WRITES A ROW. It reads rows and writes the two derived tables; who becomes whom is `people.ts`'s.
+ */
+
+import type { Sql } from '@braindog/ports';
+
+import { keysOf } from './identity-keys.ts';
+import { meetsRole, orgRole, type MeetsFields, type OrgFields, type Role, type RoleList } from './roles.ts';
+
+/** A list whose rows carry keys: the one playing `meets:`, and the one playing `org:`. */
+export type KeyedList = { register: string; role: 'meets' | 'org'; fields: MeetsFields | OrgFields };
+
+/** The lists whose rows carry keys, read from the record's lists. At most two. */
+export function keyedLists(lists: Iterable<RoleList>): KeyedList[] {
+  const all = [...lists];
+  const out: KeyedList[] = [];
+  const people: Role<MeetsFields> | null = meetsRole(all);
+  if (people) out.push({ register: people.register, role: 'meets', fields: people.fields });
+  const orgs: Role<OrgFields> | null = orgRole(all);
+  if (orgs && orgs.register !== people?.register) out.push({ register: orgs.register, role: 'org', fields: orgs.fields });
+  return out;
+}
+
+const listOf = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+const textOf = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v : undefined);
+
+/**
+ * The keys a row's fields carry. A person: the email, every handle, every key. An organisation: every key and its
+ * domain. A field the list does not name is not read.
+ */
+export function rowKeys(list: KeyedList, fields: Readonly<Record<string, unknown>>): string[] {
+  const at = list.fields as Partial<Record<string, string>>;
+  const read = (part: string): unknown => (at[part] === undefined ? undefined : fields[at[part]!]);
+  if (list.role === 'meets')
+    return keysOf({ email: textOf(read('email')), handles: listOf(read('handles')), keys: listOf(read('keys')) });
+  return keysOf({ keys: listOf(read('keys')), domain: textOf(read('domain')) });
+}
+
+/** The field a list says a row was folded into, or `undefined`. */
+export const mergeFieldOf = (list: KeyedList): string | undefined => (list.fields as { merged_into?: string }).merged_into;
+
+/** A row as `rekey` reads it. */
+export type KeyedRow = { id: string; register: string; fields: Readonly<Record<string, unknown>>; deleted_at: string | null };
+
+const liveRow = (sql: Pick<Sql, 'one'>, id: string): boolean =>
+  sql.one<{ n: number }>('SELECT 1 AS n FROM entry WHERE id = ? AND deleted_at IS NULL', id) !== undefined;
+
+/** Hold `key` for `row`, unless another live row holds it. A key whose holder is gone is taken over. */
+function claim(sql: Pick<Sql, 'one' | 'exec'>, key: string, register: string, row: string, source: string, at: string): void {
+  const held = sql.one<{ row_id: string }>('SELECT row_id FROM entity_key WHERE key = ?', key);
+  if (held?.row_id === row) return;
+  if (held && liveRow(sql, held.row_id)) return;
+  sql.exec(
+    'INSERT INTO entity_key (key, register, row_id, source, at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (key) DO UPDATE SET register = excluded.register, row_id = excluded.row_id, source = excluded.source, at = excluded.at',
+    key,
+    register,
+    row,
+    source,
+    at,
+  );
+}
+
+/**
+ * Bring `entity_key` up to one row as it now is, from what it was. In the write's transaction.
+ *
+ *   - Folded into another (its `merged_into` set): every key it holds, and every one its fields carry that nobody
+ *     holds, moves to the survivor.
+ *   - Deleted, and not folded: its keys go, so they are free for whoever is met with them next.
+ *   - Unfolded (its `merged_into` cleared): the keys its own fields carry come back from the row it was folded into.
+ *   - Live: the keys it lost go, and the ones it gained are claimed.
+ */
+export function rekey(sql: Pick<Sql, 'one' | 'all' | 'exec'>, list: KeyedList, before: KeyedRow | null, after: KeyedRow, source: string, at: string): void {
+  const field = mergeFieldOf(list);
+  const into = field === undefined ? undefined : textOf(after.fields[field]);
+  const was = field === undefined || before === null ? undefined : textOf(before.fields[field]);
+  const own = rowKeys(list, after.fields);
+
+  if (into !== undefined && into !== after.id) {
+    sql.exec('UPDATE entity_key SET row_id = ?, at = ? WHERE row_id = ?', into, at, after.id);
+    for (const key of own) claim(sql, key, list.register, into, source, at);
+    return;
+  }
+  if (after.deleted_at !== null) {
+    sql.exec('DELETE FROM entity_key WHERE row_id = ?', after.id);
+    return;
+  }
+  if (was !== undefined)
+    for (const key of own) sql.exec('UPDATE entity_key SET row_id = ?, at = ? WHERE key = ? AND row_id = ?', after.id, at, key, was);
+  const had = before === null || before.deleted_at !== null ? [] : rowKeys(list, before.fields);
+  for (const key of had) if (!own.includes(key)) sql.exec('DELETE FROM entity_key WHERE key = ? AND row_id = ?', key, after.id);
+  for (const key of own) claim(sql, key, list.register, after.id, source, at);
+}
+
+/**
+ * Every key, from nothing: what an import runs once at the end, and migration 23 once over the rows already here.
+ *
+ * THE LISTS ARE READ FROM THE LIVE DECLARATIONS, not from a kernel's cache, because the migration runs before there is
+ * one. Live rows claim first, oldest first, so the row a person made first keeps a key two rows carry; then each folded
+ * row's keys go to the end of its chain of `merged_into`, where nobody holds them.
+ */
+export function rebuildKeys(sql: Pick<Sql, 'one' | 'all' | 'exec'>, at: string): number {
+  if (!sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'entity_key'")) return 0;
+  const lists = keyedLists(
+    sql
+      .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0")
+      .flatMap(({ body }) => {
+        try {
+          return [JSON.parse(body) as RoleList];
+        } catch {
+          return [];
+        }
+      }),
+  );
+  sql.exec('DELETE FROM entity_key');
+  for (const list of lists) {
+    const field = mergeFieldOf(list);
+    const rows = sql
+      .all<{ id: string; fields: string; deleted_at: string | null }>('SELECT id, fields, deleted_at FROM entry WHERE register = ? ORDER BY seq, id', list.register)
+      .map((r) => ({ id: r.id, register: list.register, deleted_at: r.deleted_at, fields: parsed(r.fields) }));
+    const folded = (r: KeyedRow): string | undefined => (field === undefined ? undefined : textOf(r.fields[field]));
+    for (const r of rows) if (r.deleted_at === null && folded(r) === undefined) for (const key of rowKeys(list, r.fields)) claim(sql, key, list.register, r.id, 'rebuilt', at);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    for (const r of rows) {
+      let end = folded(r);
+      for (let hops = 0; end !== undefined && hops < 16; hops++) {
+        const next = byId.get(end);
+        const further = next === undefined ? undefined : folded(next);
+        if (further === undefined || further === end) break;
+        end = further;
+      }
+      if (end === undefined || !byId.get(end) || byId.get(end)!.deleted_at !== null) continue;
+      for (const key of rowKeys(list, r.fields)) claim(sql, key, list.register, end, 'rebuilt', at);
+    }
+  }
+  return Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM entity_key')?.n ?? 0);
+}
+
+function parsed(fields: string): Record<string, unknown> {
+  try {
+    return JSON.parse(fields) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * The live rows of `register` holding any of `keys`, oldest first, each with the keys it answered to. A key held by a
+ * row of another list is not one of them: a person is never found by an organisation's key, nor the other way.
+ */
+export function holders(sql: Pick<Sql, 'all'>, register: string, keys: readonly string[]): { id: string; keys: string[] }[] {
+  if (keys.length === 0) return [];
+  const rows = sql.all<{ key: string; row_id: string }>(
+    `SELECT k.key, k.row_id FROM entity_key k JOIN entry e ON e.id = k.row_id
+      WHERE k.key IN (${keys.map(() => '?').join(', ')}) AND k.register = ? AND e.deleted_at IS NULL
+      ORDER BY e.seq, e.id`,
+    ...keys,
+    register,
+  );
+  const out = new Map<string, string[]>();
+  for (const r of rows) out.set(r.row_id, [...(out.get(r.row_id) ?? []), r.key]);
+  return [...out].map(([id, held]) => ({ id, keys: held }));
+}
+
+/** Who holds one key, of any list, or `null`. */
+export function holderOf(sql: Pick<Sql, 'one'>, key: string): { register: string; id: string } | null {
+  const r = sql.one<{ register: string; row_id: string }>(
+    'SELECT k.register, k.row_id FROM entity_key k JOIN entry e ON e.id = k.row_id WHERE k.key = ? AND e.deleted_at IS NULL',
+    key,
+  );
+  return r ? { register: r.register, id: r.row_id } : null;
+}
+
+/** Say where the keys a meet just gave a row came from, in place of the write path's plain stamp. */
+export function sourceKeys(sql: Pick<Sql, 'exec'>, row: string, keys: readonly string[], source: string): void {
+  for (const key of keys) sql.exec('UPDATE entity_key SET source = ? WHERE key = ? AND row_id = ?', source, key, row);
+}
+
+/** A name as two mentions of one share it: trimmed, spaces collapsed, lower case, and no punctuation but `-` and `'`. */
+export const nameKey = (name: string): string =>
+  name
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/**
+ * Keep a name met with nothing that identifies it. One line per name, kind, project and source, so the same commit
+ * read twice is one mention, and the newest instant wins.
+ */
+export function noteMention(
+  sql: Pick<Sql, 'exec'>,
+  m: { name: string; kind: 'person' | 'organisation'; project: string | null; source: string; at: string },
+): void {
+  sql.exec(
+    `INSERT INTO entity_mention (name_key, name, kind, project, source, at) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (name_key, kind, project, source) DO UPDATE SET at = excluded.at, name = excluded.name`,
+    nameKey(m.name),
+    m.name,
+    m.kind,
+    m.project ?? '',
+    m.source,
+    m.at,
+  );
+}
+
+/** How many sources a name has been mentioned in, of one kind. */
+export const mentionSources = (sql: Pick<Sql, 'one'>, name: string, kind: 'person' | 'organisation'): number =>
+  Number(sql.one<{ n: number }>('SELECT count(DISTINCT source) AS n FROM entity_mention WHERE name_key = ? AND kind = ?', nameKey(name), kind)?.n ?? 0);

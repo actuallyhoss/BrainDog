@@ -316,6 +316,17 @@ export type Arrived = {
    * `3′` exists to ration.
    */
   redelivered?: true;
+  /**
+   * Who an email says it is from, in its three parts (`senderOf`), for whatever meets the sender after the arrival
+   * committed. Absent on another channel, and on a message whose `From` names no address.
+   */
+  sender?: Sender;
+  /**
+   * The payee a pattern read into `counterparty_text`, as it was printed, kept on the arrival whatever became of the
+   * row: written, held for a person, or on a list that declares no field for it. It is what the record's rule meets an
+   * organisation by, through its `bank:` key, and the key is the record's to make (`keyOf`), not this file's.
+   */
+  counterparty?: string;
 };
 
 /**
@@ -648,6 +659,9 @@ function neighbours(day: string): [string, string] | undefined {
  */
 export const UNVERIFIED = 'nothing verified this arrival, so no pattern was offered it';
 
+/** The field a bank door reads the payee into, as printed (`loop/contract-17.md`), and the one an arrival keeps. */
+export const COUNTERPARTY = 'counterparty_text';
+
 /**
  * One payload through the pipeline.
  *
@@ -659,10 +673,19 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     return no<Arrived>('ENUM_VALUE_UNKNOWN', `${arrival.channel} is not a channel.`, { at: 'channel', allowed: CHANNELS });
   if (!arrival.sha256) return no<Arrived>('REQUIRED_MISSING', 'An arrival is identified by the hash of its bytes.', { at: 'sha256' });
 
+  /* WHO SENT IT AND WHO WAS PAID ride on the answer, whatever path it took through the pipeline below: a redelivery
+     carries its sender as the first delivery did, and the payee is set where the pattern read it. */
+  const from = arrival.channel === 'email' ? senderOf(lower(arrival.headers ?? {}).from) : null;
+  let counterparty: string | undefined;
+  const said = (out: Result<Arrived>): Result<Arrived> =>
+    !out.ok || ((from === null || from.address === '') && counterparty === undefined)
+      ? out
+      : ok<Arrived>({ ...out.value, ...(from !== null && from.address !== '' ? { sender: from } : {}), ...(counterparty === undefined ? {} : { counterparty }) });
+
   /* `attempt` RATHER THAN `transaction`, because the refusal below is a VALUE. A raw row written and
      then reported as a failure is the worst of both: the caller believes nothing happened and the
      record holds bytes whose receipt says nothing was written and cannot say why. */
-  return attempt(deps.sql, transaction, () => {
+  return said(attempt(deps.sql, transaction, () => {
     const at = instant(deps.nowMs);
     const headers = lower(arrival.headers ?? {});
     const body = arrival.body ?? '';
@@ -735,10 +758,18 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
      * the reason for: the state a payload is in before anybody has said what it means. Matching is
      * step 2 and every other state is decided by the steps after it, so any other answer here would
      * be a claim about a decision that has not been taken yet.
+     *
+     * `from_name`, `from_address` AND `from_domain` SIT BESIDE `from`, which keeps the header word for word for every
+     * pattern already written against it. They are the header read once (`senderOf`), so a reader meeting the sender
+     * is handed an address and a domain, never `"Sara Ali" <sara@…>` to take apart again.
      */
+    const sender = senderOf(headers.from);
     const fields: Record<string, unknown> = {
       channel: arrival.channel,
       from: headers.from ?? '',
+      from_name: sender.name,
+      from_address: sender.address,
+      from_domain: sender.domain,
       to: headers.to ?? '',
       subject: headers.subject ?? '',
       body,
@@ -991,6 +1022,23 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     }
     const register = routed.to;
 
+    /**
+     * A BANK DOOR'S PAYEE IS KEPT ON THE ARRIVAL, as it was printed (`Arrived.counterparty`), so the record's rule can
+     * meet the organisation by its `bank:` key whatever happens to the row: filed, held for a person, or near another.
+     *
+     * AND IT NEVER COSTS THE ROW. A pattern fills `counterparty_text` the moment its add-on knows the field, and the list
+     * it files to may not have it yet: a ledger installed before the field was declared refused the whole write, and a
+     * payee the text did not carry held a charge that read cleanly. On a list that does not declare the field it is kept
+     * here alone, out of the row and out of what could not be read.
+     */
+    const payee = extracted[COUNTERPARTY];
+    if (typeof payee === 'string' && payee.trim() !== '') counterparty = payee.trim().replace(/\s+/g, ' ');
+    const declaredFields = deps.schemaOf(register)?.fields;
+    if (declaredFields !== undefined && !Object.hasOwn(declaredFields, COUNTERPARTY)) {
+      delete extracted[COUNTERPARTY];
+      for (const list of [missed, soft, invalid]) if (list.includes(COUNTERPARTY)) list.splice(list.indexOf(COUNTERPARTY), 1);
+    }
+
     /* AN EMAIL'S KEPT ATTACHMENTS RIDE ON `x-braindog-files`, and the row this arrival files is where a person reads
        them next: copied on here, beside the arrival itself, so nobody has to find the arrival to see what it came
        with (`gaps.md` §1.2). Only a field the register itself declares `file`, or a list of them, is filled, and only
@@ -1235,7 +1283,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     note('extract', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', '1');
 
     return ok<Arrived>({ raw, ingest: matched.ingest, state: 'matched', wrote: [wrote.value.id], confidence });
-  });
+  }));
 }
 
 /**
@@ -1259,6 +1307,15 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
  * by hand it is a row with the message's first line for a title and nothing it read. A question already holding as
  * many rows as one rowset may (`MAX_ROWS` in `govern.ts`) is asked again beside it, rather than grown past what can
  * be accepted.
+ *
+ * BUT ONLY A ROW ABOUT THE SAME THING JOINS (`joinsOn`): the same payee and money moving the same way. The words alone
+ * were the key, and "held for you to check" or "a best guess" carry no merchant and no amount, so every charge a
+ * pattern held piled into one card of up to two hundred, which a person read by its first row and accepted whole. A
+ * charge at another shop, or a refund beside a payment, is its own question now.
+ *
+ * AND A JOIN IS WRITTEN DOWN. Growing an open question changed what one press would accept with nothing in the log to
+ * say so; each row that joins writes a `suggest` event on the question with `field: 'rows'` and the count before and
+ * after, and the body carries `count`, so the heading can say how many it asks about.
  */
 function openRowset(
   deps: IngestDeps,
@@ -1266,17 +1323,20 @@ function openRowset(
   item: { ingest: string; register: string; rows: Record<string, unknown>[]; question: string; context?: string; resembles?: string; tails?: Tail[] },
 ): string {
   const context = item.context ?? '';
+  const joins = joinsOn(deps, item.register, item.rows);
   const asked = deps.sql.one<{ id: string; body: string }>(
     `SELECT s.id, s.body FROM suggestion s JOIN event e ON e.target = 'suggestion:' || s.id AND e.kind = 'suggest'
       WHERE s.body_kind = 'rowset' AND s.status = 'open' AND s.opened_by = ? AND json_extract(s.body, '$.register') = ?
         AND coalesce(e.to_v, e.note) = ? AND coalesce(json_extract(s.body, '$.context'), '') = ?
-        AND coalesce(json_extract(s.body, '$.resembles'), '') = ? AND coalesce(json_array_length(s.body, '$.rows'), 0) + ? <= ?
+        AND coalesce(json_extract(s.body, '$.resembles'), '') = ? AND coalesce(json_extract(s.body, '$.joins_on'), '') = ?
+        AND coalesce(json_array_length(s.body, '$.rows'), 0) + ? <= ?
       ORDER BY s.rowid LIMIT 1`,
     `ingest:${item.ingest}`,
     item.register,
     item.question.slice(0, 280),
     context,
     item.resembles ?? '',
+    joins,
     item.rows.length,
     ROWS_ASKED_MOST,
   );
@@ -1284,10 +1344,21 @@ function openRowset(
   if (asked && held) {
     /* A TAIL ONCE, as `confirmedTail` reads one: the digits and the row they were matched to. */
     const tails = [...held.tails, ...(item.tails ?? []).filter((t) => !held.tails.some((h) => h.digits === t.digits && h.row === t.row))];
+    const rows = [...held.rows, ...item.rows];
     deps.sql.exec(
       'UPDATE suggestion SET body = ? WHERE id = ?',
-      JSON.stringify({ ...held.body, rows: [...held.rows, ...item.rows], ...(tails.length ? { tails } : {}) }),
+      JSON.stringify({ ...held.body, rows, count: rows.length, ...(tails.length ? { tails } : {}) }),
       asked.id,
+    );
+    deps.sql.exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v, note) VALUES (?, ?, ?, 'suggest', ?, 'suggestion', 'rows', ?, ?, ?)",
+      deps.mint(),
+      at,
+      `ingest:${item.ingest}`,
+      `suggestion:${asked.id}`,
+      String(held.rows.length),
+      String(rows.length),
+      `${rows.length - held.rows.length === 1 ? 'One more' : `${rows.length - held.rows.length} more`} like it joined this question, ${rows.length} in all.`,
     );
     return asked.id;
   }
@@ -1298,7 +1369,9 @@ function openRowset(
     JSON.stringify({
       register: item.register,
       rows: item.rows,
+      count: item.rows.length,
       ingest: item.ingest,
+      ...(joins === '' ? {} : { joins_on: joins }),
       ...(context === '' ? {} : { context }),
       ...(item.resembles === undefined ? {} : { resembles: item.resembles }),
       /* THE TAILS THIS ONE WAITS ON, so accepting it is the confirmation `confirmedTail` reads, with no table beside it. */
@@ -1330,6 +1403,32 @@ function heldBody(text: string): { body: Record<string, unknown>; rows: unknown[
   } catch {
     return null;
   }
+}
+
+/**
+ * What a held row is about, as the key an open question it may join must share: its payee and which way each of its
+ * amounts moves. `''` for rows that carry neither, which join as they always did, since nothing tells them apart.
+ *
+ * THE PAYEE IS `counterparty_text` WHERE A PATTERN READ ONE, else the row's title as its list declares it (a merchant,
+ * a payee, a name), when that is words; case and spacing are folded, so `HALDEN  Coffee` and `Halden Coffee` are one.
+ * THE SIGN AND NOT THE AMOUNT, so two coffees at one shop are one question, and a refund is never asked under a charge.
+ * Read off the list's declaration rather than any field's name, so every add-on's ledger is keyed the same way.
+ */
+function joinsOn(deps: IngestDeps, register: string, rows: readonly Record<string, unknown>[]): string {
+  const fields = deps.schemaOf(register)?.fields ?? {};
+  const list = declaredList(deps.sql, register);
+  const title = typeof list.title === 'string' && TITLED.has(fields[list.title]?.type) ? list.title : null;
+  const words = (value: unknown): string => (typeof value === 'string' ? value.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim() : '');
+  const keys = rows.map((row) => {
+    const party = words(row[COUNTERPARTY]) || (title === null ? '' : words(row[title]));
+    const signs = Object.entries(fields).flatMap(([id, field]) => {
+      const amount = field.type === 'money' ? (row[id] as { amount?: unknown } | null | undefined)?.amount : undefined;
+      return typeof amount === 'number' && Number.isFinite(amount) ? [`${id}:${amount < 0 ? '-' : amount > 0 ? '+' : '0'}`] : [];
+    });
+    return party === '' && signs.length === 0 ? '' : JSON.stringify([party, ...signs]);
+  });
+  const once = keys.filter((key, i) => keys.indexOf(key) === i);
+  return once.length === 1 ? once[0]! : JSON.stringify(once);
 }
 
 /* ── what a person reads: the question an unwritten extraction asks ───── */
@@ -2002,8 +2101,8 @@ function confirmedTail(sql: Sql, ingest: string, tail: Tail): boolean {
 }
 
 /**
- * What the reason calls the row a tail landed on: its title, as its list declares it, or its list's word for one row
- * and the digits.
+ * What the reason calls the row a tail landed on: its title, as its list declares it, or its list's word for one of
+ * its rows and the digits, "the account ending 1234" where it declares none.
  *
  * READ FROM THE DECLARATION, because `IngestDeps` carries no title and the reason is written inside the arrival. A
  * title field declared `secret` is never read into a sentence.
@@ -2016,7 +2115,9 @@ function rowNamed(sql: Sql, tail: Tail): string {
     const name = sql.one<{ name: unknown }>(`SELECT json_extract(fields, '${jsonPath(title)}') AS name FROM entry WHERE id = ?`, tail.row)?.name;
     if (typeof name === 'string' && name.trim() !== '') return name;
   }
-  const one = typeof list.one === 'string' && list.one.trim() !== '' ? list.one : 'row';
+  /* "THE ROW ENDING 1234" WAS THE RECORD'S WORD, NOT A PERSON'S. A list that declares no word for one of its rows is
+     one a tail was printed for, and digits printed behind stars are an account's or a card's, so it is that. */
+  const one = typeof list.one === 'string' && list.one.trim() !== '' ? list.one.trim() : 'account';
   return `the ${one} ending ${tail.digits}`;
 }
 
@@ -2437,6 +2538,61 @@ export function day(text: string, format: string): string | null {
 
 const lower = (headers: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+
+/**
+ * Who a message says it is from, in three parts: the name a person reads, the address, and the address's domain.
+ *
+ * THREE PARTS AND NOT ONE, because the record meets each differently. The address is a person's key, the domain is an
+ * organisation's, and the name is only ever what a row is called, never what it is matched on. `from` alone made every
+ * reader parse the header again, and `rule.meet-senders` met `"Sara Ali" <sara@acme.example>` as a person whose email was
+ * that whole string.
+ *
+ * THE FORMS A MAIL SERVER SENDS: `Name <address>`, `"Last, First" <address>`, a bare address, the old `address (Name)`,
+ * and a name in RFC 2047 words (`=?UTF-8?B?…?=`), which is how a name in Arabic arrives. Only the first address is read,
+ * and a name that is the address again is no name. A header with no address in it answers three empty strings rather
+ * than a guess, and the address and domain are lower-cased, as every key the record keeps for one is.
+ */
+export type Sender = { name: string; address: string; domain: string };
+
+export function senderOf(header: string | undefined): Sender {
+  /* THE FIRST MAILBOX, split at the commas outside quotes, so `"Ali, Sara" <sara@…>` stays one name; and a piece with
+     no address in it is the front of the next one's name, so the unquoted `Ali, Sara <sara@…>` a mail client also
+     sends is still "Ali, Sara" and not "Sara". A header that is not text is no sender, never a throw out of `arrive`. */
+  const parts = (typeof header === 'string' ? header : '').replace(/\r?\n[ \t]+/g, ' ').split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+  const first = parts.findIndex((part) => part.includes('@'));
+  const text = first === -1 ? '' : parts.slice(0, first + 1).join(',').trim();
+  const angled = /<\s*(?:mailto:)?([^<>\s@]+@[^<>\s@]+?)\s*>/i.exec(text);
+  const bare = angled === null ? /(?:^|[\s;:("])(?:mailto:)?([^\s<>"(),;:@]+@[^\s<>"(),;:@]+)/i.exec(text) : null;
+  const found = (angled?.[1] ?? bare?.[1] ?? '').replace(/\.$/, '').toLowerCase();
+  if (found === '') return { name: '', address: '', domain: '' };
+  const named = angled !== null ? text.slice(0, angled.index) : (/\(([^()]*)\)/.exec(text.slice((bare?.index ?? 0) + (bare?.[0].length ?? 0)))?.[1] ?? '');
+  const unquoted = named.trim().replace(/^"([\s\S]*)"$/, '$1').replace(/\\(.)/g, '$1');
+  const name = decodeWords(unquoted).replace(/\s+/g, ' ').trim().replace(/^['"]+|['"]+$/g, '').trim();
+  return { name: name.toLowerCase() === found ? '' : name, address: found, domain: found.slice(found.lastIndexOf('@') + 1) };
+}
+
+/**
+ * RFC 2047's encoded words decoded, in a header's display name: `=?charset?B?…?=` and `=?charset?Q?…?=`. Whitespace
+ * between two encoded words is not part of the name, as the RFC says. A charset this runtime cannot decode, or a word
+ * that is not well formed, is left as it was written rather than guessed at.
+ */
+function decodeWords(text: string): string {
+  const WORD = /=\?([^?\s]+)\?([BbQq])\?([^?\s]*)\?=/g;
+  return text.replace(/(=\?[^?\s]+\?[BbQq]\?[^?\s]*\?=)\s+(?==\?[^?\s]+\?[BbQq]\?[^?\s]*\?=)/g, '$1').replace(WORD, (word, charset: string, how: string, data: string) => {
+    try {
+      const bytes =
+        how.toUpperCase() === 'B'
+          ? Uint8Array.from(atob(data), (c) => c.charCodeAt(0))
+          : Uint8Array.from(
+              data.replace(/_/g, ' ').replace(/=([0-9A-Fa-f]{2})|[\s\S]/g, (c, hex: string | undefined) => (hex === undefined ? c : String.fromCharCode(parseInt(hex, 16)))),
+              (c) => c.charCodeAt(0),
+            );
+      return new TextDecoder(charset.split('*')[0]!.trim().toLowerCase()).decode(bytes);
+    } catch {
+      return word;
+    }
+  });
+}
 
 /**
  * `@braindog/host`'s `x-braindog-files` header (`FILES_HEADER`, `IngestFile[]`), read structurally and never

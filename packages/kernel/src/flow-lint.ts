@@ -111,8 +111,11 @@ export const sealedAs = (field: { type?: unknown; of?: unknown } | undefined): s
 
 /** A name a step's answer lands under, read back as `{{vars.<name>}}`. */
 const NAME = /^[a-z][a-z0-9_]{0,31}$/;
-/** The keys of a `meet` step: `people.ts`'s `MeetArgs`, one of the first three and always `where`. */
-const MEET_KEYS: readonly string[] = ['name', 'email', 'handle', 'where'];
+/**
+ * The keys of a `meet` step: `people.ts`'s `MeetArgs`, always `where`, and something saying who: a name, an email, a
+ * handle or `keys`, or for an organisation its domain. Every one is text but `keys`, a template or a list of them.
+ */
+const MEET_KEYS: readonly string[] = ['name', 'email', 'handle', 'where', 'kind', 'keys', 'org', 'domain', 'role', 'source'];
 /** The keys of a `run_job` step. */
 const RUN_JOB_KEYS: readonly string[] = ['kind', 'args', 'as'];
 /** A kind of job by its declaration id, as `jobs.ts`'s `KIND_ID` reads one, so the lint refuses no id the queue takes. */
@@ -1621,13 +1624,23 @@ function stepFault(
          a hole fills with anything, and whether an email reads as one, is the run's to find, since a counterparty is
          empty on one row and not the next. What the list playing `meets:` can keep (a handle needs `handles`) is asked
          there too, because People is a module the owner may switch off after this rule installs. */
-      if (!isObject(spec)) return bad('DECLARATION_INVALID', `${id}'s ${at}.meet is { name, email, handle, where }.`, `${at}.meet`, MEET_KEYS);
+      if (!isObject(spec)) return bad('DECLARATION_INVALID', `${id}'s ${at}.meet is { name, email, handle, keys, kind, where }.`, `${at}.meet`, MEET_KEYS);
       const odd = Object.keys(spec).find((k) => !MEET_KEYS.includes(k));
       if (odd !== undefined) return bad('DECLARATION_INVALID', `${id}'s ${at}.meet has no ${odd}.`, `${at}.meet.${odd}`, MEET_KEYS);
-      const wrong = MEET_KEYS.find((k) => spec[k] !== undefined && typeof spec[k] !== 'string');
+      const wrong = MEET_KEYS.find((k) => k !== 'keys' && spec[k] !== undefined && typeof spec[k] !== 'string');
       if (wrong !== undefined) return bad('DECLARATION_INVALID', `${id}'s ${at}.meet.${wrong} is text.`, `${at}.meet.${wrong}`);
-      if (spec.name === undefined && spec.email === undefined && spec.handle === undefined)
-        return bad('REQUIRED_MISSING', `${id} meets somebody at ${at} and says nothing of who. Give it a name, an email or a handle.`, `${at}.meet`);
+      const keys = spec.keys;
+      if (keys !== undefined && typeof keys !== 'string' && !(Array.isArray(keys) && keys.length > 0 && keys.every((k) => typeof k === 'string' && k !== '')))
+        return bad('DECLARATION_INVALID', `${id}'s ${at}.meet.keys is a list of text, each kind:value, like bank:{{trigger.row.counterparty_text}}.`, `${at}.meet.keys`);
+      if (spec.kind !== undefined && spec.kind !== 'person' && spec.kind !== 'organisation')
+        return bad('DECLARATION_INVALID', `${id}'s ${at}.meet.kind is person or organisation.`, `${at}.meet.kind`, ['person', 'organisation']);
+      const org = spec.kind === 'organisation';
+      if (spec.name === undefined && spec.email === undefined && spec.handle === undefined && keys === undefined && !(org && spec.domain !== undefined))
+        return bad(
+          'REQUIRED_MISSING',
+          `${id} meets ${org ? 'an organisation' : 'somebody'} at ${at} and says nothing of who. Give it a name, an email, a handle or keys${org ? ', or a domain' : ''}.`,
+          `${at}.meet`,
+        );
       return text(spec.where, `${at}.meet.where`, 'the words saying where the person was met');
     }
     case 'run_job': {

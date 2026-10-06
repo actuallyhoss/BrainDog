@@ -153,22 +153,26 @@ test('A FOLDER MATCHES as Windows writes it, and the longest folder wins', async
   assert.equal(at('C:\\Repos\\other'), 'things#2 by folder');
   assert.equal(at('C:\\Repos\\braindogs'), 'things#2 by folder', 'a longer name is not a folder inside');
   assert.equal(at('/home/sam/studio/src'), 'things#3 by folder');
-  /* CASE IS IGNORED ON A DRIVE LETTER ONLY, so this is no folder of Studio's; its own name still finds Studio, last. */
-  assert.equal(at('/HOME/sam/studio'), 'things#3 by repo');
+  /* CASE IS IGNORED ON A DRIVE LETTER ONLY, so this is no folder of Studio's; its own name points at Studio, as a
+     question and never a placing. */
+  assert.deepEqual(placed(k, { cwd: '/HOME/sam/studio' }), { project: null, ambiguous: ['things#3'] });
   assert.equal(at('D:\\tmp'), null);
   sql.close();
 });
 
-test('A NAME MATCHES LAST: a bare name, or the last name of a remote or folder a project lists', async () => {
+test('A NAME SETTLES ONLY AS A BARE NAME A PROJECT LISTS; the last name of a remote or folder is a question', async () => {
   const { k, sql } = await record();
+  /* BrainDog lists `braindog` bare among its repositories: every checkout of that name is the project's. */
   assert.deepEqual(placed(k, { repo: 'BrainDog' }), { project: 'things#1 by repo', ambiguous: [] });
   assert.deepEqual(placed(k, { repo: 'braindog', cwd: 'D:\\elsewhere' }), { project: 'things#1 by repo', ambiguous: [] });
-  assert.deepEqual(placed(k, { repo: 'site' }), { project: 'things#2 by repo', ambiguous: [] }, 'Site’s remote ends in its name');
-  /* THE REMOTE'S OWN NAME, for a project listing another owner's copy, or only the folder Windows wrote. */
   assert.deepEqual(placed(k, { remote: 'https://github.com/actuallyhoss/BrainDog.git', cwd: '/Users/sam/Developer/braindog' }), {
     project: 'things#1 by repo',
     ambiguous: [],
   });
+  /* Site's remote ends in `site`, and a run that names no remote of its own may be it: asked, never filed. */
+  assert.deepEqual(placed(k, { repo: 'site' }), { project: null, ambiguous: ['things#2'] });
+  /* A run whose own remote is another owner's `site` is another repository, and is not asked about. */
+  assert.deepEqual(placed(k, { remote: 'github.com/someone/site', repo: 'site' }), { project: null, ambiguous: [] });
   assert.deepEqual(placed(k, {}), { project: null, ambiguous: [] });
   sql.close();
 });
@@ -188,7 +192,7 @@ test('TWO PROJECTS AT THE SAME STRENGTH LEAVE THE RUN GLOBAL, and are named', as
 
 /* ── the ladder places the run ───────────────────────────────────────────── */
 
-test('A RUN OPENED IN A MATCHING REPO GETS ITS PROJECT, and a run re-attached elsewhere is placed again', async () => {
+test('A RUN OPENED IN A MATCHING REPO GETS ITS PROJECT, and keeps it wherever it is named from', async () => {
   const { k, sql } = await record();
   value(k.create('tasks', { what: 'Wire scope' }, agent({ client_id: 'cc-1', remote: 'git@github.com:acme/braindog.git', host: 'h' })));
   const run = k.get('S1')!;
@@ -204,19 +208,28 @@ test('A RUN OPENED IN A MATCHING REPO GETS ITS PROJECT, and a run re-attached el
   /* By its client id with no place given, likewise. */
   value(k.create('tasks', { what: 'No hints' }, agent({ client_id: 'cc-1' })));
   assert.equal(k.get('S1')?.fields.project, 'things#1');
+  assert.equal(k.get('S1')?.version, run.version);
 
-  /* Re-attached from Studio's folder, it is in Studio, and the record noting that is not an edit. */
-  value(k.create('tasks', { what: 'Moved' }, agent({ client_id: 'cc-1', cwd: '/home/sam/studio/src' })));
-  const moved = k.get('S1')!;
-  assert.equal(moved.fields.project, 'things#3');
-  assert.equal(moved.version, run.version);
-
-  /* And from a folder that is nobody's, it is global again. */
-  value(k.create('tasks', { what: 'Adrift' }, agent({ client_id: 'cc-1', cwd: 'D:\\tmp' })));
-  assert.equal(k.get('S1')?.fields.project, undefined);
+  /* The global run, re-attached from BrainDog's folder, is placed there, once, and the record noting it is not an edit. */
+  const loose = k.get('S2')!;
+  value(k.create('tasks', { what: 'Found' }, agent({ client_id: 'cc-2', cwd: 'C:\\Repos\\braindog' })));
+  assert.deepEqual([k.get('S2')?.fields.project, k.get('S2')?.version], ['things#1', loose.version]);
   assert.equal(runs(sql), 2);
   sql.close();
 });
+
+test(
+  'A RUN IS NEVER MOVED FROM ONE PROJECT TO ANOTHER, nor made global, by where it is re-attached from',
+  async () => {
+    const { k, sql } = await record();
+    value(k.create('tasks', { what: 'Here' }, agent({ client_id: 'cc-1', remote: 'git@github.com:acme/braindog.git' })));
+    value(k.create('tasks', { what: 'Studio' }, agent({ client_id: 'cc-1', cwd: '/home/sam/studio/src' })));
+    assert.equal(k.get('S1')?.fields.project, 'things#1');
+    value(k.create('tasks', { what: 'Adrift' }, agent({ client_id: 'cc-1', cwd: 'D:\\tmp' })));
+    assert.equal(k.get('S1')?.fields.project, 'things#1');
+    sql.close();
+  },
+);
 
 /* ── a token's writes ────────────────────────────────────────────────────── */
 

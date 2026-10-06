@@ -113,7 +113,8 @@ test('EVERY KEY A READ ANSWERS IS IN ANSWER_KEYS, so a steps block read back wit
   const drawn = k.block({ kind: 'steps', source: 'register.steps', first: 1, empty: 'None.' } as never);
   assert.deepEqual(drawn.refusals, []);
   assert.equal(drawn.open, 2);
-  const declared = new Set(['kind', 'source', 'first', 'empty']);
+  /* `key` is declared on every block and answered as its stable hash when the author wrote none (`blockKeyOf`). */
+  const declared = new Set(['kind', 'source', 'first', 'empty', 'key']);
   const answered = Object.keys(drawn).filter((key) => !declared.has(key));
   assert.deepEqual(answered.filter((key) => !ANSWER_KEYS.includes(key)), [], 'a key the read answered is missing from ANSWER_KEYS');
   const again = k.block(drawn as never);

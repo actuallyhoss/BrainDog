@@ -234,7 +234,9 @@ test('A LIST CALLED contacts DECLARING meets: IS WHO MEET WRITES, under its own 
   assert.deepEqual(k.meetsList(), { register: 'contacts', fields: CONTACTS_ROLE });
 
   const ada = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'Ada@Example.com', handle: 'github:ada', where: 'commit 4464966 in braindog' }, AGENT));
-  assert.deepEqual(ada, { person: 'contacts#1', created: true, linked: true, merge: null });
+  /* The answer also carries the row, how it was matched and how sure (contract-17's meet); these four are the older ones. */
+  const picked = ({ person, created, linked, merge }: Met) => ({ person, created, linked, merge });
+  assert.deepEqual(picked(ada), { person: 'contacts#1', created: true, linked: true, merge: null });
   const row = k.get('contacts#1')!;
   assert.deepEqual(row.fields, {
     full_name: 'Ada Lovelace',
@@ -251,10 +253,11 @@ test('A LIST CALLED contacts DECLARING meets: IS WHO MEET WRITES, under its own 
 
   /* A shared name asks about the pair on this list, and the fold writes the mapped field. */
   const twin = value<Met>(k.meet({ name: 'ada lovelace', email: 'ada@work.example', where: 'commit 77aa001 in braindog' }, AGENT));
-  assert.deepEqual(twin, { person: 'contacts#2', created: true, linked: true, merge: 'SG1' });
+  assert.deepEqual(picked(twin), { person: 'contacts#2', created: true, linked: true, merge: 'SG1' });
   const body = k.governanceRow('suggestion', 'SG1')!.body as { register: string; rows: { at: string; patch: Record<string, unknown> }[] };
   assert.equal(body.register, 'contacts');
-  assert.equal(body.rows.at(-1)?.patch.folded_into, 'contacts#1');
+  /* The fold comes first in the rowset now, the kept row's patch after it. */
+  assert.equal(body.rows[0]?.patch.folded_into, 'contacts#1');
   assert.equal(value<Met>(k.meet({ email: 'ada@work.example', where: 'commit 88bb002 in braindog' }, AGENT)).merge, null, 'the pair was asked about twice');
   sql.close();
 });
@@ -264,7 +267,7 @@ test('A meets: LIST WITH NO projects RECORDS THE PERSON AND LINKS NOBODY, which 
   const role = { name: 'name', email: 'email', handles: 'handles', met: 'met', merged_into: 'merged_into' };
   const { k, sql } = await met([register('people', fields, { meets: role })]);
   const out = value<Met>(k.meet({ name: 'Grace Hopper', email: 'grace@example.com', where: 'commit 1da177e in braindog' }, AGENT));
-  assert.deepEqual(out, { person: 'people#1', created: true, linked: false, merge: null });
+  assert.deepEqual({ person: out.person, created: out.created, linked: out.linked, merge: out.merge }, { person: 'people#1', created: true, linked: false, merge: null });
   assert.equal(k.get('people#1')!.fields.projects, undefined);
   sql.close();
 });
@@ -275,7 +278,8 @@ test('A meets: WITH NO handles REFUSES A HANDLE, because there is nowhere to kee
   const out = refused(k.meet({ name: 'Grace', handle: 'github:grace', where: 'x' }, AGENT));
   assert.equal(`${out.code} at ${out.at}`, 'FIELD_UNKNOWN at handle');
   assert.equal(k.count('people'), 0);
-  assert.equal(value<Met>(k.meet({ name: 'Grace', where: 'x' }, AGENT)).person, 'people#1');
+  /* A bare name is a mention and adds nobody (contract-17), so the person met here comes with an address. */
+  assert.equal(value<Met>(k.meet({ name: 'Grace', email: 'grace@example.com', where: 'x' }, AGENT)).person, 'people#1');
   sql.close();
 });
 
@@ -322,13 +326,13 @@ test('A SECOND meets: IS REFUSED, and so is one beside a people list that holds 
   const beside = refused(await old.k.install([register('contacts', CONTACTS_FIELDS, { meets: CONTACTS_ROLE })]));
   assert.equal(beside.code, 'DECLARATION_INVALID');
   assert.match(beside.fix, /^register\.people holds this record's people and declares no meets:/);
-  assert.equal(value<Met>(old.k.meet({ name: 'Ada', where: 'x' }, OWNER)).person, 'people#1');
+  assert.equal(value<Met>(old.k.meet({ name: 'Ada', email: 'ada@example.com', where: 'x' }, OWNER)).person, 'people#1');
   old.sql.close();
 
   /* A people list without meet's fields is somebody's cast list, and blocks nothing. */
   const cast = await met([register('people', [{ id: 'name', type: 'text' }, { id: 'part', type: 'text' }])]);
   value(await cast.k.install([register('contacts', CONTACTS_FIELDS, { meets: CONTACTS_ROLE })]));
-  assert.equal(value<Met>(cast.k.meet({ name: 'Ada', where: 'x' }, OWNER)).person, 'contacts#1');
+  assert.equal(value<Met>(cast.k.meet({ name: 'Ada', email: 'ada@example.com', where: 'x' }, OWNER)).person, 'contacts#1');
   cast.sql.close();
 });
 
@@ -383,7 +387,7 @@ test('A MERGE OF TWO PEOPLE KEEPS THE LATER DAY IN TOUCH of the two', async () =
 test('A people LIST WITH NO KEY PLAYS in_touch ONLY WHEN IT HAS THE DAY FIELD, so an older record is met as before', async () => {
   const { k, sql } = await met([register('people', [...PEOPLE_FIELDS, { id: 'in_touch', type: 'day' }])]);
   assert.equal(k.meetsList()?.fields.in_touch, 'in_touch');
-  value(k.meet({ name: 'Ada', where: 'x' }, AGENT));
+  value(k.meet({ name: 'Ada', email: 'ada@example.com', where: 'x' }, AGENT));
   assert.equal(k.get('people#1')!.fields.in_touch, DAY);
   sql.close();
 });
@@ -394,7 +398,7 @@ test('THE people LIST WITH NO KEY IS STILL MET, and a field it lacks is named wi
     register: 'people',
     fields: { name: 'name', email: 'email', handles: 'handles', projects: 'projects', met: 'met', merged_into: 'merged_into' },
   });
-  assert.equal(value<Met>(k.meet({ name: 'Ada', where: 'x' }, AGENT)).linked, true);
+  assert.equal(value<Met>(k.meet({ name: 'Ada', email: 'ada@example.com', where: 'x' }, AGENT)).linked, true);
   sql.close();
 
   const plain = await met([register('people', [{ id: 'name', type: 'text' }, { id: 'email', type: 'text' }])]);

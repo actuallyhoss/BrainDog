@@ -82,7 +82,7 @@ test('A RUN IS NAMED FROM WHAT ITS AGENT IS DOING, at most sixty characters and 
   sql.close();
 });
 
-test('ELSE ITS FIRST PROPOSAL’S QUESTION: it names a run the record had named, and a second question leaves it', async () => {
+test('ELSE ITS FIRST PROPOSAL’S TITLE: it names a run the record had named, and a second proposal leaves it', async () => {
   const { k, sql, clock } = await record();
   const options = { body_kind: 'options' as const, body: { options: [{ id: 'keep', label: 'Keep it', because: 'Invoices print it.' }, { id: 'drop', label: 'Drop it', because: 'Nobody reads it.' }] } };
   value(k.create('tasks', { what: 'Look at the invoices' }, as({ ...BRAINDOG, client_id: 'cc-1' })));
@@ -90,7 +90,8 @@ test('ELSE ITS FIRST PROPOSAL’S QUESTION: it names a run the record had named,
   const before = k.get('S1')!;
 
   clock.advance(MIN);
-  value(k.propose({ ...options, question: 'Keep the address field on invoices?' }, as({ client_id: 'cc-1' })));
+  /* BY THE TITLE THE AGENT GAVE IT, never the question's own words (audit M7). */
+  value(k.propose({ ...options, question: 'Keep the address field on invoices?', title: 'Keep the address field on invoices?' }, as({ client_id: 'cc-1' })));
   assert.equal(doing(k, 'S1'), 'Keep the address field on invoices?');
   assert.deepEqual([k.get('S1')!.version, lines(sql, before.id)], [before.version, 1], 'naming the run was an edit with a line of its own');
   value(k.propose({ ...options, question: 'And drop the fax number?' }, as({ client_id: 'cc-1' })));
@@ -137,7 +138,8 @@ test('A NAME THE RECORD GAVE FOLLOWS WHAT IT LEARNS: placed again by its host se
   clock.advance(5 * MIN);
   value(k.update('session', 'S1', { next: 'Read the gates' }, as({ client_id: 'cc-1', cwd: '/Users/sam/Code/kiln-type/src' })));
   const moved = k.get('S1')!;
-  assert.deepEqual([moved.fields.project, moved.fields.doing], ['things#2', 'Claude in Kiln']);
+  /* PLACED ONCE AND NEVER MOVED (`placeOnce`): from Kiln's folder the run stays in BrainDog, under the same name. */
+  assert.deepEqual([moved.fields.project, moved.fields.doing], ['things#1', 'Claude in BrainDog']);
   assert.deepEqual(
     sql.all<{ field: string | null }>('SELECT field FROM event WHERE target = ? ORDER BY rowid', `entry:${moved.id}`).map((e) => e.field),
     [null, 'next'],
@@ -171,7 +173,8 @@ test('THE OLD NAMES ARE THE RECORD’S TOO: "Claude run, 2 Oct", "Kiln, 2 Oct" i
 
   const run = (doingSaid: string, more: Record<string, string> = {}) => ({ fields: { doing: doingSaid, ...more }, created_at: '2026-10-01T21:47:40.000Z' });
   assert.deepEqual(recordNamed(run('Claude run, 1 Oct')), { name: 'Claude' });
-  assert.deepEqual(recordNamed(run('Claude Code in BrainDog')), { name: 'Claude Code' });
+  /* A place must be the run's project, its repository or a known project (M2), so the name is read with it. */
+  assert.deepEqual(recordNamed(run('Claude Code in BrainDog'), 'BrainDog'), { name: 'Claude Code' });
   assert.deepEqual(recordNamed(run('Agent run')), { name: null });
   assert.deepEqual(recordNamed(run('Lanternly, 1 Oct'), 'Lanternly'), { name: null });
   assert.deepEqual(recordNamed(run('braindog on master', { repo: 'braindog' })), { name: null });

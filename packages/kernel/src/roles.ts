@@ -27,9 +27,15 @@
 export type RoleField = { id: string; type: string; of?: string; to?: string; retired?: boolean };
 
 /** A register as far as a role asks: its id, its fields, and the two keys. */
-export type RoleList = { id: string; fields?: readonly RoleField[]; rates?: unknown; meets?: unknown };
+export type RoleList = { id: string; fields?: readonly RoleField[]; rates?: unknown; meets?: unknown; org?: unknown };
 
 export type RoleKey = 'rates' | 'meets';
+
+/**
+ * Every role a list can play. `org` IS KEPT OUT OF `RoleKey` because `declare.ts`'s `keylessBeside` asks only the first
+ * two of a keyless list arriving beside a declaring one; `roleBody` checks all three at install.
+ */
+export type RoleName = RoleKey | 'org';
 
 /**
  * One part of a role: the types its field may be, what that is in words, and whether a role may leave it out.
@@ -47,7 +53,7 @@ export type Part = { part: string; types: readonly string[]; of?: string; says: 
  * `rate` IS A DECIMAL OR AN INT: `ratesFrom` reads a number either way. `currency` and `base` are text or an enum of
  * codes, which is how a pack that knows its three currencies would write them.
  */
-export const PARTS: Readonly<Record<RoleKey, readonly Part[]>> = {
+export const PARTS: Readonly<Record<RoleName, readonly Part[]>> = {
   rates: [
     { part: 'currency', types: ['text', 'enum'], says: 'a text or an enum of currency codes' },
     { part: 'base', types: ['text', 'enum'], says: 'a text or an enum of currency codes' },
@@ -62,27 +68,60 @@ export const PARTS: Readonly<Record<RoleKey, readonly Part[]>> = {
     { part: 'met', types: ['list'], of: 'text', says: 'a list of text' },
     { part: 'merged_into', types: ['ref'], says: 'a ref to its own list', to: 'self' },
     { part: 'in_touch', types: ['day'], says: 'a day', optional: true, later: true },
+    /* THE UNDERSTANDING LAYER'S PARTS (batch 17). Every identifier beyond the one email, as `kind:value`; the
+       organisation they are with; whether this is the record's own person; and the other names they go by. All
+       optional and all `later`, so a People from before them is met exactly as it was. */
+    { part: 'keys', types: ['list'], of: 'text', says: 'a list of text', optional: true, later: true },
+    { part: 'org', types: ['ref'], says: 'a ref to the organisations', optional: true, later: true },
+    { part: 'self', types: ['bool'], says: 'a bool', optional: true, later: true },
+    { part: 'aliases', types: ['list'], of: 'text', says: 'a list of text', optional: true, later: true },
+  ],
+  /* AN ORGANISATION: a company, an employer, a client, a vendor, a merchant or a bank, met by its domain, a payee as a
+     bank writes it, or its name. `met` and `projects` are optional and kept as People keeps them, when declared. */
+  org: [
+    { part: 'name', types: ['text'], says: 'a text' },
+    { part: 'keys', types: ['list'], of: 'text', says: 'a list of text', optional: true, later: true },
+    { part: 'kind', types: ['enum', 'text'], says: 'an enum or a text', optional: true, later: true },
+    { part: 'domain', types: ['text', 'url'], says: 'a text', optional: true, later: true },
+    { part: 'merged_into', types: ['ref'], says: 'a ref to its own list', to: 'self', optional: true, later: true },
+    { part: 'met', types: ['list'], of: 'text', says: 'a list of text', optional: true, later: true },
+    { part: 'projects', types: ['list'], of: 'ref', says: 'a list of refs to projects', optional: true, to: 'projects', later: true },
   ],
 };
 
 /** The list each role was read from by name before the keys, and still is while no list declares the role. */
-export const LEGACY: Readonly<Record<RoleKey, string>> = { rates: 'fx', meets: 'people' };
+export const LEGACY: Readonly<Record<RoleName, string>> = { rates: 'fx', meets: 'people', org: 'organisations' };
 
 /** What each role's list holds, for a sentence. */
-export const HOLDS: Readonly<Record<RoleKey, string>> = { rates: 'the rates', meets: 'the people meet writes' };
+export const HOLDS: Readonly<Record<RoleName, string>> = { rates: 'the rates', meets: 'the people meet writes', org: 'the organisations meet writes' };
 
 /** The parts of the rates, each naming its field. */
 export type RatesFields = { currency: string; base: string; rate: string; as_of: string };
 
 /** The parts of the people `meet` writes, each naming its field. */
 /** `in_touch` is the last day they were in touch, which `meet` moves to the day of the line it writes. */
-export type MeetsFields = { name: string; email: string; met: string; merged_into: string; handles?: string; projects?: string; in_touch?: string };
+export type MeetsFields = {
+  name: string;
+  email: string;
+  met: string;
+  merged_into: string;
+  handles?: string;
+  projects?: string;
+  in_touch?: string;
+  keys?: string;
+  org?: string;
+  self?: string;
+  aliases?: string;
+};
+
+/** The parts of an organisation, each naming its field. Only `name` is required. */
+export type OrgFields = { name: string; keys?: string; kind?: string; domain?: string; merged_into?: string; met?: string; projects?: string };
 
 /** A role resolved: the list that plays it, each part's field, and whether the list declared it or was found by name. */
 export type Role<F> = { register: string; fields: F; declared: boolean };
 
 /** The parts under their own names: what the named list is read with. */
-const named = (key: RoleKey): Record<string, string> => Object.fromEntries(PARTS[key].map((p) => [p.part, p.part]));
+const named = (key: RoleName): Record<string, string> => Object.fromEntries(PARTS[key].map((p) => [p.part, p.part]));
 
 /**
  * The list playing a role on this record, or `null`.
@@ -98,7 +137,7 @@ const named = (key: RoleKey): Record<string, string> => Object.fromEntries(PARTS
  * about a list that is there. For rates it makes no difference: rows without the four fields hold no rate, and
  * `ratesFrom` skips them.
  */
-function roleOf(key: RoleKey, lists: Iterable<RoleList>): Role<Record<string, string>> | null {
+function roleOf(key: RoleName, lists: Iterable<RoleList>): Role<Record<string, string>> | null {
   const all = [...lists];
   const declaring = all.filter((l) => l[key] !== undefined);
   if (declaring.length > 1) return null;
@@ -120,6 +159,19 @@ export const ratesRole = (lists: Iterable<RoleList>): Role<RatesFields> | null =
 
 /** The list `meet` writes. */
 export const meetsRole = (lists: Iterable<RoleList>): Role<MeetsFields> | null => roleOf('meets', lists) as Role<MeetsFields> | null;
+
+/**
+ * The list `meet` writes organisations into: the one declaring `org:`, or, while none does, `organisations` read by its
+ * parts' own names, each part kept only where a field of that name plays it. A keyless `organisations` without a `name`
+ * text is no organisations list at all.
+ */
+export const orgRole = (lists: Iterable<RoleList>): Role<OrgFields> | null => {
+  const all = [...lists];
+  const role = roleOf('org', all) as Role<OrgFields> | null;
+  if (role === null || role.declared) return role;
+  const name = all.find((l) => l.id === role.register)?.fields?.find((f) => f.id === 'name');
+  return plays(PARTS.org[0]!, name) ? role : null;
+};
 
 /** Whether a field's type can play a part. Where a `ref` points is `aims`'s question. */
 export function plays(part: Part, field: RoleField | undefined): boolean {
@@ -156,7 +208,7 @@ export function aims(part: Part, field: RoleField, self: string, projects?: stri
  * install under another id, which an installed list cannot. Both refusals come from `Known` laying the batch over the
  * record, which cannot tell the live holder from a new one.
  */
-export function legacyShaped(key: RoleKey, list: RoleList): boolean {
+export function legacyShaped(key: RoleName, list: RoleList): boolean {
   if (list.id !== LEGACY[key] || list[key] !== undefined) return false;
   const fields = list.fields ?? [];
   return PARTS[key]

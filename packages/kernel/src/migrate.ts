@@ -14,6 +14,7 @@
 import type { Clock, Refusal, Result, Sql } from '@braindog/ports';
 import { mapDriverMessage, ok } from '@braindog/ports';
 
+import { rebuildKeys } from './entities.ts';
 import { rebuild } from './fts.ts';
 import type { RegisterDecl } from './index.ts';
 
@@ -39,6 +40,8 @@ import memberWhere0019 from './migrations/0019_member_where.ts';
 import quiet0020 from './migrations/0020_quiet.ts';
 import draftedBy0021 from './migrations/0021_drafted_by.ts';
 import sessionClient0022 from './migrations/0022_session_client.ts';
+import entityKey0023 from './migrations/0023_entity_key.ts';
+import look0024 from './migrations/0024_look.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -66,6 +69,8 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 20, slug: 'quiet', sql: quiet0020 },
   { version: 21, slug: 'drafted_by', sql: draftedBy0021 },
   { version: 22, slug: 'session_client', sql: sessionClient0022 },
+  { version: 23, slug: 'entity_key', sql: entityKey0023 },
+  { version: 24, slug: 'look', sql: look0024 },
 ];
 
 /**
@@ -97,6 +102,9 @@ export const MIGRATIONS: readonly Migration[] = [
  * question whose drafter nobody kept, so the format is still 1.
  * Migration 22 adds a row, the next version of migration 2's `register.session`, and no table, column or index; an
  * older file carries migration 2's body, which an import supersedes the way the migration does, so the format is still 1.
+ * Migration 23 adds `entity_key` and `entity_mention`, both `local` and rebuilt from the rows an import brings, and
+ * rebuilds `outbox` with one more kind; an older file carries only the kinds it still takes, so the format is still 1.
+ * Migration 24 rebuilds `declaration` with one more kind, `look`, for the same reason, so the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 
@@ -343,6 +351,9 @@ export async function applyMigrations(
       return unavailable(unhostable(sql, 'fts5'), applied);
     }
     applied.push(m.version);
+    /* THE IDENTITIES OF THE ROWS ALREADY HERE, once, in the run that made their table. A key is normalised by code that
+       SQL cannot run (Gmail's dots, GitHub's private address), so the backfill is this and not the migration's text. */
+    if (m.slug === 'entity_key') sql.transactionSync(() => rebuildKeys(sql, instant(clock.now())));
   }
 
   /* HALF TWO: a read of `entry_fts` that returns nothing, once the schema is whole. A file whose migrations were

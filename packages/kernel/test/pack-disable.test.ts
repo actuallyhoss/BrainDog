@@ -362,7 +362,7 @@ test('A RECORD FROM BEFORE MIGRATION 3 TAKES IT ON OPEN, and its packs arrive en
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]);
+  assert.deepEqual(result.value.applied, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]);
   assert.deepEqual({ ...sql.one<Record<string, unknown>>('SELECT id, version, disabled_at FROM pack') },{ id: 'notebook', version: '1.0.0', disabled_at: null });
 
   const reopened = await openRecord(sql, fixedClock(NOW));

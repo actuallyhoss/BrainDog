@@ -157,13 +157,19 @@ test('A PAGE PER THING GATES ON ITS OWN QUESTIONS, `questions-open:{{spoken}}` f
   const blocks = (title: string) => {
     const slug = k.pages().find((p) => p.title === title)?.slug;
     assert.ok(slug, `no page for ${title}`);
-    return value<{ blocks: { drawn?: boolean; matched?: number; refusals: unknown[] }[] }>(k.page(slug)).blocks;
+    /* BY KIND AND NOT BY PLACE: the page is read under its look (`compose.ts`), which may lead with the question waiting. */
+    const read = value<{ blocks: { kind: string; key: string; drawn?: boolean; matched?: number; refusals: unknown[] }[]; look?: { lead?: string; hide?: string[] } }>(k.page(slug));
+    return [read.blocks.find((b) => b.kind === 'section'), read.blocks.find((b) => b.kind === 'queue'), read.look] as const;
   };
-  const [kilnWaits, kilnQueue] = blocks('Kiln');
-  assert.notEqual(kilnWaits?.drawn, false);
+  const [kilnWaits, kilnQueue, kilnLook] = blocks('Kiln');
+  assert.notEqual(kilnQueue?.drawn, false);
   assert.equal(kilnQueue?.matched, 1);
-  const [boxWaits, boxQueue] = blocks('Box');
+  /* KILN'S HEADING PASSED ITS GATE, and the question it stands over leads the page from under it. */
+  assert.notEqual(kilnWaits?.drawn, false);
+  assert.equal(kilnLook?.lead, kilnQueue?.key);
+  const [boxWaits, boxQueue, boxLook] = blocks('Box');
   assert.equal(boxWaits?.drawn, false, "Box's page drew Waiting on you over Kiln's question");
+  assert.ok(!(boxLook?.hide ?? []).includes(boxWaits!.key), "Box's heading was hidden by the look, not by its own gate");
   assert.equal(boxQueue?.drawn, false, 'and the queue under it, which would say Nothing matched');
   assert.ok(registersOf(page.body as never).includes(WHOLE_RECORD), 'one thing\'s count is still a fact about every list');
   sql.close();
