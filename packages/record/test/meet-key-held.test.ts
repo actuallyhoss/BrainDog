@@ -118,9 +118,12 @@ test('AN UPDATE MAY KEEP ITS OWN KEYS, and may not take another row’s', async 
 
 test('AN ADDRESS OF SOMEBODY FOLDED INTO ANOTHER BELONGS TO THE ONE THEY WERE FOLDED INTO, and is refused naming them', async () => {
   const { api, sql } = await record();
-  value<Entry>(await api.create({ register: 'people', fields: { name: 'A. Lovelace', email: 'countess@analytical.org' } }, owner));
-  value(await api.update({ register: 'people', seq: 2, patch: { merged_into: 'people#1' } }, owner));
-  value(await api.update({ register: 'people', seq: 2, patch: { deleted_at: 'now' } }, owner));
+  const twin = value<Entry>(await api.create({ register: 'people', fields: { name: 'A. Lovelace', email: 'countess@analytical.org' } }, owner));
+  /* FOLDED AS EVERY MERGE IS, BY A DECISION (`mergeShaped`): a plain update may not name `merged_into`. */
+  {
+    const asked = value<{ id: string }>(await api.propose({ question: 'Are these the same?', body_kind: 'rowset', body: { register: 'people', rows: [{ at: 'people#2', version: twin.version, patch: { merged_into: 'people#1', deleted_at: new Date(NOW).toISOString() } }] } }, owner));
+    value(await api.decide({ id: asked.id, decide: { option: 'merge', reason: 'the same' } }, owner));
+  }
   const r = refused(await api.create({ register: 'people', fields: { name: 'The Countess', email: 'countess@analytical.org' } }, agent));
   assert.equal(`${r.code} at ${r.at}`, 'ALREADY_KNOWN at email');
   assert.match(r.fix, /already belongs to Ada Lovelace \(people#1\)/u);

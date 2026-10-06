@@ -109,12 +109,14 @@ test('THE CLUSTER IS EVERY CANDIDATE BY NAME, the one kept first, each with wher
     { name: 'rohanmehta', row: 'people#2', keeps: false, org: null, seen: ['a commit in encore-admin'], known_by: ['github'], rows: [1] },
     { name: 'jherrerastudio', row: 'people#3', keeps: false, org: null, seen: ['agent run S740'], known_by: ['github'], rows: [2] },
   ]);
+  /* THE ANSWERS AS THE CARD NAMES THEM (`apps/web/src/routes/decide/merge.ts`): merge, apart, and a pick for each folded. */
   assert.deepEqual(
     q.merge?.options.map((o) => [o.says, o.decide.option]),
     [
-      ['Merge all', 'accept'],
-      ['Keep apart', 'reject'],
-      ['Pick the ones that are the same', 'accept'],
+      ['Merge all', 'merge'],
+      ['Keep apart', 'apart'],
+      ['Pick rohanmehta', 'pick:people#2'],
+      ['Pick jherrerastudio', 'pick:people#3'],
     ],
   );
   /* NO ADDRESS LEAVES, only that there is one. */
@@ -125,13 +127,75 @@ test('THE CLUSTER IS EVERY CANDIDATE BY NAME, the one kept first, each with wher
   sql.close();
 });
 
-test('PICK MERGES ONLY THE ONES PICKED: their rows are accepted, and the rest stay apart', async () => {
+const people = async (api: Awaited<ReturnType<typeof record>>['api']) =>
+  value<{ rows: { seq: number; fields: Record<string, unknown> }[] }>(await api.list({ register: 'people' }, owner)).rows;
+
+test('PICK MERGES THE ONE PICKED, carrying only what it brought, and the rest stay apart', async () => {
+  const { api, sql, asked } = await record();
+  value(await api.decide({ id: asked, decide: { option: 'pick:people#3', reason: 'only the Herrera login is him' } }, owner));
+  const live = await people(api);
+  assert.deepEqual(live.map((r) => r.fields.name).sort(), ['Rohan Mehta', 'rohanmehta']);
+  /* THE KEPT ONE GAINS THE PICKED LOGIN AND NEVER THE ONE KEPT APART. */
+  assert.deepEqual(live.find((r) => r.fields.name === 'Rohan Mehta')?.fields.handles, ['github:jherrerastudio']);
+  assert.deepEqual(live.find((r) => r.fields.name === 'rohanmehta')?.fields.handles, ['github:rohanmehta']);
+  /* AND UNDO PUTS BOTH BACK: the folded one, and what the kept one was carried. */
+  value(api.kernel.undoMerge('people#3', { actor: 'p_1' }));
+  const back = await people(api);
+  assert.deepEqual(back.map((r) => r.fields.name).sort(), ['Rohan Mehta', 'rohanmehta', 'jherrerastudio']);
+  assert.equal(back.find((r) => r.fields.name === 'Rohan Mehta')?.fields.handles ?? null, null);
+  sql.close();
+});
+
+test('MERGE ALL FOLDS EVERY ONE, KEEP APART FOLDS NONE, and a pick of a name it does not fold is refused', async () => {
+  {
+    const { api, sql, asked } = await record();
+    const wrong = (await api.decide({ id: asked, decide: { option: 'pick:people#1', reason: 'r' } }, owner)) as { ok: boolean; refusal?: { code: string } };
+    assert.equal(wrong.refusal?.code, 'ENUM_VALUE_UNKNOWN');
+    value(await api.decide({ id: asked, decide: { option: 'merge', reason: 'all him' } }, owner));
+    const live = await people(api);
+    assert.deepEqual(live.map((r) => r.fields.name), ['Rohan Mehta']);
+    assert.deepEqual(live[0]?.fields.handles, ['github:rohanmehta', 'github:jherrerastudio']);
+    sql.close();
+  }
+  {
+    const { api, sql, asked } = await record();
+    value(await api.decide({ id: asked, decide: { option: 'apart', reason: 'three people' } }, owner));
+    assert.equal((await people(api)).length, 3);
+    sql.close();
+  }
+});
+
+test('A MERGE IS NEVER TAKEN IN PART BY PLACE, which would carry the handles of the ones left apart', async () => {
   const { api, sql, asked } = await record();
   const q = await question(api, asked);
-  const picked = q.merge!.candidates.filter((c) => c.name === 'jherrerastudio').flatMap((c) => c.rows);
-  value(await api.decide({ id: asked, decide: { option: 'accept', reason: 'only the Herrera login is him', rows: picked } } as never, owner));
-  const live = value<{ rows: { fields: Record<string, unknown> }[] }>(await api.list({ register: 'people' }, owner)).rows.map((r) => r.fields.name).sort();
-  assert.deepEqual(live, ['Rohan Mehta', 'rohanmehta']);
+  const rows = q.merge!.candidates.filter((c) => c.name === 'jherrerastudio').flatMap((c) => c.rows);
+  const out = (await api.decide({ id: asked, decide: { option: 'accept', reason: 'r', rows } } as never, owner)) as { ok: boolean; refusal?: { code: string; at?: string } };
+  assert.equal(out.refusal?.code, 'VALUE_MALFORMED');
+  assert.equal(out.refusal?.at, 'rows');
+  assert.equal((await people(api)).length, 3);
+  sql.close();
+});
+
+test('ONLY DECIDE MERGES: a write naming merged_into, or bringing back one folded, is refused', async () => {
+  const { api, sql, asked } = await record();
+  const refused = (r: unknown) => (r as { ok: boolean; refusal?: { code: string; at?: string; fix: string } }).refusal;
+  const update = refused(await api.update({ register: 'people', seq: 2, patch: { merged_into: 'people#1', deleted_at: new Date(NOW).toISOString() } }, owner));
+  assert.equal(update?.code, 'IMMUTABLE_FIELD');
+  assert.equal(update?.at, 'merged_into');
+  assert.doesNotMatch(update?.fix ?? '', /people#|merged_into/u, 'a person is told in her own words');
+  const agent: CallContext = { principal: { kind: 'token', id: 't_1', level: 'owner', scope: 'write' } as never };
+  assert.equal(refused(await api.update({ register: 'people', seq: 2, patch: { merged_into: 'people#1' } }, agent))?.code, 'IMMUTABLE_FIELD');
+  assert.equal(refused(await api.create({ register: 'people', fields: { name: 'Someone', merged_into: 'people#1' } }, owner))?.code, 'IMMUTABLE_FIELD');
+  /* A NEW ROW NAMING NOBODY IS NO MERGE, and is written. */
+  value(await api.create({ register: 'people', fields: { name: 'Nobody Folded', merged_into: null } }, owner));
+  assert.equal((await people(api)).length, 4, 'nothing was folded');
+  /* AND ONE FOLDED BY DECIDE COMES BACK ONLY BY UNDO. */
+  value(await api.decide({ id: asked, decide: { option: 'merge', reason: 'him' } }, owner));
+  const back = refused(await api.update({ register: 'people', seq: 3, patch: { deleted_at: null } }, owner));
+  assert.equal(back?.code, 'IMMUTABLE_FIELD');
+  assert.equal(back?.at, 'deleted_at');
+  /* A PLAIN DELETE OF SOMEBODY NEVER FOLDED IS STILL A DELETE. */
+  value(await api.update({ register: 'people', seq: 1, patch: { deleted_at: new Date(NOW).toISOString() } }, owner));
   sql.close();
 });
 
@@ -163,5 +227,20 @@ test('THE ORGANISATION IS NAMED ONLY TO SOMEBODY WHO READS THE ORGANISATIONS, as
     ],
   );
   assert.doesNotMatch(JSON.stringify(q), /Encore/u);
+  sql.close();
+});
+
+test('TWO NAMES HAVE NO PICK, since picking the one folded is Merge all, and a pick of it lands as Merge all', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  value(await api.kernel.install([ORGS, PEOPLE, TASKS]));
+  value<Entry>(await api.create({ register: 'people', fields: { name: 'Ada Lovelace' } }, owner));
+  const twin = value<Entry>(await api.create({ register: 'people', fields: { name: 'A. Lovelace' } }, owner));
+  const rows = [{ at: 'people#2', version: twin.version, patch: { merged_into: 'people#1', deleted_at: new Date(NOW).toISOString() } }];
+  const asked = value<{ id: string }>(api.kernel.propose({ question: 'Are these one person?', body_kind: 'rowset', body: { register: 'people', rows } }, 'p_1')).id;
+  assert.deepEqual((await question(api, asked)).merge?.options.map((o) => o.says), ['Merge all', 'Keep apart']);
+  value(await api.decide({ id: asked, decide: { option: 'pick:people#2', reason: 'the same' } }, owner));
+  assert.deepEqual((await people(api)).map((r) => r.fields.name), ['Ada Lovelace']);
+  assert.equal(sql.all("SELECT 1 FROM suggestion WHERE status != 'open'").length, 1, 'one question, one answer');
   sql.close();
 });

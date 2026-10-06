@@ -29,6 +29,7 @@ import { coerce, slugify } from '@braindog/kernel';
 import { MODULE_WORDS, labelSetting, voiceSetting } from '@braindog/declare';
 import { KINDS, isKind } from 'braindog-render';
 import type { HeadlineInput } from './headlines.ts';
+import { clean } from './scrub.ts';
 
 const DAY_MS = 86_400_000;
 
@@ -608,6 +609,9 @@ function entitiesOf(sql: Sql, kernel: Kernel, roles: readonly EntityRole[], read
       }
       const name = typeof row[decl.title] === 'string' ? (row[decl.title] as string).trim() : '';
       if (name === '') continue;
+      /* A NAME THAT IS AN ADDRESS, A LINK OR A KEY IS NOT READ, since the model is handed the reading whole (`scrub.ts`), and
+         a page named after somebody's address is no page to offer them either. */
+      if (!clean(name)) continue;
       /* A ROW FOLDED INTO ANOTHER IS THAT ONE, and earns nothing of its own. */
       if (role.merged !== null && typeof row[role.merged] === 'string' && row[role.merged] !== '') continue;
       /* THE RECORD'S OWN PERSON (`self`) IS MET IN EVERYTHING THEY DO, and "you have met them" is not said of them. */
@@ -2029,6 +2033,8 @@ export function stableKey(body: Record<string, unknown>): string {
   const carried = body.doc !== null && typeof body.doc === 'object' ? (body.doc as { version?: unknown }).version : undefined;
   if (typeof body.install === 'string' && typeof carried === 'string') return `install:${body.install}@${carried}`;
   for (const k of ['install', 'enable', 'disable', 'usecase'] as const) if (typeof body[k] === 'string') return `${k}:${body[k]}`;
+  /* "START A PROJECT?" IS THE REPOSITORY IT IS ABOUT (`kernel` `projectSuggestions`), so a no holds whatever it is called. */
+  if (typeof body.project_key === 'string') return `project:${body.project_key}`;
   /* A CHANGE IS THE DECLARATION IT INSTALLS, whole, so a gold rate declined is not asked again and a different one is a new
      question. The egress the kernel adds is left out, so the key is the same on the draft and on the row it was filed as. */
   if (typeof body.declaration_id === 'string' && body.to !== null && typeof body.to === 'object')

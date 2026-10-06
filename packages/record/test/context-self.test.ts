@@ -119,7 +119,11 @@ test('PAST THE FIFTY READ TO CHOOSE FROM, EVERYBODY HERE IS STILL COUNTED', asyn
 test('A PERSON FOLDED INTO ANOTHER IS STILL READ BY THE HANDLE THEY HAD, saying who they were folded into', async () => {
   const { api, sql, me } = await record(1);
   const twin = value<Entry>(await api.create({ register: 'people', fields: { name: 'samdev' } }, owner));
-  value(await api.update({ register: 'people', seq: twin.seq!, patch: { merged_into: me.id, deleted_at: new Date(NOW).toISOString() } }, owner));
+  /* FOLDED AS EVERY MERGE IS, BY A DECISION (`mergeShaped`): a plain update may not name `merged_into`. */
+  {
+    const asked = value<{ id: string }>(await api.propose({ question: 'Are these the same?', body_kind: 'rowset', body: { register: 'people', rows: [{ at: `people#${twin.seq}`, version: twin.version, patch: { merged_into: me.id, deleted_at: new Date(NOW).toISOString() } }] } }, owner));
+    value(await api.decide({ id: asked.id, decide: { option: 'merge', reason: 'the same' } }, owner));
+  }
   const read = value<Entry | null>(await api.get({ spoken: `people#${twin.seq}` }, owner));
   assert.equal(read?.id, twin.id);
   assert.equal(read?.fields.merged_into, me.id);

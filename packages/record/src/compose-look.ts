@@ -41,6 +41,7 @@ import {
   type HeadlinePage,
   type HeadlineRow,
 } from './headlines.ts';
+import { scrubbed } from './scrub.ts';
 
 /** The declaration kind a look is, beside `page`. */
 export const LOOK_KIND = 'look';
@@ -147,11 +148,13 @@ export function lookInputOf(blocks: readonly unknown[], titleOf: (list: string) 
     keys.add(key);
     const isLead = !lead && b.kind === 'note' && b.lead === true;
     if (isLead) lead = true;
+    /* NO ADDRESS, LINK OR KEY GOES TO THE MODEL (`scrub.ts`): a heading a person wrote may hold one, and is said without it. */
+    const heading = typeof b.heading === 'string' ? scrubbed(b.heading) : null;
     if (out.length < HEADLINE_BLOCKS_MOST || isLead)
       out.push({
         key,
         kind: typeof b.kind === 'string' ? b.kind : 'block',
-        ...(typeof b.heading === 'string' && b.heading.trim() !== '' ? { heading: b.heading.trim() } : {}),
+        ...(heading === null ? {} : { heading }),
         ...(isLead ? { lead: true as const } : {}),
       });
     if (!Array.isArray(b.rows)) continue;
@@ -161,11 +164,14 @@ export function lookInputOf(blocks: readonly unknown[], titleOf: (list: string) 
       if (typeof row?.register !== 'string' || typeof row.seq !== 'number' || row.fields === null || typeof row.fields !== 'object') continue;
       const field = titleOf(row.register);
       const title = field === null ? undefined : (row.fields as Record<string, unknown>)[field];
-      if (typeof title !== 'string' || title.trim() === '') continue;
+      /* AND A TITLE IS SAID WITHOUT THEM: a person met with only an address is named by it, and a model reads "someone at
+         encore.example" in its place. A title that is nothing but a key is not handed at all. */
+      const said = typeof title === 'string' ? scrubbed(title) : null;
+      if (said === null) continue;
       const handle = `${row.register}#${row.seq}`;
       if (handles.has(handle)) continue;
       handles.add(handle);
-      rows.push({ row: handle, title: title.trim().slice(0, 120) });
+      rows.push({ row: handle, title: said.slice(0, 120) });
     }
   }
   /* THE LEAD NOTE FIRST, wherever the page drew it, since it is what an order may never move. */

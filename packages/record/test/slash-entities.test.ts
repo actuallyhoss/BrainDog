@@ -68,8 +68,14 @@ async function record() {
   const ada = make('people', { name: 'Ada Lovelace', role: 'client', met: lines(6), in_touch: '2026-09-30' });
   const bo = make('people', { name: 'Bo Chen', role: 'contractor', met: lines(1) });
   const cy = make('people', { name: 'Cy Park', met: lines(4) });
-  /* FOLDED INTO ADA: its met lines are hers, and it earns no page of its own. */
-  make('people', { name: 'A. Lovelace', met: lines(7), merged_into: ada.id });
+  /* FOLDED INTO ADA: its met lines are hers, and it earns no page of its own. Folded as every merge is, by a decision. */
+  const folded = make('people', { name: 'Ada Lovelace', met: lines(7) }) as { id: string; version: number };
+  const merge = k.propose({ question: 'Are these two Ada?', body_kind: 'rowset', body: { register: 'people', rows: [{ at: k.nameOf(folded.id), version: folded.version, patch: { merged_into: ada.id } }] } }, 'p_1');
+  assert.ok(merge.ok, JSON.stringify(merge));
+  const took = k.decide(merge.value.id, { decide: { option: 'accept', reason: 'the same' } }, 'p_1');
+  assert.ok(took.ok, JSON.stringify(took));
+  /* MET ONLY BY AN ADDRESS: the reading goes to a model whole, so it is not read (`scrub.ts`). */
+  make('people', { name: 'rohan.mehta@encore.example', met: lines(8) });
   /* THE RECORD'S OWN PERSON is in every commit, and is not somebody met. */
   make('people', { name: 'Sam', self: true, met: lines(12) });
   /* AN EXAMPLE A PACK SEEDED is nobody anyone met. */

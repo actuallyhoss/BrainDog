@@ -107,6 +107,30 @@ test('a page is handed its drawn blocks by key, the lead note first, and a few r
   assert.notEqual(blockKeyOf({ kind: 'table', heading: 'Done' }), blockKeyOf({ kind: 'table', heading: 'Late' }));
 });
 
+test('NO ADDRESS, LINK OR KEY GOES TO THE MODEL: a title or heading holding one is handed without it', () => {
+  const blocks = [
+    {
+      kind: 'table',
+      key: 'people',
+      heading: 'Mail from ops@studio.example',
+      rows: [
+        { register: 'people', seq: 1, fields: { name: 'rohan.mehta@encore.example' } },
+        { register: 'people', seq: 2, fields: { name: 'Ada Lovelace' } },
+        { register: 'people', seq: 3, fields: { name: 'sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789' } },
+        { register: 'people', seq: 4, fields: { name: 'Notes at https://example.com/private/doc' } },
+      ],
+    },
+  ];
+  const got = lookInputOf(blocks, () => 'name');
+  assert.equal(got.blocks[0]!.heading, 'Mail from someone at studio.example');
+  assert.deepEqual(got.rows, [
+    { row: 'people#1', title: 'someone at encore.example' },
+    { row: 'people#2', title: 'Ada Lovelace' },
+    { row: 'people#4', title: 'Notes at a link' },
+  ]);
+  assert.doesNotMatch(JSON.stringify(got), /@|sk-ant|https?:/u);
+});
+
 test('an order names only the keys handed, each once, and never moves anything ahead of the lead line', () => {
   assert.deepEqual(orderFault(['board', 'late'], PAGE), { order: ['board', 'late'] });
   assert.deepEqual(orderFault(['lead', 'done', 'late'], PAGE), { order: ['done', 'late'] }, 'the lead at the head is where it is anyway');

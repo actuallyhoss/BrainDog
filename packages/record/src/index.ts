@@ -18,6 +18,7 @@
 import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
 import {
+  handedOf,
   install,
   plan,
   uninstall,
@@ -146,6 +147,7 @@ import {
   type HeadlinesAsked,
   type SlashHeadline,
 } from './headlines.ts';
+import { scrubbed } from './scrub.ts';
 import { composeLooks, keepLook as keepLookOf, keptBy, lookHeld, lookInputOf, undoLook as undoLookOf, type LookNext } from './compose-look.ts';
 import {
   BODY_DEPTH,
@@ -1140,13 +1142,16 @@ export type Meeting = {
 };
 
 /**
- * A merge question about several rows, as Decide draws it: every candidate by name with its evidence, the one kept
- * first, and the three answers. Merge all and Keep apart are `decide` with the option given; Pick is `decide` with
- * `accept` and `rows`, the `rows` of each candidate picked, so only those are folded into the one kept.
+ * A merge question about several rows, as Decide draws it (`apps/web/src/routes/decide/merge.ts`): every candidate by name
+ * with its evidence, the one kept first, and the answers as a question of options words them: `merge` (Merge all),
+ * `apart` (Keep apart) and, when more than one is folded, one `pick:<row>` for each, which merges that one alone into the
+ * one kept and carries only what it brought. Each is `decide` with that option; `accept` and `reject` still answer the
+ * whole question.
+ * A candidate's `name` is `''` when it has none the reader may be given, and the card says "this one".
  */
 export type MergeCluster = {
   candidates: { name: string; row: string; keeps: boolean; org: string | null; seen: string[]; known_by: string[]; rows: number[] }[];
-  options: { option: 'merge all' | 'keep apart' | 'pick'; says: string; decide: { option: 'accept' | 'reject' } }[];
+  options: { option: string; says: string; decide: { option: string } }[];
 };
 
 /** Another run that is live now, as `context` shows it. */
@@ -2062,6 +2067,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* WHICH OF THE OWNER'S DECLARATIONS A PACK WROTE FIRST, so a plan keeps an edit of the pack's own declaration rather
        than refusing the whole update as somebody else's (`declare` `plan`). */
     detached: Object.fromEntries(kernel.detached().map((d) => [d.id, { was: d.was, body: d.body }])),
+    /* WHAT THE INSTALLED PACKS HAND ON, read off their stored manifests, so a list one pack handed to another the record
+       holds is left where it is rather than planned as a retire (`declare` `handedOf`). */
+    handed: handedOf(sql.all<{ manifest: string }>('SELECT manifest FROM pack').map((r) => r.manifest)),
     nameOf: (ref) => kernel.titleOfRow(ref),
     opensOf: (label) => kernel.opensOf(label),
     /* WHICH DOORS THIS RECORD HAS PUT TO WORK, so a pack's `hands` passes on only those (`declare` `plan`): every ingest
@@ -2359,6 +2367,54 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       ];
     const { filed, skipped } = await slashFiling(drafts, r);
     return { by, filed, skipped, dropped, large };
+  };
+
+  /**
+   * "Start a project?" for each repository the record has seen agents work in that no project holds (the kernel's
+   * `projectSuggestions`): one question a repository, filed on Decide as Slash's, which accepting turns into a project.
+   *
+   * ONCE A REPOSITORY, AND NEVER AGAIN AFTER A NO. The body carries the repository's key (`project_key`), which is what
+   * `stableKey` files it under, so a declined one stays declined whatever the repository is called next, and one already
+   * waiting is not asked twice. The slots `SLASH_OPEN_CAP` leaves are the same as every other draft's, so one passed over
+   * today is asked on a later day.
+   *
+   * IN NAMES. The question and the project it makes say the repository by its own name, as its remote spells it. The
+   * remote's host and the checkout's folder are left out: the name is listed as the project's repository, which places
+   * every later run in a checkout of that name (`scope.ts` `matchProject`).
+   *
+   * THE LIST'S OWN DECLARATION FILLS THE REST. A field the list requires and has no default for is given its first value
+   * when it is a choice; a list that requires anything else cannot be filled from a repository, and nothing is asked.
+   */
+  const slashProjects = async (): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
+    const homes = [...kernel.registers()].filter(([, r]) => r.scopes !== undefined);
+    if (homes.length !== 1) return { filed: [], dropped: [] };
+    const [list, decl] = homes[0]!;
+    const repos = decl.scopes?.repos;
+    if (repos === undefined || !decl.fields.some((f) => f.id === repos && f.retired !== true)) return { filed: [], dropped: [] };
+    const filled: Record<string, JsonValue> = {};
+    for (const f of decl.fields) {
+      if (f.retired === true || f.required !== true || f.id === decl.title || f.id === repos || f.default !== undefined) continue;
+      const first = f.type === 'enum' ? f.values?.[0] : undefined;
+      if (first === undefined) return { filed: [], dropped: [] };
+      filled[f.id] = first;
+    }
+    const drafts: SlashDraft[] = [];
+    for (const s of kernel.projectSuggestions()) {
+      const name = s.name.trim();
+      if (name === '' || looksLikeCredential(name)) continue;
+      const body = { register: list, project_key: s.key, rows: [{ ...filled, [decl.title]: name, [repos]: [name] }] };
+      drafts.push({
+        key: stableKey(body),
+        question: `Start a project for ${name}? Your agents have worked in it ${s.runs.toLocaleString('en-GB')} times, and no project holds it yet.`,
+        body_kind: 'rowset',
+        body,
+        by: 'rules',
+      });
+    }
+    if (drafts.length === 0) return { filed: [], dropped: [] };
+    const { filed, skipped } = await slashFiling(drafts, slashReading());
+    /* A NO HOLDS QUIETLY: a repository asked about before is not a line in the day's log. */
+    return { filed, dropped: skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`) };
   };
 
   /**
@@ -3892,33 +3948,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * with Merge all and with no pick, so a pick never hands the kept row a candidate the person left out.
    */
   const clusterOf = (ctx: CallContext, row: Record<string, unknown>): MergeCluster | null => {
-    if (row.body_kind !== 'rowset' || row.body === null || typeof row.body !== 'object') return null;
-    const body = row.body as { register?: unknown; rows?: unknown };
-    const people = kernel.meetsList();
+    const fold = foldsOf(row);
+    if (fold === null) return null;
+    const { body, parts, kept, folds } = fold;
     const orgs = orgsList();
-    const parts = (body.register === people?.register ? people?.fields : body.register === orgs?.register ? orgs?.fields : undefined) as
-      | Record<string, string | undefined>
-      | undefined;
-    if (parts?.merged_into === undefined || !Array.isArray(body.rows)) return null;
-    const into = parts.merged_into;
-    const folds = new Map<string, number[]>();
-    let kept: string | null = null;
-    for (const [n, r] of (body.rows as unknown[]).entries()) {
-      const at = (r as { at?: unknown } | null)?.at;
-      const target = ((r as { patch?: Record<string, unknown> } | null)?.patch ?? {})[into];
-      if (typeof at !== 'string' || typeof target !== 'string') continue;
-      if (kept !== null && kept !== target) return null;
-      kept = target;
-      folds.set(at, [...(folds.get(at) ?? []), n]);
-    }
-    if (kept === null || folds.size === 0) return null;
     const register = String(body.register);
     const title = kernel.register(register)?.title;
     const strip = (line: string): string => line.replace(/^\d{4}-\d{2}-\d{2}\s*·\s*/u, '').trim();
     const candidate = (ref: string, keeps: boolean, rows: number[]): MergeCluster['candidates'][number] | null => {
       const r = kernel.get(ref, { includeDeleted: true });
       if (!r || r.register !== register) return null;
-      const name = (title === undefined ? null : text(r.fields[title])) ?? kernel.nameOf(r.id);
+      /* BY NAME, AND NEVER BY AN ADDRESS OR A HANDLE: a person met with only an address is "someone at encore.example", and one
+         with no name at all is said as "this one" by the card (`''`). */
+      const titled = title === undefined ? null : text(r.fields[title]);
+      const name = titled === null ? '' : (scrubbed(titled) ?? '');
       /* WHERE THEY WERE SEEN, newest first: commits in one repository counted as one line, anything else as it was said. */
       const lines = (parts.met === undefined ? [] : listOf(r.fields[parts.met])).map(strip).filter(Boolean).reverse();
       const commits = new Map<string, number>();
@@ -3955,14 +3998,140 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const first = candidate(kept, true, []);
     const rest = [...folds].map(([ref, rows]) => candidate(ref, false, rows));
     if (first === null || rest.some((c) => c === null)) return null;
+    const others = rest as MergeCluster['candidates'];
+    /* ONE PICK A CANDIDATE FOLDED, as the card draws it (`apps/web/src/routes/decide/merge.ts`): `pick:<row>` merges that
+       one alone into the one kept, and the rest stay apart. Said by name, and by "this one" for a name the reader is not
+       given. TWO NAMES HAVE NO PICK, since picking the one folded is Merge all. */
     return {
-      candidates: [first, ...(rest as MergeCluster['candidates'])],
+      candidates: [first, ...others],
       options: [
-        { option: 'merge all', says: 'Merge all', decide: { option: 'accept' } },
-        { option: 'keep apart', says: 'Keep apart', decide: { option: 'reject' } },
-        { option: 'pick', says: 'Pick the ones that are the same', decide: { option: 'accept' } },
+        { option: 'merge', says: 'Merge all', decide: { option: 'merge' } },
+        { option: 'apart', says: 'Keep apart', decide: { option: 'apart' } },
+        ...(others.length < 2 ? [] : others).map((c) => ({ option: `pick:${c.row}`, says: c.name === '' ? 'Pick this one' : `Pick ${c.name}`, decide: { option: `pick:${c.row}` } })),
       ],
     };
+  };
+
+  /**
+   * A merge question's folds as its `rowset` writes them, or `null` for any other question: the list declaring `meets:`
+   * or `org:` and its parts, the row kept (the one every fold names in `merged_into`), each folded row with the places of
+   * the rows that fold it, and the place of the one patch on the kept row that carries what they knew, when there is one.
+   */
+  const foldsOf = (
+    row: Record<string, unknown>,
+  ): { body: { register: string; rows: unknown[] }; parts: Record<string, string | undefined>; kept: string; folds: Map<string, number[]>; carry: number | null } | null => {
+    if (row.body_kind !== 'rowset' || row.body === null || typeof row.body !== 'object') return null;
+    const body = row.body as { register?: unknown; rows?: unknown };
+    const people = kernel.meetsList();
+    const orgs = orgsList();
+    const parts = (body.register === people?.register ? people?.fields : body.register === orgs?.register ? orgs?.fields : undefined) as
+      | Record<string, string | undefined>
+      | undefined;
+    if (parts?.merged_into === undefined || !Array.isArray(body.rows)) return null;
+    const into = parts.merged_into;
+    const folds = new Map<string, number[]>();
+    let kept: string | null = null;
+    for (const [n, r] of (body.rows as unknown[]).entries()) {
+      const at = (r as { at?: unknown } | null)?.at;
+      const target = ((r as { patch?: Record<string, unknown> } | null)?.patch ?? {})[into];
+      if (typeof at !== 'string' || typeof target !== 'string') continue;
+      if (kept !== null && kept !== target) return null;
+      kept = target;
+      folds.set(at, [...(folds.get(at) ?? []), n]);
+    }
+    if (kept === null || folds.size === 0) return null;
+    const carry = (body.rows as unknown[]).findIndex((r) => (r as { at?: unknown } | null)?.at === kept);
+    return { body: { register: String(body.register), rows: body.rows as unknown[] }, parts, kept, folds, carry: carry < 0 ? null : carry };
+  };
+
+  /**
+   * What the kept row gains from the one candidate picked, out of the carry the question was filed with: of each value it
+   * carries, only one the picked row brought (its own fields, its address as a key, its name as another name), so a pick
+   * never hands the kept row the handles of somebody kept apart. Laid onto the kept row as it is now, so nothing it gained
+   * since the question was filed is lost: a list keeps all it holds and gains the picked one's values, and a field it
+   * already fills is left as it is.
+   */
+  const pickedCarry = (patch: Record<string, unknown>, parts: Record<string, string | undefined>, keptRow: Entry, picked: Entry, title: string | undefined): Record<string, unknown> => {
+    const said = (v: unknown): string => JSON.stringify(v ?? null);
+    const out: Record<string, unknown> = {};
+    const email = parts.email === undefined ? null : text(picked.fields[parts.email]);
+    const named = title === undefined ? null : text(picked.fields[title]);
+    for (const [field, value] of Object.entries(patch)) {
+      if (field === parts.merged_into || field === 'deleted_at') continue;
+      const ours = keptRow.fields[field];
+      const theirs = picked.fields[field];
+      if (Array.isArray(value)) {
+        const held = Array.isArray(ours) ? ours : [];
+        const brought = new Set(
+          [...(Array.isArray(theirs) ? theirs : theirs === undefined || theirs === null ? [] : [theirs]), ...(email === null ? [] : keysOf({ email })), ...(named === null ? [] : [named])].map(said),
+        );
+        const has = new Set(held.map(said));
+        const gained = value.filter((v) => brought.has(said(v)) && !has.has(said(v)));
+        if (gained.length > 0) out[field] = [...held, ...gained];
+      } else if ((ours === undefined || ours === null || ours === '') && said(value) === said(theirs)) out[field] = value;
+    }
+    return out;
+  };
+
+  /**
+   * A merge question answered in the card's words (`merge`, `apart`, `pick:<row>`), as the verdict `decide` lands, or
+   * `null` for an answer that is not one. Merge all is the whole rowset accepted and Keep apart is it rejected.
+   *
+   * A PICK IS ITS OWN MERGE, AND THE QUESTION'S ROWSET IS NOT TAKEN. The kernel answers a rowset that folds whole
+   * (`mergePickFault`), since its patch on the kept row carries every candidate's handles at once, so a pick is a merge
+   * of the two alone (`foldPicked`), with `carry` the kept row's share of what the one picked brought; and the question's
+   * rowset is then declined, the rest kept apart, with the pick said in the decision's reason.
+   */
+  type MergePick = { register: string; kept: string; at: string; version: number | null; carry: Record<string, unknown>; into: string; name: string | null; keptName: string | null };
+  const mergeAnswer = (id: string, option: string): { option: 'accept' | 'reject'; pick?: MergePick } | Refusal | null => {
+    if (option !== 'merge' && option !== 'apart' && !option.startsWith('pick:')) return null;
+    const row = kernel.governanceRow('suggestion', id) as Record<string, unknown> | null;
+    const fold = row === null ? null : foldsOf(row);
+    if (fold === null) return null;
+    if (option === 'merge') return { option: 'accept' };
+    if (option === 'apart') return { option: 'reject' };
+    const at = option.slice('pick:'.length);
+    const rows = fold.folds.get(at);
+    /* A PICK OF THE ONLY ONE FOLDED IS MERGE ALL, and lands as it does, one decision. */
+    if (rows !== undefined && fold.folds.size === 1) return { option: 'accept' };
+    if (rows === undefined)
+      return { code: 'ENUM_VALUE_UNKNOWN', fix: 'Pick one of the others this question asks about, or answer Merge all or Keep apart.', at: 'option', allowed: ['merge', 'apart', ...[...fold.folds.keys()].map((k) => `pick:${k}`)] };
+    const filed = fold.carry === null ? null : (fold.body.rows[fold.carry] as { patch?: Record<string, unknown> });
+    const keptRow = kernel.get(fold.kept, { includeDeleted: true });
+    const picked = kernel.get(at, { includeDeleted: true });
+    const title = kernel.register(fold.body.register)?.title;
+    const carry = filed?.patch && keptRow && picked ? pickedCarry(filed.patch, fold.parts, keptRow, picked, title) : {};
+    /* THE VERSION THE QUESTION WAS FILED AGAINST, so a row that moved since is the house conflict, as the rowset's would be. */
+    const version = (fold.body.rows[rows[0]!] as { version?: unknown } | undefined)?.version;
+    const nameOfRow = (r: Entry | null): string | null => {
+      const said = r && title !== undefined ? text(r.fields[title]) : null;
+      return said === null ? null : scrubbed(said);
+    };
+    return {
+      option: 'reject',
+      pick: { register: fold.body.register, kept: fold.kept, at, version: typeof version === 'number' ? version : null, carry, into: fold.parts.merged_into!, name: nameOfRow(picked), keptName: nameOfRow(keptRow) },
+    };
+  };
+
+  /**
+   * One candidate folded into the one kept, as a pick answers a merge: a merge of those two alone, filed and accepted in
+   * the person's own press, so it goes through the decide path every merge does (the kernel's merge door, its carry and
+   * one batch Undo takes back), and the history says what was merged into whom. In the caller's transaction.
+   */
+  const foldPicked = (pick: MergePick, actor: string): Result<{ id: string }> => {
+    const folded = kernel.get(pick.at, { includeDeleted: true });
+    const keptRow = kernel.get(pick.kept, { includeDeleted: true });
+    if (!folded || !keptRow) return no('ROW_UNKNOWN', 'One of the two is no longer here, so they cannot be merged. Keep them apart, or ask again.', { at: 'option' });
+    const rows = [
+      { at: pick.at, version: pick.version ?? folded.version, patch: { [pick.into]: pick.kept, deleted_at: new Date(clock.now()).toISOString() } },
+      ...(Object.keys(pick.carry).length === 0 ? [] : [{ at: pick.kept, version: keptRow.version, patch: pick.carry }]),
+    ];
+    const one = pick.name ?? 'the one picked';
+    const into = pick.keptName ?? 'the one kept';
+    const asked = kernel.propose({ question: `Merge ${one} into ${into}?`, body_kind: 'rowset', body: { register: pick.register, rows } }, actor);
+    if (!asked.ok) return asked;
+    const merged = kernel.decide(asked.value.id, { decide: { option: 'accept', reason: `Picked on Decide as the same as ${into}.` } }, actor);
+    return merged.ok ? ok({ id: asked.value.id }) : (merged as Result<never>);
   };
 
   /**
@@ -5109,6 +5278,45 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * A write that would fold one person or organisation into another, or put back or take out one already folded, said as
+   * a refusal, or `null`. ONLY THE DECIDE PATH MERGES (`loop/research-audit-17.md` H2): the write path reads any write
+   * that sets `merged_into` as a merge and points every row that named the folded one at the other, so a plain `update` from
+   * anybody with write access merged two people with nobody asked, and could point one at a row that is gone, on another
+   * list, or itself. A merge is a question on Decide, filed by `meet` or with `propose`, and Undo on it is how one comes
+   * back. A `deleted_at` on a row already folded is the same door from the other side: restoring it would bring the
+   * person back still pointing at the one kept, and is refused for the same reason.
+   *
+   * IN THE PERSON'S OWN WORDS IN THE APP, where `propose` is not a thing she can press.
+   */
+  const mergeShaped = (ctx: CallContext, register: string, fields: unknown, self: Entry | null): Refusal | null => {
+    if (fields === null || typeof fields !== 'object' || Array.isArray(fields)) return null;
+    const into = [kernel.meetsList(), orgsList()].find((l) => l?.register === register)?.fields.merged_into;
+    if (into === undefined) return null;
+    const person = ctx.principal.kind === 'person';
+    const said = fields as Record<string, unknown>;
+    /* A ROW SENT BACK WITH THE VALUE IT ALREADY HOLDS changes nothing, and passes, as the kernel's door lets it, and so
+       does a new row naming nobody. */
+    const unchanged = (text(said[into]) ?? null) === (self === null ? null : (text(self.fields[into]) ?? null));
+    if (Object.hasOwn(said, into) && !unchanged)
+      return {
+        code: 'IMMUTABLE_FIELD',
+        fix: person
+          ? 'Merging happens on Decide, where you say who is who. To split a merge, undo it.'
+          : `${into} is set only by a merge someone decided. Propose the merge as a question, or call meet with what you know, and the person answers it on Decide.`,
+        at: into,
+      };
+    if (self !== null && Object.hasOwn(said, 'deleted_at') && text(self.fields[into]) !== null)
+      return {
+        code: 'IMMUTABLE_FIELD',
+        fix: person
+          ? 'This one was merged into another. Undo the merge to split them again.'
+          : 'This row was merged into another, so it comes back only by undoing that merge, which the person does on Decide.',
+        at: 'deleted_at',
+      };
+    return null;
+  };
+
+  /**
    * A key the row being written would carry that already belongs to another live row of its list, said as a refusal
    * naming that row and sending the caller to `meet`, or `null`. ONLY ON THE LISTS PLAYING `meets:` OR `org:`, whose keys
    * are how one person or organisation is known across every source (`loop/contract-17.md`): a second row under a key
@@ -5536,6 +5744,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          dropping it quietly would be a write that did less than it was asked. `delete` is how a row goes. */
       if (args.fields && typeof args.fields === 'object' && Object.hasOwn(args.fields, 'deleted_at'))
         return no('FIELD_UNKNOWN', 'deleted_at is kept by the record, and a new row cannot arrive deleted. Create it, then delete it.', { at: 'deleted_at' });
+      /* NOBODY ARRIVES FOLDED INTO SOMEBODY ELSE: a merge is decided (`mergeShaped`). */
+      const merges = mergeShaped(ctx, args.register, args.fields, null);
+      if (merges) return { ok: false, refusal: merges };
       /* ONE ROW PER KEY ON PEOPLE AND ORGANISATIONS: a key another row holds is that row, met again (`keyHeld`). */
       const known = keyHeld(ctx, args.register, args.fields, null);
       if (known) return { ok: false, refusal: known };
@@ -5610,6 +5821,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               halted.refusal = { code: 'FIELD_UNKNOWN', fix: 'deleted_at is kept by the record, and a reported row cannot arrive deleted.', at: where(i, 'deleted_at') };
               throw halted;
             }
+            const merges = mergeShaped(ctx, binding.register, sent, null);
+            if (merges) {
+              halted.refusal = { ...merges, at: where(i, merges.at) };
+              throw halted;
+            }
             const out = kernel.create(binding.register, reportedFields(binding, sent, now, stampType) as Patch, by);
             if (!out.ok) {
               const r: Refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record moved while this report was written. Send it again.' };
@@ -5634,7 +5850,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'write', args.register);
       if (stop) return { ok: false, refusal: stop };
-      const known = keyHeld(ctx, args.register, args.patch, kernel.get(`${args.register}#${args.seq}`)?.id ?? null);
+      const self = kernel.get(`${args.register}#${args.seq}`, { includeDeleted: true });
+      /* ONLY DECIDE MERGES, AND ONLY UNDO TAKES A MERGE BACK (`mergeShaped`). */
+      const merges = mergeShaped(ctx, args.register, args.patch, self);
+      if (merges) return { ok: false, refusal: merges };
+      const known = keyHeld(ctx, args.register, args.patch, self?.id ?? null);
       if (known) return { ok: false, refusal: known };
       return tail(
         offRegister(
@@ -5861,6 +6081,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const skills = await slashSkills();
       out.filed.push(...skills.filed);
       out.dropped.push(...skills.dropped);
+      /* THEN THE REPOSITORIES AGENTS WORK IN THAT NO PROJECT HOLDS, one "Start a project?" each (`slashProjects`). */
+      const projects = await slashProjects();
+      out.filed.push(...projects.filed);
+      out.dropped.push(...projects.dropped);
       /* AND THE HEADLINES LAST, which file nothing on Decide and only write Slash's own prefs. */
       out.dropped.push(...(await slashHeadlines(today)).dropped);
       if (out.filed.length > 0 && scheduler) await kernel.tail(scheduler);
@@ -7199,8 +7423,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           { at: 'decide' },
         );
 
+      /* A MERGE IS ANSWERED IN THE CARD'S WORDS (`mergeAnswer`): Merge all, Keep apart, or one candidate picked. */
+      const merging = args.decide && typeof args.decide.option === 'string' ? mergeAnswer(String(args.id), args.decide.option) : null;
+      if (merging !== null && 'code' in merging) return { ok: false as const, refusal: merging };
+      /* AND NEVER IN PART BY PLACE. The rowset's patch on the kept row carries every candidate's handles at once, so rows
+         that took some folds and not others handed the kept person what the ones left apart knew, or left what the picked
+         one knew on a deleted row (`loop/research-audit-17.md` M3). A pick is `pick:<row>`, which carries only its own. */
+      if (merging === null && args.decide && (args.decide as { rows?: unknown }).rows !== undefined && target && foldsOf(target as Record<string, unknown>) !== null)
+        return no('VALUE_MALFORMED', 'A merge is answered whole: Merge all, Keep apart, or Pick the one that is the same.', { at: 'rows' });
       const verdict = (
-        args.decide ? { decide: args.decide } : args.defer ? { defer: args.defer } : { resolved_as: args.resolved_as, reason: args.reason }
+        merging !== null && !('code' in merging) && args.decide
+          ? { decide: { option: merging.option, reason: args.decide.reason } }
+          : args.decide
+            ? { decide: args.decide }
+            : args.defer
+              ? { defer: args.defer }
+              : { resolved_as: args.resolved_as, reason: args.reason }
       ) as Verdict;
       /* THE TAIL, LIKE EVERY OTHER WRITE PATH. Accepting a `change` that carries a prediction writes
          a `score` row into `schedule`, and this returned bare — so the alarm was never compared
@@ -7239,6 +7477,34 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (stale.length > 0)
             return no('PLAN_STALE', `This change now calls out something it did not show: ${stale.join('; ')}. Propose it again.`, { at: 'body.approve' });
         }
+      }
+      /* A PICK FOLDS THE ONE PICKED AND DECLINES THE REST, in one transaction (`mergeAnswer`, `foldPicked`): a refusal
+         anywhere writes nothing and leaves the question open. */
+      if (merging !== null && !('code' in merging) && merging.pick !== undefined) {
+        const pick = merging.pick;
+        const given = args.decide?.reason?.trim() ?? '';
+        const said = `Picked ${pick.name ?? 'one'} as the same as ${pick.keptName ?? 'the one kept'}, and kept the others apart.${given === '' ? '' : ` ${given}`}`;
+        const halted: { refusal: Refusal | null } = { refusal: null };
+        let picked: Result<Decided>;
+        try {
+          picked = kernel.transaction(() => {
+            const folded = foldPicked(pick, actorOf(ctx));
+            if (!folded.ok) {
+              halted.refusal = 'refusal' in folded ? folded.refusal : { code: 'VERSION_STALE', fix: 'The record moved while this was merged. Answer it again.' };
+              throw halted;
+            }
+            const decided = kernel.decide(args.id, { decide: { option: 'reject', reason: said } }, actorOf(ctx));
+            if (!decided.ok) {
+              halted.refusal = 'refusal' in decided ? decided.refusal : { code: 'VERSION_STALE', fix: 'The record moved while this was answered. Answer it again.' };
+              throw halted;
+            }
+            return decided;
+          });
+        } catch (e) {
+          if (e !== halted) throw e;
+          return tail({ ok: false as const, refusal: halted.refusal! });
+        }
+        return tail(settledAs(ctx, args.id, picked));
       }
       const out = kernel.decide(args.id, verdict, actorOf(ctx));
       /* AN ACCEPTED RETYPE OR NARROWING LANDS HERE, when the owner accepts it rather than the caller who filed it

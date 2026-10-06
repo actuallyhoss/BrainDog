@@ -96,7 +96,11 @@ async function record() {
   const brightloom = await org('Brightloom Infotech', 'company');
   const old = await org('Brightloom', 'company');
   /* A ROW FOLDED INTO ANOTHER IS NAMED AS THE ONE IT WAS FOLDED INTO. */
-  value(await api.update({ register: 'organisations', seq: old.seq!, patch: { merged_into: brightloom.id } }, owner));
+  /* FOLDED AS EVERY MERGE IS, BY A DECISION (`mergeShaped`): a plain update may not name `merged_into`. */
+  {
+    const asked = value<{ id: string }>(await api.propose({ question: 'Are these the same?', body_kind: 'rowset', body: { register: 'organisations', rows: [{ at: `organisations#${old.seq}`, version: old.version, patch: { merged_into: brightloom.id } }] } }, owner));
+    value(await api.decide({ id: asked.id, decide: { option: 'merge', reason: 'the same' } }, owner));
+  }
   const person = async (fields: Record<string, unknown>) => value<Entry>(await api.create({ register: 'people', fields: { projects: [encore.id], ...fields } }, owner));
   await person({ name: 'Madan Neriyanur', role: 'contractor', org: brightloom.id, in_touch: '2026-09-20' });
   await person({ name: 'Priya Raman', role: 'client', org: company.id, in_touch: '2026-10-05' });
