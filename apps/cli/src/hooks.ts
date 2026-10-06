@@ -646,6 +646,22 @@ export async function movedRepos(cwd: string, held: SessionFile, repo: string | 
 }
 
 /**
+ * Where a session's work was, as its end says it: the folder it started in, or, for one started in a folder that is no
+ * repository, the one repository under it whose HEAD moved, with that repository's remote, folder, branch and commit.
+ * The record places a run that has no project yet by what its next call says (`placeOnce` in the kernel), so a run
+ * started in `~/Developer` that only worked in `braindog` lands in BrainDog.
+ *
+ * ONE OR NOTHING. Two repositories that moved are two places, and picking one would be a guess, so the run keeps its
+ * folder's position, as it always had. A session started inside a repository is never moved to another, and a
+ * repository whose position cannot be read leaves the folder's.
+ */
+export async function workedIn(here: Position, moved: readonly MovedRepo[]): Promise<Position> {
+  if (here.repo !== null || moved.length !== 1) return here;
+  const there = await positionOf(moved[0]!.dir);
+  return there.repo === null ? here : there;
+}
+
+/**
  * SessionEnd: the people met in this session's commits, then the run goes idle, with the branch and
  * commit it stopped at.
  *
@@ -677,8 +693,10 @@ export async function hookEnd(io: Io): Promise<void> {
     /* A folder that cannot be written costs the next resume its quiet, and nothing else. */
   }
 
-  const at = await positionOf(event.cwd);
+  const here = await positionOf(event.cwd);
   const budget = hookBudget(io.env);
+  const moved = await movedRepos(event.cwd, held, here.repo);
+  const at = await workedIn(here, moved);
   /* One client and one deadline for both, so the hook's whole budget is one number. */
   const run = { spoken: held.spoken, client_id: event.client_id ?? held.client_id };
   const client = clientFor(to, async () => sessionHeaders(at, 'claude', run, { env: io.env }), AbortSignal.timeout(budget));
@@ -686,7 +704,6 @@ export async function hookEnd(io: Io): Promise<void> {
      active, so people met after the handoff would undo it; and the handoff, which is what this hook is
      for, keeps time to land. */
   const until = Date.now() + budget / 2;
-  const moved = await movedRepos(event.cwd, held, at.repo);
   if (moved.length > 0) await harvest(moved, client, (args) => client.call('meet', args), until);
   await client.handoff({
     state: 'idle',

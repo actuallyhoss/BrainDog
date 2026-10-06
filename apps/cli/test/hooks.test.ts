@@ -642,6 +642,53 @@ test('THE END HOOK READS EVERY REPOSITORY THAT MOVED UNDER A FOLDER THAT IS NOT 
     { name: 'Linus', email: 'linus@example.org', where: `commit ${linus.slice(0, 7)} in kiln` },
   ]);
   assert.equal(host.seen.at(-1)?.method, 'handoff');
+  /* Three moved, so the run is not placed by any one of them. */
+  assert.equal(host.seen.at(-1)?.headers['x-braindog-repo'], undefined);
+});
+
+test('THE END HOOK PLACES A RUN STARTED IN A FOLDER THAT IS NOT A REPOSITORY by the one repository under it that moved, and by none when two moved', async (t) => {
+  const top = realpathSync(folder('developer'));
+  const kiln = repository(join(top, 'kiln'));
+  const glaze = repository(join(top, 'glaze'));
+  kiln.commit();
+  glaze.commit();
+  execFileSync('git', ['remote', 'add', 'origin', 'git@github.com:sam/kiln.git'], { cwd: kiln.dir });
+  const host = await stubHost(t);
+  const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+  const end = (id: string) => run(['hook', 'end'], env, JSON.stringify({ session_id: id, cwd: top, hook_event_name: 'SessionEnd', reason: 'logout' }));
+  const handoff = () => host.seen.filter((s) => s.method === 'handoff').at(-1)!;
+
+  /* One moved: the handoff says kiln's remote, folder, branch and commit, so the record places the run in kiln's project. */
+  assert.equal((await run(['hook', 'start'], env, event(top, { session_id: 'claude-run-one', source: 'startup' }))).code, 0);
+  const head = kiln.commit();
+  host.seen.splice(0);
+  assert.deepEqual(Object.values(await end('claude-run-one')).slice(0, 3), [0, '', '']);
+  const one = handoff();
+  assert.equal(one.headers['x-braindog-repo'], 'kiln');
+  assert.equal(one.headers['x-braindog-remote'], 'github.com/sam/kiln');
+  assert.equal(one.headers['x-braindog-cwd'], kiln.dir);
+  assert.equal(one.headers['x-braindog-client'], 'claude-run-one');
+  assert.deepEqual({ state: one.body.state, head: one.body.head }, { state: 'idle', head });
+  assert.equal(typeof one.body.branch, 'string');
+
+  /* Two moved: no guess. The run keeps the folder's own position, with no repository and no remote. */
+  assert.equal((await run(['hook', 'start'], env, event(top, { session_id: 'claude-run-two', source: 'startup' }))).code, 0);
+  kiln.commit();
+  glaze.commit();
+  host.seen.splice(0);
+  assert.deepEqual(Object.values(await end('claude-run-two')).slice(0, 3), [0, '', '']);
+  const two = handoff();
+  assert.equal(two.headers['x-braindog-cwd'], top);
+  assert.equal(two.headers['x-braindog-repo'], undefined);
+  assert.equal(two.headers['x-braindog-remote'], undefined);
+  assert.deepEqual(two.body, { state: 'idle' });
+
+  /* None moved: the folder's position too. */
+  assert.equal((await run(['hook', 'start'], env, event(top, { session_id: 'claude-run-none', source: 'startup' }))).code, 0);
+  host.seen.splice(0);
+  await end('claude-run-none');
+  assert.equal(handoff().headers['x-braindog-cwd'], top);
+  assert.equal(handoff().headers['x-braindog-repo'], undefined);
 });
 
 test('THE END HOOK COUNTS ONLY SINCE A REPOSITORY JOINED ITS PROJECT, each commit once across two checkouts, and meets no coding agent', async (t) => {
