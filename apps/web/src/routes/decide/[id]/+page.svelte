@@ -1123,7 +1123,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--t-base);
-    line-height: 20px;
+    line-height: var(--lh-body);
   }
 
   /* THE REASONING KEEPS ITS LINES. */
@@ -1145,8 +1145,8 @@
   .cannot {
     margin: var(--sp-2) 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink2);
+    font-size: var(--t-base);
     line-height: var(--lh-body);
   }
 
@@ -1359,7 +1359,7 @@
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-base);
-    line-height: 20px;
+    line-height: var(--lh-body);
   }
 
   /* ── the reason and the defer, one tile each ───────────────────────────── */

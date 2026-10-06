@@ -1,0 +1,164 @@
+<!--
+  What one agent run did, under a section that declares `panel: run` on the run's own page (DIRECTION §37, the run docked
+  beside the runs board): every change it made that is still there, in plain lines, and Undo this run.
+
+  READ FROM THE PLAN UNDO WOULD PUT BACK (`undo-write.ts` `undoPlan`, dry): the record's own list of the run's changes in
+  names, which is exactly what Undo this run would touch, so the lines above the press never promise more than it does.
+  Said the other way round, as what the run did (`run-lines.ts`).
+
+  UNDO THIS RUN ASKS ONCE, IN WORDS: how many changes go back and how many are left alone because somebody changed them
+  since, then Put back sends the plan that was read, by its hash, so a write that slipped in between is never undone
+  blind. The record's sentence is the receipt; the page is read again and the plan with it.
+
+  A LIST WITHOUT A BOX under the section's own heading ("What it did"), with no second heading of its own, and no red:
+  putting a run back is a choice, not an alarm. A HOST PANEL (`panel-of.ts`), drawn by `BlockSlot.svelte` only on a page
+  drawn for a run, and imported by it alone.
+-->
+<script lang="ts">
+  import { untrack } from 'svelte';
+  import { apiBase } from '$lib/at.ts';
+  import { undoApply, undoPlan, type UndoPlan } from '$lib/record/undo-write.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import Button from '$lib/ui/Button.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
+  import { runLines, runWords } from './run-lines.ts';
+
+  let {
+    run,
+    title,
+    onchanged = null,
+  }: {
+    /** The run's handle (`S42`), which the record puts back by; never drawn. */
+    run: string;
+    /** The run's name as its page is titled, for a screen reader's name of the press. */
+    title: string;
+    /** Reads the page again once the run is put back, so the rows it changed are drawn as they now are. */
+    onchanged?: (() => Promise<void> | void) | null;
+  } = $props();
+
+  let from = $state<'reading' | 'ready' | 'refused'>('reading');
+  let plan = $state.raw<UndoPlan | null>(null);
+  let fix = $state('');
+  let confirming = $state(false);
+  let busy = $state(false);
+
+  async function load(handle: string) {
+    const out = await undoPlan(apiBase(), { run: handle });
+    /* A READ FOR A RUN THE PAGE HAS LEFT is not this one's. */
+    if (handle !== run) return;
+    if (out.from === 'plan') {
+      plan = out.plan;
+      from = 'ready';
+    } else {
+      fix = out.fix;
+      from = 'refused';
+    }
+  }
+
+  /* READ AGAIN FOR ANOTHER RUN, and not for each draw of the page. */
+  $effect(() => {
+    const handle = run;
+    untrack(() => {
+      from = 'reading';
+      confirming = false;
+      void load(handle);
+    });
+  });
+
+  const said = $derived(plan ? runLines(plan.steps) : { lines: [], more: null });
+
+  async function putBack() {
+    const read = plan;
+    if (!read || busy) return;
+    busy = true;
+    try {
+      const out = await undoApply(apiBase(), { run }, read);
+      confirming = false;
+      if (out.from === 'undone') toasts.push(out.said, { intent: 'good' });
+      else toasts.push(out.fix, { intent: 'warn' });
+      /* PUT BACK OR MOVED MEANWHILE, the plan is read again: what is left, or what moved. */
+      await load(run);
+      if (out.from === 'undone') await onchanged?.();
+    } finally {
+      busy = false;
+    }
+  }
+</script>
+
+<section class="run" aria-label={runWords.heading} aria-busy={from === 'reading'}>
+  {#if from === 'reading'}
+    <Waiting rows={3} />
+  {:else if from === 'refused'}
+    <p class="run-said" role="status">{fix}</p>
+  {:else if plan && plan.steps.length === 0}
+    <p class="run-said">{runWords.nothing}</p>
+  {:else if plan}
+    <ul class="run-lines">
+      {#each said.lines as line}<li class="run-line">{line}</li>{/each}
+    </ul>
+    {#if said.more}<p class="run-said">{said.more}</p>{/if}
+    <div class="run-do" role="group" aria-label={runWords.undo}>
+      {#if confirming}
+        <p class="run-sure" role="status">{runWords.sure(plan.steps.length, plan.skipped.length)}</p>
+        <Button size="sm" onclick={() => (confirming = false)}>{runWords.keep}</Button>
+        <Button size="sm" weight="primary" disabled={busy} onclick={() => void putBack()}>{runWords.putBack}</Button>
+      {:else}
+        <Button size="sm" aria-label="{runWords.undo}: {title}" onclick={() => (confirming = true)}>{runWords.undo}</Button>
+      {/if}
+    </div>
+  {/if}
+</section>
+
+<style>
+  .run {
+    display: grid;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    padding-block-start: var(--sp-2);
+  }
+
+  .run-lines {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* ONE CHANGE A LINE, at the body size and its line height, a hairline between, as the page's other lists. */
+  .run-line {
+    padding-block: var(--sp-2);
+    border-block-start: 1px solid var(--line-soft);
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+
+  .run-line:first-child {
+    border-block-start: 0;
+  }
+
+  .run-said {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 1.55;
+  }
+
+  .run-do {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-block-start: var(--sp-2);
+  }
+
+  /* THE CONFIRM'S SENTENCE takes its own line, so the two presses under it never squeeze it on a phone. */
+  .run-sure {
+    flex: 1 1 100%;
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 1.55;
+  }
+</style>

@@ -514,6 +514,22 @@ export type Question = {
   context?: string;
   /** Set once, with a mandatory reason, and then the row is immutable. */
   decided?: { option: string; reason: string; by: string; at: string };
+  /**
+   * A merge asked about several rows, as the record answers it beside the suggestion (`MergeCluster` in
+   * `packages/record`): every candidate by name with where it was seen, the one kept first, and the answers Merge all,
+   * Keep apart and one Pick a candidate. Decide draws it as the merge card. Absent on every other question.
+   */
+  merge?: MergeCluster;
+};
+
+/**
+ * A MERGE QUESTION AS THE RECORD ANSWERS IT, copied from `packages/record`'s `MergeCluster`, which the app does not
+ * import. A candidate's `name` is `''` when the reader may not be given one, and the card says "this one". `row` is the
+ * candidate's handle, which an answer (`pick:<row>`) carries and no screen prints.
+ */
+export type MergeCluster = {
+  candidates: readonly { name: string; row: string; keeps: boolean; org: string | null; seen: readonly string[]; known_by: readonly string[]; rows: readonly number[] }[];
+  options: readonly { option: string; says: string; decide: { option: string } }[];
 };
 
 export type InboxItem = {

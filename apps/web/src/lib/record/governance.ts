@@ -23,7 +23,7 @@ import { citedWords, figuresIn } from '../cite.ts';
 import { moneyInText } from './money.ts';
 import { labels, relabel } from '../voice.ts';
 import { callsOutOf, type CallOut } from './actions.ts';
-import type { Question } from './schema.ts';
+import type { MergeCluster, Question } from './schema.ts';
 
 /**
  * A `rowset` body, as `propose` files it (`packages/kernel/src/govern.ts`): a row with `at` updates that row at the
@@ -150,7 +150,40 @@ export function questionOf(row: Row, asked: string | undefined, rank: number): Q
   const context = said(body.context).trim();
   const band = costOf(text(row.body_kind), row.body);
   const title = moneyInText(asked?.trim() ?? '');
-  return { id, title: title || id, cost: '', band, rank, opened: text(row.opened_at), options, ...(context ? { context } : {}) };
+  /* A MERGE THE RECORD READ AS ONE (`merge`), carried to the card as it came, once it is the shape the card reads. */
+  const merge = mergeOf(row.merge);
+  return { id, title: title || id, cost: '', band, rank, opened: text(row.opened_at), options, ...(context ? { context } : {}), ...(merge ? { merge } : {}) };
+}
+
+const texts = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
+
+/**
+ * The record's merge question (`MergeCluster`), or `null` when the row carries none or one in a shape this build cannot
+ * read: a card drawn from half a cluster would offer a Pick for somebody it cannot name. Narrowed whole, keys and all,
+ * so nothing the record did not check rides through onto a screen.
+ */
+export function mergeOf(v: unknown): MergeCluster | null {
+  if (!isRow(v) || !Array.isArray(v.candidates) || !Array.isArray(v.options) || v.candidates.length < 2) return null;
+  const candidates = v.candidates.map((c) =>
+    isRow(c) &&
+    typeof c.name === 'string' &&
+    typeof c.row === 'string' &&
+    typeof c.keeps === 'boolean' &&
+    (c.org === null || typeof c.org === 'string') &&
+    texts(c.seen) &&
+    texts(c.known_by) &&
+    Array.isArray(c.rows) &&
+    c.rows.every((n) => Number.isInteger(n) && (n as number) >= 0)
+      ? { name: c.name, row: c.row, keeps: c.keeps, org: c.org as string | null, seen: [...c.seen], known_by: [...c.known_by], rows: [...(c.rows as number[])] }
+      : null,
+  );
+  const options = v.options.map((o) =>
+    isRow(o) && typeof o.option === 'string' && typeof o.says === 'string' && isRow(o.decide) && typeof o.decide.option === 'string'
+      ? { option: o.option, says: o.says, decide: { option: o.decide.option } }
+      : null,
+  );
+  if (candidates.some((c) => c === null) || options.some((o) => o === null)) return null;
+  return { candidates: candidates as MergeCluster['candidates'], options: options as MergeCluster['options'] };
 }
 
 /**

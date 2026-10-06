@@ -43,6 +43,7 @@ import {
 } from './api.ts';
 import { REGISTERS } from './held.ts';
 import { linkOf } from './blocks.ts';
+import { bylineOf } from './byline.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
 import { format, fxNote, hrefFor, leadOf, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
@@ -108,7 +109,8 @@ type Reading = {
   targetIn?: TargetIn;
 };
 
-type Row = RecordRow & { updated_at?: string };
+/* `group` IS A GROUPED CARD'S, the row its link points at by handle and title (`PageRow.group`), narrowed by `groupsOf`. */
+type Row = RecordRow & { updated_at?: string; group?: unknown };
 
 /**
  * A block as the record's `page` answers it: the declaration, with what the kernel read on it.
@@ -761,6 +763,23 @@ function changeOf(changes: unknown, n: number): { by: string; at: string } | nul
   return { by, at: c.at };
 }
 
+/**
+ * Each card's group by name, aligned with the rows, or `null` when the record said none.
+ *
+ * ON THE ROW, as the record answers it now: `{ value: 'organisations#7', name: 'Encore' }`, and `value: ''` for a card
+ * that points at nothing, which is no group. A record that put no group on any row is read through the names it sent
+ * beside the rows, as an older build did; neither, and the page reads the names from `names` (`blocks.ts`).
+ */
+function groupsOf(rows: readonly Row[], beside: unknown): (string | null)[] | null {
+  if (rows.some((r) => isObject(r.group)))
+    return rows.map((r) => {
+      const g = r.group;
+      return isObject(g) && typeof g.value === 'string' && g.value !== '' && typeof g.name === 'string' && g.name.trim() !== '' ? g.name.trim() : null;
+    });
+  if (Array.isArray(beside) && beside.length === rows.length) return beside.map((g) => (typeof g === 'string' && g.trim() !== '' ? g : null));
+  return null;
+}
+
 /** A series the record sent, when it is one: a name, a unit, aligned buckets, and numbers or gaps. */
 function isSeries(v: unknown): v is MeasureSeries {
   if (v === null || typeof v !== 'object') return false;
@@ -1236,6 +1255,16 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
       const run = trends?.[n];
       row.cells[trendAt] = Array.isArray(run) ? run.map((v) => (typeof v === 'number' && Number.isFinite(v) ? String(v) : '-')).join(' ') : null;
     });
+  /* EACH CARD'S GROUP BY NAME, READ OFF ITS OWN ROW (`PageRow.group` in the kernel's `pages.ts`): the record puts it on
+     the row and not beside the rows, so a block held from a reader keeps no name of a list she may not read. A card the
+     record says points at nothing (`value: ''`, "No project") and a group that is not text are drawn among the
+     ungrouped rather than under a heading of something else. A record on an older build answered the names beside the
+     rows, `groups`, which is read the same way when no row says its own. */
+  const cardGroups = kind === 'cards' ? groupsOf(got, groupNames) : null;
+  /* WHO CHANGED EACH ROW LAST, AS A BYLINE (`bylineOf`): an agent, an app, a rule or Slash, for whom, and whether the
+     reader has seen it. Only where the record said a change for some row; a row you changed yourself carries none. */
+  const lines = Array.isArray(changed) && changed.length === got.length ? got.map((_r, n) => bylineOf(changed[n], me, names, now, typeof mark === 'string' ? mark : null)) : null;
+  const bylines = lines?.some((l) => l !== null) ? lines : null;
   /* A PATH'S MARKS ARE THE RECORD'S, one a row, and the first open one's place. A path under `first:` SAYS ITS OWN REST
      as "N more" (`blocks.ts` `pathRows`), so `shown` is the whole match and the page's slice line is not drawn under it
      as the same count told twice. */
@@ -1256,11 +1285,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     ...open,
     ...(spentBy === undefined ? {} : { spentBy }),
     names: namesOf(refs),
-    /* EACH CARD'S GROUP BY NAME, only when the record sent one a row, each text or nothing: a name that is not text is no
-       name, and the card is drawn among the ungrouped rather than under a heading of something else. */
-    ...(kind === 'cards' && Array.isArray(groupNames) && groupNames.length === got.length
-      ? { groups: groupNames.map((g) => (typeof g === 'string' && g.trim() !== '' ? g : null)) }
-      : {}),
+    ...(cardGroups ? { groups: cardGroups } : {}),
+    ...(bylines ? { bylines } : {}),
     ...(inherited === undefined ? {} : { inherited }),
     /* GONE QUIET AS THE RECORD SAYS IT (`isQuiet`): open, and not heard from in 30 minutes. */
     ...(live ? { quiet: got.map((r) => isQuiet({ fields: r.fields as never, updated_at: r.updated_at ?? r.created_at }, now)) } : {}),

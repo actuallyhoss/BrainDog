@@ -10,8 +10,9 @@
  *
  * PICK ONE IS AN OPTION THE RECORD OFFERS, NEVER A SUBSET THIS SCREEN MAKES UP. A rowset's patch on the kept row carries
  * every folded row's handles and lines at once, so accepting it with one fold ticked would hand the kept person the
- * addresses of somebody who was kept apart. A rowset is therefore answered whole, and only a question of options draws
- * a Pick on its candidates.
+ * addresses of somebody who was kept apart. A rowset read off its patches is therefore answered whole. A Pick is drawn
+ * only where the record names it: a question of options, or a rowset carrying the record's own cluster (`clusterOf`),
+ * whose `pick:<row>` merges that one alone and leaves the carry for Merge all.
  *
  * NAMES, NEVER IDS. A candidate is said by its name, and a row the record would not give back is said as the person or
  * organisation already here, never as `people#3`. Where each was seen is the dated line the record keeps (`met`), said
@@ -93,7 +94,15 @@ const INTO = 'merged_into';
  * patch on the kept row. Anything else it writes makes it some other question, which the gate draws as it always has.
  */
 function fromRowset(body: Row, held: readonly Held[], offered: ReadonlySet<string>): Merge | null {
-  if (!offered.has('accept') || !offered.has('reject')) return null;
+  /* ITS ANSWERS: the cluster's own words where the record offers them, with a Pick on each one folded that it names one
+     for, or else its two, Accept and Reject, which answer it whole. */
+  const all = [...offered].find((k) => ALL.has(k)) ?? (offered.has('accept') ? 'accept' : undefined);
+  const apart = [...offered].find((k) => APART.has(k)) ?? (offered.has('reject') ? 'reject' : undefined);
+  if (all === undefined || apart === undefined) return null;
+  const pickOf = (at: string): Press | null => {
+    const key = [...offered].find((k) => PICK.exec(k)?.[1] === at);
+    return key === undefined ? null : { option: key };
+  };
   const rows = Array.isArray(body.rows) ? body.rows : [];
   const folds: { at: string; n: number }[] = [];
   let into = '';
@@ -122,9 +131,9 @@ function fromRowset(body: Row, held: readonly Held[], offered: ReadonlySet<strin
   };
   const candidates: Candidate[] = [
     { key: into, ...said(into), kept: true, pick: null },
-    ...folds.map((f) => ({ key: f.at, ...said(f.at), kept: false, pick: null })),
+    ...folds.map((f) => ({ key: f.at, ...said(f.at), kept: false, pick: pickOf(f.at) })),
   ];
-  return { candidates, all: { option: 'accept' }, apart: { option: 'reject' } };
+  return { candidates, all: { option: all }, apart: { option: apart } };
 }
 
 /* AN OPTION'S ID FOR EACH ANSWER, as a question of options may spell it. */
@@ -152,18 +161,36 @@ function fromOptions(body: Row, offered: ReadonlySet<string>): Merge | null {
 }
 
 /**
+ * THE RECORD'S OWN CLUSTER (`packages/record` `MergeCluster`), which it carries on a rowset it worked a merge out for:
+ * every candidate by name with where each was seen, and its answers, `merge`, `apart` and one `pick:<row>` for each one
+ * folded when more than one is. Read as a question of options reads, so each one folded gets its own Pick. `accept` and
+ * `reject` still answer the question whole, from the keyboard.
+ */
+export function clusterOf(merge: unknown): { body: Row; offered: string[] } | null {
+  if (!isRow(merge) || !Array.isArray(merge.candidates) || !Array.isArray(merge.options)) return null;
+  const candidates = merge.candidates.filter(isRow).map((c) => ({ at: text(c.row), name: c.name, seen: c.seen, kept: c.keeps === true }));
+  const offered = merge.options.filter(isRow).map((o) => text(o.option)).filter((k) => k !== '');
+  return candidates.length < 2 || candidates.some((c) => c.at === '') ? null : { body: { candidates }, offered };
+}
+
+/**
  * THE MERGE A QUESTION ASKS, or `null` for a question that is not one. `offered` is the keys of the answers the question
  * has, so a press the record does not offer is never drawn; `held` is the rows of the list the proposal names, as the
- * gate read them back.
+ * gate read them back. A rowset that carries the record's own cluster (`merge`) is read by it, with the answers it
+ * names, and one without is read off its patches.
  */
 export function mergeOf(
-  about: { kind: string; body: Row } | undefined,
+  about: { kind: string; body: Row; merge?: unknown } | undefined,
   offered: readonly string[],
   held: readonly Held[] = [],
 ): Merge | null {
   if (!about || !isRow(about.body)) return null;
   const keys = new Set(offered);
-  if (about.kind === 'rowset') return fromRowset(about.body, held, keys);
+  /* THE CLUSTER'S ANSWERS ONLY AS THE QUESTION OFFERS THEM, since a press is sent only for an answer the question has: a
+     question still offering Accept and Reject draws the cluster's names and places over those two, answered whole. */
+  const cluster = about.kind === 'rowset' ? clusterOf(about.merge) : null;
+  if (cluster !== null && cluster.offered.some((k) => keys.has(k))) return fromOptions(cluster.body, keys);
+  if (about.kind === 'rowset') return fromRowset(cluster === null ? about.body : { ...about.body, candidates: cluster.body.candidates }, held, keys);
   if (about.kind === 'options') return fromOptions(about.body, keys);
   return null;
 }

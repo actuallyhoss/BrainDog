@@ -37,6 +37,7 @@ import type { Entry, Fields, Filter, FieldDecl, PageBlock, RegisterDecl } from '
 import { listLine } from './tags.ts';
 /* No cycle: `names.ts` reads `held.ts` and the copy, never this file. */
 import { actor, nameWords } from './names.ts';
+import type { Byline } from './byline.ts';
 
 /* THE DECLARATIONS EVERY HELPER BELOW READS, which are `held.ts`'s and not a copy: a list the record taught this tab is
    the list a cell here is drawn from. */
@@ -1307,6 +1308,11 @@ export type BlockResult = PageBlock & {
    * aligned with `rows`, `null` for a card with none. Absent, the names are read from `names`.
    */
   groups?: readonly (string | null)[];
+  /**
+   * Aligned with `rows`, where the record said who changed some row last: that row's byline (`byline.ts`), who changed
+   * it, for whom, whether the reader has seen it, and the batch its Undo puts back. `null` for a row a person changed.
+   */
+  bylines?: readonly (Byline | null)[];
   /**
    * THE RECORD'S OWN ANSWER, KEPT WHOLE, on a block whose kind is registered (`lib/page/kinds/index.ts`). Such a kind is
    * drawn from this and from nothing above it: `page-live.ts` translates no key of it into this type, so a new kind

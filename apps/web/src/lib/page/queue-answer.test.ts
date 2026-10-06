@@ -57,3 +57,41 @@ test('A QUESTION OF OPTIONS OVER A CLUSTER IS READ AS ITS OWN PAGE READS IT', ()
   assert.deepEqual([merge?.all.option, merge?.apart.option, merge?.candidates[0]?.pick?.option], ['merge', 'apart', 'pick:a']);
   assert.equal(queueMergeOf({ kind: 'options', candidates }, ['yes', 'no']), null, 'no Merge all among its answers');
 });
+
+test("THE RECORD'S OWN MERGE ON A ROWSET IS READ AS ITS OPTIONS: Merge all, Keep apart and a Pick for each one folded", () => {
+  const merge = {
+    candidates: [
+      { name: 'Rohan Mehta', row: 'people#1', keeps: true, org: 'Encore', seen: ['3 commits in encore', 'mail'], known_by: ['email'], rows: [] },
+      { name: 'rohanm', row: 'people#4', keeps: false, org: null, seen: ['a commit in portage'], known_by: ['github'], rows: [0] },
+      { name: '', row: 'people#7', keeps: false, org: null, seen: [], known_by: [], rows: [1] },
+    ],
+    options: [
+      { option: 'merge', says: 'Merge all', decide: { option: 'merge' } },
+      { option: 'apart', says: 'Keep apart', decide: { option: 'apart' } },
+      { option: 'pick:people#4', says: 'Pick rohanm', decide: { option: 'pick:people#4' } },
+      { option: 'pick:people#7', says: 'Pick this one', decide: { option: 'pick:people#7' } },
+    ],
+  };
+  const read = queueMergeOf({ kind: 'rowset', body_kind: 'rowset', held: 3, merge }, ['accept', 'reject']);
+  assert.ok(read, 'a rowset carrying the record’s merge is a merge');
+  assert.deepEqual([read.all.option, read.apart.option], ['merge', 'apart'], 'the record’s own answers, not Accept and Decline');
+  assert.deepEqual(
+    read.candidates.map((c) => [c.key, c.name, c.kept, c.pick?.option ?? null]),
+    [
+      ['people#1', 'Rohan Mehta', true, null],
+      ['people#4', 'rohanm', false, 'pick:people#4'],
+      ['people#7', '', false, 'pick:people#7'],
+    ],
+    'the kept one first and one Pick for each one folded',
+  );
+  assert.deepEqual(read.candidates[0]?.seen, ['3 commits in encore', 'mail'], 'where they were seen stays newest first');
+
+  const two = { candidates: merge.candidates.slice(0, 2), options: merge.options.slice(0, 2) };
+  assert.deepEqual(
+    queueMergeOf({ kind: 'rowset', merge: two }, ['accept', 'reject'])?.candidates.map((c) => c.pick),
+    [null, null],
+    'two names have no Pick, since picking the one folded is Merge all',
+  );
+  assert.equal(queueMergeOf({ kind: 'rowset', merge: { candidates: merge.candidates, options: [{ says: 'Merge all' }] } }, ['accept', 'reject']), null, 'an option with no key is no merge');
+  assert.equal(queueMergeOf({ kind: 'rowset', merge: { candidates: [{ name: 'Ana' }, { name: 'Ana B' }], options: merge.options } }, ['accept', 'reject']), null, 'a candidate with no handle is no merge');
+});

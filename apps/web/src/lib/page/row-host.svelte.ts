@@ -13,6 +13,9 @@
  *
  * A ROW A PAGE ANSWERED CUT SHORT IS READ WHOLE BEFORE IT IS CHANGED (`whole`), and kept beside the rows a write
  * answered, so every later read of the same version is drawn from it. No way back here puts back a cut (`clipped.ts`).
+ *
+ * AND WHO ELSE CHANGED A ROW (`byline.ts`): a row an agent, a rule or Slash changed last carries its byline, new to the
+ * reader until they leave the page or open the row, and its Undo puts that change back on the record (`undoChange`).
  */
 
 import { createClient } from '@braindog/client';
@@ -26,6 +29,8 @@ import type { Entry, Fields } from '../record/schema.ts';
 import { optimist, type Change, type Sent } from '../data/optimistic.ts';
 import type { toasts } from '../ui/toast.svelte.ts';
 import { dayOf, shapeOf, type Shape } from '../work/board.ts';
+import { undoChange } from '../record/undo-write.ts';
+import { bylinesIn, bylineWords, keepSeen, seenOn, storeOf, type Byline, type Seen, type Store } from './byline.ts';
 import { cutIn, wholeOf } from './clipped.ts';
 import { dueWords, entryIn, finished, keyOf, titleOf, words, type RowAt, type Touch } from './row-verbs.ts';
 
@@ -47,6 +52,10 @@ export type HostDeps = {
   may: (register: string) => boolean;
   /** The record's fetch, which a test hands in over its own kernel. Absent, the browser's. */
   io?: Fetch;
+  /** The reader's own id and the people `boot` named, which a byline's names are said with. Absent, nobody is named. */
+  who?: () => { me: string | null; names: ReadonlyMap<string, string> };
+  /** Where what the reader has seen is kept. Absent, the browser's storage; `null`, nowhere. */
+  store?: Store | null;
 };
 
 export class RowHost {
@@ -75,6 +84,19 @@ export class RowHost {
   #queues = new Map<string, Promise<unknown>>();
   #deps: HostDeps;
   #on = '';
+  /** What the reader has seen on this page (`byline.ts`): when they last left it, and each row they opened. */
+  #seen = $state.raw<Seen>({ page: 0, rows: {} });
+  /** The rows whose byline Undo is on its way, so a second press does not send it twice. */
+  undoing = $state.raw(new Set<string>());
+
+  /**
+   * WHO ELSE CHANGED EACH ROW THE PAGE DRAWS, by its key: an agent, a rule or Slash, and whether the reader has seen it.
+   * Read from the blocks as the page reads them, so a page read again carries the record's newest.
+   */
+  bylines = $derived.by((): Map<string, Byline> => {
+    const who = this.#deps.who?.() ?? { me: null, names: new Map<string, string>() };
+    return bylinesIn(this.#deps.blocks() as Parameters<typeof bylinesIn>[0], this.#seen, who.me, who.names, this.clock);
+  });
 
   constructor(deps: HostDeps) {
     this.#deps = deps;
@@ -83,7 +105,9 @@ export class RowHost {
   /** The page the host is on now. Just changed is the page's, so a page opened after it reads its own. */
   forPage(slug: string) {
     if (slug === this.#on) return;
+    this.leave();
     this.#on = slug;
+    this.#seen = seenOn(slug, this.#store());
     this.#landed = new Map();
     this.opened = null;
     this.panelOpen = false;
@@ -95,6 +119,68 @@ export class RowHost {
 
   tickClock() {
     this.clock = Date.now();
+  }
+
+  #store(): Store | null {
+    return this.#deps.store === undefined ? storeOf() : this.#deps.store;
+  }
+
+  /**
+   * THE READER LEAVES THE PAGE, and everything changed on it until now has been seen: kept for the next visit, while this
+   * visit's tints stay as they were drawn. `PageView` calls it as it goes, and `forPage` for the page before.
+   */
+  leave() {
+    if (this.#on === '') return;
+    keepSeen(this.#on, { ...this.#seen, page: Date.now() }, this.#store());
+  }
+
+  /* ── who else changed a row ─────────────────────────────────────────────── */
+
+  /** Who else last changed `row`, or `undefined` where a person did or nobody did. */
+  byline(row: RowAt): Byline | undefined {
+    return this.bylines.get(keyOf(row));
+  }
+
+  /** The reader has seen what changed on `row`: they opened it, or put the change back. */
+  seeRow(row: RowAt) {
+    const key = keyOf(row);
+    if (!this.bylines.get(key)?.unseen) return;
+    this.#seen = { ...this.#seen, rows: { ...this.#seen.rows, [key]: Date.now() } };
+    keepSeen(this.#on, this.#seen, this.#store());
+  }
+
+  /**
+   * UNDO, FROM A ROW'S BYLINE: the record puts back the whole of that change, the rules it set off included, and leaves
+   * alone whatever somebody changed since (`undo-write.ts` `undoChange`). Said in the record's own sentence, kept in Just
+   * changed, and the page read again. Answers false where there is nothing to put back from here.
+   */
+  async undoBy(row: RowAt): Promise<boolean> {
+    const key = keyOf(row);
+    const line = this.bylines.get(key);
+    if (!line || this.undoing.has(key)) return false;
+    if (line.batch === null) {
+      this.#deps.toasts.push(bylineWords.noUndo, { intent: 'warn' });
+      return false;
+    }
+    const e = this.entry(row);
+    const title = e ? titleOf(e, this.shapeOf(row.register)) : `#${row.seq}`;
+    this.undoing = new Set(this.undoing).add(key);
+    try {
+      const out = await undoChange(this.#deps.base(), line.batch, this.#deps.io);
+      if (out.from !== 'undone') {
+        this.#deps.toasts.push(out.fix, { intent: 'warn' });
+        return false;
+      }
+      this.seeRow(row);
+      this.note(row, words.marks.putBack, title);
+      this.#deps.toasts.push(out.said, { intent: 'good' });
+      await this.#deps.reread();
+      return true;
+    } finally {
+      const next = new Set(this.undoing);
+      next.delete(key);
+      this.undoing = next;
+    }
   }
 
   /* ── reading a row ──────────────────────────────────────────────────────── */
@@ -202,6 +288,7 @@ export class RowHost {
     this.opened = row;
     this.typing = type;
     this.panelOpen = true;
+    this.seeRow(row);
     return true;
   }
 

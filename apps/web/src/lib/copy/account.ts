@@ -747,9 +747,7 @@ export const account = {
       ? 'Sign in with a link from your mail, then remove the lost passkey here. With no passkey and no mail, the person who runs this host can let you back in.'
       : 'Sign in with another passkey, then remove the lost one here. With none left, the person who runs this host can let you back in.',
 
-  /* Sign-up for a stranger, a record of your own for somebody signed in with none, and a passkey first */
-  signupTitle: 'Make a record',
-  signupLede: 'Your email, and a name for your record.',
+  /* Sign-up for a stranger, a record of your own for somebody signed in with none, and the passkey the first run ends on */
   signupClosedTitle: 'Sign-up is not open yet',
   signupClosedWhy: 'This BrainDog is not taking new records yet. If you already have one, sign in.',
   signupNameLabel: 'A name for your record',
@@ -757,10 +755,7 @@ export const account = {
   signupNameChecking: 'Checking the name',
   signupNameFree: 'That name is free.',
   signupNameUnreachable: 'BrainDog could not check that name. It is checked again when you send the form.',
-  signupYourName: 'Your name (optional)',
   signupHuman: 'A check that you are a person',
-  signupSend: 'Send the link',
-  signupSending: 'Sending',
   signupFailed: 'That did not go through. Check the address and the name, then send it again.',
   signupLocked: (minutes: number) => `Too many tries from here. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`,
   signupCheckMail: 'Check your mail',
@@ -779,11 +774,9 @@ export const account = {
   signupWaitingWhy: 'Your payment is in. This takes a few seconds.',
   signupWaitingSlow: 'This is taking longer than it should. Your record is made as soon as the payment arrives, so check again in a minute.',
   signupCheckAgain: 'Check again',
-  signupHaveRecord: 'Already have a record? Sign in',
   signupNewHere: 'New here? Make a record',
   noRecordTitle: 'Make a record of your own',
-  noRecordWhy: 'You are signed in and on no record yet. Name one and pay for it here, or open the invitation somebody sent you.',
-  passkeyFirstTitle: 'First, keep a way back in',
+  passkeyFirstTitle: 'Keep a way back in',
   passkeyFirstWhy: 'Add a passkey on this device, so you can sign in again without waiting for an email.',
   passkeyFirstLater: 'Not now',
   passkeyFirstFailed: 'That did not add a passkey. You can add one later in Settings, under Recovery.',

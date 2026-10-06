@@ -129,6 +129,20 @@
     reread: () => reread(),
     toasts,
     may: (register) => may(route.data as unknown as Shell, 'write', register),
+    /* WHO A BYLINE NAMES: the reader by their id, and the people `boot` named. */
+    who: () => {
+      const shell = route.data as unknown as Partial<Shell>;
+      return { me: shell.me?.person ?? null, names: new Map(Object.entries(shell.names ?? {})) };
+    },
+  });
+  /* LEAVING THE PAGE IS SEEING WHAT CHANGED ON IT (`byline.ts`): kept for the next visit, as the tab closes too. */
+  $effect(() => {
+    const away = () => host.leave();
+    addEventListener('pagehide', away);
+    return () => {
+      removeEventListener('pagehide', away);
+      host.leave();
+    };
   });
   const picked = new Picked({ base: () => apiBase(), reread: () => reread(), toasts });
   $effect.pre(() => {

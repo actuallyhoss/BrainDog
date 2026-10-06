@@ -1059,8 +1059,8 @@
   .cannot {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink2);
+    font-size: var(--t-base);
     line-height: var(--lh-body);
   }
 
@@ -1100,7 +1100,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--t-base);
-    line-height: 20px;
+    line-height: var(--lh-body);
   }
 
   /* ── the hints and the groups ──────────────────────────────────────────── */
@@ -1308,7 +1308,7 @@
     list-style: none;
     color: var(--ink);
     font-size: var(--t-base);
-    line-height: 20px;
+    line-height: var(--lh-body);
   }
 
   .q-does > li {
@@ -1345,7 +1345,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--t-base);
-    line-height: 20px;
+    line-height: var(--lh-body);
   }
 
   .q-ev {

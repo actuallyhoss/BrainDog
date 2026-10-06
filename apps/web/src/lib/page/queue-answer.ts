@@ -141,16 +141,28 @@ export function laterLine(q: { until?: unknown; until_why?: unknown }, now: numb
 export const changesSomething = (q: Pick<QueueQuestion, 'kind'>): boolean => q.kind !== 'options';
 
 /**
- * THE MERGE A QUEUE QUESTION ASKS, from the `candidates` the record sends beside it (`QueueQuestion`), or `null` for a
- * question that is not one or a record on an older build that sends none.
+ * THE MERGE A QUEUE QUESTION ASKS, from the record's own `merge` on the question (`MergeCluster`) or the `candidates` the
+ * kernel's queue sends beside it (`QueueQuestion`), or `null` for a question that is not one or a record on an older
+ * build that sends neither.
  *
- * A QUESTION OF OPTIONS IS READ AS ITS OWN PAGE READS IT (`merge.ts` `mergeOf`). A ROWSET IS READ OFF ITS CANDIDATES, since
- * the queue does not carry the rows the question's page checks: the record's own cluster question (`people.ts`
- * `askCluster`) names every one it is about, one of them kept, and folds the others into it, one row each plus at most
- * one on the kept row. A rowset whose count of rows is not that is some other change, and keeps its two answers. Accept is
- * Merge all and Reject is Keep apart, and a rowset is answered whole, so no candidate carries a Pick.
+ * THE RECORD'S `merge` WINS, AND IS READ AS A QUESTION OF OPTIONS (`merge.ts` `fromOptions`): its candidates by name,
+ * the one kept first, and its answers as the record offers them, Merge all (`merge`), Keep apart (`apart`) and one
+ * Pick for each one folded (`pick:people#4`), each a `decide` with that option. The answers come from `merge.options`
+ * and not from the card's own, which on a rowset are still Accept and Decline and still answer the question whole.
+ * Where it was seen is newest first already, so it is handed over oldest first, as `seenOf` reads a dated list.
+ *
+ * WITHOUT IT, A QUESTION OF OPTIONS IS READ AS ITS OWN PAGE READS IT (`merge.ts` `mergeOf`). A ROWSET IS READ OFF ITS
+ * CANDIDATES, since the queue does not carry the rows the question's page checks: the record's own cluster question
+ * (`people.ts` `askCluster`) names every one it is about, one of them kept, and folds the others into it, one row each
+ * plus at most one on the kept row. A rowset whose count of rows is not that is some other change, and keeps its two
+ * answers. Accept is Merge all and Reject is Keep apart, and a rowset is answered whole, so no candidate carries a Pick.
  */
-export function queueMergeOf(q: { kind: string; body_kind?: unknown; candidates?: unknown; held?: unknown }, offered: readonly string[]): Merge | null {
+export function queueMergeOf(
+  q: { kind: string; body_kind?: unknown; candidates?: unknown; held?: unknown; merge?: unknown },
+  offered: readonly string[],
+): Merge | null {
+  const cluster = clusterOf(q.merge);
+  if (cluster !== null) return mergeOf({ kind: 'options', body: { candidates: cluster.candidates } }, cluster.offered);
   const candidates = q.candidates;
   if (!Array.isArray(candidates)) return null;
   const kind = typeof q.body_kind === 'string' ? q.body_kind : q.kind;
@@ -167,4 +179,25 @@ export function queueMergeOf(q: { kind: string; body_kind?: unknown; candidates?
     all: { option: 'accept' },
     apart: { option: 'reject' },
   };
+}
+
+/**
+ * THE RECORD'S `merge` (`MergeCluster`), narrowed: its candidates in the words `merge.ts` reads (`{ at, name, seen,
+ * kept }`) and the keys of the answers it offers, or `null` where it is absent or not that shape. A record on another
+ * build is read, not trusted, so a candidate with no handle, or an option with no key, makes it no merge at all.
+ */
+function clusterOf(v: unknown): { candidates: { at: string; name: string; seen: string[]; kept?: true }[]; offered: string[] } | null {
+  if (v === null || typeof v !== 'object') return null;
+  const { candidates, options } = v as { candidates?: unknown; options?: unknown };
+  if (!Array.isArray(candidates) || !Array.isArray(options) || candidates.length < 2) return null;
+  const read = candidates.map((c) => {
+    if (c === null || typeof c !== 'object') return null;
+    const { row, name, seen, keeps } = c as { row?: unknown; name?: unknown; seen?: unknown; keeps?: unknown };
+    if (typeof row !== 'string' || row === '') return null;
+    const lines = Array.isArray(seen) ? seen.filter((s): s is string => typeof s === 'string') : [];
+    return { at: row, name: typeof name === 'string' ? name : '', seen: [...lines].reverse(), ...(keeps === true ? { kept: true as const } : {}) };
+  });
+  const offered = options.map((o) => (o !== null && typeof o === 'object' && typeof (o as { option?: unknown }).option === 'string' ? (o as { option: string }).option : ''));
+  if (read.some((c) => c === null) || offered.some((k) => k === '')) return null;
+  return { candidates: read as NonNullable<(typeof read)[number]>[], offered };
 }

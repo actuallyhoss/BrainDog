@@ -81,7 +81,10 @@ export const decide = {
   aimFor: (target: string) => `${target} open at once`,
   /* Inbox and page-row writes (lane D) */
   inboxFileInto: 'File it in',
-  inboxFiled: (row: string) => `Filed as ${row}. It has left the inbox.`,
+  /* BY THE LIST'S NAME, NEVER THE RECORD'S HANDLE: "Filed as tasks#12" put an id in front of a person. A handle, a
+     list's id (`tasks`, `time-log`, `my_list`) or a ULID handed in is said as nothing at all. */
+  inboxFiled: (list: string) =>
+    list.trim() === '' || /#|^[a-z][a-z0-9_-]*$|^[0-9A-HJKMNP-TV-Z]{26}$/u.test(list.trim()) ? 'Filed. It has left the inbox.' : `Filed in ${list.trim()}. It has left the inbox.`,
   inboxArchived: 'Archived. It is kept, and it has left the inbox.',
   inboxNoLists: 'There is nowhere to file this yet.',
   /* Decide and page writes (lane B) */
@@ -89,7 +92,6 @@ export const decide = {
   /* DECIDE AND THE INBOX AS QUEUES: the cursor, a selection, and what a
      proposal would put on the screen. No sentence here assumes what kind of record it is. */
   proposalWillAppear: 'What will appear',
-  fromSlash: 'From Slash',
   proposalInSidebar: 'In the sidebar',
   proposalUnder: (section: string) => `Under ${section}`,
   proposalNotInSidebar: 'Not in the sidebar, reached by its link',

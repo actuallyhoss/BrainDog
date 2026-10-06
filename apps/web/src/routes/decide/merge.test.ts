@@ -136,3 +136,64 @@ test('the card’s words are plain: no em dash, no word of the system’s, and n
   assert.equal(words.seen(['Encore', 'github']), 'Seen in Encore, github');
   assert.equal(words.seen([]), '', 'a name seen nowhere gets a line saying so');
 });
+
+/** The record's own cluster on a rowset that folds two into one (`packages/record` `MergeCluster`). */
+const cluster = {
+  candidates: [
+    { name: 'Rohan Mehta', row: 'people#1', keeps: true, org: 'Encore', seen: ['a commit in braindog'], known_by: ['email'], rows: [] },
+    { name: 'rohanmehta', row: 'people#4', keeps: false, org: null, seen: ['mail from encore.example'], known_by: ['github'], rows: [1] },
+    { name: '', row: 'people#7', keeps: false, org: null, seen: [], known_by: ['email'], rows: [2] },
+  ],
+  options: [
+    { option: 'merge', says: 'Merge all', decide: { option: 'merge' } },
+    { option: 'apart', says: 'Keep apart', decide: { option: 'apart' } },
+    { option: 'pick:people#4', says: 'Pick rohanmehta', decide: { option: 'pick:people#4' } },
+    { option: 'pick:people#7', says: 'Pick this one', decide: { option: 'pick:people#7' } },
+  ],
+};
+
+test('a rowset carrying the record’s cluster is read by it: its names, Merge all, Keep apart and a Pick each one folded', () => {
+  const m = mergeOf({ kind: 'rowset', body: pair, merge: cluster }, cluster.options.map((o) => o.option), held);
+  assert.ok(m);
+  assert.deepEqual(m.all, { option: 'merge' });
+  assert.deepEqual(m.apart, { option: 'apart' });
+  assert.deepEqual(
+    m.candidates.map((c) => [c.key, c.name, c.kept, c.pick?.option ?? null]),
+    [
+      ['people#1', 'Rohan Mehta', true, null],
+      ['people#4', 'rohanmehta', false, 'pick:people#4'],
+      ['people#7', '', false, 'pick:people#7'],
+    ],
+  );
+  assert.deepEqual(m.candidates[1]?.seen, ['mail from encore.example']);
+  assert.equal(keptName(m), 'Rohan Mehta');
+});
+
+test('two names in the record’s cluster have no Pick, and a cluster it could not name is read off the patches', () => {
+  const two = { candidates: cluster.candidates.slice(0, 2), options: cluster.options.slice(0, 2) };
+  const m = mergeOf({ kind: 'rowset', body: pair, merge: two }, ['merge', 'apart'], held);
+  assert.ok(m);
+  assert.ok(m.candidates.every((c) => c.pick === null));
+  assert.deepEqual(m.all, { option: 'merge' });
+  /* A QUESTION STILL OFFERING ITS TWO: the cluster's names and places over Accept and Reject, answered whole. */
+  const whole = mergeOf({ kind: 'rowset', body: pair, merge: cluster }, TWO, held);
+  assert.deepEqual([whole?.all, whole?.apart], [{ option: 'accept' }, { option: 'reject' }]);
+  assert.deepEqual(whole?.candidates.map((c) => [c.name, c.seen, c.pick]), [
+    ['Rohan Mehta', ['a commit in braindog'], null],
+    ['rohanmehta', ['mail from encore.example'], null],
+  ]);
+  /* NO CLUSTER, OR ONE WITH A CANDIDATE THE RECORD GAVE NO HANDLE: the rowset's own two answers, whole. */
+  for (const merge of [undefined, null, { candidates: [{ name: 'x' }, { name: 'y' }], options: [] }]) {
+    const read = mergeOf({ kind: 'rowset', body: pair, merge }, TWO, held);
+    assert.deepEqual(read?.all, { option: 'accept' });
+    assert.ok(read?.candidates.every((c) => c.pick === null));
+  }
+});
+
+test('a rowset offered the cluster’s answers without its cluster is read off its patches with them', () => {
+  const m = mergeOf({ kind: 'rowset', body: pair }, ['merge', 'apart', 'pick:people#4'], held);
+  assert.ok(m);
+  assert.deepEqual([m.all, m.apart], [{ option: 'merge' }, { option: 'apart' }]);
+  assert.deepEqual(m.candidates.map((c) => c.pick?.option ?? null), [null, 'pick:people#4']);
+  assert.equal(mergeOf({ kind: 'rowset', body: pair }, ['merge'], held), null, 'a merge with no way to keep them apart');
+});

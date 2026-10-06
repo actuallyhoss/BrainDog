@@ -435,8 +435,8 @@
   .cannot {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink2);
+    font-size: var(--t-base);
     line-height: var(--lh-body);
   }
 
@@ -458,7 +458,7 @@
     flex: 1 1 14rem;
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
     line-height: var(--lh-body);
   }
 

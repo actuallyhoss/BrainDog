@@ -9,6 +9,10 @@
   list of invoices gets its amount and its day and no project box. A reader who may not write reads the same panel
   with the boxes off and no Save.
 
+  WHO ELSE CHANGED IT LEADS THE BODY, for a week: "Claude for Sam · 2h ago · Undo", the agent's name the door to the run
+  that made the change, and Undo putting that change back on the record (`host.undoBy`). A row a person changed last
+  carries no such line. Opening the row is seeing it, so the row's tint goes as the panel opens.
+
   DELETE IS WORDS, then a confirm, and the row stays in Just changed with Put back for ten minutes.
 
   A ROW THE PAGE ANSWERED CUT SHORT IS READ WHOLE FIRST. A page sends each long text as its first 280 characters (the
@@ -28,6 +32,7 @@
   import Waiting from '$lib/ui/Waiting.svelte';
   import type { RowHost } from './row-host.svelte.ts';
   import { rowPatch, valuesOf } from './row-fields.ts';
+  import { bylineWords } from './byline.ts';
   import { keyOf, titleOf, words } from './row-verbs.ts';
 
   let { host }: { host: RowHost } = $props();
@@ -38,6 +43,8 @@
   const whole = $derived(entry && !entry.clipped ? entry : undefined);
   const shape = $derived(row ? host.shapeOf(row.register) : null);
   const mayWrite = $derived(row ? host.writable(row) : false);
+  /* WHO ELSE CHANGED THE ROW LAST, where an agent, a rule or Slash did. */
+  const byline = $derived(row ? host.byline(row) : undefined);
   const fields = $derived(row ? readableFields(row.register) : []);
   const currency = $derived((f: { id: string }) => (row ? currencyFor(row.register, f.id) : null));
 
@@ -172,6 +179,25 @@
     {/if}
   {/snippet}
 
+  {#if row && entry && byline}
+    {@const r = row}
+    {@const named = byline.run !== null && byline.said.startsWith(byline.name)}
+    <p class="p-by">
+      <span
+        >{#if named}<a class="p-who" href={inApp(`/r/session/${byline.run?.slice(1)}`)}>{byline.name}</a>{byline.said.slice(byline.name.length)}{:else}{byline.said}{/if}</span
+      >
+      {#if byline.batch && mayWrite}
+        <button
+          type="button"
+          class="p-undo tap"
+          aria-label={bylineWords.undoNamed(titleOf(entry, shape))}
+          disabled={host.undoing.has(keyOf(r))}
+          onclick={() => void host.undoBy(r)}>{bylineWords.undo}</button
+        >
+      {/if}
+    </p>
+  {/if}
+
   {#if row && entry && shape && unread}
     <p class="p-sure" role="status">{unread}</p>
   {:else if row && entry && shape && seeded === null}
@@ -264,6 +290,50 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--t-sm);
+  }
+
+  /* THE BYLINE: a quiet line over the form, the meta size in the second ink, and Undo as words in ink beside it. */
+  .p-by {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-3);
+    margin: 0 0 var(--sp-4);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .p-who {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .p-who:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .p-undo {
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: var(--edge);
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .p-undo:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .p-undo:disabled {
+    color: var(--dim);
+    cursor: default;
   }
 
   .more {

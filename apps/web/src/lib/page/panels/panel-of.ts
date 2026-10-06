@@ -1,6 +1,9 @@
 /**
- * Which host panel a block carries under it: the project's scheduled actions, the key its numbers are sent with, or
- * none.
+ * Which host panel a block carries under it: the project's scheduled actions, the key its numbers are sent with, what
+ * an agent run did with its Undo, or none.
+ *
+ * `panel: run` IS A RUN'S PAGE (`RunPanel.svelte`), drawn for one row of the list of runs: what the run did, in plain
+ * lines, and Undo this run (DIRECTION §37). Only a page drawn for a run draws it; under any other row it draws nothing.
  *
  * A PANEL IS NAMED, NOT FOUND BY ITS HEADING. The reader drew Resume and the report key under any section whose heading
  * was the exact English "Runs on", and the report key and the poll form under "Send numbers here". Renaming a section,
@@ -16,11 +19,11 @@
  * PURE, AND NODE LOADS IT: no import at all.
  */
 
-/** The panels the host draws: a project's scheduled actions, and the key a row's numbers are sent with. */
-export type Panel = 'actions' | 'reporting';
+/** The panels the host draws: a project's scheduled actions, the key a row's numbers are sent with, and a run's changes. */
+export type Panel = 'actions' | 'reporting' | 'run';
 
 /* A `Set`, so a `panel:` of `constructor` names nothing. */
-const PANELS: ReadonlySet<string> = new Set<Panel>(['actions', 'reporting']);
+const PANELS: ReadonlySet<string> = new Set<Panel>(['actions', 'reporting', 'run']);
 
 /** The panel `block` asks for, or `null`. Only a section carries one. */
 export function panelOf(block: { kind: string; heading?: string | undefined }): Panel | null {

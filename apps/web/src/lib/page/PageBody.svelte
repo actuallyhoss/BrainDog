@@ -36,6 +36,7 @@
   import type { RowHost } from './row-host.svelte.ts';
   import { rowOfKey } from './row-verbs.ts';
   import JustChanged from './JustChanged.svelte';
+  import Changed from './Changed.svelte';
   import { leadIndex } from './lead.ts';
   import { blockKeys, recomposer, rewritten } from './recompose.ts';
   import { lookOrder, nextOf, placedOf } from './look.ts';
@@ -208,6 +209,43 @@
   /* THE PAGE'S OWN ELEMENT, declared before the effects that read it: a `$effect.pre` runs while the component is
      still being set up, and reading a `let` the script has not reached yet is a TDZ error that blanks the page. */
   let pageEl = $state<HTMLElement | null>(null);
+  /**
+   * A ROW ANOTHER HAND CHANGED WEARS A FAINT TINT UNTIL IT IS SEEN (`byline.ts`): an agent, a rule or Slash, on a page at
+   * its own address. The renderer draws its rows and takes no word from the host about them, so the tint is an attribute
+   * set on the rows it drew (`data-row`, the row's own key), with the byline as their tooltip; the words and the Undo are
+   * in Changed for you and in the row's panel. A row the renderer draws again later (a list unfolded, a page read again)
+   * is found as it lands, by watching the page for rows added under it.
+   */
+  $effect(() => {
+    const el = pageEl;
+    const lines = mode === 'page' && host ? host.bylines : null;
+    if (!el || !lines) return;
+    const wear = () => {
+      for (const row of el.querySelectorAll<HTMLElement>('[data-row]')) {
+        const key = row.dataset.row ?? '';
+        const line = lines.get(key);
+        if (line?.unseen) {
+          row.dataset.byNew = '';
+          row.title = line.said;
+        } else if (row.dataset.byNew !== undefined) {
+          delete row.dataset.byNew;
+          row.removeAttribute('title');
+        }
+      }
+    };
+    let frame = 0;
+    const later = () => {
+      if (frame === 0) frame = requestAnimationFrame(() => ((frame = 0), wear()));
+    };
+    wear();
+    const watch = new MutationObserver(later);
+    watch.observe(el, { childList: true, subtree: true });
+    return () => {
+      watch.disconnect();
+      if (frame !== 0) cancelAnimationFrame(frame);
+    };
+  });
+
   /**
    * WHETHER THE PAGE IS TWO COLUMNS OF BLOCKS: once the work column itself is `PAIR_FROM` wide, on a page whose one flow
    * has the whole width, because no rail is declared or the rail draws nothing (`layout.ts` `paired`). A page with a
@@ -854,7 +892,7 @@
     {#if lifted?.at === at}
       <!-- THEN what narrows the page, then what changed on it, before what it holds. -->
       {#if strip}<div class="page-strip">{@render strip()}</div>{/if}
-      {#if host && mode === 'page'}<JustChanged {host} />{/if}
+      {#if host && mode === 'page'}<Changed {host} /><JustChanged {host} />{/if}
     {/if}
   {/if}
 {/snippet}
@@ -916,7 +954,7 @@
   <!-- A PAGE WITH NO HEADLINE STILL OPENS ON THE LOOK'S NEXT ACTION, before what narrows it. -->
   {#if next && !headline && !arranging}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
   {#if strip && !lifted}<div class="page-strip">{@render strip()}</div>{/if}
-  {#if host && mode === 'page' && !arranging && !lifted}<JustChanged {host} />{/if}
+  {#if host && mode === 'page' && !arranging && !lifted}<Changed {host} /><JustChanged {host} />{/if}
   {#if layout}
     <!-- TWO COLUMNS, the main one a twelve-column flow of its own so a block's `span` keeps its meaning inside it, and
          the rail one stack. Each is drawn only while it holds a block, so a page whose every block is in one of them
@@ -1269,5 +1307,12 @@
     .block-slot :global(.grid:not(:has(> .cell))) {
       grid-template-columns: minmax(0, 1fr);
     }
+  }
+
+  /* A ROW ANOTHER HAND CHANGED, NOT YET SEEN: the arrival's wash, held faint rather than faded, so the eye finds it and
+     reads past it. A shade and a tooltip, never a colour that means trouble; it goes once the row is opened or the page
+     is left and come back to. */
+  .page :global([data-row][data-by-new]) {
+    background-color: color-mix(in oklab, var(--arrived-wash) 60%, transparent);
   }
 </style>

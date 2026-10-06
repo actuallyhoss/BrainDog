@@ -585,11 +585,14 @@ function boardOrder(block: BlockResult): BlockResult {
      never touched. Anything aligned with `rows` added here must be moved here too. */
   const order = block.entries.map((e, i) => ({ e, i })).sort((a, b) => rank(a.e) - rank(b.e));
   const working = block.working_now;
+  const { quiet, bylines } = block;
   return {
     ...block,
     entries: order.map((o) => o.e),
     rows: order.map((o) => block.rows[o.i]!).filter(Boolean),
     ...(working ? { working_now: order.map((o) => working[o.i] === true) } : {}),
+    ...(quiet ? { quiet: order.map((o) => quiet[o.i] === true) } : {}),
+    ...(bylines ? { bylines: order.map((o) => bylines[o.i] ?? null) } : {}),
   };
 }
 
@@ -1099,13 +1102,14 @@ function groupedSegments(block: BlockResult, kinds?: Readonly<Record<string, Kin
   });
 }
 
-/** The block cut to the cards at `rows`, each row's entry, cells and quiet mark kept together, and `unsaid`'s cells empty. */
+/** The block cut to the cards at `rows`, each row's entry, cells, quiet mark and byline kept together, and `unsaid`'s cells empty. */
 function only(block: BlockResult, rows: readonly number[], unsaid?: string): BlockResult {
   const pick = <T>(xs: readonly T[] | undefined): T[] | undefined => (xs ? rows.map((i) => xs[i]!) : undefined);
   const quiet = pick(block.quiet);
+  const bylines = pick(block.bylines);
   const at = unsaid === undefined ? -1 : block.columns.findIndex((c) => c.field === unsaid);
   const drawn = pick(block.rows)!.map((r) => (at < 0 ? r : { ...r, cells: r.cells.map((c, j) => (j === at ? null : c)) }));
-  return { ...block, entries: pick(block.entries)!, rows: drawn, ...(quiet ? { quiet } : {}) };
+  return { ...block, entries: pick(block.entries)!, rows: drawn, ...(quiet ? { quiet } : {}), ...(bylines ? { bylines } : {}) };
 }
 
 function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSpec>>): ReturnType<typeof parse> {

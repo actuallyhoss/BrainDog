@@ -597,12 +597,12 @@
     text-align: center;
   }
 
-  /* THE PASSKEY IN ONE LINE, under its button, in the meta size. */
+  /* THE PASSKEY IN ONE LINE, under its button: a sentence, so it reads at the body size, quieter in its colour. */
   .why {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: 18px;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: var(--lh-body);
     text-wrap: pretty;
   }
 
@@ -612,7 +612,7 @@
     padding-block-start: var(--sp-3);
     border-block-start: 1px solid var(--line);
     font-size: var(--t-base);
-    line-height: 20px;
+    line-height: var(--lh-body);
   }
 
   /* A 44PX TARGET ON A PHONE, as every way on from this screen is, without making a line of text look like a button. */
@@ -624,11 +624,12 @@
     font-weight: 500;
   }
 
+  /* SENTENCES, AT THE BODY SIZE AND MEASURE (DIRECTION §37): what is happening, and what a link does. */
   .status,
   .small {
     margin: 0;
-    font-size: var(--t-sm);
-    line-height: 18px;
+    font-size: var(--t-base);
+    line-height: var(--lh-body);
   }
 
   .status {
@@ -674,7 +675,7 @@
     max-inline-size: 42ch;
     color: var(--ink2);
     font-size: var(--t-base);
-    line-height: 20px;
+    line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
 

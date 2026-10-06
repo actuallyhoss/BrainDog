@@ -19,6 +19,7 @@ const SEND_NUMBERS = 'Send numbers here';
 test('A SECTION THAT NAMES ITS PANEL GETS THAT PANEL, whatever its heading says', () => {
   assert.equal(panelOf({ kind: 'section', heading: 'What this project runs on', panel: 'actions' } as never), 'actions');
   assert.equal(panelOf({ kind: 'section', heading: 'Numbers', panel: 'reporting' } as never), 'reporting');
+  assert.equal(panelOf({ kind: 'section', heading: 'What it did', panel: 'run' } as never), 'run', "a run's page names its own panel");
   /* RENAMED, AND THE PANEL STAYS: the defect this replaces. */
   assert.equal(panelOf({ kind: 'section', heading: 'Scheduled', panel: 'actions' } as never), 'actions');
 });

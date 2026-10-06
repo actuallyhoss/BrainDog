@@ -45,7 +45,9 @@
   import Actions from './panels/Actions.svelte';
   import ActionRows from './panels/ActionRows.svelte';
   import Reporting from './panels/Reporting.svelte';
+  import RunPanel from './panels/RunPanel.svelte';
   import { panelOf } from './panels/panel-of.ts';
+  import { openInPlace, type Opening } from './group-open.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
   import type { Row } from 'braindog-render';
@@ -121,21 +123,27 @@
   let open = $state(false);
   const folded = $derived(fold ? foldOf(block.kind, block.rows.length, open) : null);
 
-  /* THE ROWS OF A LIST OR A TABLE as drawn: the renderer's rows, a plain list's items, and a table's body rows. */
-  const ROWS = '[data-row], .list > li.item, .rowgroup > [role="row"]';
+  /* THE ROWS OF A LIST OR A TABLE as drawn: the renderer's rows, a plain list's items, a table's body rows, and cards. */
+  const ROWS = '[data-row], .list > li.item, .rowgroup > [role="row"], .cards-item';
 
   /**
    * "N more" pressed. The button goes once the list is open, so the focus is handed to the first row that opened rather
    * than dropped to the page: `from` is how many rows were shown before, in the drawing just above the button.
    */
-  async function unfold(e: MouseEvent, from: number) {
+  async function unfold(e: MouseEvent, from: number, opening: () => void = () => (open = true)) {
     const above = (e.currentTarget as HTMLElement).previousElementSibling;
-    open = true;
+    opening();
     await tick();
     const all = above ? [...above.querySelectorAll<HTMLElement>(ROWS)] : [];
     const row = all.filter((el) => !all.some((o) => o !== el && o.contains(el)))[from];
-    /* A TABLE IS A GRID, whose stops are its cells, so the row's first cell takes the focus there. */
-    const to = row?.getAttribute('role') === 'row' ? (row.querySelector<HTMLElement>('[role="gridcell"], [role="cell"]') ?? row) : row;
+    /* A TABLE IS A GRID, whose stops are its cells, so the row's first cell takes the focus there; A CARD IS NAMED BY ITS
+       LINK, which takes it. */
+    const to =
+      row?.getAttribute('role') === 'row'
+        ? (row.querySelector<HTMLElement>('[role="gridcell"], [role="cell"]') ?? row)
+        : row?.classList.contains('cards-item')
+          ? (row.querySelector<HTMLElement>('a[href]') ?? row)
+          : row;
     if (!to) return;
     if (!to.hasAttribute('tabindex')) to.tabIndex = -1;
     to.focus();
@@ -270,10 +278,8 @@
      one is the failure; a filter that matched nothing and a list with nothing in it are different facts, and the
      second is the one somebody can act on. The list's size is known only when the block reads all of it. */
   const held = $derived(block.register && !block.where ? REGISTERS[block.register] : undefined);
-  const drawn = $derived(
-    draw(
-      block,
-      held
+  const emptied = $derived(
+    held
         ? {
             rows: block.total,
             name: held.name,
@@ -285,8 +291,22 @@
             ...(block.register === 'session' ? {} : { add: { href: `/r/${block.register}?new=1`, label: voiceSaid('add_first') } }),
           }
         : undefined,
-    ),
   );
+  const drawn = $derived(draw(block, emptied));
+
+  /* ── a folded group, opened in place ───────────────────────────────────────
+     A CARD BLOCK IN GROUPS FOLDS EACH LONG GROUP behind "Show all 4 people at Encore" (`blocks.ts` `groupedSegments`),
+     which went to the organisation's page. It opens here instead (`group-open.ts`): the block drawn a second time with
+     nothing folded, and the groups pressed taken from that drawing. The organisation's name over a group is still the
+     door to its page. NOT ON A BLOCK THAT IS A SLICE of its list, whose groups hold only the cards it was sent: there the
+     line still opens the organisation's page, where they all are. */
+  let groupsOpen = $state.raw<ReadonlySet<string>>(new Set());
+  const grouped = $derived(
+    block.kind === 'cards' && block.group && block.fold && block.total <= block.shown && !drawn.refusal
+      ? openInPlace(drawn.segments, draw({ ...block, fold: false }, emptied).segments, groupsOpen)
+      : null,
+  );
+  const drawing = $derived<Opening<(typeof drawn.segments)[number]>[]>(grouped ?? drawn.segments.map((segment) => ({ kind: 'segment', segment })));
 </script>
 
 {#if block.heading}
@@ -364,7 +384,20 @@
     {#if block.total > block.queue.length}<a class="queue-more" href={inApp('/decide')}>{queueMore(block.total - block.queue.length)}</a>{/if}
   </div>
 {:else}
-  {#each drawn.segments as segment}
+  {#each drawing as item}
+    {#if item.kind === 'open'}
+      <!-- THE REST OF A GROUP, ONE PRESS AWAY, opened where it is; the focus goes to the first card it opened, which
+           comes after the ones the group showed folded. -->
+      <button
+        type="button"
+        class="block-more tap"
+        onclick={(e) => {
+          const from = (e.currentTarget as HTMLElement).previousElementSibling?.querySelectorAll('.cards-item').length ?? 0;
+          void unfold(e, from, () => (groupsOpen = new Set(groupsOpen).add(item.group)));
+        }}>{item.label}</button
+      >
+    {:else}
+    {@const segment = item.segment}
     {#if segment.type === 'block'}
       <!-- A ROW SOMEBODY JUST TICKED OR MOVED IS WHERE THEY LEFT IT, and each gesture is handed the rows as drawn,
            because that is the list its place is found in. THE PRIMITIVE DRAWS A CONTROL ONLY FOR A CALLBACK IT IS
@@ -397,6 +430,7 @@
           {#if fix}<p class="block-said" role="status" data-intent="bad">{r.cells[1]}: {fix}</p>{/if}
         {/each}
       {/if}{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}
+    {/if}
   {/each}
 {/if}
 
@@ -408,6 +442,9 @@
 {#if panel && param && writes && !arranging}
   <!-- BY THE ROW, `things#1`, and not by its title: the record resolves each action's project to its row. -->
   {#if panel === 'actions'}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />
+  {:else if panel === 'run'}
+    <!-- A RUN'S PAGE, drawn for one row of the list of runs: what it did and its way back, by its handle (`S42`). -->
+    {#if param.register === 'session'}<RunPanel run={`S${param.seq}`} title={param.title} onchanged={writes.reread} />{/if}
   {:else}<Reporting register={param.register} seq={param.seq} title={param.title} />{/if}
 {/if}
 

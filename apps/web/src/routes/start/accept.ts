@@ -10,8 +10,9 @@
  * before it is read, the modules go in with none (`moduleDocument`), and the only rows written are the ones formed
  * from the person's own sentence: a guide's plan, the person, and the entries the sentence filled completely.
  *
- * IN THIS ORDER, because each step reads what the one before it made: the lists; the person's own People row, before
- * any client the sentence named; the record's currency, once Money is in; then the sentence's entries.
+ * IN THIS ORDER, because each step reads what the one before it made: the lists, and People again once every list it
+ * links to is in; the person's own People row, before any client the sentence named; the record's currency, once Money
+ * is in; then the sentence's entries.
  *
  * A REFUSAL IS SAID IN THE PERSON'S WORDS ("Money was not added.") with the record's own sentence kept beside it for
  * Details and for the log. Whatever went in stays in: an install is not undone because a later step was refused.
@@ -158,6 +159,28 @@ async function addModule(client: Client, id: string, held: readonly PackState[],
   return put.ok ? null : fixOf(put, '');
 }
 
+/**
+ * A MODULE INSTALLED IN THIS PRESS, PLANNED AGAIN ONCE EVERY LIST IS IN, and installed when that plan changes anything.
+ *
+ * A MODULE'S COPY IS CUT TO THE LISTS THE RECORD HOLDS WHEN IT GOES IN (`packDocument`). People goes in before Money, so
+ * its copy left out what an organisation's page shows of Money, and the page gained it only at People's next update.
+ * Planned again here, with the lists of everything this press put in, it gains it now. Nothing is said when the record
+ * refuses it: People works as it went in, and its next update brings the rest.
+ */
+async function refreshModule(client: Client, id: string, held: readonly PackState[], names?: Readonly<Record<string, string>>): Promise<void> {
+  if (!held.some((p) => p.id === id && p.disabled_at === null)) return;
+  const doc = named(await packDocument(id, held), names);
+  if (!doc) return;
+  /* A PLAN THAT THROWS IS A REFUSAL TOO, and says nothing: everything this press put in is in already. */
+  const planned = (await client.planPack({ doc, source: { kind: 'local' } }).catch(() => null)) as Wire<{ diff?: { planHash?: unknown; approve?: unknown; adds?: unknown; changes?: unknown; retires?: unknown } }> | null;
+  if (!planned?.ok) return;
+  const diff = planned.value.diff;
+  const some = (v: unknown): boolean => Array.isArray(v) && v.length > 0;
+  if (typeof diff?.planHash !== 'string' || diff.planHash === '' || !(some(diff.adds) || some(diff.changes) || some(diff.retires))) return;
+  const approve = Array.isArray(diff.approve) ? (diff.approve as unknown[]).filter((a): a is string => typeof a === 'string') : [];
+  await client.installPack({ doc, source: { kind: 'local' }, planHash: diff.planHash, ...(approve.length === 0 ? {} : { approve }) }).catch(() => null);
+}
+
 /** The spoken id of the entry `create` answered, `<list>#<seq>`, which a link field takes, or `null`. */
 function spokenOf(entry: unknown): string | null {
   const e = entry as { register?: unknown; seq?: unknown } | null;
@@ -224,6 +247,13 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
       const now = await packsOf(client);
       if (now.ok) states = now.value;
     }
+
+  /* PEOPLE, PUT IN BY THIS PRESS BEFORE THE LISTS IT LINKS TO, is planned again with all of them in (`refreshModule`). */
+  if (!held.value.some((p) => p.id === PEOPLE) && !off) {
+    await refreshModule(client, PEOPLE, states, names);
+    const now = await packsOf(client);
+    if (now.ok) states = now.value;
+  }
 
   /* THE USE CASE CHOSEN SPEAKS, AND ANY BESIDE IT IS SET NOT TO, so no use case added later moves the voice by how its
      id sorts (`sharing.ts` `keepVoice`). With one use case there is nothing to write. */

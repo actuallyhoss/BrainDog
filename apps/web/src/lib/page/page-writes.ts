@@ -562,7 +562,10 @@ export function pageWrites(deps: WritesDeps) {
     return true;
   }
 
-  return { forPage, warm, keptSegment, arrivedTable, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar, onpath, stepable, addStep };
+  /* THE PAGE READ AGAIN, for a host panel that changed the record from beside a block (a run put back). */
+  const reread = (): Promise<void> => deps.reread();
+
+  return { forPage, warm, keptSegment, arrivedTable, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar, onpath, stepable, addStep, reread };
 }
 
 /**

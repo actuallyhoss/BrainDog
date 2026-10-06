@@ -420,3 +420,23 @@ test('A HOST THAT IGNORES THE CURSOR cannot loop a screen: a page that goes nowh
   assert.ok(out.ok);
   assert.equal(asked, 2);
 });
+
+/* A MERGE THE RECORD READ AS ONE QUESTION rides to the merge card on the question, whole, and nothing else does. */
+test('a suggestion that carries the record’s merge carries it onto its question, and a half one carries nothing', () => {
+  const merge = {
+    candidates: [
+      { name: 'Rohan Mehta', row: 'people#1', keeps: true, org: 'Encore', seen: ['3 commits in braindog'], known_by: ['email'], rows: [] },
+      { name: 'rohanmehta', row: 'people#4', keeps: false, org: null, seen: [], known_by: ['github'], rows: [0] },
+    ],
+    options: [
+      { option: 'merge', says: 'Merge all', decide: { option: 'merge' } },
+      { option: 'apart', says: 'Keep apart', decide: { option: 'apart' } },
+    ],
+  };
+  const row = { id: 'SG7', body_kind: 'rowset', body: { register: 'people', rows: [] }, opened_at: '2026-10-06T09:00:00Z' };
+  assert.deepEqual(questionOf({ ...row, merge }, 'Are these one person?', 1).merge, merge);
+  assert.equal(questionOf(row, 'Are these one person?', 1).merge, undefined);
+  const half = { ...merge, candidates: [merge.candidates[0], { ...merge.candidates[1], rows: ['0'] }] };
+  assert.equal(questionOf({ ...row, merge: half }, 'Are these one person?', 1).merge, undefined, 'a candidate the card cannot read drops the whole cluster');
+  assert.equal(questionOf({ ...row, merge: { ...merge, candidates: [merge.candidates[0]] } }, '', 1).merge, undefined, 'one name is no merge');
+});
