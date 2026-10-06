@@ -6,11 +6,11 @@
  * filter bar, the search page and the onboarding step each grew their own, and by the time anyone
  * looked they disagreed about the surface, the radius and what focus does.
  *
- * A FIELD IS A SOFT WELL: 40 tall, 44 under a thumb, the `--s1` fill with no border, radius
- * `--r-md`, and its label above it in `--t-sm` `--ink2`. Focus is the 2px ink ring offset 2, the same ring every other
- * control takes from the a11y layer. A segmented control is a glass pill on the ground (and an `--s1` one inside a
- * tile), with the chosen segment a `--bg` pill lifted by a tiny shadow. Switches, checkboxes and radios are ink when
- * they are on.
+ * A FIELD IS A SOFT WELL: 40 tall, 44 under a thumb, the `--field` fill with no border, radius
+ * `--r-ctl`, and its label above it in `--t-sm` `--ink2`. Focus is the 2px ink ring offset 2, the same ring every other
+ * control takes from the a11y layer. A segmented control is one `--field` rectangle (radius 8), with the chosen segment
+ * the tile's own colour lifted by a hairline. Switches, checkboxes and radios are the working accent when they are on
+ * (DIRECTION §39).
  */
 
 @layer components {
@@ -91,8 +91,8 @@
     line-height: 18px;
   }
 
-  /* 40 TALL AND 44 UNDER A THUMB, on the `--s1` fill with no border. A FIELD IS NOT A PILL: the pill is for what you
-     press or choose, and a field is somewhere you put something, so it keeps the `--r-md` corner. */
+  /* 40 TALL AND 44 UNDER A THUMB, on the `--field` fill with no border, at the control's 8px corner, so a field and the
+     button beside it are one family of rectangles. */
   .field {
     display: flex;
     align-items: center;
@@ -100,9 +100,9 @@
     box-sizing: border-box;
     min-block-size: 40px;
     padding: 0 var(--sp-3);
-    background: var(--s1);
+    background: var(--field);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--dim);
     transition: background var(--d-state) var(--ease-out);
   }
@@ -203,66 +203,41 @@
   }
 
   /**
-   * A SEGMENTED CONTROL IS A GLASS PILL WITH PILLS IN IT: the frosted fill and its
-   * hairline pair on the ground, and the chosen segment a `--bg` pill lifted by a tiny shadow. The selected state has to
-   * be a SHAPE and not a shade: a slightly lighter grey behind one word out of four is the single most-missed control
-   * in dense software.
+   * A SEGMENTED CONTROL IS ONE RECTANGLE (DIRECTION §39): the `--field` fill at radius 8, 2px round its segments, and
+   * the chosen segment the tile's own colour with a hairline and a breath of shadow. The selected state has to be a
+   * SHAPE and not a shade: a slightly lighter grey behind one word out of four is the single most-missed control in
+   * dense software. The same on the board and in a tile, because there is no glass to choose between.
    *
-   * INSIDE A TILE, A SHEET OR THE PANEL'S BODY IT IS THE `--s1` PILL INSTEAD, because glass never sits on content, and
-   * a frosted white over a white tile is no track at all.
+   * AND THE TRACK WRAPS, because the alternative hides a state with no way to know it is there. Five segments on a
+   * coarse pointer measured 342px inside a 320px screen, and a strip that scrolls with nothing peeking past its edge
+   * looks like a strip that ends.
    *
-   * AND THE TRACK WRAPS, because the alternative hides a state with no way to know it is there. The segments are
-   * separately rounded chips, so a second line costs nothing visually; five of them at 44 on a coarse pointer measured
-   * 342px inside a 320px screen, and a strip that scrolls with nothing peeking past its edge looks like a strip that
-   * ends.
-   *
-   * THE RADIUS IS THE SEGMENT'S PLUS THE 3px ROUND IT, NOT `--r-pill`. On one line the two are the same curve; a track
-   * that wraps is twice as tall, and `--r-pill` would draw its ends as one curve tall enough that a chosen first or
-   * last segment's corner stood outside the track. Concentric with the segment, the corners stay inside.
+   * THE CORNERS ARE CONCENTRIC: the track is 8 and a segment 6, so the chosen segment's corner sits inside the track's.
    */
   .segmented {
     display: flex;
     flex-wrap: wrap;
     gap: 2px;
-    padding: 3px;
-    background: var(--glass);
-    backdrop-filter: var(--glass-blur);
+    padding: 2px;
+    background: var(--field);
     border: 0;
-    border-radius: calc(var(--ctl-h) / 2);
-    box-shadow: var(--glass-edge);
-  }
-
-  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives: a
-     prefixed line in the rule above was folded into the unprefixed one by the build. The rule inside a tile below
-     outranks this one, so a track there stays solid. */
-  @supports (-webkit-backdrop-filter: none) {
-    .segmented {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
-  }
-
-  :is(.tile, .sheet, [data-surface='tile']) .segmented {
-    background: var(--s1);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: none;
+    border-radius: var(--r-ctl);
   }
 
   /**
-   * THE WHOLE CONTROL IS `--ctl-h` UNDER A MOUSE (36) and each segment 44 under a thumb: density follows the POINTER,
-   * never the width (`05 §6`, `13 §7`). `min-block-size`, not `block-size`: a segment whose label wraps grows.
-   *
-   * THE LABEL IS THE CONTROL SIZE, 14 UNDER A MOUSE AND 16 UNDER A THUMB.
+   * THE WHOLE CONTROL IS `--btn-h` UNDER A MOUSE (32), and drawn 40 under a thumb with a 44 hit box round each segment:
+   * density follows the POINTER, never the width (`05 §6`, `13 §7`). `min-block-size`, not `block-size`: a segment
+   * whose label wraps grows.
    */
   .segment {
-    min-block-size: var(--ctl-h);
+    min-block-size: calc(var(--btn-h) - 4px);
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: calc(var(--r-ctl) - 2px);
     color: var(--ink2);
-    font-size: var(--t-base);
-    font-weight: 500;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -273,40 +248,39 @@
   /* HOVER ONLY WHERE THERE IS ONE. A phone reports `:hover` on the last thing tapped and keeps it. */
   @media (hover: hover) and (pointer: fine) {
     .segment:hover:not([data-on]) {
-      background: var(--hover-wash);
       color: var(--ink);
     }
   }
 
-  /* UNDER A MOUSE the track's 3px padding comes off the segment, so the whole control is `--ctl-h`. */
-  @media (pointer: fine) {
-    .segment {
-      min-block-size: calc(var(--ctl-h) - 6px);
-    }
-  }
-
-  /* AND THE CHIPS STAND APART WHERE A THUMB PICKS BETWEEN THEM, each 44 wide as well as 44 tall: "On" and "Off" are
-     narrower than a thumb, and a target is both axes. The track's radius follows the taller segment. */
+  /* UNDER A THUMB each segment is drawn at the button's 40 and is 44 to the finger, on both axes: "On" and "Off" are
+     narrower than a thumb, and a target is both axes. The hit box is `.tap`'s, grown round the drawing. */
   @media (pointer: coarse) {
     .segmented {
       gap: var(--sp-1);
-      border-radius: calc(var(--ctl-h) / 2 + 3px);
     }
 
     .segment {
+      position: relative;
+      min-block-size: calc(var(--btn-h) - 4px);
       min-inline-size: var(--tap);
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
+    }
+
+    .segment::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
     }
   }
 
-  /* THE CHOSEN SEGMENT: a `--bg` pill with a tiny shadow and a hairline in `--line`, so it is a shape on the glass in
-     light and in dark, where a shadow alone does not show. Ink text, and no weight change, so choosing does not make it
-     the loudest thing in the bar. */
+  /* THE CHOSEN SEGMENT: the tile's colour, a hairline and a breath of shadow, so it is a shape on the track in light and
+     in dark, where a shadow alone does not show. Ink text, and no weight change, so choosing does not make it the
+     loudest thing in the bar. */
   .segment[data-on] {
-    background: var(--bg);
+    background: var(--tile);
     box-shadow:
-      0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent),
-      0 0 0 0.5px var(--line);
+      0 1px 2px color-mix(in srgb, var(--ink) 10%, transparent),
+      0 0 0 1px var(--rule);
     color: var(--ink);
   }
 
@@ -317,9 +291,9 @@
    * segmented control is for choosing between named options. The button is the hit area, 44px under
    * a thumb; the track is drawn inside it.
    *
-   * ON IS AN INK TRACK WITH A GROUND THUMB, AND IT WAS THE ACCENT. Six red switches down a list of
-   * add-ons read as six alarms. The thumb's position says the state without the
-   * colour; the fill says it again for a reader who cannot see the position change.
+   * ON IS THE WORKING ACCENT'S TRACK, THE THUMB IN THE ACCENT'S LABEL COLOUR (DIRECTION §39). It was the brand's red once, and six red
+   * switches down a list of add-ons read as six alarms; blue says "on" and nothing more. The thumb's position says the
+   * state without the colour; the fill says it again for a reader who cannot see the position change.
    */
   .switch {
     display: inline-grid;
@@ -330,7 +304,7 @@
     padding: 0;
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     cursor: pointer;
   }
 
@@ -344,7 +318,7 @@
     block-size: 22px;
     background: var(--edge);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
     transition: background var(--d-state) var(--ease-out);
   }
 
@@ -355,8 +329,8 @@
     inset-inline-start: 2px;
     inline-size: 18px;
     block-size: 18px;
-    background: var(--bg);
-    border-radius: var(--r-pill);
+    background: var(--tile);
+    border-radius: var(--r-round);
     box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 18%, transparent);
     transition:
       translate var(--d-state) var(--ease-out),
@@ -369,7 +343,7 @@
 
   .switch[aria-checked='true'] .switch-track::after {
     translate: 14px 0;
-    background: var(--on-ink);
+    background: var(--on-action);
   }
 
   /* THE THUMB TRAVELS THE OTHER WAY IN A RIGHT-TO-LEFT PAGE. `translate` is physical, and the thumb
@@ -397,7 +371,8 @@
    * screen set `accent-color`, with the operating system's chevron on every select and a native
    * thumb on every slider, so one form spoke three design languages.
    * `appearance: none` takes the browser's drawing away and the rules below put the product's back:
-   * ink for what is on, `--edge` for a box's boundary, the `--s1` fill and `--r-md` for a field, a pill for a thumb.
+   * the accent for what is on, `--edge` for a box's boundary, the `--field` fill and `--r-ctl` for a field, a round
+   * thumb.
    *
    * `:where()` AROUND EVERY ELEMENT, SO A SCREEN CAN STILL SIZE AND PLACE ITS OWN. A block that gives
    * its checkbox 18px, or a form that pads its select wider, does it with a class; at zero
@@ -418,9 +393,9 @@
     inline-size: var(--icon-m);
     block-size: var(--icon-m);
     vertical-align: middle;
-    background: var(--bg);
+    background: var(--tile);
     border: 1.5px solid var(--edge);
-    border-radius: var(--r-sm);
+    border-radius: 4px;
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -428,10 +403,10 @@
   }
 
   :where(input[type='radio']) {
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
   }
 
-  /* ON IS AN INK FILL. `:indeterminate` is the checkbox's alone: a radio matches it whenever no radio
+  /* ON IS THE ACCENT'S FILL. `:indeterminate` is the checkbox's alone: a radio matches it whenever no radio
      in its group is chosen, and every option of an unanswered question would draw as chosen. */
   :where(input[type='checkbox']):checked,
   :where(input[type='checkbox']):indeterminate,
@@ -442,14 +417,14 @@
 
   /* THE MARK IS `::after` AND NEVER `::before`, because `::before` is taken twice over: `.tap` grows
      a small control's hit box with it, and the layout gate reads a control's `::before` as its
-     target. A tick drawn there would shrink the one and lie to the other. The mark is the ground
-     showing through the fill (`--on-ink`); the fill alone still says "on" where a browser draws no
+     target. A tick drawn there would shrink the one and lie to the other. The mark is the label colour
+     of the accent fill (`--on-action`); the fill alone still says "on" where a browser draws no
      pseudo-element on an input. */
   :where(input[type='checkbox']):checked::after {
     content: '';
     inline-size: 10px;
     block-size: 10px;
-    background: var(--on-ink);
+    background: var(--on-action);
     clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
   }
 
@@ -457,7 +432,7 @@
     content: '';
     inline-size: 8px;
     block-size: 2px;
-    background: var(--on-ink);
+    background: var(--on-action);
     clip-path: none;
   }
 
@@ -465,8 +440,8 @@
     content: '';
     inline-size: var(--dot);
     block-size: var(--dot);
-    background: var(--on-ink);
-    border-radius: var(--r-pill);
+    background: var(--on-action);
+    border-radius: var(--r-round);
   }
 
   :where(input[type='checkbox'], input[type='radio'], input[type='range'], select):disabled {
@@ -475,7 +450,7 @@
   }
 
   /**
-   * A SELECT IS A FIELD WITH THE HOUSE CHEVRON: the field's `--s1` fill, as tall as one, and the
+   * A SELECT IS A FIELD WITH THE HOUSE CHEVRON: the field's `--field` fill, as tall as one, and the
    * chevron drawn in `--dim` from two gradient strokes, because the icon set cannot reach inside a
    * `<select>` and a `data:` image would have to spell its colour as a literal.
    *
@@ -491,9 +466,9 @@
     appearance: none;
     min-block-size: max(40px, var(--ctl-h));
     padding-inline-start: var(--sp-3);
-    background-color: var(--s1);
+    background-color: var(--field);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     cursor: pointer;
     padding-inline-end: calc(var(--sp-3) + 12px + var(--sp-2)) !important;
@@ -522,9 +497,9 @@
     appearance: none;
     min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
-    background-color: var(--s1);
+    background-color: var(--field);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font-variant-numeric: tabular-nums;
   }
@@ -555,7 +530,7 @@
   }
 
   /**
-   * A RANGE IS A HAIRLINE TRACK AND AN INK THUMB. The track is `--edge`, the floor every data mark
+   * A RANGE IS A HAIRLINE TRACK AND AN ACCENT THUMB. The track is `--edge`, the floor every data mark
    * stands on, which the theme's check D holds at 3:1 against every surface in both schemes
    * (`packages/theme/src/checks.ts`); the thumb is the thing that is
    * "on". The input keeps `--ctl-h` as its height, so under a thumb the whole slider is 44px tall
@@ -572,13 +547,13 @@
   :where(input[type='range'])::-webkit-slider-runnable-track {
     block-size: 4px;
     background: var(--edge);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
   }
 
   :where(input[type='range'])::-moz-range-track {
     block-size: 4px;
     background: var(--edge);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
   }
 
   :where(input[type='range'])::-webkit-slider-thumb {
@@ -589,7 +564,7 @@
     margin-block-start: -6px;
     background: var(--on);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
   }
 
   :where(input[type='range'])::-moz-range-thumb {
@@ -598,7 +573,7 @@
     block-size: 16px;
     background: var(--on);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
   }
 
   /* HOVER ONLY WHERE THERE IS ONE, for the reason the segment gives. */

@@ -27,6 +27,7 @@ import {
   offerKey,
   offerUndo,
   pinBody,
+  repeatsFirst,
   retireLook,
   slashOpen,
   undoLook,
@@ -285,4 +286,16 @@ test("a look is read from the record's answer, and one with no author is no look
   assert.equal(lookOf({ by: 'someone' }), null);
   assert.equal(lookOf('slash'), null);
   assert.equal(lookOf({ by: 'rule', next: { row: 'tasks#2' } })?.next, null, 'a next action with no words is none');
+});
+
+test('THE NEXT STEP IS NOT SAID OVER THE FIRST TILE WHEN THAT TILE OPENS ON IT, a question or a row', () => {
+  const asking = look({ next: { row: 'q_7', text: 'Chase it?' } });
+  assert.equal(repeatsFirst(asking, { queue: [{ id: 'q_7' }, { id: 'q_8' }] }), true);
+  assert.equal(repeatsFirst(asking, { queue: [{ id: 'q_8' }, { id: 'q_7' }] }), false, 'second on the tile is not the first thing seen');
+  const doing = look({ next: { row: 'tasks#12', text: 'Send the Kiln invoice' } });
+  assert.equal(repeatsFirst(doing, { register: 'tasks', entries: [{ seq: 12 }, { seq: 3 }] }), true);
+  assert.equal(repeatsFirst(doing, { register: 'tasks', entries: [{ seq: 3 }, { seq: 12 }] }), false);
+  assert.equal(repeatsFirst(doing, { register: 'invoices', entries: [{ seq: 12 }] }), false, 'the same number in another list is another row');
+  assert.equal(repeatsFirst(doing, null), false);
+  assert.equal(repeatsFirst(look({}), { queue: [{ id: 'q_7' }] }), false, 'no next step repeats nothing');
 });

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { laterLine, queueMergeOf, waysOf } from './queue-answer.ts';
+import { COMPACT_MOST, compactOf, laterLine, queueMergeOf, queueWords, waysOf } from './queue-answer.ts';
 
 const now = Date.parse('2026-10-02T09:00:00Z');
 
@@ -111,4 +111,16 @@ test("THE RECORD'S OWN MERGE ON A ROWSET IS READ AS ITS OPTIONS: Merge all, Keep
   );
   assert.equal(queueMergeOf({ kind: 'rowset', merge: { candidates: merge.candidates, options: [{ says: 'Merge all' }] } }, ['accept', 'reject']), null, 'an option with no key is no merge');
   assert.equal(queueMergeOf({ kind: 'rowset', merge: { candidates: [{ name: 'Ana' }, { name: 'Ana B' }], options: merge.options } }, ['accept', 'reject']), null, 'a candidate with no handle is no merge');
+});
+
+test('A QUEUE OUTSIDE DECIDE SHOWS AT MOST THREE, and says how many more wait there', () => {
+  assert.equal(COMPACT_MOST, 3);
+  assert.deepEqual(compactOf(['a', 'b'], 2), { shown: ['a', 'b'], more: 0 });
+  assert.deepEqual(compactOf(['a', 'b', 'c', 'd', 'e'], 5), { shown: ['a', 'b', 'c'], more: 2 });
+  /* THE BLOCK'S COUNT OF WHAT IS OPEN may be more than it was handed, and is never read as less. */
+  assert.deepEqual(compactOf(['a', 'b', 'c', 'd'], 9), { shown: ['a', 'b', 'c'], more: 6 });
+  assert.deepEqual(compactOf(['a', 'b', 'c', 'd'], 1), { shown: ['a', 'b', 'c'], more: 1 });
+  assert.equal(queueWords.moreOnDecide(5), '5 more on Decide');
+  assert.equal(queueWords.moreOnDecide(1200), '1,200 more on Decide');
+  for (const line of [queueWords.choose, queueWords.moreOnDecide(2), queueWords.hard('Chase it'), queueWords.suggestedSaid]) assert.doesNotMatch(line, /—|\b(row|rows|entity|list item)\b/iu);
 });

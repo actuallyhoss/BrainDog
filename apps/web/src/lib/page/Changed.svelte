@@ -1,185 +1,75 @@
 <!--
-  Changed for you: the rows on this page an agent, a rule or Slash changed since the reader last looked, newest first,
-  each with who did it and when, and its Undo (DIRECTION §37, trust). "Fix the login · Claude for Sam · 2h ago · Undo".
+  Changed for you, as one line at the foot of the board (DIRECTION §39): "5 changes by your rules this week", and
+  Review, which opens the list in the docked panel (`ChangesPanel.svelte`). It was five lines over the page's questions,
+  each with a bank's name in capitals and "Categorise what cleared · 5w ago Undo", and it was noise above the work.
 
-  THE ROWS THEMSELVES WEAR A FAINT TINT (`PageBody.svelte`), and this is where the words and the way back are: the
-  renderer draws a row and nothing beside it, so one quiet list over the page says the bylines once, rather than a chip
-  squeezed onto every row. Not drawn while nothing is new, and a row leaves it once it is opened or the page is left.
+  THE ROWS THEMSELVES STILL WEAR A FAINT TINT until they are seen (`PageBody.svelte`), and each row's panel still says
+  who changed it with its Undo, so nothing is lost by saying the week once. Not drawn while the week holds none.
 
-  UNDO READS THE PLAN FIRST (`byline-undo.ts`): a change on this row alone goes back at once, and one that touched more
-  says what else it touched under the line before anything goes back (`UndoAsk.svelte`).
-
-  A LIST WITHOUT A BOX under a quiet heading, as the page's other lists are. The row's words open it in the docked panel,
-  where the same line and Undo stay for the rest of the week; the agent's name opens the run that made the change.
+  A TILE OF ITS OWN, as everything on the board is: the history glyph in its well, the sentence, and the one action.
 -->
 <script lang="ts">
-  import { at as inApp } from '$lib/at.ts';
+  import Button from '$lib/ui/Button.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import type { RowHost } from './row-host.svelte.ts';
-  import { bylineWords } from './byline.ts';
-  import UndoAsk from './UndoAsk.svelte';
-  import { keyOf, rowOfKey, titleOf, type RowAt } from './row-verbs.ts';
+  import { bylineWords, changedLine } from './byline.ts';
 
   let { host }: { host: RowHost } = $props();
 
-  /** At most five lines, the newest first: a way to what changed, not a second list of the page. */
-  const lines = $derived(
-    [...host.bylines]
-      .filter(([, b]) => b.unseen)
-      .sort((a, b) => Date.parse(b[1].at) - Date.parse(a[1].at))
-      .flatMap(([key, b]) => {
-        const row = rowOfKey(key);
-        const e = row ? host.entry(row) : undefined;
-        return row && e ? [{ key, row, byline: b, title: titleOf(e, host.shapeOf(row.register)) }] : [];
-      })
-      .slice(0, 5),
-  );
-
-  /** The run's own page, where the name is pressed: its row in the list of runs, record-relative until it is drawn. */
-  const runPath = (run: string): string => `/r/session/${run.slice(1)}`;
-
-  const undo = (row: RowAt) => void host.undoBy(row);
+  const line = $derived(changedLine(host.bylines.values(), host.readAt()));
+  /* WHETHER ANY OF THEM IS NEW TO THE READER, which the line says with one dot and no more. */
+  const fresh = $derived([...host.bylines.values()].some((b) => b.unseen));
 </script>
 
-{#if lines.length > 0}
+{#if line}
   <section class="changed" aria-labelledby="changed-h">
-    <h2 class="changed-h" id="changed-h">{bylineWords.heading}</h2>
-    <ul class="changed-lines">
-      {#each lines as l (l.key)}
-        <li class="changed-line">
-          <button type="button" class="changed-what" onclick={() => host.open(l.row)}>{l.title}</button>
-          <span class="changed-by">
-            {#if l.byline.run && l.byline.said.startsWith(l.byline.name)}<a class="changed-who" href={inApp(runPath(l.byline.run))}>{l.byline.name}</a>{l.byline.said.slice(l.byline.name.length)}
-            {:else}{l.byline.said}{/if}
-          </span>
-          {#if l.byline.batch && host.writable(l.row)}
-            <button
-              type="button"
-              class="changed-undo tap"
-              aria-label={bylineWords.undoNamed(l.title)}
-              disabled={host.undoing.has(keyOf(l.row)) || host.asked?.key === l.key}
-              onclick={() => undo(l.row)}>{bylineWords.undo}</button
-            >
-          {/if}
-          <UndoAsk {host} row={l.row} />
-        </li>
-      {/each}
-    </ul>
+    <IconWell name="history" />
+    <h2 class="changed-said" id="changed-h">
+      {#if fresh}<span class="changed-new" aria-hidden="true"></span>{/if}{line.text}
+    </h2>
+    <Button size="sm" onclick={() => host.openChanges()}>{bylineWords.review}</Button>
   </section>
 {/if}
 
 <style>
-  /* THE PAGE'S FIRST ROW, full width, beside Just changed: what was done for you before what the page holds. */
+  /* THE LAST TILE ON THE BOARD, the whole row, one line high: the glyph, the sentence and Review at its end. */
   .changed {
     grid-column: 1 / -1;
-    min-inline-size: 0;
-  }
-
-  /* A QUIET HEADING, the size of a meta line: it names the group and does not compete with the blocks' own names. */
-  .changed-h {
-    margin: 0 0 var(--sp-2);
-    color: var(--dim);
-    font-family: var(--font-ui);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  .changed-lines {
-    display: grid;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .changed-line {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    column-gap: var(--sp-3);
-    min-block-size: var(--ctl-h);
-    padding-block: var(--sp-1);
-    border-block-start: 1px solid var(--line-soft);
-  }
-
-  .changed-line:first-child {
-    border-block-start: 0;
-  }
-
-  .changed-what {
-    flex: 1 1 16rem;
+    gap: var(--sp-3);
     min-inline-size: 0;
-    overflow: hidden;
-    padding: 0;
-    background: none;
-    border: 0;
+    padding: var(--tile-pad, 20px);
+    background: var(--tile, var(--bg));
+    border-radius: var(--r-tile, 16px);
+  }
+
+  .changed-said {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    margin: 0;
     color: var(--ink);
-    font: inherit;
+    font-family: var(--font-ui);
     font-size: var(--t-base);
-    line-height: 1.55;
-    text-align: start;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  /* UNDER A THUMB THE WORDS ARE A 44px TARGET, though they are one 23px line. The button itself grows and its words stay
-     centred in it; `.tap`'s `::before` would be clipped here by the ellipsis's `overflow`, and so would its hits. */
-  @media (pointer: coarse) {
-    .changed-what {
-      min-block-size: var(--tap);
-    }
-  }
-
-  .changed-what:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-
-  .changed-by {
-    flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .changed-who {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .changed-who:hover {
-    color: var(--ink);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-
-  /* UNDO IS WORDS IN INK, a hairline under them, as every quiet verb on a page is. */
-  .changed-undo {
-    flex: none;
-    padding: 0 var(--sp-2);
-    background: none;
-    border: 0;
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-sm);
     font-weight: 500;
-    text-decoration: underline;
-    text-decoration-color: var(--edge);
-    text-underline-offset: 3px;
-    cursor: pointer;
+    line-height: 1.4;
   }
 
-  .changed-undo:hover {
-    text-decoration-color: currentColor;
+  /* SOMETHING IN IT IS NEW SINCE THE READER LAST LOOKED: a small dot in ink, never the red that means late. */
+  .changed-new {
+    flex: none;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    background: var(--ink);
+    border-radius: var(--r-round);
   }
 
-  .changed-undo:disabled {
-    color: var(--dim);
-    cursor: default;
-  }
-
-  /* ON A PHONE the line wraps under the row's words: the words first, then who and Undo, never cut to fit beside it. */
-  @media (width < 600px) {
-    .changed-what {
-      flex-basis: 100%;
+  @media (forced-colors: active) {
+    .changed {
+      border: 1px solid CanvasText;
     }
   }
 </style>

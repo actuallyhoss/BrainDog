@@ -56,12 +56,11 @@ export const words = {
 
   /* ── the gate ── */
 
-  /** The fold's handle when accepting changes nothing it can name, as on a question of options: what the fold holds then. */
-  doesOpen: 'Why it is asked, and what it costs',
-  /** The first of several things accepting puts in place, and how many more. */
-  andMore: (first: string, n: number) => `${first}, and ${n.toLocaleString('en-GB')} more`,
-  /** How long the question has been open, and that nobody has answered it. */
-  opened: (when: string) => `Opened ${when}. Nobody has decided it.`,
+  /** The gate's answer to a question of options, with the one chosen (DIRECTION §39). */
+  decide: 'Decide',
+  /** Putting the question off: opens the step that asks why and until when. */
+  notNow: 'Not now',
+
   /** An address naming a question this record does not hold: said without the handle in the address. */
   notHere: 'This question is not in this record.',
   /** A question settled elsewhere, whose decision is not among the ones read. Its title is the heading over this. */

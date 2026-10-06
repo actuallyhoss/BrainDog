@@ -1,11 +1,11 @@
 <!--
   An icon in its well: the rounded square that leads a tile's heading, a rail place and a row that is
   not a task or a person. `m` is 28 (a tile heading), `l` is 32 (a row). The icon is
-  18 in `--ink2` on `--s1`.
+  18 in `--ink2` on `--field`, at the control's 8px corner.
 
   A TONE IS A MEANING, never decoration. `ink` is the chosen form, the rail's current place: an ink
-  fill with the icon in `--on-ink`. `danger`, `earn`, `warn` and `live` tint the icon in that intent and
-  fill the well with a 12% tint of it (the `-fill` roles are saturated, so they would draw red on red). Red is for what needs him and nothing else.
+  fill with the icon in `--on-ink`. `action` is the working accent's tint, for a thing in progress or chosen.
+  `danger`, `earn`, `warn` and `live` tint the icon in that intent and fill the well with a 12% tint of it (the `-fill` roles are saturated, so they would draw red on red). Red is for what needs him and nothing else.
 
   Decorative: the words beside a well say what it means, so the icon is hidden from assistive tech.
 -->
@@ -17,7 +17,11 @@
     name,
     size = 'm',
     tone,
-  }: { name: IconName; size?: 'm' | 'l'; tone?: 'ink' | 'danger' | 'earn' | 'live' | 'warn' | undefined } = $props();
+  }: {
+    name: IconName;
+    size?: 'm' | 'l';
+    tone?: 'ink' | 'action' | 'danger' | 'earn' | 'live' | 'warn' | undefined;
+  } = $props();
 </script>
 
 <span class="well" data-size={size} data-tone={tone}><Icon {name} size="l" /></span>
@@ -29,8 +33,8 @@
     flex: none;
     inline-size: var(--well);
     block-size: var(--well);
-    border-radius: var(--r-well);
-    background: var(--s1);
+    border-radius: var(--r-ctl);
+    background: var(--field);
     color: var(--ink2);
   }
   .well[data-size='l'] {
@@ -49,20 +53,24 @@
     background: var(--ink);
     color: var(--on-ink);
   }
+  .well[data-tone='action'] {
+    background: var(--action-tint-1);
+    color: var(--action-text);
+  }
   .well[data-tone='danger'] {
-    background: color-mix(in srgb, var(--danger) 12%, var(--bg));
+    background: color-mix(in srgb, var(--danger) 12%, var(--tile));
     color: var(--danger);
   }
   .well[data-tone='earn'] {
-    background: color-mix(in srgb, var(--earn) 12%, var(--bg));
+    background: color-mix(in srgb, var(--earn) 12%, var(--tile));
     color: var(--earn);
   }
   .well[data-tone='warn'] {
-    background: color-mix(in srgb, var(--warn) 12%, var(--bg));
+    background: color-mix(in srgb, var(--warn) 12%, var(--tile));
     color: var(--warn);
   }
   .well[data-tone='live'] {
-    background: color-mix(in srgb, var(--live) 12%, var(--bg));
+    background: color-mix(in srgb, var(--live) 12%, var(--tile));
     color: var(--live);
   }
 

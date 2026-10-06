@@ -90,7 +90,7 @@
     block-size: 32px;
     background: var(--s1);
     border: 2px solid transparent;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
     color: var(--ink);
     text-decoration: none;
   }

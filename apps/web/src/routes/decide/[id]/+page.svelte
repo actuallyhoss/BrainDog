@@ -26,7 +26,7 @@
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
-  import { day, queueCost, since, symbolText } from 'braindog-render';
+  import { day, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { iconFor, whoDid } from '$lib/record/api.ts';
@@ -48,7 +48,8 @@
   import { COMMENT_MOST, sayComment } from '$lib/record/comments.ts';
   import { everyGovernance, plainOf, readOne, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
-  import { queueMergeOf, visualOf, type Visual } from '$lib/page/queue-answer.ts';
+  import { proposer, queueMergeOf, queueWords, visualOf, type Visual } from '$lib/page/queue-answer.ts';
+  import '$lib/decide/form.css';
   import { spoken } from '$lib/decide/card.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
   import { acceptKey, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords, type Held } from '../press.ts';
@@ -70,9 +71,9 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Thread from '$lib/ui/Thread.svelte';
-  import { gateSentence, WORDS as LEAD } from '../lead.ts';
+  import { WORDS as LEAD } from '../lead.ts';
   import { words as gate } from '../words.ts';
-  import { doesLine } from './does.ts';
+  import Face from '$lib/ui/Face.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
@@ -95,6 +96,7 @@
     if (String(page.params.id) !== id) return closed(true, at);
     live = out.from === 'live' ? out.value : null;
     unticked = [];
+    chosenKey = null;
     refusal = out.from === 'refused' ? out.fix : '';
     from = out.from;
     closed(out.from !== 'refused', at);
@@ -227,6 +229,21 @@
   const suggestedKey = $derived(question?.options.find((o) => o.recommended === true)?.key);
 
   /**
+   * THE ANSWER CHOSEN, ON A QUESTION OF OPTIONS (DIRECTION §39, "Decide reads like a form"): a press on a choice chooses
+   * it and Decide gives it. The form starts on the answer Enter would give (`acceptKey`), the suggestion where a key may
+   * give it, and on nothing where the answer is hard to undo or money moves. The record's own two answers and a merge
+   * have no choice to start on: their buttons are the answers.
+   */
+  let chosenKey = $state<string | null>(null);
+  const startKey = $derived(question && !two && !merge ? acceptKey(question, moves.length > 0) : null);
+  const selectedKey = $derived(chosenKey ?? startKey);
+  /* A BUTTON WHOSE ANSWER IS HARD TO TAKE BACK SAYS SO IN ITS WORDS, never in a chip beside it. */
+  const pressSaid = (label: string): string => (question?.band === 'undo' ? queueWords.hard(label) : label);
+
+  /* WHO ASKED AND WHEN, the quiet line over the answers, by the name every screen gives them, never a handle. */
+  const asker = $derived(about?.by ? proposer(about.by, String(page.data.me?.person ?? '') || null, new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))) : null);
+
+  /**
    * WHEN THE RECORD STILL KEEPS A REASON FOR A QUESTION, it answers the press with `wants: 'reason'` (`decide-write.ts`),
    * and one line opens under the answers with the choice kept: the reason is the record's to ask for, once, and never
    * this screen's to demand before the press.
@@ -275,6 +292,48 @@
       return;
     }
     void send(key);
+  }
+
+  /** A choice chosen, and nothing sent: Decide sends it. With the record's one line open it changes the answer there. */
+  function pick(key: string) {
+    if (!answerable) {
+      toasts.push(whyNot, { intent: 'warn' });
+      return;
+    }
+    if (sending !== null || holding !== null) return;
+    if (asked !== null) return choose(key);
+    chosenKey = key;
+  }
+
+  /** DECIDE: the answer chosen, given. With none chosen yet the focus goes to the first choice, and nothing is sent. */
+  function commit() {
+    if (selectedKey === null) return void document.getElementById(`opt-${question?.options[0]?.key ?? ''}`)?.focus();
+    choose(selectedKey);
+  }
+
+  /**
+   * ENTER ON A CHOICE CHOOSES IT AND GIVES IT, as Enter sends a form and as `1` to `9` then Enter always has; the arrows
+   * walk the choices and choose as they go. Space is the button's own press, which only chooses.
+   */
+  function onChoiceKey(e: KeyboardEvent, key: string) {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || !question) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      chosenKey = key;
+      choose(key);
+      return;
+    }
+    const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
+    if (step === 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const all = question.options;
+    const at = all.findIndex((o) => o.key === key);
+    const next = all[(at + step + all.length) % all.length];
+    if (!next) return;
+    pick(next.key);
+    document.getElementById(`opt-${next.key}`)?.focus();
   }
 
   /* ── an answer held for its Undo ─────────────────────────────────────── */
@@ -455,7 +514,7 @@
       if (key === null) return;
       e.preventDefault();
       if (act === 'decline') held(key, gate.declinedHeld(spoken(question.title)));
-      else choose(key);
+      else choose(two ? key : (selectedKey ?? key));
       return;
     }
     if (act === 'edit') {
@@ -632,13 +691,6 @@
         : null),
   );
 
-  /* THE SENTENCE UNDER THE TITLE, while the question is still open: how many options, which is suggested, and how long
-     it has been open (`../lead.ts`). A settled or closed question says what happened in its own block instead. */
-  const gateSaid = $derived(question && !settled && !(from === 'live' && live?.closed) ? gateSentence(question, now) : undefined);
-
-  /* WHAT THE COST TILE IS CALLED: the cost of deciding late when whoever asked wrote one, else the cost of getting it
-     wrong, which the record worked out; so a tile is never headed by a cost it does not hold. */
-  const costTitle = $derived(question?.cost || !queueCost(question?.band ?? '') ? copy.costOfDelay : copy.costOfWrong);
 
   /* ── what accepting does, one folded tile under the options ───────────── */
 
@@ -648,15 +700,10 @@
   const picking = $derived(pickable.length > 0 && costed);
   /** What accepting would call out, while it can still be approved. */
   const calling = $derived(from === 'live' && live !== null && live.calls.length > 0 && costed);
-  /** The tile's one line, shut (`does.ts`): the first part of what accepting does that this question has. */
-  const doesSaid = $derived(
-    doesLine({
-      story: story && !settled ? story : null,
-      appears: preview && !settled ? preview.appears : [],
-      picks: picking ? { on: picked?.length ?? pickable.length, of: pickable.length } : null,
-      updates: updates.length ? { n: updates.length, list: listName(live?.rowset?.register) } : null,
-      calls: calling ? (live?.calls.length ?? 0) : 0,
-    }),
+  /* WHAT ACCEPTING DOES HAS SOMETHING TO SAY: an arrangement, what a proposal puts in place, the rows to tick, the rows
+     it changes, what it calls out, or what deciding late costs. A question of options alone has none of these. */
+  const doesAny = $derived(
+    Boolean((story && !settled) || (preview && !settled) || picking || updates.length || calling || (costed && question?.cost)),
   );
 
   /**
@@ -709,6 +756,14 @@
      when the question was not last in the queue, so a decision reached from the Decided list, or the
      last one answered, ended the page with nothing to press. The queue is offered whatever else is,
      and the inbox when something waits there, which is what `/decide` offers when it is clear. -->
+<!-- NOT NOW, THE THIRD VERB, kept beside the answers: a queue with only yes and no is a queue that gets rubber-stamped.
+     It opens the step that asks why not yet and until when. -->
+{#snippet later()}
+  {#if !deferring}
+    <button type="button" class="dc-btn" data-weight="bare" disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} onclick={defer}>{gate.notNow}</button>
+  {/if}
+{/snippet}
+
 {#snippet onward()}
   <div class="onward">
     {#if onwardTo}<Button weight="primary" href="/decide/{onwardTo}" id="way-on">{copy.decideNext}</Button>{/if}
@@ -737,21 +792,21 @@
     </Empty>
   </div>
 {:else}
-  <!-- THE QUESTION IS THE TITLE, and the sentence under it says how many ways there are to answer, which one is
-       suggested, and how long it has been open. -->
-  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} sentence={gateSaid} />
+  <!-- THE QUESTION IS THE PAGE'S TITLE, and a question that gathered several says how many beside it. No sentence under
+       it: how many answers there are and which is suggested is what the tile under it shows, and saying it twice was
+       the trivia the reset took out (DIRECTION §39). -->
+  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} />
 
   <div class="page">
     <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news and the reason the options came back. -->
     {#if part && !settled}<Applied partial={part} />{/if}
 
-    <!-- THE BLOCK EXISTED AND ONLY THE RECORD COULD REACH IT. It was gated on `question.decided`,
-         so a question decided a moment ago on this screen went on showing the options, the reason
-         field and a live commit button, which is the one state where the product has to say plainly
-         that it is finished. -->
-    {#if settled}
-      <!-- THE RECEIPT, A TILE WITH ITS GREEN CHECK: who, when, which option, and the reason as it was written. -->
-      <Tile>
+    <!-- ONE TILE, READ LIKE A FORM (DIRECTION §39): who asked and when, why, the answers as choices, Decide and Not now,
+         then what accepting does as a plain part of the same tile, and the comments under it all. A settled question
+         is its receipt in the same place, and its comments stay under it. -->
+    <Tile class="gate">
+      {#if settled}
+        <!-- THE RECEIPT, WITH ITS GREEN CHECK: who, when, which option, and the reason as it was written. -->
         <div class="settled">
           <p class="settled-head">
             <IconWell name="check" size="l" tone="earn" />
@@ -796,58 +851,55 @@
           {/if}
           {#if applied.length}<div class="settled-applied"><Applied lines={applied} /></div>
           {:else if kept.length}<div class="settled-applied"><Applied lines={kept} /></div>{/if}
-          <!-- WHERE IT WENT, and what still waits. A receipt here is always a written decision: the sample's
-               unsaved one, with its chip and its way back, went with the sample. -->
+          <!-- WHERE IT WENT, and what still waits. A receipt here is always a written decision. -->
           <p class="settled-where">{onwardWords.where} {onwardWords.left(waiting)}</p>
           <div class="settled-next">{@render onward()}</div>
         </div>
-      </Tile>
-    {:else if from === 'live' && live?.closed}
-      <!-- SETTLED, AND ITS DECISION IS NOT AMONG THE ONES READ. Nothing here can answer it again, and the line says so
-           without the question's handle: its title is the heading above. -->
-      <p class="cost-age">{gate.closedNow} {onwardWords.left(waiting)}</p>
-      {@render onward()}
-    {:else}
-      <!-- THE OPTIONS COME STRAIGHT UNDER THE TITLE: they are what this screen is for. Everything accepting would do is
-           one folded tile under them (`does`), one press away and read before the commit, never in the way of it.
+      {:else if from === 'live' && live?.closed}
+        <!-- SETTLED, AND ITS DECISION IS NOT AMONG THE ONES READ. Nothing here can answer it again, and the line says so
+             without the question's handle: its title is the heading above. -->
+        <p class="cost-age">{gate.closedNow} {onwardWords.left(waiting)}</p>
+        {@render onward()}
+      {:else}
+        <!-- WHY THE ANSWERS ARE OFF COMES FIRST, ABOVE THE OPTIONS AND NOT AFTER A PRESS AND A PARAGRAPH. It is the
+             record's own refusal, said before anybody has chosen anything, and it ends by saying that reading is what
+             this colleague still holds. Every answer's button and Not now point at it. -->
+        {#if !answerable}
+          <p class="cannot" id="cannot-decide">{whyNot}</p>
+        {/if}
 
-           WHY THE ANSWERS ARE OFF COMES FIRST, ABOVE THE OPTIONS AND NOT AFTER A PRESS AND A PARAGRAPH. It is
-           the record's own refusal, said before anybody has chosen anything, and it ends by saying
-           that reading is what this colleague still holds. Every option's button and the defer
-           point at it. -->
-      {#if !answerable}
-        <p class="cannot" id="cannot-decide">{whyNot}</p>
-      {/if}
+        <!-- WHO ASKED AND WHEN, quiet, then WHY it is asked, in the asker's own words, before the answers. -->
+        <p class="gate-by">
+          {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{asker.name}</span>{/if}
+          <span class="gate-when">{since(question.opened, now)}</span>
+        </p>
+        {#if question.context}<p class="gate-why">{symbolText(spoken(question.context))}</p>{/if}
 
-      <!-- ONE ANSWER'S BUTTON, drawn by the cards of a question's own options and by the record's two answers alike, so the
-           one rule for who may press it is written once. It says what it does (`press.ts` `labelOf`): an option's own name,
-           Decline for the record's Reject, and the amount on Accept when money moves.
+        <!-- ONE ANSWER'S BUTTON, for the record's own two answers: it says what it does (`press.ts` `labelOf`), Decline for
+             the record's Reject and the amount on Accept when money moves, and the care a hard one asks for in its words.
 
-           OFF FOR A READER WHO MAY NOT ANSWER, pointing at the sentence above the answers that says why. `aria-describedby`
-           rather than a title, so the reason is read out with the control and not only seen beside it, which is the shape
-           `/decide` and `/settings/people` both use.
+             OFF FOR A READER WHO MAY NOT ANSWER, pointing at the sentence above the answers that says why.
+             `aria-describedby` rather than a title, so the reason is read out with the control and not only seen. -->
+        {#snippet answer(option: { key: string; title: string }, q: { options: readonly { key: string; title: string }[] })}
+          {@const marked = suggestedKey === option.key}
+          <button
+            type="button"
+            class="dc-btn"
+            id="opt-{option.key}"
+            data-answer={option.key}
+            data-suggested={marked ? '' : undefined}
+            data-weight={option.key === 'accept' ? 'primary' : undefined}
+            data-on={asked === option.key ? '' : undefined}
+            aria-pressed={asked === null ? undefined : asked === option.key}
+            disabled={!answerable || holding !== null}
+            aria-describedby={answerable ? undefined : 'cannot-decide'}
+            onclick={() => choose(option.key)}
+          >
+            {option.key === 'accept' ? pressSaid(labelOf(option, q, moves)) : labelOf(option, q, moves)}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}
+          </button>
+        {/snippet}
 
-           THE SUGGESTED ONE IS AN OUTLINE WITH A SMALL DOT, never the filled primary: shown, and not chosen for anybody. Only
-           the first one an agent marked, only where the choice can be taken back, and never where money moves. -->
-      {#snippet answer(option: { key: string; title: string }, q: { options: readonly { key: string; title: string }[] })}
-        {@const marked = suggestedKey === option.key}
-        <Button
-          id="opt-{option.key}"
-          data-answer={option.key}
-          data-suggested={marked ? '' : undefined}
-          data-on={asked === option.key ? '' : undefined}
-          aria-pressed={asked === null ? undefined : asked === option.key}
-          disabled={!answerable || holding !== null}
-          aria-describedby={answerable ? undefined : 'cannot-decide'}
-          onclick={() => choose(option.key)}
-        >
-          {#if marked}<span class="dot" aria-hidden="true"></span>{/if}{labelOf(option, q, moves)}{#if marked}<span class="sr">, {gate.suggested}</span>{/if}
-        </Button>
-      {/snippet}
-
-      <!-- A COUNT ONLY OVER A QUESTION'S OWN OPTIONS: over Accept and Decline it would count the buttons. -->
-      <Tile icon={optionsIcon} title={merge ? mergeWords.heading : copy.theOptions} count={two || merge ? undefined : question.options.length}>
-        <section class="options">
+        <section class="options" aria-label={merge ? mergeWords.heading : copy.theOptions}>
           {#if merge}
             <!-- WHO IS WHO: each name and where it was seen, and one press each, held for its Undo. -->
             <MergeCard
@@ -858,39 +910,73 @@
               onpress={pressMerge}
             />
           {:else if two}
-            <!-- THE RECORD'S TWO ANSWERS ARE TWO BUTTONS, Accept and Decline, side by side, with what accepting changes
-                 open in the tile under them. Two cards whose only content was a button was the walk's #29. -->
-            <div class="two">
+            <!-- THE RECORD'S TWO ANSWERS ARE TWO BUTTONS, Accept and Decline, with Not now beside them. -->
+            <div class="dc-actions">
               {#each question.options as option (option.key)}{@render answer(option, question)}{/each}
+              {@render later()}
             </div>
           {:else}
-            <div class="cards" data-cells={question.options.length}>
+            <!-- THE ANSWERS AS CHOICES: each a full-width rectangle with its name and what it does, the suggested one
+                 saying so in the accent's words, the one chosen ringed (`form.css`). A press chooses; Decide gives it. -->
+            <ul class="dc-choices" role="radiogroup" aria-label={copy.theOptions}>
               {#each question.options as option}
-                <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list, since a filed question
-                     keeps no titles or values for a reader who may not read them; where the body holds no reason, the words
-                     `questionOf` made of it. -->
+                <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list; where the body
+                     holds no reason, the words `questionOf` made of it. -->
                 {@const because = reasonIn(about?.body, option.key) ?? option.body}
                 {@const shows = visuals.get(option.key)}
-                <article class="card">
-                  <!-- WHAT THE OPTION IS LEADS IT, inside its own well and nowhere else: a swatch writes its colour into
-                       `--swatch` on its chip alone, hidden from a screen reader because the option's name says what it is. -->
-                  {#if shows && 'swatch' in shows}
-                    <span class="card-visual" data-shows="swatch" aria-hidden="true">
-                      {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
+                {@const marked = suggestedKey === option.key}
+                {@const on = asked === null ? selectedKey === option.key : asked === option.key}
+                <li role="none">
+                  <div class="dc-choice" data-checked={on ? '' : undefined}>
+                    <span class="dc-ring" aria-hidden="true"></span>
+                    <span class="dc-choice-main">
+                      <!-- WHAT THE OPTION IS LEADS IT, inside its own box and nowhere else: a swatch writes its colour
+                           into `--swatch` on its chip alone, hidden from a screen reader because the name says it. -->
+                      {#if shows && 'swatch' in shows}
+                        <span class="card-visual" data-shows="swatch" aria-hidden="true">
+                          {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
+                        </span>
+                      {:else if shows}
+                        <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
+                      {/if}
+                      <button
+                        type="button"
+                        role="radio"
+                        class="dc-choice-hit"
+                        id="opt-{option.key}"
+                        data-answer={option.key}
+                        data-suggested={marked ? '' : undefined}
+                        aria-checked={on}
+                        disabled={!answerable || holding !== null}
+                        aria-describedby={answerable ? undefined : 'cannot-decide'}
+                        onclick={() => pick(option.key)}
+                        onkeydown={(e) => onChoiceKey(e, option.key)}
+                        >{labelOf(option, question, moves)}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}</button
+                      >
+                      <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name. -->
+                      {#if because.trim() !== ''}
+                        <span class="dc-choice-does card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></span>
+                      {/if}
                     </span>
-                  {:else if shows}
-                    <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
-                  {/if}
-                  <!-- THE OPTION'S NAME IS ITS BUTTON, so the name is said once and pressing it is the answer. No key cap:
-                       `1` to `9` reach an answer, and the keys are said in the ? sheet, not on every card. -->
-                  {@render answer(option, question)}
-                  <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name: a rule's own options
-                       carry no `because`, and a blank paragraph reads as a reason that failed to load. -->
-                  {#if because.trim() !== ''}
-                    <p class="card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></p>
-                  {/if}
-                </article>
+                    {#if marked}<span class="dc-rec" aria-hidden="true">{gate.suggested}</span>{/if}
+                  </div>
+                </li>
               {/each}
+            </ul>
+            <div class="dc-actions">
+              {#if asked === null}
+                <button
+                  type="button"
+                  class="dc-btn"
+                  data-weight="primary"
+                  id="gate-decide"
+                  aria-disabled={selectedKey === null}
+                  disabled={!answerable || holding !== null || sending !== null}
+                  aria-describedby={answerable ? undefined : 'cannot-decide'}
+                  onclick={commit}>{pressSaid(gate.decide)}</button
+                >
+              {/if}
+              {@render later()}
             </div>
           {/if}
 
@@ -915,14 +1001,12 @@
           {#if noneTicked}<p class="commit-fix" role="status" data-intent="bad">{pickWords.none}</p>{/if}
           {#if fix && !deferring}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
         </section>
-      </Tile>
 
-      {#if deferring}
-        <Tile>
-          <section class="commit">
-            <h2 class="commit-title">{copy.deferTitle}</h2>
-            <!-- A FIELD WITH ITS LABEL ABOVE IT. "What has to happen first" was grey words beside the Defer button and
-                 a placeholder inside this box, so it read as loose text on the queue and vanished once anybody typed. -->
+        <!-- NOT NOW OPENS THE STEP THAT PUTS IT OFF, in the same tile: why not yet, and until when. -->
+        {#if deferring}
+          <section class="commit" aria-labelledby="defer-title">
+            <h2 class="commit-title" id="defer-title">{copy.deferTitle}</h2>
+            <!-- A FIELD WITH ITS LABEL ABOVE IT, so the words stay once somebody types. -->
             <label class="commit-label" for="defer-why">{copy.deferHint}</label>
             <textarea
               id="defer-why"
@@ -944,178 +1028,237 @@
             </div>
             {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
           </section>
-        </Tile>
-      {:else}
-        <div class="third">
-          <!-- The third verb, kept: a queue with only yes and no is a queue that gets rubber-stamped. -->
-          <Button disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} onclick={defer}>{copy.defer}</Button>
-        </div>
-      {/if}
-    {/if}
+        {/if}
 
-    <!-- WHAT ACCEPTING DOES, ONE TILE, FOLDED: what an arrangement does, what a proposal puts in place, the rows to tick,
-         the rows it changes, what it calls, why it was asked and what it costs, each a part of the tile rather than a
-         tile of its own above the options. Shut, it says the first of them in one line (`does.ts`). The rows to tick
-         open it, because what is left out is declined with the decision. -->
-    {#if (story && !settled) || (preview && !settled) || picking || updates.length || calling || costed}
-      <Tile icon="settings" title={LEAD.does}>
-        <details class="does" open={picking || two}>
-          <summary class="does-line">{doesSaid}</summary>
-          <div class="does-parts">
-            {#if story && !settled}
-              <section class="changed" aria-label={story.lead}>
-                <Arranged arranged={story} />
-              </section>
-            {/if}
-
-            {#if preview && !settled}
-              <section class="changed">
-                <h3 class="does-h">{copy.proposalWillAppear}</h3>
-                <Proposed proposed={preview} />
-                <!-- A SCRIPT'S SOURCE, WHOLE AND FOLDED: it is what runs, and code keeps its lines, which a line of the
-                     preview cannot. A scrolling box a keyboard can reach, as the canvas's written body is. -->
-                {#each preview.appears.filter((a) => a.source !== undefined) as a, i (i)}
-                  <details class="source-fold">
-                    <summary>{copy.proposalSource(a.title)}</summary>
-                    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                    <pre class="source" tabindex="0">{a.source}</pre>
-                  </details>
-                {/each}
-              </section>
-            {/if}
-
-            {#if picking}
-              <section class="changed">
-                <h3 class="does-h">{pickWords.heading}</h3>
-                <p class="pick-hint">{pickWords.hint}</p>
-                <ul class="picks">
-                  {#each pickable as row (row.n)}
-                    <li>
-                      <label class="pick">
-                        <input
-                          type="checkbox"
-                          checked={!unticked.includes(row.n)}
-                          aria-label={pickWords.keep(row.title)}
-                          onchange={(e) => {
-                            unticked = e.currentTarget.checked ? unticked.filter((n) => n !== row.n) : [...unticked, row.n];
-                            noneTicked = false;
-                          }}
-                        />
-                        <span class="pick-title">{row.title}</span>
-                        {#if row.detail}<span class="pick-detail">{row.detail}</span>{/if}
-                      </label>
-                    </li>
-                  {/each}
-                </ul>
-                {#if picked}<p class="pick-hint" role="status">{pickWords.some(picked.length, pickable.length)}</p>{/if}
-              </section>
-            {/if}
-
-            {#if updates.length}
-              <section class="changed">
-                <h3 class="does-h">{changeWords.heading}</h3>
-                <Changes {updates} />
-              </section>
-            {/if}
-
-            <!-- WHAT ACCEPTING WOULD CALL OUT, before the press: every host, how often, the key by label and the fields
-                 sent, as the record worked them out when the proposal was filed. Accept and Decline are the one
-                 approval, so the lines go once the question is settled. -->
-            {#if calling && live}
-              <section class="changed">
-                <h3 class="does-h">{installWords.heading}</h3>
-                <dl class="calls-out">
-                  <CallsOut calls={live.calls} hosted={hostedHere(page.data as unknown as Shell)} note={installWords.acceptApproves} />
-                </dl>
-              </section>
-            {/if}
-
-            <!-- WHY IT WAS ASKED AND WHAT IT COSTS: the reasoning whoever asked wrote, then the cost of deciding late,
-                 the cost of getting it wrong the record worked out, and its age. -->
-            {#if costed}
-              {#if question.context}
-                <section class="changed">
-                  <h3 class="does-h">{copy.whyAsked}</h3>
-                  <p class="cost-body context">{symbolText(spoken(question.context))}</p>
+        <!-- WHAT ACCEPTING DOES, A PLAIN PART OF THE SAME TILE under the answers: what an arrangement does, what a
+             proposal puts in place, the rows to tick, the rows it changes, what it calls out, and what deciding late
+             costs. Each under its own small heading, open, read before the press and never in the way of it. -->
+        {#if doesAny}
+          <section class="does" aria-labelledby="does-title">
+            <h2 class="gate-h" id="does-title">{LEAD.does}</h2>
+            <div class="does-parts">
+              {#if story && !settled}
+                <section class="changed" aria-label={story.lead}>
+                  <Arranged arranged={story} />
                 </section>
               {/if}
-              <section class="cost">
-                <h3 class="does-h">{costTitle}</h3>
-                {#if question.cost}
-                  <p class="cost-body">{symbolText(question.cost)}</p>
-                {/if}
-                <!-- AND THE OTHER COST, WHICH NOBODY TYPED. The one above is why deciding late is expensive,
-                     written by whoever asked; this is what the record worked out getting it wrong would cost,
-                     from what accepting the proposal would do, and it is what puts the question where it is
-                     in the queue. Absent on a question whose body this build cannot read. -->
-                {#if queueCost(question.band ?? '')}
-                  {#if question.cost}<h4 class="cost-label">{copy.costOfWrong}</h4>{/if}
-                  <p class="cost-body" data-cost={question.band}>{queueCost(question.band ?? '')}</p>
-                {/if}
-                <p class="cost-age">{gate.opened(since(question.opened, now))}</p>
-              </section>
-            {/if}
-          </div>
-        </details>
-      </Tile>
-    {/if}
 
-    <!-- THE QUESTION'S COMMENTS, open or settled, since what was said about it is worth as much after the
-         decision as before. On the question and not on each option: the record keeps a thread on a question or a
-         decision, and an option is part of the question. A Reads colleague may comment here too. -->
-    {#if from === 'live'}
-      <div class="thread">
-        {#key threadRead}
-          <Thread
-            on="suggestion:{question.id}"
-            me={String(page.data.me?.person ?? '') || null}
-            people={new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))}
-          />
-        {/key}
-      </div>
-    {/if}
+              {#if preview && !settled}
+                <section class="changed">
+                  <h3 class="does-h">{copy.proposalWillAppear}</h3>
+                  <Proposed proposed={preview} />
+                  <!-- A SCRIPT'S SOURCE, WHOLE AND FOLDED: it is what runs, and code keeps its lines, which a line of the
+                       preview cannot. A scrolling box a keyboard can reach, as the canvas's written body is. -->
+                  {#each preview.appears.filter((a) => a.source !== undefined) as a, i (i)}
+                    <details class="source-fold">
+                      <summary>{copy.proposalSource(a.title)}</summary>
+                      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                      <pre class="source" tabindex="0">{a.source}</pre>
+                    </details>
+                  {/each}
+                </section>
+              {/if}
+
+              {#if picking}
+                <section class="changed">
+                  <h3 class="does-h">{pickWords.heading}</h3>
+                  <p class="pick-hint">{pickWords.hint}</p>
+                  <ul class="picks">
+                    {#each pickable as row (row.n)}
+                      <li>
+                        <label class="pick">
+                          <input
+                            type="checkbox"
+                            checked={!unticked.includes(row.n)}
+                            aria-label={pickWords.keep(row.title)}
+                            onchange={(e) => {
+                              unticked = e.currentTarget.checked ? unticked.filter((n) => n !== row.n) : [...unticked, row.n];
+                              noneTicked = false;
+                            }}
+                          />
+                          <span class="pick-title">{row.title}</span>
+                          {#if row.detail}<span class="pick-detail">{row.detail}</span>{/if}
+                        </label>
+                      </li>
+                    {/each}
+                  </ul>
+                  {#if picked}<p class="pick-hint" role="status">{pickWords.some(picked.length, pickable.length)}</p>{/if}
+                </section>
+              {/if}
+
+              {#if updates.length}
+                <section class="changed">
+                  <h3 class="does-h">{changeWords.heading}</h3>
+                  <Changes {updates} />
+                </section>
+              {/if}
+
+              <!-- WHAT ACCEPTING WOULD CALL OUT, before the press: every host, how often, the key by label and the fields
+                   sent, as the record worked them out when the proposal was filed. -->
+              {#if calling && live}
+                <section class="changed">
+                  <h3 class="does-h">{installWords.heading}</h3>
+                  <dl class="calls-out">
+                    <CallsOut calls={live.calls} hosted={hostedHere(page.data as unknown as Shell)} note={installWords.acceptApproves} />
+                  </dl>
+                </section>
+              {/if}
+
+              <!-- WHAT DECIDING LATE COSTS, as whoever asked wrote it. What getting it wrong costs is said in the button. -->
+              {#if costed && question.cost}
+                <section class="cost">
+                  <h3 class="does-h">{copy.costOfDelay}</h3>
+                  <p class="cost-body">{symbolText(question.cost)}</p>
+                </section>
+              {/if}
+            </div>
+          </section>
+        {/if}
+      {/if}
+
+      <!-- THE QUESTION'S COMMENTS, IN THE SAME TILE, open or settled, since what was said about it is worth as much after
+           the decision as before. On the question and not on each option. A Reads colleague may comment here too. -->
+      {#if from === 'live'}
+        <div class="thread">
+          {#key threadRead}
+            <Thread
+              on="suggestion:{question.id}"
+              me={String(page.data.me?.person ?? '') || null}
+              people={new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))}
+            />
+          {/key}
+        </div>
+      {/if}
+    </Tile>
   </div>
 {/if}
 
 <style>
-  /* THE GATE IS ONE COLUMN OF TILES ON THE GROUND, 12 apart, running the window's width; prose inside keeps `--measure`. */
+  /* THE GATE IS ONE TILE ON THE BOARD, running the window's width; what is read inside it keeps a form's measure. */
   .page {
     container-type: inline-size;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
+    gap: var(--tile-gap);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
-  /* ── what accepting does, one tile folded shut ─────────────────────────── */
+  /* THE TILE IS A FORM'S COLUMN: who asked, why, the answers, the buttons, what accepting does, the comments. */
+  .page :global(.tile.gate) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+  }
 
-  .does > summary {
+  /* ── who asked, and why ────────────────────────────────────────────────── */
+
+  .gate-by {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--fs-meta);
+  }
+
+  .gate-who {
     color: var(--ink2);
-    font-size: var(--t-base);
+    font-weight: var(--fw-medium);
+  }
+
+  .gate-when {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* WHY IT IS ASKED, in the asker's words, read and not skimmed: the body's size, its lines kept, at a measure. */
+  .gate-why {
+    max-inline-size: var(--measure);
+    margin: calc(var(--sp-2) * -1) 0 0;
+    color: var(--ink2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
-    cursor: pointer;
+    white-space: pre-line;
   }
 
-  @media (pointer: coarse) {
-    .does > summary {
-      min-block-size: var(--tap);
-    }
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
   }
 
-  /* EACH PART UNDER ITS OWN SMALL HEADING, the gap a row of tiles keeps between them. */
+  /* THE STANDING SENTENCE OVER THE OPTIONS, at the weight of a hint rather than an alarm, and the same rule `/decide`
+     draws it by: nothing has gone wrong, and this reader is doing exactly what they were invited to do. */
+  .cannot {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  /* THE OPTION'S VISUAL, AT THE CHOICE'S SIZE: swatches share its width in one band, a figure is its largest type.
+     `--swatch` is set on a chip and read by this one rule, so the colour stays inside its option's box. */
+  .card-visual {
+    display: flex;
+    gap: 2px;
+    max-inline-size: 20rem;
+    min-inline-size: 0;
+    margin-block-end: var(--sp-1);
+    overflow: hidden;
+    border-radius: var(--r-sm);
+  }
+
+  .card-swatch {
+    flex: 1;
+    block-size: 2rem;
+    background: var(--swatch);
+    border: 1px solid var(--line);
+    forced-color-adjust: none;
+  }
+
+  .card-figure {
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--field);
+    color: var(--ink);
+    font-size: var(--fs-figure);
+    font-weight: var(--fw-medium);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── what accepting does, a plain part of the tile ─────────────────────── */
+
+  /* A HAIRLINE OVER IT, the one mark between the answers and what they would do. */
+  .does {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .gate-h {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    line-height: var(--lh-head);
+  }
+
+  /* EACH PART UNDER ITS OWN SMALL HEADING. */
   .does-parts {
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    margin-block-start: var(--sp-4);
   }
 
   .does-h {
     margin: 0 0 var(--sp-2);
-    color: var(--ink2);
+    color: var(--dim);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
   }
 
   .cost {
@@ -1125,43 +1268,17 @@
     max-inline-size: var(--measure);
   }
 
-  .cost-label {
-    margin: var(--sp-2) 0 0;
-    color: var(--ink2);
-    font-family: var(--font-ui);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
   .cost-body {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
-  }
-
-  /* THE REASONING KEEPS ITS LINES. */
-  .context {
-    white-space: pre-line;
-    max-inline-size: var(--measure);
   }
 
   .cost-age {
-    margin: var(--sp-2) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  /* THE STANDING SENTENCE OVER THE OPTIONS, at the weight of a hint rather than an alarm, and the
-     same rule `/decide` draws it by: nothing has gone wrong, and this reader is doing exactly what
-     they were invited to do. `--measure` because it is three sentences and a line that runs the
-     width of the page is a line nobody reads. */
-  .cannot {
-    margin: var(--sp-2) 0;
-    max-inline-size: var(--measure);
+    margin: 0;
     color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
+    font-size: var(--fs-body);
   }
 
   .picks {
@@ -1182,13 +1299,13 @@
 
   .pick-title {
     color: var(--ink);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
   }
 
   .pick-detail,
   .pick-hint {
     color: var(--ink2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1199,7 +1316,7 @@
   .source-fold {
     margin-block-start: var(--sp-3);
     color: var(--ink2);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .source-fold > summary {
@@ -1212,28 +1329,28 @@
     }
   }
 
-  /* The canvas's written body (`automations/[id]`), so a script reads the same wherever it is shown: tile-2, no edge. */
+  /* The canvas's written body (`automations/[id]`), so a script reads the same wherever it is shown. */
   .source {
     margin: var(--sp-2) 0 0;
     padding: var(--sp-3);
     overflow: auto;
     max-block-size: 60vh;
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--field);
+    border-radius: var(--r-ctl);
     color: var(--ink2);
     font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
 
-  /* THE HEADING IS THE TILE'S, so the list's own `dt` is said to a screen reader and not drawn twice. */
+  /* THE HEADING IS THE PART'S, so the list's own `dt` is said to a screen reader and not drawn twice. */
   .calls-out {
     display: grid;
     gap: var(--sp-2);
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 1.6;
   }
 
@@ -1246,137 +1363,7 @@
     white-space: nowrap;
   }
 
-  /* THE OPTIONS ARE WELLS OF TILE-2 SIDE BY SIDE IN THEIR TILE, told how many there are: `auto-fit` with three
-     items in a wide column once generated seven tracks, four of them empty (05 §4). Nothing on a card moves or fades
-     when a key reaches it: the focus ring is the only change. */
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(var(--cells, 3), minmax(0, 1fr));
-    gap: var(--sp-2);
-  }
-
-  .cards[data-cells='1'] {
-    --cells: 1;
-  }
-
-  .cards[data-cells='2'] {
-    --cells: 2;
-  }
-
-  .card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    min-inline-size: 0;
-    padding: var(--sp-4);
-    background: var(--s1);
-    border-radius: var(--r-md);
-  }
-
-  /* AN ANSWER IS A PILL that wraps inside itself rather than pushing its card sideways at 390. */
-  .options :global(.btn) {
-    justify-content: flex-start;
-    max-inline-size: 100%;
-    white-space: normal;
-    text-align: start;
-    overflow-wrap: anywhere;
-  }
-
-  .card > :global(.btn) {
-    align-self: start;
-  }
-
-  /* A QUIET PILL ON A TILE-2 WELL IS THE TILE'S WHITE, or it would be the well's own grey and no pill at all. */
-  .cards .card > :global(.btn[data-weight='quiet']:not([data-suggested])) {
-    background: var(--bg);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .cards .card > :global(.btn[data-weight='quiet']:hover:not(:disabled)) {
-      background: var(--s2);
-    }
-  }
-
-  /* THE RECORD'S TWO ANSWERS, side by side at the start of the tile, and stacked full width under a thumb. */
-  .two {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-3);
-  }
-
-  /* THE SUGGESTED ANSWER IS AN OUTLINE WITH A SMALL DOT (DIRECTION §37, his pick): an ink ring and no fill, so it is
-     said and not pre-pressed, and the dot before its words. A screen reader hears "Suggested" after the name. Off for a
-     reader who may not answer, the ring goes quiet with the words. */
-  .options :global(.btn.tap[data-suggested]) {
-    background: transparent;
-    box-shadow: inset 0 0 0 1.5px var(--ink);
-  }
-
-  .options :global(.btn.tap[data-suggested]:disabled) {
-    box-shadow: inset 0 0 0 1.5px var(--line);
-  }
-
-  /* THE ANSWER THE RECORD'S ONE LINE IS FOR, while it is open: the selected ground and an ink edge, a shape and not a
-     shade. */
-  .options :global(.btn.tap[data-on]) {
-    background: var(--selected);
-    box-shadow: inset 0 0 0 1.5px var(--ink2);
-  }
-
-  .dot {
-    flex: none;
-    inline-size: 6px;
-    block-size: 6px;
-    border-radius: var(--r-pill);
-    background: currentColor;
-  }
-
-  .sr {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  /* THE OPTION'S VISUAL, THE TILE'S SHAPE AT THE CARD'S SIZE: swatches share the card's width in one band, a figure
-     is the card's largest type. `--swatch` is set on a chip and read by this one rule, so the colour stays inside its
-     option's box, and forced colours leave it alone because the lining is the thing being chosen. */
-  .card-visual {
-    display: flex;
-    gap: 2px;
-    min-inline-size: 0;
-    overflow: hidden;
-    border-radius: var(--r-sm);
-  }
-
-  .card-swatch {
-    flex: 1;
-    block-size: 3rem;
-    background: var(--swatch);
-    border: 1px solid var(--line);
-    forced-color-adjust: none;
-  }
-
-  .card-figure {
-    padding: var(--sp-3);
-    flex: 1;
-    background: var(--bg);
-    color: var(--ink);
-    font-size: var(--t-xl);
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .card-body {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
-  }
-
-  /* ── the reason and the defer, one tile each ───────────────────────────── */
+  /* ── not now, and the reason the record asks for ───────────────────────── */
 
   .commit {
     display: flex;
@@ -1388,8 +1375,8 @@
     display: block;
     margin-block-end: var(--sp-2);
     color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
   }
 
   .commit-wake {
@@ -1398,33 +1385,30 @@
     gap: var(--sp-3);
     margin-block-start: var(--sp-3);
     color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
   }
 
-  /* A FIELD IS 40 ON TILE-2, radius 12, no border: the fill is its edge. */
+  /* A FIELD IS THE FIELD FILL AT THE CONTROL RADIUS, no border: the fill is its edge. */
   .commit-date {
-    min-block-size: 40px;
+    min-block-size: var(--btn-h);
     padding: 0 var(--sp-3);
-    background: var(--s1);
+    background: var(--field);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-ctl);
   }
 
-  /* A HEADING IS AS TALL AS ITS DESCENDERS, AND HAS ROOM UNDER IT: a line-height with room for a descender, and space
-     between the heading and the field, or the tails of "Why" and "yet" are painted over by the field under them. */
+  /* A HEADING IS AS TALL AS ITS DESCENDERS, AND HAS ROOM UNDER IT, or the tails of "Why" and "yet" are painted over by
+     the field under them. */
   .commit-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
     margin: 0 0 var(--sp-2);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-row);
-    font-weight: 600;
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
     line-height: 1.4;
   }
 
@@ -1432,12 +1416,12 @@
     inline-size: 100%;
     min-block-size: 40px;
     padding: 10px var(--sp-3);
-    background: var(--s1);
+    background: var(--field);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     resize: vertical;
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
@@ -1445,14 +1429,14 @@
 
   .commit-fix {
     margin: var(--sp-2) 0 0;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .commit-actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
     margin-block-start: var(--sp-4);
   }
 
@@ -1462,13 +1446,12 @@
     display: grid;
     gap: var(--sp-2);
     max-inline-size: var(--measure);
-    margin-block-start: var(--sp-4);
   }
 
   .line-label {
     color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
   }
 
   .line-row {
@@ -1478,18 +1461,18 @@
     gap: var(--sp-2);
   }
 
-  /* A FIELD IS 40 ON TILE-2, radius 12, no border: the fill is its edge. Kept clear of the sticky bar when focused. */
+  /* A FIELD IS THE FIELD FILL AT THE CONTROL RADIUS. Kept clear of the sticky bar when focused. */
   .line-field {
     flex: 1 1 18ch;
     min-inline-size: 0;
-    min-block-size: 40px;
+    min-block-size: var(--btn-h);
     padding: 0 var(--sp-3);
-    background: var(--s1);
+    background: var(--field);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
   }
 
@@ -1501,14 +1484,7 @@
   .note-kept {
     margin: var(--sp-3) 0 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  .third {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    margin-block-start: var(--sp-2);
+    font-size: var(--fs-meta);
   }
 
   /* ── the receipt ───────────────────────────────────────────────────────── */
@@ -1525,15 +1501,15 @@
     gap: var(--sp-3);
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .settled-choice {
     margin: var(--sp-3) 0 var(--sp-1);
     color: var(--ink);
-    font-size: var(--t-group);
-    font-weight: 600;
-    line-height: 24px;
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
+    line-height: var(--lh-head);
   }
 
   .settled-reason {
@@ -1544,7 +1520,7 @@
   .settled-note {
     margin: var(--sp-3) 0 0;
     color: var(--dim);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .settled-applied {
@@ -1559,37 +1535,36 @@
   .settled-where {
     margin: var(--sp-3) 0 0;
     color: var(--dim);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
-  /* THE WAY ON WRAPS, because on a phone the next question, the queue and the inbox are three
-     buttons that do not fit one line at 44px each. */
+  /* THE WAY ON WRAPS, because on a phone the next question, the queue and the inbox do not fit one line. */
   .onward {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
   }
 
+  /* THE COMMENTS, UNDER A HAIRLINE IN THE SAME TILE, so what was said is read with the question it is about. */
   .thread {
-    margin-block-start: var(--sp-5);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  /* THE THREAD'S OWN AIR IS THE TILE'S NOW, and its heading reads as the tile's other heading does. */
+  .thread > :global(.thread) {
+    margin-block: 0;
+  }
+
+  .thread :global(.thread-title) {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
   }
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-
-    /* The gate is a first-class phone surface, not a degraded one: options as stacked wells, and the
-       reason field above the fold. Decisions get made from a phone (19 §3). */
-    .cards {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
-
-  @media (pointer: coarse) and (width < 600px) {
-    .two {
-      flex-direction: column;
-      align-items: stretch;
+      padding: var(--sp-3) var(--gutter) var(--sp-8);
     }
   }
 </style>

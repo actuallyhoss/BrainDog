@@ -63,6 +63,7 @@
   import { Picked } from './picked.svelte.ts';
   import { RowHost } from './row-host.svelte.ts';
   import RowPanel from './RowPanel.svelte';
+  import ChangesPanel from './ChangesPanel.svelte';
   import RowVerbMenu from './RowVerbMenu.svelte';
   import { blockKeys } from './recompose.ts';
   import { arrivedNow, keepLook, keptHere, lookOrder, lookPage, offerKey, offered, offerUndo, placedOf, undoLook } from './look.ts';
@@ -75,6 +76,7 @@
     reread = async () => {},
     was = null,
     select = false,
+    whole = false,
   }: {
     /** The page's address, which arranging writes against and a missing page names. */
     slug: string;
@@ -90,6 +92,8 @@
     was?: LiveBlock[] | null;
     /** Whether a home's queues may be chosen several at a time and answered from one bar, as Decide's are. */
     select?: boolean;
+    /** Whether a home's questions are drawn whole (Decide) rather than compact (everywhere else). */
+    whole?: boolean;
   } = $props();
 
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
@@ -192,22 +196,13 @@
   let arranger = $state<ReturnType<typeof Arrange>>();
 
   /**
-   * WHETHER THE PAGE OPENS ON ITS SENTENCE, read as a tile that holds the page's name and tools as well (`lead.ts`). The
-   * head then rides inside that tile, over its top, and the sentence under it is the headline, at every width. Not while
-   * arranging, where every block is a list item with a bar of its own. A page a reader may narrow keeps it, with the
-   * filter strip under the headline (`PageBody`'s `strip`), and a page with a rail keeps it, with the headline over both
-   * columns. The blocks are read as the body draws them, so a block it hides for holding nothing does not stand first.
+   * WHETHER THE PAGE OPENS ON ITS SENTENCE (`lead.ts`), which is then the header's line and not a tile (DIRECTION §39,
+   * "page header, not a hero"): the name at 28 with its icon, the sentence once under it at 17 in the body ink, and the
+   * board after. The sentence was a 40px headline in a white card of its own, with the name riding over its top, and it
+   * ate the top fifth of every page. Not while arranging, where every block is a list item with a bar of its own. The
+   * blocks are read as the body draws them, so a block it hides for holding nothing does not stand first.
    */
   const led = $derived(!!live && !arranging && !showSource && leadIndex(emptyHidden(live.page.blocks)) >= 0);
-
-  /**
-   * WHETHER THE NAME OVER THE HEADLINE WOULD ONLY SAY THE NAV AGAIN: a page that is its own section's ("Money" in the
-   * Money section) is the item the top bar already marks, so its name is not drawn over the headline as well. It stays
-   * the page's `h1` for a screen reader. A page under another ("Kiln" in Projects) keeps it, as it says where it is.
-   */
-  const named = $derived(
-    led && !!live && (live.page.page.nav?.section ?? '').trim().toLowerCase() === live.page.page.title.trim().toLowerCase(),
-  );
 
   /**
    * WHETHER THE PAGE SAYS WHAT IT IS ITSELF: a drawn `note lead` anywhere among its blocks. Such a page does not get the
@@ -410,7 +405,7 @@
 {:else if mode === 'page'}
   <!-- THE PAGE GIVES UP WHAT THE DOCKED PANEL TAKES, past the gutter it already pads by (`ui/Panel.svelte`'s `--dock-w`,
        0px while no panel is docked), so a row open beside the page never sits over its head or its tiles. -->
-  <div class="hosted" data-named={named ? '' : undefined}>
+  <div class="hosted">
   <!-- `define="page"`: the rail says "1 suggested page" on every screen and this is the first place somebody is looking
        at one. Not on a page that has its own headline sentence, which says what this page is better than the noun. -->
   <PageHead
@@ -419,7 +414,6 @@
     kicker={live.page.page.nav?.section}
     title={live.page.page.title}
     define={headlined ? undefined : 'page'}
-    over={led}
   >
     {#snippet actions()}
       {#if !arranging}
@@ -462,6 +456,7 @@
   </div>
   {#if hosting}
     <RowPanel {host} />
+    <ChangesPanel {host} />
     <RowVerbMenu {host} {reread} />
   {/if}
 {:else if mode === 'home'}
@@ -503,6 +498,7 @@
     {/if}
     <PageBody
       mode="home"
+      {whole}
       page={toArrange?.page ?? live.page.page}
       blocks={all}
       now={toArrange?.now ?? live.now}
@@ -557,17 +553,6 @@
     min-inline-size: 0;
     padding-inline-end: max(0px, calc(var(--dock-w, 0px) - var(--gutter)));
     transition: padding-inline-end var(--d-panel) var(--ease-sheet);
-  }
-
-  /* THE NAME THE NAV ALREADY SAYS, kept for a screen reader and taken off the screen: the tools keep their place at the
-     end of the row, and the headline is the first thing read. */
-  .hosted[data-named] :global(.head[data-over] .title) {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
 
   /* ── a home's page menu ───────────────────────────────────────────────────

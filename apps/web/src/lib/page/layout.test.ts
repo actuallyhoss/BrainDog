@@ -19,7 +19,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 
 import { blockOf } from '../record/page-live.ts';
-import { boxesOf, paired, layoutOf, mainSpan, splitAreas, sticks, widened, type Layout } from './layout.ts';
+import { boardRail, boxesOf, paired, layoutOf, mainSpan, snapped, splitAreas, sticks, TILE_SPANS, widened, type Layout } from './layout.ts';
 
 const RAIL: Layout = { rail: 4, sticky: false };
 
@@ -284,4 +284,38 @@ test('A BLOCK THAT MAY NOT BE HALVED STANDS ALONE and the pairing starts again a
 test('AN AUTHOR`S OWN WIDTH IS KEPT, and a hidden block takes no place between two that pair', () => {
   assert.deepEqual(paired([k('todo', 6), k('feed', 6), k('timeline')]), [6, 6, 12]);
   assert.deepEqual(paired([k('todo'), k('stat', 12, { drawn: false }), k('feed')]), [6, 12, 6]);
+});
+
+/* ── the board's widths (DIRECTION §39) ─────────────────────────────────────── */
+
+const at = (...spans: number[]) => spans.map((span) => ({ span, drawn: true }));
+
+test('EVERY TILE ON THE BOARD IS A QUARTER, A THIRD, A HALF, TWO THIRDS OR THE WHOLE ROW, and a whole row stays whole', () => {
+  assert.deepEqual(snapped(at(12)), [12]);
+  assert.deepEqual(snapped(at(6, 6)), [6, 6]);
+  assert.deepEqual(snapped(at(5, 7)), [4, 8]);
+  assert.deepEqual(snapped(at(4, 4, 4)), [4, 4, 4]);
+  assert.deepEqual(snapped(at(2, 10)), [4, 8]);
+  assert.deepEqual(snapped(at(3, 3, 3, 3)), [3, 3, 3, 3]);
+  for (const row of [at(5, 7), at(2, 10), at(7, 5), at(1, 11), at(9, 3), at(5, 5, 2)]) {
+    const got = snapped(row);
+    assert.equal(
+      got.reduce((a, b) => a + b, 0),
+      12,
+      `${row.map((b) => b.span)} is a whole row and draws as one`,
+    );
+    for (const s of got) assert.ok(TILE_SPANS.includes(s), `${s} is a width the board has`);
+  }
+});
+
+test('A ROW THAT WAS NOT WHOLE STAYS WITHIN THE ROW, and a hidden block keeps its span and takes no place', () => {
+  assert.deepEqual(snapped(at(5)), [6]);
+  assert.deepEqual(snapped(at(2)), [3]);
+  assert.deepEqual(snapped(at(7, 4)), [8, 4]);
+  assert.deepEqual(snapped([{ span: 5, drawn: false }, { span: 7, drawn: true }]), [5, 8]);
+  for (const s of snapped(at(2, 2, 2, 2, 2, 2))) assert.equal(s, 3, 'six in a row are quarters, and wrap');
+});
+
+test('THE RAIL IS A THIRD OF THE BOARD AND THE MAIN COLUMN TWO, whatever rail the page declares', () => {
+  for (const rail of [3, 4, 5]) assert.deepEqual(boardRail({ rail, sticky: false }), { main: 8, rail: 4 }, `rail ${rail}`);
 });

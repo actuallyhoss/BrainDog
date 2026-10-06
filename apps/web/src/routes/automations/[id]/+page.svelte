@@ -30,7 +30,7 @@
   THE LOOK. The trigger and every step are tiles on the ground, joined by `--rule`
   lines, each with its icon in a well; the card being edited has an ink well and the docked panel beside it
   (`Inspector.svelte`), so the flow stays in view while it is filled in. Try it is a tile under the flow, and Try and
-  Save ride in a glass bar at the foot. Runs opens on a tile of how the last runs went, a bar of their endings and a
+  Save ride in a bar at the foot. Runs opens on a tile of how the last runs went, a bar of their endings and a
   sparkline of how long each took, with the one line that says what they mean, and the runs sit on the ground under
   it; Versions are rows on the ground, and As written is the declaration in a tile. The sentence under the title is the
   last run and the next, and a failed last run is its red phrase.
@@ -1042,14 +1042,15 @@
   }
 
   /**
-   * TRY AND SAVE STAY IN REACH AT EVERY WIDTH, in a glass bar at the foot of the column (chrome is glass). A
-   * flow of twenty cards puts them two screens down, and they are the two things the page is for.
+   * TRY AND SAVE STAY IN REACH AT EVERY WIDTH, in a bar at the foot of the column: an opaque tile with one hairline
+   * round it, no glass (DIRECTION §39). A flow of twenty cards puts them two screens down, and they are the two things
+   * the page is for.
    *
-   * ON A PHONE IT FLOATS ABOVE THE TAB BAR, NOT UNDER IT. Below 900px the scroller is the shell's `.body`, whose
-   * scrollport runs to the bottom of the window, and `TabBar` floats `--inset` over its last `--tabbar`, so this sticks
-   * a step above that. It is the two buttons on one row, 44 + 8 = 52px, which is `--sticky`, the most anything sticky
-   * may be on a phone. The sentence, Undo and Run now sit in the flow above it. At
-   * 900 and up there is no tab bar and it floats `--inset` over the bottom edge, at the column's end.
+   * ON A PHONE IT SITS ABOVE THE TAB BAR, NOT UNDER IT. Below 900px the scroller is the shell's `.body`, whose
+   * scrollport runs to the bottom of the window, and `TabBar` is docked to the bottom edge over its last `--tabbar`, so
+   * this sticks a step above that. It is the two buttons on one row, 44 + 8 = 52px, which is `--sticky`, the most
+   * anything sticky may be on a phone. The sentence, Undo and Run now sit in the flow above it. At 900 and up there is
+   * no tab bar and it floats `--inset` over the bottom edge, at the column's end.
    */
   .bar {
     position: sticky;
@@ -1060,22 +1061,14 @@
     gap: 6px;
     align-self: flex-end;
     padding: var(--sp-1);
-    background: var(--glass);
-    backdrop-filter: var(--glass-blur);
-    border-radius: var(--r-pill);
+    background: var(--tile);
+    border-radius: var(--r-ctl);
     box-shadow: var(--glass-edge), var(--e2);
-  }
-
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    .bar {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
   }
 
   @media (width < 900px) {
     .bar {
-      inset-block-end: calc(var(--tabbar) + var(--inset) + var(--sp-2));
+      inset-block-end: calc(var(--tabbar) + var(--sp-2));
       align-self: stretch;
       max-block-size: var(--sticky);
       border-radius: var(--r-lg);
@@ -1107,37 +1100,23 @@
     }
   }
 
-  /* THE HEAD'S "…": a 36px circle, as every icon control in a toolbar is. */
+  /* THE HEAD'S "…": a tile-coloured rectangle on the board, as every quiet control beside the name is
+     (`PageHead.svelte`): no glass, no edge, no shadow (DIRECTION §39). */
   .more-trigger {
     display: flex;
     align-items: center;
     justify-content: center;
     inline-size: var(--ctl-h);
     min-block-size: var(--ctl-h);
-    border-radius: var(--r-pill);
-    background: var(--glass);
-    box-shadow: var(--glass-edge);
+    border-radius: var(--r-ctl);
+    background: var(--tile);
     color: var(--ink);
     transition: background var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .more-trigger:hover {
-      background: var(--glass-strong);
-    }
-  }
-
-  /* GLASS NEVER HOLDS GLASS: in the compact bar the circle drops its own, and keeps it on a phone, whose head is never
-     the glass bar (`PageHead.svelte`). */
-  :global(.head[data-under]) .more-trigger {
-    background: transparent;
-    box-shadow: none;
-  }
-
-  @media (width < 900px) {
-    :global(.head[data-under]) .more-trigger {
-      background: var(--glass);
-      box-shadow: var(--glass-edge);
+      background: color-mix(in srgb, var(--ink) 5%, var(--tile));
     }
   }
 

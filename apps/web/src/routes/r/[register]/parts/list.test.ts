@@ -17,6 +17,7 @@ import {
   lanesOf,
   readDefault,
   sameDefault,
+  standOf,
   viewOf,
   writeDefault,
   type Keep,
@@ -177,4 +178,15 @@ test('A LIST OPENED AT ITS OWN ADDRESS ARRIVES, and a first load whose `from` ha
   assert.equal(arrivedAt(nowhere, at('/r/tasks?sort=due:asc')), null, 'an address that asks already is kept');
   assert.equal(arrivedAt(nowhere, null), null);
   assert.equal(arrivedAt(nowhere, { url: null, params: null }), null);
+});
+
+test('a row stands open, done or late, by what the list declares finished and nothing else', () => {
+  assert.equal(standOf(tasks, 'open', false), 'open');
+  assert.equal(standOf(tasks, 'doing', false), 'open');
+  assert.equal(standOf(tasks, 'done', false), 'done');
+  /* LATE OUTRANKS THE WORD, and a finished row is never late, whatever its date. */
+  assert.equal(standOf(tasks, 'doing', true), 'late');
+  assert.equal(standOf(tasks, 'done', true), 'done');
+  /* A LIST THAT DECLARES NOTHING FINISHED has every row open. */
+  assert.equal(standOf(leads, 'warm', false), 'open');
 });

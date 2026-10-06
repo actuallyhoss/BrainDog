@@ -217,12 +217,9 @@
 
 <svelte:head><title>{titleOf(title)}</title></svelte:head>
 
-<!-- `display: contents`, so the sticky head still sticks to the panel. THE NAME IS NOT DRAWN WHEN IT IS THE NAV'S OWN
-     WORD: "Today" under the Today item said the place twice, so the date leads and the line follows. It stays the `h1`
-     for a screen reader; a use case's own word for Home is drawn, as the nav does not say it. -->
-<div class="home-head" data-named={title === copy.today && (slashed || lead?.text) ? '' : undefined}>
-  <PageHead {title} kicker={today} sentence={slashed ? slashSaid : lead?.text} needs={slashed ? undefined : lead?.needs || undefined} />
-</div>
+<!-- THE PAGE'S NAME WITH ITS ICON, as every place's header draws it (DIRECTION §39), the day over it and the one line
+     under it. -->
+<PageHead {title} icon="today" kicker={today} sentence={slashed ? slashSaid : lead?.text} needs={slashed ? undefined : lead?.needs || undefined} />
 
 <!--
   THE MODEL'S LINE, in the head's own sentence: the same words in the same type, and the rules' red phrase where it says
@@ -294,19 +291,6 @@
 
 <style>
   /* ── the head ─────────────────────────────────────────────────────────── */
-
-  .home-head {
-    display: contents;
-  }
-
-  .home-head[data-named] :global(.head .title) {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
 
   /* THE LINE IS ITS SENTENCE'S ONE CHILD, so a block of its own changes nothing it draws; it holds who said it. */
   .home-line {

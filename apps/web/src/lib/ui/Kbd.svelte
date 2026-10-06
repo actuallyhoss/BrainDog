@@ -62,7 +62,7 @@
     white-space: nowrap;
   }
 
-  /* THE CAP: Geist Mono 12 on the `--s1` fill, an 18px square at its smallest, radius `--r-sm`, and no
+  /* THE CAP: Geist Mono 12 on the `--field` fill, an 18px square at its smallest, radius `--r-sm`, and no
      border. The old raised cap with a thicker bottom edge was a picture of a keyboard; this is a label. */
   .kbd {
     display: inline-grid;
@@ -71,8 +71,8 @@
     min-inline-size: 18px;
     block-size: 18px;
     padding: 0 var(--sp-1);
-    background: var(--s1);
-    border-radius: var(--r-sm);
+    background: var(--field);
+    border-radius: 4px;
     color: var(--ink2);
     font-family: var(--font-id);
     font-size: var(--t-xs);

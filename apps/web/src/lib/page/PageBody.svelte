@@ -29,7 +29,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
-  import { boxesOf, layoutOf, mainSpan, ONE_UNDER, PAIR_FROM, paired, slotOf, splitAreas, sticks, widened, type Run } from './layout.ts';
+  import { areaOf, boardRail, boxesOf, layoutOf, ONE_UNDER, PAIR_FROM, paired, slotOf, snapped, splitAreas, sticks, widened, type Run } from './layout.ts';
   import { emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
@@ -39,7 +39,8 @@
   import Changed from './Changed.svelte';
   import { leadIndex } from './lead.ts';
   import { blockKeys, recomposer, rewritten } from './recompose.ts';
-  import { lookOrder, nextOf, placedOf } from './look.ts';
+  import { lookOrder, nextOf, placedOf, repeatsFirst } from './look.ts';
+  import { asksAside } from './asks.ts';
   import NextStep from './NextStep.svelte';
 
   let {
@@ -56,12 +57,15 @@
     host = null,
     pick = null,
     onwalk = null,
+    whole = false,
   }: {
     /**
      * `page` is `/p/<slug>`, with its block keys. `home` is a home's body: its blocks that hold nothing are not drawn, a
      * long one folds, and the keys walk rows across every block. `preview` is drawn inside another screen and is inert.
      */
     mode: 'page' | 'home' | 'preview';
+    /** Questions drawn whole, as Decide's own form draws them, never in the compact form a home uses elsewhere. */
+    whole?: boolean;
     /** The page as the record answered it, whose `layout` says whether there is a rail. */
     page: LivePageDecl;
     /** Every block the page draws, declared then added, each at the index its slot keeps. */
@@ -75,7 +79,7 @@
     ids?: string;
     /** The level each block's name is drawn at. */
     level?: 2 | 3;
-    /** The page's head rides over the top of the lead tile on a wide screen (`PageHead`'s `over`), so the tile leaves it room. */
+    /** The page's sentence is the header's line (`PageView`'s `led`): lifted out of the board, over both columns. */
     headed?: boolean;
     /** What narrows the page (its filter strip), drawn under the headline on a page whose head rides over it. */
     strip?: Snippet | null;
@@ -115,6 +119,9 @@
   const quiet = $derived(emptyHidden(blocks, mode === 'page'));
   const drawable = $derived(mode === 'preview' || arranging ? blocks : quiet);
 
+  /** The blocks that open a board without being a card on it: a line to type into, a form, a heading. */
+  const OPENERS: ReadonlySet<string> = new Set(['capture', 'inputs', 'section']);
+
   /** Whether a block leads the page (its line, a lead figure row, a lead queue), which keeps the whole row. */
   const isLead = (b: LiveBlock): boolean => (b as { lead?: unknown }).lead === true;
 
@@ -129,11 +136,43 @@
      a view over the declared blocks, so every index the page writes by stays the block's own. Not while arranging,
      where the order on screen is the one being written. */
   const look = $derived(page.look ?? null);
-  const order = $derived(lookOrder(blocks.map((b, i) => placedOf(b, keys[i]!)), look));
+  const looked = $derived(lookOrder(blocks.map((b, i) => placedOf(b, keys[i]!)), look));
+
+  /**
+   * A PAGE'S WAITING QUESTIONS NEVER LEAD IT WHEN IT IS ABOUT SOMETHING ELSE (`asks.ts`, DIRECTION §39): on a page at its
+   * own address they are drawn compact, in the side column or after the page's own figures, so Money opens on its cash.
+   * Home leads with what needs you, and keeps it there, compact. Not while arranging, where the order is the one being
+   * written, and not in a preview.
+   */
+  /** The work column's width, measured below (`twoUp`); declared here, as the questions' place reads it. */
+  let workWidth = $state<number | null>(null);
+  const asks = $derived.by(() => {
+    if (mode !== 'page' || arranging) return { order: looked, rail: new Set<number>(), compact: new Set<number>(), spans: new Map<number, number>() };
+    const read = blocks.map((b, i) => {
+      const at = drawable[i] as (LiveBlock & { box?: unknown; joins?: unknown; lead?: unknown }) | undefined;
+      return {
+        kind: b.kind,
+        drawn: at?.drawn === true,
+        lead: (b as { lead?: unknown }).lead === true,
+        box: at?.box === true,
+        joins: at?.joins === true,
+        area: areaOf(b, layout),
+        span: slotOf(b, i, layout).span,
+      };
+    });
+    /* WIDE AS THE PAGE PAIRS ITS BLOCKS (`twoUp`), read off the measure and not off `twoUp`, which reads this order. */
+    return asksAside(read, looked, layout !== null, workWidth !== null && workWidth >= PAIR_FROM);
+  });
+  const order = $derived(asks.order);
+  /** Whether a block's questions are drawn compact: every queue on a home, and the questions a page sets aside. */
+  const compactAt = (i: number, kind: string): boolean => !whole && (mode === 'home' ? kind === 'queue' : asks.compact.has(i));
+  /** Whether the look's next action is a question the page set aside: it is on the board, and the line would lead with it again. */
+  const askedAside = (row: string | undefined): boolean =>
+    row !== undefined && blocks.some((b, i) => asks.compact.has(i) && (b.queue ?? []).some((q) => q.id === row));
   /* THE ONE NEXT ACTION THE LOOK NAMES, under the headline: a row of the page, or a question on it waiting on the
      reader. Not in a preview, which is inert. */
   const questions = $derived(new Set(blocks.flatMap((b) => (b.queue ?? []).map((q) => q.id))));
-  const next = $derived(mode === 'preview' ? null : nextOf(look, questions));
+  const nextSaid = $derived(mode === 'preview' ? null : nextOf(look, questions));
 
   /**
    * The blocks in the order and at the widths currently in force, each carrying the index it had in the declaration.
@@ -143,7 +182,12 @@
    * every width: the layout you confirmed was not the layout you got.
    */
   const laid = $derived.by(() => {
-    const slots = arrangement?.slots ?? order.map((i) => slotOf(drawable[i]!, i, layout));
+    const slots =
+      arrangement?.slots ??
+      order.map((i) => {
+        const slot = slotOf(drawable[i]!, i, layout);
+        return asks.rail.has(i) ? { ...slot, area: 'rail' as const } : slot;
+      });
     return slots.map((slot) => ({ slot, block: drawable[slot.i] })).filter((x): x is { slot: Slot; block: LiveBlock } => Boolean(x.block));
   });
 
@@ -155,9 +199,8 @@
   const split = $derived(splitAreas(pairs, layout, (x) => x.slot.area));
 
   /**
-   * THE HEADLINE, LIFTED: the page's sentence when the head rides over it (`headed`, `lead.ts`). On a page with a rail it
-   * is drawn across the page over both columns, so the head's row and its tools sit over a tile as wide as they are,
-   * and the main column starts under it.
+   * THE HEADLINE, LIFTED: the page's sentence, drawn as the header's line under the page's name and not as a tile
+   * (`headed`, `lead.ts`, DIRECTION §39). Over both columns on a page with a rail, and the board starts under it.
    */
   const lifted = $derived.by((): Laid | null => {
     if (!headed) return null;
@@ -194,6 +237,14 @@
     const top = lifted ? [lifted] : [];
     return (railFirst ? [...top, ...railRest, ...mainRest] : [...top, ...mainRest, ...railRest]).filter((x) => x.block.drawn);
   });
+
+  /**
+   * THE ONE NEXT ACTION UNDER THE HEADER, only where it is not the first thing on the board already (`look.ts`
+   * `repeatsFirst`, DIRECTION §39): the line said again what the first card asked, straight under it.
+   */
+  /* THE FIRST CARD, NOT THE FIRST BLOCK: the line a task is typed into and a heading are not what the eye reads first. */
+  const firstTile = $derived(reading.find((x) => x !== headline && !OPENERS.has(x.block.kind))?.block ?? null);
+  const next = $derived(nextSaid && !repeatsFirst(look, firstTile) && !askedAside(look?.next?.row) ? nextSaid : null);
 
   /**
    * The runs an area draws in. A boxed section and the blocks after it share one surface while reading; while arranging
@@ -258,7 +309,6 @@
    * two and goes back to one as a panel opens, the change played as a recomposition (below). `null` until the page is
    * first measured, which happens before it is first painted.
    */
-  let workWidth = $state<number | null>(null);
   $effect(() => {
     const el = pageEl;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -296,7 +346,9 @@
     for (const run of runsOf(layout ? mainRest : pairs)) {
       let got = widened(run.items.map((x) => ({ span: x === lifted ? COLUMNS : x.slot.span, drawn: x.block.drawn })));
       if (twoUp) {
-        const now = got;
+        /* THE QUESTIONS SET BESIDE THE FIGURE THAT OPENS THE PAGE, and the figure beside them (`asks.ts`): set before the
+           pairing, so neither is paired with the block after it and that block is not left half a row beside a hole. */
+        const now = run.items.map((x, n) => asks.spans.get(x.slot.i) ?? got[n]!);
         got = paired(
           run.items.map((x, n) => ({
             kind: x.block.kind,
@@ -307,8 +359,10 @@
           })),
         );
       }
+      /* AND EVERY ROW ON THE BOARD'S OWN WIDTHS (DIRECTION §39): a quarter, a third, a half, two thirds or the whole row. */
+      const board = snapped(run.items.map((x, n) => ({ span: x === lifted ? COLUMNS : got[n]!, drawn: x.block.drawn })));
       run.items.forEach((x, n) => {
-        if (x !== lifted && got[n] !== x.slot.span) out.set(x.slot.i, got[n]!);
+        if (x !== lifted && board[n] !== x.slot.span) out.set(x.slot.i, board[n]!);
       });
     }
     return out;
@@ -730,7 +784,7 @@
       case 'Escape':
         if (inPanel) return;
         /* THE PANEL FIRST, then the cursor, then the choice of questions. */
-        if (host?.panelOpen) {
+        if (host?.panelOpen || host?.changesOpen) {
           host.close();
           break;
         }
@@ -885,6 +939,7 @@
         {now}
         {level}
         fold={mode === 'home'}
+        compact={compactAt(slot.i, block.kind)}
         rows={mode === 'home' || (mode === 'page' && host) ? { cursor: cursorIn(slot.i), onrowfocus: rowFocus(slot.i) } : null}
         verbs={verbsFor(slot.i)}
         pick={mode === 'preview' ? null : pick}
@@ -894,9 +949,9 @@
     <!-- UNDER THE HEADLINE: the one next action the look names, wherever the headline is drawn. -->
     {#if next && !arranging && headline?.at === at}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
     {#if lifted?.at === at}
-      <!-- THEN what narrows the page, then what changed on it, before what it holds. -->
+      <!-- THEN what narrows the page, as part of its header, then what was just done on it, before what it holds. -->
       {#if strip}<div class="page-strip">{@render strip()}</div>{/if}
-      {#if host && mode === 'page'}<Changed {host} /><JustChanged {host} />{/if}
+      {#if host && mode === 'page'}<JustChanged {host} />{/if}
     {/if}
   {/if}
 {/snippet}
@@ -923,7 +978,7 @@
     <div
       class="area"
       data-area="main"
-      style="--area-span:{railShown ? mainSpan(layout) : COLUMNS}"
+      style="--area-span:{railShown ? boardRail(layout).main : COLUMNS}"
       role={arranging ? 'list' : undefined}
       aria-label={arranging ? copy.mainColumn : undefined}
     >
@@ -937,7 +992,7 @@
     <div
       class="area"
       data-area="rail"
-      style="--area-span:{mainShown ? layout.rail : COLUMNS}"
+      style="--area-span:{mainShown ? boardRail(layout).rail : COLUMNS}"
       data-sticky={stuck ? '' : undefined}
       role={arranging ? 'list' : undefined}
       aria-label={arranging ? copy.sideRail : undefined}
@@ -958,7 +1013,7 @@
   <!-- A PAGE WITH NO HEADLINE STILL OPENS ON THE LOOK'S NEXT ACTION, before what narrows it. -->
   {#if next && !headline && !arranging}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
   {#if strip && !lifted}<div class="page-strip">{@render strip()}</div>{/if}
-  {#if host && mode === 'page' && !arranging && !lifted}<Changed {host} /><JustChanged {host} />{/if}
+  {#if host && mode === 'page' && !arranging && !lifted}<JustChanged {host} />{/if}
   {#if layout}
     <!-- TWO COLUMNS, the main one a twelve-column flow of its own so a block's `span` keeps its meaning inside it, and
          the rail one stack. Each is drawn only while it holds a block, so a page whose every block is in one of them
@@ -974,6 +1029,8 @@
   {:else}
     {@render column(pairs)}
   {/if}
+  <!-- WHAT WAS CHANGED FOR THE READER THIS WEEK, one line at the foot of the board; the list opens in the panel. -->
+  {#if host && mode === 'page' && !arranging}<Changed {host} />{/if}
 </div>
 
 <style>
@@ -984,9 +1041,10 @@
      column to the rightmost, and people lost their spatial memory of where a control lived. A flow cannot do that: the
      order you declared is the order you get, at every width.
 
-     THE PAGE SITS ON THE GROUND AND EVERY BLOCK IS A TILE ON IT: 12 between tiles on both axes, and the
-     tiles of one row stretch to one height, so a row reads as a row of tiles rather than a skyline. The page has no
-     surface of its own; the ground and its light are the shell's.
+     ONE BOARD (DIRECTION §39): EVERY BLOCK IS A TILE ON IT, flat, opaque, no border and no shadow, radius 16, 20 in,
+     12 between tiles on both axes, and the tiles of one row stretch to one height, so a row reads as a row of tiles
+     rather than a skyline. Nothing floats on the board but the header. The page has no surface of its own; the board's
+     colour is the shell's, and the tile's is `--tile` beside it (`packages/skin/tokens.css`).
 
      NO CAP ON THE PAGE, ONLY ON THE PROSE (DIRECTION §36, §38). The page is as wide as the window, inside the fluid
      gutters, and once the work column is wide enough its full-width blocks pair into two columns (`twoUp`) rather than
@@ -995,11 +1053,11 @@
 
      `position: relative` IS FOR A BLOCK FADING OUT, which is laid over the place it held (`recompose.ts`). */
   .page {
-    --tile-pad: 20px;
+    --slot-pad: var(--tile-pad);
     position: relative;
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: var(--sp-3);
+    gap: var(--tile-gap);
     padding: var(--sp-3) var(--gutter) var(--sp-9);
   }
 
@@ -1026,7 +1084,7 @@
     display: grid;
     grid-column: span var(--area-span, 12);
     align-self: start;
-    gap: var(--sp-3);
+    gap: var(--tile-gap);
     min-inline-size: 0;
   }
 
@@ -1063,8 +1121,9 @@
   }
 
   /* ── the tile ─────────────────────────────────────────────────────────────
-     A BLOCK IS A TILE: the tile surface at the large radius, 20 in, at the first level of depth, and no
-     border. Its heading row is `BlockSlot`'s. */
+     A BLOCK IS A TILE, whatever it draws: a list, a table, the questions, a figure and a chart alike (DIRECTION §39).
+     Lists and tables sat on the ground under their heading and figures sat in tiles, so nothing on a page lined up and
+     half of it looked unfinished. Its heading row is `BlockSlot`'s: the icon, the name at 15 and 600, the count. */
   .block-slot {
     grid-column: span var(--span, 12);
     /* Required, not decorative: the tracks are `minmax(0, 1fr)` and a grid item without it refuses to shrink below its
@@ -1072,9 +1131,9 @@
     min-inline-size: 0;
     /* The landing line is positioned against this. */
     position: relative;
-    padding: var(--tile-pad);
-    background: var(--bg);
-    border-radius: var(--r-lg);
+    padding: var(--slot-pad);
+    background: var(--tile);
+    border-radius: var(--tile-r);
     /* `#b-4` must not scroll underneath the sticky header. Paid once, per anchor. */
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
   }
@@ -1087,16 +1146,16 @@
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: var(--sp-5);
     min-inline-size: 0;
-    padding: var(--tile-pad);
-    background: var(--bg);
-    border-radius: var(--r-lg);
+    padding: var(--slot-pad);
+    background: var(--tile);
+    border-radius: var(--tile-r);
   }
 
   .area[data-area='rail'] .box {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* FORCED COLOURS DELETE THE SHADOW, and a tile with no edge would be words on nothing. */
+  /* FORCED COLOURS DRAW NO FILL, and a tile with no edge would be words on nothing. */
   @media (forced-colors: active) {
     .block-slot,
     .box {
@@ -1104,13 +1163,10 @@
     }
   }
 
-  /* NOT A TILE: a block inside a boxed tile, a section, which is a group heading on the ground, the page's
-     sentence (`note lead`), which is the title row's line under the title, and a list, a table or rows, which sit on
-     the ground under their quiet heading so only figures and charts keep a tile (DIRECTION §37, less bento). */
+  /* NOT A TILE: a block inside a boxed tile, which is a part of that one surface, and the page's sentence (`note lead`),
+     which is the header's line under the page's name. */
   .box > .block-slot,
-  .block-slot:has(> :global(.block[data-kind='section'])),
-  .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])),
-  .block-slot:has(> :global(.block:is([data-primitive='list'], [data-primitive='table'], [data-primitive='rows']):not([data-kind='inputs']))) {
+  .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) {
     padding: 0;
     background: none;
     border: 0;
@@ -1125,64 +1181,56 @@
   }
 
   /**
-   * ON A WIDE SCREEN THE PAGE'S SENTENCE IS A HEADLINE IN A WHITE TILE OF ITS OWN, 40/600, so the screen opens on what
-   * is true and the figures behind it follow.
+   * THE PAGE'S SENTENCE IS THE HEADER'S LINE, NOT A HERO (DIRECTION §39): once, under the name, at 17 in the body ink
+   * and regular weight, at a reading measure, over the whole row, with the board under it. It was 40/600 in a white
+   * card of its own, which pushed the work below the fold and read as a slogan. Pulled up under the head, so the name
+   * and the line read as one header.
    */
-  @media (width >= 900px) {
-    .page[data-mode='page'] > .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) {
-      padding: var(--sp-5) var(--sp-5) var(--sp-5);
-      background: var(--bg);
-      border-radius: var(--r-lg);
-    }
-
-    /* THE HEAD'S ROW IS THE TOP OF THIS TILE, when the page says so: the name and the tools over the headline. */
-    .page[data-mode='page'][data-headed] > .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) {
-      padding-block-start: calc(var(--head-over) + var(--sp-2));
-    }
-
-    .page[data-mode='page'] > .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(p) {
-      max-inline-size: 22em;
-      margin: 0;
-      color: var(--ink);
-      font-size: var(--t-3xl);
-      font-weight: 600;
-      line-height: 1.1;
-      letter-spacing: -0.03em;
-      text-wrap: balance;
-    }
-  }
-
-  /* THE HEADLINE TAKES THE WHOLE ROW, over both columns on a page with a rail, whatever span its author gave it. */
-  .page[data-headed] > .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) {
+  .block-slot:not([data-arranging]):has(> :global(.block[data-kind='note'][data-form='lead'])) {
     grid-column: 1 / -1;
+    margin-block: calc(-1 * var(--sp-2)) var(--sp-1);
   }
 
-  /* WHAT NARROWS THE PAGE, under its headline and across the row, with the gap a row of tiles keeps. */
+  .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(p) {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-group);
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: 0;
+    text-wrap: pretty;
+  }
+
+  /* A FIGURE IN THE LINE READS AT MEDIUM, as the header's own numbers do; never bold. */
+  .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(strong) {
+    font-weight: 500;
+  }
+
+  /* WHAT NARROWS THE PAGE, under its line and across the row: the header's last row. */
   .page-strip {
     grid-column: 1 / -1;
     min-inline-size: 0;
   }
 
-  /**
-   * ON A PHONE THE PAGE'S SENTENCE IS THE HEADLINE TOO, at `--t-title` in ink, as it is at 40 from 900px up. It was
-   * body size under the 30px name, so the one line that says what is true read as a caption, and the questions under
-   * it read louder than it. The name steps down to the label over it (`PageHead`'s `over`).
-   */
-  @media (width < 900px) {
-    .page[data-mode='page'] > .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(p) {
-      margin: 0;
-      color: var(--ink);
-      font-size: var(--t-title);
-      font-weight: 600;
-      line-height: calc(34 / 28);
-      letter-spacing: -0.02em;
-      text-wrap: pretty;
-    }
+  /* ── a section on the board ───────────────────────────────────────────────
+     A SECTION IS A TILE TOO, its heading row the same as every tile's: the icon in its well, the name at 15 and 600,
+     its count, and Show or Hide at the end as a quiet rectangle (DIRECTION §39: buttons are rectangles). The blocks it
+     folds are the tiles after it, which is why it stays their sibling and is not a box round them. No rule under it. */
+  .block-slot > :global(.block[data-kind='section'] .sec) {
+    padding: 0;
+    border: 0;
   }
 
-  /* A group heading keeps air above it and none below, so it reads as the head of the tiles after it. */
-  .block-slot:not(.box > *):has(> :global(.block[data-kind='section'])) {
-    padding-block-start: var(--sp-5);
+  .block-slot > :global(.block[data-kind='section'] .sec-title) {
+    font-size: var(--t-row);
+    line-height: 20px;
+  }
+
+  .block-slot > :global(.block[data-kind='section'] .sec-toggle) {
+    min-block-size: var(--ctl-h-sm);
+    background: var(--s1);
+    border-radius: var(--r-ctl, 8px);
   }
 
   /* The figure's own bottom margin is the LIST's spacing, and the grid already provides it. */
@@ -1229,7 +1277,7 @@
      pseudo-element so nothing reflows under the pointer. `--z-raise` clears its own sibling and stays under every
      overlay. */
   .block-slot[data-drop]::after {
-    --mid: calc(var(--sp-3) / -2 - 1.5px);
+    --mid: calc(var(--tile-gap) / -2 - 1.5px);
     content: '';
     position: absolute;
     z-index: var(--z-raise);

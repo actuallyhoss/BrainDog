@@ -1,0 +1,426 @@
+/*
+ * DECIDE READS LIKE A FORM (DIRECTION §39): one drawing of a question's choices and its buttons, for the one decision
+ * card (`DecisionCard.svelte`, on Home, Decide and every page with a queue) and the question's own page
+ * (`routes/decide/[id]/+page.svelte`), so the two never draw a choice two ways.
+ *
+ * THE CHOICES ARE A VERTICAL LIST OF FULL-WIDTH RECTANGLES, each its name and one line of what it does, a ring at its
+ * start that fills when it is the one chosen, and "Suggested" in the accent's words beside the one an agent suggests.
+ * Then the buttons: Decide (or Accept) filled with the accent, the rest quiet or words only. Rectangles at the control
+ * radius, never pills; a band that warns is said in the button's own words, never a chip.
+ *
+ * UNLAYERED ON PURPOSE. The skin's `kinds/queue.css` sits in `@layer components` and still draws `.queue-act` as a pill
+ * with an outline and a dot for the suggested one, which Today's read-only queue keeps. These classes go on the same
+ * elements (the keys and the queue gate find a choice by `.queue-act`), and an unlayered rule wins over a layered one
+ * whatever its weight, so here they are drawn as choices and nowhere else is touched.
+ */
+
+/* ── the choices ──────────────────────────────────────────────────────────── */
+
+/* A FORM'S MEASURE, NOT THE WINDOW'S: on a wide tile the choices stop where a line of what each does is still read in
+   one sweep, and the buttons under them start at the same edge. */
+.dc-choices {
+  display: grid;
+  gap: var(--sp-2);
+  max-inline-size: 46rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dc-choices > li {
+  display: block;
+  min-inline-size: 0;
+}
+
+.dc-choice {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--sp-3);
+  row-gap: 2px;
+  inline-size: 100%;
+  min-block-size: var(--btn-h);
+  margin: 0;
+  padding: var(--sp-3) 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--tile);
+  box-shadow: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition:
+    background var(--d-state) var(--ease-out),
+    border-color var(--d-state) var(--ease-out);
+}
+
+/* The skin's suggested pill draws a dot before the words; a choice has its ring instead. */
+.dc-choice::before {
+  content: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dc-choice:hover:not(:disabled) {
+    background: var(--field);
+    border-color: var(--edge);
+  }
+}
+
+/* THE ONE CHOSEN: the accent's edge and its first tint, and its ring filled. A shape as well as a shade. */
+.dc-choice[aria-checked='true'],
+.dc-choice[aria-checked='true']:hover {
+  background: var(--action-tint-1);
+  border-color: var(--action);
+}
+
+.dc-choice:disabled {
+  cursor: default;
+}
+
+/* THE RING, a radio's: hollow at rest, the accent with a dot once chosen. On the first line of the name. */
+.dc-ring {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  inline-size: 16px;
+  block-size: 16px;
+  margin-block-start: calc((1lh - 16px) / 2);
+  border: 1.5px solid var(--edge);
+  border-radius: var(--r-round);
+  background: var(--tile);
+}
+
+.dc-choice[aria-checked='true'] .dc-ring {
+  border-color: var(--action);
+  background: var(--action);
+}
+
+.dc-choice[aria-checked='true'] .dc-ring::after {
+  content: '';
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: var(--r-round);
+  background: var(--on-action);
+}
+
+/* WHAT IT DOES RUNS UNDER "SUGGESTED" TOO. The words are laid on the choice's own grid rather than in a column of their
+   own, so only the name's line gives way to the end of the line, and the suggested choice's sentence is as wide as
+   every other's (on a phone the third column took a fifth of its width). Its visual leads, on a line above the name. */
+.dc-choice-main {
+  display: contents;
+}
+
+.dc-choice > .dc-ring {
+  grid-area: 1 / 1;
+}
+
+.dc-choice-main > :is(.dc-choice-name, .dc-choice-hit) {
+  grid-area: 1 / 2;
+}
+
+.dc-choice > :is(.dc-end, .dc-rec) {
+  grid-area: 1 / 3;
+}
+
+.dc-choice-main > .dc-choice-does {
+  grid-row: 2;
+  grid-column: 2 / -1;
+}
+
+.dc-choice-main > :is(.queue-visual, .card-visual) {
+  grid-row: 1;
+  grid-column: 2 / -1;
+}
+
+.dc-choice:has(> .dc-choice-main > :is(.queue-visual, .card-visual)) > .dc-choice-main > :is(.dc-choice-name, .dc-choice-hit),
+.dc-choice:has(> .dc-choice-main > :is(.queue-visual, .card-visual)) > :is(.dc-end, .dc-rec) {
+  grid-row: 2;
+}
+
+.dc-choice:has(> .dc-choice-main > :is(.queue-visual, .card-visual)) > .dc-choice-main > .dc-choice-does {
+  grid-row: 3;
+}
+
+.dc-choice-name {
+  color: var(--ink);
+  font-weight: var(--fw-medium);
+}
+
+/* WHAT IT DOES, one line under its name in the second ink, at the body's size so it is read and not skimmed. */
+.dc-choice-does {
+  color: var(--ink2);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+/* "SUGGESTED", in the accent's words at the end of the name's line: said, not chosen for anybody. */
+.dc-rec {
+  align-self: start;
+  margin-block-start: calc((1lh - 1em) / 2 - 1px);
+  color: var(--action-text);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* THE END OF A CHOICE'S FIRST LINE: "Suggested", and the number key that reaches it where the host's keys do. */
+.dc-end {
+  display: inline-flex;
+  align-self: start;
+  align-items: center;
+  gap: var(--sp-2);
+  block-size: 1lh;
+}
+
+.dc-end > .dc-rec {
+  margin: 0;
+}
+
+/* AN OPTION'S VISUAL leads its words: its colours or its figure, inside the choice and nowhere else. */
+.dc-choice .queue-visual {
+  margin-block-end: var(--sp-1);
+}
+
+/* THE NUMBER KEY THAT REACHES IT, on a host whose keys do, at the end of the line and quiet. */
+.dc-choice .queue-key {
+  align-self: start;
+}
+
+/* A CHOICE WHOSE WORDS HOLD LINKS (the question's own page cites the rows a reason is about): the rectangle is a box,
+   its radio the name, stretched over the whole box, and the links lifted over that, so a press anywhere chooses and a
+   link still opens. A link inside a button is no link at all. The ring round the box is the radio's focus. */
+div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
+  cursor: pointer;
+}
+
+.dc-choice-hit {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: var(--fw-medium);
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.dc-choice-hit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.dc-choice-hit:focus-visible {
+  outline-color: transparent;
+}
+
+.dc-choice:has(> .dc-choice-main > .dc-choice-hit:focus-visible) {
+  outline: 2px solid var(--focus-in);
+  outline-offset: 2px;
+}
+
+.dc-choice-does :is(a, button) {
+  position: relative;
+  z-index: var(--z-raise);
+}
+
+.dc-choice[data-checked],
+.dc-choice[data-checked]:hover {
+  background: var(--action-tint-1);
+  border-color: var(--action);
+}
+
+.dc-choice[data-checked] .dc-ring {
+  border-color: var(--action);
+  background: var(--action);
+}
+
+.dc-choice[data-checked] .dc-ring::after {
+  content: '';
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: var(--r-round);
+  background: var(--on-action);
+}
+
+.dc-choice:has(> .dc-choice-main > .dc-choice-hit:disabled) {
+  cursor: default;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  div.dc-choice:has(> .dc-choice-main > .dc-choice-hit:not(:disabled)):hover:not([data-checked]) {
+    background: var(--field);
+    border-color: var(--edge);
+  }
+}
+
+/* SAID TO A SCREEN READER WITH THE NAME, where the eye reads it at the end of the line. */
+.dc-sr {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* A READER WHO MAY NOT ANSWER reads the same rectangle as words: no ring, no pointer. */
+.dc-choice[data-read] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  cursor: auto;
+}
+
+.dc-choice[data-read] > .dc-choice-main > :is(.dc-choice-name, .dc-choice-hit) {
+  grid-column: 1;
+}
+
+.dc-choice[data-read] > :is(.dc-end, .dc-rec) {
+  grid-column: 2;
+}
+
+.dc-choice[data-read] > .dc-choice-main > :is(.dc-choice-does, .queue-visual, .card-visual) {
+  grid-column: 1 / -1;
+}
+
+/* ── the buttons ──────────────────────────────────────────────────────────── */
+
+.dc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.dc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  box-sizing: border-box;
+  min-block-size: var(--btn-h);
+  margin: 0;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: var(--field);
+  box-shadow: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-ctl);
+  font-weight: var(--fw-medium);
+  line-height: 20px;
+  text-align: start;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition:
+    background var(--d-state) var(--ease-out),
+    color var(--d-state) var(--ease-out);
+}
+
+.dc-btn::before {
+  content: none;
+}
+
+.dc-btn[data-weight='primary'] {
+  background: var(--action);
+  color: var(--on-action);
+}
+
+.dc-btn[data-weight='bare'] {
+  background: none;
+  color: var(--ink2);
+}
+
+/* A ROW OF ANSWERS KEEPS THE FORM'S MEASURE, and Not now stands at its far end, apart from the answers, so "Not yet"
+   and "Not now" are never read as two answers side by side. */
+.dc-actions[data-inline] {
+  max-inline-size: 46rem;
+}
+
+.dc-actions[data-inline] > .dc-later {
+  margin-inline-start: auto;
+}
+
+/* A NUMBER KEY ON THE FILLED BUTTON is in the button's own ink: the skin's dim cap vanished into the accent. */
+.dc-btn[data-weight='primary'] .queue-key {
+  border-color: color-mix(in srgb, var(--on-action) 45%, transparent);
+  color: var(--on-action);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dc-btn:hover:not(:disabled, [aria-disabled='true']) {
+    background: var(--field-hover);
+  }
+
+  .dc-btn[data-weight='primary']:hover:not(:disabled, [aria-disabled='true']) {
+    background: var(--action-hover);
+  }
+
+  .dc-btn[data-weight='bare']:hover:not(:disabled, [aria-disabled='true']) {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+}
+
+/* NOTHING CHOSEN YET, OR A READER WHO MAY NOT: the fill goes with the label, so it never reads as live. */
+.dc-btn:disabled,
+.dc-btn[aria-disabled='true'] {
+  background: var(--field);
+  color: var(--dim);
+  cursor: not-allowed;
+}
+
+.dc-btn[data-weight='bare']:is(:disabled, [aria-disabled='true']) {
+  background: none;
+}
+
+/* The answer the record's one line is for, while it is open: the chosen tint and the accent's edge. */
+.dc-btn[data-on] {
+  background: var(--action-tint-1);
+  box-shadow: inset 0 0 0 1px var(--action);
+  color: var(--ink);
+}
+
+@media (pointer: coarse) {
+  .dc-choice {
+    min-block-size: var(--tap);
+  }
+
+  .dc-btn {
+    min-block-size: 40px;
+    font-size: var(--fs-body);
+  }
+
+  .dc-choice .queue-key {
+    display: none;
+  }
+}
+
+/* ON A PHONE THE BUTTONS STACK FULL WIDTH, the primary first, so a thumb never reaches past the screen's edge, and a
+   choice gives its words the room its padding took. */
+@media (width < 600px) {
+  .dc-choice {
+    column-gap: 10px;
+    padding: var(--sp-3);
+  }
+
+  .dc-actions > .dc-btn:not([data-weight='bare']) {
+    flex: 1 1 100%;
+  }
+
+  /* A ROW OF SHORT ANSWERS SHARES ONE LINE where they fit ("Chase it", "Not yet"), each growing to fill it, and a long one
+     takes a line of its own. */
+  .dc-actions[data-inline] > .dc-btn:not([data-weight='bare']) {
+    flex: 1 1 auto;
+  }
+}

@@ -240,7 +240,7 @@
     inline-size: 36px;
     block-size: 36px;
     background: var(--ink);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
     color: var(--on-ink);
     font-size: var(--t-base);
     font-weight: 600;

@@ -1,16 +1,19 @@
 <!--
-  One control, four weights, and every one of them a pill.
+  One control, three weights, and every one of them a rectangle (DIRECTION §39).
 
-  PRIMARY is an ink pill with the tile's colour for its label, one per screen. QUIET, the default, is the secondary: a
-  `--s1` pill inside a tile, sheet or panel body, and the `--hover-wash` pill on the ground. BARE is words in `--ink2`
-  that take the wash when pointed at. GLASS is the toolbar's pill, frosted over the ground, and is for chrome only.
+  PRIMARY is the working accent's fill with `--on-action` for its label, one per screen. QUIET, the default, is the
+  secondary: the quiet `--field` fill with ink words, the same on a tile and on the board. BARE is the tertiary, words in
+  `--ink2` that take the wash when pointed at. GLASS is kept as a name for the toolbar's callers and draws as QUIET:
+  there is no glass any more.
 
-  THERE IS NO BLUE AND NO RED FILL. `tone` still reaches the element as `data-intent`, so a gate or a test can read what
-  the verb is, but it colours nothing: a destructive verb is its words in ink, asking for a confirm, and red means
-  "needs you" and nothing else.
+  Radius `--r-ctl` (8), `--btn-h` tall (32, 40 under a thumb with the 44 hit box `.tap` adds), 14 medium.
 
-  `kbd` draws the key cap inside the pill at its trailing edge (Geist Mono 12, an 18px cap), so the fast path is printed
-  on the slow one. It is hidden from a screen reader, which already has the verb.
+  THERE IS NO RED FILL. `tone` still reaches the element as `data-intent`, so a gate or a test can read what the verb
+  is, but it colours nothing: a destructive verb says what it costs in its words ("Accept, can't be undone easily"), and
+  red means "late" or "needs you" and nothing else.
+
+  `kbd` draws the key cap inside the button at its trailing edge (Geist Mono 12, an 18px cap), so the fast path is
+  printed on the slow one. It is hidden from a screen reader, which already has the verb.
 
   The invisible hit box is `.tap`: targets are 44 x 44 CSS px on BOTH axes, counting `::before` (13 §7).
 -->
@@ -36,7 +39,7 @@
     href?: string | undefined;
     type?: 'button' | 'submit' | undefined;
     tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;
-    /** `m` is `--ctl-h` (36, 44 under a thumb); `sm` is `--ctl-h-sm` (28) for a row's verbs and a heading's. */
+    /** `m` is `--btn-h` (32, 40 under a thumb); `sm` is `--btn-h-sm` (28) for a row's verbs and a heading's. */
     size?: 'm' | 'sm' | undefined;
     /** The key that does the same thing, in the table's spelling (`⌘K`, `e`); `Kbd` says it for this platform. */
     kbd?: string | undefined;
@@ -68,22 +71,21 @@
 </svelte:element>
 
 <style>
-  /* THE LABEL IS THE CONTROL SIZE: 14 under a mouse, 16 under a thumb. No border on any weight: a pill is
-     told by its fill, and the old `--edge` ring round every quiet button is the admin-console look this replaces. */
+  /* A RECTANGLE TOLD BY ITS FILL: no border on any weight, radius 8, the label at 14 medium. */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: var(--sp-2);
     box-sizing: border-box;
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-4);
-    background: var(--hover-wash);
+    min-block-size: var(--btn-h);
+    padding: 0 var(--sp-3);
+    background: var(--field);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 500;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
     line-height: 20px;
     text-decoration: none;
     white-space: nowrap;
@@ -92,19 +94,18 @@
        here both snapped. */
     transition:
       background var(--d-state) var(--ease-out),
-      box-shadow var(--d-state) var(--ease-out),
       color var(--d-state) var(--ease-out),
       opacity var(--d-state) var(--ease-out),
       transform var(--d-state) var(--ease-out);
   }
 
   .btn[data-size='sm'] {
-    min-block-size: var(--ctl-h-sm);
-    padding: 0 var(--sp-3);
-    font-size: var(--t-sm);
+    min-block-size: var(--btn-h-sm);
+    padding: 0 10px;
+    font-size: var(--fs-meta);
   }
 
-  /* A KEY CAP ASKS FOR A LITTLE LESS ROOM AT ITS END, so the cap sits in the curve the way the label sits in the other. */
+  /* A KEY CAP ASKS FOR A LITTLE LESS ROOM AT ITS END, so the cap sits in the corner the way the label sits in the other. */
   .btn:is(:hover, :focus-visible):has(.btn-kbd) {
     padding-inline-end: var(--sp-2);
   }
@@ -115,48 +116,22 @@
   }
 
   .btn:active:not(:disabled) {
-    background: var(--hold-wash);
+    background: var(--field-hover);
   }
 
-  /* QUIET INSIDE A TILE, A SHEET OR THE PANEL'S BODY IS THE `--s1` PILL: the wash is ink over whatever is under it,
-     which on white reads as a stain rather than a control. */
-  :global(:is(.tile, .sheet, [data-surface='tile'])) .btn[data-weight='quiet'] {
-    background: var(--s1);
-  }
-
-  /* Ink with the tile's colour for its label, the one filled control on a screen. */
+  /* THE ACCENT'S FILL, the one filled control on a screen. */
   .btn[data-weight='primary'] {
-    background: var(--ink);
-    color: var(--on-ink);
+    background: var(--action);
+    color: var(--on-action);
   }
 
   .btn[data-weight='primary']:active:not(:disabled) {
-    background: var(--primary-hover);
+    background: var(--action-hover);
   }
 
   .btn[data-weight='bare'] {
     background: none;
     color: var(--ink2);
-  }
-
-  /* GLASS, FOR THE TOOLBAR AND NOTHING ELSE: the frosted fill, its blur, and the hairline pair. Glass never sits on
-     glass, so a caller inside a menu or the palette uses `bare`. */
-  .btn[data-weight='glass'] {
-    background: var(--glass);
-    backdrop-filter: var(--glass-blur);
-    box-shadow: var(--glass-edge);
-  }
-
-  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives: a
-     prefixed line beside the one above was folded into it by the build, and Safari's line came out of the bundle. */
-  @supports (-webkit-backdrop-filter: none) {
-    .btn[data-weight='glass'] {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
-  }
-
-  .btn[data-weight='glass']:active:not(:disabled) {
-    background: var(--glass-strong);
   }
 
   /* HOVER ONLY WHERE THERE IS ONE. A phone reports `:hover` on the last thing tapped and keeps it.
@@ -165,37 +140,29 @@
      also a hovered one. */
   @media (hover: hover) and (pointer: fine) {
     .btn:hover:not(:disabled):not(:active) {
-      background: var(--hold-wash);
-    }
-
-    :global(:is(.tile, .sheet, [data-surface='tile'])) .btn[data-weight='quiet']:hover:not(:disabled):not(:active) {
-      background: var(--s2);
+      background: var(--field-hover);
     }
 
     .btn[data-weight='primary']:hover:not(:disabled) {
-      background: var(--primary-hover);
+      background: var(--action-hover);
     }
 
     .btn[data-weight='bare']:hover:not(:disabled):not(:active) {
       background: var(--hover-wash);
       color: var(--ink);
     }
-
-    .btn[data-weight='glass']:hover:not(:disabled):not(:active) {
-      background: var(--glass-strong);
-    }
   }
 
-  /* THE CAP. `Kbd` draws the `--s1` cap; on the ink pill it takes a tint of the label instead, or a light cap on a
-     dark pill would be the loudest thing in the button. */
+  /* THE CAP. `Kbd` draws the `--field` cap; on the accent fill it takes a tint of the label instead, or a light cap on
+     a blue button would be the loudest thing in it. */
   .btn-kbd {
     display: inline-flex;
     flex: none;
   }
 
   .btn[data-weight='primary'] :global(.kbd) {
-    background: color-mix(in srgb, var(--on-ink) 18%, transparent);
-    color: var(--on-ink);
+    background: color-mix(in srgb, var(--on-action) 20%, transparent);
+    color: var(--on-action);
   }
 
   /* A disabled control loses the fill as well as the label, so a disabled primary does not read as live. */
@@ -205,11 +172,11 @@
   }
 
   .btn[data-weight='primary']:disabled {
-    background: var(--s2);
+    background: var(--field);
     color: var(--dim);
   }
 
-  /* AND ITS KEY CAP GOES QUIET WITH IT: the on-ink cap on the grey fill was a cap nobody could see. */
+  /* AND ITS KEY CAP GOES QUIET WITH IT: the on-accent cap on the grey fill was a cap nobody could see. */
   .btn[data-weight='primary']:disabled :global(.kbd) {
     background: var(--hover-wash);
     color: var(--dim);
@@ -219,9 +186,15 @@
     background: none;
   }
 
+  /* 15 UNDER A THUMB, a step up from the mouse's 14, on the 40px drawing inside the 44 hit box. */
   @media (pointer: coarse) {
     .btn {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
+    }
+
+    .btn[data-size='sm'] {
+      padding: 0 var(--sp-3);
+      font-size: var(--fs-ctl);
     }
   }
 

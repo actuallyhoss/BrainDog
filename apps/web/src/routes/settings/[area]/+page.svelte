@@ -366,19 +366,6 @@
     display: contents;
   }
 
-  /* ARRANGE ON HOVER OR FOCUS, where a pointer hovers: at rest the tile is its name and its line. Under a thumb, where
-     nothing hovers, it is always there. */
-  @media (hover: hover) and (pointer: fine) {
-    .index-head :global(.head-actions) {
-      opacity: 0;
-      transition: opacity var(--d-state) var(--ease-out);
-    }
-
-    .index-head :global(.lead-wrap:is(:hover, :focus-within) .head-actions) {
-      opacity: 1;
-    }
-  }
-
   /* THE INDEX IS ONE COLUMN, the page's own, as Home's body is: its tiles carry their spans. */
   .settings-index {
     min-inline-size: 0;

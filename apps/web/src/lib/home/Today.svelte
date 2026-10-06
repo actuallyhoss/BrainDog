@@ -62,7 +62,6 @@
   import type { RowWriter } from '$lib/record/rows-write.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { dayOf, daySaid, dueSaid } from '$lib/work/board.ts';
-  import LeadHead from '$lib/ui/LeadHead.svelte';
   import { TASKS } from '$lib/work/list.ts';
   import { captureOf, contextOf, freshFields, isQuestion } from '$lib/work/capture.ts';
   import {
@@ -122,7 +121,6 @@
     doneLabel: (t: string) => `Mark “${t}” done`,
     marked: (t: string) => `Marked “${t}” done.`,
     reviewIt: 'Review',
-    keys: { move: 'move', done: 'done', open: 'open', answer: 'answer' },
     priority: { urgent: 'urgent', high: 'high', low: 'low' } as Record<string, string>,
   } as const;
 
@@ -519,7 +517,7 @@
 
 <svelte:head><title>{titleOf(copy.today)}</title></svelte:head>
 
-<PageHead title={copy.today} sentence={said?.text} needs={said?.needs || undefined} led={Boolean(t && said)}>
+<PageHead icon="today" title={copy.today} sentence={said?.text} needs={said?.needs || undefined}>
   {#snippet actions()}
     {#if takesTasks && !data.refused}
       <button
@@ -549,36 +547,6 @@
       <div class="t-main">
         <!-- ══ THE LEAD TILE: the day, the sentence, and what needs you ══ -->
         <div class="t-needs tile" data-quiet={needing === 0 && !capturing ? '' : undefined}>
-          {#if said}
-            <LeadHead meta={daySaid(day)} sentence={said.text} needs={said.needs || undefined}>
-              {#snippet aside()}
-                <!-- THE KEYS SHOW ONCE THE KEYBOARD IS IN THE LIST, never before: a reader with a mouse never meets them,
-                     and `?` lists them all. -->
-                {#if keyed.length > 0}
-                  <span class="hints" aria-hidden="true">
-                    <Kbd keys="j" /><Kbd keys="k" /><span class="hint">{words.keys.move}</span>
-                    {#if mayWrite}<Kbd keys="x" /><span class="hint">{words.keys.done}</span>{/if}
-                    <Kbd keys="↵" /><span class="hint">{words.keys.open}</span>
-                    {#if t.questions.length > 0}<Kbd keys="1" /><Kbd keys="2" /><Kbd keys="3" /><span class="hint">{words.keys.answer}</span>{/if}
-                  </span>
-                {/if}
-                {#if takesTasks}
-                  <button
-                    type="button"
-                    class="add tap"
-                    aria-label={words.addTask}
-                    title={words.addTip}
-                    aria-expanded={capturing}
-                    aria-controls={capturing ? 'today-capture' : undefined}
-                    onclick={() => (capturing ? closeCapture() : void openCapture())}
-                  >
-                    <Icon name="plus" size="l" />
-                  </button>
-                {/if}
-              {/snippet}
-            </LeadHead>
-          {/if}
-
           {#if capturing}
             <form class="capture" id="today-capture" onsubmit={ask}>
               <label class="sr-only" for="today-ask">{words.addTask}</label>
@@ -1056,31 +1024,6 @@
 
   .more-mark[data-open] :global(.icon) {
     rotate: 90deg;
-  }
-
-  /* THE KEYS, ONE QUIET LINE IN THE HEADING'S ASIDE, AND ONLY WHILE THE KEYBOARD IS IN THE TILE: a focus a key put there
-     shows them, a click or a tap never does. Under a thumb or on a phone there is no keyboard to press them with. */
-  .hints {
-    display: none;
-    align-items: center;
-    gap: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    white-space: nowrap;
-  }
-
-  .t-needs:has(:focus-visible) .hints {
-    display: inline-flex;
-  }
-
-  .hint {
-    margin-inline: 2px var(--sp-2);
-  }
-
-  @media (pointer: coarse), (width < 900px) {
-    .t-needs:has(:focus-visible) .hints {
-      display: none;
-    }
   }
 
   .aside-link,

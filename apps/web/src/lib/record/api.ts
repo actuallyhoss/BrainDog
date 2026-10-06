@@ -542,6 +542,14 @@ export function columnsFor(register: string, declared?: RegisterDecl, number = f
    * list shows already lives.
    */
   for (const f of r.fields) if (f.qualifies !== undefined && wanted.has(f.qualifies)) wanted.add(f.id);
+  /**
+   * AND THE THING THE ROW BELONGS TO, AS A COLUMN OF ITS OWN (DIRECTION 39). It was a shape in front of every title, a
+   * diamond, a triangle or a dot, which said "some project" to nobody who had not learnt the shapes. Its column says
+   * the project's name beside a small dot of its colour, where it can be read, sorted and hidden like any other. The
+   * field is the one `identityFor` walks to: the first link to a list that declares an identity.
+   */
+  const subject = r.fields.find((f) => f.type === 'ref' && f.to !== undefined && REGISTERS[f.to]?.identity !== undefined);
+  if (subject) wanted.add(subject.id);
 
   const cols: Column[] = [];
   for (const f of r.fields) {

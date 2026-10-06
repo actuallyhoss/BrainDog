@@ -47,12 +47,25 @@ export const HOLD_MS = 6_000;
 /** An answer held for its Undo: `undo` takes it back while it waits, and `flush` sends it at once. */
 export type Held = { undo: () => boolean; flush: () => void; readonly done: boolean };
 
+/** What `hold` waits with: the window's own timers, or a test's. */
+export type Clock = { set: (fire: () => void, ms: number) => unknown; clear: (timer: unknown) => void };
+
+/**
+ * THE WINDOW'S TIMERS, CALLED AS THE WINDOW'S. A browser refuses `setTimeout` called on any other object ("Illegal
+ * invocation"), and the clock was `{ set: setTimeout }`, so `clock.set(...)` threw on every press: the card became its
+ * answered line with no Undo on it and the answer was never sent, while Node, where the tests run, let it pass.
+ */
+const WINDOW_CLOCK: Clock = {
+  set: (fire, ms) => globalThis.setTimeout(fire, ms),
+  clear: (timer) => globalThis.clearTimeout(timer as ReturnType<typeof setTimeout>),
+};
+
 /**
  * AN ANSWER THAT CANNOT BE TAKEN BACK IS HELD, NOT CONFIRMED. A declined question is never reopened and a declined
  * merge is never asked again, so the press is kept for `HOLD_MS` with Undo beside it, and only then sent. `flush` sends
  * it early, for a reader who leaves the page before the time is up; whichever comes first, it is sent once.
  */
-export function hold(send: () => void, ms = HOLD_MS, clock: { set: typeof setTimeout; clear: typeof clearTimeout } = { set: setTimeout, clear: clearTimeout }): Held {
+export function hold(send: () => void, ms = HOLD_MS, clock: Clock = WINDOW_CLOCK): Held {
   let done = false;
   const fire = () => {
     if (done) return;

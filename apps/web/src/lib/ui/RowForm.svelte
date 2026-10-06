@@ -478,9 +478,9 @@
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
-    color: var(--dim);
+    color: var(--ink2);
     font-size: var(--t-sm);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   /* THE COLOUR IS NOT THE MESSAGE. Somebody who cannot tell the two reds apart still reads the

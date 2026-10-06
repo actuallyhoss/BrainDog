@@ -225,8 +225,9 @@
       const on = document.activeElement;
       if (on instanceof HTMLElement && on !== card && on.closest('button, a[href], summary, select') !== null) return;
       if (card.querySelector('.queue-cost') !== null) return;
-      /* THE ANSWER THE CARD SAYS ENTER GIVES (`card.ts` `enter`): none where money moves or it is hard to undo. */
-      press = card.querySelector<HTMLElement>('.queue-act[data-enter]');
+      /* THE BUTTON THE CARD SAYS ENTER PRESSES (`card.ts` `enter`): Decide with the answer chosen, or Accept, and none
+         where money moves or it is hard to undo. */
+      press = card.querySelector<HTMLElement>('[data-enter]');
     } else press = twoOn(card)?.reject;
     if (!press || (press instanceof HTMLButtonElement && press.disabled)) return;
     e.preventDefault();
@@ -283,9 +284,9 @@
   <!-- THE LINE SAYS HOW MANY WAIT, in words with the first question's suggestion, so the title carries no count; on a
        page with nothing at all to draw the cleared mark under it says that, once. Asking yourself a question is the one
        ink pill, and only for somebody who may answer. -->
-  <!-- THE NAME IS THE NAV'S OWN ITEM, so over the line it is kept for a screen reader and not drawn; with no line it is
-       the page's only heading and stays. `display: contents`, so the sticky head still sticks. -->
-  <div class="decide-head" data-named={headLine ? '' : undefined}>
+  <!-- THE PAGE'S NAME AND ITS LINE, the header every page draws (DIRECTION §39). `display: contents`, so the sticky head
+       still sticks. -->
+  <div class="decide-head">
     <PageHead icon="decide" title={said('decide')} sentence={headLine} needs={cleared ? undefined : shaped?.sentence.needs || undefined}>
       {#snippet actions()}
         {#if answerable}<Button weight="primary" onclick={() => (asking = true)}>{WORDS.ask}</Button>{/if}
@@ -311,7 +312,7 @@
       {/if}
     {:else}
       <div class="body">
-        <PageView slug="decide" got={drawn} mode="home" select {reread} />
+        <PageView slug="decide" got={drawn} mode="home" select whole {reread} />
       </div>
     {/if}
 
@@ -376,26 +377,67 @@
     display: contents;
   }
 
-  .decide-head[data-named] :global(.head .title) {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
   /* ONE COLUMN, the page's own: its blocks carry their spans, and Decide adds no column of its own beside them. */
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--tile-gap);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
     min-inline-size: 0;
   }
 
   .body {
     min-inline-size: 0;
+  }
+
+  /* EACH QUESTION IS A TILE (DIRECTION §39, "Decide reads like a form"). The page reader draws a queue as one tile with
+     its questions under hairlines, which is right for a page holding a few among other things; Decide is the questions,
+     so here the queue's own tile steps back to the board and every question is a tile of its own, a tile's gap apart.
+     The group's name ("Also waiting") is kept for a screen reader and not drawn: nothing floats on the board but the
+     head, and the head already said what waits. */
+  .body :global(.block-slot:has(> .queue)) {
+    padding: 0;
+    background: none;
+    border-radius: 0;
+  }
+
+  .body :global(.block-slot:not([data-arranging]):has(> .queue) > .block-bar) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .body :global(.block-slot > .queue) {
+    gap: var(--tile-gap);
+  }
+
+  .body :global(.block-slot > .queue > .qa) {
+    padding: var(--tile-pad);
+    background: var(--tile);
+    border-radius: var(--tile-r);
+  }
+
+  /* THE TILE IS THE EDGE NOW: no hairline over a question and no band of air under the lead. */
+  .body :global(.block-slot > .queue > .qa > .queue-card) {
+    padding-block: 0;
+    border-block-start: 0;
+  }
+
+  /* ON A PHONE A QUESTION'S TILE GIVES ITS WORDS A LITTLE MORE OF THE WIDTH. */
+  @media (width < 600px) {
+    .body :global(.block-slot > .queue > .qa) {
+      padding: var(--sp-4);
+    }
+  }
+
+  /* THE CURSOR'S RING FOLLOWS THE TILE'S CORNERS, so `j` and `k` land on a question the shape it is. */
+  .body :global(.block-slot > .queue > .qa[data-row-cursor]) {
+    border-radius: var(--tile-r);
   }
 
   /* THE FIRST QUESTION CARRIES NO NAME OVER IT: the head's line just said what waits, and a name above the card would

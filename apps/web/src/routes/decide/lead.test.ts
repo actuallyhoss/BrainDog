@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { ageDays, countSentence, evidenceOf, gateSentence, sentenceOf, shortTitle, waitedOf, waitedWords, waitingSaid } from './lead.ts';
+import { ageDays, countSentence, evidenceOf, sentenceOf, shortTitle, waitedOf, waitedWords, waitingSaid } from './lead.ts';
 
 const NOW = Date.parse('2026-09-29T09:40:00Z');
 const daysAgo = (d: number) => new Date(NOW - d * 86_400_000).toISOString();
@@ -33,21 +33,6 @@ test('the count is said in words, then what is hard to undo or what the first su
 
 test('nothing waiting is not a sentence, because the cleared state says it', () => {
   assert.equal(sentenceOf([], undefined), null);
-});
-
-test('the gate says how many options, which is suggested, and how long it has been open', () => {
-  assert.equal(
-    gateSentence({ options: [opt('Flat'), opt('Per seat', true), opt('Usage')], opened: daysAgo(15) }, NOW),
-    'Three options; “Per seat” is suggested; opened 2 weeks ago.',
-  );
-  assert.equal(gateSentence({ options: [opt('Yes'), opt('No')], opened: daysAgo(0.2) }, NOW), 'Two options; opened today.');
-  /* A CHANGE ANSWERED WITH ACCEPT OR DECLINE: how long it has been open, and no count of its two buttons. */
-  const change = [
-    { key: 'accept', title: 'Accept', body: '' },
-    { key: 'reject', title: 'Reject', body: '' },
-  ];
-  assert.equal(gateSentence({ options: change, opened: daysAgo(15) }, NOW), 'Opened 2 weeks ago.');
-  assert.equal(gateSentence({ options: change, opened: daysAgo(0.2) }, NOW), 'Opened today.');
 });
 
 test('an age is said as a person holds it', () => {
@@ -139,7 +124,10 @@ test('the declared page says the same sentence from a count, how many are hard t
   assert.deepEqual(sentenceOf(waiting, { options: [{ key: 'a', title: 'Per seat', body: '', recommended: true }] } as never, '', NOW), countSentence(2, 1, 'Per seat'));
 });
 
-test('the gate draws its sentence from this module', () => {
+/* THE GATE SAYS NO TRIVIA UNDER ITS TITLE (DIRECTION §39): "Three options; Per product is suggested; opened 5 weeks ago"
+   said what the tile under it already shows. Who asked and when is the tile's quiet first line instead. */
+test('the gate draws no sentence of counts under its title', () => {
   const gate = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
-  assert.match(gate, /gateSentence\(/u);
+  assert.doesNotMatch(gate, /gateSentence\(|<PageHead[^>]*\bsentence=/u);
+  assert.match(gate, /<p class="gate-by">/u, 'the tile no longer says who asked and when');
 });

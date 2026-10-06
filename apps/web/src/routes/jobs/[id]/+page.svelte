@@ -17,7 +17,7 @@
   the record answers only what is new; a full page means more are waiting, and it asks again at once rather than
   waiting a beat per page. Leaving the screen stops the asking.
 
-  STOP IS HERE WHILE THE RUN IS LIVE, a quiet pill and never red, and on a phone it floats on glass at the foot of the
+  STOP IS HERE WHILE THE RUN IS LIVE, a quiet pill and never red, and on a phone it sits in a tile at the foot of the
   screen, no taller than `--sticky`, where a thumb finds it while the transcript scrolls. It stops a waiting run at once and flags a running one, which its
   machine reads within seconds; the status says "Stopping" until the machine has stopped.
 
@@ -612,28 +612,21 @@
     max-inline-size: var(--measure);
   }
 
-  /* ABOVE THE TAB BAR, NOT UNDER IT, AND ON GLASS: below 900 the shell's scroller runs to the bottom of the window and
-     `TabBar` floats over its last `--tabbar`, so the bar sticks just above it as chrome does. */
+  /* ABOVE THE TAB BAR, NOT UNDER IT: below 900 the shell's scroller runs to the bottom of the window and `TabBar` is
+     docked to the bottom edge over its last `--tabbar`, so the bar sticks a step above it. An opaque tile with one
+     hairline round it, no glass (DIRECTION §39), so the steps passing under it are never read through it. */
   @media (width < 900px) {
     .stop-bar {
       position: sticky;
-      inset-block-end: calc(var(--tabbar) + var(--inset) + var(--sp-2));
+      inset-block-end: calc(var(--tabbar) + var(--sp-2));
       z-index: var(--z-raise);
       min-block-size: var(--sticky);
       max-block-size: var(--sticky);
       padding-inline: var(--sp-3);
-      background: var(--glass);
-      backdrop-filter: var(--glass-blur);
+      background: var(--tile);
       border-radius: var(--r-lg);
       box-shadow: var(--glass-edge), var(--e2);
       overflow: hidden;
-    }
-
-    /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-    @supports (-webkit-backdrop-filter: none) {
-      .stop-bar {
-        -webkit-backdrop-filter: var(--glass-blur);
-      }
     }
   }
 

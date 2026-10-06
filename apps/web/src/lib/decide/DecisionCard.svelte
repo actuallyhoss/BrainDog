@@ -3,22 +3,37 @@
   page and Decide (through `QueueAnswer.svelte`), Today's classic list (`home/Question.svelte`), Decide's classic screen
   (`Classic.svelte`) and Slash's palette. What it says is `card.ts`'s; this draws it and answers it.
 
-  WHY FIRST. The question, then at once why it is asked, on every card. Then who asked, by face and name, with the app it
-  ran in and the run, then what it moves: the money accepting writes and what changes from what to what, where the
-  record says. The ways to answer come last, in the renderer's own classes (`kinds/queue.css`), so the suggested one is
-  an outline with a small dot (his pick), on every card; where the choice is hard to undo or money moves, Enter alone
-  is taken away and the button that names the amount is the answer.
+  IT READS LIKE A FORM (DIRECTION §39). Who asked and when, quiet; the question; why it is asked; then the answers as a
+  vertical list of full-width choices, each its name and one line of what it does, with "Suggested" in the accent's
+  words beside the one an agent suggests; then Decide, filled, and Not now, words only. The suggestion is already chosen
+  where a key may give it (`card.ts` `startsOn`), so Decide is still one press; where the answer is hard to undo or money
+  moves nothing is chosen for anybody, and the button says the care it asks for in its own words ("Decide, can’t be
+  undone easily"), never a chip. The drawing is `form.css`, which the question's own page draws its choices with too.
 
-  ONE PRESS ANSWERS, WITH UNDO. The card becomes its answered line at once ("Per seat · you, just now", or "Slash
-  suggested · Sam accepted" for what Slash drafted), with Undo on it for six seconds, and only then is the answer sent
-  (`press.ts` `hold`). Leaving the page, or the card leaving it, sends what was held at once. A record on an older build
-  that still wants a reason opens one line under the card when the answer reaches it; nothing here asks for one first.
+  TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS (`card.ts` `inlineOf`): "Chase it" and "Not yet",
+  the record's own Accept and Decline. The suggested one, or else the first, is filled with the accent and the rest are
+  quiet, and one press decides, held for its Undo like every answer. The form's list stays for answers that carry a line
+  of what they do, and for a fourth.
+
+  COMPACT, OUTSIDE DECIDE (Home, a declared page): the question, a link to its own page, and its answers as buttons,
+  nothing else. Who asked, why and what it moves are read on its page; a question with more than three answers says
+  where to choose them. Decide itself draws the whole form.
+
+  ONE PRESS ANSWERS, WITH UNDO. Decide (or Accept, or Decline) makes the card its answered line at once ("Per seat ·
+  you, just now", or "Slash suggested · Sam accepted" for what Slash drafted), with Undo on it for six seconds, and
+  only then is the answer sent (`press.ts` `hold`). Leaving the page, or the card leaving it, sends what was held at
+  once. A record on an older build that still wants a reason opens one line under the card when the answer reaches it.
+
+  THE KEYS KEEP THEIR PATHS. A pointer or Space on a choice chooses it; Enter on a choice chooses it and answers, as Enter
+  in a form sends it; a page's number key (`PageBody.svelte`) presses a choice from outside it and answers with it, as it
+  always did; the host's Enter presses whichever button carries `data-enter`, which is only on a card that costs
+  nothing. The arrow keys walk the choices.
 
   A MERGE IS THE SAME CARD with `MergeCard` for its answers (Merge all, Keep apart, Pick), read off the record's own
   options question (`merge.ts`), and held for its Undo the same way.
 
   A HOST THAT ANSWERS FOR ITSELF hands `onpress` (Decide's classic screen, which keeps its own reason flow), and the
-  card then only draws the press. A READER WHO MAY NOT ANSWER reads the options as words: a control that cannot act is
+  card then only draws the press. A READER WHO MAY NOT ANSWER reads the choices as words: a control that cannot act is
   absent, not greyed (`19 §6`).
 -->
 <script module lang="ts">
@@ -28,10 +43,11 @@
 
 <script lang="ts">
   import '@braindog/skin/kinds/queue.css';
+  import './form.css';
   import { tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
   import { invalidateAll } from '$app/navigation';
-  import { QUEUE_REASONS, queueReasoned, since } from 'braindog-render';
+  import { since } from 'braindog-render';
   import type { QueueQuestion } from '@braindog/kernel';
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
@@ -50,7 +66,7 @@
   import type { Press } from '../../routes/decide/merge.ts';
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
-  import { answeredLine, cardOf, cardWords } from './card.ts';
+  import { answeredLine, cardOf, cardWords, inlineOf, pressSaid, pressTail, primaryOf, startsOn } from './card.ts';
 
   let {
     question,
@@ -64,6 +80,7 @@
     may,
     onpress,
     idOf,
+    compact = false,
   }: {
     question: QueueQuestion;
     /** Once the answer is written: the host lowers its count. */
@@ -72,7 +89,7 @@
     pick?: Picked | null;
     /** The queue's lead question, drawn whole: what accepting it does, and what it would put on the screen. */
     lead?: boolean;
-    /** Where the card sits in its queue: only the first says each option's reason in the open (`queueReasoned`). */
+    /** Where the card sits in its queue. Every card says what each answer does now, so it changes nothing drawn. */
     n?: number;
     /** Whether each option carries the number key that presses it, on a host whose keys do. */
     keys?: boolean;
@@ -86,6 +103,8 @@
     onpress?: ((key: string) => void) | undefined;
     /** The id an option's button carries, where a host's keys find it by one. */
     idOf?: ((key: string) => string) | undefined;
+    /** A question shown outside Decide (Home, a declared page): the question and its answers as buttons, nothing else. */
+    compact?: boolean;
   } = $props();
 
   const uid = `dc-${(made += 1)}`;
@@ -100,8 +119,17 @@
 
   const card = $derived(cardOf(question, { me: me?.person ?? null, names, now: Date.now(), lead }));
   const from = $derived([card.by.app, card.by.run].filter((s): s is string => s !== null));
-  const reasoned = $derived(queueReasoned(n));
-  const reasons = $derived(reasoned ? [] : card.ways.filter((w) => w.because !== ''));
+  /* THE ANSWERS AS A ROW OF BUTTONS, one press each (`inlineOf`), or the form's list to choose from and Decide. */
+  const inline = $derived(inlineOf(card, compact));
+  /* The one the row fills with the accent: the suggested answer, or the first. */
+  const primary = $derived(primaryOf(card));
+  /* A READER WHO MAY NOT ANSWER reads a question of options as its answers in words; the record's two say nothing. */
+  const listed = $derived(card.decline === null && card.merge === null && !compact && (!inline || !answerable));
+  /* THE ANSWER CHOSEN: the reader's, or the one the form starts on (the suggestion, where a key may give it). */
+  let picked = $state<string | null>(null);
+  const selected = $derived(picked ?? startsOn(card));
+  /* NOT NOW opens the question's own page at the step that puts it off; only where this card is the way in to it. */
+  const notNow = $derived(answerable && whole && !link && !compact && onpress === undefined && card.merge === null);
   const chosenForAll = $derived(pick?.has(question.id) ?? false);
   const bulkFix = $derived(pick?.fixes.get(question.id) ?? '');
   const optId = (key: string): string => idOf?.(key) ?? `${uid}-opt-${key}`;
@@ -225,7 +253,7 @@
     if (key) document.getElementById(optId(key))?.focus();
   }
 
-  /** An option pressed. With the reason line open it changes the choice and keeps the words already typed. */
+  /** An answer given. With the reason line open it changes the choice and keeps the words already typed. */
   function press(way: Way) {
     if (busy || holding !== null) return;
     if (onpress) return onpress(way.key);
@@ -234,6 +262,55 @@
       return reveal();
     }
     void answer(way);
+  }
+
+  /** A choice chosen, and nothing sent: the form's Decide sends it. With the reason line open it is the answer's change. */
+  function selectWay(way: Way) {
+    if (busy || holding !== null) return;
+    if (phase === 'asking') return press(way);
+    picked = way.key;
+  }
+
+  /**
+   * DECIDE: the answer chosen, given. With nothing chosen yet (a card that is hard to undo starts on none) the focus goes
+   * to the first choice, so the press that answers is still the reader's own.
+   */
+  function commit() {
+    const way = card.ways.find((w) => w.key === selected);
+    if (!way) return void document.getElementById(optId(card.ways[0]?.key ?? ''))?.focus();
+    press(way);
+  }
+
+  /**
+   * A PRESS ON A CHOICE. A pointer, Space and Enter on the focused choice come from the choice itself; a page's number key
+   * presses it from outside (`PageBody.svelte`, the focus elsewhere and no pointer behind it), and that has always been
+   * the answer, so it still is.
+   */
+  function onChoice(e: MouseEvent, way: Way) {
+    if (e.detail === 0 && document.activeElement !== e.currentTarget) return press(way);
+    selectWay(way);
+  }
+
+  /** Enter on a choice chooses it and answers, as Enter sends a form; the arrows walk the choices and choose as they go. */
+  function onChoiceKey(e: KeyboardEvent, i: number) {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const way = card.ways[i];
+    if (!way) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      selectWay(way);
+      press(way);
+      return;
+    }
+    const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
+    if (step === 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const next = card.ways[(i + step + card.ways.length) % card.ways.length];
+    if (!next) return;
+    selectWay(next);
+    document.getElementById(optId(next.key))?.focus();
   }
 
   /** A merge's press, with the line it leaves (`MergeCard`). */
@@ -324,6 +401,18 @@
   });
 </script>
 
+<!-- A CHOICE'S WORDS: what it is, where it says (its colours or its figure, inside the choice and nowhere else, after
+     `visualOf` held it to the renderer's reading), its name, and one line of what it does. -->
+{#snippet choiceBody(way: Way)}
+  <span class="dc-choice-main">
+    {#if way.shows && 'swatch' in way.shows}<span class="queue-visual" data-shows="swatch" aria-hidden="true"
+        >{#each way.shows.swatch as colour}<span class="queue-swatch" style="--swatch:{colour}"></span>{/each}</span
+      >{:else if way.shows}<span class="queue-visual" data-shows="figure"><span class="queue-figure num">{way.shows.figure}</span></span>{/if}
+    <span class="queue-label dc-choice-name" dir="auto">{way.label}</span>
+    {#if way.because}<span class="dc-choice-does" dir="auto">{way.because}</span>{/if}
+  </span>
+{/snippet}
+
 {#if phase === 'answered' && chosen}
   <!-- ONE LINE, QUIET: what was chosen, by whom and when, where the card was, with Undo while the answer waits. -->
   <p class="qa-done" role="status" tabindex="-1" bind:this={done} data-held={holding ? '' : undefined}>
@@ -348,8 +437,13 @@
     </form>
   {/if}
 {:else}
-  <article class={lead ? 'queue-card queue-lead dc' : 'queue-card dc'} aria-busy={busy} data-selected={chosenForAll ? '' : undefined}>
-    {#if pick && answerable}
+  <article
+    class={lead && !compact ? 'queue-card queue-lead dc' : 'queue-card dc'}
+    aria-busy={busy}
+    data-selected={chosenForAll ? '' : undefined}
+    data-compact={compact ? '' : undefined}
+  >
+    {#if pick && answerable && !compact}
       <!-- THE BOX THE RENDERER'S QUEUE DRAWS FOR A BULK ANSWER, named for the question alone. `x` presses it from the
            keyboard (`PageBody.svelte`). -->
       <button
@@ -361,83 +455,122 @@
         onclick={() => pick?.toggle(question)}><span aria-hidden="true">{chosenForAll ? '✓' : ''}</span></button
       >
     {/if}
-    <!-- WHO ASKED, WHERE AND WHEN: the face and name, the app it ran in and the run, each only where it has a name. -->
-    <p class="queue-by">
-      <Face name={card.by.name} kind={card.by.kind} size="s" /><span class="queue-who">{card.by.name}</span>
-      {#each from as part, i (i)}<span class="dc-from" dir="auto">{part}</span>{/each}
-      <span class="queue-when">{card.when}</span>
-    </p>
+    {#if !compact}
+      <!-- WHO ASKED, WHERE AND WHEN, quiet: the face and name, the app it ran in and the run, each only where it has a
+           name. The band is kept here for the keys and the ranking, and said in the answering button's words instead. -->
+      <p class="queue-by">
+        <Face name={card.by.name} kind={card.by.kind} size="s" /><span class="queue-who">{card.by.name}</span>
+        {#each from as part, i (i)}<span class="dc-from" dir="auto">{part}</span>{/each}
+        <span class="queue-when">{card.when}</span>
+        {#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
+      </p>
+    {/if}
+    <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band is
+         kept on it, unseen, for the keys and the ranking. -->
     <h3 class="queue-question" dir="auto">
-      {#if link}<a class="dc-open" href={at(card.href)}>{card.question}</a>{:else}{card.question}{/if}{#if card.joined}{' '}<span
+      {#if link || compact}<a class="dc-open" href={at(card.href)}>{card.question}</a>{:else}{card.question}{/if}{#if card.joined}{' '}<span
           class="qa-joined num">{queueWords.joined(card.joined)}</span
-        >{/if}
+        >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
     </h3>
-    <!-- WHY, FIRST: under the question on every card, before what it moves and the ways to answer. -->
-    {#if card.why}<p class="queue-why" dir="auto">{card.why}</p>{/if}
-    {#if card.later}<p class="qa-later" dir="auto">{card.later}</p>{/if}
-    {#if card.does}<ul class="queue-does"><li class="queue-does-line" dir="auto">{card.does}</li></ul>{/if}
-    <!-- WHAT IT MOVES: the money accepting writes, and what changes from what to what. -->
-    {#if card.money || card.shifts.length > 0}
-      <ul class="dc-moves">
-        {#if card.money}<li class="dc-money num">{card.money}</li>{/if}
-        {#each card.shifts as s, i (i)}
-          <li class="dc-shift">
-            {#if s.what}<span class="dc-what">{s.what}</span>{/if}
-            <span class="dc-before" dir="auto">{s.before}</span><span class="dc-to"><Icon name="arrow" size="s" /><span class="dc-said">{cardWords.to}</span></span><span dir="auto">{s.after}</span>
-          </li>
-        {/each}
-      </ul>
+    {#if !compact}
+      <!-- WHY, FIRST: under the question on every card, before what it moves and the answers. -->
+      {#if card.why}<p class="queue-why" dir="auto">{card.why}</p>{/if}
+      {#if card.later}<p class="qa-later" dir="auto">{card.later}</p>{/if}
+      {#if card.does}<p class="dc-does" dir="auto">{card.does}</p>{/if}
+      <!-- WHAT IT MOVES: the money accepting writes, and what changes from what to what. -->
+      {#if card.money || card.shifts.length > 0}
+        <ul class="dc-moves">
+          {#if card.money}<li class="dc-money num">{card.money}</li>{/if}
+          {#each card.shifts as s, i (i)}
+            <li class="dc-shift">
+              {#if s.what}<span class="dc-what">{s.what}</span>{/if}
+              <span class="dc-before" dir="auto">{s.before}</span><span class="dc-to"><Icon name="arrow" size="s" /><span class="dc-said">{cardWords.to}</span></span><span dir="auto">{s.after}</span>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      {#if card.seeWhole && whole && !link}
+        <a class="qa-see tap" href={at(card.href)}>{queueWords.seeWhole}</a>
+      {/if}
     {/if}
-    {#if card.seeWhole && whole && !link}
-      <a class="qa-see tap" href={at(card.href)}>{queueWords.seeWhole}</a>
-    {/if}
-    {#if card.merge}
+    {#if card.merge && !compact}
       <MergeCard merge={card.merge} {answerable} holding={busy ? '' : null} titleOf={(key) => card.ways.find((w) => w.key === key)?.label} onpress={pressMerge} />
-    {:else}
-      <ul class="queue-options">
+    {:else if listed}
+      <!-- THE ANSWERS, A LIST TO CHOOSE FROM: each a full-width choice with its name and what it does, the suggested one
+           saying so in the accent's words. A press chooses; Decide answers (`form.css`). -->
+      <ul class="queue-options dc-choices" role={answerable ? 'radiogroup' : undefined} aria-label={queueWords.choices}>
         {#each card.ways as way, i (way.key)}
           {@const marked = way.recommended}
-          <!-- THE SUGGESTION IS MARKED ON EVERY CARD, a hard one too: there only Enter is taken away (`card.ts`). -->
-          <li class="queue-option" data-recommended={marked ? '' : undefined}>
-            <!-- WHAT THE OPTION IS, in the renderer's own box and classes: a swatch writes its colour into `--swatch` on
-                 its chip and nowhere else (`05 §5`), after `visualOf` held it to the renderer's reading. -->
-            {#if way.shows && 'swatch' in way.shows}<span class="queue-visual" data-shows="swatch" aria-hidden="true"
-                >{#each way.shows.swatch as colour}<span class="queue-swatch" style="--swatch:{colour}"></span>{/each}</span
-              >{:else if way.shows}<span class="queue-visual" data-shows="figure"><span class="queue-figure num">{way.shows.figure}</span></span>{/if}
-            <!-- THE SUGGESTION IS THE OUTLINE AND ITS DOT (`kinds/queue.css`); its word stays in the button's name for a
-                 screen reader. The space keeps the label and the word two words. -->
+          {@const on = phase === 'asking' ? chosen?.key === way.key : selected === way.key}
+          <li class="queue-option" data-recommended={marked ? '' : undefined} role={answerable ? 'none' : undefined}>
             {#if answerable}
               <button
                 type="button"
-                class="queue-act"
+                role="radio"
+                class="queue-act dc-choice"
                 id={optId(way.key)}
-                data-enter={way.key === card.enter ? '' : undefined}
+                aria-checked={on}
                 data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
-                aria-pressed={phase === 'asking' ? chosen?.key === way.key : undefined}
-                onclick={() => press(way)}
-                >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto">{way.label}</span
-                >{#if marked}{' '}<span class="queue-rec">{queueWords.suggested}</span>{/if}</button
+                onclick={(e) => onChoice(e, way)}
+                onkeydown={(e) => onChoiceKey(e, i)}
               >
+                <span class="dc-ring" aria-hidden="true"></span>
+                {@render choiceBody(way)}
+                {#if marked || (keys && i < 9)}<span class="dc-end"
+                    >{#if marked}<span class="dc-rec">{queueWords.suggested}</span>{/if}{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true"
+                        >{i + 1}</span
+                      >{/if}</span
+                  >{/if}
+              </button>
             {:else}
-              <span class="queue-label">{way.label}</span>
-              {#if marked}<span class="queue-rec">{queueWords.suggested}</span>{/if}
+              <div class="dc-choice" data-read>
+                {@render choiceBody(way)}
+                {#if marked}<span class="dc-rec">{queueWords.suggested}</span>{/if}
+              </div>
             {/if}
-            {#if reasoned && way.because}<span class="queue-because" dir="auto">{way.because}</span>{/if}
           </li>
         {/each}
       </ul>
     {/if}
-    <!-- WHAT THE ANSWER COSTS SITS AFTER THE OPTIONS, at the end of their row, as the renderer draws it. -->
-    {#if card.band}<span class="queue-cost" data-cost={card.cost}>{card.band}</span>{/if}
-    {#if reasons.length > 0}
-      <!-- EACH OPTION'S REASON, ON EVERY CARD BUT THE FIRST, folded one press away in the renderer's own fold. The
-           question's own why is never in here: it is said first, above. -->
-      <details class="queue-ways queue-reasons">
-        <summary class="queue-ways-toggle">{QUEUE_REASONS}</summary>
-        <ul class="queue-reasons-list">
-          {#each reasons as way (way.key)}<li class="queue-reason" dir="auto"><span class="queue-reason-label">{way.label}</span> {way.because}</li>{/each}
-        </ul>
-      </details>
+    {#if answerable && (!card.merge || compact)}
+      <!-- THE BUTTONS: a row of answers, one press each, or Decide with the answer chosen; then Not now. Only the one a
+           key may press carries `data-enter`: nothing hard to undo, nothing that moves money. -->
+      <div class="dc-actions" data-inline={inline ? '' : undefined}>
+        {#if inline}
+          <!-- ONE PRESS DECIDES: the suggested answer, or the first, filled with the accent, the rest quiet. Its name is
+               its own span, so the line it leaves and the queue gate read the name without the care said after it. -->
+          {#each card.ways as way, i (way.key)}
+            <button
+              type="button"
+              class="queue-act dc-btn"
+              data-weight={way.key === primary ? 'primary' : undefined}
+              data-recommended={way.recommended ? '' : undefined}
+              id={optId(way.key)}
+              data-enter={way.key === card.enter ? '' : undefined}
+              data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
+              aria-pressed={phase === 'asking' ? chosen?.key === way.key : undefined}
+              onclick={() => press(way)}
+              >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
+                ><span class="dc-btn-name">{way.label}</span>{way.key === primary ? pressTail(card) : ''}</span
+              >{#if way.recommended}<span class="dc-sr">{queueWords.suggestedSaid}</span>{/if}</button
+            >
+          {/each}
+        {:else if compact}
+          <!-- MORE ANSWERS THAN A ROW HOLDS, OR A MERGE: chosen on the question's own page. -->
+          <a class="dc-btn" href={at(card.href)}>{queueWords.choose}</a>
+        {:else if phase !== 'asking'}
+          <button
+            type="button"
+            class="dc-btn"
+            data-weight="primary"
+            data-decide
+            data-enter={card.enter !== null && selected !== null ? '' : undefined}
+            aria-disabled={selected === null}
+            onclick={commit}>{pressSaid(card, queueWords.decide)}</button
+          >
+        {/if}
+        {#if notNow}<a class="dc-btn dc-later" data-weight="bare" href={at(`${card.href}?defer`)}>{queueWords.notNow}</a>{/if}
+      </div>
     {/if}
     {#if phase === 'asking' && chosen}
       <form class="qa-reason" onsubmit={submit}>
@@ -452,15 +585,57 @@
     {/if}
     {#if fix || bulkFix}<p class="qa-fix" role="status">{fix || bulkFix}</p>{/if}
   </article>
-  {#if lead}<LeadPreview id={question.id} kind={card.filed} />{/if}
+  {#if lead && !compact}<LeadPreview id={question.id} kind={card.filed} />{/if}
 {/if}
 
 <style>
-  /* A FACE IN THE BY-LINE sits on the line's middle, not its baseline, or the disc rides above the words. */
+  /* THE CARD IS A FORM'S COLUMN: who asked, the question, why, the choices, the buttons, at one steady step. */
+  .dc {
+    row-gap: var(--sp-3);
+  }
+
+  /* A FACE IN THE BY-LINE sits on the line's middle, not its baseline, or the disc rides above the words. Quiet: 13 in
+     the muted ink, the name a step darker. */
   .queue-by {
     align-items: center;
     flex-wrap: wrap;
     column-gap: var(--sp-2);
+    font-size: var(--fs-meta);
+  }
+
+  /* THE QUESTION, 17 AND SEMIBOLD, close under who asked it: the lead and every card alike, on a laptop and a phone. */
+  .dc > .queue-question {
+    margin-block-start: calc(var(--sp-1) * -1);
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
+    line-height: var(--lh-head);
+  }
+
+  /* COMPACT, A QUESTION IS ITS LINE AND ITS BUTTONS, a step apart, with no by-line above it to sit close under. */
+  .dc[data-compact] {
+    row-gap: var(--sp-2);
+  }
+
+  .dc[data-compact] > .queue-question {
+    margin-block-start: 0;
+  }
+
+  .dc[data-compact] > .dc-actions {
+    margin-block-start: var(--sp-1);
+  }
+
+  /* WHAT ACCEPTING THE LEAD DOES, one plain line in the second ink, with no rule down its side. */
+  .dc-does {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  /* THE BUTTONS SIT A LITTLE CLEAR OF THE LAST CHOICE, as a form's do. */
+  .dc > .dc-actions {
+    margin-block-start: var(--sp-1);
   }
 
   /* THE APP AND THE RUN, after the name and quieter than it, each giving way in an ellipsis before the time does. */
@@ -494,7 +669,7 @@
 
   /* WHY IS READ, NOT SKIMMED: body size and air, in the second ink, at a measure. */
   .dc > .queue-why {
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -552,21 +727,6 @@
     white-space: nowrap;
   }
 
-  /* AN ANSWER IS A PILL, and a long one wraps inside it rather than pushing the card sideways. */
-  .queue-act {
-    border-radius: var(--r-pill);
-    padding-inline: var(--sp-4);
-    white-space: normal;
-    text-align: start;
-    overflow-wrap: anywhere;
-  }
-
-  /* THE OPTION THE REASON IS FOR, while the line is open: the selected surface and an ink edge, a shape and not a shade. */
-  .queue-act[data-on] {
-    background: var(--selected);
-    border-color: var(--ink2);
-  }
-
   /* NO KEY CAPS UNDER A THUMB: there is no keyboard to press them with. */
   @media (pointer: coarse) {
     .dc-key {
@@ -617,10 +777,11 @@
     background: none;
     border: 0;
     font: inherit;
-    color: var(--link);
-    font-size: var(--t-sm);
+    color: var(--action-text);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
     text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+    text-decoration-color: color-mix(in srgb, var(--action-text) 40%, transparent);
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
     cursor: pointer;
@@ -681,8 +842,8 @@
 
   /* UNDO IS THE LINE'S ONE CONTROL while the answer waits, in the ink a person presses. */
   .qa-undo {
-    color: var(--ink);
-    font-weight: 500;
+    color: var(--action-text);
+    font-weight: var(--fw-medium);
   }
 
   @media (pointer: coarse) {

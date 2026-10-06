@@ -454,14 +454,13 @@
   }
 
   /**
-   * A THING'S MARK, DRAWN AND NOT TYPESET.
+   * A THING'S MARK: ONE SMALL DOT OF ITS COLOUR, AND ITS NAME BESIDE IT (DIRECTION 39).
    *
-   * The marks are the characters a project was given (a circle, a triangle, a diamond, a square), and
-   * set as text each one came out of a different font at a different optical size: the circle as a
-   * 4px bullet, the triangle as a 9px glyph, so every title in a list started at its own x. Drawn as
-   * one 8px shape in one 16px slot, a marked title and its neighbour share an edge, and a row with
-   * no project keeps the slot empty so it does too. The shape is still the first channel and the
-   * hue the second; the name stays on the element for a screen reader.
+   * The marks were the characters a project was given (a circle, a triangle, a diamond, a square), drawn as four
+   * shapes, and in front of every title they read as glyphs that meant nothing to anybody who had not learnt them.
+   * The name always stands beside the mark, so the name is what says which project, and the colour is the quick look.
+   * Every mark is the same 8px dot now, whatever shape the row stores in `data-shape`, which stays for a screen reader's
+   * label and for anything that still reads it. A row with no project keeps the slot empty, so titles share an edge.
    */
   .thing-glyph {
     display: inline-block;
@@ -473,22 +472,6 @@
     background: currentColor;
     border-radius: 50%;
     vertical-align: 0.06em;
-  }
-
-  .thing-glyph[data-shape="▲"] {
-    border-radius: 0;
-    clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  }
-
-  .thing-glyph[data-shape="◆"] {
-    border-radius: 1px;
-    transform: rotate(45deg) scale(0.8);
-  }
-
-  .thing-glyph[data-shape="■"],
-  .thing-glyph[data-shape="◼"] {
-    border-radius: 1px;
-    transform: scale(0.85);
   }
 
   .thing-glyph[data-shape=""] {

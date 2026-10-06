@@ -6,8 +6,10 @@
   folded below them, a press away, so twenty-four colleagues of one company read as one group and not as a page of
   faces. An organisation with one person here is not a group: that person is a line of their own that names it.
 
-  ON THE GROUND, NO BOX: the rows are `rows.css`'s ledger, each a link to its row's page, the person a face and the
-  organisation its list's own glyph. Nothing here is an id: an organisation the record has not named yet is said as one.
+  INSIDE THE LIST'S TILE, NO BOX OF THEIR OWN (DIRECTION 39): the rows are `rows.css`'s ledger under quiet headings,
+  each a link to its row's page, the person a face of their initials on one neutral tint (the name says who; a column
+  of pastel hues said nothing) and the organisation its list's own glyph. Nothing here is an id: an organisation the
+  record has not named yet is said as one.
 -->
 <script lang="ts">
   import { at } from '$lib/at.ts';
@@ -138,20 +140,25 @@
 {/if}
 
 <style>
-  /* THE BANDS, 32 APART, each a quiet heading over its rows. The page's own gutter is the list's edge. */
+  /* THE BANDS, 24 APART, each a quiet heading over its rows. The tile's own padding is the list's edge. */
   .people {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-6);
+    gap: var(--sp-5);
     min-inline-size: 0;
   }
 
   .band-head {
-    margin: 0 0 var(--sp-2);
+    margin: 0 0 var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-    letter-spacing: 0.01em;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+  }
+
+  /* A PERSON'S FACE IS THEIR INITIAL ON ONE NEUTRAL TINT, on every row; you keep the ink disc that says it is you. */
+  .people :global(.line-mark .face[data-kind='person']) {
+    background: var(--field);
+    color: var(--ink2);
   }
 
   /* A GROUP'S PEOPLE SIT UNDER ITS NAME, indented to the name's edge so the organisation reads as their heading. */
@@ -192,6 +199,18 @@
   }
 
   @media (width < 640px) {
+    /* A PERSON'S DATE ENDS THEIR FIRST LINE, beside the name, as it does at 1440. The phone's card rule (`rows.css`) sends
+       a date to a third line under an amount, and a person has no amount, so "2 Sep" stood alone on a line of its own.
+       The empty column a wide row keeps for an amount has nothing to hold here. */
+    .people :global(.line-when) {
+      grid-column: 3;
+      grid-row: 1;
+    }
+
+    .people :global(.line > span:empty) {
+      display: none;
+    }
+
     .members {
       margin-inline-start: var(--sp-4);
     }

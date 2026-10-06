@@ -82,7 +82,7 @@
     inline-size: 24px;
     block-size: 24px;
     background: var(--s1);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
     color: var(--ink2);
     font-size: var(--t-xs);
     font-weight: 600;

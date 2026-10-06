@@ -1,5 +1,6 @@
 <!--
-  The rows a proposal would change, field by field (`changes.ts`). A document or a long text is the
+  The rows a proposal would change, field by field (`changes.ts`), each by its name and never its handle ("Kiln", not
+  "Kiln #1": a person reads names, and the handle is the record's). A document or a long text is the
   render package's `Diff`; any other field is one line: its name, the value it had struck through, and
   the value it would have. The words `Before` and `After` are still read to a screen reader.
 
@@ -18,7 +19,7 @@
 <script lang="ts">
   /* `Diff` is drawn here outside a declared page, so its kind's sheet comes with it (`kinds/diff.css`). */
   import '@braindog/skin/kinds/diff.css';
-  import { diffPlan, ref } from 'braindog-render';
+  import { diffPlan } from 'braindog-render';
   import { Diff } from 'braindog-render/svelte';
   import { apiBase } from '$lib/at.ts';
   import { placeNamed, placesIn, words as scopeWords, type Place, type Scope } from '$lib/record/scope-move.ts';
@@ -47,7 +48,6 @@
     <li class="change">
       <p class="change-row">
         <span class="change-title">{u.title}</span>
-        <span class="change-id">{ref(u.at)}</span>
       </p>
       {#each u.changes as c (c.field)}
         {#if c.long && compact}
@@ -117,11 +117,6 @@
     font-weight: 500;
   }
 
-  .change-id {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
-  }
 
   .change-field {
     display: flex;

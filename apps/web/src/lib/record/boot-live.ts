@@ -22,7 +22,7 @@ import { isQuiet, railRoom, runAge } from '@braindog/kernel';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 import { asPartOf, useCaseName } from '@braindog/seed/usecases/names';
 
-import { iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
+import { hueOf, iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
 import { homeOf, learnHome } from './api.ts';
 import { currencyOf } from './money.ts';
 import { learnPages, REGISTERS } from './held.ts';
@@ -33,7 +33,7 @@ import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
 import type { Level } from './schema.ts';
 import { levelsFrom } from './may.ts';
 import type { IconName } from '../ui/icons.ts';
-import { agentKindOf, type AgentKind } from '../ui/face.ts';
+import { agentKindOf, hueFor, type AgentKind } from '../ui/face.ts';
 /* THE HOLDING PEN, AS THE RECORD SENDS IT (`boot`'s `pen`), held to the shape the settings screen draws. */
 import { penOf, type PenItem } from '../design/pen.ts';
 import type { Prefs } from '../nav-prefs.svelte.ts';
@@ -774,6 +774,10 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
             ...(kept.has(p) ? {} : { cut: true as const }),
             /* A PAGE ONE ROW MADE, which the flat nav leaves to its list's own page (`flatNav`). */
             ...(p.about ? { row: true as const } : {}),
+            /* AND IT DRAWS AS THAT THING'S OWN COLOURED DOT in the rail, so each project is told from its neighbours:
+               the row's frozen hue where this tab holds the row, else the hue its name is always drawn in (`hueFor`),
+               which is the colour Today gives the same project. `boot` sends no hue of its own yet. */
+            ...(p.about ? { hue: (p.about.seq === null ? undefined : hueOf({ register: p.about.register, seq: p.about.seq })) ?? hueFor(p.title) } : {}),
           },
         ]
       : [],

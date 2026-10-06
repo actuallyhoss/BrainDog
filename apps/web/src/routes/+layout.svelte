@@ -46,7 +46,7 @@
   import { assets } from '$app/paths';
 
   import { named } from '$lib/env.ts';
-  import TabBar from '$lib/ui/TabBar.svelte';
+  import TabBar from '$lib/shell/TabBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { follow, live } from '$lib/data/live.svelte.ts';
@@ -62,6 +62,7 @@
   import { palette } from '$lib/palette/open.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
+  import { railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import type { Working } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
@@ -144,7 +145,6 @@
   }
 
   /* COMPARED INSIDE THE RECORD, as the rail compares: the address with the base and the slug taken off. */
-  const current = (href: string) => here(page.url.pathname) === href;
   const under = (href: string) => {
     const where = here(page.url.pathname);
     return where === href || where.startsWith(`${href}/`);
@@ -213,7 +213,12 @@
   const flat = $derived(
     flatNav(grouped, data.open, { today: copy.today, activity: copy.audit, decide: said('decide') }, { work: holdsTasks ? WORK : null }),
   );
-  const tabs = $derived(tabsOf(flat.main));
+  /**
+   * THE RAIL'S SECTIONS (DIRECTION §39, `railOf`): the seven places, each section's own things under its name, and the
+   * rest under More. One reading for the rail, the tab bar and the More sheet, so a place is in the same spot on each.
+   */
+  const rail = $derived(railOf(flat, said('decide')));
+  const tabs = $derived(tabsOf(rail.places));
   /* WHAT THE TOP BAR SAYS IS UNDER MORE: the sections and pages that are not rows, and the lists. */
   const behind = $derived(flat.more.length + flat.pages.length + moreLists.length);
   /* THE PERSON READING, by the name the record told them, for the top bar's face. */
@@ -222,8 +227,8 @@
   /* WHERE THE READER IS, for the sheet's rows: the Work screen is a place of its own, so Today is not marked on it too. */
   const place = $derived(placeOf(here(page.url.pathname), page.url.searchParams));
 
-  /* `g 1`–`9` COUNT WHAT IS ON SCREEN: the rows of the flat list, in the order drawn. */
-  const numbered = $derived(flat.main);
+  /* `g 1`–`9` COUNT WHAT IS ON SCREEN: the places, in the order drawn, and the top bar's own rows on the top bar. */
+  const numbered = $derived(navPrefs.shape === 'bar' ? flat.main : rail.places);
   /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
      and `app.html` has always read this cookie before first paint, so a remembered fold costs no
      flash. Nothing wrote it until now. */
@@ -676,9 +681,10 @@
         <Sidebar
           icons={railIcons}
           ontoggle={toggleRail}
-          main={flat.main}
-          more={flat.more}
-          groups={flat.groups}
+          places={rail.places}
+          things={rail.things}
+          more={rail.more}
+          views={rail.views}
           hidden={hiddenCount}
           pen={data.pen}
           record={data.index.name}
@@ -844,40 +850,37 @@
       {/if}
     </div>
 
-    <!-- THE FLAT LIST, AS THE RAIL DRAWS IT (`flatNav`). On a phone the tab bar carries the first five and this carries all
-         of them, so a row past the fifth is one press from any screen. -->
+    <!-- THE PLACES, AS THE RAIL DRAWS THEM (`railOf`). On a phone the tab bar carries the first five and this carries all
+         of them, so a place past the fifth is one press from any screen. -->
     <ul class="more-list more-spine">
-      {#each flat.main as item (item.key)}
+      {#each rail.places as item (item.key)}
         <li>
-          <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) ? 'page' : undefined}>
+          <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) && !(rail.views[item.key] ?? []).some((v) => under(v.href)) ? 'page' : undefined}>
             <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
             {#if item.count}<span class="more-tally num">{item.count}</span>{/if}
           </a>
+          <!-- A place's views, Board under Work, indented under it: the tab bar has no room for them. -->
+          {#each rail.views[item.key] ?? [] as v (v.href)}
+            <a class="more-row more-view" href={at(v.href)} aria-current={under(v.href) ? 'page' : undefined}><span class="more-name">{v.title}</span></a>
+          {/each}
         </li>
       {/each}
     </ul>
 
-    <!-- AND WHAT IS UNDER MORE ON THE RAIL: the sections that did not fit, and a section's other pages, with no heading
-         over nothing. A project's own page is on the Projects page, not here. -->
-    {#if flat.more.length + flat.pages.length > 0}
-      <h3 class="more-section">{copy.otherPages}</h3>
+    <!-- EACH SECTION'S OWN THINGS UNDER ITS NAME, a project per row under Projects, in the thing's own colour. -->
+    {#each rail.things as [section, list] (section)}
+      <h3 class="more-section">{section}</h3>
       <ul class="more-list">
-        {#each flat.more as item (item.key)}
+        {#each list as entry (entry.href)}
           <li>
-            <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) ? 'page' : undefined}>
-              <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
-            </a>
-          </li>
-        {/each}
-        {#each flat.pages as entry (entry.href)}
-          <li>
-            <a class="more-row" href={at(entry.href)} aria-current={current(entry.href) ? 'page' : undefined}>
-              <Icon name={entry.icon} size="m" /><span class="more-name">{entry.title}</span>
+            <a class="more-row" href={at(entry.href)} aria-current={under(entry.href) ? 'page' : undefined}>
+              {#if entry.hue !== undefined}<span class="more-hue" style="--hue:{entry.hue}" aria-hidden="true"></span>{:else}<Icon name={entry.icon} size="m" />{/if}
+              <span class="more-name">{entry.title}</span>
             </a>
           </li>
         {/each}
       </ul>
-    {/if}
+    {/each}
 
     <!-- AND THE HEADING GOES WITH THEM. `index.registers` holds only the lists that have something
          in them, so on a young record this section would be a title over nothing. It is the record's
@@ -898,6 +901,20 @@
                 <span class="more-name">{v.name}</span>
               </a>
             {/each}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
+    <!-- THE PLACES PAST SEVEN, AND ACTIVITY, as the rail keeps them under More. -->
+    {#if rail.more.length > 0}
+      <h3 class="more-section">{copy.otherPages}</h3>
+      <ul class="more-list">
+        {#each rail.more as item (item.key)}
+          <li>
+            <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) ? 'page' : undefined}>
+              <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
+            </a>
           </li>
         {/each}
       </ul>
@@ -990,12 +1007,12 @@
   }
 
   /**
-   * THE GROUND, AND ON IT A FLOATING RAIL AND THE WORK.
+   * ONE BOARD, AND ON IT THE RAIL AND THE WORK (DIRECTION §39).
    *
-   * The work no longer sits in a lifted panel: the page IS the ground (`--sunk` with `--ground-light`, painted on
-   * `body` in the skin's `base.css`), the rail is a glass card floating 12 in from the window, and the content sits
-   * straight on the ground, the skin's fluid `--gutter` from the rail and from the window. `.body` is still the ONE
-   * scroll container, so the rail never moves and the window shows exactly one scrollbar.
+   * The page IS the board (painted on `body` in the skin's `base.css`). The rail is the board's left column, flat and
+   * the board's own colour, and the work sits straight on the board, the skin's fluid `--gutter` from the rail and from
+   * the window. `.body` is the ONE scroll container, so the rail never moves and the window shows exactly one
+   * scrollbar.
    *
    * ONE COLUMN THAT SIZES TO THE RAIL, AT BOTH OF THE RAIL'S WIDTHS. `auto` measures whatever the rail says it is, so
    * the narrow width is the rail's own declaration and this grid never has to know which state it is in.
@@ -1009,17 +1026,14 @@
     overflow: hidden;
   }
 
-  /* The card, 12 in from the window at the top, the start and the bottom.
+  /* The rail's column, the window's full height, with nothing round it: the rail pads itself.
 
-     AT THE MENU'S LEVEL, because the card is a stacking context of its own (its glass sits under it at `z-index: -1`),
-     and the record switcher's menu opens inside it: at `auto` the work's sticky title row, later in the page and at
-     `--z-sheet`, was drawn over any part of the menu that reached past the card. */
+     AT THE MENU'S LEVEL, because the record switcher's menu opens inside it: at `auto` the work's sticky title row,
+     later in the page and at `--z-sheet`, was drawn over any part of the menu that reached past the rail. */
   .rail-slot {
     position: relative;
     z-index: var(--z-palette);
     display: flex;
-    padding-block: var(--inset);
-    padding-inline-start: var(--inset);
   }
 
   /* THE OTHER TWO SHAPES ARE ONE COLUMN WITH A STRIP ON TOP, and the strip is `auto` for the same
@@ -1051,7 +1065,7 @@
     min-block-size: calc(var(--tap) + var(--sp-4) + var(--sp-2));
   }
 
-  /* One glass pill, at the start of the strip, at the size every other target in the shell is. */
+  /* One control, at the start of the strip, at the size every other target in the shell is. */
   .menu-open {
     position: relative;
     isolation: isolate;
@@ -1062,8 +1076,8 @@
     padding-inline: var(--sp-3) var(--sp-4);
     background: none;
     border: 0;
-    /* A pill, because it is pressed. */
-    border-radius: var(--r-pill);
+    /* A rectangle, as every button is (DIRECTION §39). */
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-base);
@@ -1071,8 +1085,8 @@
     cursor: pointer;
   }
 
-  /* THE GLASS ON A PSEUDO-ELEMENT, as the rail's: a `backdrop-filter` on the control would be the box a fixed
-     descendant is placed against. */
+  /* THE SURFACE ON A PSEUDO-ELEMENT: an opaque tile with one hairline, no glass (DIRECTION §39), and a step of ink
+     under a pointer. */
   .menu-open::before,
   .launcher::before {
     content: '';
@@ -1080,24 +1094,14 @@
     inset: 0;
     z-index: -1;
     border-radius: inherit;
-    background: var(--glass);
+    background: var(--tile);
     box-shadow: var(--glass-edge), var(--e2);
-    backdrop-filter: var(--glass-blur);
     transition: background var(--d-state) var(--ease-out);
-  }
-
-  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives: the
-     build folds a prefixed and an unprefixed pair in one rule into one, and Safari's line came out of the bundle. */
-  @supports (-webkit-backdrop-filter: none) {
-    .menu-open::before,
-    .launcher::before {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
   }
 
   .menu-open:hover::before,
   .launcher:hover::before {
-    background: var(--glass-strong);
+    background: color-mix(in srgb, var(--ink) 5%, var(--tile));
   }
 
   /**
@@ -1153,7 +1157,7 @@
     display: none;
   }
 
-  /* A GLASS CIRCLE WITH A MAGNIFIER, floating over the page in the corner, 44 across. */
+  /* A TILE WITH A MAGNIFIER, floating over the page in the corner, 44 across. */
   .launcher {
     position: fixed;
     inset-block-end: calc(env(safe-area-inset-bottom) + var(--inset) * 2);
@@ -1196,8 +1200,8 @@
 
     .body {
       /* THE LAST ROW ENDS 16px ABOVE THE TAB BAR (design 6.6). `--tabbar` is the bar and the home
-         indicator under it, summed once in `tokens.css`; the bar floats `--inset` above that. */
-      padding-block-end: calc(var(--tabbar) + var(--inset) + var(--sp-4));
+         indicator under it, summed once in `tokens.css`; the bar sits on the window's bottom edge. */
+      padding-block-end: calc(var(--tabbar) + var(--sp-4));
     }
 
     .tab-slot {
@@ -1349,6 +1353,16 @@
     font-size: var(--t-sm);
   }
 
+  /* A thing's own colour, where a place's glyph would be, as the rail draws it. */
+  .more-hue {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    margin-inline: calc((var(--icon-m) - 8px) / 2);
+    border-radius: var(--r-round);
+    background: oklch(var(--mark-l) var(--mark-c) var(--hue));
+  }
+
   /* The record's tile: ink with the ground's letter, the rail's own (`Sidebar.svelte`). */
   .more-tile {
     display: grid;
@@ -1399,7 +1413,7 @@
     font-weight: 600;
   }
 
-  /* A saved view is its list looked at another way: indented under it, with no glyph of its own. */
+  /* A saved view is its list looked at another way, and Board its place: indented under it, with no glyph of its own. */
   .more-view {
     padding-inline-start: calc(var(--sp-2) + var(--icon-m) + var(--sp-3));
     color: var(--ink2);

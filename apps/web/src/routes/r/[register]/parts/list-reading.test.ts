@@ -137,6 +137,11 @@ test('by state counts each declared value and says what the bar means', () => {
   ]);
   const label = (v: string) => v;
   assert.equal(stateReading(bills, parts, rows, NOW, label), 'Most are still open; 1 is late.');
+  /* The head already says "3 open, 1 late", so the tile does not say it again. */
+  assert.equal(stateReading(bills, parts, rows, NOW, label, true), null);
+  /* With no finished states declared, which state holds the most is not in the head, so it is still said. */
+  const { done: _, ...undeclared } = bills;
+  assert.equal(stateReading(undeclared, byStateOf(undeclared, rows)!, rows, NOW, label, true), 'open holds the most, 2 of 4.');
   const paid = [row({ state: 'paid' })];
   assert.equal(stateReading(bills, byStateOf(bills, paid)!, paid, NOW, label), 'The one here is finished.');
   assert.equal(byStateOf(people, rows), null);

@@ -42,10 +42,6 @@ export const decide = {
   reasonThinNudge: 'That will not mean much in six weeks. It is kept either way.',
   rankedBy: 'Ranked by the cost of being wrong',
   costOfDelay: 'Cost of deciding late',
-  /** Over the band the record computed, which is the one thing on the page nobody typed. */
-  costOfWrong: 'Cost of getting it wrong',
-  /** The heading over the reasoning a question was opened with. */
-  whyAsked: 'Why this is asked',
   theOptions: 'The options',
   recommended: 'Suggested',
   /* WHY THE COMMIT IS REFUSING, said where the refusal is. A decision is immutable once made, so the
@@ -53,7 +49,6 @@ export const decide = {
   reasonRequired: 'A decision is kept for ever and cannot be edited, so it needs a reason. Write why you chose it.',
   reasonHint: 'Why this one, in a sentence somebody can read in six weeks.',
   commit: 'Record the decision',
-  defer: 'Defer the question',
   decidedBy: 'Decided by',
   immutable: 'A decision cannot be edited once it is made.',
   noQuestions: 'Nothing waits on you',

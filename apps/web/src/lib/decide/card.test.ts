@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 
 import type { QueueQuestion } from '@braindog/kernel';
 
-import { answeredLine, askerOf, byWords, cardOf, movesOf, nameOrNull, shiftsOf, spoken } from './card.ts';
+import { answeredLine, askerOf, byWords, cardOf, inlineOf, movesOf, nameOrNull, pressSaid, pressTail, primaryOf, shiftsOf, spoken, startsOn } from './card.ts';
 
 const now = Date.parse('2026-10-06T09:00:00Z');
 
@@ -221,6 +221,80 @@ test('A MERGE IS STILL DRAWN AS ONE, from the options the record offers', () => 
   );
   assert.equal(card.merge?.all.option, 'merge');
   assert.equal(card.merge?.apart.option, 'apart');
+});
+
+/* ── the card reads like a form (DIRECTION §39) ───────────────────────────── */
+
+test('A FORM STARTS ON THE SUGGESTION ONLY WHERE A KEY MAY GIVE IT, and a hard answer says so in its button', () => {
+  assert.equal(startsOn(cardOf(ask(), { now, home: 'GBP' })), 'seat', 'the suggestion is not chosen to start with');
+  assert.equal(startsOn(cardOf(ask({ cost: 'undo' }), { now, home: 'GBP' })), null, 'a hard answer starts chosen for the reader');
+  const none = ask({ options: [{ key: 'a', label: 'A', because: '', recommended: false }, { key: 'b', label: 'B', because: '', recommended: false }] });
+  assert.equal(startsOn(cardOf(none, { now })), null, 'a question with nothing suggested starts on an answer');
+  /* THE RECORD'S OWN TWO ANSWERS ARE BUTTONS, so there is nothing to start on, even where Enter accepts. */
+  assert.equal(startsOn(cardOf(ask({ kind: 'rowset', options: [] }), { now })), null);
+
+  const hard = cardOf(ask({ cost: 'undo' }), { now, home: 'GBP' });
+  assert.equal(pressSaid(hard, 'Decide'), 'Decide, can’t be undone easily');
+  assert.equal(pressSaid(hard, 'Accept £12.98'), 'Accept £12.98, can’t be undone easily');
+  assert.equal(pressSaid(cardOf(ask({ cost: 'shape' }), { now }), 'Decide'), 'Decide', 'a band that only warns adds nothing to the words');
+  assert.doesNotMatch(pressSaid(hard, 'Decide'), /—/u);
+});
+
+test('A CHOICE IS CHOSEN AND DECIDE GIVES IT; a number key and Enter on a choice still answer; Enter only where cheap', () => {
+  const card = src('./DecisionCard.svelte');
+  /* A POINTER OR SPACE ON A CHOICE ONLY CHOOSES IT; a press from outside it (a page's number key) answers, as it did. */
+  assert.match(card, /function onChoice\(e: MouseEvent, way: Way\) \{\n\s+if \(e\.detail === 0 && document\.activeElement !== e\.currentTarget\) return press\(way\);\n\s+selectWay\(way\);/u);
+  /* ENTER ON A CHOICE CHOOSES AND ANSWERS, as Enter sends a form. */
+  assert.match(card, /if \(e\.key === 'Enter'\) \{\n\s+e\.preventDefault\(\);\n\s+e\.stopPropagation\(\);\n\s+selectWay\(way\);\n\s+press\(way\);/u);
+  /* DECIDE CARRIES THE KEY'S MARK ONLY ON A CARD THAT COSTS NOTHING, with an answer chosen. */
+  assert.match(card, /data-enter=\{card\.enter !== null && selected !== null \? '' : undefined\}/u);
+  assert.match(card, /onclick=\{commit\}>\{pressSaid\(card, queueWords\.decide\)\}/u, 'Decide does not say the care a hard answer asks for');
+  /* NO CHIP SAYS THE BAND: it is kept for the keys and the ranking, hidden, and said in the button. */
+  assert.match(card, /<span class="queue-cost" data-cost=\{card\.cost\} hidden>/u);
+  assert.match(card, /import '\.\/form\.css';/u, 'the card draws its choices its own way again');
+});
+
+test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the suggested or the first filled', () => {
+  const named = (n: number, rec = -1) =>
+    ask({ options: ['Chase it', 'Not yet', 'Ask Ana', 'Write it off'].slice(0, n).map((label, i) => ({ key: `k${i}`, label, because: '', recommended: i === rec })) });
+  assert.equal(inlineOf(cardOf(named(2), { now })), true, 'Chase it and Not yet are two buttons');
+  assert.equal(inlineOf(cardOf(named(3), { now })), true);
+  assert.equal(inlineOf(cardOf(named(4), { now })), false, 'a fourth answer keeps the form');
+  assert.equal(inlineOf(cardOf(ask(), { now })), false, 'an answer with a line of what it does keeps the form');
+  assert.equal(inlineOf(cardOf(ask({ kind: 'rowset', options: [] }), { now })), true, 'Accept and Decline were always buttons');
+  /* COMPACT, OUTSIDE DECIDE, the line of what each does waits on the question's page, and only a fourth answer does not fit. */
+  assert.equal(inlineOf(cardOf(ask(), { now }), true), true);
+  assert.equal(inlineOf(cardOf(named(4), { now }), true), false);
+  const swatch = ask({ options: [{ key: 'a', label: 'Oak', because: '', recommended: false, shows: { swatch: ['#aa7744'] } }, { key: 'b', label: 'Ash', because: '', recommended: false }] });
+  assert.equal(inlineOf(cardOf(swatch, { now })), false, 'an answer that shows its colours is chosen in the form, where they are drawn');
+
+  assert.equal(primaryOf(cardOf(named(3, 1), { now })), 'k1', 'the suggested answer is filled');
+  assert.equal(primaryOf(cardOf(named(2), { now })), 'k0', 'with none suggested, the first');
+  assert.equal(primaryOf(cardOf(ask({ kind: 'rowset', options: [] }), { now })), 'accept');
+  /* THE ENTER RULES HOLD ON A ROW: the suggestion where it is cheap, and nothing on a hard card. */
+  assert.equal(cardOf(named(2, 0), { now }).enter, 'k0');
+  assert.equal(cardOf(named(2), { now }).enter, null, 'with nothing suggested, Enter gives nothing on a question of options');
+  assert.equal(cardOf({ ...named(2, 0), cost: 'undo' } as QueueQuestion, { now }).enter, null);
+  assert.equal(pressTail(cardOf(ask({ cost: 'undo' }), { now })), ', can’t be undone easily');
+  assert.equal(pressTail(cardOf(ask(), { now })), '');
+
+  const card = src('./DecisionCard.svelte');
+  /* ONE PRESS DECIDES, through the same held press as every answer, and only the Enter answer carries its mark. */
+  assert.match(card, /data-weight=\{way\.key === primary \? 'primary' : undefined\}/u);
+  assert.match(card, /data-enter=\{way\.key === card\.enter \? '' : undefined\}/u);
+  assert.match(card, /onclick=\{\(\) => press\(way\)\}/u);
+  assert.match(card, /<span class="dc-btn-name">\{way\.label\}<\/span>/u, 'the gate and the answered line read the name apart from the care said after it');
+});
+
+test('COMPACT, OUTSIDE DECIDE: the question and its buttons only, and at most three before a count that opens Decide', () => {
+  const card = src('./DecisionCard.svelte');
+  assert.match(card, /const inline = \$derived\(inlineOf\(card, compact\)\);/u);
+  assert.match(card, /\{#if !compact\}\n\s+<!-- WHO ASKED/u, 'a compact card still says who asked');
+  assert.match(card, /\{#if link \|\| compact\}<a class="dc-open" href=\{at\(card\.href\)\}>/u, 'a compact question is not the door to its page');
+  assert.match(card, /!link && !compact && onpress === undefined/u, 'a compact card offers Not now');
+  const host = src('../page/QueueAnswer.svelte');
+  assert.match(host, /compact = false,/u, 'QueueAnswer takes no compact prop');
+  assert.match(host, /\{compact\} \/>/u, 'QueueAnswer does not hand compact to the card');
 });
 
 /* ── every place a question is drawn draws this card ───────────────────────── */

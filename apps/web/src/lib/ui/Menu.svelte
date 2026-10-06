@@ -375,9 +375,9 @@
     cursor: pointer;
   }
 
-  /* GLASS, AND THE STRONG ONE: a menu opens over busy content, and legibility is the whole of its job. Level
-     2, the chrome's, is the glass hairline pair and the floating shadow; radius `--r-md`; and it pops in over the
-     menu's step on the arriving curve. */
+  /* THE TILE, OPAQUE (DIRECTION §39, no glass): a menu opens over busy content, and legibility is the whole of its
+     job. One hairline and the floating shadow, which a menu earns because it truly floats; radius `--r-md`; and it pops
+     in over the menu's step on the arriving curve. */
   .menu {
     /* The four the clamp writes, declared here so the panel is correct before `place()` has run
        and so the names exist in a stylesheet rather than only in TypeScript. `--menu-from` is the
@@ -416,24 +416,16 @@
        it reaches past an item, and at 4px of padding `overflow-y: auto` clipped it off the first and
        last rows. The ring is the one thing in this component that may not be trimmed to make room. */
     padding: var(--sp-2);
-    background: var(--glass-strong);
-    backdrop-filter: var(--glass-blur);
+    background: var(--tile);
     border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
-    box-shadow: var(--glass-edge), var(--e2);
+    box-shadow: 0 0 0 1px var(--rule), var(--e2);
     /* AT ITS ANCHOR: the corner of the trigger it hangs from, at the start or the end. */
     transform-origin: var(--menu-x) var(--menu-from);
     transition-property: transform, opacity;
     transition-duration: var(--d-menu);
     transition-timing-function: var(--ease-out);
-  }
-
-  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives. */
-  @supports (-webkit-backdrop-filter: none) {
-    .menu {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
   }
 
   /* THE FIRST FRAME OF AN OPENING. No fade on the way in: a menu at .96 of its size is readable, and
@@ -486,7 +478,7 @@
     padding-block: 0;
     padding-inline: var(--sp-2);
     border-radius: var(--r-sm);
-    font-size: var(--t-base);
+    font-size: var(--fs-ctl);
     transition: background var(--d-state) var(--ease-out);
   }
 
@@ -508,7 +500,7 @@
    * taken back here. From 640px up, which only a coarse pointer reaches, it is a 560px sheet in the
    * middle of the bottom edge rather than one as wide as a tablet.
    *
-   * A SHEET, NOT GLASS: a tile's surface at radius `--r-lg`, the third level, over the scrim. It
+   * A SHEET: a tile's surface at radius `--r-lg`, the third level, over the scrim. It
    * moves as `Sheet.svelte`'s phone sheet does: up from below the screen over `--d-panel` on the
    * sheet curve, and back down it in `--d-panel-out`. It stays in the top layer while it goes, so its scrim fades
    * with it.
@@ -528,9 +520,7 @@
     margin-inline: auto;
     translate: none;
     padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
-    background: var(--bg);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+    background: var(--tile);
     border: 0;
     border-start-start-radius: var(--r-lg);
     border-start-end-radius: var(--r-lg);
@@ -608,7 +598,7 @@
     }
   }
 
-  /* UNDER FORCED COLOURS the glass and the shadow are gone, so the menu's edge is a border. */
+  /* UNDER FORCED COLOURS the hairline and the shadow are gone, so the menu's edge is a border. */
   @media (forced-colors: active) {
     .menu,
     .menu[popover] {

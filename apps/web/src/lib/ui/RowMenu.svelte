@@ -274,8 +274,9 @@
 {/if}
 
 <style>
-  /* `Menu.svelte`'s surface: the strong glass at level 2, radius `--r-md`, and its motion: in from .96
-     over the menu's step on the arriving curve, and out to .985 as it fades over the exit's on the leaving one. */
+  /* `Menu.svelte`'s surface: the tile's colour with a hairline and the second level's shadow, radius `--r-md`, no glass
+     (DIRECTION 39), and its motion: in from .96 over the menu's step on the arriving curve, and out to .985 as it fades
+     over the exit's on the leaving one. */
   .row-menu {
     --row-menu-from: 0%;
     --row-menu-pop: scale(0.96);
@@ -286,24 +287,16 @@
     position: fixed;
     z-index: var(--z-palette);
     min-inline-size: 252px;
-    padding: calc(var(--sp-1) + 2px);
-    background: var(--glass-strong);
-    backdrop-filter: var(--glass-blur);
+    padding: var(--sp-2);
+    background: var(--tile);
     border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
-    box-shadow: var(--glass-edge), var(--e2);
+    box-shadow: 0 0 0 1px var(--rule), var(--e2);
     transform-origin: 0% var(--row-menu-from);
     transition-property: transform, opacity;
     transition-duration: var(--d-menu);
     transition-timing-function: var(--ease-out);
-  }
-
-  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives. */
-  @supports (-webkit-backdrop-filter: none) {
-    .row-menu {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
   }
 
   /* No fade on the way in, for `Menu.svelte`'s reason: a menu at .96 of its size is readable. */
@@ -332,7 +325,7 @@
     padding-block: 0;
     padding-inline: var(--sp-2);
     border-radius: var(--r-sm);
-    font-size: var(--t-base);
+    font-size: var(--fs-ctl);
     transition: background var(--d-state) var(--ease-out);
   }
 
@@ -351,14 +344,14 @@
   }
 
   .row-menu-hand:focus-visible {
-    background: var(--hover-wash);
+    background: var(--field);
     color: var(--ink);
   }
 
   /* Hover only where there is one: a phone keeps `:hover` on the last row tapped. */
   @media (hover: hover) and (pointer: fine) {
     .row-menu-hand:hover {
-      background: var(--hover-wash);
+      background: var(--field);
       color: var(--ink);
     }
   }
@@ -387,7 +380,7 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
-    background: var(--bg);
+    background: var(--tile);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     border: 0;
@@ -463,7 +456,7 @@
     }
   }
 
-  /* UNDER FORCED COLOURS the glass and the shadow are gone, so the menu's edge is a border. */
+  /* UNDER FORCED COLOURS the shadow is gone, so the menu's edge is a border. */
   @media (forced-colors: active) {
     .row-menu,
     .row-menu[popover] {

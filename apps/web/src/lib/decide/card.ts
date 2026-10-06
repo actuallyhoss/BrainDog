@@ -312,6 +312,52 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
 }
 
 /**
+ * WHAT A BUTTON THAT ANSWERS SAYS, with the care a hard answer asks for in its own words (DIRECTION §39): "Decide, can’t
+ * be undone easily", "Accept £12.98, can’t be undone easily". Every other band leaves the words as they are; the band
+ * still ranks the card and still takes Enter away (`acceptKey`), it is only not drawn as a chip.
+ */
+export const pressSaid = (card: Pick<Card, 'cost'>, label: string): string => (card.cost === 'undo' ? queueWords.hard(label) : label);
+
+/** The words a hard answer's button adds after its name (", can’t be undone easily"), or nothing, so the name stays its own. */
+export const pressTail = (card: Pick<Card, 'cost'>): string => (card.cost === 'undo' ? queueWords.hardTail : '');
+
+/** THE MOST ANSWERS A ROW OF BUTTONS HOLDS: past three, a row is a list read sideways, and the form's choices read it. */
+export const INLINE_MOST = 3;
+
+/**
+ * WHETHER THE ANSWERS ARE A ROW OF BUTTONS, each one press that decides, rather than the form's list of choices and
+ * Decide. "Chase it" and "Not yet", "It went through" and "It stopped": two or three answers that say what they are in
+ * their own name, with no line of what each does and nothing to show, are buttons, as the record's own Accept and
+ * Decline always were. An answer that carries a line of what it does, or a fourth answer, keeps the form, where the
+ * line is read before the press. A merge is neither; it has its own card.
+ *
+ * `compact` IS A QUESTION SHOWN OUTSIDE DECIDE (Home, a declared page), which draws the question and its buttons only:
+ * there a line of what each does is left to the question's own page, one press away, and only a fourth answer still
+ * sends the reader there to choose.
+ */
+export function inlineOf(card: Pick<Card, 'ways' | 'decline' | 'merge'>, compact = false): boolean {
+  if (card.merge !== null) return false;
+  if (card.decline !== null) return true;
+  if (card.ways.length < 2 || card.ways.length > INLINE_MOST) return false;
+  return compact || card.ways.every((w) => w.because === '' && w.shows === null);
+}
+
+/**
+ * THE ANSWER A ROW OF BUTTONS FILLS WITH THE ACCENT: the suggested one, or else the first, which is Accept on the
+ * record's own two. The rest are the quiet fill. Filled is where the eye goes first, not a press made for anybody: Enter
+ * still gives only what `enter` allows.
+ */
+export const primaryOf = (card: Pick<Card, 'ways'>): string | null => (card.ways.find((w) => w.recommended) ?? card.ways[0])?.key ?? null;
+
+/**
+ * THE ANSWER A FORM STARTS ON: the one Enter would give (`enter`), so the suggestion is already chosen where a key may
+ * give it, and nothing is chosen where the answer is hard to undo or money moves. A question the record answers with
+ * its own two (Accept, Decline) or a merge has no choice to start on: its buttons are the answers.
+ */
+export const startsOn = (card: Pick<Card, 'enter' | 'decline' | 'merge'>): string | null =>
+  card.merge === null && card.decline === null ? card.enter : null;
+
+/**
  * THE LINE A CARD BECOMES ONCE IT IS ANSWERED. A proposal Slash drafted reads as its history does: "Slash suggested ·
  * Sam accepted", the reader by the name the record gives them. Every other question says what was chosen, by you, and
  * when.

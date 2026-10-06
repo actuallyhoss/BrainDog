@@ -77,11 +77,12 @@ test('every option’s own button is off for a reader who may not answer, and sa
 
 test('the third verb is off too, and points at the same sentence', () => {
   /* A GATE WITH ITS TWO ANSWERS OFF AND ITS DEFER LIVE IS STILL A DEAD END: a defer is a decision
-     about when, it takes a reason and a wake date, and `decide` is what the record wants for it. */
+     about when, it takes a reason and a wake date, and `decide` is what the record wants for it. It is Not now, words
+     only, beside the answers (DIRECTION §39). */
   assert.match(
     page,
-    /<Button disabled=\{!answerable\} aria-describedby=\{answerable \? undefined : 'cannot-decide'\} onclick=\{defer\}>\{copy\.defer\}<\/Button>/u,
-    'Defer is still offered to a reader who may not answer',
+    /<button type="button" class="dc-btn" data-weight="bare" disabled=\{!answerable\} aria-describedby=\{answerable \? undefined : 'cannot-decide'\} onclick=\{defer\}>\{gate\.notNow\}<\/button>/u,
+    'Not now is still offered to a reader who may not answer',
   );
 });
 
@@ -94,7 +95,7 @@ test('the sentence the controls point at is rendered, and before the first of th
   /* AND IT IS ABOVE THE OPTIONS, which is the whole repair. `aria-describedby` at an id further down
      the page is a control that is off and a reason a reader meets after looking for it. */
   const said = page.indexOf('id="cannot-decide">{whyNot}');
-  const options = page.indexOf('<section class="options">');
+  const options = page.indexOf('<section class="options"');
   assert.ok(said >= 0 && options > said, 'the sentence is not above the options it is about');
 
   /* AND IN THE SAME BRANCH AS THE CONTROLS THAT NAME IT, which earlier in the source is not the same
@@ -121,34 +122,32 @@ test('the sentence the controls point at is rendered, and before the first of th
 });
 
 /**
- * THE OPTIONS ARE STRAIGHT UNDER THE TITLE, and everything accepting would do is one folded tile under them.
+ * ONE TILE, READ LIKE A FORM (DIRECTION §39): who asked and when, the answers straight after, then what accepting does as
+ * a plain part of the same tile, and the comments under it all.
  *
  * MEASURED before: up to seven tiles (what an arrangement does, what a proposal puts in place, the rows to tick, the
  * rows it changes, what it calls, why it was asked and what it costs) stood between the title and the options, so on a
- * laptop the one thing this screen is for was below the fold. And every option carried a key cap.
+ * laptop the one thing this screen is for was below the fold. Then they were one folded tile under the options, a
+ * second treatment beside the options' tile and the comments floating on the board under both.
  */
-test('the options come first, and what accepting does is one folded tile after them', () => {
+test('the options come first, and what accepting does and the comments are parts of the one tile after them', () => {
   const head = page.indexOf('<PageHead icon="decide"');
-  const options = page.indexOf('<section class="options">');
-  const does = page.indexOf('<Tile icon="settings" title={LEAD.does}>');
-  assert.ok(head >= 0 && options > head && does > options, 'the options are not the first thing under the title');
-  /* NO TILE STANDS BETWEEN THE TITLE AND THE OPTIONS but the receipt, which replaces them, and the options' own. */
-  const before = page.slice(head, options).match(/<Tile\b[^>]*>/gu) ?? [];
-  assert.deepEqual(
-    before,
-    [
-      '<Tile>',
-      '<Tile icon={optionsIcon} title={merge ? mergeWords.heading : copy.theOptions} count={two || merge ? undefined : question.options.length}>',
-    ],
-    'a tile is drawn above the options again',
-  );
-  /* ONE TILE HOLDS EVERY PART, folded shut. */
-  assert.match(page.slice(does), /^<Tile icon="settings" title=\{LEAD\.does\}>\s*<details class="does"/u, 'what accepting does is not folded');
-  for (const part of ['<Arranged arranged={story} />', '<Proposed proposed={preview} />', '<ul class="picks">', '<Changes {updates} />', '<CallsOut', '{copy.whyAsked}', '{costTitle}']) {
+  const tile = page.indexOf('<Tile class="gate">');
+  const options = page.indexOf('<section class="options"');
+  const does = page.indexOf('<section class="does"');
+  const thread = page.indexOf('<Thread');
+  const shut = page.indexOf('</Tile>');
+  assert.ok(head >= 0 && tile > head && options > tile && does > options && thread > does && shut > thread, 'the tile no longer reads options, then what accepting does, then the comments');
+  /* ONE TILE ON THE SCREEN, and nothing folded shut in the way of what accepting does. */
+  assert.equal(page.match(/<Tile\b/gu)?.length, 1, 'the gate is split across tiles again');
+  assert.doesNotMatch(page, /<details class="does"/u, 'what accepting does is folded shut again');
+  for (const part of ['<Arranged arranged={story} />', '<Proposed proposed={preview} />', '<ul class="picks">', '<Changes {updates} />', '<CallsOut', '{copy.costOfDelay}']) {
     const at = page.indexOf(part);
-    assert.ok(at > does, `${part} is not inside the one tile`);
+    assert.ok(at > does && at < thread, `${part} is not inside what accepting does`);
   }
-  assert.equal(page.match(/<Tile icon="settings"/gu)?.length, 1, 'what accepting does is split across tiles again');
+  /* WHY IT IS ASKED IS READ BEFORE THE ANSWERS, in the asker's words, under who asked. */
+  const why = page.indexOf('<p class="gate-why">');
+  assert.ok(why > tile && why < options, 'why it is asked is no longer read before the answers');
 });
 
 test('no option carries a key cap, and no sentence is typed into the gate', () => {
@@ -158,8 +157,12 @@ test('no option carries a key cap, and no sentence is typed into the gate', () =
 
 test('both doors refuse before they open, not only the buttons on them', () => {
   const guard = /if \(!answerable\) \{\n\s+toasts\.push\(whyNot, \{ intent: 'warn' \}\);\n\s+return;\n\s+\}/gu;
-  /* THREE DOORS NOW: a press, a defer, and a press held for its Undo (a merge's answer, or Backspace's decline). */
-  assert.equal([...page.matchAll(guard)].length, 3, 'choose, defer and a held press do not all refuse a reader who may not answer');
+  /* FOUR DOORS NOW: a press, a choice chosen, a defer, and a press held for its Undo (a merge's answer, or Backspace's
+     decline). */
+  assert.equal([...page.matchAll(guard)].length, 4, 'choose, pick, defer and a held press do not all refuse a reader who may not answer');
+  const pickAt = page.indexOf('function pick(key: string) {');
+  const chosenAt = page.indexOf('chosenKey = key;', pickAt);
+  assert.ok(pickAt >= 0 && chosenAt > pickAt && page.slice(pickAt, chosenAt).search(guard) >= 0, 'a choice is chosen before anybody checks whether it may');
   const heldAt = page.indexOf('function held(key: string, line: string, rows?: number[]) {');
   const holdAt = page.indexOf('const h = hold(', heldAt);
   assert.ok(heldAt >= 0 && holdAt > heldAt, 'a held press no longer reads the way this test assumes');
@@ -205,23 +208,32 @@ test('nothing a reader was invited to read is hidden from them', () => {
       .filter((line) => line.includes('answerable'))
       .map((line) => line.trim()),
     [
+      /* NOT NOW, the third verb, off with the same sentence. */
+      "<button type=\"button\" class=\"dc-btn\" data-weight=\"bare\" disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} onclick={defer}>{gate.notNow}</button>",
       '{#if !answerable}',
+      /* THE RECORD'S TWO ANSWERS. */
       'disabled={!answerable || holding !== null}',
       "aria-describedby={answerable ? undefined : 'cannot-decide'}",
       /* THE MERGE CARD IS HANDED THE FLAG, and turns its presses off with it as the snippet above does (`MergeCard.svelte`). */
       '{answerable}',
-      "<Button disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} onclick={defer}>{copy.defer}</Button>",
+      /* EACH CHOICE. */
+      'disabled={!answerable || holding !== null}',
+      "aria-describedby={answerable ? undefined : 'cannot-decide'}",
+      /* DECIDE. */
+      'disabled={!answerable || holding !== null || sending !== null}',
+      "aria-describedby={answerable ? undefined : 'cannot-decide'}",
     ],
     'the markup reads `answerable` somewhere new, so something a reader was invited to read may now turn on whether they may answer',
   );
 
   /* THE OPTION BODIES STAY. A gate that greys its buttons and takes the options with them has told a
      reader the question exists and nothing about it. */
-  assert.match(page, /<p class="card-body"><Cited text=\{because\}/u, 'the option bodies no longer read the way this test assumes');
-  const bodyAt = page.indexOf('<p class="card-body"><Cited text={because}');
+  assert.match(page, /<span class="dc-choice-does card-body"><Cited text=\{because\}/u, 'the option bodies no longer read the way this test assumes');
+  const bodyAt = page.indexOf('<span class="dc-choice-does card-body"><Cited text={because}');
   const optionsAt = page.indexOf('{#each question.options as option}');
   assert.ok(optionsAt >= 0 && bodyAt > optionsAt, 'the option loop no longer reads the way this test assumes');
-  assert.doesNotMatch(page.slice(optionsAt, bodyAt), /answerable/u, 'an option’s body is drawn only for a reader who may answer');
+  /* THE CHOICE'S BUTTON BEFORE IT IS OFF FOR SUCH A READER, and that is all: no condition over the body turns on it. */
+  assert.doesNotMatch(page.slice(optionsAt, bodyAt), /\{[#:](if|else if)[^}]*answerable/u, 'an option’s body is drawn only for a reader who may answer');
 });
 
 /**
@@ -239,11 +251,15 @@ test('one press is the answer, and a reason is asked for only when the record as
   assert.match(page, /out\.from === 'refused' && out\.wants === 'reason' && said === undefined/u, 'the one line opens on something other than the record asking');
   assert.match(page, /\{#if asked\}\n\s+<form class="line-form" onsubmit=\{sendReason\}>/u, 'the reason line is drawn without the record asking');
 
-  /* NO ANSWER IS THE FILLED PRIMARY: the suggested one is marked, and the press is the reader's. */
+  /* THE SUGGESTION IS SAID, NEVER FILLED: of the record's two answers only Accept is the primary, whichever is suggested,
+     and the press is the reader's. A question of options is chosen first and given by Decide. */
   const snippetAt = page.indexOf('{#snippet answer(');
   const snippet = page.slice(snippetAt, page.indexOf('{/snippet}', snippetAt));
   assert.ok(snippetAt >= 0, 'the one answer button is no longer one snippet');
-  assert.doesNotMatch(snippet, /weight=/u, 'an answer is drawn heavier than the others again');
+  assert.deepEqual(snippet.match(/weight=\{[^}]*\}/gu), ["weight={option.key === 'accept' ? 'primary' : undefined}"], 'an answer is drawn heavier for being suggested');
+  const pickAt = page.indexOf('function pick(key: string) {');
+  assert.doesNotMatch(page.slice(pickAt, page.indexOf('\n  }\n', pickAt)), /send\(/u, 'a choice sends its answer before Decide');
+  assert.match(page, /function commit\(\) \{[^]*?choose\(selectedKey\);/u, 'Decide does not give the answer chosen');
   assert.match(snippet, /data-suggested=\{marked \? '' : undefined\}/u, 'the suggestion is no longer marked on its button');
   assert.match(snippet, /labelOf\(option, q, moves\)/u, 'an answer no longer says what it does');
 });
@@ -306,7 +322,7 @@ test('a merge is the one decision card with Undo, and Backspace is held and neve
      line it leaves says the question as the title does, with no address or id in it. */
   assert.match(
     handler,
-    /if \(act === 'decline'\) held\(key, gate\.declinedHeld\(spoken\(question\.title\)\)\);\n\s+else choose\(key\);/u,
+    /if \(act === 'decline'\) held\(key, gate\.declinedHeld\(spoken\(question\.title\)\)\);\n\s+else choose\(two \? key : \(selectedKey \?\? key\)\);/u,
     'Backspace declines with no Undo, or says the question with its addresses in',
   );
 

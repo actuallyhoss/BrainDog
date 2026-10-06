@@ -1,6 +1,6 @@
 /**
  * The words a row's page leads with: how far off its deadline is, the day a finished row finished, and how old the row
- * is, and the one word its unset fields are offered with.
+ * is, and the words the page's tiles are said in.
  *
  * THE LEAD SAID "Open" BESIDE A RED DOT, AND "8w ago" BESIDE A DUE DATE. The dot meant overdue while
  * the word beside it said something else, and nobody could tell whether "8w ago" was the date or the row. So the tone is
@@ -20,14 +20,13 @@ export const rowWords = {
   dueTomorrow: 'Due tomorrow',
   dueIn: (days: number): string => `Due in ${days} days`,
   added: (age: string): string => `added ${age}`,
-  /* What the plus on an unset field's chip is said as, so the chip reads "Add paid on" to a screen reader. */
-  add: 'Add',
   /* The title-row sentence of a row the record has just archived, before anything else it says. */
   archived: 'Archived.',
-  /* The page's groups on the ground, and what its strip of properties is called to a screen reader. */
+  /* What the fields tile is called to a screen reader, and what it says when the row has answered nothing yet. */
   details: 'Details',
-  history: 'History',
-  props: 'Properties',
+  nothingYet: 'Nothing filled in yet.',
+  /* The last choice under "Add a field": a field the list does not have yet, on every row of it. */
+  newField: (one: string): string => `New field for every ${one.toLowerCase()}`,
   today: 'Today',
   yesterday: 'Yesterday',
   /* The headings of the figures a row's page draws as tiles (`figures.ts`). */

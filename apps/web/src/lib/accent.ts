@@ -23,6 +23,12 @@
  * against the raised dark surface and `recordTheme` accepted every one, which is a checked switch
  * nobody can see. A refusal from here names a lighter or darker shade of the same colour, because
  * that is the one move the person holding the picker can make.
+ *
+ * 2026-10-07, THE COLOUR IS THE WORKING ACCENT, NOT ONLY THE BRAND'S. The product paints its buttons, links, selection
+ * and charts in `--action` (DIRECTION §39) and kept `--accent` for the mark's red, so a picker that re-solved only
+ * `--accent` changed two swatches and nothing a person uses. `recordTheme` solves `--action` and its tints, label and
+ * words from the chosen colour (`Seed.action` in `@braindog/theme`: the house's blue is pinned only beside the house
+ * red), so picking Moss turns the buttons Moss, in light exactly the swatch and in dark a lighter step of it.
  */
 
 import { ACCENTS, recordTheme } from '@braindog/theme';

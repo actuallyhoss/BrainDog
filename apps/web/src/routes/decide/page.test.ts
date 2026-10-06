@@ -89,8 +89,11 @@ test('every option is words and not a button for a reader who may not answer, an
   assert.match(page, /<DecisionCard\n\s+question=\{queueOf\(q, aboutFor\(q\)\)\}\n\s+may=\{answerable\}/u, 'the card is not told who may answer');
   assert.match(page, /onpress=\{\(key\) => void take\(q, key\)\}/u, 'a press on the card does not reach take, where the guard is');
   const card = readFileSync(fileURLToPath(new URL('../../lib/decide/DecisionCard.svelte', import.meta.url)), 'utf8');
-  assert.match(card, /\{#if answerable\}\n\s+<button\n\s+type="button"\n\s+class="queue-act"/u, 'the card draws a live button for a reader who may not answer');
-  assert.match(card, /\{:else\}\n\s+<span class="queue-label">\{way\.label\}<\/span>/u, 'the card draws nothing in place of the option it will not offer');
+  /* EACH CHOICE IS A BUTTON ONLY FOR A READER WHO MAY ANSWER, and the same rectangle as words for one who may not; the
+     buttons under the choices (Decide, Accept and Decline, Not now) are not drawn for them at all. */
+  assert.match(card, /\{#if answerable\}\n\s+<button\n\s+type="button"\n\s+role="radio"\n\s+class="queue-act dc-choice"/u, 'the card draws a live choice for a reader who may not answer');
+  assert.match(card, /\{:else\}\n\s+<div class="dc-choice" data-read>\n\s+\{@render choiceBody\(way\)\}/u, 'the card draws nothing in place of the option it will not offer');
+  assert.match(card, /\{#if answerable && \(!card\.merge \|\| compact\)\}\n(\s+<!--[^]*?-->\n)?\s+<div class="dc-actions"/u, 'the card offers its buttons to a reader who may not answer');
   /* THE SENTENCE THAT SAYS WHY HAS TO BE ON THE PAGE, over the queue, before anybody presses. */
   assert.match(
     page,

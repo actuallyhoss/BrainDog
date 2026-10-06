@@ -9,8 +9,8 @@
   That is also why this is a `nav` of links with `aria-current` and not an ARIA `tablist`: a tablist promises arrow keys
   that move between panels on one page, and these go to another page.
 
-  IT IS THE APP'S OWN CONTROL, NOT THE DECLARING PACK'S: the toolbar's glass segmented control in the design system, "here" the
-  white pill in it, and nothing in it takes a colour from the record (what a person builds is structure,
+  IT IS THE APP'S OWN CONTROL, NOT THE DECLARING PACK'S: one segmented rectangle (DIRECTION §39), "here" the tile's own
+  fill in it, and nothing in it takes a colour from the record (what a person builds is structure,
   and BrainDog's look stays its own).
 -->
 <script lang="ts">
@@ -75,16 +75,14 @@
 </nav>
 
 <style>
-  /* THE STRIP IS A GLASS SEGMENTED CONTROL ON THE GROUND (`controls.css`'s `.segmented`): a glass track with
-     its hairline pair, each tab a pill in it, and the page you are on the tile's own white pill lifted by a tiny
-     shadow, a shape and not a shade. It sits in the page's gutter, on the title's left edge, and `--page-max` is the
-     page grid's own width. */
+  /* THE STRIP IS ONE SEGMENTED RECTANGLE (DIRECTION §39: buttons are rectangles, radius 8, and no glass on the board):
+     a quiet tinted track, each tab a rectangle in it, and the page you are on the tile's own fill lifted by a tiny
+     shadow, a shape and not a shade. It sits in the page's gutter, on the title's left edge. */
   .page-tabs {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     min-inline-size: 0;
-    max-inline-size: var(--page-max);
     padding: var(--sp-3) var(--gutter) 0;
   }
 
@@ -100,17 +98,8 @@
     overflow-y: hidden;
     overscroll-behavior-inline: contain;
     scrollbar-width: none;
-    background: var(--glass);
-    backdrop-filter: var(--glass-blur);
-    border-radius: var(--r-pill);
-    box-shadow: var(--glass-edge);
-  }
-
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    .tab-row {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
+    background: var(--s1);
+    border-radius: var(--r-ctl, 8px);
   }
 
   /* AND THE EDGE WHERE IT IS CUT FADES, because its scrollbar is hidden and a tab sliced at the track's edge said
@@ -167,7 +156,7 @@
     gap: var(--sp-2);
     min-block-size: calc(var(--ctl-h) - 6px);
     padding-inline: var(--sp-3);
-    border-radius: var(--r-pill);
+    border-radius: calc(var(--r-ctl, 8px) - 2px);
     color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 500;
@@ -195,31 +184,23 @@
     }
   }
 
-  /* Where you are: the tile's white pill with a tiny shadow and a hairline, so it is a shape on the glass in light and
+  /* Where you are: the tile's own fill with a tiny shadow and a hairline, so it is a shape on the track in light and
      in dark, where a shadow alone does not show. Ink, and no weight change. */
   .tab[aria-current='page'],
   .tab-more[data-here] .tab {
-    background: var(--bg);
+    background: var(--tile, var(--bg));
     box-shadow:
       0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent),
       0 0 0 0.5px var(--line);
     color: var(--ink);
   }
 
-  /* MORE IS ITS OWN GLASS PILL BESIDE THE TRACK, as a toolbar's pill buttons are. */
+  /* MORE IS ITS OWN SMALL TRACK BESIDE THE STRIP, the same rectangle. */
   .tab-more {
     flex: 0 0 auto;
     padding: 3px;
-    background: var(--glass);
-    backdrop-filter: var(--glass-blur);
-    border-radius: var(--r-pill);
-    box-shadow: var(--glass-edge);
-  }
-
-  @supports (-webkit-backdrop-filter: none) {
-    .tab-more {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
+    background: var(--s1);
+    border-radius: var(--r-ctl, 8px);
   }
 
   .tally {

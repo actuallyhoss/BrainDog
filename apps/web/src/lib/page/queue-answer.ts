@@ -19,6 +19,9 @@ import { actor, type Actor } from '../record/names.ts';
 import { spoken } from '../decide/spoken.ts';
 import { mergeOf, type Merge } from '../../routes/decide/merge.ts';
 
+/** The care a hard answer asks for, said at the end of its button's name. */
+const HARD_TAIL = ', can’t be undone easily';
+
 /**
  * THE CARD'S OWN WORDS, in a `words` object in a module this card owns rather than the copy aggregate, by the rule every
  * area keeps. "Suggested" is the one word for a recommended option.
@@ -28,6 +31,22 @@ export const queueWords = {
   why: 'Why? (one line)',
   send: 'Send',
   suggested: 'Suggested',
+  /** The button that answers a question of options with the one chosen (DIRECTION §39, "Decide reads like a form"). */
+  decide: 'Decide',
+  /** Putting a question off, said as a person says it: the button opens the question's own page at the step. */
+  notNow: 'Not now',
+  /** A button whose answer is hard to take back says so in its own words, not in a chip beside it. */
+  hard: (verb: string) => `${verb}${HARD_TAIL}`,
+  /** The same care, as the end of a button whose name is drawn on its own. */
+  hardTail: HARD_TAIL,
+  /** Said with the suggested answer's name to a screen reader, where the eye reads the accent's fill. */
+  suggestedSaid: ', suggested',
+  /** A question shown outside Decide whose answers are too many for a row: its own page, where they are chosen. */
+  choose: 'Choose on Decide',
+  /** The last line of a compact queue: how many more wait, and the door to them. */
+  moreOnDecide: (n: number) => `${n.toLocaleString('en-GB')} more on Decide`,
+  /** The choices' name for a screen reader: the question's answers, one of them chosen. */
+  choices: 'The answers',
   /** What a proposal that changes something links to, where its whole change is laid out before anybody accepts it. */
   seeWhole: 'See what it changes',
   /**
@@ -46,6 +65,18 @@ export const queueWords = {
   /** Beside a question joined from several: how many things answering it changes. */
   joined: (n: number) => `· ${n.toLocaleString('en-GB')} changes`,
 } as const;
+
+/** THE MOST QUESTIONS A COMPACT QUEUE SHOWS (Home, a declared page): the rest are a count that opens Decide. */
+export const COMPACT_MOST = 3;
+
+/**
+ * A QUEUE SHOWN OUTSIDE DECIDE: at most three questions, and how many more wait on Decide. `total` is the block's count
+ * of what is open, which may be more than it was handed; it is never read as less than what was handed.
+ */
+export function compactOf<T>(queue: readonly T[], total: number = queue.length): { shown: T[]; more: number } {
+  const shown = queue.slice(0, COMPACT_MOST);
+  return { shown, more: Math.max(total, queue.length) - shown.length };
+}
 
 /**
  * A rule's name as the middle of a sentence: its first letter lowered, unless the name opens on a run of capitals (an

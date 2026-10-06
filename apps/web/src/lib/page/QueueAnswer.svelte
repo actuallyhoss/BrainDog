@@ -7,6 +7,9 @@
   sits in on a page: a row of the page by the question's id, so a home's cursor walks to it, its number keys press the
   card's own buttons (`PageBody.svelte`), and Enter opens it on Decide.
 
+  COMPACT OUTSIDE DECIDE (`compact`): Home and a declared page show the question and its answers as buttons only, and
+  at most three of them (`queue-answer.ts` `compactOf`), then "N more on Decide". Decide draws the whole form.
+
   A READER WHO MAY NOT ANSWER READS THE SAME CARD WITH THE OPTIONS AS WORDS, which is the renderer's rule: a control
   that cannot act is absent, not greyed (`19 §6`).
 -->
@@ -22,6 +25,7 @@
     pick = null,
     lead = false,
     n = 0,
+    compact = false,
   }: {
     question: QueueQuestion;
     onanswered: () => void;
@@ -31,6 +35,8 @@
     lead?: boolean;
     /** Where the card sits in its queue, which decides whether it says each option's reason in the open. */
     n?: number;
+    /** A question shown outside Decide: its line and its answers as buttons, nothing else (`DecisionCard.svelte`). */
+    compact?: boolean;
   } = $props();
 </script>
 
@@ -39,9 +45,9 @@
   class="qa"
   data-row="q:{question.id}"
   data-open={at(`/decide/${encodeURIComponent(question.id)}`)}
-  data-picking={pick && pick.chosen.size > 0 ? '' : undefined}
+  data-picking={pick && pick.chosen.size > 0 && !compact ? '' : undefined}
 >
-  <DecisionCard {question} {onanswered} {pick} {lead} {n} />
+  <DecisionCard {question} {onanswered} pick={compact ? null : pick} lead={lead && !compact} {n} {compact} />
 </div>
 
 <style>

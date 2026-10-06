@@ -5,9 +5,11 @@
   `mobile:` declaration rather than from a media query: the register knows what matters about its own
   rows better than a breakpoint does (13 §10, 50 §5.2 step 10).
 
-  TWO LINES, AND WHAT A DOT MEANS IS SAID BESIDE IT. Line one is the project's
-  mark, the title and the figure. Line two is the dot and its word, the date that word is about, and
-  one detail, with nothing after it: "Overdue · 3 Sep · Kiln", "Paid · 2 Sep". The dot sat beside
+  TWO LINES, AND WHAT A DOT MEANS IS SAID BESIDE IT. Line one is the title and the figure. Line two is
+  the dot and its word, the date that word is about, and one detail, with nothing after it: "Overdue ·
+  3 Sep · Kiln", "Paid · 2 Sep · Portage". The project's shape that led the title went (DIRECTION 39): it
+  said "some project" to nobody who had not learnt the shapes, and the project's name ends line two
+  where the list names no other detail. The dot sat beside
   "Money out" once, so what it meant was never said, and the row's number ended the line in the id
   face; the number is gone from the card, since a person opens a row by its title.
 
@@ -173,24 +175,16 @@
   };
 
   /**
-   * AND THE THING THE ROW BELONGS TO, WHICH IS THE ONE COLOUR THIS PRODUCT HAS AND DOES NOT SPEND.
-   *
-   * `api.ts` states the rule in its own words: "One mark and one accent per thing, and colour
-   * means WHICH PROJECT, everywhere." Everywhere was four places, and a list was not one of them,
-   * so eight lists of rows that each belong to a project were eight blocks of grey with the
-   * project's name repeated down a text column, or not shown at all.
-   *
-   * TWO CHANNELS, NOT ONE. The mark is a shape before it is a colour (`▲` for one project, `◆`
-   * for another), which is `13 §5.1`'s requirement met by the mark itself rather than by adding
-   * something beside it. The hue is the row's frozen accent and the one non-token colour the
-   * rendered-DOM gate admits, at `L`/`C` chosen so every hue clears 3:1 on every surface.
-   *
-   * The label is the project's NAME and not its mark, because a screen reader reading "black
-   * up-pointing triangle" has been told the shape and not the thing.
-   *
-   * IT SITS IN FRONT OF THE TITLE, as it does in the grid, so the colour is where the eye starts.
+   * AND THE THING THE ROW BELONGS TO, BY NAME: the project a row is about, said at the end of line two where the list
+   * puts no other detail there. It led the title as a coloured shape, which told nobody which project without a key.
    */
   const markFor = (e: Entry) => identityFor(register, e.fields, names);
+
+  /**
+   * WHERE THE ROW STANDS, FOR ITS DOT (DIRECTION 39): grey once the list calls its state finished, and the working
+   * accent while it is still to do. A late or close row's dot is the tone's, through `data-intent`, and wins over this.
+   */
+  const finishedOf = (e: Entry): boolean => Boolean(decl?.state && decl.done?.includes(String(e.fields[decl.state] ?? '')));
 
   /* A declared value is set in sentence case by the stylesheet, as the filter pills are. */
   const isEnum = (field: string) => decl?.fields.find((f) => f.id === field)?.type === 'enum';
@@ -267,12 +261,14 @@
     const text = detailFields.find((f) => saidOf(e, f) !== '');
     const place: Scope | null | undefined = scoped === undefined ? undefined : scopeOf(register, e.fields, names);
     const chip = place !== undefined && (decl?.mobile.includes(scoped ?? '') === true || text === undefined);
-    return { tone, word, date, detail: chip ? undefined : text, place: chip ? (place ?? null) : undefined, chip };
+    /* THE PROJECT'S NAME, where nothing else fills the detail and the project is not already the chip. */
+    const thing = !chip && text === undefined ? (markFor(e)?.name ?? null) : null;
+    return { tone, word, date, detail: chip ? undefined : text, place: chip ? (place ?? null) : undefined, chip, thing };
   };
 
-  /* ONE LEADING SLOT, KEPT ON EVERY CARD when any card has a mark, a face or a word: the mark or face in it on
-     the first line, the dot on the second, and the words of both lines start at one x. */
-  const slotted = $derived(faced || Boolean(decl?.state || dated) || entries.some((e) => markFor(e) !== null));
+  /* ONE LEADING SLOT, KEPT ON EVERY CARD when any card has a face or a word: the face in it on the first line, the
+     dot on the second, and the words of both lines start at one x. */
+  const slotted = $derived(faced || Boolean(decl?.state || dated));
 </script>
 
 <!-- An amount is drawn with its currency's symbol, or with its code set quiet where it has none. -->
@@ -298,15 +294,6 @@
             {#if faced}
               <!-- `aria-hidden` inside `Face`, because the name it is drawn from is the title beside it. -->
               <span class="card-face"><Face name={title ?? ''} kind="person" size="s" /></span>
-            {:else if markFor(e)}
-              {@const it = markFor(e)!}
-              <span
-                class="card-mark thing-glyph"
-                data-shape={it.mark}
-                style={it.retired ? undefined : `--hue:${it.hue}`}
-                data-retired={it.retired ? '' : undefined}
-                role="img"
-                aria-label={it.name}></span>
             {/if}
             <!-- A TITLE NOBODY SET SAYS SO, in the dim ink the grid gives a missing value. An empty
                  first line would read as a card that failed to draw. -->
@@ -326,7 +313,7 @@
                line and not on the dot, because what resolves `--tone-fill` for the dot is `blocks.css`'s
                intent map, and an element with an intent holds its named glyph (`a11y.mjs`). A calm word
                has a quiet dot with no name, since the word says all there is. -->
-          <span class="card-b" data-slot={slotted ? '' : undefined} data-intent={line.tone}>
+          <span class="card-b" data-slot={slotted ? '' : undefined} data-intent={line.tone} data-stand={decl.state ? (finishedOf(e) ? 'done' : 'open') : undefined}>
             {#if line.tone}
               <span class="glyph" role="img" aria-label={TONES[line.tone].label}>{TONES[line.tone].glyph}</span>
             {:else if line.word}
@@ -341,6 +328,8 @@
             {:else if line.detail}
               {@const f = line.detail}
               {#if line.word || line.date}<span aria-hidden="true">{' · '}</span>{/if}<span dir={dirOf(register, f)} data-enum={isEnum(f) ? '' : undefined}>{@render amount(saidOf(e, f))}</span>
+            {:else if line.thing}
+              {#if line.word || line.date}<span aria-hidden="true">{' · '}</span>{/if}<span dir="auto">{line.thing}</span>
             {/if}
           </span>
           <!-- THE END OF LINE TWO: the holder's face after a hand, then a selected row's tick. The face had
@@ -364,21 +353,6 @@
 {/if}
 
 <style>
-  /* THE THING'S HUE, WHICH IS THE ONLY COLOUR IN THIS FILE AND IS NOT A LITERAL. `oklch(L C h)`
-     where `h` is the row's frozen accent and `L`/`C` are the theme's two mark constants, generated
-     per scheme. A retired thing keeps its mark and loses its claim on a hue, so `--hue` is withheld
-     AND `--dim` is set by the rule below: an unset `--hue` makes the whole `oklch()` invalid, and
-     an invalid declaration is a dropped one, which would leave the mark inheriting the card's ink
-     rather than reading as retired. The attribute is what says so; the missing property alone
-     would not. */
-  .card-mark {
-    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
-  }
-
-  .card-mark[data-retired] {
-    color: var(--dim);
-  }
-
   .cards {
     display: none;
   }
@@ -474,18 +448,11 @@
       font-weight: 500;
     }
 
-    /* The slot is the mark's width and its gap, and what sits in it hangs there, so a title that
+    /* The slot is the dot's width and its gap, and what sits in it hangs there, so a title that
        wraps keeps its edge and a line with nothing in the slot keeps it too. */
     [data-slot] {
       position: relative;
       padding-inline-start: calc(8px + var(--sp-2));
-    }
-
-    .card-title .card-mark {
-      position: absolute;
-      inset-inline-start: 0;
-      inset-block-start: calc((1lh - 8px) / 2);
-      margin: 0;
     }
 
     /* THE DOT HANGS IN THE SLOT the mark takes on the line above, so the word starts where the title
@@ -498,10 +465,14 @@
       translate: 0 -50%;
     }
 
-    /* A CALM WORD'S DOT IS QUIET, in the ink open, paid and cleared are drawn in.
-       Only an intent on the line gives the dot a colour, through `blocks.css`'s intent map. */
+    /* A CALM WORD'S DOT SAYS WHERE THE ROW STANDS (DIRECTION 39): the accent while it is to do, grey once finished.
+       An intent on the line, late or close, gives the dot its tone instead, through `blocks.css`'s intent map. */
     .card-b:not([data-intent]) .glyph {
-      background: var(--dim);
+      background: var(--status-done);
+    }
+
+    .card-b:not([data-intent])[data-stand='open'] .glyph {
+      background: var(--status-working);
     }
 
     /* A LATE OR CLOSE WORD IS READ FIRST, in the second ink and not the tone's colour: the dot beside
@@ -587,6 +558,12 @@
       inset-inline-start: 0;
       inset-block-start: calc((1lh - 20px) / 2);
       display: flex;
+    }
+
+    /* ON ONE NEUTRAL TINT, as on every list of people (DIRECTION 39): the name beside it says who. */
+    .card .card-face :global(.face[data-kind='person']) {
+      background: var(--field);
+      color: var(--ink2);
     }
 
     /* THE FIGURE'S NAME, quieter and smaller than the figure it names, on the figure's own line. */

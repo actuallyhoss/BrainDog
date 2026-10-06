@@ -1,7 +1,7 @@
 <!--
-  How the list is drawn, from 640px up: the table, the board or the cards (a segmented control in the
-  toolbar), and first, on a list of people that says who is with which organisation, those people in groups.
-  Glass on the ground, and the chosen view a white pill lifted by a tiny shadow (`controls.css`).
+  How the list is drawn, from 640px up: the table, the board or the cards, and first, on a list of people that says who
+  is with which organisation, those people in groups. ONE SEGMENTED CONTROL at the end of the list's toolbar
+  (DIRECTION 39): one rectangle in the field's fill, and the chosen view the tile's colour on it (`controls.css`).
 
   THE CHOICE IS THE ADDRESS'S (`?view=`), written by the page's `setView`, so a link to a board opens on the board and
   Back undoes a switch. The board is offered only where the list has lanes to draw (`laneFieldOf`). Below 640 there is
@@ -61,8 +61,8 @@
 </div>
 
 <style>
-  /* 36 HIGH ON THE TOOLBAR'S LINE: the track is `--ctl-h` and each segment sits 3px inside it. The word is
-     the meta size the blend draws its segments at. */
+  /* ONE ROW, THE TOOLBAR'S HEIGHT: the track and its segments are `controls.css`'s; this only keeps it on one line and
+     sets the glyph beside the word. */
   .view-switch {
     flex-wrap: nowrap;
     flex: none;
@@ -72,22 +72,6 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding-inline: var(--sp-3);
-    font-size: var(--t-sm);
-  }
-
-  /* IN THE COMPACT BAR THE TRACK DROPS ITS OWN GLASS, because the bar is glass already and glass never holds glass. */
-  :global(.head[data-under]) .view-switch {
-    background: var(--hover-wash);
-    backdrop-filter: none;
-    box-shadow: none;
-  }
-
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    :global(.head[data-under]) .view-switch {
-      -webkit-backdrop-filter: none;
-    }
   }
 
   @media (width < 900px) {

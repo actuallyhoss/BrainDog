@@ -291,17 +291,29 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
              three drawn here and the seed's two that carry one, so a run of this seed may draw three
              cards with none: the check still holds on whichever card is drawn, because it presses
              whatever that card offers rather than a card this run assumes exists. */
-          const withRec = block.locator('.queue-card:has(.queue-option[data-recommended])').first();
+          /* A SUGGESTION IS MARKED ON ITS OPTION IN THE FORM'S LIST, and on the button itself in a row of answers
+             (`DecisionCard.svelte`, DIRECTION §39: two or three answers with no line of what each does are buttons). */
+          const withRec = block.locator('.queue-card:has(.queue-option[data-recommended], button.queue-act[data-recommended])').first();
           const card = (await withRec.count()) > 0 ? withRec : cards.first();
           const questionText = (await card.locator('.queue-question').innerText()).trim();
-          let press = card.locator('.queue-option:not([data-recommended]) button.queue-act').first();
+          let press = card.locator('.queue-option:not([data-recommended]) button.queue-act, button.queue-act.dc-btn:not([data-recommended])').first();
           if ((await press.count()) === 0) press = card.locator('button.queue-act').first();
           if ((await press.count()) === 0) {
             findings.push(`the card "${questionText}" has no pressable option.`);
           } else {
-            const pressedLabel = (await press.innerText()).trim();
+            /* THE ANSWER'S NAME, WITHOUT WHAT SITS BESIDE IT: a choice in the form carries "Suggested" and a number key,
+               and a button in a row the care a hard answer asks for (", can't be undone easily"). The line the card
+               becomes says the name alone. */
+            const name = press.locator('.dc-choice-name, .dc-btn-name').first();
+            const pressedLabel = ((await name.count()) > 0 ? await name.innerText() : await press.innerText()).trim();
             const from = page.url();
+            /* A CHOICE IN THE FORM IS ONLY CHOSEN BY A PRESS, and Decide gives it; a button in a row is the answer. Which
+               one it is is read BEFORE the press: a row's press turns the card into its answered line, and `card`, a
+               locator by what a card holds, then finds the next card down, whose Decide would answer a second question. */
+            const decideBtn = card.locator('[data-decide]');
+            const formed = (await decideBtn.count()) > 0;
             await press.click();
+            if (formed) await decideBtn.click();
             /* THE PRESS IS THE ANSWER, WHERE IT IS SHOWN. The card becomes one line naming what was chosen. An older
                record that still wants a reason opens one line under the card first, focused, and Enter sends it. */
             const why = card.locator('.qa-reason input');

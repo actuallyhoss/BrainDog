@@ -1,5 +1,6 @@
 <!--
-  The one filled badge in the product: a red square with a count in it, for what needs the reader.
+  The one filled badge in the product, and the one pill (DIRECTION §39, "pills only for counts"): a red capsule with a
+  count in it, for what needs the reader.
 
   EVERY OTHER COUNT IS A PLAIN NUMBER in the quiet ink, beside the word it counts. This one is filled because it is the
   one thing on a screen allowed to shout: Decide's open questions in the rail, a tab that holds something waiting on
@@ -19,7 +20,7 @@
     label?: string | undefined;
   } = $props();
 
-  /* PAST 99 IT SAYS 99+, so the square keeps its shape in a rail item and the count stays a glance. */
+  /* PAST 99 IT SAYS 99+, so the capsule keeps its shape in a rail item and the count stays a glance. */
   const said = $derived(n > 99 ? '99+' : String(n));
 </script>
 
@@ -33,11 +34,11 @@
     box-sizing: border-box;
     min-inline-size: 20px;
     block-size: 20px;
-    padding-inline: 5px;
+    padding-inline: 6px;
     /* THE BRAND RED ITSELF, with the tile's own colour as the figure: white on the light scheme's red, the dark tile on
        the dark scheme's lighter red, so the figure clears 4.5:1 in both. */
     background: var(--danger);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-round);
     color: var(--on-ink);
     font-size: var(--t-xs);
     font-weight: 600;

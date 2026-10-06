@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bylinesIn, keepSeen, seenOn, type Seen, type Store } from './byline.ts';
+import { bylinesIn, changedLine, keepSeen, seenOn, type Byline, type Seen, type Store } from './byline.ts';
 
 const now = Date.parse('2026-10-06T12:00:00Z');
 const hoursAgo = (h: number): string => new Date(now - h * 3_600_000).toISOString();
@@ -76,4 +76,29 @@ test('WHAT WAS SEEN IS KEPT PER PAGE, the newest rows only, and a store that ref
   assert.deepEqual(seenOn('work', refusing), none);
   assert.doesNotThrow(() => keepSeen('work', { page: 1, rows: {} }, refusing));
   assert.deepEqual(seenOn('work', null), none);
+});
+
+/* ── the line at the foot of the board (DIRECTION §39) ────────────────────── */
+
+const line = (by: Byline['by'], name: string, h: number): Byline => ({
+  by,
+  name,
+  app: null,
+  for: null,
+  at: hoursAgo(h),
+  batch: null,
+  run: null,
+  unseen: true,
+  said: name,
+});
+
+test('THE WEEK’S CHANGES ARE ONE LINE, said by who made them when it is one kind, and nothing when there are none', () => {
+  const rules = [1, 2, 3, 4, 5].map((h) => line('rule', `Rule ${h}`, h));
+  assert.deepEqual(changedLine(rules, now), { count: 5, text: '5 changes by your rules this week' });
+  assert.deepEqual(changedLine([line('agent', 'Claude', 2)], now), { count: 1, text: '1 change by Claude this week' });
+  assert.deepEqual(changedLine([line('slash', 'Slash', 2), line('slash', 'Slash', 3)], now), { count: 2, text: '2 changes by Slash this week' });
+  assert.equal(changedLine([line('agent', 'Claude', 2), line('agent', 'Cursor', 3)], now)?.text, '2 changes made for you this week');
+  assert.equal(changedLine([line('rule', 'Late reply', 2), line('agent', 'Claude', 3)], now)?.text, '2 changes made for you this week');
+  assert.equal(changedLine([line('rule', 'Late reply', 24 * 8)], now), null, 'a change older than the week is not this week’s');
+  assert.equal(changedLine([], now), null);
 });

@@ -19,7 +19,7 @@
   import { valueSaid } from '$lib/voice.ts';
   import { symbolFigure } from 'braindog-render';
   import { Table, type Column, type TableRow } from 'braindog-render/svelte';
-  import { display, DOM_CAP, identityFor, identityOf, labelOf } from '$lib/record/api.ts';
+  import { display, DOM_CAP, identityOf, labelOf } from '$lib/record/api.ts';
   import { currencyTypedIn } from '$lib/ui/money-typed.ts';
   import { isFile, isJson, isQuantity, unitOf, unitsOf } from '$lib/record/field-draft.ts';
   import { scopeFieldOf, scopeOf } from '$lib/record/scope-move.ts';
@@ -35,7 +35,7 @@
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import Face from '$lib/ui/Face.svelte';
   import { ofPeople } from '$lib/ui/RowCards.svelte';
-  import { boxOf, deadlineOf, withoutGood, type Receipt } from './list.ts';
+  import { boxOf, deadlineOf, standOf, withoutGood, type Receipt } from './list.ts';
 
   let {
     register,
@@ -51,7 +51,6 @@
     editValue = $bindable(''),
     editTicked = $bindable(false),
     fresh,
-    anyMark,
     names,
     onmore,
     onsort,
@@ -88,8 +87,6 @@
     editTicked?: boolean;
     /** The rows just added, marked for a moment so the eye can find them. */
     fresh: ReadonlyMap<number, number>;
-    /** Some row in hand carries a project's mark, so every title keeps the mark's slot. */
-    anyMark: boolean;
     names: Names | undefined;
     /** Absent when there is no next page, which is how `Table` knows to draw no sentinel. */
     onmore?: (() => void) | undefined;
@@ -135,39 +132,26 @@
 
 <div class="table-slot" data-picking={selected.size > 0 ? '' : undefined}>
   <!--
-    THE THING THE ROW BELONGS TO, IN FRONT OF WHAT THE ROW IS.
+    WHAT LEADS A TITLE: THE MARK OF A ROW THAT HAS JUST ARRIVED, AND ON A LIST OF PEOPLE A FACE.
 
-    `columnsFor` caps the default projection at nine fields, with no number among them, and `thing`
-    is not in Money's, so the desktop grid of the first list in the rail was thirty-eight rows of
-    grey with no way at all to see which project any of them was about. The mark went into `#`, the
-    one column every projection had then; `#` ends the row when a reader turns it on, and the mark
-    came with the title instead, because
-    colour saying which project is read where the eye starts.
-
-    The mark is a shape before it is a colour, which is `13 §5.1` met by the mark itself, and
-    the label is the project's NAME because a screen reader told "black diamond" has been told
-    the shape and not the thing.
+    THE PROJECT'S SHAPE WENT (DIRECTION 39). A diamond, a triangle or a dot started every title, and it said "some
+    project" to nobody who had not learnt the shapes. The project is a column of its own now (`columnsFor`), its name
+    beside a small dot of its colour, where it can be read.
   -->
   {#snippet ownMark(seq: number)}
-    {@const own = identityFor(register, rowAt(seq)?.fields ?? {}, names)}
-    <!-- THE MARK ON A ROW THAT HAS JUST ARRIVED, and it is drawn whether or not the register has an
-         identity: `ownMark` renders on every title cell and the project's glyph only on some, so hanging
-         this off that one would have marked new rows on Money and on nothing else. It is `aria-hidden`
-         because the row already says what happened to it in words, in the chip one cell over; this is
-         for the eye finding the row, and a second announcement of the same fact is noise. The page's
-         `showRow` finds the row by this attribute, so what is scrolled to and what is marked cannot
-         disagree. -->
+    <!-- THE MARK ON A ROW THAT HAS JUST ARRIVED. It is `aria-hidden` because the row already says what happened to it
+         in words, in the chip at the row's end; this is for the eye finding the row. The page's `showRow` finds the row
+         by this attribute, so what is scrolled to and what is marked cannot disagree. -->
     {#if fresh.has(seq)}<span class="fresh" data-fresh={seq} aria-hidden="true"></span>{/if}
-    <!-- A PERSON IS LED BY THEIR FACE, in the place a project's mark takes on any other list, drawn from
-         the name the title cell prints beside it; `Face` is `aria-hidden` for that reason. -->
-    {#if faced}<span class="row-face"><Face name={display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? ''} kind="person" size="s" /></span
-      >{:else if own}<span
-        class="row-mark thing-glyph"
-        data-shape={own.mark}
-        style={own.retired ? undefined : `--hue:${own.hue}`}
-        data-retired={own.retired ? '' : undefined}
-        role="img"
-        aria-label={own.name}></span>{:else if anyMark}<span class="thing-glyph" data-shape="" aria-hidden="true"></span>{/if}
+    <!-- A PERSON IS LED BY THEIR FACE, drawn from the name the title cell prints beside it; `Face` is `aria-hidden`. -->
+    {#if faced}<span class="row-face"><Face name={display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? ''} kind="person" size="s" /></span>{/if}
+  {/snippet}
+  <!-- A VALUE OF A CHOICE FIELD, in sentence case; the list's state also wears a small dot of where the row stands. -->
+  {#snippet enumSaid(row: TableRow, field: string, value: string)}
+    {#if field === decl.state}
+      {@const stored = String(rowAt(Number(row.key.split('#')[1]))?.fields[field] ?? '')}
+      <span class="state" data-stand={standOf(decl, stored, row.tone === 'bad')}><span class="state-dot" aria-hidden="true"></span><span class="enum">{copy.valueWord(value)}</span></span>
+    {:else}<span class="enum">{copy.valueWord(value)}</span>{/if}
   {/snippet}
   <!-- ONE ROW HAS NOTHING TO SORT. `onsort` is optional and the table draws a plain label
        without it, so eight header buttons over a single row, each announcing
@@ -442,7 +426,7 @@
           control per cell is four thousand tab stops. The keyboard path is `e`, which the `?`
           sheet has advertised since the grid was written.
         -->
-        <span class="cell-said">{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{copy.valueWord(value)}</span>{:else}{symbolFigure(value) ?? value}{/if}<button
+        <span class="cell-said">{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{symbolFigure(value) ?? value}{/if}<button
             type="button"
             class="cell-pen"
             tabindex="-1"
@@ -452,7 +436,7 @@
               openEditor(seq, column.field);
             }}
           ><Icon name="edit" size="s" /></button></span>
-      {:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{copy.valueWord(value)}</span>{:else}{symbolFigure(value) ?? value}{/if}{/if}
+      {:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{symbolFigure(value) ?? value}{/if}{/if}
     {/snippet}
   </Table>
 </div>
@@ -504,24 +488,49 @@
     font-size: var(--t-ui);
   }
 
-  /* THE THING'S HUE, AND IT IS NOT A LITERAL. `oklch(L C h)` where `h` is the row's frozen accent
-     and `L`/`C` are the theme's two mark constants, generated per scheme and solved so every hue
-     clears 3:1 on every surface. A retired thing keeps its mark and loses its claim on a hue, so
-     `--hue` is withheld AND `--dim` is set: an unset `--hue` makes the `oklch()` invalid, and an
-     invalid declaration is a dropped one, which would leave the mark the same ink as the id. */
-  .row-mark {
-    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+  /**
+   * WHERE A ROW STANDS, AS A SMALL DOT BEFORE ITS STATE'S WORD (DIRECTION 39): the working accent while it is still to
+   * do, grey once finished, and red for a late row. The word carries which state; the dot is the quick look down a
+   * column, and never fills the row.
+   */
+  .state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
   }
 
-  .row-mark[data-retired] {
-    color: var(--dim);
+  .state-dot {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    background: var(--status-working);
+    border-radius: var(--r-round);
   }
 
-  /* THE FACE SITS ON THE TITLE'S LINE, in the middle of it, with the gap a mark keeps before the words. */
+  .state[data-stand='done'] .state-dot {
+    background: var(--status-done);
+  }
+
+  .state[data-stand='late'] .state-dot {
+    background: var(--status-late);
+  }
+
+  .state[data-stand='done'] {
+    color: var(--ink2);
+  }
+
+  /* THE FACE SITS ON THE TITLE'S LINE, in the middle of it, with the gap a mark keeps before the words. Its disc is one
+     neutral tint on every row (DIRECTION 39): a column of pastel hues read as decoration, and the name says who. */
   .row-face {
     display: inline-flex;
     margin-inline-end: var(--sp-2);
     vertical-align: middle;
+  }
+
+  .row-face :global(.face[data-kind]) {
+    background: var(--field);
+    color: var(--ink2);
   }
 
   /* THE ROW'S NUMBER, QUIET, IN THE BODY FACE with tabular figures, so a column of them lines up. It was
@@ -561,9 +570,53 @@
     }
   }
 
+  /* WHERE A ROW APPLIES READS AS THE PROJECT COLUMN DOES: its dot, or the globe, and its name in the cell's own type, with
+     no pill round it (DIRECTION 39). The chip keeps its shape where it is a control, on a row's page. */
+  .table-slot :global(.td .scope-chip) {
+    gap: var(--sp-2);
+    min-block-size: 0;
+    padding-inline: 0;
+    background: none;
+    color: var(--ink);
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  .table-slot :global(.td .scope-chip .thing-glyph) {
+    margin-inline-end: 0;
+  }
+
+  /* THE HEADS ARE QUIET: the meta size in the second ink, one hairline under them, and nothing else. */
   .table-slot :global(.th) {
+    color: var(--dim);
     font-size: var(--t-sm);
     font-weight: 500;
+  }
+
+  /* A FIGURE READS AS A FIGURE: right-aligned by its column (`columnsFor`) and set in tabular figures, so a column of
+     amounts lines up digit under digit. */
+  .table-slot :global(.td[data-align='end']) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* THE DATE THAT MADE A ROW LATE IS SAID IN RED, the one red on the row, and the date is the reason. The tone's glyph
+     (`Table` draws one at the head of the cell) stays for a screen reader and leaves the eye: beside a red date and a
+     red state dot it was a third mark of one fact. */
+  .table-slot :global(.tr[data-intent='bad'] .td[data-tone]) {
+    color: var(--danger-text);
+  }
+
+  .table-slot :global(.table[data-toned] .td[data-glyph]) {
+    padding-inline-start: var(--sp-3);
+  }
+
+  .table-slot :global(.td-glyph) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .table-slot :global(.th-row) {
@@ -574,6 +627,19 @@
      ring still marks it while the grid has focus. A selected row keeps `--selected`. */
   .table-slot :global(.rowgroup .tr[data-focused]:not([aria-selected='true'])) {
     background: var(--hover-wash);
+  }
+
+  /* AND ONLY WHILE THE KEYBOARD IS IN THE LIST. At rest the caret sits on the first row, which nobody chose, and its
+     band read as a pointer stuck on it: the row's wash, its box and its verbs on a list nobody had touched. Away from
+     the grid the caret's row is a row like the others, hairlines and all, and it comes back the moment focus does. */
+  .table-slot:not(:focus-within) :global(.rowgroup .tr[data-focused]:not([aria-selected='true'], :hover)) {
+    background: none;
+    border-radius: 0;
+    border-block-end-color: var(--rule);
+  }
+
+  .table-slot:not(:focus-within) :global(.rowgroup .tr:has(+ .tr[data-focused]:not([aria-selected='true'], :hover)):not(:hover, [aria-selected='true'])) {
+    border-block-end-color: var(--rule);
   }
 
   /**
@@ -669,8 +735,8 @@
     inline-size: var(--dot);
     block-size: var(--dot);
     margin-inline-end: var(--sp-2);
-    background: var(--info-fill);
-    border-radius: var(--r-pill);
+    background: var(--action);
+    border-radius: var(--r-round);
     vertical-align: middle;
     animation: fresh-in var(--d-enter) var(--ease-out);
   }
@@ -702,8 +768,8 @@
     justify-content: flex-end;
   }
 
-  /* A ROW'S VERBS ARE PILLS: 28 tall, the meta size at 500, and a round 28 for a verb that is its glyph.
-     On a row that is already washed, the pill under the pointer takes the held wash, one step deeper. */
+  /* A ROW'S VERBS ARE SMALL RECTANGLES: 28 tall, the meta size at 500, and a 28 square for a verb that is its glyph.
+     On a row that is already washed, the verb under the pointer takes the held wash, one step deeper. */
   .verb {
     display: inline-flex;
     align-items: center;
@@ -711,7 +777,7 @@
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: calc(var(--r-ctl) - 2px);
     color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 500;
@@ -753,7 +819,9 @@
     }
 
     :global(.tr:not(:hover, :focus-within, [data-focused])) .verbs,
-    .table-slot:not([data-picking]) :global(.tr:not(:hover, :focus-within, [data-focused]) .pick:not([data-on])) {
+    .table-slot:not([data-picking]) :global(.tr:not(:hover, :focus-within, [data-focused]) .pick:not([data-on])),
+    .table-slot:not(:focus-within) :global(.tr[data-focused]:not(:hover) .verbs),
+    .table-slot:not([data-picking], :focus-within) :global(.tr[data-focused]:not(:hover) .pick:not([data-on])) {
       opacity: 0;
     }
   }
@@ -768,7 +836,7 @@
     padding: 0;
     background: none;
     border: 1.5px solid var(--edge);
-    border-radius: var(--r-sm);
+    border-radius: 5px;
     color: var(--on-ink);
     cursor: pointer;
     transition:
@@ -776,9 +844,11 @@
       border-color var(--d-state) var(--ease-out);
   }
 
+  /* A PICKED ROW'S BOX IS THE ACCENT, which is what selection looks like (DIRECTION 39). */
   .pick[data-on] {
-    background: var(--on);
-    border-color: var(--on);
+    background: var(--action);
+    border-color: var(--action);
+    color: var(--on-action);
   }
 
   @media (width < 640px) {

@@ -20,6 +20,7 @@
   import type { PackState } from '$lib/record/packs.ts';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import '$lib/decide/form.css';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { diffOf, install, planFor, type OfferClient, type Planned } from '../packs/browse/[id]/offer.ts';
   import { changeLine, ledBy, readFirst, type Improved } from './improved.ts';
@@ -140,9 +141,9 @@
   </ul>
   <!-- NOT DISABLED WHILE IT WORKS: a pressed button that turns disabled drops the focus it holds to the page, so a second
        press waits on `busy` instead, and the card says it is busy. -->
-  <ul class="queue-options">
-    <li class="queue-option"><button type="button" class="queue-act" onclick={accept}>{words.accept}</button></li>
-  </ul>
+  <div class="dc-actions">
+    <button type="button" class="dc-btn" data-weight="primary" onclick={accept}>{words.accept}</button>
+  </div>
   {#if updates.some((u) => u.notes.length > 1)}
     <details class="queue-ways queue-reasons">
       <summary class="queue-ways-toggle">{words.seeEach}</summary>
@@ -176,7 +177,7 @@
 
   /* THE BODY SIZE, as every sentence on Decide is, and not the skin's small line under a question's answers. */
   .improved-lines {
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -189,7 +190,7 @@
   }
 
   .improved-link {
-    color: var(--link);
+    color: var(--action-text);
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;

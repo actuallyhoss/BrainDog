@@ -22,6 +22,7 @@
   import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
   import { inline, text } from 'braindog-render';
   import QueueAnswer from './QueueAnswer.svelte';
+  import { compactOf, queueWords } from './queue-answer.ts';
   import { doorOf } from './door.ts';
   import { queueMore } from 'braindog-render';
   import { page as route } from '$app/state';
@@ -53,6 +54,7 @@
   import type { Row } from 'braindog-render';
   import AddStep from './AddStep.svelte';
   import { foldOf } from './home.ts';
+  import { headCount, headIcon } from './tile-head.ts';
   import { words } from './words.ts';
   import { blockWords } from '$lib/record/block-edit.ts';
 
@@ -70,6 +72,7 @@
     verbs = null,
     pick = null,
     walk = null,
+    compact = false,
   }: {
     block: LiveBlock;
     /** The block's declared index, which its id, its heading's id and its held rows are keyed by. */
@@ -107,6 +110,11 @@
      * `onwalk`). `null` where the page is not read again.
      */
     walk?: ((length: Walked) => void) | null;
+    /**
+     * Whether a queue's questions are drawn compact, the question and its answers and nothing else: on a home, and where
+     * the page is about something else and sets them aside (`asks.ts`).
+     */
+    compact?: boolean;
   } = $props();
 
   /* A `{{path}}` IS ANSWERED BY THE RECORD on the block's `values`; a missing value is marked. `now` is the clock the
@@ -294,6 +302,11 @@
   );
   const drawn = $derived(draw(block, emptied));
 
+  /* THE TILE'S HEADING ROW, THE SAME ON EVERY TILE (DIRECTION §39): its glyph, or its kind's where it names none, and
+     how many it holds where it is a list a person counts (`tile-head.ts`). */
+  const glyph = $derived(headIcon(block.kind, block.icon, isGlyph));
+  const count = $derived(headCount({ kind: block.kind, total: block.total, refused: !!drawn.refusal || block.cannot !== undefined }));
+
   /* ── a folded group, opened in place ───────────────────────────────────────
      A CARD BLOCK IN GROUPS FOLDS EACH LONG GROUP behind "Show all 4 people at Encore" (`blocks.ts` `groupedSegments`),
      which went to the organisation's page. It opens here instead (`group-open.ts`): the block drawn a second time with
@@ -317,9 +330,9 @@
     <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
          rather than its braces. -->
-    {#if block.icon && isGlyph(block.icon)}<IconWell name={block.icon} />{/if}
+    {#if glyph && isGlyph(glyph)}<IconWell name={glyph} />{/if}
     <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-name" id="{ids}h-{i + 1}"
-      ><Text nodes={inline(block.heading, { icon })} opts={{ icon }} /></svelte:element
+      ><Text nodes={inline(block.heading, { icon })} opts={{ icon }} />{#if count !== null}<span class="block-count num">{count}</span>{/if}</svelte:element
     >
     {#if source}
       <!-- THE LIST'S NAME, not its id, and A DOOR THAT WAITS FOR THE POINTER (DIRECTION §35: secondary controls appear on
@@ -372,16 +385,19 @@
   {#if folded}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, folded?.shown ?? 0)}>{words.more(folded.more)}</button>{/if}
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
-  <div class="queue">
+  <!-- COMPACT, AT MOST THREE (`queue-answer.ts` `compactOf`): the question and its answers, and the rest a count on Decide. -->
+  {@const asked = compact ? compactOf(block.queue, block.total) : { shown: block.queue, more: block.total - block.queue.length }}
+  <div class="queue" data-compact={compact ? '' : undefined}>
     <!-- THE LEAD QUESTION IS DRAWN WHOLE when the block says `lead:`, with what accepting it would put on the screen. -->
-    {#each block.queue as question, n (question.id)}<QueueAnswer
+    {#each asked.shown as question, n (question.id)}<QueueAnswer
         {question}
         onanswered={() => {}}
         pick={block.queue.length > 1 ? pick : null}
         lead={(block as { lead?: unknown }).lead === true && n === 0}
         {n}
+        {compact}
       />{/each}
-    {#if block.total > block.queue.length}<a class="queue-more" href={inApp('/decide')}>{queueMore(block.total - block.queue.length)}</a>{/if}
+    {#if asked.more > 0}<a class="queue-more" href={inApp('/decide')}>{compact ? queueWords.moreOnDecide(asked.more) : queueMore(asked.more)}</a>{/if}
   </div>
 {:else}
   {#each drawing as item}
@@ -504,6 +520,15 @@
     font-size: var(--t-row);
     font-weight: 600;
     line-height: 20px;
+  }
+
+  /* HOW MANY IT HOLDS, beside the name in the quiet ink, as `ui/Tile.svelte` says a count: one step lighter, never a
+     pill and never red. */
+  .block-count {
+    margin-inline-start: var(--sp-2);
+    color: var(--dim);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
   }
 
   /* Every block header names its source, and `o` opens that list PRE-FILTERED to the block's own `where:`. That is the

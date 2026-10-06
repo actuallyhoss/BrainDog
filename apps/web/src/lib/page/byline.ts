@@ -56,11 +56,48 @@ export function bylinesIn(
   return out;
 }
 
+/** A week, the most the record sends a page's changes for. */
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * THE ONE LINE AT THE FOOT OF THE BOARD (DIRECTION §39): how many of the page's rows were changed for the reader this
+ * week, and by whom, in one sentence. "5 changes by your rules this week". The list itself opens in the docked panel;
+ * five lines over the page's questions, a bank's name in capitals on each, were noise above the work.
+ *
+ * BY WHOM IS SAID ONLY WHEN IT IS ONE KIND: your rules, Slash, or the one agent by its name. Changes by more than one
+ * kind are "made for you". `null` when the week holds none.
+ */
+export function changedLine(lines: Iterable<Byline>, now: number = Date.now()): { count: number; text: string } | null {
+  const week = [...lines].filter((b) => now - Date.parse(b.at) <= WEEK_MS);
+  if (week.length === 0) return null;
+  const kinds = new Set(week.map((b) => b.by));
+  const names = new Set(week.map((b) => b.name));
+  const one = kinds.size === 1 ? week[0]! : null;
+  const by =
+    one === null
+      ? bylineWords.madeForYou
+      : one.by === 'rule'
+        ? bylineWords.byRules
+        : one.by === 'slash' || (one.by === 'agent' && names.size === 1)
+          ? bylineWords.by(one.name)
+          : bylineWords.madeForYou;
+  return { count: week.length, text: bylineWords.changes(week.length, by) };
+}
+
 /** The words a byline adds on a page, kept with it. */
 export const bylineWords = {
   undo: 'Undo',
   /** Over the page's own lines of what was changed for the reader since they last looked. */
   heading: 'Changed for you',
+  /** The line at the foot of the board: "5 changes by your rules this week". */
+  changes: (n: number, by: string) => `${n} ${n === 1 ? 'change' : 'changes'} ${by} this week`,
+  byRules: 'by your rules',
+  by: (name: string) => `by ${name}`,
+  madeForYou: 'made for you',
+  /** The line's one action, which opens the list in the panel. */
+  review: 'Review',
+  /** The panel's title over the week's changes. */
+  panelTitle: 'Changed for you this week',
   /** What a screen reader hears for a line's Undo, with the row it is about. */
   undoNamed: (title: string) => `Undo the change to ${title}`,
   /** A change on a record that sends no batch for it, which this page cannot put back. */

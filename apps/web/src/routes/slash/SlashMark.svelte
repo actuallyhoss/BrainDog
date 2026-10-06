@@ -27,7 +27,7 @@
     inline-size: var(--well);
     block-size: var(--well);
     background: var(--s1);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
     color: var(--ink);
   }
 

@@ -1,37 +1,37 @@
 <!--
   One row: a task, a project, a person, a money line.
 
-  THE PAGE IS THE DOCKED PANEL'S BODY WITH ROOM, and it reads in the product's grammar, top to bottom:
-    - the title row: the list's name as the way back, the row's title, the verbs in the toolbar, and under them one
-      sentence saying where the row stands, when it is due and how old it is, with only the late phrase in red;
-    - the strip of its properties: its status, its dates, who and what it points at, each a pill that opens its field,
-      and a dashed pill for each one it has not answered;
-    - tiles, and only where there is a figure: the row's own amount with the chart that says where it stands, and for a
-      project what came in and the open work on it (`figures.ts`);
-    - the body and the rest of the fields as groups on the ground, with no box round them;
-    - what points here, and the history, as grouped rows.
+  THE PAGE IS A DOCUMENT (DIRECTION §39), and it reads top to bottom, left to right:
+    - the head: the list's name as the way back, the row's title at 28, the one sentence saying where the row stands,
+      when it is due and how old it is with only the late phrase in red, and the verbs on the right of the title;
+    - the fields tile: the row's amount first and large, then every field it has answered as a two-column definition
+      list, the label at 13 in the quiet ink and the value at 15. A field it has not answered is not drawn at all: it
+      waits behind "Add a field" at the foot of the tile, which opens its box in the list;
+    - tiles only where there is a figure and its chart: what came in for a project and the open work on it
+      (`figures.ts`), then a person's places, the row's prose, and what points here, each a tile with a list inside;
+    - on the right, one timeline tile: a single composer, then what happened and what was said, newest first
+      (`Timeline.svelte`).
 
-  A label is VISIBLE, always. A placeholder is not a label: it disappears exactly when a user needs
-  it, and it fails contrast in most themes (06 §8). A set field is a fact with its label; an unset
-  one is a chip that says its label and opens its field.
+  A LABEL IS VISIBLE, always. A placeholder is not a label: it disappears exactly when a user needs it, and it fails
+  contrast in most themes (06 §8). A set field is a fact with its label; an unset one is a name in the "Add a field"
+  menu, never a dashed chip on the page.
 
-  THE ROW'S NUMBER LIVES IN DETAILS AND NOWHERE ELSE. It is per-list, which is why
-  renaming a list's id is refused and its display name is free, and it is what `y` copies; a person
-  reading the page reads the title, the figure and where the row stands, never an id after them.
+  THE ROW'S NUMBER IS NOT PRINTED. It is per-list, which is why renaming a list's id is refused and its display name
+  is free; a person reading the page reads the title, the figure and where the row stands. "Copy link" in the head's
+  menu and `y` / `⇧Y` are how it leaves the page.
 
-  TWO SHAPES. Below 640px a fact is its label above its value; from 640px the label
-  sits in a column capped at 16ch. At every width the pencil that opens a field sits in one trailing
-  44px column, so every pencil on the page shares an edge. The hero figure is `--t-figure`, and never wraps.
+  TWO SHAPES. Below 640px a fact is its label above its value; from 640px the label sits in a column of its own. At
+  every width the pencil that opens a field sits in one trailing column, so every pencil on the page shares an edge.
 -->
 <script lang="ts">
   /* A FACT IS DRAWN ON THE BAR PRIMITIVE'S `.prop` ROW (`kinds/proportional.css`): its label, its value and their type. */
   import '@braindog/skin/kinds/proportional.css';
   import { apiBase, at, at as inApp } from '$lib/at.ts';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
   import { listLine } from '$lib/record/tags.ts';
   import { amountOf, currencyOf, moneyInText, symbolText } from '$lib/record/money.ts';
-  import { money, since, TONES } from 'braindog-render';
+  import { money, TONES } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
@@ -39,17 +39,15 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { currencyFor, dirOf, display, homeCurrency, iconFor, identityOf, labelOf, readableFields, spokenRow, toneOf, whoDid } from '$lib/record/api.ts';
+  import { currencyFor, dirOf, display, homeCurrency, iconFor, identityOf, labelOf, readableFields, spokenRow, toneOf } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
-  import IconWell from '$lib/ui/IconWell.svelte';
   import Face from '$lib/ui/Face.svelte';
   import AgentFace from '$lib/ui/AgentFace.svelte';
-  import { faceWords, liveOf, runOf } from '$lib/ui/face.ts';
+  import { faceWords, liveOf } from '$lib/ui/face.ts';
   import { isQuiet } from '@braindog/kernel';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -58,8 +56,7 @@
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import ListEditor from '$lib/ui/ListEditor.svelte';
-  import { ofPeople } from '$lib/ui/RowCards.svelte';
-  import { Bars, Segments, Sparkline, Stacked } from '$lib/viz/index.ts';
+  import { Sparkline, Stacked } from '$lib/viz/index.ts';
   import { fieldWords } from '$lib/record/field-words.ts';
   import AddValue from './AddValue.svelte';
   import { putBackOf, valueWords } from '$lib/record/field-write.ts';
@@ -75,12 +72,10 @@
   import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
   import type { Entry, FieldDecl, Fields } from '$lib/record/schema.ts';
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
-  import { choicesOf, stateSaid, stepsOf } from './lead.ts';
-  import { addedSaid, daySaid, daysOf, dueSaid, localDay, rowWords, sentenceOf } from './said.ts';
+  import { choicesOf, stateSaid } from './lead.ts';
+  import { addedSaid, daySaid, dueSaid, localDay, rowWords, sentenceOf } from './said.ts';
   import {
     aboutOf,
-    comparedOf,
-    comparedSaid,
     figureReader,
     figureWords,
     MONEY_IN,
@@ -94,20 +89,21 @@
   import { METRICS } from '$lib/record/declared.ts';
   import { handFor } from '$lib/record/hand.ts';
   import type { Backlink } from '$lib/record/api.ts';
-  import { actor, listName, nameWords, personWords } from '$lib/record/names.ts';
+  import { listName, personWords } from '$lib/record/names.ts';
   import { movable, scopeFieldOf } from '$lib/record/scope-move.ts';
   import ScopeMove from './ScopeMove.svelte';
-  import Thread from '$lib/ui/Thread.svelte';
+  import Timeline from './Timeline.svelte';
+  import { timelineWords } from './timeline.ts';
   import HandSheet from '$lib/ui/HandSheet.svelte';
   import UsedBy from '$lib/page/panels/UsedBy.svelte';
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { reachWords } from '../reach.ts';
-  import { knownOf, lastDayOf, meetsOf, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Named } from '../people.ts';
+  import { knownOf, lastDayOf, meetsOf, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Known, type Named } from '../people.ts';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
-  /* THE IDS ARE THIS PAGE'S OWN, so the strip's pill names the editor it opens under it. */
+  /* THE IDS ARE THIS PAGE'S OWN, so the box a pencil opens is found by its id to take the caret. */
   const uid = $props.id();
 
   /**
@@ -132,12 +128,11 @@
    * WHAT THE CALLER'S LEVEL ON THIS ROW'S LIST REACHES, asked of `may()` and never worked out here.
    *
    * A CONTROL THE RECORD WOULD REFUSE IS NOT DRAWN: Edit, Archive, a field's pencil and the scope move are an `update`,
-   * which asks `write` of the list, and a note is a `log`, which asks `append`. A comment asks only that the row can be
-   * read, which is what drew this page, so the thread is not gated. `proposes` is the new-field box's rung, which files
+   * which asks `write` of the list. A comment asks only that the row can be read, which is what drew this page, so the
+   * timeline's composer is not gated. `proposes` is the new-field box's rung, which files
    * a proposal for anyone but the owner, and a `propose` names no list.
    */
   const changes = $derived(live && may(page.data as unknown as Shell, 'write', id));
-  const notes = $derived(live && may(page.data as unknown as Shell, 'append', id));
   /* WHAT THIS RECORD CALLS THE ROWS THIS ONE POINTS AT, and the only source, so a ref the record did
      not name is drawn as `<list>#<number>` and never as a sample row. Undefined for a row the record
      does not hold. */
@@ -260,39 +255,7 @@
     if (Number.isInteger(n) && n >= 1) untrack(() => void readRow(register, n));
   });
 
-  /**
-   * A NOTE ON THE ROW, which is a `log`: it changes no field and lands in the history beside the row.
-   *
-   * THE BOX IS EMPTIED ONLY ONCE THE RECORD HAS THE NOTE, so a refusal leaves the words where they were
-   * typed. The history is read again after, and the new line in it is the answer, so there is no toast.
-   */
-  let noteText = $state('');
-  let noting = false;
   let writer: RowWriter | null = null;
-
-  async function addNote(e: SubmitEvent) {
-    e.preventDefault();
-    const said = noteText.trim();
-    if (!said || noting || !row || !live) return;
-    const register = id;
-    const n = seq;
-    const key = `${register}#${n}`;
-    noting = true;
-    writer ??= rowWriter(apiBase());
-    const out = await writer.note(register, n, said);
-    noting = false;
-    if (!out.ok) {
-      toasts.push(out.fix, { intent: 'warn' });
-      return;
-    }
-    if (askedFor !== key) return;
-    if (noteText.trim() === said) noteText = '';
-    const at = opened();
-    const h = await readHistory(apiBase(), register, n);
-    const current = askedFor === key;
-    closed(!current || h.from !== 'refused', at);
-    if (current) told = h;
-  }
 
   /**
    * EDITING, ONE FIELD AT A TIME.
@@ -311,8 +274,8 @@
    * number becomes its row's id and an enum goes in its declared spelling in ONE place rather than
    * two that drift.
    *
-   * ONE BOX, WHEREVER THE FIELD IS DRAWN: under the strip for a property, in the tile for the figure, in its row under
-   * Details for the rest, and in its group for prose. The box is the `fieldEditor` snippet in every one of them.
+   * ONE BOX, WHEREVER THE FIELD IS DRAWN: under the amount for the figure, in its line of the fields tile for the rest,
+   * and in its own tile for prose. The box is the `fieldEditor` snippet in every one of them.
    */
   let editing = $state<string | null>(null);
   let draft = $state('');
@@ -347,6 +310,8 @@
     ticked = row.fields[f.id] === true;
     was = draft;
     wasTicked = ticked;
+    /* THE BOX TAKES THE CARET once it is drawn, after a menu that opened it has handed focus back to its trigger. */
+    void tick().then(() => document.getElementById(`${uid}-edit`)?.querySelector<HTMLElement>('input, select, textarea')?.focus());
   }
 
   function stopEdit() {
@@ -505,29 +470,27 @@
     void refreshHistory(register, n);
   }
 
+  /* WHAT HAPPENED TO THE ROW, newest first, which the timeline merges with what was said about it. */
   const history = $derived(told && told.from !== 'refused' ? told.lines : []);
-  /* THE HISTORY BY DAY, as every list on the ground is grouped: Today, Yesterday, then the day. */
-  const historyDays = $derived(daysOf(history, clock));
-  /* THE RECORD'S ROW DOES NOT SAY WHO ADDED IT; its oldest event does. */
-  const addedBy = $derived(live ? (history.at(-1)?.by ?? '') : (row?.by ?? ''));
 
   /* WHO, BY NAME: the reader is You, and the record's members are asked for once, only when somebody else is in the
-     history, so a row only you have touched costs no read. */
+     history or has commented, so a row only you have touched costs no read. */
   const me = $derived(String(page.data.me?.person ?? ''));
   /* WHETHER A FIELD ADDED HERE LANDS AT ONCE OR WAITS ON DECIDE: the settings screen's one predicate for owning. */
   const owner = $derived(page.data.me ? ownsRecord(page.data.me as Me) : false);
   const proposes = $derived(owner || may(page.data as unknown as Shell, 'append'));
-  /* THE LIST'S FIELDS SHEET, opened from the head's "…" menu. */
+  /* THE LIST'S FIELDS SHEET, opened from the foot of "Add a field". */
   let fieldsOpen = $state(false);
   let people = $state<ReadonlyMap<string, string>>(new Map());
   let namesAsked = false;
-  $effect(() => {
+  function askNames() {
     if (!live || namesAsked) return;
-    if (!history.some((e) => /^p_/u.test(e.by) && e.by !== me)) return;
     namesAsked = true;
     void readNames(apiBase()).then((m) => (people = m));
+  }
+  $effect(() => {
+    if (history.some((e) => /^p_/u.test(e.by) && e.by !== me)) untrack(askNames);
   });
-  const addedWho = $derived(addedBy ? whoDid(addedBy, me || null, people) : null);
 
   const stateValue = $derived(decl?.state ? String(row?.fields[decl.state] ?? '') : '');
   const tone = $derived(decl?.done?.includes(stateValue) ? ('good' as const) : undefined);
@@ -552,7 +515,7 @@
    * label. The tone is the list's own (`toneOf`), so a row drawn late in the list is drawn late here.
    *
    * A FIELD SHOWN HERE IS NOT SHOWN TWICE. The facts below keep everything else, and an empty field
-   * is a chip rather than a row saying "Not set".
+   * is a name behind "Add a field" rather than a row saying "Not set".
    */
   const unsetValue = (v: unknown) => v === null || v === undefined || v === '' || (Array.isArray(v) && listLine(v) === null);
   const figureField = $derived(shortFields.find((f) => f.type === 'money'));
@@ -580,32 +543,25 @@
       ),
     ),
   );
-  /* THE TITLE IS THE HEAD, SO IT IS NOT A FACT AS WELL. It is listed only while it is empty, when its chip is the way
-     to it, or while the head's Edit has it open, when its row holds the box. */
+  /* THE TITLE IS THE HEAD, SO IT IS NOT A FACT AS WELL. It is listed only while it is empty, when "Add a field" is the
+     way to it, or while the head's Edit has it open, when its row holds the box. */
   const titled = $derived(Boolean(decl && row && !unsetValue(row.fields[decl.title])));
   const listed = $derived(shortFields.filter((f) => !leadIds.has(f.id) && (f.id !== decl?.title || !titled || editing === f.id)));
 
-  /* EVERY EMPTY FIELD IS A CHIP. A person with four unset fields was a column of four "Not set" rows,
-     then one line of names with a separator trailing the last; a chip names its field, wraps whole, and on a row you can
-     write to it opens that field. */
+  /* AN EMPTY FIELD IS NOT DRAWN. A person with four unset fields was a column of four "Not set" rows, then a row of
+     dashed chips; now each is a name in the "Add a field" menu, and choosing one opens its box in the list, where it
+     stays while it is open. What the record keeps about who somebody is, and nobody types, is never offered. */
   const unsetFields = $derived(row ? listed.filter((f) => unsetValue(row.fields[f.id]) && editing !== f.id && !recordKept.has(f.id)) : []);
   const shownFields = $derived(listed.filter((f) => !unsetFields.includes(f)));
 
   /**
-   * THE ROW'S PROPERTIES ARE PILLS IN ONE STRIP UNDER THE TITLE: a word or a day that says what kind of row
-   * this is and where it points, which a person scans across rather than down. Its status, its dates, who holds it and
-   * which project, each with its label, each a press away from its box; the rest (sums, counts, lists, sentences) are
-   * facts in Details, where a value has the room to be long.
+   * THE FACTS, IN ONE LIST: where the row stands first, then every other field it has answered in the order its list
+   * declares them. They were split in two, the status, days and links as pills in a strip under the title and the rest
+   * under Details, so a reader looked in two places and in two shapes for one answer.
    */
-  const PROPS: ReadonlySet<string> = new Set(['enum', 'ref', 'day', 'bool']);
-  const isProp = (f: FieldDecl): boolean => PROPS.has(f.type);
-  const pills = $derived(shownFields.filter((f) => isProp(f) && f.id !== decl?.title && !evidence.has(f.id)));
-  const facts = $derived(shownFields.filter((f) => !pills.includes(f) && !evidence.has(f.id)));
-  const unsetProps = $derived(unsetFields.filter(isProp));
-  /* THE PROPERTY WHOSE BOX IS OPEN, drawn under the strip that holds its pill. */
-  const propEditing = $derived(pills.find((f) => f.id === editing));
-  /* A RUN'S PROJECT OPENS THE PROJECT, so its pill is a link to read and not a button to press. */
-  const opensRow = (f: FieldDecl, value: unknown): boolean => id === 'session' && f.id === 'project' && spokenRow(value, names) !== null;
+  const facts = $derived(
+    shownFields.filter((f) => !evidence.has(f.id)).sort((a, b) => Number(b.id === decl?.state) - Number(a.id === decl?.state)),
+  );
 
   /**
    * A PERSON'S PAGE LEADS WITH WHO THEY ARE, AND AN ORGANISATION'S WITH WHAT IT IS, on a list that declares the role
@@ -615,8 +571,8 @@
    * THE SENTENCE UNDER A PERSON'S NAME is who they are, "Contractor at Encore, on Kiln and Portage.", each name opening
    * its own page, then the last day they were in touch. An organisation's is its kind and how many people and projects
    * are with it. Then, on the ground, where the person was seen and what they are known by, which the lines `meet`
-   * wrote said in an agent's words ("2026-08-27 · commit 8b1e4d0 in portage") and now say in a person's; then Details,
-   * then the history beside them. A field said in one of those places is not listed again under Details.
+   * wrote said in an agent's words ("2026-08-27 · commit 8b1e4d0 in portage") and now say in a person's; then the facts,
+   * then the timeline beside them. A field said in one of those places is not listed again as a fact.
    */
   const meets = $derived.by(() => (void got, meetsOf(decl)));
   const orgRole = $derived.by(() => (void got, meetsOf(decl) ? null : orgRoleOf(decl)));
@@ -648,14 +604,14 @@
       const role = roleFieldOf(decl);
       const projects = projectsOf(meets.projects);
       const day = lastDayOf(row.fields, meets);
+      const roleSaid = role ? display(id, role, row.fields[role], clock, names) : null;
+      const org = meets.org ? namedRef(fieldTo(meets.org), row.fields[meets.org]) : null;
       return {
-        parts: whoParts({
-          role: role ? display(id, role, row.fields[role], clock, names) : null,
-          org: meets.org ? namedRef(fieldTo(meets.org), row.fields[meets.org]) : null,
-          projects,
-        }),
+        parts: whoParts({ role: roleSaid, org, projects }),
         named: projects.length > 0,
         last: day ? seenWords.lastInTouch(daySaid(day, clock)) : null,
+        /* THE FIELDS THE SENTENCE SAYS, so the facts do not say them a second time under it. */
+        said: [roleSaid?.trim() ? role : null, org ? meets.org : null, day ? meets.in_touch : null].filter((x): x is string => Boolean(x)),
       };
     }
     const people = incoming.filter((g) => meetsOf(REGISTERS[g.register]) !== null).reduce((n, g) => n + g.total, 0);
@@ -663,16 +619,50 @@
     const pointing = incoming.filter((g) => isProjects(g.register)).reduce((n, g) => n + g.total, 0);
     const kind = orgRole?.kind ? display(id, orgRole.kind, row.fields[orgRole.kind], clock, names) : null;
     const said = orgSaid({ kind, people, projects: projects.length > 0 ? 0 : pointing });
-    return { parts: whoParts({ role: said, org: null, projects }), named: projects.length > 0, last: null };
+    return {
+      parts: whoParts({ role: said, org: null, projects }),
+      named: projects.length > 0,
+      last: null,
+      said: [kind?.trim() && orgRole?.kind ? orgRole.kind : null].filter((x): x is string => Boolean(x)),
+    };
   });
   const seen = $derived(row && (meets?.met || orgRole?.met) ? seenOf(row.fields[(meets?.met ?? orgRole?.met)!]) : []);
   const knownParts = $derived(
     meets ? { email: meets.email, keys: meets.keys, handles: meets.handles, aliases: meets.aliases } : { keys: orgRole?.keys, domain: orgRole?.domain },
   );
-  const known = $derived(row && (meets || orgRole) ? knownOf(row.fields, knownParts) : []);
-  /* THE FIELDS "Known by" SAYS, each still changed from there, by the pencil Details would have drawn. */
+  /* THE FIELDS WHAT THEY ARE KNOWN BY IS READ FROM, each changed by its own pencil. */
   const knownFields = $derived(
     meets || orgRole ? readable.filter((f) => Object.values(knownParts).includes(f.id) && row !== undefined && !unsetValue(row.fields[f.id])) : [],
+  );
+  /**
+   * WHAT A PERSON OR AN ORGANISATION IS KNOWN BY, as facts in the same list as the rest: an address, a login, a website,
+   * each by its kind ("GitHub", "Email") and not by the field that holds it. Grouped by that field, so the pencil on a
+   * group's first line opens the one field its lines are read from. A line two fields both hold is said once, under the
+   * first; a field all of whose lines are said already is changed from "Add a field" (`knownElsewhere`).
+   */
+  const knownGroups = $derived.by((): { field: FieldDecl; lines: Known[] }[] => {
+    if (!row) return [];
+    const said = new Set<string>();
+    return knownFields.map((field) => {
+      const part = Object.entries(knownParts).find(([, v]) => v === field.id)?.[0];
+      const lines = (part ? knownOf(row.fields, { [part]: field.id }) : []).filter((k) => {
+        const key = `${k.label}:${k.value.toLowerCase()}`;
+        if (said.has(key)) return false;
+        said.add(key);
+        return true;
+      });
+      return { field, lines };
+    });
+  });
+  const knownElsewhere = $derived(knownGroups.filter((g) => g.lines.length === 0 && editing !== g.field.id).map((g) => g.field));
+  /* WHAT THE SENTENCE UNDER THE NAME SAYS ("Client at Halden Type Co. Last in touch 28 Aug."), and only while it is the
+     sentence drawn: not listed as facts as well, and changed from "Add a field", where its box opens in the list. */
+  const saidAbove = $derived(
+    !archived && (lead?.parts || lead?.last) ? readable.filter((f) => lead?.said.includes(f.id) && editing !== f.id) : [],
+  );
+  /* WHAT "Add a field" OFFERS: every field the row has not answered that this reader can write, prose included. */
+  const addable = $derived(
+    changes ? [...unsetFields, ...documents.filter((f) => !writtenDocuments.includes(f)), ...knownElsewhere, ...saidAbove].filter(editable) : [],
   );
   /* WHAT THE RECORD KEEPS ABOUT WHO SOMEBODY IS, AND NOBODY TYPES: where they were met, the row they were merged into,
      and whether they are the person whose record it is. None is offered as a chip to fill in. */
@@ -685,6 +675,7 @@
     new Set(
       [
         ...knownFields.map((f) => f.id),
+        ...saidAbove.map((f) => f.id),
         meets?.met ?? orgRole?.met,
         meets?.self,
         meets?.merged_into ?? orgRole?.merged_into,
@@ -727,10 +718,9 @@
       notes: lines(f.notes),
     };
   });
-  /* A DOCUMENT WITH NO PROSE IS ONE OF THOSE CHIPS TOO, after the short fields, and its group is drawn only while it
+  /* A DOCUMENT WITH NO PROSE IS BEHIND "Add a field" TOO, after the short fields, and its tile is drawn only while it
      holds prose or its box is open. */
   const writtenDocuments = $derived(row ? documents.filter((f) => !unsetValue(row.fields[f.id]) || editing === f.id) : []);
-  const unset = $derived([...unsetFields.filter((f) => !isProp(f)), ...documents.filter((f) => !writtenDocuments.includes(f))]);
 
   /**
    * THE SENTENCE UNDER THE TITLE, in place of the lead line of dots and words it replaced: where the row
@@ -753,17 +743,6 @@
       : [],
   );
 
-  /**
-   * THE LEAD TILE, AND ONLY WHEN IT HAS A CHART: the row's amount, where the row stands on its list's way
-   * through its states (`Segments`), and its amounts against each other where it holds two in one currency (`Bars`). An
-   * amount with nothing to chart is a figure on the ground and not a tile, since a number tile without a chart is the
-   * one thing the design system forbids a tile to be.
-   */
-  const steps = $derived(stepsOf(decl, stateValue));
-  const compared = $derived(row && figureField && figure !== null ? comparedOf(shortFields, row.fields, figureField.id, labelOf) : null);
-  const charted = $derived(steps !== null || compared !== null);
-  const stateField = $derived(decl ? decl.fields.find((f) => f.id === decl.state) : undefined);
-
   /* AN AMOUNT AS A TILE WRITES ONE: the symbol where the record's currency has one, and no fraction of all zeros. */
   const moneySaid = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), true);
   /* A CHART'S VALUES, BY THE FIGURE'S RULE: a bar and a sparkline's point say what they are, where the tile's figure is a headline. */
@@ -780,8 +759,8 @@
   };
 
   /**
-   * `y` COPIES THE ID AND `⇧Y` THE LINK, which is what the grid does; the button beside the number in
-   * Details copies the link.
+   * `y` COPIES THE ID AND `⇧Y` THE LINK, which is what the grid does; "Copy link" in the head's "…" copies
+   * the link.
    *
    * The route had no key listener at all while its own header carried `<kbd>y</kbd>`, so the one
    * screen where somebody most wants a row's spoken id to paste into a message advertised the key
@@ -854,10 +833,11 @@
   <!-- WHO A PERSON IS, OR WHAT AN ORGANISATION IS, in place of the sentence a row of any other list leads with. -->
   {#snippet whoLine()}{#each lead?.parts ?? [] as part, i (i)}{#if part.href}<a class="who-link" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}{#if lead?.parts && lead.last}{' '}{/if}{lead?.last ?? ''}{/snippet}
 
-  <!-- A VALUE AS THE PAGE SAYS IT, in a pill and in Details alike. -->
+  <!-- A VALUE AS THE PAGE SAYS IT, in its line of the fields tile. -->
   {#snippet shown(f: FieldDecl, value: unknown)}
     {#if f.type === 'money'}
-      <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} weight="strong" />
+      <!-- AT THE FACT'S OWN WEIGHT: the amount the page leads with is the large one, and a second never competes. -->
+      <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} />
     {:else if f.id === decl.state}
       <Chip label={stateSaid(decl, String(value))} {tone} />
     {:else if identityOf(id, f.id, value, names)}
@@ -869,6 +849,9 @@
     {:else if id === 'session' && f.id === 'project' && spokenRow(value, names)}
       <!-- A RUN'S PROJECT IS HELD AS A SPOKEN ID. It reads as the project, and opens it. -->
       <a href={at(spokenRow(value, names)!.href)}>{spokenRow(value, names)!.label}</a>
+    {:else if f.type === 'ref' && namedRef(f.to, value)}
+      <!-- A ROW THIS ONE POINTS AT OPENS ITS PAGE, said by its name: who an invoice is for is one press from them. -->
+      <a class="ref-link" href={at(namedRef(f.to, value)!.href ?? "")}>{namedRef(f.to, value)!.name}</a>
     {:else if f.type === 'enum'}
       <span class="enum-word">{copy.valueWord(display(id, f.id, value, clock, names) ?? '')}</span>
     {:else}
@@ -890,6 +873,7 @@
   {#snippet fieldEditor(f: FieldDecl, value: unknown)}
     <form
       class="editor"
+      id="{uid}-edit"
       onsubmit={(e) => {
         e.preventDefault();
         void saveEdit(f);
@@ -971,78 +955,44 @@
     </button>
   {/snippet}
 
-  <!-- WHAT A PERSON OR AN ORGANISATION IS KNOWN BY: an address, a login, a website, each by its kind. Each field it is read
-       from keeps its way to be changed, under the list, as Details would have offered it. -->
-  {#snippet knownBy()}
-    {#if known.length > 0 || knownFields.some((f) => editing === f.id)}
-      <Section title={!self ? seenWords.knownBy : owner ? personWords.identities : personWords.identitiesOf(String(row.fields[decl.title] ?? '') || decl.one)}>
-        <dl class="field-list known">
-          {#each known as k, i (i)}
-            <div class="fact">
-              <dt class="field-label">{k.label}</dt>
-              <dd class="field-value" dir="auto">{k.value}</dd>
-            </div>
-          {/each}
-        </dl>
-        {#each knownFields as f (f.id)}
-          {#if editing === f.id}
-            <div class="prop-editor">
-              <p class="prop-editor-label">{labelOf(f)}</p>
-              {@render fieldEditor(f, row.fields[f.id])}
-            </div>
-          {/if}
-        {/each}
-        {#if changes && knownFields.some((f) => editable(f) && editing !== f.id)}
-          <ul class="unset" aria-label={seenWords.knownBy}>
-            {#each knownFields.filter((f) => editable(f) && editing !== f.id) as f (f.id)}
-              <li>
-                <button type="button" class="unset-chip tap" onclick={() => startEdit(f)}><Icon name="edit" size="s" /><span>{copy.editValue(labelOf(f))}</span></button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </Section>
-    {/if}
-  {/snippet}
-
-  <!-- THE ROW'S AMOUNT, as big as a figure is set (`--t-figure`), in the lead tile or, with nothing to chart, on the
-       ground. A container, so the figure answers the room it has and not the width of the window. -->
-  {#snippet hero()}
-    {#if figure !== null && figureField}
-      <div class="lead">
-        {#if editing === figureField.id}
-          {@render fieldEditor(figureField, row.fields[figureField.id])}
+  <!-- ONE FACT: its label in the first column, its value in the second, and its pencil in the trailing one. A deadline
+       that has passed is said in red, the one red a fact can carry. -->
+  {#snippet fact(f: FieldDecl)}
+    {@const value = row.fields[f.id]}
+    <div class="fact">
+      <dt class="fact-label">{labelOf(f)}</dt>
+      <dd class="fact-value" data-type={f.type} data-late={f.id === dueField?.id && lateTone === 'bad' ? '' : undefined} dir={dirOf(id, f.id)}>
+        {#if editing === f.id}
+          {@render fieldEditor(f, value)}
         {:else}
-          <p class="lead-figure num">
-            <Money minor={figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" />
-          </p>
+          {@render shown(f, value)}
         {/if}
-      </div>
-    {/if}
-  {/snippet}
-
-  {#snippet heroPencil()}
-    {#if figureField && editing !== figureField.id}{@render pencil(figureField)}{/if}
+      </dd>
+      <!-- THE PENCIL IS ITS OWN CELL IN THE TRAILING COLUMN, so every pencil on the page shares one edge whatever the
+           value beside it holds. A `dd`, because a `dl`'s groups hold nothing else. -->
+      {#if changes && editable(f) && editing !== f.id}
+        <dd class="fact-pencil">{@render pencil(f)}</dd>
+      {/if}
+    </div>
   {/snippet}
 
   <!-- THE LIST'S NAME IS THE WAY BACK: a link above the title from 900px, and the chevron in the
-       phone's bar below it. No number follows the title; it is in Details. -->
+       phone's bar below it. No number follows the title, here or anywhere on the page. -->
   <PageHead icon={iconFor(decl?.icon, 'rows')} kicker={listName(id)} back={`/r/${id}`} title={String(row.fields[decl.title] ?? '')} sentence={!archived && (lead?.parts || lead?.last) ? whoLine : sentenceLine}>
     {#snippet actions()}
-      <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER, AND IT LIVES BESIDE THE NUMBER NOW. A row's
-           page led with a developer verb: the first control a person saw on an invoice was the one
-           that puts `obligations#1` on the clipboard, ahead of anything that does something to the
-           invoice. Details holds the number and its "Copy link", and `y` still copies the id. -->
+      <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER. A row's page led with a developer verb: the first control a
+           person saw on an invoice was the one that puts `obligations#1` on the clipboard, ahead of anything that does
+           something to the invoice. "Copy link" is in the "…", and `y` still copies the id. -->
       <!-- WHERE THE ROW APPLIES, FIRST: the project's chip, or the globe and "Everywhere", which opens the move. -->
       <ScopeMove register={id} {row} {names} live={changes} title={String(row.fields[decl.title] ?? '')} onmoved={() => void rowMoved(id, seq)} />
       <!-- THE ONE PRIMARY, AND ONLY ON A LIST WITH NO STATE: where a row has a status, moving it is the verb that
-           matters and it is a pill of its own; where it has none, editing it is the thing to do. -->
+           matters and it is the first of the facts; where it has none, editing it is the thing to do. -->
       {#if changes}<Button weight={decl.state ? 'quiet' : 'primary'} onclick={editTitle}>{copy.editRow}</Button>{/if}
       <!-- ARCHIVE IS THE LIST'S OWN VERB, on the row itself: a row that can be archived in one
            place and not the other is two products. `Put back` stands where `Archive` was for as
            long as this tab holds the row it just archived: see `archived` for why that moment is
            the only one it can be offered in. -->
-      <!-- AND NEITHER FOR SOMEBODY WHO CANNOT CHANGE THE LIST, where the note's place says why. -->
+      <!-- AND NEITHER FOR SOMEBODY WHO CANNOT CHANGE THE LIST, where the foot of the fields tile says why. -->
       {#if changes && archived}
         <Button weight="quiet" disabled={saving} onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
       {:else if changes}
@@ -1053,8 +1003,8 @@
       {#if live && !archived}
         <HandSheet register={id} {row} {decl} trigger onhanded={() => void rowMoved(id, seq)} />
       {/if}
-      <!-- THE HEAD'S "…", LAST: what is done to the list this row is in, and the row's link. A 36px
-           glass circle, named for a screen reader by the hidden words and for a pointer by its tooltip. -->
+      <!-- THE HEAD'S "…", LAST: the row's link. A 36px square in the buttons' shape, named for a screen reader by the
+           hidden words and for a pointer by its tooltip. A new field for the list is at the foot of "Add a field". -->
       {#if live}
         <Menu label={copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)} align="end">
           {#snippet trigger()}
@@ -1062,7 +1012,6 @@
               ><Icon name="more" size="l" /><span class="head-vh">{copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)}</span></span
             >
           {/snippet}
-          {#if proposes}<button type="button" class="mi" role="menuitem" onclick={() => (fieldsOpen = true)}>{fieldWords.add}</button>{/if}
           <button type="button" class="mi" role="menuitem" onclick={() => clipboard.putLink(id, row.seq)}>{copy.copyLink}</button>
         </Menu>
       {/if}
@@ -1077,155 +1026,138 @@
       <p class="archived-note"><Icon name="archive" size="s" /><span>{copy.rowArchivedNote}</span></p>
     {/if}
 
-    <!-- THE STRIP OF PROPERTIES. A PERSON'S PAGE LEADS IT WITH THEIR FACE, the one their row wears in the
-         list, drawn from the name in the title above; `Face` is `aria-hidden` because that name is already said. Each
-         pill is its label and its value, and on a row you can write to it opens its box under the strip; each dashed
-         pill is a property the row has not answered. -->
-    {#if ofPeople(decl) || meets || pills.length > 0 || unsetProps.length > 0}
-      <ul class="props" aria-label={rowWords.props}>
-        {#if ofPeople(decl) || meets}<li class="lead-face"><Face name={String(row.fields[decl.title] ?? '')} kind="person" you={self && owner} size="l" /></li>{/if}
-        <!-- THE PERSON WHOSE RECORD THIS IS, MARKED: the list's `self` part, which Details leaves out because it is said here. -->
-        {#if self}<li><span class="prop"><span class="prop-value">{personWords.self}</span></span></li>{/if}
-        {#each pills as f (f.id)}
-          {@const value = row.fields[f.id]}
-          {@const overdue = f.id === dueField?.id && lateTone === 'bad'}
-          <li>
-            {#if changes && editable(f) && !opensRow(f, value)}
-              <button
-                type="button"
-                class="prop tap"
-                data-late={overdue ? '' : undefined}
-                aria-expanded={editing === f.id}
-                aria-controls={editing === f.id ? `${uid}-edit` : undefined}
-                title={copy.editValue(labelOf(f))}
-                onclick={() => (editing === f.id ? stopEdit() : startEdit(f))}
-              >
-                <span class="prop-label">{labelOf(f)}</span>
-                <span class="prop-value" dir={dirOf(id, f.id)}>{@render shown(f, value)}</span>
-              </button>
-            {:else}
-              <!-- A VALUE THAT IS A LINK IS NOT INSIDE A BUTTON: the pill reads, and its pencil beside it opens the box. -->
-              <span class="prop" data-late={overdue ? '' : undefined}>
-                <span class="prop-label">{labelOf(f)}</span>
-                <span class="prop-value" dir={dirOf(id, f.id)}>{@render shown(f, value)}</span>
-              </span>
-              {#if changes && editable(f) && editing !== f.id}{@render pencil(f)}{/if}
-            {/if}
-          </li>
-        {/each}
-        {#each unsetProps as f (f.id)}
-          <li>
-            {#if changes && editable(f)}
-              <button type="button" class="unset-chip tap" aria-label="{rowWords.add} {labelOf(f).toLowerCase()}" onclick={() => startEdit(f)}>
-                <Icon name="plus" size="s" /><span>{labelOf(f)}</span>
-              </button>
-            {:else}
-              <span class="unset-chip">{labelOf(f)}</span>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
-    {#if propEditing}
-      <div class="prop-editor" id="{uid}-edit">
-        <p class="prop-editor-label">{labelOf(propEditing)}</p>
-        {@render fieldEditor(propEditing, row.fields[propEditing.id])}
-      </div>
-    {/if}
-
-    <!-- AN AMOUNT WITH NOTHING TO CHART stands on the ground, its pencil beside it. -->
-    {#if figure !== null && figureField && !charted}
-      <div class="figure-ground">
-        {@render hero()}
-        {#if changes && editable(figureField)}{@render heroPencil()}{/if}
-      </div>
-    {/if}
-
-    <!-- THE TILES, ONLY WHERE THERE IS A FIGURE: each a figure, its chart, and one line saying what it means. -->
-    {#if charted || moneyIn || openWork}
-      <div class="tiles">
-        {#if charted}
-          <Tile
-            lead
-            icon={iconFor(decl.icon, 'rows')}
-            title={figure !== null && figureField ? labelOf(figureField) : stateField ? labelOf(stateField) : decl.one}
-            actions={figure !== null && figureField && changes && editable(figureField) ? heroPencil : undefined}
-          >
-            {@render hero()}
-            {#if compared}
-              <Bars items={compared.items} format={(n) => figureSaid(n, compared.currency)} summary={comparedSaid(compared)} />
-              <p class="reading">{comparedSaid(compared)}</p>
-            {/if}
-            {#if steps}
-              <!-- THE STEP IN HAND IS OUTLINED RED ONLY ONCE THE ROW IS LATE, which is the chart's one red. -->
-              <Segments total={steps.total} done={steps.done} current={steps.current} tone={lateTone === 'bad' ? 'danger' : undefined} summary={steps.said} />
-              <p class="reading">{steps.said}</p>
-            {/if}
-          </Tile>
-        {/if}
-        {#if moneyIn}
-          <Tile icon="money" title={rowWords.moneyIn} href={moneyAll ?? undefined} hrefLabel={moneyAll ? rowWords.all : undefined}>
-            <div class="stat">
-              <p class="tile-figure num">{moneySaid(moneyIn.total, moneyIn.currency)}<span class="tile-figure-note">{rowWords.months(moneyIn.months.length)}</span></p>
-              <div class="stat-line">
-                <Sparkline values={moneyIn.months.map((m) => m.value)} tone="earn" mark="high" subject={rowWords.moneyIn} format={(n) => figureSaid(n, moneyIn?.currency ?? '')} />
-              </div>
-            </div>
-            <p class="reading">{moneyInSaid(moneyIn, clock, moneySaid)}</p>
-          </Tile>
-        {/if}
-        {#if openWork}
-          <Tile icon="task" title={rowWords.openWork} href={workAll ?? undefined} hrefLabel={workAll ? rowWords.all : undefined}>
-            <p class="tile-figure num">{openWork.total.toLocaleString('en')}{#if openWork.atLeast}<span class="more-sign">+</span>{/if}</p>
-            <Stacked parts={openWork.parts.map((p) => ({ label: p.label, value: p.count }))} subject={rowWords.openWork} />
-            <p class="reading">
-              {openWorkSaid(openWork)}{#if openWork.late > 0}{' '}<span class="said-late" data-tone="bad">{figureWords.late(openWork.late)}</span>{/if}
-            </p>
-          </Tile>
-        {/if}
-      </div>
-    {/if}
-
-    <div class="split">
+    <div class="board">
       <div class="main">
         <!-- A RUN READS AS ITS HANDOFF, led by its face, what it is doing and where it is, then what the next
              session needs: the next step, what was already tried, newest first, and the notes it left. The one place
              `live` is used on this page, in the face's ring. -->
         {#if handoff}
-          <section class="handoff" aria-label={faceWords.handoff}>
+          <Tile aria-label={faceWords.handoff}>
             <div class="handoff-head">
               <AgentFace agent={handoff.agent} run="S{seq}" live={handoff.live} project={handoff.mark} />
               <p class="handoff-doing">{handoff.doing || faceWords.nothingYet}</p>
               <span class="handoff-live">{faceWords.live[handoff.live]}</span>
             </div>
             {#if handoff.project || handoff.next}
-              <dl class="handoff-facts">
-                {#if handoff.project}<div><dt>{faceWords.project}</dt><dd>{handoff.project}</dd></div>{/if}
-                {#if handoff.next}<div><dt>{faceWords.next}</dt><dd>{handoff.next}</dd></div>{/if}
-              </dl>
+              <div class="facts-box"><dl class="facts">
+                {#if handoff.project}<div class="fact"><dt class="fact-label">{faceWords.project}</dt><dd class="fact-value">{handoff.project}</dd></div>{/if}
+                {#if handoff.next}<div class="fact"><dt class="fact-label">{faceWords.next}</dt><dd class="fact-value">{handoff.next}</dd></div>{/if}
+              </dl></div>
             {/if}
             {#if handoff.tried.length}
-              <h2 class="handoff-title">{faceWords.tried}</h2>
+              <h3 class="sub-head">{faceWords.tried}</h3>
               <ol class="handoff-lines">{#each handoff.tried as t}<li>{t}</li>{/each}</ol>
             {/if}
             {#if handoff.notes.length}
-              <h2 class="handoff-title">{faceWords.notes}</h2>
+              <h3 class="sub-head">{faceWords.notes}</h3>
               <ul class="handoff-lines">{#each handoff.notes as n}<li>{n}</li>{/each}</ul>
             {/if}
-          </section>
+          </Tile>
         {/if}
 
-        <!-- THE BODY: a `document` field is the dialect, drawn by the same interpreter a declared page uses, one group on
-             the ground each. The read view IS the renderer, so what you are looking at is the artefact (22 §8). A
-             document the row does not carry yet is still a field the list declares, so it is a chip under Details, like
-             every other unset field, and pressing it opens its box here. -->
+        <!-- THE FIELDS TILE. The amount first and large, since it is what a person opens a money line for; then every
+             field the row has answered, and what a person or an organisation is known by, as one definition list; then
+             "Add a field" for the rest. -->
+        <Tile aria-label={rowWords.details}>
+          {#if self}
+            <!-- THE PERSON WHOSE RECORD THIS IS, MARKED: the list's `self` part, which the facts leave out because it is
+                 said here, beside the face their row wears in every list. -->
+            <p class="self-line"><Face name={String(row.fields[decl.title] ?? '')} kind="person" you={owner} size="m" /><span>{personWords.self}</span></p>
+          {/if}
+          {#if figure !== null && figureField}
+            <div class="figure">
+              <p class="figure-label">{labelOf(figureField)}</p>
+              {#if editing === figureField.id}
+                {@render fieldEditor(figureField, row.fields[figureField.id])}
+              {:else}
+                <div class="figure-line">
+                  <p class="figure-value num"><Money minor={figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" /></p>
+                  {#if changes && editable(figureField)}{@render pencil(figureField)}{/if}
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          {#if facts.length > 0 || knownGroups.length > 0}
+            <div class="facts-box">
+            <dl class="facts">
+              {#each facts as f (f.id)}{@render fact(f)}{/each}
+              <!-- WHAT THEY ARE KNOWN BY, each line by its kind; the pencil on a field's first line opens that field. -->
+              {#each knownGroups as g (g.field.id)}
+                {#if editing === g.field.id}
+                  {@render fact(g.field)}
+                {:else}
+                  {#each g.lines as k, i (i)}
+                    <div class="fact">
+                      <dt class="fact-label">{k.label}</dt>
+                      <dd class="fact-value" dir="auto">{k.value}</dd>
+                      {#if i === 0 && changes && editable(g.field)}<dd class="fact-pencil">{@render pencil(g.field)}</dd>{/if}
+                    </div>
+                  {/each}
+                {/if}
+              {/each}
+            </dl>
+            </div>
+          {:else if figure === null && !self}
+            <p class="quiet">{rowWords.nothingYet}</p>
+          {/if}
+
+          <!-- WHAT THE ROW HAS NOT ANSWERED, behind one control: each field by name, and a new field for every row of the
+               list last. For somebody who cannot change the list, one sentence says why there is no Edit or Archive. -->
+          {#if addable.length > 0 || (live && proposes) || (live && !changes)}
+            <div class="facts-foot">
+              {#if addable.length > 0 || (live && proposes)}
+                <Menu label={fieldWords.add}>
+                  {#snippet trigger()}<span class="add-field"><Icon name="plus" size="s" /><span>{fieldWords.add}</span></span>{/snippet}
+                  {#each addable as f (f.id)}
+                    <button type="button" class="mi" role="menuitem" onclick={() => startEdit(f)}>{labelOf(f)}</button>
+                  {/each}
+                  {#if live && proposes}
+                    <button type="button" class="mi" role="menuitem" onclick={() => (fieldsOpen = true)}>{rowWords.newField(decl.one)}</button>
+                  {/if}
+                </Menu>
+              {/if}
+              {#if live && !changes}<p class="quiet">{reachWords.readOnly(listName(id))}</p>{/if}
+            </div>
+          {/if}
+        </Tile>
+
+        <!-- THE TILES, ONLY WHERE THERE IS A FIGURE: each a figure, its chart, and one line saying what it means. -->
+        {#if moneyIn || openWork}
+          <div class="tiles">
+            {#if moneyIn}
+              <Tile icon="money" title={rowWords.moneyIn} href={moneyAll ?? undefined} hrefLabel={moneyAll ? rowWords.all : undefined}>
+                <div class="stat">
+                  <p class="tile-figure num">{moneySaid(moneyIn.total, moneyIn.currency)}<span class="tile-figure-note">{rowWords.months(moneyIn.months.length)}</span></p>
+                  <div class="stat-line">
+                    <Sparkline values={moneyIn.months.map((m) => m.value)} tone="earn" mark="high" subject={rowWords.moneyIn} format={(n) => figureSaid(n, moneyIn?.currency ?? '')} />
+                  </div>
+                </div>
+                <p class="reading">{moneyInSaid(moneyIn, clock, moneySaid)}</p>
+              </Tile>
+            {/if}
+            {#if openWork}
+              <Tile icon="task" title={rowWords.openWork} href={workAll ?? undefined} hrefLabel={workAll ? rowWords.all : undefined}>
+                <p class="tile-figure num">{openWork.total.toLocaleString('en')}{#if openWork.atLeast}<span class="more-sign">+</span>{/if}</p>
+                <Stacked parts={openWork.parts.map((p) => ({ label: p.label, value: p.count }))} subject={rowWords.openWork} />
+                <p class="reading">
+                  {openWorkSaid(openWork)}{#if openWork.late > 0}{' '}<span class="said-late" data-tone="bad">{figureWords.late(openWork.late)}</span>{/if}
+                </p>
+              </Tile>
+            {/if}
+          </div>
+        {/if}
+
+        <!-- THE BODY: a `document` field is the dialect, drawn by the same interpreter a declared page uses, one tile
+             each. The read view IS the renderer, so what you are looking at is the artefact (22 §8). -->
         {#each writtenDocuments as f (f.id)}
-          <Section title={labelOf(f)}>
-            {#snippet aside()}{#if changes && editing !== f.id}{@render pencil(f)}{/if}{/snippet}
+          <Tile title={labelOf(f)}>
+            {#snippet actions()}{#if changes && editing !== f.id}{@render pencil(f)}{/if}{/snippet}
             <article class="document-slot">
               {#if editing === f.id}
                 <form
                   class="editor"
+                  id="{uid}-edit"
                   onsubmit={(e) => {
                     e.preventDefault();
                     void saveEdit(f);
@@ -1233,224 +1165,150 @@
                 >
                   <textarea class="edit-area" rows="10" aria-label={labelOf(f)} bind:value={draft}></textarea>
                   <div class="edit-actions">
-                    <Button type="submit" weight="primary" disabled={saving}>{saving ? copy.writeMarkSaving : copy.editSave}</Button>
-                    <Button weight="bare" onclick={stopEdit}>{copy.editCancel}</Button>
+                    <Button type="submit" weight="primary" size="sm" disabled={saving}>{saving ? copy.writeMarkSaving : copy.editSave}</Button>
+                    <Button weight="bare" size="sm" onclick={stopEdit}>{copy.editCancel}</Button>
                   </div>
                 </form>
                 {#if problem}<p class="edit-why">{problem}</p>{/if}
               {:else}
-                <!-- `hole` IS WHAT MAKES A HOLE PRESSABLE. Without it the renderer draws a marked
-                     span rather than a `<button>` nobody wrote a handler for; with it, this screen
-                     owns what pressing one does. No `dayHref`: there is no calendar in this build,
-                     and a date that links to one is an anchor to the error page.
-                     A value the record cannot answer is not pressable: nobody can supply a declared
-                     figure from this screen, so it is marked and left alone. That is the rule the
-                     page screen states beside its own `opts`, and a hole in a row's prose is the
-                     same hole in the same dialect. -->
+                <!-- `hole` IS WHAT MAKES A HOLE PRESSABLE. Without it the renderer draws a marked span rather than a
+                     `<button>` nobody wrote a handler for. No `dayHref`: there is no calendar in this build. A value the
+                     record cannot answer is not pressable: nobody can supply a declared figure from this screen. -->
                 <Document src={String(row.fields[f.id])} opts={{ resolve, link, now: clock, href: at }} />
               {/if}
             </article>
-          </Section>
+          </Tile>
         {/each}
-
-        <!-- WHAT THEY ARE KNOWN BY, LEADING ON THE PAGE OF THE PERSON WHOSE RECORD THIS IS: their own addresses and
-             handles are what their page is for. Anyone else's leads with where they were seen. -->
-        {#if self}{@render knownBy()}{/if}
 
         <!-- WHERE A PERSON WAS SEEN: each place once, newest first, with how often and when, in a person's words. -->
         {#if seen.length > 0}
-          <Section title={seenWords.seenIn}>
-            <ul class="ledger ledger-lead" aria-label={seenWords.seenIn}>
+          <Tile icon="link" title={seenWords.seenIn}>
+            <ul class="items" aria-label={seenWords.seenIn}>
               {#each seen as place (place.where)}
-                <li>
-                  <div class="line line-tall">
-                    <span class="line-mark"><IconWell name={place.kind === 'mail' ? 'inbox' : place.kind === 'commit' ? 'code' : 'link'} size="l" /></span>
-                    <span class="line-main">
-                      <span class="line-title" dir="auto">{place.where}</span>
-                      {#if place.about.length > 0}<span class="line-detail" dir="auto">{place.about.slice(0, 3).join(' · ')}</span>{/if}
-                    </span>
-                    <span></span>
-                    <span class="line-when">{timesSaid(place, (d) => daySaid(d, clock))}</span>
-                  </div>
+                <li class="item">
+                  <span class="item-icon"><Icon name={place.kind === 'mail' ? 'inbox' : place.kind === 'commit' ? 'code' : 'link'} size="s" /></span>
+                  <span class="item-main">
+                    <span class="item-title" dir="auto">{place.where}</span>
+                    {#if place.about.length > 0}<span class="item-detail" dir="auto">{place.about.slice(0, 3).join(' · ')}</span>{/if}
+                  </span>
+                  <span class="item-when">{timesSaid(place, (d) => daySaid(d, clock))}</span>
                 </li>
               {/each}
             </ul>
-          </Section>
+          </Tile>
         {/if}
-
-        {#if !self}{@render knownBy()}{/if}
-
-        <!-- DETAILS: every fact that is not a property, its number and when it was added. "This row" said what you are
-             already looking at, and "Spoken id" and "Version" are both the record's own vocabulary: one is the thing you
-             say out loud, which is what the row is called, and the other is a compare-and-set counter that means nothing
-             to a reader and changes on every write. The id stays, because it is the handle you paste into an agent. The
-             counter goes; the History beside it is the version, in words. -->
-        <Section title={rowWords.details}>
-          <dl class="field-list">
-            {#each facts as f (f.id)}
-              {@const value = row.fields[f.id]}
-              <div class="fact">
-                <dt class="field-label">{labelOf(f)}</dt>
-                <dd class="field-value" data-type={f.type} dir={dirOf(id, f.id)}>
-                  {#if editing === f.id}
-                    {@render fieldEditor(f, value)}
-                  {:else}
-                    <!-- ONLY A SET FIELD IS A FACT, so the value is always there: an empty one is a chip under the facts,
-                         except while its box is open, when it is drawn here and never reaches this branch. -->
-                    {@render shown(f, value)}
-                  {/if}
-                </dd>
-                <!-- THE PENCIL IS ITS OWN CELL IN THE TRAILING COLUMN, so every pencil on the page shares one edge
-                     whatever the value beside it holds. A `dd`, because a `dl`'s groups hold nothing else. -->
-                {#if changes && editable(f) && editing !== f.id}
-                  <dd class="field-pencil">{@render pencil(f)}</dd>
-                {/if}
-              </div>
-            {/each}
-            <div class="fact">
-              <dt class="field-label">{nameWords.number}</dt>
-              <!-- THE ROW'S NUMBER, AND THE BUTTON THAT COPIES ITS LINK. This is the one place the number is
-                   printed, bare and without the `#` that made it read as an id. The link is
-                   what a person pastes into a message and what opens the row for whoever follows it; `y`
-                   still copies the id and `⇧Y` the link, and the `?` sheet lists both keys. -->
-              <dd class="field-value id-line">
-                <span class="number num">{row.seq}</span>
-                <button type="button" class="copy-id tap" onclick={() => clipboard.putLink(id, row.seq)}>
-                  <Icon name="copy" size="s" /><span>{copy.copyLink}</span>
-                </button>
-              </dd>
-            </div>
-            <div class="fact">
-              <dt class="field-label">Added</dt>
-              <!-- IN WORDS, like the other two surfaces that answer "who changed my record". `actorOf`
-                   moved into `api.ts` when Home and `/audit` were found spelling the same two actors two
-                   ways; this route was the third. -->
-              <dd class="field-value">{#if addedWho}{copy.rowAddedBy(since(row.created, clock), addedWho.you ? copy.rowByYou : addedWho.person && addedWho.name === copy.feedSomeone ? copy.rowBySomeone : addedWho.name)}{:else}{since(row.created, clock)}{/if}</dd>
-            </div>
-          </dl>
-          <!-- WHAT THE ROW HAS NOT ANSWERED, one pill each in one wrapping row, and on a row you can write to each opens its
-               field. The list is named for a screen reader, since the pills alone do not say they are empty. -->
-          {#if unset.length > 0}
-            <ul class="unset" aria-label={copy.editNotSet}>
-              {#each unset as f (f.id)}
-                <li>
-                  {#if changes && editable(f)}
-                    <button type="button" class="unset-chip tap" aria-label="{rowWords.add} {labelOf(f).toLowerCase()}" onclick={() => startEdit(f)}>
-                      <Icon name="plus" size="s" /><span>{labelOf(f)}</span>
-                    </button>
-                  {:else}
-                    <span class="unset-chip">{labelOf(f)}</span>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-          {/if}
-          <!-- A FIELD THIS LIST DOES NOT HAVE YET is added from the head's "…" menu, in the list's own Fields
-               sheet, so the row page and the list offer one way to add a field and not two. -->
-        </Section>
 
         <!-- WHO USED IT: a key's or a tool's row lists the last ten runs that opened or reached it. -->
         {#if live && (id === 'credentials' || id === 'tools')}
           <UsedBy spoken="{id}#{row.seq}" />
         {/if}
 
-        <!-- WHAT POINTS HERE, one group per RELATION, not per register: two fields of one register can point at the same
-             place and mean different things — an update's `track` is what it is about and its `supersedes` is what it
-             replaces. Each row leads with its list's icon and what it is, its other values as its meta line, and the
-             list's tone as its dot. -->
+        <!-- WHAT POINTS HERE, one tile per RELATION, not per register: two fields of one register can point at the same
+             place and mean different things, an update's `track` is what it is about and its `supersedes` is what it
+             replaces. The list's icon heads the tile once, and each line is what it is, its other values, and the
+             list's tone as a small dot. -->
         {#each related as rel}
           {@const twice = incoming.filter((r) => r.name === rel.name).length > 1}
-          <Section title={rel.name} count={rel.total}>
-            {#snippet aside()}
-              <!-- The field only where it tells two groups apart; elsewhere it read as part of the heading. -->
-              {#if twice}<span class="incoming-label">{copy.linkedThrough(rel.label)}</span>{/if}
-              {#if rel.total > rel.rows.length}
-                <a class="incoming-more tap" href={at(rel.href)}>All {rel.total} <Icon name="arrow" size="s" /></a>
-              {/if}
-            {/snippet}
-            <!-- A LEDGER, SO ITS AMOUNTS ARE EXACT: a linked invoice reads '£1,200.00', to the penny, as every other ledger
-                 does, not the sentence's rounded '£1,200'. -->
-            <ul class="ledger ledger-lead" aria-label="{rel.name} · {rel.label}">
+          <Tile
+            icon={rel.icon}
+            title={twice ? `${rel.name} · ${copy.linkedThrough(rel.label)}` : rel.name}
+            count={rel.total}
+            href={rel.total > rel.rows.length ? rel.href : undefined}
+            hrefLabel={rel.total > rel.rows.length ? `${rowWords.all} ${rel.total}` : undefined}
+          >
+            <!-- A LEDGER, SO ITS AMOUNTS ARE EXACT: a linked invoice reads '£1,200.00', to the penny, as every other
+                 ledger does, not the sentence's rounded '£1,200'. -->
+            <ul class="items" aria-label="{rel.name} · {rel.label}">
               {#each rel.rows as r (r.key)}
                 {@const rest = r.cells.slice(1).filter((c): c is string => Boolean(c))}
                 <li>
-                  <a class="line line-tall" href={at(r.href ?? '')}>
-                    <span class="line-mark"><IconWell name={rel.icon} size="l" /></span>
-                    <span class="line-main">
-                      <span class="line-title" dir="auto">{moneyInText(r.cells[0] || r.key, homeCurrency(), 'exact')}</span>
-                      {#if rest.length > 0}<span class="line-detail">{rest.map((c) => moneyInText(c, homeCurrency(), 'exact')).join(' · ')}</span>{/if}
+                  <a class="item item-link" href={at(r.href ?? '')}>
+                    <span class="item-main">
+                      <span class="item-title" dir="auto">{moneyInText(r.cells[0] || r.key, homeCurrency(), 'exact')}</span>
+                      {#if rest.length > 0}<span class="item-detail">{rest.map((c) => moneyInText(c, homeCurrency(), 'exact')).join(' · ')}</span>{/if}
                     </span>
                     {#if r.tone}
-                      <span class="line-when" data-intent={r.tone}><span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span></span>
+                      <span class="item-when" data-intent={r.tone}><span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span></span>
                     {/if}
                   </a>
                 </li>
               {/each}
             </ul>
-          </Section>
+          </Tile>
         {/each}
-        <!-- THE ONE READ ON THIS SCREEN THAT CAN BE REFUSED BY ITSELF: a caller may read this row
-             and not the lists that point at it. Drawing nothing would say nothing points here,
-             which is a different fact about the record. -->
+        <!-- THE ONE READ ON THIS SCREEN THAT CAN BE REFUSED BY ITSELF: a caller may read this row and not the lists
+             that point at it. Drawing nothing would say nothing points here, which is a different fact about the
+             record. -->
         {#if linked?.from === 'refused'}
-          <section class="incoming"><Empty kind="error" compact title={copy.linksRefused} /></section>
+          <Tile><Empty kind="error" compact title={copy.linksRefused} /></Tile>
         {/if}
       </div>
 
-      <div class="side">
-        <!-- THE ROW'S COMMENTS. A note is the row's own log line and asks to change the row; a comment is somebody
-             saying something about it, which a Reads colleague may too, with replies one level deep and a resolved comment
-             folded. Named as the row is spoken. -->
-        {#if live}<Thread on="{id}#{row.seq}" me={me || null} {people} />{/if}
-
-        <Section title={rowWords.history}>
-          <!-- THE NOTE BOX, at the head of the history it lands in, for somebody whose level adds to the list.
-               For a Reads colleague the place says in one sentence why this row has no Edit, Archive or note. -->
-          {#if notes}
-            <form class="note-form" onsubmit={addNote}>
-              <label class="note-label" for="row-note">{copy.noteLabel}</label>
-              <div class="field note-line">
-                <input id="row-note" class="field-input note-input" type="text" maxlength="280" autocomplete="off" placeholder={copy.notePlaceholder} bind:value={noteText} />
-                {#if noteText.trim()}<Button type="submit" size="sm">{copy.noteAdd}</Button>{/if}
-              </div>
-            </form>
-          {:else if live}
-            <p class="reach">{reachWords.readOnly(listName(id))}</p>
-          {/if}
-
+      <!-- THE TIMELINE: one tile beside the row, a single composer and then what happened and what was said, newest
+           first. The history's own refusal is said in it, above whatever comments there are. -->
+      <aside class="side">
+        <Tile title={timelineWords.heading}>
           {#if told?.from === 'refused'}
             <Empty kind="error" compact title={told.fix} />
-          {:else}
-            {#each historyDays as d (d.key)}
-              <h3 class="day-head">{d.said}</h3>
-              <ol class="history">
-                {#each d.lines as e}
-                  <!-- WHO, BY `actor`, SO THE FACE IS DRAWN BY KIND: a rule wears the automations glyph and BrainDog its
-                       mark, never a monogram. The name is printed as `actor` says it, since "de Vries" is not a typo. -->
-                  {@const who = actor(e.by, me || null, people)}
-                  <li>
-                    <!-- AN AGENT'S LINE WEARS ITS RUN, in the run's hue and linking to its handoff. -->
-                    <Face name={who.name} kind={who.kind} run={runOf(e.by)} size="s" />
-                    <p class="history-line"><span class="history-by">{who.name}</span> <span class="history-note">{e.note}</span></p>
-                    <time class="history-when" datetime={e.at}>{since(e.at, clock)}</time>
-                  </li>
-                {/each}
-              </ol>
-            {/each}
           {/if}
-        </Section>
-      </div>
+          {#if live}
+            <Timeline on="{id}#{row.seq}" {history} now={clock} me={me || null} {people} onnames={askNames} />
+          {/if}
+        </Tile>
+      </aside>
     </div>
   </div>
 {/if}
 
 <style>
-  /* THE PAGE: the ground, no box. The strip, the tiles and the two columns are 24 apart, and the columns' groups 32. */
+  /* THE PAGE: the board, full width inside the gutters, its tiles 12 apart. */
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--inset);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
+  }
+
+  /* ── the board ─────────────────────────────────────────────────────── */
+
+  /* TWELVE COLUMNS: the row spans eight and its timeline four, and below 1000px they stack, the timeline under the row.
+     Nothing floats on the board: every block below the head is a tile. */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--inset);
+    align-items: start;
+  }
+
+  .main {
+    grid-column: span 8;
+  }
+
+  .side {
+    grid-column: span 4;
+  }
+
+  .main,
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--inset);
+    min-inline-size: 0;
+  }
+
+  @media (width < 1000px) {
+    .main,
+    .side {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* THE FIGURE TILES SIDE BY SIDE, each at least 280 wide, and one a row on a phone. */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: var(--inset);
+    align-items: stretch;
   }
 
   /* ── the sentence's pieces ─────────────────────────────────────────── */
@@ -1475,12 +1333,32 @@
     text-underline-offset: 3px;
   }
 
+  /* A FACT THAT OPENS ANOTHER ROW reads as the value it is, in ink, and shows it is a way there under a pointer. */
+  .ref-link {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .ref-link:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  .ref-link:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
   /* Sentence case in the stylesheet, so the text stays the record's own word. */
-  .lead-word {
+  .lead-word,
+  .enum-word {
     display: inline-block;
   }
 
-  .lead-word::first-letter {
+  .lead-word::first-letter,
+  .enum-word::first-letter {
     text-transform: uppercase;
   }
 
@@ -1500,156 +1378,332 @@
     color: var(--warn);
   }
 
-  /* ── the strip of properties ───────────────────────────────────────── */
+  /* ── the fields tile ───────────────────────────────────────────────── */
 
-  .props {
+  .self-line {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .props > li {
-    display: flex;
-    min-inline-size: 0;
-    max-inline-size: 100%;
-  }
-
-  /* A PERSON'S FACE LEADS THE STRIP, at its own size and never stretched by the row. */
-  .lead-face {
-    margin-inline-end: var(--sp-1);
-  }
-
-  /* A PROPERTY IS A PILL: the wash on the ground, its label in the meta ink and its value in ink, at the
-     meta size. It never grows past the strip: a long value wraps inside it rather than pushing the page sideways. */
-  .prop {
-    display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
-    box-sizing: border-box;
-    min-inline-size: 0;
-    max-inline-size: 100%;
-    min-block-size: var(--ctl-h-sm);
-    padding: 2px var(--sp-3);
-    background: var(--hover-wash);
-    border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-sm);
-    line-height: 18px;
-    text-align: start;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  button.prop {
-    cursor: pointer;
-  }
-
-  button.prop[aria-expanded='true'] {
-    background: var(--selected);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    button.prop:hover {
-      background: var(--hold-wash);
-    }
-  }
-
-  .prop-label {
-    flex: none;
-    color: var(--dim);
-  }
-
-  .prop-value {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-    min-inline-size: 0;
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-    overflow-wrap: anywhere;
-  }
-
-  /* A DEADLINE THAT HAS PASSED: the day in red, the words carrying the colour. */
-  .prop[data-late] .prop-value {
-    color: var(--danger-text);
-  }
-
-  /* The value inside a pill takes the pill's size, whatever it is drawn by. */
-  .prop-value :global(.chip) {
-    font-size: inherit;
-  }
-
-  /* THE BOX A PROPERTY OPENS, under the strip, with the property's label over it as a field's label sits. */
-  .prop-editor {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    max-inline-size: 640px;
-  }
-
-  .prop-editor-label {
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 500;
   }
 
-  /* ── the tiles ─────────────────────────────────────────────────────── */
-
-  /* A GRID OF EQUAL COLUMNS, 12 apart, each at least 300 wide: one tile takes a column and not the page, so a figure
-     never stretches across a window. `min` keeps one column inside a narrow phone. */
-  .tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-    gap: var(--inset);
-    align-items: start;
-  }
-
-  /* The row's amount, above its charts. A container, so the figure can answer the room it has. */
-  .lead {
-    display: grid;
-    gap: var(--sp-2);
+  /* THE AMOUNT, FIRST AND LARGE: its label at the meta size over the figure at the figure size, which never wraps, since
+     a figure broken between its symbol and its digits is two figures. A container, so it answers the tile's width. */
+  .figure {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
     container-type: inline-size;
   }
 
-  /* THE HERO IS `--t-figure`, and it never wraps: a figure broken between its symbol and its digits is two
-     figures. */
-  .lead-figure {
+  .figure-label {
     margin: 0;
-    color: var(--ink);
-    font-size: var(--t-figure);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 34px;
-    white-space: nowrap;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 18px;
   }
 
-  /* A FIGURE THAT DOES NOT FIT SHRINKS ONE STEP BEFORE ANYTHING ELSE, which on the
-     narrowest phone is what keeps a long foreign amount from pushing the page sideways. */
-  @container (inline-size < 20rem) {
-    .lead-figure.num {
-      font-size: var(--t-xl);
-    }
-  }
-
-  /* The code in front of the figure at half its size, the way every headline figure sets it: `em`
-     rather than a fixed step, so it stays half of `.lead-figure` at whichever step it is drawn. */
-  .lead-figure :global(.code) {
-    font-size: 0.5em;
-    font-weight: 600;
-  }
-
-  /* AN AMOUNT WITH NOTHING TO CHART, on the ground, its pencil beside it. */
-  .figure-ground {
+  .figure-line {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
   }
+
+  .figure-value {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-title);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
+  /* A FIGURE THAT DOES NOT FIT SHRINKS ONE STEP BEFORE ANYTHING ELSE, which on the narrowest phone is what keeps a long
+     foreign amount from pushing the page sideways. */
+  @container (inline-size < 20rem) {
+    .figure-value {
+      font-size: var(--t-xl);
+    }
+  }
+
+  /* The code in front of the figure at half its size, the way every headline figure sets it. */
+  .figure-value :global(.code) {
+    font-size: 0.5em;
+    font-weight: 600;
+  }
+
+  /* THE FACTS, A TWO-COLUMN DEFINITION LIST: no boxes and no rules between them, only the rhythm of the lines, the
+     label at 13 in the quiet ink and the value at 15 in ink. Measured by the tile and not the window, so the list reads
+     the same in the docked panel as on the page. The phone's shape is written first: the label over its value, since a
+     label column left a value 170px to wrap in at 390. */
+  .facts-box {
+    container-type: inline-size;
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0;
+  }
+
+  .fact {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--tap);
+    grid-template-areas:
+      'label pencil'
+      'value pencil';
+    column-gap: var(--sp-2);
+    align-items: center;
+    min-block-size: 40px;
+    padding-block: 6px;
+  }
+
+  .fact-label {
+    grid-area: label;
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 400;
+    line-height: 18px;
+  }
+
+  .fact-value {
+    grid-area: value;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+
+  .fact-value[data-type='money'],
+  .fact-value[data-type='day'],
+  .fact-value[data-type='int'],
+  .fact-value[data-type='decimal'] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A DEADLINE THAT HAS PASSED: the day in red, the words carrying the colour. */
+  .fact-value[data-late] {
+    color: var(--danger-text);
+    font-weight: 500;
+  }
+
+  /* The state's dot and word, a link's mark and a chip all take the value's size. */
+  .fact-value :global(.chip) {
+    color: var(--ink);
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  .fact-pencil {
+    grid-area: pencil;
+    align-self: center;
+    margin: 0;
+  }
+
+  /* FROM 440px OF TILE THE LABEL HAS ITS OWN COLUMN, wide enough for "Chasing since" on one line and capped so a long
+     label wraps inside it rather than pushing every value along. */
+  @container (inline-size >= 440px) {
+    .fact {
+      grid-template-columns: minmax(0, 10rem) minmax(0, 1fr) var(--tap);
+      grid-template-areas: 'label value pencil';
+      column-gap: var(--sp-3);
+    }
+  }
+
+  /* AND FROM 960px OF TILE THE FACTS RUN IN TWO COLUMNS, so a tile as wide as a large window is not a long thin list
+     with its pencils a page-width from their values. Below that one column reads better: two at 750 left a value 200px
+     and broke an address mid-word. Read across, then down. */
+  @container (inline-size >= 960px) {
+    .facts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: var(--sp-6);
+    }
+  }
+
+  /* UNDER A MOUSE A PENCIL SHOWS ON ITS FACT, pointed at or holding focus, so the list at rest is the facts alone. Under
+     a thumb, where there is no pointing, every pencil stays. */
+  @media (hover: hover) and (pointer: fine) {
+    .fact .edit-field,
+    .figure-line .edit-field {
+      opacity: 0;
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    .fact:hover .edit-field,
+    .fact:focus-within .edit-field,
+    .figure-line:hover .edit-field,
+    .edit-field:focus-visible {
+      opacity: 1;
+    }
+  }
+
+  /* THE TILE'S FOOT: "Add a field", and for a reader who cannot change the list, why there is no Edit. */
+  .facts-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
+  /* "Add a field" IS A BUTTON, a rectangle in the quiet fill like every secondary verb, with its plus. The menu's own
+     button carries the hit box; this is what it looks like. */
+  .add-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-block-size: 32px;
+    padding: 0 var(--sp-3);
+    background: var(--s1);
+    border-radius: 8px;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    :global(.menu-trigger:hover > .add-field) {
+      background: var(--s2);
+      color: var(--ink);
+    }
+  }
+
+  .quiet {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 20px;
+  }
+
+  /* THE CONTROL THAT OPENS A FIELD, as wide as the trailing column it sits in, so every pencil's glyph lands on one
+     vertical line. `.tap` is the invisible 44 x 44 hit box. */
+  .edit-field {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--tap);
+    block-size: 32px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 8px;
+    color: var(--dim);
+    cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .edit-field:hover {
+      background: var(--s1);
+      color: var(--ink);
+    }
+  }
+
+  /* ── the editor ────────────────────────────────────────────────────── */
+
+  /* The box and its two buttons: in a line where there is room, wrapped where there is not. */
+  .editor {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    inline-size: 100%;
+  }
+
+  .editor > .field {
+    flex: 1 1 14rem;
+    min-inline-size: 0;
+  }
+
+  /* A MENU IN THE FIELD'S SHAPE: the select filling it and its chevron at the end, which lets a press through to the
+     menu under it. */
+  .edit-caret {
+    display: inline-flex;
+    flex: none;
+    color: var(--dim);
+    pointer-events: none;
+  }
+
+  .edit-input {
+    font: inherit;
+    /* 16px IN EVERY BOX AT EVERY WIDTH, because a phone zooms the page when a smaller one takes focus. */
+    font-size: var(--t-md);
+    cursor: pointer;
+  }
+
+  .edit-area {
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-block-size: max(var(--ctl-h), var(--tap));
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--s1);
+    border: 0;
+    border-radius: 8px;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-md);
+    line-height: 1.6;
+    resize: vertical;
+  }
+
+  /* The currency, the unit, or the list a ref points at: printed beside the box, never typed. */
+  .edit-unit {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .edit-check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: max(var(--ctl-h), var(--tap));
+    color: var(--ink);
+    font-size: var(--t-base);
+  }
+
+  .edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* WHAT THE RECORD SAID, under the box it was typed in, with the words still in it. */
+  .edit-why {
+    margin: var(--sp-1) 0 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* AN ARCHIVED ROW SAYS SO, in one quiet line with the archive glyph, and nothing about it is red. */
+  .archived-note {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--hover-wash);
+    border-radius: 8px;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* ── the figure tiles ──────────────────────────────────────────────── */
 
   /* A tile's figure and the chart at its top right (a sparkline sits there, 120 × 32). */
   .stat {
@@ -1674,7 +1728,7 @@
     font-size: var(--t-figure);
     font-weight: 600;
     letter-spacing: -0.02em;
-    line-height: 34px;
+    line-height: 1.15;
     white-space: nowrap;
   }
 
@@ -1694,327 +1748,19 @@
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-base);
-    line-height: 20px;
-  }
-
-  /* ── the two columns ───────────────────────────────────────────────── */
-
-  /* The body, the facts and what points here keep a reading width; the history and the comments sit beside them, where a
-     row's timeline sits in every tracker, and move under them below 1000px. */
-  .split {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-    gap: var(--sp-6) var(--sp-7);
-    align-items: start;
-  }
-
-  .main,
-  .side {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-6);
-    min-inline-size: 0;
-  }
-
-  @media (width < 1000px) {
-    .split {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
-
-  /* ── facts ─────────────────────────────────────────────────────────── */
-
-  /* UNBOXED, like every list since `rows.css`: the facts sit on the ground with a hairline between each, and a label
-     starts where the heading above it starts. */
-  .field-list {
-    margin: 0;
-  }
-
-  /* A FACT AND NOT A FIELD. The class was field, which controls.css gives to a text-input wrapper, so
-     every row of this list wore an input box: a surface, a border and a radius, eight boxes that read
-     as a form to fill in. The name is the fix; nothing here fights the input style.
-
-     TWO SHAPES, AND THE PHONE'S IS WRITTEN FIRST. Below 640px the label sits above its
-     value, because a 16ch label column left a value 170px to wrap in at 390 and broke paths and
-     dates mid-word. The pencil's 44px column trails at every width, so no pencil moves with its value. */
-  .fact {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--tap);
-    grid-template-areas:
-      'label pencil'
-      'value pencil';
-    gap: var(--sp-1) var(--sp-2);
-    align-items: baseline;
-    min-block-size: var(--row-h);
-    padding: var(--sp-2) 0;
-    border-block-end: 1px solid var(--line);
-  }
-
-  .fact:last-child {
-    border-block-end: 0;
-  }
-
-  /* Sentence case, at the meta size, in the quiet ink. A field label is a WORD YOU READ ("Direction", "Amount",
-     "Due"), not a category stamp. */
-  .field-label {
-    grid-area: label;
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-    letter-spacing: 0;
-  }
-
-  .field-value {
-    grid-area: value;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-md);
-    overflow-wrap: anywhere;
-  }
-
-  .field-value[data-type='money'],
-  .field-value[data-type='day'],
-  .field-value[data-type='int'],
-  .field-value[data-type='decimal'] {
-    font-variant-numeric: tabular-nums;
-  }
-
-  .field-pencil {
-    grid-area: pencil;
-    align-self: center;
-    margin: 0;
-  }
-
-  /* FROM 640px THE LABEL HAS ITS OWN COLUMN, capped at 16ch so a long label wraps inside it rather
-     than pushing every value along, and the value reads at the body size the reader chose. */
-  @media (width >= 640px) {
-    .fact {
-      grid-template-columns: minmax(0, 16ch) minmax(0, 1fr) var(--tap);
-      grid-template-areas: 'label value pencil';
-      gap: var(--sp-4);
-    }
-
-    .field-value {
-      font-size: var(--t-ui);
-    }
-  }
-
-  /* THE ID AND THE ONE THING YOU DO WITH IT, ON ONE LINE. A bare button beside a value rather than
-     under it, so Details stays a list of facts with one control attached to the fact it acts on. */
-  .id-line {
-    align-items: center;
-  }
-
-  .number {
-    font-variant-numeric: tabular-nums;
-  }
-
-  .copy-id {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-    min-block-size: var(--ctl-h-sm);
-    padding: 0 var(--sp-3);
-    background: var(--hover-wash);
-    border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-sm);
-    font-weight: 500;
-    cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  /* A WASH ONLY UNDER A MOUSE: on a phone a tapped control would keep it after the finger lifted. */
-  @media (hover: hover) and (pointer: fine) {
-    .copy-id:hover {
-      background: var(--hold-wash);
-      color: var(--ink);
-    }
-  }
-
-  /* THE CONTROL THAT OPENS A FIELD, as wide as the trailing column it sits in, so every pencil's glyph
-     lands on one vertical line. `.tap` is the invisible 44 x 44 hit box: a 16px glyph in a short
-     button is a 16px target to a finger. */
-  .edit-field {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    inline-size: var(--tap);
-    block-size: var(--ctl-h-sm);
-    padding: 0;
-    background: none;
-    border: 0;
-    border-radius: var(--r-pill);
-    color: var(--dim);
-    cursor: pointer;
-    transition:
-      background var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .edit-field:hover {
-      background: var(--hover-wash);
-      color: var(--ink2);
-    }
-  }
-
-  /* THE FIELDS THE ROW HAS NOT ANSWERED, as pills that wrap whole, with no separator to trail the
-     last one onto a line of its own. */
-  .unset {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 0;
-    padding: var(--sp-3) 0 0;
-    list-style: none;
-  }
-
-  /* A DASHED PILL: a property with nothing in it yet, and on a row you can write to, the way to it. */
-  .unset-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-    box-sizing: border-box;
-    min-block-size: var(--ctl-h-sm);
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 1px dashed var(--edge);
-    border-radius: var(--r-pill);
-    color: var(--dim);
-    font: inherit;
-    font-size: var(--t-sm);
-    text-align: start;
-    /* A PILL WRAPS WHOLE onto the next line, and only a label longer than the row wraps inside it. */
-    max-inline-size: 100%;
-  }
-
-  button.unset-chip {
-    color: var(--ink2);
-    cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  /* A FINGER NEEDS ROOM BETWEEN TWO PILLS as well as the 44px `.tap` gives each. */
-  @media (pointer: coarse) {
-    .unset,
-    .props {
-      gap: var(--sp-3);
-    }
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    button.unset-chip:hover {
-      background: var(--hover-wash);
-      color: var(--ink);
-    }
-  }
-
-  /* ── the editor ────────────────────────────────────────────────────── */
-
-  /* The box and its two buttons: in a line where there is room, wrapped where there is not. */
-  .editor {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-    inline-size: 100%;
-  }
-
-  .editor > .field {
-    flex: 1 1 14rem;
-    min-inline-size: 0;
-  }
-
-  /* A MENU IN THE FIELD'S SHAPE: the `--s1` fill and the 12 corner, the select filling it and its chevron at the end,
-     which lets a press through to the menu under it. */
-  .edit-caret {
-    display: inline-flex;
-    flex: none;
-    color: var(--dim);
-    pointer-events: none;
-  }
-
-  .edit-input {
-    font: inherit;
-    /* 16px IN EVERY BOX AT EVERY WIDTH, because a phone zooms the page when a smaller one takes focus. */
-    font-size: var(--t-md);
-    cursor: pointer;
-  }
-
-  .edit-area {
-    box-sizing: border-box;
-    inline-size: 100%;
-    min-block-size: max(var(--ctl-h), var(--tap));
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
-    border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-md);
-    line-height: 1.6;
-    resize: vertical;
-  }
-
-  /* The currency, the unit, or the list a ref points at: printed beside the box, never typed. */
-  .edit-unit {
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .edit-check {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: max(var(--ctl-h), var(--tap));
-    color: var(--ink);
-    font-size: var(--t-ui);
-  }
-
-  .edit-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  /* WHAT THE RECORD SAID, under the box it was typed in, with the words still in it. */
-  .edit-why {
-    margin: var(--sp-1) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  /* ── the ground's lines ────────────────────────────────────────────── */
-
-  /* AN ARCHIVED ROW SAYS SO, in a quiet wash line with the archive glyph, and nothing about it is red. */
-  .archived-note {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--hover-wash);
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    line-height: 1.55;
   }
 
   /* ── the body ──────────────────────────────────────────────────────── */
 
-  /* Prose gets a reading measure; a table, a grid and a ledger get the room. Width is a property of
-     the block KIND, not of the page: the third time that family of bug was paid for (13 §4.1).
+  /* Prose at the body size and a reading measure. A note's own headings sit under the tile's, never over them: a
+     note's first heading was set above the group's own, so the row's prose outranked the row. */
+  .document-slot {
+    max-inline-size: var(--measure);
+    font-size: var(--t-base);
+    line-height: 1.55;
+  }
 
-     AND A NOTE'S OWN HEADINGS SIT UNDER THE PAGE'S, never over them: a note's first heading was set above
-     the group's own, so the row's prose outranked the row. */
   .document-slot :global(.document > h1) {
     margin-block: var(--sp-5) var(--sp-2);
     font-size: var(--t-md);
@@ -2027,56 +1773,91 @@
     letter-spacing: 0;
   }
 
-  .document-slot :global(.document > h1:first-child) {
+  .document-slot :global(.document > :is(h1, h2):first-child) {
     margin-block-start: 0;
   }
 
-  /* ── what points here ──────────────────────────────────────────────── */
+  /* ── the lists inside tiles ────────────────────────────────────────── */
 
-  /* The FIELD's label, quieter than the list's name: "Obligations through party" reads as one heading
-     with the relation in it, where two words of equal weight read as two headings. */
-  .incoming-label {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 400;
+  /* A LIST WITHOUT BOXES: each line its title over its detail, the trailing edge for when or where it stands, and the
+     tile's own heading the only icon. A line that opens its row takes a wash under a pointer, reaching to the tile's
+     inside edge. */
+  .items {
+    display: flex;
+    flex-direction: column;
+    margin: 0 calc(-1 * var(--sp-2));
+    padding: 0;
+    list-style: none;
   }
 
-  .incoming-more {
-    display: inline-flex;
+  .item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    gap: var(--sp-3);
+    min-block-size: 44px;
+    padding: 6px var(--sp-2);
+    border-radius: 8px;
+    color: inherit;
     text-decoration: none;
-    white-space: nowrap;
+  }
+
+  /* A place a person was seen leads with what kind of place it was, mail or a commit. */
+  .item:has(.item-icon) {
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+  }
+
+  .item-icon {
+    display: inline-flex;
+    color: var(--dim);
+  }
+
+  .item-link {
+    transition: background var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .incoming-more:hover {
-      color: var(--ink);
+    .item-link:hover {
+      background: var(--s1);
     }
   }
 
-  /* ── the handoff ───────────────────────────────────────────────────── */
-
-  /* THE HANDOFF IS A GROUP OF READING, not a form and not a tile (it holds no figure): its head is the run's face, what
-     it is doing and whether it is working, over a hairline like every group's; then the facts beside their names, and
-     the lists as lists. */
-  .handoff {
+  .item-main {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
-    max-inline-size: var(--measure);
+    min-inline-size: 0;
   }
+
+  .item-title {
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 500;
+    line-height: 22px;
+    overflow-wrap: anywhere;
+  }
+
+  .item-detail {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 18px;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  .item-when {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* ── the handoff ───────────────────────────────────────────────────── */
 
   .handoff-head {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
     min-inline-size: 0;
-    padding-block-end: var(--sp-3);
-    border-block-end: 1px solid var(--line);
   }
 
   .handoff-doing {
@@ -2084,9 +1865,9 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
-    font-weight: 500;
-    line-height: 20px;
+    font-size: var(--t-group);
+    font-weight: 600;
+    line-height: 24px;
     overflow-wrap: anywhere;
   }
 
@@ -2096,31 +1877,9 @@
     font-size: var(--t-sm);
   }
 
-  .handoff-facts {
-    display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
-    gap: var(--sp-1) var(--sp-3);
+  .sub-head {
     margin: 0;
-  }
-
-  .handoff-facts > div {
-    display: contents;
-  }
-
-  .handoff-facts dt {
     color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .handoff-facts dd {
-    margin: 0;
-    color: var(--ink);
-    overflow-wrap: anywhere;
-  }
-
-  .handoff-title {
-    margin: 0;
-    color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 500;
   }
@@ -2132,156 +1891,29 @@
     margin: 0;
     padding-inline-start: var(--sp-5);
     color: var(--ink);
-    overflow-wrap: anywhere;
-  }
-
-  /* ── the side: comments, the note and the history ─────────────────── */
-
-  /* COMMENTS ARE A GROUP OF THIS COLUMN, LIKE THE HISTORY. `Thread` titles itself as a caption, small
-     and in the second ink, which is right under a Decide card and read here as a fourth weight of heading; beside the
-     history it takes a group's heading, over the group's hairline. */
-  .side :global(.thread-title) {
-    padding-block-end: var(--sp-2);
-    border-block-end: 1px solid var(--line);
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-group);
-    font-weight: 600;
-    line-height: 24px;
-  }
-
-  /* A NOTE ON THE ROW: one 44 field on the `--s1` fill, and its button inside it once there is something to add. */
-  .note-form {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-block-end: var(--sp-3);
-  }
-
-  .note-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  .note-line {
-    min-block-size: var(--tap);
-    padding-inline-end: var(--sp-1);
-  }
-
-  .note-input {
-    /* 16px IN EVERY BOX AT EVERY WIDTH, because a phone zooms the page when a smaller one takes focus. */
-    font-size: var(--t-md);
-  }
-
-  /* WHY THERE IS NO NOTE BOX: one sentence in the box's place, so nothing below it moves further than the box's
-     own height. */
-  .reach {
-    margin: 0 0 var(--sp-3);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  /* A DAY'S HEADING IN THE HISTORY: the meta size in the quiet ink, as the palette heads its groups. */
-  .day-head {
-    margin: var(--sp-3) 0 var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  .history {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* WHO, AS A FACE AND A NAME, and what they did, on a 44 row: the shape of Home's feed, so a row's history reads as
-     people passing through rather than as a log. A long note wraps to a second line rather than being cut. */
-  .history li {
-    display: grid;
-    /* 24px, THE WIDTH OF AN AGENT'S RUN FACE AT ITS LINE SIZE, so a run's ring is not clipped by the column. */
-    grid-template-columns: 24px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--sp-3);
-    min-block-size: var(--row-h);
-    padding-block: var(--sp-1);
-  }
-
-  .history li + li {
-    border-block-start: 1px solid var(--line);
-  }
-
-  .history-line {
-    min-inline-size: 0;
-    margin: 0;
-    color: var(--ink2);
     font-size: var(--t-base);
-    line-height: 20px;
+    line-height: 1.55;
     overflow-wrap: anywhere;
-  }
-
-  .history-by {
-    color: var(--ink);
-    font-weight: 500;
-  }
-
-  /* THE TIME IN THE FEED'S MONO, in the quiet ink, at the row's trailing edge. */
-  .history-when {
-    align-self: start;
-    padding-block-start: 2px;
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
   }
 
   /* ── the toolbar's "…" ─────────────────────────────────────────────── */
 
-  /* A 36px GLASS CIRCLE, and plain inside the compact bar, which is glass already: glass never holds glass.
-     The glass is on this span and not on the menu's button, so the menu's panel is never placed against a filter. */
+  /* A SQUARE IN THE BUTTONS' SHAPE: the quiet fill and the 8 corner, as tall as the buttons beside it. */
   .head-more {
     display: flex;
     align-items: center;
     justify-content: center;
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
-    background: var(--glass);
-    border-radius: var(--r-pill);
-    box-shadow: var(--glass-edge);
-    backdrop-filter: var(--glass-blur);
+    background: var(--hover-wash);
+    border-radius: 8px;
     color: var(--ink);
     transition: background var(--d-state) var(--ease-out);
   }
 
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    .head-more {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
-  }
-
-  :global(.head[data-under]) .head-more {
-    background: transparent;
-    box-shadow: none;
-    backdrop-filter: none;
-  }
-
-  @supports (-webkit-backdrop-filter: none) {
-    :global(.head[data-under]) .head-more {
-      -webkit-backdrop-filter: none;
-    }
-  }
-
-  /* Pointed at, through the menu's own button, which this page does not draw: so the selector is the whole of it. */
   @media (hover: hover) and (pointer: fine) {
     :global(.menu-trigger:hover > .head-more) {
-      background: var(--glass-strong);
-    }
-
-    :global(.head[data-under] .menu-trigger:hover > .head-more) {
-      background: var(--hover-wash);
+      background: var(--hold-wash);
     }
   }
 
@@ -2294,33 +1926,17 @@
     white-space: nowrap;
   }
 
-  /* A declared value in sentence case, in the stylesheet, so the text stays the record's own word. */
-  .enum-word {
-    display: inline-block;
-  }
-
-  .enum-word::first-letter {
-    text-transform: uppercase;
-  }
-
   /* ── the phone ─────────────────────────────────────────────────────── */
 
   @media (width < 900px) {
     .page {
-      gap: var(--sp-4);
       padding: var(--sp-3) var(--gutter) var(--sp-8);
-    }
-
-    /* Tiles go full width. */
-    .tiles {
-      grid-template-columns: minmax(0, 1fr);
     }
   }
 
-  /* FORCED COLOURS DROP THE FILLS, so a pill keeps an edge to be told from the ground by. */
+  /* FORCED COLOURS DROP THE FILLS, so a control keeps an edge to be told from the ground by. */
   @media (forced-colors: active) {
-    .prop,
-    .copy-id,
+    .add-field,
     .head-more {
       border: 1px solid CanvasText;
     }

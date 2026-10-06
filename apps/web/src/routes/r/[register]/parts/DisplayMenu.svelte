@@ -300,8 +300,9 @@
   }
 
   .filter-value[data-on] .filter-box {
-    background: var(--on);
-    border-color: var(--on);
+    background: var(--action);
+    border-color: var(--action);
+    color: var(--on-action);
   }
 
   .locked {

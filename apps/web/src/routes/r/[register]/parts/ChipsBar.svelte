@@ -1,10 +1,11 @@
 <!--
-  The bar over the list: the search box, the filters as pills, menus or one phone button, the list
-  clauses a pill cannot draw, Clear and Save as a view. And the phone's filter sheet, which is the
+  The bar over the list: the search box, the filters as segments, menus or one phone button, the list
+  clauses a segment cannot draw, Clear and Save as a view. And the phone's filter sheet, which is the
   same filters behind the one button. Display is the toolbar's now, beside the view switch.
 
-  IT IS A CONTROL ON THE GROUND, NOT CHROME: the search box is a field, the `--s1` well, and the pills are
-  wash pills with the chosen value a white pill in them. No glass: glass is for what floats.
+  IT IS THE START OF THE LIST'S TOOLBAR, INSIDE THE LIST'S TILE (DIRECTION 39): the search box is a field, a field with
+  three or more values is one rectangle that opens a menu, and two are a segmented control. Every control is a
+  rectangle in the field's fill; a filter with a value chosen in it takes the accent's tint. No glass, and no pills.
 
   THE BAR APPEARS WHEN THERE IS SOMETHING TO SIFT, which is `shown`, the page's answer. Below eight
   rows it was a search box, six chips and a keyboard strip standing over a list you could already
@@ -85,6 +86,12 @@
     setQuery: (value: string) => void;
     saveView: () => void;
   } = $props();
+
+  /**
+   * EACH FIELD IS ONE MENU ONCE ITS VALUES WOULD CROWD THE ROW: three fields or more, or more than six values in all.
+   * Tasks' seven states as segments took the whole toolbar and pushed how the list is drawn onto a line of its own.
+   */
+  const menued = $derived(enums.length >= 3 || enums.reduce((n, f) => n + (f.values?.length ?? 0), 0) > 6);
 
   /* The phone's filter sheet: every enum field and Clear, behind one button beside the search box. */
   let filterOpen = $state(false);
@@ -206,7 +213,7 @@
       <Icon name="filter" size="m" />
       {#if chosen.length}<span class="sift-count num" aria-hidden="true">{chosen.length}</span>{/if}
     </button>
-  {:else if enums.length >= 3}
+  {:else if menued}
     {#each enums as f}
       {@const chosen = (f.values ?? []).filter((value) => isOn(f.id, value))}
       <Menu label={labelOf(f)}>
@@ -370,51 +377,12 @@
     gap: var(--sp-2);
   }
 
-  /**
-   * THE FILTERS ARE WASH PILLS ON THE GROUND: one rounded track in the ground's wash, and the chosen value a white pill
-   * in it lifted by a tiny shadow (`controls.css`), with its word in ink. The bar is a control on the ground and not
-   * chrome, so the track sheds the toolbar's glass. The state is a SHAPE and not a shade. Scoped to this
-   * screen, so every other segmented control keeps the shared rule.
-   *
-   * THE COUNT SITS BESIDE THE WORD AND QUIETER THAN IT, so a pill says what it holds before it is
-   * pressed. The weight does not change when a pill is chosen, so the bar does not shift under the
-   * pointer. Sentence case is the stylesheet's, on the first letter, so the word stays the one the
-   * record stores and the empty state quotes.
-   */
-  .segmented {
-    background: var(--hover-wash);
-    backdrop-filter: none;
-    box-shadow: none;
-  }
-
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    .segmented {
-      -webkit-backdrop-filter: none;
-    }
-  }
-
+  /* THE SEGMENTS ARE `controls.css`'s: one rectangle in the field's fill, the chosen value the tile's colour on it. The
+     count sits beside the word and quieter than it, so a value says what it holds before it is pressed. */
   .segment {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  /* 44 under a thumb is `--ctl-h`'s; under a mouse the pill sits inside a track the height of the
-     search box beside it. */
-  @media (pointer: fine) {
-    .segment {
-      min-block-size: calc(var(--ctl-h) - 6px);
-    }
-  }
-
-  /* THE CHOSEN VALUE IS `controls.css`'s white pill with its shadow and hairline; the weight holds, so nothing moves. */
-  .segment[data-on] {
-    font-weight: 500;
   }
 
   .segment-word {
@@ -431,44 +399,51 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* A FIELD AS ONE CONTROL, drawn as the pills' own track: the same wash, radius and height, its
-     name in the second ink, and what is chosen in it in ink after the name. */
+  /* A FIELD AS ONE CONTROL: a rectangle the toolbar's height in the field's fill, its name in the second ink, and what
+     is chosen in it after the name. */
   .sift {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-block-size: var(--ctl-h);
+    min-block-size: var(--btn-h);
     padding: 0 var(--sp-2) 0 var(--sp-3);
-    background: var(--hover-wash);
-    border-radius: var(--r-pill);
+    background: var(--field);
+    border-radius: var(--r-ctl);
     color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
     white-space: nowrap;
-    transition: background var(--d-state) var(--ease-out);
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  @media (pointer: coarse) {
+    .sift {
+      min-block-size: var(--tap);
+    }
   }
 
   /* Hover only where there is one: a phone keeps `:hover` on the last thing tapped. */
   @media (hover: hover) and (pointer: fine) {
     :global(.menu-trigger):hover .sift:not([data-on]) {
-      background: var(--hold-wash);
+      background: var(--field-hover);
+      color: var(--ink);
     }
   }
 
-  /* A FIELD WITH A VALUE CHOSEN IN IT IS THE WHITE PILL, as a chosen segment is. */
+  /* A FIELD WITH A VALUE CHOSEN IN IT TAKES THE ACCENT'S TINT, which is what selection looks like everywhere. */
   .sift[data-on] {
-    background: var(--bg);
-    box-shadow:
-      0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent),
-      0 0 0 0.5px var(--line);
-    color: var(--ink);
+    background: var(--action-tint-1);
+    color: var(--action-text);
   }
 
   .sift-chosen {
-    color: var(--ink);
+    color: inherit;
+    font-weight: var(--fw-semi);
   }
 
-  /* THE PHONE'S ONE FILTER CONTROL IS A 44px PILL with the glyph and, when values are on, how many.
+  /* THE PHONE'S ONE FILTER CONTROL IS A 44px SQUARE with the glyph and, when values are on, how many.
      It is a real button, so it sheds the button's own box. */
   .sift-sheet {
     justify-content: center;
@@ -482,11 +457,11 @@
   }
 
   .sift-count {
-    color: var(--ink);
-    font-size: var(--t-sm);
+    color: inherit;
+    font-size: var(--fs-meta);
   }
 
-  /* THE BUILDER'S CONTROL IS ONE MORE PILL IN THE TRACK, and a real button, so it sheds the button's own box. */
+  /* THE BUILDER'S CONTROL IS ONE MORE RECTANGLE IN THE ROW, and a real button, so it sheds the button's own box. */
   .sift-build {
     border: 0;
     font: inherit;
@@ -496,7 +471,8 @@
 
   @media (hover: hover) and (pointer: fine) {
     .sift-build:hover {
-      background: var(--hold-wash);
+      background: var(--field-hover);
+      color: var(--ink);
     }
   }
 
@@ -505,7 +481,7 @@
     margin-block-start: var(--sp-5);
   }
 
-  /* A LIST CLAUSE IS A PILL THAT IS ALREADY ON, drawn in the same track as the rest of the bar so it
+  /* A LIST CLAUSE IS A FILTER THAT IS ALREADY ON, drawn as the rest of the bar is so it
      reads as one of them rather than as a message. A repository is a URL and a handle is
      `git:jokonkwo`, so the element gives way with an ellipsis before it runs past a phone's edge. */
   .listed {
@@ -541,11 +517,18 @@
     color: var(--ink);
   }
 
-  /* THE SEARCH BOX IS A FIELD: `controls.css`'s `--s1` well, 40 tall, radius `--r-md`, as wide as a
-     phrase and no wider, so the pills beside it keep their room. */
+  /* THE SEARCH BOX IS A FIELD (`controls.css`), as wide as a phrase and no wider, so the filters beside it keep their
+     room, and the toolbar's height. */
   .bar > .field {
-    flex: 0 1 280px;
+    flex: 0 1 300px;
     min-inline-size: 180px;
+    min-block-size: var(--btn-h);
+  }
+
+  @media (pointer: coarse) {
+    .bar > .field {
+      min-block-size: var(--tap);
+    }
   }
 
   /* Save as a view ends the bar: it is about the list as a whole, not one of its filters. */
@@ -661,8 +644,9 @@
   }
 
   .filter-value[data-on] .filter-box {
-    background: var(--on);
-    border-color: var(--on);
+    background: var(--action);
+    border-color: var(--action);
+    color: var(--on-action);
   }
 
   @media (width < 640px) {
@@ -687,7 +671,7 @@
 
     .bar > .field {
       flex: 1 1 0;
-      min-inline-size: calc(100% - var(--tap) - var(--sp-2));
+      min-inline-size: 0;
     }
 
     .listed,

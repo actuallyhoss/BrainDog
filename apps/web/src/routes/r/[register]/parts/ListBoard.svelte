@@ -128,7 +128,9 @@
   {@const own = faced ? null : identityFor(register, e.fields, names)}
   {@const due = dueOf(decl, e, now)}
   {@const word = mode === 'cards' && decl.state ? saidOf(e, decl.state) : null}
-  {@const extra = detail ? saidOf(e, detail) : null}
+  <!-- THE DETAIL, or where the list names none, the project the row is about, by name: its shape led the title once, and
+       told nobody which project without a key (DIRECTION 39). -->
+  {@const extra = (detail ? saidOf(e, detail) : null) || (own?.name ?? null)}
   {@const said = receiptFor(e.seq)}
   {@const value = figure ? e.fields[figure] : undefined}
   <!-- THE DRAG IS THE POINTER'S WAY BETWEEN LANES, and "Set to" in the card's menu is everybody's. -->
@@ -155,14 +157,7 @@
     <a class="bcard-open" href={at(`/r/${register}/${e.seq}`)} draggable="false">
       <span class="bcard-title" dir="auto">
         {#if fresh.has(e.seq)}<span class="fresh" data-fresh={e.seq} aria-hidden="true"></span>{/if}
-        {#if faced}<span class="bcard-face"><Face name={title ?? ''} kind="person" size="s" /></span
-          >{:else if own}<span
-            class="bcard-mark thing-glyph"
-            data-shape={own.mark}
-            style={own.retired ? undefined : `--hue:${own.hue}`}
-            data-retired={own.retired ? '' : undefined}
-            role="img"
-            aria-label={own.name}></span>{/if}
+        {#if faced}<span class="bcard-face"><Face name={title ?? ''} kind="person" size="s" /></span>{/if}
         {#if title === null}<span class="bcard-missing">{words.unset}</span>{:else}{title}{/if}
       </span>
       {#if value !== undefined && value !== null && value !== ''}
@@ -341,16 +336,15 @@
     gap: var(--sp-3);
   }
 
-  /* ── a card: white, level 1, told from the ground by its fill ───────────── */
+  /* ── a card: a tile on the board, flat, told from the board by its fill (DIRECTION 39) ── */
 
   .bcard {
     position: relative;
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
-    background: var(--bg);
+    background: var(--tile);
     border-radius: var(--r-md);
-    box-shadow: var(--e1);
     transition: box-shadow var(--d-state) var(--ease-out);
   }
 
@@ -438,18 +432,16 @@
     color: var(--ink2);
   }
 
-  .bcard-mark {
-    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
-  }
-
-  .bcard-mark[data-retired] {
-    color: var(--dim);
-  }
-
+  /* A PERSON'S FACE ON ONE NEUTRAL TINT, as on every list of people (DIRECTION 39). */
   .bcard-face {
     display: inline-flex;
     margin-inline-end: var(--sp-2);
     vertical-align: middle;
+  }
+
+  .bcard .bcard-face :global(.face[data-kind='person']) {
+    background: var(--field);
+    color: var(--ink2);
   }
 
   /* THE ⋯, 28 at the card's top corner, quiet until the card is pointed at, and always there under a finger. */
@@ -464,7 +456,7 @@
     padding: 0;
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: calc(var(--r-ctl) - 2px);
     color: var(--ink2);
     cursor: pointer;
     transition:
@@ -486,7 +478,7 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: calc(var(--r-ctl) - 2px);
     color: var(--ink2);
     font: inherit;
     font-size: var(--t-sm);
@@ -494,19 +486,21 @@
     cursor: pointer;
   }
 
-  /* THE KEYBOARD'S CARD AND A SELECTED ONE: a ring round the white, since a wash over white is no mark at all. The
-     caret's is the quiet boundary ink, as the table's caret row is only a wash at rest; a selected card's is ink, with
-     its tick, and it wins when a card is both. */
+  /* THE KEYBOARD'S CARD AND A SELECTED ONE: a ring round the tile, since a wash over it is no mark at all. The caret's is
+     the quiet boundary ink, as the table's caret row is only a wash at rest; a selected card's is the accent, which is
+     what selection looks like (DIRECTION 39), with its tick, and it wins when a card is both. */
   .bcard[data-cursor] {
-    box-shadow:
-      var(--e1),
-      0 0 0 1.5px var(--edge);
+    box-shadow: 0 0 0 1.5px var(--edge);
   }
 
   .bcard[data-picked] {
-    box-shadow:
-      var(--e1),
-      0 0 0 2px var(--ink);
+    box-shadow: 0 0 0 2px var(--action);
+  }
+
+  /* THE CARET'S RING ONLY WHILE THE KEYBOARD IS ON THE BOARD. At rest it sat round the first card, which nobody chose,
+     and read as a card already picked. */
+  :is(.board, .bgrid):not(:focus-within) .bcard[data-cursor]:not([data-picked], :hover) {
+    box-shadow: none;
   }
 
   /* A CARD THAT ARRIVED WHILE THE READER LOOKED: the arrival's tint, fading over a second and a half. */
@@ -521,19 +515,18 @@
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .bcard:not(:hover, :focus-within, [data-cursor]) .bcard-more {
+    .bcard:not(:hover, :focus-within, [data-cursor]) .bcard-more,
+    :is(.board, .bgrid):not(:focus-within) .bcard[data-cursor]:not(:hover) .bcard-more {
       opacity: 0;
     }
 
     .bcard:not([data-picked], [data-cursor]):hover {
-      box-shadow:
-        var(--e1),
-        0 0 0 1px var(--line);
+      box-shadow: 0 0 0 1px var(--line);
     }
 
     .bcard-more:hover,
     .bcard-undo:hover {
-      background: var(--s1);
+      background: var(--field);
       color: var(--ink);
     }
   }
@@ -544,8 +537,8 @@
     inline-size: var(--dot);
     block-size: var(--dot);
     margin-inline-end: var(--sp-2);
-    background: var(--info-fill);
-    border-radius: var(--r-pill);
+    background: var(--action);
+    border-radius: var(--r-round);
     vertical-align: middle;
     animation: fresh-in var(--d-enter) var(--ease-out);
   }

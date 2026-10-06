@@ -1,6 +1,6 @@
 <!--
-  A group as a tile: a white surface on the board, the heading at `--t-group` with its count in the quiet ink and the
-  actions at the right, and the rows inside it.
+  A group as a tile (DIRECTION §39): the tile's colour on the board, flat, radius 16 and 20 in, the heading at 15
+  semibold with its count in the quiet ink and the actions at the right, and the rows inside it.
 
   INSIDE A TILE OR A SHEET IT IS ONLY THE HEADING AND ITS ROWS, because a tile never holds a tile.
 -->
@@ -39,9 +39,9 @@
 <style>
   .section {
     min-inline-size: 0;
-    padding: var(--sp-4) 12px 12px;
-    background: var(--bg);
-    border-radius: var(--r-lg);
+    padding: var(--tile-pad);
+    background: var(--tile);
+    border-radius: var(--tile-r);
   }
 
   :global(:is(.tile, .sheet)) .section {
@@ -55,17 +55,12 @@
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    min-block-size: var(--ctl-h);
-    margin-block-end: var(--sp-1);
-    padding-inline: var(--sp-2);
+    min-block-size: var(--btn-h);
+    margin-block: calc(-1 * var(--sp-1)) var(--sp-2);
   }
 
-  :global(:is(.tile, .sheet)) .section-head {
-    padding-inline: 0;
-  }
-
-  /* `--t-group`, 17 on 24 at 600: a group heading ranks under the page title and over every row title (15 at 500), so
-     the three steps read as three levels without a rule or a colour doing it. */
+  /* A TILE'S HEADING IS 15 AT 600, the step every tile heading on a page takes (`.block-head`), so a section and a
+     block beside it read as two tiles of one board. It ranks over a row title (15 at 500) by weight alone. */
   .section-title {
     display: flex;
     align-items: baseline;
@@ -74,9 +69,9 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-group);
-    font-weight: 600;
-    line-height: 24px;
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    line-height: 22px;
   }
 
   .section-count {

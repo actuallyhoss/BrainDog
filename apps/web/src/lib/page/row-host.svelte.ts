@@ -65,6 +65,11 @@ export class RowHost {
   /** The row the panel is on, and whether the panel is open. */
   opened = $state<RowAt | null>(null);
   panelOpen = $state(false);
+  /**
+   * Whether the panel holds the week's changes instead of a row (`ChangesPanel.svelte`): the list the line at the foot
+   * of the board opens. One panel at a time, so opening a row closes it and opening it closes the row.
+   */
+  changesOpen = $state(false);
   /** Whether the panel opened to type: the caret goes in the words. */
   typing = $state(false);
   /** Whether the panel holds words typed and not saved, which the cursor moving must not throw away. */
@@ -105,7 +110,7 @@ export class RowHost {
    */
   bylines = $derived.by((): Map<string, Byline> => {
     const who = this.#deps.who?.() ?? { me: null, names: new Map<string, string>() };
-    return bylinesIn(this.#deps.blocks() as Parameters<typeof bylinesIn>[0], this.#seen, who.me, who.names, this.clock);
+    return bylinesIn(this.#deps.blocks() as Parameters<typeof bylinesIn>[0], this.#seen, who.me, who.names, this.readAt());
   });
 
   constructor(deps: HostDeps) {
@@ -121,6 +126,7 @@ export class RowHost {
     this.#landed = new Map();
     this.opened = null;
     this.panelOpen = false;
+    this.changesOpen = false;
     this.menuOpen = false;
     this.asked = null;
     this.touched = new Map(kept.get(slug) ?? []);
@@ -348,6 +354,20 @@ export class RowHost {
     return r.ref ? { register: r.ref.register, seq: r.ref.seq } : null;
   }
 
+  /** The record's clock the last read said, and this machine's when it said it. */
+  #read = { rec: 0, at: 0 };
+
+  /**
+   * THE RECORD'S CLOCK NOW: the one the page was read against, moved on by the time since, which a byline's age and
+   * "this week" are both told by. A record whose clock is not this machine's (a demo's) said "Changed for you this week"
+   * over lines each "5w ago" while the two were told from different clocks.
+   */
+  readAt(): number {
+    const rec = this.#deps.now();
+    if (rec !== this.#read.rec) this.#read = { rec, at: Date.now() };
+    return rec + Math.max(0, this.clock - this.#read.at);
+  }
+
   today(): string {
     return dayOf(this.#deps.now());
   }
@@ -361,6 +381,7 @@ export class RowHost {
     this.menuOpen = false;
     this.opened = row;
     this.typing = type;
+    this.changesOpen = false;
     this.panelOpen = true;
     this.seeRow(row);
     return true;
@@ -368,6 +389,14 @@ export class RowHost {
 
   close() {
     this.panelOpen = false;
+    this.changesOpen = false;
+  }
+
+  /** Opens the week's changes in the docked panel, in place of a row. */
+  openChanges() {
+    this.menuOpen = false;
+    this.panelOpen = false;
+    this.changesOpen = true;
   }
 
   /** THE PANEL FOLLOWS THE CURSOR as j and k walk the page, unless something in it is typed and not saved yet. */

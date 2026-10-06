@@ -46,12 +46,12 @@ test('an answer that cannot be taken back is held six seconds with Undo, and sen
   const due = new Map<number, () => void>();
   let next = 0;
   const clock = {
-    set: ((fn: () => void, ms: number) => {
+    set: (fn: () => void, ms: number) => {
       assert.equal(ms, HOLD_MS);
       due.set(++next, fn);
       return next;
-    }) as unknown as typeof setTimeout,
-    clear: ((id: number) => void due.delete(id)) as unknown as typeof clearTimeout,
+    },
+    clear: (id: unknown) => void due.delete(id as number),
   };
   const tick = () => [...due.values()].forEach((fn) => fn());
 
@@ -76,6 +76,34 @@ test('an answer that cannot be taken back is held six seconds with Undo, and sen
   tick();
   assert.equal(sent, 2);
   assert.equal(c.done, true);
+});
+
+/**
+ * THE WINDOW'S OWN TIMERS, CALLED AS THE WINDOW'S. The clock was `{ set: setTimeout }`, and a browser refuses
+ * `setTimeout` called on any object but the window ("Illegal invocation"): every press on a decision card threw, the
+ * card showed its answered line with no Undo, and nothing was sent. Node lets the call through, so this stands in a
+ * `setTimeout` that refuses the wrong `this` as the browser's does.
+ */
+test('a held answer waits on the window’s timers, called as the window’s, as a browser insists', () => {
+  const real = { set: globalThis.setTimeout, clear: globalThis.clearTimeout };
+  const strict = (fn: (...a: never[]) => unknown) =>
+    function (this: unknown, ...args: unknown[]) {
+      if (this !== globalThis && this !== undefined) throw new TypeError('Illegal invocation');
+      return (fn as (...a: unknown[]) => unknown).apply(globalThis, args);
+    };
+  let sent = 0;
+  try {
+    globalThis.setTimeout = strict(real.set) as unknown as typeof setTimeout;
+    globalThis.clearTimeout = strict(real.clear) as unknown as typeof clearTimeout;
+    const held = hold(() => sent++);
+    assert.equal(held.undo(), true, 'the held answer could not be taken back');
+    const sentNow = hold(() => sent++);
+    sentNow.flush();
+  } finally {
+    globalThis.setTimeout = real.set;
+    globalThis.clearTimeout = real.clear;
+  }
+  assert.equal(sent, 1, 'a held answer was not sent once when flushed');
 });
 
 test('a hard question keeps its suggestion and loses only Enter (audit 19 M10)', () => {
@@ -229,23 +257,26 @@ test('on the queue every answer, Backspace’s too, is held six seconds with Und
   assert.match(card, /removeEventListener\('pagehide', leave\);\n\s+leave\(\);/u, 'a held answer is dropped when the card goes');
 });
 
-test('the suggestion on the queue is an outline with a dot, and is not drawn where the choice is hard to undo', () => {
-  /* DRAWN ONCE, BY THE SKIN, so Decide, Today and every page that draws a queue mark it the same way. Decide drew its own
-     copy over the skin's ink fill until the skin drew the outline itself. */
+test('the suggested answer is the accent’s tint, and not marked where the choice is hard to undo', () => {
+  /* THE SKIN MARKS THE SUGGESTION IN A ROW OF ANSWERS THE RENDERER DRAWS with the accent's first tint and the accent's
+     words (DIRECTION §39), only where the choice can be taken back; the one decision card draws its choices with
+     `lib/decide/form.css` over the same classes, says "Suggested" in the accent's words in its list, and fills the
+     suggested button of its row with the accent. Decide's page draws no copy of its own. */
   const rules = rulesOf(skin);
   const SUGGESTED = '.queue-option[data-recommended] > .queue-act:not([data-on])';
   const UNDOABLE = ".queue-card:not(:has(.queue-cost[data-cost='undo']))";
-  const marked = (r: { on: string }, tail = '') => r.on.split(',').some((one) => one.trim() === `${UNDOABLE} ${SUGGESTED}${tail}`);
-  const outline = rules.find((r) => marked(r));
-  assert.ok(outline, 'the skin no longer marks the suggested answer only where the choice can be taken back');
-  assert.match(outline.says, /background: transparent;/u, 'the suggested answer is filled again');
-  assert.match(outline.says, /border-color: var\(--ink\);/u, 'the suggested answer has lost its outline');
-  const dot = rules.find((r) => marked(r, '::before'));
-  assert.ok(dot && /background: currentColor;/u.test(dot.says), 'the suggested answer has lost its dot');
+  const marked = rules.find((r) => r.on.split(',').some((one) => one.trim().startsWith(UNDOABLE) && one.trim().endsWith(SUGGESTED)));
+  assert.ok(marked, 'the skin no longer marks the suggested answer only where the choice can be taken back');
+  assert.ok(marked.on.includes('.queue-options:not(:has(.queue-because))'), 'the tint reaches a choice in the form, where "Suggested" says it');
+  assert.match(marked.says, /background: var\(--action-tint-1\);/u, 'the suggested answer is not the accent’s tint');
+  assert.match(marked.says, /color: var\(--action-text\);/u, 'the suggested answer is not in the accent’s words');
   const unmarked = rules.find((r) => r.on.split(',').some((one) => one.trim() === ".queue-card:has(.queue-cost[data-cost='undo']) .queue-rec"));
   assert.ok(unmarked && /display: none;/u.test(unmarked.says), 'a card that is hard to undo still says which answer is suggested');
+  const form = readFileSync(fileURLToPath(new URL('../../lib/decide/form.css', import.meta.url)), 'utf8');
+  const rec = rulesOf(form).find((r) => r.on === '.dc-rec');
+  assert.ok(rec && /color: var\(--action-text\);/u.test(rec.says), 'the card’s "Suggested" is not in the accent’s words');
   const style = queue.slice(queue.indexOf('<style>'));
-  assert.doesNotMatch(style, /data-recommended|\.queue-rec\b/u, 'Decide draws its own copy of the suggestion again, which can drift from the skin’s');
+  assert.doesNotMatch(style, /data-recommended|\.queue-rec\b|\.dc-rec\b/u, 'Decide draws its own copy of the suggestion again, which can drift');
   /* NOTHING MOVES OR FADES WHEN A KEY LANDS: the by-line is always there, and nothing on the card is transitioned. */
   assert.match(queue, /\.page :global\(\.queue-card > \.queue-by\) \{\n\s+display: flex;\n\s+transition: none;/u, 'the by-line waits for the cursor and moves the card under it');
 });

@@ -348,7 +348,9 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
          it, and the row stays an ordinary person.
          ONLY A ROW THAT IS SURELY THEM: one this press added, or one already known by the address they signed in with.
          A row matched on a name alone may be somebody else of that name, and marking them as the owner would fold the
-         owner's own commits into a stranger. */
+         owner's own commits into a stranger.
+         THE RECORD ASKS ABOUT THEIR OTHER ROWS ON THIS WRITE (`ownRowsAsked` in `@braindog/record`), so nothing more is
+         sent from here. */
       const theirs = out.ok && (out.value.created || out.value.matched_by === 'key');
       if (theirs) await client.update({ register: row.register, seq: row.seq, patch: { self: true } }).catch(() => null);
     } else {

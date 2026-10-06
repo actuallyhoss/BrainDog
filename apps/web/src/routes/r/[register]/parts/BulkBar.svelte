@@ -10,10 +10,11 @@
   rather than in the stylesheet once swallowed this into the card arm, so a desktop selection raised
   no bulk bar at all. The page draws it whichever body is on the screen.
 
-  IT IS CHROME THAT FLOATS: a glass pill at the bottom centre of the window, over the list, with the count,
-  the verbs and Esc to let go. Its glass is on a pseudo-element, because a `backdrop-filter` makes its element the box
-  every fixed descendant is placed against, and the state menu is one. Glass never holds glass, so the verbs in it are
-  the quiet wash pills.
+  IT FLOATS: a bar at the bottom centre of the window, over the list, with the count, the verbs and Esc to let go. It
+  is the tile's colour with a hairline and the second level's shadow, a rectangle and no glass (DIRECTION 39). Its
+  surface is on a pseudo-element, which keeps the bar itself free of anything that would place the state menu inside
+  it rather than on the window. The verbs in it are
+  the quiet buttons.
 
   Every verb is the page's write (`copyIds`, `setPickedState`, `archiveSelected`), and `count` is the
   selection cut to the answer on screen, so what a verb acts on is what the reader is looking at.
@@ -86,8 +87,8 @@
 </div>
 
 <style>
-  /* THE FLOATING PILL: bottom centre, 12 above the window's edge twice over, and above the phone's tab bar there. The
-     glass is the `::before`; the bar itself holds no filter, so the state menu inside it places itself on the window. */
+  /* THE FLOATING BAR: bottom centre, 12 above the window's edge twice over, and above the phone's tab bar there. The
+     surface is the `::before`, so the state menu inside it places itself on the window. */
   .picked-bar {
     position: fixed;
     inset-inline: 0;
@@ -102,7 +103,7 @@
     max-inline-size: calc(100vw - 2 * var(--inset));
     margin-inline: auto;
     padding: 6px 6px 6px var(--sp-4);
-    border-radius: calc(var(--ctl-h) / 2 + 6px);
+    border-radius: var(--r-md);
     color: var(--ink2);
     font-size: var(--t-sm);
     animation: picked-in var(--d-enter) var(--ease-out);
@@ -114,17 +115,9 @@
     inset: 0;
     z-index: -1;
     border-radius: inherit;
-    background: var(--glass-strong);
-    backdrop-filter: var(--glass-blur);
-    box-shadow: var(--glass-edge), var(--e2);
+    background: var(--tile);
+    box-shadow: 0 0 0 1px var(--rule), var(--e2);
     pointer-events: none;
-  }
-
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    .picked-bar::before {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
   }
 
   @keyframes picked-in {
@@ -149,7 +142,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* LET GO: a round close with the Esc cap beside the glyph, the key that does the same. */
+  /* LET GO: a close with the Esc cap beside the glyph, the key that does the same. */
   .picked-clear {
     display: inline-flex;
     align-items: center;
@@ -158,7 +151,7 @@
     padding: 0 var(--sp-2) 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     color: var(--ink2);
     font: inherit;
     cursor: pointer;
@@ -167,7 +160,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .picked-clear:hover {
-      background: var(--hover-wash);
+      background: var(--field);
       color: var(--ink);
     }
   }

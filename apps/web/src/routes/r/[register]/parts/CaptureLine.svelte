@@ -18,6 +18,9 @@
   exists, in its cells and its receipt; said in advance, over the list, it was the screen
   explaining itself.
 
+  IT IS THE LIST TILE'S FIRST LINE, under the toolbar and over the rows (DIRECTION 39), drawn as the row a new one
+  would be: no fill until it is pointed at or typed in.
+
   ON A PHONE IT IS A SHEET BEHIND THE HEAD'S "+". The line stood over the
   search box and the filters, so three rows of controls came before the first card, and a phone's
   list starts within 150px of its head. Below 640px the line is not drawn; `CapturePlus` in the
@@ -132,25 +135,31 @@
     white-space: nowrap;
   }
 
-  /* ONE FRIENDLY FIELD, AS EVERY FIELD IS: 40 tall and 44 under a thumb, the `--s1` well with no border,
-     radius `--r-md`, and a plus at its head in the second ink, which is the shape "add" has in every list a person has
-     used. It sits on the ground at the top of the list, where the blend draws it under the sentence. */
+  /* THE LIST'S FIRST LINE, INSIDE ITS TILE (DIRECTION 39): a plus and "Add an item" at the rows' own edge, 40 tall and
+     44 under a thumb, with no fill until it is pointed at or typed in, when it takes the field's. It reads as the row a
+     new one would be, not as a second search box under the first. */
   .capture-field {
     display: flex;
     align-items: center;
     gap: 10px;
     min-block-size: 40px;
-    padding-inline: var(--sp-3) 6px;
-    background: var(--s1);
+    margin-inline: calc(-1 * var(--sp-3));
+    padding-inline: var(--sp-3) 4px;
+    background: none;
     border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--dim);
     transition: background var(--d-state) var(--ease-out);
+  }
+
+  .capture-field:focus-within {
+    background: var(--field);
+    color: var(--ink2);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .capture-field:hover {
-      background: var(--s2);
+      background: var(--field);
     }
   }
 
@@ -195,17 +204,23 @@
     box-shadow: none;
   }
 
-  /* THE ADD, AN INK PILL INSIDE THE FIELD, drawn only once there is something to add. */
+  /* THE ADD, THE ACCENT'S PRIMARY INSIDE THE FIELD, drawn only once there is something to add. */
   .capture-go {
-    min-block-size: var(--ctl-h-sm);
+    min-block-size: var(--btn-h-sm);
     padding: 0 var(--sp-3);
-    background: var(--ink);
+    background: var(--action);
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--on-ink);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    border-radius: calc(var(--r-ctl) - 2px);
+    color: var(--on-action);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
     cursor: pointer;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .capture-go:hover {
+      background: var(--action-hover);
+    }
   }
 
   /* 48x24 MEASURED AT 390, on the primary write action of the register. It is drawn only once

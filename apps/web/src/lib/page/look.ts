@@ -157,6 +157,27 @@ export function nextOf(look: LiveLook | null, questions: ReadonlySet<string> = n
   return { text: look.next.text, row: null, href: null };
 }
 
+/** What `repeatsFirst` reads off the first tile on the board: its questions, its list and the rows it draws. */
+export type FirstTile = {
+  readonly queue?: readonly { readonly id: string }[] | undefined;
+  readonly register?: string | undefined;
+  readonly entries?: readonly { readonly seq: number }[] | undefined;
+};
+
+/**
+ * WHETHER THE NEXT STEP IS ALREADY THE FIRST THING ON THE BOARD (DIRECTION §39): the first question of the first tile,
+ * or its first row. The line under the header then says nothing the eye does not meet straight after it, and is not
+ * drawn: Money's "Invoice 2026-041 was due 38 days ago. Chase it?" stood over the same question as the first card.
+ */
+export function repeatsFirst(look: LiveLook | null, first: FirstTile | null | undefined): boolean {
+  const next = look?.next?.row;
+  if (!next || !first) return false;
+  if (first.queue?.[0]?.id === next) return true;
+  const row = rowOfKey(next);
+  const lead = first.entries?.[0];
+  return row !== null && lead !== undefined && first.register === row.register && lead.seq === row.seq;
+}
+
 /* ── the bodies ─────────────────────────────────────────────────────────── */
 
 type Body = Record<string, unknown>;

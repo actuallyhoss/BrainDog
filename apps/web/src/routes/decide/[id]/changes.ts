@@ -26,6 +26,8 @@ export const words = {
   before: 'Before',
   after: 'After',
   empty: 'Empty',
+  /** A row with no title of its own: said as that, never by its handle. */
+  untitled: 'Untitled',
 } as const;
 
 /**
@@ -125,7 +127,8 @@ export function updatesOf(
     }
     if (changes.length === 0) continue;
     const title = decl?.title ? row.fields[decl.title] : undefined;
-    out.push({ at: r.at, title: typeof title === 'string' && title !== '' ? title : r.at, changes });
+    /* NEVER THE HANDLE (`projects#1`) IN ITS PLACE: a row with no title is said as one. */
+    out.push({ at: r.at, title: typeof title === 'string' && title !== '' ? title : words.untitled, changes });
   }
   return out;
 }

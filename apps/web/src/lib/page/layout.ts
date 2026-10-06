@@ -257,3 +257,79 @@ export function paired(blocks: readonly Pairable[], columns: number = COLUMNS): 
   });
   return out;
 }
+
+/**
+ * THE WIDTHS A TILE MAY HAVE ON THE BOARD (DIRECTION §39): a quarter, a third, a half, two thirds and the whole row.
+ * "One board": every tile lines up with the tiles above and below it, which a page of fives and sevens never did.
+ */
+export const TILE_SPANS: readonly number[] = [12, 8, 6, 4, 3];
+
+/** The nearest width a tile may have, the wider of two as near. */
+const nearest = (span: number): number =>
+  TILE_SPANS.reduce((best, s) => (Math.abs(s - span) < Math.abs(best - span) ? s : best), TILE_SPANS[0]!);
+
+/**
+ * The widths a row of tiles takes, as near the widths asked as the board's own allow: a row that made the whole twelve
+ * still does, and one that did not stays within it. The fewest steps away wins, then the row whose narrower and wider
+ * tiles are where the author put them, then the wider row. A row of more than four is quarters, and wraps, since five tiles in a row is no row the board draws.
+ */
+function snapRow(spans: readonly number[], columns: number): number[] {
+  const asked = spans.reduce((a, b) => a + b, 0);
+  if (spans.length > 4) return spans.map(() => 3);
+  /* HOW FAR A ROW STRAYS FROM THE SHAPE ASKED: a narrower tile beside a wider one stays the narrower. */
+  const shape = (out: readonly number[]): number =>
+    out.slice(1).reduce((n, s, k) => n + Math.abs(Math.sign(s - out[k]!) - Math.sign(spans[k + 1]! - spans[k]!)), 0);
+  let best: { out: number[]; off: number; bent: number; sum: number } | null = null;
+  const walk = (at: number, out: number[], off: number, sum: number) => {
+    if (sum > columns) return;
+    if (at === spans.length) {
+      if (asked === columns && sum !== columns) return;
+      const bent = shape(out);
+      const b = best as { off: number; bent: number; sum: number } | null;
+      if (!b || off < b.off || (off === b.off && (bent < b.bent || (bent === b.bent && sum > b.sum)))) best = { out: [...out], off, bent, sum };
+      return;
+    }
+    for (const s of TILE_SPANS) walk(at + 1, [...out, s], off + Math.abs(s - spans[at]!), sum + s);
+  };
+  walk(0, [], 0, 0);
+  return (best as { out: number[] } | null)?.out ?? spans.map(nearest);
+}
+
+/**
+ * The span each block of one twelve-column flow is drawn at on the board: the spans in force (declared, `widened`,
+ * `paired`), packed into rows the way the grid packs them, each row put on the board's widths (`TILE_SPANS`). Hidden
+ * blocks keep their span and take no place. PURE, so `layout.test.ts` holds the rule.
+ */
+export function snapped(blocks: readonly Placed[], columns: number = COLUMNS): number[] {
+  const out = blocks.map((b) => b.span);
+  let row: number[] = [];
+  let used = 0;
+  const close = () => {
+    if (row.length === 0) return;
+    const got = snapRow(
+      row.map((n) => Math.min(Math.max(1, blocks[n]!.span), columns)),
+      columns,
+    );
+    row.forEach((n, k) => (out[n] = got[k]!));
+    row = [];
+    used = 0;
+  };
+  blocks.forEach((b, n) => {
+    if (!b.drawn) return;
+    const span = Math.min(Math.max(1, b.span), columns);
+    if (used + span > columns) close();
+    row.push(n);
+    used += span;
+  });
+  close();
+  return out;
+}
+
+/**
+ * The board's two columns on a page with a rail: two thirds and a third, whatever the declaration's rail (3 to 5) asks,
+ * since a rail of five beside seven is two widths the board does not have.
+ */
+export const boardRail = (layout: Layout): { main: number; rail: number } => {
+  const [main, rail] = snapRow([mainSpan(layout), layout.rail], COLUMNS);
+  return { main: main!, rail: rail! };
+};

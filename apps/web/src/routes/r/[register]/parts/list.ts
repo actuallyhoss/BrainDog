@@ -434,6 +434,20 @@ export function arrivedAt(from: Navigated, to: Navigated): string | null {
   return to.params?.register ?? null;
 }
 
+/**
+ * WHERE A ROW STANDS, for the small dot drawn before its state's word (DIRECTION 39): `open` while it is still to do, in
+ * the working accent; `done` once the list calls its state finished, in grey; `late` past its deadline, in red, whatever
+ * its state says. Three answers and not more, because the declaration says which states are finished and nothing else:
+ * a fourth colour for "on the way" was a guess from the order the values are written in, and on Tasks it painted
+ * "Later" as working and "Doing" as waiting. The word beside the dot says which open state it is.
+ */
+export type Stand = 'open' | 'done' | 'late';
+
+export function standOf(decl: RegisterDecl | undefined, value: string, late: boolean): Stand {
+  if (decl?.done?.includes(value)) return 'done';
+  return late ? 'late' : 'open';
+}
+
 /** Whether a row is in one of the list's finished states ("Paid", "Done"). */
 export const isDone = (decl: RegisterDecl | undefined, e: Entry): boolean =>
   Boolean(decl?.state && decl.done?.includes(String(e.fields[decl.state] ?? '')));
@@ -576,6 +590,10 @@ export function byStateOf(decl: RegisterDecl | undefined, entries: readonly Entr
 /**
  * WHAT THE "BY STATE" TILE'S CHART MEANS, in one line. "Most are still open; 3 are late." on a list that declares its
  * finished states; on one that declares none, which state holds the most.
+ *
+ * NOTHING WHERE THE HEAD ALREADY SAID IT (`headSaid`): on a list that declares its finished states, the sentence under
+ * the title is "28 open, 4 late", and "Most are still open; 4 are late." under it is the same news twice. The tile's
+ * lines carry the split; which state holds the most is not in the head, so that one is still said.
  */
 export function stateReading(
   decl: RegisterDecl,
@@ -583,12 +601,14 @@ export function stateReading(
   entries: readonly Entry[],
   now: number,
   label: (value: string) => string,
-): string {
+  headSaid = false,
+): string | null {
   const all = parts.reduce((n, p) => n + p.count, 0);
   if (!decl.done?.length) {
     const top = parts.reduce((a, b) => (b.count > a.count ? b : a));
     return words.most(label(top.value), top.count, all);
   }
+  if (headSaid) return null;
   const done = parts.filter((p) => p.done).reduce((n, p) => n + p.count, 0);
   const open = all - done;
   if (open === 0) return words.allDone(all);
@@ -600,8 +620,11 @@ export function stateReading(
 /** The figure types a list can total. */
 const FIGURES = new Set(['money', 'int', 'decimal']);
 
-/** A list's number column, totalled: the field, the currency a money field is in, and the sum. */
-export type Figured = { field: FieldDecl; currency: string | null; total: number; valueOf: (e: Entry) => number | null };
+/**
+ * A list's number column, totalled: the field, the currency a money field is in, the sum, and how many rows hold a value
+ * (`seen`), which is what decides whether the figure says anything (`ListSummary`).
+ */
+export type Figured = { field: FieldDecl; currency: string | null; total: number; seen: number; valueOf: (e: Entry) => number | null };
 
 /**
  * THE LIST'S NUMBER, WHEN IT HAS ONE, ADDED UP: the first figure its card declares, else the first figure field it
@@ -630,7 +653,7 @@ export function figureOf(decl: RegisterDecl | undefined, entries: readonly Entry
     seen += 1;
   }
   if (seen === 0 || currencies.size > 1) return null;
-  return { field, currency: field.type === 'money' ? ([...currencies][0] ?? null) : null, total, valueOf };
+  return { field, currency: field.type === 'money' ? ([...currencies][0] ?? null) : null, total, seen, valueOf };
 }
 
 /** A figure as a tile or a bar says it: money with its symbol ("£4,800.00"), anything else grouped ("9,800"). */

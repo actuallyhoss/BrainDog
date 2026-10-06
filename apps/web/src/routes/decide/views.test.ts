@@ -262,7 +262,7 @@ test('how the calls went is one line over those already checked', () => {
 const screen = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
 
 test('the screen draws the declared page through the one reader, and keeps the old one at ?classic', () => {
-  assert.match(screen, /<PageView slug="decide" got=\{drawn\} mode="home" select \{reread\} \/>/u);
+  assert.match(screen, /<PageView slug="decide" got=\{drawn\} mode="home" select whole \{reread\} \/>/u);
   assert.match(screen, /readDecide\(/u);
   assert.match(screen, /decideDrawn\(/u);
   assert.match(screen, /searchParams\.has\('classic'\)/u);

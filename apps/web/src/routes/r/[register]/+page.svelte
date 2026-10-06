@@ -25,7 +25,7 @@
   import * as pref from '$lib/pref.ts';
   import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, iconFor, identityFor, labelOf, toRows, type Filter, whereOf } from '$lib/record/api.ts';
+  import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, iconFor, labelOf, toRows, type Filter, whereOf } from '$lib/record/api.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, type Names } from '$lib/record/remote.ts';
   import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
@@ -37,6 +37,8 @@
   import { REGISTERS } from '$lib/record/held.ts';
   import { handFor, readHolders } from '$lib/record/hand.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Menu from '$lib/ui/Menu.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -206,7 +208,8 @@
       handedSeq = you && you.kind === 'person' ? you.seq : null;
     });
   });
-  const handedToMeHref = $derived(hand?.person && handedSeq !== null ? at(`/r/${id}?f=${hand.person}:is:${handedSeq}`) : null);
+  /* The address in the app, not yet under the record: `at()` is called where it is drawn, as every link is. */
+  const handedToMe = $derived(hand?.person && handedSeq !== null ? `/r/${id}?f=${hand.person}:is:${handedSeq}` : null);
 
   /**
    * A LINK CAN ASK FOR THE NEW-LIST SHEET: `/r/_new?make` from the "New list" entry, or `?make` on the address of a list
@@ -2287,11 +2290,14 @@
    */
   $effect(() => drew('ready'));
 
-  /* WHETHER ANY ROW IN HAND HAS A PROJECT'S MARK. When one does, every title keeps the mark's slot,
-     so a row with no project starts where its marked neighbours do. */
-  const anyMark = $derived(
-    bySeq.size > 0 && [...bySeq.values()].some((e) => identityFor(id, e.fields, result.names ?? undefined) !== null),
-  );
+  /**
+   * WHETHER THE ROWS STAND INSIDE THE LIST'S TILE: the table, the groups, a phone's cards and an empty list do; the board
+   * and the cards on a laptop are tiles of their own, so they stand on the board under it, since a tile never holds one.
+   */
+  const tiled = $derived(view === 'table' || view === 'groups' || rowsAsCards() || rows.length === 0);
+
+  /* This screen's own words: the head's overflow, named with the list it is about. */
+  const headWords = { more: (list: string) => `More for ${list}` } as const;
 </script>
 
 <svelte:head><title>{titleOf(decl?.name)}</title></svelte:head>
@@ -2353,32 +2359,25 @@
     sentence={reading ? readingSaid : undefined}
   >
     {#snippet actions()}
-      <!-- THE TOOLBAR: glass, 36 high and 6 apart, the view switch first and the one ink primary last. -->
-      {#if result.total > 0}<ViewSwitch {view} board={boardable} groups={groupable ? iconFor(decl.icon, 'rows') : null} onview={setView} />{/if}
-      <!-- THE VIEW OVER WHAT IS HANDED TO YOU, on a list that says who holds its rows. -->
-      {#if handedToMeHref}<Button weight="glass" href={handedToMeHref}>{copy.handedToMe}</Button>{/if}
-      <!-- THE LIST'S FIELDS, opened from its head: add any kind, rename one, or retire one (`ListEditor.svelte`). -->
-      {#if proposes}<Button weight="glass" onclick={() => (fieldsOpen = true)} data-fields-open>{sheetWords.open}</Button>{/if}
-      <!-- DISPLAY: the order and the columns, what YOU see and never what the record says. `v`, printed on it. It was the
-           end of the filter bar, which is drawn only once a list is long enough to sift, so on a short list the only way
-           to it was a key; in the toolbar it is there for every list. Its name is "Display" at every width: on a phone
-           the word is hidden and the glyph is a 44px circle, and the word stays in the button for a screen reader and
-           for the gates that press it by name. -->
-      <span class="tb-display">
-        <Button weight="glass" kbd="v" title={copy.display} onclick={() => (displayOpen = true)}>
-          <Icon name="settings" size="m" /><span class="tb-word">{copy.display}</span>
-        </Button>
-      </span>
-      <!-- ON A PHONE THE FIELD IS THE WAY IN, AND THIS GOES. The capture field and this button both
-           started a row, one under the other, and on a phone the button took a line of its own over
-           the field that does the same thing in fewer presses. It stays while the field is hidden
-           (`?first`), and on a laptop, where it opens the whole form and ends the toolbar as its one
-           ink primary. -->
+      <!-- THE HEAD HOLDS ONE PRIMARY AND AN OVERFLOW (DIRECTION 39). How the list is drawn, its search and its filters
+           are about the rows, so they moved down into the list's own tile, where the rows are. -->
+      <!-- ON A PHONE THE "+" IS THE WAY IN, AND NEW GOES. The capture field and this button both started a row, and on
+           a phone the "+" opens the capture sheet, which starts one in fewer presses. New stays on the arrival
+           (`?first`), where neither is drawn, and on a laptop, where it opens the whole form. -->
       {#if adds}
         <span class="new-row" data-alone={arriving ? '' : undefined}>
           <Button weight="primary" kbd="n" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{said('new_row')} {decl.one}</Button>
         </span>
         {#if !arriving}<CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />{/if}
+      {/if}
+      <!-- THE REST OF WHAT A LIST OFFERS, IN THE OVERFLOW: the view over what is handed to you, on a list that says who
+           holds its rows, and the list's fields (`ListEditor.svelte`). -->
+      {#if handedToMe || proposes}
+        <Menu label={headWords.more(decl.name)} align="end">
+          {#snippet trigger()}<span class="head-more" title={headWords.more(decl.name)}><Icon name="more" size="m" /></span>{/snippet}
+          {#if handedToMe}<a role="menuitem" href={at(handedToMe)}>{copy.handedToMe}</a>{/if}
+          {#if proposes}<button type="button" role="menuitem" data-fields-open onclick={() => (fieldsOpen = true)}>{sheetWords.open}</button>{/if}
+        </Menu>
       {/if}
     {/snippet}
   </PageHead>
@@ -2394,48 +2393,64 @@
         <Button onclick={refresh}>{copy.tryAgain}</Button>
       </p>
     {/if}
-    <!-- CAPTURE, FIRST ON THE PAGE, above the search and the filters because it is the one thing here
-         that does not act on the rows below it. Not on the arrival itself, where the New button in
-         the head is the way in. -->
-    {#if !adds}
-      <!-- AND WHERE IT WOULD HAVE BEEN, WHY IT IS NOT: a list with no way in reads as one nobody can add to. -->
-      <p class="reach">{reachWords.readOnly(decl.name)}</p>
-    {:else if !arriving}
-      <CaptureLine one={decl.one} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
+
+    <!-- THE LIST'S FIGURES, over the whole list only (`ListSummary` says why): one tile above the list's own, 12 from it.
+         And only on a list long enough to sift: five rows are read faster than a chart of them, and the tile would be
+         the figure of what the eye already has. -->
+    {#if whole && !arriving && siftable && standing.length > 0}
+      <ListSummary {decl} entries={standing} {now} byState={view !== 'board' && filters.length === 0 && q === ''} headSaid={reading !== null} titleOf={titleSaid} />
     {/if}
 
-    <!-- THE BAR, which draws itself only while there is something to sift, and the phone's filter
-         sheet behind its one button. Which filters are on is the address, read and written here. -->
-    <ChipsBar
-      shown={siftable || q !== '' || filters.length > 0}
-      register={id}
-      name={decl.name}
-      {q}
-      filtered={q !== '' || filters.length > 0}
-      {enums}
-      {listed}
-      {facets}
-      {isOn}
-      {toggleFilter}
-      {dropFilter}
-      {setQuery}
-      saveView={() => void saveView()}
-    />
+    <!--
+      THE LIST IS ONE TILE ON THE BOARD (DIRECTION 39): its toolbar across the top (the search and the filters at the
+      start, how it is drawn and Display at the end), the line that adds a row, then the rows. The board and the cards
+      are tiles of their own, so on those two views the tile holds the toolbar and the cards stand on the board under it,
+      since a tile never holds a tile.
+    -->
+    <Tile class="list-tile" data-view={view}>
+      <div class="list-tools">
+        <!-- THE SEARCH AND THE FILTERS, which draw themselves only while there is something to sift, and the phone's
+             filter sheet behind its one button. Which filters are on is the address, read and written here. -->
+        <ChipsBar
+          shown={siftable || q !== '' || filters.length > 0}
+          register={id}
+          name={decl.name}
+          {q}
+          filtered={q !== '' || filters.length > 0}
+          {enums}
+          {listed}
+          {facets}
+          {isOn}
+          {toggleFilter}
+          {dropFilter}
+          {setQuery}
+          saveView={() => void saveView()}
+        />
+        <div class="list-views">
+          {#if result.total > 0}<ViewSwitch {view} board={boardable} groups={groupable ? iconFor(decl.icon, 'rows') : null} onview={setView} />{/if}
+          <!-- DISPLAY: the order and the columns, what YOU see and never what the record says. `v`, printed on it under
+               the pointer. Its word stays in the button for a screen reader and for the gates that press it by name. -->
+          <span class="tb-display">
+            <Button kbd="v" title={copy.display} onclick={() => (displayOpen = true)}>
+              <Icon name="settings" size="m" /><span class="tb-word">{copy.display}</span>
+            </Button>
+          </span>
+        </div>
+      </div>
 
-    <!-- THE LIST'S FIGURES, over the whole list only (`ListSummary` says why): "By state" as a stacked bar, which the
-         board's own lanes already are, and the list's number added up. Above the rows, 12 from them. -->
-    {#if whole && !arriving && standing.length > 0}
-      <ListSummary {decl} entries={standing} {now} byState={view !== 'board' && filters.length === 0 && q === ''} titleOf={titleSaid} />
-    {/if}
+      <!-- CAPTURE, THE LIST'S FIRST LINE: a name and Enter. Not on the arrival itself, where New in the head is the way
+           in, and where nobody may add, why not, in the line's place. -->
+      {#if !adds}
+        <p class="reach">{reachWords.readOnly(decl.name)}</p>
+      {:else if !arriving}
+        <CaptureLine one={decl.one} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
+      {/if}
 
-    {#if rows.length === 0}
-      <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} />
-    {:else}
-      <!-- THE VERBS BELONG TO THE LIST, NOT TO ONE OF ITS TWO BODIES. Putting the branch in the
-           markup rather than in the stylesheet swallowed this into the card arm, so a desktop
-           selection raised no bulk bar at all, which is the whole reason the branch had to be
-           measured rather than assumed. It floats over the rows it acts on, in every body. -->
-      {#if picked.length > 0}
+      {#if rows.length === 0}
+        <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} />
+      {:else if picked.length > 0}
+        <!-- THE VERBS BELONG TO THE LIST, NOT TO ONE OF ITS BODIES, so the bar is drawn here for every view. It floats
+             over the rows it acts on. -->
         <BulkBar
           count={picked.length}
           {decl}
@@ -2449,116 +2464,115 @@
         />
       {/if}
 
-      <!-- ONE BODY AT A TIME, IN THE DOM: cards below 640px (`ListCards` says why), and above it the
-           view the address asks for, the grid, the board or the cards. `body` wraps them all, so the
-           observer finds whichever sentinel is drawn and `showRow` finds whichever row is new. -->
-      <div class="body-slot" bind:this={body}>
-      <!-- PEOPLE BY ORGANISATION, at every width: a phone reads the groups as a laptop does, since a group is one line. -->
-      {#if view === 'groups'}
-        <ListPeople
-          register={id}
-          {decl}
-          entries={result.entries.slice(0, DOM_CAP)}
-          {now}
-          names={result.names ?? undefined}
-          more={cursor !== null && loaded < DOM_CAP}
-        />
-      {:else if rowsAsCards()}
-        <ListCards
-          register={id}
-          entries={result.entries.slice(0, DOM_CAP)}
-          {now}
-          names={result.names ?? undefined}
-          {selected}
-          {decl}
-          more={cursor !== null && loaded < DOM_CAP}
-          {receiptFor}
-          {openCardMenu}
-        />
-      {:else if view === 'table'}
-        <ListTable
-          register={id}
-          {decl}
-          {columns}
-          rows={arrived.size === 0 ? rows : rows.map((r) => (arrived.has(r.key) ? { ...r, arrived: true } : r))}
-          total={rowCount}
-          {sort}
-          {selected}
-          {selectedKeys}
-          bind:focus
-          {editing}
-          bind:editValue
-          bind:editTicked
-          {fresh}
-          {anyMark}
-          names={result.names ?? undefined}
-          onmore={cursor === null ? undefined : more}
-          onsort={result.entries.length < 2 ? undefined : sortBy}
-          onactivate={(row) => goto(at(`/r/${id}/${row.key.split('#')[1]}`))}
-          {rowAt}
-          {fieldOf}
-          {editableHere}
-          {shownValue}
-          {listCurrency}
-          {receiptFor}
-          {toggleSelect}
-          {openEditor}
-          {commitEdit}
-          {cancelEdit}
-          {leftTheRow}
-          {cellKeys}
-          archive={changes ? archive : undefined}
-          {openCardMenu}
-        />
-      {:else}
-        <!-- THE BOARD AND THE CARDS: the same rows as white cards on the ground, in lanes or in one grid. A card
-             moves lanes by being dragged, through the same `setRowState` its menu's "Set to" presses. -->
-        <ListBoard
-          register={id}
-          {decl}
-          mode={view === 'board' ? 'board' : 'cards'}
-          entries={result.entries.slice(0, DOM_CAP)}
-          {now}
-          names={result.names ?? undefined}
-          {selected}
-          cursor={result.entries[focus.row]?.seq ?? null}
-          {fresh}
-          {arrived}
-          more={cursor !== null && loaded < DOM_CAP}
-          {receiptFor}
-          {openCardMenu}
-          lane={lane?.id}
-          setRowState={changes && lane ? moveOnBoard : undefined}
-        />
+      {#if tiled && rows.length > 0}
+        {@render listBody()}
       {/if}
+    </Tile>
 
-      <!--
-        ONE CAP LINE, FOR WHICHEVER BODY IS DRAWING.
-
-        `Table` used to draw its own from its `total` prop, which is `aria-rowcount` — and
-        `aria-rowcount` is deliberately `-1` while a filtered list is still paging, so `2000 < -1`
-        was false and **the line vanished in exactly the state it was written for**: filter the list,
-        scroll to the cap, and the sentence telling you to narrow or export was gone. The card body
-        drew its own from a different number, so the two bodies disagreed about whether the list was
-        capped.
-
-        Out here it belongs to the LIST rather than to a body, and it reads the one number that is
-        always the answer's size. `Table` keeps `cap` for the sentinel, which is the other half of
-        what that prop is for.
-      -->
-      <!-- AND A SORTED LIST THE RECORD STOPPED says so the same way: the rows it drew, of the rows
-           it matched, and what to do about the rest. -->
-      {#if loaded >= DOM_CAP || truncated}
-        <CapLine shown={drawn} total={result.matched} />
-      {/if}
-      </div>
+    {#if !tiled && rows.length > 0}
+      {@render listBody()}
     {/if}
-    <!-- NO SECOND SCREEN UNDER THE LIST. The first run's "One kind of thing is a
-         list" panel and its Money, Services and Projects tiles went with the one-row path that led here; a list with
-         nothing in it draws its own empty state. -->
+    <!-- NO SECOND SCREEN UNDER THE LIST. A list with nothing in it draws its own empty state. -->
   </div>
 
   </div>
+
+  <!--
+    ONE BODY AT A TIME, IN THE DOM: cards below 640px (`ListCards` says why), and above it the view the address asks
+    for, the table, the groups, the board or the cards. `body` wraps them all, so the observer finds whichever sentinel
+    is drawn and `showRow` finds whichever row is new.
+  -->
+  {#snippet listBody()}
+    <div class="body-slot" bind:this={body}>
+    <!-- PEOPLE BY ORGANISATION, at every width: a phone reads the groups as a laptop does, since a group is one line. -->
+    {#if view === 'groups'}
+      <ListPeople
+        register={id}
+        {decl}
+        entries={result.entries.slice(0, DOM_CAP)}
+        {now}
+        names={result.names ?? undefined}
+        more={cursor !== null && loaded < DOM_CAP}
+      />
+    {:else if rowsAsCards()}
+      <ListCards
+        register={id}
+        entries={result.entries.slice(0, DOM_CAP)}
+        {now}
+        names={result.names ?? undefined}
+        {selected}
+        {decl}
+        more={cursor !== null && loaded < DOM_CAP}
+        {receiptFor}
+        {openCardMenu}
+      />
+    {:else if view === 'table'}
+      <ListTable
+        register={id}
+        {decl}
+        {columns}
+        rows={arrived.size === 0 ? rows : rows.map((r) => (arrived.has(r.key) ? { ...r, arrived: true } : r))}
+        total={rowCount}
+        {sort}
+        {selected}
+        {selectedKeys}
+        bind:focus
+        {editing}
+        bind:editValue
+        bind:editTicked
+        {fresh}
+        names={result.names ?? undefined}
+        onmore={cursor === null ? undefined : more}
+        onsort={result.entries.length < 2 ? undefined : sortBy}
+        onactivate={(row) => goto(at(`/r/${id}/${row.key.split('#')[1]}`))}
+        {rowAt}
+        {fieldOf}
+        {editableHere}
+        {shownValue}
+        {listCurrency}
+        {receiptFor}
+        {toggleSelect}
+        {openEditor}
+        {commitEdit}
+        {cancelEdit}
+        {leftTheRow}
+        {cellKeys}
+        archive={changes ? archive : undefined}
+        {openCardMenu}
+      />
+    {:else}
+      <!-- THE BOARD AND THE CARDS: the same rows as cards on the board, in lanes or in one grid. A card moves lanes by
+           being dragged, through the same `setRowState` its menu's "Set to" presses. -->
+      <ListBoard
+        register={id}
+        {decl}
+        mode={view === 'board' ? 'board' : 'cards'}
+        entries={result.entries.slice(0, DOM_CAP)}
+        {now}
+        names={result.names ?? undefined}
+        {selected}
+        cursor={result.entries[focus.row]?.seq ?? null}
+        {fresh}
+        {arrived}
+        more={cursor !== null && loaded < DOM_CAP}
+        {receiptFor}
+        {openCardMenu}
+        lane={lane?.id}
+        setRowState={changes && lane ? moveOnBoard : undefined}
+      />
+    {/if}
+
+    <!--
+      ONE CAP LINE, FOR WHICHEVER BODY IS DRAWING. It belongs to the LIST rather than to a body, and it reads the one
+      number that is always the answer's size: `Table`'s own `total` is `aria-rowcount`, which is `-1` while a filtered
+      list is still paging, so a line drawn from it vanished in exactly the state it was written for. A sorted list the
+      record stopped says so the same way.
+    -->
+    {#if loaded >= DOM_CAP || truncated}
+      <CapLine shown={drawn} total={result.matched} />
+    {/if}
+    </div>
+  {/snippet}
 
   <!-- Peek: the docked panel, with the list still visible beside it, for triage. `?row=7` is which row. -->
   <RowPeek register={id} seq={peeked} entry={peekedEntry} title={decl.title} {now} names={result.names ?? undefined} {peek} />
@@ -2646,7 +2660,72 @@
     transition: padding-inline-end var(--d-panel) var(--ease-sheet);
   }
 
-  /* DISPLAY IS A 44PX GLASS CIRCLE ON A PHONE, its word kept in the button for a screen reader and a tooltip on it. */
+  /* THE BOARD UNDER THE HEAD: the figures' tiles, the list's tile and, on the board and cards views, the cards, 12
+     apart (DIRECTION 39). The page is as wide as the window; the gutter keeps it off the edges. */
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tile-gap);
+    padding: var(--sp-2) var(--gutter) var(--sp-9);
+  }
+
+  /* THE LIST'S TILE: its toolbar, the capture line and the rows, a step apart rather than a section apart, so they
+     read as one block. */
+  .page :global(.list-tile) {
+    gap: var(--sp-3);
+  }
+
+  /* THE TOOLBAR, ONE ROW: the search and the filters from the start, and how the list is drawn at the end. It wraps
+     rather than running past a narrow tile. */
+  .list-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .list-tools > :global(.bar) {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+
+  .list-views {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-inline-start: auto;
+  }
+
+  /* THE HEAD'S OVERFLOW, a square control the height of the primary beside it, in the field's quiet fill. */
+  .head-more {
+    display: inline-grid;
+    place-items: center;
+    inline-size: var(--btn-h);
+    block-size: var(--btn-h);
+    background: var(--field);
+    border-radius: var(--r-ctl);
+    color: var(--ink2);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    :global(.menu-trigger):hover > .head-more {
+      background: var(--field-hover);
+      color: var(--ink);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .head-more {
+      inline-size: var(--tap);
+      block-size: var(--tap);
+    }
+  }
+
+  /* DISPLAY IS ITS GLYPH AND ITS WORD, and on a phone the glyph alone, its word kept in the button for a screen reader
+     and a tooltip on it. */
   .tb-display {
     display: contents;
   }
@@ -2667,33 +2746,25 @@
     }
   }
 
-  /* THE HEAD'S KEYS ARE PRINTED WHEN ASKED FOR (DIRECTION 35): `v` on Display and `n` on New show under the pointer
-     or with keyboard focus, never as standing chrome. Without its cap a pill takes its even padding back. */
+  /* THE KEYS ARE PRINTED WHEN ASKED FOR (DIRECTION 35): `v` on Display and `n` on New show under the pointer or with
+     keyboard focus, never as standing chrome. Without its cap a button takes its even padding back. */
   :is(.tb-display, .new-row) :global(.btn:not(:hover, :focus-visible) > .btn-kbd) {
     display: none;
   }
 
   :is(.tb-display, .new-row) :global(.btn:not(:hover, :focus-visible):has(> .btn-kbd)) {
-    padding-inline-end: var(--sp-4);
+    padding-inline-end: var(--sp-3);
   }
 
-  /* BUT NOT ON THE PHONE'S CIRCLE: the even padding above outweighs its zero and pushed the glyph off centre. */
+  /* BUT NOT ON THE PHONE'S SQUARE: the even padding above outweighs its zero and pushed the glyph off centre. */
   @media (width < 640px) {
     .tb-display :global(.btn:not(:hover, :focus-visible):has(> .btn-kbd)) {
       padding-inline: 0;
     }
   }
 
-  .page {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
-  }
-
   /* A DIM NOTE, WITH ITS ONE CONTROL BESIDE IT. It wraps, because at 320px a word and a button on one line is the button
-     leaving the window: measured on the strip that said what the record had noticed, which went with the sample, the
-     button sat eleven pixels past the edge. */
+     leaving the window. */
   .stale {
     display: flex;
     flex-wrap: wrap;
@@ -2701,15 +2772,14 @@
     gap: var(--sp-3);
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-xs);
+    font-size: var(--fs-meta);
   }
 
-  /* WHY THERE IS NO CAPTURE LINE, one dim sentence where the line would stand. It wraps like any sentence, so
-     at 390px it is the line's height or two and nothing else moves. */
+  /* WHY THERE IS NO CAPTURE LINE, one dim sentence where the line would stand. */
   .reach {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* THE HEAD'S NEW BUTTON, which a phone does without: the "+" beside it opens the capture sheet, which starts a row in
@@ -2722,11 +2792,20 @@
     .new-row:not([data-alone]) {
       display: none;
     }
+
+    /* THE PHONE'S BOARD: one column, 12 from the edges (DIRECTION 39), and the list's tile a step tighter inside. */
+    .page {
+      padding: var(--sp-2) var(--sp-3) var(--sp-8);
+    }
+
+    .page :global(.list-tile) {
+      padding: var(--sp-3);
+    }
   }
 
-  @media (width < 900px) {
+  @media (640px <= width < 900px) {
     .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
+      padding-block-end: var(--sp-8);
     }
   }
 </style>

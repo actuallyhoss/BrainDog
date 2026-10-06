@@ -268,7 +268,7 @@ test('a lift called twice lifts once, so a close and a destroy cannot take down 
  * may say "240ms" to explain what a token is.
  */
 test('NO OVERLAY OR CHROME WRITES A DURATION OR A CURVE OF ITS OWN', () => {
-  const files = ['Panel.svelte', 'Sheet.svelte', 'Menu.svelte', 'RowMenu.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', 'TabBar.svelte', 'Sidebar.svelte', 'TopBar.svelte'];
+  const files = ['Panel.svelte', 'Sheet.svelte', 'Menu.svelte', 'RowMenu.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', '../shell/TabBar.svelte', 'Sidebar.svelte', 'TopBar.svelte'];
   for (const file of files) {
     const text = readFileSync(new URL(file, import.meta.url), 'utf8');
     const style = file.endsWith('.css') ? text : (text.match(/<style>([\s\S]*)<\/style>/u)?.[1] ?? '');
@@ -283,14 +283,17 @@ test('NO OVERLAY OR CHROME WRITES A DURATION OR A CURVE OF ITS OWN', () => {
  * one rule into one value, and a Safari that knows only the prefixed one drew the chrome unblurred. The block reads the
  * skin's `--glass-blur` and never a literal: `blur(24px) saturate(1.6)` written out gave dark glass light's colour and
  * kept it through less transparency.
+ *
+ * DIRECTION §39 RETIRES THE GLASS one surface at a time (the menus, the tab bar and the phone's head bar are flat
+ * already), so a file with none left has nothing to give Safari and is passed over.
  */
 test('every glass in the overlays and the chrome has a Safari block after it, reading the skin', () => {
-  const files = ['Panel.svelte', 'Menu.svelte', 'RowMenu.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', 'TabBar.svelte', 'Sidebar.svelte', '../../routes/+layout.svelte'];
+  const files = ['Panel.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', '../shell/TabBar.svelte', 'Sidebar.svelte', '../../routes/+layout.svelte'];
   for (const file of files) {
     const code = readFileSync(new URL(file, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
     const glass = code.match(/(?<!-webkit-)backdrop-filter:\s*var\(--glass-blur\)/gu)?.length ?? 0;
     const safari = code.match(/@supports \(-webkit-backdrop-filter: none\)/gu)?.length ?? 0;
-    assert.ok(glass > 0, `${file} has no glass to check`);
+    if (glass === 0) continue;
     assert.ok(safari >= glass, `${file} has ${glass} glass rules and ${safari} Safari blocks`);
     for (const [, value = ''] of code.matchAll(/^\s*-webkit-backdrop-filter:\s*([^;]+);/gmu)) {
       assert.match(value.trim(), /^(var\(--glass-blur\)|none)$/u, `${file}: Safari's glass writes ${value.trim()}`);

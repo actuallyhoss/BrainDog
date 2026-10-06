@@ -9,8 +9,8 @@
   A BUTTON NAMED BY WHAT IT DOES, "Add an item", since a bare "+" says nothing to a screen reader.
   The page owns whether the sheet is open, so this only asks for it.
 
-  IT IS THE PHONE'S ONE PRIMARY: an ink circle with the plus in the tile's colour, where the laptop's
-  "New" pill stands, which a phone does without.
+  IT IS THE PHONE'S ONE PRIMARY: the accent's square with the plus in the tile's colour (DIRECTION 39), where the
+  laptop's "New" stands, which a phone does without.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
@@ -28,7 +28,7 @@
     display: none;
   }
 
-  /* 44 ON BOTH AXES UNDER A THUMB, AND INK: the toolbar's one primary as a circle. */
+  /* 44 ON BOTH AXES UNDER A THUMB, IN THE ACCENT: the head's one primary as a square. */
   @media (width < 640px) {
     .capture-open {
       display: inline-grid;
@@ -36,10 +36,10 @@
       inline-size: var(--tap);
       block-size: var(--tap);
       padding: 0;
-      background: var(--ink);
+      background: var(--action);
       border: 0;
-      border-radius: var(--r-pill);
-      color: var(--on-ink);
+      border-radius: var(--r-ctl);
+      color: var(--on-action);
       cursor: pointer;
     }
   }
