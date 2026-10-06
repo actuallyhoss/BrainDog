@@ -35,7 +35,7 @@
   import { tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
-  import { queueCost, since, symbolText } from 'braindog-render';
+  import { since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { said } from '$lib/voice.svelte.ts';
   import { DOM_CAP, whoDid } from '$lib/record/api.ts';
@@ -46,10 +46,10 @@
   import Arranged from './[id]/Arranged.svelte';
   import Applied from './[id]/Applied.svelte';
   import { updatesOf, words as changeWords } from './[id]/changes.ts';
-  import { ageDays, AIM, DECIDED_FIRST, evidenceOf, sentenceOf, STALE_DAYS, waitedOf, waitedWords, waitingSaid, WORDS as LEAD } from './lead.ts';
+  import { AIM, DECIDED_FIRST, evidenceOf, sentenceOf, waitedOf, waitedWords, WORDS as LEAD } from './lead.ts';
   import { proposedOf } from './[id]/proposed.ts';
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './[id]/arranged.ts';
-  import { answerFor, optionsOf, reasonState, record, setReason, withdraw, type Answer } from '$lib/record/answer.ts';
+  import { answerFor, reasonState, record, setReason, withdraw, type Answer } from '$lib/record/answer.ts';
   import { mayAnswer, whyNotAnswering } from './answering.ts';
   import { dayWord, readViews, WORDS, type Views } from './views.ts';
   import { groupedAddress, groupingOf, type Grouping } from './grouping.ts';
@@ -77,6 +77,8 @@
   import Waffle from '$lib/viz/Waffle.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
+  import DecisionCard from '$lib/decide/DecisionCard.svelte';
+  import { queueOf } from '$lib/decide/card.ts';
 
   let { data } = $props();
 
@@ -658,17 +660,14 @@
   {@const said = answers.get(q.id)}
   {@const updates = changed.get(q.id) ?? []}
   {@const preview = previews.get(q.id)}
-  {@const about = aboutOf(q)}
-  {@const set = rowsetOf(q)}
   {@const decidedHere = settledHere.get(q.id)}
   {@const story = stories.get(q.id)}
   {@const part = partHere.get(q.id)}
-  {@const asker = askerOf(q)}
   <li
     class="q"
     id="q-{q.id}"
     tabindex="-1"
-    aria-labelledby="q-{q.id}-title"
+    aria-label={q.title}
     data-lead={isLead ? '' : undefined}
     data-keys={keyed?.id === q.id ? '' : undefined}
     data-cursor={order[cursor]?.id === q.id ? '' : undefined}
@@ -678,34 +677,27 @@
       <!-- DECIDED HERE: one line in the question's place, and the way to the decision it became. -->
       <a class="q-receipt" href={at(`/decide/${q.id}`)}>
         <span class="q-tick"><Icon name="check" size="s" /></span>
-        <span class="q-receipt-text"><span class="q-title" id="q-{q.id}-title">{q.title}</span> <span class="q-said">{copy.decideDecided(decidedHere)}</span></span>
+        <span class="q-receipt-text"><span class="q-title">{q.title}</span> <span class="q-said">{copy.decideDecided(decidedHere)}</span></span>
       </a>
       {@const did = appliedHere.get(q.id)}
       {#if did}<div class="q-applied"><Applied lines={did} /></div>{/if}
     {:else}
+      <!-- THE ONE DECISION CARD (`lib/decide/DecisionCard.svelte`), as every other screen draws a question: why first, who
+           asked, what it moves, the suggestion as an outline with a small dot. This screen answers its presses itself
+           (`take`), so a press picks and the reason under it sends, as it always has here; the card writes nothing. -->
       <div class="q-top">
         <IconWell name="decide" size="l" />
-        <a class="q-open" href={at(`/decide/${q.id}`)}>
-          <span class="q-body">
-            <!-- WHAT IT IS ABOUT LEADS, AND WHO ASKED AND HOW LONG IT HAS WAITED FOLLOW. -->
-            <span class="q-title" id="q-{q.id}-title">{q.title}</span>
-            {#if q.cost && !isLead}<span class="q-cost">{symbolText(q.cost)}</span>{/if}
-            <span class="q-head">
-              {#if set && updates.length && !isLead}
-                <span class="q-entity">{copy.decideRows(updates.length, listName(set.register))}</span>
-              {:else if about && grouping === 'none'}
-                <span class="q-entity">{about}</span>
-              {/if}
-              {#if aboutFor(q)?.by === 'slash'}<span class="q-entity">{copy.fromSlash}</span>{:else if asker}<span>{LEAD.askedBy(asker)}</span>{/if}
-              <span class="q-age" data-stale={ageDays(q.opened, now) > STALE_DAYS ? '' : undefined}>{waitingSaid(q.opened, now)}</span>
-              <!-- What it would cost to get this one wrong, which is why it sits where it sits. The
-                   word is `braindog-render`'s, the same one the `queue` block draws. -->
-              {#if queueCost(q.band ?? '')}<span class="q-band" data-cost={q.band}>{queueCost(q.band ?? '')}</span>{/if}
-              <!-- NO ID ENDS THE LINE, NOT EVEN ONE A READER COULD SAY: the question is named by its words, and a number
-                   here counted the questions a one-list member was not shown. -->
-            </span>
-          </span>
-        </a>
+        <div class="q-card">
+          <DecisionCard
+            question={queueOf(q, aboutFor(q))}
+            may={answerable}
+            n={1}
+            keys={keyed?.id === q.id}
+            link
+            idOf={(key) => `opt-${q.id}-${key}`}
+            onpress={(key) => void take(q, key)}
+          />
+        </div>
         <button
           type="button"
           class="pick"
@@ -800,28 +792,6 @@
               </Button>
               <span class="keys"><Kbd keys="⌘↵" />{copy.decideToSend}<Kbd keys="Esc" />{copy.decideToLeave}</span>
             </div>
-          </div>
-        {:else}
-          <!-- Named by the question, because "Per seat" repeated down a queue is three words with no subject. Each option
-               carries the key that answers with it, drawn only where the keys act: the open question, or the cursor's.
-
-               AND OFF FOR A READER WHO MAY NOT ANSWER, each one pointing at the standing sentence
-               over the queue that says why. `aria-describedby` rather than a title, so the reason is
-               read out with the control and not only seen beside it, which is the shape
-               `/settings/people` uses for its last-owner rule. -->
-          <div class="q-options" role="group" aria-labelledby="q-{q.id}-title">
-            {#each optionsOf(q) as o (o.key)}
-              <Button
-                id="opt-{q.id}-{o.key}"
-                size={isLead ? 'm' : 'sm'}
-                kbd={o.n <= 9 ? String(o.n) : undefined}
-                disabled={!answerable}
-                aria-describedby={answerable ? undefined : 'cannot-decide'}
-                onclick={() => take(q, o.key)}
-              >
-                <span class="opt-name">{o.title}{#if o.recommended}<span class="rec">{copy.recommended}</span>{/if}</span>
-              </Button>
-            {/each}
           </div>
         {/if}
         {#if fixes.get(q.id)}
@@ -1307,17 +1277,16 @@
     margin-inline-start: calc(var(--well-l) + var(--sp-3));
   }
 
-  .q-open {
-    display: block;
-    color: var(--ink);
-    text-decoration: none;
+  /* THE CARD BESIDE THE WELL answers the width it is given, and sits in the row with no hairline or air of its own:
+     the row draws both. */
+  .q-card {
+    min-inline-size: 0;
+    container-type: inline-size;
   }
 
-  .q-body {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-inline-size: 0;
+  .q-card > :global(.queue-card) {
+    padding-block: 0;
+    border-block-start: 0;
   }
 
   .q-title {
@@ -1325,63 +1294,6 @@
     font-size: var(--t-row);
     font-weight: 500;
     line-height: 20px;
-  }
-
-  /* THE OPEN QUESTION'S NAME IS THE TILE'S HEADING, at the group step and wrapping, never cut. */
-  .q[data-lead] .q-title {
-    font-size: var(--t-group);
-    font-weight: 600;
-    line-height: 24px;
-    text-wrap: balance;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .q-open:hover .q-title {
-      text-decoration: underline;
-      text-decoration-color: var(--line);
-      text-underline-offset: 3px;
-    }
-  }
-
-  .q-cost {
-    max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: 18px;
-  }
-
-  /* THE META LINE: what it is about, who asked, how long it has waited, and what getting it wrong costs. It wraps as
-     whole items, and the dot sits between items so a line never opens with one. */
-  .q-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: 18px;
-  }
-
-  .q-head > span + span::before {
-    content: '·';
-    margin-inline-end: var(--sp-2);
-    color: var(--dim);
-  }
-
-  .q-entity {
-    color: var(--ink2);
-  }
-
-  /* PAST TWO WEEKS THE AGE IS LATE, and its words carry the red at 500 so it is never a hairline of colour. */
-  .q-age[data-stale] {
-    color: var(--danger-text);
-    font-weight: 500;
-  }
-
-  /* THE BAND TAKES THE LINE'S OWN SEPARATOR RATHER THAN A PILL: the dearest takes the darker ink and nothing else. */
-  .q-band[data-cost='undo'] {
-    color: var(--ink2);
-    font-weight: 500;
   }
 
   /* ── what accepting does, the suggestion, and its evidence (the open question only) ───────────────────── */
@@ -1502,11 +1414,6 @@
       inset: calc((100% - var(--tap)) / 2);
     }
 
-    /* A QUESTION WITH A ONE-LINE TITLE AND A META LINE WAS 43PX TALL, a pixel under a thumb. */
-    .q-open {
-      min-block-size: var(--tap);
-    }
-
     .q:hover .pick,
     .q[data-cursor] .pick {
       visibility: hidden;
@@ -1532,73 +1439,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-  }
-
-  /* Wrapping, not scrolling: every answer stays visible on a phone. */
-  .q-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-  }
-
-  /* THE OPEN QUESTION'S OPTIONS SHARE THE TILE'S WIDTH, each a pill with its name at the start and its key at the end. */
-  .q[data-lead] .q-options {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  }
-
-  .q[data-lead] .q-options :global(.btn) {
-    justify-content: space-between;
-    white-space: normal;
-    text-align: start;
-  }
-
-  .opt-name {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: var(--sp-2);
-    min-inline-size: 0;
-  }
-
-  /* THE SUGGESTION IS A WORD, IN THE QUIET INK, read with the option's name. */
-  .rec {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 400;
-  }
-
-  /* A KEY IS PRINTED ONLY WHERE THE KEYS ACT: on the open question until the cursor moves, then on the cursor's row.
-     AND ONLY WHEN ASKED FOR: under the pointer, with focus inside, or once the cursor has been walked onto it. */
-  .q:not([data-keys]) .q-options :global(.btn-kbd),
-  .q[data-keys]:not([data-cursor], :hover, :focus-within) .q-options :global(.btn-kbd) {
-    display: none;
-  }
-
-  /* A ROW'S SMALL PILLS ARE A THUMB'S HEIGHT UNDER ONE, where `--ctl-h` is 44. */
-  @media (pointer: coarse) {
-    .q-options :global(.btn[data-size='sm']) {
-      min-block-size: var(--ctl-h);
-      font-size: var(--t-md);
-    }
-  }
-
-  /* ON A PHONE EACH OPTION IS A FULL-WIDTH ROW, so a thumb meets one answer at a time and a long label wraps inside its
-     own button rather than pushing the next one onto half a line. */
-  @media (width < 640px) {
-    .q-options,
-    .q[data-lead] .q-options {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .q-options :global(.btn) {
-      inline-size: 100%;
-      justify-content: flex-start;
-      white-space: normal;
-      text-align: start;
-    }
   }
 
   .said {
@@ -1822,8 +1662,7 @@
   /* NO KEY IS PRINTED WHERE THERE IS NO KEYBOARD, and the group control, a desk's nicety, gives way on a phone. */
   @media (width < 900px), (pointer: coarse) {
     .why:focus-within .keys,
-    .col:has(:focus-visible) .hint,
-    .q-options :global(.btn-kbd) {
+    .col:has(:focus-visible) .hint {
       display: none;
     }
   }

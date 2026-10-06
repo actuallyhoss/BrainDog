@@ -11,10 +11,14 @@
 
   `held` IS WHAT WAS TYPED EARLIER, when there was an earlier: the name asked for at the start of sign-up, the person's
   own name and their zone. On `/start` there was none, and the name field starts empty.
+
+  ON `/start`, SAYING WHO YOU ARE LEADS (`describe`, DIRECTION §35 and §37): the ink press opens `/signup`, which builds a
+  free BrainDog from the answer, and the paid name is the quieter way under it, never the lead.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { copy } from '$lib/copy.ts';
+  import { firstRun } from '$lib/first-run.ts';
   import { billing, checkout, hold, zone, type Held } from '$lib/signup.ts';
   import Button from '$lib/ui/Button.svelte';
   import NameField from '../signup/NameField.svelte';
@@ -24,7 +28,8 @@
     why = null,
     held = null,
     note = null,
-  }: { title: string; why?: string | null; held?: Held | null; note?: string | null } = $props();
+    describe = false,
+  }: { title: string; why?: string | null; held?: Held | null; note?: string | null; describe?: boolean } = $props();
 
   let slug = $state('');
   let free = $state(false);
@@ -75,15 +80,20 @@
   {#if why}<p class="own-why">{why}</p>{/if}
   {#if note}<p class="own-note" role="status">{note}</p>{/if}
 
+  {#if describe}
+    <div class="own-lead"><Button weight="primary" href="/signup">{firstRun.noRecordDescribe}</Button></div>
+  {/if}
+
   {#if open === false}
-    <p class="own-why">{copy.signupClosedWhy}</p>
+    {#if !describe}<p class="own-why">{copy.signupClosedWhy}</p>{/if}
   {:else}
+    {#if describe}<h2 class="own-paid">{firstRun.noRecordPaid}</h2>{/if}
     <form class="own-form" onsubmit={pay}>
       <NameField bind:value={slug} bind:free id="own-name" />
       {#if price}<p class="own-price">{copy.signupPayWhy(price)}</p>{/if}
       {#if said}<p class="own-said" role="alert">{said}</p>{/if}
       <div class="own-go">
-        <Button weight="primary" type="submit" disabled={busy || !free || open === null} aria-busy={busy}>
+        <Button weight={describe ? 'quiet' : 'primary'} type="submit" disabled={busy || !free || open === null} aria-busy={busy}>
           {busy ? copy.signupPaying : slug === '' ? copy.signupPayRecord : copy.signupPayFor(slug)}
         </Button>
       </div>
@@ -142,6 +152,21 @@
   .own-said {
     margin: 0;
     color: var(--ink);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 18px;
+  }
+
+  .own-lead :global(.btn) {
+    min-block-size: var(--tap);
+  }
+
+  /* THE PAID WAY, UNDER THE LEAD: a quiet heading over a hairline, so it reads as the other way and not the next step. */
+  .own-paid {
+    margin: var(--sp-4) 0 0;
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+    color: var(--dim);
     font-size: var(--t-sm);
     font-weight: 500;
     line-height: 18px;

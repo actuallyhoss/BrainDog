@@ -280,15 +280,20 @@ test('NO OVERLAY OR CHROME WRITES A DURATION OR A CURVE OF ITS OWN', () => {
 
 /**
  * AND EVERY GLASS IS GIVEN TO SAFARI IN A BLOCK OF ITS OWN: the build folds a prefixed and an unprefixed declaration in
- * one rule into one value, and a Safari that knows only the prefixed one drew the chrome unblurred.
+ * one rule into one value, and a Safari that knows only the prefixed one drew the chrome unblurred. The block reads the
+ * skin's `--glass-blur` and never a literal: `blur(24px) saturate(1.6)` written out gave dark glass light's colour and
+ * kept it through less transparency.
  */
-test('every glass in the overlays and the chrome has a Safari block after it', () => {
-  const files = ['Panel.svelte', 'Menu.svelte', 'RowMenu.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', 'TabBar.svelte', 'Sidebar.svelte'];
+test('every glass in the overlays and the chrome has a Safari block after it, reading the skin', () => {
+  const files = ['Panel.svelte', 'Menu.svelte', 'RowMenu.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', 'TabBar.svelte', 'Sidebar.svelte', '../../routes/+layout.svelte'];
   for (const file of files) {
     const code = readFileSync(new URL(file, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
     const glass = code.match(/(?<!-webkit-)backdrop-filter:\s*var\(--glass-blur\)/gu)?.length ?? 0;
     const safari = code.match(/@supports \(-webkit-backdrop-filter: none\)/gu)?.length ?? 0;
     assert.ok(glass > 0, `${file} has no glass to check`);
     assert.ok(safari >= glass, `${file} has ${glass} glass rules and ${safari} Safari blocks`);
+    for (const [, value = ''] of code.matchAll(/^\s*-webkit-backdrop-filter:\s*([^;]+);/gmu)) {
+      assert.match(value.trim(), /^(var\(--glass-blur\)|none)$/u, `${file}: Safari's glass writes ${value.trim()}`);
+    }
   }
 });

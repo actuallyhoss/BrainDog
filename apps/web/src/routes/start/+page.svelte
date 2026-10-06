@@ -29,21 +29,24 @@
   the same one press files and accepts them. The sample rows are never written.
 
   THEN ONE PRESS. "Make it mine" (or Ctrl Enter from anywhere) writes it all through the install path Browse uses
-  (`accept.ts`) and lands on Home. There is no second screen and no one-row form: a list with nothing in it draws its own
-  empty state, and a record with no lists is sent here by the root layout.
+  (`accept.ts`), and the screen becomes its end (`Made.svelte`): one agent and one source, each saying what it would
+  find here, a passkey for a person with none, then Home. `/start#made` opens on that end directly, which is where
+  sign-up lands once it has written what was said there into the new record. There is no one-row form: a list with
+  nothing in it draws its own empty state, and a record with no lists is sent here by the root layout.
+
+  THE WHOLE WINDOW (`Frame.svelte`), as sign-up has it: the conversation and the build share it from 900px.
 
   NO SKIP, because a record with no lists has no other screen to show (19 §6). A colleague who holds lists and not the
   record, and an owner whose record is already made, are told so before the question, with the way back.
 -->
 <script lang="ts">
-  import { tick } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { onMount, tick } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { USE_CASES } from '@braindog/seed/usecases';
   import { dayOf } from '@braindog/seed/usecases/install';
   import { moduleName } from '@braindog/seed/usecases/names';
-  import { apiBase, at } from '$lib/at.ts';
+  import { apiBase } from '$lib/at.ts';
   import { covered, typing } from '$lib/a11y/keys.svelte.ts';
   import { silenced } from '$lib/a11y/chars.ts';
   import { methods } from '$lib/auth.ts';
@@ -61,14 +64,12 @@
   import { listById } from '$lib/start/lists.ts';
   import { titleOf } from '$lib/title.ts';
   import { drew } from '$lib/ui/screen.svelte.ts';
-  import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import Face from '$lib/ui/Face.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
-  import Entry from '../signin/Entry.svelte';
   import { PEOPLE, withChip } from '$lib/who.ts';
   import { accept, type NotMade } from './accept.ts';
   import {
@@ -95,7 +96,8 @@
   import Part from './Part.svelte';
   import Remind from './Remind.svelte';
   import NoRecord from './NoRecord.svelte';
-  import PasskeyFirst from './PasskeyFirst.svelte';
+  import Frame from './Frame.svelte';
+  import Made from './Made.svelte';
 
   /**
    * A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS NEVER ASKED TO SET ONE UP. A record's shape is its owner's, and
@@ -118,6 +120,19 @@
    * before the question, with the door back.
    */
   const alreadyMade = $derived(Boolean(page.data.live) && (page.data.pages.length > 0 || page.data.index.registers.length > 0));
+
+  /**
+   * THE END OF THE FIRST RUN: the BrainDog is made, and `Made` offers an agent and a source before Home. Set by a "Make it
+   * mine" that wrote everything, and by arriving at `#made`, which sign-up opens once it wrote the build itself. The
+   * fragment is wiped as it is read, so a reload is the question again, with the "already made" note over it.
+   */
+  let made = $state(false);
+  let madeModules = $state.raw<string[] | null>(null);
+  onMount(() => {
+    if (location.hash !== '#made') return;
+    history.replaceState(history.state, '', location.pathname + location.search);
+    if (page.data.live) made = true;
+  });
 
   /* WHERE AND HOW THE SENTENCE WAS TYPED, for a date such as "on the 1st", for the currency names and for the currency
      worth suggesting. */
@@ -588,8 +603,9 @@
       /* THE SHELL READS THE RECORD AGAIN, so the rail shows the new pages and speaks in the new voice. */
       (await import('$lib/record/boot-live.ts')).forget();
       if (out.failed.length === 0) {
-        toasts.push(firstRun.madeToast, { intent: 'good' });
-        await goto(at('/'));
+        madeModules = asked.modules;
+        made = true;
+        globalThis.scrollTo?.({ top: 0 });
         return;
       }
       /* WHAT WENT IN STAYS IN, AND IS NOT ASKED FOR AGAIN: the proposal keeps only the entries not written, so pressing
@@ -678,11 +694,11 @@
 {/snippet}
 
 <!-- THE ENTRY LAYOUT EVERY WAY IN SHARES (`signin/Entry.svelte`), in its wide form: a column up to 1040 on the ground. -->
-<Entry wide>
+<Frame>
   <div class="frame" data-making={proposal !== null ? '' : undefined}>
     {#if noRecord}
       <div class="alone">
-        <NoRecord title={copy.noRecordTitle} why={copy.noRecordWhy} />
+        <NoRecord title={copy.noRecordTitle} why={firstRun.noRecordWhy} describe />
       </div>
     {:else if colleague}
       <section class="again alone" aria-labelledby="again-h">
@@ -696,6 +712,8 @@
           {/if}
         </div>
       </section>
+    {:else if made}
+      <Made modules={madeModules} />
     {:else}
       {#if alreadyMade}
         <section class="again" aria-labelledby="again-h">
@@ -707,9 +725,6 @@
           <Button href="/">{firstRun.againBack}</Button>
         </section>
       {/if}
-
-      <!-- A NEW PERSON'S FIRST ASK IS A PASSKEY, and it draws nothing for anybody who has one. -->
-      <PasskeyFirst />
 
       <!-- THE TITLE ROW: the question, and once it is read, the sentence that says where the build stands. -->
       <header class="title">
@@ -1003,7 +1018,7 @@
       </div>
     {/if}
   </div>
-</Entry>
+</Frame>
 
 <style>
   /* THE FRAME: the title row, then the board, 20 apart. `min-inline-size: 0` everywhere a long word could otherwise
@@ -1015,10 +1030,11 @@
     min-inline-size: 0;
   }
 
-  /* A STATE THAT IS NOT THE BUILD (no record yet, a colleague's) is a centred column on the ground, no tile. */
+  /* A STATE THAT IS NOT THE BUILD (no record yet, a colleague's) is a column on the ground under the brand, no tile, at
+     a reading measure and never floated in the middle of the window. */
   .alone {
-    justify-self: center;
-    inline-size: min(440px, 100%);
+    justify-self: start;
+    inline-size: min(40rem, 100%);
   }
 
   /* ── the title row ─────────────────────────────────────────────────────── */

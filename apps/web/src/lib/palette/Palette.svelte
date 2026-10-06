@@ -79,6 +79,7 @@
   import { capLine, drawProposal, drawReading, offersSlash, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from './slash.ts';
   import Cited from '../ui/Cited.svelte';
   import SlashOut from '$lib/ui/SlashOut.svelte';
+  import DecisionCard from '$lib/decide/DecisionCard.svelte';
   import type { SlashStatus } from '@braindog/client';
 
   let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
@@ -204,11 +205,25 @@
       slashPropose.ask({ question, askId: out.value.ask_id }, (said) => {
         if (slash?.q !== asked || slash.second === null) return;
         slash.second = said.ok
-          ? { drawn: drawProposal(said.value), refused: null }
+          ? { drawn: drawProposal(said.value, question), refused: null }
           : { drawn: null, refused: pass2Refused('refusal' in said ? said.refusal : { code: 'VALUE_MALFORMED', fix: copy.slashNothing }) };
       });
     });
   }
+
+  /**
+   * SLASH'S FILED PROPOSAL, DRAWN WHERE IT WAS ASKED, as the one decision card (DIRECTION §37): when it arrives the
+   * keyboard is on it (`cursor` is -1, above the rows), Enter accepts it, a six-second Undo follows on its line, and the
+   * line reads "Slash suggested · Sam accepted". `↓` goes down to the rows as ever, and `↑` from the first row comes
+   * back to it. A proposal that moves money is not accepted by a key: Enter opens it on Decide, where Accept names the
+   * amount.
+   */
+  const filed = $derived(slashShown?.second?.drawn?.card ?? null);
+  let filedCard = $state<ReturnType<typeof DecisionCard> | null>(null);
+  const armed = $derived(filed !== null && cursor === -1);
+  $effect(() => {
+    if (filed) untrack(() => (cursor = -1));
+  });
 
   /**
    * THE WARM-UP, AND THE ONE NUMBER IT BRINGS BACK (`46 §5.2`, `23 §8`). Opening the palette on a host with a model asks
@@ -992,9 +1007,19 @@
       cursor = Math.min(cursor + 1, flat.length - 1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      cursor = Math.max(cursor - 1, 0);
+      cursor = Math.max(cursor - 1, filed ? -1 : 0);
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      /* ON SLASH'S FILED PROPOSAL, Enter accepts it; where a key may not (money moves), it opens on Decide instead. */
+      if (armed) {
+        if (filedCard?.accept()) return;
+        const decide = slashShown?.second?.drawn?.decide;
+        if (decide && !filedCard?.answered()) {
+          open = false;
+          void goto(at(decide));
+        }
+        return;
+      }
       run(flat[cursor]);
     } else if (e.key === 'Tab' && !e.shiftKey) {
       /**
@@ -1151,6 +1176,12 @@
                   <Cited text={slashShown.second.drawn.text} figures={slashShown.second.drawn.figures} />
                 </p>
               {/if}
+              {#if slashShown.second.drawn.card}
+                <!-- THE ONE DECISION CARD, where it was asked. Outside the listbox, as everything about the ask is. -->
+                <div class="p-slash-card" data-armed={armed ? '' : undefined}>
+                  <DecisionCard bind:this={filedCard} question={slashShown.second.drawn.card} whole={false} />
+                </div>
+              {/if}
               {#if slashShown.second.drawn.decide}
                 <a class="p-slash-decide tap" href={at(slashShown.second.drawn.decide)} onclick={() => (open = false)}>{slashWords.decide}</a>
               {/if}
@@ -1283,12 +1314,13 @@
     overflow: hidden;
   }
 
-  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives: Safari drops a
-     `backdrop-filter` whose value is a `var()`, and the build folds a prefixed line beside the one above into it. The
-     other browsers skip this block and keep the theme's value. The phone's sheet below takes it away again. */
+  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives: the
+     build folds a prefixed line beside the one above into it. The token reaches Safari too (`tokens.css`), so a reader
+     who asked for less transparency gets `none` here as everywhere (`a11y.css`). The phone's sheet below takes it away
+     again. */
   @supports (-webkit-backdrop-filter: none) {
     .palette {
-      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+      -webkit-backdrop-filter: var(--glass-blur);
     }
   }
 
@@ -1512,6 +1544,22 @@
     font-size: var(--t-base);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
+  }
+
+  /* THE FILED PROPOSAL'S CARD, its own container, ringed while the keyboard is on it, as a row is tinted. */
+  .p-slash-card {
+    container-type: inline-size;
+    padding: var(--sp-3);
+    border-radius: var(--r-md);
+  }
+
+  .p-slash-card[data-armed] {
+    background: var(--hover-wash);
+  }
+
+  .p-slash-card > :global(.queue-card) {
+    padding-block: 0;
+    border-block-start: 0;
   }
 
   /* A LINK IS INK WITH ITS UNDERLINE, never the brand's red, and a 44px target through `.tap`. */

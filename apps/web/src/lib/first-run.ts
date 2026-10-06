@@ -10,6 +10,10 @@
  * screen they belonged to. What is left says what was heard and what the BrainDog will be, in words a person says.
  */
 
+/** "A, B and C": a list said as a person says it. */
+const andOf = (items: readonly string[]): string =>
+  items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+
 export const firstRun = {
   /* THE PROMPT. A question, one field and four chips, one for each of the four people the product is for:
      an individual, a solo founder, a team and somebody starting something. Each chip is a
@@ -67,7 +71,7 @@ export const firstRun = {
   /* A title the record keeps, built only from what was typed: the cadence and the client's name (`shape.ts`). */
   shapeInvoice: (cadence: string | null, client: string | null) =>
     `${cadence ? `${cadence.charAt(0).toUpperCase()}${cadence.slice(1)} invoice` : 'Invoice'}${client ? ` to ${client}` : ''}`,
-  and: (items: readonly string[]) => (items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`),
+  and: andOf,
 
   /* WHAT THE BRAINDOG WILL BE, before anything is written: its pages, its Home, what it keeps and the first entries. */
   mineTitle: 'Your BrainDog',
@@ -98,7 +102,6 @@ export const firstRun = {
   makeIt: 'Make it mine',
   makingIt: 'Making it',
   makeSomething: 'Turn on one thing to keep first.',
-  madeToast: 'Your BrainDog is ready.',
   /* WHAT COULD NOT BE MADE, in the person's words; the record's own sentence stays under Details. */
   /* A TITLE, SO NO FULL STOP: it heads the list of what was refused. */
   notAllMade: 'Some of it could not be made',
@@ -108,6 +111,44 @@ export const firstRun = {
   notSet: 'The currency was not set.',
   whyDetails: 'Details',
   openHome: 'Open my BrainDog',
+
+  /**
+   * AND ONCE IT IS MADE, ONE AGENT AND ONE SOURCE, THEN HOME (`/start#made`, `lib/start/made.ts`). Each says what it
+   * would find in this BrainDog, in its own words, never a bare tick; neither is required, and Home is the one ink
+   * button. The passkey follows them, for a person who has none.
+   */
+  madeTitle: 'Your BrainDog is ready',
+  madeLede: 'Two things make it fill itself. Both are optional, and both can wait for Settings.',
+  madeNext: 'Worth doing now',
+  /** The agent: Claude Code, by its maker's mark, with the one command that connects it. */
+  agentName: 'Claude Code',
+  agentFinds: (things: readonly string[]) =>
+    things.length === 0
+      ? 'It would find what you keep here before it starts, and leave what it did when it stops.'
+      : `It would find ${andOf(things)} here before it starts, and leave what it did when it stops.`,
+  agentProjects: 'your projects',
+  agentPeople: 'the people you work with',
+  agentTasks: 'what is on your plate',
+  agentCopy: 'Copy the command',
+  agentCopied: 'Copied. Paste it in a terminal, and allow BrainDog when Claude Code asks.',
+  agentOthers: 'Other agents',
+  /** The source: the one that fits what this BrainDog keeps. */
+  sourceBank: "Your bank's mail",
+  sourceBankFinds: 'Forward it here, and it would find what you spent and what falls due.',
+  sourceMail: 'Your mail',
+  sourceMailFinds: 'Forward a mail here, and it would find who wrote and what they are waiting on.',
+  sourceFile: 'A file from another app',
+  sourceFileFinds: 'A CSV or JSON export, and it would find where each of its entries goes.',
+  sourceGo: 'Set it up',
+  sourceFileGo: 'Bring in a file',
+
+  /**
+   * SIGNED IN AND ON NO RECORD: the way in is to say who you are on `/signup`, and a paid name is the quieter way
+   * beside it, never the lead (DIRECTION §35, "Free leads").
+   */
+  noRecordWhy: 'You are signed in and have no BrainDog yet. Say who you are and it builds one for you, free.',
+  noRecordDescribe: 'Tell it who you are',
+  noRecordPaid: 'Or name one on a paid plan',
 
   /**
    * AND `/start` OPENED AGAIN ON A RECORD THAT IS ALREADY MADE SAYS SO, AND OFFERS THE WAY BACK.

@@ -444,7 +444,10 @@ test('a look row and its toast say where the change is kept: this record, this d
 test("the palette's glass is given to Safari in a block of its own, and taken away again on a phone", () => {
   const code = readFileSync(new URL('./Palette.svelte', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
   const glass = code.match(/(?<!-webkit-)backdrop-filter:\s*var\(--glass-blur\)/gu)?.length ?? 0;
-  const safari = code.match(/@supports \(-webkit-backdrop-filter: none\)\s*\{\s*\.palette\s*\{\s*-webkit-backdrop-filter: blur\(/gu)?.length ?? 0;
+  /* SAFARI'S BLOCK READS THE SKIN'S ONE VALUE, never a blur in so many words that no token (and no ask for less
+     transparency) can reach. */
+  const safari = code.match(/@supports \(-webkit-backdrop-filter: none\)\s*\{\s*\.palette\s*\{\s*-webkit-backdrop-filter: var\(--glass-blur\);/gu)?.length ?? 0;
+  assert.doesNotMatch(code, /-webkit-backdrop-filter: blur\(/u, 'a blur literal no token reaches');
   assert.ok(glass > 0, 'the palette has no glass to check');
   assert.ok(safari >= glass, `${glass} glass rules and ${safari} Safari blocks`);
   /* THE PHONE'S SHEET IS SOLID, so Safari's own property is taken off there too. */

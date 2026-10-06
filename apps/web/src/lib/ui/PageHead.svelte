@@ -620,10 +620,10 @@
       transition: opacity var(--d-move) var(--ease-out);
     }
 
-    /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives. */
+    /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives. */
     @supports (-webkit-backdrop-filter: none) {
       .head-bar::before {
-        -webkit-backdrop-filter: blur(24px) saturate(1.6);
+        -webkit-backdrop-filter: var(--glass-blur);
       }
     }
 
@@ -796,7 +796,7 @@
     @supports (-webkit-backdrop-filter: none) {
       .head[data-under] .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass'])),
       .head[data-under] .head-actions :global(.segmented) {
-        -webkit-backdrop-filter: blur(24px) saturate(1.6);
+        -webkit-backdrop-filter: var(--glass-blur);
       }
     }
 

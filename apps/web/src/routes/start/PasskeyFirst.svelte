@@ -1,9 +1,9 @@
 <!--
-  A passkey, asked for before anything else on a new record's `/start`.
+  A passkey, offered at the end of a new record's first run (`Made.svelte`), once the BrainDog is made.
 
-  A PERSON WHO SIGNED UP HAS ONLY THEIR MAILBOX. They proved it with a link, paid, and landed here; without a passkey
-  every later sign-in is another email to wait for. So the first thing the new record asks is for a way back in on
-  this device, and "Not now" leaves it for Settings > Recovery.
+  A PERSON WHO SIGNED UP HAS ONLY THEIR MAILBOX. They proved it with a link and landed here; without a passkey every
+  later sign-in is another email to wait for. So the end of the first run offers a way back in on this device, after
+  the build rather than before the question (research-firstrun-17), and "Not now" leaves it for Settings > Recovery.
 
   ASKED ONLY WHEN IT WOULD HELP: the host offers passkeys, this person has none yet (`firstRun` is about THIS person
   once they are signed in, `packages/ports/src/auth.ts`), and this browser can make one. Everybody else never sees it.

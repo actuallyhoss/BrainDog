@@ -299,10 +299,10 @@
     transition-timing-function: var(--ease-out);
   }
 
-  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives. */
+  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives. */
   @supports (-webkit-backdrop-filter: none) {
     .row-menu {
-      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+      -webkit-backdrop-filter: var(--glass-blur);
     }
   }
 

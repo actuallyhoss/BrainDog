@@ -249,15 +249,19 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
      with People off was said back on the preview and is stored nowhere. */
   const met = introduce(who, asked.email, states);
   if (met) {
-    const out = (await client.meet(met)) as Wire<{ row: { register: string; seq: number | null } | null; created: boolean }>;
+    const out = (await client.meet(met)) as Wire<{ row: { register: string; seq: number | null } | null; created: boolean; matched_by?: string }>;
     const row = out.ok ? out.value.row : null;
     if (row && row.seq !== null) {
       /* THE WORDS AFTER THE NAME ARE THE PERSON'S NOTE, which is where a sentence these rules could not read is kept. */
       if (out.ok && out.value.created && who.bio !== '') await client.update({ register: row.register, seq: row.seq, patch: { note: who.bio } }).catch(() => null);
       /* THIS IS THEM, SO THE ROW SAYS SO (People's `self`, `loop/contract-17.md`): their own commits and mail are never
          met as somebody new, and an imported copy of them folds into this row. A People list older than the part refuses
-         it, and the row stays an ordinary person. */
-      await client.update({ register: row.register, seq: row.seq, patch: { self: true } }).catch(() => null);
+         it, and the row stays an ordinary person.
+         ONLY A ROW THAT IS SURELY THEM: one this press added, or one already known by the address they signed in with.
+         A row matched on a name alone may be somebody else of that name, and marking them as the owner would fold the
+         owner's own commits into a stranger. */
+      const theirs = out.ok && (out.value.created || out.value.matched_by === 'key');
+      if (theirs) await client.update({ register: row.register, seq: row.seq, patch: { self: true } }).catch(() => null);
     } else {
       /* A PEOPLE LIST WITH NO PROJECTS TO LINK, a student's or a guide's, is one `meet` refuses (it writes the agents
          pack's fields), so the person is written as a plain entry instead, and is in People like anybody else. A name

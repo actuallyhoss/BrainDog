@@ -2,6 +2,11 @@
  * Signing up, from the browser's side: the three `/auth/signup/*` calls, the billing calls a new record is made or paid
  * through, and what the address says when somebody arrives from their mail or from Stripe.
  *
+ * DESCRIBE, THEN BUILD (DIRECTION §37). The page asks "Who are you?" first and draws the BrainDog from the answer, and
+ * only then asks for one email. The record's name is chosen from what was heard (`namesHeard`, `recordNames`,
+ * `chooseName`), and the sentence waits for the link in `localStorage` (`keepSaid`, `saidKept`), so the tab the link
+ * opens builds the record from it.
+ *
  * FREE LEADS (DIRECTION §35). The site's buttons open `/signup` with no plan, and no plan is Free: checkout with
  * `plan: 'free'` makes the record there and then and answers its `/start`. `?plan=cloud` and `?plan=plus` are the
  * site's pricing buttons, and those go to Stripe's page as before.
@@ -147,6 +152,104 @@ export function nameOf(typed: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+/, '')
     .slice(0, 32);
+}
+
+/**
+ * A name the Directory could hand out, as far as this side can tell without asking: a letter first, two to thirty-two
+ * of lower-case letters, digits and hyphens, no hyphen last, and not the shape of a spoken id such as `d41`. The
+ * Directory's own check (`checkName`) still has the last word, on its reserved words too.
+ */
+const HANDABLE = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
+const SPOKEN = /^[a-z]{1,3}[0-9]+$/;
+
+/** A typed name as a whole record name, or `null`: `nameOf`, then no leading digit and no hyphen last. */
+function wholeName(typed: string): string | null {
+  const n = nameOf(typed).replace(/^[^a-z]+/, '').replace(/-+$/, '').slice(0, 32).replace(/-+$/, '');
+  return HANDABLE.test(n) && !SPOKEN.test(n) ? n : null;
+}
+
+/** What the first sentence named: the person, and the business or project they run, as `propose` heard them. */
+export type HeardNames = { person: string | null; business: string | null };
+
+/**
+ * THE NAMES A SENTENCE GAVE, read off its proposal: the person's own name, and the first thing they run that the
+ * sentence put in a list ("I run Kiln Studio" is Kiln Studio, a project). A person, a payment or a client is not the
+ * business, so only an entry with a `name` that is not a person counts.
+ */
+export function namesHeard(p: { name: string | null; rows: readonly { register: string; fields: Record<string, unknown> }[] }): HeardNames {
+  const run = p.rows.find((r) => r.register !== 'people' && typeof r.fields.name === 'string' && r.fields.name.trim() !== '');
+  return { person: p.name, business: run ? String(run.fields.name) : null };
+}
+
+/**
+ * THE RECORD'S NAME, FROM WHAT WAS HEARD (DIRECTION §37: describe, then make the account with one field). The business
+ * first, since a record is mostly about what somebody runs; then the person; then the address's own name, so there is
+ * always one to try. Each at most once, in that order.
+ */
+export function recordNames(heard: HeardNames, email: string): string[] {
+  const local = email.trim().split('@')[0] ?? '';
+  const out: string[] = [];
+  for (const typed of [heard.business, heard.person, local]) {
+    const n = typed === null ? null : wholeName(typed);
+    if (n !== null && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
+/**
+ * The first name the Directory says is free: each name heard as it is, then the first one with `-2` to `-9`, the way a
+ * paid record taken between checkout and payment is made (`madeFor`). `null` when none is free or the host did not
+ * answer, and the person is asked to choose one.
+ */
+export async function chooseName(names: readonly string[], check: (slug: string) => Promise<Asked<NameSeen>> = checkName): Promise<string | null> {
+  const first = names[0];
+  if (first === undefined) return null;
+  const tries = [...names, ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => `${first.slice(0, 29).replace(/-+$/, '')}-${n}`)];
+  for (const slug of tries) {
+    const out = await check(slug);
+    if (!out.ok) return null;
+    if (out.value.free && out.value.slug === slug) return slug;
+  }
+  return null;
+}
+
+/**
+ * The key the first sentence is kept under while the mail travels, in `localStorage`.
+ *
+ * NOT THE TAB'S STORAGE, for the reason the plan is not (`PLAN_KEY`): the link opens a new tab, and the record it makes
+ * is built from what was said. The words alone, never the address, and forgotten once the record is made.
+ */
+export const SAID_KEY = 'braindog.signup.said';
+
+/** How long a sentence kept for the mail is good for: the link's own day, and a little over. */
+const SAID_MS = 26 * 60 * 60 * 1000;
+
+/** The longest sentence kept, as the host keeps it (2,000 characters). */
+export const SAID_MOST = 2000;
+
+/** What was said, the currency chosen for it and the use case picked by hand, kept across the mail. */
+export type Draft = { said: string; currency: string | null; usecase: string | null };
+
+/** Keep the sentence across the mail, or forget it (`null`). Storage may be off, and then the record asks again. */
+export function keepSaid(storage: Pick<Storage, 'setItem' | 'removeItem'> | null | undefined, draft: Draft | null, now: number = Date.now()): void {
+  try {
+    if (draft === null || draft.said.trim() === '') storage?.removeItem(SAID_KEY);
+    else storage?.setItem(SAID_KEY, JSON.stringify({ said: draft.said.slice(0, SAID_MOST), currency: draft.currency, usecase: draft.usecase, at: now }));
+  } catch {
+    /* Storage off: the new record's /start asks "Who are you?" again, which is the whole of the cost. */
+  }
+}
+
+/** The sentence kept across the mail, or `null` when none was, or it is older than the link it went with. */
+export function saidKept(storage: Pick<Storage, 'getItem'> | null | undefined, now: number = Date.now()): Draft | null {
+  try {
+    const raw = storage?.getItem(SAID_KEY);
+    const v: unknown = raw ? JSON.parse(raw) : null;
+    if (!isObj(v) || typeof v.said !== 'string' || v.said.trim() === '' || typeof v.at !== 'number' || now - v.at > SAID_MS || v.at > now) return null;
+    return { said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase) };
+  } catch {
+    return null;
+  }
 }
 
 /** This browser's time zone, or `null` where the runtime will not say. */

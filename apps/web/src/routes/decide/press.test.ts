@@ -215,17 +215,20 @@ test('on the queue a key presses the card’s own button, and Enter answers only
   );
 });
 
-test('on the queue Backspace is held six seconds with Undo, and never fires from inside a field or a box', () => {
+test('on the queue every answer, Backspace’s too, is held six seconds with Undo by the card, and never fires from inside a field', () => {
   const at = queue.indexOf('function onkey(e: KeyboardEvent) {');
   const onkey = queue.slice(at, queue.indexOf('\n  }\n', at));
   assert.match(onkey, /if \(covered\(\) \|\| typing\(\) \|\| fromInput\(e\.target\) \|\| silenced\(e\)\) return;/u, 'a key from inside a field reaches Decide');
-  assert.match(onkey, /if \(act === 'decline'\) return void holdDecline\(card\);\n\s+press\.click\(\);/u, 'Backspace declines at once, with no Undo');
-  const held = queue.slice(queue.indexOf('function holdDecline(card: HTMLElement) {'));
-  assert.match(held, /const held = hold\(/u, 'the decline is not held for its Undo');
-  assert.match(held, /reject\.click\(\)/u, 'the held decline sends past the card’s own button');
-  assert.match(held, /life: HOLD_MS/u, 'the Undo line does not last as long as the hold');
-  /* AND A DECLINE STILL HELD WHEN THE PAGE GOES IS SENT, not dropped. */
-  assert.match(queue, /mounted = false;\n\s+leave\(\);/u, 'a held decline is dropped when the page goes');
+  /* THE ONE DECISION CARD HOLDS EVERY PRESS FOR ITS UNDO (`lib/decide/DecisionCard.svelte`), so a key that presses its
+     button is held the same way, and the page holds nothing of its own on top. */
+  assert.match(onkey, /press\.click\(\);/u);
+  assert.doesNotMatch(queue, /holdDecline|const held = hold\(/u, 'the page holds a decline on top of the card’s own hold');
+  const card = readFileSync(fileURLToPath(new URL('../../lib/decide/DecisionCard.svelte', import.meta.url)), 'utf8');
+  assert.match(card, /holding = hold\(\(\) => \{/u, 'the card sends a press at once, with no Undo');
+  assert.match(card, /onclick=\{undo\}>\{cardWords\.undo\}/u, 'the answered line offers no Undo');
+  /* AND AN ANSWER STILL HELD WHEN THE PAGE OR THE CARD GOES IS SENT, not dropped. */
+  assert.match(card, /window\.addEventListener\('pagehide', leave\);/u, 'a held answer is dropped when the tab goes');
+  assert.match(card, /removeEventListener\('pagehide', leave\);\n\s+leave\(\);/u, 'a held answer is dropped when the card goes');
 });
 
 test('the suggestion on the queue is an outline with a dot, and is not drawn where the choice is hard to undo', () => {

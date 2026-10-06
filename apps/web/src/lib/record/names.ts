@@ -17,6 +17,7 @@ import { RULE_NAMES } from '@braindog/seed/usecases/names';
 
 import { copy } from '../copy.ts';
 import { REGISTERS } from './held.ts';
+import { mergedFieldOf } from './people.ts';
 
 /**
  * What kind of actor signed a write, which is what `Face` draws: a person and you as a monogram, an automation or a rule
@@ -186,6 +187,60 @@ export function actor(by: string, me: string | null = null, names: ReadonlyMap<s
   if (who.startsWith('p_') || ULID.test(who)) return { name: copy.feedSomeone, kind: 'person' };
   if (who === '' || who.includes('_') || who.includes(':')) return { name: copy.feedSomeone, kind: 'person' };
   return { name: who, kind: 'person' };
+}
+
+/* ── a row folded into another ──────────────────────────────────────────── */
+
+/**
+ * WHO EACH FOLDED ROW WAS FOLDED INTO, by id, followed to the end: a person merged into one who was merged in turn is
+ * said as the last of them. Read off the rows a caller walked, by the field the list declares for it (`meets:` or
+ * `org:`'s `merged_into`), so a list that declares none folds nothing, whoever's record it is.
+ *
+ * A FOLDED ROW NEVER SHOWS. The record moves what pointed at a row when it folds it and takes the row out, but a row
+ * folded before that, or a pointer written past it, still names the row that went; every reader of a ref resolves it
+ * through this (`remote.ts` `refMapOf`), so it is drawn, named and opened as the row it was folded into. The pointer
+ * may name its row by id, by number (`7`, `people#7`) or by its name, as the record's merge writes it. One that names
+ * nobody walked here, or that runs in a circle, is left as it is rather than guessed.
+ */
+export function survivorsOf(register: string, rows: readonly { id: string; seq: number | null; fields?: Record<string, unknown> | undefined }[]): Map<string, string> {
+  const out = new Map<string, string>();
+  const field = mergedFieldOf(Object.hasOwn(REGISTERS, register) ? REGISTERS[register] : undefined);
+  if (!field) return out;
+  const title = REGISTERS[register]?.title;
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const bySeq = new Map(rows.flatMap((r) => (r.seq === null ? [] : [[r.seq, r.id] as const])));
+  const byName = new Map<string, string>();
+  for (const r of rows) {
+    const n = title ? r.fields?.[title] : undefined;
+    if (typeof n === 'string' && n.trim() !== '' && !byName.has(n.trim().toLowerCase())) byName.set(n.trim().toLowerCase(), r.id);
+  }
+  const into = (id: string): string | undefined => {
+    const v = byId.get(id)?.fields?.[field];
+    if (typeof v === 'number') return bySeq.get(v);
+    if (typeof v !== 'string' || v.trim() === '') return undefined;
+    const said = v.trim();
+    if (byId.has(said)) return said;
+    const seq = /^(?:[a-z][a-z0-9_]*#)?(\d+)$/u.exec(said)?.[1];
+    if (seq !== undefined) return bySeq.get(Number(seq));
+    return byName.get(said.toLowerCase());
+  };
+  for (const r of rows) {
+    let at = into(r.id);
+    const seen = new Set([r.id]);
+    while (at !== undefined) {
+      /* A CIRCLE NAMES NO ROW THAT STAYS, so the row is left as it is. */
+      if (seen.has(at)) {
+        at = undefined;
+        break;
+      }
+      seen.add(at);
+      const next = into(at);
+      if (next === undefined) break;
+      at = next;
+    }
+    if (at !== undefined) out.set(r.id, at);
+  }
+  return out;
 }
 
 /* ── a person or an organisation, as their own row says them ─────────────── */

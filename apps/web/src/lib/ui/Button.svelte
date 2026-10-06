@@ -147,11 +147,11 @@
     box-shadow: var(--glass-edge);
   }
 
-  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives: a prefixed line
-     beside the one above was folded into it by the build, `var()` and all, and Safari drops that. */
+  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives: a
+     prefixed line beside the one above was folded into it by the build, and Safari's line came out of the bundle. */
   @supports (-webkit-backdrop-filter: none) {
     .btn[data-weight='glass'] {
-      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+      -webkit-backdrop-filter: var(--glass-blur);
     }
   }
 

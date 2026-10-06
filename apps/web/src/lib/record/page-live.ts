@@ -130,7 +130,8 @@ type Answered = {
   span?: number;
   limit?: number;
   tone?: PageBlock['tone'];
-  fold?: boolean;
+  /* A SECTION'S `true`, AND ON A GROUPED CARD BLOCK `true` OR HOW MANY OF EACH GROUP SHOW, narrowed below. */
+  fold?: unknown;
   icon?: string;
   columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string; sign?: { field: string; minus: string }; metric?: unknown }[];
   cells?: { metric: string; label?: unknown; trend?: unknown; note?: unknown }[];
@@ -359,6 +360,9 @@ function partName(g: { key: string; label?: unknown }, target: string | null, re
 
 /** A string the record did not have to check, or nothing. */
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+
+/** A block's `fold:` as the app reads it: `true`, or a whole number of cards above nought. Anything else is no fold. */
+const foldOf = (v: unknown): boolean | number | undefined => (typeof v === 'boolean' || (typeof v === 'number' && Number.isInteger(v) && v > 0) ? v : undefined);
 
 /**
  * The roles a DECLARATION may give a column, which are the roles `declare.ts` admits (`CARD_ROLES` there).
@@ -861,6 +865,9 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     said: modelSaid,
     /* WHAT THE BLOCK IS, taken by name and narrowed by `keyOf`, so a page never keys its blocks by something that is not text. */
     key: keyed,
+    /* WHAT A CARD BLOCK'S CARDS ARE GROUPED BY, AND EACH CARD'S GROUP BY NAME, taken by name and narrowed below. */
+    group: grouped,
+    groups: groupNames,
     ...rest
   } = b;
 
@@ -894,7 +901,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     ...(span === undefined ? {} : { span }),
     ...(limit === undefined ? {} : { limit }),
     ...(tone === undefined ? {} : { tone }),
-    ...(fold === undefined ? {} : { fold }),
+    ...(foldOf(fold) === undefined ? {} : { fold: foldOf(fold)! }),
+    ...(kind === 'cards' && typeof grouped === 'string' && grouped !== '' ? { group: grouped } : {}),
     ...(icon === undefined ? {} : { icon }),
     ...(heading === undefined ? {} : { heading }),
     ...(where === undefined ? {} : { where }),
@@ -1248,6 +1256,11 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     ...open,
     ...(spentBy === undefined ? {} : { spentBy }),
     names: namesOf(refs),
+    /* EACH CARD'S GROUP BY NAME, only when the record sent one a row, each text or nothing: a name that is not text is no
+       name, and the card is drawn among the ungrouped rather than under a heading of something else. */
+    ...(kind === 'cards' && Array.isArray(groupNames) && groupNames.length === got.length
+      ? { groups: groupNames.map((g) => (typeof g === 'string' && g.trim() !== '' ? g : null)) }
+      : {}),
     ...(inherited === undefined ? {} : { inherited }),
     /* GONE QUIET AS THE RECORD SAYS IT (`isQuiet`): open, and not heard from in 30 minutes. */
     ...(live ? { quiet: got.map((r) => isQuiet({ fields: r.fields as never, updated_at: r.updated_at ?? r.created_at }, now)) } : {}),

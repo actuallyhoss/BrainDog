@@ -180,6 +180,37 @@ test('A QUERY FILES NOTHING, so there is nothing to Decide and no link to it', (
   assert.equal(drawProposal({ ...PROPOSAL, body_kind: 'query', verbs: ['edit', 'save', 'open'], filed: null }).decide, null);
 });
 
+test('A FILED PROPOSAL IS DRAWN WHERE IT WAS ASKED, as the one decision card, and a query is not', () => {
+  const now = Date.parse('2026-10-06T09:00:00Z');
+  const rowset = { ...PROPOSAL, body_kind: 'rowset' as const, body: { register: 'tasks', rows: [{ title: 'Chase Acme' }] }, filed: 'SG21' };
+  const card = drawProposal(rowset, 'what is late?', now).card;
+  assert.ok(card, 'a filed rowset draws no card');
+  assert.equal(card.id, 'SG21');
+  assert.equal(card.who, 'slash', 'it is Slash that asks, so the line reads "Slash suggested"');
+  assert.equal(card.question, 'what is late?', 'the card is the question as it was filed: the ask');
+  assert.deepEqual(card.options, [], 'a rowset is accepted or declined, in the card’s own words');
+  assert.equal((card as { money?: unknown }).money, undefined);
+
+  const paying = drawProposal({ ...rowset, body: { register: 'expenses', rows: [{ title: 'Taxi', amount: { amount: 1250, currency: 'GBP' } }] } }, 'add the taxi', now).card;
+  assert.deepEqual((paying as { money?: unknown }).money, [{ amount: 1250, currency: 'GBP' }], 'money a proposal writes goes on its card, so no key accepts it');
+
+  const options = {
+    ...PROPOSAL,
+    body_kind: 'options' as const,
+    body: { options: [{ id: 'a', label: 'Per seat', because: 'Cheaper', recommended: true }, { id: 'b', label: 'Flat' }, { label: 'no id' }] },
+    filed: 'SG22',
+  };
+  assert.deepEqual(
+    drawProposal(options, 'which plan?', now).card?.options.map((o) => [o.key, o.label, o.recommended]),
+    [
+      ['a', 'Per seat', true],
+      ['b', 'Flat', false],
+    ],
+  );
+  assert.equal(drawProposal({ ...PROPOSAL, body_kind: 'query', filed: null }, 'what is late?', now).card, null, 'a query files nothing');
+  assert.equal(drawProposal(rowset).card, null, 'without the ask there is no question to draw');
+});
+
 test('THE 80 % LINE IS SHOWN ONCE A MONTH, ON TIER A, BELOW THE CAP, UNTIL DISMISSED FOR THAT MONTH', () => {
   const at = (used: number, cap = 80, tier: SlashStatus['tier'] = 'a'): SlashStatus => ({ tier, model: 'm', asks: { used, cap, resets: '2026-10-01T00:00:00.000Z' } });
   assert.equal(capLine(at(63), null), false);

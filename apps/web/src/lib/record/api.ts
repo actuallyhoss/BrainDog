@@ -1303,6 +1303,11 @@ export type BlockResult = PageBlock & {
   /** On a live record: the record's own title for each row a ref on this block points at, so a group is never named from the sample. */
   names?: Names;
   /**
+   * A `cards` block with `group:`: the name of the row each card's group field points at, as the record answered it,
+   * aligned with `rows`, `null` for a card with none. Absent, the names are read from `names`.
+   */
+  groups?: readonly (string | null)[];
+  /**
    * THE RECORD'S OWN ANSWER, KEPT WHOLE, on a block whose kind is registered (`lib/page/kinds/index.ts`). Such a kind is
    * drawn from this and from nothing above it: `page-live.ts` translates no key of it into this type, so a new kind
    * costs no line in this file or in the reader. Absent on every kind `blocks.ts` draws itself.

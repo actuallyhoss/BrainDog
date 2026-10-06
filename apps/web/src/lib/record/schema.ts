@@ -288,8 +288,19 @@ export type PageBlock = {
   working?: boolean;
   /** Aligned with `rows`, when the block set `working: true`: whether an agent is on each row right now. */
   working_now?: boolean[];
-  /** A `section` that starts shut, folding the blocks after it up to the next section. */
-  fold?: boolean;
+  /**
+   * A `section` that starts shut, folding the blocks after it up to the next section.
+   *
+   * ON A `cards` BLOCK WITH `group:`, how much of each group is shown: `true` its most recent card once it has more
+   * than three, and a number that many once it has more; the rest open on the page of the row the group points at.
+   */
+  fold?: boolean | number;
+  /**
+   * A `cards` block's: the field its cards are grouped by, a link to one row, such as the organisation a person is with.
+   * A group is headed by that row's name and stands where its first card stood; the record answers the name of each
+   * card's group as `groups`, one a row (`people.ts` `groupCards`).
+   */
+  group?: string;
   /** The glyph beside a `section`'s heading. */
   icon?: string;
   /** Which of the page's two columns the block sits in, on a page with a `layout`. `main` when absent. */

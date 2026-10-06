@@ -395,12 +395,14 @@
     border-block-end: 1px solid var(--line);
   }
 
-  /* SAFARI DROPS A `backdrop-filter` WHOSE VALUE IS A `var()`, and the build folds a prefixed and an unprefixed
-     declaration in one rule into one value, so the glass is given to it in so many words in a block of its own
-     (`blocks-charts.css` has the measurement). The other browsers skip this block and keep the theme's value. */
+  /* SAFARI'S GLASS, IN A BLOCK OF ITS OWN, READING THE SKIN'S ONE VALUE. The build folds a prefixed and an unprefixed
+     declaration in one rule into one, and the prefixed line Safari needs came out of the bundle; a block of its own
+     keeps it. It reads `--glass-blur` and never a literal, because that token already answers for both schemes and
+     for less transparency, and a literal gave dark glass light's colour (`tokens.css` has the measurement). Chromium
+     does not know the prefixed property, so this block is Safari's alone. */
   @supports (-webkit-backdrop-filter: none) {
     .dock-head {
-      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+      -webkit-backdrop-filter: var(--glass-blur);
     }
   }
 

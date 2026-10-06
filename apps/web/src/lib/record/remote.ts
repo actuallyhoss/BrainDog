@@ -29,6 +29,7 @@ import { searchable, terms } from './find.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
 import { declaredValue, schemaOf } from './where.ts';
 import { labels, relabelInto } from '../voice.ts';
+import { survivorsOf } from './names.ts';
 
 /** One register's rows, by the ULID the record stores a ref as, and back again. */
 export type RefMap = {
@@ -146,6 +147,20 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
     if (typeof said === 'string' && said !== '') titleOf.set(r.seq, said);
     const mark = identityOfRow(register, r.fields ?? {});
     if (mark) markOf.set(r.seq, mark);
+  }
+  /* A ROW FOLDED INTO ANOTHER BY A MERGE IS THAT OTHER ROW wherever something still points at it (`names.ts`
+     `survivorsOf`): the pointer reads as its number, so it is named, marked and opened as the row that stayed. Its own
+     number keeps its own id, so a write naming it by number still names the row it means. */
+  for (const [gone, kept] of survivorsOf(register, rows)) {
+    const seq = seqOf.get(kept);
+    const was = seqOf.get(gone);
+    if (seq === undefined) continue;
+    seqOf.set(gone, seq);
+    if (was === undefined) continue;
+    const name = titleOf.get(seq);
+    if (name !== undefined) titleOf.set(was, name);
+    const mark = markOf.get(seq);
+    if (mark) markOf.set(was, mark);
   }
   TITLES.set(register, new Map([...idOf.keys()].map((seq) => [seq, titleOf.get(seq) ?? ''])));
   return { seqOf, idOf, titleOf, markOf };

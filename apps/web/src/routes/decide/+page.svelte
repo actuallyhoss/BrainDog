@@ -12,9 +12,10 @@
   change what accepting takes (DIRECTION §37, `press.ts`). Nothing moves or fades when a key lands. A part that holds
   nothing is not drawn.
 
-  ONE PRESS ANSWERS, AND THE SUGGESTION IS AN OUTLINE WITH A SMALL DOT, his pick, drawn by the skin for every queue
-  (`kinds/queue.css`) and not drawn at all on a card that is hard to undo. Enter answers only a card that costs nothing;
-  one that costs something opens whole on its own page, where Accept names the amount.
+  EVERY QUESTION IS THE ONE DECISION CARD (`lib/decide/DecisionCard.svelte`, through `QueueAnswer`): why first, who
+  asked, what it moves, and one press with Undo. The suggestion is an outline with a small dot, his pick, and not drawn
+  at all on a card that is hard to undo or moves money. Enter answers only a card that costs nothing; one that costs
+  something opens whole on its own page, where Accept names the amount.
 
   BRAINDOG'S OWN PAGE UPDATES ARE ONE CARD under the questions, for the owner (`Improved.svelte`): "BrainDog improved 4
   of your pages", what changes, and Accept. It reads what waits from the same place Add-ons does (`improved.ts`).
@@ -41,10 +42,7 @@
   import { goto } from '$app/navigation';
   import { choose, type PackState } from '$lib/record/packs.ts';
   import { hostedHere } from '../settings/billing.ts';
-  import { fromInput, hold, HOLD_MS, keyAct, type Held } from './press.ts';
-  import { answerQuestion } from '$lib/record/decide-write.ts';
-  import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { words as mergeWords } from './merge.ts';
+  import { fromInput, keyAct } from './press.ts';
   import type { Improved } from './improved.ts';
   import { proposer } from '$lib/page/queue-answer.ts';
   import { listen } from '$lib/page/listen.svelte.ts';
@@ -227,94 +225,24 @@
       const on = document.activeElement;
       if (on instanceof HTMLElement && on !== card && on.closest('button, a[href], summary, select') !== null) return;
       if (card.querySelector('.queue-cost') !== null) return;
-      press = card.querySelector<HTMLElement>('.queue-option[data-recommended] > .queue-act') ?? twoOn(card)?.accept;
+      /* THE ANSWER THE CARD SAYS ENTER GIVES (`card.ts` `enter`): none where money moves or it is hard to undo. */
+      press = card.querySelector<HTMLElement>('.queue-act[data-enter]');
     } else press = twoOn(card)?.reject;
     if (!press || (press instanceof HTMLButtonElement && press.disabled)) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    /* BACKSPACE IS HELD FOR ITS UNDO, and then presses the same button: a declined question is never reopened, and a
-       merge kept apart is never asked about again. */
-    if (act === 'decline') return void holdDecline(card);
+    /* THE CARD'S OWN BUTTON, so a key gives the answer a pointer gives: the card becomes its line with Undo on it for six
+       seconds, and only then sends it. A declined question is never reopened, and the Undo is the way back. */
     press.click();
   }
-
-  /* ── a decline held for its Undo ─────────────────────────────────────── */
-
-  /** The declines Backspace gave that wait out their Undo, by question. */
-  const holds = new Map<string, Held>();
-  /** Whether this page is still the one drawn, so a decline that outlives it is sent without its card. */
-  let mounted = true;
-
-  /** A question's card as the page draws it now, which a re-read may have drawn afresh since the key. */
-  const cardOf = (id: string): HTMLElement | null => document.querySelector<HTMLElement>(`#main .qa[data-row="q:${CSS.escape(id)}"]`);
-
-  /** The card waits, out of reach of a second answer, while the decline waits for its Undo. */
-  function waits(id: string, on: boolean) {
-    const card = cardOf(id);
-    if (!card) return;
-    card.inert = on;
-    card.toggleAttribute('data-held', on);
-  }
-
-  /**
-   * THE DECLINE WAITS SIX SECONDS WITH UNDO ON ITS LINE, then presses the card's own Decline, so the write, the line the
-   * card becomes and any reason the record asks for are the card's as they are for a pointer (`press.ts` `hold`).
-   */
-  function holdDecline(card: HTMLElement) {
-    const id = card.dataset.row?.slice('q:'.length);
-    if (!id || holds.has(id)) return;
-    const title = card.querySelector('.queue-question')?.textContent?.trim() ?? '';
-    let toast = 0;
-    const held = hold(() => {
-      holds.delete(id);
-      toasts.dismiss(toast);
-      waits(id, false);
-      const now = cardOf(id);
-      const reject = mounted && now ? twoOn(now)?.reject : undefined;
-      if (reject) reject.click();
-      else void declineAway(id);
-    });
-    holds.set(id, held);
-    waits(id, true);
-    toast = toasts.push(words.declinedHeld(title), { undo: () => unhold(id), life: HOLD_MS, intent: 'good' });
-  }
-
-  /** Undo, from the line or with ⌘Z: the card comes back as it was, and nothing is sent unless it has already gone. */
-  function unhold(id: string) {
-    const held = holds.get(id);
-    if (!held?.undo()) return void toasts.push(mergeWords.tooLate);
-    holds.delete(id);
-    waits(id, false);
-    toasts.push(mergeWords.undone);
-  }
-
-  /** A held decline whose card is gone, sent on its own: the reader left the page inside the six seconds. */
-  async function declineAway(id: string) {
-    const out = await answerQuestion(apiBase(), id, 'reject');
-    if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
-    else if (mounted) void reread();
-  }
-
-  /* LEAVING THE PAGE, OR THE TAB, SENDS WHAT IS HELD AT ONCE rather than dropping it. */
-  $effect(() => {
-    const leave = () => {
-      for (const held of [...holds.values()]) held.flush();
-    };
-    window.addEventListener('pagehide', leave);
-    return () => {
-      window.removeEventListener('pagehide', leave);
-      mounted = false;
-      leave();
-    };
-  });
 
   $effect(() => {
     if (classic) return;
     window.addEventListener('keydown', onkey, { capture: true });
     return () => window.removeEventListener('keydown', onkey, { capture: true });
   });
-  /* NOT WHILE A DECLINE WAITS FOR ITS UNDO, so the card it holds is not drawn afresh under the reader. */
-  listen(reread, () => classic || reading || holds.size > 0 || typing() || document.querySelector('main [aria-busy="true"]') !== null);
+  /* NOT WHILE AN ANSWER WAITS FOR ITS UNDO, so the card holding it is not drawn afresh under the reader. */
+  listen(reread, () => classic || reading || typing() || document.querySelector('main [data-held], main [aria-busy="true"]') !== null);
 
   /* ── the page as Decide draws it ─────────────────────────────────────────── */
 
@@ -500,11 +428,6 @@
 
   .page :global(.qa-select) {
     transition: none;
-  }
-
-  /* A CARD WHOSE DECLINE WAITS FOR ITS UNDO is quieter, at once and with no fade, and takes no second answer. */
-  .page :global(.qa[data-held]) {
-    opacity: 0.5;
   }
 
   /* THE STANDING SENTENCE OVER THE QUEUE, at the weight of a hint rather than an alarm: nothing has gone wrong, and this

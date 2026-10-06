@@ -82,19 +82,20 @@ test('a level with no word for it is still refused in a sentence', () => {
  */
 const page = readFileSync(fileURLToPath(new URL('./Classic.svelte', import.meta.url)), 'utf8');
 
-test('every option button is off for a reader who may not answer, and says why', () => {
-  assert.match(
-    page,
-    /disabled=\{!answerable\}\n\s+aria-describedby=\{answerable \? undefined : 'cannot-decide'\}\n\s+onclick=\{\(\) => take\(q, o\.key\)\}/u,
-    'the option buttons are live for a reader who may not answer',
-  );
-  /* THE SENTENCE THE DESCRIPTION POINTS AT HAS TO BE ON THE PAGE. `aria-describedby` at an id
-     nothing renders is a control that is off and silent about it, which is the state before the
-     repair with one extra attribute on it. */
+test('every option is words and not a button for a reader who may not answer, and the screen says why', () => {
+  /* THE CARD IS THE ONE DECISION CARD NOW (`lib/decide/DecisionCard.svelte`), and its rule is the renderer's: a control
+     that cannot act is absent, not greyed. So the screen hands it the answer it worked out, and the card draws the
+     options as words when it is no. */
+  assert.match(page, /<DecisionCard\n\s+question=\{queueOf\(q, aboutFor\(q\)\)\}\n\s+may=\{answerable\}/u, 'the card is not told who may answer');
+  assert.match(page, /onpress=\{\(key\) => void take\(q, key\)\}/u, 'a press on the card does not reach take, where the guard is');
+  const card = readFileSync(fileURLToPath(new URL('../../lib/decide/DecisionCard.svelte', import.meta.url)), 'utf8');
+  assert.match(card, /\{#if answerable\}\n\s+<button\n\s+type="button"\n\s+class="queue-act"/u, 'the card draws a live button for a reader who may not answer');
+  assert.match(card, /\{:else\}\n\s+<span class="queue-label">\{way\.label\}<\/span>/u, 'the card draws nothing in place of the option it will not offer');
+  /* THE SENTENCE THAT SAYS WHY HAS TO BE ON THE PAGE, over the queue, before anybody presses. */
   assert.match(
     page,
     /\{#if !answerable\}\n\s+<p class="cannot" id="cannot-decide">\{whyNot\}<\/p>\n\s+\{\/if\}/u,
-    'nothing renders the sentence the option buttons point at',
+    'nothing renders the sentence that says why the options are words',
   );
 });
 

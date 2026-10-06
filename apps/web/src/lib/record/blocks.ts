@@ -67,6 +67,7 @@ const clockOf = (block: BlockResult): number => {
 };
 import { copy } from '../copy.ts';
 import type { Entry } from './schema.ts';
+import { groupCards, meetsOf, mergedAway, seenWords, type CardRun, type GroupKey } from './people.ts';
 import { declaredValue, registerHref } from './where.ts';
 import { format, fxNow, windowMs } from './metrics.ts';
 import { METRICS } from './declared.ts';
@@ -1044,7 +1045,67 @@ export function toSegments(block: BlockResult, kinds?: Readonly<Record<string, K
       ...(split.note ? parse(split.note, { page: true }) : []),
     ];
   }
-  return drawSegments(block, kinds);
+  return groupedSegments(block, kinds) ?? drawSegments(block, kinds);
+}
+
+/**
+ * A CARD BLOCK THAT SAYS `group:`, DRAWN IN ITS GROUPS (`people.ts` `groupCards`): People on a page reads as the list of
+ * people does, each organisation one quiet heading where its most recent person stands, with that person under it and
+ * the rest folded behind a line that opens the organisation's page, where they all are. Cards in no group stay where
+ * the record put them, a run of them one grid. `null` for every other block, which is drawn as it always was.
+ *
+ * THE GROUP'S NAME IS THE RECORD'S, `groups`, one a row; a record that sent none is read through the names it sent beside
+ * the rows. A row folded into another by a merge is not drawn: the one it was folded into is already a card here.
+ */
+function groupedSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSpec>>): ReturnType<typeof parse> | null {
+  if (block.kind !== 'cards' || !block.group || block.lead === true || block.entries.length === 0) return null;
+  const decl = REGISTERS[block.register ?? ''];
+  const field = decl?.fields.find((f) => f.id === block.group);
+  const to = field?.type === 'ref' ? field.to : undefined;
+  const keys = block.entries.map((e, i): GroupKey | null => {
+    const v = e.fields[block.group!];
+    const n = typeof v === 'number' ? v : typeof v === 'string' && /^\d+$/u.test(v) ? Number(v) : NaN;
+    const ref = to && Number.isInteger(n) && n > 0 ? n : null;
+    const name = (block.groups?.[i] ?? (ref !== null ? block.names?.get(`${to}#${ref}`) : typeof v === 'string' ? v : undefined))?.trim();
+    if (!name) return null;
+    return { key: ref !== null ? `#${ref}` : name.toLowerCase(), name, ref };
+  });
+  const gone = new Set(block.entries.flatMap((e, i) => (mergedAway(e.fields, decl) ? [i] : [])));
+  const runs = groupCards(keys, block.fold ?? false, gone);
+  /* EVERY CARD MERGED AWAY draws nothing, so the block says its `empty:` (`drawn`) rather than an empty grid. */
+  if (runs.length === 0) return [];
+  if (!runs.some((r) => r.kind === 'group')) return gone.size > 0 ? drawSegments(only(block, runs.flatMap((r) => r.rows)), kinds) : null;
+  const people = meetsOf(decl) !== null;
+  const counted = (n: number): string => (people ? seenWords.people(n) : seenWords.count(n, decl?.one ?? '', (decl?.name ?? '').toLowerCase()));
+  /* A BLOCK THAT IS A SLICE OF ITS LIST (fifty rows of eighty) KNOWS ONLY THE CARDS IT WAS SENT, so a group's count
+     would be the slice's and not the organisation's: "12 people" for twenty-four. A cut block heads a group by its name
+     alone and opens the rest without a number. */
+  const cut = block.total > block.shown;
+  const restSaid = (run: Extract<CardRun, { kind: 'group' }>, name: string): string =>
+    people ? (cut ? seenWords.everyoneAt(name) : seenWords.showAll(run.total, name)) : cut ? seenWords.moreIn(name) : seenWords.moreAt(run.total - run.rows.length);
+  return runs.flatMap((run) => {
+    if (run.kind === 'loose') return drawSegments(only(block, run.rows), kinds);
+    /* UNDER ITS HEADING A CARD DOES NOT SAY THE GROUP AGAIN: twenty-four cards each reading "Encore" under "Encore". */
+    const cards = drawSegments(only(block, run.rows, block.group), kinds);
+    const href = run.ref !== null && to ? `/r/${to}/${run.ref}` : null;
+    const name = run.name.replace(/[*_`{}|\\]/gu, ' ').replace(/\s+/gu, ' ').trim();
+    const linked = href && !/[[\]]/u.test(name) ? `[${name}](${href})` : name;
+    const rest = run.total - run.rows.length;
+    return [
+      ...parse(cut ? `**${linked}**` : `**${linked}** · ${counted(run.total)}`, { page: true }),
+      ...cards,
+      ...(rest > 0 && href && !/[[\]]/u.test(name) ? parse(`[${restSaid(run, name)}](${href})`, { page: true }) : []),
+    ];
+  });
+}
+
+/** The block cut to the cards at `rows`, each row's entry, cells and quiet mark kept together, and `unsaid`'s cells empty. */
+function only(block: BlockResult, rows: readonly number[], unsaid?: string): BlockResult {
+  const pick = <T>(xs: readonly T[] | undefined): T[] | undefined => (xs ? rows.map((i) => xs[i]!) : undefined);
+  const quiet = pick(block.quiet);
+  const at = unsaid === undefined ? -1 : block.columns.findIndex((c) => c.field === unsaid);
+  const drawn = pick(block.rows)!.map((r) => (at < 0 ? r : { ...r, cells: r.cells.map((c, j) => (j === at ? null : c)) }));
+  return { ...block, entries: pick(block.entries)!, rows: drawn, ...(quiet ? { quiet } : {}) };
 }
 
 function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSpec>>): ReturnType<typeof parse> {
@@ -1557,7 +1618,7 @@ export function draw(
      heading is never blank. */
   const blank =
     block.kind === 'cards'
-      ? block.entries.length === 0
+      ? block.entries.length === 0 || segments.length === 0
       : block.kind === 'section'
         /* AND A SECTION THAT WROTE NO SENTENCE SAYS NOTHING when its list matched nothing: it is a heading over the
            blocks below it, which say their own nothing, and "Nothing matched." above "Nothing is parked or finished."

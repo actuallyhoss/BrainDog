@@ -17,9 +17,14 @@
   the same palette. It is a button and not an input: the palette owns the typing.
 
   WORKING NOW IS WHO IS AT IT, read as Today reads it (`readWorking` in `record/boot-live.ts`), and absent when nobody is.
-  Each run is a face in a `--live` ring, the project's name and how long the run has gone. The ring is whole while
-  the run is heard from and faint once it has gone quiet: no run reports its steps, so the arc has no progress to draw
-  and does not pretend to.
+  Each run is a face in a `--live` ring, the run's name over the app it runs in, and how long the run has gone. The ring
+  is whole while the run is heard from and faint once it has gone quiet: no run reports its steps, so the arc has no
+  progress to draw and does not pretend to.
+
+  THE RUN'S NAME IS WHAT IT SAYS IT IS DOING, NOT ITS PROJECT. Two runs in one project read "BrainDog" and "BrainDog",
+  which named neither; the project is where a run is, and the rail already says where by the page it opens. A run that
+  has said nothing yet falls back to its project, then to its app, and the app line is left out when it would only
+  say the name again.
 
   NO CHORD HINTS IN THE ROWS. `g h`, `g d` and `g 1`–`g 9` still work, and the `?` sheet is where they are said.
 
@@ -50,7 +55,7 @@
   import type { NavEntry } from '../record/api.ts';
   import Icon, { type IconName } from './Icon.svelte';
   import AgentMark from './AgentMark.svelte';
-  import { isMarked } from './agent-marks.ts';
+  import { AGENT_MARKS, isMarked } from './agent-marks.ts';
   import Kbd from './Kbd.svelte';
   import Mark from './Mark.svelte';
   import { palette } from '../palette/open.svelte.ts';
@@ -119,7 +124,18 @@
     suggested: (n: number) => `${n} suggested`,
     working: 'Working now',
     quiet: 'gone quiet',
-    agent: (name: string) => name.charAt(0).toUpperCase() + name.slice(1),
+    /* A RUNNER IS "Runner": what follows its colon is the machine it is on, and a machine's name is not for reading. */
+    runner: 'Runner',
+    /* AN AGENT NOBODY NAMES, by the last word it signs with, in words: `agent:night-shift` is "Night shift". `other` is
+       the record saying it does not know, which is no app, so it says nothing rather than "Other". */
+    agent: (name: string) => {
+      const tail = name.slice(name.lastIndexOf(':') + 1).replace(/[-_]+/gu, ' ').trim();
+      return tail.toLowerCase() === 'other' ? '' : tail.charAt(0).toUpperCase() + tail.slice(1);
+    },
+    /* A run with no words, no project and no app it can be known by. */
+    anAgent: 'An agent',
+    /* THE APPS A MAKER SHIPS MORE THAN ONE OF, by the app: Claude Code is not Claude in a browser. */
+    apps: { 'claude-code': 'Claude Code', 'claude code': 'Claude Code' } as Readonly<Record<string, string>>,
     you: 'You',
     account: 'Your account and settings',
   } as const;
@@ -258,7 +274,14 @@
     if (min < 24 * 60) return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
     return `${Math.floor(min / (24 * 60))} d`;
   }
-  const runName = (w: Working): string => w.project ?? (w.doing || words.agent(w.agent));
+  /** The app a run is in, as a person knows it: "Claude Code", "Codex", a maker's name, else the agent's own word. */
+  function appOf(w: Working): string {
+    const key = w.agent.trim().toLowerCase().replace(/^agent:/u, '');
+    if (Object.hasOwn(words.apps, key)) return words.apps[key] ?? '';
+    if (w.kind === 'runner') return words.runner;
+    return isMarked(w.kind) ? AGENT_MARKS[w.kind].maker : words.agent(w.agent);
+  }
+  const runName = (w: Working): string => w.doing.trim() || w.project || appOf(w) || words.anAgent;
 
   /**
    * THE WIDTH CHANGES ON TRANSFORM AND OPACITY ALONE.
@@ -410,20 +433,24 @@
         <ul class="group">
           {#each working as w, i (w.seq ?? `run-${i}`)}
             {@const name = runName(w)}
+            {@const app = appOf(w)}
             {@const took = age(w)}
             <li>
               <svelte:element
                 this={w.seq === null ? 'div' : 'a'}
                 class="run tap"
                 href={w.seq === null ? undefined : at(`/r/session/${w.seq}`)}
-                data-label={name}
-                aria-label={[`${words.agent(w.agent)}: ${name}`, took, w.quiet ? words.quiet : ''].filter(Boolean).join(', ')}
+                data-label={!app || app === name ? name : `${name} · ${app}`}
+                aria-label={[!app || app === name ? name : `${app}: ${name}`, took, w.quiet ? words.quiet : ''].filter(Boolean).join(', ')}
               >
                 <span class="face" data-quiet={w.quiet ? '' : undefined} aria-hidden="true">
                   <svg class="ring" viewBox="0 0 28 28" focusable="false"><circle cx="14" cy="14" r="13" /></svg>
                   <span class="face-disc" data-marked={isMarked(w.kind) ? '' : undefined}><AgentMark kind={w.kind} size="s" /></span>
                 </span>
-                <span class="item-name" aria-hidden="true">{name}</span>
+                <span class="item-name run-words" aria-hidden="true">
+                  <span class="run-name" dir="auto">{name}</span>
+                  {#if app && app !== name}<span class="run-app">{app}</span>{/if}
+                </span>
                 {#if took}<span class="tally num" aria-hidden="true">{took}</span>{/if}
               </svelte:element>
             </li>
@@ -632,10 +659,10 @@
     pointer-events: none;
   }
 
-  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives. */
+  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives. */
   @supports (-webkit-backdrop-filter: none) {
     .rail::before {
-      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+      -webkit-backdrop-filter: var(--glass-blur);
     }
   }
 
@@ -1005,13 +1032,13 @@
     margin-block-start: var(--sp-2);
   }
 
-  /* One run, 32 tall: the face in its ring, the project, and how long, right-aligned. */
+  /* One run, 40 tall: the face in its ring, the run's name over its app, and how long, right-aligned. */
   .run {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: 32px;
-    padding: 0 10px 0 4px;
+    min-block-size: 40px;
+    padding: 3px 10px 3px 4px;
     border-radius: var(--r-md);
     color: var(--ink);
     font-size: var(--rail-text);
@@ -1020,6 +1047,26 @@
     transition:
       background var(--d-state) var(--ease-out),
       scale var(--d-release) var(--ease-out);
+  }
+
+  /* THE NAME OVER THE APP: the name in the row's ink, the app a step down in `--dim`, each cut short on its own line. */
+  .run-words {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    line-height: 1.3;
+  }
+
+  .run-name,
+  .run-app {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .run-app {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 400;
   }
 
   /* A 22px disc inside a 2px `--live` ring: whole while the run is heard from, faint once it has gone quiet. */
@@ -1253,7 +1300,7 @@
 
   @supports (-webkit-backdrop-filter: none) {
     .flyout {
-      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+      -webkit-backdrop-filter: var(--glass-blur);
     }
   }
 

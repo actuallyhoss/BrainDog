@@ -17,6 +17,7 @@
 
 import { exponentOf, yesno } from 'braindog-render';
 import type { Reading, SlashProposal, SlashStatus, SlashWhere } from '@braindog/client';
+import type { QueueQuestion } from '@braindog/kernel';
 
 import { copy } from '../copy.ts';
 import { figuresIn, summaryTitle, words as citeWords } from '../cite.ts';
@@ -198,6 +199,8 @@ export type DrawnProposal = {
   verbs: SlashProposal['verbs'];
   decide: string | null;
   footer: string;
+  /** The filed question as the one decision card draws it, where the ask was, or `null` for a `query`. */
+  card: QueueQuestion | null;
 };
 
 /**
@@ -210,7 +213,7 @@ export type DrawnProposal = {
  * defer and dismiss are that screen's; the palette links to it rather than keeping a second copy of the gate. A `query`
  * files nothing, so it has no link, and its rows are already the ones drawn above.
  */
-export function drawProposal(p: SlashProposal): DrawnProposal {
+export function drawProposal(p: SlashProposal, asked = '', now = Date.now()): DrawnProposal {
   const model = typeof p.model === 'string' ? p.model.trim() : '';
   return {
     text: p.text,
@@ -218,7 +221,60 @@ export function drawProposal(p: SlashProposal): DrawnProposal {
     verbs: [...p.verbs],
     decide: p.filed === null ? null : `/decide/${encodeURIComponent(p.filed)}`,
     footer: model === '' ? slashWords.noModel : slashWords.drawnBy(model),
+    card: filedCard(p, asked, now),
   };
+}
+
+/** A money value anywhere a proposed row keeps one: an integer of minor units and its currency. */
+const isMoney = (v: unknown): v is { amount: number; currency: string } =>
+  typeof v === 'object' && v !== null && Number.isSafeInteger((v as { amount?: unknown }).amount) && typeof (v as { currency?: unknown }).currency === 'string';
+
+/** Every money value the rows of a proposal would write, from a row's own fields, its `fields` or its `patch`. */
+function moneyIn(body: Record<string, unknown>): { amount: number; currency: string }[] {
+  const rows = Array.isArray(body.rows) ? body.rows : [];
+  return rows.flatMap((row) => {
+    if (typeof row !== 'object' || row === null) return [];
+    const r = row as Record<string, unknown>;
+    const parts = [r, r.fields, r.patch].filter((x): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x));
+    return parts.flatMap((part) => Object.values(part).filter(isMoney));
+  });
+}
+
+/**
+ * THE FILED PROPOSAL AS A QUEUE QUESTION, so the palette draws it with the one decision card (DIRECTION §37): where it
+ * was asked, Enter accepts, a six-second Undo follows, and its line reads "Slash suggested · Sam accepted".
+ *
+ * ITS QUESTION IS THE ASK, which is what the record filed it under (`packages/slash/src/propose.ts`), and its why is
+ * Slash's sentence, drawn just above the card with its links (`Cited`), so the card says no why of its own. An
+ * `options` answer carries its options; a `rowset` is accepted or declined. WHAT IT WOULD WRITE IN MONEY GOES ON IT, so
+ * the card names the amount and Enter never accepts it (`card.ts`). A `query` files nothing and has no card.
+ */
+export function filedCard(p: SlashProposal, asked: string, now: number): QueueQuestion | null {
+  if (p.filed === null || asked.trim() === '' || (p.body_kind !== 'options' && p.body_kind !== 'rowset')) return null;
+  const body = p.body ?? {};
+  const options =
+    p.body_kind === 'options' && Array.isArray(body.options)
+      ? body.options.flatMap((o) => {
+          if (typeof o !== 'object' || o === null) return [];
+          const r = o as Record<string, unknown>;
+          if (typeof r.id !== 'string' || r.id === '') return [];
+          return [{ key: r.id, label: typeof r.label === 'string' ? r.label : r.id, because: typeof r.because === 'string' ? r.because : '', recommended: r.recommended === true }];
+        })
+      : [];
+  if (p.body_kind === 'options' && options.length === 0) return null;
+  const money = moneyIn(body);
+  return {
+    id: p.filed,
+    who: 'slash',
+    at: new Date(now).toISOString(),
+    kind: p.body_kind,
+    body_kind: p.body_kind,
+    question: asked.trim(),
+    why: '',
+    cost: 'call',
+    options,
+    ...(money.length > 0 ? { money } : {}),
+  } as QueueQuestion;
 }
 
 /**

@@ -1,5 +1,6 @@
 /**
- * What `QueueAnswer.svelte` decides without a DOM: its words, who asked in words a person reads, and the ways to answer.
+ * What a question card decides without a DOM: its words, who asked in words a person reads, and the ways to answer. The
+ * one decision card (`lib/decide/card.ts`, `DecisionCard.svelte`) builds on these, and `QueueAnswer.svelte` draws it.
  *
  * PURE, AND NODE LOADS IT (relative `.ts` imports, no runes), so `blocks.ts` can say the proposer the same way on the
  * read-only queue the renderer draws, and a card and the fence under it never name one asker two ways.

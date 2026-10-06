@@ -122,7 +122,8 @@ test('the queue draws its sentence, its lead and its chart from this module, and
   assert.match(page, /class="q"/u);
   assert.match(page, /order\.slice\(1\)/u);
   /* THE HOOKS THE KEYS GATE PRESSES. */
-  for (const hook of ['id="q-{q.id}"', 'id="opt-{q.id}-{o.key}"', 'class="rec"', 'class="pick"', 'data-picking=', 'data-cursor=', 'data-done='])
+  /* THE OPTIONS ARE THE ONE DECISION CARD'S, which carries the ids the keys find by, and marks the suggestion. */
+  for (const hook of ['id="q-{q.id}"', 'idOf={(key) => `opt-${q.id}-${key}`}', '<DecisionCard', 'class="pick"', 'data-picking=', 'data-cursor=', 'data-done='])
     assert.ok(page.includes(hook), `the queue no longer draws ${hook}`);
 });
 

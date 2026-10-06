@@ -1086,12 +1086,12 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives: Safari drops a
-     `backdrop-filter` whose value is a `var()`, and the build folds a prefixed and an unprefixed pair in one rule. */
+  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives: the
+     build folds a prefixed and an unprefixed pair in one rule into one, and Safari's line came out of the bundle. */
   @supports (-webkit-backdrop-filter: none) {
     .menu-open::before,
     .launcher::before {
-      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+      -webkit-backdrop-filter: var(--glass-blur);
     }
   }
 
