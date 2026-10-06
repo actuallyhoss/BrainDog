@@ -222,7 +222,7 @@ export type Card = {
   version: string;
   glyph: IconName;
   categories: Category[];
-  /** What it adds, one chip each: "2 lists", "1 page", then each host it calls by name. */
+  /** What it adds, said on the card as one line: "2 lists", "1 page", "1 outside service". */
   adds: string[];
   installs: number | null;
   /** Everything search reads, lower case: title, summary, who made it, its categories as said. */
@@ -238,7 +238,7 @@ export function cardOf(e: Entry, counts: ReadonlyMap<string, number>, pageIcon: 
     ...(r.lists.length ? [w.lists(r.lists.length)] : []),
     ...(r.pages.length ? [w.pages(r.pages.length)] : []),
     ...(r.rules.length ? [w.rules(r.rules.length)] : []),
-    ...r.hosts,
+    ...(r.hosts.length ? [w.services(r.hosts.length)] : []),
   ];
   const categories = e.categories;
   return {

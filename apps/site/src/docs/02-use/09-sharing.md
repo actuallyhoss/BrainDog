@@ -66,7 +66,7 @@ An agent you connect works at a level too: read only, read and propose changes t
 
 ## What it costs
 
-A record is priced per record, and colleagues are free. See [pricing](/pricing).
+Free is for one person. Colleagues come with Cloud and Cloud Plus, as many as you like at no extra cost, since those plans are priced per record. See [pricing](/pricing).
 
 ## Leaving a record, or closing your account
 

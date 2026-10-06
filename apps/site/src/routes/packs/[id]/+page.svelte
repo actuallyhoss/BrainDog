@@ -55,11 +55,6 @@
           <h1 class="h2 pack-title" id="pack-h1">{card.title}</h1>
         </div>
         <p class="lede">{card.summary}</p>
-        {#if card.adds.length}
-          <ul class="adds">
-            {#each card.adds as add (add)}<li class="chip">{add}</li>{/each}
-          </ul>
-        {/if}
         <p class="meta-row">
           <span>{w.by(card.publisher)}</span>
           <span class="num">{w.version(card.version)}</span>
@@ -193,21 +188,6 @@
 
   .opening .lede {
     margin-block-start: calc(-1 * var(--sp-2));
-  }
-
-  .adds {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .adds .chip {
-    max-inline-size: 100%;
-    white-space: normal;
-    overflow-wrap: anywhere;
   }
 
   .meta-row {

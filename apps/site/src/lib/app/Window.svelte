@@ -333,6 +333,14 @@
     scroll-snap-align: start;
   }
 
+  /* Safari before 18 knows the blur only by its prefixed name. */
+  @supports (-webkit-backdrop-filter: none) {
+    .tab {
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+    }
+  }
+
   .tab[aria-selected='true'] {
     background: var(--ink);
     color: var(--on-ink);
@@ -502,6 +510,18 @@
       background: transparent;
       box-shadow: none;
       backdrop-filter: none;
+    }
+
+    @supports (-webkit-backdrop-filter: none) {
+      .tabs {
+        -webkit-backdrop-filter: var(--glass-blur);
+        backdrop-filter: var(--glass-blur);
+      }
+
+      .tab {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+      }
     }
 
     .tab[aria-selected='true'] {

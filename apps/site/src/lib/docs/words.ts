@@ -12,13 +12,13 @@ export const docsWords = {
   meta: {
     title: 'Docs · BrainDog',
     description:
-      'How to use BrainDog, connect your agents, write pages in the dialect, build packs and run it yourself. Every page is also text an agent can read.',
+      'How to use BrainDog, connect your agents, write pages in the dialect and build packs. Every page is also text an agent can read.',
     /** A page's own title in the tab. */
     page: (title: string): string => `${title} · BrainDog docs`,
   },
 
   title: 'Docs',
-  lede: 'How to use BrainDog, connect your agents, write pages and run it yourself. Every page here is also plain text an agent can read.',
+  lede: 'How to use BrainDog, connect your agents, write pages and build packs. Every page here is also plain text an agent can read.',
   /** The link to `/llms.txt`, under the lede. */
   forAgents: 'The list for agents',
 

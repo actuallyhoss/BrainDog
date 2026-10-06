@@ -171,6 +171,14 @@
     color: var(--ink);
   }
 
+  /* Safari before 18 knows the blur only by its prefixed name. */
+  @supports (-webkit-backdrop-filter: none) {
+    .find {
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+    }
+  }
+
   .tools {
     display: none;
   }
@@ -250,6 +258,13 @@
     background: var(--glass);
     box-shadow: var(--glass-edge), var(--e2);
     backdrop-filter: var(--glass-blur);
+  }
+
+  @supports (-webkit-backdrop-filter: none) {
+    .bar {
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+    }
   }
 
   .tab {

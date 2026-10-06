@@ -118,7 +118,8 @@ export const home = {
 
     agents: {
       title: 'Bring your own agents.',
-      lead: 'Claude, Codex, Cursor or anything else that speaks MCP reads and writes your record with a key you give it.',
+      /* The OAuth at `/mcp`: the client opens the app to approve it once, and no key is copied (`copy/agents.ts`). */
+      lead: 'Claude, Codex, Cursor or anything else that speaks MCP connects at one address. You approve it once in the app, and no key is copied anywhere.',
       /* The connect sheet's own words, as the app's sheet says them. */
       sheet: 'Connect an agent',
       connect: 'MCP address',
@@ -138,7 +139,6 @@ export const home = {
       lead:
         'Send bank texts and receipts by email, point a webhook at your record, or connect Stripe and Mercury. ' +
         'After three of a kind, Slash suggests how to file them. Say yes and the rest file themselves, with no credits spent.',
-      doors: ['Email', 'Webhook', 'Stripe', 'Mercury'],
       steps: ['Arrives', 'Learned once', 'Filed'],
       arrivals: [
         { from: 'Card alert', text: 'You paid £32.00 to PUREGYM on 3 Oct.' },

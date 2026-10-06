@@ -91,7 +91,7 @@ export const trust = {
         {
           title: 'Its own database',
           glyph: 'server',
-          text: 'Every hosted record is its own database. No table holds two customers, so no query can reach from one record into another.',
+          text: 'Every record is its own database. No table holds two customers, so no query can reach from one record into another.',
         },
         // docs/16-DECISIONS.md ADR-062; apps/worker/src/vault.ts and keys.ts (the host seals, the record stores).
         {
@@ -103,7 +103,7 @@ export const trust = {
         {
           title: 'Sealed nightly copies',
           glyph: 'lock',
-          text: 'Every night a copy of each hosted record is sealed to a key kept outside Cloudflare, so the stored copy alone opens nothing.',
+          text: 'Every night a copy of each record is sealed to a key kept outside Cloudflare, so the stored copy alone opens nothing.',
         },
         // docs/12-SECURITY.md §3 (passkey primary, email link fallback, no password anywhere).
         {

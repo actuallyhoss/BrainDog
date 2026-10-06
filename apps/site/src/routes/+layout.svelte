@@ -196,6 +196,14 @@
     backdrop-filter: var(--glass-blur);
   }
 
+  /* Safari before 18 knows the blur only by its prefixed name. */
+  @supports (-webkit-backdrop-filter: none) {
+    .bar-in {
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+    }
+  }
+
   .brand {
     display: flex;
     flex: none;
@@ -313,6 +321,13 @@
     border-radius: var(--r-lg);
     box-shadow: var(--glass-edge), var(--e2);
     backdrop-filter: var(--glass-blur);
+  }
+
+  @supports (-webkit-backdrop-filter: none) {
+    .menu-panel {
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+    }
   }
 
   /* CLOSED, THE PANEL IS NOT LAID OUT AT ALL. A closed disclosure only skips painting its content, so a measurement

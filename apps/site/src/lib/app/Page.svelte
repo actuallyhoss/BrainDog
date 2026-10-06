@@ -279,6 +279,14 @@
     backdrop-filter: var(--glass-blur);
   }
 
+  /* Safari before 18 knows the blur only by its prefixed name. */
+  @supports (-webkit-backdrop-filter: none) {
+    .switch {
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+    }
+  }
+
   .seg {
     min-block-size: var(--ctl-h-sm);
     padding-inline: 14px;

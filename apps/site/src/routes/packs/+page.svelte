@@ -135,13 +135,7 @@
               <Icon name="chevron-right" size="m" />
             </div>
             <p class="summary">{card.summary}</p>
-            {#if card.adds.length}
-              <ul class="adds">
-                {#each card.adds as add (add)}
-                  <li class="chip">{add}</li>
-                {/each}
-              </ul>
-            {/if}
+            {#if card.adds.length}<p class="adds">{card.adds.join(' · ')}</p>{/if}
             <p class="card-meta">
               <span>{w.by(card.publisher)}</span>
               <span class="num">{w.version(card.version)}</span>
@@ -388,20 +382,13 @@
     line-clamp: 2;
   }
 
+  /* WHAT IT ADDS, as one quiet line and not a row of chips (DIRECTION §37). A long host name wraps rather than pushing
+     the tile wider than the column. */
   .adds {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
     margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* A long host name wraps inside its chip rather than pushing the tile wider than the column. */
-  .adds .chip {
-    min-block-size: 26px;
-    max-inline-size: 100%;
-    white-space: normal;
+    color: var(--dim);
+    font-size: var(--t-site-small);
+    line-height: 20px;
     overflow-wrap: anywhere;
   }
 

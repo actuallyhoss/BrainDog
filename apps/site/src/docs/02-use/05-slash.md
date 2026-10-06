@@ -25,13 +25,13 @@ Ask for a page, a list, a rule or a change to how the record looks, and Slash dr
 
 Slash reads how your record is used and says what it noticed, such as a list that keeps growing or a question you keep asking. Under that are its suggestions, each marked as new, waiting on Decide, or answered. One press puts the new ones on Decide and changes nothing else. Accepting them is Decide's, and only the owner's.
 
-Slash also does quieter work in the background, where the host has a model: the inbox's patterns, a digest's summary, the question an automation asks it. That work has its own allowance and never spends your asks.
+Slash also does quieter work in the background: the inbox's patterns, a digest's summary, the question an automation asks it. That work has its own allowance and never spends your asks.
 
 ## Asks and the monthly limit
 
 Each question you ask Slash, or each thing you ask it to draft, is one ask, however much reading it takes. The pricing page calls these credits.
 
-- A new record starts with a limit of 80 asks a month. The [pricing page](/pricing) lists what each plan includes.
+- Free includes 20 asks a month, Cloud 80 and Cloud Plus 400. The [pricing page](/pricing) lists what each plan includes.
 - The owner sets the limit in Settings, under Agents. Zero turns Slash off.
 - Usage lists your asks by day: what was asked, when, what it cost and a link to what it filed. See [Usage and limits](/docs/use/usage).
 

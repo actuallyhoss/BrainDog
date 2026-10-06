@@ -49,6 +49,8 @@ export const packs = {
     lists: (n: number) => many(n, 'list', 'lists'),
     pages: (n: number) => many(n, 'page', 'pages'),
     rules: (n: number) => many(n, 'rule', 'rules'),
+    /* On a card the hosts are counted, never named: a person reads no hostname there. The pack's own page lists them. */
+    services: (n: number) => many(n, 'outside service', 'outside services'),
     /* Rounded down and never below ten: `roundCount` in `packages/declare/src/kennel.ts`, the Kennel's `counts.json`. */
     installs: (n: number) => `On ${n}+ BrainDogs`,
 

@@ -77,13 +77,12 @@
   </div>
 </section>
 
-<!-- ── Decide: the scene first, the words beside it. ── -->
+<!-- ── Decide: the scene first, the words beside it. No onward link: the Agents band below carries "How agents connect". ── -->
 <section class="band spaced" aria-labelledby="decide-title">
   <div class="in feature flip">
     <div class="words">
       <h2 class="h2" id="decide-title">{h.decide.title}</h2>
       <p class="lede">{h.decide.lead}</p>
-      <a class="onward" href="/agents">{h.agents.more}<Icon name="arrow" size="m" /></a>
     </div>
     <div class="frame">
       <Decide scene={home.decide} />
@@ -105,15 +104,12 @@
   </div>
 </section>
 
-<!-- ── The inbox: the doors, then the three steps. ── -->
+<!-- ── The inbox: the words, then the three steps. The lead names the doors, so no row of chips repeats them. ── -->
 <section class="band spaced" aria-labelledby="inbox-title">
   <div class="in feature flip">
     <div class="words">
       <h2 class="h2" id="inbox-title">{h.inbox.title}</h2>
       <p class="lede">{h.inbox.lead}</p>
-      <ul class="doors" aria-label={h.inbox.steps[0]}>
-        {#each h.inbox.doors as d (d)}<li class="chip">{d}</li>{/each}
-      </ul>
     </div>
     <div class="frame">
       <div class="tile"><InboxFlow flow={h.inbox} /></div>
@@ -254,17 +250,6 @@
       opacity: 1;
       transform: none;
     }
-  }
-
-  /* ── The inbox's doors ───────────────────────────────────────────────── */
-
-  .doors {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
   }
 
   /* ── The connect sheet ───────────────────────────────────────────────── */

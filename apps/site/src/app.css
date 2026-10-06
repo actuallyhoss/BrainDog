@@ -14,9 +14,10 @@
 
 @layer components {
   :root {
-    /* The one width every page's content, the bar and the footer share, so their edges line up. */
-    --site-max: 1240px;
-    /* The page's gutter: the window inset (12) on a phone, and twice it on a desk, as the Bento site boards lay out. */
+    /* The one width every page's content, the bar and the footer share, so their edges line up. Wide enough that a
+       laptop is filled to its gutters (DIRECTION §36: never a narrow column floating in empty space). */
+    --site-max: 1360px;
+    /* The page's gutter: the window inset (12) on a phone, then growing with the window from twice it to 56 on a desk. */
     --site-gutter: var(--inset);
 
     /**
@@ -36,17 +37,15 @@
 
   @media (width >= 640px) {
     :root {
-      --site-gutter: calc(2 * var(--inset));
+      --site-gutter: clamp(calc(2 * var(--inset)), 3vw + 8px, 56px);
     }
   }
 
-  /* THE GROUND AND ITS LIGHT, painted once on the document, so every band and every tile sits on the same field. */
+  /* THE GROUND AND ITS LIGHT, painted once on the document, so every band and every tile sits on the same field. One
+     soft light from the top (DIRECTION §37), the skin's own and the only gradient: no tinted glows in the corners. */
   html {
     background-color: var(--sunk);
-    background-image:
-      radial-gradient(720px 560px at 4% 0%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 72%),
-      radial-gradient(760px 620px at 100% 14%, color-mix(in srgb, var(--info-fill) 11%, transparent), transparent 72%),
-      var(--ground-light);
+    background-image: var(--ground-light);
     background-repeat: no-repeat;
     scroll-behavior: smooth;
   }
@@ -415,6 +414,14 @@
     backdrop-filter: var(--glass-blur);
   }
 
+  /* Safari before 18 knows the blur only by its prefixed name; every glass rule here repeats it the same way. */
+  @supports (-webkit-backdrop-filter: none) {
+    .btn-glass {
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+    }
+  }
+
   .btn-lg {
     min-block-size: var(--tap);
     padding-inline: 20px;
@@ -482,6 +489,13 @@
     backdrop-filter: var(--glass-blur);
   }
 
+  @supports (-webkit-backdrop-filter: none) {
+    .glass {
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+    }
+  }
+
   /* ── The band of E: words on the ground beside the product in one glass frame ── */
 
   /* TWO COLUMNS AT A DESK, the words 400 wide and the frame the rest; `.flip` puts the frame first. Below 900 the words
@@ -523,6 +537,13 @@
     background: var(--glass);
     box-shadow: var(--glass-edge), var(--e2);
     backdrop-filter: var(--glass-blur);
+  }
+
+  @supports (-webkit-backdrop-filter: none) {
+    .frame {
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+    }
   }
 
   /* A band of E sits further from the next than a row of tiles does: each is one idea with room round it. */

@@ -47,7 +47,7 @@ The step menu groups what a step can do:
 
 - **Check**: If, Remember a value, Stop here.
 - **Change**: Add a tag, Take a tag off, Set a field, Move to a state, Link to a row, Add a note, Add rows.
-- **Ask**: Tell you, Suggest on Decide, Ask a person, and Ask Slash where the host has a model.
+- **Ask**: Tell you, Suggest on Decide, Ask a person, and Ask Slash.
 - **Call out**: Call a service, Run a call on this row, Run a script.
 - **Wait**: Wait, Come back later.
 

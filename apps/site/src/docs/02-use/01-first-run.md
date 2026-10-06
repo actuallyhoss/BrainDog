@@ -9,11 +9,10 @@ Open the sign-up page and give two things: your email, and a name for your recor
 ```steps
 Give your email and a name | The name becomes part of your record's address | On the sign-up page
 Open the link | It is mailed to you, works once, and lasts a day. Open it on the same device | In your mail
-Pay for the record | On the Cloud you pay on Stripe's page, then come straight back | On Stripe
 Add a passkey | So you can sign in again without waiting for an email | On this device
 ```
 
-While the payment lands, BrainDog says it is making your record. That takes a few seconds. If you close the payment page without paying, nothing is charged and you can start again.
+Free needs no card. If you chose Cloud or Cloud Plus, you pay on Stripe's page after opening the link, then come straight back. While the payment lands, BrainDog says it is making your record, which takes a few seconds. If you close the payment page without paying, nothing is charged and you can start again.
 
 ## Keep a way back in
 

@@ -7,14 +7,15 @@ Your record includes a month of work: automation and script runs, requests to ot
 Each month, from the first of the month in UTC:
 
 ```comparison | A month's allowance, per record
-Meter | Cloud | Cloud Plus
-Runs of automations, scheduled actions and scripts | 15,000 | 60,000
-Requests to other services | 150,000 | 600,000
-Data fetched from other services | 1 GB | 5 GB
-Script time | 50 hours | 200 hours
+Meter | Free | Cloud | Cloud Plus
+Slash asks | 20 | 80 | 400
+Runs of automations, scheduled actions and scripts | 1,000 | 15,000 | 75,000
+Requests to other services | 10,000 | 150,000 | 750,000
+Data fetched from other services | 100 MB | 1 GB | 5 GB
+Script time | 5 hours | 50 hours | 250 hours
 ```
 
-Failures are counted and never limited. Slash asks are counted on their own: a new record starts with a limit of 80 asks a month, which the owner sets. See [Slash](/docs/use/slash). Prices are on the [pricing page](/pricing).
+Failures are counted and never limited. The owner sets Slash's limit in Settings, under Agents, and zero turns it off. See [Slash](/docs/use/slash). Prices are on the [pricing page](/pricing).
 
 ## Reading the Usage page
 
