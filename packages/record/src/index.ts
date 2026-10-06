@@ -94,6 +94,11 @@ import {
   isUlid,
   slugify,
   SLASH,
+  type BackfillSliceName,
+  type BackfillSuggestion,
+  type Backfilled,
+  kindsOfProposal,
+  recordReader,
   looksLikeCredential,
   rowRegisterOf,
   runPlan,
@@ -174,6 +179,7 @@ import { PEN_DISMISSED_MOST, penFor, type PenItem } from './emergent.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
 import { rerank } from './rerank.ts';
+import { aboutOf, ladder, type Caller, type Gate } from './ladder.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_ASKED_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
@@ -552,7 +558,7 @@ const POSITION = ['agent', 'host', 'repo', 'remote', 'cwd', 'branch', 'head', 'd
 /** Why `attach` was called: the hook that fired, or the command line. */
 export const SOURCES = ['startup', 'resume', 'clear', 'compact', 'cli'] as const;
 const HANDOFF = ['next', 'tried', 'note', 'doing', 'state', 'branch', 'head', 'session'] as const;
-const MEET = ['name', 'email', 'handle', 'keys', 'kind', 'org', 'domain', 'role', 'where', 'source'] as const;
+const MEET = ['name', 'email', 'handle', 'keys', 'kind', 'org', 'domain', 'role', 'where', 'source', 'untrusted'] as const;
 /** The kinds `meet` tells apart. A person is never folded into an organisation, nor one into the other. */
 const MEET_KINDS = ['person', 'organisation'] as const;
 /** The keys one `meet` may carry, each `kind:value` (`keyOf` in the kernel normalises them). */
@@ -1123,7 +1129,16 @@ export type MeetSaid = {
   role?: string;
   where?: string;
   source?: string;
+  /** The text they were met in is one anybody could have written, a mail or a bank text. Only tightens. */
+  untrusted?: boolean;
 };
+
+/**
+ * A write an agent's rung did not let through, answered in place of the row (DIRECTION §37, "Ask"): it was filed as a
+ * question for the person, `id` is the question's handle, `question` what she is asked, and `why` the one line that says
+ * why this change asks. Nothing was written to the list.
+ */
+export type Asked = { asked: { id: string; question: string; why: string } };
 
 /**
  * What `meet` answers (`loop/contract-17.md`): the row they turned out to be, by its handle and name, or `null` when a
@@ -1514,6 +1529,8 @@ export async function createRecordApi(deps: RecordDeps) {
 
 function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'catalogueOffers' | 'tryScript' | 'answersSlash' | 'directory' | 'validFrom'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
+  /* THE LADDER OF TRUST, the record's half (`ladder.ts`): what an agent's write does at the rung it stands on. */
+  const trust = ladder({ sql, kernel, now: () => clock.now() });
   /**
    * The page declaration served at a slug, and its version: the one named exactly, or else the one whose name slugs to it
    * as the kernel serves it (`pages.ts` `claim`), when exactly one does. A page per row (`for:`) has none of its own slug.
@@ -2272,7 +2289,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A CHANGE GOES STRAIGHT TO `kernel.propose`, NOT THROUGH `prepare`. It builds a declaration rather than arranging
          packs, and the kernel's review is what works out what it sends out; `prepare` knows only pack, settings and
          arrange and refused it, so a gold rate a model drafted never reached Decide (`test/slash-change.test.ts`). */
-      const prepared = d.body_kind === 'rowset' || d.body_kind === 'change' ? ok(d.body) : await arrangement.prepare(d.body_kind, d.body);
+      const prepared = d.body_kind === 'rowset' || d.body_kind === 'change' || d.body_kind === 'options' ? ok(d.body) : await arrangement.prepare(d.body_kind, d.body);
       if (!prepared.ok) {
         skipped.push({ question: d.question, why: 'refusal' in prepared ? prepared.refusal.fix : 'It would not apply.' });
         continue;
@@ -2288,7 +2305,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         skipped.push({ question: d.question, why: 'refusal' in put ? put.refusal.fix : 'It would not file.' });
         continue;
       }
-      r.asked.set(key, { id: put.value.id, status: 'open' });
+      /* SLASH CLIMBS THE SAME LADDER AS ANY AGENT (DIRECTION §37), never for money, which is on the floor: rows of a kind
+         the owner has let it make without asking land now, signed by the ladder, and keep their Undo. */
+      const landed = d.body_kind === 'rowset' ? kernel.decide(put.value.id, { rule: 'ladder' }, SLASH) : null;
+      if (landed?.ok) ladderAnswered(put.value.id, 'accept', true);
+      r.asked.set(key, { id: put.value.id, status: landed?.ok ? 'resolved' : 'open' });
       filed.push({ id: put.value.id, question: d.question, by: d.by });
       filedKeys.push(key);
     }
@@ -2415,6 +2436,152 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const { filed, skipped } = await slashFiling(drafts, slashReading());
     /* A NO HOLDS QUIETLY: a repository asked about before is not a line in the day's log. */
     return { filed, dropped: skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`) };
+  };
+
+  /**
+   * THE NIGHTLY WALK OVER WHAT THE RECORD ALREADY HOLDS (DIRECTION §38, "understanding is the engine's first job"): the
+   * kernel's `backfill` links each old payment to who it was with, each old run to its project and each service to the
+   * project it is for, a bounded slice at a time, and hands back what it would not do on its own. Each of those is filed
+   * as one question on Decide, once, and never again after a no (`understand_key`, `stableKey`).
+   *
+   * BOUNDED: at most `UNDERSTAND_SLICES` slices a night, each the kernel's `BACKFILL_LIMIT` rows a list, from where the
+   * last night stopped (`understand.next` among Slash's prefs). A walk that reads to the end starts over the next night,
+   * which writes nothing new, since every slice reads only rows still empty.
+   *
+   * THE QUESTIONS ARE SLASH'S, filed as its rules' drafts are, so `SLASH_OPEN_CAP` holds them to a few at a time and the
+   * rest are asked on later nights. A question it can answer with rows (a company to add, a repository to list) is a
+   * `rowset` accepting writes; a choice between projects is a question of options, and its answer is carried out here
+   * (`understoodAnswer`).
+   */
+  const UNDERSTAND_SLICES = 5;
+  const UNDERSTAND_NEXT = 'understand.next';
+  /** Where a choice the walk asked is kept until it is answered, under a name no person holds. */
+  const UNDERSTAND_ASKED = 'understand:asked';
+  const slashUnderstanding = async (): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
+    const dropped: string[] = [];
+    const stored = kernel.prefsOf(SLASH)[UNDERSTAND_NEXT] as Record<string, unknown> | undefined;
+    const cursor = (k: BackfillSliceName): string | null => (typeof stored?.[k] === 'string' ? (stored[k] as string) : null);
+    let after: Record<BackfillSliceName, string | null> = { ledger: cursor('ledger'), runs: cursor('runs'), services: cursor('services') };
+    const asked = new Map<string, BackfillSuggestion>();
+    let done = false;
+    for (let n = 0; n < UNDERSTAND_SLICES && !done; n += 1) {
+      let walked: Backfilled;
+      try {
+        walked = kernel.backfill({ after });
+      } catch {
+        dropped.push('The nightly read of what this BrainDog holds stopped partway, and goes on tomorrow.');
+        break;
+      }
+      for (const one of walked.suggestions) if (!asked.has(one.key)) asked.set(one.key, one);
+      after = { ledger: walked.ledger.next, runs: walked.runs.next, services: walked.services.next };
+      done = after.ledger === null && after.runs === null && after.services === null;
+    }
+    kernel.setPref(SLASH, UNDERSTAND_NEXT, done ? null : after);
+    const drafts = [...asked.values()].flatMap((one) => understoodDraft(one));
+    if (drafts.length === 0) return { filed: [], dropped };
+    const { filed, filedKeys, skipped } = await slashFiling(drafts.map((d) => d.draft), slashReading());
+    /* A CHOICE IS KEPT BESIDE ITS QUESTION, by the option ids it was filed with, until it is answered. */
+    const choices = new Map(drafts.flatMap((d) => (d.choice === null ? [] : [[stableKey(d.draft.body), d.choice] as const])));
+    filed.forEach((f, i) => {
+      const choice = choices.get(filedKeys[i] ?? '');
+      if (choice !== undefined) kernel.setPref(UNDERSTAND_ASKED, f.id, choice);
+    });
+    /* A NO HOLDS QUIETLY, as it does for "Start a project?". */
+    return { filed, dropped: [...dropped, ...skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`)] };
+  };
+
+  /** What a choice the walk asked does when it is answered: the project each option names, and what it is about. */
+  type UnderstoodChoice =
+    | { kind: 'service-project'; service: string; projects: Record<string, string> }
+    | { kind: 'run-project'; place: string; projects: Record<string, string> };
+
+  /** The list projects are kept in, and its field of repositories: the one list declaring `scopes:`, as `slashProjects` reads it. */
+  const projectsList = (): { register: string; repos: string | null } | null => {
+    const homes = [...kernel.registers()].filter(([, r]) => r.scopes !== undefined);
+    if (homes.length !== 1) return null;
+    const [register, decl] = homes[0]!;
+    const repos = decl.scopes?.repos;
+    return { register, repos: repos !== undefined && decl.fields.some((f) => f.id === repos && f.retired !== true) ? repos : null };
+  };
+
+  /** One thing the walk would not do on its own, as the draft Slash files and, for a choice, what answering it does. */
+  const understoodDraft = (one: BackfillSuggestion): { draft: SlashDraft; choice: UnderstoodChoice | null }[] => {
+    const draft = (question: string, body_kind: SlashDraft['body_kind'], body: Record<string, unknown>): SlashDraft => ({
+      key: stableKey({ ...body, understand_key: one.key }),
+      question,
+      body_kind,
+      body: { ...body, understand_key: one.key },
+      by: 'rules',
+    });
+    switch (one.kind) {
+      case 'organisation': {
+        const orgs = orgsList();
+        const title = orgs === null ? undefined : kernel.register(orgs.register)?.title;
+        if (orgs === null || title === undefined || looksLikeCredential(one.name)) return [];
+        const key = one.key.slice('organisation:'.length);
+        const row: Record<string, unknown> = { [title]: one.name, ...(orgs.fields.keys === undefined || !key.includes(':') ? {} : { [orgs.fields.keys]: [key] }) };
+        return [{ draft: draft(one.question, 'rowset', { register: orgs.register, rows: [row] }), choice: null }];
+      }
+      case 'project-remote': {
+        const home = projectsList();
+        const project = kernel.get(one.project.id);
+        if (home === null || home.repos === null || !project || project.register !== home.register) return [];
+        const held = Array.isArray(project.fields[home.repos]) ? (project.fields[home.repos] as unknown[]) : [];
+        if (held.includes(one.remote)) return [];
+        const patch = { [home.repos]: [...held, one.remote] };
+        return [{ draft: draft(one.question, 'rowset', { register: home.register, rows: [{ at: kernel.nameOf(project.id), version: project.version, patch }] }), choice: null }];
+      }
+      case 'service-project':
+      case 'run-project': {
+        if (one.projects.length < 2) return [];
+        const projects: Record<string, string> = {};
+        const options = one.projects.slice(0, 6).map((p, i) => {
+          projects[`p${i + 1}`] = p.id;
+          return {
+            id: `p${i + 1}`,
+            label: p.name,
+            because: one.kind === 'service-project' ? `${one.service.name} is linked to ${p.name}.` : `Runs in ${one.place} are placed in ${p.name}.`,
+          };
+        });
+        const about = aboutOf(one.kind === 'service-project' ? one.service.name : one.place);
+        const body = { ...(about === '' ? {} : { about }), options: [...options, { id: 'none', label: 'Neither', because: 'Nothing is linked, and this is not asked again.' }] };
+        const choice: UnderstoodChoice = one.kind === 'service-project' ? { kind: one.kind, service: one.service.id, projects } : { kind: one.kind, place: one.place, projects };
+        return [{ draft: draft(one.question, 'options', body), choice }];
+      }
+    }
+  };
+
+  /**
+   * A choice the nightly walk asked, answered: link the service to the project picked, or place every run in that
+   * repository that no project holds yet in it. Signed by whoever answered. Anything else is not the walk's, and
+   * `Neither` does nothing but answer it.
+   */
+  const understoodAnswer = (id: string, option: string, actor: string): void => {
+    const held = kernel.prefsOf(UNDERSTAND_ASKED)[id] as UnderstoodChoice | undefined;
+    if (held === undefined) return;
+    kernel.setPref(UNDERSTAND_ASKED, id, null);
+    const project = held.projects?.[option];
+    const home = projectsList();
+    const row = project === undefined ? null : kernel.get(project);
+    if (!row || home === null || row.register !== home.register) return;
+    if (held.kind === 'service-project') {
+      const service = kernel.get(held.service);
+      const field = service ? kernel.register(service.register)?.fields.find((f) => f.type === 'ref' && f.to === home.register && f.retired !== true) : undefined;
+      if (service && field) kernel.update(service.register, service.id, { [field.id]: row.id }, { actor, version: service.version });
+      return;
+    }
+    const place = held.place.toLowerCase();
+    const last = (v: unknown): string => (typeof v === 'string' ? (v.replace(/\.git$/iu, '').split(/[\\/:]/u).filter(Boolean).at(-1) ?? '').toLowerCase() : '');
+    const runs = sql.all<{ id: string; repo: unknown; remote: unknown; cwd: unknown; project: unknown }>(
+      `SELECT id, json_extract(fields, '$.repo') AS repo, json_extract(fields, '$.remote') AS remote, json_extract(fields, '$.cwd') AS cwd,
+              json_extract(fields, '$.project') AS project FROM entry WHERE register = ? AND deleted_at IS NULL`,
+      SESSION,
+    );
+    for (const r of runs) {
+      if (r.project !== null && r.project !== '') continue;
+      if (![r.repo, r.remote, r.cwd].some((v) => last(v) === place)) continue;
+      kernel.write(SESSION, r.id, {}, { actor, cascade: false, stamp: { project: kernel.nameOf(row.id) } });
+    }
   };
 
   /**
@@ -2759,8 +2926,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * The page's look (`loop/contract-17.md`) as this caller is sent it: the kernel lays it over the page before any block is
-   * held, so its one next action may name a row of a block she is not shown, in words that say what the row is. Kept
+   * The page's look (`loop/contract-17.md`) as this caller is sent it: the kernel lays it over the blocks as this caller is
+   * shown them (the `reader` `page` hands down), and its one next action may still name a row of a block she is not shown,
+   * in words that say what the row is. Kept
    * only when the row it names is drawn in a block she is shown. Slash's next goes out only while what it was written
    * from still holds (`held`, `lookHeld` in `compose-look.ts`). The order, the lead, what is hidden and what is pinned name
    * blocks by key, and every block is sent, held or not, so those go as they are, a held block's under the key it was
@@ -3852,6 +4020,128 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       : { actor: ctx.principal.id };
 
   /**
+   * A token call as the ladder reads it (`ladder.ts`), or `null` for anybody who is not an agent on a grant the record
+   * holds: a person, the system, a share link. The run is the one its hints name, found and never opened, since a read
+   * opens none; `null` before its first write.
+   */
+  const callerOf = (ctx: CallContext): Caller | null => {
+    if (ctx.principal.kind !== 'token') return null;
+    const grant = trust.grantOf(ctx.principal.id);
+    if (grant === null) return null;
+    const run = kernel.findRun(ctx.session ?? {}, ctx.principal.id);
+    const app = typeof ctx.session?.client === 'string' && ctx.session.client.trim() !== '' ? ctx.session.client.trim() : null;
+    return { token: ctx.principal.id, scope: grant.scope, person: grant.person, run: run === null ? null : kernel.nameOf(run.id), app };
+  };
+
+  /** What the ladder says an agent and a list are called: the grant's label, and the list's own name. */
+  const ladderNames = (agent: string) => ({
+    agent:
+      agent === SLASH
+        ? 'Slash'
+        : ((sql.one<{ label: string | null }>('SELECT label FROM token WHERE id = ?', agent)?.label ?? '').trim() || 'Your agent'),
+    list: (id: string) => kernel.register(id)?.name ?? id,
+  });
+
+  /**
+   * Where an agent's write stands on the ladder, before it is written, or `null` when the ladder has nothing to say: the
+   * caller is no agent, or the write is to its own run. An app that changed under the grant, or a burst of writes, takes
+   * it back to Ask first, so this write already asks.
+   */
+  const laddered = (ctx: CallContext, register: string, op: 'create' | 'update', patch: unknown, self: Entry | null): { caller: Caller; gate: Gate } | null => {
+    if (register === SESSION) return null;
+    const caller = callerOf(ctx);
+    if (caller === null) return null;
+    trust.clientChanged(caller, SESSION);
+    trust.anomaly(caller.token, caller.run);
+    const said = patch !== null && typeof patch === 'object' && !Array.isArray(patch) ? (patch as Record<string, unknown>) : {};
+    return { caller, gate: trust.gate(caller, register, op, said, self?.id ?? null) };
+  };
+
+  /**
+   * An agent's write its rung did not let through, filed as one question on Decide in its stead: a new row as the row it
+   * would have been, a change as the patch on the version it was sent against. Signed by the run, as its write would
+   * have been, so accepting it is that agent's change kept.
+   */
+  /**
+   * The refusal a write would meet, tried in a transaction that is then taken back, or `null` when it would land.
+   *
+   * A WRITE THAT WOULD NOT LAND IS REFUSED, NOT ASKED. Filed as it was sent, a missing field, a value the list does not
+   * take or a stale version reached the person as a question that fails when she accepts it ("Mark Ship nah?"), and the
+   * agent was answered `asked` and never told the fix. No rule runs on the try (`cascade: false`), so nothing it would
+   * send goes out, and nothing of it is kept.
+   */
+  const wouldRefuse = (write: (w: { cascade: false }) => Result<Entry>): Result<never> | null => {
+    const tried = unwound<null>(() =>
+      kernel.transaction(() => {
+        const out = write({ cascade: false });
+        throw new Unwind((out.ok ? ok(null) : out) as Result<never>);
+      }),
+    );
+    return tried.ok ? null : (tried as Result<never>);
+  };
+
+  const askInstead = (ctx: CallContext, register: string, row: Record<string, unknown>, self: Entry | null, why: string): Result<Asked> => {
+    const question = askedOf(register, row, self);
+    const filed = filedAs(ctx, kernel.propose({ question, body_kind: 'rowset', body: { register, rows: [row] } }, writerOf(ctx)));
+    if (!filed.ok) return filed;
+    return ok({ asked: { id: filed.value.id, question, why } });
+  };
+
+  /** The question a filed write asks, in the list's own words: "Add Fix the retry to Tasks?", "Mark Fix the retry done?". */
+  const askedOf = (register: string, row: Record<string, unknown>, self: Entry | null): string => {
+    const decl = kernel.register(register);
+    const list = decl?.name ?? register;
+    const titleOf = (fields: Record<string, unknown> | undefined): string | null => {
+      const t = decl?.title === undefined ? null : text(fields?.[decl.title]);
+      return t === null ? null : (scrubbed(t.length > 80 ? `${t.slice(0, 79)}…` : t) ?? null);
+    };
+    if (self === null) {
+      const named = titleOf(row);
+      return named === null ? `Add this to ${list}?` : `Add ${named} to ${list}?`;
+    }
+    const patch = (row.patch ?? {}) as Record<string, unknown>;
+    const named = titleOf(self.fields) ?? `this one in ${list}`;
+    if (Object.hasOwn(patch, 'deleted_at')) return patch.deleted_at === null ? `Bring back ${named}?` : `Delete ${named} from ${list}?`;
+    const state = decl?.state;
+    if (state !== undefined && typeof patch[state] === 'string' && Object.keys(patch).length === 1) return `Mark ${named} ${String(patch[state]).replace(/[_-]+/gu, ' ')}?`;
+    return `Change ${named}?`;
+  };
+
+  /**
+   * An agent's read that handed back text from outside the record marks its run (DIRECTION §37: untrusted text drops the
+   * run to Ask for the rest of it): rows a feed or a project's key brought in, and rows another person made, whose words
+   * are theirs and not the owner's. The first source is the one said. A person's read marks nothing.
+   */
+  const readFrom = <T>(ctx: CallContext, out: Result<T>): Result<T> => {
+    if (!out.ok || ctx.principal.kind !== 'token') return out;
+    const v = out.value as unknown;
+    const rows = (v !== null && typeof v === 'object' && Array.isArray((v as { rows?: unknown }).rows) ? (v as { rows: unknown[] }).rows : [v])
+      .flatMap((r) => (r !== null && typeof r === 'object' && typeof (r as { id?: unknown }).id === 'string' ? [(r as { id: string }).id] : []))
+      .slice(0, 500);
+    if (rows.length === 0) return out;
+    const caller = callerOf(ctx);
+    if (caller === null) return out;
+    const by = sql.one<{ actor: string }>(
+      `SELECT actor FROM event WHERE kind = 'create' AND target IN (${rows.map(() => '?').join(', ')})
+       AND (actor LIKE 'ingest:%' OR actor LIKE 'report:%' OR (actor LIKE 'p\\_%' ESCAPE '\\' AND actor <> ?)) LIMIT 1`,
+      ...rows.map((id) => `entry:${id}`),
+      caller.person,
+    )?.actor;
+    if (by !== undefined) trust.markUntrusted(caller, by.startsWith('p_') ? 'something another person wrote' : 'something that arrived from outside the record');
+    return out;
+  };
+
+  /**
+   * A write the ladder let through, once it is written: one more change of its kinds kept by that agent, and the row
+   * answered with the rung it was written at (`rung`), so the agent can say "Done, and Sam can undo it".
+   */
+  const keptOnLadder = (rung: { caller: Caller; gate: Gate } | null, out: Result<Entry>): Result<Entry | Asked> => {
+    if (!out.ok || !rung?.gate.write) return out;
+    trust.kept(rung.caller.token, rung.gate.kinds, ladderNames(rung.caller.token));
+    return ok({ ...out.value, rung: rung.gate.rung });
+  };
+
+  /**
    * The run a token's call belongs to, for the calls that must know it before they write: `attach` and
    * `handoff` write the run's own row. The kernel finds it by the ladder, or opens it signed by itself
    * with `note`, and writes nothing to a run it found: the call's own write moves its heartbeat.
@@ -4082,51 +4372,81 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * of the two alone (`foldPicked`), with `carry` the kept row's share of what the one picked brought; and the question's
    * rowset is then declined, the rest kept apart, with the pick said in the decision's reason.
    */
-  type MergePick = { register: string; kept: string; at: string; version: number | null; carry: Record<string, unknown>; into: string; name: string | null; keptName: string | null };
-  const mergeAnswer = (id: string, option: string): { option: 'accept' | 'reject'; pick?: MergePick } | Refusal | null => {
-    if (option !== 'merge' && option !== 'apart' && !option.startsWith('pick:')) return null;
+  type MergePick = {
+    register: string;
+    kept: string;
+    /** The ones folded, each with the version the question was filed against and its name. */
+    picks: { at: string; version: number | null; name: string | null }[];
+    carry: Record<string, unknown>;
+    into: string;
+    keptName: string | null;
+  };
+  const mergeAnswer = (id: string, option: string, rows?: readonly number[]): { option: 'accept' | 'reject'; pick?: MergePick } | Refusal | null => {
+    if (rows === undefined && option !== 'merge' && option !== 'apart' && !option.startsWith('pick:')) return null;
     const row = kernel.governanceRow('suggestion', id) as Record<string, unknown> | null;
     const fold = row === null ? null : foldsOf(row);
     if (fold === null) return null;
-    if (option === 'merge') return { option: 'accept' };
-    if (option === 'apart') return { option: 'reject' };
-    const at = option.slice('pick:'.length);
-    const rows = fold.folds.get(at);
-    /* A PICK OF THE ONLY ONE FOLDED IS MERGE ALL, and lands as it does, one decision. */
-    if (rows !== undefined && fold.folds.size === 1) return { option: 'accept' };
-    if (rows === undefined)
-      return { code: 'ENUM_VALUE_UNKNOWN', fix: 'Pick one of the others this question asks about, or answer Merge all or Keep apart.', at: 'option', allowed: ['merge', 'apart', ...[...fold.folds.keys()].map((k) => `pick:${k}`)] };
+    /* `rows` ON ACCEPT PICKS BY PLACE: each one folded whose rows it names is picked, and the row carrying what they knew
+       is worked out again for those alone. Accepting none is Keep apart, and accepting every one is Merge all. */
+    let picked: string[];
+    if (rows !== undefined) {
+      if (option !== 'accept') return null;
+      if (!Array.isArray(rows) || rows.some((n) => !Number.isInteger(n) || n < 0 || n >= fold.body.rows.length))
+        return { code: 'VALUE_MALFORMED', fix: `rows is the places of the rows to accept, whole numbers from 0 to ${fold.body.rows.length - 1}.`, at: 'rows' };
+      picked = [...fold.folds].filter(([, at]) => at.some((n) => rows.includes(n))).map(([ref]) => ref);
+    } else if (option === 'merge') return { option: 'accept' };
+    else if (option === 'apart') return { option: 'reject' };
+    else {
+      const at = option.slice('pick:'.length);
+      if (!fold.folds.has(at))
+        return { code: 'ENUM_VALUE_UNKNOWN', fix: 'Pick one of the others this question asks about, or answer Merge all or Keep apart.', at: 'option', allowed: ['merge', 'apart', ...[...fold.folds.keys()].map((k) => `pick:${k}`)] };
+      picked = [at];
+    }
+    if (picked.length === 0) return { option: 'reject' };
+    /* A PICK OF EVERY ONE FOLDED IS MERGE ALL, and lands as it does, one decision. */
+    if (picked.length === fold.folds.size) return { option: 'accept' };
     const filed = fold.carry === null ? null : (fold.body.rows[fold.carry] as { patch?: Record<string, unknown> });
     const keptRow = kernel.get(fold.kept, { includeDeleted: true });
-    const picked = kernel.get(at, { includeDeleted: true });
     const title = kernel.register(fold.body.register)?.title;
-    const carry = filed?.patch && keptRow && picked ? pickedCarry(filed.patch, fold.parts, keptRow, picked, title) : {};
-    /* THE VERSION THE QUESTION WAS FILED AGAINST, so a row that moved since is the house conflict, as the rowset's would be. */
-    const version = (fold.body.rows[rows[0]!] as { version?: unknown } | undefined)?.version;
     const nameOfRow = (r: Entry | null): string | null => {
       const said = r && title !== undefined ? text(r.fields[title]) : null;
       return said === null ? null : scrubbed(said);
     };
-    return {
-      option: 'reject',
-      pick: { register: fold.body.register, kept: fold.kept, at, version: typeof version === 'number' ? version : null, carry, into: fold.parts.merged_into!, name: nameOfRow(picked), keptName: nameOfRow(keptRow) },
-    };
+    /* WHAT THE KEPT ONE GAINS, ONE PICK AT A TIME, each laid onto the kept row as the ones before left it, so two picks
+       that bring the same address carry it once and a value one of them filled is not filled again by the next. */
+    const carry: Record<string, unknown> = {};
+    const picks: MergePick['picks'] = [];
+    let held = keptRow;
+    for (const at of picked) {
+      const one = kernel.get(at, { includeDeleted: true });
+      if (filed?.patch && held && one) {
+        const gained = pickedCarry(filed.patch, fold.parts, held, one, title);
+        Object.assign(carry, gained);
+        held = { ...held, fields: { ...held.fields, ...(gained as Entry['fields']) } };
+      }
+      /* THE VERSION THE QUESTION WAS FILED AGAINST, so a row that moved since is the house conflict, as the rowset's would be. */
+      const version = (fold.body.rows[fold.folds.get(at)![0]!] as { version?: unknown } | undefined)?.version;
+      picks.push({ at, version: typeof version === 'number' ? version : null, name: nameOfRow(one) });
+    }
+    return { option: 'reject', pick: { register: fold.body.register, kept: fold.kept, picks, carry, into: fold.parts.merged_into!, keptName: nameOfRow(keptRow) } };
   };
 
   /**
-   * One candidate folded into the one kept, as a pick answers a merge: a merge of those two alone, filed and accepted in
+   * The ones picked folded into the one kept, as a pick answers a merge: a merge of those alone, filed and accepted in
    * the person's own press, so it goes through the decide path every merge does (the kernel's merge door, its carry and
    * one batch Undo takes back), and the history says what was merged into whom. In the caller's transaction.
    */
   const foldPicked = (pick: MergePick, actor: string): Result<{ id: string }> => {
-    const folded = kernel.get(pick.at, { includeDeleted: true });
     const keptRow = kernel.get(pick.kept, { includeDeleted: true });
-    if (!folded || !keptRow) return no('ROW_UNKNOWN', 'One of the two is no longer here, so they cannot be merged. Keep them apart, or ask again.', { at: 'option' });
+    const folded = pick.picks.map((p) => ({ p, row: kernel.get(p.at, { includeDeleted: true }) }));
+    if (!keptRow || folded.some((f) => !f.row)) return no('ROW_UNKNOWN', 'One of them is no longer here, so they cannot be merged. Keep them apart, or ask again.', { at: 'option' });
+    const now = new Date(clock.now()).toISOString();
     const rows = [
-      { at: pick.at, version: pick.version ?? folded.version, patch: { [pick.into]: pick.kept, deleted_at: new Date(clock.now()).toISOString() } },
-      ...(Object.keys(pick.carry).length === 0 ? [] : [{ at: pick.kept, version: keptRow.version, patch: pick.carry }]),
+      ...folded.map(({ p, row }) => ({ at: p.at, version: p.version ?? row!.version, patch: { [pick.into]: pick.kept, deleted_at: now } })),
+      ...(Object.keys(pick.carry).length === 0 ? [] : [{ at: pick.kept, version: keptRow.version, patch: pick.carry as Patch }]),
     ];
-    const one = pick.name ?? 'the one picked';
+    const names = pick.picks.map((p) => p.name ?? 'the one picked');
+    const one = names.length === 1 ? names[0]! : new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(names);
     const into = pick.keptName ?? 'the one kept';
     const asked = kernel.propose({ question: `Merge ${one} into ${into}?`, body_kind: 'rowset', body: { register: pick.register, rows } }, actor);
     if (!asked.ok) return asked;
@@ -4445,6 +4765,45 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const put = await land(out.value, by);
     const at = put.ok ? put.value.find((d) => d.id === (out.value.install as { id?: unknown }).id) : undefined;
     return at === undefined ? {} : { landed: { declaration: at.id, version: at.version } };
+  };
+
+  /**
+   * Accept an agent's rows by the ladder (`rule: 'ladder'`, checked again at the gate by `ladderFault`) when every kind
+   * they are stands at Do and tell or Do quietly for its grant, and say what landed: the decision, by its handle, which
+   * is what Undo takes back. `null` leaves the question open for the person, as it was filed.
+   *
+   * NOT FOR A RUN THAT READ TEXT FROM OUTSIDE THE RECORD, which asks for the rest of it whatever its rung. A burst of
+   * writes or a change of app takes the grant back to Ask before the gate reads the rung.
+   */
+  const byLadder = (ctx: CallContext, id: string): { landed: true; decision: string; undo: { decision: string } } | null => {
+    const caller = callerOf(ctx);
+    if (caller === null) return null;
+    trust.clientChanged(caller, SESSION);
+    trust.anomaly(caller.token, caller.run);
+    if (trust.untrusted(caller) !== null) return null;
+    const by = kernel.governanceRow('suggestion', id)?.opened_by;
+    if (typeof by !== 'string') return null;
+    const out = kernel.decide(id, { rule: 'ladder' }, by);
+    if (!out.ok || out.value.decision === null) return null;
+    ladderAnswered(id, 'accept', true);
+    const decision = nameOf(ctx, 'decision', out.value.decision) ?? out.value.decision;
+    return { landed: true, decision, undo: { decision } };
+  };
+
+  /**
+   * A question an agent or Slash filed was answered, for the ladder: rows accepted whole are changes of their kinds kept,
+   * a decline is one more in a row, and rows accepted in part are neither, since the person changed what was asked. An
+   * offer of a rung is answered as one. Anything else, a person's own question or a choice, is not the ladder's.
+   */
+  const ladderAnswered = (id: string, answer: string | 'declined', whole: boolean): void => {
+    if (trust.answered(id, answer)) return;
+    const row = kernel.governanceRow('suggestion', id) as { body_kind?: unknown; body?: unknown; opened_by?: unknown } | null;
+    if (row?.body_kind !== 'rowset' || typeof row.opened_by !== 'string') return;
+    const agent = trust.agentOfActor(row.opened_by);
+    if (agent === null) return;
+    const kinds = kindsOfProposal('rowset', row.body, recordReader(sql, row.opened_by));
+    if (answer === 'accept' && whole) trust.kept(agent, kinds, ladderNames(agent));
+    else if (answer === 'reject' || answer === 'declined') trust.declined(agent, kinds);
   };
 
   /**
@@ -5632,17 +5991,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               { at: 'spoken' },
             );
           const owned = kernel.get(said) ?? folded(said);
-          return ok(owned && rowAdmitted(ctx, owner.id, owned.seq) ? owned : null);
+          return readFrom(ctx, ok(owned && rowAdmitted(ctx, owner.id, owned.seq) ? owned : null));
         }
         const row = kernel.get(said) ?? folded(said);
-        return ok(row && !readable(ctx, row.register) && rowAdmitted(ctx, row.register, row.seq) ? row : null);
+        return readFrom(ctx, ok(row && !readable(ctx, row.register) && rowAdmitted(ctx, row.register, row.seq) ? row : null));
       }
       const missing = named(args, true);
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop };
       const row = kernel.get({ register: args.register as string, seq: args.seq as number });
-      return ok(row && rowAdmitted(ctx, args.register as string, row.seq) ? row : null);
+      return readFrom(ctx, ok(row && rowAdmitted(ctx, args.register as string, row.seq) ? row : null));
     },
 
     async list(
@@ -5725,7 +6084,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A REF INTO A LIST THE CALLER CANNOT READ NAMES NO ROW, WHETHER OR NOT THE ROW EXISTS. The kernel
          resolves refs and only this layer knows who is asking, so without `reads` a member invited to
          Jobs alone read `ok 0` for a hidden client that exists and `REF_UNKNOWN` for one that does not. */
-      return kernel.list({ ...args, reads: (register) => readable(ctx, register) === null }, whereFor(ctx.wheres, args.register));
+      return readFrom(ctx, kernel.list({ ...args, reads: (register) => readable(ctx, register) === null }, whereFor(ctx.wheres, args.register)));
     },
 
     /**
@@ -5735,7 +6094,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * permission, because the risk is different: a wrong new row is visible and a wrong edit to an
      * old one is not.
      */
-    async create(args: { register: string; fields: Patch; note?: string; op_id?: string }, ctx: CallContext): Promise<Result<Entry>> {
+    async create(args: { register: string; fields: Patch; note?: string; op_id?: string }, ctx: CallContext): Promise<Result<Entry | Asked>> {
       const missing = named(args);
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'append', args.register);
@@ -5750,18 +6109,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* ONE ROW PER KEY ON PEOPLE AND ORGANISATIONS: a key another row holds is that row, met again (`keyHeld`). */
       const known = keyHeld(ctx, args.register, args.fields, null);
       if (known) return { ok: false, refusal: known };
+      /* AN AGENT WRITES AT THE RUNG IT HAS EARNED, AND ASKS BELOW IT (`ladder.ts`): at Ask, on the floor, or after its
+         run read text from outside the record, the row is filed on Decide instead, and the answer says so in one line. */
+      const rung = laddered(ctx, args.register, 'create', args.fields, null);
+      if (rung && !rung.gate.write) {
+        const refused = wouldRefuse((w) => offRegister(args.register, kernel.create(args.register, args.fields, { ...writerOf(ctx), reads: refsSeen(ctx), ...w })));
+        if (refused) return refused;
+        return tail(askInstead(ctx, args.register, { ...(args.fields as Record<string, unknown>) }, null, rung.gate.why));
+      }
       return tail(
-        offRegister(
-          args.register,
-          kernel.create(args.register, args.fields, {
-            ...writerOf(ctx),
-            reads: refsSeen(ctx),
-            ...(args.note === undefined ? {} : { note: args.note }),
-            ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
-            /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
-               without its own id the record has no way to know the second is the first. */
-            ...(args.op_id === undefined ? {} : { opId: args.op_id }),
-          }),
+        keptOnLadder(
+          rung,
+          offRegister(
+            args.register,
+            kernel.create(args.register, args.fields, {
+              ...writerOf(ctx),
+              reads: refsSeen(ctx),
+              ...(args.note === undefined ? {} : { note: args.note }),
+              ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+              /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
+                 without its own id the record has no way to know the second is the first. */
+              ...(args.op_id === undefined ? {} : { opId: args.op_id }),
+            }),
+          ),
         ),
       );
     },
@@ -5845,7 +6215,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async update(
       args: { register: string; seq: number; patch: Patch; version?: number; note?: string; op_id?: string },
       ctx: CallContext,
-    ): Promise<Result<Entry>> {
+    ): Promise<Result<Entry | Asked>> {
       const missing = named(args, true);
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'write', args.register);
@@ -5856,17 +6226,37 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (merges) return { ok: false, refusal: merges };
       const known = keyHeld(ctx, args.register, args.patch, self?.id ?? null);
       if (known) return { ok: false, refusal: known };
+      /* AT THE RUNG IT HAS EARNED, as `create` (`ladder.ts`). A row that is not there is left to the write's own refusal. */
+      const rung = self === null ? null : laddered(ctx, args.register, 'update', args.patch, self);
+      if (rung && self && !rung.gate.write) {
+        const refused = wouldRefuse((w) =>
+          offRegister(
+            args.register,
+            kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
+              ...writerOf(ctx),
+              reads: refsSeen(ctx),
+              ...(args.version === undefined ? {} : { version: args.version }),
+              ...w,
+            }),
+          ),
+        );
+        if (refused) return refused;
+        return tail(askInstead(ctx, args.register, { at: `${args.register}#${args.seq}`, version: args.version ?? self.version, patch: args.patch }, self, rung.gate.why));
+      }
       return tail(
-        offRegister(
-          args.register,
-          kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
-            ...writerOf(ctx),
-            reads: refsSeen(ctx),
-            ...(args.version === undefined ? {} : { version: args.version }),
-            ...(args.note === undefined ? {} : { note: args.note }),
-            ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
-            ...(args.op_id === undefined ? {} : { opId: args.op_id }),
-          }),
+        keptOnLadder(
+          rung,
+          offRegister(
+            args.register,
+            kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
+              ...writerOf(ctx),
+              reads: refsSeen(ctx),
+              ...(args.version === undefined ? {} : { version: args.version }),
+              ...(args.note === undefined ? {} : { note: args.note }),
+              ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+              ...(args.op_id === undefined ? {} : { opId: args.op_id }),
+            }),
+          ),
         ),
       );
     },
@@ -6085,6 +6475,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const projects = await slashProjects();
       out.filed.push(...projects.filed);
       out.dropped.push(...projects.dropped);
+      /* THEN WHAT THE RECORD ALREADY HOLDS, READ AGAIN A SLICE A NIGHT, and what it would not settle asked once each. */
+      const understood = await slashUnderstanding();
+      out.filed.push(...understood.filed);
+      out.dropped.push(...understood.dropped);
       /* AND THE HEADLINES LAST, which file nothing on Decide and only write Slash's own prefs. */
       out.dropped.push(...(await slashHeadlines(today)).dropped);
       if (out.filed.length > 0 && scheduler) await kernel.tail(scheduler);
@@ -6237,7 +6631,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           refusal: { ...said, fix: said.fix.split(NOWHERE).join(args.slug), ...(said.allowed ? { allowed: said.allowed.filter((slug) => shown.has(slug)) } : {}) },
         };
       }
-      let out = kernel.page(args.slug, filter, reach);
+      /* THE READER GOES DOWN WITH THE ASK, so the kernel lays the look over the blocks as this caller is shown them: held
+         as `heldBlock` holds them, with her own read mark on a feed. */
+      const reader = { hold: (b: ReturnType<Kernel['block']>) => heldBlock(ctx, b), seen: markOf(readerOf(ctx)) };
+      let out = kernel.page(args.slug, filter, { ...reach, reader });
       /* A FILTER IS HELD BY THE LISTS IT WAS COUNTED FROM, as a block is by the list it reads. The kernel counts every
          list the page's blocks read and names each link by its row's title, so a member invited to Tasks alone was handed
          the titles of projects she may not read, and how many tasks each holds. Her choice on it is dropped and the page
@@ -6246,7 +6643,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (out.ok && filter && (out.value.filters as PageFilter[] | undefined)?.some((f) => unseen(f) && Object.hasOwn(filter, f.field))) {
         const kept = { ...filter };
         for (const f of out.value.filters as PageFilter[]) if (unseen(f)) delete kept[f.field];
-        out = kernel.page(args.slug, kept, reach);
+        out = kernel.page(args.slug, kept, { ...reach, reader });
       }
       /* AND THE OBSERVATION IS AFTER THE ANSWER, not before it. It ran first, on the caller's raw
          slug, so `GET /api/page?slug=<anything>` inserted a row keyed by whatever a reader typed and
@@ -7010,6 +7407,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          file one. */
       const stop = guard(ctx, 'append', args.register);
       if (stop) return { ok: false as const, refusal: stop };
+      /* AN AGENT'S NOTE MEETS ONLY THE FLOOR (`noteFault`): a row another person made, or a list of keys. */
+      const caller = args.register === SESSION ? null : callerOf(ctx);
+      const noted = caller === null ? null : kernel.get(`${args.register}#${args.seq}`);
+      const held = caller === null || noted === null ? null : trust.noteFault(caller, args.register, noted.id);
+      if (held !== null) return no('FORBIDDEN', held, { at: 'note' });
       /* AND IT IS A `note` EVENT RATHER THAN AN `edit`. This went through `update` with an empty
          patch, so a log entry bumped the row's VERSION — and anybody holding the version they read
          then got a spurious `VERSION_STALE` on their next real change, for a call that changed no
@@ -7245,6 +7647,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       for (const key of ['name', 'email', 'handle', 'org', 'domain', 'role', 'where', 'source'] as const)
         if (said[key] !== undefined && said[key] !== null && typeof said[key] !== 'string')
           return no('VALUE_MALFORMED', `${key} takes a line of text.`, { at: key });
+      /* `untrusted` ONLY TIGHTENS: an agent may say the text it read anybody could have written, and `false` lifts nothing. */
+      if (said.untrusted !== undefined && said.untrusted !== null && typeof said.untrusted !== 'boolean')
+        return no('VALUE_MALFORMED', 'untrusted is true when what you met them in is text anybody could have written, such as a mail.', { at: 'untrusted' });
       if (said.keys !== undefined && said.keys !== null) {
         const keys = said.keys;
         if (!Array.isArray(keys) || keys.length > MEET_KEYS_MOST || keys.some((k) => typeof k !== 'string' || !/^[a-z][a-z0-9.-]*:\S/iu.test(k.trim())))
@@ -7286,7 +7691,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (said.role !== undefined && said.role !== null && parts.role === undefined && !kernel.register(people.register)?.fields.some((f) => f.id === 'role' && !f.retired))
           return no('FIELD_UNKNOWN', `${people.register} keeps no role. Meet them without one.`, { at: 'role' });
       }
-      return tail(meeting(ctx, kernel.meet(said as never, writerOf(ctx)) as Result<unknown>));
+      /* A RUN THE LADDER DROPPED TO ASK FOR READING UNTRUSTED TEXT MEETS PEOPLE UNDER THE SAME RULE (DIRECTION §37): what it
+         says of them is that text, so nobody is merged on it and an address it read is never taken as theirs. */
+      const caller = callerOf(ctx);
+      const doubted = said.untrusted === true || (caller !== null && trust.untrusted(caller) !== null);
+      const { untrusted: _said, ...met } = said;
+      return tail(meeting(ctx, kernel.meet({ ...met, ...(doubted ? { untrusted: true } : {}) } as never, writerOf(ctx)) as Result<unknown>));
     },
 
     /* ── THE DECISION GATE ─────────────────────────── */
@@ -7386,6 +7796,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       /* A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are. */
       const filed = kernel.propose(args, writerOf(ctx));
+      if (filed.ok && args?.body_kind === 'rowset') {
+        /* ROWS ITS RUNG LETS THROUGH ARE ACCEPTED BY THE LADDER AND LAND NOW, with the Undo every decision has. */
+        const landed = byLadder(ctx, filed.value.id);
+        if (landed !== null) return tail(filedAs(ctx, ok({ ...filed.value, ...landed })));
+      }
       if (!filed.ok || !byRule(args, ctx)) return filedAs(ctx, filed);
       return tail(filedAs(ctx, ok({ ...filed.value, ...(await additive(filed.value.id)) })));
     },
@@ -7424,13 +7839,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         );
 
       /* A MERGE IS ANSWERED IN THE CARD'S WORDS (`mergeAnswer`): Merge all, Keep apart, or one candidate picked. */
-      const merging = args.decide && typeof args.decide.option === 'string' ? mergeAnswer(String(args.id), args.decide.option) : null;
+      /* AND IN PART BY PLACE, with what the kept one gains worked out again for the ones picked. The rowset's patch on the
+         kept row carries every candidate's handles at once, so rows that took some folds and not others handed the kept
+         person what the ones left apart knew, or left what the picked one knew on a deleted row
+         (`loop/research-audit-17.md` M3). `rows` is read as the candidates it names, as `pick:<row>` is one. */
+      const picking = (args.decide as { rows?: unknown } | undefined)?.rows;
+      const merging =
+        args.decide && typeof args.decide.option === 'string'
+          ? picking !== undefined && !Array.isArray(picking)
+            ? null
+            : mergeAnswer(String(args.id), args.decide.option, picking as number[] | undefined)
+          : null;
       if (merging !== null && 'code' in merging) return { ok: false as const, refusal: merging };
-      /* AND NEVER IN PART BY PLACE. The rowset's patch on the kept row carries every candidate's handles at once, so rows
-         that took some folds and not others handed the kept person what the ones left apart knew, or left what the picked
-         one knew on a deleted row (`loop/research-audit-17.md` M3). A pick is `pick:<row>`, which carries only its own. */
-      if (merging === null && args.decide && (args.decide as { rows?: unknown }).rows !== undefined && target && foldsOf(target as Record<string, unknown>) !== null)
-        return no('VALUE_MALFORMED', 'A merge is answered whole: Merge all, Keep apart, or Pick the one that is the same.', { at: 'rows' });
+      if (merging === null && picking !== undefined && target && foldsOf(target as Record<string, unknown>) !== null)
+        return no('VALUE_MALFORMED', 'A merge is answered as Merge all, Keep apart, or the ones that are the same picked by their rows.', { at: 'rows' });
       const verdict = (
         merging !== null && !('code' in merging) && args.decide
           ? { decide: { option: merging.option, reason: args.decide.reason } }
@@ -7483,7 +7905,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (merging !== null && !('code' in merging) && merging.pick !== undefined) {
         const pick = merging.pick;
         const given = args.decide?.reason?.trim() ?? '';
-        const said = `Picked ${pick.name ?? 'one'} as the same as ${pick.keptName ?? 'the one kept'}, and kept the others apart.${given === '' ? '' : ` ${given}`}`;
+        const names = pick.picks.map((p) => p.name ?? 'one');
+        const who = names.length === 1 ? names[0]! : new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(names);
+        const said = `Picked ${who} as the same as ${pick.keptName ?? 'the one kept'}, and kept the others apart.${given === '' ? '' : ` ${given}`}`;
         const halted: { refusal: Refusal | null } = { refusal: null };
         let picked: Result<Decided>;
         try {
@@ -7507,6 +7931,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return tail(settledAs(ctx, args.id, picked));
       }
       const out = kernel.decide(args.id, verdict, actorOf(ctx));
+      /* THE LADDER COUNTS THE ANSWER (`ladderAnswered`): kept whole, declined, or a rung offered and answered. */
+      if (out.ok && !('defer' in verdict))
+        ladderAnswered(String(args.id), 'decide' in verdict ? verdict.decide.option : 'declined', !('decide' in verdict) || verdict.decide.rows === undefined);
+      /* AND A CHOICE THE NIGHTLY WALK ASKED IS CARRIED OUT (`understoodAnswer`), or let go when it was dismissed. */
+      if (out.ok && !('defer' in verdict)) understoodAnswer(String(args.id), 'decide' in verdict ? verdict.decide.option : 'none', actorOf(ctx));
       /* AN ACCEPTED RETYPE OR NARROWING LANDS HERE, when the owner accepts it rather than the caller who filed it
          `govern.decide` hands back `retype` in place of `install`, since it stages the list's next version
          through the pack path rather than an ordinary declaration write, and `landRetype` is the one place both
@@ -9257,6 +9686,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const limit = Math.min(Math.max(1, asked ?? 50), 200);
       const lines = kernel.inboxBefore(cursor ?? null, limit + 1, states);
       const arrivals = lines.slice(0, limit);
+      /* WHAT ARRIVED IS TEXT ANYBODY COULD HAVE WRITTEN, so an agent that reads it asks for the rest of its run (`ladder.ts`). */
+      const reader = arrivals.length === 0 ? null : callerOf(ctx);
+      if (reader !== null) trust.markUntrusted(reader, 'the inbox');
       return ok({
         arrivals,
         cursor: lines.length > limit ? (arrivals.at(-1)?.rowid ?? null) : null,
@@ -9357,14 +9789,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(registers.length === every.length ? {} : { registers }),
         ...(args.limit === undefined ? {} : { limit: args.limit }),
       });
+      /* THE WORDS' ORDER, SHUFFLED BY MEANING WHERE THE ROWS HAVE VECTORS (`rerank.ts`), and left exactly as it was
+         where they have none. Before the reach below, which only drops hits and so keeps the order it is given. */
+      const shown = rerank(sql, found.hits).flatMap((hit) => {
+        const row = kernel.get(hit.id);
+        return row && rowAdmitted(ctx, row.register, row.seq) ? [{ row, rank: hit.rank }] : [];
+      });
+      /* A TITLE IS THE ROW'S OWN WORDS, so an agent handed one from outside the record is marked as `get` marks it. */
+      readFrom(ctx, ok({ rows: shown.map((h) => h.row) }));
       return ok({
-        /* THE WORDS' ORDER, SHUFFLED BY MEANING WHERE THE ROWS HAVE VECTORS (`rerank.ts`), and left exactly as it was
-           where they have none. Before the reach below, which only drops hits and so keeps the order it is given. */
-        hits: rerank(sql, found.hits).flatMap((hit) => {
-          const row = kernel.get(hit.id);
-          if (!row || !rowAdmitted(ctx, row.register, row.seq)) return [];
+        hits: shown.map(({ row, rank }) => {
           const title = kernel.register(row.register)?.title;
-          return [{ register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank: hit.rank }];
+          return { register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank };
         }),
         /* THE TOTAL IS NOT NARROWED THE SAME WAY: `fts.searchMatched` counts every live row of a register
            this caller may read, and a caller whose grant is further narrowed by a `where` sees a figure over the

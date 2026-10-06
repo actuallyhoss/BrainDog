@@ -34,6 +34,7 @@ import { methods as quiet } from './quiet.ts';
 import { methods as retype } from './retype.ts';
 import { methods as pattern } from './pattern.ts';
 import { methods as personName } from './person-name.ts';
+import { methods as undo } from './undo.ts';
 /* END METHODS */
 
 /**
@@ -90,6 +91,7 @@ export function methods(deps: RecordDeps) {
     ...retype(deps),
     ...pattern(deps),
     ...personName(deps),
+    ...undo(deps),
     /* END METHODS */
   };
 }

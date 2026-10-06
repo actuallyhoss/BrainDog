@@ -2,7 +2,7 @@
  * A doubtful merge is one question for the whole cluster (`loop/contract-17.md`), and Decide draws it as one card: every
  * candidate by name with where each was seen, and three answers, Merge all, Keep apart and Pick. The question is a
  * `rowset` whose rows fold rows into one through `merged_into`, so the record reads the candidates out of it and says
- * which rows each one is, and `decide` with `rows` merges only the ones picked.
+ * which rows each one is, and `decide` with `rows` merges only the ones picked, carrying only what they brought.
  */
 
 import { test } from 'node:test';
@@ -165,15 +165,41 @@ test('MERGE ALL FOLDS EVERY ONE, KEEP APART FOLDS NONE, and a pick of a name it 
   }
 });
 
-test('A MERGE IS NEVER TAKEN IN PART BY PLACE, which would carry the handles of the ones left apart', async () => {
+test('A MERGE TAKEN IN PART BY PLACE folds the ones picked and carries only what they brought', async () => {
   const { api, sql, asked } = await record();
   const q = await question(api, asked);
-  const rows = q.merge!.candidates.filter((c) => c.name === 'jherrerastudio').flatMap((c) => c.rows);
-  const out = (await api.decide({ id: asked, decide: { option: 'accept', reason: 'r', rows } } as never, owner)) as { ok: boolean; refusal?: { code: string; at?: string } };
-  assert.equal(out.refusal?.code, 'VALUE_MALFORMED');
-  assert.equal(out.refusal?.at, 'rows');
-  assert.equal((await people(api)).length, 3);
+  /* THE PLACES OF ONE CANDIDATE'S ROWS, AND THE CARRY ROW BESIDE THEM, which is worked out again for the one picked. */
+  const rows = [0, ...q.merge!.candidates.filter((c) => c.name === 'jherrerastudio').flatMap((c) => c.rows)];
+  value(await api.decide({ id: asked, decide: { option: 'accept', reason: 'only the Herrera login is him', rows } } as never, owner));
+  const live = await people(api);
+  assert.deepEqual(live.map((r) => r.fields.name).sort(), ['Rohan Mehta', 'rohanmehta']);
+  /* THE KEPT ONE GAINS THE PICKED LOGIN AND NEVER THE ONE KEPT APART. */
+  assert.deepEqual(live.find((r) => r.fields.name === 'Rohan Mehta')?.fields.handles, ['github:jherrerastudio']);
+  assert.equal(sql.all("SELECT 1 FROM suggestion WHERE id = ? AND status = 'open'", asked).length, 0, 'the question is answered');
   sql.close();
+});
+
+test('IN PART BY PLACE, NONE PICKED IS KEEP APART AND EVERY ONE IS MERGE ALL, and rows that are not places are refused', async () => {
+  {
+    const { api, sql, asked } = await record();
+    const bad = (await api.decide({ id: asked, decide: { option: 'accept', reason: 'r', rows: ['people#2'] } } as never, owner)) as { ok: boolean; refusal?: { code: string; at?: string } };
+    assert.equal(bad.refusal?.code, 'VALUE_MALFORMED');
+    assert.equal(bad.refusal?.at, 'rows');
+    /* A PLACE THE QUESTION DOES NOT HAVE IS REFUSED, never read as Keep apart. */
+    const past = (await api.decide({ id: asked, decide: { option: 'accept', reason: 'r', rows: [99] } } as never, owner)) as { ok: boolean; refusal?: { at?: string } };
+    assert.equal(past.refusal?.at, 'rows');
+    value(await api.decide({ id: asked, decide: { option: 'accept', reason: 'three people', rows: [0] } } as never, owner));
+    assert.equal((await people(api)).length, 3);
+    sql.close();
+  }
+  {
+    const { api, sql, asked } = await record();
+    value(await api.decide({ id: asked, decide: { option: 'accept', reason: 'all him', rows: [1, 2] } } as never, owner));
+    const live = await people(api);
+    assert.deepEqual(live.map((r) => r.fields.name), ['Rohan Mehta']);
+    assert.deepEqual(live[0]?.fields.handles, ['github:rohanmehta', 'github:jherrerastudio']);
+    sql.close();
+  }
 });
 
 test('ONLY DECIDE MERGES: a write naming merged_into, or bringing back one folded, is refused', async () => {

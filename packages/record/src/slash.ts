@@ -226,7 +226,7 @@ export type SlashDraft = {
   /** What it is about, stable across readings, so the same draft is recognised once it has been asked. */
   key: string;
   question: string;
-  body_kind: 'pack' | 'settings' | 'arrange' | 'rowset' | 'change';
+  body_kind: 'pack' | 'settings' | 'arrange' | 'rowset' | 'change' | 'options';
   body: Record<string, unknown>;
   /** Who drafted it: the rules, or the model named. */
   by: string;
@@ -2035,6 +2035,9 @@ export function stableKey(body: Record<string, unknown>): string {
   for (const k of ['install', 'enable', 'disable', 'usecase'] as const) if (typeof body[k] === 'string') return `${k}:${body[k]}`;
   /* "START A PROJECT?" IS THE REPOSITORY IT IS ABOUT (`kernel` `projectSuggestions`), so a no holds whatever it is called. */
   if (typeof body.project_key === 'string') return `project:${body.project_key}`;
+  /* WHAT THE NIGHTLY WALK OVER THE RECORD WOULD NOT DO ON ITS OWN (`kernel` `backfill`) IS THE KEY IT ASKED BY, so a no
+     to "Is Amazon a company you pay?" holds however its payments are worded next. */
+  if (typeof body.understand_key === 'string') return `understand:${body.understand_key}`;
   /* A CHANGE IS THE DECLARATION IT INSTALLS, whole, so a gold rate declined is not asked again and a different one is a new
      question. The egress the kernel adds is left out, so the key is the same on the draft and on the row it was filed as. */
   if (typeof body.declaration_id === 'string' && body.to !== null && typeof body.to === 'object')

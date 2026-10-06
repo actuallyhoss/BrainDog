@@ -22,6 +22,8 @@ import assert from 'node:assert/strict';
 
 import * as recordModule from '../src/index.ts';
 import type { CallContext } from '../src/index.ts';
+import type { Entry } from '@braindog/kernel';
+import type { Result } from '@braindog/ports';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 /* READ OFF THE MODULE RATHER THAN IMPORTED BY NAME, so that against a record without the ceilings each test fails on
@@ -88,9 +90,9 @@ async function record(bills = 0, text = '', currencies: readonly string[] = ['US
   const put = await api.kernel.install(DECLS as never);
   assert.ok(put.ok, JSON.stringify(put));
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
-  const acme = await api.create({ register: 'clients', fields: { name: 'Acme Redundancy Plan' } }, owner);
+  const acme = (await api.create({ register: 'clients', fields: { name: 'Acme Redundancy Plan' } }, owner)) as Result<Entry>;
   assert.ok(acme.ok);
-  const pricing = await api.create({ register: 'topics', fields: { name: 'Pricing' } }, owner);
+  const pricing = (await api.create({ register: 'topics', fields: { name: 'Pricing' } }, owner)) as Result<Entry>;
   assert.ok(pricing.ok);
   assert.ok((await api.create({ register: 'diary', fields: { body: 'Told Sam' } }, owner)).ok);
   assert.ok((await api.create({ register: 'notes', fields: { body: 'Call back', client: acme.value.id, topic: pricing.value.id } }, owner)).ok);
