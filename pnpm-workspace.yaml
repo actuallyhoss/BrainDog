@@ -54,7 +54,13 @@ allowBuilds:
 #   undici   A medium advisory on 7.28.0 up to 7.29.1. It arrives through `wrangler` and `miniflare` for
 #            the dev server and deploys, never in what a browser or a record runs; the patched 7.x is the
 #            same API, so the range holds until those packages ask for it themselves.
+#   devalue  Six advisories on 5.9.2, three high: `uneval` and `stringify` amplification on sparse arrays and
+#            repeated strings, shared memory serialised, a `__proto__` key slipping through, and an unhandled
+#            rejection in `stringifyAsync`. It arrives through `@sveltejs/kit`, which serialises page data with
+#            it. The app is `ssr = false`, so little of that path runs, but 5.9.3 is a patch release of the
+#            same API and costs nothing to take.
 overrides:
   cookie: ^0.7.2
   sharp: ^0.35.4
   undici: ^7.29.1
+  devalue: ^5.9.3
