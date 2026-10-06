@@ -753,18 +753,23 @@ test('THE DESIGN SYSTEM LANDS EXACTLY WHEREVER THE FLOORS ALLOW IT', () => {
 
      2026-10-02: light's ink-3 and red words aim where AA has room, and red's mark aims at the house mark (`SYSTEM_AIM`),
      so all three land exactly. Dark's ground, tile and the steps inside a tile are the product's own ladder now, widened
-     under the design system's ceiling (`HOUSE_PROFILE.ladder`), and are pinned here as that. */
+     under the design system's ceiling (`HOUSE_PROFILE.ladder`), and are pinned here as that.
+
+     2026-10-06: light's ladder widened too, under the white tile, and its ground came down for room. Ink-2, ink-3, red
+     words and green each aim a step darker to keep the room they had on the old ground (`SYSTEM_AIM`). */
   const exact: Record<'light' | 'dark', Partial<Record<keyof Palette, string>>> = {
     light: {
-      sunk: '#E9ECF0',
+      sunk: '#E4E6EB',
       bg: '#FFFFFF',
       s1: '#F2F4F7',
+      s2: '#EBEDF1',
+      s3: '#E4E7EB',
       ink: '#101318',
-      ink2: '#4A505B',
-      dim: '#5F6570',
+      ink2: '#484F5A',
+      dim: '#5C626D',
       line: '#E3E7EC',
-      earn: '#157A48',
-      'danger-text': '#C21F22',
+      earn: '#067342',
+      'danger-text': '#BD181E',
       danger: '#DB2527',
       live: '#4F4FD8',
     },
@@ -853,7 +858,7 @@ test('TEXT ON THE CHROME CLEARS THE SAME FLOORS AS TEXT ON A SURFACE', () => {
 });
 
 test('THE DESIGN SYSTEM CHROME: glass in the house, opaque in high contrast', () => {
-  assert.equal(HOUSE.chrome.light.glass, 'rgb(255 255 255 / 0.66)');
+  assert.equal(HOUSE.chrome.light.glass, 'rgb(255 255 255 / 0.7)');
   assert.equal(HOUSE.chrome.dark.glass, 'rgb(30 34 43 / 0.62)');
   assert.equal(HOUSE.chrome.light['hover-wash'], 'rgb(255 255 255 / 0.6)'); // lifts toward white on the ground (build.ts GLASS)
   assert.equal(HOUSE.chrome.light['arrived-wash'], '#EEF0FF');
@@ -888,6 +893,27 @@ test('THE DARK LADDER: TILES, WELLS AND CHROME STAND APART FROM THE GROUND', () 
   /* And a tile catches the top light, at a level the chrome's shadow is still above (check I). */
   assert.equal(HOUSE.elevation.dark[0], '0 0 0 0 rgb(0 0 0 / 0), inset 0 1px 0 rgb(255 255 255 / 0.05)');
   assert.deepEqual(refusals(checkElevation(HOUSE)), []);
+});
+
+test('THE LIGHT LADDER: TILES, WELLS AND CHROME STAND APART AS THEY DO IN DARK', () => {
+  /* 2026-10-06. Light's steps inside a tile sat 0.8 and 0.95 delta-E apart, so a hover, a focused question and a chosen
+     segment drew next to nothing in light while dark showed each. They step down from the white tile toward the ground
+     now, held to dark's distances, and never onto the ground (check H). */
+  const p = HOUSE.schemes.light;
+  const apart = (a: Rgb, b: Rgb) => deltaE2000(rgbToCielab(a), rgbToCielab(b));
+  const dE = (a: string, b: string) => apart(fromHex(a), fromHex(b));
+  assert.ok(dE(p.sunk, p.bg) >= 4, `a tile is ${dE(p.sunk, p.bg).toFixed(2)} from the ground`);
+  assert.ok(dE(p.bg, p.s1) >= 2.5, `a well is ${dE(p.bg, p.s1).toFixed(2)} from its tile`);
+  /* 1.4 and not dark's 1.5: the steps share the room between a white tile and a ground the words must still clear
+     4.5:1 on, and the second step measures 1.42. */
+  for (const [a, b] of [['s1', 's2'], ['s2', 's3']] as const)
+    assert.ok(dE(p[a], p[b]) >= 1.4, `${b} is ${dE(p[a], p[b]).toFixed(2)} from ${a}, which a hover cannot show`);
+  const L = (hex: string) => rgbToLch(fromHex(hex)).L;
+  assert.ok(Math.abs(L(p.s1) - L(p.s2) - (L(p.s2) - L(p.s3))) < 0.003, 's1, s2 and s3 do not step evenly');
+  assert.ok(L(p.s3) > L(p.sunk), 'the last step inside a tile went down onto the ground');
+  /* The rail is glass over the ground, and it reads as a thing on it, as dark's does. */
+  const glass = over(HOUSE.chrome.light.glass, p.sunk);
+  assert.ok(apart(glass, fromHex(p.sunk)) >= 4, `glass on the ground is ${apart(glass, fromHex(p.sunk)).toFixed(2)} from it`);
 });
 
 test('A TILE EASES INTO THE CHROME’S LEVEL, in both schemes', () => {

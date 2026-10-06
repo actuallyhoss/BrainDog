@@ -105,42 +105,33 @@
     white-space: nowrap;
   }
 
-  /* WHO ASKED AND WHEN WAIT FOR THE CARD (DIRECTION §35), as the renderer marks them (`data-calm`, `blocks.css`), on
-     every host's by-line: Decide's answerable cards draw the same line with no mark on it, and showed it always. Only
-     where there is a pointer that hovers; under a thumb the line is always there.
+  /* WHO ASKED STAYS, AND WHEN WAITS FOR THE CARD (DIRECTION §35, §37). The name on a by-line is the agent or Slash
+     that is asking, and which of them is asking is half of whether to say yes, so it is read at rest like the question
+     under it. The time is the line's detail: it waits for the pointer or the keyboard to reach its card, then fades in
+     where it already sits. Only where there is a pointer that hovers; under a thumb the whole line is always there.
 
-     AT REST THE LINE TAKES NO ROOM. Faded and kept, it was an empty band above every question on Today, Decide, Money
-     and Kiln, with "Hard to undo" floating alone at its far end (visual review 4). It is not drawn until the pointer or
-     the keyboard reaches its card, and then it fades in where it belongs. A part the record set in bold never waits,
-     so a line holding one keeps its place, with only its plain parts faded. So does a line a host still ends with the
-     cost, which is the card's place in the queue and not a detail of it. A page's j and k mark the card itself when it
-     is a row of the page (`data-row-cursor`), and a host's box round it when the card sits in one. */
+     THE LINE KEEPS ITS ROOM AT REST, AND THAT IS THE POINT. It was taken out of the layout until a hover (visual review
+     4: a faded band with nothing in it sat above every question), and a hover then put a line back above the question,
+     so every card below the pointer moved down one line as the pointer crossed it. With the name on it the line is
+     never an empty band, and with only opacity changing the cards never move. The renderer marks both parts calm
+     (`data-calm`, `blocks.css`); the name is taken back out of that here. A part the record set in bold never waits,
+     and neither does a cost an older host still ends the line with. A page's j and k mark the card itself when it is a
+     row of the page (`data-row-cursor`), and a host's box round it when the card sits in one. Decide's own hosts draw
+     the line with no mark and keep it whole (`decide/+page.svelte`). */
+  .queue-by > .queue-who[data-calm] {
+    opacity: 1;
+  }
+
   @media (hover: hover) and (pointer: fine) {
-    .queue-by:not(:has(strong, .queue-cost:not([data-cost='call']))) {
-      display: none;
-    }
-
-    .queue-card:is(:hover, :focus-within, [data-focused], [data-row-cursor]) > .queue-by,
-    [data-row-cursor] > .queue-card > .queue-by {
-      display: flex;
-      transition: opacity var(--d-state) var(--ease-out);
-    }
-
-    @starting-style {
-      .queue-card:is(:hover, :focus-within, [data-focused], [data-row-cursor]) > .queue-by,
-      [data-row-cursor] > .queue-card > .queue-by {
-        opacity: 0;
-      }
-    }
-
-    .queue-by > :not(.queue-cost, :has(strong)) {
+    .queue-by > :is(.queue-when, [data-calm]):not(.queue-who, .queue-cost, :has(strong)) {
       opacity: 0;
-      transition: opacity var(--d-state) var(--ease-out);
+      transition: opacity var(--d-exit) var(--ease-in);
     }
 
     .queue-card:is(:hover, :focus-within, [data-focused], [data-row-cursor]) > .queue-by > *,
     [data-row-cursor] > .queue-card > .queue-by > * {
       opacity: 1;
+      transition: opacity var(--d-enter) var(--ease-out);
     }
   }
 
@@ -449,14 +440,9 @@
     grid-column: 1;
   }
 
-  /* WHERE THE BY-LINE WAITS FOR THE POINTER (above), the question takes the box's line while it does, so the box does
-     not hold a row of its own above the question: that was the empty band again, one box high. The question keeps the
-     first track whether the by-line is drawn or not, so its words never rewrap under the pointer. */
-  @media (hover: hover) and (pointer: fine) {
-    .queue-card:has(> .queue-select) > .queue-question {
-      grid-column: 1;
-    }
-  }
+  /* The by-line keeps its line at rest now (above), with the name on it, so the question always starts on the line
+     under the box and spans the card. It took the box's line while the by-line was out of the layout, and gave it
+     back under the pointer. */
 
   /* A TILE LEADS WITH ITS VISUAL, so where one is drawn it keeps the first row and the by-line and its box share the
      second. Pinned to the first, the by-line would put the visual under it, where its pull to the tile's top edge lays

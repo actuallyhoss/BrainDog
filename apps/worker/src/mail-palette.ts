@@ -2,13 +2,13 @@
 /** The house colours a mail is painted in, light inline and dark in its media query. Written by `packages/skin/scripts/theme.mjs`. */
 export const MAIL_PALETTE = {
   "light": {
-    "sunk": "#E9ECF0",
+    "sunk": "#E4E6EB",
     "bg": "#FFFFFF",
     "s1": "#F2F4F7",
-    "s3": "#ECEFF2",
+    "s3": "#E4E7EB",
     "ink": "#101318",
-    "ink2": "#4A505B",
-    "dim": "#5F6570",
+    "ink2": "#484F5A",
+    "dim": "#5C626D",
     "line": "#E3E7EC",
     "accent": "#DB2527"
   },

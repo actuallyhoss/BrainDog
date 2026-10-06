@@ -47,21 +47,38 @@
     inset: min(0px, calc((100% - var(--tap)) / 2));
   }
 
-  /* Reduced motion is a PROMISE, not a preference: durations collapse and the state simply
-     changes. Replace, never delete: every state must still change something.
+  /* Reduced motion is a PROMISE, not a preference: nothing moves, and a state still changes. Replace, never
+     delete: every state must still change something.
 
-     THE SEVEN STEPS OF THE SCALE, and the older names follow them (`--d-state`, `--d-release` and `--d-move`
-     are written in `tokens.css` as the step they are), so a delay or a duration written with any of them
-     collapses too. No curve is touched: at 1ms none of them can be seen. */
+     NOTHING MOVES, AND A FADE STAYS. Movement is what a vestibular reader is asking to be spared, and a fade is not
+     movement: it is the one cue that says "this changed", and cutting it to 1ms (as this block used to) left a panel,
+     a menu and a line of text simply there with nothing to say they had arrived. So every transition here is opacity
+     and visibility and nothing else, at one short fade: a transform, a translate, a scale, a size or a position that
+     was eased now jumps to where it ends, and the fade on the same element still plays. `display` and `overlay` stay
+     in the list so a closing menu or panel that fades out (`allow-discrete`) stays in the page for its fade.
+
+     ONE FADE FOR EVERY ELEMENT, 120MS, FORCED. A host writes its own times (a sheet's 240, a panel's 180), and under
+     a forced duration none of them can stretch a fade past what a reader asked for. Colour changes are not in the
+     list, so a hover fill or a chosen row changes at once, as it did before.
+
+     THE SCALE FOLLOWS (`--d-state`, `--d-release`, `--d-move` and `--d-panel-out` are written in `tokens.css` as the
+     step they are), so a delay or a wait a script reads from any of them is no longer than the fade.
+
+     A KEYFRAME ANIMATION STILL ENDS AT ONCE, because a stylesheet cannot tell a keyframe that fades from one that
+     moves. A host that wants a fade here draws it as a transition. The one exception is the arrival tint
+     (`[data-arrived]`, `blocks.css` and the app's lists): it is a colour held for a second and a half and then let go,
+     each host writes it `step-end` under this query, and it is the fact that the row is new, so it keeps its time. */
   @media (prefers-reduced-motion: reduce) {
     :root {
-      --d-press: 1ms;
-      --d-exit: 1ms;
-      --d-enter: 1ms;
-      --d-menu: 1ms;
-      --d-rows: 1ms;
-      --d-page: 1ms;
-      --d-panel: 1ms;
+      --d-press: 70ms;
+      --d-exit: 90ms;
+      --d-enter: 110ms;
+      --d-menu: 120ms;
+      --d-swap: 120ms;
+      --d-rows: 120ms;
+      --d-page: 120ms;
+      --d-recompose: 120ms;
+      --d-panel: 120ms;
     }
 
     *,
@@ -69,17 +86,33 @@
     *::after {
       animation-duration: 1ms !important;
       animation-iteration-count: 1 !important;
-      transition-duration: 1ms !important;
+      transition-property: opacity, visibility, display, overlay !important;
+      transition-duration: 120ms !important;
       scroll-behavior: auto !important;
     }
 
-    /* A VIEW TRANSITION'S PARTS ARE PSEUDO-ELEMENTS OF THE ROOT, and `*` matches none of them, so a page's
-       cross-fade and anything that morphs between two screens kept its whole animation. Without one the new
-       screen is simply there. */
-    ::view-transition-group(*),
+    /* The row, or the line a list draws inside it (`rows.css`: `.ledger > li[data-arrived] > .line`). */
+    :is([data-arrived], .arrived, :is([data-arrived], .arrived) > *) {
+      animation-duration: 1.5s !important;
+    }
+
+    /* A VIEW TRANSITION'S PARTS ARE PSEUDO-ELEMENTS OF THE ROOT, and `*` matches none of them. Each group is what
+       moves and resizes a part from where it was to where it is, so it does not run; the old and new pictures inside
+       it keep the fade they were given (the browser's own is opacity alone) and play it in the same 120ms where the
+       part now stands.
+
+       THEIR ANIMATION'S NAME IS LEFT TO THE PAGE. A forced fade on every picture reached the root too, which the app
+       tells not to animate (`app.css`) so the rail and the docked panel stay put, and with the normal blend it sets
+       there the whole window dipped a quarter of the way to the ground through every route change, for the very reader
+       who asked for less going on. */
+    ::view-transition-group(*) {
+      animation-name: none !important;
+      animation-duration: 120ms !important;
+    }
+
     ::view-transition-old(*),
     ::view-transition-new(*) {
-      animation: none !important;
+      animation-duration: 120ms !important;
     }
   }
 
@@ -99,12 +132,23 @@
     }
   }
 
-  /* ASKED FOR LESS TRANSPARENCY, glass is the tile's own opaque surface, with nothing blurred behind it. */
+  /* ASKED FOR LESS TRANSPARENCY, glass is the tile's own opaque surface, with nothing blurred behind it.
+
+     AND SAFARI'S LITERAL BLUR GOES WITH IT. Safari drops a `-webkit-backdrop-filter` whose value is a `var()`, so a
+     component that floats over a chart gives Safari the blur in so many words, in an `@supports` block of its own
+     (`blocks-charts.css`), and `--glass-blur: none` cannot reach a literal. Important in this layer, because the
+     a11y layer sits under the components one and only an important declaration here wins over theirs. */
   @media (prefers-reduced-transparency: reduce) {
     :root {
       --glass: var(--bg);
       --glass-strong: var(--bg);
       --glass-blur: none;
+    }
+
+    @supports (-webkit-backdrop-filter: none) {
+      * {
+        -webkit-backdrop-filter: none !important;
+      }
     }
   }
 

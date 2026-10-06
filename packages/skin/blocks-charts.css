@@ -1058,11 +1058,27 @@
   /* SAFARI DROPS A `backdrop-filter` WHOSE VALUE IS A `var()`, so the readout over a chart drew unblurred there, the
      lines through its words. It is given the blur in so many words, here and not beside the rule above: the build
      folds a prefixed and an unprefixed declaration in one rule into one value and would write the `var()` into both,
-     and a block of its own keeps the literal. The other browsers skip this block, so they keep the theme's own value. */
+     and a block of its own keeps the literal. The other browsers skip this block, so they keep the theme's own value.
+
+     THE LITERAL IS PER SCHEME, AS THE THEME'S IS. The saturation is the one part of the glass the design system varies
+     by scheme (`--glass-sat`, 1.6 in light and 1.4 in dark, `packages/theme/src/build.ts`), and one literal for both
+     made dark glass in Safari the only dark glass with light's colour behind it. The dark scheme is chosen two ways,
+     as `house.css` chooses it: by the reader's setting where the record names no scheme, and by the record's own.
+     Asked for less transparency, the a11y layer takes the blur away here too (`a11y.css`). */
   @supports (-webkit-backdrop-filter: none) {
     .lines-readout,
     .forecast-readout {
       -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
+
+    html[data-scheme='dark'] :is(.lines-readout, .forecast-readout) {
+      -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      html:not([data-scheme]) :is(.lines-readout, .forecast-readout) {
+        -webkit-backdrop-filter: blur(24px) saturate(1.4);
+      }
     }
   }
 

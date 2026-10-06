@@ -218,17 +218,23 @@ export type AimRole =
  * mark itself, #DB2527, which is the seed (`HOUSE_SEED.accent`). #D92426 and #DB2527 were two reds a hair apart,
  * a badge beside the logo that did not quite match it, and the logo keeps its value (SYSTEM 13), so a badge, a late
  * dot and the mark are one colour now. Dark's red already clears 4.5:1 as words, so its two roles are one value.
+ *
+ * 2026-10-06, THREE LIGHT AIMS MOVED AGAIN, WITH THE GROUND. The light ground came down to give the steps inside a tile
+ * room (`HOUSE_PROFILE.ladder`), and every word on the ground lost about four percent of its contrast. Each of the
+ * four that had room on purpose keeps it, a step darker in its own hue: ink-2 #484F5A at 6.62:1 (the design system's
+ * #4A505B fell just under its 6.5 floor), ink-3 #5C626D at 4.91:1, red words #BD181E at 5.08:1, and green #067342
+ * at 4.79:1, where the floor alone would have set green at exactly 4.5.
  */
 const SYSTEM_AIM: Record<Scheme, Partial<Record<AimRole, Aim>>> = {
   light: {
     ink: { L: 0.1858, C: 0.0113 }, //    #101318
-    ink2: { L: 0.43, C: 0.0198 }, //     #4A505B
-    dim: { L: 0.5054, C: 0.019 }, //     #5F6570
-    faint: { L: 0.5054, C: 0.019 },
+    ink2: { L: 0.425, C: 0.0198 }, //    #484F5A
+    dim: { L: 0.495, C: 0.019 }, //      #5C626D
+    faint: { L: 0.495, C: 0.019 },
     line: { L: 0.9259, C: 0.0085 }, //  #E3E7EC
     danger: { L: 0.575, C: 0.215, H: 27 }, //       #DB2527, the mark
-    'danger-text': { L: 0.5246, C: 0.1963, H: 26.7 }, // #C21F22
-    earn: { L: 0.5123, C: 0.1182, H: 155.4 }, //   #157A48
+    'danger-text': { L: 0.512, C: 0.1963, H: 26.7 }, // #BD181E
+    earn: { L: 0.49, C: 0.1182, H: 155.4 }, //     #067342
     warn: { L: 0.5198, C: 0.133, H: 52.4 }, //     #A24E00
     live: { L: 0.5131, C: 0.204, H: 276.5 }, //    #4F4FD8
     'live-fill': { L: 0.5131, C: 0.204, H: 276.5 },
@@ -309,6 +315,16 @@ export const HOUSE_PROFILE: Profile = {
    * step 0.02 apart, and every rung keeps the design system's lean, chroma about 0.07 of its lightness. Ground to tile
    * is 4.1 delta-E now, tile to well 2.5 and each step above it 1.6, and glass over the ground stands 4.75 off it,
    * with ink-3 on it at 5.69:1. The inks and every intent are solved on `s3`, which did not move, so none of them did.
+   *
+   * 2026-10-06, AND THE LIGHT LADDER WIDENS THE SAME WAY. Its `s1` to `s3` sat 0.8 and 0.95 delta-E apart, so the
+   * hover inside a white tile, the focused question and the chosen segment drew next to nothing in light while they
+   * read in dark. The steps live between the tile and the ground and never on it, and there was not room for two
+   * steps a reader sees, so the ground comes down to L 0.925 (#E4E6EB) and `s2` and `s3` step 0.02 apart under the
+   * tile-2 the design system names (#F2F4F7, which stays). The tile is 5.8 delta-E off the ground, the well 2.8 under
+   * the tile, each step under that 1.5 and 1.4, and glass over the ground 4.1 (`GLASS`). The ground is the worst
+   * surface in light, so the words on it lost about four percent, and the four aims that had room keep it
+   * (`SYSTEM_AIM`). `s3` sits one code value over the ground, as close as it ever was (0.84 delta-E, from 0.81):
+   * it is a step inside a tile and never meets the ground there.
    */
   ladder: {
     dark: {
@@ -319,11 +335,11 @@ export const HOUSE_PROFILE: Profile = {
       s3: { L: 0.275, C: 0.0195 }, //   #222831
     },
     light: {
-      sunk: { L: 0.9419, C: 0.0063 }, // #E9ECF0
+      sunk: { L: 0.925, C: 0.0065 }, //  #E4E6EB
       bg: { L: 1, C: 0 }, //             #FFFFFF
       s1: { L: 0.9665, C: 0.0045 }, //   #F2F4F7
-      s2: { L: 0.9582, C: 0.005 },
-      s3: { L: 0.95, C: 0.0055 },
+      s2: { L: 0.9465, C: 0.0055 }, //   #EBEDF1
+      s3: { L: 0.9265, C: 0.0062 }, //   #E4E7EB
     },
   },
   /* The cap for a rung that gives no chroma of its own, and the inks' default lean (`Cink`). */
@@ -917,7 +933,9 @@ type Paint = 'white' | 'black' | Required<Aim>;
 const SHADE: Paint = { L: 0.2099, C: 0.0341, H: 263.4 };
 const GLASS: Record<Scheme, Record<'glass' | 'glass-strong' | 'glass-rim' | 'glass-hair' | 'ground-glow' | 'wash', [Paint, number]>> = {
   light: {
-    glass: ['white', 0.66],
+    /* 0.7, and it was the design system's 0.66: over the deeper light ground that stood 3.85 off it, and the rail read
+       as a lighter patch of the page rather than as a thing on it. At 0.7 it stands 4.08 off, as dark's glass does. */
+    glass: ['white', 0.7],
     'glass-strong': ['white', 0.84],
     'glass-rim': ['white', 0.9],
     'glass-hair': [SHADE, 0.08],
