@@ -63,8 +63,23 @@ function projectsOf(sql: Sql, registers: Holders): Candidate[] | null {
     )
     .map((row) => {
       const fields = JSON.parse(row.fields) as Record<string, Json>;
-      return { id: row.id, spoken: `${said}${row.seq}`, repos: texts(fields, repos), folders: texts(fields, folders) };
+      return candidateOf(row.id, `${said}${row.seq}`, texts(fields, repos), texts(fields, folders));
     });
+}
+
+/**
+ * Whether a place a project lists is a folder on a machine, though it may be listed among its repositories: from the
+ * root, from a drive, or from home (`/Users/sam/Code/kiln`, `C:\Repos\kiln`, `~/kiln`).
+ */
+export const isFolderPlace = (said: string): boolean => /^(?:\/|~\/|[A-Za-z]:[\\/])/u.test(said.trim());
+
+/**
+ * A project as `matchProject` reads it, from what it lists. A FOLDER LISTED AMONG THE REPOSITORIES IS A FOLDER, as the
+ * owner's BrainDog lists `/Users/…/braindog` in its repositories: read as a repository it matched no remote and no name,
+ * so not one run in that checkout was ever placed, and the command line already read it as a folder (`apps/cli`).
+ */
+export function candidateOf(id: string, spoken: string, repos: readonly string[], folders: readonly string[]): Candidate {
+  return { id, spoken, repos: repos.filter((r) => !isFolderPlace(r)), folders: [...folders, ...repos.filter(isFolderPlace)] };
 }
 
 /**

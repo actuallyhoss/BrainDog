@@ -190,9 +190,12 @@ async function people(): Promise<{ k: Kernel; sql: NodeSql }> {
 
 test('WHO A PERSON OR AN ORGANISATION IS IS READ FROM THE ROLES THEIR LIST PLAYS, never from its name', async () => {
   const { sql } = await people();
-  assert.deepEqual(shapeIn(sql, 'people')?.identity, ['merged_into', 'email', 'handles', 'keys', 'self']);
-  assert.deepEqual(shapeIn(sql, 'organisations')?.identity, ['merged_into', 'keys']);
+  assert.deepEqual(shapeIn(sql, 'people')?.identity, ['merged_into', 'email', 'handles', 'keys', 'self', 'name']);
+  assert.deepEqual(shapeIn(sql, 'people')?.names, ['name']);
+  assert.deepEqual(shapeIn(sql, 'organisations')?.identity, ['merged_into', 'keys', 'domain', 'name']);
+  assert.deepEqual(shapeIn(sql, 'organisations')?.names, ['name']);
   assert.equal(shapeIn(sql, 'tasks')?.identity, undefined);
+  assert.equal(shapeIn(sql, 'tasks')?.names, undefined);
   sql.close();
 
   /* A `contacts` LIST DECLARING THE ROLE IS FLOORED THE SAME, and a keyless `people` from before the keys by its names. */
@@ -201,13 +204,13 @@ test('WHO A PERSON OR AN ORGANISATION IS IS READ FROM THE ROLES THEIR LIST PLAYS
   const body = PEOPLE.body as { fields: { id: string; to?: string }[] };
   const fields = body.fields.map((f) => (f.id === 'merged_into' ? { ...f, to: 'contacts' } : f));
   value(await k.install([{ id: 'register.contacts', kind: 'register', body: { ...body, id: 'contacts', name: 'Contacts', fields } as never }]));
-  assert.deepEqual(shapeIn(other, 'contacts')?.identity, ['merged_into', 'email', 'handles', 'keys', 'self']);
+  assert.deepEqual(shapeIn(other, 'contacts')?.identity, ['merged_into', 'email', 'handles', 'keys', 'self', 'name']);
   other.close();
   const legacy = openSqlite();
   const old = await openRecord(legacy, fixedClock(NOW));
   const { meets: _meets, ...keyless } = PEOPLE.body as unknown as Record<string, unknown>;
   value(await old.install([{ id: 'register.people', kind: 'register', body: keyless as never }]));
-  assert.deepEqual(shapeIn(legacy, 'people')?.identity, ['merged_into', 'email', 'handles', 'keys', 'self']);
+  assert.deepEqual(shapeIn(legacy, 'people')?.identity, ['merged_into', 'email', 'handles', 'keys', 'self', 'name']);
   legacy.close();
 });
 
@@ -225,11 +228,11 @@ test('H2. A MERGE OR AN IDENTITY KEY IS ON THE FLOOR, and the ladder never answe
   assert.match(ladderSays(k, ask(k, [{ at: 'organisations#1', version: 1, patch: { keys: ['domain:vine.test'] } }], 'organisations'))!, /\(identity\)/);
   assert.equal(k.get('people#2')?.fields.merged_into ?? null, null, 'the merge was written');
 
-  /* THE REST OF A PERSON STILL CLIMBS: a note, a meeting, a new name, and the email sent back as it already was. */
+  /* THE REST OF A PERSON STILL CLIMBS: a note, a meeting, and the name and email sent back as they already were. */
   assert.equal(ladderSays(k, ask(k, [{ at: 'people#2', version: 1, patch: { note: 'Ada’s initials, from a commit' } }], 'people')), null);
   assert.equal(ladderSays(k, ask(k, [{ at: 'people#1', version: 1, patch: { met: ['2026-10-06 in braindog'] } }], 'people')), null);
-  assert.equal(ladderSays(k, ask(k, [{ at: 'people#1', version: 2, patch: { name: 'Ada R. Vine', email: 'ada@vine.test' } }], 'people')), null);
-  assert.equal(k.get('people#1')?.fields.name, 'Ada R. Vine');
+  assert.equal(ladderSays(k, ask(k, [{ at: 'people#1', version: 2, patch: { name: 'Ada Vine', email: 'ada@vine.test', note: 'Met at the studio' } }], 'people')), null);
+  assert.equal(k.get('people#1')?.fields.note, 'Met at the studio');
   sql.close();
 });
 
@@ -288,6 +291,90 @@ test('M4. A FIELD SENT EMPTY IS THE DELETE FLOOR, and one sent back empty as it 
   assert.match(ladderSays(k, ask(k, [{ at: 'tasks#1', version: 2, patch: { tags: [] } }], 'tasks'))!, /tasks:tag, which always asks \(delete\)/);
   /* AN AGENT SENDING THE PEOPLE ROW BACK WHOLE, nulls and all, is not clearing what was never there. */
   tell(sql, 't_1', 'people:edit', 'people:tag');
-  assert.equal(ladderSays(k, ask(k, [{ at: 'people#2', version: 1, patch: { name: 'Ada Vine (initials)', merged_into: null, keys: [] } }], 'people')), null);
+  assert.equal(ladderSays(k, ask(k, [{ at: 'people#2', version: 1, patch: { note: 'Initials only', merged_into: null, keys: [] } }], 'people')), null);
+  sql.close();
+});
+
+/* ── research-audit-21, item 3: the identity floor on a new row, and on the names a merge reads ─────────────────── */
+
+test('A NEW PERSON OR ORGANISATION MADE WITH MORE THAN A NAME IS WHO SOMEBODY IS, and asks; a name alone climbs', async () => {
+  const { k, sql } = await people();
+  tell(sql, 't_1', 'people:add', 'organisations:add');
+  /* A PROPOSAL ROW WITHOUT `at` IS A NEW ROW, read as the write would be. Each of these used to be a plain add. */
+  for (const fields of [{ self: true }, { merged_into: 'people#1' }, { email: 'ada@vine.test' }, { handles: ['@ada'] }, { keys: ['github:ada'] }])
+    assert.match(ladderSays(k, ask(k, [{ name: 'Ada Vine', ...fields }], 'people'))!, /people:add, which always asks \(identity\)/, JSON.stringify(fields));
+  assert.match(ladderSays(k, ask(k, [{ name: 'Evil Ltd', domain: 'vine.test' }], 'organisations'))!, /organisations:add, which always asks \(identity\)/);
+  assert.match(ladderSays(k, ask(k, [{ name: 'Vine', keys: ['bank:VINE LTD'] }], 'organisations'))!, /\(identity\)/);
+  /* ONE JOINING PART AMONG PLAIN ADDS STILL HOLDS THE WHOLE QUESTION. */
+  assert.match(ladderSays(k, ask(k, [{ name: 'Bea Lane' }, { name: 'Second Owner', self: true }], 'people'))!, /\(identity\)/);
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM entry WHERE register = 'people'")?.n, 2, 'a new person was written');
+
+  /* A NAME ALONE IS AN ADD, and a part sent empty, or `self` sent false, sets nothing. */
+  assert.equal(ladderSays(k, ask(k, [{ name: 'Bea Lane' }], 'people')), null);
+  assert.equal(ladderSays(k, ask(k, [{ name: 'Cy Moss', handles: [], self: false, merged_into: null, note: 'From standup' }], 'people')), null);
+  assert.equal(kindsOfWrite({ list: 'people', op: 'create', patch: { name: 'Cy Moss', email: '', keys: [] }, shape: shapeIn(sql, 'people') })[0]?.floor, null);
+  assert.equal(ladderSays(k, ask(k, [{ name: 'Lane Studio' }], 'organisations')), null);
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM entry WHERE register = 'people'")?.n, 4);
+
+  /* THE LOG READS A CREATE THE SAME WAY, so the ladder's seed never counts one made with an address as a plain add. */
+  const made = (to: Record<string, unknown>) => kindOfEvent({ list: 'people', kind: 'create', field: null, to_v: JSON.stringify(to) }, shapeIn(sql, 'people'))?.floor;
+  assert.equal(made({ name: 'Bea Lane' }), null);
+  assert.equal(made({ name: 'Bea Lane', email: 'bea@lane.test' }), 'identity');
+  sql.close();
+});
+
+test('A RENAME, AND A CHANGE TO A DOMAIN, ALIASES OR AN ORGANISATION, IS WHO SOMEBODY IS, and asks', async () => {
+  const { k, sql } = await people();
+  tell(sql, 't_1', 'people:edit', 'people:tag', 'organisations:edit');
+  /* A RENAME PREPARES A FOLD: the strong merge matches on names, so "A. Vine" renamed "Ada Vine" is one meeting from Ada. */
+  assert.match(ladderSays(k, ask(k, [{ at: 'people#2', version: 1, patch: { name: 'Ada Vine' } }], 'people'))!, /people:edit, which always asks \(identity\)/);
+  assert.match(ladderSays(k, ask(k, [{ at: 'organisations#2', version: 1, patch: { name: 'Vine Ltd' } }], 'organisations'))!, /\(identity\)/);
+  /* THE DOMAIN FEEDS THE ORGANISATION'S KEY, so moving it moves whose mail a domain is. */
+  assert.match(ladderSays(k, ask(k, [{ at: 'organisations#1', version: 1, patch: { domain: 'vine.test' } }], 'organisations'))!, /organisations:edit, which always asks \(identity\)/);
+  assert.equal(k.get('people#2')?.fields.name, 'A. Vine');
+  assert.equal(k.get('organisations#1')?.fields.domain ?? null, null);
+
+  /* ALIASES AND THE ORGANISATION A PERSON IS WITH, on a list that declares them. */
+  const FULL: ListShape = {
+    fields: [
+      { id: 'name', type: 'text' },
+      { id: 'aliases', type: 'list', of: 'text' },
+      { id: 'org', type: 'ref' },
+      { id: 'email', type: 'email' },
+      { id: 'note', type: 'text' },
+    ],
+    identity: ['email', 'name', 'aliases', 'org'],
+    names: ['name', 'aliases', 'org'],
+  };
+  const floor = (op: 'create' | 'update', patch: Record<string, unknown>) => Object.fromEntries(kindsOfWrite({ list: 'people', op, patch, shape: FULL }).map((x) => [x.key, x.floor]));
+  assert.deepEqual(floor('update', { aliases: ['Rohan Mehta'] }), { 'people:tag': 'identity' });
+  assert.deepEqual(floor('update', { org: 'organisations#1' }), { 'people:edit': 'identity' });
+  assert.deepEqual(floor('update', { note: 'x' }), { 'people:edit': null });
+  /* MADE WITH THEM, a person is only named: the add climbs. */
+  assert.deepEqual(floor('create', { name: 'Rohan', aliases: ['Rohan Mehta'], org: 'organisations#1' }), { 'people:add': null });
+  assert.deepEqual(floor('create', { name: 'Rohan', email: 'rohan@x.test' }), { 'people:add': 'identity' });
+  sql.close();
+});
+
+test('A LIST DECLARING EVERY PART OF A PERSON FLOORS EACH, and names the ones a new row may carry', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const body = PEOPLE.body as { meets: Record<string, string>; fields: object[] };
+  value(
+    await k.install([
+      ORGS,
+      {
+        id: 'register.people',
+        kind: 'register',
+        body: {
+          ...body,
+          meets: { ...body.meets, aliases: 'aliases', org: 'org' },
+          fields: [...body.fields, { id: 'aliases', type: 'list', of: 'text' }, { id: 'org', type: 'ref', to: 'organisations' }],
+        } as never,
+      },
+    ]),
+  );
+  assert.deepEqual(shapeIn(sql, 'people')?.identity, ['merged_into', 'email', 'handles', 'keys', 'self', 'name', 'aliases', 'org']);
+  assert.deepEqual(shapeIn(sql, 'people')?.names, ['name', 'aliases', 'org']);
   sql.close();
 });

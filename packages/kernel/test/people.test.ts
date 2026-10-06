@@ -106,7 +106,7 @@ const shape = (m: Met) => ({ name: m.row?.name ?? null, person: m.person, create
 
 /* ── matching ────────────────────────────────────────────────────────────── */
 
-test('A PERSON IS MATCHED BY EMAIL, and gains a dated line, the project and a handle, and nothing else', async () => {
+test('A PERSON IS MATCHED BY EMAIL IN A COMMIT, and gains a dated line and the project, and nothing it says of who they are', async () => {
   const { k, sql, project } = await record();
   const ada = value<Entry>(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com', role: 'client' }, OWNER));
 
@@ -120,17 +120,22 @@ test('A PERSON IS MATCHED BY EMAIL, and gains a dated line, the project and a ha
   assert.equal(row.fields.name, 'Ada Lovelace', 'a name the owner typed was overwritten by one read from a commit');
   assert.equal(row.fields.role, 'client');
   assert.equal(row.fields.email, 'ada@example.com');
-  assert.deepEqual(row.fields.handles, ['github:ada']);
+  /* Anybody who can push may sign with her address and any login beside it (research-audit-21 M9). */
+  assert.equal(row.fields.handles, undefined, 'a handle read from a commit was carried onto her');
   assert.deepEqual(row.fields.projects, [project]);
   assert.deepEqual(row.fields.met, [`${DAY} · commit 4464966 in braindog`]);
   assert.equal(sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = ? AND field = 'met'", `entry:${ada.id}`)?.actor, 'S1');
-  /* The key it was met by says where it came from. */
-  assert.equal(sql.one<{ source: string }>("SELECT source FROM entity_key WHERE key = 'github:ada'")?.source, 'commit 4464966 in braindog');
+  assert.equal(sql.one("SELECT 1 AS n FROM entity_key WHERE key = 'github:ada'"), undefined);
+
+  /* The same handle in a note is believed, and the key says where it came from. */
+  value<Met>(k.meet({ email: 'ada@example.com', handle: 'GitHub:@Ada', where: 'a note about the launch' }, OWNER));
+  assert.deepEqual(k.get(ada.id)!.fields.handles, ['github:ada']);
+  assert.equal(sql.one<{ source: string }>("SELECT source FROM entity_key WHERE key = 'github:ada'")?.source, 'a note about the launch');
 
   /* Met again, in the same project: another line, and no second link. */
   const again = value<Met>(k.meet({ email: 'ada@example.com', where: 'commit 9f00aa1 in braindog' }, AGENT));
   assert.deepEqual(shape(again), { name: 'Ada Lovelace', person: 'people#1', created: false, matched_by: 'key', linked: false, merge: null });
-  assert.equal((k.get(ada.id)!.fields.met as string[]).length, 2);
+  assert.equal((k.get(ada.id)!.fields.met as string[]).length, 3);
   assert.equal(k.count('people'), 1);
   sql.close();
 });
@@ -148,11 +153,15 @@ test('A PERSON KEEPS THE NEWEST MET LINES, up to the cap, in the order they happ
   sql.close();
 });
 
-test('WITH NO EMAIL MATCH, A HANDLE MATCHES, and the missing email is filled', async () => {
+test('WITH NO EMAIL MATCH, A HANDLE MATCHES, and the missing email is filled from a note, never from a commit', async () => {
   const { k, sql } = await record();
   const grace = value<Entry>(k.create('people', { name: 'Grace Hopper', handles: ['github:ghopper'] }, OWNER));
 
-  const met = value<Met>(k.meet({ name: 'G. Hopper', email: 'grace@example.com', handle: 'github:GHopper', where: 'commit 12ab34c in braindog' }, AGENT));
+  const committed = value<Met>(k.meet({ name: 'G. Hopper', email: 'grace@example.com', handle: 'github:GHopper', where: 'commit 12ab34c in braindog' }, AGENT));
+  assert.equal(committed.matched_by, 'key');
+  assert.equal(k.get(grace.id)!.fields.email, undefined, 'an address read from a commit was carried onto her');
+
+  const met = value<Met>(k.meet({ name: 'G. Hopper', email: 'grace@example.com', handle: 'github:GHopper', where: 'a note on the review' }, OWNER));
   assert.equal(met.person, 'people#1');
   assert.equal(met.created, false);
   assert.equal(met.matched_by, 'key');

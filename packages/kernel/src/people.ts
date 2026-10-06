@@ -34,6 +34,12 @@
  * is that person's, and one by a key nobody holds is a person of their own. A commit folds somebody met in commits alone
  * only into somebody else met in commits alone; one who looks like a person typed, noted or mailed is asked about.
  *
+ * A KEY IS NEVER BELIEVED OUTRIGHT (research-audit-21 H2): what an agent's key or a script says is held to a commit's
+ * word, whatever its source says. AND AN ORGANISATION IS HELD TO THE SAME RULES (H1): a mail, a bank text or a commit
+ * naming one already held writes its line, and a domain or key it would add is one question. Nothing makes an
+ * organisation the record was not told of by a key: two people it vouches for at a domain nobody holds are one question
+ * ("Add Acme?"), and two organisations whose names fold to the same words are one question per pair.
+ *
  * `only: 'known'` IS A RULE'S WAY OF SAYING "NOBODY NEW FROM THIS": it writes only on a key somebody holds, an address at
  * an organisation the record keeps, or one the record's own person has written to, and is a mention otherwise.
  *
@@ -178,6 +184,17 @@ export type PeopleDeps = {
    * sources `TRUSTED` names are.
    */
   typed?: boolean;
+  /**
+   * Whether the caller is a key: an agent's run or a script, never a person at their keyboard (research-audit-21 H2).
+   * Nothing a key says is believed outright, whatever its source says: `session in braindog` from a key is held to a
+   * commit's word, folding only into somebody met in commits alone and carrying nothing onto anybody known.
+   */
+  token?: boolean;
+  /**
+   * The remote of the repository the caller's run is in (`github.com/Brightloom-Infotech/Fanline`), or `null`. What
+   * names an organisation asked about from its people's addresses when the remote's owner and the domain agree.
+   */
+  remote?: () => string | null;
 };
 
 /** Where a part lives in a row's JSON, for a bound `json_extract` path. */
@@ -246,27 +263,45 @@ const ARRIVED = /^\s*(?:(?:e-?)?mail\s*(?::|from\b)|bank\b|import(?:ed)?\b|sms\b
  */
 const TRUSTED = /^\s*(?:(?:a|an|the|this|that|my|his|her|their|our)\s+)?(?:notes?|sessions?|runs?|handoffs?)\b/iu;
 
-/** Words anywhere in a source that say a believed one is relaying somebody else's text: `a run reading the inbox`. */
+/**
+ * Words anywhere in a source that say a believed one is relaying somebody else's text: `a run reading the inbox`, and a
+ * run reading a commit's author or a git log, which anybody who can push wrote (research-audit-21 H2).
+ */
 const RELAYED =
-  /\b(?:e-?mails?|mail|inbox|forwarded|bank|imports?|imported|sms|texts?|messages?|whatsapp|slack|dms?|discord|telegram|calendar|invites?|issues?|pull\s+requests?|prs?|tickets?|transcripts?|pasted|paste|arrival|arrived|webhook|tweets?|linkedin)\b/iu;
+  /\b(?:e-?mails?|mail|inbox|forwarded|bank|imports?|imported|sms|texts?|messages?|whatsapp|slack|dms?|discord|telegram|calendar|invites?|issues?|pull\s+requests?|prs?|tickets?|transcripts?|pasted|paste|arrival|arrived|webhook|tweets?|linkedin|commits?|git|authors?|co-authored|logs?)\b/iu;
 
 /** A commit, whose author anybody who can push may write as anyone (audit 19 H1). */
 const COMMIT = /^\s*commits?\b/iu;
 
 /**
+ * How a met line says a key's word, held to a commit's (research-audit-21 H2): `an agent said: session in braindog`.
+ * Read back as a commit's line, so a person a key made is folded later only as somebody met in commits alone.
+ */
+const AGENT_SAID = 'an agent said:';
+
+/** A met line's source that was a commit's word, or a key's held to one. */
+const COMMIT_WORD = /^\s*(?:commits?\b|an agent said:)/iu;
+
+/**
  * What a meeting's source may prove. `trusted` folds and carries, `untrusted` does neither, and `commit` is believed
  * on a key somebody holds and is otherwise a person of their own, folded only into somebody met in commits alone.
  */
-type Trust = 'trusted' | 'commit' | 'untrusted';
+export type Trust = 'trusted' | 'commit' | 'untrusted';
 
-function trustOf(source: string | undefined, where: string | undefined, flagged: boolean, typed: boolean): Trust {
+/**
+ * A KEY IS NEVER `trusted` (research-audit-21 H2): it names its own source, so a suggest-only token that read a forged
+ * commit and says `session in braindog` would otherwise fold and carry keys onto a real person. What a key would have
+ * been believed on is held to a commit's word instead.
+ */
+export function trustOf(source: string | undefined, where: string | undefined, flagged: boolean, typed: boolean, token = false): Trust {
   if (flagged) return 'untrusted';
   const given = source ?? where ?? '';
   const said = [source, where].filter((t): t is string => t !== undefined);
   if (said.some((t) => ARRIVED.test(t))) return 'untrusted';
   if (COMMIT.test(given)) return 'commit';
-  if (typed) return 'trusted';
-  return TRUSTED.test(given) && !said.some((t) => RELAYED.test(t)) ? 'trusted' : 'untrusted';
+  const believed = (typed && !token) || (TRUSTED.test(given) && !said.some((t) => RELAYED.test(t)));
+  if (!believed) return 'untrusted';
+  return token ? 'commit' : 'trusted';
 }
 
 /** An address anywhere in a text, with its domain as the first group. */
@@ -314,7 +349,7 @@ type Said = {
   only?: 'known';
 };
 
-function normalise(args: MeetArgs, typed = false): Result<Said> {
+function normalise(args: MeetArgs, typed = false, token = false): Result<Said> {
   const text = (v: unknown, at: string): Result<string | undefined> =>
     v === undefined || v === null ? ok(undefined) : typeof v === 'string' ? ok(v.trim() || undefined) : no('VALUE_MALFORMED', `${at} takes a string.`, { at });
 
@@ -332,7 +367,7 @@ function normalise(args: MeetArgs, typed = false): Result<Said> {
   const source = clip(unaddressed(given));
   if (args.untrusted !== undefined && typeof args.untrusted !== 'boolean')
     return no('VALUE_MALFORMED', 'untrusted is true or false.', { at: 'untrusted' });
-  const trust = trustOf(read.source, read.where, args.untrusted === true, typed);
+  const trust = trustOf(read.source, read.where, args.untrusted === true, typed, token);
   const only = (args as { only?: unknown }).only;
   if (only !== undefined && only !== null && only !== 'known')
     return no('VALUE_MALFORMED', "only takes known, to meet nobody the record has no reason to know.", { at: 'only', allowed: ['known'] });
@@ -440,7 +475,7 @@ const mention = (): Met => ({ row: null, created: false, matched_by: 'none', men
 
 export function meet(deps: PeopleDeps, args: MeetArgs): Result<Met> {
   const list = deps.list;
-  const said = normalise(args, deps.typed === true);
+  const said = normalise(args, deps.typed === true, deps.token === true);
   /* WHICH LIST, FIRST: a person's, unless they said organisation or the address is a shared inbox or a machine. */
   const toOrg = said.ok && (said.value.kind === 'organisation' || (said.value.email !== undefined && isOrganisationAddress(said.value.email)));
   if (!toOrg) {
@@ -457,11 +492,13 @@ export function meet(deps: PeopleDeps, args: MeetArgs): Result<Met> {
 
 /**
  * The dated line a meeting leaves, and the day it is. A meeting said to be untrusted whose source does not say so is
- * kept as `arrived in …`, so the line still tells `vouched` what it was when the flag is long gone.
+ * kept as `arrived in …`, and a key's word held to a commit's as `an agent said: …`, so the line still tells `vouched`
+ * and `commitsOnly` what it was when the caller is long gone.
  */
 const lineOf = (deps: PeopleDeps, s: Said): { day: string; line: string } => {
   const day = instant(deps.nowMs).slice(0, 10);
-  const said = s.untrusted && !ARRIVED.test(s.source) ? clip(`arrived in ${s.source}`) : s.source;
+  const said =
+    s.untrusted && !ARRIVED.test(s.source) ? clip(`arrived in ${s.source}`) : s.commit && !COMMIT.test(s.source) ? clip(`${AGENT_SAID} ${s.source}`) : s.source;
   return { day, line: `${day} · ${said}` };
 };
 
@@ -498,20 +535,25 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   if (hit) {
     const f = hit.fields;
     const patch: Record<string, unknown> = { [at.met]: metLines(listOf(f[at.met]), [line]) };
-    if (at.projects !== undefined) {
-      const projects = listOf(f[at.projects]);
-      if (project !== null && !projects.includes(project)) {
-        patch[at.projects] = [...projects, project];
-        linked = true;
-      }
-    }
-    if (at.in_touch !== undefined && later(day, f[at.in_touch]) === day) patch[at.in_touch] = day;
-    /* AN EXACT KEY MATCH FROM TEXT ANYBODY COULD HAVE WRITTEN ADDS ITS LINE AND NOTHING ELSE: no key, no name, no
-       organisation, since the rest of what it says is only as true as whoever wrote it. */
+    /* AN EXACT KEY MATCH FROM TEXT ANYBODY COULD HAVE WRITTEN ADDS ITS LINE AND NOTHING ELSE (research-audit-21 M10): no
+       project, no day in touch, no key, no name, no organisation, since a spoofed From must not move the real person. */
     if (!s.untrusted) {
+      if (at.projects !== undefined) {
+        const projects = listOf(f[at.projects]);
+        if (project !== null && !projects.includes(project)) {
+          patch[at.projects] = [...projects, project];
+          linked = true;
+        }
+      }
+      if (at.in_touch !== undefined && later(day, f[at.in_touch]) === day) patch[at.in_touch] = day;
+      /* AND ONE BY A COMMIT ADDS ITS LINE, ITS PROJECT AND ITS DAY (M9): anybody who can push may sign with this key and
+         any other, so the keys, the name and the other names it says are not carried onto the person who holds it. The
+         organisation their own address is at still is, which the address already says (`orgFor`). */
+      if (org !== null && at.org !== undefined && textOf(f[at.org]) === undefined) patch[at.org] = org;
+    }
+    if (!s.untrusted && !s.commit) {
       Object.assign(patch, carryKeys(deps, list, hit, s, keys));
       if (s.name !== undefined && typeof f[at.name] !== 'string') patch[at.name] = s.name;
-      if (at.org !== undefined && org !== null && textOf(f[at.org]) === undefined) patch[at.org] = org;
       const alias = aliasOf(list, hit, s.name, keys);
       if (alias !== null) patch[at.aliases!] = [...listOf(f[at.aliases!]), alias];
     }
@@ -547,6 +589,11 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   const fresh = reask(deps, list, [person.id, ...touched]);
   if (!fresh.ok) return fresh as Result<Met>;
   const final = kept ?? rowById(deps.sql, person.id) ?? person;
+  /* SOMEBODY THE RECORD VOUCHES FOR AT A DOMAIN NOBODY HOLDS may make it a company worth asking about. Mail never does. */
+  if (!s.untrusted) {
+    const company = askDomainOrgs(deps, list, final);
+    if (!company.ok) return company as Result<Met>;
+  }
   return ok({
     row: metRow(deps, list.register, final),
     created: !hit && kept === null,
@@ -647,13 +694,17 @@ function keysPatch(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields
 /**
  * The organisation a person is with, as a row id, or `null`: the one named, or the one whose domain their address is
  * at. Only one the record already holds, unless they named a domain, which is a key and may add one.
+ *
+ * UNDER THE MEETING'S OWN TRUST (research-audit-21 H1): a mail or a commit naming an organisation meets it as `meetOrg`
+ * meets any such text, a line on one already held and nothing carried onto it, and puts nobody in it: `pat@evil.test`
+ * saying she is with Stripe is one of Stripe's lines, never one of its people. The domain her own address is at says.
  */
 function orgFor(deps: PeopleDeps, s: Said, keys: readonly string[]): string | null {
   const orgs = deps.orgs;
   if (!orgs || deps.list?.fields.org === undefined) return null;
   if (s.domain !== undefined || s.org !== undefined) {
     const met = meetOrg(deps, { kind: 'organisation', keys: [], source: s.source, untrusted: s.untrusted, commit: s.commit, ...(s.only === undefined ? {} : { only: s.only }), ...(s.org === undefined ? {} : { name: s.org }), ...(s.domain === undefined ? {} : { domain: s.domain }) }, false);
-    if (met.ok && met.value.row) return met.value.row.id;
+    if (met.ok && met.value.row && !s.untrusted && !s.commit) return met.value.row.id;
   }
   const mail = keys.find((k) => kindOfKey(k) === 'email');
   const domain = mail === undefined ? null : registrable(valueOfKey(mail));
@@ -703,21 +754,36 @@ function meetOrg(deps: PeopleDeps, s: Said, rerouted: boolean): Result<Met> {
     const f = row.fields;
     const patch: Record<string, unknown> = {};
     if (at.met !== undefined) patch[at.met] = metLines(listOf(f[at.met]), [line]);
-    if (at.projects !== undefined && project !== null && !listOf(f[at.projects]).includes(project)) patch[at.projects] = [...listOf(f[at.projects]), project];
-    if (at.domain !== undefined && domain !== undefined && textOf(f[at.domain]) === undefined && holderOf(deps.sql, `domain:${domain}`) === null) patch[at.domain] = domain;
-    if (at.kind !== undefined && kind !== undefined && textOf(f[at.kind]) === undefined) patch[at.kind] = kind;
-    if (at.keys !== undefined) {
-      const now = listOf(f[at.keys]);
-      const fresh = keys.filter((k) => !k.startsWith('domain:') && !now.includes(k) && holderOf(deps.sql, k) === null);
-      if (fresh.length > 0) patch[at.keys] = [...now, ...fresh];
+    /* WHAT A MEETING WOULD GIVE THE ORGANISATION: a domain where it has none, and keys nobody holds. */
+    const newDomain = at.domain !== undefined && domain !== undefined && textOf(f[at.domain]) === undefined && holderOf(deps.sql, `domain:${domain}`) === null;
+    const now = at.keys === undefined ? [] : listOf(f[at.keys]);
+    const fresh = at.keys === undefined ? [] : keys.filter((k) => !k.startsWith('domain:') && !now.includes(k) && holderOf(deps.sql, k) === null);
+    if (!s.untrusted && !s.commit) {
+      if (at.projects !== undefined && project !== null && !listOf(f[at.projects]).includes(project)) patch[at.projects] = [...listOf(f[at.projects]), project];
+      if (newDomain) patch[at.domain!] = domain;
+      if (at.kind !== undefined && kind !== undefined && textOf(f[at.kind]) === undefined) patch[at.kind] = kind;
+      if (fresh.length > 0) patch[at.keys!] = [...now, ...fresh];
     }
     if (Object.keys(patch).length === 0) return ok(orgMet(deps, orgs.register, row, false));
     written = deps.write(orgs.register, row.id, patch, { version: row.version });
+    if (!written.ok) return written as Result<Met>;
+    const fresher = reaskOrgs(deps, orgs, [row.id]);
+    if (!fresher.ok) return fresher as Result<Met>;
+    /* A MAIL, A BANK TEXT OR A COMMIT MEETING AN ORGANISATION ALREADY HELD WRITES ITS LINE AND NOTHING ELSE (research-
+       audit-21 H1): `org: "Stripe"` with `domain: evil.test` must not file evil.test's mail under the real Stripe. What
+       it would have added is asked once instead. */
+    if (s.untrusted || s.commit) {
+      const offered = offerOrg(deps, orgs, written.value, s, name, [...(newDomain ? [`domain:${domain}`] : []), ...fresh]);
+      if (!offered.ok) return offered as Result<Met>;
+      return ok({ ...orgMet(deps, orgs.register, written.value, false), ...(offered.value === null ? {} : { question: offered.value, merge: offered.value }) });
+    }
   } else {
     const stored = keys.filter((k) => !(k === `domain:${domain}` && at.domain !== undefined));
     const keepable = (at.domain !== undefined && domain !== undefined) || (at.keys !== undefined && stored.length > 0);
-    /* `only: 'known'` ADDS NO ORGANISATION EITHER: one the record keeps is met above, by a key or its name. */
-    if (!keepable || name === undefined || s.only === 'known') {
+    /* `only: 'known'` ADDS NO ORGANISATION EITHER: one the record keeps is met above, by a key or its name. NOR DOES A
+       MACHINE THAT SIGNED A COMMIT (`jenkins@client.example`): anybody may sign as one, and the domain it would claim is
+       asked about from the people there instead (`askDomainOrgs`), under a name and not a hostname. */
+    if (!keepable || name === undefined || s.only === 'known' || (rerouted && s.commit)) {
       noteMention(deps.sql, { name: name ?? '', kind: 'organisation', project, source: s.source, at: instant(deps.nowMs) });
       return ok(mention());
     }
@@ -732,6 +798,12 @@ function meetOrg(deps: PeopleDeps, s: Said, rerouted: boolean): Result<Met> {
   }
   if (!written.ok) return written as Result<Met>;
   sourceKeys(deps.sql, written.value.id, keys, s.source);
+  /* A NEW ORGANISATION WHOSE NAME FOLDS TO THE WORDS OF ONE ALREADY HELD is asked about, one question per pair. */
+  if (!row) {
+    const paired = askOrgPairs(deps, orgs, written.value);
+    if (!paired.ok) return paired as Result<Met>;
+    if (paired.value !== null) return ok({ ...orgMet(deps, orgs.register, written.value, true), question: paired.value, merge: paired.value });
+  }
   return ok(orgMet(deps, orgs.register, written.value, !row));
 }
 
@@ -784,6 +856,369 @@ function byOrgName(sql: Sql, orgs: DeclaredList<OrgFields>, name: string): Row |
       .map(hydrate)
       .find((r) => typeof r.fields[orgs.fields.name] === 'string' && orgNameKey(String(r.fields[orgs.fields.name])) === want) ?? null
   );
+}
+
+/* ── what is asked about organisations ───────────────────────────────── */
+
+/** A list as a question about it names its rows: by its register, and the field a fold points at the row kept. */
+type Keyed = { register: string; fields: { merged_into?: string | undefined } };
+
+/** An organisation's own name, as a sentence says it. */
+const orgNameOf = (deps: Pick<PeopleDeps, 'titleOf'>, orgs: DeclaredList<OrgFields>, row: Row): string =>
+  deps.titleOf(row.id) ?? textOf(row.fields[orgs.fields.name]) ?? 'an organisation';
+
+/** Every key an organisation's row answers to: its domain and its keys. */
+const keysOfOrg = (orgs: DeclaredList<OrgFields>, row: Row): string[] => {
+  const at = orgs.fields;
+  return keysOf({ domain: at.domain === undefined ? undefined : textOf(row.fields[at.domain]), keys: at.keys === undefined ? [] : listOf(row.fields[at.keys]) });
+};
+
+/**
+ * What a meeting the record does not believe would have given an organisation it already holds (`fresh`), asked once
+ * (research-audit-21 H1, M12): "Is the Stripe met in mail from evil.test the Stripe you already know?". Nothing is
+ * written until the owner says yes, and an address or a key offered before is never offered again.
+ *
+ * WHAT THE ORGANISATION ALREADY ANSWERS TO IS NOT ASKED ABOUT: a shared inbox at a domain it holds, and the payee key a
+ * bank text spells with the very name it was matched by, which the name files there anyway.
+ */
+function offerOrg(deps: PeopleDeps, orgs: DeclaredList<OrgFields>, row: Row, s: Said, name: string | undefined, fresh: readonly string[]): Result<string | null> {
+  const at = orgs.fields;
+  const held = new Set(keysOfOrg(orgs, row).filter((k) => kindOfKey(k) === 'domain').map(valueOfKey));
+  const byName = name !== undefined && orgNameKey(name) === orgNameKey(textOf(row.fields[at.name]) ?? '');
+  const offered = fresh.filter((k) => {
+    if (kindOfKey(k) === 'email') return !held.has(registrable(valueOfKey(k).split('@')[1] ?? '') ?? '');
+    if (kindOfKey(k) === 'bank' && byName && keyOf('bank', name!) === k) return false;
+    return true;
+  });
+  if (offered.length === 0) return ok(null);
+  const spoken = deps.nameOf(row.id);
+  for (const { body, status } of deps.sql.all<{ body: string; status: string }>(
+    "SELECT body, status FROM suggestion WHERE body_kind = 'rowset' AND json_extract(body, '$.register') = ? AND json_type(body, '$.offer') = 'object'",
+    orgs.register,
+  )) {
+    try {
+      const b = JSON.parse(body) as { rows?: { at?: unknown }[]; offer?: { keys?: unknown } };
+      if (status === 'open' && b.rows?.[0]?.at === spoken) return ok(null);
+      if (listOf(b.offer?.keys).some((k) => offered.includes(k))) return ok(null);
+    } catch {
+      /* a body nobody can read offered nothing */
+    }
+  }
+  const patch = orgOfferPatch(orgs, row, offered);
+  if (Object.keys(patch).length === 0) return ok(null);
+  const known = orgNameOf(deps, orgs, row);
+  const what = offered.some((k) => kindOfKey(k) === 'domain')
+    ? 'mail from that domain'
+    : offered.every((k) => kindOfKey(k) === 'bank')
+      ? 'payments written that way'
+      : 'what it was met by';
+  const said = name === undefined || orgNameKey(name) === orgNameKey(known) ? known : name;
+  const question = `Is the ${said} met in ${s.source} the ${known} you already know? Yes files ${what} under ${known}.`;
+  const opened = deps.propose({ question, body_kind: 'rowset', body: { register: orgs.register, rows: [{ at: spoken, version: row.version, patch }], offer: { keys: offered } } });
+  return opened.ok ? ok(opened.value.id) : (opened as Result<never>);
+}
+
+/** The patch that gives an organisation keys it lacks: a domain where it has none, the rest in its keys. */
+function orgOfferPatch(orgs: DeclaredList<OrgFields>, row: Row, offered: readonly string[]): Record<string, unknown> {
+  const at = orgs.fields;
+  const patch: Record<string, unknown> = {};
+  const rest: string[] = [];
+  for (const k of offered) {
+    if (kindOfKey(k) === 'domain' && at.domain !== undefined && textOf(row.fields[at.domain]) === undefined && patch[at.domain] === undefined) patch[at.domain] = valueOfKey(k);
+    else if (kindOfKey(k) !== 'domain') rest.push(k);
+  }
+  if (at.keys !== undefined && rest.length > 0) {
+    const now = listOf(row.fields[at.keys]);
+    const union = [...new Set([...now, ...rest])];
+    if (union.length > now.length) patch[at.keys] = union;
+  }
+  return patch;
+}
+
+/** Legal and web endings a name of an organisation is said with in one place and not another, for `orgWords`. */
+const ENDINGS = new Set(['llc', 'ltd', 'limited', 'inc', 'incorporated', 'corp', 'corporation', 'co', 'company', 'gmbh', 'ag', 'sa', 'sae', 'plc', 'bv', 'pty', 'pvt', 'fze', 'fzco', 'oy', 'oyj', 'ab', 'aps', 'srl', 'sarl', 'spa', 'nv', 'kk', 'pbc', 'lp', 'llp']);
+
+/**
+ * The words an organisation's name folds to, for asking whether two are one: lower case, a web address said as its
+ * name (`SOWBELL.COM` is `sowbell`), punctuation gone, and the legal endings off its end. `Lantern AI, PBC` is `lantern
+ * ai`, `Tarnvale Oy` is `tarnvale`.
+ */
+function orgWords(name: string): string[] {
+  const bare = name.replace(/\.(?:[a-z]{2,6})(?:\.[a-z]{2})?(?=$|[\s/])/giu, ' ');
+  const words = nameKey(bare)
+    .split(' ')
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ''))
+    .filter((w) => w !== '');
+  while (words.length > 1 && ENDINGS.has(words.at(-1)!)) words.pop();
+  return words;
+}
+
+/** Whether two names of organisations fold to the same words, in any order or run together (`Chill Out`, `Chillout`). */
+function sameWords(a: string, b: string): boolean {
+  const [x, y] = [orgWords(a), orgWords(b)];
+  if (x.length === 0 || y.length === 0) return false;
+  if (x.join('') === y.join('') && x.join('').length >= 4) return true;
+  return x.length === y.length && [...x].sort().join(' ') === [...y].sort().join(' ');
+}
+
+/** The most other organisations one new one is asked about at once. */
+const ORG_PAIRS_MOST = 3;
+
+/**
+ * A new organisation whose name folds to the words of one already held, by a key the other does not answer to: one
+ * question per pair, as people are asked, and never a merge made on its own (research-understanding-judge change 3).
+ */
+function askOrgPairs(deps: PeopleDeps, orgs: DeclaredList<OrgFields>, row: Row): Result<string | null> {
+  const merged = orgs.fields.merged_into;
+  const name = textOf(row.fields[orgs.fields.name]);
+  if (merged === undefined || name === undefined) return ok(null);
+  const words = orgWords(name);
+  if (words.length === 0) return ok(null);
+  const probe = (words[0]!.length >= 4 ? words[0]! : words.join('')).slice(0, 6);
+  const others = deps.sql
+    .all<{ id: string; seq: number | null; version: number; fields: string }>(
+      `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} AND id <> ? AND instr(replace(lower(json_extract(fields, ?)), ' ', ''), ?) > 0 ORDER BY seq`,
+      ...live(orgs.register, merged),
+      row.id,
+      path(orgs.fields.name),
+      probe,
+    )
+    .map(hydrate)
+    .filter((o) => typeof o.fields[orgs.fields.name] === 'string' && sameWords(name, String(o.fields[orgs.fields.name])))
+    .filter((o) => deps.othersRow?.(o.id) !== true && !refused(deps, orgs as Keyed, row, o))
+    .slice(0, ORG_PAIRS_MOST);
+  let first: string | null = null;
+  for (const other of others) {
+    const drawn = orgPairBody(deps, orgs, other, row);
+    if (drawn === null) continue;
+    const opened = deps.propose({ question: drawn.question, body_kind: 'rowset', body: drawn.body });
+    if (!opened.ok) return opened as Result<never>;
+    first ??= opened.value.id;
+  }
+  return ok(first);
+}
+
+/**
+ * What a question about two organisations that may be one writes when accepted, and what it says: the newer folded into
+ * the older, which gains every key, domain, line and project the newer held.
+ */
+function orgPairBody(deps: PeopleDeps, orgs: DeclaredList<OrgFields>, a: Row, b: Row): { question: string; body: Record<string, unknown> } | null {
+  const at = orgs.fields;
+  const merged = at.merged_into;
+  if (merged === undefined || a.id === b.id) return null;
+  const [keep, fold] = (b.seq ?? 0) < (a.seq ?? 0) ? [b, a] : [a, b];
+  const patch: Record<string, unknown> = {};
+  const theirs = keysOfOrg(orgs, fold);
+  const domain = at.domain === undefined ? undefined : textOf(fold.fields[at.domain]);
+  if (at.domain !== undefined && domain !== undefined && textOf(keep.fields[at.domain]) === undefined) patch[at.domain] = domain;
+  if (at.keys !== undefined) {
+    const now = listOf(keep.fields[at.keys]);
+    const moved = theirs.filter((k) => !(kindOfKey(k) === 'domain' && valueOfKey(k) === patch[at.domain ?? '']));
+    const union = [...new Set([...now, ...moved])];
+    if (union.length > now.length) patch[at.keys] = union;
+  }
+  if (at.met !== undefined) {
+    const lines = metLines(listOf(keep.fields[at.met]), listOf(fold.fields[at.met]));
+    if (!same(lines, keep.fields[at.met] ?? [])) patch[at.met] = lines;
+  }
+  if (at.projects !== undefined) {
+    const union = [...new Set([...listOf(keep.fields[at.projects]), ...listOf(fold.fields[at.projects])])];
+    if (union.length > listOf(keep.fields[at.projects]).length) patch[at.projects] = union;
+  }
+  if (at.kind !== undefined && textOf(keep.fields[at.kind]) === undefined && textOf(fold.fields[at.kind]) !== undefined) patch[at.kind] = fold.fields[at.kind];
+  const [keepName, foldName] = [orgNameOf(deps, orgs, keep), orgNameOf(deps, orgs, fold)];
+  const seen = (r: Row): string[] => (at.met === undefined ? [] : [...new Set(listOf(r.fields[at.met]).map((l) => clip(unaddressed(sourceOfLine(l)))).reverse())].slice(0, 3));
+  const body = {
+    register: orgs.register,
+    rows: [
+      { at: deps.nameOf(fold.id), version: fold.version, patch: { [merged]: deps.nameOf(keep.id), deleted_at: instant(deps.nowMs) } },
+      ...(Object.keys(patch).length === 0 ? [] : [{ at: deps.nameOf(keep.id), version: keep.version, patch }]),
+    ],
+    pair: [deps.nameOf(keep.id), deps.nameOf(fold.id)],
+    candidates: [keep, fold].map((r) => ({ at: deps.nameOf(r.id), name: orgNameOf(deps, orgs, r), seen: seen(r), ...(r.id === keep.id ? { kept: true } : {}) })),
+  };
+  const question = `Are ${keepName} and ${foldName} one organisation? Yes keeps ${keepName} and files everything ${foldName} was met by under it.`;
+  return { question, body };
+}
+
+/**
+ * Bring every open question about these organisations up to them, as `reask` does for people: an offer at the version
+ * its organisation is now, or taken off the list once what it offered is held; a pair drawn again, or taken off once
+ * the two are one or one is gone. A later bank text of the same payee must not leave him a question he cannot accept.
+ */
+function reaskOrgs(deps: PeopleDeps, orgs: DeclaredList<OrgFields>, ids: readonly string[]): Result<null> {
+  const moved = new Set(ids);
+  const keyed = orgs as Keyed;
+  for (const { id, body: raw } of deps.sql.all<{ id: string; body: string }>(
+    "SELECT id, body FROM suggestion WHERE status = 'open' AND body_kind = 'rowset' AND json_extract(body, '$.register') = ? ORDER BY rowid",
+    orgs.register,
+  )) {
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const offer = body.offer !== null && typeof body.offer === 'object' ? listOf((body.offer as { keys?: unknown }).keys) : null;
+    const pair = Array.isArray(body.pair) ? listOf(body.pair) : null;
+    if (offer === null && pair === null) continue;
+    const named = (offer !== null ? [String((body.rows as { at?: unknown }[] | undefined)?.[0]?.at ?? '')] : pair!).map((at) => rowAt(deps, keyed, at));
+    if (!named.some((r) => r !== null && moved.has(r.id))) continue;
+    const ends = named.map((r) => (r === null ? null : liveEnd(deps, keyed, r)));
+    if (offer !== null) {
+      const row = ends[0] ?? null;
+      const patch = row === null ? {} : orgOfferPatch(orgs, row, offer.filter((k) => holderOf(deps.sql, k) === null));
+      if (row === null || Object.keys(patch).length === 0) close(deps, id, 'What it offered is settled.');
+      else rewrite(deps, id, { ...body, rows: [{ at: deps.nameOf(row.id), version: row.version, patch }] });
+      continue;
+    }
+    const [a, b] = ends;
+    const drawn = a == null || b == null ? null : orgPairBody(deps, orgs, a, b);
+    if (drawn === null) close(deps, id, 'They were found to be one organisation.');
+    else if (JSON.stringify(drawn.body) !== JSON.stringify(body)) rewrite(deps, id, drawn.body);
+  }
+  return ok(null);
+}
+
+/**
+ * The people at a domain: every live, unfolded person holding an address there or at a part of it.
+ */
+function peopleAt(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, domain: string): Row[] {
+  const safe = domain.replace(/[\\%_]/g, (c) => `\\${c}`);
+  return deps.sql
+    .all<{ id: string; seq: number | null; version: number; fields: string }>(
+      `SELECT DISTINCT e.id, e.seq, e.version, e.fields FROM entity_key k JOIN entry e ON e.id = k.row_id
+        WHERE k.register = ? AND e.deleted_at IS NULL AND (k.key LIKE ? ESCAPE '\\' OR k.key LIKE ? ESCAPE '\\') ORDER BY e.seq`,
+      list.register,
+      `email:%@${safe}`,
+      `email:%.${safe}`,
+    )
+    .map(hydrate)
+    .filter((r) => textOf(r.fields[list.fields.merged_into]) === undefined);
+}
+
+/** The fewest people vouched for at one domain that make it worth asking whether it is an organisation. */
+const DOMAIN_PEOPLE_LEAST = 2;
+
+/**
+ * The name an organisation asked about from a domain goes by: the owner of the repository the run is in, when its name
+ * and the domain's agree and it says more (`Brightloom-Infotech` beside brightloomit.example is Brightloom Infotech),
+ * else the domain's own label (`kestrel-uni.example` is Kestrel Uni).
+ */
+export function domainOrgName(domain: string, remote: string | null): string {
+  const label = domain.split('.')[0]!;
+  const cap = (w: string): string => (w === '' ? w : `${w[0]!.toUpperCase()}${w.slice(1)}`);
+  const owner = remote === null ? undefined : /github\.com[/:]([^/\s]+)\//iu.exec(remote)?.[1];
+  if (owner !== undefined) {
+    const words = owner.replace(/([a-z])([A-Z])/g, '$1 $2').split(/[-_\s.]+/).filter((w) => w !== '');
+    const first = words[0]?.toLowerCase() ?? '';
+    const run = words.join('').toLowerCase();
+    const bare = label.replace(/-/g, '');
+    /* ONLY WHEN THE OWNER SAYS MORE THAN THE DOMAIN DOES: `lumacraft-ai` beside lumacraft.example is still Lumacraft. */
+    if (words.length > 0 && bare !== first && ((first.length >= 4 && bare.startsWith(first)) || (bare.length >= 4 && run.startsWith(bare)))) return words.map(cap).join(' ');
+  }
+  return label.split('-').filter((w) => w !== '').map(cap).join(' ');
+}
+
+/**
+ * ORGANISATIONS FROM MAIL DOMAINS (research-understanding-judge change 3). Two or more people the record vouches for at
+ * one domain nobody holds is a company it does not keep yet: one question, "Add Brightloom Infotech?", whose yes makes it
+ * and links them (`joinOrganisation`). One already kept under that name is offered the domain instead. Never made on its
+ * own, never from people only mail vouches for, never for a public mailbox, and asked once per domain.
+ */
+function askDomainOrgs(deps: PeopleDeps, list: DeclaredList<MeetsFields>, row: Row): Result<string | null> {
+  const orgs = deps.orgs;
+  if (!orgs || orgs.fields.domain === undefined) return ok(null);
+  const domains = [
+    ...new Set(
+      keysOfRow(list, row)
+        .filter((k) => kindOfKey(k) === 'email')
+        .map(valueOfKey)
+        .filter((a) => githubOfAddress(a) === null && !isOrganisationAddress(a))
+        .map((a) => registrable(a.split('@')[1] ?? ''))
+        .filter((d): d is string => d !== null),
+    ),
+  ];
+  let first: string | null = null;
+  for (const domain of domains) {
+    if (holderOf(deps.sql, `domain:${domain}`) !== null) continue;
+    const asked = deps.sql.one<{ n: number }>(
+      "SELECT 1 AS n FROM suggestion WHERE body_kind = 'rowset' AND json_extract(body, '$.register') = ? AND json_extract(body, '$.join.domain') = ? LIMIT 1",
+      orgs.register,
+      domain,
+    );
+    if (asked !== undefined) continue;
+    const people = peopleAt(deps, list, domain).filter((r) => vouched(deps, list, r));
+    /* ONE PERSON HELD TWICE IS ONE: two rows of one name, or two an open question asks about as one person, count once,
+       so the owner and his own other name are never "two people" at his own domain. */
+    const together = openAsked(deps, list)
+      .filter((q) => q.offer === null)
+      .map((q) => new Set(q.members.map((m) => m.id)));
+    const groups: Row[][] = [];
+    for (const r of people) {
+      const name = nameKey(nameOfRow(list, r));
+      const group = groups.find((g) => g.some((o) => (name !== '' && nameKey(nameOfRow(list, o)) === name) || together.some((t) => t.has(o.id) && t.has(r.id))));
+      if (group) group.push(r);
+      else groups.push([r]);
+    }
+    if (groups.length < DOMAIN_PEOPLE_LEAST) continue;
+    const name = domainOrgName(domain, deps.remote?.() ?? null);
+    const names = groups.map((g) => nameOfRow(list, g[0]!) || 'someone unnamed');
+    const who = names.length <= 3 ? listed(names) : `${names.slice(0, 2).join(', ')} and ${names.length - 2} others`;
+    const kept = byOrgName(deps.sql, orgs, name);
+    const join = { domain, people: people.map((r) => deps.nameOf(r.id)) };
+    const opened =
+      kept === null
+        ? deps.propose({
+            question: `Add ${name}? ${who} have an address at ${domain}. Yes adds ${name} and puts them in it.`,
+            body_kind: 'rowset',
+            body: { register: orgs.register, rows: [{ [orgs.fields.name]: name, [orgs.fields.domain]: domain }], join },
+          })
+        : textOf(kept.fields[orgs.fields.domain]) !== undefined
+          ? null
+          : deps.propose({
+              question: `Is mail from ${domain} from ${orgNameOf(deps, orgs, kept)}? ${who} have an address there. Yes files it under ${orgNameOf(deps, orgs, kept)} and puts them in it.`,
+              body_kind: 'rowset',
+              body: { register: orgs.register, rows: [{ at: deps.nameOf(kept.id), version: kept.version, patch: { [orgs.fields.domain]: domain } }], join },
+            });
+    if (opened === null) continue;
+    if (!opened.ok) return opened as Result<never>;
+    first ??= opened.value.id;
+  }
+  return ok(first);
+}
+
+/**
+ * After the owner accepts a question that asked about an organisation from its people's domain: everybody at that domain
+ * who is with nobody yet is put in the organisation that now holds it. For the kernel to run after every decision, in
+ * its transaction; a question not accepted, not one of these, or one whose domain nobody holds, links nobody.
+ */
+export function joinOrganisation(deps: PeopleDeps, suggestion: string): Result<string[]> {
+  const list = deps.list;
+  const orgs = deps.orgs;
+  if (!list || !orgs || list.fields.org === undefined) return ok([]);
+  /* ONLY ONE HE ACCEPTED: a no leaves its people where they are, whoever holds the domain since. */
+  const q = deps.sql.one<{ body: string }>("SELECT body FROM suggestion WHERE id = ? AND body_kind = 'rowset' AND status = 'resolved' AND resolved_as = 'addressed'", suggestion);
+  if (!q) return ok([]);
+  let domain: unknown;
+  try {
+    const body = JSON.parse(q.body) as { register?: unknown; join?: { domain?: unknown } };
+    if (body.register !== orgs.register) return ok([]);
+    domain = body.join?.domain;
+  } catch {
+    return ok([]);
+  }
+  if (typeof domain !== 'string') return ok([]);
+  const held = holderOf(deps.sql, `domain:${domain}`);
+  if (held === null || held.register !== orgs.register) return ok([]);
+  const linked: string[] = [];
+  for (const person of peopleAt(deps, list, domain)) {
+    if (textOf(person.fields[list.fields.org]) !== undefined) continue;
+    const wrote = deps.write(list.register, person.id, { [list.fields.org]: held.id }, { version: person.version });
+    if (!wrote.ok) return wrote as Result<never>;
+    linked.push(person.id);
+  }
+  return ok(linked);
 }
 
 /* ── who else they might be ──────────────────────────────────────────── */
@@ -862,9 +1297,9 @@ function madeLines(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields
 function commitsOnly(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, row: Row): boolean {
   const believed = (ls: string[]) => ls.map(sourceOfLine).filter((l) => !ARRIVED.test(l));
   const lines = believed(listOf(row.fields[list.fields.met]));
-  if (lines.length === 0 || !lines.every((l) => COMMIT.test(l))) return false;
+  if (lines.length === 0 || !lines.every((l) => COMMIT_WORD.test(l))) return false;
   const made = madeLines(deps, list, row);
-  return made !== null && made.length > 0 && believed(made).every((l) => COMMIT.test(l));
+  return made !== null && made.length > 0 && believed(made).every((l) => COMMIT_WORD.test(l));
 }
 
 /**
@@ -1254,7 +1689,7 @@ type RawRow = { id: string; seq: number | null; version: number; fields: string;
 const withDeleted = (r: RawRow): Hydrated => ({ ...hydrate(r), deleted: r.deleted_at !== null });
 
 /** A row of the list by the handle a question names it by (`people#3`), or by its id; deleted ones too. */
-function rowAt(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<MeetsFields>, at: string): Hydrated | null {
+function rowAt(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: Keyed, at: string): Hydrated | null {
   const seq = /(\d+)$/.exec(at)?.[1];
   const bySeq = seq === undefined ? undefined : deps.sql.one<RawRow>('SELECT id, seq, version, fields, deleted_at FROM entry WHERE register = ? AND seq = ?', list.register, Number(seq));
   const r = bySeq !== undefined && deps.nameOf(bySeq.id) === at ? bySeq : deps.sql.one<RawRow>('SELECT id, seq, version, fields, deleted_at FROM entry WHERE register = ? AND id = ?', list.register, at);
@@ -1262,10 +1697,10 @@ function rowAt(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<Meet
 }
 
 /** The live row a row ended in: itself, or the one it was folded into, followed to the end. `null` for one deleted outright. */
-function liveEnd(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<MeetsFields>, start: Hydrated): Row | null {
+function liveEnd(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: Keyed, start: Hydrated): Row | null {
   let row = start;
   for (let hops = 0; hops < FOLD_HOPS; hops++) {
-    const into = textOf(row.fields[list.fields.merged_into]);
+    const into = list.fields.merged_into === undefined ? undefined : textOf(row.fields[list.fields.merged_into]);
     const next = into === undefined ? null : rowAt(deps, list, into);
     if (next === null || next.id === row.id) return row.deleted ? null : row;
     row = next;
@@ -1454,7 +1889,9 @@ function offerArrival(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said
  * `open` false counts only what he answered: a question still waiting is the one a newcomer may join, and a strong rule
  * may still settle it.
  */
-function refused(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<MeetsFields>, a: Row, b: Row, open = true): boolean {
+function refused(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: Keyed, a: Row, b: Row, open = true): boolean {
+  const merged = list.fields.merged_into;
+  if (merged === undefined) return false;
   const [x, y] = [deps.nameOf(a.id), deps.nameOf(b.id)];
   const bodies = deps.sql.all<{ body: string }>(
     "SELECT body FROM suggestion WHERE body_kind = 'rowset' AND json_extract(body, '$.register') = ? AND (? = 1 OR status <> 'open')",
@@ -1464,7 +1901,7 @@ function refused(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<Me
   const asked = bodies.some(({ body }) => {
     try {
       const rows = (JSON.parse(body) as { rows?: { at?: unknown; patch?: Record<string, unknown> }[] }).rows ?? [];
-      const named = new Set(rows.flatMap((r) => [r?.at, r?.patch?.[list.fields.merged_into]]));
+      const named = new Set(rows.flatMap((r) => [r?.at, r?.patch?.[merged]]));
       return named.has(x) && named.has(y);
     } catch {
       return false;
@@ -1475,7 +1912,7 @@ function refused(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<Me
   return deps.sql.one<{ n: number }>(
     `SELECT 1 AS n FROM event WHERE kind = 'edit' AND field = ? AND to_v IS NULL
        AND ((target = ? AND instr(from_v, ?) > 0) OR (target = ? AND instr(from_v, ?) > 0)) LIMIT 1`,
-    list.fields.merged_into,
+    merged,
     `entry:${a.id}`,
     b.id,
     `entry:${b.id}`,

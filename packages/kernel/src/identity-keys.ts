@@ -112,7 +112,7 @@ const ROLE_LOCALS = new Set([
   'careers', 'hr', 'press', 'payments', 'bounce', 'bounces', 'updates', 'digest', 'reply', 'mail', 'email',
   'webmaster', 'hostmaster', 'abuse', 'privacy', 'legal', 'statements', 'estatements', 'banking', 'onlinebanking',
   'ebanking', 'enquiries', 'enquiry', 'inquiries', 'inquiry', 'reservations', 'reservation', 'booking', 'bookings',
-  'shop', 'store', 'events', 'partners', 'partnerships', 'community', 'membership', 'members', 'finance', 'payroll',
+  'shop', 'store', 'events', 'partners', 'partnerships', 'community', 'membership', 'members', 'finance',
   'procurement', 'purchasing', 'compliance', 'operations', 'reception', 'frontdesk', 'general', 'mailbox', 'inbox',
   'investors', 'developers', 'engineering', 'devops', 'welcome', 'account', 'subscriptions', 'messages', 'verify',
   'verification', 'kyc',
@@ -200,10 +200,51 @@ const GENERIC_PAYEES = new Set([
   'vet', 'school', 'nursery', 'academy', 'cinema', 'atm', 'bank', 'center', 'centre', 'restaurants', 'food', 'foods',
 ]);
 
+/**
+ * Every country's name in English, folded as a payee's words are (`unitedkingdom`), from the runtime's own region names
+ * rather than a list here: a bank text writes the country after the merchant, whichever country it is, and the core names
+ * none of them (`tools/gates/shell-words.mjs`). Only names of more than three letters, since a short one is as often a
+ * word or initials of a name, and the codes a bank prints are in `PLACES`. A COUNTRY'S NAME IS ALSO A SURNAME
+ * (`MICHAEL JORDAN`), so it goes only while two words are left before it: `XO TELECOM EGYPT` is XO Telecom, and a name
+ * of two words keeps both.
+ */
+const COUNTRIES: ReadonlySet<string> = (() => {
+  const out = new Set<string>();
+  let names: Intl.DisplayNames | null = null;
+  try {
+    names = new Intl.DisplayNames(['en'], { type: 'region', fallback: 'none' });
+  } catch {
+    return out;
+  }
+  const A = 'A'.charCodeAt(0);
+  for (let i = 0; i < 26; i++)
+    for (let j = 0; j < 26; j++) {
+      const said = names.of(String.fromCharCode(A + i, A + j));
+      const folded = said?.normalize('NFKD').toLowerCase().replace(/[^a-z]/g, '') ?? '';
+      if (folded.length > 3) out.add(folded);
+    }
+  return out;
+})();
+
+/**
+ * Whether a payee's words say only what kind of shop it is and not which one (`CAFE`, `The Pharmacy`): such a payee is
+ * no other payee's name, so `CAFE NERO` and `CAFE ROUGE` are never one payee under it.
+ */
+export function onlyAKind(said: string): boolean {
+  return said
+    .toLowerCase()
+    .split(/\s+/u)
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ''))
+    .every((bare) => bare === '' || bare === 'the' || GENERIC_PAYEES.has(bare));
+}
+
+/** Words that join a name to what follows it, so a country after one of them is part of the name. */
+const CONNECTIVES = new Set(['of', 'de', 'du', 'des', 'del', 'della', 'di', 'da', 'do', 'dos', 'la', 'le', 'les', 'el', 'al', 'the', 'and', 'for', 'in', 'von', 'van', 'der', 'den', 'y', 'e', 'et', 'und']);
+
 /** Places a bank text writes after the merchant, removed so `CHILLOUT CAIRO EG` and `Chillout` are one payee. */
 const PLACES = new Set([
   'cairo', 'giza', 'alexandria', 'alex', 'newcairo', 'nasr', 'nasrcity', 'heliopolis', 'maadi', 'zamalek', 'dokki',
-  'mohandessin', 'sheikhzayed', 'zayed', 'october', '6thofoctober', 'tagamoa', 'tagamo3', 'eg', 'egy', 'egypt',
+  'mohandessin', 'sheikhzayed', 'zayed', 'october', '6thofoctober', 'tagamoa', 'tagamo3', 'eg', 'egy',
   'london', 'gb', 'uk', 'gbr', 'dubai', 'ae', 'uae', 'are', 'abudhabi', 'riyadh', 'sa', 'jeddah', 'us', 'usa',
   'newyork', 'ny', 'sanfrancisco', 'sf', 'ca', 'de', 'berlin', 'fr', 'paris', 'nl', 'amsterdam', 'ie', 'dublin',
   'internet', 'online', 'www',
@@ -419,8 +460,13 @@ function bankKey(raw: string): string | null {
     const last = words[words.length - 1]!;
     const bare = bareOf(last);
     /* TWO WORDS FIRST, so `NEW CAIRO` goes whole and does not leave `new` behind as part of the payee. */
-    const place2 = words.length > 2 && PLACES.has(`${bareOf(words[words.length - 2]!)}${bare}`);
-    const drop = place2 ? 2 : /\d/.test(last) || PLACES.has(bare) || bare === '' ? 1 : 0;
+    const pair = words.length > 2 ? `${bareOf(words[words.length - 2]!)}${bare}` : '';
+    /* A COUNTRY JOINED TO THE NAME BY A WORD LIKE `of` is the name's own, not where it was paid: dropped, `BANK OF
+       IRELAND` and `BANK OF GEORGIA` would be one payee. */
+    const joined = (n: number): boolean => CONNECTIVES.has(bareOf(words[words.length - 1 - n] ?? ''));
+    const place2 = pair !== '' && (PLACES.has(pair) || (COUNTRIES.has(pair) && words.length > 3 && !joined(2)));
+    const country = COUNTRIES.has(bare) && words.length > 2 && !joined(1);
+    const drop = place2 ? 2 : /\d/.test(last) || PLACES.has(bare) || country || bare === '' ? 1 : 0;
     if (drop === 0 || (bare !== '' && !names(words.length - drop))) break;
     words.splice(-drop, drop);
   }

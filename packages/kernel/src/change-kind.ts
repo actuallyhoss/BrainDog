@@ -21,9 +21,10 @@
  *   - `money`: a money amount set or changed
  *   - `keys`: anything in a list that holds a sealed value, which is where keys live
  *   - `sharing`: where a row applies, which is who can see it
- *   - `identity`: who a person or an organisation is: folding one into another, the addresses, handles and keys
- *     `meet` knows them by, since a key added to the wrong row files everything that arrives under it there, or which
- *     person is the record's own
+ *   - `identity`: who a person or an organisation is: folding one into another, the addresses, handles, keys and
+ *     domain `meet` knows them by, since a key added to the wrong row files everything that arrives under it there,
+ *     which person is the record's own, or the names a merge matches on. A new row may be made with a name; one made
+ *     already joined to someone, or with their addresses, asks like the edit would
  *   - `addons`: installing, turning on or off, or setting up an add-on
  *   - `outside`: anything that runs unattended or sends something out of the record, or a list the record does not have
  *   - `others`: a row another person made.
@@ -57,19 +58,25 @@ export const AUTOMATION = 'automation';
 export const KEPT_DAYS = 30;
 
 /**
- * What this file needs of a list: its fields, with their types, which field is its state, and which fields say who a
- * row is (`identity`).
+ * What this file needs of a list: its fields, with their types, which field is its state, which fields say who a row
+ * is (`identity`), and which of those only name it (`names`).
  *
  * STRUCTURAL, so a `RegisterDecl`, a declaration's parsed body and a test's literal are all one.
  *
  * `identity` IS READ FROM THE ROLES THE LIST PLAYS (`roles.ts`), never from its name or a field's: the fields playing
- * `merged_into`, `email`, `handles`, `keys` or `self` in the people `meet` writes, or `merged_into` or `keys` in its
- * organisations. Any record's People, and any pack's list that declares the role, get the same floor.
+ * `merged_into`, `email`, `handles`, `keys`, `self`, `name`, `aliases` or `org` in the people `meet` writes, or
+ * `merged_into`, `keys`, `domain` or `name` in its organisations. Any record's People, and any pack's list that
+ * declares the role, get the same floor.
+ *
+ * `names` ARE THE ONES A NEW ROW MAY BE MADE WITH: its name, the other names it goes by, and the organisation a person
+ * is with. Every row is made with a name, so adding a person by name alone is an add like any other; changing one
+ * later is a rename a merge would match on, and asks. The rest of `identity` asks on the add too.
  */
 export type ListShape = {
   fields: readonly { id: string; type?: string; of?: string; scope?: unknown; by?: unknown; transitions?: unknown }[];
   state?: string;
   identity?: readonly string[];
+  names?: readonly string[];
 };
 
 /**
@@ -162,8 +169,9 @@ const same = (a: unknown, b: unknown): boolean => (emptied(a ?? null) && emptied
  * made.
  *
  * WHO A ROW IS, AND A FIELD SENT EMPTY, ARE ON THE FLOOR TOO. A field playing `merged_into`, `email`, `handles`,
- * `keys` or `self` (`ListShape.identity`) is `identity` on the edit or the tag that changes it, since one key moved
- * onto the wrong person files every mail and commit that arrives under it there, and a merge folds a person away. A
+ * `keys`, `self`, `domain`, `name`, `aliases` or `org` (`ListShape.identity`) is `identity` on the edit or the tag
+ * that changes it, since one key moved onto the wrong person files every mail and commit that arrives under it there,
+ * a merge folds a person away, and a rename prepares one: the strong match reads names and aliases. A
  * field sent as `null` or `''`, or a list sent with nothing in it, is `delete` on its kind: the floor is "a row, or a
  * field, away", and a cleared field is a field away. Money, then sharing, then identity name a key that is two of these at once,
  * since the narrower power is the truer sentence. A field sent back as it already was (`was`) is neither.
@@ -178,9 +186,17 @@ export function kindsOfWrite(w: WriteSaid): ChangeKind[] {
      amount changes it as much as setting one. */
   const money = (keys: string[], clearing: boolean): boolean =>
     keys.some((k) => fields.get(k)?.type === 'money' && patch[k] !== undefined && (clearing || patch[k] !== null));
-  if (w.op === 'create') return [kind(w.list, 'add', dearerFloor(money(Object.keys(patch), false) ? 'money' : null, floor))];
-
   const identity = new Set(w.shape?.identity ?? []);
+  /* A NEW ROW IS WHO SOMEBODY IS WHEN IT IS MADE WITH MORE THAN NAMES (research-audit-21): made already merged, as the
+     record's own person, or holding the addresses, handles, keys or domain `meet` files arrivals by. An agent that may
+     add people could otherwise make a second owner, or a row that takes someone's mail, without asking. A part sent
+     empty, or `self` sent false, sets nothing. */
+  if (w.op === 'create') {
+    const names = new Set(w.shape?.names ?? []);
+    const joins = Object.keys(patch).some((k) => identity.has(k) && !names.has(k) && !emptied(patch[k]) && patch[k] !== false);
+    return [kind(w.list, 'add', dearerFloor(money(Object.keys(patch), false) ? 'money' : joins ? 'identity' : null, floor))];
+  }
+
   const moved = (key: string): boolean => !w.was || !same(w.was[key], patch[key]);
   /* THE FLOOR ONE FIELD'S CHANGE HITS ON ITS OWN, before the row's. */
   const fieldFloor = (key: string): Floor | null => {
@@ -386,11 +402,12 @@ export function shapeIn(sql: Sql, list: string): ListShape | null {
   if (!row) return null;
   const body = parsed(row.body);
   const fields = arr(body.fields).map(obj).filter((f) => typeof f.id === 'string') as unknown as ListShape['fields'];
-  const identity = identityOf(list, body, fields);
+  const { identity, names } = identityOf(list, body, fields);
   return {
     fields,
     ...(typeof body.state === 'string' ? { state: body.state } : {}),
     ...(identity.length > 0 ? { identity } : {}),
+    ...(names.length > 0 ? { names } : {}),
   };
 }
 
@@ -400,19 +417,30 @@ export function shapeIn(sql: Sql, list: string): ListShape | null {
  * `self` TOO, which says which person is the record's own: the row a merge keeps (`people.ts`'s fold order), and
  * whose addresses count as the owner's when a stranger's mail is weighed (`wroteTo`). Set on the wrong row it is the
  * same harm as a key moved there.
+ *
+ * `domain` FEEDS AN ORGANISATION'S ENTITY KEY (`entities.ts`), so editing it moves who a domain belongs to. `name` and
+ * `aliases` are what the strong merge matches (`people.ts`), so a rename prepares a fold on the next meeting. `org` is
+ * who a person is with, which their mail is filed under.
  */
-const IDENTITY_PARTS = ['merged_into', 'email', 'handles', 'keys', 'self'] as const;
+const IDENTITY_PARTS = ['merged_into', 'email', 'handles', 'keys', 'self', 'domain', 'name', 'aliases', 'org'] as const;
+
+/** The identity parts a new row may be made with, since they only name it (`ListShape.names`). */
+const NAMING_PARTS: ReadonlySet<string> = new Set(['name', 'aliases', 'org']);
 
 /**
  * The fields of one list that say who its rows are: those playing an identity part of the people or the
  * organisations `meet` writes, read with `roles.ts`'s own rule, so a list that declares `meets:` or `org:` and a
  * keyless `people` from before the keys are read the same way `meet` reads them.
  */
-function identityOf(list: string, body: Record<string, unknown>, fields: ListShape['fields']): string[] {
+function identityOf(list: string, body: Record<string, unknown>, fields: ListShape['fields']): { identity: string[]; names: string[] } {
   const one = [{ id: list, fields: fields as readonly RoleField[], meets: body.meets, org: body.org }];
   const played = { ...orgRole(one)?.fields, ...meetsRole(one)?.fields } as Record<string, string | undefined>;
   const held = new Set(fields.map((f) => f.id));
-  return [...new Set(IDENTITY_PARTS.map((p) => played[p]).filter((f): f is string => f !== undefined && held.has(f)))];
+  const of = (parts: readonly string[]): string[] => [...new Set(parts.map((p) => played[p]).filter((f): f is string => f !== undefined && held.has(f)))];
+  const identity = of(IDENTITY_PARTS);
+  /* A FIELD THAT PLAYS A NAMING PART AND A JOINING ONE, which only a hand-made declaration could say, joins. */
+  const joining = new Set(of(IDENTITY_PARTS.filter((p) => !NAMING_PARTS.has(p))));
+  return { identity, names: of([...NAMING_PARTS]).filter((f) => !joining.has(f)) };
 }
 
 /** A run's spoken name as its writes are signed, `S42`, and nothing else. */

@@ -141,8 +141,16 @@ test('AN ARRIVAL MATCHED BY ITS KEY ADDS ITS LINE AND NOTHING ELSE: no handle, n
   /* The handle is still nobody's, so the next meeting by it is not her. */
   assert.equal(sql.one("SELECT 1 AS n FROM entity_key WHERE key = 'github:attacker'"), undefined);
 
-  /* The same meeting from a commit is evidence, and she gains both. */
+  /* Nor does a project or the day in touch move on a spoofed From (research-audit-21 M10). */
+  assert.equal(row.fields.projects, undefined, 'a mail linked her to the run’s project');
+
+  /* A commit by her address is hers, and still carries nothing (M9): anybody can sign one with her address. */
   value(k.meet({ name: 'The Countess', email: 'ada@example.com', handle: 'github:ada', where: 'commit 4464966 in braindog' }, AGENT));
+  assert.equal(k.get(ada.id)!.fields.handles, undefined);
+  assert.equal(k.get(ada.id)!.fields.aliases, undefined);
+
+  /* The same meeting in a note is evidence, and she gains both. */
+  value(k.meet({ name: 'The Countess', email: 'ada@example.com', handle: 'github:ada', where: 'a note about her' }, OWNER));
   assert.deepEqual(k.get(ada.id)!.fields.handles, ['github:ada']);
   assert.deepEqual(k.get(ada.id)!.fields.aliases, ['The Countess']);
   sql.close();
@@ -178,7 +186,7 @@ test('A PERSON THE OWNER TYPED IS STILL HIS AFTER THEIR MAIL IS READ: the same n
   const { k, sql } = await record();
   const typed = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
   value(k.meet({ email: 'rohanmehta@encore.example', source: 'mail from encore.example' }, AGENT));
-  const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohan.mehta@gmail.com', where: 'a note about the launch' }, AGENT));
+  const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohan.mehta@gmail.com', where: 'a note about the launch' }, OWNER));
   assert.equal(met.matched_by, 'strong');
   assert.equal(met.row?.id, typed.id);
   assert.equal(k.count('people'), 1);
@@ -218,7 +226,7 @@ test('TWO COMMITS BY ONE AUTHOR UNDER TWO ADDRESSES STILL FOLD, and the real per
   /* The owner types her in, and a note meets her under a third address: the note folds into the row he typed, and the
      commit-made row is not folded in a step later, since whoever pushed signed it. He is asked once instead. */
   const typed = value<Entry>(k.create('people', { name: 'Lakshmi Vadlamudi', email: 'lv@brightloom.example', handles: ['github:lakshmi-vadlamudi'] }, OWNER));
-  const noted = value<Met>(k.meet({ name: 'Lakshmi Vadlamudi', email: 'lakshmivadlamudi@outlook.com', where: 'a note on the launch' }, AGENT));
+  const noted = value<Met>(k.meet({ name: 'Lakshmi Vadlamudi', email: 'lakshmivadlamudi@outlook.com', where: 'a note on the launch' }, OWNER));
   assert.equal(noted.matched_by, 'strong');
   assert.equal(noted.row?.id, typed.id);
   assert.equal(k.get(first.row!.id)!.fields.merged_into, undefined, 'a commit author was folded in on the real person’s next meeting');
@@ -241,12 +249,20 @@ test('A FORGED COMMIT AUTHOR WHO THEN MAILS IN FROM THE SAME ADDRESS IS STILL ON
   sql.close();
 });
 
-test('A COMMIT BY A KEY SOMEBODY HOLDS IS THEIRS, and what it carries joins them as before', async () => {
+test('A COMMIT BY A KEY SOMEBODY HOLDS IS THEIRS, and carries no key, name or other name onto them (research-audit-21 M9)', async () => {
   const { k, sql } = await record();
   const ada = value<Entry>(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com' }, OWNER));
-  const met = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'ada@example.com', handle: 'github:ada', where: 'commit 1 in braindog' }, AGENT));
+  const met = value<Met>(k.meet({ name: 'The Countess', email: 'ada@example.com', handle: 'github:ada', keys: ['email:countess@evil.test'], where: 'commit 1 in braindog' }, AGENT));
   assert.equal(met.matched_by, 'key');
-  assert.deepEqual(k.get(ada.id)!.fields.handles, ['github:ada']);
+  assert.equal(met.row?.id, ada.id);
+  const row = k.get(ada.id)!;
+  assert.deepEqual(row.fields.met, [`${DAY} · commit 1 in braindog`]);
+  assert.deepEqual(row.fields.projects, [sql.one<{ id: string }>("SELECT id FROM entry WHERE register = 'things'")?.id], 'a commit by her key did not link her to its project');
+  assert.equal(row.fields.handles, undefined);
+  assert.equal(row.fields.keys, undefined);
+  assert.equal(row.fields.aliases, undefined);
+  /* So the next commit by the address it named is not hers. */
+  assert.notEqual(value<Met>(k.meet({ email: 'countess@evil.test', where: 'commit 2 in braindog' }, AGENT)).row?.id, ada.id);
   sql.close();
 });
 
@@ -270,9 +286,9 @@ test('EVERY SOURCE BUT A NOTE, A SESSION’S OWN RUN AND A COMMIT IS TEXT ANYBOD
   assert.equal(slack.mention, true);
 
   /* A note and the session's own run are believed. */
-  value(k.meet({ email: 'ada@example.com', handle: 'github:ada', where: 'a note about the launch' }, AGENT));
+  value(k.meet({ email: 'ada@example.com', handle: 'github:ada', where: 'a note about the launch' }, OWNER));
   assert.deepEqual(k.get(ada.id)!.fields.handles, ['github:ada']);
-  value(k.meet({ email: 'ada@example.com', handle: 'github:countess', where: 'session in braindog' }, AGENT));
+  value(k.meet({ email: 'ada@example.com', handle: 'github:countess', where: 'session in braindog' }, OWNER));
   assert.deepEqual(k.get(ada.id)!.fields.handles, ['github:ada', 'github:countess']);
   sql.close();
 });
@@ -380,7 +396,8 @@ test('ONE WHO MAY BE THE SAME PERSON JOINS THE QUESTION ALREADY ASKED, and Yes f
   assert.equal(k.count('people'), 1);
   const row = k.get(kept.id)!;
   assert.equal(row.fields.email, 'devraj@fanline.example');
-  assert.deepEqual(row.fields.aliases, ['Devraj B']);
+  /* "Devraj B" came only from a commit by a key the row held, which carries no other name (research-audit-21 M9). */
+  assert.equal(row.fields.aliases, undefined);
   assert.equal((row.fields.met as string[]).length, 4);
   sql.close();
 });
@@ -419,7 +436,7 @@ test('THE RECORD’S OWN PERSON KEEPS EVERY SPELLING OF THEM: a name their handl
   const committed = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@driftwind.example', where: 'commit 2 in bake' }, AGENT));
   assert.equal(committed.matched_by, 'none');
   assert.ok(committed.question);
-  const folded = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@tidepool.example', where: 'session in bake' }, AGENT));
+  const folded = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@tidepool.example', where: 'session in bake' }, OWNER));
   assert.equal(folded.matched_by, 'strong');
   assert.equal(folded.row?.id, self.id);
   assert.equal(k.get(committed.row!.id)!.fields.merged_into, undefined, 'the commit author was folded in down the chain');
@@ -433,7 +450,7 @@ test('A QUESTION WHOSE PEOPLE BECAME ONE IS TAKEN OFF THE LIST', async () => {
   assert.ok(asked.question);
   /* The second row is met again by its own address, in the session's own run, with a handle the first holds too: the
      strong rules fold it, and the question has nobody left to ask about. A commit never would (audit 19 H1). */
-  const last = value<Met>(k.meet({ name: 'Owen Hartley', email: 'owenh@fanline.example', handle: 'github:ohartley', where: 'session in fanline' }, AGENT));
+  const last = value<Met>(k.meet({ name: 'Owen Hartley', email: 'owenh@fanline.example', handle: 'github:ohartley', where: 'session in fanline' }, OWNER));
   assert.equal(last.row?.seq, 1);
   assert.equal(k.count('people'), 1);
   assert.equal(k.governanceRow('suggestion', asked.question!)?.status, 'resolved');

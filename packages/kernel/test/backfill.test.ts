@@ -189,7 +189,7 @@ test('A PAYEE ON ONE LINE IS LEFT ALONE UNLESS AN ORGANISATION OR A SERVICE ALRE
   understandBackfill(deps);
 
   assert.equal(partyOf(k, ids.fenwickLine!), ids.fenwick, 'Fenwick Cloud is known by its name, folded as a bank folds it');
-  assert.deepEqual(k.get(ids.fenwick!)?.fields.keys, ['bank:fenwickcloud'], 'and keeps the key it was found by');
+  assert.equal(k.get(ids.fenwick!)?.fields.keys, undefined, 'and a held organisation gains no key from a payee’s name alone');
   assert.equal(partyOf(k, ids.haldenLine!), ids.halden, 'a description is cut at what the payment was for');
   assert.equal(partyOf(k, ids.corner!), null, 'a shop on one line is nobody yet');
 
@@ -473,18 +473,20 @@ test('A BROAD FOLDER, OR A FOLDER THE RUN’S OWN REPOSITORY CONTRADICTS, IS A Q
 
 test('A KEY THE WALK GAVE, AND WHERE IT CAME FROM, GO WITH ITS UNDO', async () => {
   const { k, sql, deps, ids } = await record();
-  /* An organisation found by its name, that already held a key of its own before the walk gave it one more. */
+  /* An organisation held by the person, with a key of its own, found by its name: linked, and given nothing. */
   const orchard = value<Entry>(k.create('organisations', { name: 'Orchard Rentals', keys: ['bank:orchardrent'] }, OWNER)).id;
-  value(k.create('transactions', { what: 'ORCHARD RENTALS', amount: gbp(-90_000) }, OWNER));
+  const toOrchard = value<Entry>(k.create('transactions', { what: 'ORCHARD RENTALS', amount: gbp(-90_000) }, OWNER)).id;
   const done = understandBackfill(deps);
-  assert.deepEqual(k.get(orchard)?.fields.keys, ['bank:orchardrent', 'bank:orchardrentals']);
+  assert.equal(partyOf(k, toOrchard), orchard);
+  assert.deepEqual(k.get(orchard)?.fields.keys, ['bank:orchardrent'], 'a payee’s name gives a held organisation no key');
   const ours = () => sql.all<{ key: string }>('SELECT key FROM entity_key WHERE source = ? ORDER BY key', BACKFILL_ACTOR).map((r) => r.key);
-  assert.ok(ours().includes('bank:bridgestcoffee') && ours().includes('bank:fenwickcloud'), ours().join(', '));
+  assert.ok(ours().includes('bank:bridgestcoffee'), ours().join(', '));
+  assert.ok(!ours().includes('bank:fenwickcloud'), 'nor Fenwick Cloud, which the person keeps');
   assert.equal(BACKFILL_SOURCE, BACKFILL_ACTOR);
   value(undoBackfill(deps, done.ledger.batch!, 'p_owner'));
   assert.deepEqual(ours(), [], 'nothing the walk keyed is left behind');
-  assert.equal(sql.one('SELECT 1 AS n FROM entity_key WHERE key = ?', 'bank:fenwickcloud'), undefined);
   assert.ok(k.get(ids.fenwick!));
+  assert.equal(partyOf(k, toOrchard), null);
   assert.deepEqual(k.get(orchard)?.fields.keys, ['bank:orchardrent'], 'a key it held before stays');
   assert.ok(sql.one('SELECT 1 AS n FROM entity_key WHERE key = ? AND row_id = ?', 'bank:orchardrent', orchard));
   sql.close();

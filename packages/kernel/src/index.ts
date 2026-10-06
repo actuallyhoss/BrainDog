@@ -221,7 +221,7 @@ import {
   type VaultDeps,
 } from './vault.ts';
 import { slashMayWrite } from './slash.ts';
-import { answeredOnly, fileVerdicts, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
+import { answeredOnly, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { builtInFigure } from './built-in-figures.ts';
@@ -377,7 +377,7 @@ export {
 } from './change-kind.ts';
 /* UNDO ON THE SERVER (`undo.ts`) and THE WALK OVER WHAT THE RECORD ALREADY HOLDS (`backfill.ts`), each also a kernel
    method below (`undoPlan`, `undoApply`, `backfill`, `undoBackfill`), which hands them the record's own parts. */
-export { undoApply, undoPlan, type UndoApplied, type UndoDo, type UndoneMark, type UndoOptions, type UndoParts, type UndoPlan, type UndoScope, type UndoSkip, type UndoStep } from './undo.ts';
+export { undoApply, undoPlan, type UndoApplied, type UndoDo, type UndoneMark, type UndoOptions, type UndoParts, type UndoPlan, type UndoRow, type UndoScope, type UndoSkip, type UndoStep } from './undo.ts';
 export {
   BACKFILL_ACTOR, BACKFILL_LIMIT, BACKFILL_SOURCE, PAYEE_SEEN, organisationsHolding, tidy as tidyPayee, understandBackfill, undoBackfill,
   type BackfillDeps, type BackfillOptions, type BackfillSuggestion, type Backfilled, type Named as BackfillNamed, type Slice as BackfillSlice, type SliceName as BackfillSliceName,
@@ -8230,6 +8230,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         if (whole) return { ok: false as const, refusal: whole };
         const out = decide(governDeps(), id, verdict, actor);
         if (out.ok) {
+          /* AN ACCEPTED 'Add <organisation>?' OR DOMAIN OFFER LINKS EVERYONE AT THAT DOMAIN; any other answer links nobody. */
+          const joined = joinOrganisation(peopleDeps({ actor }, () => null, (p) => openSuggestion(governDeps(), actor, p)), id);
+          if (!joined.ok) return joined as Result<never>;
           /* AN ACCEPTED MERGE KEEPS WHAT THE TWO DISAGREED ON, in the batch the rows were written in (`carryFolds`). */
           for (const batch of foldBatches(out.value.wrote)) {
             const carried = carryFolds(batch, { actor });
@@ -8267,7 +8270,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (theirs) return theirs;
       /* THE LISTS DECLARING meets: AND org:, or `people` and `organisations` on a record older than the keys (`roles.ts`). */
       return attempt(sql, transaction, () => {
-        /* ONLY A PERSON AT THEIR OWN KEYBOARD IS BELIEVED whatever the source says; a token or the system is read by it. */
+        /* ONLY A PERSON AT THEIR OWN KEYBOARD IS BELIEVED whatever the source says; a token or the system is read by it.
+           A TOKEN IS NEVER `typed`: not as `kind: 'token'`, and not as a person's principal that carries a token, which
+           is an agent writing for that person and so as untrusted as any other agent's word. */
         const met = meetPerson(
           {
             ...peopleDeps(
@@ -8275,7 +8280,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
               () => (as.principal?.kind === 'token' ? (locateRun(as).project?.id ?? null) : null),
               (p) => openSuggestion(governDeps(), () => signedBy(as), p),
             ),
-            typed: as.principal?.kind === 'person',
+            typed: as.principal?.kind === 'person' && as.principal.token === undefined,
+            /* AN AGENT'S WORD IS CAPPED AT A COMMIT'S, whatever its source says (`people.ts` `trustOf`). */
+            token: as.principal?.kind === 'token' || as.principal?.token !== undefined,
+            remote: () => as.session?.remote ?? null,
           },
           args,
         );

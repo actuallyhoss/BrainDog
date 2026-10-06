@@ -51,8 +51,15 @@ import { attempt } from './tx.ts';
 /**
  * What to undo: one write and everything it caused (`batch`), what one decision wrote (`decision`, `D12`), or
  * everything one agent's run wrote and the rule cascades it started (`run`, `S42`).
+ *
+ * `row` NARROWS ANY OF THE THREE TO ONE ROW, by its list and number: "Only this one" on a step of the plan. The plan
+ * then puts back what the scope did to that row and nothing else, leaves the question a decision answered decided, and
+ * stops only a message that row queued. Its hash is that row's alone, so a hash from the whole plan is refused.
  */
-export type UndoScope = { batch: string } | { decision: string } | { run: string };
+export type UndoScope = ({ batch: string } | { decision: string } | { run: string }) & { row?: UndoRow };
+
+/** One row by its list and number, as a person's screen holds it: `tasks` and 3, never an id. */
+export type UndoRow = { register: string; seq: number };
 
 /** What one step does, as a word a screen can pick an icon by. */
 export type UndoDo = 'remove' | 'restore' | 'delete' | 'set' | 'untag' | 'tag' | 'stop';
@@ -60,12 +67,16 @@ export type UndoDo = 'remove' | 'restore' | 'delete' | 'set' | 'untag' | 'tag' |
 /**
  * One thing the undo puts back, in names.
  *
- * `row` IS A HANDLE, NEVER SHOWN: the row's id, so a screen can key a line and open the row. Everything a person reads
+ * `row` IS A HANDLE, NEVER SHOWN: the row's id, so a screen can key a line and open the row, and `register` and `seq`
+ * say it the way `UndoScope.row` asks for it. Everything a person reads
  * is in `line`, and in `title`, `list`, `label`, `from` and `to` for a screen that lays the line out itself.
  */
 export type UndoStep = {
   do: UndoDo;
   row?: string;
+  /** The row's list and number, which `UndoScope.row` takes back to undo this row alone. Absent only on a `stop`. */
+  register?: string;
+  seq?: number;
   title: string;
   list?: string;
   label?: string;
@@ -196,6 +207,25 @@ function scoped(sql: Sql, scope: UndoScope): Result<Scoped> {
   return no('VALUE_MALFORMED', 'Say what to undo: a batch, a decision or a run.', { at: 'scope' });
 }
 
+/**
+ * The one row `scope.row` narrows the undo to, as its id, or `null` when it narrows nothing. A refusal at `row` when
+ * it is not a list and a number, names no row of this record, or names one the scope never changed. A row in a list
+ * she cannot read is one this record does not hold, as far as she is told.
+ */
+function onlyRow(sql: Sql, scope: UndoScope, lines: readonly Line[], opts: UndoOptions): Result<string | null> {
+  const said = (scope as { row?: unknown }).row;
+  if (said === undefined) return ok(null);
+  const r = isMap(said) ? said : {};
+  if (typeof r.register !== 'string' || r.register.trim() === '' || typeof r.seq !== 'number' || !Number.isInteger(r.seq) || r.seq < 1)
+    return no('VALUE_MALFORMED', 'Say the one to undo by its list and number: { register: "tasks", seq: 3 }.', { at: 'row' });
+  const register = r.register.trim();
+  const id = opts.reads && !opts.reads(register) ? undefined : sql.one<{ id: string }>('SELECT id FROM entry WHERE register = ? AND seq = ?', register, r.seq)?.id;
+  if (id === undefined) return no('ROW_UNKNOWN', 'That one is not in this record, so there is nothing of it to undo.', { at: 'row' });
+  if (!lines.some((l) => l.target === `entry:${id}`))
+    return no('ROW_UNKNOWN', 'This change did not touch that one, so there is nothing of it to undo here.', { at: 'row' });
+  return ok(id);
+}
+
 /* ── the lists, as a person reads them ───────────────────────────────────── */
 
 type FieldShape = {
@@ -248,17 +278,24 @@ function listsOf(sql: Sql): (register: string) => ListDecl | null {
   };
 }
 
-type Held = { id: string; register: string; fields: Record<string, Json>; version: number; deleted_at: string | null };
+type Held = { id: string; register: string; seq: number; fields: Record<string, Json>; version: number; deleted_at: string | null };
 
 function rowsOf(sql: Sql, ids: readonly string[]): Map<string, Held> {
   const out = new Map<string, Held>();
   if (ids.length === 0) return out;
-  for (const r of sql.all<{ id: string; register: string; fields: string; version: number; deleted_at: string | null }>(
-    'SELECT id, register, fields, version, deleted_at FROM entry WHERE id IN (SELECT value FROM json_each(?))',
+  for (const r of sql.all<{ id: string; register: string; seq: number; fields: string; version: number; deleted_at: string | null }>(
+    'SELECT id, register, seq, fields, version, deleted_at FROM entry WHERE id IN (SELECT value FROM json_each(?))',
     JSON.stringify(ids),
   )) {
     const fields = parse(r.fields);
-    out.set(r.id, { id: r.id, register: r.register, fields: isMap(fields) ? (fields as Record<string, Json>) : {}, version: Number(r.version), deleted_at: r.deleted_at });
+    out.set(r.id, {
+      id: r.id,
+      register: r.register,
+      seq: Number(r.seq),
+      fields: isMap(fields) ? (fields as Record<string, Json>) : {},
+      version: Number(r.version),
+      deleted_at: r.deleted_at,
+    });
   }
   return out;
 }
@@ -380,7 +417,11 @@ type Work = {
 
 type Stop = { id: string; state: string; step: UndoStep };
 
-type Worked = { plan: UndoPlan; work: Work[]; stops: Stop[]; keys: string[]; lines: Line[]; decisions: string[] };
+/**
+ * `lines` are the ones the plan puts back from, only the row's under `scope.row`; `every` is every line of the scope's
+ * batches, which the ladder reads for who made each.
+ */
+type Worked = { plan: UndoPlan; work: Work[]; stops: Stop[]; keys: string[]; lines: Line[]; every: Line[]; decisions: string[] };
 
 /**
  * What undoing `scope` would do, in names, and the hash `undoApply` needs. Reads only.
@@ -393,7 +434,11 @@ export function undoPlan(sql: Sql, scope: UndoScope, opts: UndoOptions = {}): Re
 function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
   const got = scoped(sql, scope);
   if (!got.ok) return got;
-  const { keys, lines, decisions } = got.value;
+  const { keys, lines: every, decisions } = got.value;
+  /* ONLY THIS ONE: every line but the row's is out of the plan, and so out of its hash. */
+  const only = onlyRow(sql, scope, every, opts);
+  if (!only.ok) return only;
+  const lines = only.value === null ? every : every.filter((l) => l.target === `entry:${only.value}`);
   const inScope = new Set(lines.map((l) => l.id));
   const lists = listsOf(sql);
 
@@ -504,6 +549,8 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
         {
           do: 'set',
           row: row.id,
+          register: SESSION,
+          seq: row.seq,
           title,
           list: decl.name,
           label,
@@ -553,8 +600,8 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
     const target = `entry:${id}`;
     const last = changes[changes.length - 1]!.rowid;
     const w: Work = { id, register: row.register, version: row.version, restore: false, remove: false, made: madeBy?.rowid ?? 0, patch: {}, steps: [], from: [] };
-    const step = (s: Omit<UndoStep, 'row' | 'title' | 'list'>, from: Line[]): void => {
-      w.steps.push({ ...s, row: id, title, list: decl.name });
+    const step = (s: Omit<UndoStep, 'row' | 'register' | 'seq' | 'title' | 'list'>, from: Line[]): void => {
+      w.steps.push({ ...s, row: id, register: row.register, seq: row.seq, title, list: decl.name });
       w.from.push(...from);
     };
 
@@ -740,14 +787,21 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
   }
 
   const acted = new Set(work.map((w) => w.id));
-  const stops = stopsOf(sql, lines, keys, (id) => byRow.has(id) && (acted.has(id) || !leftAlone.has(id)), skipped);
+  const stops = stopsOf(sql, lines, keys, (id) => byRow.has(id) && (acted.has(id) || !leftAlone.has(id)), skipped, only.value);
 
   /* THE ORDER IT IS WRITTEN IN, and so the order it is read in: rows back first, values next, removals last. */
   work.sort((a, b) => rank(a) - rank(b) || (a.remove && b.remove ? b.made - a.made : 0));
   const steps = [...work.flatMap((w) => w.steps), ...stops.map((s) => s.step)];
   const count = steps.length;
   /* ANY OF ITS BATCHES, since a run's own bookkeeping batches are never put back and so never marked. */
-  const already = count === 0 && sql.one('SELECT 1 AS y FROM undone WHERE batch IN (SELECT value FROM json_each(?)) LIMIT 1', JSON.stringify(keys)) !== undefined;
+  /* UNDER `row`, ONLY WHEN AN UNDO HAS PUT THAT ROW BACK SINCE: another row's undo marks the batch too, and the mark
+     keeps the first undo's batch only, so it is the row's own lines that say so. */
+  const already =
+    count === 0 &&
+    (only.value === null
+      ? sql.one('SELECT 1 AS y FROM undone WHERE batch IN (SELECT value FROM json_each(?)) LIMIT 1', JSON.stringify(keys))
+      : sql.one('SELECT 1 AS y FROM event WHERE target = ? AND rowid > ? AND note = ? LIMIT 1', `entry:${only.value}`, lines[lines.length - 1]!.rowid, PUT_BACK)) !==
+      undefined;
 
   const say =
     count === 0
@@ -764,10 +818,14 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
       work: work.map((w) => ({ id: w.id, v: w.version, r: w.restore, x: w.remove, p: w.patch as Json, ...(w.stamp === undefined ? {} : { s: w.stamp }) })),
       stops: stops.map((s) => [s.id, s.state]),
       skipped: skipped.map((s) => s.line),
+      ...(only.value === null ? {} : { only: only.value }),
     } as unknown as Json),
   );
-  return ok({ plan: { say, lines: lineList, steps, skipped, notes, hash, already }, work, stops, keys, lines, decisions });
+  return ok({ plan: { say, lines: lineList, steps, skipped, notes, hash, already }, work, stops, keys, lines, every, decisions });
 }
+
+/** The note on what an undo writes, which is how a row says it was put back. */
+const PUT_BACK = 'Put back by an undo.';
 
 const rank = (w: Work): number => (w.remove ? 2 : w.restore ? 0 : 1);
 
@@ -782,7 +840,7 @@ const rank = (w: Work): number => (w.remove ? 2 : w.restore ? 0 : 1);
  * STOPPED IS `done` WITH THE MOMENT IT WAS STOPPED IN ITS PAYLOAD, the way an erased one is `done` (`0001`'s schedule
  * note: there is no `cancelled`), and the retry that would have put a failed one back is closed with it.
  */
-function stopsOf(sql: Sql, lines: readonly Line[], keys: readonly string[], undoes: (row: string) => boolean, skipped: UndoSkip[]): Stop[] {
+function stopsOf(sql: Sql, lines: readonly Line[], keys: readonly string[], undoes: (row: string) => boolean, skipped: UndoSkip[], only: string | null): Stop[] {
   if (lines.length === 0) return [];
   const first = lines[0]!.ts;
   const lastMs = Date.parse(lines[lines.length - 1]!.ts);
@@ -808,10 +866,13 @@ function stopsOf(sql: Sql, lines: readonly Line[], keys: readonly string[], undo
     const p = parse(q.payload);
     const body = isMap(p) ? p : {};
     if (body.cancelled !== undefined) continue;
+    /* ONLY THIS ONE stops what that row queued, and nothing the batch or an interrupt queued for all of it. */
     const ours =
-      (typeof body.batch === 'string' && keySet.has(body.batch)) ||
-      (typeof body.entry === 'string' && undoes(body.entry)) ||
-      ((q.kind === 'notify.email' || q.kind === 'notify.push') && near(q.created));
+      only !== null
+        ? body.entry === only && undoes(only)
+        : (typeof body.batch === 'string' && keySet.has(body.batch)) ||
+          (typeof body.entry === 'string' && undoes(body.entry)) ||
+          ((q.kind === 'notify.email' || q.kind === 'notify.push') && near(q.created));
     if (!ours) continue;
     const what =
       q.kind === 'notify.email'
@@ -846,13 +907,13 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
   return attempt(sql, parts.transaction, () => {
     const got = worked(sql, scope, opts);
     if (!got.ok) return got;
-    const { plan, work, stops, keys, lines, decisions } = got.value;
+    const { plan, work, stops, keys, lines, every, decisions } = got.value;
     if (typeof hash !== 'string' || hash !== plan.hash)
       return no<UndoApplied>('PLAN_STALE', 'Something changed since this undo was shown. Look at it again, then put it back.', { at: 'hash' });
 
     const batch = parts.mint();
     const at = new Date(parts.clock.now()).toISOString();
-    const w = { actor, batch, cascade: false, note: 'Put back by an undo.' };
+    const w = { actor, batch, cascade: false, note: PUT_BACK };
     const done: UndoStep[] = [];
     const skipped = [...plan.skipped];
     const put: Line[] = [];
@@ -903,8 +964,9 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
       if (kind) of.add(kind.key);
       kinds.set(k, of);
     }
-    /* A stopped message belongs to the batches it was matched to; its batch is marked when nothing else of it was. */
-    if (stops.length > 0 && kinds.size === 0) for (const k of keys) kinds.set(k, new Set());
+    /* A stopped message belongs to the batches it was matched to; its batch is marked when nothing else of it was. Under
+       `row`, that is the batches that wrote the row, not every one of a run's. */
+    if (stops.length > 0 && kinds.size === 0) for (const k of scope.row === undefined ? keys : [...new Set(lines.map(keyOf))]) kinds.set(k, new Set());
     /* A SECOND UNDO OF THE SAME BATCH, putting back what the first left, adds its kinds to the mark the first made: the
        ladder reads one line per batch, and a kind put back later is as undone as one put back first. Who made it and
        the undo that first marked it stay as they were. */
@@ -912,7 +974,7 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
     for (const k of keys) {
       const of = kinds.get(k);
       if (!of) continue;
-      const by = makerOf(sql, k, lines);
+      const by = makerOf(sql, k, every);
       const mark: UndoneMark = { batch: k, actor: by, agent: by === null ? null : agentOf(sql, by), kinds: [...of].sort() };
       undone.push(mark);
       const had = sql.one<{ kinds: string | null }>('SELECT kinds FROM undone WHERE batch = ?', k);
@@ -949,9 +1011,13 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
       for (const d of decisions) noteOn(sql, parts.mint(), at, actor, `decision:${d}`, 'decision', note, batch);
     }
 
-    /* ── the question a decision answered: asked again when all of it went back, and marked undone when some stayed ── */
-    const asked = count > 0 ? answered(sql, lines) : [];
-    const whole = skipped.length === 0;
+    /* ── the question a decision answered: asked again when all of it went back, and marked undone when some stayed ──
+       UNDER `row` THE REST OF IT STAYS, so the question reads undone in part, and is asked again only when this row was
+       the last of it left to put back. */
+    const asked = count > 0 ? answered(sql, every) : [];
+    const { row: one, ...all } = scope;
+    const rest = one === undefined || asked.length === 0 ? null : worked(sql, all as UndoScope, opts);
+    const whole = skipped.length === 0 && (rest === null || (rest.ok && rest.value.plan.steps.length === 0 && rest.value.plan.skipped.length === 0));
     for (const q of asked) {
       if (!whole && q.as === 'undone') continue;
       if (whole) sql.exec("UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL WHERE id = ?", q.id);

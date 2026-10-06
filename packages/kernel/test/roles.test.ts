@@ -357,11 +357,11 @@ test('A meets: THAT NAMES in_touch HAS THE DAY MOVED FORWARD BY EVERY MEET, and 
   assert.equal(k.get('people#1')!.fields.last, DAY, 'a new person was not stamped in touch today');
 
   value(k.create('people', { name: 'Grace', email: 'grace@example.com', last: '2026-08-01' }, OWNER));
-  value(k.meet({ email: 'grace@example.com', where: 'mail from Grace' }, AGENT));
+  value(k.meet({ email: 'grace@example.com', where: 'commit 1 in braindog' }, AGENT));
   assert.equal(k.get('people#2')!.fields.last, DAY, 'an older day was left standing');
 
   value(k.create('people', { name: 'Alan', email: 'alan@example.com', last: '2026-12-01' }, OWNER));
-  value(k.meet({ email: 'alan@example.com', where: 'mail from Alan' }, AGENT));
+  value(k.meet({ email: 'alan@example.com', where: 'commit 2 in braindog' }, AGENT));
   assert.equal(k.get('people#3')!.fields.last, '2026-12-01', 'a later day the person typed was moved back');
   sql.close();
 

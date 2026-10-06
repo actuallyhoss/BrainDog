@@ -374,21 +374,21 @@ test('A STEP THE WRITE PATH REFUSES WHEN IT COMES TO IT is left with its own sen
       },
     ]),
   );
-  const a = value<Entry>(r.k.create('codes', { code: 'SPRING' }, SAM));
-  const b = value<Entry>(r.k.create('codes', { code: 'AUTUMN' }, SAM));
+  const a = value<Entry>(r.k.create('codes', { code: 'Spring' }, SAM));
+  const b = value<Entry>(r.k.create('codes', { code: 'Autumn' }, SAM));
   r.clock.advance(10 * MIN);
   const B = '01JRUNBATCH000000000000000';
   value(r.k.update('codes', a.id, { deleted_at: true }, { ...AGENT, batch: B, version: a.version }));
   value(r.k.update('codes', b.id, { note: 'old' }, { ...AGENT, batch: B }));
   /* SOMEBODY TAKES THE CODE while the first is deleted, so bringing it back would hold one code twice. */
-  value(r.k.create('codes', { code: 'SPRING' }, SAM));
+  value(r.k.create('codes', { code: 'Spring' }, SAM));
 
   const p = plan(r, { batch: B });
   assert.equal(p.steps.length, 2);
   const done = value(undoApply(r.parts, { batch: B }, p.hash, 'p_sam'));
   assert.equal(done.put, 1);
   assert.equal(done.skipped.length, 1);
-  assert.equal(done.skipped[0]!.line, 'Leaves "SPRING" as it is: another one already has that code.');
+  assert.equal(done.skipped[0]!.line, 'Leaves "Spring" as it is: another one already has that code.');
   readable(done.lines);
   assert.ok(r.k.get(a.id, { includeDeleted: true })!.deleted_at, 'still deleted, nothing half done');
   assert.equal(r.k.get(b.id)!.fields.note, undefined);

@@ -1097,6 +1097,25 @@ function cardGroupFault(id: string, at: string, block: Readonly<Record<string, u
   return null;
 }
 
+/** The keys of a page's `for:`. */
+const FOR_KEYS: readonly string[] = ['register', 'where', 'fleeting'];
+
+/** A page's `for:` as `{ register, where?, fleeting? }`, or the refusal at `for` saying what it is instead. */
+function forShapeFault(id: string, said: unknown): Refusal | null {
+  if (said === undefined) return null;
+  const shape = `${id}'s for: is { register: tasks }, the list the page is one per row of, with where: to narrow it and fleeting: true when its rows come and go.`;
+  if (said === null || typeof said !== 'object' || Array.isArray(said)) return bad('DECLARATION_INVALID', shape, 'for', FOR_KEYS);
+  const f = said as { register?: unknown; where?: unknown; fleeting?: unknown };
+  const stray = Object.keys(f).find((k) => !FOR_KEYS.includes(k));
+  if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}'s for: has ${stray}:. ${shape}`, 'for', FOR_KEYS);
+  if (typeof f.register !== 'string' || f.register.trim() === '') return bad('DECLARATION_INVALID', shape, 'for', FOR_KEYS);
+  if (f.where !== undefined && typeof f.where !== 'string')
+    return bad('DECLARATION_INVALID', `${id}'s for: where is ${JSON.stringify(f.where)}; it is a sentence, such as state is open.`, 'for', FOR_KEYS);
+  if (f.fleeting !== undefined && typeof f.fleeting !== 'boolean')
+    return bad('DECLARATION_INVALID', `${id}'s for: fleeting is ${JSON.stringify(f.fleeting)}; it is true or false.`, 'for', FOR_KEYS);
+  return null;
+}
+
 /**
  * A page declaration, checked against `06 §1.1` and `42 §4.5`.
  *
@@ -1138,6 +1157,12 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
 
   if (typeof body.title !== 'string' || body.title.trim() === '')
     return bad('DECLARATION_INVALID', `${id} has no title, and a page is named on the screen before it is drawn.`, 'title');
+
+  /* `for:` MAKES THE PAGE ONE PER ROW of the list it names (`pages.ts`'s `PageDecl.for`). It installed whatever it said,
+     so `for: tasks` or `for: { list: tasks }` was a page with no row behind it, and the reader met a blank where the row
+     should lead. The shape is checked here; whether the list is installed is the template's own question, at reading. */
+  const forFault = forShapeFault(id, (body as { for?: unknown }).for);
+  if (forFault) return forFault;
 
   /* `06 §3`: *"pages can appear on their own; navigation cannot"* — a nav entry with no section is
      an item in no menu, and one with no order sorts against whatever the reader last wrote. Both

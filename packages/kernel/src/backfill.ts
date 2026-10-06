@@ -12,18 +12,30 @@
  *
  *   1. A ledger line with no party is read for its payee: the bank's words, else "Payee: X" in its note, else its own
  *      description. The payee is met as an organisation by its `bank:` key (`identity-keys.ts`), or by an organisation
- *      or service whose name folds to the same key, and the line is linked. A payee the record does not know yet is made
- *      an organisation only when it says it is a business (`soundsLikeBusiness`): a company suffix, a card processor's
- *      prefix or a web address, or a word only a shop or a supplier is called by. Anything else, a plain "Layla Ahmed"
- *      above all, is a question and never an organisation. A payee on one line alone is left as it is unless the record
- *      already knows it; a payee that is a person, or shaped like one, is never an organisation, nor is the payee of a
- *      line that says it is a transfer, nor a word like "Unknown" that names nobody.
+ *      or service whose name folds to the same key, and the line is linked. A payee whose key is a known one with one more
+ *      word ("AMAZON PRIME" beside Amazon, "SWIFTCAB RIDE" beside Swiftcab) is that payee too (`baseOf`). A payee the
+ *      record does not know yet is made an organisation only when it says it is a business (`soundsLikeBusiness`): a
+ *      company suffix, a card processor's prefix or a web address, or a word only a shop or a supplier is called by.
+ *      Anything else, a plain "Layla Ahmed" above all, is a question and never an organisation. A payee on one line
+ *      alone is left as it is unless the record already knows it; a payee that is a person, or shaped like one, is never
+ *      an organisation, nor is the payee of a line that says it is a transfer, nor a word like "Unknown" that names
+ *      nobody, nor an account on a payment network.
+ *
+ *      AN ORGANISATION THE PERSON HOLDS NEVER GAINS A BANK KEY FROM A PAYEE'S NAME ALONE (research-audit-21 item 12). A
+ *      payer's name on a bank line is not under the owner's control, and a key routes every later text by it. So a line
+ *      whose payee is a held organisation's name, exactly, is linked and the key is left off; one whose payee only extends
+ *      that name is asked about (`held`). Only an organisation the walk or a door made from the bank's own words gains
+ *      the key, with Undo.
  *   2. A run with no project is placed only when its place is sure (`placedFor`): a remote a project lists, or a folder
  *      a project lists that holds no other project's folder and is not contradicted by the run's own repository. A bare
- *      name, a broad folder like `~/Developer`, or a last name is one question per place and guess. Once, and never a
- *      run already placed, nor one still working, which the ladder places itself.
- *   3. A service with no project is linked when its name or the host it points at matches exactly one project's name
- *      or domain.
+ *      name, a broad folder like `~/Developer`, or a last name is one question per place and guess, a single guess
+ *      included ("Is that BrainDog?"). A run whose place guesses nothing better, in a repository whose owner on its host
+ *      holds the repositories of exactly one project, is one question per owner ("Is that Crumb.gg?"). Each question
+ *      carries `wheres`, the whole place of every run it is about, so a yes places exactly those. Once, and never a run
+ *      already placed, nor one still working, which the ladder places itself.
+ *   3. A service with no project is linked when its name, the first word of its name, its domain, or the label of its
+ *      domain matches exactly one project's name (with any domain ending left off) or domain. Linked, a domain of it
+ *      that spells the project's name is written into the project's domains, so mail from it is matched later.
  *   4. A project that lists a bare repository name, where runs have worked in exactly one remote of that name, is a
  *      suggestion to list the remote. Never a write: the person says which repository a project is.
  *
@@ -46,12 +58,12 @@ import { no, ok } from '@braindog/ports';
 
 import type { Json } from './coerce.ts';
 import { holderOf, holders, nameKey } from './entities.ts';
-import { keyOf, registrable } from './identity-keys.ts';
+import { keyOf, onlyAKind, registrable } from './identity-keys.ts';
 import type { Entry, Patch, RegisterDecl, WriteContext } from './index.ts';
 import { COUNTERPARTY } from './ingest.ts';
 import { instant } from './migrate.ts';
 import { meetsRole, orgRole, type OrgFields, type RoleList } from './roles.ts';
-import { matchProject, remoteKey, type Candidate, type Whereabouts } from './scope.ts';
+import { candidateOf, isFolderPlace, matchProject, remoteKey, type Candidate, type Whereabouts } from './scope.ts';
 import { SESSION, isStale } from './session.ts';
 
 /** Who the walk writes as: a mechanism (`pairs.ts`'s `isMechanism`), which the feed files with the rules. */
@@ -106,15 +118,25 @@ export type Named = { id: string; name: string };
  */
 export type BackfillSuggestion =
   | { kind: 'organisation'; key: string; name: string; payments: number; question: string }
-  | { kind: 'run-project'; key: string; place: string; runs: number; projects: Named[]; question: string }
+  | { kind: 'run-project'; key: string; place: string; runs: number; projects: Named[]; question: string; wheres: string[] }
   | { kind: 'service-project'; key: string; service: Named; projects: Named[]; question: string }
   | { kind: 'project-remote'; key: string; project: Named; repo: string; remote: string; runs: number; question: string };
+
+/**
+ * A payee that may be an organisation the person holds, which the walk never gives a key on its own: "Are the 3
+ * payments to Amazon Prime with Amazon?". `key` is what the question is kept by; a yes gives the organisation `bank`,
+ * the payee's key, and the next walk links every line by it. A no leaves both as they are. Kept apart from
+ * `suggestions`, whose every kind the record already files, until the record files this one too.
+ */
+export type HeldAsk = { kind: 'organisation-key'; key: string; organisation: Named; payee: string; bank: string; payments: number; question: string };
 
 export type Backfilled = {
   ledger: Slice & { organisations: number };
   runs: Slice;
   services: Slice;
   suggestions: BackfillSuggestion[];
+  /** Payees that may be an organisation the person holds, for the person to say (`HeldAsk`). */
+  held: HeldAsk[];
 };
 
 type Field = RegisterDecl['fields'][number];
@@ -162,16 +184,24 @@ export function understandBackfill(deps: BackfillDeps, opts: BackfillOptions = {
   const suggest = (s: BackfillSuggestion): void => {
     const held = suggestions.get(s.key);
     /* THE SAME QUESTION FROM TWO ROWS IS ONE, counting both. */
-    if (held?.kind === 'run-project' && s.kind === 'run-project') suggestions.set(s.key, { ...held, runs: held.runs + s.runs, question: runQuestion(held.place, held.runs + s.runs, held.projects) });
-    else if (!held) suggestions.set(s.key, s);
+    if (held?.kind === 'run-project' && s.kind === 'run-project') {
+      const runs = held.runs + s.runs;
+      const wheres = [...new Set([...held.wheres, ...s.wheres])].sort();
+      suggestions.set(s.key, { ...held, runs, wheres, question: s.key.startsWith(OWNER_KEY) ? ownerQuestion(held.place, runs, held.projects) : runQuestion(held.place, runs, held.projects) });
+    } else if (!held) suggestions.set(s.key, s);
   };
+  const asks = new Map<string, HeldAsk>();
+  const ask = (a: HeldAsk): void => void (asks.has(a.key) || asks.set(a.key, a));
 
-  const ledger = deps.transaction(() => ledgerSlice(deps, lists, limit, opts.after?.ledger ?? '', suggest));
+  const ledger = deps.transaction(() => ledgerSlice(deps, lists, limit, opts.after?.ledger ?? '', suggest, ask));
   const runs = deps.transaction(() => runsSlice(deps, lists, limit, opts.after?.runs ?? '', suggest));
   const services = deps.transaction(() => servicesSlice(deps, lists, limit, opts.after?.services ?? '', suggest));
   for (const s of remoteSuggestions(deps.sql, lists)) suggest(s);
-  return { ledger, runs, services, suggestions: [...suggestions.values()] };
+  return { ledger, runs, services, suggestions: [...suggestions.values()], held: [...asks.values()] };
 }
+
+const heldQuestion = (payee: string, payments: number, organisation: string): string =>
+  `${payments === 1 ? 'Is the payment' : `Are the ${payments} payments`} to ${payee} with ${organisation}?`;
 
 /* ── a slice's batch ─────────────────────────────────────────────────── */
 
@@ -190,7 +220,16 @@ function batcher(deps: BackfillDeps): { w: () => WriteContext; batch: () => stri
 /* ── 1. ledger lines with no party ───────────────────────────────────── */
 
 /** A list whose lines say who money moved with: a `ref` to the organisations, beside a money field. */
-type Ledger = { register: string; party: string; title: string | undefined; note: string | undefined; payee: string | undefined; transfer: string | undefined };
+type Ledger = {
+  register: string;
+  party: string;
+  title: string | undefined;
+  note: string | undefined;
+  payee: string | undefined;
+  transfer: string | undefined;
+  /** The field its lines are filed under, a link to a list of categories or a choice, read for what a payment was for. */
+  category: string | undefined;
+};
 
 function ledgersOf(lists: Lists, orgs: string, people: string | undefined): Ledger[] {
   const out: Ledger[] = [];
@@ -211,6 +250,7 @@ function ledgersOf(lists: Lists, orgs: string, people: string | undefined): Ledg
       note: text('note'),
       payee: text(COUNTERPARTY),
       transfer: mark !== undefined && fields.some((f) => f.id === mark && f.type === 'bool') ? mark : undefined,
+      category: fields.some((f) => f.id === 'category' && (f.type === 'enum' || (f.type === 'ref' && f.to !== orgs))) ? 'category' : undefined,
     });
   }
   return out.sort((a, b) => a.register.localeCompare(b.register));
@@ -274,10 +314,12 @@ const PAYEE_NOTE = /\bpayee\s*:\s*(.+?)(?:\.(?=\s|$)|[;\n]|$)/iu;
 /**
  * Words that say what a payment was for and not whom it was with: "HALDEN TYPE CO INV 2026-035", "TRANSFER TO TAX
  * RESERVE", "PELL & VINE, HALF THE YEAR-END FEE", "J OKONKWO JUNE SET". A description is cut at the first of them, a month
- * among them, and at its first comma.
+ * among them, and at its first comma. And a description that starts with the name of one of the ledger's own
+ * categories says what it was for from its first word (`purposesOf`): the words a record files its money under are
+ * its own, read off its lists, and never written here.
  */
 const ABOUT_A_PAYMENT =
-  /^(?:inv|invoice|ref|reference|transfer|payment|paid|purchase|pos|bill|fee|fees|refund|deposit|salary|wages|to|from|for|card|tax|vat|interest|cash|atm|withdrawal|topup|standing|order|direct|debit|dd|so|rent|payout|subscription|renewal|jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)$/iu;
+  /^(?:inv|invoice|ref|reference|transfer|payment|paid|purchase|pos|bill|fee|fees|refund|deposit|wages|to|from|for|card|tax|vat|interest|cash|atm|withdrawal|topup|standing|order|direct|debit|dd|so|rent|payout|subscription|renewal|jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)$/iu;
 
 /** The most words a description may be and still be only a name. */
 const NAME_WORDS = 4;
@@ -285,10 +327,28 @@ const NAME_WORDS = 4;
 /**
  * WORDS THAT NAME NOBODY, as a bank or an import fills a payee it did not know: "Unknown", "Initial" on an opening
  * balance, "Internet Banking", "IPN inward", "TT". A payee made only of them is no payee. Measured on the owner's ledger,
- * where 11 lines say "Unknown" and 5 "Initial", and each became an organisation.
+ * where 11 lines say "Unknown" and 5 "Initial", and each became an organisation. A payment network's own name is one
+ * too, and is learnt from the ledger rather than written here (`railsOf`).
  */
 const NAMES_NOBODY =
-  /^(?:unknown|unnamed|initial|opening|balance|misc|miscellaneous|sundry|other|none|na|adjustment|correction|internet|phone|mobile|online|banking|bank|ipn|instapay|tt|pos|purchase|inward|outward|incoming|outgoing|credit|debit|cash|card|payment|transfer)$/iu;
+  /^(?:unknown|unnamed|initial|opening|balance|misc|miscellaneous|sundry|other|none|na|adjustment|correction|internet|phone|mobile|online|banking|bank|ipn|tt|pos|purchase|inward|outward|incoming|outgoing|credit|debit|cash|card|payment|transfer)$/iu;
+
+/**
+ * An account on a payment network, as a bank prints who a transfer came from: `quill.harbour@<network>`, the network's
+ * name after the `@` with no dot, which no mail host has. It is a person's or a business's account and names neither,
+ * so it is no payee; and the network's name, wherever a line says it alone, is a word that names nobody.
+ */
+const RAIL_ADDRESS = /[^\s@]+@(\p{L}[\p{L}\p{N}-]*)(?![\p{L}\p{N}.@-])/gu;
+
+/** The payment networks a ledger's lines write accounts on, by name, lower case: what `RAIL_ADDRESS` finds after an `@`. */
+function railsOf(texts: Iterable<string | undefined>): Set<string> {
+  const out = new Set<string>();
+  for (const text of texts) if (text !== undefined) for (const m of text.matchAll(RAIL_ADDRESS)) out.add(m[1]!.toLowerCase());
+  return out;
+}
+
+/** What a ledger's own lists say about reading its lines: the one-word names of its categories, and its payment networks. */
+type Reading = { purposes: ReadonlySet<string>; rails: ReadonlySet<string> };
 
 /**
  * A LINE THAT SAYS IT IS A TRANSFER moved money to or from somebody's account: a person ("IPN inward transfer from
@@ -298,30 +358,42 @@ const NAMES_NOBODY =
 const SAYS_TRANSFER = /\b(?:transfers?|trf|xfer)\b/iu;
 
 /** The name at the start of a description, and whether anything after it was cut off. */
-function nameIn(what: string): { said: string; cut: boolean } {
+function nameIn(what: string, purposes: ReadonlySet<string>): { said: string; cut: boolean } {
   const first = what.split(/[:,;(]/u)[0] ?? '';
   const words = first.trim().split(/\s+/u).filter((w) => w !== '');
-  const at = words.findIndex((w) => ABOUT_A_PAYMENT.test(w.replace(/[^\p{L}]/gu, '')));
+  const bare = (w: string): string => w.replace(/[^\p{L}]/gu, '');
+  /* A CATEGORY'S NAME ONLY FIRST: as a later word it is as often a shop's own ("BELLWETHER COFFEE" under Coffee). */
+  if (words.length > 0 && purposes.has(bare(words[0]!).toLowerCase())) return { said: '', cut: true };
+  const at = words.findIndex((w) => ABOUT_A_PAYMENT.test(bare(w)));
   const kept = at < 0 ? words : words.slice(0, at);
   const said = kept.join(' ');
   return { said, cut: said !== what.trim().replace(/\s+/gu, ' ') };
 }
 
+/** The texts of a line a payee is read from: the bank's words, its note, its description. */
+const textsOf = (ledger: Ledger, fields: Record<string, Json>): (string | undefined)[] =>
+  [ledger.payee, ledger.note, ledger.title].map((id) => (id === undefined ? undefined : textOf(fields[id])));
+
 /** The payee a line names, or `null` for a line that names none, or none the record could key. */
-function payeeOf(ledger: Ledger, fields: Record<string, Json>): Payee | null {
+function payeeOf(ledger: Ledger, fields: Record<string, Json>, reading: Reading): Payee | null {
   const bank = ledger.payee === undefined ? undefined : textOf(fields[ledger.payee]);
   const noted = ledger.note === undefined ? undefined : PAYEE_NOTE.exec(textOf(fields[ledger.note]) ?? '')?.[1]?.trim();
   const what = ledger.title === undefined ? undefined : textOf(fields[ledger.title]);
   const moved = what !== undefined && SAYS_TRANSFER.test(what);
   const keyed = (said: string, sure: boolean): Payee | null => {
-    if (said.split(/\s+/u).every((w) => { const bare = w.replace(/[^\p{L}\p{N}]/gu, ''); return bare === '' || NAMES_NOBODY.test(bare); })) return null;
+    if (railsOf([said]).size > 0) return null;
+    const nobody = (w: string): boolean => {
+      const bare = w.replace(/[^\p{L}\p{N}]/gu, '');
+      return bare === '' || NAMES_NOBODY.test(bare) || reading.rails.has(bare.toLowerCase());
+    };
+    if (said.split(/\s+/u).every(nobody)) return null;
     const key = keyOf('bank', said);
     return key === null ? null : { said, key, sure, moved };
   };
   if (bank) return keyed(bank, true);
   if (noted) return keyed(noted, true);
   if (what === undefined) return null;
-  const { said, cut } = nameIn(what);
+  const { said, cut } = nameIn(what, reading.purposes);
   /* A DESCRIPTION OF MORE WORDS THAN A NAME, with nothing in it to cut at, is a sentence, and names nobody surely. */
   if (said === '' || (!cut && tidy(said).split(' ').length > NAME_WORDS)) return null;
   return keyed(said, !cut);
@@ -356,7 +428,50 @@ export function tidy(said: string): string {
   return /\p{Ll}/u.test(name) ? name : name.toLowerCase().replace(/(^|[\s&/(-])(\p{L})/gu, (_, before: string, first: string) => `${before}${first.toUpperCase()}`);
 }
 
-function ledgerSlice(deps: BackfillDeps, lists: Lists, limit: number, after: string, suggest: (s: BackfillSuggestion) => void): Backfilled['ledger'] {
+/**
+ * The key a payee's name has one word shorter: its words with the last that changes its key left off, so `SWIFTCAB RIDE
+ * 2210` is `bank:swiftcab` and `Edgewall, Inc.` is `bank:edgewall`. `null` for a one-word payee, and for one whose
+ * shorter words only say what kind of shop it is (`CAFE NERO`, never under `CAFE`).
+ */
+function shorterKey(said: string, key: string): string | null {
+  const words = said.trim().split(/\s+/u);
+  for (let n = words.length - 1; n >= 1; n--) {
+    const shorter = keyOf('bank', words.slice(0, n).join(' '));
+    if (shorter !== key) return shorter === null || onlyAKind(words.slice(0, n).join(' ')) ? null : shorter;
+  }
+  return null;
+}
+
+/**
+ * The one-word names of the categories a ledger files its lines under, lower case: the titles of the list its
+ * `category` field points at, or the values and labels of the field when it is a choice.
+ */
+function purposesOf(sql: Sql, lists: Lists, ledger: Ledger): Set<string> {
+  const out = new Set<string>();
+  const add = (said: string | undefined): void => {
+    const word = said?.trim().toLowerCase() ?? '';
+    if (/^\p{L}+$/u.test(word)) out.add(word);
+  };
+  const field = ledger.category === undefined ? undefined : lists.find((l) => l.id === ledger.register)?.fields.find((f) => f.id === ledger.category);
+  if (field?.type === 'enum') {
+    const choice = field as { values?: readonly string[]; labels?: Readonly<Record<string, string>> };
+    for (const v of choice.values ?? []) add(v);
+    for (const v of Object.values(choice.labels ?? {})) add(v);
+  } else if (field?.type === 'ref' && field.to !== undefined) {
+    const to = lists.find((l) => l.id === field.to);
+    if (to) for (const row of allRows(sql, to.id)) add(textOf(row.fields[to.title]));
+  }
+  return out;
+}
+
+function ledgerSlice(
+  deps: BackfillDeps,
+  lists: Lists,
+  limit: number,
+  after: string,
+  suggest: (s: BackfillSuggestion) => void,
+  ask: (a: HeldAsk) => void,
+): Backfilled['ledger'] {
   const none = { ...idle(), organisations: 0 };
   const orgRoleOf = orgRole(lists as unknown as RoleList[]);
   const peopleRole = meetsRole(lists as unknown as RoleList[]);
@@ -403,12 +518,21 @@ function ledgerSlice(deps: BackfillDeps, lists: Lists, limit: number, after: str
       }
     }
 
+  /* HOW EACH LEDGER IS READ: the words its categories are named by, and the payment networks its lines write accounts
+     on, read off its own lines, so neither is ever a word of the code's. */
+  const readings = new Map<string, Reading>();
+  for (const ledger of ledgers)
+    readings.set(ledger.register, { purposes: purposesOf(sql, lists, ledger), rails: railsOf(allRows(sql, ledger.register).flatMap((row) => textsOf(ledger, row.fields))) });
+  const readingOf = (ledger: Ledger): Reading => readings.get(ledger.register)!;
+
   /* HOW MANY LINES NAME EACH PAYEE, over the whole ledger and not the slice, and the spelling a name is made from: the
-     first said as a payee, else the first description. */
-  const seen = new Map<string, { lines: number; sure: boolean; business: boolean; said: string }>();
+     first said as a payee, else the first description. And the keys one word shorter each payee's spellings have. */
+  type Seen = { lines: number; sure: boolean; business: boolean; said: string };
+  const seen = new Map<string, Seen>();
+  const shorter = new Map<string, Set<string>>();
   for (const ledger of ledgers)
     for (const row of allRows(sql, ledger.register)) {
-      const p = payeeOf(ledger, row.fields);
+      const p = payeeOf(ledger, row.fields, readingOf(ledger));
       if (p === null || p.moved || (ledger.transfer !== undefined && row.fields[ledger.transfer] === true)) continue;
       const held = seen.get(p.key);
       seen.set(p.key, {
@@ -417,7 +541,42 @@ function ledgerSlice(deps: BackfillDeps, lists: Lists, limit: number, after: str
         business: (held?.business ?? false) || soundsLikeBusiness(p.said),
         said: held === undefined || (p.sure && !held.sure) ? p.said : held.said,
       });
+      const less = shorterKey(p.said, p.key);
+      if (less !== null) shorter.set(p.key, new Set([...(shorter.get(p.key) ?? []), less]));
     }
+
+  /* THE ORGANISATION A KEY IS, or `null`: the one holding the key, else the one whose name folds to it. `undefined` is a
+     payee the record does not know. `named` says it was found by its name and holds no such key yet. */
+  type Found = { id: string; named: boolean };
+  const known = (key: string): Found | null | undefined => {
+    const holder = holderOf(sql, key);
+    if (holder !== null) return holder.register === orgs.register ? { id: holder.id, named: false } : null;
+    const named = byName.get(key) ?? [];
+    if (named.length > 1) return null;
+    return named[0] === undefined ? undefined : { id: named[0], named: true };
+  };
+
+  /**
+   * THE PAYEE A KEY IS ONE WORD LONGER THAN, when there is exactly one: `bank:amazonprime` is Amazon's when the record
+   * holds Amazon or another line names it, and `bank:swiftcabride` is Swiftcab's. Never a person's key, and never a key
+   * two organisations answer to. Its own key otherwise.
+   */
+  const baseOf = new Map<string, string>();
+  for (const [key, less] of shorter) {
+    const [base] = [...less];
+    if (less.size !== 1 || base === undefined || base === key || people.has(base)) continue;
+    const found = known(base);
+    if (found === null || (found === undefined && !seen.has(base) && !services.has(base))) continue;
+    baseOf.set(key, base);
+  }
+  /* THE COUNTS FOLD INTO THE PAYEE A KEY EXTENDS, so two spellings on one line each are one payee on two. */
+  const counted = new Map(seen);
+  for (const [key, base] of baseOf) {
+    const own = seen.get(key);
+    if (!own) continue;
+    const into = counted.get(base);
+    counted.set(base, into === undefined ? own : { lines: into.lines + own.lines, sure: into.sure || own.sure, business: into.business || own.business, said: into.said });
+  }
 
   const writes = batcher(deps);
   let looked = 0;
@@ -426,37 +585,42 @@ function ledgerSlice(deps: BackfillDeps, lists: Lists, limit: number, after: str
   let made = 0;
   let last = '';
 
-  /* THE ORGANISATION A KEY IS, or `null`: the one holding the key, else the one whose name folds to it, which is given
-     the key too so the next line finds it the first way. `undefined` is a payee the record does not know. */
-  const known = (key: string): string | null | undefined => {
-    const holder = holderOf(sql, key);
-    if (holder !== null) return holder.register === orgs.register ? holder.id : null;
-    const named = byName.get(key) ?? [];
-    if (named.length > 1) return null;
-    const [id] = named;
-    if (id === undefined) return undefined;
-    if (orgs.at.keys !== undefined) {
-      const row = sql.one<{ version: number; fields: string }>('SELECT version, fields FROM entry WHERE id = ?', id);
-      if (row) {
-        const keys = listOf((JSON.parse(row.fields) as Record<string, Json>)[orgs.at.keys]);
-        deps.write(orgs.register, id, { [orgs.at.keys]: [...keys, key] }, { ...writes.w(), version: row.version });
-      }
+  /* WHETHER THE WALK, OR A DOOR, MADE AN ORGANISATION FROM A BANK'S OWN WORDS: the only kind that gains a bank key from a
+     payee's name. One the person or an agent made is held, and keeps the keys it has (research-audit-21 item 12). */
+  const fromWords = new Map<string, boolean>();
+  const madeFromWords = (id: string): boolean => {
+    let said = fromWords.get(id);
+    if (said === undefined) {
+      const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = ? AND kind = 'create' ORDER BY rowid LIMIT 1", `entry:${id}`)?.actor;
+      said = by !== undefined && /^(?:rule|ingest):/u.test(by);
+      fromWords.set(id, said);
     }
-    return id;
+    return said;
   };
 
-  /* A NEW ORGANISATION, carrying the key it was made for, or `null` when the list cannot keep a key. */
-  const make = (key: string, name: string, vendor: boolean): string | null => {
+  /* KEYS AN ORGANISATION MADE FROM THE BANK'S WORDS DID NOT HOLD YET, given in the slice's batch so Undo takes them back. */
+  const give = (id: string, keys: readonly string[]): void => {
+    if (orgs.at.keys === undefined) return;
+    const row = sql.one<{ version: number; fields: string }>('SELECT version, fields FROM entry WHERE id = ?', id);
+    if (!row) return;
+    const held = listOf((JSON.parse(row.fields) as Record<string, Json>)[orgs.at.keys]);
+    const more = keys.filter((k) => !held.includes(k) && holderOf(sql, k) === null);
+    if (more.length > 0) deps.write(orgs.register, id, { [orgs.at.keys]: [...held, ...more] }, { ...writes.w(), version: row.version });
+  };
+
+  /* A NEW ORGANISATION, carrying the keys it was made for, or `null` when the list cannot keep a key. */
+  const make = (keys: readonly string[], name: string, vendor: boolean): string | null => {
     if (orgs.at.keys === undefined || name === '') return null;
     const kind = vendor ? kindValue(lists, orgs.register, orgs.at, 'vendor') : undefined;
     const created = deps.write(
       orgs.register,
       null,
-      { [orgs.at.name]: name, [orgs.at.keys]: [key], ...(kind === undefined ? {} : { [orgs.at.kind!]: kind }) },
+      { [orgs.at.name]: name, [orgs.at.keys]: [...new Set(keys)], ...(kind === undefined ? {} : { [orgs.at.kind!]: kind }) },
       writes.w(),
     );
     if (!created.ok) return null;
-    byName.set(keyOf('bank', name) ?? key, [created.value.id]);
+    byName.set(keyOf('bank', name) ?? keys[0]!, [created.value.id]);
+    fromWords.set(created.value.id, true);
     made++;
     return created.value.id;
   };
@@ -473,25 +637,46 @@ function ledgerSlice(deps: BackfillDeps, lists: Lists, limit: number, after: str
       left--;
       last = `${ledger.register}/${row.id}`;
       if (ledger.transfer !== undefined && row.fields[ledger.transfer] === true) continue;
-      const p = payeeOf(ledger, row.fields);
+      const p = payeeOf(ledger, row.fields, readingOf(ledger));
       if (p === null || isPerson(p)) continue;
 
-      let org = known(p.key);
-      if (org === undefined && !p.moved) {
-        const service = services.get(p.key);
-        const count = seen.get(p.key);
+      /* BY ITS OWN KEY FIRST, then as the payee it is one word longer than. */
+      const base = baseOf.get(p.key);
+      let found = known(p.key);
+      const extended = found === undefined && base !== undefined;
+      if (extended) found = known(base);
+      const key = extended ? base : p.key;
+
+      let org: string | null | undefined;
+      if (found !== null && found !== undefined) {
+        if (madeFromWords(found.id)) give(found.id, [...(found.named ? [key] : []), ...(extended ? [p.key] : [])]);
+        else if (extended) {
+          /* A HELD ORGANISATION A PAYEE ONLY EXTENDS IS ASKED ABOUT, AND THE LINE LEFT AS IT IS. */
+          const held = sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', found.id);
+          const organisation = { id: found.id, name: (held && textOf((JSON.parse(held.fields) as Record<string, Json>)[orgs.at.name])) ?? 'an organisation' };
+          const payee = tidy(p.said);
+          const payments = seen.get(p.key)?.lines ?? 1;
+          if (payee !== '' && !p.moved)
+            ask({ kind: 'organisation-key', key: `organisation-key:${p.key}:${found.id}`, organisation, payee, bank: p.key, payments, question: heldQuestion(payee, payments, organisation.name) });
+          continue;
+        }
+        org = found.id;
+      } else if (found === undefined && !p.moved) {
+        const service = services.get(key);
+        const count = counted.get(key);
+        const keys = extended ? [key, p.key] : [key];
         /* A SERVICE'S PROVIDER THE RECORD ALREADY HOLDS AS AN ORGANISATION is that one, and never a second of one name. */
         const same = service === undefined ? [] : (byName.get(keyOf('bank', service) ?? '') ?? []);
         if (same.length === 1) org = same[0]!;
-        else if (service !== undefined) org = make(p.key, service, true);
+        else if (service !== undefined) org = make(keys, service, true);
         else if (count !== undefined && count.lines >= PAYEE_SEEN) {
           /* A PAYEE SAID AS ONE ON ANY OF ITS LINES, THAT SAYS IT IS A BUSINESS ON ANY OF THEM, IS MADE. One only ever
              cut out of a description, or one that could be a person's name, is a question, named the way the walk
              would have named it. */
-          if (count.sure && count.business) org = make(p.key, tidy(count.said), false);
+          if (count.sure && count.business) org = make(keys, tidy(count.said), false);
           else if (tidy(count.said) !== '') {
             const name = tidy(count.said);
-            suggest({ kind: 'organisation', key: `organisation:${p.key}`, name, payments: count.lines, question: `Is ${name} a company you pay or are paid by? ${count.lines} payments name it.` });
+            suggest({ kind: 'organisation', key: `organisation:${key}`, name, payments: count.lines, question: `Is ${name} a company you pay or are paid by? ${count.lines} payments name it.` });
           }
         }
       }
@@ -522,7 +707,15 @@ function kindValue(lists: Lists, register: string, at: OrgFields, said: string):
 
 /* ── the projects, as a run and a service are matched to them ────────── */
 
-type ProjectsList = { id: string; title: string; candidates: Candidate[]; names: Map<string, string>; domains: Map<string, string[]> };
+/** The projects, read whole. `domain` is the field a project keeps its domains in, a list or one text, when it has one. */
+type ProjectsList = {
+  id: string;
+  title: string;
+  candidates: Candidate[];
+  names: Map<string, string>;
+  domains: Map<string, string[]>;
+  domain: { id: string; many: boolean } | undefined;
+};
 
 /** The one list declaring `scopes:`, as `scope.ts` reads it. */
 function projectsList(lists: Lists): RegisterDecl | undefined {
@@ -536,7 +729,8 @@ function projectsOf(sql: Sql, lists: Lists): ProjectsList | null {
   if (!home?.scopes) return null;
   const { repos, folders } = home.scopes;
   const said = home.seq_prefix && home.seq_prefix !== '#' ? home.seq_prefix : `${home.id}#`;
-  const domainField = live(home.fields).find((f) => (f.id === 'domains' && f.type === 'list') || (f.id === 'domain' && f.type === 'text'))?.id;
+  const domainDecl = live(home.fields).find((f) => (f.id === 'domains' && f.type === 'list') || (f.id === 'domain' && f.type === 'text'));
+  const domainField = domainDecl?.id;
   const rows = sql
     .all<{ id: string; seq: number; fields: string }>(
       'SELECT id, seq, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND seq IS NOT NULL ORDER BY seq',
@@ -552,23 +746,14 @@ function projectsOf(sql: Sql, lists: Lists): ProjectsList | null {
       const said = typeof held === 'string' ? [held] : listOf(held);
       domains.set(row.id, said.map((d) => registrable(d.replace(/^\*\./u, ''))).filter((d): d is string => d !== null));
     }
-    /* A FOLDER LISTED AMONG THE REPOSITORIES IS A FOLDER, as the owner's BrainDog lists `/Users/…/braindog`: matched as
-       one, it places the runs in that checkout, where as a repository it matches no remote and no name. */
-    const listed = repos === undefined ? [] : listOf(row.fields[repos]);
-    return {
-      id: row.id,
-      spoken: `${said}${row.seq}`,
-      repos: listed.filter((r) => !isFolder(r)),
-      folders: [...(folders === undefined ? [] : listOf(row.fields[folders])), ...listed.filter(isFolder)],
-    };
+    /* A FOLDER LISTED AMONG THE REPOSITORIES IS A FOLDER, as `scope.ts` reads one (`candidateOf`). */
+    return candidateOf(row.id, `${said}${row.seq}`, repos === undefined ? [] : listOf(row.fields[repos]), folders === undefined ? [] : listOf(row.fields[folders]));
   });
-  return { id: home.id, title: home.title, candidates, names, domains };
+  const domain = domainDecl === undefined ? undefined : { id: domainDecl.id, many: domainDecl.type === 'list' };
+  return { id: home.id, title: home.title, candidates, names, domains, domain };
 }
 
 const named = (projects: ProjectsList, ids: readonly string[]): Named[] => ids.map((id) => ({ id, name: projects.names.get(id) ?? 'a project' }));
-
-/** Whether a place a project lists is a folder, though it was listed among its repositories: `/Users/sam/Code/kiln`. */
-const isFolder = (said: string): boolean => /^(?:\/|~\/|[A-Za-z]:[\\/])/u.test(said.trim());
 
 /** A list of names as a sentence says them: `Kiln`, `Kiln or Portage`, `Kiln, Marlow or Portage`. */
 const orList = (names: readonly string[]): string => (names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} or ${names.at(-1)}`);
@@ -581,6 +766,25 @@ const lastSpelled = (said: string): string =>
 
 const runQuestion = (place: string, runs: number, projects: readonly Named[]): string =>
   `${runs === 1 ? 'A run' : `${runs} runs`} worked in ${place}. Is that ${orList(projects.map((p) => p.name))}?`;
+
+/** What a question about the runs under one owner is kept by, before the owner and the project. */
+const OWNER_KEY = 'run-project:owner:';
+
+const ownerQuestion = (owner: string, runs: number, projects: readonly Named[]): string =>
+  `${runs === 1 ? `A run worked in a ${owner} repository` : `${runs} runs worked in ${owner} repositories`}. Is that ${orList(projects.map((p) => p.name))}?`;
+
+/** A remote's host and owner, `github.com/bakegame`, and the owner as it was written, `BakeGame`; `null` for a remote with no owner. */
+function ownerOf(remote: string): { key: string; spelled: string } | null {
+  const key = remoteKey(remote).split('/');
+  if (key.length < 3) return null;
+  /* AS WRITTEN: the part before the repository's own name, after a host and any `:` or scheme. */
+  const parts = remote.trim().replace(/\.git$/iu, '').replace(/[\\/]+$/u, '').split(/[\\/:]+/u).filter((x) => x !== '');
+  return { key: `${key[0]}/${key[1]}`, spelled: parts.at(-2) ?? key[1]! };
+}
+
+/** Where a run worked, whole, as one key: its remote, or the folder it ran in when it has none. As the record answers a question by. */
+const whereKey = (where: Whereabouts): string | null =>
+  (where.remote === undefined ? null : keyOf('remote', where.remote)) ?? (where.cwd === undefined ? null : keyOf('folder', where.cwd));
 
 /** A folder as `scope.ts` compares one: forward slashes, a drive letter in lower case, and no trailing slash. */
 const pathOf = (said: string): string =>
@@ -601,7 +805,7 @@ const within = (inner: string, outer: string): boolean => {
  * one included. A bare name a project lists (`portage`) is only a name, which any fork or any other `app` shares, and a
  * last name is a guess, so both are questions.
  */
-function placedFor(projects: readonly Candidate[], where: Whereabouts): { sure: Candidate | null; guess: string[] } {
+function placedFor(projects: readonly Candidate[], where: Whereabouts): { sure: Candidate | null; guess: string[]; fallback?: true } {
   const found = matchProject(projects, where);
   const byId = new Map(projects.map((c) => [c.id, c]));
   const bySpoken = new Map(projects.map((c) => [c.spoken, c.id]));
@@ -614,14 +818,14 @@ function placedFor(projects: readonly Candidate[], where: Whereabouts): { sure: 
   const cwd = pathOf(where.cwd ?? '');
   const folder = hit.folders.map(pathOf).filter((f) => within(cwd, f)).sort((a, b) => b.length - a.length)[0] ?? cwd;
   /* A FOLDER HOLDING ANOTHER PROJECT'S is a parent of projects, `~/Developer`, and says nothing about which one. */
-  const broad = projects.some((c) => c.id !== hit.id && [...c.folders, ...c.repos.filter(isFolder)].some((f) => { const p = pathOf(f); return p !== folder && within(p, folder); }));
+  const broad = projects.some((c) => c.id !== hit.id && [...c.folders, ...c.repos.filter(isFolderPlace)].some((f) => { const p = pathOf(f); return p !== folder && within(p, folder); }));
   if (broad) {
     /* SO THE GUESS IS WHAT THE RUN'S PLACE SAYS WITH THAT FOLDER SET ASIDE: a name its repository or a folder up its
        path shares with a project, as `matchProject` guesses one. "Is coinfish Coinfish?", never "Is coinfish
        Workshop?"; the broad project is asked about only when nothing else is a guess. */
     const aside = matchProject(projects.map((c) => (c.id === hit.id ? { ...c, folders: c.folders.filter((f) => pathOf(f) !== folder) } : c)), where);
     const others = [...(aside.project ? [aside.project.id] : []), ...ids(aside.ambiguous)];
-    return { sure: null, guess: others.length > 0 ? [...new Set(others)] : [hit.id] };
+    return others.length > 0 ? { sure: null, guess: [...new Set(others)] } : { sure: null, guess: [hit.id], fallback: true };
   }
   /* THE RUN'S OWN REPOSITORY, BY ITS REMOTE OR ITS NAME, as the projects say it without their folders. */
   const own = matchProject(projects.map((c) => ({ ...c, folders: [] })), { remote: where.remote, repo: where.repo });
@@ -631,10 +835,47 @@ function placedFor(projects: readonly Candidate[], where: Whereabouts): { sure: 
   return { sure: null, guess: [...new Set([hit.id, ...named])] };
 }
 
+/**
+ * WHICH PROJECT HOLDS THE REPOSITORIES UNDER EACH OWNER ON A HOST, as `github.com/bakegame`: by a remote a project lists,
+ * by a run already placed in one, and by the one remote runs have worked in under a bare name a project lists, which is
+ * how the owner's projects mostly name their repositories. An owner whose repositories two projects hold (a person's own
+ * account, as `kasdev` is) settles nothing.
+ */
+function ownersOf(sql: Sql, projects: ProjectsList): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  const hold = (remote: string, project: string): void => {
+    const owner = ownerOf(remote);
+    if (owner !== null) out.set(owner.key, new Set([...(out.get(owner.key) ?? []), project]));
+  };
+  const bySpoken = new Map(projects.candidates.map((c) => [c.spoken, c.id]));
+  const remotes = new Map<string, Set<string>>();
+  for (const r of sql.all<{ remote: string | null; project: string | null }>(
+    `SELECT json_extract(fields, '$.remote') AS remote, json_extract(fields, '$.project') AS project FROM entry
+      WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.remote') IS NOT NULL`,
+    SESSION,
+  )) {
+    if (typeof r.remote !== 'string' || r.remote.trim() === '') continue;
+    const placed = typeof r.project === 'string' ? (bySpoken.get(r.project) ?? (projects.names.has(r.project) ? r.project : undefined)) : undefined;
+    if (placed !== undefined) hold(r.remote, placed);
+    const name = lastSpelled(remoteKey(r.remote)).toLowerCase();
+    remotes.set(name, new Set([...(remotes.get(name) ?? []), remoteKey(r.remote)]));
+  }
+  for (const c of projects.candidates)
+    for (const repo of c.repos) {
+      if (/[\\/:]/u.test(repo)) hold(repo, c.id);
+      else {
+        const seen = remotes.get(repo.trim().replace(/\.git$/iu, '').toLowerCase());
+        if (seen?.size === 1) hold([...seen][0]!, c.id);
+      }
+    }
+  return out;
+}
+
 function runsSlice(deps: BackfillDeps, lists: Lists, limit: number, after: string, suggest: (s: BackfillSuggestion) => void): Slice {
   const { sql } = deps;
   const projects = projectsOf(sql, lists);
   if (!projects || projects.candidates.length === 0 || !lists.some((l) => l.id === SESSION)) return idle();
+  const owners = ownersOf(sql, projects);
   const now = deps.clock.now();
   const writes = batcher(deps);
   let wrote = 0;
@@ -653,21 +894,32 @@ function runsSlice(deps: BackfillDeps, lists: Lists, limit: number, after: strin
        of its own row a conflict. */
     if (!isStale(row, now)) continue;
     const where = { remote: textOf(row.fields.remote), repo: textOf(row.fields.repo), cwd: textOf(row.fields.cwd) };
-    const { sure, guess: ids } = placedFor(projects.candidates, where);
+    const { sure, guess: ids, fallback } = placedFor(projects.candidates, where);
     if (sure) {
       const placed = deps.write(SESSION, row.id, {}, { ...writes.w(), version: row.version, stamp: { project: sure.spoken } });
       if (placed.ok) wrote++;
       else refused++;
       continue;
     }
+    const at = whereKey(where);
+    const wheres = at === null ? [] : [at];
+    /* A PLACE THAT GUESSES NOTHING BETTER THAN A BROAD FOLDER, in a repository whose owner's repositories one project
+       holds, is that project's question, one for the owner however many of its repositories the runs worked in. */
+    const owner = (ids.length === 0 || fallback) && where.remote !== undefined ? ownerOf(where.remote) : null;
+    const held = owner === null ? undefined : owners.get(owner.key);
+    if (owner !== null && held?.size === 1) {
+      const these = named(projects, [...held]);
+      suggest({ kind: 'run-project', key: `${OWNER_KEY}${owner.key}:${these[0]!.id}`, place: owner.spelled, runs: 1, projects: these, question: ownerQuestion(owner.spelled, 1, these), wheres });
+      continue;
+    }
     if (ids.length === 0) continue;
     /* THE PLACE AS A PERSON SAYS IT: the repository's name, never its host or a folder's path. One question for each
-       place and guess, however many runs worked there. */
+       place and guess, however many runs worked there, a single guess included. */
     const place = where.repo ?? (where.remote ? lastSpelled(where.remote) : lastSpelled(where.cwd ?? ''));
     if (place === '') continue;
     const key = `run-project:${place.toLowerCase()}:${[...ids].sort().join(',')}`;
     const these = named(projects, ids);
-    suggest({ kind: 'run-project', key, place, runs: 1, projects: these, question: runQuestion(place, 1, these) });
+    suggest({ kind: 'run-project', key, place, runs: 1, projects: these, question: runQuestion(place, 1, these), wheres });
   }
   return { batch: writes.batch(), looked: rows.length, wrote, refused, next: rows.length === limit ? rows.at(-1)!.id : null };
 }
@@ -694,16 +946,29 @@ function servicesOf(lists: Lists, projects: string | undefined): Services[] {
   return out.sort((a, b) => a.register.localeCompare(b.register));
 }
 
+/** The first label of a registrable domain, the name it spells on the web: `teetime` of `teetime.com`, `bake` of `crumb.gg`. */
+const labelOf = (domain: string): string => domain.split('.')[0] ?? '';
+
 function servicesSlice(deps: BackfillDeps, lists: Lists, limit: number, after: string, suggest: (s: BackfillSuggestion) => void): Slice {
   const { sql } = deps;
   const projects = projectsOf(sql, lists);
   const all = servicesOf(lists, projects?.id);
   if (!projects || all.length === 0) return idle();
   /* A NAME IS COMPARED BY ITS LETTERS AND DIGITS, so the domain `fern.ly` is the project Fernly and `otters.gg` is Otters.gg,
-     as the owner's own links say: a domain is how a project spells its name on the web. */
-  const fold = (said: string): string => nameKey(said).replace(/[\s'-]+/gu, '');
+     as the owner's own links say: a domain is how a project spells its name on the web. AND A PROJECT NAMED AS A DOMAIN
+     IS ITS NAME WITHOUT THE ENDING TOO, so `Crumb.gg` answers to `bake`, the first word of "bake VM", and `teetime.com`'s
+     label answers to Tee Time. */
+  const fold = (said: string): string => nameKey(said).replace(/[\s'.-]+/gu, '');
   const byName = new Map<string, string[]>();
-  for (const [id, name] of projects.names) byName.set(fold(name), [...(byName.get(fold(name)) ?? []), id]);
+  const named_ = (said: string, id: string): void => {
+    const at = fold(said);
+    if (at !== '' && !(byName.get(at) ?? []).includes(id)) byName.set(at, [...(byName.get(at) ?? []), id]);
+  };
+  for (const [id, name] of projects.names) {
+    named_(name, id);
+    const domain = /\.[\p{L}]{2,}$/u.test(name.trim()) ? registrable(name) : null;
+    if (domain !== null) named_(labelOf(domain), id);
+  }
   const byDomain = new Map<string, string[]>();
   for (const [id, domains] of projects.domains) for (const d of new Set(domains)) byDomain.set(d, [...(byDomain.get(d) ?? []), id]);
 
@@ -723,11 +988,13 @@ function servicesSlice(deps: BackfillDeps, lists: Lists, limit: number, after: s
       left--;
       last = `${list.register}/${row.id}`;
       const name = textOf(row.fields[list.title]);
-      const hosts = [name, ...list.hosts.map((h) => textOf(row.fields[h]))]
+      const hosts = [...new Set([name, ...list.hosts.map((h) => textOf(row.fields[h]))]
         .filter((h): h is string => h !== undefined)
         .map((h) => registrable(h.replace(/^\*\./u, '')))
-        .filter((d): d is string => d !== null);
-      const hits = new Set([...(name === undefined || fold(name) === '' ? [] : (byName.get(fold(name)) ?? [])), ...hosts.flatMap((d) => byDomain.get(d) ?? [])]);
+        .filter((d): d is string => d !== null))];
+      /* THE NAMES IT ANSWERS TO: its own, its first word, and the label of each domain it is or points at. */
+      const said = [...new Set([...(name === undefined ? [] : [name, name.trim().split(/\s+/u)[0] ?? '']), ...hosts.map(labelOf)].map(fold).filter((n) => n !== ''))];
+      const hits = new Set([...said.flatMap((n) => byName.get(n) ?? []), ...hosts.flatMap((d) => byDomain.get(d) ?? [])]);
       if (hits.size === 0) continue;
       if (hits.size > 1) {
         const these = named(projects, [...hits]);
@@ -735,12 +1002,35 @@ function servicesSlice(deps: BackfillDeps, lists: Lists, limit: number, after: s
         suggest({ kind: 'service-project', key: `service-project:${row.id}`, service, projects: these, question: `Which project is ${service.name} for: ${orList(these.map((p) => p.name))}?` });
         continue;
       }
-      const linked = deps.write(list.register, row.id, { [list.project]: [...hits][0]! }, { ...writes.w(), version: row.version });
+      const project = [...hits][0]!;
+      const linked = deps.write(list.register, row.id, { [list.project]: project }, { ...writes.w(), version: row.version });
       if (linked.ok) wrote++;
       else refused++;
+      /* ONLY A DOMAIN THAT SPELLS THE PROJECT'S NAME is the project's: "bake analytics" at `plausible.io` is Crumb.gg's
+         service, and `plausible.io` is somebody else's. */
+      if (linked.ok) addDomains(deps, projects, project, hosts.filter((d) => (byName.get(fold(labelOf(d))) ?? []).includes(project)), writes.w);
     }
   }
   return { batch: writes.batch(), looked, wrote, refused, next: left === 0 && last !== '' ? last : null };
+}
+
+/**
+ * A LINKED SERVICE'S DOMAINS GO ON ITS PROJECT, so mail from them is matched to it from then on: in the slice's batch, so
+ * Undo takes them off with the link. Only a domain no row already holds as a key, and only into a field with room: a
+ * list gains it, and a single domain field only when empty.
+ */
+function addDomains(deps: BackfillDeps, projects: ProjectsList, project: string, hosts: readonly string[], w: () => WriteContext): void {
+  const field = projects.domain;
+  if (field === undefined || hosts.length === 0) return;
+  const row = deps.sql.one<{ version: number; fields: string }>('SELECT version, fields FROM entry WHERE id = ? AND deleted_at IS NULL', project);
+  if (!row) return;
+  const fields = JSON.parse(row.fields) as Record<string, Json>;
+  const held = field.many ? listOf(fields[field.id]) : (textOf(fields[field.id]) === undefined ? [] : [textOf(fields[field.id])!]);
+  const has = new Set(held.map((d) => registrable(d.replace(/^\*\./u, ''))).filter((d): d is string => d !== null));
+  const more = hosts.filter((d) => !has.has(d) && holderOf(deps.sql, `domain:${d}`) === null);
+  if (more.length === 0 || (!field.many && held.length > 0)) return;
+  const out = deps.write(projects.id, project, { [field.id]: field.many ? [...held, ...more] : more[0]! }, { ...w(), version: row.version });
+  if (out.ok) projects.domains.set(project, [...(projects.domains.get(project) ?? []), ...(field.many ? more : [more[0]!])]);
 }
 
 /* ── 4. projects whose repositories are bare names ───────────────────── */

@@ -266,16 +266,29 @@ test('AN UNDONE DECISION PUTS ITS QUESTION BACK IN DECIDE, and one only partly u
   s.sql.close();
 });
 
+test('ONLY ONE ROW OF A DECISION TAKEN BACK leaves its question decided and marked undone in part', async () => {
+  const r = await record();
+  const [venue, invites] = accepted(r, '01JDECIDEBATCH000000000003', ['Book venue', 'Send invites']) as (Entry & { seq: number })[];
+  const row = { register: 'tasks', seq: venue!.seq };
+  const p = plan(r, { decision: 'D1', row });
+  assert.ok(!p.lines.includes('Puts the question back in Decide.'), p.lines.join(' | '));
+  value(undoApply(r.parts, { decision: 'D1', row }, p.hash, 'p_sam'));
+  assert.ok(r.k.get(venue!.id, { includeDeleted: true })!.deleted_at, 'that one is gone');
+  assert.equal(r.k.get(invites!.id)!.deleted_at, null, 'the other stays');
+  assert.deepEqual(question(r), { status: 'resolved', resolved_as: 'undone' });
+  r.sql.close();
+});
+
 test('A SECOND UNDO OF THE SAME BATCH ADDS WHAT IT PUT BACK TO THE MARK the first made', async () => {
   const r = await record();
-  const a = value<Entry>(r.k.create('codes', { code: 'SPRING' }, SAM));
-  const b = value<Entry>(r.k.create('codes', { code: 'AUTUMN' }, SAM));
+  const a = value<Entry>(r.k.create('codes', { code: 'Spring' }, SAM));
+  const b = value<Entry>(r.k.create('codes', { code: 'Autumn' }, SAM));
   r.clock.advance(10 * MIN);
   const B = '01JRUNBATCH000000000000000';
   value(r.k.update('codes', a.id, { deleted_at: true }, { ...AGENT, batch: B, version: a.version }));
   value(r.k.update('codes', b.id, { note: 'old' }, { ...AGENT, batch: B }));
   /* The code taken while the first is deleted, so its restore is refused the first time. */
-  const taken = value<Entry>(r.k.create('codes', { code: 'SPRING' }, SAM));
+  const taken = value<Entry>(r.k.create('codes', { code: 'Spring' }, SAM));
 
   const first = value(undoApply(r.parts, { batch: B }, plan(r, { batch: B }).hash, 'p_sam'));
   assert.equal(first.put, 1);
@@ -294,8 +307,8 @@ test('A SECOND UNDO OF THE SAME BATCH ADDS WHAT IT PUT BACK TO THE MARK the firs
 
 test('A SECOND UNDO THAT PUTS BACK WHAT THE FIRST LEFT puts the question back in Decide', async () => {
   const r = await record();
-  const a = value<Entry>(r.k.create('codes', { code: 'SPRING' }, SAM));
-  const b = value<Entry>(r.k.create('codes', { code: 'AUTUMN' }, SAM));
+  const a = value<Entry>(r.k.create('codes', { code: 'Spring' }, SAM));
+  const b = value<Entry>(r.k.create('codes', { code: 'Autumn' }, SAM));
   r.clock.advance(10 * MIN);
   const B = '01JDECIDEBATCH000000000002';
   const at = new Date(r.clock.now()).toISOString();
@@ -305,7 +318,7 @@ test('A SECOND UNDO THAT PUTS BACK WHAT THE FIRST LEFT puts the question back in
   r.sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, batch) VALUES ('01JDECIDE00000000000000002', ?, 'p_sam', 'decide', 'decision:D2', 'decision', '{}', ?)", at, B);
   r.sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, batch) VALUES ('01JRESOLVE0000000000000002', ?, 'p_sam', 'resolve', 'suggestion:SG1', 'suggestion', 'addressed', ?)", at, B);
   /* The code taken while the first is deleted, so its restore is refused the first time. */
-  const taken = value<Entry>(r.k.create('codes', { code: 'SPRING' }, SAM));
+  const taken = value<Entry>(r.k.create('codes', { code: 'Spring' }, SAM));
 
   value(undoApply(r.parts, { decision: 'D2' }, plan(r, { decision: 'D2' }).hash, 'p_sam'));
   assert.deepEqual(question(r), { status: 'resolved', resolved_as: 'undone' });

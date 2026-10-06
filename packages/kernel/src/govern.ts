@@ -1085,7 +1085,10 @@ const LADDER_REASON =
  * a merge or an identity key (`merged_into`, `email`, `handles`, `keys` or `self` on the people or organisations
  * `meet` writes) was a plain edit, so a rowset setting only `merged_into` was let through at Do and tell; and a field
  * sent empty was an edit and not a delete. Both are on the floor now, and a filer that acts for nobody (Slash, a run no token opened)
- * meets every row a person made as somebody else's.
+ * meets every row a person made as somebody else's. research-audit-21 closed the rest of who someone is: a row filed
+ * without `at`, which is a new person or organisation, asks when it is made merged, as the record's own person, or
+ * with addresses, handles, keys or a domain, and a rename of one, or a change to its domain, aliases or organisation,
+ * asks as an edit. A new row with only a name still climbs as an add.
  *
  * AND A FIELD ONLY A DECISION CHANGES (`by: 'decide'`, on the field or on the move) still waits for a person, because
  * a rung is not a person deciding.
