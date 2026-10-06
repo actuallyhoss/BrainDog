@@ -152,6 +152,15 @@ test('A PLAIN NAME IS WRITTEN BARE, so the filters a page prints back are the on
   assert.equal(odd.heading, 'Wax, wick and scent');
 });
 
+test('A LIST IN A NOTE IS ONE VALUE A LINE, and a list in a heading is its values with commas, never run together', () => {
+  const row = { id: 'x', register: 'people', seq: 1, fields: { name: 'Sara', met: ['2026-08-27 · commit 8b1e4d0 in portage', '2026-09-02 · mail from halden.example'] } } as never;
+  const filled = fill({ kind: 'note', heading: 'Seen {{met}}', body: '{{met}}' }, row) as Record<string, string>;
+  assert.equal(filled.body, '2026-08-27 · commit 8b1e4d0 in portage\n2026-09-02 · mail from halden.example');
+  assert.equal(filled.heading, 'Seen 2026-08-27 · commit 8b1e4d0 in portage, 2026-09-02 · mail from halden.example');
+  /* AN EMPTY LIST FILLS WITH NOTHING, so the note's `empty:` sentence is what the page says. */
+  assert.equal((fill({ body: '{{met}}' }, { id: 'x', register: 'people', seq: 1, fields: { met: [] } } as never) as Record<string, string>).body, '');
+});
+
 test('A PARAMETER IS ONE VALUE TOO: a figure over one part, named with a comma, counts that part', () => {
   const filled = fill({ metric: 'm', where: 'part is {{it}}, done is no' }, null, 'Wax, wick and scent') as { where: string; within: string };
   assert.equal(filled.where, 'part is "Wax, wick and scent", done is no');

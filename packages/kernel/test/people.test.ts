@@ -385,6 +385,12 @@ test('THE STRONG RULES MERGE ON THEIR OWN, as one batch, and Undo puts both back
 
   const undone = value<{ restored: string[] }>(k.undoMerge(met.undo!, OWNER));
   assert.deepEqual(undone.restored, ['Rohan Mehta']);
+  /* THE LADDER IS TOLD: one line in `undone` for the merge's batch, by whoever met them, with the kinds it was. */
+  const mark = sql.one<{ actor: string | null; kinds: string; undone_by: string }>('SELECT actor, kinds, undone_by FROM undone WHERE batch = ?', met.undo!);
+  assert.match(mark?.actor ?? '', /^S\d+$/u, 'the run that met them, as its writes are signed');
+  assert.equal(mark?.undone_by, OWNER.actor);
+  const kinds = JSON.parse(mark!.kinds) as string[];
+  assert.ok(kinds.length > 0 && kinds.every((kind) => kind.startsWith('people:')), kinds.join(', '));
   assert.equal(k.count('people'), 2);
   const back = k.get('people#2')!;
   assert.equal(back.fields.merged_into, undefined);

@@ -118,6 +118,29 @@ test('A MAIL IS READ BY ITS PARTS IN A RULE: {{trigger.body.from_address}} meets
   sql.close();
 });
 
+test('A RULE MEETS AS UNTRUSTED WHATEVER ITS SOURCE SAYS: a stranger who looks like someone known is asked about, never added', async () => {
+  const { k, sql } = await record(
+    rule({
+      rule: 'meet-inbox',
+      on: { arrival: { channel: 'email' } },
+      steps: [{ meet: { email: '{{trigger.body.from_address}}', name: '{{trigger.body.from_name}}', where: 'the inbox', source: 'the inbox' } }],
+    }),
+  );
+  value(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com' }, OWNER));
+  value(k.arrive({ channel: 'email', headers: { from: '"Ada Lovelace" <ada@elsewhere.example>' }, body: 'Hi.', sha256: 'u1', verified: true }));
+  await k.drain();
+  assert.equal(k.count('people'), 1, 'a source worded "the inbox" is still text anybody could have written');
+  assert.deepEqual(steps(sql, 'meet-inbox').map((s) => s.answer), ['Nobody added: they look like someone already known, and a question asks whether the new address is theirs.']);
+  const asked = sql.all<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND body_kind = 'rowset'");
+  assert.equal(asked[0]?.n, 1);
+  /* HER OWN ADDRESS IS STILL HER: an exact key is met as before. */
+  value(k.arrive({ channel: 'email', headers: { from: 'Ada Lovelace <ada@example.com>' }, body: 'Again.', sha256: 'u2', verified: true }));
+  await k.drain();
+  assert.equal(k.count('people'), 1);
+  assert.equal(steps(sql, 'meet-inbox').at(-1)?.answer, 'Ada Lovelace');
+  sql.close();
+});
+
 test('A meet STEP TAKES kind AND keys: a payee meets one organisation, and a key that fills with nothing is dropped', async () => {
   const { k, sql } = await record(
     rule({

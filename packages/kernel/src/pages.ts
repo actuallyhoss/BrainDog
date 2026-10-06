@@ -31,7 +31,7 @@ import { kindModule } from './kinds/index.ts';
 import { fileLists } from './kinds/gallery.ts';
 import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import { BODY_KINDS, type Shows } from './govern.ts';
-import { CARD_FOLD, CARD_FOLD_MOST, CARD_GROUP_KEYS } from './declare.ts';
+import { CARD_FOLD, CARD_FOLD_MOST } from './declare.ts';
 import type { Json } from './coerce.ts';
 import type { Part, Rate } from './fx.ts';
 import type { Entry } from './index.ts';
@@ -475,6 +475,19 @@ export type QueueQuestion = {
   /** On a question put off (`governance.later`): the day it comes back, and why it was put off. */
   until?: string;
   until_why?: string;
+  /**
+   * FOR THE DECISION CARD'S BY-LINE: the run that asked, by its handle (`S42`) beside what it was doing and the app it
+   * ran in ("Claude Code"), when an agent's run filed it; and who drafted it for whoever filed it, `slash` or
+   * `slash:<model>` when Slash did.
+   */
+  run?: { id: string; name?: string; app?: string };
+  drafted_by?: string;
+  /** The money accepting writes, one value a row it writes: integer minor units with a currency, never added up here. */
+  money?: { amount: number; currency: string }[];
+  /** What accepting changes on the one row a question updates: each field, its name, what it holds now and what it will. */
+  changes?: { field: string; label?: string; before: Json | null; after: Json | null }[];
+  /** The kinds of change it is (`change-kind.ts`'s keys, `tasks:move:done`), dearest first, as the ladder counts it. */
+  kinds?: string[];
 };
 
 /** One name a merge question is about: its handle (`people#4`), its name, where it was seen, and whether it is kept. */
@@ -1663,10 +1676,8 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      answers. It is read here, when a block is read, and never copied into a constant of this file when it loads: a
      kind module may import this file, and `block-keys.ts` is built from the kind registry, so a copy taken at load
      could be taken before the list exists (`kinds/index.ts`). */
-  /* A GROUPED CARD'S `group` AND `fold` ARE NAMED IN `declare.ts` until `block-keys.ts` names them (`CARD_GROUP_KEYS`). */
-  const cardKey = (key: string): boolean => block.kind === 'cards' && CARD_GROUP_KEYS.has(key);
   const unread = Object.keys(block)
-    .filter((key) => !BLOCK_READS.has(key) && !cardKey(key))
+    .filter((key) => !BLOCK_READS.has(key))
     .map((key): Refusal => ({ code: 'DECLARATION_INVALID', fix: `${key}: is not a key this record reads.`, at: key }));
   /* AND A KEY ANOTHER KIND READS IS SAID HERE AS THE INSTALL SAYS IT (`block-keys.ts`). A page installed before the install
      check closed carries `lead: true` on its cards or `since: seen` on a table, and each read clean and was drawn
@@ -1677,7 +1688,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      one only that kind may carry. */
   for (const [key, value] of Object.entries(block)) {
     const kinds = kindsReading(key);
-    if (value === undefined || key === 'of' || !kinds || kinds.includes(block.kind) || cardKey(key)) continue;
+    if (value === undefined || key === 'of' || !kinds || kinds.includes(block.kind)) continue;
     unread.push({ code: 'DECLARATION_INVALID', fix: wrongKindKey(key, block.kind), at: key });
   }
   /* A PACK'S OWN KIND (`block.<id>`) IS INSTALLED LIKE ANY OTHER (`declare.ts` `pageBody`), so it is read like any
@@ -3943,9 +3954,14 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
     const value = row && Object.hasOwn(row.fields, key) ? row.fields[key] : undefined;
     return value === undefined ? null : value;
   };
-  const valueOf = (key: string): string | null => {
+  /* A LIST OUTSIDE A SENTENCE IS ITS VALUES, one a line in a note's `body` and joined by commas anywhere else. Written
+     with `String` it was `a,b`, and a person's "Seen in" read two sightings run together with a bare comma. */
+  const valueOf = (key: string, lines: boolean): string | null => {
     const value = heldOf(key);
-    return value === null ? null : String(value);
+    if (!Array.isArray(value)) return value === null ? null : String(value);
+    return value
+      .flatMap((one) => (typeof one === 'string' || typeof one === 'number' || typeof one === 'boolean' ? [String(one)] : []))
+      .join(lines ? '\n' : ', ');
   };
   /* A LIST IN A SENTENCE IS ITS VALUES JOINED BY `or`, which is how the grammar reads several values after `is`
      (`state is open or doing`). Written with `String` it was `a,b`, and the comma cut the clause in two. A quote holds
@@ -3959,9 +3975,9 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
     if (words.length === 1 && typeof only === 'string') return quoteValue(only);
     return words.length > 1 && words.every((word) => word !== null && quoteValue(word) === word) ? words.join(' or ') : null;
   };
-  const text = (s: string, sentence: boolean): string =>
+  const text = (s: string, sentence: boolean, lines = false): string =>
     s.replace(/\{\{(\w+)\}\}/g, (whole: string, key: string, at: number) => {
-      if (!sentence) return valueOf(key) ?? whole;
+      if (!sentence) return valueOf(key, lines) ?? whole;
       /* A HOLE THE AUTHOR ALREADY QUOTED IS NOT QUOTED AGAIN. `what contains "{{it}}"` took the value quoted by
          `quoteValue` inside the author's own marks, and a value that needed quoting came out as two quotes the grammar
          reads as neither. So where the marks round the hole are a quote by the grammar's own reading (`unquoted`,
@@ -3983,7 +3999,7 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
     if (typeof node === 'string') return text(node, sentence);
     if (Array.isArray(node)) return node.map((n) => walk(n, false));
     if (node === null || typeof node !== 'object') return node;
-    return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, walk(v, SENTENCES.has(k))]));
+    return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, typeof v === 'string' && k === 'body' ? text(v, false, true) : walk(v, SENTENCES.has(k))]));
   };
   return walk(scope === undefined ? doc : { ...(doc as object), within: scope }, false);
 }

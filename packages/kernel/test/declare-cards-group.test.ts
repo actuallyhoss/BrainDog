@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { KEY_KINDS } from '../src/block-keys.ts';
 import { validate, type Declaration, type Known } from '../src/declare.ts';
 import type { Json } from '../src/coerce.ts';
 
@@ -62,4 +63,14 @@ test('FOLD IS A COUNT OF CARDS FROM 1 TO 50, AND ONLY ON CARDS THAT GROUP', () =
   assert.equal(validate(section(true)), null);
   assert.deepEqual(at(section(3)), ['DECLARATION_INVALID', 'blocks[0]']);
   assert.notEqual(validate(page({ kind: 'table', group: 'project' }), KNOWN), null);
+});
+
+test('GROUP AND FOLD ARE NAMED WHERE EVERY KIND KEY IS (`KEY_KINDS`), so a table carrying group hears where it belongs', () => {
+  assert.deepEqual(KEY_KINDS.group, ['cards']);
+  assert.deepEqual(KEY_KINDS.fold, ['section', 'cards']);
+  const table = validate(page({ kind: 'table', group: 'project' }), KNOWN)!;
+  assert.deepEqual([table.code, table.at], ['DECLARATION_INVALID', 'blocks[0].group']);
+  assert.match(table.fix, /group: is read by cards blocks, and a table block does nothing with it\. Draw these rows as cards/u);
+  const folded = validate(page({ kind: 'table', fold: 3 }), KNOWN)!;
+  assert.match(folded.fix, /fold: is read by section and cards blocks/u);
 });

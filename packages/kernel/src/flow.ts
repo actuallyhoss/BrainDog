@@ -1866,11 +1866,22 @@ function meetOne(
       ...(kind === undefined ? {} : { kind: organisation ? 'organisation' : 'person' }),
       ...(keys.length === 0 ? {} : { keys }),
       where: named.where ?? `rule.${rule}`,
+      /* UNTRUSTED ALWAYS (H1): a rule's meet reads its trigger's text, a mail's or a bank text's or an import's, so the
+         guard holds whatever its `source` is worded as, and a key it already knows is still met as before. */
+      untrusted: true,
     },
     { actor, project },
   );
   if (!met.ok) return { ok: false, say: `rule.${rule}'s meet at step ${n + 1} met nobody: ${fixOf(met)}` };
-  if (met.value.mention === true) return { ok: true, person: null, said: 'Nobody added: a name alone is kept until an address or a handle comes with it.' };
+  if (met.value.mention === true)
+    return {
+      ok: true,
+      person: null,
+      said:
+        met.value.question !== undefined
+          ? 'Nobody added: they look like someone already known, and a question asks whether the new address is theirs.'
+          : 'Nobody added: a name alone is kept until an address or a handle comes with it.',
+    };
   const { person, created, merge } = met.value;
   /* THE NAME AND NOT THE ID, since the run's history is read by a person. */
   const who = met.value.row?.name || person;

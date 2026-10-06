@@ -1055,16 +1055,6 @@ function filtersFault(id: string, filters: unknown, requires: unknown, installed
   return null;
 }
 
-/**
- * The keys a `cards` block reads to draw its cards in groups: `group`, a link field of its list, and `fold`, how many
- * cards a group shows before the rest fold.
- *
- * NAMED HERE UNTIL `block-keys.ts` NAMES THEM, where every other key a kind reads is listed for the install and the read
- * at once (`KEY_KINDS`): `group: ['cards']`, and `cards` beside `section` on `fold`. The read lets them through by the
- * same set (`pages.ts`), so both sides agree until the line moves there.
- */
-export const CARD_GROUP_KEYS: ReadonlySet<string> = new Set(['group', 'fold']);
-
 /** How many cards a group shows before the rest fold, when a grouped `cards` block does not say, and the most it may. */
 export const CARD_FOLD = 3;
 export const CARD_FOLD_MOST = 50;
@@ -1299,7 +1289,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
        read answers (`rows`, `next`, `types`) is refused here too: `{ kind: cards, next: what }` installed and drew
        nothing. The read still takes them, because a block that came out of a read may be read again. */
     for (const [key, value] of Object.entries(block)) {
-      if (value === undefined || (kind === 'cards' && CARD_GROUP_KEYS.has(key))) continue;
+      if (value === undefined) continue;
       if (!BLOCK_INSTALLS.has(key)) return bad('DECLARATION_INVALID', `${id}.${at}: ${unreadBlockKey(key)}`, `${at}.${key}`, keysFor(kind as string));
       const kinds = kindsReading(key);
       if (kinds && !kinds.includes(kind as string))

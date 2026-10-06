@@ -111,6 +111,10 @@ test('A GROUP THAT IS NO LINK OF THE LIST IS SAID ON THE BLOCK, as the install s
   assert.deepEqual(said({ ...CARDS, fold: 0 }), [['OUT_OF_BOUNDS', 'fold']]);
   assert.deepEqual(said({ kind: 'cards', source: 'register.tasks', columns: [{ field: 'what' }], fold: 2 }), [['DECLARATION_INVALID', 'fold']]);
   assert.deepEqual(said({ ...CARDS, source: 'actions' }), [['DECLARATION_INVALID', 'group']]);
+  /* AND A TABLE CARRYING group IS TOLD WHICH KIND READS IT, at read as at install (`KEY_KINDS`). */
+  const table = readBlock(depsOver(k), { kind: 'table', source: 'register.tasks', columns: [{ field: 'what' }], group: 'project' } as PageBlock);
+  assert.deepEqual(table.refusals.map((r) => [r.code, r.at]), [['DECLARATION_INVALID', 'group']]);
+  assert.match(table.refusals[0]!.fix, /Draw these rows as cards/u);
 });
 
 test('A READER WHO MAY NOT READ THE LIST THE GROUPS ARE NAMED FROM IS TOLD NO NAME, and the block names that list for the hold', async () => {

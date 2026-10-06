@@ -225,11 +225,15 @@ import { answeredOnly, fileVerdicts, meet as meetPerson, resolveJob, type MeetAr
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { builtInFigure } from './built-in-figures.ts';
+import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, shapeIn } from './change-kind.ts';
+import { undoApply as applyUndo, undoPlan as planUndo, type UndoApplied, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
+import { understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
 import {
   FINISHED,
   KERNEL_WRITTEN,
   REVIVED,
   SESSION,
+  agentOf as runAgentOf,
   clipTitle,
   findSession,
   isRunName,
@@ -362,16 +366,31 @@ export { runway } from './forecast.ts';
 export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
 export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
-export { ARRANGING, BODY_KINDS, GOVERNANCE, OPEN_ARRANGEMENTS, PACK_VERBS, pressedOnly } from './govern.ts';
+export { ARRANGING, BODY_KINDS, GOVERNANCE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, ladderFault, pressedOnly } from './govern.ts';
+/* THE LADDER OF TRUST'S NAMES (`change-kind.ts`): what kind of change a write or a question is, and which rung an agent
+   stands on for it, so the record, the web and the CLI read one table of kinds rather than each keeping a copy. Its
+   `agentOf` goes out as `ladderAgentOf`, since `session.ts`'s `agentOf` (the kind of agent a run is) already has the name. */
+export {
+  ADDONS, AUTOMATION, CALL, FLOORS, KEPT_DAYS, RUNGS, agentOf as ladderAgentOf, dearest, keysOfStamp, kindOfEvent, kindOfWrite, kindsOfProposal, kindsOfWrite, madeByIn,
+  personOf, recordReader, rungOf, seedLadder, shapeIn, stampOf, tokenOfRun,
+  type ChangeKind, type Floor, type KindReader, type ListShape, type Rung, type WriteSaid,
+} from './change-kind.ts';
+/* UNDO ON THE SERVER (`undo.ts`) and THE WALK OVER WHAT THE RECORD ALREADY HOLDS (`backfill.ts`), each also a kernel
+   method below (`undoPlan`, `undoApply`, `backfill`, `undoBackfill`), which hands them the record's own parts. */
+export { undoApply, undoPlan, type UndoApplied, type UndoDo, type UndoneMark, type UndoOptions, type UndoParts, type UndoPlan, type UndoScope, type UndoSkip, type UndoStep } from './undo.ts';
+export {
+  BACKFILL_ACTOR, BACKFILL_LIMIT, BACKFILL_SOURCE, PAYEE_SEEN, organisationsHolding, tidy as tidyPayee, understandBackfill, undoBackfill,
+  type BackfillDeps, type BackfillOptions, type BackfillSuggestion, type Backfilled, type Named as BackfillNamed, type Slice as BackfillSlice, type SliceName as BackfillSliceName,
+} from './backfill.ts';
 export { MET_CAP, PEOPLE, RESOLVE_PAIRS_NIGHT, pairHash } from './people.ts';
 export type { MeetArgs, Met, MetRow, ResolveJob, ResolveSide } from './people.ts';
 export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
 /* THE IDENTITY KEYS (`identity-keys.ts`), for every door that reads who something is about: one normaliser, so a key
    the CLI harvests from a commit and one the record holds are the same string. */
-export { KEY_KINDS, PUBLIC_MAIL, githubOfAddress, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
-export type { KeyInput, KeyKind } from './identity-keys.ts';
+export { KEY_KINDS, PUBLIC_MAIL, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
+export type { IdentitySaid, KeyInput, KeyKind } from './identity-keys.ts';
 export { nameKey } from './entities.ts';
-export { SCOPES, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
+export { CEILING, CLIENT_KINDS, SCOPES, ceilingOf, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
 export { cutOffReadable, endedByCutOff } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
@@ -379,7 +398,7 @@ export type { Member } from './members.ts';
 export { whereFor, WHERE_MAX_CHARS, type Wheres } from './members.ts';
 export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
 export type { InvitationRow, InviteArgs, Invited } from './invitations.ts';
-export type { CreateTokenArgs, Minted, Scope, TokenReach, TokenRow, Verified } from './token.ts';
+export type { ClientKind, CreateTokenArgs, Minted, Scope, TokenClient, TokenReach, TokenRow, Verified } from './token.ts';
 /* THE JOB QUEUE'S NAMES (`jobs.ts`, `kernel.jobs`). Its `Claimed` stays unexported here, because the scheduler's `Claimed`
    already has the name; a caller reads it as `ReturnType` of `kernel.jobs.claim`. */
 export { JOB_EVENT_KINDS, JOB_LEASE_MS, JOB_MCP_PATH, JOB_MCP_PREFIX, JOB_PERMISSIONS, JOB_STATUSES, commandOf, fillPrompt, jobBody } from './jobs.ts';
@@ -400,7 +419,7 @@ export type {
 export type { Arranging, Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 /* `exponentOf` IS EXPORTED SO THE RECORD'S CURRENCY TABLE IS NOT A SECOND EXPONENT READER. It is
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
-export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, resolve as extractOutcome, shapeOf } from './ingest.ts';
+export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, resolve as extractOutcome, senderOf, shapeOf } from './ingest.ts';
 export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
 export { applyPage, writePoints } from './fetched.ts';
@@ -435,7 +454,7 @@ export type {
  */
 export type DeclarationBundle = { declarations: Declaration[] };
 export type { Analysis, Counted, Finding, Observation, Signal } from './observe.ts';
-export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, NumberReaders } from './ingest.ts';
+export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, NumberReaders, Sender } from './ingest.ts';
 export type { ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
@@ -4896,8 +4915,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     } else if (sql.one("SELECT 1 AS n FROM event WHERE batch = ? AND kind = 'edit' LIMIT 1", ref)) batch = ref;
     if (batch === null) return no('VALUE_MALFORMED', `Nothing called ${ref} was merged, so there is no merge to undo.`, { at: 'ref' });
 
-    const lines = sql.all<{ target: string; kind: string; field: string | null; from_v: string | null; to_v: string | null }>(
-      'SELECT target, kind, field, from_v, to_v FROM event WHERE batch = ? OR id = ? ORDER BY rowid',
+    const lines = sql.all<{ target: string; kind: string; field: string | null; from_v: string | null; to_v: string | null; actor: string }>(
+      'SELECT target, kind, field, from_v, to_v, actor FROM event WHERE batch = ? OR id = ? ORDER BY rowid',
       batch,
       batch,
     );
@@ -5031,6 +5050,25 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (!out.ok) return out as Result<never>;
       if (folds.has(id)) undone.push(titleOfRow(id) ?? nameOf(id));
     }
+    /* AND THE LADDER IS TOLD, as `undo.ts` tells it: a merge somebody put back is a change of theirs undone, so the agent
+       whose meeting folded the two drops back to Ask on that kind (migration 25's `undone`). Once per batch. */
+    const by = lines[0]?.actor ?? null;
+    const kinds = new Set<string>();
+    for (const l of lines) {
+      const list = l.target.startsWith('entry:') ? byId(l.target.slice('entry:'.length), true)?.register : undefined;
+      const kind = list === undefined ? null : kindOfEvent({ list, kind: l.kind, field: l.field, to_v: l.to_v }, shapeIn(sql, list));
+      if (kind) kinds.add(kind.key);
+    }
+    sql.exec(
+      'INSERT OR IGNORE INTO undone (batch, by_batch, actor, agent, kinds, undone_by, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      batch,
+      as.batch!,
+      by,
+      by === null ? null : ladderAgentOf(sql, by),
+      JSON.stringify([...kinds].sort()),
+      w.actor,
+      instant(clock.now()),
+    );
     return ok({ restored: undone });
   }
 
@@ -5327,7 +5365,79 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       ...(does ? { does } : {}),
       ...(candidates.length > 0 ? { candidates } : {}),
       ...(Array.isArray(body.rows) ? { held: body.rows.length } : {}),
+      ...cardFacts(r, kind, body),
     };
+  };
+
+  /** A value that is money: a whole number of minor units with a three-letter currency. */
+  const moneyIn = (v: unknown): { amount: number; currency: string } | null => {
+    if (v === null || typeof v !== 'object' || Array.isArray(v)) return null;
+    const m = v as { amount?: unknown; currency?: unknown };
+    return typeof m.amount === 'number' && Number.isSafeInteger(m.amount) && typeof m.currency === 'string' && /^[A-Z]{3}$/u.test(m.currency)
+      ? { amount: m.amount, currency: m.currency }
+      : null;
+  };
+
+  /*
+   * WHAT THE DECISION CARD SAYS BESIDE THE QUESTION: who asked from which run and app, who drafted it, the money accepting
+   * writes, what changes on the row it updates, and the kinds of change it is. Each is left off when the record cannot
+   * say it, and none is invented: a run is named only by what it said it was doing, and a value only as the row holds it.
+   *
+   * THE MONEY IS EACH VALUE AS WRITTEN, one a row, and never two currencies added: the card says one line a currency.
+   * THE CHANGES ARE ONE ROW'S, since a field name alone across several rows would not say which row moves, and a secret or
+   * a file is never said; the queue is drawn only for a reader of the whole record, who may read every value here.
+   */
+  const cardFacts = (r: Record<string, unknown>, kind: string, body: Record<string, unknown>): Partial<QueueQuestion> => {
+    const out: Partial<QueueQuestion> = {};
+    const by = String(r.opened_by ?? '');
+    if (isRunName(by)) {
+      const run = bySeq(SESSION, Number(by.slice((registers.get(SESSION)?.seq_prefix ?? 'S').length)), true);
+      if (run) {
+        const doing = typeof run.fields.doing === 'string' ? run.fields.doing.trim() : '';
+        const hints = {
+          ...(typeof run.fields.agent === 'string' ? { agent: run.fields.agent } : {}),
+          ...(typeof run.fields.client === 'string' ? { client: run.fields.client } : {}),
+        };
+        out.run = { id: by, ...(doing === '' ? {} : { name: clipTitle(doing) }), app: runAgentOf(hints).name };
+      }
+    }
+    if (typeof r.drafted_by === 'string' && r.drafted_by !== '') out.drafted_by = r.drafted_by;
+    const kinds = keysOfStamp(typeof r.kind === 'string' ? r.kind : null);
+    if (kinds.length > 0) out.kinds = kinds;
+    if (kind !== 'rowset' || !Array.isArray(body.rows)) return out;
+    const register = typeof body.register === 'string' ? body.register : '';
+    const rows = (body.rows as unknown[]).filter((x): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x));
+    const writes = rows.map((x) => ('at' in x ? x.patch : x)).filter((x): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x));
+    const money = writes.flatMap((w) => Object.values(w).flatMap((v) => moneyIn(v) ?? []));
+    if (money.length > 0) out.money = money;
+    const [only] = rows;
+    if (rows.length !== 1 || only === undefined || typeof only.at !== 'string' || writes.length !== 1) return out;
+    const row = get(only.at, { includeDeleted: true });
+    const list = registers.get(register);
+    if (!row || row.register !== register || !list) return out;
+    /* A LINK IS SAID BY THE TITLE OF THE ROW IT POINTS AT, and an enum by its label where it has one, since a person reads
+       the card and a row id is never shown to one; a link that names no row leaves its change off rather than say an id. */
+    const named = (type: string | undefined, labels: Readonly<Record<string, string>> | undefined, v: unknown): Json | null | undefined => {
+      if (v === null || v === undefined || v === '') return null;
+      if (Array.isArray(v)) {
+        const each = v.map((x) => named(type, labels, x));
+        return each.includes(undefined) ? undefined : (each as Json[]);
+      }
+      if (type === 'ref') return typeof v === 'string' ? (titleOfRow(v) ?? undefined) : undefined;
+      if (type === 'enum' && typeof v === 'string') return labels?.[v] ?? v;
+      return v as Json;
+    };
+    const changes = Object.entries(writes[0]!).flatMap(([field, after]) => {
+      const spec = list.fields.find((f) => f.id === field);
+      const type = spec?.type === 'list' ? spec.of : spec?.type;
+      if (!spec || type === 'secret' || type === 'file') return [];
+      const label = typeof spec.label === 'string' && spec.label.trim() !== '' ? spec.label.trim() : undefined;
+      const before = named(type, spec.labels, row.fields[field]);
+      const now = named(type, spec.labels, after);
+      return before === undefined || now === undefined ? [] : [{ field, ...(label ? { label } : {}), before, after: now }];
+    });
+    if (changes.length > 0) out.changes = changes;
+    return out;
   };
 
   const pageDeps = (): PageDeps => ({
@@ -5504,7 +5614,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             ? []
             : sql
                 .all<Record<string, unknown>>(
-                  `SELECT id, body_kind, body, opened_by, opened_at FROM suggestion WHERE id IN (${ids.map(() => '?').join(', ')})`,
+                  `SELECT id, body_kind, body, opened_by, opened_at, drafted_by, kind FROM suggestion WHERE id IN (${ids.map(() => '?').join(', ')})`,
                   ...ids,
                 )
                 .map((r) => [String(r.id), r]),
@@ -5562,7 +5672,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     laterQuestions: (limit) => {
       const now = instant(clock.now());
       const rows = sql.all<Record<string, unknown>>(
-        "SELECT id, body_kind, body, status, opened_by, opened_at, defer_until, defer_why FROM suggestion WHERE status = 'open' AND defer_until > ? ORDER BY defer_until ASC, rowid ASC LIMIT ?",
+        "SELECT id, body_kind, body, status, opened_by, opened_at, defer_until, defer_why, drafted_by, kind FROM suggestion WHERE status = 'open' AND defer_until > ? ORDER BY defer_until ASC, rowid ASC LIMIT ?",
         now,
         Math.min(Math.max(1, Math.floor(limit)), 200),
       );
@@ -6997,9 +7107,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * can use to find out what is wrong with it.
      */
     /* `walk` IS A LENGTH A READER PICKED on a forecast's horizon knob, which a forecast offering it walks in full (`walkReach`
-       in `pages.ts`); without it a walk reaches past what it opens on to `WALK_UNASKED` at most. */
-    page: (slug: string, filter?: Readonly<Record<string, string>>, opts: { walk?: number | 'last' } = {}): Result<PageResult> =>
-      readPage(opts.walk === undefined ? pageDeps() : { ...pageDeps(), walk: opts.walk }, slug, filter),
+       in `pages.ts`); without it a walk reaches past what it opens on to `WALK_UNASKED` at most. `reader` IS WHO IS READING
+       (`PageDeps.reader`), so the look is laid over the blocks as this caller is shown them. */
+    page: (
+      slug: string,
+      filter?: Readonly<Record<string, string>>,
+      opts: { walk?: number | 'last'; reader?: PageDeps['reader'] } = {},
+    ): Result<PageResult> =>
+      readPage({ ...pageDeps(), ...(opts.walk === undefined ? {} : { walk: opts.walk }), ...(opts.reader ? { reader: opts.reader } : {}) }, slug, filter),
 
     /** One metric document by its id, so a caller can fill a parameter and read it. */
     metricDecl: (id: string): MetricDecl | null => pageDeps().metric(id),
@@ -9166,7 +9281,37 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const trigger = trialTrigger(trial, body, sample, io, actor);
         return trigger.ok ? tryRun(trial, body, trigger.value, actor) : trigger;
       }),
+
+    /**
+     * What undoing one write, one decision or one agent's run would put back, in names, with the hash `undoApply` takes
+     * (`undo.ts`). Reads and writes nothing.
+     */
+    undoPlan: (scope: UndoScope, opts: UndoOptions = {}): Result<UndoPlan> => planUndo(sql, scope, opts),
+
+    /**
+     * Put back what `undoPlan` showed, as `actor`, while `hash` is still what it would do. One transaction and one batch,
+     * through the record's own write path, and the ladder told of every batch put back (`undone`). HERE AND NOT UNDER
+     * `api/`, like `tryAutomation`: `parts` is read when this is called, after it is built.
+     */
+    undoApply: (scope: UndoScope, hash: string, actor: string, opts: UndoOptions = {}): Result<UndoApplied> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      return applyUndo(parts, scope, hash, actor, opts);
+    },
+
+    /** One bounded slice of the walk over what the record already holds: payees, runs and services linked (`backfill.ts`). */
+    backfill: (opts: BackfillOptions = {}): Backfilled => understandBackfill(backfillDeps(), opts),
+
+    /** Put back one batch the walk wrote; a second undo of the same batch puts nothing back. */
+    undoBackfill: (batch: string, by: string): Result<{ undone: number; batch: string | null }> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      return undoBackfill(backfillDeps(), batch, by);
+    },
   };
+
+  /** What the walk over the past writes through: this record's parts and its live lists. */
+  const backfillDeps = (): BackfillDeps => ({ sql, clock, mint, transaction, write: kernel.write, registers: () => registers });
 
   /**
    * The closure's own functions, for the methods written under `api/` (`parts.ts` says why each is there).
