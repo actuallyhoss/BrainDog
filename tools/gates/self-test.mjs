@@ -431,13 +431,17 @@ const BROWSER = [
    * `layout`: `BRAINDOG_GATE_SEED=1` puts a 2000px heading inside `#main`, the exact bug the gate
    * is named after, and the one it could not see while it treated the app's own scroll container
    * as an exemption.
+   *
+   * AND ONCE MORE WITH A PANEL DOCKED BESIDE THE WORK, which is its own pass with its own edge and
+   * had never been asked to go red (research-audit-16 L12). Both sentences, because the sweep's alone
+   * would hold the run red with the docked pass seeing nothing.
    */
   {
     gate: 'layout',
     seed: '1',
-    names: 'reaches 2000px',
+    names: ['reaches 2000px', 'under the panel'],
     blind: 'PASSED a 2000px heading inside #main. It is examining nothing.',
-    red: 'red on a 2000px heading inside #main',
+    red: 'red on a 2000px heading inside #main, with the panel shut and with it docked',
   },
   /**
    * `a11y`: `BRAINDOG_GATE_SEED=intent` prepends an `a[data-intent="bad"]` with no name for the
@@ -518,11 +522,13 @@ function seededBrowser({ gate, seed, names, blind, red }) {
     env: { ...process.env, BRAINDOG_GATE_SEED: seed },
   });
   const said = `${r.stdout}${r.stderr}`;
+  /* EVERY SENTENCE A NEGATIVE NAMES, where one gate proves more than one pass on a single run. */
+  const unnamed = [names].flat().filter((n) => !said.includes(n));
   if (r.status === 0) {
     console.error(`  ${gate}: ${blind}`);
     failed.push(gate);
-  } else if (!said.includes(names)) {
-    console.error(`  ${gate}: went red but never named ${names}, so this run says nothing about the rule. What it did say:`);
+  } else if (unnamed.length) {
+    console.error(`  ${gate}: went red but never named ${unnamed.join(' or ')}, so this run says nothing about the rule. What it did say:`);
     console.error(
       said
         .split('\n')

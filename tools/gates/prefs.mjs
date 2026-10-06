@@ -73,7 +73,7 @@ import { chromium } from '@playwright/test';
 
 import { ACCENTS } from '../../packages/theme/src/record.ts';
 import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
-import { answers, forward, forwards, serverKeyFor, startRecord } from './record.mjs';
+import { answers, bootWith, forward, forwards, RECORD_PREFS, recordPrefsOf, startRecord } from './record.mjs';
 
 /* AND WHY THIS GATE DECLARES NO `needs`, although it drives a browser like the four that do.
    `52 §5.1` step 2 lets the runner refuse a gate whose prerequisite is unmet, and a refusal means
@@ -305,7 +305,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
      * THE RECORD'S OWN KEYS (`PREF_KEYS`, contracts §7.3). A person's shape, switch and dismissals are kept by the record
      * and answered on `boot`'s `me.prefs`, and the cookie is only their first-paint copy. The gate's record is reached with
      * a key, and a key is not a person, so `setPref` refuses it; instead this gate's server writes the case's `@record`
-     * into the `boot` it hands the page (`bootWith` below), which is exactly the answer a person's `boot` carries. A value
+     * into the `boot` it hands the page (`bootWith` in `record.mjs`), which is exactly the answer a person's `boot` carries. A value
      * may be a function of the value before it, for a case whose second load names what the first one drew.
      */
     {
@@ -796,38 +796,6 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     if (server !== null) await new Promise((r) => server.close(() => r()));
     await record?.close().catch(() => {});
   }
-}
-
-/** The cookie a case's `@record` rides in from the browser to this gate's server. Only this gate's server reads it. */
-const RECORD_PREFS = 'bd_gate_record';
-
-/** What a case says the record keeps for the person, from the request's cookie, or `null` when the case says nothing. */
-function recordPrefsOf(cookie) {
-  const raw = new RegExp(`(?:^|;\\s*)${RECORD_PREFS}=([^;]*)`).exec(cookie ?? '')?.[1];
-  if (raw === undefined) return null;
-  try {
-    const out = JSON.parse(decodeURIComponent(raw));
-    return out && typeof out === 'object' && !Array.isArray(out) ? out : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The record's own `boot`, with `me.prefs` set to what the case says the record keeps.
- *
- * THE REST IS THE RECORD'S ANSWER, UNTOUCHED, read with the gate's key as `forward` reads it, so the page draws exactly
- * the screen it draws for a person whose record holds these preferences.
- */
-async function bootWith(req, res, base, held) {
-  const key = serverKeyFor(base);
-  const said = await fetch(new URL(req.url ?? '/', base), { headers: key === undefined ? {} : { authorization: `Bearer ${key}` } })
-    .then((r) => r.json())
-    .catch(() => null);
-  if (said?.ok === true && said.value && typeof said.value === 'object') said.value.me = { ...(said.value.me ?? {}), prefs: held };
-  const answer = said ?? { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: "The gate's record did not answer its boot." } };
-  res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-  res.end(JSON.stringify(answer));
 }
 
 /* AND IT IS STILL A SCRIPT, because `self-test` spawns this file with `BRAINDOG_GATE_SEED=prefs` and

@@ -35,7 +35,7 @@ import { extname, join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { APP_BASE, appShell, budget, readiness, skipDir } from './lib.mjs';
-import { answers, forward, forwards, startRecord, VARIANTS as RECORDS } from './record.mjs';
+import { answers, bootWith, forward, forwards, RECORD_PREFS, recordPrefsOf, startRecord, VARIANTS as RECORDS } from './record.mjs';
 import { routesOf } from './routes.mjs';
 
 /**
@@ -298,6 +298,8 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      * of the record app's shell and every variant of it is the same shell.
      */
     const ready = readiness('layout', budget('ready').settleTimeoutMs, ROOT);
+    /* AND THE SAME WAIT FOR A PRESS THAT OPENS SOMETHING, so the docked pass spells no number of its own. */
+    const ACT_MS = budget('ready').settleTimeoutMs;
 
     const bps = (await breakpoints()).sort((a, b) => a - b);
     /* One pixel either side of each. `width < 900px` is on at 899 and off at 900, and those are two
@@ -326,6 +328,10 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
 
     server = createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://x');
+      /* A SHAPE THE RECORD KEEPS, for the passes that draw the top bar and the menu (`SHAPES` below): the page's `boot`
+         carries it as a person's would, by the cookie `prefs` uses for the same thing. */
+      const held = recordPrefsOf(req.headers.cookie);
+      if (held !== null && /^\/+api\/boot$/u.test(url.pathname)) return bootWith(req, res, asking === null ? record.base : record.variants[asking], held);
       if (forwards(url.pathname)) return forward(req, res, asking === null ? record.base : record.variants[asking]);
       const rel = decodeURIComponent(url.pathname).slice(1);
       if (rel.includes('..')) return res.writeHead(400).end();
@@ -370,8 +376,18 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      * pass over a second record with a COPY of this would be two rules wearing one name, the exact
      * shape this repo keeps finding. It is named once and passed to both.
      */
-    const MEASURE = ([w, slack, COARSE]) => {
+    const MEASURE = ([w, slack, COARSE, docked = false]) => {
           const hits = [];
+          /* WITH A PANEL DOCKED, THE WORK ENDS WHERE THE PANEL STARTS, and that is the edge nothing in it may pass: the
+             panel has a column of its own from 1,280 up, so a heading reaching under it has made `#main` scroll sideways
+             beside it, which is the same bug as the document doing it with the panel shut. The panel's own contents are
+             not the work's and are not read. */
+          const dock = docked ? document.querySelector('dialog.dock[open]:not(:modal)') : null;
+          const edge = dock ? dock.getBoundingClientRect().left : w;
+          const work = document.getElementById('main');
+          if (dock && work && work.scrollWidth > work.clientWidth + slack) {
+            hits.push(`the work scrolls sideways beside the panel (${work.scrollWidth}px in ${work.clientWidth}px)`);
+          }
           if (document.documentElement.scrollWidth > w + slack) {
             hits.push(`the DOCUMENT scrolls sideways (${document.documentElement.scrollWidth}px)`);
           }
@@ -402,10 +418,11 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
           };
           for (const el of document.querySelectorAll('#main *, nav *, .tab-slot *')) {
             const r = el.getBoundingClientRect();
-            if (r.width === 0 || r.right <= w + 1) continue;
-            if (getComputedStyle(el).position === 'fixed' || contained(el)) continue;
+            if (r.width === 0 || r.right <= edge + 1) continue;
+            if (getComputedStyle(el).position === 'fixed' || contained(el) || dock?.contains(el)) continue;
             hits.push(
-              `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]} reaches ${Math.round(r.right)}px`,
+              `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]} reaches ${Math.round(r.right)}px` +
+                (dock ? `, under the panel from ${Math.round(edge)}px` : ''),
             );
           }
           /**
@@ -512,6 +529,18 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      * was nothing here". `self-test` reads that sentence and reports the variant half as unproved
      * rather than counting it.
      */
+    /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=1` a 2000px heading is put into `#main`
+       (the exact bug this gate is named after) and the run must go red. It is here rather than in a fixture tree because
+       the thing under test is a real browser over a real build, and there is no smaller way to hold that. One function
+       for every pass that seeds, so the heading the docked pass is proved on is the one the sweep is. */
+    const seedHeading = (page) =>
+      page.evaluate(() => {
+        const h = document.createElement('h2');
+        h.textContent = 'seeded';
+        h.style.cssText = 'width:2000px;white-space:nowrap';
+        document.getElementById('main')?.prepend(h);
+      });
+
     if (process.env.BRAINDOG_GATE_SEED) {
       widths.length = 1;
       ROUTES.length = 1;
@@ -553,19 +582,8 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
         }
         // An un-laid-out rowgroup has no geometry: it cannot overflow, and it cannot be measured.
         await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-        /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=1` a 2000px heading
-           is put into `#main` (the exact bug this gate is named after) and the run must go red. It is
-           here rather than in a fixture tree because the thing under test is a real browser over a real
-           build, and there is no smaller way to hold that. */
-        if (process.env.BRAINDOG_GATE_SEED)
-          await page.evaluate(() => {
-            const h = document.createElement('h2');
-            h.textContent = 'seeded';
-            h.style.cssText = 'width:2000px;white-space:nowrap';
-            document.getElementById('main')?.prepend(h);
-          });
+        if (process.env.BRAINDOG_GATE_SEED) await seedHeading(page);
         await page.waitForTimeout(L.settleMs);
-
 
         const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
 
@@ -616,8 +634,15 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      * Inline boxes, positioned layers and anything reaching past `#main` (a table scrolling in its region) are not the
      * page's width and are not read.
      *
-     * THE ROOM IS THE VIEWPORT LESS THE RAIL'S COLUMN, the rail card and its inset, read off the page so a folded or
-     * narrow rail is measured as it is drawn. On a shape with no rail the room is the whole window.
+     * THE ROOM IS THE COLUMN THE SHELL GIVES THE WORK, read off the shell's own grid: the track `#main` stands in, so the
+     * rail card's column, folded or not, and the docked panel's column are both outside it. It was the viewport less
+     * `.rail-slot`'s width, which is only drawn on the rail: on the top bar and the menu it read 0 and the room was the
+     * whole window, right with the panel shut and 400 too wide with it open (research-audit-16 L12). The track is what
+     * the shell gave and not what the page took, so a page capping itself is still the short one.
+     *
+     * ON ALL THREE SHAPES, because each lays the work out on its own grid and only one of them was ever drawn. A shape
+     * the record keeps rides in on `boot` (`bootWith`), and a pass that asked for the top bar and got the rail says so
+     * rather than measuring the rail three times.
      *
      * NAMED BY THEIR NAMES, because a red line here is read by somebody deciding which screen to open. The addresses are
      * the shipped seed's pages (`packages/seed/src/modules`): Projects is `portfolio`.
@@ -630,6 +655,32 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       { name: 'Projects', route: '/p/portfolio' },
       { name: 'People', route: '/p/people' },
     ];
+    /* THE THREE SHAPES `19 §3` OFFERS, by what the shell writes on `.shell[data-shape]` and what the record keeps to ask
+       for each. The rail is the default and asks for nothing; the record's word for it is not the shell's. */
+    const SHAPES = [
+      { name: 'the rail', drawn: 'rail', keeps: null },
+      { name: 'the top bar', drawn: 'bar', keeps: { 'nav.shape': 'bar' } },
+      { name: 'the menu', drawn: 'menu', keeps: { 'nav.shape': 'menu' } },
+    ];
+    /** A desktop window drawing one shape. Motion is reduced unless the pass is watching something move. */
+    const contextFor = async (width, shape, reducedMotion = 'reduce') => {
+      const context = await browser.newContext({ viewport: { width, height: L.viewportHeightPx }, reducedMotion, bypassCSP: true });
+      if (shape.keeps !== null)
+        await context.addCookies([{ name: RECORD_PREFS, value: encodeURIComponent(JSON.stringify(shape.keeps)), url: `http://localhost:${PORT}` }]);
+      return context;
+    };
+    /** Opens a screen and waits for it to settle; `false`, with the finding written, when it never did. */
+    const reach = async (page, route, where) => {
+      await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
+      const unmeasured = ready.check(where, route, await ready.settled(page));
+      if (unmeasured) {
+        findings.push(unmeasured);
+        process.stdout.write('!');
+        return false;
+      }
+      await page.waitForTimeout(L.settleMs);
+      return true;
+    };
     const SPAN = () => {
       const main = document.getElementById('main');
       if (!main) return null;
@@ -639,48 +690,221 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       for (const el of main.querySelectorAll('*')) {
         const s = getComputedStyle(el);
         if (s.display === 'inline' || s.display === 'contents' || s.position === 'fixed' || s.position === 'absolute') continue;
+        if (el.closest('dialog')) continue;
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0 || r.left < box.left - 1 || r.right > box.right + 1) continue;
         const inner = r.width - px(s.paddingLeft) - px(s.paddingRight) - px(s.borderLeftWidth) - px(s.borderRightWidth);
         if (inner > widest) widest = inner;
       }
-      const rail = document.querySelector('.rail-slot')?.getBoundingClientRect().width ?? 0;
-      return { widest: Math.round(widest), rail: Math.round(rail) };
+      /* THE SHELL'S TRACKS, as the browser resolved them (`216px 1256px 0px` on the rail with the panel shut), and the
+         one `#main` starts in is the room. The track after it, when there is one, is the docked panel's column. */
+      const shell = main.closest('.shell');
+      const tracks = shell ? getComputedStyle(shell).gridTemplateColumns.split(' ').map(parseFloat).filter(Number.isFinite) : [];
+      let start = shell ? shell.getBoundingClientRect().left : 0;
+      let room = box.width;
+      let dock = 0;
+      for (const [i, t] of tracks.entries()) {
+        if (box.left + 1 < start + t) {
+          room = t;
+          dock = tracks[i + 1] ?? 0;
+          break;
+        }
+        start += t;
+      }
+      return { widest: Math.round(widest), room: Math.round(room), dock: Math.round(dock), shape: shell?.getAttribute('data-shape') ?? null };
     };
     /* THE WIDTHS THIS PART DRAWS, AND ANY NO PART DRAWS, in the first part, so a width named in the budget is never
-       judged by nobody. NOT UNDER THE SEED: the seeded heading is 2000px wide and proves nothing about a narrow page. */
-    const fullAt = process.env.BRAINDOG_GATE_SEED
-      ? []
-      : L.fullWidthAtPx.filter((w) => widths.includes(w) || (part === 1 && !every.includes(w)));
+       judged by nobody. NOT UNDER THE SEED for the full-width pass: the seeded heading is 2000px wide and proves nothing
+       about a narrow page. The docked pass takes one page under it (below). */
+    const ours = (list) => (process.env.BRAINDOG_GATE_SEED ? [] : list.filter((w) => widths.includes(w) || (part === 1 && !every.includes(w))));
+    const fullAt = ours(L.fullWidthAtPx);
     const pct = new Intl.NumberFormat('en', { style: 'percent' });
-    for (const width of fullAt) {
-      const context = await browser.newContext({ viewport: { width, height: L.viewportHeightPx }, reducedMotion: 'reduce', bypassCSP: true });
-      const page = await context.newPage();
-      process.stdout.write(`    full @${String(width).padStart(4)} `);
-      for (const screen of MAIN_SCREENS) {
-        await page.goto(`http://localhost:${PORT}${base}${screen.route}`, { waitUntil: 'domcontentloaded' });
-        const unmeasured = ready.check(`${screen.route} @${width} (full width)`, screen.route, await ready.settled(page));
-        if (unmeasured) {
-          findings.push(unmeasured);
-          process.stdout.write('!');
-          continue;
+    /** What is wrong with a screen narrower than its room, or `null`. `beside` says what the room is. */
+    const short = (span, beside) =>
+      span.widest < span.room * L.fullWidthShare
+        ? `is ${span.widest}px wide at most in the ${span.room}px ${beside} ` +
+          `(${pct.format(span.widest / span.room)}), and a main screen fills ${pct.format(L.fullWidthShare)}: a cap or a centred column`
+        : null;
+    /** What is wrong with a shell that drew another shape than the one asked for, or `null`. */
+    const misdrawn = (span, shape) =>
+      span.shape === shape.drawn ? null : `asked for ${shape.name} and the shell drew ${span.shape ?? 'no shell'}, so ${shape.name} was not measured`;
+    for (const width of fullAt)
+      for (const shape of SHAPES) {
+        const context = await contextFor(width, shape);
+        const page = await context.newPage();
+        process.stdout.write(`    full @${String(width).padStart(4)} ${shape.drawn.padEnd(4)} `);
+        for (const screen of MAIN_SCREENS) {
+          const where = `${screen.name} (${screen.route}) @${width} on ${shape.name}`;
+          if (!(await reach(page, screen.route, `${screen.route} @${width} on ${shape.name} (full width)`))) continue;
+          const span = await page.evaluate(SPAN);
+          checked++;
+          const said = span === null ? 'drew no #main to measure for full width' : (misdrawn(span, shape) ?? short(span, 'the shell gives the work'));
+          process.stdout.write(said ? '!' : '.');
+          if (said) findings.push(`${where}  ${said}`);
         }
-        await page.waitForTimeout(L.settleMs);
-        const span = await page.evaluate(SPAN);
-        checked++;
-        const room = width - (span?.rail ?? 0);
-        const short = span === null || span.widest < room * L.fullWidthShare;
-        process.stdout.write(short ? '!' : '.');
-        if (span === null) findings.push(`${screen.name} (${screen.route}) @${width}  drew no #main to measure for full width`);
-        else if (short)
-          findings.push(
-            `${screen.name} (${screen.route}) @${width}  is ${span.widest}px wide at most in the ${room}px beside the rail ` +
-              `(${pct.format(span.widest / room)}), and a main screen fills ${pct.format(L.fullWidthShare)}: a cap or a centred column`,
-          );
+        process.stdout.write('\n');
+        await context.close();
       }
-      process.stdout.write('\n');
-      await context.close();
-    }
+
+    /**
+     * AND WITH A PANEL DOCKED BESIDE THE WORK, which no pass above ever opened (research-audit-16 L12).
+     *
+     * DIRECTION 37's docked right panel takes a column of its own from 1,280 up, and every screen that opens a task or a
+     * row narrows beside it. Every pass above measures a screen at rest, so the three things that go wrong only while a
+     * panel is open swept green: the work squeezed under the panel or scrolling sideways beside it, blocks paired into
+     * halves by the window's width when the panel has taken a third of it (H2), and the column opening in one frame while
+     * the panel takes a quarter of a second to arrive, so a strip of bare ground shows where it will be (M1).
+     *
+     * AT 1,280, 1,440 AND 1,728 (`dockedAtPx`): where the panel first docks, where blocks begin to pair, and the owner's
+     * wide laptop. On all three shapes, because the panel's column is a track of each shape's own grid.
+     *
+     * TWO SCREENS, ONE FOR EACH WAY A PANEL OPENS: a task's title on Work (`.item-open`, the renderer's row verb) and `p`
+     * on a list (the register's peek). An open that does not take is a finding and not a skip, for the reason `ACTS`
+     * gives.
+     *
+     * WHAT IS READ, IN ORDER:
+     *   * THE ARRIVAL, WITH MOTION ON. Every pass above reduces motion, which is the right default and is exactly why a
+     *     panel that arrives late was never seen. Each frame from the press until the panel is still, the ground between
+     *     the work's edge and the panel's is read; more than `dockBlankShare` of the panel's column over the gap it rests
+     *     at is the blank column.
+     *   * THE OVERFLOW RULE, with the panel's edge for the window's (`MEASURE`'s `docked`).
+     *   * FULL WIDTH, IN THE COLUMN LEFT BESIDE THE PANEL, by the same share as at rest.
+     *   * THE PAIRING, AGAINST THE SAME SCREEN WITH THE SAME ROOM AND NO PANEL. Blocks set side by side beside the panel
+     *     are compared with the screen drawn in a window narrower by the panel's column, where the work has about the same
+     *     room and nothing is docked. If that window stacks them, pairing read the window and not the work. No number
+     *     of pixels is assumed: the product's own rule at that room is the measure.
+     */
+    const DOCKED = [
+      { name: 'Work', route: '/p/work', open: (page) => page.locator('#main .item-open:visible').first().click({ timeout: ACT_MS }) },
+      { name: 'Bills and invoices', route: '/r/obligations', open: (page) => page.keyboard.press('p') },
+    ];
+    /* EACH FRAME FROM THE PRESS UNTIL THE PANEL IS STILL, the widest ground between the work and the panel. Still is two
+       frames with the gap unchanged and nothing running on the panel or on the root; `limit` ends a watch on a panel
+       that never came.
+
+       THE ROOT TOO, because the column is a transition there and not on the panel: `--dock-col` waits `--d-panel` and
+       then lands in one step (`Panel.svelte`). Read off the panel alone, a slide that ended a frame before the column
+       came looked still with the panel over the work's end, and the column landing after the watch was never seen.
+       A transition in its delay is running, so the root's list holds it until it lands.
+
+       THE WIDEST GAP STARTS AT THE FIRST ONE READ, NOT AT 0. While the panel slides in over the work the gap is
+       negative, and a 0 to start from made every watch that ended there report the whole overlap as bare ground.
+
+       AND A WATCH THAT RUNS OUT HAS NO REST, so it says it never came to rest and gives no gap to measure from: the last
+       one read was mid-slide, and the overlap against it is the same false bare ground. `#main` is read each frame,
+       because a press that changes the address draws a new one (`{#key}` in `+layout.svelte`). */
+    const ARRIVAL = (limit) =>
+      new Promise((done) => {
+        const from = performance.now();
+        let blank = null;
+        let last = null;
+        let still = 0;
+        const moving = (el) => el.getAnimations().some((a) => a.playState === 'running');
+        const frame = () => {
+          const main = document.getElementById('main');
+          const dock = document.querySelector('dialog.dock[open]:not(:modal)');
+          if (dock && main) {
+            const gap = dock.getBoundingClientRect().left - main.getBoundingClientRect().right;
+            if (blank === null || gap > blank) blank = gap;
+            still = last !== null && Math.abs(gap - last) < 1 && !moving(dock) && !moving(document.documentElement) ? still + 1 : 0;
+            last = gap;
+            if (still > 1) return done({ docked: true, settled: true, blank: Math.round(blank), rest: Math.round(gap) });
+          }
+          if (performance.now() - from > limit) return done({ docked: dock !== null, settled: false, blank: null, rest: null });
+          requestAnimationFrame(frame);
+        };
+        requestAnimationFrame(frame);
+      });
+    /* THE NARROWEST OF ANY TWO BLOCKS SET SIDE BY SIDE in the work, or `null` when every block has its row to itself. */
+    const PAIRED = () => {
+      const slots = [...document.querySelectorAll('#main .block-slot')]
+        .filter((el) => !el.closest('dialog'))
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0);
+      let narrowest = null;
+      for (const a of slots)
+        for (const b of slots)
+          if (a !== b && Math.abs(a.top - b.top) < 1 && a.right <= b.left + 1) narrowest = Math.min(narrowest ?? a.width, a.width, b.width);
+      return narrowest === null ? null : Math.round(narrowest);
+    };
+    /* UNDER THE SEED, ONE PAGE WITH THE PANEL OPEN, AND NOT NONE (research-audit-16 L12: this pass skipped the seed, so
+       `self-test` had never once asked it to go red). The first width, the rail and Work: the seeded heading is 2000px
+       wide, so it reaches under the panel at every width on every shape, and `self-test` holds the run to naming that.
+       In the first part only, like every width no part draws. */
+    const seeded = Boolean(process.env.BRAINDOG_GATE_SEED);
+    const dockAt = seeded ? (part === 1 ? L.dockedAtPx.slice(0, 1) : []) : ours(L.dockedAtPx);
+    for (const width of dockAt)
+      for (const shape of seeded ? SHAPES.slice(0, 1) : SHAPES) {
+        const context = await contextFor(width, shape, 'no-preference');
+        const page = await context.newPage();
+        process.stdout.write(`    dock @${String(width).padStart(4)} ${shape.drawn.padEnd(4)} `);
+        for (const screen of seeded ? DOCKED.slice(0, 1) : DOCKED) {
+          const where = `${screen.name} (${screen.route}) @${width} on ${shape.name}, panel open`;
+          if (!(await reach(page, screen.route, `${screen.route} @${width} on ${shape.name} (docked)`))) continue;
+          await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+          const watching = page.evaluate(ARRIVAL, L.dockArrivalMs);
+          try {
+            await screen.open(page);
+          } catch (e) {
+            await watching.catch(() => null);
+            findings.push(`${where}  could not open a panel: ${String(e).split('\n')[0]}`);
+            process.stdout.write('!');
+            continue;
+          }
+          /* `null` IS A PAGE THAT LOADED AGAIN UNDER THE WATCH, which took the watch with it: the press left the screen. */
+          const arrival = await watching.catch(() => null);
+          checked++;
+          if (arrival === null || !arrival.docked) {
+            findings.push(
+              `${where}  ${arrival === null ? 'loaded the page again instead of opening a panel' : `opened no docked panel in ${L.dockArrivalMs}ms: a sheet over the screen, or nothing`}`,
+            );
+            process.stdout.write('!');
+            continue;
+          }
+          if (seeded) await seedHeading(page);
+          await page.waitForTimeout(L.settleMs);
+          const said = [...(await page.evaluate(MEASURE, [width, L.widthTolerancePx, false, true]))];
+          if (!arrival.settled) said.push(`was still moving ${L.dockArrivalMs}ms after the press, so how it arrived was not read`);
+          const span = await page.evaluate(SPAN);
+          if (span === null) said.push('drew no #main to measure beside the panel');
+          else {
+            const wrong = misdrawn(span, shape);
+            if (wrong) said.push(wrong);
+            else {
+              const narrow = short(span, 'left beside the panel');
+              if (narrow) said.push(narrow);
+              if (arrival.rest !== null && arrival.blank - arrival.rest > span.dock * L.dockBlankShare)
+                said.push(
+                  `showed ${arrival.blank - arrival.rest}px of bare ground between the work and the panel while it arrived: ` +
+                    'the column opened before the panel came to fill it',
+                );
+              const pairs = await page.evaluate(PAIRED);
+              if (pairs !== null && span.dock > 0) {
+                /* THE SAME SCREEN, NO PANEL, IN A WINDOW NARROWER BY THE PANEL'S COLUMN. */
+                const alike = width - span.dock;
+                const other = await contextFor(alike, shape);
+                const bare = await other.newPage();
+                if (await reach(bare, screen.route, `${screen.route} @${alike} on ${shape.name} (the panel's room, shut)`)) {
+                  await bare.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+                  const apart = await bare.evaluate(PAIRED);
+                  const room = await bare.evaluate(SPAN);
+                  checked++;
+                  if (apart === null)
+                    said.push(
+                      `sets blocks side by side, the narrower ${pairs}px, in the ${span.room}px left beside the panel, where a ${alike}px ` +
+                        `window with ${room?.room ?? alike}px for the work stacks them: pairing reads the window and not the work`,
+                    );
+                }
+                await other.close();
+              }
+            }
+          }
+          process.stdout.write(said.length ? '!' : '.');
+          for (const s of [...new Set(said)]) findings.push(`${where}  ${s}`);
+        }
+        process.stdout.write('\n');
+        await context.close();
+      }
 
     /**
      * The variants, at the widths that matter for them.
@@ -734,13 +958,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
                `self-test`, which otherwise passes on the main loop alone however little the variant pass
                measures. */
             await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-            if (process.env.BRAINDOG_GATE_SEED)
-              await page.evaluate(() => {
-                const h = document.createElement('h2');
-                h.textContent = 'seeded';
-                h.style.cssText = 'width:2000px;white-space:nowrap';
-                document.getElementById('main')?.prepend(h);
-              });
+            if (process.env.BRAINDOG_GATE_SEED) await seedHeading(page);
             await page.waitForTimeout(L.settleMs);
             const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
             checked++;

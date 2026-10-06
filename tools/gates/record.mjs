@@ -322,6 +322,44 @@ export async function answers(origin) {
     throw new Error(`${origin}/api/boot is not the gate's record answering, so every screen would draw the refusal that says so.`);
 }
 
+/**
+ * The cookie that carries what the record keeps for the person from the browser to a gate's own server, which hands it to
+ * the page inside `boot` (`bootWith`). Only a gate's server reads it, and the record never sees it.
+ *
+ * HERE AND NOT IN `prefs.mjs`, which wrote it first, because `layout` draws the shell's other two shapes with it too, and
+ * a gate another file imports is a library to `run.mjs` and would stop being run.
+ */
+export const RECORD_PREFS = 'bd_gate_record';
+
+/** What the gate says the record keeps for the person, from the request's cookie, or `null` when it says nothing. */
+export function recordPrefsOf(cookie) {
+  const raw = new RegExp(`(?:^|;\\s*)${RECORD_PREFS}=([^;]*)`).exec(cookie ?? '')?.[1];
+  if (raw === undefined) return null;
+  try {
+    const out = JSON.parse(decodeURIComponent(raw));
+    return out && typeof out === 'object' && !Array.isArray(out) ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The record's own `boot`, with `me.prefs` set to what the gate says the record keeps.
+ *
+ * THE REST IS THE RECORD'S ANSWER, UNTOUCHED, read with the gate's key as `forward` reads it, so the page draws exactly
+ * the screen it draws for a person whose record holds these preferences.
+ */
+export async function bootWith(req, res, base, held) {
+  const key = serverKeyFor(base);
+  const said = await fetch(new URL(req.url ?? '/', base), { headers: key === undefined ? {} : { authorization: `Bearer ${key}` } })
+    .then((r) => r.json())
+    .catch(() => null);
+  if (said?.ok === true && said.value && typeof said.value === 'object') said.value.me = { ...(said.value.me ?? {}), prefs: held };
+  const answer = said ?? { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: "The gate's record did not answer its boot." } };
+  res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(JSON.stringify(answer));
+}
+
 /* THE COMMAND LINE: one open record on a fixed port, for `vite dev` and `vite preview` to proxy to. Its
    origin is the dev server's (`apps/web/vite.config.ts`, port 5183), because that is the `Host` and the
    `Origin` the proxy passes on, and an open self-host answers only its own names. */
