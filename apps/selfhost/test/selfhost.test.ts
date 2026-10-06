@@ -113,7 +113,7 @@ test('a record is a FILE, and it is still there when the process is not', async 
     assert.equal(rows.value.rows[0]?.fields.what, 'Invoice 41');
     // And the number does not restart, because the counter travelled with the file.
     const next = await again.api.create({ register: 'obligations', fields: { what: 'Invoice 42' } }, { principal: { kind: 'person', id: 'p_self', level: 'owner' } });
-    assert.ok(next.ok);
+    assert.ok(next.ok && !('asked' in next.value), 'the owner writes, and is not asked');
     assert.equal(next.value.seq, 2);
   } finally {
     await again.close();

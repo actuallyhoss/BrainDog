@@ -507,6 +507,10 @@
             {/each}
           </ul>
         </dd>
+        {#if offer.changes.length}
+          <dt>{vaultWords.changesTitle}</dt>
+          <dd>{#each offer.changes as c (c)}<p>{c}</p>{/each}</dd>
+        {/if}
         {#if offer.conflicts.length}
           <dt>{copy.diffConflicts}</dt>
           <dd>{#each offer.conflicts as c (c)}<p>{c}</p>{/each}</dd>

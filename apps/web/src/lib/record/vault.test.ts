@@ -14,7 +14,7 @@ import type { DeviceRow } from '@braindog/client';
 import { copy } from '../copy.ts';
 import * as vault from './vault.ts';
 import {
-  GLOBAL, VAULT_ALL_DAYS, VAULT_DAYS, answerLine, approve, asks, daysFor, holders, keysOf, namesOf, planOf, reprove, revoke,
+  GLOBAL, VAULT_ALL_DAYS, VAULT_DAYS, answerLine, approve, asks, daysFor, holders, keysOf, namesOf, packSaid, planOf, reprove, revoke,
   reconnectOf, scopeName, words,
 } from './vault.ts';
 
@@ -216,7 +216,8 @@ test('a plan from the record reads in the Packs screen words, and keeps its hash
     { kind: 'list', name: 'Tools', detail: '1 field' },
     { kind: 'page', name: 'Agents', detail: '6 tables and figures' },
   ]);
-  assert.deepEqual(plan.conflicts, ['Skills already exists, from someone']);
+  assert.deepEqual(plan.conflicts, ['Skills already exists, from Someone'], 'a pack is said by name, never its id');
+  assert.deepEqual(plan.changes, []);
   assert.equal(plan.seeds, '1 example row, marked example, clearable in one action');
   assert.equal(plan.touches, words.touches);
 });
@@ -226,6 +227,23 @@ test('a plan that writes no example rows has no line about them, not "0 example 
   assert.equal(plan?.seeds, null);
   assert.equal(planOf({ adds: [], planHash: '3.def' }, (_, id) => id)?.seeds, null);
   assert.equal(planOf({ adds: [], seeds: { count: 6, registers: [] }, planHash: '3.def' }, (_, id) => id)?.seeds, '6 example rows, marked example, clearable in one action');
+});
+
+test('A CHANGE TAKEN OVER FROM ANOTHER PACK says both names, grouped by that pack, before the pack’s own changes', () => {
+  const diff = {
+    changes: [
+      { id: 'register.clients', from_version: 2, summary: '7 fields', from: 'people' },
+      { id: 'register.tasks', from_version: 3, summary: '1 fields' },
+      { id: 'page.invoices', from_version: 1, summary: '3 blocks', from: 'people' },
+      { id: 'register.bills', from_version: 1, summary: '4 fields', from: 'money-core' },
+    ],
+    planHash: '9.abc',
+  };
+  const names: Record<string, string> = { clients: 'Clients', tasks: 'Tasks', invoices: 'Invoices', bills: 'Bills' };
+  const packs: Record<string, string> = { people: 'People' };
+  const plan = planOf(diff, (_, id) => names[id] ?? id, (id) => packs[id] ?? packSaid(id));
+  assert.deepEqual(plan?.changes, ['Takes Clients and Invoices over from People', 'Takes Bills over from Money core', 'Changes Tasks, now 1 field']);
+  assert.ok(!plan?.changes.some((l) => /money-core|register\.|page\./u.test(l)), 'names, never ids');
 });
 
 test('an answer with no plan hash is no plan, so nothing can be installed from it', () => {

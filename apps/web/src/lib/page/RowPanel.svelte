@@ -10,7 +10,8 @@
   with the boxes off and no Save.
 
   WHO ELSE CHANGED IT LEADS THE BODY, for a week: "Claude for Sam · 2h ago · Undo", the agent's name the door to the run
-  that made the change, and Undo putting that change back on the record (`host.undoBy`). A row a person changed last
+  that made the change, and Undo putting that change back on the record (`host.undoBy`), saying first what else it takes
+  back when the change touched more than this row (`UndoAsk.svelte`). A row a person changed last
   carries no such line. Opening the row is seeing it, so the row's tint goes as the panel opens.
 
   DELETE IS WORDS, then a confirm, and the row stays in Just changed with Put back for ten minutes.
@@ -33,6 +34,7 @@
   import type { RowHost } from './row-host.svelte.ts';
   import { rowPatch, valuesOf } from './row-fields.ts';
   import { bylineWords } from './byline.ts';
+  import UndoAsk from './UndoAsk.svelte';
   import { keyOf, titleOf, words } from './row-verbs.ts';
 
   let { host }: { host: RowHost } = $props();
@@ -191,11 +193,12 @@
           type="button"
           class="p-undo tap"
           aria-label={bylineWords.undoNamed(titleOf(entry, shape))}
-          disabled={host.undoing.has(keyOf(r))}
+          disabled={host.undoing.has(keyOf(r)) || host.asked?.key === keyOf(r)}
           onclick={() => void host.undoBy(r)}>{bylineWords.undo}</button
         >
       {/if}
     </p>
+    <UndoAsk {host} row={r} />
   {/if}
 
   {#if row && entry && shape && unread}

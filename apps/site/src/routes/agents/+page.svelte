@@ -7,7 +7,7 @@
     lead       the answer, the one action, and agents at work leaving what they found for the next one's briefing.
     connect    the address, then the terminal, beside the lead: the way in is on the first screen.
     value      what an agent gives and what it gets back, as two lists with icon wells; a key and the skill beside.
-    tools      the sixteen tools split into reads and writes, drawn as the record between two lanes, and the addresses.
+    tools      the seventeen tools split into reads and writes, drawn as the record between two lanes, and the addresses.
     outside    the three ways in from outside, charted by how much each can do, then one tile each with its limits.
     cannot     what only a person can do.
 

@@ -85,7 +85,12 @@ test('the plan alone, for a panel that shows it first, and a plan in a shape thi
   assert.equal(read.from === 'plan' && read.plan.say, PLAN.say, 'the record’s sentence for the plan rides with it');
   assert.equal(sent.length, 1);
   assert.equal(planOf({ steps: [] }), null, 'no hash, no plan');
-  assert.deepEqual(planOf({ hash: 'h', steps: [7, { title: 'A' }] })?.steps, [{ title: 'A', label: null, from: undefined, to: undefined, do: '', line: '' }]);
+  assert.deepEqual(planOf({ hash: 'h', steps: [7, { title: 'A' }] })?.steps, [{ title: 'A', label: null, from: undefined, to: undefined, do: '', line: '', row: null, list: null, at: null }]);
+  assert.deepEqual(
+    planOf({ hash: 'h', steps: [{ title: 'A', row: '01J0000000000000000000000A', list: 'Tasks', register: 'tasks', seq: 4 }] })?.steps.map((s) => [s.row, s.list, s.at]),
+    [['01J0000000000000000000000A', 'Tasks', { register: 'tasks', seq: 4 }]],
+    'which row a step is on rides with it, as handles a byline matches its own row by',
+  );
   assert.equal(undoneSaid(0, []), undoWords.nothing);
   assert.equal(undoneSaid(1, [{ title: 'A', why: 'x', line: '' }, { title: 'B', why: 'y', line: '' }]), 'Put back 1 change. Skipped 2 that changed since or cannot come back.');
 });

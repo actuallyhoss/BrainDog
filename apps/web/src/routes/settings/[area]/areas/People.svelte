@@ -34,6 +34,7 @@
   import { namesHeld, personSaid, secondSaid } from '../people-said.ts';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import Links from '../Links.svelte';
+  import Understand from '../Understand.svelte';
 
   let { shell }: AreaProps = $props();
 
@@ -856,6 +857,10 @@
 
 <!-- The read-only links to single pages, beside who can see the record. -->
 {#if anOwner}<Links />{/if}
+
+<!-- READ WHAT YOU ALREADY HAVE: the record's walk linking old payments, runs and services to who and what they are
+     about, a dry look first and then Do it. The owner's, as the record's `understand` is. -->
+{#if anOwner}<Understand />{/if}
 
 <!-- AND ERASE ARRIVES WITH THE SECOND PERSON. On a record whose only person is you, the one
      candidate for a red, irreversible "Erase a person" is the person reading it. -->

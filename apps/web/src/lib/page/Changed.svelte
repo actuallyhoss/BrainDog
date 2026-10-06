@@ -6,6 +6,9 @@
   renderer draws a row and nothing beside it, so one quiet list over the page says the bylines once, rather than a chip
   squeezed onto every row. Not drawn while nothing is new, and a row leaves it once it is opened or the page is left.
 
+  UNDO READS THE PLAN FIRST (`byline-undo.ts`): a change on this row alone goes back at once, and one that touched more
+  says what else it touched under the line before anything goes back (`UndoAsk.svelte`).
+
   A LIST WITHOUT A BOX under a quiet heading, as the page's other lists are. The row's words open it in the docked panel,
   where the same line and Undo stay for the rest of the week; the agent's name opens the run that made the change.
 -->
@@ -13,6 +16,7 @@
   import { at as inApp } from '$lib/at.ts';
   import type { RowHost } from './row-host.svelte.ts';
   import { bylineWords } from './byline.ts';
+  import UndoAsk from './UndoAsk.svelte';
   import { keyOf, rowOfKey, titleOf, type RowAt } from './row-verbs.ts';
 
   let { host }: { host: RowHost } = $props();
@@ -52,10 +56,11 @@
               type="button"
               class="changed-undo tap"
               aria-label={bylineWords.undoNamed(l.title)}
-              disabled={host.undoing.has(keyOf(l.row))}
+              disabled={host.undoing.has(keyOf(l.row)) || host.asked?.key === l.key}
               onclick={() => undo(l.row)}>{bylineWords.undo}</button
             >
           {/if}
+          <UndoAsk {host} row={l.row} />
         </li>
       {/each}
     </ul>

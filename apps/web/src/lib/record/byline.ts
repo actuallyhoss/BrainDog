@@ -1,7 +1,7 @@
 /**
  * WHO LAST CHANGED A ROW, AS A BYLINE (DIRECTION §37, "Trust and his screens: bylines, undo"): a row an agent, an app, a
  * rule or Slash changed wears "Claude for Sam · 2h ago" and a faint tint until the reader has seen it, and its Undo puts
- * back that one change (`undo-write.ts` `undoChange`, by `batch`).
+ * back the write it came in (by `batch`), naming first whatever else that write touched (`page/byline-undo.ts`).
  *
  * READ FROM THE RECORD'S `changes`, one a row (`packages/kernel/src/pages.ts` `changesOf`): who signed the row's newest
  * event, the kind of actor and when, and on a current record the batch it wrote under and the run it came from. Every

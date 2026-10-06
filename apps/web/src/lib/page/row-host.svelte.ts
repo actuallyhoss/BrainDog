@@ -15,7 +15,9 @@
  * answered, so every later read of the same version is drawn from it. No way back here puts back a cut (`clipped.ts`).
  *
  * AND WHO ELSE CHANGED A ROW (`byline.ts`): a row an agent, a rule or Slash changed last carries its byline, new to the
- * reader until they leave the page or open the row, and its Undo puts that change back on the record (`undoChange`).
+ * reader until they leave the page or open the row, and its Undo puts that change back on the record. A change that
+ * touched more than the row says what it will take back first, and lets the reader take back only this row's part
+ * (`byline-undo.ts`).
  */
 
 import { createClient } from '@braindog/client';
@@ -29,8 +31,9 @@ import type { Entry, Fields } from '../record/schema.ts';
 import { optimist, type Change, type Sent } from '../data/optimistic.ts';
 import type { toasts } from '../ui/toast.svelte.ts';
 import { dayOf, shapeOf, type Shape } from '../work/board.ts';
-import { undoChange } from '../record/undo-write.ts';
+import { undoApply, undoPlan, type Undone, type UndoPlan } from '../record/undo-write.ts';
 import { bylinesIn, bylineWords, keepSeen, seenOn, storeOf, type Byline, type Seen, type Store } from './byline.ts';
+import { askOf, onlyHere, type Ask, type Here } from './byline-undo.ts';
 import { cutIn, wholeOf } from './clipped.ts';
 import { dueWords, entryIn, finished, keyOf, titleOf, words, type RowAt, type Touch } from './row-verbs.ts';
 
@@ -88,6 +91,13 @@ export class RowHost {
   #seen = $state.raw<Seen>({ page: 0, rows: {} });
   /** The rows whose byline Undo is on its way, so a second press does not send it twice. */
   undoing = $state.raw(new Set<string>());
+  /**
+   * A byline's Undo whose change touched more than its row, waiting on the reader: the row, the plan that was read, and
+   * what it says. `only` is the record's plan for this row's part, read beside it, or `null` where the record answered
+   * none it could keep to this row, which leaves no Only this one to press. One at a time; `UndoAsk.svelte` draws it
+   * under the row's byline wherever that is drawn.
+   */
+  asked = $state.raw<{ key: string; row: RowAt; title: string; batch: string; plan: UndoPlan; only: UndoPlan | null; ask: Ask } | null>(null);
 
   /**
    * WHO ELSE CHANGED EACH ROW THE PAGE DRAWS, by its key: an agent, a rule or Slash, and whether the reader has seen it.
@@ -112,6 +122,7 @@ export class RowHost {
     this.opened = null;
     this.panelOpen = false;
     this.menuOpen = false;
+    this.asked = null;
     this.touched = new Map(kept.get(slug) ?? []);
     /* AND READ AGAINST NOW, or a page come back to after a while would show what aged out until the next tick. */
     this.clock = Date.now();
@@ -150,9 +161,10 @@ export class RowHost {
   }
 
   /**
-   * UNDO, FROM A ROW'S BYLINE: the record puts back the whole of that change, the rules it set off included, and leaves
-   * alone whatever somebody changed since (`undo-write.ts` `undoChange`). Said in the record's own sentence, kept in Just
-   * changed, and the page read again. Answers false where there is nothing to put back from here.
+   * UNDO, FROM A ROW'S BYLINE: the record's plan for that change is read first. A change on this row alone goes back in
+   * the same press, the rules it set off included, leaving alone whatever somebody changed since; one that touched more
+   * waits in `asked` for the reader to say all of it, only this row, or keep (`byline-undo.ts`). Answers true once
+   * something went back.
    */
   async undoBy(row: RowAt): Promise<boolean> {
     const key = keyOf(row);
@@ -162,25 +174,87 @@ export class RowHost {
       this.#deps.toasts.push(bylineWords.noUndo, { intent: 'warn' });
       return false;
     }
+    const batch = line.batch;
+    const title = this.#titleOf(row);
+    const here = this.#here(row, title);
+    return this.#busy(key, async () => {
+      const read = await undoPlan(this.#deps.base(), { batch }, this.#deps.io);
+      if (read.from !== 'plan') return this.#said(row, title, read);
+      const ask = askOf(read.plan, here);
+      if (ask === null) return this.#said(row, title, await undoApply(this.#deps.base(), { batch }, read.plan, this.#deps.io));
+      /* THIS ROW'S PART IS ASKED FOR BEFORE IT IS OFFERED, so Only this one is never a button that cannot work: a record
+         that does not know the filter answers the whole change again, or refuses it, and the choice is not drawn. */
+      const mine = ask.mine === 0 ? null : await undoPlan(this.#deps.base(), { batch, row: here.at }, this.#deps.io);
+      const only = mine?.from === 'plan' && mine.plan.steps.length > 0 && onlyHere(mine.plan, here) ? mine.plan : null;
+      this.asked = { key, row, title, batch, plan: read.plan, only, ask };
+      return false;
+    });
+  }
+
+  /** The reader said put back all of it: the plan they were shown, by its hash. */
+  async undoAll(): Promise<boolean> {
+    const a = this.asked;
+    if (!a || this.undoing.has(a.key)) return false;
+    return this.#busy(a.key, async () => {
+      this.asked = null;
+      return this.#said(a.row, a.title, await undoApply(this.#deps.base(), { batch: a.batch }, a.plan, this.#deps.io));
+    });
+  }
+
+  /**
+   * The reader said only this row: the record's plan for this row's part, read with the whole, by its hash. A change
+   * since the read is the record's to refuse (the plan moved), and nothing else goes with it.
+   */
+  async undoOnly(): Promise<boolean> {
+    const a = this.asked;
+    if (!a || a.only === null || this.undoing.has(a.key)) return false;
+    const only = a.only;
+    return this.#busy(a.key, async () => {
+      this.asked = null;
+      const scope = { batch: a.batch, row: { register: a.row.register, seq: a.row.seq } };
+      return this.#said(a.row, a.title, await undoApply(this.#deps.base(), scope, only, this.#deps.io));
+    });
+  }
+
+  /** The reader kept the change: nothing goes back. */
+  keepAsked() {
+    this.asked = null;
+  }
+
+  /** The row's title as its list says it, for the plan and the receipt. */
+  #titleOf(row: RowAt): string {
     const e = this.entry(row);
-    const title = e ? titleOf(e, this.shapeOf(row.register)) : `#${row.seq}`;
+    return e ? titleOf(e, this.shapeOf(row.register)) : `#${row.seq}`;
+  }
+
+  /** The row as a plan's steps are matched against it: a row with no title, or none known here, is matched by its number. */
+  #here(row: RowAt, title: string): Here {
+    return { at: { register: row.register, seq: row.seq }, title: title === `#${row.seq}` ? '' : title, list: REGISTERS[row.register]?.name ?? null };
+  }
+
+  /** Runs `work` with the row marked as on its way, so a second press waits for the first. */
+  async #busy(key: string, work: () => Promise<boolean>): Promise<boolean> {
     this.undoing = new Set(this.undoing).add(key);
     try {
-      const out = await undoChange(this.#deps.base(), line.batch, this.#deps.io);
-      if (out.from !== 'undone') {
-        this.#deps.toasts.push(out.fix, { intent: 'warn' });
-        return false;
-      }
-      this.seeRow(row);
-      this.note(row, words.marks.putBack, title);
-      this.#deps.toasts.push(out.said, { intent: 'good' });
-      await this.#deps.reread();
-      return true;
+      return await work();
     } finally {
       const next = new Set(this.undoing);
       next.delete(key);
       this.undoing = next;
     }
+  }
+
+  /** What the record answered, said in its own sentence; what went back is kept in Just changed and the page read again. */
+  async #said(row: RowAt, title: string, out: Undone): Promise<boolean> {
+    if (out.from !== 'undone') {
+      this.#deps.toasts.push(out.fix, { intent: 'warn' });
+      return false;
+    }
+    this.seeRow(row);
+    this.note(row, words.marks.putBack, title);
+    this.#deps.toasts.push(out.said, { intent: 'good' });
+    await this.#deps.reread();
+    return true;
   }
 
   /* ── reading a row ──────────────────────────────────────────────────────── */

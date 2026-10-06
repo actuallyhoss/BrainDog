@@ -152,11 +152,11 @@ export const agents = {
     },
 
     mcp: {
-      /* `packages/mcp/src/index.ts`: `TOOLS` holds sixteen entries, nine carrying `writes: false`. `triage` joined last. */
-      title: 'Sixteen tools, and nine of them only read.',
+      /* `packages/mcp/src/index.ts`: `TOOLS` holds seventeen entries, ten carrying `writes: false`. `understand` joined last. */
+      title: 'Seventeen tools, and ten of them only read.',
       lead: 'An agent reads the record the way a person does, and what it writes lands as an event carrying its name. Nothing here is a separate copy of your data.',
       readsTitle: 'Read',
-      reads: ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance'],
+      reads: ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'understand'],
       writesTitle: 'Write',
       /* The line under the split of the tools, said from the lead: the writes carry a name, the reads change nothing. */
       reading: 'Every write lands in the record as an event under the agent’s name. A read changes nothing.',

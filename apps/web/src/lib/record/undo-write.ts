@@ -22,14 +22,33 @@ import { createClient } from '@braindog/client';
 import { copy } from '../copy.ts';
 import { forget, type Fetch } from './boot-live.ts';
 
-/** What is put back: one write, what one decision did, or one run's every change. */
-export type UndoScope = { batch: string } | { decision: string } | { run: string };
+/**
+ * What is put back: one write, what one decision did, or one run's every change. `row` narrows a write to the part of it
+ * on one row, the row's own number on its list, for a byline's "Only this one" (`page/row-host.svelte.ts`).
+ */
+export type UndoScope = { batch: string; row?: RowHandle } | { decision: string } | { run: string };
+
+/** A row by its list and number, as a page knows it. A handle the record is sent, never words a person reads. */
+export type RowHandle = { register: string; seq: number };
 
 /**
  * One change the plan puts back, in names: the row's title, the field's label, the value it goes back to, `do` the word
  * a screen picks an icon by (`remove`, `restore`, `set`...), and `line` the record's own sentence for it.
+ *
+ * AND WHICH ROW, AS HANDLES NEVER DRAWN: `row` the record's id for it, `list` its list's name, and `at` its list and
+ * number where the record says them. A byline reads them to tell the steps on its own row from the rest (`stepsOn`).
  */
-export type UndoStep = { title: string; label: string | null; from: unknown; to: unknown; do: string; line: string };
+export type UndoStep = {
+  title: string;
+  label: string | null;
+  from: unknown;
+  to: unknown;
+  do: string;
+  line: string;
+  row: string | null;
+  list: string | null;
+  at: RowHandle | null;
+};
 
 /** One change the plan leaves alone, and why: somebody changed it since, it was sent already, it was erased. */
 export type UndoSkip = { title: string; why: string; line: string };
@@ -77,6 +96,9 @@ export function planOf(v: unknown): UndoPlan | null {
     to: s.to,
     do: text(s.do) ?? '',
     line: text(s.line) ?? '',
+    row: text(s.row),
+    list: text(s.list),
+    at: text(s.register) !== null && typeof s.seq === 'number' && Number.isInteger(s.seq) ? { register: text(s.register)!, seq: s.seq } : null,
   }));
   const skipped = (Array.isArray(v.skipped) ? v.skipped : []).filter(isRow).map((s) => ({ title: text(s.title) ?? '', why: text(s.why) ?? '', line: text(s.line) ?? '' }));
   return { say: text(v.say) ?? '', steps, skipped, hash: v.hash };
@@ -97,9 +119,13 @@ const failed = (out: Exclude<Wire, { ok: true }>): Exclude<Undone, { from: 'undo
   return { from: 'refused', fix: out.refusal.fix };
 };
 
-/** The route and the arguments for a scope: `undo` takes a batch or a decision, and `undoRun` a run. */
+/** The route and the arguments for a scope: `undo` takes a batch, narrowed to one row or not, or a decision; `undoRun` a run. */
 const routeOf = (scope: UndoScope): { name: 'undo' | 'undoRun'; args: Record<string, unknown> } =>
-  'run' in scope ? { name: 'undoRun', args: { run: scope.run } } : { name: 'undo', args: 'batch' in scope ? { batch: scope.batch } : { decision: scope.decision } };
+  'run' in scope
+    ? { name: 'undoRun', args: { run: scope.run } }
+    : 'batch' in scope
+      ? { name: 'undo', args: { batch: scope.batch, ...(scope.row ? { row: { register: scope.row.register, seq: scope.row.seq } } : {}) } }
+      : { name: 'undo', args: { decision: scope.decision } };
 
 /** Read what would go back, without changing anything. */
 export async function undoPlan(base: string, scope: UndoScope, io?: Fetch): Promise<{ from: 'plan'; plan: UndoPlan } | Exclude<Undone, { from: 'undone' }>> {

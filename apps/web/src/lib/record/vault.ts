@@ -23,6 +23,7 @@ import type { DeviceApproved, DeviceRow } from '@braindog/client';
 
 import { BASE, signinFor } from '../at.ts';
 import { copy } from '../copy.ts';
+import { list } from '../copy/english.ts';
 import { answerOf, codeOf, reachKey, type Answer, type Refusal } from './device.ts';
 import { REGISTERS } from './held.ts';
 import type { Scope } from './scope-move.ts';
@@ -88,6 +89,11 @@ export const words = {
   seeds: (n: number) => `${n} example ${n === 1 ? 'row' : 'rows'}, marked example, clearable in one action`,
   touches: 'nothing you have written: 0 rows read, 0 of your rows changed',
   conflict: (name: string, pack: string) => `${name} already exists, from ${pack}`,
+  /* WHAT AN UPDATE CHANGES. A declaration another pack handed this one is taken over, said by both names; one of its own
+     is changed. */
+  changesTitle: 'Changes',
+  takesOver: (names: string[], pack: string) => `Takes ${list(names)} over from ${pack}`,
+  changesOwn: (name: string, detail: string) => (detail === '' ? `Changes ${name}` : `Changes ${name}, now ${detail}`),
   /* THE VAULT PASSPHRASE (`12 §6`, "The optional second factor"): the switch, the honesty table and the two sheets. The
      table is the document's own trade, said in a person's words, with the consequence in the same place as the switch. */
   passphrase: 'Passphrase',
@@ -369,10 +375,11 @@ export const runPath = (run: string): string | null => (/^S[1-9][0-9]*$/u.test(r
 
 /* ── the pack offered on connect ──────────────────────────────────────── */
 
-/** `planPack`'s diff, with only the keys drawn here. */
+/** `planPack`'s diff, with only the keys drawn here. `from` on a change is the pack it is taken over from. */
 type PlanDiff = {
   pack?: { summary?: string };
   adds?: { id: string; summary: string }[];
+  changes?: { id: string; summary?: string; from?: string }[];
   conflicts?: { id: string; pack: string }[];
   seeds?: { count: number };
   planHash?: string;
@@ -382,6 +389,8 @@ type PlanDiff = {
 export type Plan = {
   summary: string;
   adds: { kind: 'list' | 'page' | 'figure'; name: string; detail: string }[];
+  /** What it changes of what is here, a line each: "Takes Clients and Invoices over from People", "Changes Tasks". */
+  changes: string[];
   conflicts: string[];
   /** What example rows it writes, or `null` when it writes none, so the plan has no line to say so. */
   seeds: string | null;
@@ -392,11 +401,17 @@ export type Plan = {
 const counted = (summary: string, one: string, many: string): string =>
   summary.replace(/^(\d+) \S+$/u, (_, n: string) => (n === '1' ? `1 ${one}` : `${n} ${many}`));
 
+/** A pack by its id, where the screen holds no better name for it: `money-core` is "Money core". */
+export function packSaid(id: string): string {
+  const w = id.replace(/[-_.]+/gu, ' ').trim();
+  return w === '' ? id : w.charAt(0).toUpperCase() + w.slice(1);
+}
+
 /**
- * A plan from the record, in the Packs screen's words. `nameOf` names a register or a page by id; the
- * plan carries ids, and the reader is being asked about names. A plan with no hash is no plan.
+ * A plan from the record, in the Packs screen's words. `nameOf` names a register or a page by id, and `packOf` a pack;
+ * the plan carries ids, and the reader is being asked about names. A plan with no hash is no plan.
  */
-export function planOf(diff: unknown, nameOf: (kind: 'register' | 'page' | 'metric', id: string) => string): Plan | null {
+export function planOf(diff: unknown, nameOf: (kind: 'register' | 'page' | 'metric', id: string) => string, packOf: (id: string) => string = packSaid): Plan | null {
   if (typeof diff !== 'object' || diff === null) return null;
   const d = diff as PlanDiff;
   if (typeof d.planHash !== 'string' || d.planHash === '') return null;
@@ -409,21 +424,43 @@ export function planOf(diff: unknown, nameOf: (kind: 'register' | 'page' | 'metr
         ? { kind, name: nameOf('metric', bare) }
         : { kind: 'page', name: nameOf('page', bare) };
   };
+  const described = (id: string, summary: string): Plan['adds'][number] => {
+    const { kind, name } = split(id);
+    return kind === 'register'
+      ? { kind: 'list', name, detail: counted(summary, 'field', 'fields') }
+      : kind === 'metric'
+        ? { kind: 'figure', name, detail: '' }
+        : { kind: 'page', name, detail: counted(summary, 'table or figure', 'tables and figures') };
+  };
   return {
     summary: d.pack?.summary ?? '',
-    adds: (d.adds ?? []).map((a) => {
-      const { kind, name } = split(a.id);
-      return kind === 'register'
-        ? { kind: 'list', name, detail: counted(a.summary, 'field', 'fields') }
-        : kind === 'metric'
-          ? { kind: 'figure', name, detail: '' }
-          : { kind: 'page', name, detail: counted(a.summary, 'table or figure', 'tables and figures') };
-    }),
-    conflicts: (d.conflicts ?? []).map((c) => words.conflict(split(c.id).name, c.pack)),
+    adds: (d.adds ?? []).map((a) => described(a.id, a.summary)),
+    changes: changesOf(d.changes ?? [], described, packOf),
+    conflicts: (d.conflicts ?? []).map((c) => words.conflict(split(c.id).name, packOf(c.pack))),
     seeds: (d.seeds?.count ?? 0) === 0 ? null : words.seeds(d.seeds?.count ?? 0),
     touches: words.touches,
     planHash: d.planHash,
   };
+}
+
+/**
+ * A plan's changes, a line each: the ones taken over from another pack grouped by that pack ("Takes Clients and Invoices
+ * over from People"), first and in the plan's order, then this pack's own.
+ */
+function changesOf(
+  changes: readonly { id: string; summary?: string; from?: string }[],
+  described: (id: string, summary: string) => { name: string; detail: string },
+  packOf: (id: string) => string,
+): string[] {
+  const taken = new Map<string, string[]>();
+  const own: string[] = [];
+  for (const c of changes) {
+    const { name, detail } = described(c.id, c.summary ?? '');
+    const from = typeof c.from === 'string' && c.from.trim() !== '' ? c.from.trim() : null;
+    if (from === null) own.push(words.changesOwn(name, detail));
+    else taken.set(from, [...(taken.get(from) ?? []), name]);
+  }
+  return [...[...taken].map(([pack, names]) => words.takesOver(names, packOf(pack))), ...own];
 }
 
 /* ── reconnecting a paused action's key ──────────────────────────────── */
