@@ -391,7 +391,7 @@
       {#each main as item (item.key)}
         <li>
           <a class="item tap" href={at(item.href)} data-nav data-label={item.label} aria-current={isHere(item, path) ? 'page' : undefined}>
-            <span class="glyph"><Icon name={item.icon as IconName} size="l" /></span><span class="item-name">{item.label}</span>
+            <span class="rail-glyph"><Icon name={item.icon as IconName} size="l" /></span><span class="item-name">{item.label}</span>
             {#if item.count}<span
                 class="tally num"
                 data-waiting={item.key === 'decide' ? '' : undefined}
@@ -438,7 +438,7 @@
       {:else}
         <h2 class="section" bind:this={foldAt}>
           <button type="button" class="fold item tap" aria-expanded={!moreShut} onclick={() => void toggleMore()}>
-            <span class="glyph"><Icon name="more" size="l" /></span>
+            <span class="rail-glyph"><Icon name="more" size="l" /></span>
             <span class="item-name">{copy.more}</span>
             <span class="fold-mark" aria-hidden="true" data-shut={moreShut ? '' : undefined}>
               <Icon name="chevronDown" size="s" />
@@ -453,7 +453,7 @@
             {#each more as item (item.key)}
               <li>
                 <a class="item tap" href={at(item.href)} data-nav data-label={item.label} aria-current={isHere(item, path) ? 'page' : undefined}>
-                  <span class="glyph"><Icon name={item.icon as IconName} size="l" /></span><span class="item-name">{item.label}</span>
+                  <span class="rail-glyph"><Icon name={item.icon as IconName} size="l" /></span><span class="item-name">{item.label}</span>
                 </a>
               </li>
             {/each}
@@ -465,7 +465,7 @@
         {#snippet page(entry: NavEntry)}
           <li>
             <a class="item tap" href={at(entry.href)} data-nav data-label={entry.title} aria-current={path === entry.href ? 'page' : undefined}>
-              <span class="glyph"><Icon name={entry.icon} size="l" /></span><span class="item-name">{entry.title}</span>
+              <span class="rail-glyph"><Icon name={entry.icon} size="l" /></span><span class="item-name">{entry.title}</span>
             </a>
           </li>
         {/snippet}
@@ -496,7 +496,7 @@
           {#each listsShown as r}
             <li>
               <a class="item tap" href={at(`/r/${r.id}`)} data-nav data-label={r.name} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
-                <span class="glyph"><Icon name={r.icon} size="l" /></span>
+                <span class="rail-glyph"><Icon name={r.icon} size="l" /></span>
                 <span class="item-name">{r.name}</span>
                 <span class="tally num">{r.count}</span>
               </a>
@@ -511,14 +511,14 @@
           {#if listsFold}
             <li>
               <button type="button" class="item tap" aria-expanded={listsAll} onclick={() => (listsAll = !listsAll)}>
-                <span class="glyph"><Icon name="more" size="l" /></span>
+                <span class="rail-glyph"><Icon name="more" size="l" /></span>
                 <span class="item-name">{listsAll ? words.fewerLists : words.moreLists(listsHidden)}</span>
               </button>
             </li>
           {/if}
           <li>
             <a class="item tap" href={at('/r/_new?make')} data-label={words.newList} aria-current={path === '/r/_new' ? 'page' : undefined}>
-              <span class="glyph"><Icon name="plus" size="l" /></span><span class="item-name">{words.newList}</span>
+              <span class="rail-glyph"><Icon name="plus" size="l" /></span><span class="item-name">{words.newList}</span>
             </a>
           </li>
         </ul>
@@ -528,7 +528,7 @@
           {#each tools as t (t.href)}
             <li>
               <a class="item tap" href={at(t.href)} data-label={t.label} title={t.title} aria-current={under(t.href) ? 'page' : undefined}>
-                <span class="glyph"><Icon name={t.icon} size="l" /></span><span class="item-name">{t.label}</span>
+                <span class="rail-glyph"><Icon name={t.icon} size="l" /></span><span class="item-name">{t.label}</span>
                 {#if t.count}<span class="tally num">{t.count}</span>{/if}
               </a>
             </li>
@@ -538,7 +538,7 @@
         {#if hidden > 0}
           <!-- THE WAY BACK, WHERE THE PAGE WAS. A page hidden from the nav is findable from the nav. -->
           <a class="item pen tap" href={at('/settings/navigation#hidden')} data-label={copy.hiddenCount(hidden)} data-hidden-row>
-            <span class="glyph"><Icon name="eye" size="l" /></span>
+            <span class="rail-glyph"><Icon name="eye" size="l" /></span>
             <span class="item-name">{copy.hiddenCount(hidden)}</span>
             <span class="pen-action">{copy.showHidden}</span>
           </a>
@@ -547,7 +547,7 @@
         {#if pen.length}
           <!-- A holding pen: an update that adds a page lands hidden and nothing moves until somebody keeps it. -->
           <a class="item pen tap" href={at('/settings/navigation')} data-label={words.suggested(pen.length)}>
-            <span class="glyph"><Icon name="alert" size="l" /></span>
+            <span class="rail-glyph"><Icon name="alert" size="l" /></span>
             <span class="item-name">{words.suggested(pen.length)}</span>
             <span class="pen-action">{copy.review}</span>
           </a>
@@ -926,7 +926,7 @@
 
   /* THE GLYPH, BARE ON THE GLASS: 18 in a 26 slot, so every name starts on one line whatever its glyph's own width. It
      takes its row's ink, so the glyph and the name are always one colour, at rest, under the pointer and here. */
-  .glyph {
+  .rail-glyph {
     display: grid;
     place-items: center;
     flex: none;
@@ -934,7 +934,7 @@
     block-size: 26px;
   }
 
-  .glyph :global(.icon) {
+  .rail-glyph :global(.icon) {
     inline-size: 18px;
     block-size: 18px;
   }
