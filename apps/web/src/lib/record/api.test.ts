@@ -1010,9 +1010,10 @@ test('THE MONEY PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety day
   assert.equal(marks[0], 'opening');
   assert.ok(marks.filter((m) => m === 'past').length >= 80, 'the sample remembers ninety days of cash');
   assert.equal(marks.filter((m) => m === 'step').length, forecast.walk!.steps.length, 'every movement, not a slice of them');
-  /* THREE MONTHS FIRST AND FIVE YEARS WALKED, SINCE money-core 3.7.0, so every longer length is still on the control. */
+  /* THREE MONTHS FIRST AND TWO YEARS WALKED, SINCE money-core 3.9.0 and the kernel's WALK_UNASKED: the longest length
+     Cash ahead offers is 730 days, so every length is still on the control without walking further than it shows. */
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'horizon')?.cells.slice(0, 2), ['horizon', '90']);
-  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'reach')?.cells.slice(0, 2), ['reach', '1825']);
+  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'reach')?.cells.slice(0, 2), ['reach', '730']);
   /* `leave` IS FOLDED INTO `count` AND `sell` IS OFFERED, since money-core 3.0.0: one control over the streams, not two
      with opposite meanings, and what a pack declares sellable. */
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'knobs')?.cells.slice(0, 2), ['knobs', 'horizon late spend count grow drift sell']);
