@@ -65,3 +65,37 @@ test('A RECORD WITHOUT IT IS A REFUSAL WITH A SENTENCE, not a thrown error', asy
   assert.equal(!out.ok && 'refusal' in out ? out.refusal.code : null, 'NOT_IN_THIS_BUILD');
   sql.close();
 });
+
+/* ── understandPlan: the dry slice as a read ───────────────────────────────────────────────────────────────────── */
+
+async function planned(understandPlan?: (args: unknown) => Promise<unknown>) {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 9, 6)) });
+  const handlers = handlersFor(Object.assign(Object.create(api) as typeof api, { understandPlan }) as never);
+  const sent: { method: string; path: string; query: string }[] = [];
+  const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input));
+    sent.push({ method: init?.method ?? 'GET', path: url.pathname, query: url.search });
+    return serveApi(new Request(url, init), handlers, owner);
+  }) as typeof globalThis.fetch;
+  return { sql, sent, client: createClient({ base: 'https://braindog.example', fetch }) };
+}
+
+test('UNDERSTAND PLAN IS SENT AS THE READ ITS ROUTE IS, a GET with nothing on it, and answers what the record said', async () => {
+  assert.equal(ROUTES.find((r) => r.name === 'understandPlan')?.writes, false);
+  const heard: unknown[] = [];
+  const { sql, sent, client } = await planned(async (args) => (heard.push({ ...(args as object) }), ok(SLICE)));
+  const out = await client.understandPlan();
+  assert.ok(out.ok);
+  assert.deepEqual(out.value, SLICE);
+  assert.deepEqual(sent, [{ method: 'GET', path: '/api/understandPlan', query: '' }]);
+  assert.deepEqual(heard, [{}]);
+  sql.close();
+});
+
+test('A RECORD WITHOUT UNDERSTAND PLAN IS A REFUSAL WITH A SENTENCE, not a thrown error', async () => {
+  const { sql, client } = await planned();
+  const out = await client.understandPlan();
+  assert.equal(!out.ok && 'refusal' in out ? out.refusal.code : null, 'NOT_IN_THIS_BUILD');
+  sql.close();
+});

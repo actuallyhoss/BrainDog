@@ -92,8 +92,9 @@ test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
 
 test("THE SEED'S DIRECTORY: packages/seed/src/packs holds only what a record is built from", () => {
   const here = readdirSync(new URL('../../packages/seed/src/packs/', import.meta.url)).sort();
-  /* `bank-hsbc-eg` AND `holdings` LEFT TOO, for packs/. */
-  assert.deepEqual(here, ['agents.ts', 'first-party.ts']);
+  /* `bank-hsbc-eg` AND `holdings` LEFT TOO, for packs/. `quiet.ts` stays: it is how a record already built takes
+     BrainDog's own newer modules (DIRECTION §37), which is building the record too. */
+  assert.deepEqual(here, ['agents.ts', 'first-party.ts', 'quiet.ts']);
 });
 
 /* ── nothing moved but the file ───────────────────────────────────────────────────────────────── */

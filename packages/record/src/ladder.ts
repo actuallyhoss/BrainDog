@@ -209,8 +209,11 @@ export function ladder(deps: LadderDeps) {
 
   /**
    * Take an agent back to Ask on these kinds, or on every kind when `kinds` is `null`, and forget what it was kept for,
-   * so climbing again starts from nothing. An offer still waiting is left to be answered; answering it yes then sets a
-   * rung from Ask, which is where it is.
+   * so climbing again starts from nothing.
+   *
+   * AND AN OFFER STILL WAITING FOR ONE OF THEM IS WITHDRAWN (research-audit-20 M2). "You kept them all" stopped being true
+   * the moment one was undone, declined a third time or written in a burst, and a yes to it would have set the rung the
+   * drop just took away. It is answered as not done, signed by the ladder, so Decide shows it settled and never asks it.
    */
   const drop = (agent: string, kinds: readonly string[] | null): void => {
     const at = iso();
@@ -218,6 +221,13 @@ export function ladder(deps: LadderDeps) {
     for (const kind of keys) {
       sql.exec("UPDATE ladder SET rung = 'ask', accepted_unchanged = 0, since = ?, dropped_at = ? WHERE agent = ? AND kind = ?", at, at, agent, kind);
       kernel.setPref(KEPT(agent), kind, null);
+    }
+    const dropped = new Set(keys);
+    for (const [id, o] of prefsOf(OFFERS)) {
+      if (o.agent !== agent || (kinds !== null && (typeof o.kind !== 'string' || !dropped.has(o.kind)))) continue;
+      if (kernel.governanceRow('suggestion', id)?.status === 'open')
+        kernel.decide(id, { resolved_as: 'wont-fix', reason: 'A change of this kind was taken back, so it asks again before it does this.' }, LADDER_RULE);
+      kernel.setPref(OFFERS, id, null);
     }
   };
 

@@ -102,7 +102,7 @@ without one gets `403 NEEDS_BROWSER_SESSION`; over MCP every token is refused (�
 
 A customer's registers come from *their* installed packs and from what they and their agents added
 at run time. A freelancer with `money-core` and `freelancer-uk` has
-different registers from a studio with `products` and `people`, and the same sixteen tools reach all of them.
+different registers from a studio with `products` and `people`, and the same seventeen tools reach all of them.
 
 ### The generation rule
 
@@ -124,10 +124,11 @@ Instead:
 | `create` / `update` | typed writes against a named register; `update` carries the row's `version` | 2 |
 | `log` | one note on a row, changing nothing about it | 1 |
 | `handoff` | keep the session's next step and its dead ends true | 1 |
+| `understand` | what the record would link to who and what each thing is about, and what it would ask, in names, read before meeting anyone | 1 |
 | `meet` | a person met in the work, matched or added, with where they were met | 1 |
 | **Per-register schemas, pages, figures, skills** | delivered as **resources**, not tools | *n* |
 
-**Sixteen tools, fixed, regardless of how many registers a customer has.** The variability lives in the
+**Seventeen tools, fixed, regardless of how many registers a customer has.** The variability lives in the
 *arguments*, as in `list(register: "obligations", where: {...})`, and in the resources, which are fetched when
 needed. Fourteen and not the eight an earlier revision named, because the agent path added three things every
 session does: `context`, `handoff` and `meet`. Five went to pay for them: `pages`, `page` and
@@ -171,7 +172,7 @@ This is the central design decision of the MCP surface and it exists because of 
 
 ### `tools/list_changed`
 
-Not pushed, and not needed for the tools: the server is stateless, the sixteen do not change on an install, and no
+Not pushed, and not needed for the tools: the server is stateless, the seventeen do not change on an install, and no
 tool description names a register. A register added or removed is seen through `record_index`, `context` and
 `resources/list`, and a client holding a stale register name is answered `REGISTER_UNKNOWN` with the registers there
 are in `allowed` ([44-SPEC-MCP](44-SPEC-MCP.md) §5.6).
@@ -192,7 +193,7 @@ session, with no loss of capability, because the index says what to ask for next
 Three rules follow, and they are the difference between an MCP server agents keep and one they
 disable.
 
-**1 · Sixteen tools, not forty.** A tool per register would put every customer's entire schema in
+**1 · Seventeen tools, not forty.** A tool per register would put every customer's entire schema in
 every context window. Registers are arguments; schemas are resources fetched on demand.
 
 **2 · Progressive disclosure, by contract.** Every response ends with what to ask for next. This is the design:
@@ -226,7 +227,7 @@ record's answer ends.
 
 **3 · `ttlMs` on every list.** `tools/list` gets `ttlMs: 3600000` and `cacheScope: "private"`, the scope for
 anything a record answers; `server/discover` alone is `"public"`, because it reads nothing and is the same for every
-caller ([44-SPEC-MCP](44-SPEC-MCP.md) §4.3). The sixteen do not change on an install and no tool description names a
+caller ([44-SPEC-MCP](44-SPEC-MCP.md) §4.3). The seventeen do not change on an install and no tool description names a
 register (§3), so a client holds the list for its hour without holding anything stale. This also keeps the client's
 *upstream prompt cache* stable across reconnects, which the 2026-07-28 spec calls out explicitly as a goal of the
 field.
@@ -468,7 +469,7 @@ the sixty-six methods, each refused to every MCP token **with a reason**, plus `
 transitions that need a person. `markRead`, alone in DATA, answers a person principal only.
 
 Over MCP none of these methods is a tool, so an agent that names one to `tools/call` is answered `ROUTE_UNKNOWN` with
-the sixteen tools in `allowed`, and nothing runs. The reason in the table is what the record answers a token at that
+the seventeen tools in `allowed`, and nothing runs. The reason in the table is what the record answers a token at that
 route over `/api`. A refusal list at the MCP layer, one named refusal per method as the predecessor has, is not built
 ([44-SPEC-MCP](44-SPEC-MCP.md) §6.2).
 

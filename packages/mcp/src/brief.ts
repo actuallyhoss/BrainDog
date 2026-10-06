@@ -972,5 +972,151 @@ export function triagedBrief(settled: Record<string, unknown>, entry: Shaped | n
 export function proposedBrief(filed: Record<string, unknown>, question: string, look: Look): string {
   const id = typeof filed.id === 'string' && filed.id !== '' ? ` (${filed.id})` : '';
   const at = typeof filed.decide === 'string' ? ` at ${filed.decide}` : '';
-  return [`Asked ${look.decider}: ${clip(plainOf(question, look), 160)}${id}`, `${sentence(look.decider)} decides in BrainDog${at}.`].join('\n');
+  return [
+    `Asked ${look.decider}: ${clip(plainOf(question, look), 160)}${id}`,
+    movesSaid(filed.money),
+    changesSaid(filed.changes, look),
+    `${sentence(look.decider)} decides in BrainDog${at}.`,
+  ]
+    .filter((l): l is string => l !== null)
+    .join('\n');
+}
+
+/* ── what a question moves and changes, as the decision card says it ───────────────────────────────────────────── */
+
+/** One money value the record sends with a question: whole minor units and a three-letter currency. Zero moves nothing. */
+function movedOf(v: unknown): { amount: number; currency: string } | null {
+  const m = moneyIn(v);
+  return m === null || !Number.isSafeInteger(m.amount) || m.amount === 0 ? null : { amount: m.amount, currency: m.currency.toUpperCase() };
+}
+
+/**
+ * `Moves GBP -17.98 and USD 7.00`: the money accepting writes, one amount a currency, or `null` when none moves.
+ *
+ * THE DECISION CARD'S RULE (`apps/web/src/lib/decide/card.ts` `movesOf`), so the agent and the person read one account of
+ * it: amounts in one currency are one figure, their sum where they all go one way and what moves in all where they do not,
+ * since a payment out and a refund in are two movements and never netted to less; two currencies are never added.
+ */
+export function movesSaid(v: unknown): string | null {
+  const by = new Map<string, { net: number; moved: number }>();
+  for (const m of (Array.isArray(v) ? v : [v]).map(movedOf)) {
+    if (m === null) continue;
+    const was = by.get(m.currency) ?? { net: 0, moved: 0 };
+    by.set(m.currency, { net: was.net + m.amount, moved: was.moved + Math.abs(m.amount) });
+  }
+  if (by.size === 0) return null;
+  const each = [...by].map(([currency, { net, moved }]) => money(Math.abs(net) === moved ? net : moved, currency));
+  return `Moves ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(each)}`;
+}
+
+/** The most changes a proposal's answer names; the question's own page in BrainDog says all of them. */
+const CHANGES_SHOWN = 3;
+
+/**
+ * A value before or after a change, in words, or `null` for one that names nothing a person reads: an id, or a handle
+ * whose words this answer did not read. Empty is `nothing`.
+ */
+function changeValue(v: unknown, look: Look): string | null {
+  if (v === null || v === undefined || v === '') return 'nothing';
+  const m = moneyIn(v);
+  if (m) return money(m.amount, m.currency);
+  if (typeof v === 'boolean') return v ? 'yes' : 'no';
+  if (typeof v === 'number') return grouped(v);
+  if (typeof v === 'string') {
+    const t = v.trim();
+    if (ULID.test(t)) return null;
+    if (/^[a-z][a-z0-9_]*#[1-9][0-9]*$/u.test(t)) {
+      const words = look.title(t);
+      return words === undefined ? null : namedIn(nameOnly(words) ?? '', t, look, 40);
+    }
+    return clip(plainOf(t, look), 60);
+  }
+  if (Array.isArray(v)) {
+    const each = v.map((x) => changeValue(x, look));
+    return each.includes(null) || each.length === 0 ? null : each.join(', ');
+  }
+  return null;
+}
+
+/**
+ * `Changes Status from open to paid; Amount from nothing to GBP 12.00`: what accepting changes on the one row a question
+ * updates, as the record sends it (`changes`, each a field, its label, what it holds and what it will), the first three,
+ * or `null`. A change whose value is an id is left to the question's page rather than said as one.
+ */
+export function changesSaid(v: unknown, look: Look): string | null {
+  if (!Array.isArray(v)) return null;
+  const out: string[] = [];
+  for (const c of v) {
+    if (!isObject(c)) continue;
+    const id = typeof c.field === 'string' ? c.field : '';
+    const label = typeof c.label === 'string' && c.label.trim() !== '' ? c.label.trim() : id.replace(/_/gu, ' ');
+    const [before, after] = [changeValue(c.before, look), changeValue(c.after, look)];
+    if (label === '' || before === null || after === null || before === after) continue;
+    out.push(`${sentence(clip(label, 40))} from ${before} to ${after}`);
+  }
+  if (out.length === 0) return null;
+  const more = out.length > CHANGES_SHOWN ? ` and ${counted(out.length - CHANGES_SHOWN, 'more change')}` : '';
+  return `Changes ${out.slice(0, CHANGES_SHOWN).join('; ')}${more}`;
+}
+
+/* ── understand: what the walk would link and ask, before anybody is met ───────────────────────────────────────── */
+
+/** What one kind reads as after its count, in the words a person uses for their own things. */
+const UNDERSTOOD_KINDS: Readonly<Record<string, readonly [one: string, many: string]>> = {
+  payments: ['payment to who it was with', 'payments to who they were with'],
+  runs: ['run to its project', 'runs to their projects'],
+  services: ['service to its project', 'services to their projects'],
+};
+
+/** The most changes and questions `understand` names; the rest are counted. */
+export const UNDERSTOOD_SHOWN = 8;
+
+const countOf = (v: unknown): number => (typeof v === 'number' && Number.isSafeInteger(v) && v > 0 ? v : 0);
+const sentencesOf = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string' && s.trim() !== '').map((s) => s.trim()) : []);
+
+/**
+ * `understand`: what the record would link next and what it would ask, in names, with nothing changed.
+ *
+ *     Would link 3 payments to who they were with, 2 runs to their projects · would add 1 organisation
+ *     Link LOWRY ST STUDIOS RENT AUG to Lowry St Studios
+ *     Add Lowry St Studios to Organisations
+ *     and 1 more change
+ *     Would ask Sam: Which project is Fly for?
+ *     Nothing was changed. The rest is read on later nights.
+ *
+ * READ AS `unknown`, a part the record leaves out read as none of it, as the command line reads the same answer
+ * (`apps/cli/src/understand.ts`). Every sentence goes through `plainOf`, because the record words a link from the row it
+ * would make, and a payment's words can be an address.
+ */
+export function understoodBrief(value: Record<string, unknown>, look: Look): string {
+  const links: string[] = [];
+  let orgs = 0;
+  for (const k of Array.isArray(value.kinds) ? value.kinds : []) {
+    if (!isObject(k) || typeof k.kind !== 'string') continue;
+    orgs += countOf(k.organisations);
+    const n = countOf(k.linked);
+    if (n === 0) continue;
+    const words = UNDERSTOOD_KINDS[k.kind] ?? [k.kind.replace(/[-_.]+/gu, ' '), k.kind.replace(/[-_.]+/gu, ' ')];
+    links.push(`${grouped(n)} ${n === 1 ? words[0] : words[1]}`);
+  }
+  const writes = sentencesOf(value.writes);
+  const questions = sentencesOf(value.questions);
+  const asks = isObject(value.asks) ? Object.values(value.asks).reduce<number>((sum, n) => sum + countOf(n), 0) : 0;
+  const done = value.done !== false;
+  const rest = done ? '' : ' The rest is read on later nights.';
+  if (links.length === 0 && orgs === 0 && writes.length === 0 && questions.length === 0)
+    return done ? 'Nothing to link and nothing to ask: what the record holds is understood.' : `Nothing to link or ask in the next part of the record.${rest}`;
+  const out: string[] = [];
+  const head = [links.length > 0 ? `Would link ${links.join(', ')}` : '', orgs > 0 ? `would add ${counted(orgs, 'organisation')}` : ''].filter(Boolean).join(' · ');
+  if (head !== '') out.push(sentence(head));
+  const shown = writes.slice(0, UNDERSTOOD_SHOWN);
+  out.push(...shown.map((w) => clip(plainOf(w, look), 140)));
+  const more = writes.length - shown.length + countOf(value.more);
+  if (more > 0) out.push(`and ${counted(more, 'more change')}`);
+  const asked = questions.slice(0, UNDERSTOOD_SHOWN);
+  for (const q of asked) out.push(`Would ask ${look.decider}: ${clip(plainOf(q, look), 140)}`);
+  const unasked = Math.max(asks, questions.length) - asked.length;
+  if (unasked > 0) out.push(`and ${counted(unasked, 'more question')} for ${look.decider}`);
+  out.push(`Nothing was changed.${rest}`);
+  return out.join('\n');
 }

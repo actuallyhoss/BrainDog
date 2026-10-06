@@ -1249,6 +1249,10 @@ export function createClient(options: ClientOptions) {
      */
     understand: (args: { dry?: boolean; undo?: readonly string[] } = {}) =>
       call<AnswerOr<'understand', Understood>>('understand', args as Record<string, unknown>),
+    /* AND ITS DRY HALF AS A READ (READ+): a GET a token may send, so the command line and an agent see what the walk
+       would link and ask without a browser. Who may read it is the record's to say. */
+    /** What the next slice of the walk would link and ask, in names, with `dry: true`. It changes nothing. */
+    understandPlan: () => call<AnswerOr<'understandPlan', Understood>>('understandPlan'),
     /** Delete this record. `slug` is its name, typed to confirm. */
     deleteRecord: (args: { slug: string }) => call<{ slug: string; deleted: true }>('deleteRecord', args as Record<string, unknown>),
 

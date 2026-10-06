@@ -522,7 +522,7 @@ test('THE GRAMMAR\'S ask_person STEP INSTALLS AS WRITTEN, so an agent copying it
 
 /* ── and what it cost ──────────────────────────────────────────────────── */
 
-test('NO TOOL WAS ADDED FOR AUTOMATIONS: the sixteen are the sixteen, and the reads are resources', () => {
-  assert.equal(TOOLS.length, 16);
+test('NO TOOL WAS ADDED FOR AUTOMATIONS: the seventeen are the seventeen, and the reads are resources', () => {
+  assert.equal(TOOLS.length, 17);
   for (const name of ['automations', 'automation', 'dry_run', 'automationRun', 'cancelRun']) assert.equal(TOOLS.some((t) => t.name === name), false, name);
 });

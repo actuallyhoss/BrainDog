@@ -76,13 +76,14 @@ const refusal = (r: unknown) => {
 
 /* ── the surface itself ──────────────────────────────────────────────────── */
 
-test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
+test('THE COUNT IS THE DESIGN: seventeen, and each is named by the plan', () => {
   /* The eight of `10-MCP` §3 less what no token can use, plus `context`,
      `handoff` and `meet`, which are what an agent does every session. `decide` is ABSENT because no
      token reaches that rung: a tool that could only ever refuse is a tool an agent spends its turns
      discovering. `activity` is the fifteenth, a record-wide log, the one thing agents coming from
      other records reach for and nowhere here: see `activity.test.ts` for the rest of that comparison.
-     `triage` is the sixteenth, the one tool the ceiling was raised for.
+     `triage` is the sixteenth, the one tool the ceiling was raised for. `understand` is the seventeenth (DIRECTION
+     §38): what the record would link, read before an agent meets anyone, paid for out of the list's own words.
 
      `money` WAS ONCE THE SIXTEENTH, and it read seven of money-core's figure ids by name, so the
      core knew one use case. A pack's figures are named
@@ -90,7 +91,7 @@ test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
      other pack's (`figures.test.ts`). */
   assert.deepEqual(
     TOOLS.map((t) => t.name),
-    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage'],
+    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'understand', 'meet', 'triage'],
   );
   for (const t of TOOLS) assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
 });

@@ -81,6 +81,16 @@ export type RecordDeps = {
    * Absent, `understand` answers `NOT_IN_THIS_BUILD` for anything but an undo.
    */
   understood?: (dry: boolean, ctx: CallContext) => Promise<Result<Understanding>>;
+  /**
+   * The batches the walk wrote, newest walk first, each with when (`walkedBatches` in `index.ts`), which
+   * `understand({ undo: 'last' })` puts back. Absent, only an undo by its batch is taken.
+   */
+  walked?: () => { at: string; batches: string[] }[];
+  /**
+   * Whether the caller reads every list in the record (`readsEveryList` in `index.ts`), which `understandPlan` asks
+   * before it answers in the names of every list. Absent, nobody is answered.
+   */
+  readsEveryList?: (ctx: CallContext) => boolean;
 };
 
 export function methods(deps: RecordDeps) {

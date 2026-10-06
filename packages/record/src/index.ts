@@ -43,8 +43,6 @@ import {
   fill,
   GRANT_KINDS,
   agentOf as kindOf,
-  clipTitle,
-  keysOfStamp,
   type QueueQuestion,
   isQuiet,
   isStale,
@@ -98,6 +96,13 @@ import {
   slugify,
   SLASH,
   BACKFILL_ACTOR,
+  CEILING,
+  keyOf,
+  keyOfAny,
+  kindOfKey,
+  nameKey,
+  noteMention,
+  valueOfKey,
   type BackfillSliceName,
   type BackfillSuggestion,
   type Backfilled,
@@ -586,6 +591,18 @@ class Unwind extends Error {
   constructor(refusal: Result<never>) {
     super('refused');
     this.refusal = refusal;
+  }
+}
+
+/**
+ * What an agent's `meet` would have written onto somebody the record already knows, beyond the meeting itself, carried
+ * out of a transaction it unwinds (`meet`), so the ladder reads it against the row as it still is.
+ */
+class Asserting extends Error {
+  asserted: { register: string; id: string; patch: Record<string, JsonValue | null> };
+  constructor(asserted: { register: string; id: string; patch: Record<string, JsonValue | null> }) {
+    super('asserting');
+    this.asserted = asserted;
   }
 }
 
@@ -2002,6 +2019,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /* ── the vault doors' half ── */
 
   const mintGrant = ulids(() => clock.now());
+  /* A BATCH THE RECORD WRITES UNDER ITSELF, as the kernel mints its own, so several writes are one change to Undo. */
+  const mintBatch = ulids(() => clock.now());
   /* A PHONE'S SUBSCRIPTION IS NAMED BY ID IN A `notify.push` JOB, so it gets one of its own (`push.ts`). */
   const mintPush = ulids(() => clock.now());
 
@@ -2491,6 +2510,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const cursor = (k: BackfillSliceName): string | null => (typeof stored?.[k] === 'string' ? (stored[k] as string) : null);
     let after: Record<BackfillSliceName, string | null> = { ledger: cursor('ledger'), runs: cursor('runs'), services: cursor('services') };
     const asked = new Map<string, BackfillSuggestion>();
+    const batches: string[] = [];
     let done = false;
     for (let n = 0; n < UNDERSTAND_SLICES && !done; n += 1) {
       let walked: Backfilled;
@@ -2501,12 +2521,43 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         break;
       }
       for (const one of walked.suggestions) if (!asked.has(one.key)) asked.set(one.key, one);
+      batches.push(...sliceBatches(walked));
       after = { ledger: walked.ledger.next, runs: walked.runs.next, services: walked.services.next };
       done = after.ledger === null && after.runs === null && after.services === null;
     }
     kernel.setPref(SLASH, UNDERSTAND_NEXT, done ? null : after);
+    keepWalked(batches);
     const filing = await understoodFiling([...asked.values()]);
     return { filed: filing.filed, dropped: [...dropped, ...filing.dropped] };
+  };
+
+  /** Each kind's batch one walk wrote, the handles `undoBackfill` takes back. */
+  const sliceBatches = (walked: Backfilled): string[] =>
+    [walked.ledger.batch, walked.runs.batch, walked.services.batch].filter((b): b is string => b !== null);
+
+  /**
+   * WHAT THE WALK WROTE IS KEPT WHERE IT CAN BE TAKEN BACK (research-audit-20 H1). The night's slices, a slice done by
+   * hand and the runs placed by answering one of its questions each keep their batches here, newest first, so
+   * `understand({ undo: 'last' })` puts back the last walk without anybody holding its handles, and `walkedBatches` hands
+   * them to anything that lists what the walk did. A row's byline finds the same batch on its own event, and Undo there
+   * goes the walk's way (`methods/undo.ts`). `UNDERSTAND_KEPT` walks, a fortnight of nights; an older one is still
+   * undone by its batch.
+   */
+  const UNDERSTAND_UNDO = 'understand.undo';
+  const UNDERSTAND_KEPT = 14;
+  const walkedBatches = (): { at: string; batches: string[] }[] => {
+    const held = kernel.prefsOf(SLASH)[UNDERSTAND_UNDO];
+    if (!Array.isArray(held)) return [];
+    return held.flatMap((w) => {
+      const one = (w ?? {}) as { at?: unknown; batches?: unknown };
+      const batches = Array.isArray(one.batches) ? one.batches.filter((b): b is string => typeof b === 'string' && b !== '') : [];
+      return typeof one.at === 'string' && batches.length > 0 ? [{ at: one.at, batches }] : [];
+    });
+  };
+  const keepWalked = (batches: readonly string[]): void => {
+    if (batches.length === 0) return;
+    const at = new Date(clock.now()).toISOString();
+    kernel.setPref(SLASH, UNDERSTAND_UNDO, [{ at, batches: [...batches] }, ...walkedBatches()].slice(0, UNDERSTAND_KEPT));
   };
 
   /** Where the walk goes on from, as the last night or the last `understand` left it. */
@@ -2565,6 +2616,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     }
     const next = { ledger: walked.ledger.next, runs: walked.runs.next, services: walked.services.next };
     kernel.setPref(SLASH, UNDERSTAND_NEXT, next.ledger === null && next.runs === null && next.services === null ? null : next);
+    keepWalked(sliceBatches(walked));
     const answer = understandingOf(walked, false);
     const filing = await understoodFiling(walked.suggestions);
     return ok({
@@ -2674,7 +2726,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       { kind: 'runs', looked: walked.runs.looked, linked: walked.runs.wrote, refused: walked.runs.refused },
       { kind: 'services', looked: walked.services.looked, linked: walked.services.wrote, refused: walked.services.refused },
     ];
-    const batches = [walked.ledger.batch, walked.runs.batch, walked.services.batch].filter((b): b is string => b !== null);
+    const batches = sliceBatches(walked);
     const lines = understoodLines(batches, dry);
     const asks: Record<string, number> = {};
     for (const q of walked.suggestions) asks[q.kind] = (asks[q.kind] ?? 0) + 1;
@@ -2746,9 +2798,53 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /** What a choice the walk asked does when it is answered: the project each option names, and what it is about. */
+  /* `wheres` IS EVERY PLACE THE RUNS ASKED ABOUT WORKED IN, each whole (`whereOf`), kept when it was asked; a choice kept
+     before it was read again from `place` when it is answered. */
   type UnderstoodChoice =
     | { kind: 'service-project'; service: string; projects: Record<string, string> }
-    | { kind: 'run-project'; place: string; projects: Record<string, string> };
+    | { kind: 'run-project'; place: string; projects: Record<string, string>; wheres?: string[] };
+
+  /**
+   * Where a run worked, whole, as one key: its remote by the kernel's own reading (`remote:github.com/sam/kiln`), or the
+   * folder it ran in when it has none (`folder:/Users/sam/kiln`). `null` for a run that says only a bare name, which any
+   * fork and any other checkout shares, so answering a question never places it.
+   */
+  const whereOf = (fields: Record<string, unknown>): string | null => {
+    const remote = typeof fields.remote === 'string' && fields.remote.trim() !== '' ? keyOf('remote', fields.remote) : null;
+    if (remote !== null) return remote;
+    return typeof fields.cwd === 'string' && fields.cwd.trim() !== '' ? keyOf('folder', fields.cwd) : null;
+  };
+
+  /** The place a run is asked about by, as the walk names it (`backfill.ts`): its repository, or the last name of its remote or folder. */
+  const placeOf = (fields: Record<string, unknown>): string => {
+    const said = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+    const last = (v: string): string => v.replace(/[\\/]+$/u, '').replace(/\.git$/iu, '').split(/[\\/:]+/u).filter((p) => p !== '').at(-1) ?? '';
+    const repo = said(fields.repo);
+    if (repo !== null) return repo;
+    const remote = said(fields.remote);
+    return remote !== null ? last(remote) : last(said(fields.cwd) ?? '');
+  };
+
+  /** The live runs no project holds yet, read whole, for the walk's question about them. */
+  const unplacedRuns = (): { id: string; version: number; fields: Record<string, JsonValue>; updated_at: string }[] =>
+    sql
+      .all<{ id: string; version: number; fields: string; updated_at: string }>(
+        "SELECT id, version, fields, updated_at FROM entry WHERE register = ? AND deleted_at IS NULL AND coalesce(json_extract(fields, '$.project'), '') = ''",
+        SESSION,
+      )
+      .map((r) => ({ ...r, fields: JSON.parse(r.fields) as Record<string, JsonValue> }));
+
+  /** Every whole place the runs named by `place` worked in, which is what a question about them is answered for. */
+  const wheresOf = (place: string): string[] => {
+    const named = place.trim().toLowerCase();
+    const out = new Set<string>();
+    for (const r of unplacedRuns()) {
+      if (placeOf(r.fields).toLowerCase() !== named) continue;
+      const at = whereOf(r.fields);
+      if (at !== null) out.add(at);
+    }
+    return [...out].sort();
+  };
 
   /** The list projects are kept in, and its field of repositories: the one list declaring `scopes:`, as `slashProjects` reads it. */
   const projectsList = (): { register: string; repos: string | null } | null => {
@@ -2800,7 +2896,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         });
         const about = aboutOf(one.kind === 'service-project' ? one.service.name : one.place);
         const body = { ...(about === '' ? {} : { about }), options: [...options, { id: 'none', label: 'Neither', because: 'Nothing is linked, and this is not asked again.' }] };
-        const choice: UnderstoodChoice = one.kind === 'service-project' ? { kind: one.kind, service: one.service.id, projects } : { kind: one.kind, place: one.place, projects };
+        /* THE KERNEL'S OWN WHERES WHEN IT SAYS THEM, and otherwise every whole place the runs by that name work in now. */
+        const told = one.kind === 'run-project' ? (one as { wheres?: unknown }).wheres : undefined;
+        const wheres = Array.isArray(told) ? told.filter((w): w is string => typeof w === 'string') : one.kind === 'run-project' ? wheresOf(one.place) : [];
+        const choice: UnderstoodChoice =
+          one.kind === 'service-project' ? { kind: one.kind, service: one.service.id, projects } : { kind: one.kind, place: one.place, projects, wheres };
         return [{ draft: draft(one.question, 'options', body), choice }];
       }
     }
@@ -2808,8 +2908,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * A choice the nightly walk asked, answered: link the service to the project picked, or place every run in that
-   * repository that no project holds yet in it. Signed by whoever answered. Anything else is not the walk's, and
-   * `Neither` does nothing but answer it.
+   * repository that no project holds yet in it. Anything else is not the walk's, and `Neither` does nothing but answer it.
+   *
+   * THE RUNS ARE PLACED AS THE WALK PLACES THEM (research-audit-20 H2): in one transaction and one batch, signed
+   * `rule:backfill` with the version each was read at, so a throw places none of them, and the owner's Undo takes them all
+   * back the walk's way (`methods/undo.ts`), which no run's own row would let the general undo do. ONLY THE PLACES ASKED
+   * ABOUT, WHOLE: a run is placed when its remote, or its folder when it has none, is one the question was about
+   * (`whereOf`), never because its last name matches, so somebody else's `app` on another host stays where it is. AND ONLY
+   * A RUN THAT HAS GONE QUIET, as the walk's own slice, since a run still working places itself on its next call and a
+   * write here would make that call a conflict.
    */
   const understoodAnswer = (id: string, option: string, actor: string): void => {
     const held = kernel.prefsOf(UNDERSTAND_ASKED)[id] as UnderstoodChoice | undefined;
@@ -2825,18 +2932,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (service && field) kernel.update(service.register, service.id, { [field.id]: row.id }, { actor, version: service.version });
       return;
     }
-    const place = held.place.toLowerCase();
-    const last = (v: unknown): string => (typeof v === 'string' ? (v.replace(/\.git$/iu, '').split(/[\\/:]/u).filter(Boolean).at(-1) ?? '').toLowerCase() : '');
-    const runs = sql.all<{ id: string; repo: unknown; remote: unknown; cwd: unknown; project: unknown }>(
-      `SELECT id, json_extract(fields, '$.repo') AS repo, json_extract(fields, '$.remote') AS remote, json_extract(fields, '$.cwd') AS cwd,
-              json_extract(fields, '$.project') AS project FROM entry WHERE register = ? AND deleted_at IS NULL`,
-      SESSION,
-    );
-    for (const r of runs) {
-      if (r.project !== null && r.project !== '') continue;
-      if (![r.repo, r.remote, r.cwd].some((v) => last(v) === place)) continue;
-      kernel.write(SESSION, r.id, {}, { actor, cascade: false, stamp: { project: kernel.nameOf(row.id) } });
-    }
+    const wheres = new Set(Array.isArray(held.wheres) ? held.wheres : wheresOf(held.place));
+    if (wheres.size === 0) return;
+    const now = clock.now();
+    const placed = kernel.nameOf(row.id);
+    const batch = kernel.transaction(() => {
+      const minted = mintBatch();
+      let wrote = 0;
+      for (const r of unplacedRuns()) {
+        if (!isStale(r, now)) continue;
+        const at = whereOf(r.fields);
+        if (at === null || !wheres.has(at)) continue;
+        /* A RUN WRITTEN SINCE IT WAS READ IS REFUSED ON ITS VERSION AND LEFT WHERE IT IS; the rest still go in. */
+        const out = kernel.write(SESSION, r.id, {}, { actor: BACKFILL_ACTOR, batch: minted, cascade: false, version: r.version, stamp: { project: placed } });
+        if (out.ok) wrote += 1;
+      }
+      return wrote > 0 ? minted : null;
+    });
+    if (batch !== null) keepWalked([batch]);
   };
 
   /**
@@ -4495,82 +4608,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return row ? cardFactsOf(ctx, row) : {};
   };
 
-  /** A value that is money: a whole number of minor units with a three-letter currency. */
-  const moneyIn = (v: unknown): { amount: number; currency: string } | null => {
-    if (v === null || typeof v !== 'object' || Array.isArray(v)) return null;
-    const m = v as { amount?: unknown; currency?: unknown };
-    return typeof m.amount === 'number' && Number.isSafeInteger(m.amount) && typeof m.currency === 'string' && /^[A-Z]{3}$/u.test(m.currency)
-      ? { amount: m.amount, currency: m.currency }
-      : null;
-  };
-
   /**
    * WHAT THE DECISION CARD SAYS BESIDE A QUESTION, wherever the record answers one outside a page's queue: `governance`
-   * (which /decide/<id> reads) and `propose` (which an agent says back). The same facts the kernel puts on a queue's
-   * question (`pages.ts` `QueueQuestion`): the run that asked, by its handle beside what it was doing and the app it ran
-   * in; who drafted it; the money accepting writes, one value a row it writes and never two currencies added; what
-   * changes on the one row a question updates, each value said as a person reads it; and the kinds of change it is.
+   * (which /decide/<id> reads) and `propose` (which an agent says back). They are the kernel's (`kernel.queueQuestion`),
+   * the one reading the queue's card is drawn from, so the two never say different things: the run that asked by its
+   * handle beside what it was doing and the app, who drafted it, the money accepting writes (one value a row, never two
+   * currencies added), what changes on the one row it updates, and the kinds of change it is. Nothing is invented and no
+   * id is said where a name goes.
    *
-   * NOTHING INVENTED: a fact the record cannot say is left off. A link is said by the title of the row it points at and a
-   * link to no row leaves its change off, so no id reaches the card; a secret or a file is never said.
-   *
-   * THE RUN AND THE CHANGES ONLY TO A READER OF EVERY LIST, as the kernel draws the queue only for one: what a run was
-   * doing, a row's value now and the title a link points at may sit on lists a member invited to one of them cannot
-   * read. Anybody the question reaches gets its money, who drafted it and its kinds, which its own body and stamp say.
+   * THE RUN AND THE CHANGES ONLY TO A READER OF EVERY LIST, which is the record's to say (`readsEveryList`): what a run
+   * was doing and a row's value now may sit on lists a member invited to one of them cannot read.
    */
-  const cardFactsOf = (ctx: CallContext, row: Record<string, unknown>): Partial<QueueQuestion> => {
-    const out: Partial<QueueQuestion> = {};
-    const every = readsEveryList(ctx);
-    const id = String(row.id);
-    const kind = String(row.body_kind ?? '');
-    const body = (row.body !== null && typeof row.body === 'object' && !Array.isArray(row.body) ? row.body : {}) as Record<string, unknown>;
-    const by = String(row.opened_by ?? '');
-    const run = /^[A-Z][1-9][0-9]*$/u.test(by) ? kernel.get(by, { includeDeleted: true }) : null;
-    if (every && run && run.register === SESSION) {
-      const doing = text(run.fields.doing)?.trim() || null;
-      const hints = {
-        ...(typeof run.fields.agent === 'string' ? { agent: run.fields.agent } : {}),
-        ...(typeof run.fields.client === 'string' ? { client: run.fields.client } : {}),
-      };
-      out.run = { id: by, ...(doing === null ? {} : { name: clipTitle(doing) }), app: kindOf(hints).name };
-    }
-    const stamped = sql.one<{ drafted_by: string | null; kind: string | null }>('SELECT drafted_by, kind FROM suggestion WHERE id = ?', id);
-    if (stamped?.drafted_by) out.drafted_by = stamped.drafted_by;
-    const kinds = keysOfStamp(stamped?.kind ?? null);
-    if (kinds.length > 0) out.kinds = kinds;
-    if (kind !== 'rowset' || !Array.isArray(body.rows)) return out;
-    const register = typeof body.register === 'string' ? body.register : '';
-    const rows = (body.rows as unknown[]).filter((x): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x));
-    const writes = rows.map((x) => ('at' in x ? x.patch : x)).filter((x): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x));
-    const money = writes.flatMap((w) => Object.values(w).flatMap((v) => moneyIn(v) ?? []));
-    if (money.length > 0) out.money = money;
-    const [only] = rows;
-    if (!every || rows.length !== 1 || only === undefined || typeof only.at !== 'string' || writes.length !== 1) return out;
-    const target = kernel.get(only.at, { includeDeleted: true });
-    const list = kernel.register(register);
-    if (!target || target.register !== register || !list) return out;
-    const named = (type: string | undefined, labels: Readonly<Record<string, string>> | undefined, v: unknown): JsonValue | null | undefined => {
-      if (v === null || v === undefined || v === '') return null;
-      if (Array.isArray(v)) {
-        const each = v.map((x) => named(type, labels, x));
-        return each.includes(undefined) ? undefined : (each as JsonValue[]);
-      }
-      if (type === 'ref') return typeof v === 'string' ? (kernel.titleOfRow(v) ?? undefined) : undefined;
-      if (type === 'enum' && typeof v === 'string') return labels?.[v] ?? v;
-      return v as JsonValue;
-    };
-    const changes = Object.entries(writes[0]!).flatMap(([field, after]) => {
-      const spec = list.fields.find((f) => f.id === field);
-      const type = spec?.type === 'list' ? spec.of : spec?.type;
-      if (!spec || type === 'secret' || type === 'file') return [];
-      const label = typeof spec.label === 'string' && spec.label.trim() !== '' ? spec.label.trim() : undefined;
-      const before = named(type, spec.labels, target.fields[field]);
-      const now = named(type, spec.labels, after);
-      return before === undefined || now === undefined ? [] : [{ field, ...(label ? { label } : {}), before, after: now }];
-    });
-    if (changes.length > 0) out.changes = changes;
-    return out;
-  };
+  const cardFactsOf = (ctx: CallContext, row: Record<string, unknown>): Partial<QueueQuestion> =>
+    kernel.queueQuestion(String(row.id), { everyList: readsEveryList(ctx) }) ?? {};
 
   /**
    * A merge question as Decide draws it (`MergeCluster`), or `null` for any other question: a `rowset` on the list
@@ -6092,6 +6142,141 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       };
     }
     return null;
+  };
+
+  /**
+   * AN AGENT'S `meet`, AT ITS RUNG (research-audit-20 H4, DIRECTION §38). What `meet` does on its own stays automatic,
+   * since understanding is meant to fill People without asking and every write it makes keeps its Undo: a person or an
+   * organisation it adds, the dated line of where they were met, the last day in touch, the run's project, and a merge
+   * the kernel's strong rules make. What the agent asserts on top about somebody the record ALREADY holds (a key carried
+   * onto them, the organisation they are with, a role or a kind, a name, an alias) is a change to that row like any
+   * `update`, so it goes through `laddered`. Where the gate says ask, nothing is written: the sighting is kept as a
+   * mention, and the change is asked once on Decide, or not at all while a question about that row already waits.
+   *
+   * READ BY DOING IT AND TAKING IT BACK. The kernel alone decides who a meeting is and what it would carry, so it is run
+   * in a transaction that is unwound once it has said what it wrote onto a row already there, and run again for real
+   * when the rung lets it through; nothing else writes in between.
+   */
+  const metOnLadder = (ctx: CallContext, caller: Caller, kind: 'person' | 'organisation', said: Record<string, unknown>, sent: never, by: WriteContext): Result<Meeting> => {
+    let asserted: Asserting['asserted'] | null = null;
+    let first: Result<unknown> | null = null;
+    try {
+      first = kernel.transaction(() => {
+        const mark = sql.one<{ n: number | null }>('SELECT max(rowid) AS n FROM event')?.n ?? 0;
+        const met = kernel.meet(sent, by) as Result<unknown>;
+        const held = met.ok ? assertedOn(met.value, mark) : null;
+        if (held !== null) throw new Asserting(held);
+        return met;
+      });
+    } catch (e) {
+      if (!(e instanceof Asserting)) throw e;
+      asserted = e.asserted;
+    }
+    if (asserted === null) return meeting(ctx, first as Result<unknown>);
+    const self = kernel.get(asserted.id);
+    const rung = self === null ? null : laddered(ctx, asserted.register, 'update', asserted.patch, self);
+    if (rung === null || self === null || rung.gate.write) {
+      const out = meeting(ctx, kernel.meet(sent, by) as Result<unknown>);
+      if (out.ok && rung?.gate.write) trust.kept(rung.caller.token, rung.gate.kinds, ladderNames(rung.caller.token));
+      return out;
+    }
+    const answer = mentioned(kind, said, caller, self);
+    const question = askedOnce(ctx, asserted, self);
+    if (!question.ok) return question;
+    return ok({
+      ...answer,
+      row: { register: self.register, id: kernel.nameOf(self.id), seq: self.seq, name: kernel.titleOfRow(self.id) ?? kernel.nameOf(self.id) },
+      matched_by: 'key',
+      ...(question.value === null ? {} : { question: question.value }),
+    });
+  };
+
+  /**
+   * What one meeting wrote onto a row that was already there, past the meeting's own parts, read from the events it left
+   * after `mark`: each field it changed, as the row now holds it, or `null` when it added the row, only folded rows by the
+   * strong rules, or wrote nothing but where and when they were met.
+   */
+  const assertedOn = (met: unknown, mark: number): Asserting['asserted'] | null => {
+    const m = (met ?? {}) as { row?: { id?: unknown } | null; created?: unknown; matched_by?: unknown };
+    if (m.created === true || m.matched_by !== 'key' || typeof m.row?.id !== 'string') return null;
+    const row = kernel.get(m.row.id);
+    if (!row) return null;
+    const own = meetingParts(row.register);
+    const fields = sql
+      .all<{ field: string }>('SELECT DISTINCT field FROM event WHERE target = ? AND rowid > ? AND field IS NOT NULL', `entry:${row.id}`, mark)
+      .map((e) => e.field)
+      .filter((f) => !own.has(f));
+    if (fields.length === 0) return null;
+    return { register: row.register, id: row.id, patch: Object.fromEntries(fields.map((f) => [f, (row.fields[f] ?? null) as JsonValue | null])) };
+  };
+
+  /** The fields a meeting writes of its own on a person or an organisation: where and when they were met, and the run's project. */
+  const meetingParts = (register: string): Set<string> => {
+    const people = kernel.meetsList();
+    const orgs = orgsList();
+    const parts = people?.register === register ? people.fields : orgs?.register === register ? orgs.fields : {};
+    const own = parts as { met?: string; in_touch?: string; projects?: string };
+    return new Set([own.met, own.in_touch, own.projects].filter((f): f is string => typeof f === 'string'));
+  };
+
+  /**
+   * A sighting kept as a mention (`entity_mention`), the way the kernel keeps a name met with nothing that identifies it:
+   * by the name, the kind, the project of the agent's run and where it was seen, and no row. `known` is the row it would
+   * have written onto, whose own name is kept when the agent said none. A meeting with no name to keep leaves nothing,
+   * since an address alone is never a name.
+   */
+  const mentioned = (kind: 'person' | 'organisation', said: Record<string, unknown>, caller: Caller, known: Entry | null): Meeting => {
+    const name = text(typeof said.name === 'string' ? said.name.trim() : null) ?? (known === null ? null : kernel.titleOfRow(known.id)) ?? nameOfKeys(said);
+    const source = (text(typeof said.source === 'string' ? said.source.trim() : null) ?? text(typeof said.where === 'string' ? said.where.trim() : null) ?? 'an agent').slice(0, 80);
+    const list = kind === 'organisation' ? orgsList() : kernel.meetsList();
+    const projects = (list?.fields as { projects?: string } | undefined)?.projects;
+    const run = caller.run === null ? null : kernel.get(caller.run);
+    const at = run !== null && typeof run.fields.project === 'string' ? kernel.get(run.fields.project) : null;
+    const project = projects === undefined || at === null ? '' : at.id;
+    if (name !== null && nameKey(name) !== '')
+      noteMention(sql, { name, kind, project: project === '' ? null : project, source, at: new Date(clock.now()).toISOString() });
+    return { row: null, created: false, matched_by: 'none', mention: true };
+  };
+
+  /**
+   * The name a meeting said only by its keys goes by, as the kernel names a person it adds that way: a login as it is
+   * written, or the part of an address before the `@`, and never the address. `null` when no key says one.
+   */
+  const nameOfKeys = (said: Record<string, unknown>): string | null => {
+    const raw = [said.handle, said.email, ...(Array.isArray(said.keys) ? said.keys : [])].filter((k): k is string => typeof k === 'string');
+    const keys = raw.map((k) => keyOfAny(k)).filter((k): k is string => k !== null);
+    const login = keys.find((k) => kindOfKey(k) === 'github');
+    if (login !== undefined) return valueOfKey(login);
+    const mail = keys.find((k) => kindOfKey(k) === 'email');
+    return mail === undefined ? null : (valueOfKey(mail).split('@')[0] ?? null);
+  };
+
+  /**
+   * The one question an asserted change is asked as: "Add GitHub handle and organisation to Ada Lovelace?", a `rowset` on
+   * the version the agent met, signed by its run so accepting it is that agent's change kept. NOT A SECOND ONE while a
+   * question about that row is already waiting, which is answered by its handle instead. Answers the question as this
+   * caller is handed it.
+   */
+  const askedOnce = (ctx: CallContext, asserted: Asserting['asserted'], self: Entry): Result<string | null> => {
+    const ats = [kernel.nameOf(self.id), ...(self.seq === null ? [] : [`${self.register}#${self.seq}`])];
+    const waiting = sql.one<{ id: string }>(
+      `SELECT id FROM suggestion WHERE status = 'open' AND body_kind = 'rowset' AND json_valid(body)
+         AND json_extract(body, '$.register') = ? AND json_extract(body, '$.rows[0].at') IN (${ats.map(() => '?').join(', ')}) LIMIT 1`,
+      asserted.register,
+      ...ats,
+    );
+    if (waiting) return ok(nameOf(ctx, 'suggestion', waiting.id) ?? null);
+    const decl = kernel.register(asserted.register);
+    const labels = Object.keys(asserted.patch).map((f) => {
+      const spec = decl?.fields.find((x) => x.id === f);
+      return (typeof spec?.label === 'string' && spec.label.trim() !== '' ? spec.label.trim() : f.replace(/[_-]+/gu, ' ')).toLowerCase();
+    });
+    const what = labels.length === 1 ? labels[0]! : `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)!}`;
+    const title = kernel.titleOfRow(self.id);
+    const whom = title === null ? null : (scrubbed(title.length > 80 ? `${title.slice(0, 79)}…` : title) ?? null);
+    const question = `Add ${what} to ${whom ?? `this one in ${decl?.name ?? 'the list'}`}?`;
+    const filed = filedAs(ctx, kernel.propose({ question, body_kind: 'rowset', body: { register: asserted.register, rows: [{ at: kernel.nameOf(self.id), version: self.version, patch: asserted.patch }] } }, writerOf(ctx)));
+    return filed.ok ? ok(filed.value.id) : filed;
   };
 
   /**
@@ -7981,6 +8166,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      *
      * PEOPLE IS A MODULE THE OWNER MAY SWITCH OFF. Without the register this is `REGISTER_UNKNOWN`, and the
      * kernel writes nothing, a run included.
+     *
+     * AN AGENT MEETS AT ITS RUNG (`metOnLadder`): what it asserts on somebody already known asks where its rung asks, as a
+     * mention and one question, and an agent on a Suggest grant only leaves mentions.
      */
     async meet(args: MeetSaid, ctx: CallContext): Promise<Result<Meeting>> {
       const said = (args ?? {}) as Record<string, unknown>;
@@ -8054,7 +8242,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A PERSON AT HER OWN KEYBOARD SAYS SO (`principal: person`), so what she types is believed whatever its source says,
          unless it says it arrived (`PeopleDeps.typed` in the kernel). A token, a rule or the system never does. */
       const by = ctx.principal.kind === 'person' ? { ...writerOf(ctx), principal: { kind: 'person' as const } } : writerOf(ctx);
-      return tail(meeting(ctx, kernel.meet({ ...met, ...(doubted ? { untrusted: true } : {}) } as never, by) as Result<unknown>));
+      const sent = { ...met, ...(doubted ? { untrusted: true } : {}) } as never;
+      if (caller === null) return tail(meeting(ctx, kernel.meet(sent, by) as Result<unknown>));
+      /* AN AGENT ON A SUGGEST GRANT ONLY EVER LEAVES A MENTION (research-audit-20 H4): its scope holds every kind at Ask
+         (`CEILING`), so nothing it meets is written, and nothing is asked either, since the owner chose for it to suggest. */
+      if (CEILING[caller.scope] !== 'quiet') return tail(ok(mentioned(kind, said, caller, null)));
+      return tail(metOnLadder(ctx, caller, kind, said, sent, by));
     },
 
     /* ── THE DECISION GATE ─────────────────────────── */
@@ -10196,7 +10389,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        handed the guards above rather than a copy of them, so a method there is held to the same ladder as every method
        in this file; the `guards` gate reads those files as it reads this one, and refuses a name two files both define,
        since the later one would win here without a word. */
-    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow }),
+    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList }),
     /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/`: the owner's, in a browser, and a runner's,
        for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin` as every ADMIN method
        here is, and a runner's admit the one principal every guard above refuses. */

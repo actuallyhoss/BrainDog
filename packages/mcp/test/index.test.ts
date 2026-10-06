@@ -75,6 +75,7 @@ const CALLS: Record<string, Record<string, unknown>> = {
   update: { spoken: 'obligations#1', patch: { state: 'paid' }, version: 1 },
   log: { spoken: 'obligations#1', note: 'Chased twice.' },
   handoff: { doing: 'Checking the tool list', next: 'Report what answered' },
+  understand: {},
   meet: { name: 'Ada', where: 'commit 4464966 in braindog' },
   triage: { arrival: 'arr_1', ignore: true },
 };
@@ -125,7 +126,7 @@ const narrowOver = (api: Awaited<ReturnType<typeof record>>['api']): McpSurface<
   digestToday: (args, ctx) => api.digestToday(args, ctx),
 });
 
-test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS FIVE OF THEM, which is the list a transport has to route', async () => {
+test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS SIX OF THEM, which is the list a transport has to route', async () => {
   /* THE COMMAND LINE BUILDS ITS SURFACE FROM A FIXED LIST (`apps/cli/src/surface.ts`), and a name
      missing from it is a tool that refuses for ever. */
   const { sql, api } = await record();
@@ -133,7 +134,7 @@ test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS FIVE OF THEM, which is t
 
   const dark: string[] = [];
   for (const tool of TOOLS) if ((await called(tool.name, narrow, owner)) === 'NOT_IN_THIS_BUILD') dark.push(tool.name);
-  assert.deepEqual(dark, ['context', 'activity', 'handoff', 'meet', 'triage']);
+  assert.deepEqual(dark, ['context', 'activity', 'handoff', 'understand', 'meet', 'triage']);
   sql.close();
 });
 

@@ -111,6 +111,7 @@ test('NO BRIEF ANSWER CARRIES A ROW ID, A PERSON OR TOKEN ID, OR A NULL, over ev
   await call('update', { spoken, patch: { state: 'doing' }, version });
   await call('update', { spoken, patch: { state: 'done' }, version });
   await call('log', { spoken, note: 'Every answer was read.' });
+  await call('understand', {});
   await call('meet', { name: 'Ada Lovelace', where: 'commit 4464966 in kiln-type' });
   await call('propose', {
     question: 'Keep the brief answers?',

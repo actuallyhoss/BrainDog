@@ -122,6 +122,7 @@ import {
   searchBrief,
   titleOf,
   triagedBrief,
+  understoodBrief,
   wroteBrief,
   type Decl,
   type Field,
@@ -244,6 +245,12 @@ export type McpSurface<C> = {
    * figure by its id. With it the list is taken as answered, because the record holds it to `metric`'s own check.
    */
   figures?(ctx: C): Answer<{ id: string; name?: string; param?: boolean }[]>;
+  /**
+   * What the record's walk over what it already holds would link next and ask on Decide, in names, with nothing changed
+   * (the record's `understandPlan`, READ+, DIRECTION §38). It backs the `understand` tool. Optional for the command line's
+   * reason above: both HTTP hosts hand `serveMcp` the whole record, and a surface without it answers `NOT_IN_THIS_BUILD`.
+   */
+  understandPlan?(args: Record<string, never>, ctx: C): Answer;
 };
 
 /**
@@ -324,9 +331,13 @@ const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
 
 /**
  * Every read's last argument: `full` answers the JSON in the text as well, where it otherwise travels only in
- * `structuredContent`. NO DESCRIPTION, because the instructions say it once and the two words say the rest.
+ * `structuredContent`. NO DESCRIPTION, because the instructions say it once and the one word says the rest.
+ *
+ * `brief` WENT FROM THE ENUM TO PAY FOR `understand`: it is what a read answers when `format` is left out, so naming
+ * it told an agent nothing, and the layer strips `format` before anything reads it, so a call that still sends it is
+ * answered as before.
  */
-const FORMAT = { enum: ['brief', 'full'] } as const;
+const FORMAT = { enum: ['full'] } as const;
 
 export const TOOLS: readonly Tool[] = [
   {
@@ -335,7 +346,7 @@ export const TOOLS: readonly Tool[] = [
     /* AND ITS FIGURES, BECAUSE NOTHING ELSE AN AGENT CALLS NAMES ONE. With the one tool
        that read figures gone, the probe called all nine reads with their most helpful arguments and not one answer
        named a figure the record holds; they were resources, and a client that reads no resources had none. */
-    description: 'Its registers with how many rows each, and its figures: the cheap way to learn register names.',
+    description: 'Its registers with how many rows each, and its figures.',
     input: obj({ format: FORMAT }),
     writes: false,
   },
@@ -345,14 +356,14 @@ export const TOOLS: readonly Tool[] = [
     /* THAT IT IS THE FIRST CALL IS THE INSTRUCTIONS' FIRST RULE, which a client shows in the same payload. What is left
        is what comes back, and since the card it is the card's five slots, in the order the card says them. */
     description:
-      'Your briefing by name: run, project, next step, what waits, what was learned. Call it again after a long pause.',
+      'Your briefing: run, project, next step, what waits, what was learned.',
     input: obj({ format: FORMAT }),
     writes: false,
   },
   {
     name: 'schema',
     title: 'See the fields',
-    description: 'The fields of one register, their types and what each may take. Read before writing.',
+    description: 'The fields of one register, their types and what each may take.',
     input: obj({ register: str('A register id from record_index.'), format: FORMAT }, ['register']),
     writes: false,
   },
@@ -413,7 +424,7 @@ export const TOOLS: readonly Tool[] = [
        130 rows all matching one word: `limit: 80` answered 80 hits, which an agent reading this was
        told it could not ask for. The default of 20 was right and is unchanged. */
     /* "WHAT TO LOOK FOR" IS WHAT `q` BESIDE "ROWS WHOSE TEXT MATCHES" ALREADY SAYS, and its five tokens went to `propose`. */
-    input: obj({ q: str('Plain words.'), limit: int('1 to 100. Default 20.'), format: FORMAT }, ['q']),
+    input: obj({ q: { type: 'string' }, limit: int('1 to 100. Default 20.'), format: FORMAT }, ['q']),
     writes: false,
   },
   {
@@ -427,7 +438,7 @@ export const TOOLS: readonly Tool[] = [
     name: 'activity',
     title: 'See recent changes',
     description:
-      'What changed lately, newest first, and who changed it. Read it to pick up after another session.',
+      'What changed lately, newest first, and who changed it.',
     /* A CURSOR NOW, AND TWENTY BY DEFAULT. It took a limit alone, up to the record's 200 and 50 when asked for none, so
        the default read on the owner's record was 13 KB with 70 row ids in it, and a session that wanted the page below
        had no way to ask. Paged as `list` is, the closing line says what is left and the call that reads it. */
@@ -438,7 +449,7 @@ export const TOOLS: readonly Tool[] = [
     name: 'governance',
     title: 'See questions and decisions',
     description:
-      'Questions waiting on the person, what was decided and why, and predictions. Ask by id for a body.',
+      'Questions waiting on the person, what was decided and why, and predictions.',
     input: obj({
       register: { enum: ['suggestion', 'decision', 'prediction'] },
       id: str('One by its SG or D number.'),
@@ -488,7 +499,7 @@ export const TOOLS: readonly Tool[] = [
       {
         register: { type: 'string' },
         fields: { type: 'object', description: 'Field ids to values. Money is an amount in minor units and its currency: GBP 2 decimals, JPY 0, KWD 3.' },
-        note: str('For whoever reads it later.'),
+        note: { type: 'string' },
       },
       ['register', 'fields'],
     ),
@@ -508,7 +519,7 @@ export const TOOLS: readonly Tool[] = [
         spoken: str('As get takes it.'),
         patch: { type: 'object', description: 'As create takes fields; null clears one, deleted_at true deletes.' },
         version: int("The row's version when you read it."),
-        note: str('For whoever reads it later.'),
+        note: { type: 'string' },
       },
       ['spoken', 'patch'],
     ),
@@ -551,6 +562,17 @@ export const TOOLS: readonly Tool[] = [
     writes: true,
   },
   {
+    name: 'understand',
+    title: 'See what would be linked',
+    /* THE SEVENTEENTH, FOR DIRECTION §38: "the MCP answers in those names, so an agent never meets a raw id or a
+       duplicate person". Before it an agent learnt how the record reads the people and projects in the work only by
+       meeting them; now it can see what the record would link, and ask the owner, first. Read-only, taking nothing but
+       `format`, and paid for out of the list's own words, so `budget.test.ts`'s ceiling did not move. */
+    description: 'What the record would link and ask next, in names. Read before meet.',
+    input: obj({}),
+    writes: false,
+  },
+  {
     name: 'meet',
     title: 'Note someone you met',
     /* WHEN TO CALL IT IS THE INSTRUCTIONS' LINE AGAIN, "meet everyone you work with or are told about", and the
@@ -558,7 +580,12 @@ export const TOOLS: readonly Tool[] = [
        matches or adds, and a name alone is only noted, because the record never makes a person out of a name
        (`loop/contract-17.md`). `kind`, `org`, `domain`, `role` and `keys` are the contract's input, paid for out of the
        description's examples and `handle`'s sentence, which `keys` now says for every kind of key. */
-    description: 'A person or organisation in the work, matched by email, handle or key. A name alone is only noted.',
+    /* AND WHERE IS SAID HONESTLY, because the record believes it accordingly (`kernel/src/people.ts` `trustOf`): what an
+       agent read in mail, a commit or on the web is text anybody could have written, so it never folds two people into
+       one on its own, and an agent's own run, `session in <repo>`, is what the record does believe. An agent that wrote
+       its own run for what it read in a mail would be lending the mail its trust. */
+    description:
+      'A person or organisation in the work, matched by email, handle or key. A name alone is only noted. Mail, commits and the web are not believed alone: say where honestly. Your own run is session in <repo>.',
     input: obj(
       {
         name: { type: 'string' },
@@ -584,7 +611,7 @@ export const TOOLS: readonly Tool[] = [
        `ignore` says nothing beside its name, because "or set it aside" in the description already has.
        AND ITS ARGUMENTS SAY LESS. The seven are the record's, and the two that only go with `back` and the note that only
        goes with `register` are named and left to the record's sentence, which says when each is taken. */
-    description: 'File one arrival from the inbox as a row, or set it aside. braindog:inbox lists them.',
+    description: 'File one arrival from the inbox as a row, or set it aside.',
     input: obj(
       {
         arrival: str('Its id in braindog:inbox.'),
@@ -2075,7 +2102,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       /* THE ROWS THE QUESTION NAMES ARE READ BEFORE IT IS SAID, so a handle or an id in it is said by its words with the
          handle beside them, never alone (audit 19, M11). */
       const dry = out.dry_run === undefined ? null : clip(JSON.stringify(out.dry_run), 1_500);
-      if (turn.text) await handlesNamed(handlesIn([question, ruled !== null && 'filed' in ruled ? `${ruled.filed.question} ${ruled.filed.why ?? ''}` : '', dry ?? ''].join(' ')), ctx, turn);
+      /* AND A CHANGE'S HANDLES BEFORE AND AFTER, so `changesSaid` says a ref field moved by its words rather than leave it
+         to the page. Only handles: a row id there is never said, so it is not worth a read. */
+      const moved = (Array.isArray(out.changes) ? out.changes : [])
+        .flatMap((c) => (isObject(c) ? [c.before, c.after] : []))
+        .filter((v): v is string => typeof v === 'string' && /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u.test(v.trim()));
+      if (turn.text) await handlesNamed(handlesIn([question, ruled !== null && 'filed' in ruled ? `${ruled.filed.question} ${ruled.filed.why ?? ''}` : '', dry ?? '', ...moved].join(' ')), ctx, turn);
       return {
         result: { ok: true, value: out },
         say: (look) =>
@@ -2186,6 +2218,34 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (!isEntry(out.value)) return { result: { ok: true, value: bare(out.value) } };
       const row = await entryOut(out.value, ctx, turn);
       return { result: { ok: true, value: row }, say: () => handoffBrief(row as Shaped) };
+    },
+
+    /**
+     * WHAT THE RECORD WOULD LINK AND ASK, BEFORE ANYBODY IS MET (DIRECTION §38): the record's `understandPlan`, the next
+     * slice of its nightly walk looked at and nothing kept, said in names. Who may read it is the record's to say, so a
+     * refusal passes through in its words.
+     *
+     * THE ANSWER IS THE PLAN AND NOTHING THAT ACTS: the counts by kind, the first changes and questions in names and how
+     * many in all, and whether this slice reads to the end. An `undo` or a filed question's id is a dry slice's never, and
+     * would be a handle no tool takes, so neither is passed on.
+     */
+    understand: async (_args, ctx, turn) => {
+      if (!surface.understandPlan) return { result: unbuilt('understand', 'Meet people with an email or handle, and the record links them as it can.') };
+      const out = await surface.understandPlan({}, ctx);
+      if (!out.ok || !isObject(out.value)) return { result: out };
+      const v = out.value;
+      const value = bare({
+        kinds: v.kinds,
+        writes: v.writes,
+        more: v.more,
+        questions: v.questions,
+        asks: v.asks,
+        done: v.done,
+        ...(v.dropped === undefined ? {} : { dropped: v.dropped }),
+      }) as Record<string, unknown>;
+      /* THE ROWS ITS SENTENCES NAME ARE READ FIRST, so a handle in one is said by its words with the handle beside them. */
+      if (turn.text) await handlesNamed(handlesIn([...(Array.isArray(v.writes) ? v.writes : []), ...(Array.isArray(v.questions) ? v.questions : [])].join(' ')), ctx, turn);
+      return { result: { ok: true, value }, say: (look) => understoodBrief(value, look), names: { people: true } };
     },
 
     /**

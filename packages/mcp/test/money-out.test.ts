@@ -30,9 +30,9 @@ const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'own
 /** The seven ids the tool read, spelled out here so that the package under test does not have to. */
 const MONEY_CORE_IDS = ['cash-now', 'received-30d', 'spent-30d', 'in-30d', 'out-30d', 'late-in', 'overdue'];
 
-test('NO `money` TOOL: sixteen tools, and a call by that name is refused like any other name that is not one', async () => {
+test('NO `money` TOOL: seventeen tools, and a call by that name is refused like any other name that is not one', async () => {
   assert.equal(mcp.TOOLS.some((t) => t.name === 'money'), false, 'the core still advertises a tool for one pack');
-  assert.equal(mcp.TOOLS.length, 16);
+  assert.equal(mcp.TOOLS.length, 17);
   assert.equal('MONEY_FIGURES' in mcp, false, 'the core still exports a list of one pack\'s figure ids');
 
   const { surface, calls } = stub();

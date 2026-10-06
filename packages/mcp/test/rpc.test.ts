@@ -96,12 +96,12 @@ test('ping answers, and prompts are an empty list for now', async () => {
 
 type Hints = { readOnlyHint?: boolean; destructiveHint?: boolean; openWorldHint?: boolean };
 
-test('tools/list is the sixteen, each with its title and every hint said, and no second copy of the instructions', async () => {
+test('tools/list is the seventeen, each with its title and every hint said, and no second copy of the instructions', async () => {
   const { surface, calls } = stub();
   const r = result<{ tools: { name: string; title: string; inputSchema: { type: string }; annotations: Hints }[]; instructions?: string; ttlMs: number }>(
     await handle(req('tools/list'), surface, ctx),
   );
-  assert.equal(r.tools.length, 16);
+  assert.equal(r.tools.length, 17);
   assert.deepEqual(r.tools.map((t) => t.name), TOOLS.map((t) => t.name));
   assert.equal(r.instructions, undefined, 'the instructions went out a second time');
   assert.equal(r.ttlMs, 3_600_000);
@@ -112,7 +112,7 @@ test('tools/list is the sixteen, each with its title and every hint said, and no
     assert.equal(t.annotations.openWorldHint, false, `${t.name} says it reaches the world`);
   }
   const hints = Object.fromEntries(r.tools.map((t) => [t.name, t.annotations]));
-  for (const name of ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance'])
+  for (const name of ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'understand'])
     assert.equal(hints[name]?.readOnlyHint, true, `${name} reads and does not say so`);
   /* THE ADDITIVE WRITES TAKE NOTHING AWAY, so a host need not ask a person before each one as it would a delete. */
   for (const name of ['create', 'propose', 'log', 'meet', 'triage', 'handoff']) {
@@ -129,8 +129,9 @@ test('tools/list is the sixteen, each with its title and every hint said, and no
 /**
  * EACH TOOL'S METHODS, IN ORDER, WITH THE READS ITS WORDS ASK BESIDE IT. `context` asks `boot` for whom the questions
  * wait on and the Home page; `history` the schema and the row, for the head line's name and words; `governance` `boot`
- * for the person's name. A `list` whose page came back empty asks nothing more, and is said by the list's id, so one
- * `list` is one request to a host (`apps/cli/test/hooks.test.ts` counts them).
+ * for the person's name, and `understand` the same, for whom it would ask. A `list` whose page came back empty asks
+ * nothing more, and is said by the list's id, so one `list` is one request to a host (`apps/cli/test/hooks.test.ts`
+ * counts them).
  */
 const EACH: [tool: string, args: Record<string, unknown>, methods: string[], first?: unknown][] = [
   ['record_index', {}, ['boot', 'version']],
@@ -150,6 +151,7 @@ const EACH: [tool: string, args: Record<string, unknown>, methods: string[], fir
   ['update', { spoken: 'obligations#41', patch: { what: 'b' }, version: 3 }, ['update'], { register: 'obligations', seq: 41, patch: { what: 'b' }, version: 3 }],
   ['log', { spoken: 'obligations#41', note: 'Chased.' }, ['update'], { register: 'obligations', seq: 41, patch: {}, note: 'Chased.' }],
   ['handoff', { next: 'Wire the self-host.', tried: 'Reading the cookie.' }, ['handoff'], { next: 'Wire the self-host.', tried: 'Reading the cookie.' }],
+  ['understand', {}, ['understandPlan', 'boot'], {}],
   ['meet', { name: 'Ada', where: 'commit 4464966 in braindog' }, ['meet'], { name: 'Ada', where: 'commit 4464966 in braindog' }],
   ['triage', { arrival: 'a1', ignore: true }, ['triage'], { arrival: 'a1', ignore: true }],
 ];

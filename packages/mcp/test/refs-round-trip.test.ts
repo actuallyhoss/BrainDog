@@ -79,6 +79,8 @@ const ASK: Record<string, (fx: Fixture) => Record<string, unknown>[]> = {
   update: (fx) => [{ spoken: fx.onDoomed.spoken, patch: { what: fx.onDoomed.fields.what } }],
   log: (fx) => [{ spoken: fx.onDoomed.spoken, note: 'Read for the round trip.' }],
   handoff: () => [{ next: 'Send every ref back.' }],
+  /* WHAT THE WALK WOULD LINK, IN SENTENCES: it answers no row, and is asked so a row it ever answers is sent back. */
+  understand: () => [{}],
   meet: () => [{ name: 'Ada Lovelace', email: 'ada@example.com', where: 'the refs round trip' }],
   /* NOTHING TO ASK: `triage` files an arrival from the inbox, and this record holds none, so it answers no row. */
   triage: () => [],
