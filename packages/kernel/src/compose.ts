@@ -19,6 +19,11 @@
  *
  * PURE. Nothing here reads the record: `readPage` hands in the page as read, today, the reader's mark and the lists'
  * declarations, so the same page reads the same look on every host.
+ *
+ * AND THE PAGE IS THE ONE ITS READER IS SHOWN. A host that says who is reading (`PageDeps.reader`) has each block held
+ * before the look is composed, so a block a member may not see weighs nothing here: it never leads, never moves, is
+ * never hidden and names no next step, and the order, the hide and the basis she is sent are the ones a page with that
+ * block empty would answer. Nothing she reads off the look says whether it holds anything.
  */
 
 import { BLOCK_KEY, blockKeyOf, shortHash } from './block-keys.ts';
@@ -89,6 +94,20 @@ const unique = (keys: readonly string[]): string[] => [...new Set(keys)];
  */
 const topOf = (blocks: readonly BlockResult[]): number =>
   blocks.findIndex((b) => areaOf(b) === 'main' && (b.kind === 'section' || (!STAYS.has(b.kind) && b.drawn !== false)));
+
+/**
+ * Which group each block is in: the blocks between two headings in one column, numbered in page order. A heading opens
+ * the group it heads, and the blocks before a column's first heading are a group of their own.
+ */
+function groupsOf(blocks: readonly BlockResult[]): number[] {
+  const open = new Map<Area, number>();
+  let made = 0;
+  return blocks.map((b) => {
+    const area = areaOf(b);
+    if (b.kind === 'section' || !open.has(area)) open.set(area, made++);
+    return open.get(area)!;
+  });
+}
 
 /* ── reading a stored look ───────────────────────────────────────────────── */
 
@@ -288,18 +307,13 @@ export function composeLook(input: ComposeInput): LookBody {
 
   /* THE ORDER, a group at a time. */
   const order: string[] = [];
-  const groups: number[][] = [];
-  const open = new Map<Area, number[]>();
-  blocks.forEach((b, i) => {
-    const area = areaOf(b);
-    if (b.kind === 'section' || !open.has(area)) {
-      const group: number[] = [];
-      groups.push(group);
-      open.set(area, group);
-    }
-    const movable = !STAYS.has(b.kind) && !pinned.has(keys[i]!) && i !== leadAt && !hidden.has(keys[i]!) && b.drawn !== false;
-    if (movable) open.get(area)!.push(i);
-  });
+  const groupOf = groupsOf(blocks);
+  const groups: number[][] = [...new Set(groupOf)].map((g) =>
+    blocks.flatMap((b, i) => {
+      const movable = !STAYS.has(b.kind) && !pinned.has(keys[i]!) && i !== leadAt && !hidden.has(keys[i]!) && b.drawn !== false;
+      return groupOf[i] === g && movable ? [i] : [];
+    }),
+  );
   for (const group of groups) {
     if (!group.some((i) => weighed[i]!.rank >= RANK.changed)) continue;
     const sorted = [...group].sort((a, b) => weighed[b]!.rank - weighed[a]!.rank || a - b);
@@ -368,12 +382,14 @@ function handlesOf(blocks: readonly BlockResult[]): Set<string> {
  * THE PAGE WITH ITS LOOK LAID OVER IT, and the look as it applied.
  *
  * - ORDER is a reordering of blocks the page has. The blocks it names fill the places those blocks held, in its order,
- *   one column at a time, so a block never changes column and a block it does not name never moves. A key the page
- *   does not have is dropped, and an engine's look never moves a pinned block.
- * - LEAD goes first in the main column, under the page's opening line.
+ *   one group at a time (the blocks between two headings in one column), so a block never changes column or heading
+ *   and a block it does not name never moves. A key the page does not have is dropped, a heading is never one it
+ *   moves, and an engine's look never moves a pinned block.
+ * - LEAD goes first in the main column, under the page's opening line. Not when a pinned block stands between it and
+ *   there: moving it up would push the pinned block down, so it stays where it is and is not answered as the lead.
  * - HIDE says `drawn: false`, as a `when:` that says no does. A pinned, refused or lead block is never hidden. A
  *   heading that is hidden hides the blocks under it, and is not hidden while one of them may not be.
- * - NEXT is kept only when the page handed the row it names.
+ * - NEXT is kept only when a block still drawn after the hide holds the row it names.
  *
  * Nothing is added and nothing is taken out of the list, so a host keyed by `key` sees the same blocks, moved.
  */
@@ -385,21 +401,25 @@ export function applyLook(blocks: readonly BlockResult[], look: LookBody): { blo
   });
   const pinned = (look.pinned ?? []).filter((k) => at.has(k));
   const pins = new Set(pinned);
-  const lead = look.lead !== undefined && at.has(look.lead) ? look.lead : undefined;
+  const asked = look.lead !== undefined && at.has(look.lead) ? look.lead : undefined;
 
-  /* ORDER, a column at a time. */
-  const order = unique(look.order ?? []).filter((k) => at.has(k) && (look.by === 'owner' || !pins.has(k)));
+  /* ORDER, A GROUP AT A TIME: the blocks between two headings in one column, as the rules order them. Named across two
+     groups, each block keeps its own heading and takes its place among the others named under it, so a look can never
+     carry a block out from under "Bills" into "Today". A heading is no block a look moves. */
+  const groupOf = groupsOf(blocks);
+  const order = unique(look.order ?? []).filter((k) => at.has(k) && blocks[at.get(k)!]!.kind !== 'section' && (look.by === 'owner' || !pins.has(k)));
   const named = new Set(order);
   let out = [...blocks];
-  for (const area of ['main', 'rail'] as const) {
-    const slots = blocks.flatMap((b, i) => (areaOf(b) === area && named.has(keys[i]!) ? [i] : []));
-    const placed = order.filter((k) => areaOf(blocks[at.get(k)!]!) === area).map((k) => blocks[at.get(k)!]!);
+  for (const group of new Set(groupOf)) {
+    const slots = blocks.flatMap((_, i) => (groupOf[i] === group && named.has(keys[i]!) ? [i] : []));
+    const placed = order.filter((k) => groupOf[at.get(k)!] === group).map((k) => blocks[at.get(k)!]!);
     slots.forEach((slot, n) => {
       out[slot] = placed[n]!;
     });
   }
 
   /* LEAD. */
+  let lead = asked;
   if (lead !== undefined) {
     const from = out.findIndex((b) => keyOf(b) === lead);
     const block = out[from]!;
@@ -408,7 +428,12 @@ export function applyLook(blocks: readonly BlockResult[], look: LookBody): { blo
        the first thing the page shows, and moving it over its own heading would only leave the heading standing over
        nothing ("Waiting on you" hidden above the question it introduced). */
     const leads = top !== -1 && out.slice(top, from).every((b) => areaOf(b) !== 'main' || STAYS.has(b.kind) || b.drawn === false);
-    if (areaOf(block) === 'main' && block.drawn !== false && top !== -1 && top < from && !leads) {
+    /* AND A PINNED BLOCK KEEPS ITS PLACE. Moved to the top, the lead pushed every block between down one, the pinned one
+       among them, which `composeLook` already refused to do and this did for any look that named a lead: so the lead
+       stays where it is, and the look does not say it leads. */
+    const moves = areaOf(block) === 'main' && block.drawn !== false && top !== -1 && top < from && !leads;
+    if (moves && out.slice(top, from).some((b) => areaOf(b) === 'main' && pins.has(keyOf(b)))) lead = undefined;
+    else if (moves) {
       out.splice(from, 1);
       out.splice(top, 0, block);
     }
@@ -450,7 +475,8 @@ export function applyLook(blocks: readonly BlockResult[], look: LookBody): { blo
     return { ...b, drawn: false };
   });
 
-  const next = look.next !== undefined && handlesOf(blocks).has(look.next.row) ? look.next : undefined;
+  /* NEXT IS A ROW THE READER IS SHOWN: one in a block the look just hid, or one refused, is no step anybody can take. */
+  const next = look.next !== undefined && handlesOf(out.filter((b) => b.drawn !== false && b.refusals.length === 0)).has(look.next.row) ? look.next : undefined;
   const hidden = keys.filter((k) => hide.has(k));
   return {
     blocks: out,

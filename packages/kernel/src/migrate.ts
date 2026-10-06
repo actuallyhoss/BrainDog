@@ -14,6 +14,7 @@
 import type { Clock, Refusal, Result, Sql } from '@braindog/ports';
 import { mapDriverMessage, ok } from '@braindog/ports';
 
+import { seedLadder } from './change-kind.ts';
 import { rebuildKeys } from './entities.ts';
 import { rebuild } from './fts.ts';
 import type { RegisterDecl } from './index.ts';
@@ -42,6 +43,7 @@ import draftedBy0021 from './migrations/0021_drafted_by.ts';
 import sessionClient0022 from './migrations/0022_session_client.ts';
 import entityKey0023 from './migrations/0023_entity_key.ts';
 import look0024 from './migrations/0024_look.ts';
+import trust0025 from './migrations/0025_trust.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -71,6 +73,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 22, slug: 'session_client', sql: sessionClient0022 },
   { version: 23, slug: 'entity_key', sql: entityKey0023 },
   { version: 24, slug: 'look', sql: look0024 },
+  { version: 25, slug: 'trust', sql: trust0025 },
 ];
 
 /**
@@ -105,6 +108,8 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 23 adds `entity_key` and `entity_mention`, both `local` and rebuilt from the rows an import brings, and
  * rebuilds `outbox` with one more kind; an older file carries only the kinds it still takes, so the format is still 1.
  * Migration 24 rebuilds `declaration` with one more kind, `look`, for the same reason, so the format is still 1.
+ * Migration 25 rebuilds `suggestion` with one nullable column last, which an older file imports without and reads as NULL,
+ * and `token` with three, adds two indexes and `ladder` and `undone`, both `local`, so the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 
@@ -354,6 +359,9 @@ export async function applyMigrations(
     /* THE IDENTITIES OF THE ROWS ALREADY HERE, once, in the run that made their table. A key is normalised by code that
        SQL cannot run (Gmail's dots, GitHub's private address), so the backfill is this and not the migration's text. */
     if (m.slug === 'entity_key') sql.transactionSync(() => rebuildKeys(sql, instant(clock.now())));
+    /* AND THE RUNGS EXISTING WRITE TOKENS KEEP, once, in the run that made the ladder: the kinds each used in the last
+       thirty days and that are not on the floor stay at Do and tell (`seedLadder`). A kind is worked out by code too. */
+    if (m.slug === 'trust') sql.transactionSync(() => seedLadder(sql, clock.now()));
   }
 
   /* HALF TWO: a read of `entry_fts` that returns nothing, once the schema is whole. A file whose migrations were

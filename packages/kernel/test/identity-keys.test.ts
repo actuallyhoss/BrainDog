@@ -9,7 +9,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { isOrganisationAddress, keyFrom, keyOf, keysOf, parseFrom, registrable } from '../src/index.ts';
+import { isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, parseFrom, registrable } from '../src/index.ts';
+import { isMachineIdentity, keyOfAny } from '../src/identity-keys.ts';
 
 test('AN EMAIL IS LOWER-CASED, AND ONLY GMAIL FOLDS its dots and +tags, with googlemail as gmail', () => {
   assert.equal(keyOf('email', ' Ada@Example.COM '), 'email:ada@example.com');
@@ -81,4 +82,145 @@ test('A From HEADER READS AS A NAME, AN ADDRESS AND A DOMAIN, and a shared inbox
   for (const a of ['noreply@encore.example', 'no-reply@accounts.google.com', 'notifications@github.com', 'billing@hetzner.com', 'info@quartz.gg', 'noreply-1234@mail.x.io'])
     assert.equal(isOrganisationAddress(a), true, a);
   for (const a of ['ada@encore.example', '583231+octo@users.noreply.github.com', 'information.ada@x.io']) assert.equal(isOrganisationAddress(a), false, a);
+});
+
+test('A PAYEE KEEPS A WORD THAT NAMES IT: two cafés or two pharmacies are never one key', () => {
+  assert.notEqual(keyOf('bank', 'Pharmacy Cairo'), keyOf('bank', 'Pharmacy Giza'));
+  assert.equal(keyOf('bank', 'PHARMACY CAIRO EG'), 'bank:pharmacycairo');
+  assert.equal(keyOf('bank', 'Pharmacy Giza'), 'bank:pharmacygiza');
+  assert.notEqual(keyOf('bank', 'CAFE 22'), keyOf('bank', 'CAFE 7'));
+  assert.equal(keyOf('bank', 'CAFE 22'), 'bank:cafe22');
+  assert.equal(keyOf('bank', 'SUPERMARKET 0423 NEW CAIRO EG'), 'bank:supermarket0423');
+  assert.equal(keyOf('bank', 'The Coffee Shop 4'), 'bank:thecoffeeshop4');
+  /* A NAMED SHOP STILL LOSES ITS TOWN AND TERMINAL, however the processor spelled it. */
+  for (const said of ['GEIDEA*EL EZABY PHARMACY 0423 CAIRO EG', 'El Ezaby Pharmacy', 'PAYMOB-El Ezaby Pharmacy New Cairo', 'POS EL EZABY PHARMACY 12'])
+    assert.equal(keyOf('bank', said), 'bank:elezabypharmacy', said);
+  for (const said of ['GEIDEA*PHARMACY CAIRO', 'Pharmacy Cairo', 'FAWRY*Pharmacy Cairo EG', 'TST* PHARMACY CAIRO'])
+    assert.equal(keyOf('bank', said), 'bank:pharmacycairo', said);
+  assert.equal(keyOf('bank', 'SQ *BRIDGE STREET COFFEE LONDON GB'), 'bank:bridgestreetcoffee');
+  assert.equal(keyOf('bank', 'SP * Cedar Lane Bakery'), 'bank:cedarlanebakery');
+  assert.equal(keyOf('bank', 'CAFE'), 'bank:cafe');
+});
+
+test('A PUBLIC MAIL HOST IN ANY COUNTRY, A BROADBAND PROVIDER’S MAIL OR A BARE PLATFORM IS NOBODY’S DOMAIN', () => {
+  for (const host of ['yahoo.com.eg', 'btinternet.com', 'mail.ru', 'hotmail.fr', 'outlook.sa', 'live.co.uk', 'web.de', 'orange.fr', 'naver.com', 'icloud.com', 'privaterelay.appleid.com', 'link.net'])
+    assert.equal(registrable(host), null, host);
+  assert.equal(registrable('ahmed.saleh@yahoo.com.eg'), null);
+  for (const host of ['github.io', 'vercel.app', 'pages.dev', 'co.uk', 'com.eg', 'com.au', '192.168.1.10', 'nas.local', 'printer.lan'])
+    assert.equal(registrable(host), null, host);
+  assert.equal(registrable('ada.github.io'), 'ada.github.io');
+  assert.equal(registrable('https://encore-git-main-sam.vercel.app/login'), 'encore-git-main-sam.vercel.app');
+  assert.equal(registrable('api.svc.up.railway.app'), 'svc.up.railway.app');
+  assert.equal(registrable('mail.cibeg.com.eg'), 'cibeg.com.eg');
+  assert.equal(registrable('portal.unsw.edu.au'), 'unsw.edu.au');
+  assert.equal(registrable('www.tesco.com.au'), 'tesco.com.au');
+  assert.equal(registrable('shop.noon.co.ae'), 'noon.co.ae');
+  assert.equal(registrable('stc.com.sa'), 'stc.com.sa');
+  assert.equal(registrable('vercel.com'), 'vercel.com');
+  assert.equal(isPublicMail('Yahoo.com.eg'), true);
+  assert.equal(isPublicMail('vercel.app'), true);
+  assert.equal(isPublicMail('encore.example'), false);
+  assert.equal(keyOf('domain', 'btinternet.com'), null);
+});
+
+test('A SHARED INBOX OR A MACHINE IS AN ORGANISATION SPEAKING, and its address is the organisation’s key', () => {
+  for (const a of [
+    'support@vodafone.com.eg', 'Support+EG@talabat.com', 'customer.service@cibeg.com', 'sales-team@encore.example', 'info2@hetzner.com',
+    'enquiries@bridgestreetcoffee.co.uk', 'no_reply@instapay.eg', 'do.not.reply@hsbc.com.eg', 'MAILER-DAEMON@googlemail.com',
+    'bounce-mc.us5_123.456-ada=x.io@mail189.suw121.mcdlv.net', 'bounces+12345-abcd@em.stripe.com', 'renovate-bot@whitesourcesoftware.com',
+    'notifications+abc123@github.com', 'alerts@hsbc.example', 'postmaster@encore.example', '49699333+dependabot[bot]@users.noreply.github.com',
+  ])
+    assert.equal(isOrganisationAddress(a), true, a);
+  for (const a of ['ada@encore.example', 'abbot@x.io', 'botond.nagy@x.hu', 'ada.support@x.io', 'information.ada@x.io', '583231+octo@users.noreply.github.com', 'ada_acme@users.noreply.github.com'])
+    assert.equal(isOrganisationAddress(a), false, a);
+  assert.equal(keyOf('email', 'Support@Vodafone.com.eg'), 'email:support@vodafone.com.eg');
+});
+
+test('A MACHINE IS NOBODY: bots, no-reply senders, CI and a laptop’s own host name, but never a shared inbox or a person', () => {
+  const machines: Parameters<typeof isMachineIdentity>[0][] = [
+    { name: 'dependabot[bot]', email: '49699333+dependabot[bot]@users.noreply.github.com' },
+    { name: 'github-actions[bot]', email: '41898282+github-actions[bot]@users.noreply.github.com' },
+    { name: 'Renovate Bot', email: 'bot@renovateapp.com' },
+    { name: 'semantic-release-bot', email: 'semantic-release-bot@martynus.net' },
+    { name: 'GitHub', email: 'noreply@github.com' },
+    { name: 'Ubuntu', email: 'ubuntu@ip-172-31-5-12.eu-west-1.compute.internal' },
+    { name: 'root', email: 'root@localhost' },
+    { name: 'Ada Lovelace', email: 'ada@Adas-MacBook-Pro.local' },
+    { name: 'Jenkins Schema Sync', email: 'jenkins-sync@brightloomit.com' },
+    { name: 'Brightloom Repos', email: 'repos@brightloomit.com' },
+    { name: 'Mail Delivery Subsystem', email: 'mailer-daemon@googlemail.com' },
+    { handle: 'github:vercel[bot]' },
+    { handle: '@renovate-bot' },
+    { email: 'no-reply@accounts.google.com' },
+  ];
+  for (const m of machines) assert.equal(isMachineIdentity(m), true, JSON.stringify(m));
+  const people: Parameters<typeof isMachineIdentity>[0][] = [
+    { name: 'Ada Lovelace', email: 'ada@encore.example' },
+    { name: 'Octo Cat', email: '583231+octo-cat@users.noreply.github.com' },
+    { name: 'Abbot Kinney', email: 'abbot@kinney.io' },
+    { name: 'Support', email: 'support@hetzner.com' },
+    { name: 'Avery Sync', email: 'avery.sync@gmail.com' },
+    { handle: 'github:ada' },
+    {},
+  ];
+  for (const p of people) assert.equal(isMachineIdentity(p), false, JSON.stringify(p));
+});
+
+test('keyOfAny READS AN ADDRESS, A KEY OR A HANDLE the way the record does, for a door outside the kernel', () => {
+  assert.equal(keyOfAny('Ada.Lovelace+cli@gmail.com'), 'email:adalovelace@gmail.com');
+  assert.equal(keyOfAny('mailto:Ada@Encore.xyz'), 'email:ada@encore.example');
+  assert.equal(keyOfAny('"Ada" <ada@x.io>'), 'email:ada@x.io');
+  assert.equal(keyOfAny('email:Ada@X.io'), 'email:ada@x.io');
+  assert.equal(keyOfAny('github:@Octo-Cat'), 'github:octo-cat');
+  assert.equal(keyOfAny('583231+Octo-Cat@users.noreply.github.com'), 'github:octo-cat');
+  assert.equal(keyOfAny('ada_acme@users.noreply.github.com'), 'github:ada_acme');
+  assert.equal(keyOfAny('49699333+dependabot[bot]@users.noreply.github.com'), 'github:dependabot[bot]');
+  assert.equal(keyOfAny('discord:Ada'), 'discord:ada');
+  assert.equal(keyOfAny('bank:GEIDEA*CHILLOUT 0423 CAIRO EG'), 'bank:chillout');
+  assert.equal(keyOfAny('Ada Lovelace'), null);
+  assert.equal(keyOfAny(''), null);
+  /* A DOTTED LOGIN IS NO LOGIN, so the address it came in stays an address and is never sent as a malformed handle. */
+  assert.equal(keyOfAny('123+ada.l@users.noreply.github.com'), 'email:123+ada.l@users.noreply.github.com');
+});
+
+test('AN EXAMPLE DOMAIN STANDS FOR A REAL ONE, a +tag is the person’s own filing, and a word a business is named with is no bot', () => {
+  /* `.example` and `.test` are how a real organisation's domain is written in an example, so they register as one. */
+  assert.equal(registrable('sara@acme.example'), 'acme.example');
+  assert.equal(keyOf('domain', 'quill.test'), 'domain:quill.test');
+  assert.equal(isMachineIdentity({ name: 'Sara Okafor', email: 'sara@acme.example' }), false);
+  for (const a of ['ada+alerts@gmail.com', 'sam+bot@gmail.com', 'ada+notifications@encore.example']) {
+    assert.equal(isOrganisationAddress(a), false, a);
+    assert.equal(isMachineIdentity({ name: 'Ada', email: a }), false, a);
+  }
+  assert.equal(isMachineIdentity({ name: 'Renovate Homes', email: 'jo@renovatehomes.co.uk' }), false);
+  assert.equal(isMachineIdentity({ name: 'renovate', email: 'renovate@whitesourcesoftware.com' }), true);
+  assert.equal(keyOfAny('Ada: Founder <ada@encore.example>'), 'email:ada@encore.example');
+});
+
+test('isMachineIdentity KNOWS EVERY MACHINE THE CLI’S HARVEST LEAVES OUT, so the harvest can use it in place of its own', () => {
+  for (const [name, email] of [
+    ['renovate[bot]', '29139614+renovate[bot]@users.noreply.github.com'],
+    ['Release Bot', 'release-bot@acme.example'],
+    ['Acme CI', 'ci@acme.example'],
+    ['GitLab Runner', 'gitlab-runner@acme.example'],
+    ['Jenkins', 'jenkins@acme.example'],
+    ['Jenkins Schema Sync', 'jenkins@brightloomit.example'],
+    ['Docs Mirror', 'mirror@acme.example'],
+    ['ec2-user', 'ec2-user@ip-10-0-0-1.example'],
+    ['root', 'root@build.example'],
+    ['Claude', 'noreply@anthropic.com'],
+    ['Deploy', 'deploy@acme.example'],
+    ['Somebody', 'somebody@macbook.local'],
+    ['Somebody', 'somebody@localhost'],
+  ])
+    assert.equal(isMachineIdentity({ name, email }), true, `${name!} <${email!}>`);
+  for (const [name, email] of [
+    ['Rohan Mehta', 'rohan@encore.example'],
+    ['Ada Sync', 'ada.sync@gmail.com'],
+    ['Sarah Jenkins', 'sarah.jenkins@acme.example'],
+    ['Ada Talbot', 'talbot@acme.example'],
+    ['Travis Okoye', 'travis@acme.example'],
+    ['Madan Neriyanur', 'madann@users.noreply.github.com'],
+  ])
+    assert.equal(isMachineIdentity({ name, email }), false, `${name!} <${email!}>`);
 });

@@ -1056,6 +1056,58 @@ function filtersFault(id: string, filters: unknown, requires: unknown, installed
 }
 
 /**
+ * The keys a `cards` block reads to draw its cards in groups: `group`, a link field of its list, and `fold`, how many
+ * cards a group shows before the rest fold.
+ *
+ * NAMED HERE UNTIL `block-keys.ts` NAMES THEM, where every other key a kind reads is listed for the install and the read
+ * at once (`KEY_KINDS`): `group: ['cards']`, and `cards` beside `section` on `fold`. The read lets them through by the
+ * same set (`pages.ts`), so both sides agree until the line moves there.
+ */
+export const CARD_GROUP_KEYS: ReadonlySet<string> = new Set(['group', 'fold']);
+
+/** How many cards a group shows before the rest fold, when a grouped `cards` block does not say, and the most it may. */
+export const CARD_FOLD = 3;
+export const CARD_FOLD_MOST = 50;
+
+/**
+ * Why a `cards` block's `group` or `fold` cannot be drawn, or `null`.
+ *
+ * A GROUP IS A LINK FIELD OF THE LIST THE CARDS ARE OVER, so each group is a row of the list it points at, named by that
+ * row's title: tasks grouped by their project. A text or a choice would be a group with no page to open and no name of
+ * its own, and the filters already pick one value of those. The list is checked when the record knows it, as a
+ * filter's field is (`filtersFault`). `fold` is a count of cards from 1 to `CARD_FOLD_MOST`, and only folds a group.
+ */
+function cardGroupFault(id: string, at: string, block: Readonly<Record<string, unknown>>, installed?: Known): Refusal | null {
+  const { group, fold, source } = block;
+  if (fold !== undefined && !isInt(fold, 1, CARD_FOLD_MOST))
+    return bad('OUT_OF_BOUNDS', `${id}.${at}'s fold is ${JSON.stringify(fold)}; it is how many cards each group shows before the rest fold, from 1 to ${CARD_FOLD_MOST}.`, `${at}.fold`);
+  if (group === undefined) {
+    if (fold !== undefined)
+      return bad('DECLARATION_INVALID', `${id}.${at} folds its groups and draws none. Give it group: a link field of its list, or take fold: off.`, `${at}.fold`);
+    return null;
+  }
+  if (typeof group !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/u.test(group))
+    return bad('DECLARATION_INVALID', `${id}.${at}'s group is ${JSON.stringify(group)}; it names one link field of the list the cards are over.`, `${at}.group`);
+  const list = typeof source === 'string' && source.startsWith('register.') ? source.slice('register.'.length) : null;
+  if (list === null)
+    return bad('DECLARATION_INVALID', `${id}.${at} groups by ${group}, and only cards over a list are grouped: give it source: register.<id>.`, `${at}.group`);
+  const shape = installed?.get(`register.${list}`);
+  if (shape === undefined || !Array.isArray(shape.fields)) return null;
+  const fields = (shape.fields as { id?: unknown; type?: unknown; retired?: unknown }[]).filter((f) => f?.retired !== true);
+  const links = fields.filter((f) => f?.type === 'ref' && typeof f.id === 'string').map((f) => f.id as string);
+  const field = fields.find((f) => f?.id === group);
+  if (!field) return bad('FIELD_UNKNOWN', `${id}.${at} groups by ${group}, and ${list} has no field called ${group}.`, `${at}.group`, links);
+  if (field.type !== 'ref')
+    return bad(
+      'DECLARATION_INVALID',
+      `${id}.${at} groups by ${group}, which is ${String(field.type)}. Cards are grouped by a link to another list, so each group is a row with a name: ${links.length ? `${links.join(', ')} on ${list}` : `${list} has none`}.`,
+      `${at}.group`,
+      links,
+    );
+  return null;
+}
+
+/**
  * A page declaration, checked against `06 §1.1` and `42 §4.5`.
  *
  * NOTHING CHECKED ONE, and a page is the declaration with the most ways to be quietly wrong,
@@ -1247,7 +1299,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
        read answers (`rows`, `next`, `types`) is refused here too: `{ kind: cards, next: what }` installed and drew
        nothing. The read still takes them, because a block that came out of a read may be read again. */
     for (const [key, value] of Object.entries(block)) {
-      if (value === undefined) continue;
+      if (value === undefined || (kind === 'cards' && CARD_GROUP_KEYS.has(key))) continue;
       if (!BLOCK_INSTALLS.has(key)) return bad('DECLARATION_INVALID', `${id}.${at}: ${unreadBlockKey(key)}`, `${at}.${key}`, keysFor(kind as string));
       const kinds = kindsReading(key);
       if (kinds && !kinds.includes(kind as string))
@@ -1409,8 +1461,10 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     /* A `section`'s fold, and the icon any block may carry. Another kind carrying `fold` is refused above by
        `KEY_KINDS`; here only the shape is checked, because `fold: 'yes'` would draw a section shut by accident and an
        icon that names no glyph draws an empty well. */
-    if (block.fold !== undefined && typeof block.fold !== 'boolean')
+    if (kind !== 'cards' && block.fold !== undefined && typeof block.fold !== 'boolean')
       return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
+    const grouped = kind === 'cards' ? cardGroupFault(id, at, raw as Readonly<Record<string, unknown>>, installed) : null;
+    if (grouped) return grouped;
     if (block.icon !== undefined && (typeof block.icon !== 'string' || !GLYPH.test(block.icon)))
       return bad('DECLARATION_INVALID', `${id}.${at}'s icon is a glyph name: lower-case letters, digits and dashes.`, at);
 

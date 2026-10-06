@@ -223,7 +223,7 @@ import {
 import { slashMayWrite } from './slash.ts';
 import { answeredOnly, fileVerdicts, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
-import { keyedLists, mergeFieldOf, rebuildKeys, rekey, type KeyedList } from './entities.ts';
+import { foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { builtInFigure } from './built-in-figures.ts';
 import {
   FINISHED,
@@ -847,9 +847,13 @@ const navOf = (nav: unknown): { section: string; order: number; tabs?: true } | 
  *              `by: 'decide'` changes. Governance's accept path sets it.
  *   `seal`     the vault door. `depositGrant` binds the key's grant inside the write, once the run
  *              signing it is known, and points `field` at it. No patch names a secret field.
+ *   `merge`    the write is one the record makes to fold a row into another or to undo that: `meet`'s strong
+ *              rules, the merge's own carry, and `undoMerge`. With `decided`, the only way `merged_into` is set
+ *              or cleared, or a folded row deleted or restored (the merge door, below).
  */
 type Door = {
   decided?: boolean;
+  merge?: boolean;
   seal?: { field: string; bind: (actor: string, held: string | null) => Result<GrantRow> };
 };
 
@@ -3677,6 +3681,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          caller may fold and delete in one write. */
       const keyedHere = keyedOf(register);
       const foldField = keyedHere === undefined ? undefined : mergeFieldOf(keyedHere);
+      const door_ = mergeDoor(register, current, merged, patch, touched, keyedHere, foldField, door);
+      if (door_) return { ok: false, refusal: door_ };
       if (current && foldField !== undefined && touched.includes(foldField)) {
         const into = merged[foldField];
         if (typeof into === 'string' && into !== current.id && into !== current.fields[foldField]) {
@@ -3832,7 +3838,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          what the field declares now, the only test it has, since a mark can be pinned before the list ever pairs and
          `decl.pairs` is not there yet to except the write the way it excepts one made after. Ticked and then unticked
          is his word twice, and folding the second write into the create would print the same value the row was born
-         with, indistinguishable from never having been touched at all. */
+         with, indistinguishable from never having been touched at all.
+
+         NOR A DECISION CARRIED OUT, NOR A MERGE'S OWN WRITE. Their lines are what `undoMerge` and an undone decision read
+         back by batch: the owner who added two rows and merged them a minute later had the fold's `merged_into` folded
+         into the create line with no batch, and Undo answered that the row was never merged. A meet's plain write passes
+         the merge door with no batch, and is folded as any other. */
       const GRACE_MS = 3 * 60_000;
       const foldable = (key: string): boolean => {
         const of = known.get(key);
@@ -3844,6 +3855,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       };
       const lines =
         !deleting &&
+        !door.decided &&
+        !(door.merge && w.batch !== undefined) &&
         !isMechanism(w.actor) &&
         w.note === undefined &&
         w.opId === undefined &&
@@ -4587,6 +4600,169 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
+   * THE MERGE DOOR (`loop/research-audit-17.md` H2, L4): what a write that folds a row, unfolds it, or deletes or restores
+   * a folded one must pass, and what a restore of a keyed row must not collide with. A refusal, or `null`.
+   *
+   * ONLY A DECISION OR THE RECORD'S OWN MERGE MOVES `merged_into`. A plain update that set it repointed every link to the
+   * row it named and moved every key there, so anybody with write access could fold one person into another, with no
+   * question and nothing to undo by. The owner's accept carries `decided`; `meet`'s strong rules and `undoMerge` carry
+   * `merge`. A row sent back with the value it already holds changes nothing and passes.
+   *
+   * AND IT FOLDS INTO A ROW THAT CAN TAKE IT: one that exists, in the same list, standing (not deleted, not itself folded),
+   * and neither the row itself nor one folded into it, since a loop hands keys round and never lands them. Never on a
+   * create: a row is folded once it exists.
+   *
+   * A RESTORED ROW DOES NOT COME BACK AS A GHOST. A row deleted while another took one of its keys, restored, answered
+   * to nothing its fields said, and the record's door refuses that same pair when both are live. Refused the same way,
+   * naming who holds the key; a folded row coming back through `undoMerge` takes its keys back as it unfolds, and is
+   * not asked.
+   */
+  function mergeDoor(
+    register: string,
+    current: Entry | null,
+    merged: Readonly<Record<string, Json>>,
+    patch: Patch,
+    touched: readonly string[],
+    list: KeyedList | undefined,
+    field: string | undefined,
+    door: Door,
+  ): Refusal | null {
+    if (list === undefined) return null;
+    const was = field === undefined || current === null ? undefined : current.fields[field];
+    const is = field === undefined ? undefined : merged[field];
+    const folding = field !== undefined && touched.includes(field) && (is ?? null) !== (was ?? null);
+    const turning = patch.deleted_at !== undefined && current !== null && (patch.deleted_at === null) !== (current.deleted_at === null);
+    const foldedRow = typeof was === 'string' || typeof is === 'string';
+    const named = (id: string): string => titleOfRow(id) ?? 'that one';
+    if ((folding || (turning && foldedRow)) && !door.decided && !door.merge)
+      return {
+        code: 'FORBIDDEN',
+        fix: !folding
+          ? `${current ? named(current.id) : 'That one'} was merged into ${typeof (is ?? was) === 'string' ? named(String(is ?? was)) : 'another'}. Undo the merge to bring it back; it is not deleted or restored on its own.`
+          : typeof is !== 'string' && typeof was === 'string'
+            ? `${current ? named(current.id) : 'That one'} comes apart from ${named(was)} only by undoing the merge.`
+            : `${current ? named(current.id) : 'A new one'} is merged into another only by an accepted merge. Propose the merge, and it is made when the owner accepts it.`,
+        at: folding ? field! : 'deleted_at',
+      };
+    if (folding && typeof is === 'string') {
+      if (current === null)
+        return { code: 'VALUE_MALFORMED', fix: 'Nothing is merged as it is added. Add it, then propose the merge.', at: field! };
+      const into = byId(is, true);
+      if (!into) return { code: 'ROW_UNKNOWN', fix: `${named(current.id)} cannot be merged into one that is not there.`, at: field! };
+      if (into.register !== register)
+        return { code: 'REF_REGISTER_MISMATCH', fix: `${named(current.id)} is merged only into one of its own list, and ${named(into.id)} is in another.`, at: field! };
+      if (into.id === current.id) return { code: 'VALUE_MALFORMED', fix: `${named(current.id)} cannot be merged into itself.`, at: field! };
+      if (into.deleted_at !== null)
+        return { code: 'VALUE_MALFORMED', fix: `${named(into.id)} was deleted, so nothing can be merged into it. Bring it back first, or merge into the one kept.`, at: field! };
+      const onward = foldChain(sql, field!, into.id);
+      if (onward.includes(current.id))
+        return { code: 'VALUE_MALFORMED', fix: `${named(into.id)} was merged into ${named(current.id)}, so merging back the other way would go round in a circle.`, at: field! };
+      if (onward.length > 0)
+        return { code: 'VALUE_MALFORMED', fix: `${named(into.id)} was itself merged into ${named(onward.at(-1)!)}. Merge into that one.`, at: field! };
+    }
+    if (patch.deleted_at === null && current !== null && current.deleted_at !== null && typeof (is ?? was) !== 'string') {
+      for (const key of rowKeys(list, merged)) {
+        const held = holderOf(sql, key);
+        if (held === null || held.id === current.id) continue;
+        const kind = key.slice(0, key.indexOf(':'));
+        const said = key.slice(key.indexOf(':') + 1);
+        const plain = kind === 'email' || kind === 'domain' ? said : `${said} on ${kind}`;
+        return {
+          code: 'ALREADY_KNOWN',
+          fix: `${titleOfRow(held.id) ?? 'Someone else'} now has ${plain}. Merge the two, or take it off ${named(current.id)} before bringing it back.`,
+          at: 'deleted_at',
+        };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * What a merge carried as one batch, finished: for every row this batch folded, what it and the row kept disagree on
+   * is kept on the row kept (`entities.ts`'s `foldedCarry`), in the same batch, so `undoMerge` takes it back with the
+   * rest. Run once the batch's own writes are done, by `meet` after a strong merge and by `decide` after an accepted
+   * one, since the carry the merge was drawn with replaces whole lists and would drop a line written before it.
+   */
+  function carryFolds(batch: string, w: WriteContext): Result<null> {
+    const day = instant(clock.now()).slice(0, 10);
+    const lines = sql.all<{ target: string; field: string }>(
+      "SELECT DISTINCT target, field FROM event WHERE batch = ? AND kind = 'edit' AND field IS NOT NULL AND to_v IS NOT NULL",
+      batch,
+    );
+    for (const l of lines) {
+      const fold = byId(l.target.replace(/^entry:/, ''), true);
+      const list = fold === null ? undefined : keyedOf(fold.register);
+      const field = list === undefined ? undefined : mergeFieldOf(list);
+      if (!fold || !list || field !== l.field || typeof fold.fields[field] !== 'string') continue;
+      const keep = byId(foldEnd(sql, field, fold.id));
+      if (!keep || keep.id === fold.id) continue;
+      const declared = registers.get(fold.register)?.fields ?? [];
+      const patch = foldedCarry(list, declared, keep.fields, fold.fields, titleOfRow(fold.id) ?? 'the one merged', day);
+      if (Object.keys(patch).length === 0) continue;
+      const out = write(
+        keep.register,
+        keep.id,
+        patch as Patch,
+        { ...w, cascade: false, batch, note: `Kept what ${titleOfRow(fold.id) ?? 'the one merged'} said differently.` },
+        { merge: true },
+      );
+      if (!out.ok) return out as Result<never>;
+    }
+    return ok(null);
+  }
+
+  /**
+   * The batch each of these rows was last written in, for the rows of a keyed list: what an accepted rowset was written
+   * as. `carryFolds` acts only on the rows a batch folded, so a batch that folded nothing carries nothing.
+   */
+  function foldBatches(ids: readonly string[]): string[] {
+    const out = new Set<string>();
+    for (const id of ids) {
+      const row = byId(id, true);
+      if (row === null || keyedOf(row.register) === undefined) continue;
+      const line = sql.one<{ batch: string | null }>('SELECT batch FROM event WHERE target = ? ORDER BY rowid DESC LIMIT 1', `entry:${id}`);
+      if (line?.batch) out.add(line.batch);
+    }
+    return [...out];
+  }
+
+  /**
+   * A merge is answered whole (`loop/research-audit-17.md` M3). A pick of some rows of a rowset that folds rows of a
+   * keyed list must take every fold with the row kept, whose patch carries what they held: a fold taken without it
+   * left the folded row's organisation, names and where they were met on a deleted row, and the carry taken without
+   * its fold copied a live row's addresses onto another. The web card already answers a merge as one; this is the
+   * record agreeing with it. A refusal, or `null`.
+   */
+  function mergePickFault(id: string, verdict: Verdict): Refusal | null {
+    const rows = 'decide' in verdict ? verdict.decide.rows : undefined;
+    if (rows === undefined) return null;
+    const sg = sql.one<{ body_kind: string; body: string }>('SELECT body_kind, body FROM suggestion WHERE id = ?', id);
+    if (sg?.body_kind !== 'rowset') return null;
+    let body: { register?: unknown; rows?: unknown };
+    try {
+      body = JSON.parse(sg.body) as typeof body;
+    } catch {
+      return null;
+    }
+    const list = typeof body.register === 'string' ? keyedOf(body.register) : undefined;
+    const field = list === undefined ? undefined : mergeFieldOf(list);
+    if (field === undefined || !Array.isArray(body.rows)) return null;
+    const all = body.rows as { at?: unknown; patch?: Record<string, unknown> }[];
+    /* BY THE ROW EACH NAMES, not the spelling: a fold naming the kept one by id and its carry at `people#1` are one merge. */
+    const idOf = (v: unknown): string | undefined => (typeof v === 'string' && v !== '' ? (get(v, { includeDeleted: true })?.id ?? v) : undefined);
+    const into = new Set(all.map((r) => idOf(r?.patch?.[field])).filter((v): v is string => v !== undefined));
+    if (into.size === 0) return null;
+    const part = all.flatMap((r, n) => (idOf(r?.patch?.[field]) !== undefined || into.has(idOf(r?.at) ?? '') ? [n] : []));
+    const taken = part.filter((n) => rows.includes(n));
+    if (taken.length === 0 || taken.length === part.length) return null;
+    return {
+      code: 'VALUE_MALFORMED',
+      fix: 'A merge is answered whole: accept it to keep one and carry over what the others held, or reject it to keep them apart.',
+      at: 'rows',
+    };
+  }
+
+  /**
    * `entity_key` brought up to one row as it now is, in the write's transaction, the way `reproject` keeps the index.
    * The source is who wrote it; `meet` says where it came from once the write is back (`sourceKeys`).
    */
@@ -4616,12 +4792,19 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           else if (Array.isArray(held) && held.includes(from)) patch[f.id] = [...new Set(held.map((v) => (v === from ? to : v)))];
         }
         if (Object.keys(patch).length === 0) continue;
-        const out = write(decl.id, id, patch, {
-          actor: w.actor,
-          cascade: false,
-          note: `Pointed at ${named ?? 'the one kept'} after a merge.`,
-          ...(w.batch === undefined ? {} : { batch: w.batch }),
-        });
+        const out = write(
+          decl.id,
+          id,
+          patch,
+          {
+            actor: w.actor,
+            cascade: false,
+            note: `Pointed at ${named ?? 'the one kept'} after a merge.`,
+            ...(w.batch === undefined ? {} : { batch: w.batch }),
+          },
+          /* A HALF-FOLDED ROW OF THE SAME LIST may point at the one folded through its own `merged_into`. */
+          { merge: true },
+        );
         if (!out.ok) return out as Result<never>;
       }
     }
@@ -4644,13 +4827,20 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       project,
       nameOf,
       titleOf: titleOfRow,
+      /* THROUGH THE MERGE DOOR: `meet`'s strong rules are the record's own merge, made as one batch Undo takes back. */
       write: (register, ref, patch, o = {}) =>
-        write(register, ref, patch, {
-          ...as,
-          ...(o.version === undefined ? {} : { version: o.version }),
-          ...(o.batch === undefined ? {} : { batch: o.batch }),
-          ...(o.note === undefined ? {} : { note: o.note }),
-        }),
+        write(
+          register,
+          ref,
+          patch,
+          {
+            ...as,
+            ...(o.version === undefined ? {} : { version: o.version }),
+            ...(o.batch === undefined ? {} : { batch: o.batch }),
+            ...(o.note === undefined ? {} : { note: o.note }),
+          },
+          { merge: true },
+        ),
       propose,
       othersRow,
       moneyAt,
@@ -4740,9 +4930,60 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const redacted = (v: string | null): boolean => v !== null && v.includes('--redacted--');
     const undone: string[] = [];
     const as: WriteContext = { actor: w.actor, cascade: false, batch: mint(), note: 'Undid a merge.' };
+    /* THROUGH THE MERGE DOOR, the only way a folded row comes back and `merged_into` is cleared. */
+    const put = (register: string, id: string, patch: Patch): Result<Entry> => write(register, id, patch, as, { merge: true });
+
+    /* A LATER MERGE MOVED THINGS ON. A was folded into B here, and B into C since: a link this merge pointed at B now
+       points at C, and the keys and names B was carried went on to C. So a ref is compared by where its chain ends, a
+       link moved here goes back to the row it left, and what this merge carried that the later one moved on to C comes
+       off C too, but only what a merge put there. */
+    const endOf = (id: string): string => {
+      const row = byId(id, true);
+      const list = row === null ? undefined : keyedOf(row.register);
+      const field = list === undefined ? undefined : mergeFieldOf(list);
+      return field === undefined ? id : foldEnd(sql, field, id);
+    };
+    const onward = (v: unknown): unknown =>
+      typeof v === 'string' ? endOf(v) : Array.isArray(v) ? [...new Set(v.map((x) => (typeof x === 'string' ? endOf(x) : x)))] : v;
+    const backward = (v: unknown): unknown =>
+      typeof v === 'string' ? (folds.has(v) ? v : endOf(v)) : Array.isArray(v) ? [...new Set(v.map((x) => (typeof x === 'string' && !folds.has(x) ? endOf(x) : x)))] : v;
+    const isRef = (register: string, field: string): boolean => {
+      const f = registers.get(register)?.fields.find((x) => x.id === field);
+      return f !== undefined && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref'));
+    };
+    /** What this merge tagged onto `kept` that a later merge carried on to the end of its chain, and the end. */
+    const carriedOn = (kept: Entry, p: Undo): { end: string; patch: Patch } | null => {
+      const list = keyedOf(kept.register);
+      const field = list === undefined ? undefined : mergeFieldOf(list);
+      if (field === undefined || p.tagged.size === 0) return null;
+      const chain = [kept.id, ...foldChain(sql, field, kept.id)];
+      const end = chain.at(-1)!;
+      const there = end === kept.id ? null : byId(end);
+      if (!there) return null;
+      const via = chain.slice(0, -1).map((id) => `entry:${id}`);
+      const patch: Patch = {};
+      for (const [f, added] of p.tagged) {
+        const held = Array.isArray(there.fields[f]) ? (there.fields[f] as unknown[]) : [];
+        const gone = added.filter((v) =>
+          sql.one(
+            `SELECT 1 AS n FROM event t WHERE t.target = ? AND t.kind = 'tag' AND t.field = ? AND t.to_v = ? AND t.batch IN (
+               SELECT batch FROM event WHERE field = ? AND to_v IS NOT NULL AND batch IS NOT NULL AND target IN (${via.map(() => '?').join(', ')})) LIMIT 1`,
+            `entry:${end}`,
+            f,
+            written(v as Json),
+            field,
+            ...via,
+          ),
+        );
+        const left = held.filter((h) => !gone.some((v) => JSON.stringify(v) === JSON.stringify(h)));
+        if (left.length !== held.length) patch[f] = left.length === 0 ? null : (left as Json);
+      }
+      return Object.keys(patch).length === 0 ? null : { end, patch };
+    };
+
     const revert = (id: string, p: Undo): Result<null> => {
       if (p.restore) {
-        const back = write(byId(id, true)!.register, id, { deleted_at: null }, as);
+        const back = put(byId(id, true)!.register, id, { deleted_at: null });
         if (!back.ok) return back as Result<never>;
       }
       const now = byId(id, true);
@@ -4751,6 +4992,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       for (const [field, from] of p.from) {
         const to = p.to.get(field) ?? null;
         if (redacted(from) || redacted(to)) continue;
+        if (isRef(now.register, field)) {
+          if (JSON.stringify(onward(now.fields[field] ?? null)) !== JSON.stringify(onward(parse(to)))) continue;
+          const back = backward(parse(from));
+          if (JSON.stringify(back) !== JSON.stringify(now.fields[field] ?? null)) patch[field] = back as Json;
+          continue;
+        }
         if (JSON.stringify(now.fields[field] ?? null) !== JSON.stringify(parse(to))) continue;
         patch[field] = parse(from);
       }
@@ -4762,9 +5009,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const list = [...held.filter((h) => !added.includes(JSON.stringify(h))), ...back];
         if (JSON.stringify(list) !== JSON.stringify(held)) patch[field] = list.length === 0 ? null : list;
       }
-      if (Object.keys(patch).length === 0) return ok(null);
-      const out = write(now.register, id, patch, as);
-      return out.ok ? ok(null) : (out as Result<never>);
+      if (Object.keys(patch).length > 0) {
+        const out = put(now.register, id, patch);
+        if (!out.ok) return out as Result<never>;
+      }
+      const on = folds.has(id) ? null : carriedOn(now, p);
+      if (on) {
+        const out = put(now.register, on.end, on.patch);
+        if (!out.ok) return out as Result<never>;
+      }
+      return ok(null);
     };
     const foldRegister = byId([...folds][0]!, true)?.register;
     const ordered = [
@@ -7737,8 +7991,17 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     decide: (id: string, verdict: Verdict, actor: string): Result<Decided> =>
       attempt(sql, transaction, () => {
+        const whole = mergePickFault(id, verdict);
+        if (whole) return { ok: false as const, refusal: whole };
         const out = decide(governDeps(), id, verdict, actor);
-        if (out.ok) answered(id, verdict, actor);
+        if (out.ok) {
+          /* AN ACCEPTED MERGE KEEPS WHAT THE TWO DISAGREED ON, in the batch the rows were written in (`carryFolds`). */
+          for (const batch of foldBatches(out.value.wrote)) {
+            const carried = carryFolds(batch, { actor });
+            if (!carried.ok) return carried as Result<never>;
+          }
+          answered(id, verdict, actor);
+        }
         return out;
       }),
 
@@ -7768,16 +8031,20 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const theirs = foreignRun<Met>(as);
       if (theirs) return theirs;
       /* THE LISTS DECLARING meets: AND org:, or `people` and `organisations` on a record older than the keys (`roles.ts`). */
-      return attempt(sql, transaction, () =>
-        meetPerson(
+      return attempt(sql, transaction, () => {
+        const met = meetPerson(
           peopleDeps(
             as,
             () => (as.principal?.kind === 'token' ? (locateRun(as).project?.id ?? null) : null),
             (p) => openSuggestion(governDeps(), () => signedBy(as), p),
           ),
           args,
-        ),
-      );
+        );
+        /* A STRONG MERGE KEEPS WHAT THE TWO DISAGREED ON too, in its own batch, so Undo takes it back with the rest. */
+        if (!met.ok || met.value.undo === undefined) return met;
+        const carried = carryFolds(met.value.undo, as);
+        return carried.ok ? met : (carried as Result<never>);
+      });
     },
 
     /**

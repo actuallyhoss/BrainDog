@@ -14,6 +14,10 @@
  * the survivor, and every key it held moves to the survivor, so the folded row's second address still finds the one
  * person. Undoing the merge takes back the keys its own fields carry.
  *
+ * BOTH FOLLOW THE CHAIN. A was folded into B, and later B into C: A's keys are at C, not B. A fold moves keys to the end
+ * of the chain it points into, and an unfold takes its keys back from wherever along that chain they went, or undoing
+ * A's merge after B's left A answering to nothing and C answering to A's address.
+ *
  * NOTHING HERE WRITES A ROW. It reads rows and writes the two derived tables; who becomes whom is `people.ts`'s.
  */
 
@@ -60,6 +64,31 @@ export type KeyedRow = { id: string; register: string; fields: Readonly<Record<s
 const liveRow = (sql: Pick<Sql, 'one'>, id: string): boolean =>
   sql.one<{ n: number }>('SELECT 1 AS n FROM entry WHERE id = ? AND deleted_at IS NULL', id) !== undefined;
 
+/** How many steps of `merged_into` are followed before a chain is called a loop. */
+export const FOLD_HOPS = 16;
+
+/**
+ * The rows `from` was folded into, in order, each the one the last was folded into: `[B, C]` for A folded into B and B
+ * into C. Empty for a row not folded. A loop written by hand ends where it repeats, and a chain ends at `FOLD_HOPS`.
+ */
+export function foldChain(sql: Pick<Sql, 'one'>, field: string, from: string): string[] {
+  const out: string[] = [];
+  const seen = new Set([from]);
+  let at = from;
+  for (let hops = 0; hops < FOLD_HOPS; hops++) {
+    const row = sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', at);
+    const next = row === undefined ? undefined : textOf(parsed(row.fields)[field]);
+    if (next === undefined || seen.has(next)) break;
+    out.push(next);
+    seen.add(next);
+    at = next;
+  }
+  return out;
+}
+
+/** The row at the end of `from`'s chain: the one it was finally folded into, or `from` itself when it was not. */
+export const foldEnd = (sql: Pick<Sql, 'one'>, field: string, from: string): string => foldChain(sql, field, from).at(-1) ?? from;
+
 /** Hold `key` for `row`, unless another live row holds it. A key whose holder is gone is taken over. */
 function claim(sql: Pick<Sql, 'one' | 'exec'>, key: string, register: string, row: string, source: string, at: string): void {
   const held = sql.one<{ row_id: string }>('SELECT row_id FROM entity_key WHERE key = ?', key);
@@ -79,9 +108,10 @@ function claim(sql: Pick<Sql, 'one' | 'exec'>, key: string, register: string, ro
  * Bring `entity_key` up to one row as it now is, from what it was. In the write's transaction.
  *
  *   - Folded into another (its `merged_into` set): every key it holds, and every one its fields carry that nobody
- *     holds, moves to the survivor.
+ *     holds, moves to the end of the chain it points into (`foldEnd`), the one row of it still standing.
  *   - Deleted, and not folded: its keys go, so they are free for whoever is met with them next.
- *   - Unfolded (its `merged_into` cleared): the keys its own fields carry come back from the row it was folded into.
+ *   - Unfolded (its `merged_into` cleared): the keys its own fields carry come back from any row along the chain it
+ *     was folded into, since a later merge may have moved them on.
  *   - Live: the keys it lost go, and the ones it gained are claimed.
  */
 export function rekey(sql: Pick<Sql, 'one' | 'all' | 'exec'>, list: KeyedList, before: KeyedRow | null, after: KeyedRow, source: string, at: string): void {
@@ -91,16 +121,24 @@ export function rekey(sql: Pick<Sql, 'one' | 'all' | 'exec'>, list: KeyedList, b
   const own = rowKeys(list, after.fields);
 
   if (into !== undefined && into !== after.id) {
-    sql.exec('UPDATE entity_key SET row_id = ?, at = ? WHERE row_id = ?', into, at, after.id);
-    for (const key of own) claim(sql, key, list.register, into, source, at);
+    /* THE END OF THE CHAIN, never a row back on itself: the write path refuses a fold into a descendant, and a loop
+       written by hand past it leaves the keys where they are rather than handing them round the loop. */
+    const end = foldEnd(sql, field!, into);
+    if (end === after.id) return;
+    sql.exec('UPDATE entity_key SET row_id = ?, at = ? WHERE row_id = ?', end, at, after.id);
+    for (const key of own) claim(sql, key, list.register, end, source, at);
     return;
   }
   if (after.deleted_at !== null) {
     sql.exec('DELETE FROM entity_key WHERE row_id = ?', after.id);
     return;
   }
-  if (was !== undefined)
-    for (const key of own) sql.exec('UPDATE entity_key SET row_id = ?, at = ? WHERE key = ? AND row_id = ?', after.id, at, key, was);
+  if (was !== undefined && own.length > 0) {
+    const chain = [was, ...foldChain(sql, field!, was)].filter((id) => id !== after.id);
+    const marks = chain.map(() => '?').join(', ');
+    for (const key of own)
+      sql.exec(`UPDATE entity_key SET row_id = ?, at = ? WHERE key = ? AND row_id IN (${marks})`, after.id, at, key, ...chain);
+  }
   const had = before === null || before.deleted_at !== null ? [] : rowKeys(list, before.fields);
   for (const key of had) if (!own.includes(key)) sql.exec('DELETE FROM entity_key WHERE key = ? AND row_id = ?', key, after.id);
   for (const key of own) claim(sql, key, list.register, after.id, source, at);
@@ -222,3 +260,73 @@ export function noteMention(
 /** How many sources a name has been mentioned in, of one kind. */
 export const mentionSources = (sql: Pick<Sql, 'one'>, name: string, kind: 'person' | 'organisation'): number =>
   Number(sql.one<{ n: number }>('SELECT count(DISTINCT source) AS n FROM entity_mention WHERE name_key = ? AND kind = ?', nameKey(name), kind)?.n ?? 0);
+
+/** A declared field as `foldedCarry` reads it. */
+export type CarryField = { id: string; type: string; label?: string; retired?: boolean; derived?: unknown };
+
+/** How many dated lines a `met` field keeps, as `people.ts`'s `MET_CAP` does: the newest. */
+const LINES_KEPT = 20;
+/** How much of a value a note line keeps. */
+const NOTE_CLIP = 80;
+
+/**
+ * What a kept row takes from a row folded into it where the two DISAGREE: the part `people.ts`'s `carried` leaves
+ * behind, since it fills only what the kept row left empty. THE KEPT ROW WINS, and the folded value is not lost: a
+ * different name joins `aliases` (or, on a list with none, a `met` line saying they were also called it), and any other
+ * text the two disagree on becomes a dated `met` line naming the field, the value and the row it came from.
+ *
+ * NOT THE PARTS THAT ARE KEYS. An address, a handle or a domain the fold held already answers for the kept row through
+ * `entity_key`, and a line carrying an address would put it in front of every reader of `met`. Nor a list, which
+ * `carried` joins whole, nor a `document`, which is no line's length.
+ *
+ * Nothing when there is nowhere to keep it: a list with neither `aliases` nor `met` keeps the value on the folded row,
+ * which stays in the file.
+ */
+export function foldedCarry(
+  list: KeyedList,
+  declared: readonly CarryField[],
+  keep: Readonly<Record<string, unknown>>,
+  fold: Readonly<Record<string, unknown>>,
+  foldName: string,
+  day: string,
+): Record<string, unknown> {
+  const at = list.fields as Partial<Record<string, string>>;
+  const parts = new Set(Object.values(at).filter((f): f is string => f !== undefined));
+  const patch: Record<string, unknown> = {};
+  const lines: string[] = [];
+  const met = at.met;
+  const aliases = at.aliases;
+  const held = (f: string): string[] => listOf(f in patch ? patch[f] : keep[f]);
+  const noted = (text: string): boolean => [...listOf(keep[met ?? '']), ...lines].some((l) => l.slice(l.indexOf(' · ') + 3) === text);
+
+  const theirs = textOf(fold[at.name!]);
+  const ours = textOf(keep[at.name!]);
+  if (theirs !== undefined && ours !== undefined && nameKey(theirs) !== nameKey(ours)) {
+    if (aliases !== undefined) {
+      if (!held(aliases).some((a) => nameKey(a) === nameKey(theirs))) patch[aliases] = [...held(aliases), theirs.trim()];
+    } else if (met !== undefined && !held(met).some((l) => l.includes(theirs.trim()))) {
+      const text = `also called ${clip(theirs)}`;
+      if (!noted(text)) lines.push(`${day} · ${text}`);
+    }
+  }
+  if (met !== undefined)
+    for (const f of declared) {
+      if (f.retired === true || f.derived !== undefined || parts.has(f.id) || f.id.startsWith('_')) continue;
+      if (f.type !== 'text' && f.type !== 'url') continue;
+      const was = textOf(fold[f.id]);
+      const is = textOf(keep[f.id]);
+      if (was === undefined || is === undefined || was.trim() === is.trim()) continue;
+      const text = `${f.label ?? f.id.replace(/_/g, ' ')}: ${clip(was)}, from ${clip(foldName)}`;
+      if (!noted(text)) lines.push(`${day} · ${text}`);
+    }
+  if (lines.length > 0 && met !== undefined) {
+    const all = [...new Set([...held(met), ...lines])];
+    patch[met] = all.sort((a, b) => (a.slice(0, 10) < b.slice(0, 10) ? -1 : a.slice(0, 10) > b.slice(0, 10) ? 1 : 0)).slice(-LINES_KEPT);
+  }
+  return patch;
+}
+
+const clip = (text: string): string => {
+  const one = text.replace(/\s+/g, ' ').trim();
+  return one.length <= NOTE_CLIP ? one : `${one.slice(0, NOTE_CLIP - 1).trimEnd()}…`;
+};

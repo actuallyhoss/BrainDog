@@ -1,0 +1,343 @@
+/**
+ * Who may say who somebody is (research-audit-17 H1, M1, M2, M4), and asking once per cluster.
+ *
+ * TEXT ANYBODY COULD HAVE WRITTEN IS NOT EVIDENCE. A mail, a bank text or an import never folds two people, never carries
+ * a key onto somebody known, and never folds an address into a real person: a key match gains its line, a sender like
+ * nobody known is a person of their own, and one who looks like somebody known is a mention and one question.
+ *
+ * THE STRONG RULES ARE A NAME AND A HANDLE, never a name and a company. The same handle is read past its dots and the
+ * number on its end. Everything weaker is one question per cluster, kept current while the work goes on, and the
+ * record's own person is the one a cluster is folded into.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { openRecord, type Declaration, type Entry, type Kernel, type Met, type ResolveJob, type WriteContext } from '../src/index.ts';
+import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
+
+const NOW = Date.UTC(2026, 9, 6, 12);
+const DAY = '2026-10-06';
+
+const PROJECTS: Declaration = {
+  id: 'register.things',
+  kind: 'register',
+  body: { id: 'things', name: 'Projects', title: 'name', scopes: { repos: 'repos' }, fields: [{ id: 'name', type: 'text', required: true }, { id: 'repos', type: 'list', of: 'text' }] },
+};
+
+/** People with every part the understanding layer reads: keys, the other names, and which one is the record's own. */
+const PEOPLE: Declaration = {
+  id: 'register.people',
+  kind: 'register',
+  body: {
+    id: 'people',
+    name: 'People',
+    title: 'name',
+    meets: { name: 'name', email: 'email', handles: 'handles', projects: 'projects', met: 'met', merged_into: 'merged_into', keys: 'keys', aliases: 'aliases', self: 'self' },
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'email', type: 'email', unique: true, index: true },
+      { id: 'handles', type: 'list', of: 'text' },
+      { id: 'keys', type: 'list', of: 'text' },
+      { id: 'aliases', type: 'list', of: 'text' },
+      { id: 'self', type: 'bool' },
+      { id: 'note', type: 'text' },
+      { id: 'projects', type: 'list', of: 'ref', to: 'things' },
+      { id: 'met', type: 'list', of: 'text' },
+      { id: 'merged_into', type: 'ref', to: 'people' },
+    ],
+  },
+};
+
+const value = <T>(r: unknown): T => {
+  const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string } };
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code}: ${x.refusal?.fix}`);
+  return x.value;
+};
+
+const OWNER: WriteContext = { actor: 'p_owner' };
+const AGENT: WriteContext = { actor: 'p_owner', principal: { kind: 'token', token: 't_1' }, session: { client_id: 'cc-1', host: 'h', repo: 'braindog' } };
+
+async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  value(await k.install([PROJECTS, PEOPLE]));
+  value(k.create('things', { name: 'BrainDog', repos: ['braindog'] }, OWNER));
+  return { k, sql };
+}
+
+const questions = (sql: NodeSql): number => Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM suggestion')?.n);
+const open = (sql: NodeSql): string[] => sql.all<{ id: string }>("SELECT id FROM suggestion WHERE status = 'open' ORDER BY rowid").map((r) => r.id);
+
+/* ── H1: text anybody could have written ──────────────────────────────── */
+
+test('A FORGED SENDER WITH A KNOWN NAME MAKES NOBODY AND FOLDS NOTHING: a mention, and one question, asked once', async () => {
+  const { k, sql } = await record();
+  const real = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
+  const forged = { email: '"Rohan Mehta" <rohanmehta@evil.test>', where: 'mail: Re: the invoice', source: 'mail from evil.test' };
+
+  const met = value<Met>(k.meet(forged, AGENT));
+  assert.equal(met.row, null, 'a forged sender made a row');
+  assert.equal(met.mention, true);
+  assert.equal(met.matched_by, 'none');
+  assert.equal(k.count('people'), 1);
+  const kept = k.get(real.id)!;
+  assert.equal(kept.fields.keys, undefined, 'the forged address was carried onto the real person');
+  assert.equal(kept.fields.merged_into, undefined);
+
+  /* One question, in names, offering the address and nothing else. */
+  assert.ok(met.question);
+  const question = k.question(met.question) ?? '';
+  assert.match(question, /^Is the Rohan Mehta met in mail from evil\.test the Rohan Mehta you already know \(an address at encore\.xyz\)\? Yes adds the new address to Rohan Mehta\./);
+  assert.doesNotMatch(question, /@|people#/);
+  /* The sighting is kept, by its source and never by the mail's subject. */
+  assert.deepEqual(sql.all<{ source: string }>("SELECT source FROM entity_mention WHERE kind = 'person'").map((m) => m.source), ['mail from evil.test']);
+
+  /* Mailed again, and again from another forged address: no second question while the first waits. */
+  assert.equal(value<Met>(k.meet(forged, AGENT)).question, undefined);
+  assert.equal(value<Met>(k.meet({ ...forged, email: '"Rohan Mehta" <rohan.mehta@evil2.test>' }, AGENT)).question, undefined);
+  assert.equal(questions(sql), 1);
+
+  /* He says no: the address is never offered again, and still nobody is made. */
+  value(k.decide(met.question, { decide: { option: 'reject', reason: 'not him' } }, 'p_owner'));
+  assert.equal(value<Met>(k.meet(forged, AGENT)).question, undefined);
+  assert.equal(k.count('people'), 1);
+  assert.equal(questions(sql), 1);
+  sql.close();
+});
+
+test('AN OFFER KEPT CURRENT STILL GIVES A PERSON WITH NO ADDRESS THE ADDRESS ITSELF, not a key beside an empty field', async () => {
+  const { k, sql } = await record();
+  const ada = value<Entry>(k.create('people', { name: 'Ada Lovelace', handles: ['github:adal'] }, OWNER));
+  const met = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'countess@analytical.org', source: 'mail from analytical.org' }, AGENT));
+  value(k.meet({ handle: 'github:adal', where: 'commit 1 in braindog' }, AGENT));
+  value(k.decide(met.question!, { decide: { option: 'accept', reason: 'her address' } }, 'p_owner'));
+  assert.equal(k.get(ada.id)!.fields.email, 'countess@analytical.org');
+  assert.equal(k.get(ada.id)!.fields.keys, undefined);
+  sql.close();
+});
+
+test('ACCEPTING THE OFFER ADDS THE ADDRESS, and the next mail from it is that person', async () => {
+  const { k, sql } = await record();
+  const real = value<Entry>(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com' }, OWNER));
+  const met = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'countess@analytical.org', source: 'mail from analytical.org' }, AGENT));
+  /* A later mail from her known address moves her row; the offer is kept current with it. */
+  value(k.meet({ email: 'ada@example.com', source: 'mail from example.com' }, AGENT));
+  value(k.decide(met.question!, { decide: { option: 'accept', reason: 'her second address' } }, 'p_owner'));
+  assert.deepEqual(k.get(real.id)!.fields.keys, ['email:countess@analytical.org']);
+  assert.equal(value<Met>(k.meet({ email: 'countess@analytical.org', source: 'mail from analytical.org' }, AGENT)).row?.id, real.id);
+  sql.close();
+});
+
+test('AN ARRIVAL MATCHED BY ITS KEY ADDS ITS LINE AND NOTHING ELSE: no handle, no name, no other name', async () => {
+  const { k, sql } = await record();
+  const ada = value<Entry>(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com' }, OWNER));
+  const met = value<Met>(k.meet({ name: 'The Countess', email: 'ada@example.com', handle: 'github:attacker', where: 'mail from example.com' }, AGENT));
+  assert.equal(met.matched_by, 'key');
+  const row = k.get(ada.id)!;
+  assert.deepEqual(row.fields.met, [`${DAY} · mail from example.com`]);
+  assert.equal(row.fields.handles, undefined, 'a handle read from a mail was carried onto her');
+  assert.equal(row.fields.aliases, undefined, 'a name read from a mail was kept as hers');
+  /* The handle is still nobody's, so the next meeting by it is not her. */
+  assert.equal(sql.one("SELECT 1 AS n FROM entity_key WHERE key = 'github:attacker'"), undefined);
+
+  /* The same meeting from a commit is evidence, and she gains both. */
+  value(k.meet({ name: 'The Countess', email: 'ada@example.com', handle: 'github:ada', where: 'commit 4464966 in braindog' }, AGENT));
+  assert.deepEqual(k.get(ada.id)!.fields.handles, ['github:ada']);
+  assert.deepEqual(k.get(ada.id)!.fields.aliases, ['The Countess']);
+  sql.close();
+});
+
+test('A SENDER LIKE NOBODY KNOWN IS A PERSON OF THEIR OWN, and a forged one who came first never takes in the real one', async () => {
+  const { k, sql } = await record();
+  const forged = value<Met>(k.meet({ email: '"Rohan Mehta" <rohanmehta@evil.test>', where: 'mail: hello', source: 'mail from evil.test' }, AGENT));
+  assert.equal(forged.created, true);
+
+  /* The real Rohan, in a commit: the same name and the same handle, and still asked, never folded. */
+  const real = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanmehta@encore.example', where: 'commit 1 in encore' }, AGENT));
+  assert.equal(real.matched_by, 'none');
+  assert.equal(real.created, true);
+  assert.ok(real.question, 'two people with one name and one handle were neither folded nor asked about');
+  assert.equal(k.count('people'), 2);
+  sql.close();
+});
+
+test('SAID TO BE UNTRUSTED, IT STAYS SO ON THE LINE: a forged sender met that way first still never takes in the real one', async () => {
+  const { k, sql } = await record();
+  const forged = value<Met>(k.meet({ email: '"Rohan Mehta" <rohanmehta@evil.test>', source: 'a run reading the inbox', untrusted: true }, AGENT));
+  assert.equal(forged.created, true);
+  assert.deepEqual(k.get(forged.row!.id)!.fields.met, [`${DAY} · arrived in a run reading the inbox`]);
+  const real = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanmehta@encore.example', where: 'commit 1 in encore' }, AGENT));
+  assert.equal(real.matched_by, 'none', 'the real person was folded into a sender nobody vouched for');
+  assert.ok(real.question);
+  assert.equal(k.count('people'), 2);
+  sql.close();
+});
+
+test('A PERSON THE OWNER TYPED IS STILL HIS AFTER THEIR MAIL IS READ: the same name and handle in a commit fold into them', async () => {
+  const { k, sql } = await record();
+  const typed = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
+  value(k.meet({ email: 'rohanmehta@encore.example', source: 'mail from encore.example' }, AGENT));
+  const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohan.mehta@gmail.com', where: 'commit 1 in encore' }, AGENT));
+  assert.equal(met.matched_by, 'strong');
+  assert.equal(met.row?.id, typed.id);
+  assert.equal(k.count('people'), 1);
+  sql.close();
+});
+
+test('UNTRUSTED IS SAID OR READ FROM THE SOURCE, and false never lifts a source that says so', async () => {
+  const { k, sql } = await record();
+  value(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
+  for (const said of [
+    { untrusted: true, where: 'a run reading the inbox' },
+    { untrusted: false, source: 'bank text' },
+    { source: 'import' },
+  ]) {
+    const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: `rohanmehta@${Object.keys(said).join('')}.test`, ...said }, AGENT));
+    assert.equal(met.row, null, `${JSON.stringify(said)} folded or made a person`);
+  }
+  assert.equal(k.count('people'), 1);
+  const refused = k.meet({ name: 'Ada', email: 'ada@example.com', where: 'x', untrusted: 'yes' as never }, AGENT) as { ok: boolean; refusal?: { at?: string } };
+  assert.equal(refused.ok, false);
+  assert.equal(refused.refusal?.at, 'untrusted');
+  sql.close();
+});
+
+/* ── M4: the strong rules ─────────────────────────────────────────────── */
+
+test('TWO COLLEAGUES WITH ONE NAME AND ONE COMPANY ARE ASKED ABOUT, never folded', async () => {
+  const { k, sql } = await record();
+  value(k.create('people', { name: 'Ahmed Hassan', email: 'ahmed@encore.example' }, OWNER));
+  const met = value<Met>(k.meet({ name: 'Ahmed Hassan', email: 'a.hassan@encore.example', where: 'commit 1 in encore' }, AGENT));
+  assert.equal(met.matched_by, 'none');
+  assert.ok(met.question);
+  assert.equal(k.count('people'), 2);
+  sql.close();
+});
+
+test('ONE HANDLE IS ONE HANDLE PAST ITS DOTS AND ITS NUMBER: the same name and handle fold on their own', async () => {
+  const { k, sql } = await record();
+  const first = value<Entry>(k.create('people', { name: 'Lakshmi Vadlamudi', email: 'lakshmi.vadlamudi@brightloom.example' }, OWNER));
+  const met = value<Met>(k.meet({ name: 'Lakshmi Vadlamudi', email: 'lakshmivadlamudi24@gmail.com', where: 'commit 1 in braindog' }, AGENT));
+  assert.equal(met.matched_by, 'strong');
+  assert.equal(met.row?.id, first.id);
+  /* And a private GitHub address whose login is that handle. */
+  const login = value<Met>(k.meet({ name: 'Lakshmi Vadlamudi', email: '4412+lakshmi-vadlamudi@users.noreply.github.com', where: 'commit 2 in braindog' }, AGENT));
+  assert.equal(login.matched_by, 'strong');
+  assert.equal(k.count('people'), 1);
+  assert.equal(questions(sql), 0);
+  /* A handle too short to say who somebody is never folds, however alike the names. */
+  value(k.create('people', { name: 'Sam Ortiz', email: 'sam@one.example' }, OWNER));
+  assert.equal(value<Met>(k.meet({ name: 'Sam Ortiz', email: 'sam@two.example', where: 'commit 3 in braindog' }, AGENT)).matched_by, 'none');
+  sql.close();
+});
+
+/* ── M2, M1: what is kept, and what a model reads ─────────────────────── */
+
+test('THE SOURCE WINS OVER WHERE, CLIPPED, AND AN ADDRESS IS NEVER A NAME OR A LINE', async () => {
+  const { k, sql } = await record();
+  const long = `commit 4464966 in braindog, ${'which touched a great many files across the whole repository '.repeat(3)}`;
+  const met = value<Met>(k.meet({ email: 'ada.l@example.com', where: 'the lease thread, from bob@x.example', source: long }, AGENT));
+  const row = k.get(met.row!.id)!;
+  assert.equal(row.fields.name, 'ada.l', 'a person met with no name was named by their whole address');
+  const [line] = row.fields.met as string[];
+  assert.ok(line!.length <= DAY.length + 3 + 80, `a met line of ${line!.length} characters`);
+  assert.match(line!, /^2026-10-06 · commit 4464966 in braindog, which/u);
+  assert.match(line!, /…$/u);
+
+  const addressed = value<Met>(k.meet({ name: 'grace@navy.example', email: 'grace@navy.example', source: 'a call with grace@navy.example' }, AGENT));
+  const grace = k.get(addressed.row!.id)!;
+  assert.equal(grace.fields.name, 'grace');
+  assert.deepEqual(grace.fields.met, [`${DAY} · a call with navy.example`]);
+  sql.close();
+});
+
+test('A MODEL IS HANDED NAMES AND PLACES, never an address, even one an older record kept', async () => {
+  const { k, sql } = await record();
+  value(k.create('people', { name: 'Sam Ortiz <sam@one.example>', email: 'sam@one.example', met: ['2026-09-01 · mail from sam@one.example', 'no day here'] }, OWNER));
+  value(k.create('people', { name: 'Sam Ortiz', email: 'sortiz@two.example' }, OWNER));
+  k.purge();
+  const [job] = sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'infer.resolve'");
+  assert.ok(job, 'no job was queued');
+  const pairs = (JSON.parse(job.payload) as ResolveJob).pairs;
+  assert.equal(pairs.length, 1);
+  assert.doesNotMatch(JSON.stringify(pairs), /@/u, 'an address went to the model');
+  const side = [pairs[0]!.a, pairs[0]!.b].find((s) => s.seen.length > 0)!;
+  assert.deepEqual(side.seen, ['no day here', 'mail from one.example']);
+  sql.close();
+});
+
+/* ── one question per cluster ─────────────────────────────────────────── */
+
+test('ONE WHO MAY BE THE SAME PERSON JOINS THE QUESTION ALREADY ASKED, and Yes folds them all into the oldest', async () => {
+  const { k, sql } = await record();
+  const kept = value<Entry>(k.create('people', { name: 'Devraj Banerji', note: 'Founder at Lumacraft' }, OWNER));
+  const one = value<Met>(k.meet({ name: 'Devraj Banerji', email: 'devraj@fanline.example', where: 'commit 1 in fanline' }, AGENT));
+  const two = value<Met>(k.meet({ name: 'Devraj Banerji', email: 'devrajbanerji@gmail.com', where: 'commit 2 in fanline' }, AGENT));
+  assert.equal(two.question, one.question, 'a second question was opened about the same person');
+  /* A third address strong-folds into the second row, and a fourth meeting by key moves it; the question keeps up. */
+  value(k.meet({ name: 'Devraj Banerji', email: 'devraj@lumacraft.example', where: 'commit 3 in lumacraft' }, AGENT));
+  value(k.meet({ name: 'Devraj B', email: 'devrajbanerji@gmail.com', where: 'commit 4 in lumacraft' }, AGENT));
+  assert.deepEqual(open(sql), [one.question]);
+  assert.equal(questions(sql), 1);
+  const body = k.governanceRow('suggestion', one.question!)!.body as { candidates: { name: string; kept?: boolean }[] };
+  assert.deepEqual(body.candidates.map((c) => [c.name, c.kept === true]), [['Devraj Banerji', true], ['Devraj Banerji', false], ['Devraj Banerji', false]]);
+
+  value(k.decide(one.question!, { decide: { option: 'accept', reason: 'one Devraj' } }, 'p_owner'));
+  assert.equal(k.count('people'), 1);
+  const row = k.get(kept.id)!;
+  assert.equal(row.fields.email, 'devraj@fanline.example');
+  assert.deepEqual(row.fields.aliases, ['Devraj B']);
+  assert.equal((row.fields.met as string[]).length, 4);
+  sql.close();
+});
+
+test('A SHORT FORM OF A NAME IS ASKED ABOUT: farahq beside Farah Qureshi, tlindqvist beside Tomas Lindqvist', async () => {
+  const { k, sql } = await record();
+  value(k.create('people', { name: 'Farah Qureshi', email: 'farah.qureshi@fanline.example' }, OWNER));
+  const farah = value<Met>(k.meet({ name: 'farahq', email: '6152+farahq@users.noreply.github.com', where: 'commit 1 in fanline' }, AGENT));
+  assert.match(k.question(farah.question!) ?? '', /^Are Farah Qureshi .* and farahq .* one person\?/u);
+  value(k.create('people', { name: 'Tomas Lindqvist', email: 'tomas@fanline.example' }, OWNER));
+  assert.ok(value<Met>(k.meet({ handle: 'github:tlindqvist', name: 'tlindqvist', where: 'commit 2 in fanline' }, AGENT)).question);
+  /* And not a first name alone: Rohan beside Rohan Iyer is nobody's short form. */
+  value(k.create('people', { name: 'Rohan Iyer', email: 'rohan.iyer@fanline.example' }, OWNER));
+  assert.equal(value<Met>(k.meet({ name: 'rohanbrightloom', email: 'rohanbrightloom@gmail.com', where: 'commit 3 in fanline' }, AGENT)).question, undefined);
+  sql.close();
+});
+
+test('THE RECORD’S OWN PERSON KEEPS EVERY SPELLING OF THEM: a name their handle spells is asked, an alias and a handle fold', async () => {
+  const { k, sql } = await record();
+  const self = value<Entry>(k.create('people', { name: 'Kas', email: 'kas@kas.example', keys: ['email:karimassaf91@gmail.com', 'github:kasdev'], self: true }, OWNER));
+  const second = value<Entry>(k.create('people', { name: 'Kas', note: 'Founder, Tidepool Apps' }, OWNER));
+
+  /* "Karim Assaf" is what karimassaf91 spells: asked, the record's own person kept, the second Kas asked about with them. */
+  const met = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karim@tidepool.example', where: 'commit 1 in fanline' }, AGENT));
+  assert.match(k.question(met.question!) ?? '', /Yes keeps Kas /u);
+  const body = k.governanceRow('suggestion', met.question!)!.body as { candidates: { at: string; kept?: boolean }[] };
+  assert.deepEqual(body.candidates.map((c) => [c.at, c.kept === true]), [['people#1', true], ['people#2', false], ['people#3', false]]);
+  value(k.decide(met.question!, { decide: { option: 'accept', reason: 'all me' } }, 'p_owner'));
+  assert.equal(k.count('people'), 1);
+  assert.equal(k.get(second.id, { includeDeleted: true })!.fields.merged_into, self.id);
+  assert.deepEqual(k.get(self.id)!.fields.aliases, ['Karim Assaf']);
+
+  /* Now that the record knows the name, the same name and the same handle fold on their own, into the owner's row. */
+  const folded = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@driftwind.example', where: 'commit 2 in bake' }, AGENT));
+  assert.equal(folded.matched_by, 'strong');
+  assert.equal(folded.row?.id, self.id);
+  sql.close();
+});
+
+test('A QUESTION WHOSE PEOPLE BECAME ONE IS TAKEN OFF THE LIST', async () => {
+  const { k, sql } = await record();
+  value(k.create('people', { name: 'Owen Hartley', email: 'owen@fanline.example', keys: ['email:ohartley@old.example'] }, OWNER));
+  const asked = value<Met>(k.meet({ name: 'Owen Hartley', email: 'owenh@fanline.example', where: 'commit 1 in fanline' }, AGENT));
+  assert.ok(asked.question);
+  /* The second row is met again with a handle the first holds too: the strong rules fold it, and the question has
+     nobody left to ask about. */
+  const last = value<Met>(k.meet({ name: 'Owen Hartley', email: 'owenh@fanline.example', handle: 'github:ohartley', where: 'commit 2 in fanline' }, AGENT));
+  assert.equal(last.row?.seq, 1);
+  assert.equal(k.count('people'), 1);
+  assert.equal(k.governanceRow('suggestion', asked.question!)?.status, 'resolved');
+  assert.deepEqual(open(sql), []);
+  sql.close();
+});

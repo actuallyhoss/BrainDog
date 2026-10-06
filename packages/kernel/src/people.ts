@@ -11,15 +11,27 @@
  *   2. A NAME ALONE NEVER MAKES A ROW. Two people share a name often enough that joining on it would fold strangers
  *      together, and making a row for every bare name made the owner's record five "Fofo"s and two of himself. It is
  *      kept as a mention (`entity_mention`), and the caller is told to give an address or a handle.
- *   3. THE STRONG RULES, written by the record as one undoable batch: the same name of two or more words, plus the
- *      same email local part of five or more characters, or a login equal to that local part, or the same organisation
- *      domain. The older row is kept and the newer folded into it, carrying every field the kept row lacks (H2).
+ *   3. THE STRONG RULES, written by the record as one undoable batch: the same name of two or more words (a name or an
+ *      alias), plus the same personal handle: an email local part or a login of five or more characters, read without
+ *      its dots, dashes, underscores and the number on its end (`rohan.meduri`, `rohanmeduri` and `rohanmeduri24` are
+ *      one handle). The same organisation or domain alone is never enough: two colleagues share both (M4). The older
+ *      row is kept, the record's own person always, and the newer folded into it, carrying every field the kept row
+ *      lacks (H2).
  *   4. ONE QUESTION PER CLUSTER for the doubtful rest, worded in names and the evidence for each (M4), never in ids.
- *      Asked once: a pair the owner said no to, or a merge he undid, is never asked about again.
+ *      Asked once: a pair the owner said no to, or a merge he undid, is never asked about again. A later meeting of
+ *      somebody the question names keeps it current (`reask`), and one who may be the same person joins it rather than
+ *      opening another, so a question is never left stale by the work it is about.
+ *
+ * TEXT ANYBODY COULD HAVE WRITTEN IS NOT EVIDENCE (H1). A mail, a bank text, an import or any other arrival (`untrusted`,
+ * or a source that says so) never strong-merges, never carries a key onto somebody already known, and never folds an
+ * address into a real person: an exact key match gains its dated line and nothing else, a sender like nobody known is a
+ * person of their own, and one who looks like somebody known is kept as a mention with one question for the owner. A row
+ * every meeting of which was such text is never folded on the strong rules either, whichever order the two arrived in.
  *
  * NEVER: a person merged with an organisation (they live in two lists, and a key belongs to one row of one list); a row
  * another member made merged by anybody but its maker's say; a merge made without asking while money rows point at
  * both. A shared inbox or a machine sender (`info@`, `noreply@`) is an organisation speaking and never makes a person.
+ * A full address is never a name, a met line or a word handed to a model (M1, M2).
  *
  * THE LISTS ARE WHICHEVER DECLARE `meets:` AND `org:`, and each field is the one its part names (`roles.ts`). A record
  * older than the keys is met into `people` and `organisations` under the parts' own names. A list may leave out
@@ -32,7 +44,7 @@ import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { instant } from './coerce.ts';
-import { holderOf, holders, nameKey, noteMention, sourceKeys } from './entities.ts';
+import { FOLD_HOPS, holderOf, holders, nameKey, noteMention, sourceKeys } from './entities.ts';
 import type { Proposal } from './govern.ts';
 import { githubOfAddress, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
 import { LEGACY, PARTS, plays, type MeetsFields, type OrgFields, type Role } from './roles.ts';
@@ -50,9 +62,22 @@ export const MET_CAP = 20;
 /** The most doubtful pairs one night's `infer.resolve` job asks a model about. */
 export const RESOLVE_PAIRS_NIGHT = 20;
 
+/** The longest a source may be in a met line, a mention or a question: a phrase, never a mail's subject line in full. */
+export const SOURCE_MOST = 80;
+
+/** The most people one question asks about. Past it a cluster is not one person's spellings, and nobody can read it. */
+const CLUSTER_MOST = 12;
+
+/** The most other names a person keeps, so a name read from every commit does not grow a list nobody reads. */
+const ALIASES_MOST = 8;
+
+/** How many strong folds one meeting may chain, each the record's own rule: a fold can make the kept row like another. */
+const STRONG_HOPS = 3;
+
 /**
- * What `meet` is told: at least one of a name, an email, a handle, keys or a domain, and always where (or the source,
- * which says the same: `commit 4464966 in braindog`, `mail from encore.example`, `bank text`).
+ * What `meet` is told: at least one of a name, an email, a handle, keys or a domain, and always the source (or where,
+ * which says the same: `commit 4464966 in braindog`, `mail from encore.example`, `bank text`). The source wins when both
+ * are said, since `where` is often a mail's subject.
  *
  * `email` MAY BE A RAW `From` HEADER, `"Ada" <ada@x.com>`, and is read into its name and address.
  */
@@ -69,6 +94,11 @@ export type MeetArgs = {
   role?: string;
   where?: string;
   source?: string;
+  /**
+   * Read from text anybody could have written: a mail, a bank text, an import, any arrival. A source that says so
+   * (`mail from …`, `bank text`, `import`) is read as untrusted without it, and `false` never lifts that.
+   */
+  untrusted?: boolean;
 };
 
 /** The row met, as a person reads it: its list, its id, its number and its name. */
@@ -160,6 +190,59 @@ const orgNameKey = (name: string): string => {
 /** A name with its spaces and punctuation gone, as a login or a local part spells the same person: `rohanmehta`. */
 const compact = (name: string): string => nameKey(name).replace(/[^\p{L}\p{N}]/gu, '');
 
+/**
+ * A handle as one person spells it everywhere: lower case, no `+tag`, no dots, dashes or underscores, and no number on
+ * the end, which is what a taken handle grows. `Rohan.Meduri`, `rohanmeduri` and `rohanmeduri24` are one.
+ */
+const stem = (handle: string): string => handle.toLowerCase().replace(/\+.*$/, '').replace(/[._-]/g, '').replace(/\d+$/, '');
+
+/** The shortest stem that says who somebody is; a shorter one (`kas`, `sam`, `owen`) is shared by too many people. */
+const STEM_LEAST = 5;
+
+/**
+ * The short forms a person's handle takes from a name of two or more words: the first name and the last's initial
+ * (`farahq`, `mohank`), and the first's initial and the last name (`tlindqvist`). None shorter than a stem.
+ */
+function shortForms(name: string): string[] {
+  const words = nameKey(name).split(' ').map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter((w) => w !== '');
+  if (words.length < 2) return [];
+  const [first, last] = [words[0]!, words.at(-1)!];
+  if (first.length < 2 || last.length < 2) return [];
+  return [`${first}${last[0]}`, `${first[0]}${last}`].filter((f) => f.length >= STEM_LEAST);
+}
+
+/**
+ * A source that is text anybody could have written: a mail as it arrived, a bank text, an import, a message. What the
+ * owner wrote himself (`mail to …`, a note, a commit in his own repository) is not.
+ */
+const ARRIVED = /^\s*(?:(?:e-?)?mail\s*(?::|from\b)|bank\b|import(?:ed)?\b|sms\b|(?:text\s+)?message\s+from\b|text\s+from\b|whatsapp\b|arrival\b|arrived\s+in\b|inbox\b|forwarded\b)/iu;
+
+/** An address anywhere in a text, with its domain as the first group. */
+const ADDRESS = /[^\s<>()[\]"',;:]+@([a-z0-9-]+(?:\.[a-z0-9-]+)+)/giu;
+
+/** A text with every address said as its domain: `mail from ada@x.com` is `mail from x.com`. */
+const unaddressed = (text: string): string => text.replace(ADDRESS, (_all, domain: string) => domain.toLowerCase()).replace(/\s+/g, ' ').trim();
+
+/** A text cut to `most` characters at a word, with an ellipsis when it was cut. */
+function clip(text: string, most = SOURCE_MOST): string {
+  if (text.length <= most) return text;
+  const cut = text.slice(0, most - 1);
+  const word = cut.lastIndexOf(' ');
+  return `${(word > most / 2 ? cut.slice(0, word) : cut).trimEnd()}…`;
+}
+
+/** A name with any address in it taken out (`Ada <ada@x.com>` is `Ada`), or `undefined` when nothing else was said. */
+function nameOnly(raw: string | undefined): string | undefined {
+  if (raw === undefined) return undefined;
+  const bare = raw.replace(ADDRESS, ' ');
+  const said = bare === raw ? raw : bare.replace(/<\s*>|\(\s*\)|\[\s*\]/g, ' ');
+  const name = said.replace(/\s+/g, ' ').trim();
+  return name === '' ? undefined : name;
+}
+
+/** The source a met line holds: what follows its day. A line with no day is all source (L3). */
+const sourceOfLine = (line: string): string => (line.includes(' · ') ? line.slice(line.indexOf(' · ') + 3) : line);
+
 /** What `meet` was told, read and checked. */
 type Said = {
   name?: string;
@@ -171,6 +254,8 @@ type Said = {
   domain?: string;
   role?: string;
   source: string;
+  /** Text anybody could have written: no strong merge, no key carried onto anybody, no address folded into anybody. */
+  untrusted: boolean;
 };
 
 function normalise(args: MeetArgs): Result<Said> {
@@ -183,8 +268,15 @@ function normalise(args: MeetArgs): Result<Said> {
     if (!got.ok) return got as Result<never>;
     read[at] = got.value;
   }
-  const source = read.where ?? read.source;
-  if (source === undefined) return no('REQUIRED_MISSING', 'Say where they were met, as commit 4464966 in braindog.', { at: 'where' });
+  /* THE SOURCE WINS OVER WHERE (M2): a mail rule says `where: 'mail: <subject>'` beside `source: 'mail from <domain>'`,
+     and a subject in every met line put the mail's words, and its addresses, in the record and in front of a model.
+     Either is clipped to a phrase and says an address only as its domain. */
+  const given = read.source ?? read.where;
+  if (given === undefined) return no('REQUIRED_MISSING', 'Say where they were met, as commit 4464966 in braindog.', { at: 'where' });
+  const source = clip(unaddressed(given));
+  if (args.untrusted !== undefined && typeof args.untrusted !== 'boolean')
+    return no('VALUE_MALFORMED', 'untrusted is true or false.', { at: 'untrusted' });
+  const untrusted = args.untrusted === true || [read.source, read.where].some((t) => t !== undefined && ARRIVED.test(t));
 
   const kind = args.kind ?? 'person';
   if (kind !== 'person' && kind !== 'organisation')
@@ -202,13 +294,15 @@ function normalise(args: MeetArgs): Result<Said> {
 
   /* A RAW `From` HEADER IS READ INTO ITS TWO HALVES, so a mail rule passing the header whole meets the sender and not a
      refusal. A name in the header is the sender's only when nobody said one. */
-  let name = read.name?.replace(/\s+/g, ' ');
+  /* A NAME IS NEVER AN ADDRESS (M1): one written into the name (`ada@x.com <ada@x.com>`, `Ada (ada@x.com)`) is taken out,
+     and a name that was only an address is no name. */
+  let name = nameOnly(read.name);
   let email: string | undefined;
   if (read.email !== undefined) {
     const from = parseFrom(read.email);
     if (from === null) return no('VALUE_MALFORMED', 'email takes one address, as name@example.com.', { at: 'email' });
     email = from.address;
-    name ??= from.name ?? undefined;
+    name ??= nameOnly(from.name ?? undefined);
   }
 
   let handle: string | undefined;
@@ -229,6 +323,7 @@ function normalise(args: MeetArgs): Result<Said> {
 
   return ok({
     source,
+    untrusted,
     kind,
     keys,
     ...(name === undefined ? {} : { name }),
@@ -299,10 +394,14 @@ export function meet(deps: PeopleDeps, args: MeetArgs): Result<Met> {
   return toOrg ? meetOrg(deps, s, s.kind === 'person') : meetPerson(deps, list!, s);
 }
 
-/** The dated line a meeting leaves, and the day it is. */
+/**
+ * The dated line a meeting leaves, and the day it is. A meeting said to be untrusted whose source does not say so is
+ * kept as `arrived in …`, so the line still tells `vouched` what it was when the flag is long gone.
+ */
 const lineOf = (deps: PeopleDeps, s: Said): { day: string; line: string } => {
   const day = instant(deps.nowMs).slice(0, 10);
-  return { day, line: `${day} · ${s.source}` };
+  const said = s.untrusted && !ARRIVED.test(s.source) ? clip(`arrived in ${s.source}`) : s.source;
+  return { day, line: `${day} · ${said}` };
 };
 
 function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said): Result<Met> {
@@ -319,10 +418,16 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   }
 
   const found = holders(deps.sql, list.register, keys);
+  const hit = found[0] ? rowById(deps.sql, found[0].id) : null;
+  /* AN ARRIVAL NOBODY ANSWERS TO THAT LOOKS LIKE SOMEBODY KNOWN (H1): `From: "Rohan Mehta" <rohanmehta@evil.test>`
+     made a row the strong rules folded into the real Rohan, and his keys then answered for whoever sent it. */
+  if (!hit && s.untrusted) {
+    const offered = offerArrival(deps, list, s, keys, project);
+    if (offered !== null) return offered;
+  }
   const org = orgFor(deps, s, keys);
   let written: Result<Row>;
   let linked = false;
-  const hit = found[0] ? rowById(deps.sql, found[0].id) : null;
   if (hit) {
     const f = hit.fields;
     const patch: Record<string, unknown> = { [at.met]: metLines(listOf(f[at.met]), [line]) };
@@ -334,18 +439,21 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
       }
     }
     if (at.in_touch !== undefined && later(day, f[at.in_touch]) === day) patch[at.in_touch] = day;
-    Object.assign(patch, carryKeys(deps, list, hit, s, keys));
-    if (s.name !== undefined && typeof f[at.name] !== 'string') patch[at.name] = s.name;
-    if (at.org !== undefined && org !== null && textOf(f[at.org]) === undefined) patch[at.org] = org;
+    /* AN EXACT KEY MATCH FROM TEXT ANYBODY COULD HAVE WRITTEN ADDS ITS LINE AND NOTHING ELSE: no key, no name, no
+       organisation, since the rest of what it says is only as true as whoever wrote it. */
+    if (!s.untrusted) {
+      Object.assign(patch, carryKeys(deps, list, hit, s, keys));
+      if (s.name !== undefined && typeof f[at.name] !== 'string') patch[at.name] = s.name;
+      if (at.org !== undefined && org !== null && textOf(f[at.org]) === undefined) patch[at.org] = org;
+      const alias = aliasOf(list, hit, s.name, keys);
+      if (alias !== null) patch[at.aliases!] = [...listOf(f[at.aliases!]), alias];
+    }
     written = deps.write(list.register, hit.id, patch, { version: hit.version });
   } else {
     linked = project !== null;
-    const login = keys.find((k) => kindOfKey(k) === 'github');
-    const local = s.email?.split('@')[0];
-    const name = s.name ?? (login === undefined ? local : valueOfKey(login)) ?? valueOfKey(keys[0]!);
     const placed = placeKeys(list, keys, s);
     written = deps.write(list.register, null, {
-      [at.name]: name,
+      [at.name]: s.name ?? nameFromKeys(keys),
       ...placed,
       ...(project === null || at.projects === undefined ? {} : { [at.projects]: [project] }),
       ...(at.in_touch === undefined ? {} : { [at.in_touch]: day }),
@@ -360,10 +468,14 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   /* THE MEETING BRIDGED TWO PEOPLE THE RECORD HELD APART: one key was one row's and another key another's. Never
      joined on its own, since one wrong key would fold two people; asked. */
   const bridged = found.slice(1).map((h) => rowById(deps.sql, h.id)).filter((r): r is Row => r !== null);
-  const settled = settle(deps, list, person, bridged);
+  const settled = settle(deps, list, person, bridged, !s.untrusted);
   if (!settled.ok) return settled as Result<Met>;
-  const { kept, undo, question } = settled.value;
-  const final = kept ?? person;
+  const { kept, undo, question, touched } = settled.value;
+  /* EVERY QUESTION NAMING SOMEBODY THIS MEETING MOVED IS BROUGHT UP TO THEM, so a later commit of the same person never
+     leaves the owner a question he cannot accept. */
+  const fresh = reask(deps, list, [person.id, ...touched]);
+  if (!fresh.ok) return fresh as Result<Met>;
+  const final = kept ?? rowById(deps.sql, person.id) ?? person;
   return ok({
     row: metRow(deps, list.register, final),
     created: !hit && kept === null,
@@ -377,6 +489,34 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   });
 }
 
+/**
+ * The name a person met with no name is added under: their login, or their address's local part, never the whole
+ * address (M1). A key that is neither is said by its kind and its last characters, and still names nobody else.
+ */
+function nameFromKeys(keys: readonly string[]): string {
+  const login = keys.find((k) => kindOfKey(k) === 'github');
+  if (login !== undefined) return valueOfKey(login);
+  const mail = keys.find((k) => kindOfKey(k) === 'email');
+  if (mail !== undefined) return valueOfKey(mail).split('@')[0]!;
+  const first = keys[0]!;
+  const value = valueOfKey(first);
+  return kindOfKey(first) === 'phone' ? `a phone number ending ${value.slice(-4)}` : value;
+}
+
+/**
+ * The other name a person was just met under, worth keeping as an alias, or `null`: one the row does not already go by,
+ * and not merely the handle it was met with (`rohanmeduri` beside `rohanmeduri@…` says nothing new).
+ */
+function aliasOf(list: DeclaredList<MeetsFields>, row: Row, name: string | undefined, keys: readonly string[]): string | null {
+  const at = list.fields;
+  if (at.aliases === undefined || name === undefined) return null;
+  const said = nameKey(name);
+  if (said === '' || namesOf(list, row).includes(said)) return null;
+  if (listOf(row.fields[at.aliases]).length >= ALIASES_MOST) return null;
+  const handles = new Set([...stemsOf(list, row), ...keys.map((k) => stem(valueOfKey(k).split('@')[0]!))]);
+  return said.includes(' ') || !handles.has(stem(compact(said))) ? name : null;
+}
+
 const metRow = (deps: PeopleDeps, register: string, row: Row): MetRow => ({
   register,
   id: row.id,
@@ -388,7 +528,7 @@ const metRow = (deps: PeopleDeps, register: string, row: Row): MetRow => ({
  * Where a new person's keys go: the email field takes a real mailbox, `handles` takes logins, and `keys` the rest. A
  * key the list has nowhere for is not written, and the person simply does not answer to it.
  */
-function placeKeys(list: DeclaredList<MeetsFields>, keys: readonly string[], s: Said): Record<string, unknown> {
+function placeKeys(list: DeclaredList<MeetsFields>, keys: readonly string[], s: { email?: string }): Record<string, unknown> {
   const at = list.fields;
   const out: Record<string, unknown> = {};
   const emailKey = keys.find((k) => kindOfKey(k) === 'email');
@@ -404,7 +544,14 @@ function placeKeys(list: DeclaredList<MeetsFields>, keys: readonly string[], s: 
 }
 
 /** What a matched person gains of the keys this meeting carried, in the fields it already has. Nothing is replaced. */
-function carryKeys(deps: PeopleDeps, list: DeclaredList<MeetsFields>, row: Row, s: Said, keys: readonly string[]): Record<string, unknown> {
+const carryKeys = (deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, row: Row, s: { email?: string }, keys: readonly string[]): Record<string, unknown> =>
+  keysPatch(deps, list, row, keys, s);
+
+/**
+ * The patch that gives a person the keys they lack, each in the field it belongs in, the address as it was said when
+ * there is one (`s.email`). Only a key nobody else answers to, so it is also what an offer of a new address writes.
+ */
+function keysPatch(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, row: Row, keys: readonly string[], s: { email?: string }): Record<string, unknown> {
   const at = list.fields;
   const f = row.fields;
   const has = new Set(keysOf({ email: textOf(f[at.email]), handles: at.handles === undefined ? [] : listOf(f[at.handles]), keys: at.keys === undefined ? [] : listOf(f[at.keys]) }));
@@ -434,7 +581,7 @@ function orgFor(deps: PeopleDeps, s: Said, keys: readonly string[]): string | nu
   const orgs = deps.orgs;
   if (!orgs || deps.list?.fields.org === undefined) return null;
   if (s.domain !== undefined || s.org !== undefined) {
-    const met = meetOrg(deps, { kind: 'organisation', keys: [], source: s.source, ...(s.org === undefined ? {} : { name: s.org }), ...(s.domain === undefined ? {} : { domain: s.domain }) }, false);
+    const met = meetOrg(deps, { kind: 'organisation', keys: [], source: s.source, untrusted: s.untrusted, ...(s.org === undefined ? {} : { name: s.org }), ...(s.domain === undefined ? {} : { domain: s.domain }) }, false);
     if (met.ok && met.value.row) return met.value.row.id;
   }
   const mail = keys.find((k) => kindOfKey(k) === 'email');
@@ -586,111 +733,187 @@ function identity(list: DeclaredList<MeetsFields>, row: Row): { emails: { local:
   };
 }
 
-const nameOfRow = (list: DeclaredList<MeetsFields>, row: Row): string => textOf(row.fields[list.fields.name]) ?? '';
+/** A person's name as a sentence says it: an address an older record kept in it is left out (M1). */
+const nameOfRow = (list: DeclaredList<MeetsFields>, row: Row): string => nameOnly(textOf(row.fields[list.fields.name])) ?? '';
+
+/** Every name a person goes by, as two names compare: theirs, then each alias. */
+function namesOf(list: DeclaredList<MeetsFields>, row: Row): string[] {
+  const at = list.fields;
+  const said = [textOf(row.fields[at.name]), ...(at.aliases === undefined ? [] : listOf(row.fields[at.aliases]))];
+  return [...new Set(said.map(nameOnly).filter((n): n is string => n !== undefined).map(nameKey).filter((n) => n !== ''))];
+}
+
+/** A person's handles as stems, those long enough to say who they are: each address's local part, and each login. */
+function stemsOf(list: DeclaredList<MeetsFields>, row: Row): Set<string> {
+  const i = identity(list, row);
+  return new Set([...i.emails.map((e) => e.local), ...i.logins].map(stem).filter((s) => s.length >= STEM_LEAST));
+}
 
 /**
- * Whether the strong rules say two people are one: the same name of two or more words, and the same email local part
- * of five or more characters, or a login equal to the other's local part, or the same organisation (by a domain that
- * is not a public mail host, or by the org they are linked to).
+ * Whether somebody was ever met other than in text anybody could have written: one met at least once in a commit, a
+ * call or a note, or a row an arrival did not make (one a person typed keeps its word after their mail is read). A row
+ * an arrival made and only arrivals met since is never folded on the strong rules, so a forged sender who came first
+ * cannot take in the real person who comes after (H1).
+ */
+function vouched(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, row: Row): boolean {
+  const lines = listOf(row.fields[list.fields.met]);
+  if (lines.some((l) => !ARRIVED.test(sourceOfLine(l)))) return true;
+  /* WHAT THE ROW WAS MADE WITH, from its create line in the log: the fields whole. One that cannot be read vouches only
+     for a row nobody met. */
+  const made = deps.sql.one<{ to_v: string | null }>("SELECT to_v FROM event WHERE target = ? AND kind = 'create' ORDER BY rowid LIMIT 1", `entry:${row.id}`)?.to_v;
+  try {
+    return !listOf((JSON.parse(made ?? '') as Record<string, unknown>)[list.fields.met]).some((l) => ARRIVED.test(sourceOfLine(l)));
+  } catch {
+    return lines.length === 0;
+  }
+}
+
+/**
+ * Whether the strong rules say two people are one: a name of two or more words they both go by, and a handle of five
+ * or more characters they both hold (`stem`). A login equal to the other's local part is such a handle.
+ *
+ * THE SAME ORGANISATION IS NOT EVIDENCE OF THE SAME PERSON (M4). Two colleagues called Ahmed Hassan share a domain and a
+ * linked company and nothing else; that is a question, and `similar` asks it.
  */
 function strong(list: DeclaredList<MeetsFields>, a: Row, b: Row): boolean {
-  const name = nameKey(nameOfRow(list, a));
-  if (name === '' || name.split(' ').length < 2 || name !== nameKey(nameOfRow(list, b))) return false;
-  const x = identity(list, a);
-  const y = identity(list, b);
-  const locals = (i: typeof x) => new Set(i.emails.map((e) => e.local).filter((l) => l.length >= 5));
-  const [lx, ly] = [locals(x), locals(y)];
-  if ([...lx].some((l) => ly.has(l))) return true;
-  if (x.logins.some((l) => ly.has(l)) || y.logins.some((l) => lx.has(l))) return true;
-  const domains = (i: typeof x) => new Set(i.emails.map((e) => e.domain).filter((d) => !isPublicMail(d)));
-  const dy = domains(y);
-  if ([...domains(x)].some((d) => dy.has(d))) return true;
-  return x.org !== null && x.org === y.org;
+  const theirs = new Set(namesOf(list, b).filter((n) => n.includes(' ')));
+  if (!namesOf(list, a).some((n) => n.includes(' ') && theirs.has(n))) return false;
+  const held = stemsOf(list, b);
+  return [...stemsOf(list, a)].some((s) => held.has(s));
 }
 
 /**
- * Whether two people may be one, worth a question: the same name, or one name the other's initial ("Ahmed H." and
- * "Sam Avery"), or one's login or local part spelling the other's name ("rohanmehta" and "Rohan Mehta").
+ * Whether two names may be one person's: the same, the same run together, one the other's handle form (`farahq` and
+ * Farah Qureshi), or the same first and last word with an initial or a middle name between ("Ahmed H." and "Ahmed
+ * Avery", "Anand K Murthy" and "Anand Murthy").
  */
-function similar(list: DeclaredList<MeetsFields>, a: Row, b: Row): boolean {
-  const [na, nb] = [nameKey(nameOfRow(list, a)), nameKey(nameOfRow(list, b))];
-  if (na === '' || nb === '') return false;
-  if (na === nb) return true;
-  const [ca, cb] = [compact(na), compact(nb)];
-  if (ca.length >= 5 && ca === cb) return true;
-  const spelled = (row: Row) => {
-    const i = identity(list, row);
-    return new Set([...i.logins, ...i.emails.map((e) => e.local)].map((s) => s.replace(/[^a-z0-9]/g, '')).filter((s) => s.length >= 5));
-  };
-  if ((cb.length >= 5 && spelled(a).has(cb)) || (ca.length >= 5 && spelled(b).has(ca))) return true;
-  const [ta, tb] = [na.split(' '), nb.split(' ')];
-  if (ta.length < 2 || tb.length < 2 || ta[0] !== tb[0] || ta[0]!.length < 2) return false;
-  const [sa, sb] = [ta[1]!.replace(/\.$/, ''), tb[1]!.replace(/\.$/, '')];
-  return (sa.length === 1 && sb.startsWith(sa)) || (sb.length === 1 && sa.startsWith(sb));
+function alike(x: string, y: string): boolean {
+  if (x === y) return true;
+  const [cx, cy] = [compact(x), compact(y)];
+  if (cx.length >= STEM_LEAST && cx === cy) return true;
+  const [tx, ty] = [x.split(' '), y.split(' ')];
+  if (tx.length === 1 && shortForms(y).includes(cx)) return true;
+  if (ty.length === 1 && shortForms(x).includes(cy)) return true;
+  if (tx.length < 2 || ty.length < 2 || tx[0] !== ty[0] || tx[0]!.length < 2) return false;
+  const [lx, ly] = [tx.at(-1)!.replace(/\.$/, ''), ty.at(-1)!.replace(/\.$/, '')];
+  return lx === ly || (lx.length === 1 && ly.startsWith(lx)) || (ly.length === 1 && lx.startsWith(ly));
 }
 
-/** The live people who may be this one, oldest first: a narrow read in SQL, then `similar`. */
-function candidates(deps: PeopleDeps, list: DeclaredList<MeetsFields>, person: Row): Row[] {
-  const at = list.fields;
-  const name = nameKey(nameOfRow(list, person));
-  if (name === '') return [];
-  const first = name.split(' ')[0]!.replace(/[%_\\]/g, '');
-  const spelled = [compact(name), ...identity(list, person).logins, ...identity(list, person).emails.map((e) => e.local)].filter((s) => s.length >= 5);
-  const byKey = spelled.length === 0
-    ? []
-    : deps.sql
-        .all<{ row_id: string }>(
-          `SELECT DISTINCT row_id FROM entity_key WHERE register = ? AND row_id <> ? AND (${spelled.map(() => "key = 'github:' || ? OR key LIKE 'email:' || ? || '@%'").join(' OR ')})`,
-          list.register,
-          person.id,
-          ...spelled.flatMap((s) => [s, s]),
-        )
-        .map((r) => r.row_id);
-  const rows = deps.sql
-    .all<{ id: string; seq: number | null; version: number; fields: string }>(
-      `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} AND id <> ? AND (lower(json_extract(fields, ?)) LIKE ? OR replace(lower(json_extract(fields, ?)), ' ', '') IN (${spelled.length === 0 ? "''" : spelled.map(() => '?').join(', ')}) OR id IN (${byKey.length === 0 ? "''" : byKey.map(() => '?').join(', ')})) ORDER BY seq`,
-      ...live(list.register, at.merged_into),
-      person.id,
-      path(at.name),
-      `${first}%`,
-      path(at.name),
-      ...spelled,
-      ...byKey,
-    )
-    .map(hydrate);
-  return rows.filter((r) => similar(list, person, r));
+/**
+ * Whether two people may be one, worth a question: names that are `alike`, by name or alias; one handle held by both
+ * under two names; or one's handle spelling the other's name, whole or in its short form ("rohanmehta" and Rohan
+ * Mehta, "karimassaf91" and Karim Assaf).
+ */
+function similar(list: DeclaredList<MeetsFields>, a: Row, b: Row): boolean {
+  const [xs, ys] = [namesOf(list, a), namesOf(list, b)];
+  const [sa, sb] = [stemsOf(list, a), stemsOf(list, b)];
+  if ([...sa].some((s) => sb.has(s))) return true;
+  if (xs.some((x) => ys.some((y) => alike(x, y)))) return true;
+  const spells = (stems: Set<string>, names: readonly string[]): boolean =>
+    names.some((n) => {
+      const run = stem(compact(n));
+      return (run.length >= STEM_LEAST && stems.has(run)) || shortForms(n).some((f) => stems.has(f));
+    });
+  return spells(sa, ys) || spells(sb, xs);
 }
+
+/** A text as `candidates` searches a row's fields for it: lower case, with no spaces, dots, dashes or underscores. */
+const folded = (text: string): string => text.toLowerCase().replace(/[\s._-]/g, '');
+
+/**
+ * The live people who may be this one, oldest first: a narrow read in SQL for the words, run-together names and handles
+ * that `similar` could match on, then `similar` itself.
+ */
+function candidates(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, person: Row): Row[] {
+  const probes = new Set<string>();
+  for (const name of namesOf(list, person)) {
+    const words = name.split(' ').map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter((w) => w.length >= 3);
+    for (const w of words) probes.add(folded(w));
+    const run = compact(name);
+    /* A ONE-WORD NAME MAY BE A SHORT FORM: `farahq` is found by `farah`, and `tlindqvist` by `lindqvist`. */
+    if (words.length === 1 && run.length >= STEM_LEAST) {
+      probes.add(run.slice(0, -1));
+      probes.add(run.slice(1));
+    }
+    for (const f of shortForms(name)) probes.add(f);
+  }
+  for (const s of stemsOf(list, person)) probes.add(s);
+  const like = [...probes].filter((p) => p.length >= 3);
+  if (like.length === 0) return [];
+  const searched = "replace(replace(replace(replace(lower(fields), ' ', ''), '.', ''), '-', ''), '_', '')";
+  return deps.sql
+    .all<{ id: string; seq: number | null; version: number; fields: string }>(
+      `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} AND id <> ? AND (${like.map(() => `instr(${searched}, ?) > 0`).join(' OR ')}) ORDER BY seq`,
+      ...live(list.register, list.fields.merged_into),
+      person.id,
+      ...like,
+    )
+    .map(hydrate)
+    .filter((r) => similar(list, person, r));
+}
+
+/** What `settle` did: the row a strong rule folded this meeting into, the batch that undoes it, the question, the rows moved. */
+type Settled = { kept: Row | null; undo: string | null; question: string | null; touched: string[] };
 
 /**
  * After a person is met: fold them into the one the strong rules say they are, or ask once about the doubtful rest.
  *
- * `bridged` ARE ROWS THIS MEETING'S OWN KEYS FOUND BESIDE THE ONE IT MATCHED, always asked, never folded.
+ * `bridged` ARE ROWS THIS MEETING'S OWN KEYS FOUND BESIDE THE ONE IT MATCHED, always asked, never folded. `trusted` is
+ * false for text anybody could have written, which folds nothing (H1).
+ *
+ * A FOLD MAY MAKE THE KEPT ROW ONE ANOTHER ROW'S STRONG MATCH (it now holds the fold's handle), so the rules run again on
+ * it, a few times at most, all in one batch, so one Undo takes back everything this meeting folded.
  */
-function settle(deps: PeopleDeps, list: DeclaredList<MeetsFields>, person: Row, bridged: Row[]): Result<{ kept: Row | null; undo: string | null; question: string | null }> {
-  const fresh = rowById(deps.sql, person.id) ?? person;
-  const others = [...bridged, ...candidates(deps, list, fresh).filter((c) => !bridged.some((b) => b.id === c.id))];
+function settle(deps: PeopleDeps, list: DeclaredList<MeetsFields>, person: Row, bridged: Row[], trusted: boolean): Result<Settled> {
   const mine = (r: Row) => deps.othersRow?.(r.id) === true;
-  const doubtful: Row[] = [];
-  for (const other of others) {
-    if (mine(other) || mine(fresh)) continue;
-    if (refused(deps, list, fresh, other)) continue;
-    const bridge = bridged.some((b) => b.id === other.id);
-    if (!bridge && strong(list, fresh, other) && !(deps.moneyAt?.(fresh.id) && deps.moneyAt?.(other.id))) {
-      const [keep, fold] = order(list, fresh, other);
-      const note = `Merged ${deps.titleOf(fold.id) ?? 'a duplicate'} into ${deps.titleOf(keep.id) ?? 'the person already known'}: the same name and the same address or organisation.`;
-      /* A MERGE THE RECORD REFUSES IS ASKED INSTEAD, and its writes taken back: a link that cannot move (a desk only one
-         person may hold) must not stop the meeting itself, on this call and every one after it. */
-      const merged = deps.attempt ? deps.attempt(() => fold_(deps, list, keep, [fold], note)) : fold_(deps, list, keep, [fold], note);
-      if (merged.ok) return ok({ kept: rowById(deps.sql, keep.id), undo: merged.value, question: null });
+  const apart = new Set(bridged.map((b) => b.id));
+  const touched: string[] = [];
+  let fresh = rowById(deps.sql, person.id) ?? person;
+  let batch: string | null = null;
+  for (let hop = 0; trusted && !mine(fresh) && hop < STRONG_HOPS; hop++) {
+    const now = fresh;
+    const other = candidates(deps, list, now).find(
+      (o) =>
+        !apart.has(o.id) &&
+        !mine(o) &&
+        strong(list, now, o) &&
+        vouched(deps, list, now) &&
+        vouched(deps, list, o) &&
+        !(deps.moneyAt?.(now.id) && deps.moneyAt?.(o.id)) &&
+        !refused(deps, list, now, o, false),
+    );
+    if (other === undefined) break;
+    const [keep, fold] = order(list, now, other);
+    const note = `Merged ${deps.titleOf(fold.id) ?? 'a duplicate'} into ${deps.titleOf(keep.id) ?? 'the person already known'}: the same name and the same handle.`;
+    const into: string = batch ?? deps.mint();
+    /* A MERGE THE RECORD REFUSES IS ASKED INSTEAD, and its writes taken back: a link that cannot move (a desk only one
+       person may hold) must not stop the meeting itself, on this call and every one after it. */
+    const merged = deps.attempt ? deps.attempt(() => fold_(deps, list, keep, [fold], note, into)) : fold_(deps, list, keep, [fold], note, into);
+    if (!merged.ok) {
       if (!deps.attempt) return merged as Result<never>;
+      break;
     }
+    batch = into;
+    touched.push(keep.id, fold.id);
+    fresh = rowById(deps.sql, keep.id) ?? keep;
+  }
+
+  const kept = fresh.id === person.id ? null : fresh;
+  const seen = new Set([fresh.id]);
+  const doubtful: Row[] = [];
+  for (const other of [...bridged, ...candidates(deps, list, fresh)]) {
+    if (seen.has(other.id)) continue;
+    seen.add(other.id);
+    if (mine(other) || mine(fresh)) continue;
+    /* ASKED ALREADY, OR SAID NO TO: a question waiting on both is the question, and is kept current, not opened again. */
+    if (refused(deps, list, fresh, other)) continue;
     /* NOT BESIDE ONE HE SAID IS SOMEBODY ELSE: a question about three, two of whom he kept apart, would fold them. */
-    if (doubtful.some((d) => refused(deps, list, d, other))) continue;
+    if (doubtful.some((d) => refused(deps, list, d, other, false))) continue;
     doubtful.push(other);
   }
-  if (doubtful.length === 0) return ok({ kept: null, undo: null, question: null });
-  const asked = askCluster(deps, list, [fresh, ...doubtful]);
-  return asked.ok ? ok({ kept: null, undo: null, question: asked.value }) : (asked as Result<never>);
+  if (doubtful.length === 0) return ok({ kept, undo: batch, question: null, touched });
+  const asked = askOrExtend(deps, list, [fresh, ...doubtful]);
+  return asked.ok ? ok({ kept, undo: batch, question: asked.value, touched }) : (asked as Result<never>);
 }
 
 /** Which of two is kept: the record's own person always, then the older. */
@@ -704,7 +927,7 @@ function order(list: DeclaredList<MeetsFields>, a: Row, b: Row): [Row, Row] {
 /**
  * What the kept row gains from the folded ones (H2): every field it leaves empty, filled from the first fold that has
  * it; every list joined; the later day in touch; and each fold's address, kept as a key when the kept row has its own.
- * A fold's other name joins `aliases`.
+ * A fold's other name joins `aliases`, once, and never the kept row's own name again.
  */
 function carried(list: DeclaredList<MeetsFields>, keep: Row, folds: readonly Row[]): Record<string, unknown> {
   const at = list.fields;
@@ -734,8 +957,19 @@ function carried(list: DeclaredList<MeetsFields>, keep: Row, folds: readonly Row
       if (key !== null && !listOf(now(into)).includes(key)) patch[into] = [...listOf(now(into)), key];
     }
     const named = textOf(fold.fields[at.name]);
-    if (at.aliases !== undefined && named !== undefined && nameKey(named) !== nameKey(textOf(now(at.name)) ?? '') && !listOf(now(at.aliases)).includes(named))
-      patch[at.aliases] = [...listOf(now(at.aliases)), named];
+    if (at.aliases !== undefined && named !== undefined) patch[at.aliases] = [...listOf(now(at.aliases)), named];
+  }
+  /* ONE OF EACH NAME, NOT THE KEPT ROW'S OWN: three folds called Karim Assaf are one alias, and "kas" beside Kas none. */
+  if (at.aliases !== undefined && at.aliases in patch) {
+    const had = new Set([nameKey(textOf(now(at.name)) ?? '')]);
+    const aliases = listOf(patch[at.aliases]).filter((n) => {
+      const key = nameKey(n);
+      if (key === '' || had.has(key)) return false;
+      had.add(key);
+      return true;
+    });
+    if (same(aliases, keep.fields[at.aliases] ?? [])) delete patch[at.aliases];
+    else patch[at.aliases] = aliases;
   }
   return patch;
 }
@@ -745,8 +979,7 @@ function carried(list: DeclaredList<MeetsFields>, keep: Row, folds: readonly Row
  * kept row first, which moves every row that pointed at it there too (the write path's merge step), then taken out;
  * the kept row gains what they carried last, once the address it may take is free. Answers the batch.
  */
-function fold_(deps: PeopleDeps, list: DeclaredList<MeetsFields>, keep: Row, folds: readonly Row[], note: string): Result<string> {
-  const batch = deps.mint();
+function fold_(deps: PeopleDeps, list: DeclaredList<MeetsFields>, keep: Row, folds: readonly Row[], note: string, batch = deps.mint()): Result<string> {
   const register = list.register;
   for (const fold of folds) {
     const pointed = deps.write(register, fold.id, { [list.fields.merged_into]: keep.id }, { version: fold.version, batch, note });
@@ -764,7 +997,7 @@ function fold_(deps: PeopleDeps, list: DeclaredList<MeetsFields>, keep: Row, fol
 }
 
 /** What a person is known by, for a question: where they were met, how often, what they answer to. Never an id. */
-function evidence(deps: PeopleDeps, list: DeclaredList<MeetsFields>, row: Row): string {
+function evidence(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsFields>, row: Row): string {
   const at = list.fields;
   const said: string[] = [];
   const org = at.org === undefined ? undefined : textOf(row.fields[at.org]);
@@ -789,17 +1022,17 @@ function evidence(deps: PeopleDeps, list: DeclaredList<MeetsFields>, row: Row): 
 const listed = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
 
 /**
- * One question for a cluster of people who may be one, in names and evidence: "Are Rohan Mehta (Encore, met 6 times)
- * and rohanmehta (GitHub) one person?" Accepting it folds every other into the oldest, carrying what they hold.
+ * What a question about a cluster writes when accepted, and what its card reads: every other folded into the one kept
+ * (the record's own person, else the oldest), carrying what they hold, and each of them by name and where seen.
  *
  * THE FOLDS COME FIRST IN THE BODY, the kept row last, so an address moving to the kept row is free by the time it
  * arrives (the email field is unique among live rows).
  */
-function askCluster(deps: PeopleDeps, list: DeclaredList<MeetsFields>, rows: readonly Row[], confidence?: number): Result<string | null> {
+function clusterBody(deps: Pick<PeopleDeps, 'nameOf' | 'titleOf' | 'nowMs'>, list: DeclaredList<MeetsFields>, rows: readonly Row[]): { body: Record<string, unknown>; sorted: Row[]; keep: Row; folds: Row[] } | null {
   const sorted = [...rows].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
   const keep = sorted.reduce((k, r) => order(list, k, r)[0], sorted[0]!);
   const folds = sorted.filter((r) => r.id !== keep.id);
-  if (folds.length === 0) return ok(null);
+  if (folds.length === 0) return null;
   const keepName = deps.nameOf(keep.id);
   const patch = carried(list, keep, folds);
   const body = {
@@ -812,6 +1045,17 @@ function askCluster(deps: PeopleDeps, list: DeclaredList<MeetsFields>, rows: rea
        Yes keeps. The rows above are what accepting writes; this is only what the card reads. */
     candidates: sorted.map((r) => ({ at: deps.nameOf(r.id), name: nameOfRow(list, r) || 'someone unnamed', seen: seenOf(deps, list, r), ...(r.id === keep.id ? { kept: true } : {}) })),
   };
+  return { body, sorted, keep, folds };
+}
+
+/**
+ * One question for a cluster of people who may be one, in names and evidence: "Are Rohan Mehta (Encore, met 6 times)
+ * and rohanmehta (GitHub) one person?" Accepting it folds every other into the one kept, carrying what they hold.
+ */
+function askCluster(deps: PeopleDeps, list: DeclaredList<MeetsFields>, rows: readonly Row[], confidence?: number): Result<string | null> {
+  const drawn = clusterBody(deps, list, rows);
+  if (drawn === null) return ok(null);
+  const { body, sorted, keep, folds } = drawn;
   const named = (r: Row) => `${nameOfRow(list, r) || 'someone unnamed'}${evidence(deps, list, r)}`;
   const one = nameOfRow(list, keep) || 'the first';
   const likely = confidence === undefined ? '' : ' They look likely to be.';
@@ -820,13 +1064,220 @@ function askCluster(deps: PeopleDeps, list: DeclaredList<MeetsFields>, rows: rea
   return opened.ok ? ok(opened.value.id) : (opened as Result<never>);
 }
 
+/* ── the questions waiting on the owner ──────────────────────────────── */
+
+type Hydrated = Row & { deleted: boolean };
+type RawRow = { id: string; seq: number | null; version: number; fields: string; deleted_at: string | null };
+const withDeleted = (r: RawRow): Hydrated => ({ ...hydrate(r), deleted: r.deleted_at !== null });
+
+/** A row of the list by the handle a question names it by (`people#3`), or by its id; deleted ones too. */
+function rowAt(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<MeetsFields>, at: string): Hydrated | null {
+  const seq = /(\d+)$/.exec(at)?.[1];
+  const bySeq = seq === undefined ? undefined : deps.sql.one<RawRow>('SELECT id, seq, version, fields, deleted_at FROM entry WHERE register = ? AND seq = ?', list.register, Number(seq));
+  const r = bySeq !== undefined && deps.nameOf(bySeq.id) === at ? bySeq : deps.sql.one<RawRow>('SELECT id, seq, version, fields, deleted_at FROM entry WHERE register = ? AND id = ?', list.register, at);
+  return r ? withDeleted(r) : null;
+}
+
+/** The live row a row ended in: itself, or the one it was folded into, followed to the end. `null` for one deleted outright. */
+function liveEnd(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<MeetsFields>, start: Hydrated): Row | null {
+  let row = start;
+  for (let hops = 0; hops < FOLD_HOPS; hops++) {
+    const into = textOf(row.fields[list.fields.merged_into]);
+    const next = into === undefined ? null : rowAt(deps, list, into);
+    if (next === null || next.id === row.id) return row.deleted ? null : row;
+    row = next;
+  }
+  return null;
+}
+
+/**
+ * An open question `meet` asked: who it names, as the rows they are now (a folded one by the row it was folded into),
+ * and whether it offers an address to one person (`offer`) or asks about a cluster.
+ */
+type Asked = { id: string; body: Record<string, unknown>; named: string[]; members: Row[]; offer: readonly string[] | null };
+
+function openAsked(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<MeetsFields>): Asked[] {
+  const open = deps.sql.all<{ id: string; body: string }>(
+    "SELECT id, body FROM suggestion WHERE status = 'open' AND body_kind = 'rowset' AND json_extract(body, '$.register') = ? ORDER BY rowid",
+    list.register,
+  );
+  const out: Asked[] = [];
+  for (const q of open) {
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(q.body) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const offer = body.offer !== null && typeof body.offer === 'object' ? listOf((body.offer as { keys?: unknown }).keys) : null;
+    const said =
+      offer !== null
+        ? [String((body.rows as { at?: unknown }[] | undefined)?.[0]?.at ?? '')]
+        : Array.isArray(body.candidates)
+          ? (body.candidates as { at?: unknown }[]).map((c) => String(c?.at ?? ''))
+          : null;
+    /* A ROWSET ANOTHER PART OF THE RECORD FILED ABOUT THIS LIST is not one of these, and is left as it is. */
+    if (said === null) continue;
+    const raws = said.map((at) => rowAt(deps, list, at)).filter((r): r is Hydrated => r !== null);
+    const members: Row[] = [];
+    for (const r of raws) {
+      const end = liveEnd(deps, list, r);
+      if (end !== null && !members.some((m) => m.id === end.id)) members.push(end);
+    }
+    out.push({ id: q.id, body, named: raws.map((r) => r.id), members, offer });
+  }
+  return out;
+}
+
+/** Take a question off the owner's list because the record answered it: they became one, or it joined another. */
+function close(deps: Pick<PeopleDeps, 'sql' | 'nowMs' | 'mint'>, id: string, why: string): void {
+  deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'addressed' WHERE id = ? AND status = 'open'", id);
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, 'system', 'resolve', ?, 'suggestion', 'addressed', ?)",
+    deps.mint(),
+    instant(deps.nowMs),
+    `suggestion:${id}`,
+    why.slice(0, 280),
+  );
+}
+
+/** Write a question's body again, as `ingest.ts` does when one more joins an open question. */
+const rewrite = (deps: Pick<PeopleDeps, 'sql'>, id: string, body: Record<string, unknown>): void =>
+  void deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify(body), id);
+
+/**
+ * Ask about a cluster once: when a question already waits on any of them, the others join it, and nobody he said is
+ * somebody else; otherwise a new one. Answers the question's id, or `null` when nobody new joined one already open.
+ */
+function askOrExtend(deps: PeopleDeps, list: DeclaredList<MeetsFields>, asked: readonly Row[], confidence?: number): Result<string | null> {
+  /* THE CLUSTER, NOT THE PAIR: whoever is like one of them is asked about in the same question. The owner typed in twice
+     ("Kas", and his own row "Kas") is never met again by any key, so asked only about the newcomer, his second row would
+     stay apart for good, and two questions about one person go stale on each other's answer. */
+  const rows = [...asked];
+  for (const r of asked)
+    for (const near of candidates(deps, list, r)) {
+      if (rows.length >= CLUSTER_MOST) break;
+      if (rows.some((x) => x.id === near.id) || deps.othersRow?.(near.id) === true) continue;
+      if (rows.some((x) => refused(deps, list, x, near, false))) continue;
+      rows.push(near);
+    }
+  const ids = new Set(rows.map((r) => r.id));
+  const touching = openAsked(deps, list).filter((q) => q.offer === null && q.members.some((m) => ids.has(m.id)));
+  if (touching.length === 0) return askCluster(deps, list, rows, confidence);
+  const [target, ...rest] = touching as [Asked, ...Asked[]];
+  const members = [...target.members];
+  const joined: Row[] = [];
+  for (const r of [...rows, ...rest.flatMap((q) => q.members)]) {
+    if (members.length >= CLUSTER_MOST) break;
+    if (members.some((m) => m.id === r.id) || deps.othersRow?.(r.id) === true) continue;
+    if (members.some((m) => refused(deps, list, m, r, false))) continue;
+    members.push(r);
+    joined.push(r);
+  }
+  /* ANOTHER QUESTION WHOSE PEOPLE ALL JOINED THIS ONE is answered by it, and is taken off his list. */
+  for (const q of rest) if (q.members.every((m) => members.some((x) => x.id === m.id))) close(deps, q.id, `Asked together with the others who may be the same person, in ${target.id}.`);
+  if (joined.length === 0) return ok(null);
+  const drawn = clusterBody(deps, list, members);
+  if (drawn === null) return ok(null);
+  rewrite(deps, target.id, drawn.body);
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v, note) VALUES (?, ?, 'system', 'suggest', ?, 'suggestion', 'rows', ?, ?, ?)",
+    deps.mint(),
+    instant(deps.nowMs),
+    `suggestion:${target.id}`,
+    String(target.members.length),
+    String(members.length),
+    `${listed(joined.map((r) => nameOfRow(list, r) || 'someone unnamed'))} may be the same person too, and joined this question.`.slice(0, 280),
+  );
+  return ok(target.id);
+}
+
+/**
+ * Bring every open question naming one of these rows up to them: each person as the row they are now, at the version
+ * it is now, with what accepting would carry worked out again. A question whose people became one is taken off the
+ * list; an offer of an address the person now holds, or another took, likewise.
+ *
+ * A QUESTION IS ABOUT WHO SOMEBODY IS, NOT ABOUT THE LINE A COMMIT ADDED. Left at the version it was drawn at, every
+ * later meeting of the same person made it one the owner could not accept, and the person stayed two.
+ */
+function reask(deps: PeopleDeps, list: DeclaredList<MeetsFields>, ids: readonly string[]): Result<null> {
+  const moved = new Set(ids);
+  for (const q of openAsked(deps, list)) {
+    if (!q.named.some((id) => moved.has(id)) && !q.members.some((m) => moved.has(m.id))) continue;
+    if (q.offer !== null) {
+      const row = q.members[0];
+      /* THE ADDRESS AS AN ADDRESS, so a person with none still takes it in the email field, as the offer first said. */
+      const mail = q.offer.find((k) => kindOfKey(k) === 'email');
+      const patch = row === undefined ? {} : keysPatch(deps, list, row, q.offer, mail === undefined ? {} : { email: valueOfKey(mail) });
+      if (row === undefined || Object.keys(patch).length === 0) close(deps, q.id, 'The address it offered is settled.');
+      else rewrite(deps, q.id, { ...q.body, rows: [{ at: deps.nameOf(row.id), version: row.version, patch }] });
+      continue;
+    }
+    const drawn = q.members.length < 2 ? null : clusterBody(deps, list, q.members);
+    if (drawn === null) close(deps, q.id, 'They were found to be one person.');
+    else if (JSON.stringify(drawn.body) !== JSON.stringify(q.body)) rewrite(deps, q.id, drawn.body);
+  }
+  return ok(null);
+}
+
+/**
+ * Somebody met in text anybody could have written, by a key nobody holds, who looks like somebody known (H1). No row is
+ * made and nothing is folded: the sighting is kept as a mention, and when exactly one person is like them, the owner is
+ * asked once whether the new address is theirs. `null` when nobody known is like them, and they are a person of their
+ * own, touching nobody.
+ */
+function offerArrival(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said, keys: readonly string[], project: string | null): Result<Met> | null {
+  const at = list.fields;
+  const name = s.name ?? nameFromKeys(keys);
+  const phantom: Row = { id: '', seq: null, version: 0, fields: { [at.name]: name, ...placeKeys(list, keys, s) } };
+  const near = candidates(deps, list, phantom).filter((r) => deps.othersRow?.(r.id) !== true);
+  if (near.length === 0) return null;
+  noteMention(deps.sql, { name, kind: 'person', project, source: s.source, at: instant(deps.nowMs) });
+  const other = near.length === 1 ? near[0]! : null;
+  const patch = other === null ? {} : keysPatch(deps, list, other, keys, s);
+  if (other === null || Object.keys(patch).length === 0) return ok(mention());
+  /* ONCE: not while another such question waits on this person, and never again for an address offered before. */
+  const spoken = deps.nameOf(other.id);
+  const before = deps.sql.all<{ body: string; status: string }>(
+    "SELECT body, status FROM suggestion WHERE body_kind = 'rowset' AND json_extract(body, '$.register') = ? AND json_type(body, '$.offer') = 'object'",
+    list.register,
+  );
+  for (const { body, status } of before) {
+    try {
+      const b = JSON.parse(body) as { rows?: { at?: unknown }[]; offer?: { keys?: unknown } };
+      if (status === 'open' && b.rows?.[0]?.at === spoken) return ok(mention());
+      if (listOf(b.offer?.keys).some((k) => keys.includes(k))) return ok(mention());
+    } catch {
+      /* a body nobody can read offered nothing */
+    }
+  }
+  const known = nameOfRow(list, other) || 'someone unnamed';
+  const what = keys.some((k) => kindOfKey(k) === 'email') ? 'address' : 'handle';
+  const question = `Is the ${name} met in ${s.source} the ${known} you already know${evidence(deps, list, other)}? Yes adds the new ${what} to ${known}. Nobody new is added either way.`;
+  const offered = keys.filter((k) => holderOf(deps.sql, k) === null);
+  const opened = deps.propose({
+    question,
+    body_kind: 'rowset',
+    body: { register: list.register, rows: [{ at: spoken, version: other.version, patch }], offer: { keys: offered } },
+  });
+  if (!opened.ok) return opened as Result<never>;
+  return ok({ ...mention(), question: opened.value.id, merge: opened.value.id });
+}
+
 /**
  * Whether a pair is settled against merging: a question that named both, answered or not, or a merge of the two that
  * was undone. Asking again on every commit would make the question noise, and an undo is a no.
+ *
+ * `open` false counts only what he answered: a question still waiting is the one a newcomer may join, and a strong rule
+ * may still settle it.
  */
-function refused(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<MeetsFields>, a: Row, b: Row): boolean {
+function refused(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<MeetsFields>, a: Row, b: Row, open = true): boolean {
   const [x, y] = [deps.nameOf(a.id), deps.nameOf(b.id)];
-  const bodies = deps.sql.all<{ body: string }>("SELECT body FROM suggestion WHERE body_kind = 'rowset' AND json_extract(body, '$.register') = ?", list.register);
+  const bodies = deps.sql.all<{ body: string }>(
+    "SELECT body FROM suggestion WHERE body_kind = 'rowset' AND json_extract(body, '$.register') = ? AND (? = 1 OR status <> 'open')",
+    list.register,
+    open ? 1 : 0,
+  );
   const asked = bodies.some(({ body }) => {
     try {
       const rows = (JSON.parse(body) as { rows?: { at?: unknown; patch?: Record<string, unknown> }[] }).rows ?? [];
@@ -898,21 +1349,29 @@ export function resolveJob(deps: Pick<PeopleDeps, 'sql' | 'nowMs' | 'list' | 'na
     )
     .map(hydrate);
   /* BUCKETED, NOT EVERY PAIR: two thousand people are two million pairs, and `similar` only ever says yes to two that
-     share a first word, or where one's name run together is the other's login or local part. So each person is filed
-     under those words, and only people sharing a bucket are compared. */
+     share a first or a last word, a name run together, a handle, or a handle's short form of a name. So each person is
+     filed under those, by every name they go by, and only people sharing a bucket are compared. */
   const buckets = new Map<string, Row[]>();
   const file = (word: string, row: Row): void => {
-    if (word === '') return;
+    if (word.endsWith(':')) return;
     const held = buckets.get(word) ?? [];
     if (!held.includes(row)) buckets.set(word, [...held, row]);
   };
   for (const row of people) {
-    const name = nameKey(nameOfRow(list, row));
-    file(`first:${name.split(' ')[0] ?? ''}`, row);
-    const run = compact(name);
-    if (run.length >= 5) file(`run:${run}`, row);
-    const i = identity(list, row);
-    for (const s of [...i.logins, ...i.emails.map((e) => e.local)].map((x) => x.replace(/[^a-z0-9]/g, ''))) if (s.length >= 5) file(`run:${s}`, row);
+    for (const name of namesOf(list, row)) {
+      const words = name.split(' ');
+      file(`first:${words[0] ?? ''}`, row);
+      if (words.length > 1) file(`last:${words.at(-1)!.replace(/\.$/, '')}`, row);
+      const run = compact(name);
+      if (run.length >= STEM_LEAST) file(`run:${stem(run)}`, row);
+      /* A ONE-WORD NAME MAY BE A SHORT FORM, filed where the long one is: `farahq` with Farah, `tlindqvist` with Lindqvist. */
+      if (words.length === 1 && run.length >= STEM_LEAST) {
+        file(`first:${run.slice(0, -1)}`, row);
+        file(`last:${run.slice(1)}`, row);
+      }
+      for (const f of shortForms(name)) file(`run:${f}`, row);
+    }
+    for (const s of stemsOf(list, row)) file(`run:${s}`, row);
   }
   const job: ResolveJob = { pairs: [], rows: {} };
   const seen = new Set<string>();
@@ -935,6 +1394,7 @@ function sideOf(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsField
   const work = i.emails.find((e) => !isPublicMail(e.domain));
   const local = i.emails[0]?.local ?? i.logins[0];
   return {
+    /* THE NAME WITHOUT ANY ADDRESS AN OLDER RECORD KEPT IN IT (`nameOfRow`), and the places as their domains (M1). */
     name: nameOfRow(list, row),
     kind: 'person',
     ...(work === undefined ? {} : { domain: work.domain }),
@@ -943,14 +1403,17 @@ function sideOf(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsField
   };
 }
 
-/** Where somebody was seen, in at most three plain phrases: their projects by name, then where they were met, newest first. */
+/**
+ * Where somebody was seen, in at most three plain phrases: their projects by name, then where they were met, newest
+ * first. A line kept before sources were cleaned may hold an address, and it is said as its domain (M1).
+ */
 function seenOf(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsFields>, row: Row): string[] {
   const at = list.fields;
   const seen = [
     ...(at.projects === undefined ? [] : listOf(row.fields[at.projects]).map((p) => deps.titleOf(p)).filter((t): t is string => t !== null)),
-    ...listOf(row.fields[at.met]).map((l) => l.slice(l.indexOf(' · ') + 3)).reverse(),
+    ...listOf(row.fields[at.met]).map((l) => clip(unaddressed(sourceOfLine(l)))).reverse(),
   ];
-  return [...new Set(seen)].slice(0, 3);
+  return [...new Set(seen.filter((t) => t !== ''))].slice(0, 3);
 }
 
 /**
@@ -1000,7 +1463,7 @@ export function fileVerdicts(deps: PeopleDeps, payload: string, result: unknown)
     if (!pair || v.same !== true || confidence < 0.6) continue;
     const [a, b] = [rowById(deps.sql, pair[0]), rowById(deps.sql, pair[1])];
     if (!a || !b || deps.othersRow?.(a.id) === true || deps.othersRow?.(b.id) === true || refused(deps, list, a, b)) continue;
-    const asked = askCluster(deps, list, [a, b], confidence);
+    const asked = askOrExtend(deps, list, [a, b], confidence);
     if (!asked.ok) return asked as Result<never>;
     if (asked.value !== null) opened.push(asked.value);
   }

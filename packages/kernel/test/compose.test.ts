@@ -301,3 +301,66 @@ test('A STORED LOOK IS READ FORGIVINGLY: what still reads is kept and the rest d
     order: ['ka'],
   });
 });
+
+/* ── the edges audit 17 found (L1) ───────────────────────────────────────── */
+
+test('A LEAD NEVER PUSHES A PINNED BLOCK DOWN: with one between it and the top it stays, and is not said to lead', () => {
+  const blocks = keyed(
+    block({ kind: 'note', lead: true, body: 'Your desk' }),
+    block({ kind: 'table', source: 'register.notes', heading: 'Notes', rows: [row('notes', 1, { name: 'x' })], matched: 1 }),
+    block({ kind: 'table', source: 'register.tasks', heading: 'Now', rows: [row('tasks', 7, { what: 'Pay HSBC', by: '2026-10-03' })], matched: 1 }),
+  );
+  const [line, notes, now] = keysOf(blocks);
+  /* WHOEVER NAMED THE LEAD: a stored look that pins nothing moves it, and one that pins the block above does not. */
+  assert.deepEqual(keysOf(applyLook(blocks, { look: 'desk', basis: 'x', by: 'slash', lead: now! }).blocks), [line, now, notes]);
+  const owner = applyLook(blocks, { look: 'desk', basis: 'x', by: 'owner', lead: now!, pinned: [notes!] });
+  assert.deepEqual(keysOf(owner.blocks), keysOf(blocks), 'the pinned Notes keeps its place');
+  assert.equal(owner.look.lead, undefined);
+  /* AND THE ENGINE'S LEAD UNDER HIS PINS, once merged, does the same. */
+  const merged = mergeLook({ look: 'desk', basis: 'x', by: 'owner', pinned: [notes!] }, { look: 'desk', basis: 'r', by: 'rule', lead: now! });
+  assert.deepEqual(keysOf(applyLook(blocks, merged).blocks), keysOf(blocks));
+  /* A PIN IN THE RAIL IS NOT IN THE WAY: the main column's blocks are what move. */
+  const railed = keyed(
+    block({ kind: 'table', source: 'register.notes', heading: 'Notes', rows: [row('notes', 1, { name: 'x' })], matched: 1 }),
+    block({ kind: 'stat', heading: 'Cash', area: 'rail', readings: [{ metric: 'cash', reading: { value: 1 } as never }] }),
+    block({ kind: 'table', source: 'register.tasks', heading: 'Now', rows: [row('tasks', 7, { what: 'Pay HSBC', by: '2026-10-03' })], matched: 1 }),
+  );
+  const r = keysOf(railed);
+  const led = applyLook(railed, { look: 'desk', basis: 'x', by: 'owner', lead: r[2]!, pinned: [r[1]!] });
+  assert.deepEqual(keysOf(led.blocks), [r[2], r[0], r[1]]);
+  assert.equal(led.look.lead, r[2]);
+});
+
+test('THE NEXT STEP IS A ROW STILL DRAWN AFTER THE HIDE: a look that hides the block holding it says no next', () => {
+  const blocks = keyed(
+    block({ kind: 'table', source: 'register.tasks', heading: 'Now', rows: [row('tasks', 1, { what: 'Write' })], matched: 1 }),
+    block({ kind: 'table', source: 'register.tasks', heading: 'Later', rows: [row('tasks', 2, { what: 'Call Sam' })], matched: 1 }),
+  );
+  const [now, later] = keysOf(blocks);
+  const hid = applyLook(blocks, { look: 'desk', basis: 'x', by: 'slash', hide: [now!], next: { row: 'tasks#1', text: 'Write' } });
+  assert.deepEqual(hid.look.hide, [now]);
+  assert.equal(hid.look.next, undefined, 'tasks#1 is in the block the look hid');
+  const kept = applyLook(blocks, { look: 'desk', basis: 'x', by: 'slash', hide: [now!], next: { row: 'tasks#2', text: 'Call Sam' } });
+  assert.deepEqual(kept.look.next, { row: 'tasks#2', text: 'Call Sam' });
+  /* A ROW IN A BLOCK HELD FROM THE READER IS NOT ONE SHE CAN TAKE EITHER. */
+  const held = keyed(block({ kind: 'table', heading: 'Now', rows: [row('tasks', 1, { what: 'Write' })], refusals: [{ code: 'FORBIDDEN', fix: 'x' }] }));
+  assert.equal(applyLook(held, { look: 'desk', basis: 'x', by: 'slash', next: { row: 'tasks#1', text: 'Write' } }).look.next, undefined);
+  assert.equal(later, keysOf(blocks)[1]);
+});
+
+test('AN ORDER STAYS UNDER ITS HEADINGS: a block named across two groups keeps its own, and a heading is never moved', () => {
+  const blocks = keyed(
+    block({ kind: 'section', heading: 'Today' }),
+    block({ kind: 'table', source: 'register.a', heading: 'A', rows: [row('a', 1, { n: 1 })], matched: 1 }),
+    block({ kind: 'table', source: 'register.b', heading: 'B', rows: [row('b', 1, { n: 1 })], matched: 1 }),
+    block({ kind: 'section', heading: 'Bills' }),
+    block({ kind: 'table', source: 'register.c', heading: 'C', rows: [row('c', 1, { n: 1 })], matched: 1 }),
+  );
+  const [today, a, b, bills, c] = keysOf(blocks);
+  /* C NAMED FIRST WOULD HAVE TAKEN A'S PLACE UNDER "Today", and A gone under "Bills". */
+  assert.deepEqual(keysOf(applyLook(blocks, { look: 'desk', basis: 'x', by: 'slash', order: [c!, b!, a!] }).blocks), [today, b, a, bills, c]);
+  assert.deepEqual(keysOf(applyLook(blocks, { look: 'desk', basis: 'x', by: 'owner', order: [c!, a!] }).blocks), keysOf(blocks));
+  const headed = applyLook(blocks, { look: 'desk', basis: 'x', by: 'owner', order: [bills!, today!, c!] });
+  assert.deepEqual(keysOf(headed.blocks), keysOf(blocks), 'a heading is no block an order moves');
+  assert.deepEqual(headed.look.order, [c]);
+});

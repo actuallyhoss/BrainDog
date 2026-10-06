@@ -31,6 +31,7 @@ import { kindModule } from './kinds/index.ts';
 import { fileLists } from './kinds/gallery.ts';
 import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import { BODY_KINDS, type Shows } from './govern.ts';
+import { CARD_FOLD, CARD_FOLD_MOST, CARD_GROUP_KEYS } from './declare.ts';
 import type { Json } from './coerce.ts';
 import type { Part, Rate } from './fx.ts';
 import type { Entry } from './index.ts';
@@ -86,8 +87,16 @@ export type PageBlock = {
   who?: boolean;
   /** A `section`'s: the blocks after it, up to the next section, drawn on one surface. */
   box?: boolean;
-  /** A `section`'s: whether it starts shut. */
-  fold?: boolean;
+  /**
+   * A `section`'s: whether it starts shut. A grouped `cards` block's: how many cards each group shows before the rest
+   * fold, `CARD_FOLD` when it does not say (answered either way).
+   */
+  fold?: boolean | number;
+  /**
+   * A `cards` block's: a link field of its list, which draws the cards in groups, one a row it points at, named by that
+   * row's title. Each answered row says its group (`PageRow.group`), in the order the rows were read.
+   */
+  group?: string;
   /** Any block's: the glyph in the well beside its heading. */
   icon?: string;
   /**
@@ -641,6 +650,13 @@ export type PageDeps = {
    * (`composeLook`) when it has none, and the answer says which in `look`. Absent, a page reads as declared.
    */
   look?: (page: string) => unknown;
+  /**
+   * WHO IS READING, for the look: each block as this reader may be shown it (whole, or held back with the sentence that
+   * says why), and their own read mark. A host that hands this has the page's blocks held BEFORE its look is composed
+   * and laid, so the rules weigh only what the reader may see, and a look Slash wrote from blocks she is held from is
+   * not laid for her (`lookedAt`). The answer carries the held blocks. Absent, every block is read as the record's.
+   */
+  reader?: { hold: (block: BlockResult) => BlockResult; seen?: string | null };
 };
 
 /**
@@ -1063,7 +1079,9 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
     const drawn = astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
     return added === undefined ? drawn : { ...drawn, added };
   });
-  const looked = lookedAt(deps, found.decl.page, blocks);
+  /* HELD BEFORE THE LOOK IS COMPOSED, so the look is the one this reader's page answers and not the record's (`heldFor`). */
+  const shown = deps.reader ? heldFor(blocks, deps.reader.hold) : null;
+  const looked = lookedAt(deps, found.decl.page, shown?.blocks ?? blocks, shown);
   return ok({
     ...found.decl,
     page: found.slug,
@@ -1075,7 +1093,7 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
        because the page is in hand here; the word itself was checked with the block (`kinds/words.ts` `panelFault`). */
     /* AND WHAT OTHER PACKS ADD TO IT, laid among its own blocks as it is read and never written into its declaration
        (`page-adds.ts`). A page made from a template fills each addition from its row, as `resolvePages` filled its own. */
-    blocks: headlineHeld(emptyBoxesShut(looked?.blocks ?? blocks)),
+    blocks: headlineHeld(emptyBoxesShut(looked?.blocks ?? shown?.blocks ?? blocks)),
     ...(filters ? { filters: filters.answer } : {}),
     ...(looked ? { look: looked.look } : {}),
   });
@@ -1085,24 +1103,76 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
  * THE PAGE UNDER ITS LOOK (DIRECTION §38), or `null` when the host reads no looks.
  *
  * The stored look wins as it is, unless it is the owner's: then the rules fill what he left unset, never over what he
- * pinned (`mergeLook`). With none stored, the rules' look is the page's. Read after the page's own blocks and its adds,
+ * pinned (`mergeLook`). With none stored, or one Slash wrote from blocks this reader is held from, the rules' look over
+ * what she is shown is the page's. Read after the page's own blocks and its adds,
  * so the look can name either, and before the boxes are shut and the headline is held, so a box the look emptied is
  * shut and a hidden lead note says no line.
  */
-function lookedAt(deps: PageDeps, page: string, blocks: readonly BlockResult[]): { blocks: BlockResult[]; look: LookBody } | null {
+function lookedAt(
+  deps: PageDeps,
+  page: string,
+  blocks: readonly BlockResult[],
+  shown: { rekeyed: ReadonlyMap<string, string>; held: boolean } | null,
+): { blocks: BlockResult[]; look: LookBody } | null {
   if (!deps.look) return null;
-  const stored = lookOf(deps.look(page));
-  if (stored !== null && stored.by !== 'owner') return applyLook(blocks, stored);
+  const stored = rekeyedLook(lookOf(deps.look(page)), shown?.rekeyed);
+  /* A LOOK SLASH WROTE WAS WRITTEN FROM THE WHOLE PAGE, so it is laid only for a reader shown the whole page. Laid for a
+     member held from a block, its order, its lead and its basis said whether that block held something late: the rules
+     answer her instead, from what she is shown. An owner's look is his arrangement and not a reading, so it stands. */
+  if (stored !== null && stored.by !== 'owner' && !shown?.held) return applyLook(blocks, stored);
   const composed = composeLook({
     page,
     blocks,
     today: localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs),
-    seen: deps.activity?.(0).seen ?? null,
+    seen: deps.reader?.seen !== undefined ? deps.reader.seen : (deps.activity?.(0).seen ?? null),
     ...(deps.lists ? { lists: deps.lists() } : {}),
     titleOf: deps.titleOf,
-    ...(stored?.pinned ? { pinned: stored.pinned } : {}),
+    ...(stored?.by === 'owner' && stored.pinned ? { pinned: stored.pinned } : {}),
   });
-  return applyLook(blocks, stored === null ? composed : mergeLook(stored, composed));
+  return applyLook(blocks, stored?.by === 'owner' ? mergeLook(stored, composed) : composed);
+}
+
+/**
+ * The page's blocks as its reader is shown them (`PageDeps.reader`), each with a key no other block of the page has,
+ * whether any was held from them, and the new key of each block the hold keyed again.
+ *
+ * A HELD BLOCK MAY BE KEYED AGAIN WITHOUT WHAT IT READS, so two held blocks alike can meet on one key, and one key for two
+ * blocks would let a look pin whichever came first. A key the hold left alone is the block's; one it changed is parted
+ * from every other in page order, `-2`, then `-3`, as `keyedBlocks` parts the page's own.
+ */
+function heldFor(
+  blocks: readonly BlockResult[],
+  hold: (block: BlockResult) => BlockResult,
+): { blocks: BlockResult[]; rekeyed: Map<string, string>; held: boolean } {
+  const held = blocks.map((b) => hold(b));
+  const taken = new Set(held.flatMap((b, i) => (b.key !== undefined && b.key === blocks[i]!.key ? [b.key] : [])));
+  const rekeyed = new Map<string, string>();
+  const out = held.map((b, i) => {
+    const was = blocks[i]!.key;
+    if (b.key === undefined) return was === undefined ? b : { ...b, key: was };
+    if (b.key === was) return b;
+    let key = b.key;
+    for (let n = 2; taken.has(key); n += 1) key = `${b.key}-${n}`;
+    taken.add(key);
+    if (was !== undefined) rekeyed.set(was, key);
+    return key === b.key ? b : { ...b, key };
+  });
+  /* HELD IS A SENTENCE THE HOLD ADDED, not a longer list: the record's shell answers its one sentence in place of the
+     block's own, so a block already refused and then held answered no more refusals than it had and read as shown. */
+  return { blocks: out, rekeyed, held: held.some((b, i) => b.refusals.some((r) => !blocks[i]!.refusals.includes(r))) };
+}
+
+/** A stored look with each block it names under the key its reader's page gives that block (`heldFor`). */
+function rekeyedLook(look: LookBody | null, rekeyed: ReadonlyMap<string, string> | undefined): LookBody | null {
+  if (look === null || !rekeyed?.size) return look;
+  const as = (k: string): string => rekeyed.get(k) ?? k;
+  return {
+    ...look,
+    ...(look.lead !== undefined ? { lead: as(look.lead) } : {}),
+    ...(look.order ? { order: look.order.map(as) } : {}),
+    ...(look.hide ? { hide: look.hide.map(as) } : {}),
+    ...(look.pinned ? { pinned: look.pinned.map(as) } : {}),
+  };
 }
 
 /**
@@ -1483,7 +1553,15 @@ function shorn<T extends { cells?: unknown }>(block: T): T {
 export const ROW_TEXT_MOST = 280;
 
 /** A row as a page answers it: the row, saying `clipped` where a text in it was cut (`leanRows`). */
-export type PageRow = Entry & { clipped?: true };
+export type PageRow = Entry & {
+  clipped?: true;
+  /**
+   * On a grouped `cards` block (`group:`): the row its link points at, by its handle (`projects#7`), and that row's
+   * title. `value` is `''` and `name` says "No project" for a card that points at nothing. ON THE ROW AND NOT BESIDE
+   * THE ROWS, so a block held from a reader, whose rows are taken off, keeps no name of the list she may not read.
+   */
+  group?: { value: string; name: string };
+};
 
 /** The keys a block answers one to a row, which go with the rows a section does not send. */
 const ALIGNED = ['scopes', 'scope_marks', 'rings', 'nexts', 'trends', 'done_now', 'next', 'short_now', 'changes', 'working_now', 'quiet', 'files'] as const;
@@ -1585,8 +1663,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      answers. It is read here, when a block is read, and never copied into a constant of this file when it loads: a
      kind module may import this file, and `block-keys.ts` is built from the kind registry, so a copy taken at load
      could be taken before the list exists (`kinds/index.ts`). */
+  /* A GROUPED CARD'S `group` AND `fold` ARE NAMED IN `declare.ts` until `block-keys.ts` names them (`CARD_GROUP_KEYS`). */
+  const cardKey = (key: string): boolean => block.kind === 'cards' && CARD_GROUP_KEYS.has(key);
   const unread = Object.keys(block)
-    .filter((key) => !BLOCK_READS.has(key))
+    .filter((key) => !BLOCK_READS.has(key) && !cardKey(key))
     .map((key): Refusal => ({ code: 'DECLARATION_INVALID', fix: `${key}: is not a key this record reads.`, at: key }));
   /* AND A KEY ANOTHER KIND READS IS SAID HERE AS THE INSTALL SAYS IT (`block-keys.ts`). A page installed before the install
      check closed carries `lead: true` on its cards or `since: seen` on a table, and each read clean and was drawn
@@ -1597,7 +1677,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      one only that kind may carry. */
   for (const [key, value] of Object.entries(block)) {
     const kinds = kindsReading(key);
-    if (value === undefined || key === 'of' || !kinds || kinds.includes(block.kind)) continue;
+    if (value === undefined || key === 'of' || !kinds || kinds.includes(block.kind) || cardKey(key)) continue;
     unread.push({ code: 'DECLARATION_INVALID', fix: wrongKindKey(key, block.kind), at: key });
   }
   /* A PACK'S OWN KIND (`block.<id>`) IS INSTALLED LIKE ANY OTHER (`declare.ts` `pageBody`), so it is read like any
@@ -1653,6 +1733,13 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      `readPage`. */
   const worded = panelFault(block.panel, null) ?? shortFault(block.short) ?? (block.kind === 'roadmap' ? roadmapFault(block) : null);
   if (worded) return { ...base, refusals: also(worded) };
+  /* CARDS ARE GROUPED BY A LINK FIELD OF THEIR LIST, so cards over anything but a list draw no groups, and say so rather
+     than drawing ungrouped under a `group:` the author wrote. The field itself is checked where the list is in hand. */
+  if (block.kind === 'cards' && block.group !== undefined && !(typeof block.source === 'string' && block.source.startsWith('register.')))
+    return {
+      ...base,
+      refusals: also({ code: 'DECLARATION_INVALID', fix: `group: draws cards in groups by a link field of their list, and these cards are over no list. Give them source: register.<id>, or take group: off.`, at: 'group' }),
+    };
 
   /* THE FIGURES PINNED TO HOME ARE CHOSEN BY THE RECORD, AND ANSWERED BEFORE ANY KIND READS THE BLOCK: a `stat` over
      `figures.home` names no cells, so the stat arm below would draw it empty, and a kind module registered for `stat`
@@ -1900,6 +1987,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
       };
   }
 
+  /* A CARD'S GROUP IS A LINK FIELD OF THIS LIST, checked here where the list is in hand, as the install checks it. */
+  const grouping = block.kind === 'cards' ? cardGrouping(block, register, schema) : null;
+  if (grouping && 'code' in grouping) return { ...base, refusals: also(grouping) };
+
   /* A HOLE STILL IN THE `where` IS A FIELD THE PAGE'S ROW HOLDS NOTHING IN, since only a template page is filled and
      `fill` leaves a hole it has no value for. A skill with no `because` yet has no learnings behind it, which is the
      block's `empty:` sentence and not a refusal naming a row called `{{because}}`. */
@@ -2111,7 +2202,8 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   const read = short && !(drawn > 0) ? [] : listed.value.rows;
   const ranged = block.kind === 'progress' && block.range === true ? rangeFault(block, register, schema, read) : null;
   if (ranged) return { ...base, refusals: also(ranged) };
-  const rows = read;
+  /* EACH GROUPED CARD SAYS ITS GROUP (`groupedRows`). */
+  const rows = grouping ? groupedRows(deps, read, grouping) : read;
   const marks = path ? rows.map((r) => r.fields[path.done] === true) : null;
   /* A PATH'S NEXT STEP IS ITS FIRST OPEN STEP IN THE ORDER ITS LIST DECLARES, not the first open one drawn. Under
      `order: rank desc` a path drew S3, S2, S1 and marked S2 as next while the card over the same steps said S1. So it
@@ -2163,8 +2255,60 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     ...nextsOf(deps, block, register, rows),
     ...trendsOf(deps, block, rows),
     ...(marks ? { done_now: marks, next: lead === undefined ? null : lead.at } : {}),
+    ...(grouping ? { fold: typeof block.fold === 'number' ? block.fold : CARD_FOLD } : {}),
     ...inShort,
   };
+}
+
+/**
+ * The link a `cards` block groups by, or why it cannot, or `null` when it groups by nothing. Said again at read for a
+ * page installed before the install checked it (`declare.ts` `cardGroupFault`), in the same words.
+ */
+function cardGrouping(block: PageBlock, register: string, schema: Schema): { field: string; to: string; label: string } | Refusal | null {
+  const fold = block.fold;
+  if (fold !== undefined && !(typeof fold === 'number' && Number.isInteger(fold) && fold >= 1 && fold <= CARD_FOLD_MOST))
+    return { code: 'OUT_OF_BOUNDS', fix: `fold: is how many cards each group shows before the rest fold, from 1 to ${CARD_FOLD_MOST}.`, at: 'fold' };
+  if (block.group === undefined)
+    return fold === undefined ? null : { code: 'DECLARATION_INVALID', fix: 'fold: folds the groups of cards, and these cards draw none. Give them group: a link field of their list, or take fold: off.', at: 'fold' };
+  const links = Object.entries(schema.fields).flatMap(([id, f]) => (f.type === 'ref' && typeof f.to === 'string' && f.to !== '' ? [id] : []));
+  const spec = typeof block.group === 'string' && Object.hasOwn(schema.fields, block.group) ? schema.fields[block.group] : undefined;
+  if (!spec) return { code: 'FIELD_UNKNOWN', fix: `${register} has no field called ${String(block.group)} to group these cards by.`, at: 'group', allowed: links };
+  if (spec.type !== 'ref' || typeof spec.to !== 'string' || spec.to === '')
+    return {
+      code: 'DECLARATION_INVALID',
+      fix: `Cards are grouped by a link to another list, so each group is a row with a name, and ${block.group} is ${spec.type}. ${links.length ? `Group by ${links.join(' or ')}.` : `${register} has no link field.`}`,
+      at: 'group',
+      allowed: links,
+    };
+  return { field: block.group as string, to: spec.to, label: wordsOf(spec.label ?? (block.group as string)) };
+}
+
+/**
+ * EACH CARD WITH ITS GROUP: the row its link points at, by its handle and its title. A row no longer there is nothing,
+ * and so is a link to a list the reader may not read, whose titles she is not told: the record holds the whole block
+ * from her anyway, by the list `registersOf` names for it.
+ *
+ * THE CARDS STAY IN THE ORDER THEY WERE READ. A host draws a group where its first card stands and the cards in no group
+ * where the record put them, so a block ordered by the last day in touch still reads the most recent first.
+ */
+function groupedRows(deps: PageDeps, rows: readonly Entry[], g: { field: string; to: string; label: string }): PageRow[] {
+  if (deps.ctx.reads !== undefined && !deps.ctx.reads(g.to)) return [...rows];
+  const first = (v: unknown): string | null =>
+    Array.isArray(v) ? ((v.find((x) => typeof x === 'string' && x !== '') as string | undefined) ?? null) : typeof v === 'string' && v !== '' ? v : null;
+  const ids = [...new Set(rows.map((r) => first(r.fields[g.field])).filter((id): id is string => id !== null))];
+  const title = deps.titleOf(g.to);
+  const listed = ids.length ? deps.list({ register: g.to, where: { field: 'id', in: ids }, limit: ids.length }) : null;
+  const found = new Map(listed?.ok ? listed.value.rows.map((r) => [r.id, r] as const) : []);
+  /* "No project", and "No CRM deal" as its label says it: only a capital that starts a word is taken down. */
+  const said = /^[A-Z][^A-Z]/u.test(g.label) ? g.label[0]!.toLowerCase() + g.label.slice(1) : g.label;
+  const none = { value: '', name: `No ${said}` };
+  return rows.map((r): PageRow => {
+    const id = first(r.fields[g.field]);
+    const to = id === null ? undefined : found.get(id);
+    if (!to || to.seq === null) return { ...r, group: none };
+    const t = title !== null && Object.hasOwn(to.fields, title) ? to.fields[title] : null;
+    return { ...r, group: { value: `${g.to}#${to.seq}`, name: typeof t === 'string' && t.trim() !== '' ? t.trim() : 'Untitled' } };
+  });
 }
 
 /**
@@ -3924,6 +4068,9 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     const source = typeof block.source === 'string' && block.source.startsWith('register.') ? block.source.slice('register.'.length) : null;
     if (source !== null && block.kind === 'cards' && (block.columns ?? []).some((c) => c?.as === 'next' || c?.as === 'ring'))
       for (const list of beside?.stepsOf?.(source) ?? []) named.add(list.register);
+    /* A CARD'S GROUP IS NAMED BY THE TITLE OF THE ROW ITS LINK POINTS AT (`groupedRows`), a row of that list. */
+    const groupedBy = source !== null && block.kind === 'cards' && typeof block.group === 'string' ? pointsAt?.(source, block.group) : null;
+    if (groupedBy) named.add(groupedBy);
     /* A CARD'S PICTURE AND ITS HUE READ NO LIST BESIDE THE CARDS' OWN: each is a field of the card's row (`roleFault`),
        and the source above names that list. What is named here is what a picture reads that its block does not say:
        a gallery's picture written out as `file:contracts#2/scan` is a row of Contracts, which its answer hands over as

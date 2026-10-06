@@ -24,6 +24,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 
 import { approvalLines, egressOf, keyNamed, runnerCannotOpen, type Egress } from './actions.ts';
+import { agentOf, kindsOfProposal, recordReader, rungOf, shapeIn, stampOf } from './change-kind.ts';
 import { instant } from './migrate.ts';
 import { point } from './metrics.ts';
 import { pairsReads, type PairsDecl } from './pairs.ts';
@@ -401,14 +402,19 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   const by = typeof actor === 'function' ? actor() : actor;
   const id = `SG${deps.allocate('suggestion')}`;
   const at = instant(deps.nowMs);
+  /* THE KIND OF CHANGE IT IS, STAMPED HERE AND NEVER TAKEN FROM THE PROPOSER, for `costOf`'s reason: a proposer that
+     named its own kind would name the one it is trusted with. Worked out from the body as it is stored, after the
+     record's own egress lines replaced any it sent, so what it sends out is on the floor (`change-kind.ts`). */
+  const kind = stampOf(kindsOfProposal(p.body_kind, body, recordReader(deps.sql, by)));
   deps.sql.exec(
-    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, drafted_by) VALUES (?, ?, ?, 'open', ?, ?, ?)",
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, drafted_by, kind) VALUES (?, ?, ?, 'open', ?, ?, ?, ?)",
     id,
     p.body_kind,
     JSON.stringify(body),
     by,
     at,
     drafted ?? null,
+    kind,
   );
   /* THE QUESTION GOES IN `to_v`, WHICH IS WHERE 45 §5.4 PUTS IT — and `note` is capped at 280 by
      the rule that a note is one sentence a human reads in six weeks. A question is not a note: it is
@@ -1053,6 +1059,66 @@ export function additiveFault(body: Record<string, unknown> | null): string | nu
   return null;
 }
 
+/**
+ * Who answers a question the ladder settles: an agent's proposal of kinds the owner has let it make without asking
+ * (DIRECTION §37). No agent answers a question, its own least of all, so the ladder does, and signs as itself.
+ */
+export const LADDER_RULE = 'rule:ladder';
+
+/** What the decision says when the ladder answered it. */
+const LADDER_REASON = 'Changes like this were kept unchanged often enough that they no longer ask. None is money, a key, sharing, a delete, an add-on or somebody else\'s.';
+
+/**
+ * Why a question cannot be answered by the ladder, or `null` when it can. Checked at the gate whoever sends the verdict,
+ * as the additive rule is, so a caller that got the rung wrong still cannot accept without a person.
+ *
+ * ONLY ROWS. A rowset is the one body whose every kind can climb; a choice is a judgement nobody but a person makes, and
+ * a change, a pattern or an add-on is the shape of the record, which the additive rule or the owner answers.
+ *
+ * THE KINDS ARE WORKED OUT AGAIN AT THE PRESS, never read off the stamp: a list can have gained a money field since the
+ * question was filed, and the floor is what it is now. The grant is read now too, so a token revoked, expired or taken
+ * down to Suggest since stops here. The rung is the ladder's for the agent the question was filed by, and every kind
+ * must stand at Do and tell or Do quietly, none on the floor.
+ *
+ * AND A FIELD ONLY A DECISION CHANGES (`by: 'decide'`, on the field or on the move) still waits for a person, because
+ * a rung is not a person deciding.
+ */
+export function ladderFault(sql: Sql, row: { body_kind: string; body: string; opened_by: string }, nowMs: number): string | null {
+  if (row.body_kind !== 'rowset') return `A ${row.body_kind} is never answered by the ladder.`;
+  const agent = agentOf(sql, row.opened_by);
+  if (agent === null) return 'Only an agent climbs the ladder, and this was not filed by one.';
+  if (agent !== SLASH) {
+    const grant = sql.one<{ scope: string; revoked_at: string | null; expires_at: string | null; suspended_at: string | null }>(
+      'SELECT t.scope AS scope, t.revoked_at AS revoked_at, t.expires_at AS expires_at, p.suspended_at AS suspended_at FROM token t LEFT JOIN person p ON p.id = t.person_id WHERE t.id = ?',
+      agent,
+    );
+    /* `verifyToken`'s three ends: revoked, run out, or its person suspended. Any of them and the grant is gone. */
+    if (!grant || grant.revoked_at !== null || (grant.expires_at !== null && grant.expires_at <= instant(nowMs)) || grant.suspended_at)
+      return 'The grant it was filed under has ended.';
+    if (grant.scope !== 'write') return 'Its grant may only suggest, so everything it files asks.';
+  }
+  const body = parse(row.body);
+  if (!body) return 'The question cannot be read.';
+  const kinds = kindsOfProposal(row.body_kind, body, recordReader(sql, row.opened_by));
+  const floor = kinds.find((k) => k.floor !== null);
+  if (floor) return `It is ${floor.key}, which always asks (${String(floor.floor)}).`;
+  const low = kinds.find((k) => rungOf(sql, agent, k) === 'ask');
+  if (low) return `It is ${low.key}, which still asks.`;
+  const shape = shapeIn(sql, String(body.register));
+  const fields = new Map((shape?.fields ?? []).map((f) => [f.id, f]));
+  /* A MOVE IS HELD WHEN ANY WAY INTO THE STATE IT GOES TO IS `by: 'decide'`, read without the row's current state, so
+     it errs toward asking: `reverted` back to `active` on a learning is a person's call however the agent got there. */
+  const decidedMove = (key: string, to: unknown): boolean => {
+    const ways = fields.get(key)?.transitions;
+    return isMap(ways) && Object.values(ways).some((w) => isMap(w) && w.by === 'decide' && Array.isArray(w.to) && w.to.includes(to));
+  };
+  const held = ((body.rows ?? []) as Record<string, unknown>[])
+    .flatMap((r) => Object.entries(isMap(r.patch) ? r.patch : r))
+    .find(([k, v]) => fields.get(k)?.by === 'decide' || decidedMove(k, v))?.[0];
+  if (held !== undefined) return `${held} changes only when a person accepts it.`;
+  return null;
+}
+
 /** What the decision says when the rule answered, in the words the owner reads it by in Decide. */
 const ADDITIVE_REASON = 'It only adds optional fields or values, and those land without a press. Taking away, retyping or requiring anything still asks.';
 
@@ -1546,6 +1612,12 @@ function checkPrediction(raw: unknown): Refusal | null {
 export type Decided = {
   /** `D<n>` when it was decided, `null` when it was deferred. */
   decision: string | null;
+  /**
+   * The batch the decision was written in, on a decision: the rows an accepted rowset wrote wear it, and so do its
+   * `decide` and `resolve` events, so "undo this decision" and "who accepted this row" are each one read of the log.
+   * A caller that installs or applies what was accepted may sign that with it too.
+   */
+  batch?: string;
   suggestion: string;
   status: string;
   /** Rows an accepted `rowset` wrote. */
@@ -1587,8 +1659,12 @@ export type Verdict =
   /**
    * Accepted by the additive rule and not by a person: only a `change` that `additiveFault` passes, answered as
    * `ADDITIVE_RULE` whatever `actor` says. The record sends it on an agent's own `propose`, and never from `decide`.
+   *
+   * `ladder`: accepted because the agent that filed it may make every kind of change it is without asking
+   * (`ladderFault`), answered as `LADDER_RULE`. Its rows are signed by the run that filed them, since they are that
+   * agent's changes and its byline is what Undo finds; a question Slash filed has its rows signed by the ladder.
    */
-  | { rule: 'additive' };
+  | { rule: 'additive' | 'ladder' };
 
 /** One approved line as a suggestion holds it: what accept reads of it before anything is armed. */
 type SentLine = { key?: unknown; paged?: unknown; channel?: unknown; ingest?: unknown };
@@ -1680,8 +1756,8 @@ function oneAnswer(deps: GovernDeps, id: string, bodyKind: BodyKind, raw: string
  * suggestion until that has happened.
  */
 export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: string): Result<Decided> {
-  const row = deps.sql.one<{ id: string; body_kind: BodyKind; body: string; status: string }>(
-    'SELECT id, body_kind, body, status FROM suggestion WHERE id = ?',
+  const row = deps.sql.one<{ id: string; body_kind: BodyKind; body: string; status: string; opened_by: string }>(
+    'SELECT id, body_kind, body, status, opened_by FROM suggestion WHERE id = ?',
     id,
   );
   if (!row) return no<Decided>('OUT_OF_BOUNDS', `There is no suggestion called ${id}.`, { at: 'id' });
@@ -1725,13 +1801,18 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
      ordinary accept, with every check an accept runs (`resolveTo`, `namesFault`, `fits`), signed by the rule. The
      resolution stays `addressed` because that is what `reopen` and the feed read as "accepted", and an install that
      will not land must come back to the queue exactly as a pressed one does. */
+  let signer: string | null = null;
   if ('rule' in verdict) {
-    if (verdict.rule !== 'additive')
-      return no<Decided>('ENUM_VALUE_UNKNOWN', `${String(verdict.rule)} is not a rule that answers questions.`, { at: 'rule', allowed: ['additive'] });
-    const why = row.body_kind === 'change' ? additiveFault(parse(row.body)) : `A ${row.body_kind} is never answered by rule.`;
+    if (verdict.rule !== 'additive' && verdict.rule !== 'ladder')
+      return no<Decided>('ENUM_VALUE_UNKNOWN', `${String(verdict.rule)} is not a rule that answers questions.`, { at: 'rule', allowed: ['additive', 'ladder'] });
+    const ladder = verdict.rule === 'ladder';
+    const why = ladder ? ladderFault(deps.sql, row, deps.nowMs) : row.body_kind === 'change' ? additiveFault(parse(row.body)) : `A ${row.body_kind} is never answered by rule.`;
     if (why !== null) return no<Decided>('TRANSITION_ILLEGAL', `${id} waits for the owner. ${why}`, { at: 'rule' });
-    verdict = { decide: { option: 'accept', reason: ADDITIVE_REASON } };
-    actor = ADDITIVE_RULE;
+    verdict = { decide: { option: 'accept', reason: ladder ? LADDER_REASON : ADDITIVE_REASON } };
+    actor = ladder ? LADDER_RULE : ADDITIVE_RULE;
+    /* SLASH'S ROWS ARE THE LADDER'S. A model writes only suggest, propose and predict (`slash.ts`), so the rows of a
+       question Slash filed are signed by the rule that let them land, and Slash stays on the question as its filer. */
+    if (ladder && row.opened_by !== SLASH) signer = row.opened_by;
   }
 
   /* NO IS AN ANSWER AND IS RECORDED AS ONE. `incorrect` also feeds the brake: a class of proposal
@@ -1800,6 +1881,9 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   }
 
   const wrote: string[] = [];
+  /* ONE BATCH FOR THE WHOLE DECISION, minted before anything is written: the rows an accepted rowset writes and the
+     rules they start share it with the decision's own two events, so a decision is undone as one. */
+  const batch = deps.mint();
   let install: Record<string, unknown> | undefined;
   let expect: Decided['expect'];
   let expects: Decided['expects'];
@@ -1808,15 +1892,16 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
 
   if (option === 'accept') {
     if (row.body_kind === 'rowset') {
-      const batch = deps.mint();
       const register = String(body.register);
-      const mechanism = typeof body.ingest === 'string' ? `ingest:${body.ingest}` : actor;
+      /* THE LADDER'S ROWS ARE THE AGENT'S, signed by the run that filed them; the decision is still the ladder's. */
+      const by = signer ?? actor;
+      const mechanism = typeof body.ingest === 'string' ? `ingest:${body.ingest}` : by;
       for (const [n, r] of ((body.rows ?? []) as Record<string, unknown>[]).entries()) {
         if (only !== null && !only.has(n)) continue;
         /* AN UPDATE IS SIGNED BY THE PERSON DECIDING, whoever drew the proposal, because changing a
            row that exists is what their press authorised. A row a rowset creates keeps the ingest's
            name when an ingest produced it. */
-        const made = 'at' in r ? applyUpdate(deps, register, r, actor, batch) : deps.write(register, r, mechanism, batch);
+        const made = 'at' in r ? applyUpdate(deps, register, r, by, batch) : deps.write(register, r, mechanism, batch);
         /* ALL THE ROWS OR NONE. Half a rowset accepted is a decision whose answer is not true of the
            record, and the caller's transaction is what undoes the rest. A stale version is the
            house conflict, and it undoes the rest the same way. */
@@ -1944,11 +2029,12 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   /* AND THE LINES THAT PRESS APPROVED, word for word, so "what did I agree to send" has an answer that does not depend
      on the declaration staying as it was. */
   const approved = option === 'accept' && (row.body_kind === 'change' || row.body_kind === 'pattern') && Array.isArray(body.approve) ? { approved: body.approve } : {};
-  event(deps, at, actor, 'decide', `decision:${decision}`, 'decision', JSON.stringify({ question, answer: option, ...approved, ...(only === null ? {} : { rows: [...only].sort((a, b) => a - b) }) }));
-  event(deps, at, actor, 'resolve', `suggestion:${id}`, 'suggestion', 'addressed', reason);
+  event(deps, at, actor, 'decide', `decision:${decision}`, 'decision', JSON.stringify({ question, answer: option, ...approved, ...(only === null ? {} : { rows: [...only].sort((a, b) => a - b) }) }), undefined, batch);
+  event(deps, at, actor, 'resolve', `suggestion:${id}`, 'suggestion', 'addressed', reason, batch);
 
   return ok({
     decision,
+    batch,
     suggestion: id,
     status: 'resolved',
     wrote,
@@ -2141,10 +2227,11 @@ function event(
   targetKind: string,
   to: string,
   note?: string,
+  batch?: string,
 ): void {
   slashMayWrite(actor, kind);
   deps.sql.exec(
-    'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note, batch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     deps.mint(),
     at,
     actor,
@@ -2153,6 +2240,7 @@ function event(
     targetKind,
     to,
     note === undefined ? null : note.slice(0, 280),
+    batch ?? null,
   );
 }
 

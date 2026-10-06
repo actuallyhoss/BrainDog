@@ -77,8 +77,10 @@ test('MIGRATION 23 KEYS THE ROWS ALREADY HERE, and a folded row’s keys go to t
   const ada = value<Entry>(k.create('people', { name: 'Ada', email: 'ada@x.io' }, OWNER));
   const ada2 = value<Entry>(k.create('people', { name: 'Ada L', email: 'ada@work.io' }, OWNER));
   const ada3 = value<Entry>(k.create('people', { name: 'A. L.', handles: ['github:al'] }, OWNER));
-  value(k.update('people', ada3.id, { merged_into: ada2.id }, OWNER));
-  value(k.update('people', ada2.id, { merged_into: ada.id }, OWNER));
+  /* Folded as a record from before the merge door holds them: the fields alone, since only a decision folds a row now. */
+  for (const [row, into] of [[ada3, ada2], [ada2, ada]] as const)
+    sql.exec("UPDATE entry SET fields = json_set(fields, '$.merged_into', ?), deleted_at = ? WHERE id = ?", into.id, new Date(NOW).toISOString(), row.id);
+  assert.equal(k.rebuildKeys(), 3);
   const live = keys(sql);
   assert.deepEqual(live, { 'email:ada@work.io': ada.id, 'email:ada@x.io': ada.id, 'github:al': ada.id });
 
@@ -88,7 +90,8 @@ test('MIGRATION 23 KEYS THE ROWS ALREADY HERE, and a folded row’s keys go to t
   sql.exec('DELETE FROM migration WHERE version >= 23');
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok);
-  assert.deepEqual(result.value.applied, [23, 24]);
+  /* From 23 on, however many have landed since. */
+  assert.deepEqual(result.value.applied.slice(0, 2), [23, 24]);
   assert.deepEqual(keys(sql), live);
   /* And an import's rebuild says the same. */
   sql.exec('DELETE FROM entity_key');

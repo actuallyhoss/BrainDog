@@ -337,11 +337,24 @@ test('ACCEPTING A MERGE CARRIES WHAT THE KEPT ROW LACKED, the email first, so th
   sql.close();
 });
 
-test('A MERGE DRAWN BEFORE THE ROW MOVED AGAIN IS STALE, and accepting it changes nothing', async () => {
+test('A LATER MEETING KEEPS THE QUESTION CURRENT, so the owner can still accept it, with the new line carried', async () => {
+  const { k, sql } = await record();
+  const ada = value<Entry>(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com' }, OWNER));
+  value(k.meet({ name: 'Ada Lovelace', email: 'ada@work.example', where: 'commit 4464966 in braindog' }, AGENT));
+  value(k.meet({ email: 'ada@work.example', where: 'commit 9f00aa1 in braindog' }, AGENT));
+
+  value(k.decide('SG1', { decide: { option: 'accept', reason: 'the same Ada' } }, 'p_owner'));
+  assert.equal(k.count('people'), 1);
+  assert.deepEqual(k.get(ada.id)!.fields.met, [`${DAY} · commit 4464966 in braindog`, `${DAY} · commit 9f00aa1 in braindog`], 'the later line was lost');
+  assert.equal(counts(sql).suggestions, 1, 'a later meeting opened a second question');
+  sql.close();
+});
+
+test('A MERGE DRAWN BEFORE SOMEBODY EDITED THE ROW IS STALE, and accepting it changes nothing', async () => {
   const { k, sql } = await record();
   value(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com' }, OWNER));
   value(k.meet({ name: 'Ada Lovelace', email: 'ada@work.example', where: 'commit 4464966 in braindog' }, AGENT));
-  value(k.meet({ email: 'ada@work.example', where: 'commit 9f00aa1 in braindog' }, AGENT));
+  value(k.update('people', 'people#2', { role: 'client' }, OWNER));
 
   const out = k.decide('SG1', { decide: { option: 'accept', reason: 'the same Ada' } }, 'p_owner') as { ok: boolean; conflict?: unknown };
   assert.equal(out.ok, false);

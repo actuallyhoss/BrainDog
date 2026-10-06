@@ -211,3 +211,94 @@ test("A STORED LOOK IS LAID AS IT IS, over the page's adds too, and a box it emp
   assert.equal(page.look?.by, 'slash');
   assert.deepEqual(page.look?.next, { row: 'tasks#2', text: 'Write the brief' });
 });
+
+/* ── a look per reader ───────────────────────────────────────────────────── */
+
+/**
+ * A member's hold, as the record's `heldBlock` holds a block over a list she may not read: blanked to its written shape,
+ * keyed again without its source, with the sentence that says why.
+ */
+const holdFrom =
+  (list: string) =>
+  (b: BlockResult): BlockResult => {
+    if (b.source !== `register.${list}`) return b;
+    const { source: _source, columns: _columns, ...kept } = b;
+    return { ...kept, key: `k${b.heading === 'Now' ? 'held1' : 'held2'}`, rows: [], matched: 0, refusals: [{ code: 'FORBIDDEN', fix: 'You may not open this list.' }] };
+  };
+
+test('A MEMBER HELD FROM A LIST LEARNS NOTHING FROM THE LOOK: it reads the same whether the list holds a late row or none', async () => {
+  const full = await record();
+  const bare = await openRecord(openSqlite(), fixedClock(NOW));
+  assert.ok((await bare.install([TASKS, NOTES])).ok);
+  const member = { reader: { hold: holdFrom('tasks'), seen: null } };
+  const late = read(depsOver(full, { look: () => null, ...member }));
+  const none = read(depsOver(bare, { look: () => null, ...member }));
+  assert.deepEqual(late.look, none.look, 'the lead, the order, the hide, the next and the basis');
+  assert.deepEqual(headings(late.blocks), headings(none.blocks));
+  assert.equal(late.look?.lead, undefined, 'a held list never leads');
+  assert.equal(late.look?.next, undefined, 'and names no row of it');
+  assert.ok(late.blocks.filter((b) => b.refusals.length).every((b) => b.rows.length === 0 && b.drawn !== false), 'held, shown as held, never hidden');
+  /* THE OWNER IS STILL LED BY IT. */
+  assert.deepEqual(read(depsOver(full, { look: () => null })).look?.next, { row: 'tasks#1', text: 'Pay HSBC is 3 days late' });
+});
+
+test("SLASH'S LOOK IS NOT LAID FOR A READER HELD FROM A BLOCK IT WAS WRITTEN OVER: the rules answer her from what she is shown", async () => {
+  const k = await record();
+  const now = defaultBlockKey(DESK.blocks[3]);
+  const notes = defaultBlockKey(DESK.blocks[1]);
+  const slash = { look: 'desk', basis: 'b', by: 'slash', lead: now, hide: [notes], next: { row: 'tasks#1', text: 'Pay HSBC' } };
+  /* SHOWN THE WHOLE PAGE, SHE IS SENT SLASH'S LOOK AS IT IS. */
+  const whole = read(depsOver(k, { look: () => slash, reader: { hold: (b) => b } }));
+  assert.deepEqual([whole.look?.by, whole.look?.lead, whole.look?.basis], ['slash', now, 'b']);
+  const member = read(depsOver(k, { look: () => slash, reader: { hold: holdFrom('tasks') } }));
+  assert.equal(member.look?.by, 'rule');
+  assert.equal(member.look?.lead, undefined);
+  assert.equal(member.look?.next, undefined);
+  assert.notEqual(member.look?.basis, 'b');
+});
+
+test("A BLOCK THE HOLD KEYS AGAIN IS NAMED BY ITS NEW KEY, the owner's pin on it too, and two held alike are parted", async () => {
+  const k = await record();
+  const coming = defaultBlockKey(DESK.blocks[2]);
+  const now = defaultBlockKey(DESK.blocks[3]);
+  /* BOTH TASKS BLOCKS HELD UNDER ONE KEY: the first keeps it, the second is parted. */
+  const same = (b: BlockResult): BlockResult => (b.source === 'register.tasks' ? { ...holdFrom('tasks')(b), key: 'kheld' } : b);
+  const page = read(depsOver(k, { look: () => ({ look: 'desk', basis: 'mine', by: 'owner', pinned: [now], order: [now, coming] }), reader: { hold: same } }));
+  assert.deepEqual(
+    page.blocks.map((b) => b.key),
+    [page.blocks[0]!.key, page.blocks[1]!.key, 'kheld-2', 'kheld'],
+    'Now, parted, then Coming up, in the order he set',
+  );
+  assert.deepEqual(page.look?.pinned, ['kheld-2'], 'his pin follows the block');
+  assert.deepEqual(page.look?.order, ['kheld-2', 'kheld']);
+});
+
+test("THE READER'S OWN MARK SAYS WHAT CHANGED SINCE THEY LOOKED, not the record's", async () => {
+  const k = await record();
+  const changedOnly: PageDecl = {
+    page: 'desk',
+    title: 'Desk',
+    blocks: [
+      { kind: 'table', source: 'register.notes', heading: 'Notes', columns: [{ field: 'name' }] },
+      { kind: 'table', source: 'register.tasks', heading: 'Later', where: 'by after 2026-10-08', columns: [{ field: 'what' }] },
+    ],
+  };
+  assert.ok(k.create('notes', { name: 'Call the bank' }, OWNER).ok);
+  const deps = (seen: string | null | undefined) =>
+    depsOver(k, { pages: () => [changedOnly], look: () => null, ...(seen === undefined ? {} : { reader: { hold: (b: BlockResult) => b, seen } }) });
+  /* THE RECORD'S MARK IS BEFORE THE ROWS WERE WRITTEN, so what changed leads; hers is after, so nothing did. */
+  assert.equal(read(deps(undefined)).look?.lead, defaultBlockKey(changedOnly.blocks[0]));
+  assert.equal(read(deps('2026-10-07T00:00:00.000Z')).look?.lead, undefined);
+});
+
+test('A BLOCK ALREADY REFUSED AND THEN HELD STILL COUNTS AS HELD: the shell answers its one sentence in place of the old', async () => {
+  const k = await record();
+  const now = defaultBlockKey(DESK.blocks[3]);
+  const odd: PageDecl = { ...DESK, blocks: DESK.blocks.map((b, i) => (i === 3 ? ({ ...b, size: 2 } as PageBlock) : b)) };
+  const slash = { look: 'desk', basis: 'b', by: 'slash', lead: now, next: { row: 'tasks#1', text: 'Pay HSBC' } };
+  const shell = (b: BlockResult): BlockResult => (b.heading === 'Now' ? { ...holdFrom('tasks')(b), refusals: [{ code: 'FORBIDDEN', fix: 'You may not open this list.' }] } : b);
+  assert.equal(read(depsOver(k, { pages: () => [odd] })).blocks.find((b) => b.heading === 'Now')?.refusals.length, 1, 'refused before the hold');
+  const page = read(depsOver(k, { pages: () => [odd], look: () => slash, reader: { hold: shell } }));
+  assert.ok(page.blocks.some((b) => b.heading === 'Now' && b.refusals.length === 1));
+  assert.equal(page.look?.by, 'rule', "Slash's look, written from the whole page, is not hers");
+});
