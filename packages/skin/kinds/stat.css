@@ -40,7 +40,7 @@
   a.cell {
     margin: calc(-1 * var(--sp-2)) calc(-1 * var(--sp-3));
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: inherit;
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
@@ -51,7 +51,7 @@
   }
 
   a.cell:active {
-    background: var(--s1);
+    background: var(--field);
   }
 
   /* A LINKED FIGURE IS A TARGET, so under a thumb it is 44 tall (pages §2.5, stat lead). */
@@ -78,10 +78,10 @@
   .cell-figure {
     grid-area: figure;
     color: var(--ink);
-    font-size: var(--t-figure);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
+    font-size: var(--fs-figure);
+    font-weight: var(--fw-semi);
+    letter-spacing: -0.015em;
+    line-height: var(--lh-figure);
     font-variant-numeric: tabular-nums;
   }
 
@@ -131,19 +131,20 @@
      2px of ink with round joins and a 3px dot on the last point, the dot in the figure's tone when it has one. */
   .trend-line {
     fill: none;
-    stroke: var(--ink);
+    stroke: var(--chart-1);
     stroke-width: 2px;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
 
   .trend-end {
-    stroke: var(--tone, var(--ink));
+    stroke: var(--tone, var(--chart-1));
     stroke-width: 6px;
     stroke-linecap: round;
   }
 
-  /* `stat lead`: the first figure is the screen's one lead figure (`t-lead`), and the others stay the size
+  /* `stat lead`: the first figure is the screen's one lead figure, up to the page name's 28 (DIRECTION §39: a figure is
+     read beside its heading, never shouted over it), and the others stay the size
      they are, so the lead reads as the answer and the rest as its detail. IT STEPS DOWN INSIDE ITS OWN CELL rather than
      running into the next one: a balance in the millions, in pounds with its code, is wider than a quarter of the page
      at the lead size. */
@@ -152,14 +153,14 @@
   }
 
   .block[data-form='lead'] .cell:first-child .cell-figure {
-    font-size: clamp(var(--t-figure), 10cqi, var(--t-lead));
-    letter-spacing: -0.025em;
+    font-size: clamp(var(--fs-figure), 10cqi, var(--fs-page));
+    letter-spacing: -0.02em;
   }
 
   /* A LONG LEAD ALSO TAKES THE FIT EVERY LONG FIGURE TAKES (no stat figure is ever cut): the smaller of the
      two, and never past either. No floor, unlike the fit below: only a figure too long for its cell steps down. */
   .block[data-form='lead'] .cell:first-child .cell-figure[data-fit] {
-    font-size: min(clamp(var(--t-figure), 10cqi, var(--t-lead)), calc(100cqi / (var(--chars) * 0.64)));
+    font-size: min(clamp(var(--fs-figure), 10cqi, var(--fs-page)), calc(100cqi / (var(--chars) * 0.64)));
   }
 
   /* A FIGURE LONGER THAN ITS CELL STEPS DOWN INSIDE IT, rather than running into the next one: a balance in two or three

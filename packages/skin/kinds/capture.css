@@ -33,9 +33,9 @@
     gap: var(--sp-2);
     min-block-size: calc(var(--ctl-h) + var(--sp-1));
     padding-inline: var(--sp-3) var(--sp-1);
-    background: var(--s1);
+    background: var(--field);
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     transition: border-color var(--d-state) var(--ease-out);
   }
 
@@ -65,12 +65,12 @@
   .capture-add {
     min-block-size: var(--ctl-h-sm);
     padding: 0 var(--sp-3);
-    background: var(--ink);
-    border: 1px solid var(--ink);
-    border-radius: var(--r-pill);
-    color: var(--bg);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    background: var(--action);
+    border: 1px solid var(--action);
+    border-radius: calc(var(--r-ctl) - 2px);
+    color: var(--on-action);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
     cursor: pointer;
   }
 

@@ -72,12 +72,12 @@
      edges gone. The row has no inline padding, so the band reaches a step past each side with two offset copies of
      itself rather than padding that would move the words when the cursor arrives. */
   .feed-row[data-focused] {
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     border-block-end-color: transparent;
-    background: var(--s2);
+    background: var(--field);
     box-shadow:
-      calc(var(--sp-2) * -1) 0 0 0 var(--s2),
-      var(--sp-2) 0 0 0 var(--s2);
+      calc(var(--sp-2) * -1) 0 0 0 var(--field),
+      var(--sp-2) 0 0 0 var(--field);
   }
 
   .feed-row:has(+ .feed-row[data-focused]) {
@@ -99,8 +99,8 @@
     align-self: center;
     inline-size: 20px;
     block-size: 20px;
-    background: var(--s2);
-    border-radius: var(--r-pill);
+    background: var(--field);
+    border-radius: var(--r-round);
     color: var(--ink2);
     font-size: var(--t-xs);
     font-weight: 500;
@@ -108,7 +108,7 @@
   }
 
   .feed-group[data-by='rule'] .feed-face {
-    background: var(--s3);
+    background: var(--field-hover);
     border-radius: var(--r-sm);
   }
 

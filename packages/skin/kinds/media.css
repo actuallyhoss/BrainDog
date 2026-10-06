@@ -11,8 +11,8 @@
   .media {
     margin: 0;
     padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--field);
+    border-radius: var(--r-ctl);
     color: var(--ink2);
     font-family: var(--font-id);
     font-size: var(--t-sm);

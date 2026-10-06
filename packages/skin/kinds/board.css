@@ -54,8 +54,8 @@
     flex-direction: column;
     gap: 2px;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--field);
+    border-radius: var(--r-ctl);
   }
 
   .board-col .card-title {

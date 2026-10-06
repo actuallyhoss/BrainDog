@@ -133,9 +133,9 @@ function progressRing(r: RingInput): RingPlan {
 }
 
 /**
- * How each circle is painted when the page has no rule for it, as `ROADMAP_PAINT` paints a roadmap.
+ * How each circle is painted when the page has no rule for it.
  *
- * AN SVG CIRCLE NOBODY PAINTS IS A BLACK DISC. `roadmap` shipped without a rule in the web's stylesheet and drew one
+ * AN SVG CIRCLE NOBODY PAINTS IS A BLACK DISC. `roadmap`, when it was a drawing, shipped without a rule and drew one
  * black slab; these attributes are the weakest thing in the cascade, so a host's `ring-` rules win over them and a
  * host with none still draws an outline in the block's own ink. A part's step is a lighter share of that ink, so
  * four parts are told apart with no stylesheet at all.

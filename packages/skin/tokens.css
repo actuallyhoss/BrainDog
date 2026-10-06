@@ -83,6 +83,83 @@
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212;
   }
 
+  /* ── THE BOARD (DIRECTION §39) ─────────────────────────────────────────────
+     The reset of the look, in one place, so every screen builds on the same few names.
+
+       Surfaces     --board (the page), --tile (every block on it), --field (a control's fill inside or beside a tile),
+                    --field-hover
+       Tile         --tile-r 16, --tile-pad 20, --tile-gap 12, on a 12-column grid (--cols)
+       Type         --fs-meta 13, --fs-body 15, --fs-ctl 14, --fs-head 17, --fs-figure 22, --fs-page 28 (22 on a phone,
+                    --fs-page-phone); weights --fw-regular 400, --fw-medium 500, --fw-semi 600; `.num` for tabular figures
+       Accent       --action (selection, primary buttons, links, charts), --action-hover, --action-tint-1 (a selected
+                    fill), --action-tint-2 (a stronger one, a chart's second series), --action-text (words in the
+                    accent on a tile or a tint), --on-action (a label on the accent fill)
+       Status dots  --status-working, --status-late, --status-ok, --status-waiting, --status-done, --status-idle
+       Charts       --chart-1, --chart-2, --chart-3, --chart-other, --chart-late, --chart-risk, --chart-track
+       Controls     --btn-h 32 (40 under a thumb), --btn-h-sm 28, --r-ctl 8 (a button, a field, a segmented control),
+                    --r-round (a count, a dot, a face: the only round thing), --r-tile 16
+
+     THE COLOURS ARE THE THEME'S ROLES, AND NEVER A LITERAL. `packages/theme` generates every colour the product has and
+     `colour-grep` holds everything else to naming them. `--board`, `--tile`, `--field`, `--action`, `--action-hover`,
+     the two `--action-tint`s, `--action-text` and `--on-action` are generated roles (`house.css`), at the design's own
+     values (light board #F3F4F6 and tile #FFFFFF, dark #0D1014 and #161A20; the accent #2563EB in light and #6EA8FE in
+     dark) and proven by the theme's check S: a label on the fill, the fill on the board, the accent's words on every
+     ground and both tints, and every word a chosen row carries on its tint, at AA. So they are not written here, where
+     the theme layer would only paint over them. A record's own colour (`apps/web/src/lib/accent.ts`) re-solves all of
+     them, so the colour a person picks is the colour of their buttons, links, selection and charts.
+
+     What is left here is mixed from those roles, the same in both schemes: a field under the pointer, the status dots
+     and the chart steps.
+
+     RED STAYS THE BRAND AND THE "LATE" COLOUR (`--accent`, `--danger`), AND NOTHING ELSE. Blue is the working colour, so
+     a red on screen again means one thing. */
+  :root {
+    --field-hover: color-mix(in srgb, var(--ink) 6%, var(--field));
+
+    --tile-r: 16px;
+    --tile-pad: 20px;
+    --tile-gap: 12px;
+    --cols: 12;
+
+    --fs-meta: 13px;
+    --fs-ctl: 14px;
+    --fs-body: 15px;
+    --fs-head: 17px;
+    --fs-figure: 22px;
+    --fs-page: 28px;
+    --fs-page-phone: 22px;
+    --fw-regular: 400;
+    --fw-medium: 500;
+    --fw-semi: 600;
+    --lh-head: 1.4;
+    --lh-figure: 1.15;
+
+    /* A STATUS IS A SMALL DOT AND ITS WORD, never the fill of a whole row. Working is the accent, late is the red,
+       done and idle are greys, so the eye finds the two that ask for something. */
+    --status-working: var(--action);
+    --status-late: var(--danger);
+    --status-ok: var(--earn-fill);
+    --status-waiting: var(--warn-fill);
+    --status-done: color-mix(in srgb, var(--ink) 35%, var(--tile));
+    --status-idle: color-mix(in srgb, var(--ink) 20%, var(--tile));
+
+    /* A CHART IS THE ACCENT AND ITS TINTS, the red only for late or over, grey only for "other". */
+    --chart-1: var(--action);
+    --chart-2: color-mix(in srgb, var(--action) 55%, var(--tile));
+    --chart-3: color-mix(in srgb, var(--action) 28%, var(--tile));
+    --chart-other: color-mix(in srgb, var(--ink) 18%, var(--tile));
+    --chart-late: var(--danger);
+    /* AT RISK IS AMBER: not late yet, and not going to plan. The status dot's own colour, so a plan bar and its dot agree. */
+    --chart-risk: var(--status-waiting);
+    --chart-track: var(--field);
+
+    --btn-h: 32px;
+    --btn-h-sm: 28px;
+    --r-ctl: 8px;
+    --r-tile: 16px;
+    --r-round: 999px;
+  }
+
   :root {
     --font-ui: 'Geist', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-display: 'Poppins', 'Geist', 'Plex', system-ui, sans-serif;
@@ -113,7 +190,8 @@
     --t-row: 15px;
     --t-group: 17px;
     --t-title: 28px;
-    --t-figure: 30px;
+    /* 22 (DIRECTION §39): a tile's figure is read beside its heading, not shouted over it. */
+    --t-figure: 22px;
     --t-lead: 34px;
     --text: var(--t-base);
 
@@ -167,8 +245,12 @@
     --r-sm: 6px;
     --r-well: 9px;
     --r-md: 12px;
-    --r-lg: 22px;
-    --r-pill: 999px;
+    /* 16 (DIRECTION §39): a tile, the panel, a sheet and the palette. */
+    --r-lg: 16px;
+    /* THE PILL IS RETIRED AS A SHAPE (DIRECTION §39, "pills only for counts"). The name stays so the hundred-odd
+       buttons, chips and tracks that ask for it become the 8px rectangle in one step; a thing that must be round (a count,
+       a dot, a face, a switch) names `--r-round`. */
+    --r-pill: var(--r-ctl);
 
     /* THE ELEVATION LADDER IS THE THEME'S (`--e1` to `--e3`, generated per scheme and checked monotonic in both by
        `packages/theme`). A resting tile names `--e1` itself; the alias that used to stand for it here (`--raise`) had
@@ -178,7 +260,8 @@
        never the pixels (13 §4.2). */
     /* The design system's heights: a one-line row 44 and a two-line row 56, a toolbar control 36, a rail place 36. */
     --row-h: 44px;
-    --ctl-h: 36px;
+    /* 32 UNDER A MOUSE (DIRECTION §39), and 44 under a thumb below, which is the product's target size. */
+    --ctl-h: 32px;
     --tap: 44px;
     /* Header and row actions, a two-line row, a table row, a rail row. */
     --ctl-h-sm: 28px;
@@ -214,9 +297,9 @@
        the layout gate has to draw either side of. */
     --gutter: clamp(16px, 2.4vw, 40px);
     --sticky: 52px;
-    /* The rail CARD, 216 wide; the shell adds `--inset` round it. `--inset` is the window inset of the rail and the
+    /* The rail, 240 wide (DIRECTION §39: the board's own left column, flat); the shell adds `--inset` round it. `--inset` is the window inset of the rail and the
        docked panel, and the gap between tiles; the panel is 440. */
-    --rail: 216px;
+    --rail: 240px;
     /* THE NARROW RAIL, one tap and the card's padding either side: 60. Here and not on the rail, so the toasts that
        centre beside it (`Toasts.svelte`) read the same value the rail does rather than working it out again. */
     --rail-icons: calc(var(--tap) + var(--sp-2) * 2);
@@ -322,10 +405,10 @@
      * nobody paints is the same defect as a flag nothing reads. The day a second construction-warn
      * element appears it gets a token beside this one, not a tenth percentage.
      */
-    /* `--hover-wash`, `--selected` AND `--arrived-wash` ARE GENERATED. The design system gives the wash as a
-       cool near-black at 5% in light and white at 6% in dark, and the arrival as an opaque lavender, which no one
-       `color-mix` of an ink writes in both schemes. `packages/theme` emits all three into every scheme block of the
-       palette sheet, beside the glass. */
+    /* `--hover-wash`, `--selected` AND `--arrived-wash` ARE GENERATED. The wash is the ink at 5%, a chosen row the
+       working accent's first tint, and the arrival an opaque lavender, which no one `color-mix` of an ink writes in
+       both schemes. `packages/theme` emits all three into every scheme block of the palette sheet, so a record's
+       colour re-solves them with everything else. */
     /* THE SOFT RING ROUND A FOCUSED TEXT FIELD, outside its `--ink2` edge (a11y.css, controls.css). One
        value, so every field in the product focuses the same way.
 
@@ -336,29 +419,21 @@
     --focus-halo: color-mix(in srgb, var(--ink) 14%, transparent);
     --hold-wash: color-mix(in srgb, var(--ink) 12%, transparent);
 
-    /* THE DESIGN SYSTEM'S GLASS AND THE GROUND'S LIGHT. The colours are generated (`--glass`, `--glass-strong`,
-       `--glass-rim`, `--glass-hair`, `--ground-glow`, `--glass-sat`); the geometry is here. Chrome is
-       `background: var(--glass); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge), var(--e2)`.
-       `--ground-light` is the only gradient in the product, painted on the ground by `base.css`.
-
-       SAFARI READS THE SAME TOKEN, IN A BLOCK OF ITS OWN, AND NEVER A LITERAL:
-       `@supports (-webkit-backdrop-filter: none) { .x { -webkit-backdrop-filter: var(--glass-blur); } }`.
-       The block is for the build, not for Safari: lightningcss folds a prefixed and an unprefixed declaration in one
-       rule into one, and the prefixed line Safari needs came out of the bundle (or came out as the other's value).
-       What it reads is this token, because this token already answers for both schemes (`--glass-sat` is 1.6 in
-       light and 1.4 in dark) and for less transparency (`a11y.css` sets it to `none`). The literal
-       `blur(24px) saturate(1.6)` that a dozen blocks wrote gave dark glass light's colour, and only an important
-       rule in `a11y.css` could take it away. WebKit computes this `var()` in both spellings (WebKit 26.5, measured
-       2026-10-06); what went missing was the prefixed line the build folded away, and an older Safari that mishandles
-       the unprefixed one is given the prefixed one here regardless. Chromium does not know the prefixed property
-       (151 answers `false` to the query), so the block is Safari's alone, and were it not, it would set the same value.
-
-       THERE IS NO SECOND, SAFARI-ONLY TOKEN, ON PURPOSE. A `--glass-blur-webkit` would have to be set wherever this one
-       is (both schemes, high contrast, less transparency) to say the same thing, and the day one of them was missed is
-       the day dark Safari wore light's glass again. `glass-motion.test.ts` holds the skin to it. */
-    --ground-light: radial-gradient(1200px 520px at 50% -140px, var(--ground-glow), transparent);
-    --glass-blur: blur(24px) saturate(var(--glass-sat));
-    --glass-edge: inset 0 0 0 0.5px var(--glass-rim), 0 0 0 0.5px var(--glass-hair);
+    /* THE GLASS AND THE GROUND'S LIGHT, RETIRED (DIRECTION §39). Chrome was `background: var(--glass);
+       backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge), var(--e2)`, and those names stay so the hosts
+       that still write them draw something sane. Safari reads the same `--glass-blur` in a block of its own and never a
+       literal (`@supports (-webkit-backdrop-filter: none)`), because the build folds a prefixed and an unprefixed
+       declaration in one rule into one; `glass-motion.test.ts` holds the skin to it. */
+    /* NONE NOW (DIRECTION §39): the board is one flat colour. The names stay for the hosts that still paint them: the
+       ground's light is none, its glow is transparent (a `radial-gradient(…, var(--ground-glow), transparent)` draws
+       nothing rather than dropping the whole background), and the blur is none, since the palette no longer emits
+       glass or its saturation and a blur through the opaque tile would draw nothing anyway. */
+    --ground-light: none;
+    --ground-glow: transparent;
+    --glass-blur: none;
+    /* NO GLASS (DIRECTION §39). Chrome that still names the glass gets the opaque tile (`base.css`) and this one hairline,
+       which is what keeps a menu or a popover off the content it opens over in the dark. */
+    --glass-edge: 0 0 0 1px var(--rule);
 
     /**
      * THE STATE ROLES: WHAT IS ON, WHAT IS CURRENT AND WHAT IS A LINK.
@@ -381,16 +456,18 @@
      * They sit on `:root` for the reason `--hover-wash` does: every one resolves its `var()`s against
      * the palette on `html`, which is the element `:root` is.
      */
-    --on: var(--ink);
+    /* ON AND A LINK ARE THE WORKING ACCENT NOW (DIRECTION §39): the blue says "chosen" and "go", and the red is free
+       to say "late" again. `--on-ink` stays the ground, for a mark on an ink fill. */
+    --on: var(--action);
     --on-ink: var(--bg);
-    --link: var(--ink);
+    --link: var(--action-text);
     /* A divider between rows of one list, softer than a boundary. */
     /* A hairline that reads on the ground as well as on a tile: `--line` is tuned for the tile and all but
        vanishes on the ground (1.05:1). Rows and group headings draw their rule with this. */
     --rule: color-mix(in srgb, var(--ink) 10%, transparent);
     --line-soft: color-mix(in srgb, var(--line) 60%, transparent);
-    /* Primary actions are drawn in ink, not in the accent. */
-    --primary-hover: color-mix(in srgb, var(--ink) 88%, var(--bg));
+    /* A primary action is the working accent's fill (DIRECTION §39), and this is its hover. */
+    --primary-hover: var(--action-hover);
     --warn-wash: color-mix(in srgb, var(--warn) 12%, transparent);
 
     /* A leading and a tracking for the top of the type scale (`--lh-3xl`, `--tr-tight`) stood here, and so did a tint
@@ -516,7 +593,7 @@
   /* SIZE follows the pointer, never the width. A small laptop window is not a phone, and a width
      query that changes a control's size is how it starts behaving like one (05 §6). */
   @media (pointer: coarse) {
-    :root { --ctl-h: 44px; }
+    :root { --ctl-h: 44px; --btn-h: 40px; --btn-h-sm: 40px; }
   }
 
   /* Comfortable is the design system's 44, which is `--row-h` as `:root` sets it, and the other two keep a step of 8
@@ -524,6 +601,8 @@
   html[data-density='compact'] { --row-h: 36px; }
   html[data-density='roomy'] { --row-h: 52px; }
 
+  /* The page says both schemes even where no meta does, so a form control the browser draws follows the system. */
+  html:not([data-scheme]) { color-scheme: light dark; }
   html[data-scheme='dark'] { color-scheme: dark; }
   html[data-scheme='light'] { color-scheme: light; }
 

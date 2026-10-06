@@ -972,7 +972,7 @@ export function readoutAt(model: ForecastModel, shown: Scenario, plan: ForecastP
 }
 
 /**
- * The paints the wash and the faint rules carry as attributes, as `ROADMAP_PAINT` gives its marks, so a page with no rule
+ * The paints the wash and the faint rules carry as attributes, as `RING_PAINT` gives its circles, so a page with no rule
  * for them draws a quiet wash and hairlines rather than a black slab; every rule in the host's stylesheet wins over them.
  */
 export const FORECAST_PAINT = {

@@ -45,9 +45,9 @@
     min-inline-size: 0;
     min-block-size: calc(var(--ctl-h) + var(--sp-1));
     padding-inline: var(--sp-3);
-    background: var(--s1);
+    background: var(--field);
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-ui);

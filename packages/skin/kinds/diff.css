@@ -26,8 +26,8 @@
 
   .diff-lines {
     padding-block: var(--sp-2);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--field);
+    border-radius: var(--r-ctl);
     overflow: hidden;
   }
 

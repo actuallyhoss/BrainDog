@@ -54,18 +54,16 @@ test('with no callback the chart is the picture it was: no grip, no cursor, noth
 
 test('with a callback every window and every date is a grip, and a date is taken whole because it has no edges', async () => {
   const html = render(await Roadmap(), { props: { block: block(), opts: { now: NOW }, onreschedule: () => {} } }).body;
-  const bars = html.match(/<rect[^>]*class="roadmap-bar"[^>]*>/gu) ?? [];
-  assert.equal(bars.length, 2);
+  const bars = html.match(/<span[^>]*class="roadmap-bar"[^>]*>/gu) ?? [];
+  assert.equal(bars.length, 3, 'two windows and a date');
   for (const bar of bars) {
     assert.match(bar, /data-grip=""/u);
-    assert.match(bar, /cursor="grab"/u);
+    assert.match(bar, /cursor: ?grab/u);
     /* A PHONE SCROLLS UP AND DOWN THROUGH A ROADMAP and drags across it, so only the horizontal is taken. */
     assert.match(bar, /touch-action: ?pan-y/u);
   }
-  /* A stem is a hairline, which no finger lands on, so it is taken by a wider stroke nobody sees, over the same line. */
-  const grips = html.match(/<path[^>]*class="roadmap-grip"[^>]*>/gu) ?? [];
-  assert.equal(grips.length, 1);
-  assert.match(grips[0]!, /stroke="transparent"/u);
+  /* The date is a dot on its day, and the dot is the grip: it has no edges, so the whole of it moves the date. */
+  assert.match(html, /<li class="roadmap-item" data-date=""[^>]*>[\s\S]*?class="roadmap-bar" data-grip=""/u);
 });
 
 test('the edge a pointer lands on picks the mode, and a bar too narrow for three parts is mostly its middle', async () => {

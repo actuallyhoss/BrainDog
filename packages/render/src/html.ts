@@ -13,7 +13,7 @@
  * ONE escape function, used on every value, and the only inline `style` values in the output are
  * custom properties holding numbers this file formats itself, never a colour or a length. This said
  * three of them, `--cells`, `--magnitude` and `--at`, long after `--chars`, `--cols`, `--fill` and
- * `--limit` had joined; `roadmap` adds `--tracks`, `--track`, `--lines` and `--line`, `heat` adds `--weeks`, a
+ * `--limit` had joined; `roadmap` adds `--rows` and `--span`, `heat` adds `--weeks`, a
  * range adds `--from` and `--to`, and a card's `hue` adds `--hue`, a whole number `hueOf` read as digits.
  *
  * ONE EXCEPTION, NAMED: `--swatch`, on an option's visual, holds a colour from the record, because which lining a
@@ -41,13 +41,13 @@ import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, gly
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
-import { SERIES_NET, SERIES_NONE, seriesPlan } from './series.ts';
+import { SERIES_NET, SERIES_NONE, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesOnly, linesPlan } from './lines.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { figureLike } from './figure.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
-import { ROADMAP_NONE, ROADMAP_PAINT, roadmapDue, roadmapLane, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
+import { ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
 import { HEAT_DAY, HEAT_NONE, HEAT_VALUE, heatLines, heatMissed, heatOutside, heatPeopleMore, heatPeoplePlan, heatPersonSaid, heatPlan, heatSkipped, heatTitle, heatWeekTitle } from './heat.ts';
 import { CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from './calendar.ts';
@@ -1231,8 +1231,16 @@ function lines(b: Block, o: RenderOptions): string {
 }
 
 /**
- * `series`: bars by bucket over a zero rule, in above and out below (`src/series.ts`), a legend, the
- * bucket labels, and the numbers as a table in a fold. `Series.svelte` is this function's twin.
+ * `series`: bars by bucket over the scale's three lines, money in above zero and money out below, the `net` form's
+ * line over them, the bucket names under them, and the numbers in a table for a screen reader (`src/series.ts`).
+ *
+ * THE BARS ARE HTML, a column a bucket, so a bar keeps its own width (no more than 24px) and its rounded end at any
+ * size of tile: drawn in a stretched box, a bar was as wide as its slot made it and its corners came out as ellipses.
+ * Each column holds its figures, shown on hover beside its bar, and before it in the right half (`data-flip`), where
+ * after it the card would run off the tile. Only the net line is drawn in a box, under no rule of width.
+ *
+ * TOO FEW BUCKETS ARE A FIGURE, NOT A CHART (`drawn`): each series' total, said once, where two bars side by side read
+ * as a comparison. The legend is drawn only where it tells two things apart; one series is named by the tile.
  */
 function series(b: Block, o: RenderOptions): string {
   const plan = seriesPlan(
@@ -1240,24 +1248,45 @@ function series(b: Block, o: RenderOptions): string {
     b.form === 'net',
   );
   const net = b.form === 'net';
-  const legend = `<ul class="series-legend">${plan.series
-    .map((s) => `<li class="series-key" data-dir="${s.dir}" data-step="${s.step}"><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${escape(s.label)}</span></li>`)
-    .join('')}${net ? `<li class="series-key" data-net=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${SERIES_NET}</span></li>` : ''}</ul>`;
+  const keyed = plan.drawn && (plan.series.length > 1 || net);
+  const legend = keyed
+    ? `<ul class="series-legend">${plan.series
+        .map((s) => `<li class="series-key" data-dir="${s.dir}" data-step="${s.step}"><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${escape(s.label)}</span></li>`)
+        .join('')}${net ? `<li class="series-key" data-net=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${SERIES_NET}</span></li>` : ''}</ul>`
+    : '';
+  const tip = (k: SeriesPlan['buckets'][number]): string =>
+    `<span class="series-tip"><span class="series-tip-label">${escape(k.label)}${k.said ? ` ${escape(k.said)}` : ''}</span>${plan.series
+      .map((s, i) => `<span class="series-tip-value">${escape(s.label)} <span class="num">${escape(k.values[i] ?? MISSING)}</span></span>`)
+      .join('')}${net ? `<span class="series-tip-value">${SERIES_NET} <span class="num">${escape(k.net)}</span></span>` : ''}</span>`;
   const chart = plan.empty
     ? `<p class="series-empty">${escape(SERIES_NONE)}</p>`
-    : `<div class="series-plot">${plan.top ? `<span class="series-top num" aria-hidden="true">${escape(plan.top)}</span>` : ''}<svg class="series-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(
-        `${plan.axis ? `${plan.axis}: ` : ''}${plan.sentence}`,
-      )}"><path class="series-zero" d="M0 ${plan.zero}H1000" vector-effect="non-scaling-stroke"></path>${plan.bars
-        .map(
-          (bar) =>
-            `<rect class="series-bar" data-dir="${bar.dir}" data-step="${bar.step}"${bar.state ? ` data-state="${bar.state}"` : ''} x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}" vector-effect="non-scaling-stroke"></rect>`,
-        )
-        .join('')}${plan.netLine ? `<path class="series-net" d="${plan.netLine}" vector-effect="non-scaling-stroke"></path><path class="series-dot" d="${plan.netDots}" vector-effect="non-scaling-stroke"></path>` : ''}</svg>${plan.bottom ? `<span class="series-bottom num" aria-hidden="true">${escape(plan.bottom)}</span>` : ''}</div><ol class="series-ticks" aria-hidden="true">${plan.buckets
-        .map(
-          (k) =>
-            `<li class="series-tick"${k.state ? ` data-state="${k.state}"` : ''}><span class="series-tick-long">${escape(k.label)}</span><span class="series-tick-short">${escape(k.short)}</span></li>`,
-        )
-        .join('')}</ol>`;
+    : !plan.drawn
+      ? `<p class="series-totals">${plan.totals
+          .map((t) => `<span class="series-total"><span class="series-total-value num">${escape(t.value)}</span> <span class="series-total-label">${escape(t.label)}</span></span>`)
+          .join('')}</p>`
+      : `<div class="series-plot" role="img" aria-label="${escape(`${plan.axis ? `${plan.axis}: ` : ''}${plan.sentence}`)}"><ol class="series-scale" aria-hidden="true">${plan.ticks
+          .map((t) => `<li class="series-line"${t.zero ? ' data-zero=""' : ''} style="--y:${t.y}"><span class="series-line-label num">${escape(t.label)}</span></li>`)
+          .join('')}</ol><ol class="series-cols" aria-hidden="true">${plan.buckets
+          .map(
+            (k, i) =>
+              `<li class="series-col"${k.state ? ` data-state="${k.state}"` : ''}${i >= plan.buckets.length / 2 ? ' data-flip=""' : ''}>${plan.bars
+                .filter((bar) => bar.bucket === i)
+                .map(
+                  (bar) =>
+                    `<span class="series-bar" data-dir="${bar.dir}" data-step="${bar.step}"${bar.state ? ` data-state="${bar.state}"` : ''}${bar.end ? ' data-end=""' : ''} style="--y:${bar.y};--h:${bar.height}"></span>`,
+                )
+                .join('')}${tip(k)}</li>`,
+          )
+          .join('')}</ol>${
+          plan.netLine
+            ? `<svg class="series-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><path class="series-net" d="${plan.netLine}" vector-effect="non-scaling-stroke"></path><path class="series-dot" d="${plan.netDots}" vector-effect="non-scaling-stroke"></path></svg>`
+            : ''
+        }</div><ol class="series-ticks" aria-hidden="true">${plan.buckets
+          .map(
+            (k) =>
+              `<li class="series-tick"${k.state ? ` data-state="${k.state}"` : ''}><span class="series-tick-long">${escape(k.label)}</span><span class="series-tick-short">${escape(k.short)}</span></li>`,
+          )
+          .join('')}</ol>`;
   const numbers = plan.buckets.length
     ? `<div class="series-numbers"><table class="series-table"><thead><tr><th scope="col">${escape(plan.axis)}</th>${plan.series
         .map((s) => `<th scope="col">${escape(s.label)}</th>`)
@@ -1314,21 +1343,19 @@ function forecast(b: Block, o: RenderOptions): string {
 }
 
 /**
- * `roadmap`: tasks on one time axis (`src/roadmap.ts`). A window is a bar on its track and a date is a stem,
- * over alternate month bands and today's line; the words sit in an HTML layer over the box, placed by `--at`,
- * because text inside a `preserveAspectRatio="none"` box is stretched with it. Every placed row is said again
- * as a table, in the order the rows came, which is what a screen reader reads: the drawing's own name is one
- * sentence and the labels over it are hidden, so nothing is heard twice.
+ * `roadmap`: tasks on one time axis (`src/roadmap.ts`), drawn as a timeline. Each row is a line of its own, its name in
+ * the left column and its window as a bar on a track in the right, so no name can land on another or on a bar: the
+ * names over a stretched drawing collided at every width (DIRECTION §39). A date with no effort is a dot on its day.
+ * Across the top the axis names each Monday or each month, and today's line runs down every track.
  *
- * THE VERTICAL IS THE DRAWING'S, the horizontal the plan's. The plan answers which track and where along the
- * axis; how tall a track is depends on how many there are (`roadmapLane`), and the host's stylesheet reads
- * `--tracks` and `--lines` to give the box and the label layer room. Every mark carries `ROADMAP_PAINT`, so a
- * page with no rule for this kind draws it quiet rather than black.
+ * THE LIST IS THE CHART. It was a drawing with a lane list under it for a screen reader and a phone; now the one list
+ * is what all three read, its name the plan's sentence. The bar's colour is the row's state, working, late or done, and
+ * a late row keeps its named glyph, so the colour is never the only word. Its days are said beside the bar on hover
+ * and under the name on a phone.
  *
- * A ROW THE PLAN SKIPPED IS NAMED UNDER THE DRAWING, by its title. Drawn nowhere and said nowhere, a task
- * whose due day did not read would simply be missing from the roadmap, and nobody would know to fix it.
- * Nothing here is interactive, and `svelte/p/Roadmap.svelte` draws this same tree (`roadmap-parity.test.ts`);
- * the drag and its undo will be the Svelte twin's alone, as `forecast`'s knobs are.
+ * A ROW THE PLAN SKIPPED IS NAMED UNDER THE TIMELINE, by its title. Drawn nowhere and said nowhere, a task whose due
+ * day did not read would simply be missing, and nobody would know to fix it. Nothing here is interactive, and
+ * `svelte/p/Roadmap.svelte` draws this same tree (`roadmap-parity.test.ts`); the drag is the Svelte twin's alone.
  */
 function roadmap(b: Block, o: RenderOptions): string {
   const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
@@ -1339,59 +1366,19 @@ function roadmap(b: Block, o: RenderOptions): string {
     : '';
   if (plan.empty) return `<div class="roadmap"><p class="roadmap-empty">${escape(ROADMAP_NONE)}</p>${skipped}</div>`;
 
-  const paint = (p: Readonly<Record<string, string>>): string =>
-    Object.entries(p)
-      .map(([k, v]) => ` ${k}="${v}"`)
-      .join('');
-  const line = (cls: string, x: string, painted: string): string =>
-    `<path class="${cls}" d="M${x} 0V100"${painted} vector-effect="non-scaling-stroke"></path>`;
-  /* A TONED MARK IS A GROUP: the intent on the group, and the drawing and its named dot inside it (`roadmapDue`). */
-  const toned = (tone: string | undefined, drawn: string, due: string): string => {
-    if (!tone || !Object.hasOwn(TONES, tone)) return drawn;
-    return `<g class="roadmap-mark"${toneAttrs(tone)}>${drawn}<path class="roadmap-due" role="img" aria-label="${TONES[tone as keyof typeof TONES].label}" d="${due}"${paint(ROADMAP_PAINT.due)} vector-effect="non-scaling-stroke"></path></g>`;
-  };
-  const chart = `<svg class="roadmap-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(roadmapSentence(plan))}">${plan.bands
-    .map(
-      (m) =>
-        `<rect class="roadmap-band"${m.odd ? ' data-odd=""' : ''}${paint(m.odd ? ROADMAP_PAINT.band : ROADMAP_PAINT.even)} x="${m.x}" y="0" width="${m.width}" height="100"></rect>`,
-    )
-    .join('')}${plan.bars
-    .map((bar) => {
-      const lane = roadmapLane(bar.lane, plan.laneCount);
-      const drawn = `<rect class="roadmap-bar"${paint(ROADMAP_PAINT.bar)} x="${bar.x}" y="${lane.y}" width="${bar.width}" height="${lane.height}" vector-effect="non-scaling-stroke"></rect>`;
-      return toned(bar.tone, drawn, roadmapDue(bar.x, bar.width, lane));
-    })
-    .join('')}${plan.stems.map((s) => toned(s.tone, line('roadmap-stem', s.x, paint(ROADMAP_PAINT.stem)), roadmapDue(s.x, null, null))).join('')}${
-    plan.today === null ? '' : line('roadmap-today', plan.today, paint(ROADMAP_PAINT.today))
-  }</svg>`;
-  /* `--at` IS A SHARE OF THE WIDTH, as `blocks-charts.css` reads it for every chart's ticks (`calc(var(--at) * 100%)`),
-     and the plan answers in the box's thousand units, so a label is put where its mark is only after dividing. */
-  const names = `<ol class="roadmap-names" aria-hidden="true">${plan.bars
-    .map(
-      (bar) =>
-        `<li class="roadmap-name" data-side="${bar.label.side}"${bar.label.today ? ' data-today=""' : ''} style="--at:${roadmapShare(bar.label.x)};--room:${roadmapShare(bar.label.room)};--track:${bar.lane}">${escape(bar.title)}</li>`,
-    )
-    .join('')}${plan.stems
-    .map((s) => `<li class="roadmap-name" data-stem="" style="--at:${roadmapShare(s.label.x)};--line:${s.label.line}">${escape(s.title)}</li>`)
-    .join('')}</ol>`;
-  /* ONE DOT A MARK: the names carry no glyph, because the dot on the due day is the tone and is named. NOR ANY
-     INTENT: a name is drawn in the ink whatever its mark's tone, and an intent on it with no glyph inside was colour
-     claiming a meaning it never drew (the a11y gate's `intent-without-glyph`, on `/p/kiln`). The axis names each
-     month wide enough to hold its name, or each Monday of a short span (`ticks`). */
-  const months = `<ol class="roadmap-months"${plan.weekly ? ' data-weekly=""' : ''} aria-hidden="true">${plan.ticks
-    .map((m) => `<li class="roadmap-month"${m.odd ? ' data-odd=""' : ''} style="--at:${roadmapShare(m.x)}">${escape(m.label)}</li>`)
-    .join('')}</ol>`;
-  /* A LANE LIST, NOT A TABLE: a name with its span of days under it and a short bar where it lies in the span. It is
-     what a screen reader reads beside the drawing and what a phone draws instead of it, where the three columns of
-     a table broke every name inside its words. */
-  const list = `<div class="roadmap-numbers"><ol class="roadmap-list">${roadmapLines(plan)
+  /* `--at` IS A SHARE OF THE WIDTH, as `blocks-charts.css` reads it for every chart's ticks (`calc(var(--at) * 100%)`). */
+  const axis = `<ol class="roadmap-axis"${plan.weekly ? ' data-weekly=""' : ''} aria-hidden="true">${roadmapAxis(plan)
+    .map((t) => `<li class="roadmap-tick" style="--at:${roadmapShare(t.x)}">${escape(t.label)}</li>`)
+    .join('')}${plan.today === null ? '' : `<li class="roadmap-today" style="--at:${roadmapShare(plan.today)}">${ROADMAP_TODAY}</li>`}</ol>`;
+  const lines = roadmapLines(plan);
+  const list = `<ol class="roadmap-list" aria-label="${escape(roadmapSentence(plan))}">${lines
     .map(
       (p) =>
-        `<li class="roadmap-item"${toneAttrs(p.tone)} style="--at:${p.at};--span:${p.span}"><span class="roadmap-item-title">${escape(p.title)}${toneGlyph(p.tone)}</span> <span class="roadmap-item-when num">${escape(p.when)}</span><span class="roadmap-item-track" aria-hidden="true"><span class="roadmap-item-bar"></span></span></li>`,
+        `<li class="roadmap-item"${toneAttrs(p.tone)}${p.from === MISSING ? ' data-date=""' : ''}${roadmapFlip(p) ? ' data-flip=""' : ''} style="--at:${p.at};--span:${p.span}"><span class="roadmap-item-title">${escape(p.title)}${toneGlyph(p.tone)}</span> <span class="roadmap-item-when num">${escape(p.when)}</span><span class="roadmap-item-track" aria-hidden="true"><span class="roadmap-bar"></span></span></li>`,
     )
-    .join('')}</ol></div>`;
+    .join('')}</ol>`;
 
-  return `<div class="roadmap"${plan.lanes ? ' data-lanes=""' : ''} style="--tracks:${plan.laneCount};--lines:${plan.lines}"><div class="roadmap-plot">${chart}${names}</div>${months}${list}${skipped}</div>`;
+  return `<div class="roadmap" style="--rows:${lines.length}">${axis}${list}${skipped}</div>`;
 }
 
 /**

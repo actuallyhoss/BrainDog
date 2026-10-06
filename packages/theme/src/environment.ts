@@ -21,9 +21,11 @@
  * mark to stand beside the brand, it answers 286. That is the answer, and it did not need a
  * designer.
  *
- * WHAT MOVES AND WHAT DOES NOT. Only the eight accent roles change: `accent`, `accent-edge`,
- * `accent-hover`, `accent-press`, `accent-text`, `accent-ink`, and the two mark constants that
- * follow the hue. The five surfaces, the four inks, both boundaries, all four intents and all four
+ * WHAT MOVES AND WHAT DOES NOT. Only the accent roles change: `accent`, `accent-edge`,
+ * `accent-hover`, `accent-press`, `accent-text`, `accent-ink`, the two mark constants that
+ * follow the hue, and since 2026-10-07 the working accent (`action` and its five), which the house
+ * pins only beside its own red (`Seed.action`), so an environment's buttons and links wear its hue
+ * too. The five surfaces, the board and the tile, the four inks, both boundaries, all four intents and all four
  * `-fill` variants are byte-identical to the house palette, because the intents are solved at fixed
  * hue anchors against a ground whose chroma is capped well below any seed's. Measured: every
  * non-accent role identical in both schemes. Three consequences, all wanted —

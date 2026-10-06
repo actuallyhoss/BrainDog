@@ -25,7 +25,18 @@ export type SeriesState = '' | 'partial' | 'due' | 'ahead';
 /** At most this many series draw; a fifth column is left out of the drawing and the numbers alike. */
 export const SERIES_MOST = 4;
 
-export type SeriesBar = { series: number; dir: SeriesDir; step: number; state: SeriesState; x: string; y: string; width: string; height: string };
+/**
+ * One bar of a bucket's stack, in the `0 0 1000 100` box: `y` and `height` are shares of the plot's height in
+ * hundredths, which is what the drawers write as `--y` and `--h`. `end` marks the outermost bar of its stack, the one
+ * whose free end is rounded.
+ */
+export type SeriesBar = { bucket: number; series: number; dir: SeriesDir; step: number; state: SeriesState; x: string; y: string; width: string; height: string; end: boolean };
+
+/** A line of the scale: where it sits, in hundredths of the plot's height from the top, and the figure it says. */
+export type SeriesTick = { y: string; label: string; zero: boolean };
+
+/** A series' total, for a tile with too few buckets to draw: the figure in the cells' own form, and its name. */
+export type SeriesTotal = { label: string; value: string };
 
 export type SeriesPlan = {
   /** What the first column names: `Month`. */
@@ -49,11 +60,20 @@ export type SeriesPlan = {
   /** The net line's path, broken at a gap, and a dot at every point. Empty without the `net` form. */
   netLine: string;
   netDots: string;
-  /** The largest stack up and down, as printed, or '' when nothing stands on that side. */
+  /** The top and the foot of the scale, as printed, or '' when nothing stands on that side. */
   top: string;
   bottom: string;
+  /** The scale's three lines: the top, the middle or zero, and zero or the foot (`seriesScale`). */
+  ticks: SeriesTick[];
   /** No value anywhere above zero: the chart is a sentence. */
   empty: boolean;
+  /**
+   * Whether there is a chart to draw: at least `SERIES_POINTS` buckets hold a value. Fewer is not a trend, and two bars
+   * side by side read as a comparison nobody asked for, so the tile says each series' total instead (`totals`).
+   */
+  drawn: boolean;
+  /** Each series added up over every bucket, written like its cells. */
+  totals: SeriesTotal[];
   /** The chart's accessible name. */
   sentence: string;
 };
@@ -97,9 +117,12 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
     down: v.reduce<number>((s, x, i) => s + (series[i]!.dir === 'out' ? (x ?? 0) : 0), 0),
     gap: v.every((x) => x === null),
   }));
-  const hi = Math.max(0, ...sums.map((s) => s.up));
-  const lo = Math.max(0, ...sums.map((s) => s.down));
   const template = body.flatMap((r) => r.slice(1, series.length + 1)).find((c) => seriesValue(c) !== null) ?? '';
+  /* THE SCALE ENDS ON A ROUND FIGURE, so its three lines say figures a person reads at a glance: 2, 1 and 0 under a
+     week of two, not 2.3 and 1.15. A whole-number series keeps its middle line whole. */
+  const whole = !/[.,]\d{1,2}(?!\d)/u.test(template.replace(/,\d{3}/gu, ''));
+  const hi = seriesNice(Math.max(0, ...sums.map((s) => s.up)), whole);
+  const lo = seriesNice(Math.max(0, ...sums.map((s) => s.down)), whole);
   const netOf = (i: number): number | null => (sums[i]!.gap ? null : sums[i]!.up - sums[i]!.down);
 
   const n = body.length;
@@ -113,6 +136,7 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
   if (span > 0)
     body.forEach((r, i) => {
       const state = stateOf(stated ? r[stateAt] : undefined);
+      const stack: SeriesBar[] = [];
       let up = 0;
       let down = 0;
       series.forEach((s, k) => {
@@ -123,8 +147,14 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
         if (s.dir === 'in') up += v;
         else down += v;
         const top = y(Math.max(from, to));
-        bars.push({ series: k, dir: s.dir, step: s.step, state, x: at(i * slot + (slot - barWidth) / 2), y: at(top), width: at(barWidth), height: at(y(Math.min(from, to)) - top) });
+        stack.push({ bucket: i, series: k, dir: s.dir, step: s.step, state, x: at(i * slot + (slot - barWidth) / 2), y: at(top), width: at(barWidth), height: at(y(Math.min(from, to)) - top), end: false });
       });
+      /* THE OUTERMOST BAR EACH WAY carries the rounded end, so a stack reads as one bar with one cap. */
+      for (const dir of ['in', 'out'] as const) {
+        const last = stack.findLast((b) => b.dir === dir);
+        if (last) last.end = true;
+      }
+      bars.push(...stack);
     });
 
   let netLine = '';
@@ -177,6 +207,23 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
     };
   });
 
+  /* A TOTAL IS ADDED IN ONE UNIT AND IN WHOLE MINOR UNITS. Each series is summed in its own cells' form, not the first
+     series', so hours under money stay hours; a series whose cells name two currencies, or a currency and none, has no
+     total, because two currencies are never added, and then the tile draws its bars rather than drop the series. The
+     sum is taken in hundredths (or whatever the cells write) as integers, so £0.10 and £0.20 are £0.30 exactly. */
+  let mixed = false;
+  const totals = series.flatMap((sr, k) => {
+    const cells = body.map((r) => (r[k + 1] ?? '').trim()).filter((c) => seriesValue(c) !== null);
+    if (!cells.length) return [];
+    if (new Set(cells.map(unitOf)).size > 1) {
+      mixed = true;
+      return [];
+    }
+    const places = Math.max(0, ...cells.map((c) => /\.(\d+)/u.exec(c.replace(/,/gu, ''))?.[1]?.length ?? 0));
+    const minor = cells.reduce((t, c) => t + Math.round(seriesValue(c)! * 10 ** places), 0);
+    return [{ label: sr.label, value: figureLike(cells[0]!, minor / 10 ** places) }];
+  });
+
   const sentence = buckets
     .map((b) => {
       const parts = series.map((s, k) => `${s.label} ${b.values[k]}`);
@@ -195,9 +242,49 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
     netDots,
     top: hi > 0 ? axisFigure(figureLike(template, hi)) : '',
     bottom: lo > 0 ? axisFigure(figureLike(template, -lo)) : '',
+    ticks: span > 0 ? seriesScale(hi, lo, y, template) : [],
     empty: span <= 0,
+    drawn: span > 0 && (sums.filter((x) => !x.gap).length >= SERIES_POINTS || mixed),
+    totals,
     sentence,
   };
+}
+
+/** What a cell says around its figure, its sign aside: `£#` of `−£1,200.00`, `GBP #`, `#h`. */
+const unitOf = (cell: string): string => cell.replace(/^[+−-]\s*/u, '').replace(/[−-]?\d[\d,]*(?:\.\d+)?/u, '#').replace(/\s+/gu, ' ');
+
+/** The fewest buckets with a value that make a chart: fewer is a figure, not a trend (DIRECTION §39). */
+export const SERIES_POINTS = 3;
+
+/**
+ * The round figure at or above `v` that a scale ends on: 1, 2, 3, 4, 5, 6, 8 or 10 times a power of ten, so a short
+ * scale does not jump from 5 to 10. Never 2.5: its middle line, 12.5 or 1.25, was printed rounded (`axisFigure`) and
+ * said a figure the line was not at. Nor a step whose middle would not print as itself: a count's 1, 3 or 5 (a half),
+ * or 0.3 (0.15, printed 0.2).
+ */
+export function seriesNice(v: number, whole = false): number {
+  if (!(v > 0) || !Number.isFinite(v)) return 0;
+  const power = 10 ** Math.floor(Math.log10(v));
+  /* THE MIDDLE MUST PRINT AS ITSELF: whole for a count, and to the one decimal `axisFigure` keeps under ten. */
+  const exact = (n: number): boolean => Math.abs(n - Math.round(n)) < 1e-9;
+  const steps = [1, 2, 3, 4, 5, 6, 8, 10].filter((x) => {
+    const mid = (x * power) / 2;
+    return whole || mid >= 10 ? exact(mid) : exact(mid * 10);
+  });
+  const f = v / power;
+  /* A hair of rounding slack, so 3.0000000004 of a float is still 3's step and not the next; and the product rounded,
+     so 3 tenths is 0.3 and not 0.30000000000000004. */
+  const step = steps.find((x) => f <= x * (1 + 1e-9)) ?? 10;
+  return Number((step * power).toPrecision(12));
+}
+
+/**
+ * The scale's three lines, top first: the top, its middle and zero where nothing goes out; the top, zero and the foot
+ * where something does; zero, the middle and the foot where nothing comes in.
+ */
+function seriesScale(hi: number, lo: number, y: (v: number) => number, template: string): SeriesTick[] {
+  const marks = hi > 0 && lo > 0 ? [hi, 0, -lo] : hi > 0 ? [hi, hi / 2, 0] : [0, -lo / 2, -lo];
+  return marks.map((v) => ({ y: at(y(v)), label: axisFigure(figureLike(template, v)), zero: v === 0 }));
 }
 
 /** The renderer's own words, as `split.ts` keeps `SPLIT_ZERO`: it imports nothing from the app. */

@@ -73,8 +73,8 @@
   .list[data-form='path'] .item-marker {
     position: relative;
     justify-self: center;
-    border-radius: var(--r-pill);
-    background: var(--bg);
+    border-radius: var(--r-round);
+    background: var(--tile);
   }
 
   .list[data-form='path'] > .item[data-mark='done'] > .item-marker {
@@ -96,10 +96,10 @@
   .path-next {
     display: inline-block;
     padding: 1px var(--sp-2);
-    border: 1px solid var(--ink);
-    border-radius: var(--r-pill);
-    background: var(--bg);
-    color: var(--ink);
+    border: 0;
+    border-radius: var(--r-sm);
+    background: var(--action-tint-1);
+    color: var(--action-text);
     font-size: var(--t-sm);
     font-weight: 500;
   }

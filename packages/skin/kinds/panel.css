@@ -14,9 +14,9 @@
   .panel {
     margin: 0;
     padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
+    background: var(--field);
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink2);
     font-size: var(--t-base);
   }

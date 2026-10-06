@@ -26,8 +26,8 @@
   .degraded-source {
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--field);
+    border-radius: var(--r-ctl);
     color: var(--dim);
     font-family: var(--font-id);
     font-size: var(--t-sm);
@@ -40,9 +40,9 @@
     margin-inline-start: auto;
     min-block-size: var(--ctl-h-sm);
     padding: 0 var(--sp-3);
-    background: var(--s1);
+    background: var(--field);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font-size: var(--t-sm);
     cursor: pointer;
@@ -50,8 +50,8 @@
 
   .needs-client {
     padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--field);
+    border-radius: var(--r-ctl);
     color: var(--dim);
     font-size: var(--t-sm);
   }

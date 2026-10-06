@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SERIES_AHEAD, SERIES_DUE, SERIES_PARTIAL, seriesPlan, seriesValue } from './series.ts';
+import { SERIES_AHEAD, SERIES_DUE, SERIES_PARTIAL, seriesNice, seriesPlan, seriesValue } from './series.ts';
 import { figureLike } from './figure.ts';
 
 const HEAD = ['Month', 'in: Money in', 'out: Money out', 'state'];
@@ -18,8 +18,9 @@ test('a gap is a gap and never a zero', () => {
   assert.doesNotMatch(plan.netLine, /L/u, 'the net line breaks at the gap rather than reading zero');
 });
 
-test('in stands above the zero rule and out hangs under it, on one scale', () => {
+test('in stands above the zero rule and out hangs under it, on one scale that ends on round figures', () => {
   const plan = seriesPlan([HEAD, ['Apr', '£300.00', '£100.00', ''], ['May', '£100.00', '£300.00', 'partial']]);
+  /* £300 each way is a round figure already, so the scale's lines say £300, £0 and −£300. */
   assert.equal(plan.zero, '50');
   const [upA, downA, upB, downB] = plan.bars;
   assert.deepEqual([upA!.dir, upA!.y, upA!.height], ['in', '0', '50']);
@@ -28,14 +29,49 @@ test('in stands above the zero rule and out hangs under it, on one scale', () =>
   assert.equal(downB!.height, '50');
   assert.equal(plan.top, '£300');
   assert.equal(plan.bottom, '−£300');
+  assert.deepEqual(plan.ticks.map((t) => [t.y, t.label, t.zero]), [['0', '£300', false], ['50', '£0', true], ['100', '−£300', false]]);
   assert.equal(plan.series[1]!.dir, 'out');
 });
 
 test('two series one way stack, and a bare header label is money in', () => {
   const plan = seriesPlan([['Q', 'Sales', 'Fees', 'out: Costs'], ['Q1', '10', '5', '3']]);
   assert.deepEqual(plan.series.map((s) => [s.dir, s.step]), [['in', 0], ['in', 1], ['out', 0]]);
-  assert.equal(plan.bars[1]!.y, '0');
-  assert.equal(plan.bars[0]!.y, String(Math.round((5 / 18) * 10000) / 100));
+  /* 15 up rounds to 20 and 3 down to 4, a scale of 24. */
+  assert.equal(plan.bars[1]!.y, String(Math.round((5 / 24) * 10000) / 100));
+  assert.equal(plan.bars[0]!.y, String(Math.round((10 / 24) * 10000) / 100));
+  assert.deepEqual(plan.bars.map((b) => b.end), [false, true, true], 'the cap is on the top of the stack and the foot of what hangs');
+});
+
+test('THE SCALE ENDS ON A ROUND FIGURE, and a count keeps its middle line whole', () => {
+  const nice = (v: number, whole = false): number => seriesNice(v, whole);
+  assert.deepEqual([nice(2, true), nice(3, true), nice(1, true), nice(7, true)], [2, 4, 2, 8]);
+  assert.deepEqual([nice(300), nice(4800), nice(1.2), nice(0)], [300, 5000, 2, 0]);
+  /* A MIDDLE LINE PRINTS AS ITSELF: 25 halved is 12.5, printed 13 on a line at 12.5, so a count of 21 ends on 30. */
+  assert.deepEqual([nice(21, true), nice(21), nice(2.1), nice(0.3)], [30, 30, 3, 0.4]);
+  const run = seriesPlan([['Week', 'in: Done'], ['Week of 20 Jul', '1'], ['Week of 27 Jul', '0'], ['Week of 3 Aug', '2']]);
+  assert.deepEqual(run.ticks.map((t) => t.label), ['2', '1', '0']);
+});
+
+test('FEWER THAN THREE BUCKETS ARE A FIGURE, NOT A CHART: each series is said as its total', () => {
+  const two = seriesPlan([['Week', 'in: Done'], ['Week of 20 Jul', '1'], ['Week of 27 Jul', '2']]);
+  assert.equal(two.empty, false);
+  assert.equal(two.drawn, false);
+  assert.deepEqual(two.totals, [{ label: 'Done', value: '3' }]);
+  const gaps = seriesPlan([HEAD, ['Apr', '£300.00', '', ''], ['May', '', '', ''], ['Jun', '£100.00', '£50.00', '']]);
+  assert.equal(gaps.drawn, false, 'a bucket of gaps is not a point');
+  assert.deepEqual(gaps.totals.map((t) => t.value), ['£400.00', '£50.00']);
+  assert.equal(seriesPlan([['Week', 'in: Done'], ['A', '1'], ['B', '0'], ['C', '2']]).drawn, true);
+});
+
+test('A TOTAL IS IN ONE UNIT: each series in its own cells, in whole minor units, and two currencies are never added', () => {
+  const own = seriesPlan([['Month', 'in: Billed', 'in: Hours'], ['Jan', '£0.10', '3'], ['Feb', '£0.20', '4']]);
+  assert.deepEqual(own.totals, [
+    { label: 'Billed', value: '£0.30' },
+    { label: 'Hours', value: '7' },
+  ]);
+  const two = seriesPlan([['Month', 'in: Money in', 'out: Money out'], ['Jan', '£1,200.00', '£300.00'], ['Feb', '€500.00', '£100.00']]);
+  assert.deepEqual(two.totals, [{ label: 'Money out', value: '£400.00' }], 'pounds and euros have no total');
+  assert.equal(two.drawn, true, 'a series with no total is drawn rather than dropped');
 });
 
 test('the net is in minus out, written like the cells, and the states are said', () => {

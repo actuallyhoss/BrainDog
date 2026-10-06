@@ -27,7 +27,7 @@
     padding: var(--sp-1) var(--sp-3);
     min-block-size: var(--row-h);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     background: none;
     color: inherit;
     font: inherit;
@@ -38,7 +38,7 @@
     position: relative;
     block-size: 6px;
     border-radius: calc(var(--r-sm) / 2);
-    background: var(--s1);
+    background: var(--field);
     overflow: hidden;
   }
 

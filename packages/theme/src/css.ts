@@ -23,8 +23,8 @@ function block(built: Built, scheme: Scheme, selector: string, indent = '  '): s
     decls(built.schemes[scheme], inner),
     `${inner}--mark-l: ${m.L};`,
     `${inner}--mark-c: ${m.C};`,
-    /* The glass, the ground's light and the washes. Generated values that are not roles, emitted where the
-       palette is so they swap with the scheme and with high contrast in the same block. */
+    /* The row washes and the arrival tint. Generated values that are not roles, emitted where the palette is so
+       they swap with the scheme and with high contrast in the same block. */
     ...Object.entries(built.chrome[scheme]).map(([k, v]) => `${inner}--${k}: ${v};`),
     `${inner}--e1: ${e[0]};`,
     `${inner}--e2: ${e[1]};`,

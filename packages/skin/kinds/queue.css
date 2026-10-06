@@ -9,8 +9,10 @@
 @layer components {
   /* ── queue: what is waiting on you ───────────────────────────────────────
      One card a question, because a question is read whole: who asked, what they are asking, why, and
-     the ways to answer it. The ways are a row of quiet buttons, and a line each only where a reason is
-     given, so the reason is read beside its own option and no other. */
+     the ways to answer it. DIRECTION §39: it reads like a form. Who asked and when at 13 in the quiet ink, the question
+     at 17 semibold, then the ways: a row of rectangle buttons where none carries a reason, and where one does, a
+     vertical list of choices, each a full-width rectangle with its name and its one line of what it does, the
+     suggested one marked "Suggested" in the accent's words. */
 
   /* THE BLOCK IS ITS OWN CONTAINER, so a queue answers the width of the slot it was placed in rather
      than the width of the window. A queue at `span: 6` on a wide screen is as narrow as the same
@@ -63,9 +65,9 @@
      hairlines it would cross go. */
   .queue-card[data-focused] {
     border-block-start-color: transparent;
-    border-radius: var(--r-md);
-    background: var(--s2);
-    box-shadow: 0 0 0 var(--sp-2) var(--s2);
+    border-radius: var(--r-ctl);
+    background: var(--field);
+    box-shadow: 0 0 0 var(--sp-2) var(--field);
   }
 
   .queue-card[data-focused] + .queue-card {
@@ -84,7 +86,7 @@
     gap: var(--sp-2);
     align-items: baseline;
     margin: 0;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     color: var(--dim);
   }
 
@@ -141,16 +143,16 @@
      it is centred on the pill's height. Quiet, in the same pill as `queue-rec`, for the same reason: a ranking that
      shouts is a ranking that decides.
 
+     WORDS, NOT A PILL (DIRECTION §39): the band is a quiet line of 13 at the end of the ways, and the host says the
+     dearest one in its button too ("Accept, can't be undone easily").
+
      THE WORD CARRIES IT AND THE COLOUR DOES NOT. Four bands on four colours would be a legend a
      reader has to learn and an a11y failure the moment one of them is the only difference, so the
      dearest band takes weight and the darker ink, and the other three are identical. `data-cost` is
      matched rather than the English, so a translated label still weights the right card. */
   .queue-cost {
-    padding-inline: var(--sp-2);
-    border-radius: var(--r-pill);
-    background: var(--s1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--dim);
+    font-size: var(--fs-meta);
     white-space: nowrap;
   }
 
@@ -170,7 +172,7 @@
   }
 
   .queue-card > .queue-options + .queue-cost {
-    margin-block-start: calc((var(--ctl-h) - 1lh) / 2);
+    margin-block-start: calc((var(--btn-h) - 1lh) / 2);
   }
 
   .queue-card > .queue-ways + .queue-cost {
@@ -178,8 +180,8 @@
   }
 
   .queue-cost[data-cost='undo'] {
-    color: var(--ink);
-    font-weight: 500;
+    color: var(--ink2);
+    font-weight: var(--fw-medium);
   }
 
   /* THE PLAINEST BAND IS NOT DRAWN. "Your call" is what every question is until something makes it dearer, so on every
@@ -189,10 +191,13 @@
     display: none;
   }
 
+  /* THE QUESTION IS 17 SEMIBOLD (DIRECTION §39), the headline step: read first on the card and never a heading's
+     shout. */
   .queue-question {
     margin: 0;
-    font-size: var(--t-lg);
-    line-height: var(--lh-tight);
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
+    line-height: var(--lh-head);
     color: var(--ink);
   }
 
@@ -202,9 +207,9 @@
     color: var(--ink2);
   }
 
-  /* THE WAYS TO ANSWER ARE ONE ROW OF QUIET BUTTONS when none of them carries a reason, side by side and as wide as
-     their words, because "Chase it" and "Not yet" stacked under each other read as a list of two things and not as the
-     two answers to one question. The suggestion's word sits beside the button it names. */
+  /* THE WAYS TO ANSWER ARE ONE ROW OF RECTANGLE BUTTONS when none of them carries a reason, side by side and as wide
+     as their words, because "Chase it" and "Not yet" stacked under each other read as a list of two things and not as
+     the two answers to one question. */
   .queue-options {
     display: flex;
     flex-wrap: wrap;
@@ -220,101 +225,148 @@
     align-items: center;
   }
 
-  /* WHERE A REASON IS GIVEN, EACH WAY IS A LINE: the button in a column of ONE fixed width, its reason beside it. The
-     width is the queue's and not each question's, so every reason in the tile starts at one x, question after question,
-     and does not follow the longest button of its own question. It is wide enough for a short answer and its "Suggested"
-     on one line ("Keep the subdomain" took two at 12rem); a longer option wraps inside its pill. The suggestion's
-     word goes under its button, in the button's column, so it never pushes that one reason out of line. */
+  /* WHERE A REASON IS GIVEN, THE WAYS ARE A FORM'S CHOICES (DIRECTION §39): a vertical list, each a full-width
+     rectangle with the option's name on its first line, "Suggested" at that line's end in the accent's words, and the
+     one line of what it does under the name. The whole rectangle answers a press (the button's `::after` covers it),
+     so the reason is part of the choice and never a second column out of line with it. */
   .queue-options:has(.queue-because) {
     display: grid;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
   }
 
   .queue-options:has(.queue-because) > .queue-option {
+    position: relative;
     display: grid;
-    grid-template-columns: 15rem minmax(0, 1fr);
-    gap: var(--sp-1) var(--sp-4);
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'visual visual'
+      'name rec'
+      'because because';
+    gap: 0 var(--sp-3);
     align-items: baseline;
+    padding: 10px var(--sp-3);
+    border-radius: var(--r-ctl);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    transition:
+      background var(--d-state) var(--ease-out),
+      box-shadow var(--d-state) var(--ease-out);
   }
 
-  /* EACH PART NAMES ITS OWN CELL, so an option with no suggestion or no reason leaves its cell empty rather than sliding
-     the next part into it. */
-  .queue-options:has(.queue-because) .queue-act,
-  .queue-options:has(.queue-because) .queue-label {
-    grid-row: 1;
-    grid-column: 1;
-    max-inline-size: 100%;
+  @media (hover: hover) and (pointer: fine) {
+    .queue-options:has(.queue-because) > .queue-option:hover {
+      background: var(--hover-wash);
+    }
   }
 
-  .queue-options:has(.queue-because) .queue-rec {
-    grid-row: 2;
-    grid-column: 1;
+  /* THE ONE BEING ANSWERED (`QueueAnswer.svelte`'s `data-on`) is the accent's tint with an accent edge: chosen, in the
+     colour that means chosen. */
+  .queue-options:has(.queue-because) > .queue-option:has(> .queue-act[data-on]) {
+    background: var(--action-tint-1);
+    box-shadow: inset 0 0 0 1px var(--action);
+  }
+
+  .queue-options:has(.queue-because) .queue-visual {
+    grid-area: visual;
+    margin-block-end: var(--sp-2);
+  }
+
+  .queue-options:has(.queue-because) :is(.queue-act, .queue-label) {
+    grid-area: name;
+  }
+
+  .queue-options:has(.queue-because) .queue-option > .queue-rec {
+    grid-area: rec;
   }
 
   .queue-options:has(.queue-because) .queue-because {
-    grid-row: 1;
-    grid-column: 2;
+    grid-area: because;
+    margin-block-start: 2px;
   }
 
-  /* AN ANSWER IS A PILL, the shape `QueueAnswer.svelte` already
-     gave the answerable queue, so the read-only renderer's options and the ones on Home are one drawing. A long option
-     wraps inside its pill rather than pushing the card sideways at 390. */
+  /* THE NAME IS THE BUTTON, drawn as words: no fill of its own, since the rectangle round it is the control. */
+  .queue-options:has(.queue-because) .queue-act {
+    display: flex;
+    inline-size: 100%;
+    min-block-size: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-weight: var(--fw-medium);
+  }
+
+  .queue-options:has(.queue-because) .queue-act::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  /* A LINK IN A REASON STAYS A LINK: it stands over the press that covers the rest of the choice. */
+  .queue-options:has(.queue-because) .queue-because :is(a, button) {
+    position: relative;
+    z-index: var(--z-raise);
+  }
+
+  /* A NAME'S OWN "SUGGESTED" GOES TO THE END OF ITS LINE. */
+  .queue-options:has(.queue-because) .queue-act > .queue-rec {
+    margin-inline-start: auto;
+  }
+
+  /* AN ANSWER IS A RECTANGLE BUTTON, the shape `Button.svelte` draws (DIRECTION §39: radius 8, `--btn-h`, 14 medium on
+     the `--field` fill), so the read-only renderer's options and the ones on Home and Decide are one drawing. A long
+     option wraps inside its rectangle rather than pushing the card sideways at 390. */
   .queue-act {
     justify-self: start;
-    /* THE PILL IS A ROW OF PARTS: the suggestion's dot and the number key at its start (below), then the option's
-       words, which give way inside themselves. A flex pill does not centre a line in its height as a button does, so
-       the padding puts a one-line pill's words in its middle and a longer one grows from there. */
+    /* THE BUTTON IS A ROW OF PARTS: the number key at its start (below), then the option's words, which give way inside
+       themselves, then "Suggested". A flex box does not centre a line in its height as a button does, so the padding
+       puts a one-line button's words in its middle and a longer one grows from there. */
     display: inline-flex;
     align-items: baseline;
     column-gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
-    padding-block: max(0px, calc((var(--ctl-h) - 2px - 1lh) / 2));
-    padding-inline: var(--sp-4);
+    min-block-size: var(--btn-h);
+    padding-block: max(0px, calc((var(--btn-h) - 2px - 1lh) / 2));
+    padding-inline: var(--sp-3);
     border: 1px solid transparent;
-    border-radius: var(--r-pill);
-    background: var(--s1);
+    border-radius: var(--r-ctl);
+    background: var(--field);
     color: var(--ink);
     font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
     text-align: start;
     overflow-wrap: anywhere;
     cursor: pointer;
   }
 
   .queue-act:hover {
-    background: var(--hold-wash);
+    background: var(--field-hover);
   }
 
-  /* THE SUGGESTED ANSWER IS AN OUTLINE WITH A SMALL DOT (DIRECTION §37, his pick), and not the primary's ink fill: it
-     is said and not pressed for anybody, so it reads as one answer among the others and never as one already chosen.
-     The dot says it to the eye and the word is kept for a screen reader (below). NOT WHILE IT IS THE ONE BEING
-     ANSWERED (`data-on`): `QueueAnswer.svelte` draws that on the selected ground, which says so.
-
-     AND NOTHING IS MARKED WHERE THE CHOICE IS HARD TO TAKE BACK (`data-cost='undo'`, as `press.ts` `suggestionShown`
-     reads it). A marked answer on a card the other button cannot undo tomorrow reads as an endorsement, so there its
-     pill is drawn as every other answer is, and its word goes with the mark, for the eye and a screen reader alike. */
-  .queue-card:not(:has(.queue-cost[data-cost='undo'])) .queue-option[data-recommended] > .queue-act:not([data-on]) {
-    background: transparent;
-    border-color: var(--ink);
-    box-shadow: inset 0 0 0 0.5px var(--ink);
-    color: var(--ink);
-  }
-
-  /* Its hover is the wash a bare control takes (`Button.svelte`'s `bare`), and only where there is one: a phone keeps
-     `:hover` on the last thing tapped. */
-  @media (hover: hover) and (pointer: fine) {
-    .queue-card:not(:has(.queue-cost[data-cost='undo'])) .queue-option[data-recommended] > .queue-act:not([data-on]):hover {
-      background: var(--hover-wash);
+  /* UNDER A THUMB AN ANSWER IS THE 44 TARGET THE PRODUCT DESIGNS TO, drawn at that height so the words stay centred. */
+  @media (pointer: coarse) {
+    .queue-act {
+      min-block-size: var(--tap);
+      padding-block: max(0px, calc((var(--tap) - 2px - 1lh) / 2));
+      font-size: var(--fs-body);
     }
   }
 
-  .queue-card:not(:has(.queue-cost[data-cost='undo'])) .queue-option[data-recommended] > .queue-act:not([data-on])::before {
-    content: '';
-    flex: none;
-    align-self: center;
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    border-radius: var(--r-pill);
-    background: currentColor;
+  /* THE SUGGESTED ANSWER, IN A ROW OF BUTTONS, IS THE ACCENT'S TINT with "Suggested" in its words: said, in the colour
+     that means "this way", and not pressed for anybody, so it never reads as the primary already chosen. NOT WHILE IT IS
+     THE ONE BEING ANSWERED (`data-on`): `QueueAnswer.svelte` draws that on the selected ground, which says so.
+
+     AND NOTHING IS MARKED WHERE THE CHOICE IS HARD TO TAKE BACK (`data-cost='undo'`, as `press.ts` `suggestionShown`
+     reads it). A marked answer on a card the other button cannot undo tomorrow reads as an endorsement, so there its
+     button is drawn as every other answer is, and its word goes with the mark, for the eye and a screen reader alike. */
+  .queue-card:not(:has(.queue-cost[data-cost='undo'])) .queue-options:not(:has(.queue-because)) .queue-option[data-recommended] > .queue-act:not([data-on]) {
+    background: var(--action-tint-1);
+    color: var(--action-text);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .queue-card:not(:has(.queue-cost[data-cost='undo'])) .queue-options:not(:has(.queue-because)) .queue-option[data-recommended] > .queue-act:not([data-on]):hover {
+      background: var(--action-tint-2);
+    }
   }
 
   .queue-card:has(.queue-cost[data-cost='undo']) .queue-rec {
@@ -334,7 +386,7 @@
     block-size: 18px;
     padding: 0 4px;
     border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    border-radius: 4px;
     color: var(--dim);
     font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
@@ -345,47 +397,30 @@
     font-weight: 500;
   }
 
-  /* THE WORD BESIDE THE SUGGESTED ANSWER. What an agent suggests is worth saying and is not worth pre-pressing, so this
-     quiet label names it rather than the option reading as already chosen. It is drawn as it is here only beside an
-     option that cannot be pressed (`.queue-label`); beside a pill the pill's dot says it (above). */
+  /* "SUGGESTED", IN THE ACCENT'S WORDS (DIRECTION §39). What an agent suggests is worth saying and is not worth
+     pre-pressing, so this names it rather than the option reading as already chosen: inside its button after the
+     words (so the button's name says it to a screen reader too), at the end of its choice's line, or beside an option
+     that cannot be pressed. */
   .queue-rec {
     justify-self: start;
-    padding-inline: var(--sp-2);
-    border-radius: var(--r-pill);
-    background: var(--s1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  /* BESIDE A PILL "SUGGESTED" IS FOR A SCREEN READER ALONE, and adds no line: the dot says it to the eye. The word is
-     kept in the page and clipped, inside the button after its words (so the button's name says it) or after the button
-     where an older host still draws it there. */
-  .queue-act > .queue-rec,
-  .queue-option[data-recommended] > .queue-act ~ .queue-rec {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
+    color: var(--action-text);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
     white-space: nowrap;
   }
 
   .queue-because {
     max-inline-size: var(--measure);
     color: var(--dim);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
-  /* `queue lead`: THE FIRST QUESTION, READ WHOLE. One step larger than the cards under it and nothing louder: no well,
-     no border, no colour of its own. What accepting it changes is a short list in the quiet ink, a hairline down its
+  /* `queue lead`: THE FIRST QUESTION, READ WHOLE. The same 17 as the cards under it (DIRECTION §39 gives a question one
+     size) and set apart by the air under it alone: no well, no border, no colour of its own. What accepting it changes is a short list in the quiet ink, a hairline down its
      start the only mark, so the consequences read as a part of the question and not as a second card. */
   .queue-lead {
     gap: var(--sp-3);
     padding-block-end: var(--sp-5);
-  }
-
-  .queue-lead > .queue-question {
-    font-size: var(--t-xl);
   }
 
   /* THE AIR UNDER THE LEAD IS FOR A QUESTION UNDER IT. Where it is the last thing in its tile, alone in a box that is
@@ -396,24 +431,9 @@
     padding-block-end: 0;
   }
 
-  /* ON A PHONE A QUESTION IS A STEP UNDER THE PAGE'S HEADLINE, not level with it: at 20 and 24 the questions under
-     the headline line read as headlines themselves, and Decide opened on a wall of them. The first question keeps its
-     one step over the rest. Home said this for its own questions only; it holds wherever a queue is drawn. */
-  @media (width < 900px) {
-    .queue-question {
-      font-size: var(--t-group);
-      font-weight: 600;
-    }
-
-    .queue-lead > .queue-question {
-      font-size: var(--t-lg);
-    }
-  }
-
   /* WHERE THE LINE ABOVE ITS WAYS SAYS WHICH ONE IS SUGGESTED (`.queue-suggested`, the renderer's lead), the word in the
-     option's pill would say it a second time, to a screen reader too, so it goes; the pill keeps its outline and its
-     dot, as every suggested answer does. Decide's answerable lead draws no such line, so there the word stays for a
-     screen reader: hidden on every lead, the dot was the only thing that said it. */
+     option's button would say it a second time, to a screen reader too, so it goes; a button in a row keeps its tint.
+     Decide's answerable lead draws no such line, so there the word stays: hidden on every lead, nothing else said it. */
   .queue-lead:has(> .queue-suggested) .queue-rec {
     display: none;
   }
@@ -469,9 +489,9 @@
     block-size: 20px;
     padding: 0;
     border: 1.5px solid var(--edge);
-    border-radius: var(--r-sm);
+    border-radius: 4px;
     background: transparent;
-    color: var(--on-ink);
+    color: var(--on-action);
     font-size: var(--t-xs);
     cursor: pointer;
   }
@@ -483,9 +503,9 @@
 
   /* A CHOSEN QUESTION IS THE RAISED SURFACE the cursor band uses, and nothing louder: the box says it in shape. */
   .queue-card[data-selected]:not([data-focused]) {
-    border-radius: var(--r-md);
-    background: var(--s1);
-    box-shadow: 0 0 0 var(--sp-2) var(--s1);
+    border-radius: var(--r-ctl);
+    background: var(--action-tint-1);
+    box-shadow: 0 0 0 var(--sp-2) var(--action-tint-1);
   }
 
   .queue-more,
@@ -501,17 +521,6 @@
      adds no indent of its own. The width is the BLOCK's and not the window's: a queue at `span: 6` on a wide
      screen is as narrow as the same queue on a phone, and it is the block that has to fit. */
   @container (inline-size < 34rem) {
-    .queue-options:has(.queue-because) > .queue-option {
-      grid-template-columns: auto minmax(0, 1fr);
-      column-gap: var(--sp-2);
-    }
-
-    /* No row of its own: it takes the first one free under the button and its word, whichever of them are there. */
-    .queue-options:has(.queue-because) .queue-because {
-      grid-row: auto;
-      grid-column: 1 / -1;
-    }
-
     /* THE COST GOES UNDER THE WAYS TO ANSWER, at the card's own edge, rather than squeezing a phone's pills into what is
        left beside it. */
     .queue-card > :has(+ .queue-cost:not([data-cost='call'])),
@@ -541,33 +550,9 @@
     color: var(--ink);
   }
 
-  /* AN OPTION'S VISUAL IS ITS OWN BOX: beside the button in a row of answers, and above the button where each way is a
-     line, so the button column keeps its one edge. Above the words it reads as a sample laid over its name. */
+  /* AN OPTION'S VISUAL IS ITS OWN BOX, beside the button in a row of answers and over the name in a choice. */
   .queue-option > .queue-visual {
-    grid-column: 1;
     justify-self: start;
-  }
-
-  .queue-options:has(.queue-because) .queue-option:has(> .queue-visual) {
-    > .queue-visual {
-      grid-row: 1;
-    }
-
-    > .queue-act,
-    > .queue-label,
-    > .queue-because {
-      grid-row: 2;
-    }
-
-    > .queue-rec {
-      grid-row: 3;
-    }
-  }
-
-  @container (inline-size < 34rem) {
-    .queue-options:has(.queue-because) .queue-option:has(> .queue-visual) > .queue-because {
-      grid-row: auto;
-    }
   }
 
   .queue-visual {
@@ -594,8 +579,8 @@
 
   .queue-figure {
     padding-inline: var(--sp-2);
-    border-radius: var(--r-pill);
-    background: var(--s2);
+    border-radius: var(--r-sm);
+    background: var(--field);
     color: var(--ink);
     font-size: var(--t-sm);
     font-variant-numeric: tabular-nums;
@@ -608,7 +593,7 @@
     aspect-ratio: 1;
     object-fit: cover;
     border-radius: var(--r-sm);
-    background: var(--s2);
+    background: var(--field);
   }
 
   /* `queue tiles`: A TILE A QUESTION, SIDE BY SIDE WHERE THEY FIT, each led by what its recommended
@@ -623,9 +608,9 @@
   /* Side by side, a question is a well of the tile's second surface rather than a section under a hairline. */
   .queue-card.queue-tile {
     padding: var(--sp-4);
-    background: var(--s1);
+    background: var(--field);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
   }
 
   .queue:has(> .queue-tile) > .queue-more {
@@ -639,8 +624,8 @@
     margin-block: calc(var(--sp-4) * -1) var(--sp-1);
     margin-inline: calc(var(--sp-4) * -1);
     overflow: hidden;
-    border-start-start-radius: var(--r-md);
-    border-start-end-radius: var(--r-md);
+    border-start-start-radius: var(--r-ctl);
+    border-start-end-radius: var(--r-ctl);
   }
 
   .queue-tile > .queue-visual > .queue-swatch {
@@ -655,8 +640,8 @@
     padding: var(--sp-4);
     flex: 1;
     border-radius: 0;
-    font-size: var(--t-xl);
-    font-weight: 500;
+    font-size: var(--fs-figure);
+    font-weight: var(--fw-medium);
   }
 
   .queue-tile > .queue-visual > .queue-file {
@@ -673,7 +658,7 @@
     font-weight: 500;
   }
 
-  /* THE WAYS TO ANSWER ARE FOLDED AND SAY SO IN WORDS, a pill like a section's fold, because the tile
+  /* THE WAYS TO ANSWER ARE FOLDED AND SAY SO IN WORDS, a quiet control like a section's fold, because the tile
      has to be read before it is answered and the recommendation must not stand in for the choice. */
   .queue-ways > .queue-options {
     margin-block-start: var(--sp-2);
@@ -698,7 +683,7 @@
   }
 
   .queue-ways-toggle:hover {
-    background: var(--s2);
+    background: var(--field);
     color: var(--ink);
   }
 

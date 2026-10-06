@@ -1,6 +1,6 @@
 /**
- * The validator. Eighteen checks, 28 §4.4 and 39 §6.1: A to H are 13 §2.4's, I to P are 28's
- * additions, and Q and R are this file's own.
+ * The validator. Nineteen checks, 28 §4.4 and 39 §6.1: A to H are 13 §2.4's, I to P are 28's
+ * additions, and Q, R and S are this file's own.
  * Runs at install, in CI, and live in the theme editor. A failing theme is refused, naming the pair.
  *
  * TWO POLICIES, NOT THREE, AND THE HEADER SAID THREE FOR AS LONG AS THERE WERE TWO. A breached floor
@@ -23,6 +23,7 @@ import {
   type Deficiency,
 } from './color.ts';
 import {
+  GROUNDS,
   HUE_FLOOR,
   hueGap,
   INKS,
@@ -92,8 +93,10 @@ function pairsAgainstSurfaces(
   scheme: Scheme,
 ): Finding[] {
   const out: Finding[] = [];
+  /* 2026-10-07, AND THE BOARD, THE TILE AND THE FIELD (DIRECTION §39). They are where the product now paints its
+     words and marks, so a pair proven on the five rungs alone was a pair proven somewhere nobody reads it. */
   for (const role of roles)
-    for (const surface of SURFACES) {
+    for (const surface of GROUNDS) {
       const got = contrast(rgb(p[role as Role]), rgb(p[surface]));
       if (got < floor)
         out.push({
@@ -414,7 +417,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
      filter box on the register page), and three paint a borderless accent fill (the net-series
      swatch and the drag-and-drop indicator, plus `accent-color: var(--accent)` on the forecast
      range, which the browser fills and which can carry no border of ours at all). */
-  for (const surface of SURFACES) {
+  for (const surface of GROUNDS) {
     const got = contrast(rgb(p.accent), rgb(p[surface]));
     if (got < 3) {
       /* WHICH WAY TO MOVE IS A MEASUREMENT AND NOT A GUESS. Two colours are close because their
@@ -436,6 +439,34 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
       });
     } else out.push({ check: 'R', scheme, level: 'pass', measured: r2(got) });
   }
+
+  /* S · THE WORKING ACCENT (DIRECTION §39), every pair it makes, at AA.
+     Its label on the fill at rest and under the pointer (Q's argument), the fill against the three grounds a button
+     stands on (R's), the accent as words on every ground and on both of its tints (B's), and the words a chosen thing
+     carries on the tint that marks it: body, second and quiet text and a row's state words on the first, body and
+     second text on the second.
+     The address is the role the generator moves to fix the pair: the fill, the words, or the tint. */
+  const pair = (fg: Role, bg: Role, floor: number, moves: Role, what: string) => {
+    const got = contrast(rgb(p[fg]), rgb(p[bg]));
+    if (got < floor)
+      out.push({
+        check: 'S',
+        scheme,
+        level: 'refuse',
+        code: 'CONTRAST_FLOOR',
+        measured: r2(got),
+        at: at(moves),
+        fix: `theme: ${what} (${fg} on ${bg}) is ${r2(got)}:1 in ${scheme}. It needs ${floor}:1. Move ${moves}.`,
+      });
+    else out.push({ check: 'S', scheme, level: 'pass', measured: r2(got) });
+  };
+  for (const fill of ['action', 'action-hover'] as const) pair('on-action', fill, 4.5, fill, 'the label on a primary button');
+  for (const ground of ['board', 'tile', 'field'] as const) pair('action', ground, 3, 'action', 'a primary button');
+  for (const ground of [...GROUNDS, 'action-tint-1', 'action-tint-2'] as const)
+    pair('action-text', ground, floors.intentText, 'action-text', 'a link');
+  for (const ink of ['ink', 'ink2', 'dim', 'earn', 'warn', 'danger-text', 'info', 'live'] as const)
+    pair(ink, 'action-tint-1', 4.5, 'action-tint-1', 'text on a chosen row');
+  for (const ink of ['ink', 'ink2'] as const) pair(ink, 'action-tint-2', 4.5, 'action-tint-2', 'text on a selection');
 
   /* K · hue-only encoding. A link must differ in LIGHTNESS from the two things it is most likely to
      be confused with: body ink, and red words (`danger-text`) — which in a theme whose accent is a

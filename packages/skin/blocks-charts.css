@@ -12,11 +12,12 @@
  * The one rule of `blocks.css` holds here too: no colour is written, every value is a role a theme
  * maps, and an intent reaches the DOM only through the map in `blocks.css`.
  *
- * THE MARKS. One series is highlighted in ink and the rest are the greys of the ramp `blocks.css` mixes
- * from it on every block (`--ramp-1` to `--ramp-3`), darkest first. A colour is a meaning and only one: `--earn` for
- * money in, `--warn` for a crossing below a line the owner set (with its glyph, so never by colour alone), `--live`
- * for now and for what is running, and an intent through the map. NOTHING IN A CHART IS RED unless it is the late part
- * or what needs him, because the brand's red is the one loud thing on a screen.
+ * THE MARKS ARE THE WORKING ACCENT AND ITS TINTS (DIRECTION §39). The first series, the one that matters, is the accent;
+ * the next two are its tints, lighter in turn; grey is only for "other" and for what is done. A colour is a meaning and
+ * only one: the red is for what is late or over and nothing else, `--warn` for a crossing below a line the owner set
+ * (with its glyph, so never by colour alone), and an intent through the map. The palette is the theme's `--chart-*`
+ * (`tokens.css`): `--chart-1` to `--chart-3`, `--chart-other`, `--chart-late` and `--chart-track`, so a kind names a
+ * role and never a hue.
  *
  * Bars have a 3px radius, lines are 2px with round joins and a 3px dot on the last point, a projection or a threshold
  * is dashed, and every label on a chart's axes (a tick, a month, the top and the foot of the scale, the now line's
@@ -52,6 +53,15 @@
     inline-size: 120px;
     block-size: 32px;
     overflow: visible;
+  }
+
+  /* A SPARKLINE IS THE ACCENT, its end dot in the row's tone where it has one (`.trend-line` in `kinds/stat.css`). */
+  .sparkline-line > .trend-line {
+    stroke: var(--chart-1);
+  }
+
+  .sparkline-line > .trend-end {
+    stroke: var(--tone, var(--chart-1));
   }
 
   .sparkline-figure {
@@ -108,26 +118,27 @@
 
   .split-track {
     display: block;
-    block-size: 8px;
-    border-radius: calc(var(--r-sm) / 2);
+    block-size: 10px;
+    border-radius: var(--r-pill);
     overflow: hidden;
   }
 
-  /* THE PARTS OF A WHOLE, A SPLIT'S AND A RING'S: ink, then the ramp, and a row with a tone in its intent's fill. */
+  /* THE PARTS OF A WHOLE, A SPLIT'S AND A RING'S: the accent, then its two tints, then grey for the rest, and a row
+     with a tone in its intent's fill. */
   :is(.split-seg, .split-dot, .ring-arc, .ring-dot) {
-    --part: var(--ink);
+    --part: var(--chart-1);
   }
 
   :is(.split-seg, .split-dot, .ring-arc, .ring-dot)[data-step='1'] {
-    --part: var(--ramp-1);
+    --part: var(--chart-2);
   }
 
   :is(.split-seg, .split-dot, .ring-arc, .ring-dot)[data-step='2'] {
-    --part: var(--ramp-2);
+    --part: var(--chart-3);
   }
 
   :is(.split-seg, .split-dot, .ring-arc, .ring-dot)[data-step='3'] {
-    --part: var(--ramp-3);
+    --part: var(--chart-other);
   }
 
   .split-seg[data-intent],
@@ -190,9 +201,8 @@
     align-self: center;
     inline-size: 8px;
     block-size: 8px;
-    border-radius: calc(var(--r-sm) / 3);
+    border-radius: var(--r-pill);
   }
-
 
   .split-label {
     min-inline-size: 0;
@@ -319,21 +329,21 @@
     overflow: visible;
   }
 
+  /* THE START AND THE END ARE THE ACCENT, what came in its tint and what went out its light tint. */
   .bridge-bar {
-    fill: var(--ink);
+    fill: var(--chart-1);
     rx: 3px;
   }
 
   .bridge-bar[data-move='up'] {
-    fill: var(--in-fill);
+    fill: var(--chart-2);
   }
 
   .bridge-bar[data-move='down'] {
-    fill: var(--ramp-2);
+    fill: var(--chart-3);
   }
 
   .bridge-zero,
-  .series-zero,
   .forecast-zero {
     fill: none;
     stroke: var(--line);
@@ -430,16 +440,18 @@
   }
 
   /* ── series: bars by bucket ───────────────────────────────────────────────
-     Money in stands on the zero rule in `earn`, money out hangs under it in `--dim`, a second series
-     either way is `--ink2`, and the net is the one primary series. The current bucket is faint inside a
-     solid edge; a bucket still to come is a wash inside a dashed one.
-     The words, the two axis figures and the bucket labels are HTML, so nothing stretches. */
+     A COLUMN A BUCKET, its bars thin (no wider than 24px) with the free end rounded, over the scale's three lines. The
+     first series is the accent, a second its tint; money out hangs under zero in the light tint, and the net is a
+     line of ink over them. A bucket says its figures on hover, in a small card over the column. The current bucket is
+     faint inside a solid edge; one still to come is a wash inside a dashed one. Too few buckets are the totals alone. */
   .block[data-kind='series'] {
     container-type: inline-size;
   }
 
   .series {
-    gap: var(--sp-2);
+    --series-h: 168px;
+    --series-scale: 3.5rem;
+    gap: var(--sp-3);
   }
 
   .series-legend {
@@ -462,16 +474,16 @@
     flex: none;
     inline-size: 8px;
     block-size: 8px;
-    border-radius: calc(var(--r-sm) / 3);
-    background: var(--ramp-3);
+    border-radius: var(--r-pill);
+    background: var(--chart-2);
   }
 
   .series-key[data-dir='in'][data-step='0'] .series-swatch {
-    background: var(--in-fill);
+    background: var(--chart-1);
   }
 
-  .series-key[data-dir='out'][data-step='0'] .series-swatch {
-    background: var(--ramp-2);
+  .series-key[data-dir='out'] .series-swatch {
+    background: var(--chart-3);
   }
 
   .series-key[data-net] .series-swatch {
@@ -480,82 +492,167 @@
     background: var(--ink);
   }
 
+  /* THE PLOT LEAVES ITS FIRST COLUMN TO THE SCALE'S FIGURES, and the columns and the bucket names share the rest. */
   .series-plot {
     position: relative;
+    block-size: var(--series-h);
+    margin-inline-start: var(--series-scale);
   }
 
-  .series-chart {
-    display: block;
-    inline-size: 100%;
-    block-size: 180px;
-    overflow: visible;
+  .series-scale,
+  .series-cols {
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
-  .series-top,
-  .series-bottom {
+  .series-scale {
     position: absolute;
-    inset-inline-start: 0;
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-variant-numeric: tabular-nums;
+    inset: 0;
     pointer-events: none;
   }
 
-  .series-top {
-    inset-block-start: 0;
+  .series-line {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: calc(var(--y) * 1%);
+    border-block-start: 1px dashed var(--rule);
   }
 
-  .series-bottom {
-    inset-block-end: 0;
+  .series-line[data-zero] {
+    border-block-start-style: solid;
+    border-block-start-color: var(--line);
   }
 
+  .series-line-label {
+    position: absolute;
+    inset-inline-end: calc(100% + var(--sp-2));
+    translate: 0 -50%;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .series-cols {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
+  }
+
+  .series-col {
+    position: relative;
+    border-radius: var(--r-sm);
+  }
+
+  /* `--y` AND `--h` ARE THE PLAN'S, written on each bar by both drawers; these zeros stand only where a host leaves them out. */
   .series-bar {
-    fill: var(--ramp-3);
-    stroke: none;
-    rx: 3px;
+    --y: 0;
+    --h: 0;
+    --bar: var(--chart-2);
+    position: absolute;
+    inset-block-start: calc(var(--y) * 1%);
+    inset-inline-start: 50%;
+    inline-size: clamp(4px, 55%, 24px);
+    block-size: calc(var(--h) * 1%);
+    translate: -50% 0;
+    background: var(--bar);
   }
 
   .series-bar[data-dir='in'][data-step='0'] {
-    fill: var(--in-fill);
+    --bar: var(--chart-1);
   }
 
-  .series-bar[data-dir='out'][data-step='0'] {
-    fill: var(--ramp-2);
+  .series-bar[data-dir='out'] {
+    --bar: var(--chart-3);
   }
 
-  /* A SERIES WITH NOTHING GOING OUT IS A COUNT, NOT MONEY IN: work done by week, notes a month. Green there said
-     "earned" of a bar that only counts, and was the loudest colour on the tile, so it is drawn in the ink ramp, its
-     key with it. The green stays for money in beside money out, where in and out are the two things being told apart. */
-  .series:not(:has(.series-key[data-dir='out'])) .series-bar[data-dir='in'][data-step='0'] {
-    fill: var(--ramp-1);
+  /* THE FREE END IS ROUNDED, the top of what stands up and the foot of what hangs down. */
+  .series-bar[data-dir='in'][data-end] {
+    border-start-start-radius: 4px;
+    border-start-end-radius: 4px;
   }
 
-  .series:not(:has(.series-key[data-dir='out'])) .series-key[data-dir='in'][data-step='0'] .series-swatch {
-    background: var(--ramp-1);
+  .series-bar[data-dir='out'][data-end] {
+    border-end-start-radius: 4px;
+    border-end-end-radius: 4px;
   }
 
-  /* THE CURRENT BUCKET SO FAR: its fill is faint because the bucket is not over, so a solid edge in `--dim` is what
-     keeps its height readable against the page, as the dashed edge does for the two states below. */
-  .series-bar[data-state='partial'] {
-    fill-opacity: 0.45;
-    stroke: var(--dim);
-    stroke-width: 1px;
-  }
-
-  /* THE CURRENT BUCKET WITH MONEY STILL DUE IN IT: faint as so far, inside the dashed edge of what is expected. */
-  .series-bar[data-state='due'] {
-    fill-opacity: 0.45;
-    stroke: var(--dim);
-    stroke-width: 1px;
-    stroke-dasharray: 3 2;
-  }
-
-  /* A BUCKET STILL TO COME keeps its colour as a wash inside a dashed edge, so in and out still read apart. */
+  /* THE CURRENT BUCKET SO FAR: its fill is faint because the bucket is not over, so a solid edge keeps its height
+     readable against the tile, as the dashed edge does for the two states below. */
+  .series-bar[data-state='partial'],
+  .series-bar[data-state='due'],
   .series-bar[data-state='ahead'] {
-    fill-opacity: 0.3;
-    stroke: var(--dim);
-    stroke-width: 1px;
-    stroke-dasharray: 3 2;
+    background: color-mix(in oklab, var(--bar) 40%, transparent);
+    box-shadow: inset 0 0 0 1px var(--bar);
+  }
+
+  .series-bar[data-state='due'],
+  .series-bar[data-state='ahead'] {
+    box-shadow: none;
+    outline: 1px dashed var(--bar);
+    outline-offset: -1px;
+  }
+
+  .series-bar[data-state='ahead'] {
+    background: color-mix(in oklab, var(--bar) 22%, transparent);
+  }
+
+  /* A BUCKET'S FIGURES ON HOVER, in a small card beside its bar at the top of the plot, before the bar in the right
+     half (`data-flip`). Over the column it covered the tile's name and the legend, the words that say what it is. */
+  .series-tip {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: calc(50% + 12px + var(--sp-2));
+    z-index: var(--z-raise);
+    display: grid;
+    gap: 2px;
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-sm);
+    background: var(--bg);
+    box-shadow: 0 0 0 1px var(--line), var(--e2);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--d-state) var(--ease-out);
+  }
+
+  .series-col[data-flip] > .series-tip {
+    inset-inline: auto calc(50% + 12px + var(--sp-2));
+  }
+
+  .series-tip-label {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .series-tip-value > .num {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    /* HALF THE ROW WASH: a full one was a grey slab behind a 24px bar, heavier than the bar it pointed at. */
+    .series-col:hover {
+      background: color-mix(in oklab, var(--hover-wash) 50%, transparent);
+    }
+
+    .series-col:hover > .series-tip {
+      opacity: 1;
+    }
+  }
+
+  /* THE NET IS THE ONE LINE, in ink over the bars, drawn in a box of its own over the columns. */
+  .series-chart {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    overflow: visible;
+    pointer-events: none;
   }
 
   .series-net {
@@ -573,8 +670,36 @@
     stroke-linecap: round;
   }
 
+  /* TOO FEW BUCKETS TO DRAW: each series' total, the figure large and its name beside it. */
+  .series-totals {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2) var(--sp-6);
+    margin: 0;
+  }
+
+  .series-total {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+  }
+
+  .series-total-value {
+    color: var(--ink);
+    font-size: var(--t-xl);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .series-total-label {
+    color: var(--ink2);
+    font-size: var(--t-base);
+  }
+
   .series-ticks {
     display: grid;
+    margin-inline-start: var(--series-scale);
     grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
     padding: 0;
     list-style: none;
@@ -691,8 +816,8 @@
     position: relative;
     display: block;
     block-size: 6px;
-    border-radius: calc(var(--r-sm) / 2);
-    background: var(--s1);
+    border-radius: var(--r-pill);
+    background: var(--chart-track);
     overflow: hidden;
   }
 
@@ -702,7 +827,7 @@
     inset-inline-start: 0;
     inline-size: calc(var(--fill) * 100%);
     border-radius: inherit;
-    background: var(--tone-fill, var(--ink));
+    background: var(--tone-fill, var(--chart-1));
   }
 
   .progress-over {
@@ -710,7 +835,9 @@
     inset-block: 0;
     inset-inline: calc(var(--limit) * 100%) 0;
     border-inline-start: 2px solid var(--bg);
-    background: repeating-linear-gradient(135deg, var(--tone, var(--ink)) 0 3px, transparent 3px 6px);
+    /* PAST THE LIMIT IS OVER, and over is the one thing a chart paints red (DIRECTION §39), unless the row's own tone
+       says otherwise. */
+    background: repeating-linear-gradient(135deg, var(--tone, var(--chart-late)) 0 3px, transparent 3px 6px);
   }
 
   .progress-left {
@@ -736,15 +863,15 @@
   }
 
   /* A CHART'S NUMBERS ARE FOR A SCREEN READER where the drawing or its rows already say them: a series, a split, a bridge,
-     a sparkline and a roadmap with the room. A fold headed "The numbers" under each read as a stray caption, so the table
+     and a sparkline. A fold headed "The numbers" under each read as a stray caption, so the table
      is kept out of sight and in the document. AND A TONE'S GLYPH beside a split's or a ring's dot or a progress row, which
      already carry the intent in their fill, keeps its name for a screen reader and draws nothing. */
   .series-numbers,
   .split-numbers,
   .bridge-numbers,
   .sparkline-numbers,
-  .roadmap-numbers,
   .split-item > .glyph,
+  .roadmap-item:not([data-intent='bad']) > .roadmap-item-title > .glyph,
   .ring-item > .glyph,
   .progress-row > .glyph {
     position: absolute;
@@ -867,13 +994,14 @@
   }
 
   @container (inline-size < 30rem) {
-    .series-chart {
-      block-size: 140px;
+    .series {
+      --series-h: 136px;
+      --series-scale: 2.75rem;
     }
   }
 
   /* ── lines: a measure over time, and the period before it ─────────────────
-     The current line is the ink; a second current line is the ramp's grey; the period before is a dashed grey under
+     The current line is the accent; a second current line is its tint; the period before is a dashed grey under
      both. The lead figure sits above in ink with its change beside it, never
      coloured, because a rise is not a verdict. Every word is HTML, placed along the chart by `--at`. */
   .block[data-kind='lines'] {
@@ -947,17 +1075,17 @@
     flex: none;
     inline-size: 14px;
     block-size: 0;
-    border-block-start: 2px solid var(--ramp-2);
+    border-block-start: 2px solid var(--chart-2);
   }
 
   .lines-key[data-step='0']:not([data-was]) .lines-swatch,
   .lines-readout-value[data-step='0']:not([data-was]) .lines-swatch {
-    border-block-start-color: var(--ink);
+    border-block-start-color: var(--chart-1);
   }
 
   .lines-key[data-was] .lines-swatch,
   .lines-readout-value[data-was] .lines-swatch {
-    border-block-start: 2px dashed var(--ramp-2);
+    border-block-start: 2px dashed var(--chart-other);
   }
 
   .lines-plot {
@@ -976,31 +1104,31 @@
 
   .lines-line {
     fill: none;
-    stroke: var(--ramp-2);
+    stroke: var(--chart-2);
     stroke-width: 2px;
     stroke-linejoin: round;
     stroke-linecap: round;
   }
 
   .lines-line[data-step='0']:not([data-was]) {
-    stroke: var(--ink);
+    stroke: var(--chart-1);
   }
 
   .lines-line[data-was] {
-    stroke: var(--ramp-2);
+    stroke: var(--chart-other);
     stroke-width: 1.5px;
     stroke-dasharray: 4 4;
   }
 
   .lines-end {
     fill: none;
-    stroke: var(--ramp-2);
+    stroke: var(--chart-2);
     stroke-width: 6px;
     stroke-linecap: round;
   }
 
   .lines-end[data-step='0'] {
-    stroke: var(--ink);
+    stroke: var(--chart-1);
   }
 
   /* THE TOP AND THE BOTTOM OF THE VALUE AXIS: the highest above the chart's near corner, the lowest inside it. */
@@ -1231,8 +1359,8 @@
 
   /* THE WASH UNDER THE WALK AND THE GRID AT EACH STEP, both quieter than the line: the line is the answer. */
   .forecast-area {
-    fill: var(--ink);
-    fill-opacity: 0.06;
+    fill: var(--chart-1);
+    fill-opacity: 0.08;
     stroke: none;
   }
 
@@ -1264,7 +1392,7 @@
   .forecast-future,
   .forecast-base {
     fill: none;
-    stroke: var(--ink);
+    stroke: var(--chart-1);
     stroke-width: 2px;
     stroke-linejoin: round;
     stroke-linecap: round;
@@ -1275,7 +1403,7 @@
   }
 
   .forecast-base {
-    stroke: var(--ramp-3);
+    stroke: var(--chart-other);
     stroke-width: 1.5px;
     stroke-dasharray: 2 3;
   }
@@ -1288,7 +1416,7 @@
   }
 
   .forecast-low {
-    stroke: var(--ink);
+    stroke: var(--chart-1);
   }
 
   .forecast-cross {
@@ -1305,11 +1433,11 @@
   }
 
   /* TODAY IS A DOT ON THE LINE with its balance beside it, said without a hover. The dot is
-     the ink at the low point's size; the words sit just after it and above it, placed by `--at` across and `--y` down
+     the accent at the low point's size; the words sit just after it and above it, placed by `--at` across and `--y` down
      (both fractions of the plot, from `src/forecast.ts`), so they never sit on the line they name. */
   .forecast-now {
     fill: none;
-    stroke: var(--ink);
+    stroke: var(--chart-1);
     stroke-width: 7px;
     stroke-linecap: round;
   }
@@ -1916,216 +2044,216 @@
     }
   }
 
-  /* ── roadmap: dated work on one time axis ─────────────────────────────────
-     NO RULE DREW THIS KIND, so a shipped pack's roadmap put its names under the chart in a heap and the
-     marks took the weak paints `src/roadmap.ts` gives a page with no stylesheet. A window is a thin bar with no edge, light
-     enough that the name drawn over it stays readable; a date is a stem in `--dim`, a tone in its intent's fill;
-     today is a hairline of ink. The names sit in HTML over the box, placed by `--at` across and by their track or
-     label line down, and each stops at the end edge rather than running past it. On a phone the chart gives way to
-     the lane list under it: each row's name, its dates, and a thin track with its window on it. It is the renderer's own kind and not a registered one
-     (`lib/page/kinds/`), which is why its rules sit here with the other charts and not in a `kinds/` sheet. */
+  /* ── roadmap: dated work on one time axis, as a timeline ──────────────────
+     A ROW A LINE: its name in the left column and its window as a bar on a track in the right, so no name lands on
+     another or on a bar (the names over a stretched drawing collided at every width, DIRECTION §39). A date is a dot on
+     its day. The axis names sit across the top, each with a hairline down every track, and today's line runs down them
+     all in the ink. The bar's colour is the row's state: the accent while it is in hand, amber when it is at risk, red
+     when it is late, grey when it is done. A row's days are said beside its bar on hover. In a narrow tile the list is the lane list: the name and
+     its days on one line, the track under them. The list is the one thing a screen reader reads; its name is the plan's
+     sentence and the axis is hidden from it. */
   .block[data-kind='roadmap'] {
     container-type: inline-size;
   }
 
-  /* `--tracks` AND `--lines` ARE THE PLAN'S, written on the element by both drawers; these are what a roadmap with none
-     written reads, and the element's own `style` wins over them. `--track` and `--room` on a name are the same. */
   .roadmap {
-    --tracks: 1;
-    --lines: 0;
-    --roadmap-lane: var(--sp-7);
-    --roadmap-line: calc(var(--sp-4) + var(--sp-1));
-    /* A WINDOW IS THE INK RAMP'S MIDDLE GREY, as Done-by-week's bars are, and only a late one takes a colour (below).
-       Beige and brown for "close" read as mud beside the ink, in the dark scheme most of all. A name drawn over its
-       bar stays in plain ink: 55% holds the ink at 4.5:1 on it. */
-    --roadmap-bar: color-mix(in srgb, var(--ink) 55%, var(--bg));
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
+    --roadmap-row: 36px;
+    --roadmap-head: 24px;
+    display: grid;
+    grid-template-columns: clamp(9rem, 34%, 20rem) minmax(0, 1fr);
+    grid-template-rows: var(--roadmap-head) auto;
+    column-gap: var(--sp-4);
   }
 
-  .roadmap-plot {
-    position: relative;
-    padding-block-start: calc(var(--lines) * var(--roadmap-line));
-  }
-
-  .roadmap-chart {
-    display: block;
-    inline-size: 100%;
-    block-size: calc(max(var(--tracks), 1) * var(--roadmap-lane));
-    overflow: visible;
-  }
-
-  /* NO MONTH IS WASHED. The month names under the chart already say where one ends; a band under every other month
-     was a second grid the eye read before the work, and in the dark scheme the loudest surface on the tile. */
-  .roadmap-band,
-  .roadmap-band[data-odd] {
-    fill: none;
-  }
-
-  /* THE DARK SCHEME TAKES A LIGHTER STEP. The ink is the light end there, so the same share of it is a brighter bar
-     than the tile's loudest figure; a third of it is the same weight the light scheme's 55% has, and the name over it
-     still reads. */
-  html[data-scheme='dark'] .roadmap {
-    --roadmap-bar: color-mix(in srgb, var(--ink) 35%, var(--bg));
-  }
-
-  @media (prefers-color-scheme: dark) {
-    html:not([data-scheme]) .roadmap {
-      --roadmap-bar: color-mix(in srgb, var(--ink) 35%, var(--bg));
-    }
-  }
-
-  /* A WINDOW IS A THIN BAR WITH NO EDGE: a little over half its lane's height, centred in it, so the lane's air reads
-     as the gap between two pieces of work. Every window is the one grey whatever its tone; only a late one is a muted
-     brick, with its due dot (`.roadmap-due`). The renderer sizes the rect to its lane; the scale is
-     drawn about its own middle, so the due dot (`roadmapDue`) stays on it. */
-  .roadmap-bar {
-    fill: var(--roadmap-bar);
-    fill-opacity: 1;
-    stroke: none;
-    rx: 3px;
-    transform-box: fill-box;
-    transform-origin: center;
-    scale: 1 0.6;
-  }
-
-  /* A TONED MARK IS A GROUP carrying the intent, so its line takes the tone from it. Its window keeps the grey unless
-     it is late (`bad`): that one is the intent's muted brick (`blocks.css`), never the brand's red, at a strength that
-     stands beside the grey bars in both schemes and keeps the ink over it at 4.5:1. */
-  .roadmap-mark[data-intent='bad'] > .roadmap-bar {
-    fill: color-mix(in oklab, var(--tone-fill) 85%, var(--bg));
-    stroke: none;
-  }
-
-  .roadmap-stem {
-    stroke: var(--dim);
-    stroke-opacity: 1;
-    stroke-width: 1.5px;
-  }
-
-  .roadmap-mark > .roadmap-stem {
-    stroke: var(--tone-fill);
-  }
-
-  /* AND ITS GLYPH, a dot on the due day in the tone's fill, as every intent on a row is drawn (`.glyph` in
-     `blocks.css`). It is the window's one dot: the name beside it does not draw a second (below). */
-  .roadmap-due {
-    fill: none;
-    stroke: var(--tone-fill);
-    stroke-width: var(--dot);
-    stroke-linecap: round;
-  }
-
-  /* A WINDOW'S DOT IS DRAWN ONLY WHEN IT IS LATE. At the end of every grey bar it sat where the name starts, a small
-     brown mark before each label that read as a stray (visual review 4); the bar's own grey already says the work is
-     fine. The late one keeps its dot beside its brick, and a date's stem keeps its dot, which is the date's mark. The
-     list under the chart still reads every tone. */
-  .roadmap-mark:has(> .roadmap-bar):not([data-intent='bad']) > .roadmap-due {
-    display: none;
-  }
-
-  /* TODAY IS ONE HAIRLINE OF INK. In the live violet it was the only second hue on the tile and the first thing seen;
-     a fixed line of the ink says where now is and lets the work be read. */
-  .roadmap-today {
-    stroke: var(--ink);
-    stroke-width: 1px;
-  }
-
-  /* IN THE DARK SCHEME IT TAKES THE SECOND INK. The ink is the light end there, so the full step was the brightest
-     thing on the page (visual review 4); `--ink2` still clears the grey bars and reads as now. */
-  html[data-scheme='dark'] .roadmap-today {
-    stroke: var(--ink2);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    html:not([data-scheme]) .roadmap-today {
-      stroke: var(--ink2);
-    }
-  }
-
-  .roadmap-names,
-  .roadmap-months {
+  .roadmap-axis,
+  .roadmap-list {
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .roadmap-names {
-    position: absolute;
-    inset-block: 0;
-    inset-inline: 0;
+  /* THE AXIS IS UNDER THE ROWS, the second column of both grid rows, so its hairlines run the height of the timeline
+     and the rows are drawn over them. */
+  .roadmap-axis {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    position: relative;
     pointer-events: none;
   }
 
-  /* A NAME STOPS AT THE END EDGE, in an ellipsis on the item that holds its words, so no roadmap scrolls the page. */
-  .roadmap-name {
-    --track: 0;
-    --room: 1;
+  .roadmap-tick,
+  .roadmap-today {
     position: absolute;
+    inset-block: 0;
     inset-inline-start: calc(var(--at) * 100%);
-    max-inline-size: calc((1 - var(--at)) * 100%);
-    padding-inline: var(--sp-1);
-    overflow: hidden;
-    color: var(--ink);
-    font-size: var(--t-sm);
-    line-height: var(--roadmap-line);
-    text-overflow: ellipsis;
+    padding-inline-start: var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    line-height: 18px;
     white-space: nowrap;
   }
 
-  /* A WINDOW'S NAME sits on its own track, in the middle of the lane its bar is drawn in, and takes only the room the
-     plan measured for it (`--room`), so it stops before the next window in its lane. */
-  .roadmap-name:not([data-stem]) {
-    inset-block-start: calc(var(--lines) * var(--roadmap-line) + (var(--track) + 0.5) * var(--roadmap-lane));
-    max-inline-size: calc(var(--room) * 100%);
-    translate: 0 -50%;
+  .roadmap-tick::before,
+  .roadmap-today::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    border-inline-start: 1px solid var(--rule);
   }
 
-  /* A NAME AFTER ITS WINDOW starts where the plan put it; one BEFORE it ends at the bar's start. */
-  .roadmap-name[data-side='after'] {
-    inset-inline-start: calc(var(--at) * 100%);
+  .roadmap-tick::before {
+    inset-block-start: calc(var(--roadmap-head) - var(--sp-1));
   }
 
-  .roadmap-name[data-side='before'] {
-    translate: -100% -50%;
+  /* TODAY IS THE ONE LINE IN INK, and says its name at the top. */
+  .roadmap-today {
+    z-index: var(--z-raise);
+    color: var(--ink2);
+    font-weight: 500;
   }
 
-  /* A NAME THAT COULD NOT MOVE OFF TODAY'S RULE sits on the tile's own surface, so the rule passes under its words
-     rather than through them. */
-  .roadmap-name[data-today] {
-    background: var(--bg);
+  .roadmap-today::before {
+    border-inline-start-color: var(--ink2);
+  }
+
+  .roadmap-list {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: subgrid;
+  }
+
+  .roadmap-item {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: center;
+    min-block-size: var(--roadmap-row);
     border-radius: var(--r-sm);
   }
 
-  /* A DATE'S NAME sits above the chart on the line the plan spaced it to, where its stem meets the top. */
-  .roadmap-name[data-stem] {
-    inset-block-start: calc(var(--line) * var(--roadmap-line));
-    color: var(--ink2);
-  }
-
-  /* ONE DOT A MARK. The chart draws the tone on the due day; the same glyph after the name over it was a second dot
-     a few pixels on. The names are hidden from a screen reader, which reads the tone from the list under the chart. */
-  .roadmap-name > .glyph {
-    display: none;
-  }
-
-  .roadmap-months {
-    position: relative;
-    block-size: var(--roadmap-line);
-  }
-
-  .roadmap-month {
-    position: absolute;
-    inset-inline-start: calc(var(--at) * 100%);
-    max-inline-size: calc((1 - var(--at)) * 100%);
-    padding-inline-start: var(--sp-1);
+  /* A LONG NAME TAKES A SECOND LINE before it is cut, so a name is read whole in all but the longest; the row grows
+     with it and its bar stays centred on it. */
+  .roadmap-item-title {
+    grid-column: 1;
+    grid-row: 1;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    min-inline-size: 0;
+    padding-block: var(--sp-1);
+    padding-inline-start: var(--sp-2);
     overflow: hidden;
-    color: var(--dim);
-    font-size: var(--t-xs);
-    text-overflow: ellipsis;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 1.35;
+  }
+
+  /* THE TRACK: a faint line the bar sits on, the full width of the axis. */
+  .roadmap-item-track {
+    grid-column: 2;
+    grid-row: 1;
+    position: relative;
+    block-size: 12px;
+    border-radius: var(--r-pill);
+    background: var(--chart-track);
+  }
+
+  .roadmap-bar {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: calc(var(--at) * 100%);
+    inline-size: max(6px, calc(var(--span) * 100%));
+    border-radius: var(--r-pill);
+    background: var(--chart-1);
+  }
+
+  .roadmap-item[data-intent='bad'] .roadmap-bar {
+    background: var(--chart-late);
+  }
+
+  /* AT RISK IS AMBER, between working and late, so a plan says which bars to watch before any of them is red. */
+  .roadmap-item[data-intent='warn'] .roadmap-bar {
+    background: var(--chart-risk);
+  }
+
+  .roadmap-item[data-intent='good'] .roadmap-bar {
+    background: var(--chart-other);
+  }
+
+  /* A DATE IS A DOT ON ITS DAY, ringed in the tile so it reads over a hairline. */
+  .roadmap-item[data-date] .roadmap-bar {
+    inset-block: -1px;
+    inline-size: 14px;
+    translate: -50% 0;
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+
+  .roadmap-bar[data-grip] {
+    touch-action: pan-y;
+  }
+
+  .roadmap-bar[data-dragging] {
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--chart-1);
+  }
+
+  /* ITS DAYS ON HOVER, beside the bar where they fit and before it past seven tenths of the track (`data-flip`). A
+     percentage margin on a grid item is a share of its grid area, which is the track's width. */
+  .roadmap-item-when {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: start;
+    z-index: var(--z-raise);
+    margin-inline-start: calc((var(--at) + var(--span)) * 100% + var(--sp-2));
+    padding-inline: var(--sp-1);
+    border-radius: var(--r-sm);
+    background: var(--bg);
+    color: var(--ink2);
+    font-size: var(--t-sm);
     white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--d-state) var(--ease-out);
+  }
+
+  .roadmap-item[data-flip] > .roadmap-item-when {
+    margin-inline-start: calc(var(--at) * 100% - var(--sp-2));
+    translate: -100% 0;
+  }
+
+  .roadmap-item[data-date] > .roadmap-item-when {
+    margin-inline-start: calc(var(--at) * 100% + var(--sp-3));
+  }
+
+  .roadmap-item[data-date][data-flip] > .roadmap-item-when {
+    margin-inline-start: calc(var(--at) * 100% - var(--sp-3));
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .roadmap-item:hover {
+      background: var(--hover-wash);
+    }
+
+    .roadmap-item:hover > .roadmap-item-when {
+      opacity: 1;
+    }
+  }
+
+  /* A LATE ROW SAYS SO BY ITS DOT, named for a screen reader, in front of its name, where an ellipsis cannot take it;
+     every other tone is its bar's colour alone, and its glyph keeps its name for a screen reader and draws nothing. */
+  .roadmap-item[data-intent='bad'] > .roadmap-item-title {
+    position: relative;
+    padding-inline-start: calc(var(--sp-2) + var(--dot) + var(--sp-2));
+  }
+
+  .roadmap-item[data-intent='bad'] > .roadmap-item-title > .glyph {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: var(--sp-2);
+    translate: 0 -50%;
+    background: var(--chart-late);
   }
 
   .roadmap-empty,
@@ -2135,80 +2263,86 @@
     font-size: var(--t-sm);
   }
 
+  .roadmap-skipped {
+    grid-column: 1 / -1;
+    padding-block-start: var(--sp-3);
+  }
+
+  /* THE LANE LIST IN A NARROW TILE: the name and its days on one line, and under them a thin track with the window
+     drawn where it falls in the whole span, so a phone still sees what runs when. */
   @container (inline-size < 30rem) {
-    .roadmap-plot,
-    .roadmap-months {
+    .roadmap {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto;
+    }
+
+    .roadmap-axis {
       display: none;
     }
 
-    .roadmap-numbers {
-      position: static;
-      inline-size: auto;
-      block-size: auto;
-      overflow: visible;
-      clip-path: none;
-      white-space: normal;
-    }
-
-    /* THE LANE LIST: a row a mark, its name and its dates on one line, and under them a thin track with the window
-       drawn where it falls in the whole span, so a phone still sees what runs when. */
-    .roadmap-list {
-      margin: 0;
-      padding: 0;
-      list-style: none;
+    .roadmap-list,
+    .roadmap-item {
+      grid-row: auto;
+      grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .roadmap-item {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: var(--sp-1) var(--sp-3);
+      gap: var(--sp-2) var(--sp-3);
       padding-block: var(--sp-3);
       border-block-end: 1px solid var(--line);
+      border-radius: 0;
     }
 
-    .roadmap-item-title {
+    .roadmap-item-title,
+    .roadmap-item[data-intent='bad'] > .roadmap-item-title {
+      display: block;
+      -webkit-line-clamp: none;
+      line-clamp: none;
+      padding-block: 0;
+      padding-inline-start: 0;
       font-weight: 500;
-      overflow-wrap: normal;
+      white-space: normal;
       text-wrap: pretty;
     }
 
-    /* THE TONE'S DOT KEEPS A STEP OFF THE WORDS. Drawn straight after the last letter it read as a part of the name,
-       "kilnfonts.example•". */
-    .roadmap-item-title > .glyph {
-      margin-inline-start: var(--sp-2);
+    .roadmap-item-when {
+      grid-column: 2;
+      margin: 0;
+      padding: 0;
+      translate: none;
+      background: none;
+      color: var(--dim);
+      opacity: 1;
     }
 
-    .roadmap-item-when {
-      color: var(--dim);
-      font-size: var(--t-sm);
-      white-space: nowrap;
+    .roadmap-item[data-flip] > .roadmap-item-when,
+    .roadmap-item[data-date] > .roadmap-item-when,
+    .roadmap-item[data-date][data-flip] > .roadmap-item-when {
+      margin: 0;
+      translate: none;
     }
 
     .roadmap-item-track {
       grid-column: 1 / -1;
-      position: relative;
+      grid-row: 2;
       block-size: 4px;
-      border-radius: var(--r-pill);
-      background: var(--s2);
     }
 
-    .roadmap-item-bar {
-      position: absolute;
-      inset-block: 0;
-      inset-inline-start: calc(var(--at) * 100%);
-      inline-size: max(4px, calc(var(--span) * 100%));
-      border-radius: inherit;
-      background: var(--roadmap-bar);
+    .roadmap-item[data-date] .roadmap-bar {
+      inset-block: -3px;
+      inline-size: 10px;
     }
 
-    /* The chart's own two paints: the grey for every window and the brick for a late one alone. */
-    .roadmap-item[data-intent='bad'] .roadmap-item-bar {
-      background: color-mix(in oklab, var(--tone-fill) 85%, var(--bg));
+    /* ON A PHONE THE NAME WRAPS, so the late dot goes back after it. */
+    .roadmap-item[data-intent='bad'] > .roadmap-item-title > .glyph {
+      position: static;
+      margin-inline-start: var(--sp-2);
+      translate: none;
     }
   }
 
   /* ── ring: a 64px dial with its figure in the centre, the rows beside it ──
-     The parts are `split`'s (above): ink, then the ramp, a tone in its intent. The track is the tile's second
+     The parts are `split`'s (above): the accent, then its tints, a tone in its intent. The track is the tile's second
      surface, what the whole is measured against. The circles carry presentation attributes from `src/ring.ts` so a
      page without these rules still draws an outline; every rule here wins over them. */
   .ring {
@@ -2298,8 +2432,7 @@
   /* ── heat: twelve weeks by weekday, four washes of the one series ─────────
      The cells arrive week by week, Monday first, and flow down seven rows and across `--weeks` columns, so no cell
      carries a position. A GAP AND A ZERO ARE NOT THE SAME DAY (`days.ts`): a day nobody wrote is an outline, a day
-     counted empty is the second surface, and a busy day is one of the ramp's four steps up to the ink (greys with
-     one ink highlight). A day still to come is not drawn at all. Today is outlined in the ink. */
+     counted empty is the second surface, and a busy day is one of four steps of the accent, lightest to full. A day still to come is not drawn at all. Today is outlined in the ink. */
   .block[data-kind='heat'] {
     container-type: inline-size;
   }
@@ -2338,19 +2471,19 @@
   }
 
   .heat-day[data-wash='1'] {
-    background: var(--ramp-3);
+    background: var(--chart-3);
   }
 
   .heat-day[data-wash='2'] {
-    background: var(--ramp-2);
+    background: var(--chart-2);
   }
 
   .heat-day[data-wash='3'] {
-    background: var(--ramp-1);
+    background: color-mix(in oklab, var(--chart-1) 80%, var(--bg));
   }
 
   .heat-day[data-wash='4'] {
-    background: var(--ink);
+    background: var(--chart-1);
   }
 
   .heat-day[data-today] {
@@ -2415,7 +2548,7 @@
   }
 
   .heat-week[data-on] {
-    background: var(--ink);
+    background: var(--chart-1);
   }
 
   .heat-ticks {

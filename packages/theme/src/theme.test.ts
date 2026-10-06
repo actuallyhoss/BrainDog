@@ -343,7 +343,7 @@ test('and the checks would SAY so — a floor nothing measures is not a floor', 
 
 /* ── the shape of the result, and not only its refusals ─────────────────── */
 
-test('EVERY CHECK REPORTS, PASS OR FAIL: 119 rows per scheme, counted here and nowhere quoted', () => {
+test('EVERY CHECK REPORTS, PASS OR FAIL: 204 rows per scheme, counted here and nowhere quoted', () => {
   /**
    * 39 §6.1 SPECIFIED 90 RESULTS PER SCHEME AND THE CODE RETURNED 6 IN DARK AND 4 IN LIGHT.
    *
@@ -362,15 +362,19 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 119 rows per scheme, counted here and n
    *
    * 114 UNTIL 2026-10-02, when red split in two (`INTENT_TEXT`): its words became `danger-text`, which takes `danger`'s
    * place in F, G and K, and `danger` became red as a mark, which joins the fills in D. Five surfaces, five rows.
+   *
+   * 119 UNTIL 2026-10-07, when the board arrived (DIRECTION §39): every pair measured on the five rungs is measured on
+   * the board, the tile and the field too (`GROUNDS`), eight grounds where there were five, and check S holds the
+   * working accent's twenty-five pairs.
    */
   const PER_CHECK: Record<string, number> = {
-    A: 15, // three inks that are not `faint`, each on five surfaces
-    B: 5, //  `accent-text` on five surfaces
-    C: 5, //  `faint` on five surfaces
-    D: 40, // `edge`, `accent-edge`, five `-fill` roles (the four intents' and `live-fill`) and `danger`, each on five surfaces
-    E: 6, //  the two ring tones against each other, then `focus-in` on five surfaces
+    A: 24, // three inks that are not `faint`, each on eight grounds
+    B: 8, //  `accent-text` on eight grounds
+    C: 8, //  `faint` on eight grounds
+    D: 64, // `edge`, `accent-edge`, five `-fill` roles (the four intents' and `live-fill`) and `danger`, each on eight grounds
+    E: 9, //  the two ring tones against each other, then `focus-in` on eight grounds
     F: 1, //  one summary row carrying the worst separation over the six intent pairs
-    G: 25, // the four intents as words (red's are `danger-text`) and `live`, each on five surfaces
+    G: 40, // the four intents as words (red's are `danger-text`) and `live`, each on eight grounds
     H: 4, //  four rungs of the five-surface ladder
     J: 1, //  one row for the palette: the most chroma any role gave up to the gamut
     K: 2, //  a link against body ink, and against red words, `danger-text`
@@ -379,10 +383,12 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 119 rows per scheme, counted here and n
     O: 1, //  one row for the palette: every value is shaped like a colour
     P: 1, //  one row for the palette: no value holds a banned token
     Q: 3, //  the control fill against its own label, at rest and on hover and on press
-    R: 5, //  the accent fill against the five surfaces it can be painted on
+    R: 8, //  the accent fill against the eight grounds it can be painted on
+    S: 25, // the working accent: its label at rest and on hover, the fill on three grounds, its words on eight grounds
+    //        and two tints, three inks and five state words on the first tint, and two inks on the second
   };
   const PER_SCHEME = Object.values(PER_CHECK).reduce((a, b) => a + b, 0);
-  assert.equal(PER_SCHEME, 119, 'the per-letter table no longer sums to the number the checks report');
+  assert.equal(PER_SCHEME, 204, 'the per-letter table no longer sums to the number the checks report');
 
   for (const built of [HOUSE, HIGH_CONTRAST])
     for (const scheme of ['dark', 'light'] as const) {
@@ -395,13 +401,13 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 119 rows per scheme, counted here and n
     }
 
   /* AND THE WHOLE VALIDATOR IS THE TWO SCHEMES PLUS THREE. `checkElevation` answers once per
-     scheme and `checkForcedColors` once for the document, so `validate` is 119 + 119 + 2 + 1. */
+     scheme and `checkForcedColors` once for the document, so `validate` is 204 + 204 + 2 + 1. */
   const whole = validate(HOUSE, toCSS(HOUSE, HIGH_CONTRAST) + FORCED);
   assert.equal(whole.length, PER_SCHEME * 2 + 3, `validate returned ${whole.length} results`);
 
   /* THE POINT OF ALL OF IT: a letter that goes missing is now visible in the output. */
   const spoke = new Set(whole.map((f) => f.check));
-  for (const letter of 'ABCDEFGHIJKLMNOPQR')
+  for (const letter of 'ABCDEFGHIJKLMNOPQRS')
     assert.ok(spoke.has(letter), `check ${letter} said nothing at all, so nothing can tell it apart from a deleted check`);
 });
 
@@ -835,43 +841,76 @@ const over = (paint: string, under: string) => {
   return { r: mix(Number(m[1]), u.r), g: mix(Number(m[2]), u.g), b: mix(Number(m[3]), u.b) };
 };
 
-test('TEXT ON THE CHROME CLEARS THE SAME FLOORS AS TEXT ON A SURFACE', () => {
-  /* Glass over the ground or a tile, and the arrival tint, are things a word sits on, and none of them is one of the
-     five surfaces the checks walk. Each is held here against every ink's own floor.
+test('TEXT ON THE WASHES CLEARS THE SAME FLOORS AS TEXT ON A SURFACE', () => {
+  /* A hovered row on the board or in a tile, and the arrival tint, are things a word sits on, and none of them is one
+     of the grounds the checks walk. Each is held here against every ink's own floor.
 
-     THE ROW WASH IS NOT, AND THAT IS AN OPEN QUESTION FOR THE DESIGN SYSTEM RATHER THAN A PASS. Its light wash is darker than its
-     ground, so a selected row's ink-3 meta measures about 4.0:1 on it (`build.ts`, `worstOf`). */
+     2026-10-07, THE WASH IS IN NOW, AND IT WAS THE OPEN QUESTION. The old light wash was white over a grey ground and
+     took ink-3 under AA on a chosen row; the wash is the ink at 5% (`chromeOf`) and a chosen row the accent's first
+     tint, which check S proves, so the question has an answer and this asserts it.
+
+     A HOVER IS HELD TO THE HOUSE'S FLOORS IN HIGH CONTRAST, and the arrival tint to its own. A row under the pointer is
+     a moment, and high contrast's 12.5:1 second text measures 11.75:1 under the light wash: far past AA, and short of a
+     floor set for text a reader lives on. */
   for (const built of [HOUSE, HIGH_CONTRAST])
     for (const scheme of ['light', 'dark'] as const) {
       const p = built.schemes[scheme];
       const c = built.chrome[scheme];
-      const grounds = [
-        ...(['glass', 'glass-strong'] as const).flatMap((k) => [over(c[k], p.sunk), over(c[k], p.bg)]),
-        fromHex(c['arrived-wash']),
+      const grounds: [Rgb, number[]][] = [
+        [over(c['hover-wash'], p.board), HOUSE_PROFILE.ink],
+        [over(c['hover-wash'], p.tile), HOUSE_PROFILE.ink],
+        [fromHex(c['arrived-wash']), built.profile.ink],
       ];
       for (const [i, ink] of (['ink', 'ink2', 'dim'] as const).entries())
-        for (const g of grounds) {
+        for (const [g, floors] of grounds) {
           const got = contrast(fromHex(p[ink]), g);
-          assert.ok(got >= built.profile.ink[i]! - 0.01, `${built.id} ${scheme}: ${ink} is ${got.toFixed(2)}:1 on the chrome`);
+          assert.ok(got >= floors[i]! - 0.01, `${built.id} ${scheme}: ${ink} is ${got.toFixed(2)}:1 on a wash`);
         }
     }
 });
 
-test('THE DESIGN SYSTEM CHROME: glass in the house, opaque in high contrast', () => {
-  assert.equal(HOUSE.chrome.light.glass, 'rgb(255 255 255 / 0.7)');
-  assert.equal(HOUSE.chrome.dark.glass, 'rgb(30 34 43 / 0.62)');
-  assert.equal(HOUSE.chrome.light['hover-wash'], 'rgb(255 255 255 / 0.6)'); // lifts toward white on the ground (build.ts GLASS)
+test('THE BOARD (DIRECTION §39): exact colours, no glass, no light, a flat tile', () => {
+  assert.deepEqual(
+    (['board', 'tile', 'action'] as const).map((r) => HOUSE.schemes.light[r]),
+    ['#F3F4F6', '#FFFFFF', '#2563EB'],
+  );
+  assert.deepEqual(
+    (['board', 'tile', 'action'] as const).map((r) => HOUSE.schemes.dark[r]),
+    ['#0D1014', '#161A20', '#6EA8FE'],
+  );
+  /* The brand stays red: the working accent is beside the mark, never instead of it. */
+  assert.equal(HOUSE.schemes.light.accent, '#DB2527');
+  assert.equal(HOUSE.chrome.light['hover-wash'], 'rgb(16 19 24 / 0.05)');
+  assert.equal(HOUSE.chrome.light.selected, HOUSE.schemes.light['action-tint-1']);
   assert.equal(HOUSE.chrome.light['arrived-wash'], '#EEF0FF');
-  assert.equal(HOUSE.elevation.light[0], '0 1px 1px rgb(16 24 40 / 0.03), 0 8px 24px -12px rgb(16 24 40 / 0.12)');
-  assert.equal(HOUSE.elevation.dark[1], '0 16px 40px -12px rgb(0 0 0 / 0.6)');
   for (const scheme of ['light', 'dark'] as const) {
+    assert.match(HOUSE.elevation[scheme][0], /^0 0 0 0 rgb\([\d ]+\/ 0\)$/u, `a resting ${scheme} tile casts a shadow`);
     assert.equal(HOUSE.elevation[scheme][2], HOUSE.elevation[scheme][1], 'a sheet is at level 2');
-    assert.equal(HIGH_CONTRAST.chrome[scheme].glass, HIGH_CONTRAST.schemes[scheme].bg, 'high-contrast glass is not opaque');
-    assert.equal(HIGH_CONTRAST.chrome[scheme]['glass-strong'], HIGH_CONTRAST.schemes[scheme].bg);
   }
   const css = toCSS(HOUSE, HIGH_CONTRAST);
-  for (const name of ['glass', 'glass-strong', 'glass-rim', 'glass-hair', 'glass-sat', 'ground-glow', 'live', 'live-fill', 'hover-wash', 'selected', 'arrived-wash', 'danger-text'])
+  for (const name of ['glass', 'glass-strong', 'glass-rim', 'glass-hair', 'glass-sat', 'ground-glow'])
+    assert.equal(css.split(`--${name}:`).length - 1, 0, `--${name} is still emitted`);
+  for (const name of ['board', 'tile', 'field', 'action', 'action-hover', 'action-tint-1', 'action-tint-2', 'action-text', 'on-action', 'live', 'hover-wash', 'selected', 'arrived-wash', 'danger-text'])
     assert.equal(css.split(`--${name}:`).length - 1, 12, `--${name} is not in every scheme block`);
+});
+
+test('A RECORD’S COLOUR DRIVES THE WORKING ACCENT, and the house pin holds only beside the house red', () => {
+  for (const { name, hex } of ACCENTS) {
+    const got = recordTheme(hex);
+    assert.ok(got.ok, `${name} was refused`);
+    if (!got.ok) continue;
+    const p = got.value.built.schemes;
+    /* In light the buttons are the colour the person picked, exactly. */
+    assert.equal(p.light.action, hex.toUpperCase(), `${name}'s buttons are not ${name}`);
+    /* In dark a lighter step of the same hue, never the house blue. */
+    const dh = rgbToLch(fromHex(p.dark.action)).H;
+    const ph = rgbToLch(fromHex(hex)).H;
+    assert.ok(Math.min(Math.abs(dh - ph), 360 - Math.abs(dh - ph)) < 8, `${name}'s dark buttons left its hue`);
+    assert.notEqual(p.dark.action, HOUSE.schemes.dark.action);
+  }
+  /* A seed spread from the house with another accent does not keep the house blue. */
+  const spread = build({ ...HOUSE_SEED, accent: '#2B7F8A' }, HOUSE_PROFILE, 'spread');
+  assert.equal(spread.schemes.light.action, '#2B7F8A');
 });
 
 test('THE DARK LADDER: TILES, WELLS AND CHROME STAND APART FROM THE GROUND', () => {
@@ -887,11 +926,8 @@ test('THE DARK LADDER: TILES, WELLS AND CHROME STAND APART FROM THE GROUND', () 
   /* Evenly: the two steps above tile-2 are one step, to within a code value. */
   const L = (hex: string) => rgbToLch(fromHex(hex)).L;
   assert.ok(Math.abs(L(p.s2) - L(p.s1) - (L(p.s3) - L(p.s2))) < 0.003, 's1, s2 and s3 do not step evenly');
-  /* The chrome is glass over the ground, and it reads as a thing on it. */
-  const glass = over(HOUSE.chrome.dark.glass, p.sunk);
-  assert.ok(apart(glass, fromHex(p.sunk)) >= 4, `glass on the ground is ${apart(glass, fromHex(p.sunk)).toFixed(2)} from it`);
-  /* And a tile catches the top light, at a level the chrome's shadow is still above (check I). */
-  assert.equal(HOUSE.elevation.dark[0], '0 0 0 0 rgb(0 0 0 / 0), inset 0 1px 0 rgb(255 255 255 / 0.05)');
+  /* And the tile stands off the board it sits on, by its colour alone (DIRECTION §39: no border, no shadow). */
+  assert.ok(dE(p.board, p.tile) >= 2.5, `a tile is ${dE(p.board, p.tile).toFixed(2)} from the board`);
   assert.deepEqual(refusals(checkElevation(HOUSE)), []);
 });
 
@@ -911,9 +947,8 @@ test('THE LIGHT LADDER: TILES, WELLS AND CHROME STAND APART AS THEY DO IN DARK',
   const L = (hex: string) => rgbToLch(fromHex(hex)).L;
   assert.ok(Math.abs(L(p.s1) - L(p.s2) - (L(p.s2) - L(p.s3))) < 0.003, 's1, s2 and s3 do not step evenly');
   assert.ok(L(p.s3) > L(p.sunk), 'the last step inside a tile went down onto the ground');
-  /* The rail is glass over the ground, and it reads as a thing on it, as dark's does. */
-  const glass = over(HOUSE.chrome.light.glass, p.sunk);
-  assert.ok(apart(glass, fromHex(p.sunk)) >= 4, `glass on the ground is ${apart(glass, fromHex(p.sunk)).toFixed(2)} from it`);
+  /* And the white tile stands off the board it sits on, as dark's does, at the design's own pair (2.47). */
+  assert.ok(dE(p.board, p.tile) >= 2.4, `a tile is ${dE(p.board, p.tile).toFixed(2)} from the board`);
 });
 
 test('A TILE EASES INTO THE CHROME’S LEVEL, in both schemes', () => {

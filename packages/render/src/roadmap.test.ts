@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { roadmapLabelAt, roadmapLines, roadmapPlan, roadmapWhen, type RoadmapRow } from './roadmap.ts';
+import { roadmapAxis, roadmapFlip, roadmapLines, roadmapPlan, roadmapWhen, type RoadmapRow } from './roadmap.ts';
 
 const TODAY = '2026-09-22';
 const win = (start: string, end: string, title = `${start} to ${end}`): RoadmapRow => ({ start, end, title });
@@ -246,7 +246,6 @@ test('A NAME NEAR THE END EDGE GOES BEFORE ITS BAR, where the room is', () => {
   assert.equal(last.label.room, last.x);
   const wide = plan.bars.find((b) => b.title === 'B')!;
   assert.equal(wide.label.side, 'over', 'a bar as wide as a name keeps it over itself');
-  assert.equal(roadmapLabelAt(last, { x: '500', width: '20' }), '500');
 });
 
 test('A WINDOW IS SAID AS ONE SPAN OF DAYS, the month and the year once where both ends share them', () => {
@@ -271,4 +270,21 @@ test('A NAME TODAY\'S LINE RUNS THROUGH WITH NO ROOM BEFORE ITS BAR STAYS, AND S
   assert.deepEqual(a.label, { x: a.x, side: 'over', room: a.label.room, today: true }, 'A starts at the edge, so its name cannot go before it');
   assert.ok(crossed.bars.filter((x) => x.title !== 'A').every((x) => x.label.today === undefined), 'a name the line misses is not marked');
   assert.ok(roadmapPlan(rows, '2026-09-09', 150).bars.every((x) => x.label.today === undefined), 'and with today between names, none is');
+});
+
+test('THE AXIS GIVES WAY TO TODAY: a tick near today\'s line is not named, so "Today" and a date never share a place', () => {
+  const plan = roadmapPlan([win('2026-08-30', '2026-08-31', 'A'), win('2026-09-20', '2026-09-21', 'B')], '2026-09-01');
+  assert.ok(plan.today !== null);
+  const now = Number(plan.today);
+  const kept = roadmapAxis(plan);
+  assert.ok(kept.length < plan.ticks.length, 'the Monday beside today gave way');
+  assert.ok(kept.every((t) => Math.abs(Number(t.x) - now) >= 60));
+  const later = roadmapPlan([win('2026-08-30', '2026-08-31', 'A'), win('2026-09-20', '2026-09-21', 'B')], '2027-01-01');
+  assert.deepEqual(roadmapAxis(later), later.ticks, 'with no today line every tick is named');
+});
+
+test('A ROW\'S DAYS GO BEFORE ITS BAR past seven tenths of the track, where after it they would run off the tile', () => {
+  assert.equal(roadmapFlip({ at: '0.1', span: '0.2' }), false);
+  assert.equal(roadmapFlip({ at: '0.6', span: '0.2' }), true);
+  assert.equal(roadmapFlip({ at: '0.9', span: '0' }), true);
 });

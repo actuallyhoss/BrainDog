@@ -93,20 +93,20 @@ test('and the comparison is not vacuous: the chart is on both sides, and a diffe
   const [seg] = parse(SHAPES['windows, a date, a tone, and a row that does not read']!);
   const block = seg as BlockSegment;
   const svelte = tree(render(Block, { props: { block, opts: { now: NOW } } }).body);
-  assert.match(svelte, /<svg [^>]*class="roadmap-chart"/u);
+  assert.match(svelte, /class="roadmap-list"/u);
   assert.match(svelte, /class="roadmap-today"/u);
   /* Today a week later moves its line, so a side that ignored the host's clock would be caught by the shapes above. */
   const later = tree(render(Block, { props: { block, opts: { now: NOW + 7 * 86_400_000 } } }).body);
   assert.notEqual(later, svelte);
 });
 
-test('A NAME TODAY\'S LINE STILL RUNS THROUGH IS MARKED ON BOTH SIDES, where its bar is too near the edge for it to go before', () => {
-  /* Kiln on 1 Sep: the first bar starts at the edge, its name runs past today's line, and there is no room before it. */
+test('TODAY\'S WORD TAKES ITS PLACE ON THE AXIS ON BOTH SIDES, and the Monday beside it gives way', () => {
+  /* Kiln on 1 Sep: the 31 August tick sits a day from today's line, and the two names in one place were one smear. */
   const [seg] = parse(SHAPES['short windows end to end, a lane each with the name beside it']!);
   const block = seg as BlockSegment;
   const now = Date.UTC(2026, 8, 1, 12);
   const svelte = tree(render(Block, { props: { block, opts: { now } } }).body);
   assert.equal(svelte, tree(toHTML([block], { now })));
-  assert.match(svelte, /<li class="roadmap-name" data-side="after" data-today style="[^"]*">Turn auto-renew back on for kilnfonts\.example<\/li>/u);
-  assert.equal(svelte.match(/data-today/gu)?.length, 1, 'only the name the line runs through');
+  assert.match(svelte, /<li class="roadmap-today" style="--at:[\d.]+">Today<\/li>/u);
+  assert.doesNotMatch(svelte, />31 Aug</u);
 });

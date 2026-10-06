@@ -156,7 +156,7 @@ const FENCE = [
   '```',
 ].join('\n');
 
-test('toHTML draws the bars, the stem and today from the plan, where the plan put them', () => {
+test('toHTML draws each row on its own track, its bar, its date and today where the plan put them', () => {
   const segments = parse(FENCE);
   assert.equal(segments.length, 1);
   assert.equal(segments[0]?.type, 'block', 'the fence degraded instead of drawing');
@@ -168,46 +168,30 @@ test('toHTML draws the bars, the stem and today from the plan, where the plan pu
     [roadmapRow('Build the kiln page', '2026-09-10', '10'), roadmapRow('Regate window', '2026-10-05', '3', 'warn'), roadmapRow('Launch', '2026-09-30', ''), roadmapRow('Someday', 'soon', '')],
     TODAY,
   );
-  const bars = [...html.matchAll(/<rect class="roadmap-bar"[^>]*x="([^"]+)"[^>]*width="([^"]+)"/gu)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(bars, plan.bars.map((b) => [b.x, b.width]));
-  assert.equal([...html.matchAll(/class="roadmap-stem"/gu)].length, 1);
-  assert.match(html, new RegExp(`class="roadmap-today" d="M${plan.today} `, 'u'));
-  /* A LABEL'S `--at` IS A SHARE OF THE WIDTH, as the stylesheet multiplies it by 100%. It was first written in the
-     box's thousand units, `483.61`, which puts every label 48,361% of the way across. */
-  assert.match(html, new RegExp(`data-stem="" style="--at:${roadmapShare(plan.stems[0]!.label.x).replace('.', '\\.')};--line:0">Launch<`, 'u'));
-  assert.ok(Number(roadmapShare(plan.stems[0]!.label.x)) < 1);
+  /* `--at` AND `--span` ARE SHARES OF THE TRACK, as the stylesheet multiplies them by 100%. */
+  const placed = [...html.matchAll(/<li class="roadmap-item"[^>]*style="--at:([^;]+);--span:([^"]+)"/gu)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(
+    placed.filter(([, span]) => span !== '0'),
+    plan.bars.map((b) => [roadmapShare(b.x), roadmapShare(b.width)]),
+  );
+  assert.ok(placed.every(([at]) => Number(at) >= 0 && Number(at) < 1));
+  assert.equal([...html.matchAll(/data-date=""/gu)].length, 1, 'Launch is a date, a dot on its day');
+  assert.equal([...html.matchAll(/class="roadmap-bar"/gu)].length, 3, 'every placed row has its mark on its track');
+  assert.match(html, new RegExp(`<li class="roadmap-today" style="--at:${roadmapShare(plan.today!).replace('.', '\\.')}">Today</li>`, 'u'));
   /* Five weeks of work are named by the week, each Monday a day and a month. */
-  assert.match(html, /<ol class="roadmap-months" data-weekly="" aria-hidden="true"><li class="roadmap-month" style="--at:[\d.]+">7 Sep<\/li>/u);
+  assert.match(html, /<ol class="roadmap-axis" data-weekly="" aria-hidden="true"><li class="roadmap-tick" style="--at:[\d.]+">7 Sep<\/li>/u);
   assert.match(html, />5 Oct</u);
 });
 
-test('EVERY MARK IN THE DRAWING SAYS HOW IT IS PAINTED, so a page with no roadmap rules does not fill it black', () => {
-  /* NO STYLESHEET DREW THIS KIND. `apps/web/src/lib/blocks-charts.css` styles `series-bar`, `lines-*` and the rest by
-     class and had no `roadmap-` rule when this test was written, and an SVG shape with no fill is painted black: the month bands, every bar and
-     the whole box came out one black slab, with the stems and today's line drawn black on black (read off the HTML
-     this renderer wrote, before this test). So each mark carries its own presentation attributes, which any rule a
-     host's stylesheet writes still overrides, and they are `currentColor` or `none`, never a colour of this kind's. */
+test('THE TIMELINE IS ONE LIST, NOT A STRETCHED DRAWING: no name is placed over another, and the list is named', () => {
+  /* The names sat in a layer over a box drawn with `preserveAspectRatio="none"`, placed beside their bars, and at
+     every width some ran into a bar, a line or each other (DIRECTION §39). A row is a line of its own now, its name in
+     a column, so the drawing has nothing to collide. */
   const html = toHTML(parse(FENCE), { now: NOW });
-  const svg = /<svg class="roadmap-chart"[\s\S]*?<\/svg>/u.exec(html)?.[0] ?? '';
-  const marks = [...svg.matchAll(/<(rect|path)\b[^>]*>/gu)].map((m) => m[0]);
-  assert.ok(marks.length >= 5, `bands, bars, a stem and today: ${marks.length}`);
-  for (const mark of marks) {
-    const fill = /\sfill="([^"]*)"/u.exec(mark)?.[1];
-    assert.ok(fill === 'currentColor' || fill === 'none', `left to the default black: ${mark}`);
-    if (mark.startsWith('<path')) {
-      assert.equal(fill, 'none', `a line is a stroke: ${mark}`);
-      assert.match(mark, /\sstroke="currentColor"/u, `a line with no stroke is not drawn: ${mark}`);
-    }
-  }
-  /* A BAR IS LIGHTER THAN THE INK AND A BAND LIGHTER STILL, so the words over them stay readable on a page with no
-     rules for them: a bar at full ink would put its own title black on black. */
-  const opacity = (cls: string): number[] =>
-    marks
-      .filter((m) => m.includes(`class="${cls}"`) && m.includes('fill="currentColor"'))
-      .map((m) => Number(/\sfill-opacity="([^"]*)"/u.exec(m)?.[1] ?? '1'));
-  assert.ok(opacity('roadmap-bar').length && opacity('roadmap-band').length, 'the bars and the alternate bands are painted');
-  for (const o of [...opacity('roadmap-bar'), ...opacity('roadmap-band')]) assert.ok(o > 0 && o < 0.5, `fill-opacity ${o}`);
-  assert.ok(Math.max(...opacity('roadmap-band')) < Math.min(...opacity('roadmap-bar')), 'a band is quieter than a bar');
+  assert.equal(html.includes('<svg'), false);
+  assert.doesNotMatch(html, /roadmap-names|roadmap-chart/u);
+  assert.match(html, /<ol class="roadmap-list" aria-label="[^"]+: 2 windows and 1 date\.">/u);
+  assert.match(html, /<div class="roadmap" style="--rows:3">/u);
 });
 
 test('the rows are also a lane list a screen reader reads, each with its span of days, and the tone keeps its glyph', () => {
@@ -218,13 +202,11 @@ test('the rows are also a lane list a screen reader reads, each with its span of
   assert.match(html, /Regate window<span class="glyph" role="img" aria-label="watch this">⚠︎<\/span>/u);
 });
 
-test('ONE DOT A BAR: a toned window carries its named dot on its due day, and its name over the chart carries none', () => {
-  const html = toHTML(parse(FENCE), { now: NOW });
-  const names = /<ol class="roadmap-names"[\s\S]*?<\/ol>/u.exec(html)?.[0] ?? '';
-  assert.match(names, />Regate window<\/li>/u);
-  assert.doesNotMatch(names, /class="glyph"/u, 'a second dot after the name read as two marks for one bar');
-  assert.doesNotMatch(names, /data-intent/u, 'a name drawn in the ink claimed its tone by colour with no glyph inside');
-  assert.equal([...html.matchAll(/class="roadmap-due" role="img" aria-label="watch this"/gu)].length, 1);
+test('A ROW CARRIES ITS STATE, so a late one is drawn red and says so with its named dot', () => {
+  const html = toHTML(parse('```roadmap | Kiln\nTurn auto-renew back on | 2026-09-10 | 1 | bad\nWrite the page | 2026-09-30 | 2\nShipped | 2026-09-12 | 2 | good\n```'), { now: NOW });
+  assert.match(html, /<li class="roadmap-item" data-intent="bad"[^>]*><span class="roadmap-item-title">Turn auto-renew back on<span class="glyph" role="img" aria-label="wrong">/u);
+  assert.match(html, /<li class="roadmap-item" data-intent="good"/u);
+  assert.match(html, /<li class="roadmap-item"(?! data-intent)[^>]*><span class="roadmap-item-title">Write the page<\/span>/u, 'work in hand wears no intent');
 });
 
 test('THE TABLE KEEPS THE ORDER THE ROWS CAME IN, a date written first read first', () => {
@@ -324,8 +306,8 @@ test('A ROADMAP BOUND TO A LIST DRAWS ITS ROWS, read from the day this package w
   const html = toHTML(parse(BOUND, { page: true }), { now: NOW });
   assert.equal(html.includes(ROADMAP_NONE), false, `the bound roadmap drew its sentence: ${html}`);
   assert.equal(html.includes('roadmap-skipped'), false, 'a row the record wrote was named as unreadable');
-  assert.equal([...html.matchAll(/class="roadmap-bar"/gu)].length, 2, 'Fire and Glaze carry an effort and are windows');
-  assert.equal([...html.matchAll(/class="roadmap-stem"/gu)].length, 1, 'Ship carries none and is a date');
+  assert.equal([...html.matchAll(/<li class="roadmap-item"(?![^>]*data-date)[^>]*>/gu)].length, 2, 'Fire and Glaze carry an effort and are windows');
+  assert.equal([...html.matchAll(/data-date=""/gu)].length, 1, 'Ship carries none and is a date');
   /* And each is placed where its typed twin is, so the two spellings are one day and not merely both accepted. */
   assert.deepEqual(roadmapRow('Fire', '5 Oct 2026', '1.5 d'), roadmapRow('Fire', '2026-10-05', '1.5 d'));
   assert.deepEqual(roadmapRow('Ship', '10 Oct 2026', ''), roadmapRow('Ship', '2026-10-10', ''));

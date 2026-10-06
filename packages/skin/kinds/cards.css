@@ -90,13 +90,13 @@
   /* A MARK IS SQUARE AND A FACE IS ROUND, so a project and a person are told apart by shape, which
      holds in every theme and for every reader where a hue would not. */
   .cards-mark {
-    background: var(--s1);
-    border-radius: var(--r-well);
+    background: var(--field);
+    border-radius: var(--r-ctl);
   }
 
   .cards-face {
-    background: var(--hold-wash);
-    border-radius: var(--r-pill);
+    background: var(--field);
+    border-radius: var(--r-round);
   }
 
   .cards-who .cards-face {
@@ -206,14 +206,14 @@
 
   .cards-trend-line {
     fill: none;
-    stroke: var(--ink);
+    stroke: var(--chart-1);
     stroke-width: 2px;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
 
   .cards-trend-end {
-    stroke: var(--tone, var(--ink));
+    stroke: var(--tone, var(--chart-1));
     stroke-width: 6px;
     stroke-linecap: round;
   }
@@ -255,7 +255,7 @@
 
   .cards-ring-fill {
     fill: none;
-    stroke: var(--ink);
+    stroke: var(--chart-1);
     stroke-width: 4;
     stroke-linecap: round;
   }
@@ -360,7 +360,7 @@
     inline-size: 100%;
     aspect-ratio: 16 / 9;
     object-fit: cover;
-    border-radius: var(--r-md);
-    background: var(--s1);
+    border-radius: var(--r-ctl);
+    background: var(--field);
   }
 }

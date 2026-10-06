@@ -82,26 +82,39 @@ export type Role =
      suggestion lines. NOT AN INTENT: it is a state, never a row's verdict, so check F does not hold it apart from
      `info`. `live` is solved as text, `live-fill` as a mark. */
   | 'live'
-  | 'live-fill';
+  | 'live-fill'
+  /* THE BOARD (DIRECTION §39): the page every tile sits on, the tile, and the fill of a control inside or beside one.
+     Not rungs of the ladder (check H walks `SURFACES` only): they are what the product paints, at the design's own
+     values, and every word and mark is proven on them as on the five (`GROUNDS`). */
+  | 'board'
+  | 'tile'
+  | 'field'
+  /* THE WORKING ACCENT (DIRECTION §39): selection, primary buttons, links and charts. Not the brand: `accent` stays the
+     mark's red, so a red on screen means one thing. `action` is the fill, `on-action` the label on it, `action-hover`
+     the fill under the pointer, the two tints a chosen thing and a stronger one, and `action-text` the accent as
+     words, on any ground and on either tint. */
+  | 'action'
+  | 'action-hover'
+  | 'action-tint-1'
+  | 'action-tint-2'
+  | 'action-text'
+  | 'on-action';
 
 export type Palette = Record<Role, string>;
 
+/** Everything a word or a mark is painted on: the five rungs, and the board, the tile and the field. */
+export const GROUNDS = [...SURFACES, 'board', 'tile', 'field'] as const satisfies readonly Role[];
+
 /**
- * The generated values that are not colours a theme may set: the glass chrome, the ground's light, the row washes
- * and the arrival tint. They carry alpha, which the dialect refuses in a role (`parseColour`: "No
- * alpha"), and a theme has no key for them, the same as elevation. Emitted beside the palette in every scheme block.
+ * The generated values that are not colours a theme may set: the row washes and the arrival tint. They carry alpha,
+ * which the dialect refuses in a role (`parseColour`: "No alpha"), and a theme has no key for them, the same as
+ * elevation. Emitted beside the palette in every scheme block.
+ *
+ * 2026-10-07, THE GLASS AND THE GROUND'S LIGHT ARE GONE (DIRECTION §39: "no glass, no gradients"). Six values went
+ * with them (`glass`, `glass-strong`, `glass-rim`, `glass-hair`, `glass-sat`, `ground-glow`); a host that still names
+ * one gets the tile from the skin (`base.css`), and the light falls on nothing.
  */
-export const CHROME = [
-  'glass',
-  'glass-strong',
-  'glass-rim',
-  'glass-hair',
-  'glass-sat',
-  'ground-glow',
-  'hover-wash',
-  'selected',
-  'arrived-wash',
-] as const;
+export const CHROME = ['hover-wash', 'selected', 'arrived-wash'] as const;
 export type Chrome = Record<(typeof CHROME)[number], string>;
 
 /** Where a role wants to sit, in OKLCH. `H` omitted is the seed's neutral hue. */
@@ -151,8 +164,6 @@ export type Profile = {
    * as it always has.
    */
   aim?: Record<Scheme, Partial<Record<AimRole, Aim>>>;
-  /** The chrome this profile paints: the design system's glass, or opaque, which is what high contrast asks for. */
-  chrome: 'glass' | 'opaque';
   /** The chroma ladder the separability search walks, and the contrast grid it walks it against. */
   chromaLadder: number[];
   targetGrid: number[];
@@ -196,7 +207,9 @@ export type AimRole =
   | 'danger-text'
   | 'live'
   | 'live-fill'
-  | 'arrive';
+  | 'arrive'
+  | 'board'
+  | 'tile';
 
 /**
  * The design system's colours, as the generator reads them: every colour it names, in OKLCH, measured off its hex.
@@ -224,9 +237,16 @@ export type AimRole =
  * four that had room on purpose keeps it, a step darker in its own hue: ink-2 #484F5A at 6.62:1 (the design system's
  * #4A505B fell just under its 6.5 floor), ink-3 #5C626D at 4.91:1, red words #BD181E at 5.08:1, and green #067342
  * at 4.79:1, where the floor alone would have set green at exactly 4.5.
+ *
+ * 2026-10-07, THE BOARD AND THE TILE, AT DIRECTION §39'S OWN VALUES: light board #F3F4F6 under a white tile, dark board
+ * #0D1014 under #161A20. Each carries its own hue, read off the hex, so the value that ships is the value named. They
+ * have no floor to be moved by: both sit inside the band the five rungs already span, so every ink solved on the
+ * worst rung clears them too, and check A proves it on them.
  */
 const SYSTEM_AIM: Record<Scheme, Partial<Record<AimRole, Aim>>> = {
   light: {
+    board: { L: 0.967, C: 0.0029, H: 264.5 }, //  #F3F4F6
+    tile: { L: 1, C: 0 }, //                      #FFFFFF
     ink: { L: 0.1858, C: 0.0113 }, //    #101318
     ink2: { L: 0.425, C: 0.0198 }, //    #484F5A
     dim: { L: 0.495, C: 0.019 }, //      #5C626D
@@ -241,6 +261,8 @@ const SYSTEM_AIM: Record<Scheme, Partial<Record<AimRole, Aim>>> = {
     arrive: { L: 0.958, C: 0.0202, H: 279.9 }, //  #EEF0FF
   },
   dark: {
+    board: { L: 0.1716, C: 0.0097, H: 255.7 }, // #0D1014
+    tile: { L: 0.2163, C: 0.0133, H: 258.4 }, //  #161A20
     ink: { L: 0.9635, C: 0.0045 }, //    #F1F3F6
     ink2: { L: 0.7872, C: 0.0157 }, //   #B4BAC4
     dim: { L: 0.6611, C: 0.0182 }, //    #8C939E
@@ -345,7 +367,6 @@ export const HOUSE_PROFILE: Profile = {
   /* The cap for a rung that gives no chroma of its own, and the inks' default lean (`Cink`). */
   groundC: { dark: 0.02, light: 0.0065 },
   aim: SYSTEM_AIM,
-  chrome: 'glass',
   prefer: {
     dark: { earn: 7, warn: 8.5, danger: 5, info: 6 },
     light: { earn: 4.5, warn: 7, danger: 5.5, info: 5.5 },
@@ -395,8 +416,6 @@ export const HIGH_CONTRAST_PROFILE: Profile = {
      changed the grounds and the quieter inks and left the one colour a reader turns it on for. Dark's ink is pushed
      to near-white by its floor, so it moves on its own. */
   aim: { dark: SYSTEM_AIM.dark, light: { ...SYSTEM_AIM.light, ink: { L: 0.13, C: 0.008 } } },
-  /* The design system: "High contrast makes glass opaque." */
-  chrome: 'opaque',
   intentFill: 4.5,
   mark: { dark: { L: 0.78, C: 0.13 }, light: { L: 0.46, C: 0.11 } },
   chromaLadder: [0.18, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1],
@@ -418,6 +437,19 @@ export type Seed = {
   space: number;
   radius: { sm: number; md: number; lg: number };
   density: 'compact' | 'comfortable' | 'roomy';
+  /**
+   * THE WORKING ACCENT, PINNED, AND ONLY BESIDE THE ACCENT IT WAS CHOSEN WITH.
+   *
+   * Omitted, `action` is solved from `accent`, which is what a record's own colour asks for: the person picks a
+   * green and the buttons, the links, the selection and the charts go green. The house is the one seed whose working
+   * colour is not its accent (the accent is the mark's red, the working colour a blue), so it names both here.
+   *
+   * KEYED BY `accent` BECAUSE A SEED IS SPREAD. `{ ...HOUSE_SEED, accent }` is how a look, an environment or a record
+   * starts from the house, and a pin that travelled with the spread would keep the house blue under every colour
+   * anybody chose: the control would report success and paint the same buttons. A pin whose `accent` is not the seed's
+   * is ignored, and the action is solved from the colour that is there.
+   */
+  action?: { accent: string; light: string; dark: string } | undefined;
 };
 
 /** Hue anchors, 28 §3 step 5. `danger` sits at 27 — which is where the BrainDog red already is. */
@@ -474,7 +506,7 @@ export type Built = {
   mark: Record<Scheme, { L: number; C: number }>;
   /** The elevation ladder, three levels, fixed geometry, alphas per scheme (28 §1). */
   elevation: Record<Scheme, [string, string, string]>;
-  /** The glass, the ground's light and the washes, per scheme. Not roles: see `CHROME`. */
+  /** The row washes and the arrival tint, per scheme. Not roles: see `CHROME`. */
   chrome: Record<Scheme, Chrome>;
   radius: { sm: number; md: number; lg: number };
   space: number;
@@ -891,8 +923,76 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
     place('live-fill', profile.intentFill, () => solveL(profile.intentFill, 0.16, LIVE_HUE, worst, dir)),
   );
 
+  /* 8 · THE BOARD (DIRECTION §39). The board and the tile at their aims, or the ground and the panel where a profile
+     names none; the field is the step a control sits on, one rung off the tile: `s2` in light, where the steps go
+     down from a white tile, and `s3` in dark, where they go up. */
+  const board = aims.board ? hex(place('board', null, () => acc)) : g.sunk;
+  const tile = aims.tile ? hex(place('tile', null, () => acc)) : g.bg;
+  const field = scheme === 'light' ? g.s2 : g.s3;
+  const boardGrounds = [board, tile, field];
+
+  /* 9 · THE WORKING ACCENT. Pinned beside the accent it was chosen with (`Seed.action`), or solved from the accent: in
+     light the accent itself, which check R has already held to 3:1 on every ground, so the colour a person picked is
+     the colour their buttons are; in dark a lighter step of it, as light as the design's own blue (L 0.72) and no
+     more saturated, because a mid-tone fill on a near-black tile reads as a hole and its words as mud. */
+  const pin = seed.action && toHex(rgb(seed.action.accent)) === toHex(rgb(seed.accent)) ? seed.action[scheme] : null;
+  const action = pin
+    ? toHex(rgb(pin))
+    : hex(scheme === 'light' ? gamutMap(acc) : gamutMap({ L: Math.max(acc.L, 0.72), C: Math.min(acc.C, 0.15), H: acc.H }));
+  const actionLch = rgbToLch(rgb(action));
+
+  /* The label on it: the tile or the ink, whichever stands further off it, and black or white only where neither
+     clears AA. White on the light blue, the dark tile on the dark one. */
+  const onAction = (() => {
+    const by = (c: string) => contrast(rgb(c), rgb(action));
+    const best = [tile, ink].reduce((a, b) => (by(b) > by(a) ? b : a));
+    return by(best) >= 4.5 ? best : by('#FFFFFF') >= by('#000000') ? '#FFFFFF' : '#000000';
+  })();
+  /* Hover steps away from the label, as `accent-hover` does, and only as far as the label still reads. */
+  const labelIsLight = rgbToLch(rgb(onAction)).L > 0.5;
+  const actionHover =
+    [0.05, 0.07, 0.09]
+      .map((d) => hex(gamutMap({ ...actionLch, L: Math.min(0.98, Math.max(0.02, actionLch.L + (labelIsLight ? -d : d))) })))
+      .find((c) => contrast(rgb(c), rgb(onAction)) >= 4.5) ?? action;
+
+  /* THE TWO TINTS, the accent laid over the tile as `color-mix(in srgb, …)` would, and as strong as the words on them
+     allow. A chosen row is `tint-1`, so its meta line (`dim`) sits on it, and the text inside a selection or a chosen
+     segment sits on `tint-2`: each steps down a percent at a time until every word it carries clears AA. In dark,
+     12% is where `dim` still clears 4.5:1 on the first, and 22% where body and second text do on the second.
+
+     A CHOSEN ROW STILL SAYS ITS STATE, so the first tint carries the intents' words and `live` too: dark `info` measured
+     4.35:1 on a 12% tint that was solved for the inks alone, a row whose status went under AA the moment it was picked. */
+  const over = (top: string, under: string, a: number) => {
+    const t = rgb(top);
+    const u = rgb(under);
+    return toHex({ r: t.r * a + u.r * (1 - a), g: t.g * a + u.g * (1 - a), b: t.b * a + u.b * (1 - a) });
+  };
+  const tint = (want: number, words: string[]) => {
+    for (let a = want; a > 0.005; a -= 0.01) {
+      const t = over(action, tile, a);
+      if (words.every((w) => contrast(rgb(w), rgb(t)) >= 4.5)) return t;
+    }
+    return tile;
+  };
+  const states = [chosen.earn, chosen.warn, chosen.danger, chosen.info, live];
+  const tint1 = tint(scheme === 'light' ? 0.1 : 0.12, [ink, ink2, dim, ...states]);
+  const tint2 = tint(scheme === 'light' ? 0.2 : 0.22, [ink, ink2]);
+
+  /* THE ACCENT AS WORDS: the fill itself where it clears the intent floor on every ground and on both tints, and
+     otherwise the least move along lightness, away from the ground, in its own hue, that does. In light the blue fill
+     is 4.0:1 on its own second tint, so its words are a step deeper; in dark they are the fill. */
+  const textGrounds = [...SURFACES.map((s) => g[s]), ...boardGrounds, tint1, tint2].map(rgb);
+  const worstText = textGrounds.reduce((a, b) => ((relLuminance(b) < relLuminance(a)) === (scheme === 'light') ? b : a));
+  const actionText =
+    contrast(rgb(action), worstText) >= profile.intentText
+      ? action
+      : hex(solveL(profile.intentText, actionLch.C, actionLch.H, worstText, dir));
+
   return {
     ...g,
+    board,
+    tile,
+    field,
     ink,
     ink2,
     dim,
@@ -916,6 +1016,12 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
     'accent-ink': accentInk,
     'accent-hover': accentHover,
     'accent-press': accentPress,
+    action,
+    'action-hover': actionHover,
+    'action-tint-1': tint1,
+    'action-tint-2': tint2,
+    'action-text': actionText,
+    'on-action': onAction,
     /* The ring is two tones, nine apart, so it survives on every surface in both schemes. */
     'focus-in': ink,
     'focus-out': g.bg,
@@ -923,40 +1029,14 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
 }
 
 /**
- * The design system's translucent paints, each an OKLCH colour or white or black, at an alpha.
+ * The translucent paints that are left: the shadows and the row wash, each an OKLCH colour or white or black, at an
+ * alpha.
  *
- * `SHADE` is the design system's cool near-black, rgb(16 24 40): the colour of a light-scheme shadow, of the hairline outside
- * glass and of the wash under a hovered row. The dark scheme's shadows and outer hairline are plain black and its
- * washes and inner edges plain white, as the design system writes them.
+ * `SHADE` is the design system's cool near-black, rgb(16 24 40): the colour of a light-scheme shadow. The dark scheme's
+ * shadows are plain black, as the design system writes them.
  */
 type Paint = 'white' | 'black' | Required<Aim>;
 const SHADE: Paint = { L: 0.2099, C: 0.0341, H: 263.4 };
-const GLASS: Record<Scheme, Record<'glass' | 'glass-strong' | 'glass-rim' | 'glass-hair' | 'ground-glow' | 'wash', [Paint, number]>> = {
-  light: {
-    /* 0.7, and it was the design system's 0.66: over the deeper light ground that stood 3.85 off it, and the rail read
-       as a lighter patch of the page rather than as a thing on it. At 0.7 it stands 4.08 off, as dark's glass does. */
-    glass: ['white', 0.7],
-    'glass-strong': ['white', 0.84],
-    'glass-rim': ['white', 0.9],
-    'glass-hair': [SHADE, 0.08],
-    'ground-glow': ['white', 0.85],
-    /* The light wash LIFTS toward white rather than shading. A shade over the grey ground took ink-3 and the red
-       below 4.5:1 on a chosen row (measured 2026-09-29); a lift raises every text pair on it. Inside a tile, where
-       a lift would vanish, rows.css points the washes at `--s1` instead. */
-    wash: ['white', 0.6],
-  },
-  dark: {
-    glass: [{ L: 0.2519, C: 0.0181, H: 266.3 }, 0.62], //        rgb(30 34 43)
-    'glass-strong': [{ L: 0.2722, C: 0.02, H: 264.2 }, 0.84], // rgb(34 39 49)
-    'glass-rim': ['white', 0.08],
-    'glass-hair': ['black', 0.5],
-    'ground-glow': [{ L: 0.6438, C: 0.0788, H: 267.4 }, 0.14], // rgb(120 140 190)
-    wash: ['white', 0.06],
-  },
-};
-/* `backdrop-filter: blur(24px) saturate(n)`: tokens.css owns the blur, and the saturation is the one part the design
-   system varies by scheme. */
-const SATURATE: Record<Scheme, number> = { light: 1.6, dark: 1.4 };
 
 const channels = (hexColour: string) => {
   const c = fromHex(hexColour);
@@ -989,24 +1069,17 @@ function arrival(p: Palette, profile: Profile, scheme: Scheme): string {
 }
 
 /**
- * The chrome of one scheme. The design system's glass where the profile paints glass; opaque where it does not, which is high
- * contrast: the glass becomes the tile, the inner edge goes and the outer one is `edge`, the proven boundary, and the
- * ground loses its light. The wash stays the design system's: a stronger one would take more contrast from the words on it.
+ * The washes of one scheme.
+ *
+ * 2026-10-07, THE HOVER WASH IS THE INK, AND IT WAS WHITE. White at 60% lifted a row off the grey ground, which is where
+ * rows sat; a row lives in a tile on the board now (DIRECTION §39), and white over a white tile is no wash at all. The
+ * ink at 5% darkens a light tile and lightens a dark one, so one rule answers both schemes, and every word on it keeps
+ * its floor (`theme.test.ts`). A CHOSEN ROW IS THE ACCENT'S FIRST TINT, which every word it carries is solved to clear.
  */
 function chromeOf(p: Palette, profile: Profile, scheme: Scheme): Chrome {
-  const g = GLASS[scheme];
-  const glass = profile.chrome === 'glass';
-  const wash = paint(...g.wash);
   return {
-    glass: glass ? paint(...g.glass) : p.bg,
-    'glass-strong': glass ? paint(...g['glass-strong']) : p.bg,
-    'glass-rim': glass ? paint(...g['glass-rim']) : paint('white', 0),
-    'glass-hair': glass ? paint(...g['glass-hair']) : p.edge,
-    'glass-sat': String(SATURATE[scheme]),
-    'ground-glow': glass ? paint(...g['ground-glow']) : paint('white', 0),
-    'hover-wash': wash,
-    /* The design system: "hover and selection fill of a row". One wash; a chosen row is told from a hovered one by staying. */
-    selected: wash,
+    'hover-wash': `rgb(${channels(p.ink)} / 0.05)`,
+    selected: p['action-tint-1'],
     'arrived-wash': arrival(p, profile, scheme),
   };
 }
@@ -1016,28 +1089,25 @@ function chromeOf(p: Palette, profile: Profile, scheme: Scheme): Chrome {
  * (`--e2`). `--e3` is the sheet, which the design system puts at level 2 too, so it is `--e2`'s value under the name the sheets
  * already read.
  *
- * 2026-10-02, A DARK TILE CATCHES THE TOP LIGHT. It was a shadow of no alpha: no shadow reads on a near-black ground, so
- * a tile was told from the ground by its fill alone. Now it carries the ground's one soft light from above
- * (`--ground-glow`) on its own top edge, a 1px highlight of white at 0.05 inside its box, so it moves nothing and follows
- * the corners.
+ * 2026-10-07, A RESTING TILE IS FLAT (DIRECTION §39: "flat, opaque, no border, no shadow"). `--e1` is one shadow of no
+ * alpha in both schemes, so a tile is told from the board by its colour alone, and the dark tile's 1px top highlight,
+ * the last of the ground's light, went with the light. `--e2` and `--e3` stay for what truly floats: a menu, the
+ * palette, a sheet.
  *
- * AND THE SHADOW OF NO ALPHA STAYS, FIRST. A browser eases one shadow list into another only when each pair is inset on
- * both sides or on neither; one mixed pair and the whole change jumps. The highlight alone is inset and `--e2` is a
- * drop, so a card that lifts to `--e2` on hover or when chosen (`StepMenu`, `FlowCard`, an automation's trigger) jumped in
- * dark where it eases in light. With the empty drop first, it eases into `--e2`'s drop, and the highlight fades against
- * the transparent shadow the browser pads the shorter list with. Check I reads the first shadow's alpha, 0, under
- * chrome's 0.6, so it still reads two levels.
+ * A DROP AND NOT NOTHING, because a card that lifts to `--e2` on hover or when chosen eases from one shadow list into
+ * another only where each pair is inset on both sides or on neither, and `--e2` is a drop. Check I reads the first
+ * shadow's alpha, 0, under chrome's, so it still reads two levels.
  *
- * `--glass-edge` IS NOT IN HERE. It is the hairline pair around glass and belongs to glass rather than to a level: a
- * sheet is a tile at level 2 and has no glass edge. Chrome writes `var(--glass-edge), var(--e2)`.
+ * `--glass-edge` IS NOT IN HERE. It is the hairline around chrome and belongs to chrome rather than to a level: a
+ * sheet is a tile at level 2 and has no edge of its own. Chrome writes `var(--glass-edge), var(--e2)`.
  */
 function elevationOf(scheme: Scheme): [string, string, string] {
   if (scheme === 'dark') {
     const two = `0 16px 40px -12px ${paint('black', 0.6)}`;
-    return [`0 0 0 0 ${paint('black', 0)}, inset 0 1px 0 ${paint('white', 0.05)}`, two, two];
+    return [`0 0 0 0 ${paint('black', 0)}`, two, two];
   }
   const two = `0 2px 4px ${paint(SHADE, 0.04)}, 0 16px 40px -16px ${paint(SHADE, 0.22)}`;
-  return [`0 1px 1px ${paint(SHADE, 0.03)}, 0 8px 24px -12px ${paint(SHADE, 0.12)}`, two, two];
+  return [`0 0 0 0 ${paint(SHADE, 0)}`, two, two];
 }
 
 export function build(seed: Seed, profile: Profile = HOUSE_PROFILE, id = 'house'): Built {

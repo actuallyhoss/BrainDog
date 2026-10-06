@@ -105,13 +105,22 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_NEUTRAL_HUE, HOUSE_PROFILE, type Se
  * and 260 is already the design system's slate, whose surfaces and inks measure 254 to 263. What moved is the profile
  * (`HOUSE_PROFILE` in `build.ts`), which now carries the design system's ground, tile, inks, line, intents and `live` as aims,
  * and the radius, which is the design system's: key caps 6, fields and menus 12, tiles and the rail 22 (`tokens.css`).
+ *
+ * TEN · 2026-10-07, ONE WORKING ACCENT BESIDE THE MARK (DIRECTION §39: "keep BrainDog red as the brand and the late
+ * colour; add one working accent for selection, primary buttons, links and charts"). The accent stays the mark's red,
+ * and the house pins its working colour beside it: #2563EB in light and #6EA8FE in dark, the design's own blues. The pin
+ * holds only beside this accent (`Seed.action`), so a record, a look or an environment that brings its own colour has
+ * its working accent solved from that colour instead.
  */
+const HOUSE_ACCENT = 'oklch(0.575 0.215 27)';
+
 export const HOUSE_SEED: Seed = {
-  accent: 'oklch(0.575 0.215 27)',
+  accent: HOUSE_ACCENT,
   neutralHue: HOUSE_NEUTRAL_HUE,
   space: 4,
   radius: { sm: 6, md: 12, lg: 22 },
   density: 'comfortable',
+  action: { accent: HOUSE_ACCENT, light: '#2563EB', dark: '#6EA8FE' },
 };
 
 export const HOUSE = build(HOUSE_SEED, HOUSE_PROFILE, 'house');

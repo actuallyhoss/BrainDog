@@ -50,13 +50,14 @@ const FENCE = '```roadmap | Autumn\nBuild the kiln page | 2026-09-10 | 10\nRegat
 const block = (): Block => parse(FENCE)[0] as Block;
 
 /**
- * The marks a pointer can take: the windows, which are grips themselves, and the dates, each taken by a wide stroke
- * nobody sees laid over its hairline. The fence has two windows and one date.
+ * The marks a pointer can take: the windows and the dates, each its row's bar or dot. The fence has two windows and
+ * one date.
  */
-const grips = (html: string): { bars: number; stems: number } => ({
-  bars: (html.match(/<rect[^>]*class="roadmap-bar"[^>]*data-grip=""[^>]*>/gu) ?? []).length,
-  stems: (html.match(/<path[^>]*class="roadmap-grip"[^>]*>/gu) ?? []).length,
-});
+const grips = (html: string): { bars: number; stems: number } => {
+  const items = html.match(/<li class="roadmap-item"[\s\S]*?<\/li>/gu) ?? [];
+  const taken = items.filter((i) => /class="roadmap-bar" data-grip=""/u.test(i));
+  return { bars: taken.filter((i) => !i.includes('data-date')).length, stems: taken.filter((i) => i.includes('data-date')).length };
+};
 
 for (const [name, path] of [
   ['a page block', '../Block.svelte'],

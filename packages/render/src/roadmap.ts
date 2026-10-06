@@ -545,49 +545,25 @@ export function roadmapToday(now?: number): string {
 export const roadmapShare = (x: string): string => String(Math.round(Number(x) * 10) / 10_000);
 
 /**
- * Where a track sits in the box's hundred vertical units: an equal band each, the bar in its middle seventy per
- * cent, so two tracks never touch. The plan answers the horizontal; how tall a track is depends on how many there
- * are, which only the drawing knows.
+ * The names along the top of the timeline: each tick the plan named, but for one too near today's line, whose word
+ * "Today" stands there instead. A Monday a few days from today put its date and "Today" in one smear over the line.
  */
-export function roadmapLane(track: number, tracks: number): { y: string; height: string } {
-  const tall = 100 / Math.max(1, tracks);
-  return { y: at(track * tall + tall * 0.15), height: at(tall * 0.7) };
+export function roadmapAxis(plan: RoadmapPlan): RoadmapTick[] {
+  const now = plan.today === null ? null : Number(plan.today);
+  return now === null ? plan.ticks : plan.ticks.filter((t) => Math.abs(Number(t.x) - now) >= ROADMAP_NEAR);
 }
 
-/**
- * Where a toned mark says its tone: one dot on its due day, which is where a window ends and where a date's line
- * stands, halfway down a window's lane and at the top of a date's line.
- *
- * THE MARK'S COLOUR IS NEVER ITS ONLY WORD (13 §5.1). A window or a line drawn in the danger fill is a picture of a
- * tone, so the tone's glyph is drawn with it, named as every glyph is. A zero-length path with a round cap and a
- * stroke that does not scale is a round dot in a box that stretches, where a circle would come out an ellipse.
- */
-export function roadmapDue(x: string, width: string | null, lane: { y: string; height: string } | null): string {
-  const end = Number(x) + (width === null ? 0 : Number(width));
-  const y = lane === null ? 0 : Number(lane.y) + Number(lane.height) / 2;
-  return `M${at(end)} ${at(y)}h0`;
-}
+/** How close to today's line, in the box's thousand units, a tick gives way to the word "Today". */
+const ROADMAP_NEAR = 60;
+
+/** The word over today's line. */
+export const ROADMAP_TODAY = 'Today';
 
 /**
- * How each mark is painted when the page has no rule for it: `currentColor` at a low opacity, or `none`.
- *
- * NO STYLESHEET DREW THIS KIND AT FIRST, and an SVG shape nobody paints is filled black: the box came out one
- * black slab with its stems and today's line black on black (read off the markup `toHTML` wrote), before
- * `blocks-charts.css` gained its `roadmap-` rules. Presentation attributes are the weakest thing in the cascade,
- * so any rule a host writes for a band, a bar or a tone still wins over them. `blocks-charts.css` now styles
- * every mark by class, and these paints are what a host with no stylesheet draws.
- *
- * CURRENT COLOUR, NEVER A COLOUR OF THIS KIND'S (05 §1): the ink the block is already drawn in, made quieter.
- * A bar is lighter than the ink so its title stays readable over it, and a band lighter still.
+ * Whether a row's days, said on hover, sit before its bar rather than after it: past seven tenths of the track there is
+ * no room after the bar for `30 Aug – 6 Sep 2026`, and the words would run off the tile.
  */
-export const ROADMAP_PAINT = {
-  band: { fill: 'currentColor', 'fill-opacity': '0.05' },
-  even: { fill: 'none' },
-  bar: { fill: 'currentColor', 'fill-opacity': '0.25' },
-  stem: { fill: 'none', stroke: 'currentColor', 'stroke-opacity': '0.6' },
-  today: { fill: 'none', stroke: 'currentColor', 'stroke-width': '2' },
-  due: { fill: 'none', stroke: 'currentColor', 'stroke-width': '6', 'stroke-linecap': 'round' },
-} as const satisfies Record<string, Readonly<Record<string, string>>>;
+export const roadmapFlip = (line: Pick<RoadmapLine, 'at' | 'span'>): boolean => Number(line.at) + Number(line.span) > 0.7;
 
 /**
  * One placed row as the list under the drawing says it: its first day, or `—` on a date, its due day, the two said as
@@ -632,9 +608,4 @@ export function roadmapWhen(start: string, end: string): string {
   if (start.slice(0, 7) === end.slice(0, 7)) return `${a.split(' ')[0]} – ${z}`;
   if (start.slice(0, 4) === end.slice(0, 4)) return `${a.split(' ').slice(0, 2).join(' ')} – ${z}`;
   return `${a} – ${z}`;
-}
-
-/** Where a window's name is drawn while its bar is dragged: beside or over the bar where it is drawn now. */
-export function roadmapLabelAt(bar: RoadmapBar, drawn: { x: string; width: string }): string {
-  return bar.label.side === 'after' ? at(Number(drawn.x) + Number(drawn.width)) : drawn.x;
 }

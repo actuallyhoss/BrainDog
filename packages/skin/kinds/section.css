@@ -62,8 +62,8 @@
     place-items: center;
     inline-size: var(--well);
     block-size: var(--well);
-    background: var(--s1);
-    border-radius: var(--r-well);
+    background: var(--field);
+    border-radius: var(--r-ctl);
     color: var(--ink2);
   }
 
@@ -81,10 +81,10 @@
     align-items: center;
     min-block-size: var(--ctl-h-sm);
     padding-inline: var(--sp-3);
-    background: var(--hover-wash);
-    border-radius: var(--r-pill);
+    background: var(--field);
+    border-radius: var(--r-ctl);
     color: var(--ink2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     list-style: none;
     cursor: pointer;
@@ -96,12 +96,12 @@
   }
 
   .sec-toggle:hover {
-    background: var(--hold-wash);
+    background: var(--field-hover);
     color: var(--ink);
   }
 
   .box .sec-toggle {
-    background: var(--s1);
+    background: var(--field);
   }
 
   /* One word at a time: the control says what pressing it does, and the other word leaves the

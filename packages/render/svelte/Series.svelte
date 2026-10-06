@@ -1,10 +1,12 @@
 <!--
-  `series`: bars by bucket over a zero rule, money in above and money out below, the `net` form's
-  line, the bucket labels, and the numbers in a table for a screen reader. `src/series.ts` decides every bar and every
-  printed figure; `series` in `src/html.ts` is this file's twin.
+  `series`: bars by bucket over the scale's three lines, money in above zero and money out below, the `net` form's
+  line, the bucket names, and the numbers in a table for a screen reader. `src/series.ts` decides every bar and every
+  printed figure; `series` in `src/html.ts` is this file's twin, and says why the bars are HTML and why too few buckets
+  are a figure.
 -->
 <script lang="ts">
   import { inline, text, type Block, type RenderOptions } from '../src/index.ts';
+  import { MISSING } from '../src/format.ts';
   import { SERIES_NET, SERIES_NONE, seriesPlan } from '../src/series.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -12,31 +14,51 @@
   const net = $derived(block.form === 'net');
   const plan = $derived(seriesPlan(block.rows.map((r) => r.cells.map((c) => text(inline(c, opts)))), net));
   const name = $derived(`${plan.axis ? `${plan.axis}: ` : ''}${plan.sentence}`);
+  const keyed = $derived(plan.drawn && (plan.series.length > 1 || net));
 </script>
 
 <div class="prop series" style="--cells:{plan.buckets.length}">
-  <ul class="series-legend">
-    {#each plan.series as s}
-      <li class="series-key" data-dir={s.dir} data-step={s.step}><span class="series-swatch" aria-hidden="true"></span><span class="series-name">{s.label}</span></li>
-    {/each}
-    {#if net}<li class="series-key" data-net=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">{SERIES_NET}</span></li>{/if}
-  </ul>
+  {#if keyed}
+    <ul class="series-legend">
+      {#each plan.series as s}
+        <li class="series-key" data-dir={s.dir} data-step={s.step}><span class="series-swatch" aria-hidden="true"></span><span class="series-name">{s.label}</span></li>
+      {/each}
+      {#if net}<li class="series-key" data-net=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">{SERIES_NET}</span></li>{/if}
+    </ul>
+  {/if}
   {#if plan.empty}
     <p class="series-empty">{SERIES_NONE}</p>
+  {:else if !plan.drawn}
+    <p class="series-totals">
+      {#each plan.totals as t}<span class="series-total"><span class="series-total-value num">{t.value}</span> <span class="series-total-label">{t.label}</span></span>{/each}
+    </p>
   {:else}
-    <div class="series-plot">
-      {#if plan.top}<span class="series-top num" aria-hidden="true">{plan.top}</span>{/if}
-      <svg class="series-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={name}>
-        <path class="series-zero" d="M0 {plan.zero}H1000" vector-effect="non-scaling-stroke"></path>
-        {#each plan.bars as bar}
-          <rect class="series-bar" data-dir={bar.dir} data-step={bar.step} data-state={bar.state || undefined} x={bar.x} y={bar.y} width={bar.width} height={bar.height} vector-effect="non-scaling-stroke"></rect>
+    <div class="series-plot" role="img" aria-label={name}>
+      <ol class="series-scale" aria-hidden="true">
+        {#each plan.ticks as t}
+          <li class="series-line" data-zero={t.zero ? '' : undefined} style="--y:{t.y}"><span class="series-line-label num">{t.label}</span></li>
         {/each}
-        {#if plan.netLine}
+      </ol>
+      <ol class="series-cols" aria-hidden="true">
+        {#each plan.buckets as k, i}
+          <li class="series-col" data-state={k.state || undefined} data-flip={i >= plan.buckets.length / 2 ? '' : undefined}>
+            {#each plan.bars.filter((bar) => bar.bucket === i) as bar}
+              <span class="series-bar" data-dir={bar.dir} data-step={bar.step} data-state={bar.state || undefined} data-end={bar.end ? '' : undefined} style="--y:{bar.y};--h:{bar.height}"></span>
+            {/each}
+            <span class="series-tip"
+              ><span class="series-tip-label">{k.label}{#if k.said}{' '}{k.said}{/if}</span>{#each plan.series as s, j}<span class="series-tip-value"
+                  >{s.label} <span class="num">{k.values[j] ?? MISSING}</span></span
+                >{/each}{#if net}<span class="series-tip-value">{SERIES_NET} <span class="num">{k.net}</span></span>{/if}</span
+            >
+          </li>
+        {/each}
+      </ol>
+      {#if plan.netLine}
+        <svg class="series-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
           <path class="series-net" d={plan.netLine} vector-effect="non-scaling-stroke"></path>
           <path class="series-dot" d={plan.netDots} vector-effect="non-scaling-stroke"></path>
-        {/if}
-      </svg>
-      {#if plan.bottom}<span class="series-bottom num" aria-hidden="true">{plan.bottom}</span>{/if}
+        </svg>
+      {/if}
     </div>
     <ol class="series-ticks" aria-hidden="true">
       {#each plan.buckets as k}

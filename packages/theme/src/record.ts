@@ -40,7 +40,8 @@ export type RecordTheme = {
  * brand renders brown: at L 0.16 even a whisper of chroma at a warm hue reads as dirt rather than
  * as warmth, which is what the house seed's own note records paying to learn. So a record's
  * surfaces stay the house's slate that everything else is built against, and what changes
- * is the accent, the marks and the links — which is where colour means anything.
+ * is the accent, the marks, and the working accent (buttons, links, selection and charts: `action`, solved from
+ * this colour since the house pins its blue only beside its own red) — which is where colour means anything.
  */
 /**
  * WHY IT WAS REFUSED, AND NOT ONLY THE AUTHOR'S SENTENCE FOR IT.

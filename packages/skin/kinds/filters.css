@@ -5,8 +5,10 @@
  * Gathered by `blocks-kinds.css` with the kind sheets, because only a declared page draws it. It keeps `blocks.css`'s one
  * rule: no colour is written, every value is a role.
  *
- * CALM (DIRECTION §35): one line, no box around it, the chosen value the one ink fill, every other a word on the
- * ground that takes the second surface under the pointer. Counts wait for the pointer or the keyboard (`data-calm`).
+ * CALM (DIRECTION §35): one line, no box around it. DIRECTION §39: a segmented field is one 8px rectangle with the
+ * chosen value the tile's colour on it, as `controls.css` draws every segmented control; a chip field's chosen value is
+ * the accent's tint, every other a word that takes the field's fill under the pointer. Counts wait for the pointer or
+ * the keyboard (`data-calm`).
  */
 
 @layer components {
@@ -29,8 +31,8 @@
   .filters-group[data-control='segmented'] {
     flex-wrap: nowrap;
     padding: 2px;
-    border-radius: var(--r-pill);
-    background: var(--s1);
+    border-radius: var(--r-ctl);
+    background: var(--field);
   }
 
   .filters-choice {
@@ -41,12 +43,12 @@
     min-block-size: var(--ctl-h-sm);
     padding-inline: var(--sp-3);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     background: none;
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-sm);
-    font-weight: 500;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
     white-space: nowrap;
   }
 
@@ -55,16 +57,36 @@
   }
 
   button.filters-choice:hover {
-    background: var(--s2);
+    background: var(--field);
     color: var(--ink);
   }
 
-  /* THE CHOSEN VALUE IS THE PRIMARY'S FILL, as a checked control is everywhere in the product: ink, with the ground's
-     letters. `data-on` is the mirror's spelling of the same fact. */
+  /* THE CHOSEN VALUE IS THE ACCENT'S TINT, in the accent's words: chosen, in the colour that means chosen, and quiet
+     enough that a strip of filters never outshouts the page's one primary. `data-on` is the mirror's spelling of the
+     same fact. */
   .filters-choice:is([aria-pressed='true'], [data-on]),
   button.filters-choice[aria-pressed='true']:hover {
-    background: var(--on);
-    color: var(--on-ink);
+    background: var(--action-tint-1);
+    color: var(--action-text);
+  }
+
+  /* INSIDE A SEGMENTED TRACK A SEGMENT'S CORNER SITS INSIDE THE TRACK'S, and the chosen one is the tile's colour lifted
+     by a hairline, the segmented control's own drawing. */
+  .filters-group[data-control='segmented'] .filters-choice {
+    border-radius: calc(var(--r-ctl) - 2px);
+  }
+
+  .filters-group[data-control='segmented'] button.filters-choice:hover {
+    background: none;
+  }
+
+  .filters-group[data-control='segmented'] .filters-choice:is([aria-pressed='true'], [data-on]),
+  .filters-group[data-control='segmented'] button.filters-choice[aria-pressed='true']:hover {
+    background: var(--tile);
+    box-shadow:
+      0 1px 2px color-mix(in srgb, var(--ink) 10%, transparent),
+      0 0 0 1px var(--rule);
+    color: var(--ink);
   }
 
   .filters-count {
@@ -79,11 +101,11 @@
     min-block-size: var(--ctl-h-sm);
     padding-inline: var(--sp-2);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     background: none;
     color: var(--dim);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   select.filters-more {
@@ -91,7 +113,7 @@
   }
 
   select.filters-more:hover {
-    background: var(--s2);
+    background: var(--field);
     color: var(--ink);
   }
 
@@ -102,7 +124,7 @@
     }
 
     /* BOTH AXES: "All" is one short word, and at 40 wide it was a 40x44 target. The word sits in the middle of the
-       wider pill. */
+       wider control. */
     .filters-choice {
       min-inline-size: var(--tap);
       justify-content: center;

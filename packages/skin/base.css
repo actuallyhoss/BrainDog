@@ -22,14 +22,20 @@
   html {
     /* 2.4.11: keyboard focus must not land under the sticky header. Paid once, here. */
     scroll-padding-block-start: calc(var(--sticky) + var(--sp-2));
+
+    /* THE GLASS IS RETIRED (DIRECTION §39: "no glass, no gradients"), and the palette no longer emits it. Every piece of
+       chrome that still names `--glass` or `--glass-strong` gets the opaque tile, so nothing is seen through and
+       nothing is blurred. The washes and the flat resting tile are the palette's own now (`packages/theme`, `chromeOf`
+       and `elevationOf`), so a record's colour re-solves them with everything else. */
+    --glass: var(--tile);
+    --glass-strong: var(--tile);
   }
 
   body {
     margin: 0;
     color: var(--ink);
-    /* THE GROUND AND ITS LIGHT: the page is the ground, and one soft light falls on it
-       from the top of the window. The only gradient in the product, and it is painted here and nowhere else. */
-    background: var(--ground-light), var(--sunk);
+    /* THE BOARD (DIRECTION §39): one flat colour under every tile, and no light falling on it. */
+    background: var(--board);
     font-family: var(--font-ui);
     font-size: var(--text);
     line-height: var(--lh-body);
@@ -54,10 +60,9 @@
     margin: 0;
   }
 
-  /* A LINK IS INK WITH A QUIET UNDERLINE, AND IT WAS THE ACCENT. Red underlined words ("Open Money
-     for the rest", "Browse add-ons") sat beside red overdue dots and read as the same
-     fact. The underline is what says "link", so it carries the affordance at 40% of the ink and
-     firms up under the pointer; the colour says nothing a sentence has not already said. */
+  /* A LINK IS THE WORKING ACCENT WITH A QUIET UNDERLINE (DIRECTION §39). It was the brand's red once, which read as
+     the same fact as a red overdue dot, and then ink, which read as no link at all. Blue is the colour that means
+     "go" here and nothing else; the underline carries the affordance at 40% and firms up under the pointer. */
   a {
     color: var(--link);
     text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent);
@@ -132,6 +137,6 @@
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--accent) 34%, transparent);
+    background: var(--action-tint-2);
   }
 }
