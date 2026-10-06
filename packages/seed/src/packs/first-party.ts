@@ -382,8 +382,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `domains`, a field added, so a minor step. STILL 3.0.0, UNRELEASED, after the audit of October 6th
  *   (`loop/research-audit-17.md`): mail nobody's pattern claimed makes nobody, its sender kept as a mention
  *   (`rule.meet-senders`), a pattern's mail from a public host names no organisation, neither rule writes a subject,
- *   Everyone is grouped by organisation, and an organisation's page draws its projects and money where the record holds
- *   them (`placed` in `firstPartyDocument`, which makes those two lists People's links and not its needs).
+ *   Everyone is grouped by organisation and leaves out a person folded into another, and an organisation's page draws
+ *   its projects and money where the record holds them (`placed` in `firstPartyDocument`, which makes those two lists
+ *   People's links and not its needs).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.14.0',

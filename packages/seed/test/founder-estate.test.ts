@@ -10,14 +10,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
+import { handedOf, install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
-import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyManifest } from '../src/index.ts';
 import { modulesFor, useCase, useCaseDocument } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 import { FOUNDER_SHIPPED_1_3_2, FOUNDER_SHIPPED_1_4_0, FOUNDER_SHIPPED_1_5_0, shippedFingerprint } from './founder-shipped.ts';
+import { peopleBefore3 } from './people-before-3.ts';
 
 const TODAY = dayOf(NOW);
 
@@ -39,6 +40,18 @@ const hostFor = (k: Kernel): Host => ({
   claimed: (pack) => k.packClaims(pack),
 });
 
+/** Each record's own database, so a plan is told what its installed packs hand on, as the record tells it. */
+const sqlOf = new WeakMap<Kernel, NodeSql>();
+
+async function opened(): Promise<Kernel> {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  sqlOf.set(k, sql);
+  return k;
+}
+
+/* `handed` AS THE RECORD READS IT (`packages/record/src/index.ts`), off the stored manifests, so Founder handing its
+   organisations to the People the record already holds plans as a handover and not as a retire. */
 const stateOf = (k: Kernel): Installed => ({
   format: 1,
   primitives: 1,
@@ -47,6 +60,7 @@ const stateOf = (k: Kernel): Installed => ({
   declarations: k.declarations() as Installed['declarations'],
   rows: k.census(),
   config: k.packSettings(),
+  handed: handedOf((sqlOf.get(k)?.all<{ manifest: string }>('SELECT manifest FROM pack') ?? []).map((r) => r.manifest)),
 });
 
 const held = (k: Kernel): string[] => (k.declarations() as { id: string; kind: string }[]).filter((d) => d.kind === 'register').map((d) => d.id.slice('register.'.length));
@@ -59,7 +73,7 @@ async function put(k: Kernel, doc: unknown): Promise<void> {
 
 /** A founder record made the way onboarding makes one: each module in order, People for the person, then the use case's pack. */
 async function founder(): Promise<Kernel> {
-  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  const k = await opened();
   const u = useCase('founder')!;
   for (const m of modulesFor(u, ['people'])) {
     if (m === 'agents') continue;
@@ -121,38 +135,6 @@ test("A FOUNDER'S PROJECT DRAWS WHAT IT RUNS ON: a domain pointed at it is on it
 type Body = Record<string, unknown>;
 
 /**
- * PEOPLE AS IT WAS BEFORE 3.0.0, NEAR 2.7.0 AND NOT BYTE FOR BYTE: today's document with the organisations, and the
- * parts of a person that name one, taken out. A record on Founder 1.x held `organisations` as Founder's own list, and
- * the People it held declared none, so a rebuild with today's People would have two packs claiming one list before
- * the update under test began.
- */
-function peopleBefore3(doc: Body): Body {
-  const later = new Set(['org', 'keys', 'aliases', 'self']);
-  const declarations = (doc.declarations as Body[])
-    .filter((d) => d.register !== 'organisations' && d.page !== 'relation' && d.metric !== 'organisations-count')
-    .map((d) => {
-      if (d.register === 'people')
-        return {
-          ...d,
-          fields: (d.fields as Body[]).filter((f) => !later.has(String(f.id))),
-          meets: Object.fromEntries(Object.entries(d.meets as Body).filter(([part]) => !later.has(part))),
-        };
-      if (d.page === 'people' || d.page === 'someone')
-        return {
-          ...d,
-          requires: ['register.people'],
-          blocks: (d.blocks as Body[])
-            .filter((b) => b.heading !== 'Organisations' && b.heading !== 'Known by')
-            .map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter((c) => c.field !== 'org') } : b)),
-        };
-      return d;
-    });
-  const { seeds: all, ...rest } = doc;
-  const seeds = ((all as Body[] | undefined) ?? []).filter((x) => x.register !== 'organisations');
-  return { ...rest, version: '2.7.0', declarations, ...(seeds.length > 0 ? { seeds } : {}) };
-}
-
-/**
  * A RECORD MADE ON 1.3.2, REBUILT: the four modules it named, and its pack as it shipped. `founder-shipped.ts` holds
  * what each old version's pack actually was, read off the commit that raised it rather than rebuilt by hand over
  * `founder.ts`'s current diff.
@@ -172,7 +154,7 @@ async function onEarlier(): Promise<{ k: Kernel; before: Record<string, unknown>
   assert.equal(shippedFingerprint(FOUNDER_SHIPPED_1_3_2), '3e4927061f959b6d', 'founder-shipped.ts’s 1.3.2 is not the 1.3.2 that shipped');
   const before = FOUNDER_SHIPPED_1_3_2 as Record<string, unknown>;
 
-  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  const k = await opened();
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
     const doc = moduleDocument(u, m, { today: TODAY, holds, examples: true });
@@ -188,12 +170,14 @@ async function onEarlier(): Promise<{ k: Kernel; before: Record<string, unknown>
  * 1.5.0 a record on 1.3.2 lands on 1.5.0 in the same step, and the pin that read '1.4.0' failed with '1.5.0' the moment
  * the version moved. It reads the use case's own version now, and Home is held to draw the two tables 1.5.0 added.
  */
-/* A TODO, NOT A PASS, UNTIL `@braindog/declare` HANDS A LIST TO A PACK THE RECORD ALREADY HAS. Founder 2.0.0 hands
-   `register.organisations` to People (`hands`), and the plan only hands to a pack the record does not hold yet, so on
-   a record with People it retires the list instead and the use case's own pages lose it (`REGISTER_UNRESOLVED` at
-   `register.datapoints.fields.organisation.to`); People 3.0.0 planned first is `PROVIDES_CONFLICT`, the list being
-   Founder's. Measured here on October 6th. The test runs and says what it meets. */
-test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN THE CURRENT VERSION, and neither loses a row or a page of what it held', { todo: 'needs a handover to an installed pack in @braindog/declare' }, async () => {
+/* A TODO, NOT A PASS, UNTIL A LIST CAN BE TAKEN FROM A PACK WHOSE NEXT VERSION HANDS IT. The record now says what its
+   packs hand on (`Installed.handed`), and that was half of it. The other half, measured here on October 6th: Founder
+   2.0.0 and People 3.0.0 each need the other in first. People first is `PROVIDES_CONFLICT` at `register.organisations`,
+   Founder 1.x's still, even with Founder 2.0.0's `hands` in `handed`, because `plan` reads `handed` only for a list
+   already under the receiver's name. Founder first is `PAGE_UNKNOWN` at `adds.page.relation`, and without its `adds`
+   `FIELD_UNKNOWN` at `page.dashboard`, which reads `merged_into` on the organisations as only People 3.0.0 lays it. The
+   test runs and says what it meets. */
+test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN THE CURRENT VERSION, and neither loses a row or a page of what it held', { todo: 'needs @braindog/declare to take a list from the pack whose coming version hands it' }, async () => {
   const { k } = await onEarlier();
   const org = value<{ id: string }>(k.create('organisations', { name: 'Harbour Studio', kind: 'company', currency: 'GBP' }, OWNER));
   value(k.create('datapoints', { name: 'Sign-ups', value: 12, organisation: org.id, source: 'reported', at: new Date(NOW).toISOString() }, OWNER));
@@ -212,10 +196,16 @@ test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN THE CURRENT VERSION, and neither 
   assert.deepEqual(lacking, ['estate'], 'the step offers exactly one module');
   const holds = new Set([...held(k), 'services']);
   await put(k, moduleDocument(u, 'estate', { today: TODAY, holds, examples: true }));
-  /* AND SINCE FOUNDER 2.0.0, People 3.0.0 AFTER IT: the use case hands its organisations to People (`hands`), and adds
-     its numbers to People's page for one, which only People 3.0.0 declares. */
+  /* AND SINCE FOUNDER 2.0.0, People 3.0.0 FIRST, told what the use case is about to hand it (`hands`), which is the
+     order the record plans a use case in: its modules, then its own pack. The use case adds its numbers to People's page
+     for an organisation, which only People 3.0.0 declares, and its Dashboard reads the organisations as People 3.0.0
+     lays them, so it cannot go first. */
+  const hands = (next as { hands?: Record<string, string> }).hands ?? {};
+  const people = value<Pack>(await normalise(moduleDocument(u, 'people', { today: TODAY, holds: new Set(held(k)), examples: false }), { kind: 'local' }));
+  const state = stateOf(k);
+  const diff = await plan(people, { ...state, handed: { ...state.handed, ...hands } });
+  value(await install(people, diff, hostFor(k), diff.planHash));
   await put(k, next);
-  await put(k, moduleDocument(u, 'people', { today: TODAY, holds: new Set(held(k)), examples: false }));
 
   assert.equal(k.packs().find((p) => p.id === 'usecase-founder')?.version, u.version);
   assert.ok(held(k).includes('services'));

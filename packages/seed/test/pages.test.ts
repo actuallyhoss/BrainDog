@@ -169,11 +169,18 @@ test('AND EVERY `where:` RESOLVES AGAINST THE REGISTER IT NAMES', async () => {
       const register = block.source.slice('register.'.length);
       if (!k.register(register)) continue;
 
-      /* `{{spoken}}` is the row's spoken id, `things#1` for the first row, rather than a field. */
+      /* `{{spoken}}` is the row's spoken id, `things#1` for the first row, rather than a field. A LINK IS THE ID OF THE
+         ROW IT NAMES, as the record holds it and fills it (`fill` in `packages/kernel/src/pages.ts`), several joined
+         by `or`, where the sample writes the place of that row: an organisation's `projects: [2]` read `id is 2`. */
+      const holeOf = (key: string): string => {
+        const field = (REGISTERS[template!.register]!.fields as { id: string; type: string; of?: string; to?: string }[]).find((f) => f.id === key);
+        const raw = first![key];
+        const linked = field && (field.type === 'ref' || field.of === 'ref') && field.to !== undefined;
+        if (!linked) return String(raw ?? '');
+        return (Array.isArray(raw) ? raw : [raw]).flatMap((n) => (typeof n === 'number' ? [k.get(`${field.to}#${n}`)?.id ?? ''] : [])).join(' or ');
+      };
       const said = first && template
-        ? block.where.replace(/\{\{(\w+)\}\}/g, (_, key: string) =>
-            key === 'spoken' ? `${template.register}#1` : String(first[key] ?? ''),
-          )
+        ? block.where.replace(/\{\{(\w+)\}\}/g, (_, key: string) => (key === 'spoken' ? `${template.register}#1` : holeOf(key)))
         : block.where;
 
       const out = parseWhere(said, schemaOf(k, register), {

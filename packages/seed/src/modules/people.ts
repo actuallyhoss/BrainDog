@@ -500,6 +500,8 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         icon: 'people',
         span: 12,
         source: 'register.people',
+        /* NEVER SOMEBODY FOLDED INTO ANOTHER, as the organisations below: a merge leaves one card, not two. */
+        where: 'merged_into is empty',
         /* THE ORGANISATION THEY ARE WITH, SINCE People 3.0.0, as the second of a card's three facts: "Client · Halden
            Type Co" says who somebody is where a role alone said only what they are. */
         columns: [
