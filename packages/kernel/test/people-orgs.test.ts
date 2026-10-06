@@ -7,7 +7,8 @@
  * outright, whatever its source says.
  *
  * NOTHING IS MADE ON ITS OWN. Two people the record vouches for at a domain nobody holds are one question, "Add Acme?";
- * two organisations whose names fold to the same words are one question per pair.
+ * two organisations whose names fold to the same words are one question per pair. A name that differs only by a web or
+ * a legal ending is the same name, and asks nothing.
  */
 
 import { test } from 'node:test';
@@ -271,18 +272,45 @@ test('THE NAME COMES FROM THE REPOSITORY’S OWNER WHEN IT AND THE DOMAIN AGREE,
 
 /* ── doubtful organisation pairs ──────────────────────────────────────── */
 
+test('A NAME THAT DIFFERS ONLY BY A WEB OR A LEGAL ENDING IS THE ORGANISATION ALREADY HELD, and asks nothing', async () => {
+  const { k, sql } = await record();
+  for (const [first, second] of [
+    ['SOWBELL.COM', 'Sowbell LLC'],
+    ['Tarnvale Oy', 'TARNVALE'],
+    ['LANTERN AI', 'Lantern AI, PBC'],
+    ['FORGEHUB.COM', 'Forgehub, Inc.'],
+  ] as const) {
+    const held = value<Met>(k.meet({ kind: 'organisation', name: first, keys: [`bank:${first}`], source: 'bank text' }, OWNER));
+    const again = value<Met>(k.meet({ kind: 'organisation', name: second, keys: [`bank:${second}`], source: 'bank text' }, OWNER));
+    assert.equal(again.row?.id, held.row?.id, `${second} was not found as ${first}`);
+    assert.equal(again.created, false);
+    assert.equal(again.question, undefined, `${second} asked about the payments its own name files under ${first}`);
+  }
+  assert.equal(k.count('organisations'), 4);
+  assert.deepEqual(open(sql), []);
+  /* An ending that also ends ordinary names is part of the name: Day Spa is not Day. */
+  const day = value<Met>(k.meet({ kind: 'organisation', name: 'Day', keys: ['bank:Day'], source: 'bank text' }, OWNER));
+  assert.notEqual(value<Met>(k.meet({ kind: 'organisation', name: 'Day Spa', keys: ['bank:Day Spa'], source: 'bank text' }, OWNER)).row?.id, day.row?.id);
+  /* A word after a dot that is no web ending is part of the name: Dr.Oetker is not DR, Next.Money is not NEXT. */
+  for (const [short, dotted] of [['DR', 'Dr.Oetker'], ['NEXT', 'Next.Money']] as const) {
+    const held = value<Met>(k.meet({ kind: 'organisation', name: short, keys: [`bank:${short}`], source: 'bank text' }, OWNER));
+    assert.notEqual(value<Met>(k.meet({ kind: 'organisation', name: dotted, keys: [`bank:${dotted}`], source: 'bank text' }, OWNER)).row?.id, held.row?.id, `${dotted} was filed under ${short}`);
+  }
+  sql.close();
+});
+
 test('TWO ORGANISATIONS WHOSE NAMES FOLD TO THE SAME WORDS ARE ONE QUESTION, never a merge, and Yes folds them into the older', async () => {
   const { k, sql } = await record();
-  const first = value<Met>(k.meet({ kind: 'organisation', name: 'SOWBELL.COM', keys: ['bank:SOWBELL.COM'], source: 'bank text' }, OWNER));
-  const second = value<Met>(k.meet({ kind: 'organisation', name: 'Sowbell LLC', keys: ['bank:Sowbell LLC'], source: 'bank text' }, OWNER));
+  const first = value<Met>(k.meet({ kind: 'organisation', name: 'Sow Bell', keys: ['bank:Sow Bell Retail'], source: 'bank text' }, OWNER));
+  const second = value<Met>(k.meet({ kind: 'organisation', name: 'SOWBELL.COM', keys: ['bank:SOWBELL.COM'], source: 'bank text' }, OWNER));
   assert.equal(second.created, true);
   assert.ok(second.question);
   assert.equal(k.count('organisations'), 2, 'two organisations were merged without asking');
-  assert.equal(k.question(second.question), 'Are SOWBELL.COM and Sowbell LLC one organisation? Yes keeps SOWBELL.COM and files everything Sowbell LLC was met by under it.');
+  assert.equal(k.question(second.question), 'Are Sow Bell and SOWBELL.COM one organisation? Yes keeps Sow Bell and files everything SOWBELL.COM was met by under it.');
 
   /* Met again, either one: the question is kept current, and nothing more is asked. */
-  value(k.meet({ kind: 'organisation', name: 'Sowbell LLC', keys: ['bank:Sowbell LLC'], source: 'bank text' }, OWNER));
   value(k.meet({ kind: 'organisation', name: 'SOWBELL.COM', keys: ['bank:SOWBELL.COM'], source: 'bank text' }, OWNER));
+  value(k.meet({ kind: 'organisation', name: 'Sow Bell', keys: ['bank:Sow Bell Retail'], source: 'bank text' }, OWNER));
   assert.deepEqual(open(sql), [second.question]);
 
   accept(k, second.question!);
@@ -291,13 +319,13 @@ test('TWO ORGANISATIONS WHOSE NAMES FOLD TO THE SAME WORDS ARE ONE QUESTION, nev
   assert.equal((kept.fields.keys as string[]).length, 2);
   assert.ok((kept.fields.met as string[]).includes(`${DAY} · bank text`));
   /* And the next of either spelling is the one kept. */
-  assert.equal(value<Met>(k.meet({ kind: 'organisation', keys: ['bank:Sowbell LLC'], source: 'bank text' }, OWNER)).row?.id, first.row?.id);
+  assert.equal(value<Met>(k.meet({ kind: 'organisation', keys: ['bank:SOWBELL.COM'], source: 'bank text' }, OWNER)).row?.id, first.row?.id);
   sql.close();
 });
 
 test('A PAIR HE SAID NO TO IS NEVER ASKED AGAIN, and names that only share a word are not asked about', async () => {
   const { k, sql } = await record();
-  value(k.meet({ kind: 'organisation', name: 'Tarnvale Oy', keys: ['bank:Tarnvale Oy'], source: 'bank text' }, OWNER));
+  value(k.meet({ kind: 'organisation', name: 'Tarn Vale Oy', keys: ['bank:Tarn Vale Oy'], source: 'bank text' }, OWNER));
   const asked = value<Met>(k.meet({ kind: 'organisation', name: 'TARNVALE', keys: ['bank:TARNVALE'], source: 'bank text' }, OWNER));
   assert.ok(asked.question);
   value(k.decide(asked.question!, { decide: { option: 'reject', reason: 'two companies' } }, 'p_owner'));

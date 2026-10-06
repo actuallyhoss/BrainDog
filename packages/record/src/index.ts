@@ -1627,6 +1627,8 @@ export async function markOwnRow(kernel: Kernel, signIn: string): Promise<Result
   const held = live.filter((r) => holdsAddress(parts, r.fields, address));
   if (held.length !== 1 || !vouchedHolder(kernel, parts, held[0]!)) return ok({ marked: false, said: null });
   const said = markHolder(kernel, { register: meets.register, self }, held[0]!);
+  /* HIS OTHER ROWS, ASKED ABOUT AT ONCE: "Are Kas and Karim Assaf both you?", not whenever somebody is next met. */
+  kernel.askOwnRows?.('system');
   return ok({ marked: kernel.get(held[0]!.id)?.fields[self] === true, said });
 }
 
@@ -2948,7 +2950,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (!row) return letGo();
     const out = kernel.update(people.register, row.id, { [people.self]: true }, { actor, cascade: false, version: row.version, note: 'Picked on Decide as you.', ...(batch === undefined ? {} : { batch }) });
     /* A MARK THAT DID NOT LAND PUTS THE QUESTION BACK, with its people still kept, so the owner's answer is never lost. */
-    if (!out.ok) kernel.reopen(id, 'The person you picked changed while you answered. Pick again.');
+    if (!out.ok) {
+      kernel.reopen(id, 'The person you picked changed while you answered. Pick again.');
+      return;
+    }
+    /* HIS OTHER ROWS, ASKED ABOUT AT ONCE, as after any other mark: "Are Kas and Karim Assaf both you?". The pick is an
+       options question, which the kernel's `joinOrganisation` does not read as a mark, so nothing else asks it. */
+    kernel.askOwnRows?.('system');
   };
 
   /**
@@ -6923,6 +6931,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const offRegister = <T>(register: string, out: Result<T>): Result<T> =>
     !out.ok && 'refusal' in out && out.refusal.code === 'REGISTER_UNKNOWN' ? offPack(out, (r) => r === register) : out;
 
+  /**
+   * A WRITE THAT MARKS A PERSON AS THE RECORD'S OWN ASKS ABOUT HIS OTHER ROWS AT ONCE (`kernel.askOwnRows`): sign-up's
+   * "this is them" (`apps/web/src/routes/start/accept.ts`) and anybody's own mark, as `markOwnRow` does after its own.
+   * Only a write that landed and set People's `self` part; what it asks is the record's question, and the write stands
+   * whatever the asking answers.
+   */
+  const ownRowsAsked = <T>(register: string, patch: Patch, out: Result<T>): Result<T> => {
+    const meets = out.ok ? kernel.meetsList() : null;
+    const self = (meets?.fields as { self?: string } | undefined)?.self;
+    if (meets?.register === register && self !== undefined && (patch as Record<string, unknown>)[self] === true) kernel.askOwnRows?.('system');
+    return out;
+  };
+
   const listOf = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : []);
   const projectOf = (run: Entry): string | null => (typeof run.fields.project === 'string' ? run.fields.project : null);
 
@@ -7181,17 +7202,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return tail(
         keptOnLadder(
           rung,
-          offRegister(
+          ownRowsAsked(
             args.register,
-            kernel.create(args.register, args.fields, {
-              ...writerOf(ctx),
-              reads: refsSeen(ctx),
-              ...(args.note === undefined ? {} : { note: args.note }),
-              ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
-              /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
-                 without its own id the record has no way to know the second is the first. */
-              ...(args.op_id === undefined ? {} : { opId: args.op_id }),
-            }),
+            args.fields,
+            offRegister(
+              args.register,
+              kernel.create(args.register, args.fields, {
+                ...writerOf(ctx),
+                reads: refsSeen(ctx),
+                ...(args.note === undefined ? {} : { note: args.note }),
+                ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+                /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
+                   without its own id the record has no way to know the second is the first. */
+                ...(args.op_id === undefined ? {} : { opId: args.op_id }),
+              }),
+            ),
           ),
         ),
       );
@@ -7307,16 +7332,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return tail(
         keptOnLadder(
           rung,
-          offRegister(
+          ownRowsAsked(
             args.register,
-            kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
-              ...writerOf(ctx),
-              reads: refsSeen(ctx),
-              ...(args.version === undefined ? {} : { version: args.version }),
-              ...(args.note === undefined ? {} : { note: args.note }),
-              ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
-              ...(args.op_id === undefined ? {} : { opId: args.op_id }),
-            }),
+            args.patch,
+            offRegister(
+              args.register,
+              kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
+                ...writerOf(ctx),
+                reads: refsSeen(ctx),
+                ...(args.version === undefined ? {} : { version: args.version }),
+                ...(args.note === undefined ? {} : { note: args.note }),
+                ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+                ...(args.op_id === undefined ? {} : { opId: args.op_id }),
+              }),
+            ),
           ),
         ),
       );

@@ -218,13 +218,14 @@ const later = (a: unknown, b: unknown): string | undefined => {
 const metLines = (...lists: string[][]): string[] =>
   [...new Set(lists.flat())].sort((a, b) => (a.slice(0, 10) < b.slice(0, 10) ? -1 : a.slice(0, 10) > b.slice(0, 10) ? 1 : 0)).slice(-MET_CAP);
 
-/** Legal endings an organisation's name carries in one source and not another: `Quartz Apps LLC` is `Quartz Apps`. */
-const LEGAL = /\s+(?:llc|l\.l\.c\.|ltd|limited|inc|incorporated|corp|corporation|co|company|gmbh|ag|sa|s\.a\.|sae|s\.a\.e\.|plc|bv|b\.v\.|pty|pvt|private|fze|fzco|fz-llc)\.?$/i;
-const orgNameKey = (name: string): string => {
-  let said = nameKey(name);
-  for (let i = 0; i < 2 && LEGAL.test(` ${said}`); i++) said = ` ${said}`.replace(LEGAL, '').trim();
-  return said;
-};
+/**
+ * An organisation's name as a key: its words with a web ending and the legal endings one source writes and another does
+ * not taken off (`orgWords`), in their own order. `Quartz Apps LLC`, `Quartz Apps, Inc.` and `quartz apps` are one
+ * name, as are `Sowbell LLC` and `SOWBELL.COM`, and `Tarnvale Oy` and `TARNVALE`: the ending says how one source writes
+ * the company, not which company. Words run together or in another order are not the same name, only a question
+ * (`sameWords`). Not `spa` or `lp`, which end ordinary names (`Day Spa`, `Vinyl LP`) as often as a company's.
+ */
+const orgNameKey = (name: string): string => orgWords(name, NAME_ENDINGS).join(' ');
 
 /** A name with its spaces and punctuation gone, as a login or a local part spells the same person: `rohanmehta`. */
 const compact = (name: string): string => nameKey(name).replace(/[^\p{L}\p{N}]/gu, '');
@@ -848,13 +849,15 @@ function byOrgName(sql: Sql, orgs: DeclaredList<OrgFields>, name: string): Row |
   const want = orgNameKey(name);
   if (want === '') return null;
   const first = want.split(' ')[0]!;
+  /* THE NAME AS ITS KEY READS IT, punctuation gone, so `Forgehub, Inc.` is found by `forgehub` and `O'Reilly` by `oreilly`. */
+  const bare = "replace(replace(replace(replace(replace(lower(json_extract(fields, ?)), '.', ''), ',', ''), '''', ''), '-', ''), '&', '')";
   return (
     sql
       .all<{ id: string; seq: number | null; version: number; fields: string }>(
-        `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} AND lower(json_extract(fields, ?)) LIKE ? ORDER BY seq`,
+        `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} AND instr(${bare}, ?) > 0 ORDER BY seq`,
         ...live(orgs.register, orgs.fields.merged_into),
         path(orgs.fields.name),
-        `%${first.replace(/[%_]/g, '')}%`,
+        first,
       )
       .map(hydrate)
       .find((r) => typeof r.fields[orgs.fields.name] === 'string' && orgNameKey(String(r.fields[orgs.fields.name])) === want) ?? null
@@ -955,18 +958,23 @@ function orgOfferPatch(orgs: DeclaredList<OrgFields>, row: Row, offered: readonl
 /** Legal and web endings a name of an organisation is said with in one place and not another, for `orgWords`. */
 const ENDINGS = new Set(['llc', 'ltd', 'limited', 'inc', 'incorporated', 'corp', 'corporation', 'co', 'company', 'gmbh', 'ag', 'sa', 'sae', 'plc', 'bv', 'pty', 'pvt', 'fze', 'fzco', 'oy', 'oyj', 'ab', 'aps', 'srl', 'sarl', 'spa', 'nv', 'kk', 'pbc', 'lp', 'llp']);
 
+/** The endings an organisation's name is matched without (`orgNameKey`): every legal one but the two that end ordinary names. */
+const NAME_ENDINGS = new Set([...[...ENDINGS].filter((e) => e !== 'spa' && e !== 'lp'), 'private', 'fzllc']);
+
 /**
  * The words an organisation's name folds to, for asking whether two are one: lower case, a web address said as its
  * name (`SOWBELL.COM` is `sowbell`), punctuation gone, and the legal endings off its end. `Lantern AI, PBC` is `lantern
- * ai`, `Tarnvale Oy` is `tarnvale`.
+ * ai`, `Tarnvale Oy` is `tarnvale`. A dot after a single letter is an initial, not a web ending: `J.Crew` stays whole.
+ * Only a country's two letters or a common web ending is one: `Dr.Oetker` and `Next.Money` keep their second word, so
+ * neither is taken for `DR` or `NEXT`.
  */
-function orgWords(name: string): string[] {
-  const bare = name.replace(/\.(?:[a-z]{2,6})(?:\.[a-z]{2})?(?=$|[\s/])/giu, ' ');
+function orgWords(name: string, endings: ReadonlySet<string> = ENDINGS): string[] {
+  const bare = name.replace(/(?<=[\p{L}\p{N}]{2})\.(?:[a-z]{2}|com|net|org|info|biz|edu|gov|app|dev|xyz|tech|shop|store|online|site|cloud)(?:\.[a-z]{2})?(?=$|[\s/])/giu, ' ');
   const words = nameKey(bare)
     .split(' ')
     .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ''))
     .filter((w) => w !== '');
-  while (words.length > 1 && ENDINGS.has(words.at(-1)!)) words.pop();
+  while (words.length > 1 && endings.has(words.at(-1)!)) words.pop();
   return words;
 }
 
@@ -1218,10 +1226,18 @@ function askDomainOrgs(deps: PeopleDeps, list: DeclaredList<MeetsFields>, row: R
  * who arrived after it was asked, nobody only mail vouches for, and no subdomain's address. For the kernel to run after
  * every decision, in its transaction; a question not accepted, not one of these, or one whose domain nobody holds,
  * links nobody.
+ *
+ * AND AN ACCEPTED "Mark Kas as you?" ASKS ABOUT HIS OTHER ROWS AT ONCE (`askOwnRows`), the record's own step that marks
+ * his row (`markOwnRow`) and the tick's "Which of these is you?" included: the second Kas he typed is asked about the
+ * moment the first is his, not whenever somebody is next met.
  */
 export function joinOrganisation(deps: PeopleDeps, suggestion: string): Result<string[]> {
   const list = deps.list;
   const orgs = deps.orgs;
+  if (list && marksSelf(deps, list, suggestion)) {
+    const asked = askOwnRows(deps);
+    if (!asked.ok) return asked as Result<never>;
+  }
   if (!list || !orgs || list.fields.org === undefined) return ok([]);
   /* ONLY ONE HE ACCEPTED: a no leaves its people where they are, whoever holds the domain since. */
   const q = deps.sql.one<{ body: string }>("SELECT body FROM suggestion WHERE id = ? AND body_kind = 'rowset' AND status = 'resolved' AND resolved_as = 'addressed'", suggestion);
@@ -1758,6 +1774,33 @@ function askSelf(deps: PeopleDeps, list: DeclaredList<MeetsFields>): Result<stri
   /* ONE QUESTION ALREADY WAITING ON ALL OF THEM is the answer, without searching the cluster again at every meeting. */
   if (waiting.some((q) => ids.every((id) => q.members.some((m) => m.id === id)))) return ok(null);
   return askOrExtend(deps, list, [me, ...near]);
+}
+
+/**
+ * THE SWEEP FOR THE OWNER HELD TWICE, for a caller that has just marked his row and met nobody (DIRECTION §38): the
+ * question every meeting asks (`askSelf`), "Are Kas and Karim Assaf both you?", asked now. The record calls it right
+ * after a row is marked by a write of its own; a mark accepted on Decide runs it already (`joinOrganisation`). Asks
+ * nothing while no row or more than one is marked, never twice, and never about a pair he answered. Answers the question
+ * it opened or joined, or `null`.
+ */
+export function askOwnRows(deps: PeopleDeps): Result<string | null> {
+  const list = deps.list;
+  if (!list || list.fields.self === undefined) return ok(null);
+  return askSelf(deps, list);
+}
+
+/** Whether a question he accepted marked a person of this list as the record's own: "Mark Kas as you?". */
+function marksSelf(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, suggestion: string): boolean {
+  const self = list.fields.self;
+  if (self === undefined) return false;
+  const q = deps.sql.one<{ body: string }>("SELECT body FROM suggestion WHERE id = ? AND body_kind = 'rowset' AND status = 'resolved' AND resolved_as = 'addressed'", suggestion);
+  if (!q) return false;
+  try {
+    const body = JSON.parse(q.body) as { register?: unknown; rows?: { patch?: Record<string, unknown> }[] };
+    return body.register === list.register && Array.isArray(body.rows) && body.rows.some((r) => r?.patch?.[self] === true);
+  } catch {
+    return false;
+  }
 }
 
 /* ── the questions waiting on the owner ──────────────────────────────── */

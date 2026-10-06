@@ -462,6 +462,36 @@ test('THE OWNER HELD TWICE IS ONE QUESTION, "Are Kas and Kas both you?", never a
   sql.close();
 });
 
+test('MARKING HIS ROW ON DECIDE ASKS AT ONCE ABOUT HIS OTHER ROWS, before anybody is met, and a no to the mark asks nothing', async () => {
+  const { k, sql } = await record();
+  const own = value<Entry>(k.create('people', { name: 'Kas', email: 'kas@kas.example', keys: ['email:karimassaf91@gmail.com'] }, OWNER));
+  const second = value<Entry>(k.create('people', { name: 'Kas', note: 'Founder, Tidepool Apps' }, OWNER));
+  value(k.create('people', { name: 'Karim Assaf', email: 'karim@karimassaf.example', met: [`${DAY} · note on Lumacraft`] }, OWNER));
+  assert.deepEqual(open(sql), []);
+  /* As the record's own step marks him (`markOwnRow`): "Mark Kas as you?", filed and accepted by the record. */
+  const mark = (row: Entry) =>
+    value<{ id: string }>(k.propose({ question: 'Mark Kas as you?', body_kind: 'rowset', body: { register: 'people', rows: [{ at: k.nameOf(row.id), version: row.version, patch: { self: true } }] } }, 'system')).id;
+  value(k.decide(mark(own), { decide: { option: 'accept', reason: 'holds the sign-in address' } }, 'system'));
+  const asked = open(sql);
+  assert.equal(asked.length, 1, 'nothing was asked about his other rows when his row was marked');
+  assert.match(k.question(asked[0]!) ?? '', /^Are Kas .*, Kas and Karim Assaf .*all you\? Yes keeps Kas /u);
+  assert.doesNotMatch(k.question(asked[0]!) ?? '', /people#|@/u);
+  /* Met after, nothing more is asked: the question is the one already waiting. */
+  value(k.meet({ name: 'Ada Lovelace', email: 'ada@example.com', where: 'commit 1 in braindog' }, AGENT));
+  assert.deepEqual(open(sql), asked);
+  value(k.decide(asked[0]!, { decide: { option: 'accept', reason: 'all me' } }, 'p_owner'));
+  assert.equal(k.get(second.id, { includeDeleted: true })!.fields.merged_into, own.id);
+  sql.close();
+
+  const two = await record();
+  const first = value<Entry>(two.k.create('people', { name: 'Kas', email: 'kas@kas.example' }, OWNER));
+  value(two.k.create('people', { name: 'Kas' }, OWNER));
+  const q = value<{ id: string }>(two.k.propose({ question: 'Mark Kas as you?', body_kind: 'rowset', body: { register: 'people', rows: [{ at: two.k.nameOf(first.id), version: first.version, patch: { self: true } }] } }, 'system')).id;
+  value(two.k.decide(q, { decide: { option: 'reject', reason: 'not me' } }, 'p_owner'));
+  assert.deepEqual(open(two.sql), []);
+  two.sql.close();
+});
+
 test('ONE WHO GOES BY THE OWNER’S OTHER NAME IS ASKED ABOUT AS HIM, and what he is met by after lands on his row by key', async () => {
   const { k, sql } = await record();
   const self = value<Entry>(k.create('people', { name: 'Kas', email: 'kas@kas.example', aliases: ['Karim Assaf'], self: true }, OWNER));

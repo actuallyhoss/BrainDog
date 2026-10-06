@@ -221,7 +221,7 @@ import {
   type VaultDeps,
 } from './vault.ts';
 import { slashMayWrite } from './slash.ts';
-import { answeredOnly, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
+import { answeredOnly, askOwnRows, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { builtInFigure } from './built-in-figures.ts';
@@ -8251,6 +8251,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         }
         return out;
       }),
+
+    /**
+     * THE OWNER HELD TWICE, asked about now: "Are Kas and Karim Assaf both you?" (`people.ts` `askOwnRows`). For a
+     * caller that has just marked his row by a write of its own and met nobody, such as the record's `markOwnRow` and a
+     * sign-up; a mark accepted on Decide asks it already. Answers the question it opened or joined, or `null`.
+     */
+    askOwnRows: (actor: string = 'system'): Result<string | null> =>
+      attempt(sql, transaction, () => askOwnRows(peopleDeps({ actor }, () => null, (p) => openSuggestion(governDeps(), actor, p)))),
 
     /** Put one back in the queue, for the change the gate accepted and could not land. */
     reopen: (id: string, why?: string): Result<null> => transaction(() => reopen(governDeps(), id, why)),
