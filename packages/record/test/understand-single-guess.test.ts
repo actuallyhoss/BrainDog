@@ -112,3 +112,88 @@ test('UNDO REFUSES A row THAT IS NOT A LIST AND A NUMBER, AT row', async () => {
   }
   sql.close();
 });
+
+/** Two quiet runs in `sam/lantern`, one in `evil/lantern`, and a project listing `lantern` by its bare name. */
+async function twoPlaces() {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW - 48 * HOUR);
+  const api = await createRecordApi({ sql, clock });
+  value(await api.kernel.install([PROJECTS]));
+  const k = api.kernel;
+  const run = (doing: string, remote: string) => value<Entry>(k.create('session', { doing, agent: 'claude', state: 'done', remote, repo: 'lantern' }, { ...OWNER, stamp: { project: '' } }));
+  const sams = [run('Fix the retry', 'git@github.com:sam/lantern.git'), run('Ship the cards', 'git@github.com:sam/lantern.git')];
+  const evil = run('Read the keys', 'https://github.com/evil/lantern');
+  const lantern = value<Entry>(k.create('things', { name: 'Lantern', repos: ['lantern'] }, OWNER));
+  clock.set(NOW);
+  return { api, sql, sams, evil, lantern };
+}
+
+const answerOnePlace = async (api: Awaited<ReturnType<typeof createRecordApi>>, sql: NodeSql, sams: Entry[], evil: Entry, lantern: Entry) => {
+  const asked = open(sql).filter((q) => q.q.includes('Is that Lantern?'));
+  /* ONE QUESTION PER WHOLE PLACE, each saying how many runs it covers. */
+  assert.deepEqual(asked.map((q) => q.q).sort(), ['2 runs worked in sam/lantern. Is that Lantern?', 'A run worked in evil/lantern. Is that Lantern?']);
+  const sam = asked.find((q) => q.q.includes('sam/lantern'))!;
+  value(await api.decide({ id: sam.id, decide: { option: 'p1', reason: '' } }, owner));
+  /* AND ONE YES PLACES THAT PLACE'S RUNS ALONE, and lists that remote alone. */
+  const spoken = api.kernel.nameOf(lantern.id);
+  for (const r of sams) assert.equal(api.kernel.get(r.id)?.fields.project, spoken);
+  assert.equal(api.kernel.get(evil.id)?.fields.project, '');
+  assert.deepEqual(api.kernel.get(lantern.id)?.fields.repos, ['lantern', 'git@github.com:sam/lantern.git']);
+  /* THE OTHER PLACE IS STILL ASKED ABOUT ON ITS OWN. */
+  assert.equal(open(sql).filter((q) => q.q === 'A run worked in evil/lantern. Is that Lantern?').length, 1);
+};
+
+test('ONE YES NEVER COVERS sam/lantern AND evil/lantern: one question per whole place', async () => {
+  const { api, sql, sams, evil, lantern } = await twoPlaces();
+  await api.slashTick();
+  await answerOnePlace(api, sql, sams, evil, lantern);
+  sql.close();
+});
+
+test('A WALK THAT GROUPS PLACES BY THEIR LAST NAME IS STILL FILED AS ONE QUESTION PER WHOLE PLACE', async () => {
+  const { api, sql, sams, evil, lantern } = await twoPlaces();
+  /* THE WALK AS IT ONCE WAS: every run of one last name in one question, its wheres every place among them. */
+  const backfill = api.kernel.backfill.bind(api.kernel);
+  (api.kernel as { backfill: typeof backfill }).backfill = (opts) => {
+    const walked = backfill(opts);
+    const runs = walked.suggestions.filter((s) => s.kind === 'run-project');
+    if (runs.length < 2) return walked;
+    const first = runs[0]!;
+    const grouped = {
+      ...first,
+      key: 'run-project:lantern:grouped',
+      place: 'lantern',
+      runs: runs.reduce((n, s) => n + (s.kind === 'run-project' ? s.runs : 0), 0),
+      wheres: [...new Set(runs.flatMap((s) => (s.kind === 'run-project' ? s.wheres : [])))].sort(),
+      question: '3 runs worked in lantern. Is that Lantern?',
+    };
+    return { ...walked, suggestions: [grouped, ...walked.suggestions.filter((s) => s.kind !== 'run-project')] };
+  };
+  await api.slashTick();
+  assert.equal(open(sql).filter((q) => q.q === '3 runs worked in lantern. Is that Lantern?').length, 0);
+  await answerOnePlace(api, sql, sams, evil, lantern);
+  sql.close();
+});
+
+test('THE WALK ASKED FOR BY HAND FILES ONE QUESTION PER WHOLE PLACE TOO, even from a walk that groups them', async () => {
+  const { api, sql, sams, evil, lantern } = await twoPlaces();
+  const backfill = api.kernel.backfill.bind(api.kernel);
+  (api.kernel as { backfill: typeof backfill }).backfill = (opts) => {
+    const walked = backfill(opts);
+    const runs = walked.suggestions.filter((s) => s.kind === 'run-project');
+    if (runs.length < 2) return walked;
+    const grouped = {
+      ...runs[0]!,
+      key: 'run-project:lantern:grouped',
+      place: 'lantern',
+      runs: runs.reduce((n, s) => n + (s.kind === 'run-project' ? s.runs : 0), 0),
+      wheres: [...new Set(runs.flatMap((s) => (s.kind === 'run-project' ? s.wheres : [])))].sort(),
+      question: '3 runs worked in lantern. Is that Lantern?',
+    };
+    return { ...walked, suggestions: [grouped, ...walked.suggestions.filter((s) => s.kind !== 'run-project')] };
+  };
+  value(await api.understand({}, owner));
+  assert.equal(open(sql).filter((q) => q.q === '3 runs worked in lantern. Is that Lantern?').length, 0);
+  await answerOnePlace(api, sql, sams, evil, lantern);
+  sql.close();
+});
