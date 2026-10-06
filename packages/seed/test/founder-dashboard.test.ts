@@ -99,9 +99,11 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
   const pages = k.pages() as unknown as { slug: string; title: string }[];
   const harbour = pages.find((p) => p.title === 'Harbour Studio');
   assert.ok(harbour, 'an organisation has its own page');
-  /* PEOPLE'S PAGE FOR IT SINCE founder 2.0.0, with this pack's numbers added after its people (`adds`). */
+  /* PEOPLE'S PAGE FOR IT SINCE founder 2.0.0, with this pack's numbers added after its people (`adds`), then its
+     projects. NOT ITS MONEY YET: People is installed before Money, so its copy leaves out a block over a list the
+     record does not hold yet (`placed` in `packs/first-party.ts`), until People is next updated. */
   const own = value<{ blocks: Drawn[] }>(k.page(harbour.slug)).blocks;
-  assert.deepEqual(own.map((b) => b.heading), [undefined, 'People', 'Numbers, 30 days', 'Latest numbers', 'Send numbers here', 'Seen in', 'Notes']);
+  assert.deepEqual(own.map((b) => b.heading), [undefined, 'People', 'Numbers, 30 days', 'Latest numbers', 'Send numbers here', 'Projects', 'Seen in', 'Notes']);
   for (const b of own) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.equal(own[0]!.rows?.length, 1, 'its card reads its own row');
   assert.equal(own[2]!.matched, 40, 'only its own numbers, the example one left out');

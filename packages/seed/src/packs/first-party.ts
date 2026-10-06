@@ -379,7 +379,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   book's page, offers five years and `last` again (research audit 16, H1): the kernel now walks two years at most
  *   unasked (`WALK_UNASKED`) and further only when a reader picks a longer length, which the page asks for, so the cost
  *   3.9.0 took them off for is gone. Two lengths put back on a control, so it is no step of its own. Projects gain
- *   `domains`, a field added, so a minor step.
+ *   `domains`, a field added, so a minor step. STILL 3.0.0, UNRELEASED, after the audit of October 6th
+ *   (`loop/research-audit-17.md`): mail nobody's pattern claimed makes nobody, its sender kept as a mention
+ *   (`rule.meet-senders`), a pattern's mail from a public host names no organisation, neither rule writes a subject,
+ *   Everyone is grouped by organisation, and an organisation's page draws its projects and money where the record holds
+ *   them (`placed` in `firstPartyDocument`, which makes those two lists People's links and not its needs).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.14.0',
@@ -483,13 +487,17 @@ function split(): Split {
  * words the first run hears it in (`SIGNALS`).
  */
 export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides: readonly string[]; links: readonly string[]; signals: readonly string[] } {
-  const { packs } = split();
+  const { packs, owner } = split();
   const mine = packs.get(id)!.declarations;
   const own = new Set(mine.filter((d) => typeof d.register === 'string').map((d) => d.register as string));
   const needs = new Set<string>();
   const any = new Set<string>();
+  /* A PAGE'S LIST OF ANOTHER FIRST-PARTY PACK IS A LINK AND NOT A NEED, SINCE People 3.0.0: the blocks over it are drawn
+     only where the record holds it (`placed` in `firstPartyDocument`), as a link field is kept only where the list it
+     points at is. */
+  const drawnWhereHeld = (d: Body, r: string): boolean => typeof d.page === 'string' && owner.has(r) && owner.get(r) !== id;
   for (const d of mine) {
-    for (const r of leansOn(d, LINKS[id])) if (!own.has(r)) needs.add(`register.${r}`);
+    for (const r of leansOn(d, LINKS[id])) if (!own.has(r) && !drawnWhereHeld(d, r)) needs.add(`register.${r}`);
     for (const r of leansOn(d)) if (!own.has(r)) any.add(`register.${r}`);
   }
   const links = [...any].filter((r) => !needs.has(r)).sort();
@@ -620,10 +628,30 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
     held === null || !Array.isArray(d.blocks)
       ? d
       : { ...d, blocks: (d.blocks as Body[]).map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter(drawable) } : b)) };
+  /* A BLOCK OVER ANOTHER PACK'S LIST IS KEPT ONLY WHERE THE RECORD HOLDS THAT LIST, SINCE People 3.0.0, as a leg is: an
+     organisation's page draws its projects and its money (`page.relation` in `modules/people.ts`), and `@braindog/declare`
+     refuses a page whose block reads a list the record does not hold, so People would not install before Money and
+     Projects, which is the order every record takes them in. WITH NO `holds` SUCH A BLOCK IS LEFT OUT, as a figure's
+     leg is, because a document installed as it is goes onto a record that may hold none of them. No first-party page
+     but that one reads another pack's list, so every other document is the same with or without this. */
+  /* ONLY ANOTHER FIRST-PARTY PACK'S LIST: a list the kernel keeps itself (`session`) is on every record. */
+  const reads = (list: string | null): boolean =>
+    list === null || own.has(list) || !every.owner.has(list) || every.owner.get(list) === id || (held !== null && held.has(list));
+  const listIn = (source: unknown): string | null => (typeof source === 'string' && source.startsWith('register.') ? source.slice('register.'.length) : null);
+  /* AND ITS `requires` WITH IT, which names every list a block reads (the kernel refuses a page that reads one it does
+     not name), so a page that keeps no block over Money does not ask for Money. */
+  const placed = (d: Body): Body =>
+    typeof d.page !== 'string' || !Array.isArray(d.blocks)
+      ? d
+      : {
+          ...d,
+          ...(Array.isArray(d.requires) ? { requires: (d.requires as unknown[]).filter((r) => reads(listIn(r))) } : {}),
+          blocks: (d.blocks as Body[]).filter((b) => reads(listIn(b.source))),
+        };
   const pack = {
     declarations: whole.declarations.flatMap((d) => {
       const kept = without(d, typeof d.register === 'string' ? (goneIn.get(d.register) ?? new Set<string>()) : gone);
-      return kept === null ? [] : [trends(legs(kept))];
+      return kept === null ? [] : [placed(trends(legs(kept)))];
     }),
     seeds: (options.seeds ?? whole.seeds).map((s) => ({
       ...s,

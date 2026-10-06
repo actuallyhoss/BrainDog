@@ -78,8 +78,8 @@ export const PEOPLE: Fields[] = [
  * header over in parts (`from_address`, `from_name`, `from_domain`, `senderOf` in `packages/kernel/src/ingest.ts`), and:
  *
  * - A MAIL NO DOOR'S PATTERN CLAIMED (`untriaged`) IS FROM SOMEBODY, unless its address says nobody reads replies to it
- *   (noreply, no-reply, donotreply, mailer-daemon). The person is met by address and name; a no-reply sender is the
- *   organisation behind it, met by its domain.
+ *   (noreply, no-reply, donotreply, mailer-daemon). It was met by address and name, and a no-reply sender as the
+ *   organisation behind it; since the audit of October 6th the name is kept as a mention and nobody is written (below).
  * - A MAIL A DOOR'S PATTERN CLAIMED IS FROM A SYSTEM: a bank's alert, a shop's receipt. Meeting it as a person made a
  *   person called "Alerts" one mail at a time, so it meets the organisation by its domain, the rule below.
  *
@@ -100,50 +100,104 @@ export const PEOPLE: Fields[] = [
  * a payee is as often a client paying in as a shop. A PAYEE WRITTEN AS AN ADDRESS IS NOBODY MET: an InstaPay transfer in
  * prints who sent it as `quill.harbour@instapay`, most often a person's, and an organisation called by that address is
  * a name nobody reads as one.
+ *
+ * MAIL NOBODY'S PATTERN CLAIMED MAKES NOBODY, SINCE THE AUDIT OF OCTOBER 6TH (`loop/research-audit-17.md`, H1). Anybody
+ * can send a mail and write any name above it: a forged `"Rohan Mehta" <rohanmehta@evil.test>` made a person, the
+ * strong rules then folded it into the real Rohan on the same two words and a long enough local part, and his keys
+ * took the stranger's address, so every later mail from that domain was filed as his. Spam made a person a sender. So
+ * `rule.meet-senders` keeps the sender's name as a mention, with where it came from, and writes no person: a mention
+ * holds no key, matches nobody and is never merged, and it is what a person or an agent who knows them turns into
+ * somebody. Meeting the sender as a person once the owner has written to them, or once their domain is an
+ * organisation the record already knows, is the kernel's to check, since only it can read the lists while it meets
+ * (the batch report names what it needs); the rule moves to that the day the check exists.
+ *
+ * AND A NO-REPLY SENDER NOBODY'S PATTERN CLAIMED IS NOBODY TO MEET: a newsletter, a notification, or a forgery of
+ * either. One a door's pattern reads, a bank's alert, is met by `rule.meet-sender-organisations` below.
+ *
+ * WHERE IS THE SENDER'S DOMAIN, NEVER THE SUBJECT (audit 17, M2). The line said `mail: <subject>`, and the subject of
+ * any mail reached the person's `met` lines, the merge cards, the model's reading and the mention table, which grew a
+ * row per subject.
  */
 const NO_REPLY = ['noreply', 'no-reply', 'donotreply', 'do-not-reply', 'mailer-daemon'];
 
-/** The organisation a mail came from, by its domain, with the name the mail went out under. */
+/** Where a mail was seen, in the words a `met` line and a mention keep: the domain it came from, never its subject. */
+const MAIL_FROM = 'mail from {{trigger.body.from_domain}}';
+
+/**
+ * MAIL HOSTS ANYBODY CAN SIGN UP TO, WHOSE DOMAIN SAYS NOTHING ABOUT WHO A SENDER WORKS FOR (audit 17, M4): a mail from
+ * one is a person's own account, and the display name above it is whatever they typed. Named in the rule itself, so a
+ * person reading `rule.meet-sender-organisations` sees which hosts it passes over and can add their own country's.
+ *
+ * THE RULE'S OWN LIST AND NOT THE KERNEL'S `PUBLIC_MAIL` (`packages/kernel/src/identity-keys.ts`), which is what a key
+ * is normalised against and grows with every host somebody meets. A declaration that copied it would change under
+ * every record that holds the rule each time it grew, and reach none of them until People's next version. NOT AN
+ * INTERNET PROVIDER THAT SENDS ITS OWN BILLS FROM ITS CUSTOMERS' HOST (`sky.com`, `orange.fr`), since that mail is the
+ * provider speaking and a pattern that reads it should meet the provider.
+ */
+const PUBLIC_MAIL_HOSTS = [
+  'gmail.com', 'googlemail.com', 'icloud.com', 'me.com', 'mac.com', 'msn.com', 'live.com', 'live.co.uk', 'live.fr',
+  'proton.me', 'pm.me', 'mail.com', 'email.com', 'zoho.com', 'fastmail.com', 'hey.com', 'tutanota.com', 'tuta.io',
+  'qq.com', '163.com', '126.com', 'sina.com', 'naver.com', 'daum.net', 'mail.ru', 'inbox.ru', 'list.ru', 'bk.ru',
+  'web.de', 't-online.de', 'laposte.net', 'libero.it', 'btinternet.com', 'virginmedia.com', 'att.net', 'verizon.net',
+  'sbcglobal.net', 'seznam.cz', 'wp.pl', 'o2.pl', 'users.noreply.github.com',
+];
+
+/** The free mail brands whose every country's host is one too: `yahoo.com.eg`, `hotmail.fr`, `outlook.co.uk`. */
+const PUBLIC_MAIL_BRANDS = ['yahoo.', 'ymail.', 'rocketmail.', 'hotmail.', 'outlook.', 'aol.', 'gmx.', 'yandex.', 'rambler.', 'protonmail.', 'rediffmail.'];
+
+/**
+ * The organisation a mail came from, by its domain, with the name the mail went out under. Reached only for a domain
+ * that is not a public host (`rule.meet-sender-organisations`), so a display name names an organisation only where
+ * the domain it came from is one.
+ */
 const MEET_SENDER_ORG = {
   meet: {
     kind: 'organisation',
     domain: '{{trigger.body.from_domain}}',
     name: '{{trigger.body.from_name}}',
-    where: 'mail: {{trigger.body.subject}}',
-    source: 'mail from {{trigger.body.from_domain}}',
+    where: MAIL_FROM,
+    source: MAIL_FROM,
   },
 };
 
 export const PEOPLE_AUTOMATIONS: Record<string, unknown>[] = [
   {
     rule: 'meet-senders',
-    name: 'Meet whoever writes in',
+    name: 'Note whoever writes in',
     pack: 'people',
     on: { arrival: { channel: 'email', state: ['untriaged'] } },
     steps: [
       { set_var: { name: 'sender', to: '{{trigger.body.from_address}}' } },
       {
-        if: { any: NO_REPLY.map((word) => ({ field: 'sender', contains: word })) },
-        then: [MEET_SENDER_ORG],
-        else: [
-          {
-            meet: {
-              email: '{{trigger.body.from_address}}',
-              name: '{{trigger.body.from_name}}',
-              where: 'mail: {{trigger.body.subject}}',
-              source: 'mail from {{trigger.body.from_domain}}',
-            },
-          },
-        ],
+        /* A NAME AND WHERE, AND NO ADDRESS: `meet` keeps a name alone as a mention and writes no row (`meetPerson` in
+           `packages/kernel/src/people.ts`). A sender with no name leaves nothing to keep, and the run goes on. */
+        if: { none: [{ field: 'sender', empty: true }, ...NO_REPLY.map((word) => ({ field: 'sender', contains: word }))] },
+        then: [{ meet: { name: '{{trigger.body.from_name}}', where: MAIL_FROM, source: MAIL_FROM } }],
       },
     ],
   },
   {
+    /* NEVER AN ORGANISATION NAMED AFTER WHOEVER WROTE FROM A PUBLIC HOST (audit 17, M4). A mail a pattern claimed from
+       `gmail.com` or `yahoo.com.eg` named an organisation after the first sender's display name, keyed by the host, and
+       filed every later mail from that host under it. A mail with no address is passed over too, since a name alone
+       would be matched against the organisations by name. */
     rule: 'meet-sender-organisations',
     name: 'Know who sends the mail a pattern reads',
     pack: 'people',
     on: { arrival: { channel: 'email', state: ['matched', 'review', 'proposed', 'skipped'] } },
-    steps: [MEET_SENDER_ORG],
+    steps: [
+      { set_var: { name: 'domain', to: '{{trigger.body.from_domain}}' } },
+      {
+        if: {
+          none: [
+            { field: 'domain', empty: true },
+            { field: 'domain', in: PUBLIC_MAIL_HOSTS },
+            ...PUBLIC_MAIL_BRANDS.map((brand) => ({ field: 'domain', starts: brand })),
+          ],
+        },
+        then: [MEET_SENDER_ORG],
+      },
+    ],
   },
   {
     rule: 'meet-payees',
@@ -455,6 +509,12 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
           { field: 'projects', label: 'Met in', as: 'fact' },
           { field: 'in_touch', label: 'Last in touch', as: 'when' },
         ],
+        /* GROUPED BY THE ORGANISATION THEY ARE WITH, SINCE People 3.0.0 (DIRECTION §37's lists grouped under quiet
+           headings): Halden's people under Halden, and whoever is with nobody under no heading. Three a group are drawn
+           and the rest of it folded behind its count, so one big client does not push everyone else off the page. The
+           order still runs inside each group, the one last in touch first. */
+        group: 'org',
+        fold: 3,
         order: [
           { field: 'in_touch', dir: 'desc' },
           { field: 'seq', dir: 'desc' },
@@ -574,8 +634,9 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
    * then the organisation, then a person. Founder's own `organisation` page went at Founder 2.0.0, and the numbers it
    * drew are added to this page by Founder (`adds` in `usecases/founder.ts`).
    *
-   * NO MONEY HERE, for the reason a person's page has none: a block over Money's lists would refuse People's install
-   * on every record without Money.
+   * ITS MONEY ONLY WHERE THE RECORD HOLDS MONEY, for the reason a person's page has none: a block over Money's lists
+   * written into every record's People would refuse People's install on every record without Money. The Money block
+   * below is left out of the document for such a record (`firstPartyDocument`), and its Projects with it.
    */
   relation: {
     page: 'relation',
@@ -583,7 +644,9 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
     for: { register: 'organisations' },
     icon: 'grid',
     pack: 'people',
-    requires: ['register.organisations', 'register.people'],
+    /* PROJECTS' AND MONEY'S LISTS ARE NAMED FOR THE BLOCKS THAT READ THEM, and both go from a record's copy with those
+       blocks where it holds neither (`placed` in `packs/first-party.ts`). */
+    requires: ['register.organisations', 'register.people', 'register.things', 'register.transactions'],
     blocks: [
       {
         kind: 'cards',
@@ -595,8 +658,9 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
           { field: 'name', label: 'Organisation', as: 'who' },
           { field: 'kind', label: 'Kind', as: 'fact' },
           { field: 'domain', label: 'Website', as: 'fact' },
-          { field: 'projects', label: 'Projects', as: 'fact' },
         ],
+        /* NO PROJECTS ON THE CARD, SINCE People 3.0.0: they are a list of their own under it, each opening its page, and
+           a card saying them again was the same names twice on one screen. */
         limit: 1,
         empty: 'Nothing is kept about {{name}} yet.',
       },
@@ -618,6 +682,39 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
           { field: 'seq', dir: 'desc' },
         ],
         empty: 'Nobody here is known to be with {{name}} yet.',
+      },
+      /* ITS PROJECTS AND ITS MONEY, SINCE People 3.0.0, each a list under its heading and each opening its own page:
+         the projects it is part of (`projects`, which `meet` adds to), and what moved with it, the latest first, signed
+         by its own direction as Money's own list is. Neither says it is empty, and an organisation with neither draws
+         only its people.
+
+         OVER LISTS PEOPLE DOES NOT HOLD, SO DRAWN ONLY WHERE THE RECORD HOLDS THEM. `firstPartyDocument` keeps a block
+         of one pack's page over another pack's list only when the record it is written for holds that list, as it keeps
+         a walk's leg (`packs/first-party.ts`), so People still installs first and alone; a record that takes Money or
+         Projects later gains these when People is next updated. */
+      {
+        kind: 'cards',
+        heading: 'Projects',
+        icon: 'thing',
+        span: 12,
+        source: 'register.things',
+        where: 'id is {{projects}}',
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'next', label: 'Next step', as: 'fact' },
+        ],
+        limit: 8,
+      },
+      {
+        kind: 'timeline',
+        heading: 'Money',
+        icon: 'receipt',
+        span: 12,
+        source: 'register.transactions',
+        where: 'state is not void, party is {{name}}',
+        columns: [{ field: 'on' }, { field: 'what' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
+        order: [{ field: 'on', dir: 'desc' }],
+        limit: 8,
       },
       {
         kind: 'note',

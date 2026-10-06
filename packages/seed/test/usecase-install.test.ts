@@ -82,7 +82,8 @@ const STUDIO = /Kiln|Halden|Ravensworth|Okonkwo|Marchetti|Pell & Vine|Nordhaven|
 test('PEOPLE IS NOT A DEPENDENT OF PROJECTS: "Met in" is a link, left out when the record holds no projects', async () => {
   const manifest = firstPartyManifest('people');
   assert.deepEqual([...manifest.requires], []);
-  assert.deepEqual([...manifest.links], ['register.things']);
+  /* AND MONEY'S LEDGER, which an organisation's page draws only where the record holds it. */
+  assert.deepEqual([...manifest.links], ['register.things', 'register.transactions']);
 
   const { k, sql } = await record();
   const alone = moduleDocument(useCase('student')!, 'people', { today: TODAY, holds: ['people'], examples: true }) as { declarations: { register?: string; fields?: { id: string }[] }[] };
@@ -92,10 +93,14 @@ test('PEOPLE IS NOT A DEPENDENT OF PROJECTS: "Met in" is a link, left out when t
   assert.equal(k.count('people'), 0, 'a use case with no example for People gets none');
   sql.close();
 
-  const whole = firstPartyDocument('people') as { declarations: { fields?: { id: string }[] }[] };
+  const whole = firstPartyDocument('people') as { declarations: { fields?: { id: string }[]; page?: string; blocks?: { heading?: string }[] }[] };
   assert.ok(whole.declarations.some((d) => d.fields?.some((f) => f.id === 'projects')), 'with no holds given, the document is as it always was');
   const withProjects = firstPartyDocument('people', { holds: ['people', 'things'] }) as typeof whole;
-  assert.deepEqual(withProjects, whole, 'a record holding projects gets the link');
+  const lists = (doc: typeof whole) => doc.declarations.filter((d) => !('page' in d));
+  assert.deepEqual(lists(withProjects), lists(whole), 'a record holding projects gets the link');
+  /* AND AN ORGANISATION'S PAGE GAINS ITS PROJECTS, which the document with no holds leaves out. */
+  const relation = (doc: typeof whole) => doc.declarations.find((d) => d.page === 'relation')?.blocks?.map((b) => b.heading);
+  assert.ok(relation(withProjects)?.includes('Projects') && !relation(whole)?.includes('Projects'));
 });
 
 test('WITH NO USE CASE, A MODULE CARRIES THE SAMPLE ROWS AS IT ALWAYS DID', () => {

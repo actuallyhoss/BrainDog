@@ -194,6 +194,43 @@ const COUNT = { value: { count: 'id' }, format: 'int', target: { gte: 0 }, windo
  */
 export const RUNS_WORKING = 'state is active, last_seen is today';
 
+/**
+ * THE RUNS THAT STOPPED TODAY, SINCE 1.6.0: idle or handed off, and last heard from today. With `RUNS_WORKING` and
+ * `RUNS_EARLIER` it cuts the live runs (`sessions.live`, every run not done or abandoned) so each sits under exactly one
+ * heading: a run still active and heard from today is working, one that stopped today is Today, and anything last heard
+ * from before today is Earlier, the run the end hook never closed among them.
+ */
+export const RUNS_TODAY = 'state is idle or handoff, last_seen is today';
+
+/** THE RUNS LAST HEARD FROM BEFORE TODAY, SINCE 1.6.0, whatever they say they are doing (`RUNS_TODAY` says why). */
+export const RUNS_EARLIER = 'last_seen before today';
+
+/**
+ * WHAT AN AGENT'S RUN ASKED, SINCE 1.6.0: an open question opened by a run (its spoken id, `S12`) or by an agent's key
+ * with no run to sign it (`agent:claude`), as `byOf` in `packages/kernel/src/pages.ts` reads an actor. A question a
+ * rule, a door, Slash or the record itself put is Decide's and not a run's, so the Agents page leaves it there.
+ *
+ * A TREE AND NOT A SENTENCE, because a spoken id is an `S` and a number and the grammar has no pattern: it is an s and
+ * a first digit, one to nine since a run's number starts at one, so `slash`, `system`, `script:` and any actor named
+ * later that starts with an s stay out without each being named.
+ */
+const ASKED_BY_A_RUN = {
+  any: [{ field: 'who', starts: 'agent:' }, ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ field: 'who', starts: `s${n}` }))],
+};
+
+/**
+ * WHAT A STOPPED RUN'S CARD SAYS, Today's and Earlier's: what it was doing, which agent, the project it was placed in,
+ * the next step it left, and when it was last heard from. The next step is a fact and not the title, as it was under
+ * Where they left off, because a run that left none is still a run somebody looks for by what it did.
+ */
+const STOPPED_COLUMNS = [
+  { field: 'doing', as: 'title' },
+  { field: 'agent', as: 'who' },
+  { field: 'project', label: 'Project', as: 'scope' },
+  { field: 'next', label: 'Next', as: 'fact' },
+  { field: 'last_seen', as: 'when' },
+];
+
 export const AGENTS_METRICS: Record<string, SeedMetric> = {
   'learnings-by-week': { metric: 'learnings-by-week', name: 'Learnings added, by week', source: 'register.learnings', where: 'created_at after -182d', ...WEEKLY },
   'keys-by-week': { metric: 'keys-by-week', name: 'Keys added, by week', source: 'register.credentials', where: 'created_at after -182d', ...WEEKLY },
@@ -232,6 +269,10 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
      which every record holds. Working now counts the cards' own clause since 1.5.0 (`RUNS_WORKING`). */
   'agents-working': { metric: 'agents-working', name: 'Agents working now', source: 'register.session', where: RUNS_WORKING, ...COUNT },
   'runs-left-next': { metric: 'runs-left-next', name: 'Runs that left a next step', source: 'register.session', where: 'state is idle or handoff, next is set', ...COUNT },
+  /* THE TWO GROUPS OF STOPPED RUNS, SINCE 1.6.0, each over its cards' own clause, so a heading is drawn only over runs.
+     Earlier counts only the runs still open, as `sessions.live` lists them, so a figure and its cards agree. */
+  'runs-today': { metric: 'runs-today', name: 'Runs that stopped today', source: 'register.session', where: RUNS_TODAY, ...COUNT },
+  'runs-earlier': { metric: 'runs-earlier', name: 'Runs last heard from before today', source: 'register.session', where: `state is active or idle or handoff, ${RUNS_EARLIER}`, ...COUNT },
   'learnings-active': { metric: 'learnings-active', name: 'Learnings in use', source: 'register.learnings', where: 'state is active', ...COUNT },
   'skills-active': { metric: 'skills-active', name: 'Skills in use', source: 'register.skills', where: 'state is active', ...COUNT },
   /* ONE SKILL'S LESSONS, `{{it}}` filled from the skill page's own `{{name}}`, the clauses of the tile drawn on it. */
@@ -249,6 +290,13 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
  * brain has grown, its learnings and its skills were an inventory of four lists, each with a page of its own, under a
  * heading that drew a lone "Faded 0" on a quiet record. And no part says it is empty: a block with nothing in it is
  * not drawn, and the line says the quiet half.
+ *
+ * THE RUNS GROUPED, SINCE 1.6.0 (DIRECTION §37, the agent directions' "runs grouped by state, the run docked beside"):
+ * Needs you, Working, Today and Earlier, in that order, each a heading over its own runs and drawn only while it has
+ * any. Needs you is back, and it is not the Waiting on you 1.5.0 took away: that was every question Decide holds, and
+ * this is only what an agent's run asked (`ASKED_BY_A_RUN`). Where they left off goes into Today and Earlier, whose
+ * cards say the next step each run left. Each card opens its run in the panel docked beside the page, which is the
+ * host's (DIRECTION §34), so the page declares lists of runs and no panel of its own. The word on screen stays "run".
  *
  * NO PEOPLE ON THEM. "People met lately" would make the page require `register.people`, and then a
  * record without People could not take this pack. The people an agent meets are on the People page.
@@ -279,14 +327,27 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         when: { metric: 'agents-working', is: 0 },
         body: 'No agent is working right now, and {{runs-left-next}} run(s) left a next step',
       },
+      /* WHAT A RUN ASKED YOU, FIRST, SINCE 1.6.0: the questions agents' runs opened, ranked as Decide ranks them, three
+         drawn and the rest counted. Only while anything is open at all (`questions-open`, the record's own count); with
+         none of them a run's, the queue has nothing in it and is not drawn. */
+      {
+        kind: 'queue',
+        heading: 'Needs you',
+        icon: 'ask',
+        span: 12,
+        source: 'governance.open',
+        where: ASKED_BY_A_RUN,
+        limit: 3,
+        when: { metric: 'questions-open', gt: 0 },
+      },
       /* ONLY THE RUNS STILL WORKING (`RUNS_WORKING`). The end hook leaves a run idle and a handoff waits for a pickup,
          and both were listed here as working, the run that closed a minute ago beside the one typing now. A run still
          active and heard from today stays, and the host draws it dimmed once it has gone quiet, because it may yet come
          back. The project is a scope chip, read off the run's placed project (`projectsOf` in
-         `packages/kernel/src/pages.ts`). */
+         `packages/kernel/src/pages.ts`). WORKING AND NOT "Working now" SINCE 1.6.0, one word among the group headings. */
       {
         kind: 'cards',
-        heading: 'Working now',
+        heading: 'Working',
         icon: 'session',
         span: 12,
         source: 'sessions.live',
@@ -301,25 +362,29 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         limit: 12,
         when: { metric: 'agents-working', gt: 0 },
       },
-      /* WHERE THE STOPPED RUNS LEFT OFF, led by the next step, because that is what the next session starts from. A
-         run that stopped without one has nothing to hand on, and is left out. UNDER WHAT IS WORKING, SINCE 1.4.0, where
-         it was the page's last tile: it is what somebody picks up next. */
+      /* THE RUNS THAT STOPPED TODAY, SINCE 1.6.0, and with them where each left off: what the next session starts from. */
       {
         kind: 'cards',
-        heading: 'Where they left off',
+        heading: 'Today',
         icon: 'flag',
         span: 12,
         source: 'sessions.live',
-        where: 'state is idle or handoff, next is set',
-        columns: [
-          { field: 'next', as: 'title' },
-          { field: 'agent', as: 'who' },
-          { field: 'doing', label: 'Was doing', as: 'fact' },
-          { field: 'project', label: 'Project', as: 'scope' },
-          { field: 'last_seen', as: 'when' },
-        ],
+        where: RUNS_TODAY,
+        columns: STOPPED_COLUMNS,
+        limit: 8,
+        when: { metric: 'runs-today', gt: 0 },
+      },
+      /* AND EVERY RUN LAST HEARD FROM BEFORE TODAY, the latest first, six drawn and the rest counted under them. */
+      {
+        kind: 'cards',
+        heading: 'Earlier',
+        icon: 'history',
+        span: 12,
+        source: 'sessions.live',
+        where: RUNS_EARLIER,
+        columns: STOPPED_COLUMNS,
         limit: 6,
-        when: { metric: 'runs-left-next', gt: 0 },
+        when: { metric: 'runs-earlier', gt: 0 },
       },
       /* WHAT THE AGENTS ADDED AND CHANGED IN WHAT THE BRAIN HOLDS, one group per run, from the record's own log. An
          `agents` block and not a `feed`, because a feed groups by the kind of actor and would put every run under one
@@ -421,8 +486,12 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      the brain holds goes with Growth, Learnings and Skills under it, each a list with its own page; the line says
      the runs alone; and no block on the home or the lessons of a skill's page says it is empty, since a block with
      nothing in it is not drawn. Every figure stays declared, for a page that draws one and for an agent that reads
-     one. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.5.0', requires: ['register.things'] },
+     one. No list, field or figure goes.
+     1.6.0 ADDS AND REGROUPS, SO IT IS MINOR: the agents home groups the runs under Needs you, Working, Today and
+     Earlier (DIRECTION §37), over the new `runs-today` and `runs-earlier`; Working now is called Working, and Where
+     they left off goes into Today and Earlier, whose cards carry each run's next step. `runs-left-next` stays, read by
+     the line. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.6.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

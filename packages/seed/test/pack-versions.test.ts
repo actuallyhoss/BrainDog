@@ -1140,12 +1140,14 @@ const DECLARED: Record<string, Version> = {
       register.organisations register.people
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders
     `,
-    declares: '3178b75f133dbcaf',
+    declares: '4fc794e6106950fd',
     history: [
       "`register.organisations` moves here from Founder under its id and declares `org:`, with `page.relation` a page each; `register.people` names `keys`, `org`, `self` and `aliases` in `meets:`; `page.someone` lists the keys and where a person was seen; `rule.meet-senders` meets the parsed address and `rule.meet-sender-organisations` the organisation behind a claimed mail -> ad6105a9acea6d51",
       "`page.someone` no longer draws Known by, which printed each key as `kind:value` joined by commas -> 3409c19c5f73a2be",
       "`rule.meet-payees` meets the payee a bank door read as an organisation by its `bank:` key, off the arrival, so a held charge meets it too -> d92d98f8624d5db7",
       "`rule.meet-payees` meets nobody for a payee written as an address, an InstaPay sender's `name@instapay` -> 3178b75f133dbcaf",
+      "`rule.meet-senders` keeps an unclaimed mail's sender as a name and where it came from and writes no person, `rule.meet-sender-organisations` passes over a public mail host, both say where as the domain and never the subject (audit 17, H1, M2, M4), and `page.people`'s Everyone groups people by organisation, three a group; `page.relation`'s projects and money are drawn only where the record holds those lists, so they reach no record's copy without them -> 963caa7eb2eb1223",
+      "`page.relation`'s lead card no longer says its projects, which are the list under it -> 4fc794e6106950fd",
     ],
   },
   /** A MINOR STEP THOUGH `party` POINTS ELSEWHERE: `FIRST_PARTY_VERSIONS`' note says why. */

@@ -45,10 +45,10 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.5.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.6.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.5.0');
+  assert.equal(pack.manifest.version, '1.6.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
@@ -58,7 +58,9 @@ const PROVIDES = [
   'metric.learnings-active',
   'metric.learnings-by-week',
   'metric.learnings-faded',
+  'metric.runs-earlier',
   'metric.runs-left-next',
+  'metric.runs-today',
   'metric.skill-learnings',
   'metric.skills-active',
   'metric.tools-by-week',
@@ -73,7 +75,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.5.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.6.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -213,28 +215,52 @@ const headed = (blocks: Drawn[], heading: string): Drawn => {
   return found;
 };
 
-test('/p/agents: the runs working now, the newest seen first, then where the stopped ones left off and what they added', async () => {
+test('/p/agents: the runs grouped, what a run asked first, then working, today and earlier, and what they added', async () => {
   const { k, sql } = await seeded();
+  /* A RUN THAT STOPPED YESTERDAY WITH A NEXT STEP, and one still marked active that nobody closed, both Earlier; and a
+     question a run asked beside one a rule put, so Needs you is the run's alone. */
+  const yesterday = new Date(NOW - 26 * 3_600_000).toISOString();
+  value(k.create('session', { doing: 'Stopped yesterday', agent: 'codex', state: 'idle', next: 'Pick the review up again.' } as never, { actor: 'p_seed', stamp: { last_seen: yesterday } }));
+  value(k.create('session', { doing: 'Left open since yesterday', agent: 'claude', state: 'active' } as never, { actor: 'p_seed', stamp: { last_seen: yesterday } }));
+  const OPTIONS = { options: [{ id: 'yes', label: 'Yes', because: 'It is due' }, { id: 'no', label: 'No', because: 'It is not' }] };
+  value(k.propose({ question: 'Retire the old Fenwick key?', body_kind: 'options', body: OPTIONS }, 'S1'));
+  value(k.propose({ question: 'Raise the retainer?', body_kind: 'options', body: OPTIONS }, 'agent:codex'));
+  value(k.propose({ question: 'A rule asks about a bill', body_kind: 'options', body: OPTIONS }, 'rule:bills'));
+  value(k.propose({ question: 'Slash asks about a page', body_kind: 'options', body: OPTIONS }, 'slash'));
   const blocks = opened(k, 'agents');
   for (const b of blocks) assert.deepEqual(b.refusals, [], `${b.heading}: ${JSON.stringify(b.refusals)}`);
 
+  const groups = blocks.filter((b) => ['Needs you', 'Working', 'Today', 'Earlier'].includes(String(b.heading))).map((b) => b.heading);
+  assert.deepEqual(groups, ['Needs you', 'Working', 'Today', 'Earlier'], 'the runs are not grouped in the order the direction gives');
+
+  const asked = (headed(blocks, 'Needs you') as Drawn & { queue?: { question?: string }[] }).queue ?? [];
+  assert.deepEqual(asked.map((q) => q.question).sort(), ['Raise the retainer?', 'Retire the old Fenwick key?'], 'Needs you holds a question no run asked');
+
   const seen = (a: (typeof RUNS)[number], z: (typeof RUNS)[number]) => String(z.last_seen).localeCompare(String(a.last_seen));
-  const working = RUNS.filter((r) => r.state === 'active').sort(seen);
-  assert.deepEqual(headed(blocks, 'Working now').rows.map((r) => r.fields.doing), working.map((r) => r.doing), 'a stopped run is listed as working, or the order is not by last seen');
-  const left = RUNS.filter((r) => (r.state === 'idle' || r.state === 'handoff') && r.next).sort(seen);
-  assert.ok(left.length > 0, 'the seed has no run that left a next step');
-  assert.deepEqual(headed(blocks, 'Where they left off').rows.map((r) => r.fields.next), left.map((r) => r.next), 'a run that left no next step is listed, or a working one is');
+  const today = (r: (typeof RUNS)[number]) => String(r.last_seen).slice(0, 10) === new Date(NOW).toISOString().slice(0, 10);
+  const working = RUNS.filter((r) => r.state === 'active' && today(r)).sort(seen);
+  assert.deepEqual(headed(blocks, 'Working').rows.map((r) => r.fields.doing), working.map((r) => r.doing), 'a stopped run is listed as working, or the order is not by last seen');
+  const stopped = RUNS.filter((r) => (r.state === 'idle' || r.state === 'handoff') && today(r)).sort(seen);
+  assert.ok(stopped.length > 0, 'the seed has no run that stopped today');
+  assert.deepEqual(headed(blocks, 'Today').rows.map((r) => r.fields.doing), stopped.map((r) => r.doing), 'a run that stopped today is missing, or a working one is listed');
+  assert.deepEqual([...headed(blocks, 'Earlier').rows.map((r) => String(r.fields.doing))].sort(), ['Left open since yesterday', 'Stopped yesterday'], 'a run last heard from yesterday is not under Earlier');
+  /* EVERY LIVE RUN UNDER EXACTLY ONE HEADING. */
+  const drawn = ['Working', 'Today', 'Earlier'].flatMap((h) => headed(blocks, h).rows.map((r) => String(r.fields.doing)));
+  assert.equal(new Set(drawn).size, drawn.length, `a run is under two headings: ${drawn.join(', ')}`);
+  /* THE NEXT STEP A STOPPED RUN LEFT IS ON ITS CARD. */
+  assert.ok(headed(blocks, 'Today').rows.some((r) => typeof r.fields.next === 'string' && r.fields.next !== ''), 'Today drops the next step a run left');
   assert.ok(blocks.some((b) => b.kind === 'agents'), 'the page lost what the brain learned');
 
-  /* THE RUNS AND NOTHING ELSE, SINCE 1.5.0: Decide's questions are Decide's, and what the brain holds is four lists with
-     pages of their own. */
+  /* THE RUNS AND NOTHING ELSE: what the brain holds is four lists with pages of their own, and Where they left off is
+     Today and Earlier. */
   const headings = blocks.map((b) => b.heading);
-  for (const gone of ['Waiting on you', 'What the brain holds', 'Growth', 'Learnings', 'Skills'])
+  for (const gone of ['Waiting on you', 'Working now', 'Where they left off', 'What the brain holds', 'Growth', 'Learnings', 'Skills'])
     assert.ok(!headings.includes(gone), `${gone} is still on the agents page`);
-  assert.ok(!blocks.some((b) => b.kind === 'queue'), 'the agents page draws a queue of the questions Decide holds');
   /* AND NO PART SAYS IT IS EMPTY: the line is the one place the page says what is quiet. */
   const said = (AGENTS_PAGES.agents!.blocks as { lead?: boolean; empty?: string; heading?: string }[]).filter((b) => !b.lead && b.empty !== undefined);
   assert.deepEqual(said.map((b) => b.heading), [], 'a block on the agents page draws its own empty line');
+  /* THE WORD ON SCREEN IS RUN, never session. */
+  for (const b of AGENTS_PAGES.agents!.blocks as { heading?: string; body?: string }[]) assert.doesNotMatch(`${b.heading ?? ''} ${b.body ?? ''}`, /session/iu);
   sql.close();
 });
 
@@ -250,14 +276,14 @@ test('WORKING NOW IS THE RUNS ACTIVE AND HEARD FROM TODAY, and the line counts t
   const yesterday = new Date(NOW - 26 * 3_600_000).toISOString();
   value(k.create('session', { doing: 'Left open since yesterday', agent: 'claude', state: 'active' } as never, { actor: 'p_seed', stamp: { last_seen: yesterday } }));
 
-  const doing = headed(opened(k, 'agents'), 'Working now').rows.map((r) => String(r.fields.doing));
+  const doing = headed(opened(k, 'agents'), 'Working').rows.map((r) => String(r.fields.doing));
   assert.ok(!doing.includes('Left open since yesterday'), `a run quiet since yesterday is working now: ${doing.join(', ')}`);
   assert.deepEqual([...doing].sort(), RUNS.filter((r) => r.state === 'active').map((r) => String(r.doing)).sort(), 'a run heard from today is not working now');
   const read = k.metric(k.metricDecl('agents-working')!);
   assert.ok(read.ok, JSON.stringify(read));
   assert.equal(read.value.value, doing.length, 'the line counts a run the cards do not draw');
   /* ONE CLAUSE FOR EVERY PAGE THAT DRAWS WORKING RUNS, the figure included. */
-  assert.equal((AGENTS_PAGES.agents!.blocks as { heading?: string; where?: string }[]).find((b) => b.heading === 'Working now')?.where, RUNS_WORKING);
+  assert.equal((AGENTS_PAGES.agents!.blocks as { heading?: string; where?: string }[]).find((b) => b.heading === 'Working')?.where, RUNS_WORKING);
   sql.close();
 });
 

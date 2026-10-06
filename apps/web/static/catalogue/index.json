@@ -10,8 +10,27 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.5.0",
+      "latest": "1.6.0",
       "versions": [
+        {
+          "version": "1.6.0",
+          "checksum": "c26200dd5536c44814d6e1792b4d3a437e40e5cb52ce77b9f0f0b867de483c4d",
+          "bytes": 57061,
+          "published_at": "2026-10-06T19:57:52.059Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "A card charge and an InstaPay transfer keep the shop or the person as the bank wrote it, in a new Paid to or from field, so the same payee is recognised however it is spelled."
+        },
         {
           "version": "1.5.0",
           "checksum": "deff978e5e52e5352540ebd7fa86ba1a2f05bba9b36ad23ff1014ff525b11771",
@@ -104,8 +123,27 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "3bb2181f38a96bf556a72c30620e99514e8970ae0405713543faa6c46c637878",
+          "bytes": 9922,
+          "published_at": "2026-10-06T19:57:52.059Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Each alert keeps the shop or the sender as the alert names it, in a new Paid to or from field, so the same payee is recognised however it is spelled."
+        },
         {
           "version": "1.1.0",
           "checksum": "6f81bd8a57001ca26e2c1c14f0bc212d64ac5fbb38f2b448ad3d77f5b372de98",
@@ -682,8 +720,38 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "ced1b0ee9219d93b04dbc61e0d52f69936cd8b416fd63d7f519ed4dd75b497a4",
+          "bytes": 20853,
+          "published_at": "2026-10-06T19:57:52.059Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"Mercury (read only)\"",
+                "key": "Mercury (read only)"
+              },
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its vault entry opens",
+                "key": "Mercury (read only)"
+              }
+            ]
+          },
+          "notes": "Each transaction keeps the payee as Mercury names it, in a new Paid to or from field, so the same shop or person is recognised however it is spelled."
+        },
         {
           "version": "1.0.1",
           "checksum": "039ca547e63a02ea23d79c903f3f36f354e67994aaa6aaef3057c19fd1ae339f",

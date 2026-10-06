@@ -64,7 +64,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     {
       version: '3.0.0',
       notes:
-        'Organisations live here now: the companies, clients, vendors, shops and banks you deal with, each with its own page and the people who are with it. A person keeps every address and handle they are known by, the organisation they are with and where they were seen. Mail from a no-reply address, or one a pattern reads, meets the company behind it, not a person, and the payee on a bank text is known as the one shop or company however the bank spells it.',
+        'Organisations live here now, each with a page of its people, projects and money. People are grouped by the organisation they are with. A person keeps every address and handle they are known by and where they were seen. Mail a pattern reads meets the company behind it, unless it came from a free mail service; other mail only notes who wrote, so a stranger never becomes a contact. The payee on a bank text is one shop however the bank spells it.',
     },
     { version: '2.7.0', notes: 'People opens on who has gone quiet and since when, by name, and otherwise on who you have been in touch with lately.' },
     { version: '2.6.0', notes: 'Nothing changes on screen: In touch, 12 weeks is written the way the app now reads it.' },
@@ -177,6 +177,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    {
+      version: '1.6.0',
+      notes: 'Agents groups the runs: what a run asked you first, then the runs working, the ones that stopped today and the ones from earlier, each with the next step it left. A run opens beside the page.',
+    },
     {
       version: '1.5.0',
       notes: 'Agents shows the runs: who is working now, where the stopped runs left off and what they added. A run quiet since yesterday is no longer listed as working. Questions are on Decide, and lessons and skills on their own pages.',

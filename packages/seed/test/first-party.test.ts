@@ -79,10 +79,11 @@ test('EACH FIRST-PARTY PACK IS A LEGAL PACK, and needs what its fields, pages an
     estate: ['register.things'],
     work: [],
   });
-  /* PEOPLE ONLY LINKS TO PROJECTS: "Met in" is left out of a record that holds none (`LINKS`). */
+  /* PEOPLE ONLY LINKS TO PROJECTS AND MONEY: "Met in" is left out of a record that holds no Projects (`LINKS`), and an
+     organisation's page draws its projects and what moved with it only where the record holds those lists. */
   assert.deepEqual(Object.fromEntries(FIRST_PARTY.map((id) => [id, firstPartyManifest(id).links])), {
     portfolio: [],
-    people: ['register.things'],
+    people: ['register.things', 'register.transactions'],
     /* MONEY ONLY LINKS TO PEOPLE'S LISTS since 3.0.0: who a row is with is left out of a record without them. A ledger
        row names an organisation since 3.10.0, and a bill still names a person. */
     'money-core': ['register.organisations', 'register.people'],
@@ -124,10 +125,25 @@ const everyList = (): string[] => (packDocument() as { declarations: Body[] }).d
    walk figures carry no `services` renews leg until Money is installed again for a record that holds Estate. */
 const ownLegs = (body: string): string => {
   const d = JSON.parse(body) as Body;
+  if (typeof d.page === 'string' && typeof d.pack === 'string') return ownBlocks(d, body);
   if (!Array.isArray(d.legs) || typeof d.pack !== 'string') return body;
   const own = new Set(firstPartyManifest(d.pack as never).provides);
   return JSON.stringify({ ...d, legs: (d.legs as Body[]).filter((l) => own.has(`register.${String(l.register)}`)) });
 };
+
+/* AND A PAGE'S BLOCKS OVER ANOTHER PACK'S LIST, left out the same way: People comes before Projects and Money, so an
+   organisation's page carries no Projects or Money until People is installed again for a record that holds them. */
+function ownBlocks(d: Body, body: string): string {
+  const own = new Set(firstPartyManifest(d.pack as never).provides);
+  const others = new Set(FIRST_PARTY.flatMap((id) => firstPartyManifest(id).provides).filter((p) => !own.has(p)));
+  const kept = (r: unknown) => typeof r !== 'string' || !others.has(r);
+  if (!Array.isArray(d.blocks)) return body;
+  return JSON.stringify({
+    ...d,
+    ...(Array.isArray(d.requires) ? { requires: (d.requires as unknown[]).filter(kept) } : {}),
+    blocks: (d.blocks as Body[]).filter((b) => kept(b.source)),
+  });
+}
 
 test('THE FIVE AND THE PROJECT TEMPLATE ARE THE STARTER, and nothing is in two of them', () => {
   const starter = packDocument() as { declarations: Body[]; seeds: Body[] };
@@ -161,9 +177,9 @@ test('INSTALLED IN ORDER ON AN EMPTY RECORD, each through its own plan, they mak
       .sort((a, b) => a[0].localeCompare(b[0]));
   const own = (list: [string, string][]) => list.map(([id, body]) => [id, ownLegs(body)]);
   assert.deepEqual(own(shapes(one.k)), own(shapes(whole.k)));
-  /* And that leg is the only difference: every other declaration is the starter's byte for byte. */
+  /* And those legs and blocks are the only difference: every other declaration is the starter's byte for byte. */
   const differ = shapes(one.k).filter(([id, body]) => shapes(whole.k).find(([w]) => w === id)?.[1] !== body).map(([id]) => id);
-  assert.deepEqual(differ, ['metric.arriving-30d', 'metric.leaving-30d', 'metric.runway-days']);
+  assert.deepEqual(differ, ['metric.arriving-30d', 'metric.leaving-30d', 'metric.runway-days', 'page.relation']);
 
   /* Each pack's claims are its own, so turning one off later retires only what it brought. */
   for (const id of FIRST_PARTY) assert.deepEqual([...one.k.packClaims(id)].sort(), firstPartyManifest(id).provides);
