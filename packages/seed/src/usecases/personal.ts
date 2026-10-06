@@ -125,8 +125,11 @@ export const PERSONAL = {
      needs you comes first, Coming up is the one list of what falls due where Bills this week drew the same bills
      again, each track is drawn only while it has something, and what changed is folded shut. The Goals page and a
      project's page open on a line too, and every heading wears a glyph. Nine counts are added to draw them on, and
-     nothing goes, so a minor step. */
-  version: '2.3.0',
+     nothing goes, so a minor step.
+     2.3.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name of
+     the Ledger list"), not by its id ("Label: transactions"), and every list's name is declared before any
+     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step. */
+  version: '2.3.1',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',

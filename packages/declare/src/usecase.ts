@@ -118,7 +118,8 @@ export const FIRST_PARTY_LISTS: ReadonlyMap<string, ModuleId> = new Map(MODULES.
 /**
  * WHAT A PERSON CALLS EACH FIRST-PARTY LIST, AND ONE OF IT, as the modules' manifests say: the defaults a use case's
  * `label_<list>` and `one_<list>` settings start from for a module's list, so a record shows the module's own words until
- * somebody types new ones. Held equal to the manifests by `packages/seed`'s tests, as `MODULE_LISTS` is.
+ * somebody types new ones. Held equal to the manifests' `name:` and `one:`, both, by `packages/seed`'s
+ * `test/module-words.test.ts`, as `MODULE_LISTS` is by its `first-party.test.ts`; the test here holds only the keys.
  *
  * NOT EVERY LIST IN `MODULE_LISTS`. Money's `balances`, `fx` and `snapshots` hold what the module keeps for its own
  * sums (a balance on a day, a rate, a night's figures) and nobody renames them; giving them words would put three more
@@ -489,6 +490,13 @@ function heldLists(u: UseCase): { list: string; name: string; one: string | unde
  *
  * THE LISTS' WORDS FILL WHAT ROOM IS LEFT, own lists first. A pack declares at most 64 settings, and what a use case wrote
  * itself (its voice and labels) always fits; a list past the ceiling keeps its declaration's word and gets no box.
+ * EVERY LIST'S NAME COMES BEFORE ANY LIST'S SINGULAR, so the ceiling costs a "one of" before it costs a name: the name
+ * is what the rail, the list's page and its headings read, and the singular only the button that adds one. Personal
+ * sits at the ceiling, where filling list by list took the last list's name away with its singular.
+ *
+ * ONLY THE LISTS A PERSON CAN OPEN GET WORDS. That is every list the use case declares, which the rail draws once it
+ * holds anything, and each module list `MODULE_WORDS` names; a module's own sums (`balances`, `fx`, `snapshots`) are
+ * left out there, and a shared add-on's lists are not known here (`heldLists`).
  */
 export function useCasePack(u: UseCase): Record<string, unknown> | null {
   if (u.pack === null) return null;
@@ -497,17 +505,20 @@ export function useCasePack(u: UseCase): Record<string, unknown> | null {
     const line = u.voice[key];
     if (line !== undefined) config[voiceSetting(key)] = { type: 'text', label: VOICE_TITLES[key], default: line };
   }
-  for (const [key, word] of Object.entries(u.labels))
-    config[labelSetting(key)] = { type: 'text', label: labelTitle(key), default: word };
-  const room = (): boolean => Object.keys(config).length < SETTINGS_CEILING - HELD_SETTINGS;
-  for (const { list, name, one } of heldLists(u)) {
+  const held = heldLists(u).map(({ list, name, one }) => {
     const called = u.labels[list] ?? name;
-    const singular = u.labels[`${list}:one`] ?? (called !== name ? singularOf(called) : one);
-    for (const [key, word] of [[list, called], [`${list}:one`, singular]] as const) {
-      const setting = labelSetting(key);
-      if (Object.hasOwn(config, setting) || !room()) continue;
-      config[setting] = { type: 'text', label: labelTitle(key), ...(word === undefined ? {} : { default: word }) };
-    }
+    return { list, called, singular: u.labels[`${list}:one`] ?? (called !== name ? singularOf(called) : one) };
+  });
+  /* EACH TITLE NAMES THE LIST IN ITS OWN WORDS, the ones a person reads on it, and never by its id. */
+  const calls = new Map(held.map((h) => [h.list, h.called]));
+  for (const [key, word] of Object.entries(u.labels))
+    config[labelSetting(key)] = { type: 'text', label: labelTitle(key, calls), default: word };
+  const room = (): boolean => Object.keys(config).length < SETTINGS_CEILING - HELD_SETTINGS;
+  const words = [...held.map((h) => [h.list, h.called] as const), ...held.map((h) => [`${h.list}:one`, h.singular] as const)];
+  for (const [key, word] of words) {
+    const setting = labelSetting(key);
+    if (Object.hasOwn(config, setting) || !room()) continue;
+    config[setting] = { type: 'text', label: labelTitle(key, calls), ...(word === undefined ? {} : { default: word }) };
   }
   const settings: Record<string, { type: 'text' | 'bool'; label: string; default?: string }> = {
     ...config,
@@ -557,9 +568,25 @@ const VOICE_TITLES: Readonly<Record<VoiceKey, string>> = {
   pen_waits: 'The line saying where suggestions wait',
 };
 
-/** What a label's setting is called at `/packs/<id>`: "Label: people, role", "Label: one of tickets", "Label: what tickets holds". */
-function labelTitle(key: string): string {
+/**
+ * What a label's setting is called at `/packs/<id>`. A list's own words are titled by what the list is called (`calls`):
+ * "Name of the Bills list", "What one is called in the Bills list", "What the Bills list holds". It read "Label: things"
+ * and "Label: one of put by", which are ids a person never sees anywhere else (research audit 11-13).
+ *
+ * A FIELD'S OR A VALUE'S LABEL, AND ANY LABEL KEPT BY ITS HASH, KEEPS THE KEY'S OWN SPELLING: "Label: people, role". A
+ * long key is stored as `lk_<hash>`, and its title is the only place the key is written down, which `labelKeyOf` (and the
+ * web's `hashedKey`) read it back from; a list too long for a setting's name is rare enough to pay that.
+ */
+function labelTitle(key: string, calls: ReadonlyMap<string, string> = new Map()): string {
   const word = LIST_WORD_KEY.exec(key);
+  const list = word ? (word[1] ?? '') : key;
+  const called = calls.get(list);
+  if (called !== undefined && !HASHED.test(labelSetting(key))) {
+    /* A LIST CALLED "Reading list" IS THE READING LIST, and never "the Reading list list". */
+    const named = /\blist$/i.test(called) ? called : `${called} list`;
+    if (!word) return `Name of the ${named}`;
+    return word[2] === 'one' ? `What one is called in the ${named}` : `What the ${named} holds`;
+  }
   const spaced = (s: string): string => s.replace(/_/g, ' ');
   if (word) return word[2] === 'one' ? `Label: one of ${spaced(word[1] ?? '')}` : `Label: what ${spaced(word[1] ?? '')} holds`;
   return `Label: ${key.split('.').map(spaced).join(', ')}`;

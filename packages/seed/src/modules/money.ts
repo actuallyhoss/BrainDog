@@ -2317,9 +2317,12 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            asks of cash is the next few months, and a year down to −£150k was a picture of a year nobody plans. Opening on
            90 days was tried for 3.6.0 and took the knob away with it, because the record walked only as far as the chart
            opened; it now walks to the longest of `horizons:` and says so (`reach`), and the renderer offers every length
-           up to that (`horizonChoices` in `packages/render/src/forecast.ts`), so 180, 365 and 730 days are a press away. */
+           up to that (`horizonChoices` in `packages/render/src/forecast.ts`), so 180, 365 and 730 days are a press away.
+           TWO YEARS AT MOST, SINCE money-core 3.9.0: the longest length is what a walk may cost, and the record walked it
+           on every load, so five years and `last` (as far as ten) made each opening of Money walk twenty times the three
+           months it draws, for two choices nobody plans cash by (research audit 11-13). */
         horizon: 90,
-        horizons: [90, 180, 365, 730, 1825, 'last'],
+        horizons: [90, 180, 365, 730],
         /* COUNTING A PLAN OR A STREAM IN OR OUT IS ONE CONTROL, `count`, and `leave` is folded into it: two controls over
            the same streams with opposite meanings was one question asked two ways. Drift draws a slider only for a pair
            some step was converted through, so a record in one currency sees none. `sell` offers what a pack declares
@@ -2592,7 +2595,8 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         opening: { metric: 'book-cash:{{name}}' },
         from: BOOK_LEGS,
         horizon: 365,
-        horizons: [90, 180, 365, 730, 1825, 'last'],
+        /* TWO YEARS AT MOST, SINCE money-core 3.9.0, as Money's own Cash ahead: the longest length is what a walk may cost. */
+        horizons: [90, 180, 365, 730],
         knobs: ['horizon', 'late', 'spend', 'count', 'grow', 'drift'],
         late: 'days-late-in',
         under: 30,

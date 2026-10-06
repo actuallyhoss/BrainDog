@@ -875,6 +875,24 @@ const DECLARED: Record<string, Version> = {
       "`setting.voice_lists` reads My things where it said My lists, so the rail's heading names a student's courses and homework and not how they are stored -> 454996961e56245c",
     ],
   },
+  'student@1.5.1': {
+    holds: `
+      metric.courses-held metric.homework-due-7d metric.homework-later metric.homework-open metric.study-done-12w
+      metric.study-held
+      page.home-student page.studies
+      register.assignments register.courses register.study_sessions
+      setting.label_assignments setting.label_courses setting.label_study_sessions setting.one_assignments
+      setting.one_courses setting.one_study_sessions setting.shared_version setting.speaks setting.voice_add_first
+      setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists
+      setting.voice_needs_you setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits
+      setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '818fcec8f17d2019',
+    history: [
+      "Each list's name and one of it, `setting.label_courses` and `setting.one_courses` among them, are titled by what the list is called where they read its id, \"Label: courses\", and every name is declared before any singular -> 818fcec8f17d2019",
+    ],
+  },
   'team@2.10.0': {
     holds: `
       metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
@@ -990,6 +1008,36 @@ const DECLARED: Record<string, Version> = {
       "Every list Personal holds declares its name and one of it, `setting.label_people` and `setting.one_transactions` among them, with the words the record already shows as defaults, so Settings > Words can rename any of them -> ff4d843704645b48",
     ],
   },
+  'personal@2.3.1': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson metric.budgets-set
+      metric.goal-log-held metric.goals-active metric.goals-held metric.habits-active metric.logged-by-goal
+      metric.logged-this-week-by-goal metric.put-by-by-goal metric.put-by-held metric.saved-toward-goals
+      metric.savings-active metric.steps-done metric.steps-left page.goals page.home-personal page.my-project
+      register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      setting.holds_obligations setting.holds_people setting.holds_things setting.label_accounts setting.label_books
+      setting.label_categories setting.label_goal_log setting.label_goals setting.label_installments
+      setting.label_obligations setting.label_people setting.label_people__role__accountant
+      setting.label_people__role__client setting.label_people__role__collaborator setting.label_people__role__contractor
+      setting.label_project_steps setting.label_put_by setting.label_recurring setting.label_savings_goals
+      setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue
+      setting.label_transactions setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906
+      setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1 setting.one_accounts
+      setting.one_books setting.one_categories setting.one_goal_log setting.one_goals setting.one_installments
+      setting.one_obligations setting.one_people setting.one_project_steps setting.one_put_by setting.one_recurring
+      setting.one_savings_goals setting.one_things setting.one_transactions setting.shared_version setting.speaks
+      setting.voice_add_first setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists
+      setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you
+      setting.voice_nothing_now setting.voice_overdue setting.voice_record_empty setting.voice_right_now
+      setting.voice_since_away
+    `,
+    declares: '268bbef9b5df127a',
+    history: [
+      "Each list's name and one of it, `setting.label_transactions` and `setting.one_transactions` among them, are titled by what the list is called where they read its id, \"Label: transactions\", and every name is declared before any singular -> 268bbef9b5df127a",
+    ],
+  },
   'founder@1.15.0': {
     holds: `
       metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held page.dashboard
@@ -1052,6 +1100,26 @@ const DECLARED: Record<string, Version> = {
       "Every list the guide holds declares one of it beside its name, `setting.one_milestones` and `setting.one_steps` among them, with the words the record already shows as defaults, so Settings > Words can rename any of them -> 8a53a1f76198266d",
     ],
   },
+  'guide@1.6.1': {
+    holds: `
+      metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached
+      metric.guide-milestones metric.guide-milestones-reached metric.guide-milestones-underway metric.guide-resources
+      metric.guide-steps-agents metric.guide-steps-blocked metric.guide-steps-done metric.guide-steps-done-7d
+      metric.guide-steps-done-by-week metric.guide-steps-open metric.milestone-choices metric.milestone-resources
+      metric.milestone-steps page.guide page.home-guide page.milestone register.choices register.milestones
+      register.resources register.steps rule.guide_milestone_open rule.guide_milestone_passed setting.label_choices
+      setting.label_milestones setting.label_resources setting.label_steps setting.one_choices setting.one_milestones
+      setting.one_resources setting.one_steps setting.shared_version setting.speaks setting.start_next_milestone
+      setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_lists
+      setting.voice_needs_you setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits
+      setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'e73b289e6932ddf2',
+    history: [
+      "Each list's name and one of it, `setting.label_steps` and `setting.one_steps` among them, are titled by what the list is called where they read its id, \"Label: steps\", and every name is declared before any singular -> e73b289e6932ddf2",
+    ],
+  },
   /* THE PAGES THAT SAY ONLY WHAT IS TRUE OF THE RECORD (DIRECTION §37, "Stop the harm"): each use case's last version is
      on `origin/master`, so these are versions and not resets. */
   'founder@1.16.0': {
@@ -1074,6 +1142,28 @@ const DECLARED: Record<string, Version> = {
     declares: '1499caf8ce71395c',
     history: [
       "`page.home-founder` says only what is true of the record: What you have, by organisation draws while `organisations-with-accounts` counts one, Bring your money in only while no account counts as cash, Lapsing only within 30 days of today over `lapsing-30d`, Numbers this week over 7 days and six lines at most over `datapoints-7d`, its way to start held to `datapoints-reported`, and Working now only the runs heard from today; `page.dashboard` stops saying Home's cash and balances again and draws each number once, as a line -> 1499caf8ce71395c",
+    ],
+  },
+  'founder@1.16.1': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported metric.due-this-week
+      metric.lapsing-30d metric.organisations-held metric.organisations-with-accounts page.dashboard page.home-founder
+      page.organisation page.project register.datapoints register.organisations setting.label_accounts
+      setting.label_books setting.label_categories setting.label_datapoints setting.label_installments
+      setting.label_obligations setting.label_organisations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories setting.one_datapoints
+      setting.one_installments setting.one_obligations setting.one_organisations setting.one_people
+      setting.one_recurring setting.one_services setting.one_tasks setting.one_things setting.one_tracks
+      setting.one_transactions setting.one_updates setting.shared_version setting.speaks setting.voice_coming_up
+      setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: '561406a155a3a30c',
+    history: [
+      "Each list's name and one of it, `setting.label_transactions` and `setting.one_transactions` among them, are titled by what the list is called where they read its id, \"Label: transactions\", and every name is declared before any singular -> 561406a155a3a30c",
     ],
   },
   'business@1.5.0': {
@@ -1106,6 +1196,27 @@ const DECLARED: Record<string, Version> = {
     history: [
       "`page.agent-work`'s Working now reads the runs active and heard from today, where a run that stopped a minute ago or waits for a pickup was drawn as working, and its empty line no longer tells a team whose agents stopped to connect one -> b0ee0005f6b6172a",
       "`page.agent-work`'s Working now says in plainer words that agents connected in Settings show there while they work -> 6bbd0be501cf8727",
+    ],
+  },
+  'team@2.15.1': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles setting.holds_people setting.holds_tasks
+      setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people
+      setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan
+      setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: '50b524406524baf6',
+    history: [
+      "Each list's name and one of it, `setting.label_tasks` and `setting.one_tasks` among them, are titled by what the list is called where they read its id, \"Label: tasks\", and every name is declared before any singular -> 50b524406524baf6",
     ],
   },
 };

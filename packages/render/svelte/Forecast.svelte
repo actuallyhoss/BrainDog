@@ -133,7 +133,8 @@
   /* THE CONTROLS OF A GROUP OFFER WHAT EVERY WALK MAY COUNT, and spending in each walk's currency. */
   const members = $derived(group ? (Object.entries(group.members) as [string, Member][]).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)) : []);
   const counts = $derived.by((): { in: Counted[]; out: Counted[] } => {
-    if (!group) return drawn ? countsOf(drawn) : { in: [], out: [] };
+    /* OVER THE LENGTH ON SCREEN, not the whole walk the host sent, which reaches past it so a longer one is a press away. */
+    if (!group) return drawn && knobs ? countsOf(drawn, knobs.horizon) : { in: [], out: [] };
     const side = (s: 'in' | 'out'): Counted[] => [...new Map(members.flatMap(([, m]) => m.counts[s]).map((h) => [h.label, h] as const)).values()];
     return { in: side('in'), out: side('out') };
   });
@@ -163,7 +164,7 @@
   });
   $effect(() => {
     if (!group || !model) return;
-    const mine = countsOf(model);
+    const mine = countsOf(model, held.horizon ?? model.horizon);
     const member: Member = { template: model.template, heavy: [...mine.in, ...mine.out], counts: mine, range: spendRange(model) };
     group.members[key] = member;
   });

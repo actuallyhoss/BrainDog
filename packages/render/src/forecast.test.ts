@@ -250,6 +250,41 @@ test('WHAT COUNTS: every stream and every plan, in and out, and a plan counted o
   assert.deepEqual(stray.steps, [{ day: '2026-10-01', label: 'A', delta: 1 }]);
 });
 
+/** A walk of two years that opens on three months: a salary every month, a lease that starts in the spring, one bonus. */
+const LONG = [
+  ['opening', '2026-09-17', 'Cash now', '£1,000.00'],
+  ...Array.from({ length: 24 }, (_, i) => ['step', `${2026 + Math.floor((9 + i) / 12)}-${String(((9 + i) % 12) + 1).padStart(2, '0')}-01`, 'Salary', '£2,000.00']),
+  ['step', '2027-03-01', 'Lease', '−£900.00'],
+  ['step', '2027-04-01', 'Lease', '−£900.00'],
+  ['step', '2027-06-01', 'Bonus', '£5,000.00'],
+  ['step', '2026-09-10', 'Overdue invoice', '£300.00'],
+  ['horizon', '90', '', ''],
+  ['reach', '730', '', ''],
+  ['knobs', 'horizon count', '', ''],
+];
+
+test('WHAT COUNTS IS COUNTED INSIDE THE HORIZON ON SCREEN, not over the whole walk the host sent past it', () => {
+  const m = forecastModel(LONG)!;
+  assert.equal(m.reach, 730);
+  /* THREE MONTHS OPEN: three salaries, and nothing of the lease or the bonus, which move only past the chart. */
+  assert.deepEqual(streamsOf(m), { in: [{ label: 'Salary', amount: '£6,000.00' }], out: [] });
+  assert.deepEqual(countsOf(m), { in: [{ label: 'Salary', amount: '£6,000' }, { label: 'Overdue invoice', amount: '£300' }], out: [] }, 'an overdue one is walked today, so it is on screen');
+  /* A YEAR CHOSEN: the lease is a stream now, and the bonus a one-off. */
+  const year = countsOf(m, 365);
+  assert.deepEqual(year.in.map((c) => c.label), ['Salary', 'Bonus', 'Overdue invoice']);
+  assert.deepEqual(year.out, [{ label: 'Lease', amount: '−£1,800' }]);
+  assert.deepEqual(streamsOf(m, 365).out, [{ label: 'Lease', amount: '−£1,800.00' }]);
+  /* NO FURTHER THAN THE WALK, as `scenario` holds the horizon to it, and never less than a day. */
+  assert.deepEqual(countsOf(m, 5_000), countsOf(m, 730));
+  assert.deepEqual(countsOf(m, 0), countsOf(m, 1));
+  /* AND WHAT IT OFFERS IS WHAT THE TABLE UNDER THE CHART LISTS, the steps `scenario` walks inside the same horizon. */
+  for (const h of [90, 365, 730]) {
+    const walked = new Set(scenario(m, { ...baseKnobs(m), horizon: h }).steps.map((s) => s.of ?? s.label));
+    const offered = countsOf(m, h);
+    assert.deepEqual([...offered.in, ...offered.out].map((c) => c.label).filter((l) => !walked.has(l)), [], `${h} days`);
+  }
+});
+
 test('HOLDINGS COUNTED AS SOLD ON A DAY ARRIVE THAT DAY, in the walk’s own money and never in another', () => {
   const rows = [...ROWS, ['sell', '', 'Gold', '£2,000.00'], ['sell', '', 'Dollar bonds', '$900.00']];
   const m = forecastModel(rows)!;

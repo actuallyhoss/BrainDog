@@ -83,8 +83,11 @@ export const TEAM = {
      2.15.0: Agent work's Working now reads the runs active and heard from today (`RUNS_WORKING`, DIRECTION §37). It
      read every run the record had not closed, so a run that stopped a minute ago, or one waiting for a pickup, was
      drawn as working, and its empty line no longer tells a team whose agents stopped to connect one. A clause added,
-     so a minor step. 2.14.0 is live. */
-  version: '2.15.0',
+     so a minor step. 2.14.0 is live.
+     2.15.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name
+     of the Tickets list"), not by its id ("Label: tasks"), and every list's name is declared before any
+     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step. */
+  version: '2.15.1',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

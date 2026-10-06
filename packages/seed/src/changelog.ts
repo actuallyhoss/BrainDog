@@ -77,6 +77,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.9.0',
+      notes: 'Cash ahead goes as far as two years, so Money opens faster. Five years and To the end are no longer offered.',
+    },
+    {
       version: '3.8.0',
       notes: "Accounts shows only when there is cash to split, and a book's Where this month's money went only when something left the book this month.",
     },

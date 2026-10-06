@@ -713,9 +713,9 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   for (const b of (out.value as { blocks: readonly DrawnBlock[] }).blocks) assert.deepEqual(b.refusals, [], `${String(b.heading)} is refused`);
   assert.ok(!k.page('ledger').ok, 'the Ledger page is still on the record');
 
-  /* THE CASH WALK OFFERS YEARS, AND COUNTING IS ONE CONTROL. */
+  /* THE CASH WALK OFFERS UP TO TWO YEARS, SINCE money-core 3.9.0, AND COUNTING IS ONE CONTROL. */
   const ahead = (page.blocks as { heading?: string; horizons?: unknown; knobs?: unknown }[]).find((b) => b.heading === 'Cash ahead')!;
-  assert.deepEqual(ahead.horizons, [90, 180, 365, 730, 1825, 'last']);
+  assert.deepEqual(ahead.horizons, [90, 180, 365, 730]);
   assert.ok(!(ahead.knobs as string[]).includes('leave'), '`leave` is a second control over the streams `count` moves');
 
   /* AND IT LEAVES ITS OWN SENTENCE TO THE LINE OVER THE PAGE, while that line is drawn (money-core 3.6.0). */
@@ -1186,6 +1186,19 @@ test('CASH AHEAD OPENS ON THREE MONTHS AND WALKS TO THE LONGEST LENGTH IT OFFERS
   const ahead = out.value.blocks.find((b) => b.heading === 'Cash ahead') as { walk?: { horizon?: number; reach?: number; steps?: { day: string }[] } } | undefined;
   assert.ok(ahead?.walk, 'Cash ahead drew no walk');
   assert.equal(ahead.walk.horizon, 90);
-  assert.equal(ahead.walk.reach, 1825);
-  assert.ok((ahead.walk.steps ?? []).some((s) => s.day > day(365)), 'the walk stops at the length it opens on');
+  /* AND NO FURTHER THAN TWO YEARS, SINCE money-core 3.9.0: five years or "to the end" made every opening of Money walk
+     twenty times the chart it opens on. How far short of the longest length a load stops is the kernel's call
+     (`walkReach`), so this holds only the ends: past the opening, and never past what the block offers. */
+  const reach = ahead.walk.reach ?? 0;
+  assert.ok(reach > 90 && reach <= 730, `the walk reaches ${reach} days`);
+  const steps = ahead.walk.steps ?? [];
+  assert.ok(steps.some((s) => s.day > day(90)), 'the walk stops at the length it opens on');
+  assert.ok(steps.every((s) => s.day <= day(730)), 'the walk goes past the longest length it offers');
+});
+
+test("A BOOK'S CASH AHEAD OFFERS NO LENGTH PAST TWO YEARS either, since money-core 3.9.0", () => {
+  const book = MONEY_PAGES['money-book']!;
+  const ahead = (book.blocks as { heading?: string; horizon?: unknown; horizons?: unknown }[]).find((b) => b.heading === 'Cash ahead')!;
+  assert.equal(ahead.horizon, 365);
+  assert.deepEqual(ahead.horizons, [90, 180, 365, 730]);
 });

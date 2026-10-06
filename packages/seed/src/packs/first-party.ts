@@ -357,11 +357,16 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   only while there is cash to cut and a book's month only while something left it (`book-spent-month` added). Work
  *   says an empty list in one line and no band says it is empty. A figure added and empty lines taken away, no list or
  *   field, so each step is a minor one.
+ * - money-core 3.9.0: Cash ahead, on Money and on a book's page, offers two years at most. The record walked the longest
+ *   of `horizons:` on every load (3.7.0), so five years and `last` made each opening of Money walk at least 1,825 days
+ *   for a chart that opens on 90, and as far as ten years over a long plan (research audit 11-13). The longest length
+ *   is still what a walk may cost, whether a load walks it or a reader asks for it. Two lengths taken off a control, no
+ *   list, field or figure, so the step is a minor one.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.13.0',
   people: '2.7.0',
-  'money-core': '3.8.0',
+  'money-core': '3.9.0',
   estate: '2.1.0',
   work: '1.14.0',
 };

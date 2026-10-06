@@ -195,6 +195,9 @@ const SHAPES: Record<string, string> = {
     '```forecast\nopening | 2026-09-03 | Cash now | £1,000.00\nstep | 2026-10-30 | Rent | −£2,000.00\nhorizon | 90 |  | \nheadline | under |  | \n```',
   'a forecast that stays above zero, with no past': '```forecast\nopening | 2026-09-17 | Cash now | USD 1,000.00\nstep | 2026-09-18 | Rent | USD −100.00\nhorizon | 30 |  | \n```',
   'a forecast with no opening row': '```forecast\nstep | 2026-09-18 | Rent | −£100.00\n```',
+  /* A WALK OF TWO YEARS THAT OPENS ON THREE MONTHS, as Money's Cash ahead is: a lease and a bonus move only past it. */
+  'a forecast that walks past the length it opens on':
+    '```forecast\nopening | 2026-09-17 | Cash now | £1,000.00\nstep | 2026-10-01 | Salary | £2,000.00\nstep | 2026-11-01 | Salary | £2,000.00\nstep | 2026-12-01 | Salary | £2,000.00\nstep | 2026-10-20 | Refund | £40.00\nstep | 2027-03-01 | Lease | −£900.00\nstep | 2027-04-01 | Lease | −£900.00\nstep | 2027-06-01 | Bonus | £5,000.00\nhorizon | 90 |  | \nreach | 730 |  | \nknobs | horizon count |  | \n```',
   'sparklines of two lengths, one with a gap': '```sparkline\nCash | 18 20 x 24 | 24\n | 1 2 | 2\n```',
   'a split with an unnamed part': '```split\nRent | 300\n | 100\n```',
   /* A LEDGER NEWEST FIRST, its days said once over their rows (`timeline.ts`), and one whose days never repeat. */
@@ -298,6 +301,24 @@ test('EVERY MOVEMENT IS INSIDE ADJUST WHERE ADJUST IS DRAWN, and under the chart
   const plain = tree(render(Block, { props: { block } }).body);
   assert.match(plain, /<details class="forecast-numbers">/u);
   assert.doesNotMatch(plain, /forecast-knobs/u, 'with no Adjust it stays under the chart');
+});
+
+test('WHAT COUNTS OFFERS WHAT THE CHART SHOWS: every switch is a movement both renderers list under it, and nothing past it', () => {
+  const block = page(SHAPES['a forecast that walks past the length it opens on']!);
+  const Knobbed = Block as unknown as Component<{ block: BlockSegment; opts: { scenario: boolean } }>;
+  const knobs = tree(render(Knobbed, { props: { block, opts: { scenario: true } } }).body);
+  const html = tree(toHTML([block]));
+  const chips = [...knobs.matchAll(/<span class="forecast-chip-label">([^<]*)<\/span><span class="forecast-chip-amount num">([^<]*)<\/span>/gu)].map((m) => [m[1], m[2]]);
+  /* THREE SALARIES AND THE REFUND, the four movements of the three months on screen, and not two years of salary. */
+  assert.deepEqual(chips, [['Salary', '£6,000'], ['Refund', '£40']]);
+  const table = (t: string): string => /<table class="forecast-table">[\s\S]*?<\/table>/u.exec(t)?.[0] ?? '';
+  assert.ok(table(html), 'toHTML draws the movements');
+  assert.equal(table(knobs), table(html), 'the two renderers list the same movements under the chart');
+  for (const [label] of chips) assert.ok(table(html).includes(`>${label}<`), `${label} is offered and not listed`);
+  for (const past of ['Lease', 'Bonus']) {
+    assert.ok(!table(html).includes(past), `${past} moves past the three months on screen`);
+    assert.ok(!chips.some(([label]) => label === past), `${past} is offered over a chart that does not reach it`);
+  }
 });
 
 test('a capture draws its field only where the host can write, prompted by its heading, and no Add until there is text', () => {

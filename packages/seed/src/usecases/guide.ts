@@ -51,8 +51,11 @@ export const GUIDE = {
      1.5.0: calmer (DIRECTION §35). Home and the Guide open on one line said from the guide's figures, where the Guide
      had a tile of four; every heading wears a glyph; each list is drawn only while it holds something; the Guide folds
      what is done and kept under Everything so far; and a milestone's page draws its steps, choices and what helps only
-     while it has them. Only counts are added, so a minor step. */
-  version: '1.6.0',
+     while it has them. Only counts are added, so a minor step.
+     1.6.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name of
+     the Steps list"), not by its id ("Label: steps"), and every list's name is declared before any
+     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step. */
+  version: '1.6.1',
   title: 'New project guide',
   summary: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
   author: 'BrainDog',

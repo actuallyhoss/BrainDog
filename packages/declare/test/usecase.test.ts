@@ -140,8 +140,14 @@ test("A LIST'S SINGULAR AND ITS DESCRIPTION LINE ARE LABELS TOO, as one_<list> a
   const pack = value<{ manifest: { config?: Record<string, { default?: unknown; label?: string }> } }>(await normalise(useCasePack(u)!));
   const config = pack.manifest.config ?? {};
   assert.equal(config.one_books?.default, 'volume');
-  assert.equal(config.one_books?.label, 'Label: one of books');
-  assert.equal(config.holds_books?.label, 'Label: what books holds');
+  /* TITLED BY WHAT THE LIST IS CALLED, the word a person reads on it, and never by its id. */
+  assert.equal(config.label_books?.label, 'Name of the Shelf list');
+  assert.equal(config.one_books?.label, 'What one is called in the Shelf list');
+  assert.equal(config.holds_books?.label, 'What the Shelf list holds');
+  /* A LIST ALREADY CALLED A LIST IS NOT CALLED ONE TWICE. */
+  const reading = useCasePack(value<UseCase>(normaliseUseCase(DOC({ labels: { books: 'Reading list' } }))))!.config as Record<string, { label?: string }>;
+  assert.equal(reading.label_books?.label, 'Name of the Reading list');
+  assert.equal(reading.one_books?.label, 'What one is called in the Reading list');
   assert.equal(labelSetting('books:holds'), 'holds_books');
   assert.deepEqual(labelsOf(Object.fromEntries(Object.entries(config).map(([k, c]) => [k, c.default]))), labels);
   const long = 'a line about what is kept here, '.repeat(6);
@@ -159,7 +165,12 @@ test('EVERY LIST A USE CASE HOLDS CAN BE RENAMED, and starts from the words the 
   /* ITS OWN LIST GIVES NO SINGULAR, so the setting is declared with none and the display keeps making its own. */
   assert.equal(labels.books, 'Books');
   assert.ok(Object.hasOwn(config, 'one_books') && config.one_books?.default === undefined);
-  assert.equal(config.one_books?.label, 'Label: one of books');
+  assert.equal(config.one_books?.label, 'What one is called in the Books list');
+  /* A MODULE'S LIST IS TITLED BY THE MODULE'S WORD, or the use case's where it renamed it: "Label: put by" read an id. */
+  assert.equal(config.label_transactions?.label, 'Name of the Ledger list');
+  assert.equal(config.one_obligations?.label, 'What one is called in the Bills and invoices list');
+  assert.equal(config.label_tasks?.label, 'Name of the Tickets list');
+  assert.equal(config.one_tasks?.label, 'What one is called in the Tickets list');
   /* A MODULE'S LIST SAYS THE MODULE'S WORDS, and one renamed with no singular says one of the new name. */
   assert.equal(labels.transactions, 'Ledger');
   assert.equal(labels['transactions:one'], 'transaction');
@@ -176,13 +187,29 @@ test('EVERY LIST A USE CASE HOLDS CAN BE RENAMED, and starts from the words the 
   assert.deepEqual(Object.keys(useCasePack(stranger)!.config as object).filter((k) => !k.startsWith('voice_')).sort(), ['label_books', 'one_books', 'shared_version', 'speaks']);
 });
 
-test("THE LISTS' WORDS FILL WHAT ROOM IS LEFT, own lists first, and never take the pack past its settings", async () => {
-  const many = Object.fromEntries(Array.from({ length: 58 }, (_, i) => [`list${i}`, 'x']));
+test('A LIST TOO LONG FOR A SETTING NAME KEEPS ITS KEYED TITLE, the one place its hashed setting says which list it is', async () => {
+  const list = 'books_kept_upstairs_on_a_shelf';
+  const doc = DOC({ pack: { pack: 'usecase-reading', requires: { format: 1, primitives: 1, packs: {} }, declarations: [{ register: list, name: 'Upstairs', one: 'volume', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] }] } });
+  const u = value<UseCase>(normaliseUseCase(doc));
+  const pack = value<{ manifest: { config?: Record<string, { default?: unknown; label?: string }> } }>(await normalise(useCasePack(u)!));
+  const config = pack.manifest.config ?? {};
+  const name = labelSetting(list);
+  assert.match(name, /^lk_[0-9a-f]{8}$/);
+  assert.equal(config[name]?.label, `Label: ${list.replace(/_/g, ' ')}`);
+  const defaults = Object.fromEntries(Object.entries(config).map(([k, c]) => [k, c.default]));
+  assert.deepEqual(labelsOf(defaults, config), { [list]: 'Upstairs', [`${list}:one`]: 'volume' });
+});
+
+test("THE LISTS' WORDS FILL WHAT ROOM IS LEFT, names before singulars and own lists first, and never take the pack past its settings", async () => {
+  const many = Object.fromEntries(Array.from({ length: 57 }, (_, i) => [`list${i}`, 'x']));
   const u = value<UseCase>(normaliseUseCase(DOC({ modules: ['money-core'], labels: many })));
   const config = useCasePack(u)!.config as Record<string, unknown>;
   assert.equal(Object.keys(config).length, 64);
-  assert.ok(Object.hasOwn(config, 'label_books') && Object.hasOwn(config, 'one_books'), 'its own list comes first');
-  assert.ok(!Object.hasOwn(config, 'label_accounts'), 'a module list past the ceiling keeps its own word');
+  /* THREE BOXES OF ROOM: its own list's name, then Money's first two names, and no singular. A name is what the rail
+     and the list read; filling list by list spent the room on "one of" first. */
+  assert.ok(Object.hasOwn(config, 'label_books') && Object.hasOwn(config, 'label_accounts') && Object.hasOwn(config, 'label_categories'), 'its own list comes first');
+  assert.ok(!Object.hasOwn(config, 'one_books'), 'a singular took the room of a name');
+  assert.ok(!Object.hasOwn(config, 'label_installments'), 'a module list past the ceiling keeps its own word');
   assert.ok((await normalise(useCasePack(u)!)).ok);
 });
 

@@ -625,15 +625,31 @@ export function largest(model: ForecastModel, most = 5): { label: string; amount
 }
 
 /**
- * The streams and the plans a reader may count in or out: every movement that happens more than once, by the plan it
- * is part of when the host said so and by its label when not, money in apart from money out and the heaviest first.
+ * The movements dated inside the horizon on screen, `horizon` days from today as `scenario` holds it to the walk's
+ * reach, an overdue one among them, since it is walked today.
+ *
+ * NOT THE WHOLE WALK. The host walks past the length the chart opens on, so a longer one is a press away, and "What
+ * counts" totalled every step it sent: on Money that was five years of salary beside a chart of three months (research
+ * audit 11-13). A stream is offered and weighed by what moves on the chart and in its table. By the day each movement
+ * is dated, before the late knob moves money in: a salary paid late is still one a reader may count, and the switches do
+ * not come and go as the knob is dragged.
+ */
+function stepsInside(model: ForecastModel, horizon: number): ForecastStep[] {
+  const end = addDays(model.today, Math.max(1, Math.min(reachOf(model), Math.round(horizon))));
+  return model.steps.filter((s) => s.day <= end);
+}
+
+/**
+ * The streams and the plans a reader may count in or out: every movement inside the horizon on screen that happens
+ * more than once there, by the plan it is part of when the host said so and by its label when not, money in apart from
+ * money out and the heaviest first. `horizon` is the length shown, the one the chart opens on unless a reader moved it.
  *
  * MORE THAN ONCE, because that is what a stream or a plan is without naming either: a salary comes every month and a
  * plan has parts. A movement that happens once is a one-off, which `countsOf` offers beside these when it weighs.
  */
-export function streamsOf(model: ForecastModel): { in: { label: string; amount: string }[]; out: { label: string; amount: string }[] } {
+export function streamsOf(model: ForecastModel, horizon: number = model.horizon): { in: { label: string; amount: string }[]; out: { label: string; amount: string }[] } {
   const by = new Map<string, { sum: number; weight: number; n: number }>();
-  for (const s of model.steps) {
+  for (const s of stepsInside(model, horizon)) {
     const key = s.of ?? s.label;
     if (key === '') continue;
     const g = by.get(key) ?? { sum: 0, weight: 0, n: 0 };
@@ -652,16 +668,16 @@ export type Counted = { label: string; amount: string };
 
 /**
  * Everything "What counts" offers, money in apart from money out and the heaviest first: every stream and plan
- * (`streamsOf`), and the `most` heaviest movements that happen once.
+ * (`streamsOf`), and the `most` heaviest movements that happen once, each counted inside the horizon on screen.
  *
  * ONE CONTROL, ONE MEANING OF ON. "Leave out" offered the heavy movements and "What counts" the streams, over the one
  * list of what is left out, and a chip pressed in one meant the opposite of a chip pressed in the other. A movement
  * is keyed as `streamsOf` keys it, by the plan it is part of and by its label when not, which is what `scenario`
  * leaves out.
  */
-export function countsOf(model: ForecastModel, most = 5): { in: Counted[]; out: Counted[] } {
+export function countsOf(model: ForecastModel, horizon: number = model.horizon, most = 5): { in: Counted[]; out: Counted[] } {
   const by = new Map<string, { sum: number; weight: number; n: number }>();
-  for (const s of model.steps) {
+  for (const s of stepsInside(model, horizon)) {
     const key = s.of ?? s.label;
     if (key === '') continue;
     const g = by.get(key) ?? { sum: 0, weight: 0, n: 0 };

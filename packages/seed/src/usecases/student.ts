@@ -21,8 +21,11 @@ export const STUDENT = {
      pen's line among them. Each is a new setting a person can change at /packs, so a minor step.
      1.5.0: calmer (DIRECTION §35). Home and Studies open on one line said from new counts, every heading wears a
      glyph, each list is drawn only while it holds something, and Studies draws what is due once, on the board, where
-     a table of it stood above. Only counts are added, so a minor step. */
-  version: '1.5.0',
+     a table of it stood above. Only counts are added, so a minor step.
+     1.5.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name of
+     the Courses list"), not by its id ("Label: courses"), and every list's name is declared before any
+     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step. */
+  version: '1.5.1',
   title: 'Student',
   summary: 'Your courses, what is due and when, and how each piece of work went.',
   author: 'BrainDog',

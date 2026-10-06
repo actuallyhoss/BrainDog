@@ -1094,6 +1094,29 @@ const DECLARED: Record<string, Version> = {
       "`page.money`'s Accounts is drawn only while there is cash to cut, where a record whose accounts all stood at nought drew a track of its own saying so, and `page.money-book`'s Where this month's money went only while something left the book this month, over the new `book-spent-month` -> 91711ddc6ac8fb8f",
     ],
   },
+  'money-core@3.9.0': {
+    holds: `
+      metric.arriving-30d metric.balances-stale metric.book-cash metric.book-spent-month metric.books-held
+      metric.cash-accounts metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-now metric.chasing
+      metric.days-late-in metric.due-30d metric.due-items-30d metric.every-month-by-category metric.every-month-in
+      metric.every-month-out metric.in-30d metric.in-by-month metric.in-due-by-month metric.installments-due-30d
+      metric.installments-left metric.late-in metric.leaving-30d metric.net-by-month metric.out-30d metric.out-by-month
+      metric.out-due-by-month metric.overdue metric.owed-by-you metric.owed-to-you metric.project-in-by-month
+      metric.project-in-month metric.project-kept-month metric.project-out-by-month metric.project-out-month
+      metric.project-owed metric.received-30d metric.runway-days metric.spent-30d metric.spent-by-category-month
+      metric.txn-uncategorised page.money page.money-book register.accounts register.balances register.books
+      register.categories register.fx register.installments register.obligations register.recurring register.snapshots
+      register.transactions rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late
+      rule.recurring-ended rule.recurring-missed rule.recurring-stopped rule.txn-categorise setting.home_currency
+      setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you
+      setting.most_owed_to_you setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+    `,
+    declares: 'c0965e05d708483d',
+    history: [
+      "`page.money`'s and `page.money-book`'s Cash ahead offer 90, 180, 365 and 730 days, where 1825 and `last` made every load of Money walk at least five years for a chart that opens on three months -> c0965e05d708483d",
+    ],
+  },
   'work@1.14.0': {
     holds: `
       metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon

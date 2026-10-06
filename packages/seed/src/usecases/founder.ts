@@ -221,8 +221,11 @@ export const FOUNDER = {
      as cash, Lapsing only within thirty days of today, and Numbers this week over a week, six lines at most, each
      declared with the project it is about; Working now reads the runs heard from today. The Dashboard stops saying Home's cash and its
      organisations' balances again, and every numbers block is a line a measure with no tile beside it. Four counts are
-     added to draw on, so a minor step. 1.15.0 is live. */
-  version: '1.16.0',
+     added to draw on, so a minor step. 1.15.0 is live.
+     1.16.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name
+     of the Ledger list"), not by its id ("Label: transactions"), and every list's name is declared before any
+     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step. */
+  version: '1.16.1',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
