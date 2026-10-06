@@ -761,6 +761,9 @@ export type WriteContext = {
    * to Jobs alone filed a Job at `clients#1` and was answered `ok`, at `clients#2` "which was deleted", and at
    * `clients#9` "there is no such row": three answers about a list whose `list` refuses her. With this, a ref into a
    * list she cannot read names no row, whether the row is live, deleted or never existed.
+   *
+   * AND A ROW HOLDING A KEY IS NAMED ONLY WHEN THIS SAYS ITS LIST IS READ: absent, the refusal says "someone on this
+   * list" (`mergeDoor`), since a write that does not say who reads it may be answered to anybody.
    */
   reads?: ((register: string) => boolean) | undefined;
 };
@@ -3732,7 +3735,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          caller may fold and delete in one write. */
       const keyedHere = keyedOf(register);
       const foldField = keyedHere === undefined ? undefined : mergeFieldOf(keyedHere);
-      const door_ = mergeDoor(register, current, merged, patch, touched, keyedHere, foldField, door);
+      const door_ = mergeDoor(register, current, merged, patch, touched, keyedHere, foldField, door, w.reads);
       if (door_) return { ok: false, refusal: door_ };
       if (current && foldField !== undefined && touched.includes(foldField)) {
         const into = merged[foldField];
@@ -4672,6 +4675,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * to nothing its fields said, and the record's door refuses that same pair when both are live. Refused the same way,
    * naming who holds the key; a folded row coming back through `undoMerge` takes its keys back as it unfolds, and is
    * not asked.
+   *
+   * WHO HOLDS A KEY IS NAMED ONLY TO A WRITER WHO READS THAT LIST (research-audit-22 M5): `reads` says so, and a write
+   * that does not say what its writer reads (a rule's, a flow's, an ingest's) is told "someone on this list". Naming the
+   * holder to a writer held to `append` handed them a row they may not read, one refused create at a time.
    */
   function mergeDoor(
     register: string,
@@ -4682,6 +4689,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     list: KeyedList | undefined,
     field: string | undefined,
     door: Door,
+    reads: WriteContext['reads'],
   ): Refusal | null {
     if (list === undefined) return null;
     const was = field === undefined || current === null ? undefined : current.fields[field];
@@ -4718,10 +4726,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     }
     /* A ROW IS NOT ADDED AS A SECOND OF SOMEBODY ALREADY HERE. A create carrying a key a live row holds made a second
        person who answered to nothing (`claim` keeps the key where it is), so the record held two of one person and an
-       agent met both. Refused, naming who holds it, in the words the record's own door says it in (`keyHeld` in
-       `packages/record`), which only its create and update pass through: this one holds for every write, a rule's, a
-       flow's or an ingest's too. `meet` finds that row by the key and adds nothing, and an accepted rowset is the owner's
-       own word, so both pass. */
+       agent met both. Refused, naming who holds it to a writer who reads the list (`holder`), in the words the record's
+       own door says it in (`keyHeld` in `packages/record`), which only its create and update pass through: this one
+       holds for every write, a rule's, a flow's or an ingest's too. `meet` finds that row by the key and adds nothing,
+       and an accepted rowset is the owner's own word, so both pass. */
+    const holder = (held: { id: string; register: string }): string | null => (reads !== undefined && reads(held.register) ? titleOfRow(held.id) : null);
     if (current === null && !door.decided && !door.merge) {
       const parts = Object.values(list.fields as Readonly<Record<string, string | undefined>>).filter((f): f is string => typeof f === 'string');
       const them = list.role === 'meets' ? 'them' : 'it';
@@ -4734,7 +4743,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const plain = kind === 'email' || kind === 'domain' ? said : `${said} on ${kind}`;
         return {
           code: 'ALREADY_KNOWN',
-          fix: `${titleOfRow(held.id) ?? (list.role === 'meets' ? 'Someone on this list' : 'An organisation on this list')} already has ${plain}. Add what you know to ${them} rather than adding ${them} twice.`,
+          fix: `${holder(held) ?? (list.role === 'meets' ? 'Someone on this list' : 'An organisation on this list')} already has ${plain}. Add what you know to ${them} rather than adding ${them} twice.`,
           at,
         };
       }
@@ -4748,7 +4757,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const plain = kind === 'email' || kind === 'domain' ? said : `${said} on ${kind}`;
         return {
           code: 'ALREADY_KNOWN',
-          fix: `${titleOfRow(held.id) ?? 'Someone else'} now has ${plain}. Merge the two, or take it off ${named(current.id)} before bringing it back.`,
+          fix: `${holder(held) ?? (list.role === 'meets' ? 'Someone else on this list' : 'Another organisation on this list')} now has ${plain}. Merge the two, or take it off ${named(current.id)} before bringing it back.`,
           at: 'deleted_at',
         };
       }
@@ -9464,7 +9473,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const write: BackfillDeps['write'] = (register, ref, patch, w) => {
       const was = ref === null ? null : titleOfRow(ref);
       const done = deps.write(register, ref, patch, w);
-      if (done.ok && planned.length < BACKFILL_PLANNED) planned.push(plannedOf(register, ref === null ? null : (was ?? titleOfRow(done.value.id)), patch));
+      if (done.ok && planned.length < BACKFILL_PLANNED) planned.push(plannedOf(register, ref === null ? null : (was ?? titleOfRow(done.value.id)), patch, w.stamp));
       return done;
     };
     attempt(sql, transaction, () => {
@@ -9481,8 +9490,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * One write the walk would make, as a person reads it: the list by its name, the row by its title (`null` for a new
    * one), and each field by its label with a link said as the title of the row it points at. A secret, a file and the
    * identity keys a person or an organisation is joined on (`identity-keys.ts`) are never said.
+   *
+   * A RUN IS PLACED BY A STAMP AND NOT A PATCH (`project` is the record's own field), so its placement is said from the
+   * stamp: the project's name under Project. Without it a dry walk's placement read as a write that changed nothing.
    */
-  function plannedOf(register: string, row: string | null, patch: Patch): BackfillPlanned {
+  function plannedOf(register: string, row: string | null, patch: Patch, stamp?: Record<string, Json>): BackfillPlanned {
     const decl = registers.get(register);
     const lists = [...registers.values()];
     const keyed = [meetsRole(lists), orgRole(lists)].flatMap((r) => (r?.register === register && r.fields.keys !== undefined ? [r.fields.keys] : []));
@@ -9494,6 +9506,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const label = typeof spec?.label === 'string' && spec.label.trim() !== '' ? spec.label.trim() : id;
       const named = (v: unknown): Json => (type === 'ref' && typeof v === 'string' ? (titleOfRow(v) ?? null) : ((v ?? null) as Json));
       fields[label] = Array.isArray(value) ? value.map(named) : named(value);
+    }
+    const project = stamp?.project;
+    if (typeof project === 'string' && project.trim() !== '') {
+      const spec = decl?.fields.find((f) => f.id === 'project');
+      fields[typeof spec?.label === 'string' && spec.label.trim() !== '' ? spec.label.trim() : 'Project'] = titleOfRow(project) ?? null;
     }
     return { list: decl?.name ?? register, row, fields };
   }

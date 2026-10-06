@@ -106,7 +106,7 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql; deps: BackfillDeps; 
   const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, OWNER));
   run({ remote: 'git@github.com:acme/quarry.git', repo: 'quarry', cwd: '/Users/sam/Code/quarry' });
   run({ repo: 'lantern', cwd: '/Users/sam/Code/lantern' });
-  run({ cwd: '/Users/sam/Clients/brightside/site' });
+  run({ cwd: '/Users/sam/Clients/brightside' });
   run({ repo: 'tallow', cwd: '/Users/sam/Code/tallow' });
   run({ repo: 'tallow', cwd: '/Users/sam/Code/tallow' });
   for (let i = 0; i < 3; i++) run({ remote: 'https://github.com/acme/Lantern.git', repo: 'lantern', cwd: '/Users/sam/Code/lantern' });
@@ -446,6 +446,7 @@ test('A BROAD FOLDER, OR A FOLDER THE RUN’S OWN REPOSITORY CONTRADICTS, IS A Q
   const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '' } })).id;
   const notes = run({ cwd: '/Users/sam/Code/notes' });
   const scratch = run({ cwd: 'c:\\repos\\scratch' });
+  const atKiln = run({ cwd: '/Users/sam/Code/kiln' });
   const inKiln = run({ cwd: '/Users/sam/Code/kiln/web' });
   const remote = run({ remote: 'git@github.com:acme/quarry.git', repo: 'quarry', cwd: '/Users/sam/Code/quarry' });
   const contradicted = run({ repo: 'lantern', cwd: '/Users/sam/Clients/brightside/lantern' });
@@ -456,7 +457,8 @@ test('A BROAD FOLDER, OR A FOLDER THE RUN’S OWN REPOSITORY CONTRADICTS, IS A Q
 
   assert.equal(k.get(notes)?.fields.project, '', 'a folder holding another project’s says nothing about which');
   assert.equal(k.get(scratch)?.fields.project, '', 'nor on Windows, in whatever case the drive was written');
-  assert.equal(k.get(inKiln)?.fields.project, k.nameOf(kiln), 'a folder of one project, holding none, places');
+  assert.equal(k.get(atKiln)?.fields.project, k.nameOf(kiln), 'the folder a project lists, holding none, places');
+  assert.equal(k.get(inKiln)?.fields.project, '', 'a folder further down it is a question (research-audit-22 M4)');
   assert.equal(k.get(remote)?.fields.project, k.nameOf(ids.quarry!), 'a remote places whatever folder it is in');
   assert.equal(k.get(contradicted)?.fields.project, '', 'Brightside’s folder, but Lantern’s repository');
 
@@ -466,7 +468,8 @@ test('A BROAD FOLDER, OR A FOLDER THE RUN’S OWN REPOSITORY CONTRADICTS, IS A Q
   assert.equal(k.get(game)?.fields.project, '');
   assert.ok(asked.includes('A run worked in Game. Is that Coinfish?'), 'the broad folder set aside, its own folder’s name is the guess');
   assert.ok(!asked.some((q) => q.includes('Game') && q.includes('Workbench')), asked.join(' / '));
-  assert.ok(!asked.some((q) => q.includes('Kiln')), 'a placed run is no question');
+  assert.ok(asked.includes('A run worked in web. Is that Kiln?'), asked.join(' / '));
+  assert.equal(asked.filter((q) => q.includes('Kiln')).length, 1, 'a placed run is no question');
   assert.ok(workbench);
   sql.close();
 });

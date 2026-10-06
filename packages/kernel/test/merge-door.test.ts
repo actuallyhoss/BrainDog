@@ -296,10 +296,13 @@ test('A RESTORED ROW IS NOT A GHOST: one whose key another row took since is ref
   const again = value<Entry>(k.create('people', { name: 'Ada L', handles: ['github:ada'] }, OWNER));
   assert.equal(keys(sql)['github:ada'], again.id);
 
-  const no = refused(k.update('people', ada.id, { deleted_at: null } as never, OWNER));
+  const no = refused(k.update('people', ada.id, { deleted_at: null } as never, { ...OWNER, reads: () => true }));
   assert.equal(no.code, 'ALREADY_KNOWN');
   assert.match(no.fix, /^Ada L now has ada on github\. Merge the two, or take it off Ada Lovelace before bringing it back\.$/);
   assert.ok(k.get(ada.id, { includeDeleted: true })?.deleted_at);
+  /* A WRITER WHO DOES NOT SAY THEY READ PEOPLE IS NOT TOLD WHO. */
+  const unsaid = refused(k.update('people', ada.id, { deleted_at: null } as never, OWNER));
+  assert.equal(unsaid.fix, 'Someone else on this list now has ada on github. Merge the two, or take it off Ada Lovelace before bringing it back.');
 
   /* With the key free again, it comes back. */
   value(k.update('people', again.id, { handles: null }, OWNER));
@@ -316,11 +319,18 @@ test('A ROW IS NOT ADDED AS A SECOND OF SOMEBODY HERE: a create carrying a key a
     [{ name: 'Ada L', handles: ['github:ada'] }, 'ada on github'],
     [{ name: 'A. Lovelace', email: 'ada@work.io' }, 'ada@work.io'],
   ] as const) {
-    const no = refused(k.create('people', fields, AGENT));
+    const no = refused(k.create('people', fields, { ...AGENT, reads: () => true }));
     assert.equal(no.code, 'ALREADY_KNOWN');
     assert.equal(no.at, 'email' in fields ? 'email' : 'handles');
     assert.equal(no.fix, `Ada Lovelace already has ${plain}. Add what you know to them rather than adding them twice.`);
     assert.ok(!no.fix.includes(ada.id), 'the refusal names a person, never an id');
+  }
+  /* ONLY TO A WRITER WHO READS PEOPLE (research-audit-22 M5): one held away from it, and one that does not say, such as
+     a rule's, a flow's or an ingest's write, are told somebody has it and never who. */
+  for (const w of [{ ...AGENT, reads: (list: string) => list !== 'people' }, AGENT]) {
+    const no = refused(k.create('people', { name: 'Ada L', handles: ['github:ada'] }, w));
+    assert.equal(no.code, 'ALREADY_KNOWN');
+    assert.equal(no.fix, 'Someone on this list already has ada on github. Add what you know to them rather than adding them twice.');
   }
   assert.equal(sql.all("SELECT id FROM entry WHERE register = 'people'").length, 1);
 

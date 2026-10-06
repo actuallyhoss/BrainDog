@@ -27,8 +27,9 @@
  *      that name is asked about (`held`). Only an organisation the walk or a door made from the bank's own words gains
  *      the key, with Undo.
  *   2. A run with no project is placed only when its place is sure (`placedFor`): a remote a project lists, or a folder
- *      a project lists that holds no other project's folder and is not contradicted by the run's own repository. A bare
- *      name, a broad folder like `~/Developer`, or a last name is one question per place and guess, a single guess
+ *      a project lists that the run worked in itself, or one whose project lists the run's repository too, and not
+ *      contradicted by the run's own repository. A bare name, a run further down a folder, a broad folder like
+ *      `~/Developer`, or a last name is one question per place and guess, a single guess
  *      included ("Is that BrainDog?"). A run whose place guesses nothing better, in a repository whose owner on its host
  *      holds the repositories of exactly one project, is one question per owner ("Is that Crumb.gg?"). Each question
  *      carries `wheres`, the whole place of every run it is about, so a yes places exactly those. Once, and never a run
@@ -63,7 +64,7 @@ import type { Entry, Patch, RegisterDecl, WriteContext } from './index.ts';
 import { COUNTERPARTY } from './ingest.ts';
 import { instant } from './migrate.ts';
 import { meetsRole, orgRole, type OrgFields, type RoleList } from './roles.ts';
-import { candidateOf, isFolderPlace, matchProject, remoteKey, type Candidate, type Whereabouts } from './scope.ts';
+import { candidateOf, matchProject, remoteKey, type Candidate, type Whereabouts } from './scope.ts';
 import { SESSION, isStale } from './session.ts';
 
 /** Who the walk writes as: a mechanism (`pairs.ts`'s `isMechanism`), which the feed files with the rules. */
@@ -271,11 +272,18 @@ const COMPANY_FORMS = new Set([
 ]);
 
 /**
+ * A legal form of two letters is a person's initials as often as a company's (`AB OKONKWO`, `SAM CO MARCHETTI`), so it
+ * says business only as the last word, after a name: `Tarnvale Oy`, `HALDEN TYPE CO`.
+ */
+const SHORT_FORM = /^\p{L}{2}$/u;
+
+/**
  * A card processor or point of sale before the merchant's name, or the `*` a card text puts between a merchant and what
  * was bought: `GEIDEA*BREEZEWAY`, `PAYMOB-SWIFTCAB`, `POS FRESHBAY 0921`, `RIDEWELL *TRIP`. A bank prints a transfer to a
- * person without one. And a web address, which only a business pays from: `SOWBELL.COM`, `ORCHARD.COM/BILL`.
+ * person without one. And a web address, which only a business pays from: `SOWBELL.COM`, `WWW.ORCHARD.COM/BILL`. Its
+ * name before the dot is two letters or more, so an initial and a surname (`A.Co`, `J.COM`) is never one.
  */
-const MERCHANT_SHAPE = /\*|^(?:pos|paymob|fawry|kashier|paytabs|sumup|paypal|zettle|izettle|sq|tst)\s*[-\s]|[\p{L}\p{N}]\.(?:com|net|org|io|co|app|ai|eg|uk)\b/iu;
+const MERCHANT_SHAPE = /\*|^(?:pos|paymob|fawry|kashier|paytabs|sumup|paypal|zettle|izettle|sq|tst)\s*[-\s]|(?<![\p{L}\p{N}])[\p{L}\p{N}][\p{L}\p{N}-]*[\p{L}\p{N}]\.(?:com|net|org|io|co|app|ai|eg|uk)\b/iu;
 
 /**
  * A processor or point of sale before the merchant's name, as a name leaves it out: `PAYMOB-SWIFTCAB`, `POS FRESHBAY`.
@@ -286,14 +294,16 @@ const PROCESSOR_PREFIX = /^(?:pos\s+|(?:pos|paymob|fawry|kashier|paytabs|sumup|p
 /**
  * Words only a shop or a supplier is called by, or that say what was bought from one: `BELLWETHER COFFEE`, `NILE
  * MARKET`, `XO TELECOM`, `Sahara Spider Hosting`, `RIDEWELL TRIP`, `VODACELL RECHARGE`, `HARBOUR BANK FEES`. Never a word
- * a transfer to a person is printed with (`wire`, `transfer`, `payroll`), which would make a person a business.
+ * a transfer to a person is printed with (`wire`, `transfer`, `payroll`), which would make a person a business, nor one
+ * a person is named by: `Prime`, `Ride`, `Energy`, `Media`, `Mobile`, `Fee` and `Interest` are each somebody's surname,
+ * and "SAM PRIME" on three lines is a question (research-audit-22 L3).
  */
 const MERCHANT_WORDS = new Set([
   'coffee', 'cafe', 'café', 'restaurant', 'kitchen', 'bakery', 'grill', 'pizza', 'burger', 'market', 'supermarket', 'hypermarket', 'mart',
-  'marketplace', 'mktplace', 'store', 'stores', 'shop', 'pharmacy', 'hotel', 'hotels', 'telecom', 'mobile', 'cloud', 'hosting', 'online',
-  'bank', 'insurance', 'assurance', 'airlines', 'airways', 'travel', 'motors', 'energy', 'media', 'studio', 'studios', 'labs', 'software',
-  'systems', 'digital', 'services', 'developments', 'properties', 'prime', 'trip', 'ride', 'rides', 'recharge', 'subscription', 'premium',
-  'fee', 'fees', 'interest', 'payout', 'purchase', 'instalment', 'installment',
+  'marketplace', 'mktplace', 'store', 'stores', 'shop', 'pharmacy', 'hotel', 'hotels', 'telecom', 'cloud', 'hosting', 'online',
+  'bank', 'insurance', 'assurance', 'airlines', 'airways', 'travel', 'motors', 'studio', 'studios', 'labs', 'software',
+  'systems', 'digital', 'services', 'developments', 'properties', 'trip', 'rides', 'recharge', 'subscription', 'premium',
+  'fees', 'payout', 'purchase', 'instalment', 'installment',
 ]);
 
 /**
@@ -304,8 +314,10 @@ const MERCHANT_WORDS = new Set([
 export function soundsLikeBusiness(said: string): boolean {
   if (MERCHANT_SHAPE.test(said.trim())) return true;
   const words = said.toLowerCase().split(/[\s,]+/u).map((w) => w.replace(/[^\p{L}]/gu, '')).filter((w) => w !== '');
-  /* A LEGAL FORM ENDS A NAME, never starts it: `AB OKONKWO` and `AG SMITH` are a person's initials. */
-  return words.some((w, i) => (i > 0 && COMPANY_FORMS.has(w)) || MERCHANT_WORDS.has(w));
+  /* A LEGAL FORM ENDS A NAME, never starts it: `AB OKONKWO` and `AG SMITH` are a person's initials. One of two letters
+     only as the very last word. */
+  const last = words.length - 1;
+  return words.some((w, i) => (i > 0 && COMPANY_FORMS.has(w) && (i === last || !SHORT_FORM.test(w))) || MERCHANT_WORDS.has(w));
 }
 
 /** "Payee: Amazon." in a note, up to the end of its sentence. */
@@ -315,8 +327,8 @@ const PAYEE_NOTE = /\bpayee\s*:\s*(.+?)(?:\.(?=\s|$)|[;\n]|$)/iu;
  * Words that say what a payment was for and not whom it was with: "HALDEN TYPE CO INV 2026-035", "TRANSFER TO TAX
  * RESERVE", "PELL & VINE, HALF THE YEAR-END FEE", "J OKONKWO JUNE SET". A description is cut at the first of them, a month
  * among them, and at its first comma. And a description that starts with the name of one of the ledger's own
- * categories says what it was for from its first word (`purposesOf`): the words a record files its money under are
- * its own, read off its lists, and never written here.
+ * categories or choices says what it was for from its first word (`purposesOf`): the words a record files its money
+ * under are its own, read off its lists and its declaration, and never written here.
  */
 const ABOUT_A_PAYMENT =
   /^(?:inv|invoice|ref|reference|transfer|payment|paid|purchase|pos|bill|fee|fees|refund|deposit|wages|to|from|for|card|tax|vat|interest|cash|atm|withdrawal|topup|standing|order|direct|debit|dd|so|rent|payout|subscription|renewal|jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)$/iu;
@@ -347,8 +359,11 @@ function railsOf(texts: Iterable<string | undefined>): Set<string> {
   return out;
 }
 
-/** What a ledger's own lists say about reading its lines: the one-word names of its categories, and its payment networks. */
-type Reading = { purposes: ReadonlySet<string>; rails: ReadonlySet<string> };
+/**
+ * What a ledger's own lists say about reading its lines: the one-word names of its categories and choices (`purposes`),
+ * every word those names are made of (`about`), and its payment networks.
+ */
+type Reading = { purposes: ReadonlySet<string>; about: ReadonlySet<string>; rails: ReadonlySet<string> };
 
 /**
  * A LINE THAT SAYS IT IS A TRANSFER moved money to or from somebody's account: a person ("IPN inward transfer from
@@ -384,7 +399,7 @@ function payeeOf(ledger: Ledger, fields: Record<string, Json>, reading: Reading)
     if (railsOf([said]).size > 0) return null;
     const nobody = (w: string): boolean => {
       const bare = w.replace(/[^\p{L}\p{N}]/gu, '');
-      return bare === '' || NAMES_NOBODY.test(bare) || reading.rails.has(bare.toLowerCase());
+      return bare === '' || NAMES_NOBODY.test(bare) || reading.rails.has(bare.toLowerCase()) || reading.about.has(bare.toLowerCase());
     };
     if (said.split(/\s+/u).every(nobody)) return null;
     const key = keyOf('bank', said);
@@ -443,25 +458,33 @@ function shorterKey(said: string, key: string): string | null {
 }
 
 /**
- * The one-word names of the categories a ledger files its lines under, lower case: the titles of the list its
- * `category` field points at, or the values and labels of the field when it is a choice.
+ * THE WORDS A LEDGER DESCRIBES ITS OWN LINES BY, lower case, read off its declaration and never written here: the titles
+ * of the list its `category` field points at, and the values and labels of every choice it declares (a category, a
+ * kind, a direction). `purposes` are the ones that are a single word, which cut a description that starts with one;
+ * `about` is every word of every one of them, and a payee made only of those words is the line describing itself and
+ * names nobody: "SALARY OCTOBER" on a ledger with a Salary kind, or "UTILITIES" under "Rent and utilities".
  */
-function purposesOf(sql: Sql, lists: Lists, ledger: Ledger): Set<string> {
-  const out = new Set<string>();
+function purposesOf(sql: Sql, lists: Lists, ledger: Ledger): Pick<Reading, 'purposes' | 'about'> {
+  const purposes = new Set<string>();
+  const about = new Set<string>();
   const add = (said: string | undefined): void => {
-    const word = said?.trim().toLowerCase() ?? '';
-    if (/^\p{L}+$/u.test(word)) out.add(word);
+    const whole = said?.trim().toLowerCase() ?? '';
+    if (/^\p{L}+$/u.test(whole)) purposes.add(whole);
+    for (const word of whole.split(/[^\p{L}]+/u)) if (word.length > 1) about.add(word);
   };
-  const field = ledger.category === undefined ? undefined : lists.find((l) => l.id === ledger.register)?.fields.find((f) => f.id === ledger.category);
-  if (field?.type === 'enum') {
+  const decl = lists.find((l) => l.id === ledger.register);
+  for (const field of live(decl?.fields ?? [])) {
+    if (field.type !== 'enum') continue;
     const choice = field as { values?: readonly string[]; labels?: Readonly<Record<string, string>> };
     for (const v of choice.values ?? []) add(v);
     for (const v of Object.values(choice.labels ?? {})) add(v);
-  } else if (field?.type === 'ref' && field.to !== undefined) {
+  }
+  const field = ledger.category === undefined ? undefined : decl?.fields.find((f) => f.id === ledger.category);
+  if (field?.type === 'ref' && field.to !== undefined) {
     const to = lists.find((l) => l.id === field.to);
     if (to) for (const row of allRows(sql, to.id)) add(textOf(row.fields[to.title]));
   }
-  return out;
+  return { purposes, about };
 }
 
 function ledgerSlice(
@@ -522,7 +545,7 @@ function ledgerSlice(
      on, read off its own lines, so neither is ever a word of the code's. */
   const readings = new Map<string, Reading>();
   for (const ledger of ledgers)
-    readings.set(ledger.register, { purposes: purposesOf(sql, lists, ledger), rails: railsOf(allRows(sql, ledger.register).flatMap((row) => textsOf(ledger, row.fields))) });
+    readings.set(ledger.register, { ...purposesOf(sql, lists, ledger), rails: railsOf(allRows(sql, ledger.register).flatMap((row) => textsOf(ledger, row.fields))) });
   const readingOf = (ledger: Ledger): Reading => readings.get(ledger.register)!;
 
   /* HOW MANY LINES NAME EACH PAYEE, over the whole ledger and not the slice, and the spelling a name is made from: the
@@ -790,24 +813,43 @@ const whereKey = (where: Whereabouts): string | null =>
 const pathOf = (said: string): string =>
   said.trim().replace(/\\/gu, '/').replace(/^([A-Za-z]):/u, (_, drive: string) => `${drive.toLowerCase()}:`).replace(/\/+$/u, '');
 
-/** Whether `inner` is `outer` or inside it. Case is ignored on a drive-letter path, as Windows ignores it and `scope.ts` does. */
-const within = (inner: string, outer: string): boolean => {
-  const [a, b] = /^[a-z]:/u.test(inner) && /^[a-z]:/u.test(outer) ? [inner.toLowerCase(), outer.toLowerCase()] : [inner, outer];
-  return a === b || a.startsWith(`${b}/`);
+/** Whether `inner` is `outer` or inside it, both as `folderOf` leaves them. */
+const within = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(`${outer}/`);
+
+/** The home folder a run's own folder is under, `/Users/sam` or `c:/Users/sam`, which a project's `~/` stands for. */
+const homeOf = (cwd: string): string | null => /^(?:\/(?:Users|home)\/[^/]+|[a-z]:\/Users\/[^/]+)(?=\/|$)/iu.exec(cwd)?.[0] ?? null;
+
+/**
+ * A folder as the walk compares one: `pathOf`'s, with a leading `~` read as `home` (a project listing `~/Developer/kiln`
+ * holds the run in `/Users/sam/Developer/kiln`), and in lower case where the machine ignores case: a drive-letter path,
+ * as Windows does, and a Mac's own folders (`/Users`, `/Volumes`), whose disk ignores it too, so `~/developer/Kiln` is
+ * the folder a run in `/Users/sam/Developer/kiln` worked in. A `~` with no home to read it by stays as written, and
+ * matches nothing.
+ */
+const folderOf = (said: string, home: string | null): string => {
+  const path = pathOf(said);
+  const homed = home !== null && /^~(?=\/|$)/u.test(path) ? `${home}${path.slice(1)}` : path;
+  return /^(?:[a-z]:|\/(?:users|volumes)(?:\/|$))/iu.test(homed) ? homed.toLowerCase() : homed;
 };
 
 /**
  * WHERE A RUN IS SURELY IN, or the projects it may be in, by id, for the person to say.
  *
- * Only two places are sure. A remote a project lists, compared whole, is the repository itself. A folder a project
- * lists is sure only when it holds no other project's folder and the run's own repository is not another project's by
- * its name or its remote: a project listing `~/Developer` would otherwise claim every checkout under it, the Tee Time
- * one included. A bare name a project lists (`portage`) is only a name, which any fork or any other `app` shares, and a
- * last name is a guess, so both are questions.
+ * Only two places are sure (research-audit-22 M4). A remote a project lists, compared whole, is the repository itself.
+ * A folder a project lists is sure only when the run worked in that very folder, or the project also lists the run's
+ * own repository by its name or its remote, and in neither case when the run's repository is another project's: a
+ * project listing `~/Developer` would otherwise claim every checkout under it, the ones no project knows included. A run
+ * further down a folder is a question about it ("A run worked in web. Is that Kiln?"), and one under a folder holding
+ * another project's guesses by what else its place says. A bare name a project lists (`portage`) is only a name, which
+ * any fork or any other `app` shares, and a last name is a guess, so both are questions.
  */
-function placedFor(projects: readonly Candidate[], where: Whereabouts): { sure: Candidate | null; guess: string[]; fallback?: true } {
+function placedFor(listed: readonly Candidate[], said: Whereabouts): { sure: Candidate | null; guess: string[]; fallback?: true } {
+  /* EVERY FOLDER READ ONCE, `~` AND CASE AS THE RUN'S MACHINE READS THEM, before anything compares one. */
+  const home = said.cwd === undefined ? null : homeOf(pathOf(said.cwd));
+  const projects = listed.map((c) => ({ ...c, folders: c.folders.map((f) => folderOf(f, home)) }));
+  const where = said.cwd === undefined ? said : { ...said, cwd: folderOf(said.cwd, home) };
   const found = matchProject(projects, where);
-  const byId = new Map(projects.map((c) => [c.id, c]));
+  const byId = new Map(listed.map((c) => [c.id, c]));
   const bySpoken = new Map(projects.map((c) => [c.spoken, c.id]));
   const ids = (spoken: readonly string[]): string[] => spoken.map((s) => bySpoken.get(s)).filter((id): id is string => id !== undefined);
   const hit = found.project === null ? undefined : byId.get(found.project.id);
@@ -815,24 +857,26 @@ function placedFor(projects: readonly Candidate[], where: Whereabouts): { sure: 
   if (found.project.how === 'remote') return { sure: hit, guess: [] };
   if (found.project.how === 'repo') return { sure: null, guess: [hit.id] };
 
-  const cwd = pathOf(where.cwd ?? '');
-  const folder = hit.folders.map(pathOf).filter((f) => within(cwd, f)).sort((a, b) => b.length - a.length)[0] ?? cwd;
+  const cwd = where.cwd ?? '';
+  const mine = projects.find((c) => c.id === hit.id)!.folders;
+  const folder = mine.filter((f) => within(cwd, f)).sort((a, b) => b.length - a.length)[0] ?? cwd;
   /* A FOLDER HOLDING ANOTHER PROJECT'S is a parent of projects, `~/Developer`, and says nothing about which one. */
-  const broad = projects.some((c) => c.id !== hit.id && [...c.folders, ...c.repos.filter(isFolderPlace)].some((f) => { const p = pathOf(f); return p !== folder && within(p, folder); }));
+  const broad = projects.some((c) => c.id !== hit.id && c.folders.some((p) => p !== folder && within(p, folder)));
   if (broad) {
     /* SO THE GUESS IS WHAT THE RUN'S PLACE SAYS WITH THAT FOLDER SET ASIDE: a name its repository or a folder up its
        path shares with a project, as `matchProject` guesses one. "Is coinfish Coinfish?", never "Is coinfish
        Workshop?"; the broad project is asked about only when nothing else is a guess. */
-    const aside = matchProject(projects.map((c) => (c.id === hit.id ? { ...c, folders: c.folders.filter((f) => pathOf(f) !== folder) } : c)), where);
+    const aside = matchProject(projects.map((c) => (c.id === hit.id ? { ...c, folders: c.folders.filter((f) => f !== folder) } : c)), where);
     const others = [...(aside.project ? [aside.project.id] : []), ...ids(aside.ambiguous)];
     return others.length > 0 ? { sure: null, guess: [...new Set(others)] } : { sure: null, guess: [hit.id], fallback: true };
   }
   /* THE RUN'S OWN REPOSITORY, BY ITS REMOTE OR ITS NAME, as the projects say it without their folders. */
   const own = matchProject(projects.map((c) => ({ ...c, folders: [] })), { remote: where.remote, repo: where.repo });
   const named = [...(own.project ? [own.project.id] : []), ...ids(own.ambiguous)].filter((id) => id !== hit.id);
-  if (named.length === 0) return { sure: hit, guess: [] };
   /* A NARROW FOLDER ITS REPOSITORY CONTRADICTS IS A CHOICE between the two. */
-  return { sure: null, guess: [...new Set([hit.id, ...named])] };
+  if (named.length > 0) return { sure: null, guess: [...new Set([hit.id, ...named])] };
+  /* SURE ONLY IN THE FOLDER ITSELF, or where the project names the run's repository too. */
+  return cwd === folder || own.project?.id === hit.id ? { sure: hit, guess: [] } : { sure: null, guess: [hit.id] };
 }
 
 /**
@@ -1083,7 +1127,11 @@ function remoteSuggestions(sql: Sql, lists: Lists): BackfillSuggestion[] {
 /**
  * Put back one batch the walk wrote: every link it made emptied again, every key it gave an organisation taken back,
  * every organisation it made removed, and every run it placed unplaced. In one transaction, as its own batch; a row
- * changed since by anybody else keeps what they changed. A second undo of the same batch puts nothing back.
+ * changed since by anybody else keeps what they changed, a key somebody took off and put back among them.
+ *
+ * THE BATCH IS MARKED UNDONE ONLY WHEN THIS PUT SOMETHING BACK AND THE RECORD REFUSED NONE OF IT (research-audit-22 L2).
+ * A line the write path refused is still the walk's, and a later undo tries it again; one somebody changed since is
+ * theirs, and stays theirs. A second undo of a batch marked undone puts nothing back.
  */
 export function undoBackfill(deps: BackfillDeps, batch: string, by: string): Result<{ undone: number; batch: string | null }> {
   const { sql } = deps;
@@ -1097,6 +1145,7 @@ export function undoBackfill(deps: BackfillDeps, batch: string, by: string): Res
   return deps.transaction(() => {
     const writes = batcher(deps);
     let undone = 0;
+    let refused = 0;
     const row = (id: string): Row | null => {
       const r = sql.one<{ id: string; register: string; version: number; fields: string; updated_at: string }>(
         'SELECT id, register, version, fields, updated_at FROM entry WHERE id = ? AND deleted_at IS NULL',
@@ -1107,6 +1156,7 @@ export function undoBackfill(deps: BackfillDeps, batch: string, by: string): Res
     const put = (r: Row, patch: Patch, stamp?: Record<string, Json>): void => {
       const out = deps.write(r.register, r.id, patch, { ...writes.w(), version: r.version, ...(stamp === undefined ? {} : { stamp }) });
       if (out.ok) undone++;
+      else refused++;
     };
     for (const line of lines) {
       const r = row(line.target.slice('entry:'.length));
@@ -1123,8 +1173,20 @@ export function undoBackfill(deps: BackfillDeps, batch: string, by: string): Res
         const ours = line.field === null ? !since : JSON.stringify(r.fields.project ?? null) === JSON.stringify(to);
         if (ours && textOf(r.fields.project) !== undefined) put(r, {}, { project: null });
       } else if (line.kind === 'tag' && line.field !== null) {
+        /* A KEY SOMEBODY TOOK OFF AND PUT BACK IS THEIRS NOW, though it reads as it did, and so is every key of a field
+           somebody wrote whole since: as the general undo reads a tag (`undo.ts`). */
+        const said = JSON.stringify(to);
+        const theirs = sql
+          .all<{ kind: string; from_v: string | null; to_v: string | null }>(
+            "SELECT kind, from_v, to_v FROM event WHERE target = ? AND field = ? AND rowid > ? AND (batch IS NULL OR batch <> ?) AND kind <> 'note'",
+            line.target,
+            line.field,
+            line.at,
+            batch,
+          )
+          .some((e) => (e.kind === 'tag' ? e.to_v === said : e.kind === 'untag' ? e.from_v === said : true));
         const held = listOf(r.fields[line.field]);
-        if (held.includes(String(to))) put(r, { [line.field]: held.filter((k) => k !== String(to)) });
+        if (!theirs && held.includes(String(to))) put(r, { [line.field]: held.filter((k) => k !== String(to)) });
       } else if (line.kind === 'edit' && line.field !== null) {
         /* WHAT THE FIELD HELD BEFORE COMES BACK, not nothing: an organisation found by its name keeps the keys it had
            before the walk gave it one more. */
@@ -1132,14 +1194,15 @@ export function undoBackfill(deps: BackfillDeps, batch: string, by: string): Res
         if (JSON.stringify(r.fields[line.field] ?? null) === JSON.stringify(to)) put(r, { [line.field]: was });
       }
     }
-    sql.exec(
-      'INSERT OR IGNORE INTO undone (batch, by_batch, actor, agent, kinds, undone_by, at) VALUES (?, ?, ?, NULL, NULL, ?, ?)',
-      batch,
-      writes.batch() ?? batch,
-      BACKFILL_ACTOR,
-      by,
-      instant(deps.clock.now()),
-    );
+    if (undone > 0 && refused === 0)
+      sql.exec(
+        'INSERT OR IGNORE INTO undone (batch, by_batch, actor, agent, kinds, undone_by, at) VALUES (?, ?, ?, NULL, NULL, ?, ?)',
+        batch,
+        writes.batch() ?? batch,
+        BACKFILL_ACTOR,
+        by,
+        instant(deps.clock.now()),
+      );
     return ok({ undone, batch: writes.batch() });
   });
 }
