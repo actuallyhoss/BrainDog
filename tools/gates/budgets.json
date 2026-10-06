@@ -33,6 +33,10 @@
       1512,
       1728
     ],
+    "//fullWidthAtPx": "DIRECTION 36, \"it's not even filling fully horizontally on my macbook\", and 37's full width with fluid gutters, judged at the owner's two MacBook widths. The widths the main screens are asked to fill, beside the rail. Both are floor widths, so the sweep draws them anyway and the pass adds six screens to the part that holds each; a width no part draws is taken by the first part.",
+    "fullWidthAtPx": [1512, 1728],
+    "//fullWidthShare": "The least share of the room beside the rail (the viewport less the rail card's column) that a main screen's widest content box may take. 0.85 leaves room for the page's fluid gutters (at most 40 a side) and a scrollbar, and not for a page held to a column: a 1280 cap at 1728 is about 80%.",
+    "fullWidthShare": 0.85,
     "viewportHeightPx": 900,
     "//widthTolerancePx": "52 §4 records 0. One pixel is the recorded deviation, and it is sub-pixel rounding rather than a widened budget: `scrollWidth` is an integer rounded up from a fractional layout, so a page laid out to exactly the viewport reports one more than it. At 0 the gate is red on every route for a rounding mode.",
     "widthTolerancePx": 1,

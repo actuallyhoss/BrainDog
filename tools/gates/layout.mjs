@@ -307,6 +307,9 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
        width draws the one layout, only wider. The floor's two laptop widths are there, so the acts and the variant
        pass below ask this rather than reading the floor as a list of phones, which it no longer is. */
     const desktop = (w) => bps.length > 0 && w >= bps[bps.length - 1];
+    /* EVERY WIDTH OF EVERY PART, kept before the cut so the full-width pass can tell a width some other part draws from
+       one no part draws at all. */
+    const every = [...widths];
     /* THIS PART'S WIDTHS AND NO OTHER, dealt in turn so each width is in exactly one part. Whole, it is all of them. */
     widths.splice(0, Infinity, ...widths.filter((_, i) => i % of === part - 1));
 
@@ -593,6 +596,87 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
             await ready.settled(page);
             await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
           }
+      }
+      process.stdout.write('\n');
+      await context.close();
+    }
+
+    /**
+     * AND THE MAIN SCREENS FILL THE WINDOW, which nothing above can say.
+     *
+     * DIRECTION 36: "it's not even filling fully horizontally on my macbook". Every check in this file is about a page
+     * that is too WIDE, and a page held to a narrow column in the middle of a laptop scrolls nowhere and has nothing to
+     * press under 44px, so it sweeps clean at every width. 37 asks for full width with fluid gutters, judged at the
+     * owner's two MacBook widths, and this is the half of that the sweep could not see.
+     *
+     * THE WIDEST CONTENT BOX IN `#main`, NOT `#main` ITSELF. `#main` is the shell's grid column and always takes the room
+     * beside the rail; a page that caps itself inside it is the defect. So every element drawn in `#main` is read, less
+     * its own padding and border, and the widest is the screen's content. The widest and not some fixed wrapper, because
+     * a screen is free to draw its prose at 72ch beside a wide list: one thing running the width is what full width means.
+     * Inline boxes, positioned layers and anything reaching past `#main` (a table scrolling in its region) are not the
+     * page's width and are not read.
+     *
+     * THE ROOM IS THE VIEWPORT LESS THE RAIL'S COLUMN, the rail card and its inset, read off the page so a folded or
+     * narrow rail is measured as it is drawn. On a shape with no rail the room is the whole window.
+     *
+     * NAMED BY THEIR NAMES, because a red line here is read by somebody deciding which screen to open. The addresses are
+     * the shipped seed's pages (`packages/seed/src/modules`): Projects is `portfolio`.
+     */
+    const MAIN_SCREENS = [
+      { name: 'Today', route: '/' },
+      { name: 'Work', route: '/p/work' },
+      { name: 'Decide', route: '/decide' },
+      { name: 'Money', route: '/p/money' },
+      { name: 'Projects', route: '/p/portfolio' },
+      { name: 'People', route: '/p/people' },
+    ];
+    const SPAN = () => {
+      const main = document.getElementById('main');
+      if (!main) return null;
+      const box = main.getBoundingClientRect();
+      const px = (v) => parseFloat(v) || 0;
+      let widest = 0;
+      for (const el of main.querySelectorAll('*')) {
+        const s = getComputedStyle(el);
+        if (s.display === 'inline' || s.display === 'contents' || s.position === 'fixed' || s.position === 'absolute') continue;
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0 || r.left < box.left - 1 || r.right > box.right + 1) continue;
+        const inner = r.width - px(s.paddingLeft) - px(s.paddingRight) - px(s.borderLeftWidth) - px(s.borderRightWidth);
+        if (inner > widest) widest = inner;
+      }
+      const rail = document.querySelector('.rail-slot')?.getBoundingClientRect().width ?? 0;
+      return { widest: Math.round(widest), rail: Math.round(rail) };
+    };
+    /* THE WIDTHS THIS PART DRAWS, AND ANY NO PART DRAWS, in the first part, so a width named in the budget is never
+       judged by nobody. NOT UNDER THE SEED: the seeded heading is 2000px wide and proves nothing about a narrow page. */
+    const fullAt = process.env.BRAINDOG_GATE_SEED
+      ? []
+      : L.fullWidthAtPx.filter((w) => widths.includes(w) || (part === 1 && !every.includes(w)));
+    const pct = new Intl.NumberFormat('en', { style: 'percent' });
+    for (const width of fullAt) {
+      const context = await browser.newContext({ viewport: { width, height: L.viewportHeightPx }, reducedMotion: 'reduce', bypassCSP: true });
+      const page = await context.newPage();
+      process.stdout.write(`    full @${String(width).padStart(4)} `);
+      for (const screen of MAIN_SCREENS) {
+        await page.goto(`http://localhost:${PORT}${base}${screen.route}`, { waitUntil: 'domcontentloaded' });
+        const unmeasured = ready.check(`${screen.route} @${width} (full width)`, screen.route, await ready.settled(page));
+        if (unmeasured) {
+          findings.push(unmeasured);
+          process.stdout.write('!');
+          continue;
+        }
+        await page.waitForTimeout(L.settleMs);
+        const span = await page.evaluate(SPAN);
+        checked++;
+        const room = width - (span?.rail ?? 0);
+        const short = span === null || span.widest < room * L.fullWidthShare;
+        process.stdout.write(short ? '!' : '.');
+        if (span === null) findings.push(`${screen.name} (${screen.route}) @${width}  drew no #main to measure for full width`);
+        else if (short)
+          findings.push(
+            `${screen.name} (${screen.route}) @${width}  is ${span.widest}px wide at most in the ${room}px beside the rail ` +
+              `(${pct.format(span.widest / room)}), and a main screen fills ${pct.format(L.fullWidthShare)}: a cap or a centred column`,
+          );
       }
       process.stdout.write('\n');
       await context.close();

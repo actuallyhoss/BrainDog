@@ -71,6 +71,7 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
+import { ACCENTS } from '../../packages/theme/src/record.ts';
 import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
 import { answers, forward, forwards, serverKeyFor, startRecord } from './record.mjs';
 
@@ -393,6 +394,88 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       probe: () =>
         [...document.querySelectorAll('nav.rail a[data-nav]')].map((a) => (a.textContent ?? '').replace(/\s+/g, ' ').trim()).join(' | '),
     },
+
+    /*
+     * THE FIVE `look.*` KEYS, the look a person chose and the record keeps for every device they sign in on (`35`). They
+     * were excused as measured by the cookie cases above, and that was only half true: those cases load a cookie, and the
+     * record's answer reaches the page by another road (`theme/follow.ts`: `boot` answers, `pref.adopt` and `accent.adopt`
+     * put it on `<html>` and write it over the cookie). A build that dropped that road kept every cookie case green.
+     *
+     * THREE LOADS EACH, AND THE THIRD IS THE ONE THAT MATTERS: the cookie says one thing and the record another, so a build
+     * that still trusted the cookie draws the second load's answer twice and goes red. Each probe reads the attribute the
+     * key writes AND the token it moves, so a red line says whether the word or the look stopped arriving.
+     */
+    {
+      name: 'look.scheme',
+      record: true,
+      what: "data-scheme and the ground colour, when the record keeps the scheme, over the cookie's copy (35)",
+      route: '/',
+      values: [{ '@record': {} }, { '@record': { 'look.scheme': 'dark' } }, { scheme: 'dark', '@record': { 'look.scheme': 'light' } }],
+      /* `device` IS AN ABSENT ATTRIBUTE, which is what the unset load draws: the device's own scheme, decided by CSS. So the
+         first and third loads may share a ground and still differ, because a light the person chose is written down. */
+      probe: () => `${document.documentElement.getAttribute('data-scheme') ?? 'device'} ${getComputedStyle(document.body).backgroundColor}`,
+    },
+    {
+      name: 'look.size',
+      record: true,
+      what: "data-text and the body step, when the record keeps the text size, over the cookie's copy (13 §7)",
+      route: '/r/obligations',
+      values: [{ '@record': {} }, { '@record': { 'look.size': 'sm' } }, { text: 'sm', '@record': { 'look.size': 'md' } }],
+      /* A CELL IN `#main`, for the reason the `text` case gives: the rail is a fixed step and would read the same three times. */
+      probe: () => {
+        const el = document.querySelector('#main .td') ?? document.querySelector('#main .line-title');
+        return `${document.documentElement.getAttribute('data-text') ?? 'none'} ${el ? getComputedStyle(el).fontSize : 'no element'}`;
+      },
+    },
+    {
+      name: 'look.density',
+      record: true,
+      what: "data-density and the row height, when the record keeps the density, over the cookie's copy (13 §4.2)",
+      route: '/r/obligations',
+      values: [{ '@record': {} }, { '@record': { 'look.density': 'compact' } }, { density: 'compact', '@record': { 'look.density': 'roomy' } }],
+      probe: () =>
+        `${document.documentElement.getAttribute('data-density') ?? 'none'} ${getComputedStyle(document.documentElement).getPropertyValue('--row-h').trim()}`,
+    },
+    {
+      /**
+       * `look.contrast`: TWO LOADS, BECAUSE A SWITCH HAS TWO ANSWERS. A third load would have to repeat one of them, and this
+       * gate is red on any two that agree.
+       *
+       * THE COOKIE IS ON IN BOTH AND THE RECORD TURNS IT OFF IN THE SECOND. That pair is the one a broken build cannot pass
+       * either way round: a build that ignored the record draws `hc` twice, and so does one that let the cookie win. Off
+       * over on is the harder direction, since an adopt that only ever turned the palette on would be green the other way.
+       */
+      name: 'look.contrast',
+      record: true,
+      what: "data-theme and the ink, when the record keeps the contrast palette, over the cookie's copy (28 §4)",
+      route: '/',
+      values: [{ contrast: true, '@record': {} }, { contrast: true, '@record': { 'look.contrast': false } }],
+      /* THE INK AND NOT THE GROUND, for the reason the `contrast` case gives. */
+      probe: () => `${document.documentElement.getAttribute('data-theme') ?? 'none'} ${getComputedStyle(document.body).color}`,
+    },
+    {
+      /**
+       * `look.accent`: the colour by its swatch's name. NO ATTRIBUTE TO READ, because the accent is an adopted stylesheet
+       * and not a `data-` word (`accent.ts`, "this does not touch data-theme"), so the token it moves is the measurement.
+       *
+       * THE COOKIE CARRIES A HEX AND THE RECORD A NAME, which is how each keeps it. The third load's cookie is the second
+       * load's colour, so a build that let the cookie win draws that colour twice.
+       *
+       * THE SWATCHES ARE READ OUT OF `@braindog/theme`, NOT SPELT HERE. A name written into this file would outlive the
+       * swatch it named, and `accent.adopt` reads a name it has no swatch for as no answer: both loads would draw the house
+       * colour and this case would call a working key dead.
+       */
+      name: 'look.accent',
+      record: true,
+      what: "the accent the page is painted in, when the record keeps it, over the cookie's copy (35)",
+      route: '/',
+      values: [
+        { '@record': {} },
+        { '@record': { 'look.accent': ACCENTS[0].name } },
+        { theme: ACCENTS[0].hex, '@record': { 'look.accent': ACCENTS[ACCENTS.length - 1].name } },
+      ],
+      probe: () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || 'no accent',
+    },
   ];
 
   /**
@@ -450,19 +533,27 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    * `nav.order` AND `nav.hidden` ARE EXCUSED because the rail keeps them through the same `nav-prefs.svelte.ts` path the
    * three cases above measure, and their cookie and `localStorage` copies are what the `nav` case already loads.
    *
-   * THE FIVE `look.*` KEYS ARE EXCUSED because the record's answer is adopted into the very cookie the scheme, size,
-   * density, contrast and accent cases load (`apps/web/src/lib/theme/follow.ts`), so what they change on screen is
-   * measured there; `follow.test.ts` proves the record's answer wins over the cookie. `notify.muted` changes no screen at
-   * all: it decides which notices a person is sent, and the kernel's digest tests are what ask whether it does.
+   * THE FIVE `look.*` KEYS ARE NOT EXCUSED ANY MORE, and have their cases above.
+   *
+   * `notify.muted` IS EXCUSED BECAUSE THE RECORD APPLIES IT, NOT THE PAGE. The record drops a muted rule's notes from what
+   * it answers (`mutedFor`), reading the mutes it keeps; this gate's `@record` only rewrites `boot`'s `me.prefs` on the way
+   * to the page, so it never reaches that read, and a case here would compare two loads of one unchanged answer. The test
+   * that asks is the record's: "A RULE A PERSON MUTED LEAVES THEIR NOTICES" in `packages/record/test/prefs.test.ts`, with
+   * `mutedFor` itself in `packages/kernel/test/digest.test.ts`.
+   *
+   * IT USED TO SAY THE KEY "CHANGES NO SCREEN AT ALL", AND THAT WAS FALSE. Settings promises a muted rule's notices leave
+   * the person's digest, and Today's activity is a screen; it drew muted notes all the same, and the excuse is what kept
+   * anybody from looking (`loop/research-audit-11-13.md`). Whether a muted note leaves Today is the record's to test, where
+   * the activity block is built: `packages/record/test/activity-muted.test.ts`.
    */
-  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'look.scheme', 'look.size', 'look.density', 'look.contrast', 'look.accent', 'notify.muted']);
+  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'notify.muted']);
   const recordSrc = await readFile(join(root, 'packages', 'record', 'src', 'index.ts'), 'utf8').catch(() => '');
   const keysSaid = /export const PREF_KEYS = \[([^\]]*)\]/u.exec(recordSrc)?.[1];
   const RECORD_KEYS = keysSaid === undefined ? [] : [...keysSaid.matchAll(/'([^']+)'/gu)].map((m) => m[1]);
   if (!RECORD_KEYS.length)
     drift.push(
       'PREF_KEYS could not be read out of packages/record/src/index.ts, so no key the record keeps was checked here.\n' +
-        "        The parse wants `export const PREF_KEYS = ['a', 'b'] as const;` on one line.",
+        "        The parse wants `export const PREF_KEYS = [`, each key in single quotes on as many lines as it likes, and `]` after the last.",
     );
   else {
     const measured = new Set(CASES.filter((c) => c.record).map((c) => c.name));
