@@ -349,6 +349,9 @@
   const also = $derived(proposal && chosen === proposal.usecase ? proposal.also.flatMap((id) => caseOf(id) ?? []) : []);
   const cases = $derived(u ? [u, ...also] : []);
 
+  /** Whether the person opened the other use cases beside the one chosen. */
+  let picking = $state(false);
+
   /** Choose a use case from the conversation, or put the one chosen down. */
   function pickCase(id: string) {
     caseByHand = true;
@@ -693,7 +696,7 @@
   {/if}
 {/snippet}
 
-<!-- THE ENTRY LAYOUT EVERY WAY IN SHARES (`signin/Entry.svelte`), in its wide form: a column up to 1040 on the ground. -->
+<!-- THE WHOLE WINDOW (`Frame.svelte`): the conversation on the ground at the left, the build in tiles at the right. -->
 <Frame>
   <div class="frame" data-making={proposal !== null ? '' : undefined}>
     {#if noRecord}
@@ -736,7 +739,9 @@
 
       <div class="board">
         <!-- ── THE CONVERSATION ──────────────────────────────────────────── -->
-        <Tile lead icon="edit" title={words.talk} actions={keys} data-dragging={dragging ? '' : undefined}>
+        <!-- ON THE GROUND, NOT IN A TILE (DIRECTION §37: tiles hold figures and charts). Words read as a page does, and the
+             build beside them is what is boxed, as on /signup. -->
+        <section class="talk" aria-label={words.talk} data-dragging={dragging ? '' : undefined}>
           {#if dragging}<p class="drop" aria-hidden="true">{firstRun.exportDrop}</p>{/if}
           {#if proposal === null}
             <form
@@ -829,7 +834,10 @@
                       <section class="reply" aria-labelledby="mine-h">
                         <h3 class="reply-h" id="mine-h">{firstRun.mineTitle}</h3>
                         {#if u}
-                          <p class="mine-title">{u.title}{#if also.length > 0}<span class="quiet">, {firstRun.and(also.map((a) => a.title))}</span>{/if}</p>
+                          <p class="mine-title">
+                            <span>{u.title}{#if also.length > 0}<span class="quiet">, {firstRun.and(also.map((a) => a.title))}</span>{/if}</span>
+                            {#if !picking && !closest}<button type="button" class="change" disabled={busy} onclick={() => (picking = true)}>{words.changeCase}</button>{/if}
+                          </p>
                           <p class="quiet">{proposal.summary ?? u.summary}</p>
                         {:else if using}
                           <p class="mine-title">{drawing.drafted}</p>
@@ -839,7 +847,8 @@
                         {:else if proposal.summary}
                           <p class="quiet">{proposal.summary}</p>
                         {/if}
-                        {#if !closest}
+                        <!-- THE OTHER USE CASES ONLY WHEN ASKED FOR: one line says what it is, and Change opens the rest. -->
+                        {#if !closest && (picking || u === null)}
                           <div class="chips" role="group" aria-label={firstRun.mineFor}>
                             {#each USE_CASES as one (one.usecase)}
                               <Button size="sm" aria-pressed={chosen === one.usecase} disabled={busy} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
@@ -918,8 +927,9 @@
                 </div>
               </section>
             {/if}
+            {@render keys()}
           {/if}
-        </Tile>
+        </section>
 
         <!-- ── THE BUILD ─────────────────────────────────────────────────── -->
         <div class="build">
@@ -1210,7 +1220,7 @@
   }
 
   /* A FILE HELD OVER THE SCREEN: the conversation says where it goes, in the ink, over a quiet wash. */
-  :global(.tile[data-dragging]) {
+  .talk[data-dragging] {
     position: relative;
   }
 
@@ -1231,6 +1241,19 @@
   }
 
   /* ── the conversation ──────────────────────────────────────────────────── */
+
+  /* ON THE GROUND, with the lead tile's own padding at the top so its first line sits level with the build's heading. */
+  .talk {
+    display: grid;
+    gap: var(--sp-4);
+    align-content: start;
+    min-inline-size: 0;
+    padding-block-start: var(--sp-2);
+  }
+
+  .talk > .keys {
+    justify-self: end;
+  }
 
   .log {
     display: grid;
@@ -1287,7 +1310,7 @@
     color: var(--ink);
     font: inherit;
     font-size: var(--t-base);
-    line-height: 22px;
+    line-height: var(--lh-body);
     text-align: start;
     cursor: text;
     transition: background var(--d-state) var(--ease-out);
@@ -1349,7 +1372,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--t-base);
-    line-height: 20px;
+    line-height: var(--lh-body);
   }
 
   .heard-name,
@@ -1358,6 +1381,30 @@
     color: var(--ink);
     font-size: var(--t-row);
     font-weight: 500;
+  }
+
+  .mine-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-3);
+  }
+
+  /* CHANGE IS A WORD IN THE LINK INK, not another pill: the line says what was chosen, and this opens the rest. */
+  .change {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--link);
+    font: inherit;
+    font-size: var(--t-base);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .change:disabled {
+    color: var(--dim);
+    cursor: default;
   }
 
   /* WHAT IT FOUND, one phrase to a cell, two a row where there is room (the board's grid of found things). */
@@ -1409,14 +1456,15 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--t-base);
-    line-height: 20px;
+    line-height: var(--lh-body);
   }
 
+  /* A SENTENCE IN THE QUIET INK IS STILL A SENTENCE, read at the body size (DIRECTION §36). */
   .quiet {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: 18px;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: var(--lh-body);
   }
 
   .drafting {
@@ -1526,7 +1574,7 @@
 
   /* THE KEYS ARE PRINTED WHEN ASKED FOR (DIRECTION 35): while the conversation is pointed at or has focus, and never
      as standing chrome over the one question. Hidden and not removed, so the head does not move when they come. */
-  :global(.tile:not(:hover, :focus-within)) .keys {
+  .talk:not(:hover, :focus-within) .keys {
     visibility: hidden;
   }
 
@@ -1576,9 +1624,9 @@
     max-inline-size: 100%;
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
-    line-height: 16px;
+    line-height: 18px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1605,8 +1653,8 @@
   .reading {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: 18px;
+    font-size: var(--t-base);
+    line-height: var(--lh-body);
   }
 
   /* THE ONE PRIMARY, AT THE END OF THE BUILD at 1440. */

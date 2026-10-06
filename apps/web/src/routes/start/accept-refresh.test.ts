@@ -13,10 +13,13 @@ import { accept, type Accepting } from './accept.ts';
 
 type Call = { name: string; args: unknown };
 
-/** An empty record that holds each module once it is installed; a plan of an installed one changes `changes` things. */
-function record(changes: number) {
+/**
+ * A record that holds each module once it is installed; a plan of an installed one changes `changes` things, and asks
+ * for `approve` to be approved. `before` is what it held before the press.
+ */
+function record(changes: number, before: readonly string[] = [], approve: readonly string[] = []) {
   const calls: Call[] = [];
-  const held: { id: string; version: string; disabled_at: null; registers: string[] }[] = [];
+  const held: { id: string; version: string; disabled_at: null; registers: string[] }[] = before.map((id) => ({ id, version: '1.0.0', disabled_at: null, registers: [id] }));
   const ok = (value: unknown) => ({ ok: true, value });
   const client = {
     packs: async () => ok([...held]),
@@ -24,7 +27,7 @@ function record(changes: number) {
       calls.push({ name: 'planPack', args });
       const id = args.doc.pack ?? '';
       const again = held.some((p) => p.id === id);
-      return ok({ diff: { planHash: `${id}-${held.length}`, adds: again ? [] : [{ id: `register.${id}`, summary: '' }], changes: again ? Array.from({ length: changes }, () => ({ id: 'page.relation' })) : [], retires: [] } });
+      return ok({ diff: { planHash: `${id}-${held.length}`, adds: again ? [] : [{ id: `register.${id}`, summary: '' }], changes: again ? Array.from({ length: changes }, () => ({ id: 'page.relation' })) : [], retires: [], approve: again ? [...approve] : [] } });
     },
     installPack: async (args: { doc: { pack?: string } }) => {
       calls.push({ name: 'installPack', args });
@@ -62,4 +65,19 @@ test('A PLAN THAT CHANGES NOTHING IS NOT INSTALLED', async () => {
   const { client, calls } = record(0);
   await accept(client, asked());
   assert.equal(installs(calls, 'people'), 1);
+});
+
+test('A PEOPLE LIST HELD BEFORE IS PLANNED AGAIN ONCE MONEY GOES IN, and goes in only when it asks nothing to approve', async () => {
+  const quiet = record(1, ['people']);
+  assert.deepEqual((await accept(quiet.client, asked())).failed, []);
+  assert.equal(installs(quiet.calls, 'money-core'), 1);
+  assert.equal(installs(quiet.calls, 'people'), 1, 'the held People list did not gain what Money brings');
+  /* ONE THAT ASKS FOR APPROVAL IS THE PERSON'S TO SEE, at People's own update, and not approved for them here. */
+  const asks = record(1, ['people'], ['page.relation']);
+  await accept(asks.client, asked());
+  assert.equal(installs(asks.calls, 'people'), 0);
+  /* NOTHING ADDED, NOTHING PLANNED: a press on a record that holds every list already leaves People as it is. */
+  const full = record(1, ['people', 'money-core']);
+  await accept(full.client, asked());
+  assert.equal(full.calls.filter((c) => c.name === 'planPack').length, 0);
 });

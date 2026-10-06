@@ -8,11 +8,11 @@ import { readFileSync } from 'node:fs';
 
 import type { QueueQuestion } from '@braindog/kernel';
 
-import { answeredLine, askerOf, byWords, cardOf, movesOf, nameOrNull, shiftsOf } from './card.ts';
+import { answeredLine, askerOf, byWords, cardOf, movesOf, nameOrNull, shiftsOf, spoken } from './card.ts';
 
 const now = Date.parse('2026-10-06T09:00:00Z');
 
-const ask = (over: Partial<QueueQuestion> & Record<string, unknown> = {}): QueueQuestion =>
+const ask = (over: Record<string, unknown> = {}): QueueQuestion =>
   ({
     id: 'SG7',
     who: 'agent:claude',
@@ -34,16 +34,16 @@ test('WHY COMES FIRST, with who asked, and the suggestion is marked where it can
   assert.equal(card.why, 'Two of the three quotes came back.');
   assert.equal(card.by.kind, 'agent');
   assert.equal(card.when, '2h ago');
-  assert.equal(card.suggests, true);
+  assert.equal(card.ways.find((w) => w.recommended)?.key, 'seat');
   assert.equal(card.enter, 'seat', 'Enter gives the suggested answer');
   assert.equal(card.decline, null, 'a question of options has no Decline key');
   assert.equal(card.band, '', 'the plainest band is not said');
   assert.equal(card.href, '/decide/SG7');
 });
 
-test('NOTHING IS MARKED, AND NO KEY ANSWERS, WHERE IT IS HARD TO UNDO OR MONEY MOVES', () => {
+test('THE SUGGESTION STAYS, AND NO KEY ANSWERS, WHERE IT IS HARD TO UNDO OR MONEY MOVES (audit 19 M10)', () => {
   const hard = cardOf(ask({ cost: 'undo' }), { now, home: 'GBP' });
-  assert.equal(hard.suggests, false);
+  assert.equal(hard.ways.find((w) => w.recommended)?.key, 'seat', 'the dot stays on a hard card');
   assert.equal(hard.enter, null);
   assert.ok(hard.band !== '', 'a band that warns is said');
 
@@ -77,6 +77,64 @@ test('WHO ASKED IS THE AGENT, THE APP AND THE RUN, and never an id', () => {
   assert.deepEqual(byWords(bare), ['Claude'], 'a run named by its id and an app named by a path say nothing');
   for (const id of ['tools#8', 'run_42', 'agent:claude', 'SG14', 'sam-mbp.local', '01J9Z8X7W6V5T4S3R2Q1P0N9M8']) assert.equal(nameOrNull(id), null, id);
   for (const name of ['Claude Code', 'claude.ai', 'MacBook']) assert.equal(nameOrNull(name), name);
+});
+
+test('THE RECORD\'S OWN FACTS DRAW: money from each row, the run by what it was doing, the app as the name (audit 19 H3)', () => {
+  const card = cardOf(
+    ask({
+      who: 'S42',
+      kind: 'rowset',
+      options: [],
+      cost: 'rows',
+      run: { id: 'S42', name: 'Tidy the March invoices', app: 'Claude Code' },
+      drafted_by: 'slash:model',
+      money: [{ amount: -1298, currency: 'GBP' }, { amount: -500, currency: 'GBP' }, { amount: 700, currency: 'USD' }],
+      kinds: ['expenses:add'],
+    }),
+    { now, home: 'GBP' },
+  );
+  assert.deepEqual(byWords(card.by), ['Claude Code', 'Tidy the March invoices'], 'a run is named by its app, never An agent or S42');
+  assert.equal(card.by.kind, 'agent');
+  assert.equal(card.money, 'Moves −£17.98 and $7\u00a0USD');
+  assert.equal(card.ways[0]?.label, 'Accept −£17.98 and $7\u00a0USD');
+  assert.equal(card.enter, null, 'Enter never accepts money');
+  assert.equal(card.slash, true, 'drafted by Slash');
+  const old = cardOf(ask({ who: 'S42', run: { id: 'S42', app: 'Claude Code' } }), { now });
+  assert.deepEqual(byWords(old.by), ['Claude Code'], 'a run that said nothing of what it did is its app alone');
+  const doing = askerOf(ask({ run: { id: 'S9', name: 'Fix the sign-in in apps/web/src/login.ts', app: 'Cursor' } }));
+  assert.equal(doing.run, 'Fix the sign-in', 'a path the agent wrote is taken out, not the whole line');
+});
+
+test('AN ADDRESS SIGNS AS SOMEONE, and no address or id reaches the words (audit 19 M11)', () => {
+  assert.match(askerOf(ask({ who: 'alex@acme.com' })).name, /^Someone\b/u);
+  assert.equal(nameOrNull('alex@acme.com'), null);
+  const card = cardOf(
+    ask({
+      question: 'Add alex@acme.com to Acme?',
+      why: 'Alex Ng <alex.ng@acme.com> replied from 192.168.1.4 about tasks#8 (see /Users/sam/Developer/braindog/notes.md).',
+      does: 'Adds 01J9Z8X7W6V5T4S3R2Q1P0N9M8 to people',
+    }),
+    { now, lead: true },
+  );
+  assert.equal(card.question, 'Add someone to Acme?');
+  assert.equal(card.why, 'Alex Ng replied.');
+  assert.equal(card.does, 'Adds to people');
+  for (const s of [card.question, card.why, card.does]) assert.doesNotMatch(s, /@|#\d|\/|[0-9A-HJKMNP-TV-Z]{26}/u, s);
+});
+
+test('SPOKEN LEAVES WORDS ALONE and takes out only what is an address or an id', () => {
+  const same = ['Pay the £12.98 invoice by 10/06/2026.', 'Two of the three quotes came back.', 'Renew it in 3 days and/or cancel.', 'Invoice 20261001 is late.'];
+  for (const s of same) assert.equal(spoken(s), s);
+  assert.equal(spoken('alex@acme.com wrote back'), 'Someone wrote back');
+  assert.equal(spoken('Seen on https://www.stripe.com/invoices/42.'), 'Seen on stripe.com.');
+  assert.equal(spoken('Running on sam-mbp.local'), 'Running');
+  assert.equal(spoken('From commit 4464966f in braindog'), 'From commit in braindog');
+  assert.equal(spoken('Filed by agent:claude as SG14 for p_7x2k'), 'Filed');
+  assert.equal(spoken('Proposed by agent:claude because the bill is late'), 'Proposed because the bill is late');
+  assert.equal(spoken('Moved from ~/Developer/old to C:\\Repos\\new'), 'Moved');
+  assert.equal(spoken('Renew the face2face plan.'), 'Renew the face2face plan.', 'a word of hex letters is no hash');
+  assert.equal(spoken('Ask Jo (jo@x.io) about it.'), 'Ask Jo about it.', 'an address beside its name goes whole');
+  assert.equal(spoken('Changed in (apps/web/src/a.ts, apps/web/src/b.ts)'), 'Changed', 'no bracket of commas is left');
 });
 
 test('WHAT CHANGES IS SAID FROM WHAT TO WHAT, and an id is never a value', () => {

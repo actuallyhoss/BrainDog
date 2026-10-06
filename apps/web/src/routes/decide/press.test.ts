@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { acceptKey, amountSaid, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, suggestionShown, twoWords } from './press.ts';
+import { acceptKey, amountSaid, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords } from './press.ts';
 import { words } from './words.ts';
 
 const change = (band = 'rows') => ({
@@ -78,12 +78,11 @@ test('an answer that cannot be taken back is held six seconds with Undo, and sen
   assert.equal(c.done, true);
 });
 
-test('the suggestion is drawn only where the choice can be taken back, and never where money moves', () => {
-  assert.equal(suggestionShown('call', false), true);
-  assert.equal(suggestionShown('rows', false), true);
-  assert.equal(suggestionShown(undefined, false), true);
-  assert.equal(suggestionShown('undo', false), false);
-  assert.equal(suggestionShown('rows', true), false);
+test('a hard question keeps its suggestion and loses only Enter (audit 19 M10)', () => {
+  assert.equal(acceptKey({ ...options('per seat'), band: 'undo' }), null, 'no key answers what is hard to undo');
+  assert.equal(acceptKey(options('per seat'), true), null, 'no key answers what moves money');
+  assert.equal(acceptKey({ ...options('per seat'), band: 'rows' }), 'per seat', 'a band that only adds still lets Enter give the suggestion');
+  assert.doesNotMatch(readFileSync(new URL('./press.ts', import.meta.url), 'utf8'), /suggestionShown/u, 'nothing hides the suggestion any more');
 });
 
 test('Enter gives the suggested answer, or Accept, and nothing that is hard to undo or moves money', () => {
@@ -154,7 +153,6 @@ test('the money accepting writes is summed in each currency and never across two
   const two = { register: 'expenses', rows: [{ amount: { amount: -500, currency: 'GBP' } }, { amount: { amount: 300, currency: 'USD' } }] };
   assert.deepEqual(movesOf(two, registers), [{ amount: -500, currency: 'GBP' }, { amount: 300, currency: 'USD' }]);
   assert.equal(acceptKey(change(), transfer.length > 0), null, 'Enter accepts money that cancels out');
-  assert.equal(suggestionShown('rows', transfer.length > 0), false, 'money that cancels out is drawn with its suggestion');
 });
 
 test('Accept names the amount when money moves, and the record’s Reject is Decline', () => {

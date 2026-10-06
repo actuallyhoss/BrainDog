@@ -160,14 +160,18 @@ async function addModule(client: Client, id: string, held: readonly PackState[],
 }
 
 /**
- * A MODULE INSTALLED IN THIS PRESS, PLANNED AGAIN ONCE EVERY LIST IS IN, and installed when that plan changes anything.
+ * A MODULE PLANNED AGAIN ONCE EVERY LIST IS IN, and installed when that plan changes anything.
  *
  * A MODULE'S COPY IS CUT TO THE LISTS THE RECORD HOLDS WHEN IT GOES IN (`packDocument`). People goes in before Money, so
  * its copy left out what an organisation's page shows of Money, and the page gained it only at People's next update.
  * Planned again here, with the lists of everything this press put in, it gains it now. Nothing is said when the record
  * refuses it: People works as it went in, and its next update brings the rest.
+ *
+ * `ours` IS WHETHER THIS PRESS PUT THE MODULE IN. One the record held before is the person's, and may carry what they
+ * changed, so its plan goes in only when it asks nothing to be approved and takes nothing away; otherwise it waits for
+ * the module's own update, where the person sees it.
  */
-async function refreshModule(client: Client, id: string, held: readonly PackState[], names?: Readonly<Record<string, string>>): Promise<void> {
+async function refreshModule(client: Client, id: string, held: readonly PackState[], names?: Readonly<Record<string, string>>, ours = true): Promise<void> {
   if (!held.some((p) => p.id === id && p.disabled_at === null)) return;
   const doc = named(await packDocument(id, held), names);
   if (!doc) return;
@@ -178,6 +182,7 @@ async function refreshModule(client: Client, id: string, held: readonly PackStat
   const some = (v: unknown): boolean => Array.isArray(v) && v.length > 0;
   if (typeof diff?.planHash !== 'string' || diff.planHash === '' || !(some(diff.adds) || some(diff.changes) || some(diff.retires))) return;
   const approve = Array.isArray(diff.approve) ? (diff.approve as unknown[]).filter((a): a is string => typeof a === 'string') : [];
+  if (!ours && (approve.length > 0 || some(diff.retires))) return;
   await client.installPack({ doc, source: { kind: 'local' }, planHash: diff.planHash, ...(approve.length === 0 ? {} : { approve }) }).catch(() => null);
 }
 
@@ -248,9 +253,12 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
       if (now.ok) states = now.value;
     }
 
-  /* PEOPLE, PUT IN BY THIS PRESS BEFORE THE LISTS IT LINKS TO, is planned again with all of them in (`refreshModule`). */
-  if (!held.value.some((p) => p.id === PEOPLE) && !off) {
-    await refreshModule(client, PEOPLE, states, names);
+  /* PEOPLE IS PLANNED AGAIN WITH EVERY LIST IN (`refreshModule`): put in by this press before the lists it links to, or
+     held already while this press added a list it links to, such as Money's. */
+  const peopleOurs = !held.value.some((p) => p.id === PEOPLE);
+  const added = states.some((s) => !held.value.some((h) => h.id === s.id));
+  if (!off && (peopleOurs || added)) {
+    await refreshModule(client, PEOPLE, states, names, peopleOurs);
     const now = await packsOf(client);
     if (now.ok) states = now.value;
   }

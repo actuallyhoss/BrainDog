@@ -21,6 +21,8 @@
  * sign-in link is, so it never reaches a server log, a `Referer` or the tab's history.
  */
 
+import { moduleOfList } from '@braindog/seed/packs/modules';
+
 /** The world the calls reach, so a test needs no socket. */
 export type Io = { fetch: (url: string, init: RequestInit) => Promise<Response> };
 
@@ -171,14 +173,25 @@ function wholeName(typed: string): string | null {
 /** What the first sentence named: the person, and the business or project they run, as `propose` heard them. */
 export type HeardNames = { person: string | null; business: string | null };
 
+/** The module whose list holds what a person runs or builds ("Projects"), the only list a record's name is taken from. */
+const PROJECTS = 'portfolio';
+
+/** A name as two sentences would both say it: trimmed, folded to lower case, its spaces as one. */
+const sameName = (v: unknown): string => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').toLowerCase() : '');
+
 /**
  * THE NAMES A SENTENCE GAVE, read off its proposal: the person's own name, and the first thing they run that the
- * sentence put in a list ("I run Kiln Studio" is Kiln Studio, a project). A person, a payment or a client is not the
- * business, so only an entry with a `name` that is not a person counts.
+ * sentence put in their projects ("I run Kiln Studio" is Kiln Studio, a project).
+ *
+ * ONLY THE PROJECTS LIST, NEVER ANOTHER. A client in People, an organisation, a payment, a bank or a service the
+ * person pays is somebody else's name, and the record's name is public in its address. A project that carries the same
+ * name as one of those is left out too: a project called Fenwick beside a client called Fenwick is the client's work.
  */
 export function namesHeard(p: { name: string | null; rows: readonly { register: string; fields: Record<string, unknown> }[] }): HeardNames {
-  const run = p.rows.find((r) => r.register !== 'people' && typeof r.fields.name === 'string' && r.fields.name.trim() !== '');
-  return { person: p.name, business: run ? String(run.fields.name) : null };
+  const ours = (r: { register: string }): boolean => moduleOfList(r.register)?.id === PROJECTS;
+  const others = new Set(p.rows.filter((r) => !ours(r)).flatMap((r) => [sameName(r.fields.name), sameName(r.fields.what)].filter((n) => n !== '')));
+  const run = p.rows.find((r) => ours(r) && sameName(r.fields.name) !== '' && !others.has(sameName(r.fields.name)));
+  return { person: p.name, business: run ? String(run.fields.name).trim() : null };
 }
 
 /**
@@ -217,7 +230,7 @@ export async function chooseName(names: readonly string[], check: (slug: string)
  * The key the first sentence is kept under while the mail travels, in `localStorage`.
  *
  * NOT THE TAB'S STORAGE, for the reason the plan is not (`PLAN_KEY`): the link opens a new tab, and the record it makes
- * is built from what was said. The words alone, never the address, and forgotten once the record is made.
+ * is built from what was said. The words alone, never the address, and forgotten once all of it is in the record.
  */
 export const SAID_KEY = 'braindog.signup.said';
 
@@ -230,7 +243,12 @@ export const SAID_MOST = 2000;
 /** What was said, the currency chosen for it and the use case picked by hand, kept across the mail. */
 export type Draft = { said: string; currency: string | null; usecase: string | null };
 
-/** Keep the sentence across the mail, or forget it (`null`). Storage may be off, and then the record asks again. */
+/**
+ * Keep the sentence across the mail, or forget it (`null`). Storage may be off, and then the record asks again.
+ *
+ * KEPT ONLY ONCE THE MAIL IS ASKED FOR AND THE HOST SAID YES, and forgotten only once the record holds all of it: the
+ * page calls this after `startSignup` answers, and with `null` after an `accept` that missed nothing.
+ */
 export function keepSaid(storage: Pick<Storage, 'setItem' | 'removeItem'> | null | undefined, draft: Draft | null, now: number = Date.now()): void {
   try {
     if (draft === null || draft.said.trim() === '') storage?.removeItem(SAID_KEY);
@@ -240,17 +258,42 @@ export function keepSaid(storage: Pick<Storage, 'setItem' | 'removeItem'> | null
   }
 }
 
-/** The sentence kept across the mail, or `null` when none was, or it is older than the link it went with. */
-export function saidKept(storage: Pick<Storage, 'getItem'> | null | undefined, now: number = Date.now()): Draft | null {
+/**
+ * The sentence kept across the mail, or `null` when none was, or it is older than the link it went with.
+ *
+ * ONE THAT CANNOT BE BUILT IS REMOVED AS IT IS READ: an old, broken or future-dated sentence is somebody's own words
+ * in plain text, and on a shared device it would sit there for the next person to find.
+ */
+export function saidKept(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | undefined, now: number = Date.now()): Draft | null {
+  let raw: string | null | undefined;
   try {
-    const raw = storage?.getItem(SAID_KEY);
-    const v: unknown = raw ? JSON.parse(raw) : null;
-    if (!isObj(v) || typeof v.said !== 'string' || v.said.trim() === '' || typeof v.at !== 'number' || now - v.at > SAID_MS || v.at > now) return null;
-    return { said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase) };
+    raw = storage?.getItem(SAID_KEY);
   } catch {
     return null;
   }
+  if (!raw) return null;
+  let v: unknown = null;
+  try {
+    v = JSON.parse(raw);
+  } catch {
+    /* Broken, and so nothing to build: removed below with the rest. */
+  }
+  if (!isObj(v) || typeof v.said !== 'string' || v.said.trim() === '' || typeof v.at !== 'number' || now - v.at > SAID_MS || v.at > now) {
+    try {
+      storage?.removeItem(SAID_KEY);
+    } catch {
+      /* Storage that reads but will not write: nothing more this page can do. */
+    }
+    return null;
+  }
+  return { said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase) };
 }
+
+/**
+ * WHETHER THE BUILD IS ALL IN, so the sentence kept for it can be forgotten: a press that answered, and missed nothing.
+ * A press that did not answer (`null`) or came back with something refused keeps it, for Try again.
+ */
+export const allWritten = (out: { failed: readonly unknown[] } | null): boolean => out !== null && out.failed.length === 0;
 
 /** This browser's time zone, or `null` where the runtime will not say. */
 export function zone(): string | null {

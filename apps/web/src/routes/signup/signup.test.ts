@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { chooseName, keepSaid, namesHeard, recordNames, SAID_KEY, SAID_MOST, saidKept, type Asked, type NameSeen } from '../../lib/signup.ts';
+import { allWritten, chooseName, keepSaid, namesHeard, recordNames, SAID_KEY, SAID_MOST, saidKept, type Asked, type NameSeen } from '../../lib/signup.ts';
 import { propose } from '../../lib/start/propose.ts';
 
 const CTX = { zone: 'Europe/London', locale: 'en-GB' };
@@ -46,6 +46,24 @@ test('THE RECORD IS NAMED FOR THE BUSINESS HEARD FIRST, then the person, then th
   const billing = propose('I am Dana. We bill Fenwick £2,000 a month on the 1st', CTX);
   assert.equal(namesHeard(billing).business, null);
   assert.deepEqual(recordNames({ person: null, business: null }, 'dana@example.com'), ['dana']);
+  /* THE BUSINESS WITH A CLIENT BESIDE IT is still the business, whichever the sentence said first. */
+  assert.equal(namesHeard(propose('I am Dana, I run Kiln Studio and we bill Fenwick £2,000 a month', CTX)).business, 'Kiln Studio');
+});
+
+test('THE RECORD IS NEVER NAMED FOR A CLIENT OR A VENDOR, only for what the person runs', () => {
+  /* WHAT A MODEL MAY HAND BACK, list by list: none of these is the person's, and the record's name is public. */
+  const theirs = [
+    { register: 'organisations', fields: { name: 'Acme Ltd' } },
+    { register: 'people', fields: { name: 'Fenwick', role: 'client' } },
+    { register: 'services', fields: { name: 'Adobe' } },
+    { register: 'accounts', fields: { name: 'HSBC' } },
+    { register: 'obligations', fields: { what: 'Monthly invoice to Fenwick' } },
+  ];
+  assert.deepEqual(namesHeard({ name: 'Jo', rows: theirs }), { person: 'Jo', business: null });
+  assert.deepEqual(recordNames(namesHeard({ name: 'Jo', rows: theirs }), 'jo@acme.example'), ['jo']);
+  /* A PROJECT THAT CARRIES A CLIENT'S NAME is the client's work, and the next project is the one taken. */
+  const rows = [...theirs, { register: 'things', fields: { name: ' fenwick ' } }, { register: 'things', fields: { name: 'Kiln Studio' } }];
+  assert.equal(namesHeard({ name: null, rows }).business, 'Kiln Studio');
 });
 
 test('A NAME IS ONE THE DIRECTORY COULD HAND OUT: a letter first, no hyphen last, never a spoken id', () => {
@@ -76,6 +94,12 @@ test('WHAT WAS SAID SURVIVES THE ROUND TRIP THROUGH THE MAIL, and only for the l
   /* THE TAB THE LINK OPENS reads it back, and builds what the first tab drew. */
   assert.deepEqual(saidKept(tab, now + 60_000), { said: 'Sami, I run Kiln Studio', currency: 'GBP', usecase: null });
   assert.equal(saidKept(tab, now + 27 * 60 * 60 * 1000), null, 'a sentence older than the link is not built');
+  /* AN OLD SENTENCE IS REMOVED AS IT IS READ, so a shared device does not keep somebody's words for the next person. */
+  assert.equal(tab.map.has(SAID_KEY), false);
+  keepSaid(tab, { said: 'Sami, I run Kiln Studio', currency: 'GBP', usecase: null }, now);
+  assert.equal(saidKept(tab, now - 60_000), null, 'one dated after this clock is not built');
+  assert.equal(tab.map.has(SAID_KEY), false);
+  keepSaid(tab, { said: 'Sami, I run Kiln Studio', currency: 'GBP', usecase: null }, now);
   /* FORGOTTEN once the record is made. */
   keepSaid(tab, null, now);
   assert.equal(tab.map.has(SAID_KEY), false);
@@ -94,6 +118,7 @@ test('THE SENTENCE KEPT IS THE WORDS ALONE, at most what the host keeps, and sto
   assert.equal(tab.map.has(SAID_KEY), false);
   tab.setItem(SAID_KEY, '{not json');
   assert.equal(saidKept(tab, 2), null);
+  assert.equal(tab.map.has(SAID_KEY), false, 'a broken sentence is removed too');
   const blocked = {
     getItem: () => {
       throw new Error('blocked');
@@ -107,4 +132,10 @@ test('THE SENTENCE KEPT IS THE WORDS ALONE, at most what the host keeps, and sto
   };
   assert.doesNotThrow(() => keepSaid(blocked, { said: 'hello', currency: null, usecase: null }));
   assert.equal(saidKept(blocked), null);
+});
+
+test('THE SENTENCE IS FORGOTTEN ONLY WHEN THE BUILD IS ALL IN, so a dropped line or a refusal can be tried again', () => {
+  assert.equal(allWritten({ failed: [] }), true);
+  assert.equal(allWritten({ failed: [{ said: 'Money was not added.', why: '' }] }), false);
+  assert.equal(allWritten(null), false, 'nothing answered');
 });

@@ -47,9 +47,10 @@
   import { COMMENT_MOST, sayComment } from '$lib/record/comments.ts';
   import { everyGovernance, plainOf, readOne, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
-  import { visualOf, type Visual } from '$lib/page/queue-answer.ts';
+  import { queueMergeOf, visualOf, type Visual } from '$lib/page/queue-answer.ts';
+  import { spoken } from '$lib/decide/card.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
-  import { acceptKey, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, suggestionShown, twoWords, type Held } from '../press.ts';
+  import { acceptKey, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords, type Held } from '../press.ts';
   import { mergeOf, words as mergeWords, type Press } from '../merge.ts';
   import MergeCard from '../MergeCard.svelte';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
@@ -181,9 +182,14 @@
   const sidebarNow = (): Map<string, string> =>
     new Map(((page.data.nav ?? []) as { href: string; title: string }[]).map((n) => [n.href, n.title]));
 
-  /* A MERGE IS ASKED AS WHO IS WHO (`../merge.ts`): the names, where each was seen, Merge all, Keep apart and Pick. */
+  /* A MERGE IS ASKED AS WHO IS WHO (`../merge.ts`): the names, where each was seen, Merge all, Keep apart and Pick.
+     THE RECORD'S OWN GROUP FIRST, as the suggestion row carries it (`merge`), with the answers it names, so this page
+     offers the Picks the queue's card does; a rowset with none is read off its patches as before. */
   const merge = $derived(
-    question && from === 'live' && live ? mergeOf(live.about, question.options.map((o) => o.key), live.rowset ? (live.rows[live.rowset.register] ?? []) : []) : null,
+    question && from === 'live' && live
+      ? (queueMergeOf({ kind: 'rowset', merge: live.about?.merge }, []) ??
+          mergeOf(live.about, question.options.map((o) => o.key), live.rowset ? (live.rows[live.rowset.register] ?? []) : []))
+      : null,
   );
 
   /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. A merge's
@@ -209,10 +215,9 @@
   const two = $derived(question ? twoWords(question) : false);
   /* THE MONEY ACCEPTING WOULD WRITE, in each currency it is in, for the rows that are ticked: the button names it. */
   const moves = $derived(question && live ? movesOf(live.rowset, live.registers, picked) : []);
-  /* AND THE SUGGESTION, only where the choice can be taken back and no money moves; the first one an agent marked. */
-  const suggestedKey = $derived(
-    question && suggestionShown(question.band, moves.length > 0) ? question.options.find((o) => o.recommended === true)?.key : undefined,
-  );
+  /* AND THE SUGGESTION, the first one an agent marked, on every question: where it is hard to undo or money moves, the
+     dot stays and only Enter is taken away (`press.ts` `acceptKey`). */
+  const suggestedKey = $derived(question?.options.find((o) => o.recommended === true)?.key);
 
   /**
    * WHEN THE RECORD STILL KEEPS A REASON FOR A QUESTION, it answers the press with `wants: 'reason'` (`decide-write.ts`),
@@ -424,6 +429,8 @@
        link or a fold it opens it. Backspace has no meaning on a button, so it declines from anywhere but a field. */
     const onControl = e.target instanceof Element && e.target.closest('button, a[href], summary, input, select, textarea') !== null;
     if ((act === 'accept' && !onControl) || act === 'decline') {
+      /* A MERGE IS ANSWERED ON ITS OWN BUTTONS: folding a person away is hard to undo, and Enter never gives it. */
+      if (act === 'accept' && merge) return;
       const key = act === 'accept' ? acceptKey(question, moves.length > 0) : declineKey(question);
       /* NOTHING ENTER MAY GIVE ON ITS OWN, on a question that is hard to undo, moves money or suggests nothing: the focus
          goes to the first answer (Accept, whose words name the amount), so the next Enter is a press on that button. */
@@ -440,7 +447,7 @@
       }
       if (key === null) return;
       e.preventDefault();
-      if (act === 'decline') held(key, gate.declinedHeld(question.title));
+      if (act === 'decline') held(key, gate.declinedHeld(spoken(question.title)));
       else choose(key);
       return;
     }
@@ -686,7 +693,7 @@
   });
 </script>
 
-<svelte:head><title>{titleOf(question?.title, copy.decide)}</title></svelte:head>
+<svelte:head><title>{titleOf(question ? spoken(question.title) : undefined, copy.decide)}</title></svelte:head>
 
 <svelte:window {onkeydown} />
 
@@ -725,7 +732,7 @@
 {:else}
   <!-- THE QUESTION IS THE TITLE, and the sentence under it says how many ways there are to answer, which one is
        suggested, and how long it has been open. -->
-  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={question.title} count={joined} sentence={gateSaid} />
+  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} sentence={gateSaid} />
 
   <div class="page">
     <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news and the reason the options came back. -->
@@ -1022,7 +1029,7 @@
               {#if question.context}
                 <section class="changed">
                   <h3 class="does-h">{copy.whyAsked}</h3>
-                  <p class="cost-body context">{symbolText(question.context)}</p>
+                  <p class="cost-body context">{symbolText(spoken(question.context))}</p>
                 </section>
               {/if}
               <section class="cost">

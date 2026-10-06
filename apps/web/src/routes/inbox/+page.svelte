@@ -342,6 +342,7 @@
     if (busy) return;
     if (gesture === 'file' && target === '') return void toasts.push(copy.inboxNoLists, { intent: 'warn' });
     busy = true;
+    const filedIn = listOf(target);
     try {
       const out = await write(item, gesture);
       if (!out.ok) return;
@@ -349,7 +350,8 @@
       /* EVERY FILING AND ARCHIVING CAN BE PUT BACK FROM ITS TOAST. A filing is put back at the version its row was made
          at, so a host too old to send one offers no Undo rather than one the record would refuse. */
       const version = gesture === 'archive' ? null : (out.version ?? undefined);
-      const text = gesture === 'archive' ? copy.inboxArchived : copy.inboxFiled(out.row ?? target);
+      /* BY THE LIST'S NAME, as the picker shows it, taken before the write so a change of list meanwhile says the right one. */
+      const text = gesture === 'archive' ? copy.inboxArchived : copy.inboxFiled(filedIn);
       toasts.push(text, version === undefined ? {} : { undo: () => void putBack(item.id, version) });
       /* AND THE RAIL FOLLOWS, as it does after a decision: its Inbox count, and the list a first row just put on it. */
       void retally();

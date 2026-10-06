@@ -9,9 +9,9 @@
  * answer, the reason is offered after a decline or an edit and never demanded, and a note somebody chose to write is
  * worth more than a sentence somebody was made to type.
  *
- * THE SUGGESTION IS AN OUTLINE WITH A SMALL DOT, the owner's own pick, and only where the choice can be taken back: a
- * pre-selected answer reads as an endorsement, so where the other button tomorrow does not undo it, or where money
- * moves, no answer is marked and the reader chooses with nothing leaning on them.
+ * THE SUGGESTION IS AN OUTLINE WITH A SMALL DOT, the owner's own pick, on every question that has one. It once went
+ * where the choice is hard to undo or money moves, which hid the agent's advice exactly where it matters most (audit 19
+ * M10). What leaves those questions is Enter alone (`acceptKey`): a mark is advice, a key is an answer given unread.
  *
  * PURE, with relative imports, so `press.test.ts` loads it in Node.
  */
@@ -77,9 +77,6 @@ export function hold(send: () => void, ms = HOLD_MS, clock: { set: typeof setTim
 
 /** The band a question is in when accepting it is hard to take back (`@braindog/kernel` `weigh.ts`). */
 export const HARD_TO_UNDO = 'undo';
-
-/** Whether the suggestion is drawn: only where the choice can be undone, and never where money moves. */
-export const suggestionShown = (band: string | undefined, moves: boolean): boolean => band !== HARD_TO_UNDO && !moves;
 
 /** A question as these rules read it: its answers by key, the suggested one marked, and its band. */
 type Keyed = { options: readonly { key: string; recommended?: boolean | undefined }[] };

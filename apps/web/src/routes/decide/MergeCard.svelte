@@ -3,8 +3,8 @@
   each was seen, and the answers, Merge all, Keep apart and, where the record offers it, Pick on a name. One press each.
 
   THE ONE DECISION CARD'S LOOK, inside the gate's tile: the names as a list without boxes, each a line with its well,
-  and the answers as the gate's pills under them. Nothing is suggested: a merge is hard to undo, and a pre-selected
-  answer reads as an endorsement (`press.ts` `suggestionShown`).
+  and the answers as the gate's pills under them. Nothing is marked: the record suggests no answer to who is who, and
+  no key gives one, since a merge is hard to undo (`press.ts` `acceptKey`).
 
   THE PRESS IS HELD FOR ITS UNDO, NOT SENT. The gate keeps it for six seconds with Undo on the line it leaves, and only
   then sends it (`press.ts` `hold`), because a merge folds a person away and a pair kept apart is never asked about

@@ -35,6 +35,9 @@
  *   });
  */
 
+import { batchOf, serverFirst } from '../record/undo-back.ts';
+import type { Undone } from '../record/undo-write.ts';
+
 /** What a write answered: the value it landed with, or the record's one sentence about why not. */
 export type Sent<T> = { ok: true; value: T } | { ok: false; fix: string };
 
@@ -52,9 +55,15 @@ export type Change<T> = {
   said?: string | ((value: T) => string);
   /**
    * The way back from what landed: a `Change`, drawn and sent the same way, or a function for a screen whose way back
-   * already draws itself (the register list's Put back). Absent or `null`, the receipt has no Undo.
+   * already draws itself (the register list's Put back). Absent or `null`, the receipt has no Undo of the screen's own;
+   * a write that landed under a batch is still offered the record's, where `optimist` was handed `undoBatch`.
    */
   undo?: (value: T) => Change<unknown> | (() => void) | null;
+  /**
+   * Read the screen's rows again after the record put them back, so the Undo's drawing is let go only once it has.
+   * Absent, `optimist`'s own `reread` is used.
+   */
+  reread?: () => unknown;
 };
 
 /** Where a change speaks: the app's toasts, or a test's list. `life` is how long an Undo stays offered. */
@@ -74,7 +83,10 @@ export const UNSENT = 'That change did not reach your BrainDog, so it has been p
  * `run` RESOLVES WITH THE ANSWER, so a caller that needs to know (a capture line putting the typing back) can, and one
  * that does not can ignore it: every visible consequence has already been drawn or said by then.
  */
-export function optimist(say: Say, { life = UNDO_MS }: { life?: number } = {}) {
+export function optimist(
+  say: Say,
+  { life = UNDO_MS, undoBatch, reread }: { life?: number; undoBatch?: (batch: string) => Promise<Undone>; reread?: () => unknown } = {},
+) {
   async function run<T>(change: Change<T>): Promise<Sent<T>> {
     change.apply();
     let out: Sent<T>;
@@ -90,9 +102,14 @@ export function optimist(say: Say, { life = UNDO_MS }: { life?: number } = {}) {
     }
     const value = out.value;
     change.settle?.(value);
-    const back = change.undo?.(value) ?? null;
+    /* THE RECORD PUTS BACK A WRITE IT LOGGED UNDER A BATCH (`undo-back.ts`); the screen's own inverse is the fallback.
+       The record's undo skips a screen's self-drawing Put back, so the screen is read again (`reread`) or it would
+       still draw the write until the next poll. */
+    const own = change.undo?.(value) ?? null;
+    const back = undoBatch ? serverFirst(batchOf(value), own, undoBatch, change.reread ?? reread) : own;
     const said = typeof change.said === 'function' ? change.said(value) : change.said;
-    if (said !== undefined) {
+    /* AN EMPTY LINE RAISES NO TOAST. */
+    if (said) {
       say.push(said, {
         intent: 'good',
         life,

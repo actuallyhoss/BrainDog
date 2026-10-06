@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { copy } from '../copy.ts';
-import { answer, DECIDED_PAGE, everyGovernance, keepDecided, olderDecisions, pagesStanding, pairs, park, plainOf, questionOf, readOne, readQueue, type Governor, type Queue } from './governance.ts';
+import { aboutOf, answer, DECIDED_PAGE, everyGovernance, keepDecided, olderDecisions, pagesStanding, pairs, park, plainOf, questionOf, readOne, readQueue, type Governor, type Queue } from './governance.ts';
 import { updatesOf } from '../../routes/decide/[id]/changes.ts';
 import type { Question } from './schema.ts';
 
@@ -422,6 +422,14 @@ test('A HOST THAT IGNORES THE CURSOR cannot loop a screen: a page that goes nowh
 });
 
 /* A MERGE THE RECORD READ AS ONE QUESTION rides to the merge card on the question, whole, and nothing else does. */
+test('WHAT A SUGGESTION IS carries the merge group the record put on it, and one with none carries none', () => {
+  const merge = { candidates: [{ name: 'Rohan Mehta' }, { name: 'rohanmehta' }], options: [{ option: 'merge', says: 'Merge all' }] };
+  const row = { id: 'SG7', body_kind: 'rowset', body: { register: 'people', rows: [] }, opened_by: 'slash' };
+  assert.deepEqual(aboutOf({ ...row, merge }), { kind: 'rowset', body: { register: 'people', rows: [] }, by: 'slash', merge });
+  assert.equal('merge' in aboutOf(row), false);
+  assert.equal('merge' in aboutOf({ ...row, merge: ['not', 'a', 'group'] }), false);
+});
+
 test('a suggestion that carries the record’s merge carries it onto its question, and a half one carries nothing', () => {
   const merge = {
     candidates: [

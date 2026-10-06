@@ -73,6 +73,8 @@ export const words = {
     lists.length === 0 ? '' : lists.length <= 3 ? `Keeps ${firstRun.and(lists)}.` : `Keeps ${lists.slice(0, 2).join(', ')} and ${lists.length - 2} more.`,
   /** The phrases that turned a part on. */
   because: (phrases: readonly string[]) => `You said ${firstRun.and(phrases.map((p) => `“${p}”`))}.`,
+  /** Beside the use case chosen: opens the others to choose from. */
+  changeCase: 'Change',
   /** The parts not on, as a group on the ground. */
   alsoHere: 'More it can keep',
   /** What an entry from the sentence is, beside its name. */

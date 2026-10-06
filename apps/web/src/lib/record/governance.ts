@@ -55,8 +55,9 @@ export type Held = { id?: string; register?: string; seq: number | null; version
 export type Rows = { registers: Record<string, Decl>; rows: Record<string, Held[]> };
 
 /** What an open suggestion is, as filed: its kind, its body as the record holds it, and who filed it. The queue groups by
-    `by`, and a `change` or a `pattern` is previewed from `body` (`routes/decide/[id]/proposed.ts`). */
-export type About = { kind: string; body: Row; by: string };
+    `by`, and a `change` or a `pattern` is previewed from `body` (`routes/decide/[id]/proposed.ts`). `merge` is the group a
+    merge suggestion was filed for, as the record puts it on the row, which `merge.ts` reads for its names and Picks. */
+export type About = { kind: string; body: Row; by: string; merge?: Row };
 
 export type Queue = Rows & {
   open: Question[];
@@ -297,7 +298,12 @@ async function linkedRow(client: Governor, register: 'suggestion' | 'decision', 
 }
 
 /** The body of a `rowset` suggestion, or nothing. */
-export const aboutOf = (row: Row): About => ({ kind: text(row.body_kind), body: isRow(row.body) ? row.body : {}, by: text(row.opened_by) });
+export const aboutOf = (row: Row): About => ({
+  kind: text(row.body_kind),
+  body: isRow(row.body) ? row.body : {},
+  by: text(row.opened_by),
+  ...(isRow(row.merge) ? { merge: row.merge } : {}),
+});
 
 export function rowsetOf(row: Row): RowsetBody | undefined {
   if (row.body_kind !== 'rowset' || !isRow(row.body)) return undefined;

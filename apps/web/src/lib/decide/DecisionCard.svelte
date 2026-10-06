@@ -6,7 +6,8 @@
   WHY FIRST. The question, then at once why it is asked, on every card. Then who asked, by face and name, with the app it
   ran in and the run, then what it moves: the money accepting writes and what changes from what to what, where the
   record says. The ways to answer come last, in the renderer's own classes (`kinds/queue.css`), so the suggested one is
-  an outline with a small dot (his pick), and is not marked where the choice is hard to undo or money moves.
+  an outline with a small dot (his pick), on every card; where the choice is hard to undo or money moves, Enter alone
+  is taken away and the button that names the amount is the answer.
 
   ONE PRESS ANSWERS, WITH UNDO. The card becomes its answered line at once ("Per seat · you, just now", or "Slash
   suggested · Sam accepted" for what Slash drafted), with Undo on it for six seconds, and only then is the answer sent
@@ -395,7 +396,8 @@
     {:else}
       <ul class="queue-options">
         {#each card.ways as way, i (way.key)}
-          {@const marked = way.recommended && card.suggests}
+          {@const marked = way.recommended}
+          <!-- THE SUGGESTION IS MARKED ON EVERY CARD, a hard one too: there only Enter is taken away (`card.ts`). -->
           <li class="queue-option" data-recommended={marked ? '' : undefined}>
             <!-- WHAT THE OPTION IS, in the renderer's own box and classes: a swatch writes its colour into `--swatch` on
                  its chip and nowhere else (`05 §5`), after `visualOf` held it to the renderer's reading. -->

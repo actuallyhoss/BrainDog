@@ -298,11 +298,25 @@ export type Seen = { where: string; kind: 'commit' | 'mail' | 'other'; times: nu
    holds a digit and a letter both, so a word spelt in a to f ("defaced") and a plain number ("Invoice 20261001") stay. */
 const IDS = [/\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b/giu, /\b[0-9A-HJKMNP-TV-Z]{26}\b/gu, /\b[a-z][a-z0-9_]*#\d+\b/giu];
 
+/* AN ADDRESS IS NOT A WORD EITHER (DIRECTION §37: names, never addresses): a mail address, bare, in angle brackets or
+   behind `mailto:`, is taken out of a bank text's or an import's line as surely as out of a mail's subject. */
+const ADDRESS = /(?:mailto:)?<?[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+>?/giu;
+
+/* BRACKETS LEFT HOLDING NOTHING once what was in them is out, "Jo ()", go too. Only those: a subject's own `foo()` stays. */
+const BRACKETED = /\(([^()]*)\)|\[([^[\]]*)\]|<([^<>]*)>/gu;
+
 /* A WORD LEFT POINTING AT NOTHING once its id is out, "asked about in", goes with it. */
 const DANGLING = /\s+(?:in|on|at|about|for|to|of|from|with|by)$/iu;
 
-const plain = (s: string): string => {
-  let t = IDS.reduce((x, re) => x.replace(re, ''), s)
+/* A HANDLE IN "KNOWN BY" KEEPS ITS ADDRESS (`mastodon:jo@social.example` is how Jo is known there); words lose both. */
+const WORDLESS = [ADDRESS, ...IDS];
+
+const plain = (s: string, out: readonly RegExp[] = WORDLESS): string => {
+  const strip = (x: string) => out.reduce((y, re) => y.replace(re, ''), x);
+  let t = strip(s.replace(BRACKETED, (all, ...held: (string | undefined)[]) => {
+    const inner = held.slice(0, 3).find((h) => h !== undefined) ?? '';
+    return inner.trim() !== '' && strip(inner).trim() === '' ? '' : all;
+  }))
     .replace(/\s{2,}/gu, ' ')
     .replace(/\s+([,.;:])/gu, '$1')
     .trim();
@@ -315,7 +329,7 @@ const repoOf = (s: string): string => s.replace(/\.git$/u, '').split(/[/:]/u).fi
 
 /**
  * Where one `met` line says the person was, and what about: a commit names its repository, a mail its subject.
- * Anything else is its own words, with any id taken out.
+ * Anything else (a bank text, an import, a note) is its own words, with any id or address taken out.
  */
 function placeOf(said: string): { where: string; kind: Seen['kind']; about: string | null } | null {
   const commit = /^commits?\b.*?\bin\s+(\S+)\s*$/iu.exec(said);
@@ -381,7 +395,7 @@ export function keySaid(key: string): Known | null {
   if (!raw) return null;
   /* A KEY OF A KIND THE KERNEL NAMES IS ALREADY ITS VALUE, and taking ids out of it would eat a phone number or a login
      that happens to look like a hash. Only a handle of some other kind is read for ids. */
-  const value = kind === 'remote' || kind === 'folder' ? repoOf(raw) : Object.hasOwn(KEY_LABELS, kind) ? raw : plain(raw);
+  const value = kind === 'remote' || kind === 'folder' ? repoOf(raw) : Object.hasOwn(KEY_LABELS, kind) ? raw : plain(raw, IDS);
   if (!value) return null;
   const label = Object.hasOwn(KEY_LABELS, kind) ? KEY_LABELS[kind]! : kind ? kind.charAt(0).toUpperCase() + kind.slice(1) : seenWords.handle;
   return { label, value };

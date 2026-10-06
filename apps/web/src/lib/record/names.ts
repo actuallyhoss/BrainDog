@@ -162,13 +162,17 @@ export const saidKind = (name: string): ActorKind | undefined => SAID.get(name.t
  *
  * A STRING IN NONE OF THOSE SHAPES IS ALREADY A NAME. Home's feed hands over the name the record gave a person, and
  * that is kept as it was written ("de Vries" stays lower case). Anything left that still looks like an id, with an
- * underscore, a colon or a ULID in it, is Someone on this record rather than itself.
+ * underscore, a colon or a ULID in it, is Someone on this record rather than itself, and so is anything with an `@`,
+ * since that is an address and not a name.
  */
 export function actor(by: string, me: string | null = null, names: ReadonlyMap<string, string> = new Map()): Actor {
   const who = by.trim();
   if (who === 'you' || (me !== null && me !== '' && who === me)) return { name: copy.feedYou, kind: 'you' };
   const named = names.get(who);
   if (named !== undefined && named.trim() !== '') return { name: named, kind: 'person' };
+  /* AN ADDRESS IS NEVER A NAME, in whatever shape it came (`jo@kiln.example`, `Jo <jo@kiln.example>`, `@jo`): a `who`
+     with an `@` the caller holds no name for is Someone on this record, never the address itself. */
+  if (who.includes('@')) return { name: copy.feedSomeone, kind: 'person' };
   if (who === 'slash') return said(nameWords.slash, 'slash');
   if (who === 'system') return said(nameWords.brainDog, 'system');
   if (who === SEED) return said(nameWords.brainDog, 'sample');

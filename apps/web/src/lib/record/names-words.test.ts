@@ -22,6 +22,13 @@ test('a person is their name where the caller holds one, and Someone on this rec
   assert.deepEqual(actor('p_self'), { name: copy.feedSomeone, kind: 'person' });
 });
 
+test('AN ADDRESS IS NEVER A NAME: any who with an @ is Someone, unless the caller holds a name for it', () => {
+  for (const who of ['jo@kiln.example', 'Jo Bell <jo@kiln.example>', '@jo', 'agent:bot@kiln.example']) {
+    assert.deepEqual(actor(who), { name: copy.feedSomeone, kind: 'person' }, who);
+  }
+  assert.deepEqual(actor('jo@kiln.example', null, new Map([['jo@kiln.example', 'Jo Bell']])), { name: 'Jo Bell', kind: 'person' });
+});
+
 test('Slash, the record and the sample are said by the product\'s names', () => {
   assert.deepEqual(actor('slash'), { name: nameWords.slash, kind: 'slash' });
   assert.deepEqual(actor('system'), { name: nameWords.brainDog, kind: 'system' });

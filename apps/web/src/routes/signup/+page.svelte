@@ -40,6 +40,7 @@
   import * as pref from '$lib/pref.ts';
   import { INSTALL_ORDER } from '$lib/shape.ts';
   import {
+    allWritten,
     arrivalOf,
     billing,
     checkout,
@@ -76,6 +77,7 @@
   import Currency from '../start/Currency.svelte';
   import Frame from '../start/Frame.svelte';
   import NoRecord from '../start/NoRecord.svelte';
+  import type { Accepting } from '../start/accept.ts';
   import NameField from './NameField.svelte';
   import { words } from './words.ts';
 
@@ -421,8 +423,9 @@
     /* ONE PRESS, ONE MAIL: a second press while the first is out does nothing. */
     if (!ready) return;
     const person = live?.name ?? '';
-    keepSaid(localStore(), draftNow());
     if (signedIn !== null) {
+      /* NO MAIL TO WAIT ON: kept now, because a paid plan leaves for Stripe's page and comes back to a new page load. */
+      keepSaid(localStore(), draftNow());
       held = { slug, name: person || null, tz: zone(), plan };
       hold(globalThis.sessionStorage, held);
       if (plan === 'free') void makeFree(held);
@@ -435,6 +438,8 @@
     busy = false;
     if (out.ok) {
       sentTo = email.trim();
+      /* KEPT ONLY ONCE THE HOST SAID YES, so a refused address leaves nobody's words on this device. */
+      keepSaid(localStore(), draftNow());
       /* KEPT NOW AS WELL AS IN THE PROOF, so a proof opened in this tab still finds the name if the mail was slow. */
       hold(globalThis.sessionStorage, { slug, name: person.trim() || null, tz: zone(), plan });
       keepPlan(localStore(), plan);
@@ -486,6 +491,17 @@
   /** What could not be written into the new record, said in the person's words. */
   let missed = $state.raw<string[]>([]);
   let madeAt = $state('');
+  /**
+   * The press that did not finish, to make again from here: the record by its name, and what is still to write. `null`
+   * once everything went in, or when there is nothing to make again.
+   */
+  let again = $state.raw<{ name: string; asked: Accepting } | null>(null);
+
+  /** The person moved on to the record as it is: nothing more is made from here, so the words are forgotten. */
+  function openAsIs(): void {
+    forget();
+    location.assign(madeAt);
+  }
 
   /**
    * A free record, made there and then, and opened in this browser; then the build written into it.
@@ -532,9 +548,7 @@
     stage = words.makingParts([...(one ? [one.title] : []), ...kept.map(moduleName)].slice(0, 4));
     const keepsMoney = kept.some(keepsCurrency);
     const signed = await methods();
-    const { accept } = await import('../start/accept.ts');
-    /* THE NEW RECORD BY ITS NAME: this page is under no slug, so its own base is the host's, and the record's is under it. */
-    const out = await accept(createClient({ base: apiBase({ origin: apiBase(), pathname: `${BASE}/${name}/` }) }), {
+    await write(name, {
       sentence: draft.said,
       proposal: p,
       usecase: one?.usecase ?? null,
@@ -545,24 +559,44 @@
       email: signed.ok ? (signed.value.me?.email ?? null) : null,
       nav: pref.read().nav ?? [],
       locale,
-    }).catch(() => null);
+    });
+  }
+
+  /**
+   * ONE PRESS OF `/start`'s `accept()` AGAINST THE NEW RECORD, and what it came back with.
+   *
+   * THE WORDS ARE FORGOTTEN ONLY WHEN ALL OF IT WENT IN. A press that did not answer, or that missed something, keeps the
+   * sentence and offers Try again, which writes only what is still missing (`left`), as a second press on `/start` does.
+   */
+  async function write(name: string, asked: Accepting): Promise<void> {
+    step = 'making';
+    busy = true;
+    const { accept } = await import('../start/accept.ts');
+    /* THE NEW RECORD BY ITS NAME: this page is under no slug, so its own base is the host's, and the record's is under it. */
+    const out = await accept(createClient({ base: apiBase({ origin: apiBase(), pathname: `${BASE}/${name}/` }) }), asked).catch(() => null);
     if (out?.nav) pref.write({ nav: out.nav });
-    forget();
-    /* NOTHING ANSWERED: the record is made and empty, so its /start asks the question there rather than saying it is ready. */
-    if (out === null) {
-      location.assign(at('/start', `${BASE}/${name}/`));
+    /* NOTHING ANSWERED: the record may be empty, so opening it as it is lands on its /start, which asks the question
+       there, not on the end of a first run that never wrote anything. */
+    madeAt = at(out === null ? '/start' : '/start#made', `${BASE}/${name}/`);
+    if (allWritten(out)) {
+      again = null;
+      forget();
+      stage = words.makingOpen;
+      location.assign(madeAt);
       return;
     }
-    const made = at('/start#made', `${BASE}/${name}/`);
-    if (out.failed.length > 0) {
-      missed = out.failed.map((f) => f.said);
-      madeAt = made;
-      busy = false;
-      step = 'made-partly';
-      return;
-    }
-    stage = words.makingOpen;
-    location.assign(at(made));
+    /* NOTHING ANSWERED: the record is made and may be empty, so it is the whole press again. Otherwise only what is left,
+       over the rail order this press already wrote. */
+    again = { name, asked: out === null ? asked : { ...asked, nav: out.nav ?? asked.nav, proposal: { ...asked.proposal, rows: out.left } } };
+    missed = out === null ? [] : out.failed.map((f) => f.said);
+    busy = false;
+    step = 'made-partly';
+  }
+
+  function writeAgain(): void {
+    if (busy || again === null) return;
+    stage = words.makingAgain;
+    void write(again.name, again.asked);
   }
 
   function makeAgain(e: SubmitEvent): void {
@@ -764,12 +798,15 @@
         <p class="lede" role="status">{stage}</p>
         <span class="bar" aria-hidden="true"><span class="bar-fill"></span></span>
       {:else if step === 'made-partly'}
-        <h1 class="title">{firstRun.madeTitle}</h1>
-        <p class="lede">{words.madePartly}</p>
-        <ul class="missed">
-          {#each missed as m, i (i)}<li>{m}</li>{/each}
-        </ul>
-        <div class="go"><Button weight="primary" href={madeAt}>{firstRun.openHome}</Button></div>
+        <h1 class="title">{words.madeTitle}</h1>
+        <p class="lede" role="status">{missed.length > 0 ? words.madePartly : words.madeUnreached}</p>
+        {#if missed.length > 0}
+          <ul class="missed">
+            {#each missed as m, i (i)}<li>{m}</li>{/each}
+          </ul>
+        {/if}
+        <div class="go"><Button weight="primary" onclick={writeAgain} disabled={busy || again === null}>{words.tryAgain}</Button></div>
+        <p class="aside"><button class="link plain" type="button" onclick={openAsIs}>{words.openAsIs}</button></p>
       {:else if step === 'make-failed'}
         <h1 class="title">{words.makeRecord}</h1>
         {#if said}<p class="lede" role="alert">{said}</p>{/if}

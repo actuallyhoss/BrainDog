@@ -45,8 +45,16 @@ export const words = {
   makingRecord: 'Making your record',
   makingParts: (parts: readonly string[]) => (parts.length === 0 ? 'Setting it up' : `Adding ${firstRun.and(parts)}`),
   makingOpen: 'Opening it',
-  /** When some of the build did not go in: the record is made, and what is missing can be added from it. */
-  madePartly: 'Your BrainDog is made, and some of it could not be added. You can add it from inside.',
+  /**
+   * When the build did not all go in: the record is made, what you said is kept on this device, and one press tries
+   * again with only what is missing. Opening it as it is forgets what you said here.
+   */
+  madeTitle: 'Your BrainDog is made',
+  madePartly: 'Some of what you said could not be added yet. Try again, or open it and add the rest from inside.',
+  madeUnreached: 'What you said did not reach it yet. Try again, or open it and say it there.',
+  tryAgain: 'Try again',
+  makingAgain: 'Adding what is missing',
+  openAsIs: 'Open it as it is',
 
   /** A refusal that came without the host's sentence: the name is the one thing on this screen to change. */
   makeFor: (name: string) => `Make ${name}`,

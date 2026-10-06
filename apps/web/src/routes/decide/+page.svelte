@@ -44,7 +44,7 @@
   import { hostedHere } from '../settings/billing.ts';
   import { fromInput, keyAct } from './press.ts';
   import type { Improved } from './improved.ts';
-  import { proposer } from '$lib/page/queue-answer.ts';
+  import { askerOf as cardAsker } from '$lib/decide/card.ts';
   import { listen } from '$lib/page/listen.svelte.ts';
   import PageView from '$lib/page/PageView.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -74,9 +74,9 @@
   const answerable = $derived(mayAnswer(me.level, me.owner));
   const whyNot = $derived(whyNotAnswering(me.level, me.lists));
 
-  /** Who asked the first question, by name, for the head's line; nothing for the reader themself. */
+  /** Who asked the first question, by name, as its card's by-line says it (a run by its app); nothing for the reader. */
   function askerOf(q: QueueQuestion): string {
-    const who = proposer(q.who, me.person || null, names);
+    const who = cardAsker(q, me.person || null, names);
     return who.kind === 'you' ? '' : who.name;
   }
 

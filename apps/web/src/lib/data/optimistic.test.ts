@@ -121,6 +121,56 @@ test('a change with no receipt says nothing when it lands', async () => {
   assert.equal(lines.length, 0);
 });
 
+test('AN EMPTY RECEIPT raises no toast', async () => {
+  const { say, lines } = said();
+  await optimist(say).run({ apply: () => {}, revert: () => {}, send: async () => ({ ok: true, value: 1 }), said: '' });
+  await optimist(say).run({ apply: () => {}, revert: () => {}, send: async () => ({ ok: true, value: 1 }), said: () => '' });
+  assert.equal(lines.length, 0);
+});
+
+test('WITH THE RECORD’S UNDO HANDED IN, a write that landed under a batch is put back by the record and read again', async () => {
+  const { say, lines } = said();
+  const log: string[] = [];
+  const undoBatch = async (batch: string) => (log.push(`undo ${batch}`), { from: 'undone' as const, put: 2, skipped: [], said: 'Put back 2 changes.' });
+  const { run } = optimist(say, { undoBatch });
+  await run({
+    apply: () => {},
+    revert: () => {},
+    send: async () => ({ ok: true, value: { seq: 4, batch: 'b9' } }),
+    said: 'Marked Rent done.',
+    undo: () => ({ apply: () => log.push('draw'), revert: () => log.push('drop'), send: async () => (log.push('inverse'), { ok: true, value: null }) }),
+    reread: () => log.push('reread'),
+  });
+  lines[0]?.undo?.();
+  await settle();
+  await settle();
+  assert.deepEqual(log, ['draw', 'undo b9', 'reread', 'drop']);
+  assert.deepEqual(lines.map((l) => l.text), ['Marked Rent done.', 'Put back 2 changes.']);
+});
+
+test('WITH THE RECORD’S UNDO HANDED IN, a self-drawn way back the record replaced still has the screen read again', async () => {
+  const { say, lines } = said();
+  const log: string[] = [];
+  const undoBatch = async () => ({ from: 'undone' as const, put: 1, skipped: [], said: 'Put back 1 change.' });
+  const { run } = optimist(say, { undoBatch, reread: () => log.push('reread') });
+  await run({ apply: () => {}, revert: () => {}, send: async () => ({ ok: true, value: { batch: 'b2' } }), said: 'Archived Rent.', undo: () => () => log.push('own') });
+  lines[0]?.undo?.();
+  await settle();
+  await settle();
+  assert.deepEqual(log, ['reread']);
+});
+
+test('WITH THE RECORD’S UNDO HANDED IN, a write that said no batch is undone by the screen’s own way back', async () => {
+  const { say, lines } = said();
+  const asked: string[] = [];
+  let pressed = 0;
+  const { run } = optimist(say, { undoBatch: async (b) => (asked.push(b), { from: 'missing', fix: '' }) });
+  await run({ apply: () => {}, revert: () => {}, send: async () => ({ ok: true, value: { seq: 4 } }), said: 'Saved.', undo: () => () => pressed++ });
+  lines[0]?.undo?.();
+  assert.equal(pressed, 1);
+  assert.deepEqual(asked, []);
+});
+
 type Row = { id: string; state: string };
 const key = (r: Row) => r.id;
 

@@ -236,6 +236,8 @@ export type LiveBlock = BlockResult & {
    * record older than the look overlay, where the page works one out the same way.
    */
   key?: string;
+  /** Who changed each row last, aligned with the rows, as the record answered it (`$lib/page/byline.ts` reads it). */
+  changes?: unknown[];
 };
 
 /** The mark and hue of the project a row applies to, as the kernel answers them beside `scopes` (`scope_marks`). */
@@ -915,6 +917,9 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
      dropped. */
   const shell: LiveBlock = {
     ...rest,
+    /* WHO CHANGED EACH ROW, aligned with the rows, put back on the block so a page draws its bylines and tints
+       (`$lib/page/byline.ts` narrows each one itself). */
+    ...(Array.isArray(changed) ? { changes: changed } : {}),
     kind,
     ...(source === undefined ? {} : { source }),
     ...(span === undefined ? {} : { span }),

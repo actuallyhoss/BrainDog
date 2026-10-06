@@ -383,6 +383,17 @@ test('a label that is not text is left off rather than drawn, and the page still
   assert.doesNotThrow(() => toSegments(stat!));
 });
 
+test('WHO CHANGED EACH ROW rides on the block for its bylines, and a block that said none carries none', () => {
+  const now = Date.UTC(2026, 8, 16, 12);
+  const changes = [{ by: 'agent:claude', at: '2026-09-16T11:00:00Z' }, null];
+  const said = blockOf({ kind: 'note', heading: 'Notes', rows: [], matched: 0, refusals: [], changes }, new Map(), now);
+  assert.deepEqual(said.changes, changes);
+  const none = blockOf({ kind: 'note', heading: 'Notes', rows: [], matched: 0, refusals: [] }, new Map(), now);
+  assert.equal('changes' in none, false);
+  const odd = blockOf({ kind: 'note', heading: 'Notes', rows: [], matched: 0, refusals: [], changes: 'everyone' } as never, new Map(), now);
+  assert.equal('changes' in odd, false, 'changes that are not a list are left off');
+});
+
 /* A CASH WALK, A FEED AND A DIFF ARE ANSWERED LIVE BY THE KERNEL, as `walk`, `feed` with `seen`, and
    `history`. This build drew each as "This block cannot be drawn from the record yet". They are now
    shaped into the rows the sample's own blocks carry, so the same renderers draw them. */
