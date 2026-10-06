@@ -13,7 +13,8 @@
 <script lang="ts">
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
-  import { iconFor, REGISTERS } from '$lib/record/api.ts';
+  import { iconFor } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import { keptName, mergeListOf, words, type Merge, type Press } from './merge.ts';
 
   let {

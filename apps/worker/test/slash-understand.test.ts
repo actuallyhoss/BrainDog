@@ -68,7 +68,7 @@ test('AT AN OPERATOR CEILING OF 0 NOTHING REACHES THE BINDING, and the pair wait
 
   const judged = await jobs.resolve(PAIRS);
   assert.equal(judged.ok, false);
-  assert.equal(!judged.ok && judged.refusal.code, 'SLASH_BUDGET_SPENT');
+  assert.equal(!judged.ok && 'refusal' in judged && judged.refusal.code, 'SLASH_BUDGET_SPENT');
   assert.equal(ai.runs.length, 0, 'the operator turned every ask away and the Worker asked who is who anyway');
 });
 

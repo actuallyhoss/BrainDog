@@ -29,7 +29,8 @@
   import { day, queueCost, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { iconFor, REGISTERS, whoDid } from '$lib/record/api.ts';
+  import { iconFor, whoDid } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import { installWords } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import Cited from '$lib/ui/Cited.svelte';
