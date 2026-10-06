@@ -294,7 +294,7 @@ async function record() {
   const installed = await api.kernel.install([PROJECTS, PEOPLE]);
   assert.ok(installed.ok, JSON.stringify(installed));
   const bake = await api.create({ register: 'projects', fields: { name: 'Bake', note: BAKE_NOTE } }, OWNER);
-  assert.ok(bake.ok, JSON.stringify(bake));
+  assert.ok(bake.ok && !('asked' in bake.value), JSON.stringify(bake));
   const jo = await api.create({ register: 'people', fields: { name: 'Jo Okonkwo', email: 'jo@okonkwo.example', note: 'Illustration, invoices monthly.' } }, OWNER);
   assert.ok(jo.ok, JSON.stringify(jo));
   const filed: { question: string; body: Record<string, unknown> }[] = [];

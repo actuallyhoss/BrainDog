@@ -766,6 +766,61 @@ export function wroteBrief(verb: 'Added' | 'Changed', row: Shaped, register: str
   return [`${verb}: ${rowLine(row, register, look)}`, version].filter(Boolean).join(' · ');
 }
 
+/**
+ * What became of an agent's write under its rung (DIRECTION §37's ladder), as the record answers it beside the write:
+ * `rung` when the write went through because the agent may make that kind of change (`null` when the record said it
+ * landed by the ladder without naming the rung), `filed` when it was put on Decide as a question instead, with the
+ * record's one line on why. Neither for a person's own write, which has no rung.
+ */
+export type Filed = { id: string; question: string; why?: string; decide?: string };
+export type Ruled = { rung: 'tell' | 'quiet' | null } | { filed: Filed };
+
+/**
+ * The record's word on a write's rung, read off its answer, or `null` when it said none.
+ *
+ * READ OFF THE ANSWER AND NEVER WORKED OUT HERE: which rung an agent stands on is the record's ladder, and the tool
+ * layer decides nothing. The record files a write as `asked` in place of the row, and a proposal its ladder accepted
+ * says `landed: true` beside the decision; `filed` is read as `asked` is.
+ */
+export function ruledOf(value: unknown): Ruled | null {
+  if (!isObject(value)) return null;
+  if (value.rung === 'tell' || value.rung === 'quiet') return { rung: value.rung };
+  if (value.landed === true) return { rung: null };
+  const filed = isObject(value.asked) ? value.asked : value.filed;
+  if (isObject(filed) && typeof filed.id === 'string' && filed.id !== '')
+    return {
+      filed: {
+        id: filed.id,
+        question: typeof filed.question === 'string' ? filed.question : '',
+        ...(typeof filed.why === 'string' && filed.why.trim() !== '' ? { why: filed.why.trim() } : {}),
+        ...(typeof filed.decide === 'string' ? { decide: filed.decide } : {}),
+      },
+    };
+  return null;
+}
+
+/**
+ * The line a write ends with when its rung decided it:
+ *
+ *     Done, as you may on Tasks · Sam can undo it
+ *     Filed for Sam to decide: Mark the invoice to Acme paid? (Q12)
+ *
+ * IN NAMES: the lists by the names their declarations give, and the person by the name the record has for them, so the
+ * agent can say it on as it is. A filed write tells the agent nothing was written, which is the one thing it must not
+ * get wrong next, and why it asked, so the agent does not send it again.
+ */
+export function ruledBrief(ruled: Ruled, registers: readonly string[], look: Look): string {
+  if ('rung' in ruled) {
+    const names = [...new Set(registers.map((r) => look.decl(r)?.name ?? r))];
+    const on = names.length === 0 ? '' : ` on ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(names)}`;
+    return `Done, as you may${on} · ${look.decider} can undo it`;
+  }
+  const { id, question, why, decide } = ruled.filed;
+  const asked = question.trim() === '' ? `Filed for ${look.decider} to decide (${id})` : `Filed for ${look.decider} to decide: ${clip(question, 160)} (${id})`;
+  const unwritten = `Nothing is written until ${look.decider} accepts it in BrainDog${decide ? ` at ${decide}` : ''}.`;
+  return [asked, why === undefined ? unwritten : `${clip(why, 200)} ${unwritten}`].join('\n');
+}
+
 /** `log`: where the note went, and the version it left the entry at. */
 export function loggedBrief(spoken: string, words: string, version: unknown, deleted: boolean, look?: Look): string {
   return [`Noted on ${look ? namedIn(words, spoken, look) : named(words, spoken)}`, typeof version === 'number' ? `version ${String(version)}` : null, deleted ? 'it was deleted, and the note is kept with it' : null]

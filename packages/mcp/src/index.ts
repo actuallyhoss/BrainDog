@@ -111,7 +111,10 @@ import {
   metBrief,
   namedIn,
   type MetSaid,
+  type Filed,
   proposedBrief,
+  ruledBrief,
+  ruledOf,
   refusalBrief,
   rowWhole,
   schemaBrief,
@@ -2063,9 +2066,18 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         value = { ...value, dry_run: dry.ok ? dry.value : { refused: 'refusal' in dry ? dry.refusal : dry } };
       }
       const out = bare(value) as Record<string, unknown>;
+      /* A PROPOSAL THE AGENT'S RUNG LET THROUGH IS DONE, NOT ASKED: the record answered it as the ladder (`rule:ladder`)
+         and says so with `landed: true` (or `rung`), so "Asked" would send the agent to wait on a question nobody will see. */
+      const ruled = ruledOf(out);
+      const lists = isObject(body) && typeof body.register === 'string' ? [body.register] : [];
+      for (const list of ruled === null ? [] : lists) if (!prefixes.has(list)) await learnPrefix(list, ctx);
       return {
         result: { ok: true, value: out },
-        say: (look) => [proposedBrief(out, question, look), ...(out.dry_run === undefined ? [] : [`What it would do: ${clip(JSON.stringify(out.dry_run), 1_500)}`])].join('\n'),
+        say: (look) =>
+          [
+            ruled !== null && 'rung' in ruled ? ruledBrief(ruled, lists, look) : proposedBrief(out, question, look),
+            ...(out.dry_run === undefined ? [] : [`What it would do: ${clip(JSON.stringify(out.dry_run), 1_500)}`]),
+          ].join('\n'),
         names: { people: true },
       };
     },
@@ -2138,7 +2150,11 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         out = await surface.update({ ...at.value, patch: {}, note }, ctx);
       }
       if (!out.ok) return { result: await failed(out, ctx, turn) };
-      if (!isEntry(out.value)) return { result: { ok: true, value: bare(out.value) } };
+      const ruled = ruledOf(out.value);
+      if (!isEntry(out.value)) {
+        if (ruled !== null && 'filed' in ruled) return filedOut(ruled.filed, ctx, turn);
+        return { result: { ok: true, value: bare(out.value) } };
+      }
       const entry = out.value;
       if (!prefixes.has(entry.register)) await learnPrefix(entry.register, ctx);
       const row = compact(entry, prefixOf(entry.register));
@@ -2148,7 +2164,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const { spoken, version, updated_at, deleted_at } = row;
       const value = { spoken, version, ...(updated_at === undefined ? {} : { updated_at }), ...(deleted_at === undefined ? {} : { deleted_at }) };
       const words = titleOf(entry.fields, decls.get(entry.register));
-      return { result: { ok: true, value }, say: (look) => loggedBrief(String(spoken), words, version, deleted_at !== undefined, look) };
+      if (ruled === null || !('rung' in ruled)) return { result: { ok: true, value }, say: (look) => loggedBrief(String(spoken), words, version, deleted_at !== undefined, look) };
+      return {
+        result: { ok: true, value: ruled.rung === null ? value : { ...value, rung: ruled.rung } },
+        say: (look) => [loggedBrief(String(spoken), words, version, deleted_at !== undefined, look), ruledBrief(ruled, [entry.register], look)].join('\n'),
+        names: { people: true },
+      };
     },
 
     /* The arguments go through whole: which fields a session may set, and how `tried` appends, are
@@ -2276,13 +2297,39 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     },
   };
 
-  /** What `create`, `update` and `log` on a run answer: the row compact, or the conflict with its row in that shape. */
+  /**
+   * What `create`, `update` and `log` on a run answer: the row compact, or the conflict with its row in that shape.
+   *
+   * AND WHAT THE AGENT'S RUNG DID WITH IT (`ruledOf`), said after the row in names: done because it may make that kind of
+   * change, or filed on Decide with nothing written. A write the record filed has no row, so the answer is the question
+   * and its link, and never a row the agent would take for written.
+   */
   async function wrote(r: Result<unknown>, verb: 'Added' | 'Changed', ctx: C, turn: Turn): Promise<Done> {
     if (!r.ok) return { result: await failed(r, ctx, turn) };
-    if (!isEntry(r.value)) return { result: { ok: true, value: bare(r.value) } };
+    const ruled = ruledOf(r.value);
+    if (!isEntry(r.value)) {
+      if (ruled === null || !('filed' in ruled)) return { result: { ok: true, value: bare(r.value) } };
+      return filedOut(ruled.filed, ctx, turn);
+    }
     const entry = r.value;
     const row = await entryOut(entry, ctx, turn);
-    return { result: { ok: true, value: row }, say: (look) => wroteBrief(verb, row as Shaped, entry.register, look) };
+    if (ruled === null || !('rung' in ruled)) return { result: { ok: true, value: row }, say: (look) => wroteBrief(verb, row as Shaped, entry.register, look) };
+    return {
+      result: { ok: true, value: ruled.rung === null ? row : { ...row, rung: ruled.rung } },
+      say: (look) => [wroteBrief(verb, row as Shaped, entry.register, look), ruledBrief(ruled, [entry.register], look)].join('\n'),
+      names: { people: true },
+    };
+  }
+
+  /** A write the record filed on Decide instead of making: the question, its link, and the person it waits on. */
+  async function filedOut(filed: Filed, ctx: C, turn: Turn): Promise<Done> {
+    const linked = await decideAt({ ok: true, value: filed }, ctx, turn);
+    const value = (linked.ok && isObject(linked.value) ? linked.value : filed) as Filed;
+    return {
+      result: { ok: true, value: { filed: value } },
+      say: (look) => ruledBrief({ filed: value }, [], look),
+      names: { people: true },
+    };
   }
 
   /** A row whose JSON would not fit one answer, its longest texts cut at a word until it does, and the row saying so. */

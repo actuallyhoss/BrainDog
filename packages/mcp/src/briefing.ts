@@ -197,6 +197,12 @@ const touched = (p: Record<string, unknown>): number | null => {
  * known, and no handle is said for a person, because the slot is read by a person through the agent.
  */
 export function whoSaid(c: Record<string, unknown>, project: Record<string, unknown> | null, look: Look): string | null {
+  /* THE ORGANISATIONS `context` SENDS (`organisations`, each `{ spoken, name, kind }`, the project's own first), read
+     for two things: a person's organisation sent as a handle is said by its name from here when this answer read no
+     words for it, and the project's own is what it is for. */
+  const organisations = (Array.isArray(c.organisations) ? c.organisations : []).filter(isObject);
+  const orgNames = new Map(organisations.flatMap((o) => (typeof o.spoken === 'string' && typeof o.name === 'string' && o.name.trim() !== '' ? [[o.spoken, o.name.trim()] as const] : [])));
+  const said: Look = { ...look, title: (spoken) => look.title(spoken) ?? orgNames.get(spoken) };
   const people = (Array.isArray(c.people) ? c.people : []).filter(isObject).filter((p) => p.self !== true);
   const order = people.map((p, i) => ({ p, i, at: touched(p) }));
   /* THE DATED FIRST, NEWEST AT THE TOP, and anybody `context` sent no date for after them in the order it sent: a
@@ -204,16 +210,21 @@ export function whoSaid(c: Record<string, unknown>, project: Record<string, unkn
   order.sort((a, z) => (a.at === z.at ? a.i - z.i : a.at === null ? 1 : z.at === null ? -1 : z.at - a.at));
   const named = order
     .map(({ p }) => {
-      const name = wordsOf(p.name, look) ?? wordsOf(titleOf(shapedOf(p).fields, undefined), look);
+      const name = wordsOf(p.name, said) ?? wordsOf(titleOf(shapedOf(p).fields, undefined), said);
       if (name === null) return null;
-      const about = wordsOf(p.role, look) ?? wordsOf(p.org, look) ?? wordsOf(p.organisation, look);
+      const about = wordsOf(p.role, said) ?? wordsOf(p.org, said) ?? wordsOf(p.organisation, said);
       return about && about.toLowerCase() !== name.toLowerCase() ? `${clip(name, 40)} (${clip(about, 30)})` : clip(name, 40);
     })
     .filter((n): n is string => n !== null);
   const total = typeof c.people_total === 'number' && c.people_total >= named.length ? c.people_total : named.length;
   const rest = total - Math.min(named.length, WHO_SHOWN);
-  const orgs = [project?.org, project?.organisation, ...(Array.isArray(c.organisations) ? c.organisations : [])];
-  const org = orgs.map((o) => wordsOf(o, look)).find((o): o is string => o !== null) ?? null;
+  /* WHAT THE PROJECT IS FOR IS ITS OWN ORGANISATION: one the project names, else one `context` marks `linked`, else, from
+     a record that marks none, the first it sent, which is the linked one when there is one. One marked not linked is
+     only who its people are with, and they already say so beside their names. */
+  const marked = organisations.some((o) => typeof o.linked === 'boolean');
+  const own = marked ? organisations.filter((o) => o.linked === true) : organisations;
+  const orgs = [project?.org, project?.organisation, ...own];
+  const org = orgs.map((o) => wordsOf(o, said)).find((o): o is string => o !== null) ?? null;
   /* ONE THING FOR THE PEOPLE AND ONE FOR THE ORGANISATION, as every slot names at most three. */
   const who = [...named.slice(0, WHO_SHOWN), ...(rest > 0 ? [`+${grouped(rest)}`] : [])].join(', ');
   const parts = [...(who ? [who] : []), ...(org ? [`for ${clip(org, 40)}`] : [])];

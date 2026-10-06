@@ -83,7 +83,7 @@ test('THE LOG IS ASKED FOR ITS BOOKKEEPING ONLY WITH everything, as the word the
   const { sql, clock, api, sent, client } = await wired();
   /* A STAMP, which is bookkeeping: the agent's run moving an instant it wrote an hour ago to the moment it writes. */
   const made = await api.create({ register: 'tasks', fields: { what: 'Look at the tools', checked: new Date(NOW).toISOString() } }, agent);
-  assert.ok(made.ok, JSON.stringify(made));
+  assert.ok(made.ok && !('asked' in made.value), JSON.stringify(made));
   clock.advance(60 * MIN);
   const stamped = await api.update({ register: 'tasks', seq: made.value.seq!, patch: { checked: new Date(NOW + 60 * MIN).toISOString() } }, agent);
   assert.ok(stamped.ok, JSON.stringify(stamped));

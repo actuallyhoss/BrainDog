@@ -307,6 +307,12 @@ const CORE_ROUTES: readonly Route[] = [
      `setDeclaration`'s reason: a look is a declaration, and what it puts back or keeps is the page everybody opens. */
   { name: 'undoLook', group: 'ADMIN', writes: true, what: 'Put a page back the way it was before Slash arranged it. Only while that arrangement is still the one Slash wrote.' },
   { name: 'keepLook', group: 'ADMIN', writes: true, what: 'Keep how Slash arranged a page once its Undo has passed, so the page says who kept it. The arrangement itself is not changed.' },
+  /* UNDO ON THE SERVER (DIRECTION §37's trust ladder): one batch of changes or one decision, and every change one run
+     made. ADMIN for `restore`'s reason, a person in a browser: what is put back is the record everybody reads, and no
+     token reaches either, so an agent cannot quietly take back what a person saw. `dry` answers the plan in names and
+     the hash that applying it needs, so what is put back is the plan the person read and nothing that moved since. */
+  { name: 'undo', group: 'ADMIN', writes: true, what: 'Put back one set of changes, or what one decision did. Ask with dry first to read what would go back; a change somebody has made since is left alone.' },
+  { name: 'undoRun', group: 'ADMIN', writes: true, what: 'Put back every change one agent run made. Ask with dry first to read what would go back; a change somebody has made since is left alone.' },
   { name: 'ruleApply', group: 'ADMIN', writes: true, what: 'Run one rule over the rows already there. `dry` first: there is no undo.' },
   { name: 'examples', group: 'ADMIN', writes: false, what: 'The example rows setting up planted that nobody has touched, counted by list. It writes nothing.' },
   { name: 'clearExamples', group: 'ADMIN', writes: true, what: 'Delete every example row nobody has touched. A row somebody edited, or one a row of theirs points at, stays.' },
@@ -586,6 +592,10 @@ export type RecordSurface = {
   retireDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
   undoLook(args: never, ctx: never): Promise<Result<unknown>>;
   keepLook(args: never, ctx: never): Promise<Result<unknown>>;
+  /* OPTIONAL FOR `scriptTry`'s REASON: a record built before server undo answers `NOT_IN_THIS_BUILD` from its handler
+     below, never a 500 from calling a method that is not there. */
+  undo?(args: never, ctx: never): Promise<Result<unknown>>;
+  undoRun?(args: never, ctx: never): Promise<Result<unknown>>;
   ruleApply(args: never, ctx: never): Promise<Result<unknown>>;
   examples(args: never, ctx: never): Promise<Result<unknown>>;
   clearExamples(args: never, ctx: never): Promise<Result<unknown>>;
@@ -690,6 +700,14 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     retireDeclaration: (a, ctx) => api.retireDeclaration(a as never, ctx as never),
     undoLook: (a, ctx) => api.undoLook(a as never, ctx as never),
     keepLook: (a, ctx) => api.keepLook(a as never, ctx as never),
+    undo: async (a, ctx) =>
+      api.undo
+        ? api.undo(a as never, ctx as never)
+        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot put changes back yet, so nothing was changed. Change it back by hand where it was made.' } },
+    undoRun: async (a, ctx) =>
+      api.undoRun
+        ? api.undoRun(a as never, ctx as never)
+        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot put a run back yet, so nothing was changed. Change back by hand what the run did.' } },
     ruleApply: (a, ctx) => api.ruleApply(a as never, ctx as never),
     examples: (a, ctx) => api.examples(a as never, ctx as never),
     clearExamples: (a, ctx) => api.clearExamples(a as never, ctx as never),

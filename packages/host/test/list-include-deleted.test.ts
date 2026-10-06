@@ -52,7 +52,7 @@ async function host() {
   assert.ok((await api.kernel.install([OBLIGATIONS])).ok);
   const kept = await api.create({ register: 'obligations', fields: { what: 'Invoice 41' } }, owner);
   const gone = await api.create({ register: 'obligations', fields: { what: 'Invoice 42' } }, owner);
-  assert.ok(kept.ok && gone.ok);
+  assert.ok(kept.ok && gone.ok && !('asked' in gone.value));
   const deleted = await api.update({ register: 'obligations', seq: gone.value.seq!, patch: { deleted_at: true }, version: gone.value.version }, owner);
   assert.ok(deleted.ok, JSON.stringify(deleted));
   const handlers = handlersFor(api);

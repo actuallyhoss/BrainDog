@@ -20,7 +20,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ROUTES } from '@braindog/host';
-import type { Answer } from '@braindog/host/types';
+import type { Answer, AnswerOr } from '@braindog/host/types';
 import type { ShareClosed, ShareLink, ShareRow } from '@braindog/host';
 
 export type ClientOptions = {
@@ -1212,6 +1212,14 @@ export function createClient(options: ClientOptions) {
     undoLook: (args: { page: string }) => call<Answer<'undoLook'>>('undoLook', args as Record<string, unknown>),
     /** Keep how Slash arranged a page once its Undo has passed, so the page says who kept it. */
     keepLook: (args: { page: string }) => call<Answer<'keepLook'>>('keepLook', args as Record<string, unknown>),
+    /* UNDO ON THE SERVER: ADMIN, so a browser session, and no token reaches either. `dry: true` answers the plan in
+       names and its `hash`; applying sends that `hash` back, so what goes back is the plan the person read. A change
+       somebody made since is skipped and said, never overwritten. */
+    /** Put back one set of changes (`batch`) or what one decision did (`decision`). */
+    undo: (args: ({ batch: string } | { decision: string }) & { dry?: boolean; hash?: string }) =>
+      call<AnswerOr<'undo', unknown>>('undo', args as Record<string, unknown>),
+    /** Put back every change one agent run made. */
+    undoRun: (args: { run: string; dry?: boolean; hash?: string }) => call<AnswerOr<'undoRun', unknown>>('undoRun', args as Record<string, unknown>),
     /** Delete this record. `slug` is its name, typed to confirm. */
     deleteRecord: (args: { slug: string }) => call<{ slug: string; deleted: true }>('deleteRecord', args as Record<string, unknown>),
 

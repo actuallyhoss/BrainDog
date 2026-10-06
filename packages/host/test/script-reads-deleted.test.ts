@@ -73,7 +73,7 @@ async function record() {
   assert.ok((await api.kernel.install([CLIENTS])).ok);
   const acme = await api.create({ register: 'clients', fields: { name: 'Acme' } }, owner);
   const bolt = await api.create({ register: 'clients', fields: { name: 'Bolt' } }, owner);
-  assert.ok(acme.ok && bolt.ok);
+  assert.ok(acme.ok && bolt.ok && !('asked' in bolt.value));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', ?) WHERE register = 'clients'", GRANT);
   const fresh = await api.get({ register: 'clients', seq: bolt.value.seq! } as never, owner);
   assert.ok(fresh.ok && fresh.value !== null);
