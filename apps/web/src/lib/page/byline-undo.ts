@@ -5,11 +5,12 @@
  * before, and one that touched more says what it will take back, in names, before anything moves, as Undo this run does
  * (`panels/RunPanel.svelte`). Then one press: Put back all of it, Only this one, or Keep.
  *
- * WHICH STEPS ARE THIS ROW'S is read off the plan: by list and number where the record says them (`at`), and by title
- * and list name where it does not, which is every step a person would call this row's. The record clips a long title to
- * 80 characters and names an untitled row by its list ("a payment"), so a clipped title is matched by what it keeps,
- * and an untitled row by nothing but its number. Once a step is known to be this row's, every step with the same record
- * handle (`row`) is too, and a step on another handle is not, whatever its title says.
+ * WHICH STEPS ARE THIS ROW'S is read off the plan by the record's handles alone: a step's list and number (`at`), which
+ * the record says on every step but a stop, or its id for the row (`row`) where the page knows this row's. Never by
+ * title (audit 22, M2): a walk batch can hold two payments both called "STRIPE PAYOUT", and a row with no title shares
+ * its name with every other, so a title says nothing about which row a step was on. A step none of that ties to this
+ * row is another row's, and the change is asked about before it goes back. Once a step is known to be this row's, a
+ * step with the same id and no number is too.
  *
  * ONLY THIS ONE ASKS THE RECORD FOR THIS ROW'S PART (`row` on the undo scope), beside the whole, and is offered only
  * when every step it answers is this row's. A record that does not know the filter answers the whole change again or
@@ -22,8 +23,8 @@ import { list } from '../copy/english.ts';
 import type { RowHandle, UndoPlan, UndoStep } from '../record/undo-write.ts';
 import { runLines, runWords } from './panels/run-lines.ts';
 
-/** The row a byline is on: its list and number, its title (`''` for a row with none), and its list's name. */
-export type Here = { at: RowHandle; title: string; list: string | null };
+/** The row a byline is on: its list and number, and the record's id for it where the page was given one. */
+export type Here = { at: RowHandle; id: string | null };
 
 /** What the byline's Undo asks before it puts anything back. */
 export type Ask = {
@@ -42,9 +43,14 @@ export type Ask = {
 /** How many other things the lead names before the rest is a count. */
 const NAMED = 3;
 
+const named = (names: string[], more: number): string =>
+  list(more > 0 ? [...names, more === 1 ? '1 more' : `${more.toLocaleString('en-GB')} more`] : names);
+
 export const undoAskWords = {
   lead: (names: string[], more: number) =>
-    `This change also touched ${list(more > 0 ? [...names, more === 1 ? '1 more' : `${more.toLocaleString('en-GB')} more`] : names)}.`,
+    `This change also touched ${named(names, more)}.`,
+  /* WHEN NO STEP CAN BE TOLD AS THIS ROW'S, nothing is "also": the change is said whole, this row's name among the rest. */
+  touched: (names: string[], more: number) => `This change touched ${named(names, more)}.`,
   all: (n: number) => (n === 1 ? 'Put back 1 change' : `Put back all ${n.toLocaleString('en-GB')}`),
   only: 'Only this one',
   onlyNamed: (title: string) => `Put back only the change to ${title}`,
@@ -53,31 +59,20 @@ export const undoAskWords = {
   group: (title: string) => `Undo the change to ${title}`,
 } as const;
 
-/** The record's title for a row is its own, or the same clipped to 80 characters with an ellipsis. */
-function sameTitle(said: string, title: string): boolean {
-  if (title === '') return false;
-  if (said === title) return true;
-  return said.endsWith('…') && said.length > 1 && title.startsWith(said.slice(0, -1).trimEnd());
-}
-
-/** Whether a step is on the row `here`, from the step alone. */
-export function isOn(step: Pick<UndoStep, 'title' | 'list' | 'at'>, here: Here): boolean {
+/** Whether a step is on the row `here`, from the step alone: by its list and number, or else by its id for the row. */
+export function isOn(step: { readonly row: string | null; readonly at: RowHandle | null }, here: Here): boolean {
   if (step.at) return step.at.register === here.at.register && step.at.seq === here.at.seq;
-  return sameTitle(step.title, here.title) && (step.list === null || here.list === null || step.list === here.list);
+  return here.id !== null && step.row === here.id;
 }
 
 /**
- * Which of a plan's steps are on the row `here`, a flag each: by the step, then widened and narrowed by the record's
- * handle for the row a matched step is on. A plan that puts back one row's changes and leaves nothing is this row's
- * when the row has no title to tell it by, since the change the byline names was on it.
+ * Which of a plan's steps are on the row `here`, a flag each: by the step, then a step with no number on the id of a
+ * step that matched.
  */
-export function mineIn(plan: { readonly steps: readonly UndoStep[]; readonly skipped: readonly unknown[] }, here: Here): boolean[] {
-  const steps = plan.steps;
-  const rows = new Set(steps.map((s) => s.row));
-  if (here.title === '' && steps.length > 0 && plan.skipped.length === 0 && rows.size === 1 && !rows.has(null)) return steps.map(() => true);
-  const direct = steps.map((s) => isOn(s, here));
-  const ids = new Set(steps.flatMap((s, i) => (direct[i] && s.row !== null ? [s.row] : [])));
-  return steps.map((s, i) => (s.at === null && s.row !== null && ids.size > 0 ? ids.has(s.row) : direct[i]!));
+export function mineIn(plan: { readonly steps: readonly UndoStep[] }, here: Here): boolean[] {
+  const direct = plan.steps.map((s) => isOn(s, here));
+  const ids = new Set(plan.steps.flatMap((s, i) => (direct[i] && s.row !== null ? [s.row] : [])));
+  return plan.steps.map((s, i) => direct[i]! || (s.at === null && s.row !== null && ids.has(s.row)));
 }
 
 /** One name for each other thing the plan touches, in the plan's order, said once. */
@@ -103,7 +98,7 @@ export function askOf(plan: UndoPlan, here: Here): Ask | null {
   if (others.length === 0) return null;
   const said = runLines(plan.steps);
   return {
-    lead: undoAskWords.lead(others.slice(0, NAMED), others.length - NAMED),
+    lead: (mine.some(Boolean) ? undoAskWords.lead : undoAskWords.touched)(others.slice(0, NAMED), others.length - NAMED),
     lines: said.lines,
     more: said.more,
     left: plan.skipped.length === 0 ? null : undoAskWords.left(plan.skipped.length),

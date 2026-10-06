@@ -36,7 +36,7 @@ export type RowHandle = { register: string; seq: number };
  * a screen picks an icon by (`remove`, `restore`, `set`...), and `line` the record's own sentence for it.
  *
  * AND WHICH ROW, AS HANDLES NEVER DRAWN: `row` the record's id for it, `list` its list's name, and `at` its list and
- * number where the record says them. A byline reads them to tell the steps on its own row from the rest (`stepsOn`).
+ * number where the record says them. A byline reads them to tell the steps on its own row from the rest (`page/byline-undo.ts`), never the title.
  */
 export type UndoStep = {
   title: string;

@@ -437,6 +437,9 @@ export function whereFor(register: string, filters: readonly Filter[], q: string
  * a page's rows and marks the row `clipped` (`leanRows`), and this copied the fields and nothing beside them, so the
  * docked panel opened a project's note on its first 280 characters and Save wrote those, plus the edit, over the whole
  * note. The mark rides on the entry, and every write worked out from a page's row reads it (`lib/page/clipped.ts`).
+ *
+ * AND SO DOES THE ROW'S ID, a handle never drawn: a byline's Undo tells this row's steps in the record's plan by it where
+ * a step names no list and number (`lib/page/byline-undo.ts`), never by a title two rows can share.
  */
 export function entryOf(register: string, row: RecordRow, refs: Refs): Entry {
   const decl = REGISTERS[register];
@@ -448,7 +451,8 @@ export function entryOf(register: string, row: RecordRow, refs: Refs): Entry {
     if (map && Array.isArray(value)) fields[key] = value.map((v) => (typeof v === 'string' ? (map.seqOf.get(v) ?? v) : v)) as Fields[string];
     else fields[key] = ((map && typeof value === 'string' ? map.seqOf.get(value) : undefined) ?? value) as Fields[string];
   }
-  return { seq: row.seq ?? 0, fields, version: row.version, created: row.created_at, by: '', ...(row.clipped === true ? { clipped: true as const } : {}) };
+  const id = typeof row.id === 'string' && row.id !== '' ? { id: row.id } : {};
+  return { ...id, seq: row.seq ?? 0, fields, version: row.version, created: row.created_at, by: '', ...(row.clipped === true ? { clipped: true as const } : {}) };
 }
 
 /** The sort in the address, as the record's `order`. */

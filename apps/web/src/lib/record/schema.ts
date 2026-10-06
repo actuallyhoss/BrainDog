@@ -219,6 +219,11 @@ export const isMoney = (v: unknown): v is MoneyValue =>
 export type Fields = Record<string, string | number | boolean | MoneyValue | readonly (string | number | boolean)[] | null>;
 
 export type Entry = {
+  /**
+   * The record's id for the row, where a page sent it: a handle never drawn, which a byline's Undo matches the record's
+   * plan by (`page/byline-undo.ts`).
+   */
+  id?: string;
   /** The number you can say out loud. Per-register, and it is why renaming a register is refused. */
   seq: number;
   fields: Fields;

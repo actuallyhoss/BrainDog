@@ -213,7 +213,7 @@ test('a row comes back in the numbers a person says, and a ref with no row stays
   const [register, f] = ORDER.flatMap((r) => (REGISTERS[r]?.fields ?? []).filter((x) => x.type === 'ref' && x.to).map((x) => [r, x] as const))[0]!;
   const ulid = refs.get(f.to!)!.idOf.get(1)!;
   const row: RecordRow = { id: 'x', seq: 4, fields: { [f.id]: ulid }, version: 2, created_at: '2026-09-03T12:00:00.000Z' };
-  assert.deepEqual(entryOf(register, row, refs), { seq: 4, fields: { [f.id]: 1 }, version: 2, created: row.created_at, by: '' });
+  assert.deepEqual(entryOf(register, row, refs), { id: 'x', seq: 4, fields: { [f.id]: 1 }, version: 2, created: row.created_at, by: '' }, 'the id rides along as a handle, never drawn');
   assert.equal(entryOf(register, { ...row, fields: { [f.id]: '01ZZZZZZZZZZZZZZZZZZZZZZZZ' } }, refs).fields[f.id], '01ZZZZZZZZZZZZZZZZZZZZZZZZ');
   assert.ok(targetsOf(register).includes(f.to!));
 });

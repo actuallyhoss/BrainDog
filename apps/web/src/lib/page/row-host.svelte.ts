@@ -176,7 +176,7 @@ export class RowHost {
     }
     const batch = line.batch;
     const title = this.#titleOf(row);
-    const here = this.#here(row, title);
+    const here = this.#here(row);
     return this.#busy(key, async () => {
       const read = await undoPlan(this.#deps.base(), { batch }, this.#deps.io);
       if (read.from !== 'plan') return this.#said(row, title, read);
@@ -227,9 +227,9 @@ export class RowHost {
     return e ? titleOf(e, this.shapeOf(row.register)) : `#${row.seq}`;
   }
 
-  /** The row as a plan's steps are matched against it: a row with no title, or none known here, is matched by its number. */
-  #here(row: RowAt, title: string): Here {
-    return { at: { register: row.register, seq: row.seq }, title: title === `#${row.seq}` ? '' : title, list: REGISTERS[row.register]?.name ?? null };
+  /** The row as a plan's steps are matched against it: by its list and number, and the record's id for it where the page sent one. */
+  #here(row: RowAt): Here {
+    return { at: { register: row.register, seq: row.seq }, id: this.entry(row)?.id ?? null };
   }
 
   /** Runs `work` with the row marked as on its way, so a second press waits for the first. */
