@@ -55,6 +55,7 @@ import {
   type SlashInference,
 } from '@braindog/host/slash';
 import type { OpenKey } from '@braindog/host/actions';
+import { SLASH_MENTIONS_INSTRUCTIONS, SLASH_RESOLVE_INSTRUCTIONS, type UnderstandModel } from '@braindog/host/understand';
 import { slashAskDoor, type SlashAskDoor } from '@braindog/host';
 import type { SlashAnswer } from '@braindog/host/slash-answers';
 import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
@@ -143,6 +144,10 @@ const DRAFTS: JsonSchema = { type: 'object', properties: { drafts: { type: 'arra
 const PLAN: JsonSchema = { type: 'object', properties: { plan: { type: 'object' } }, required: ['plan'] };
 /* The page headlines: one line a page, keyed by the page's id. Each line is checked by the record (`headlineFault`). */
 const LINES: JsonSchema = { type: 'object', properties: { lines: { type: 'object' } }, required: ['lines'] };
+/* Who is who: a number for each doubtful pair, keyed by the pair's handle, and the names read in the night's notes. Each
+   is checked by `@braindog/host/understand` (`settleResolve`, `mentionsKept`), which keeps only what it handed out. */
+const VERDICTS: JsonSchema = { type: 'object', properties: { verdicts: { type: 'object' } }, required: ['verdicts'] };
+const MENTIONS: JsonSchema = { type: 'object', properties: { mentions: { type: 'array', items: { type: 'object' } } }, required: ['mentions'] };
 
 /** Nothing reached the binding, which the package reads by this mark and not by the class, as it reads `SlashKeyClosedError`'s. */
 class NotSent extends Error {
@@ -220,6 +225,9 @@ export function includedInference(env: SlashEnv, most: () => number | Promise<nu
   };
 }
 
+/** The record's model on this Worker: its press, first plan and headlines, and the two asks of who is who. */
+export type WorkerSlashModel = SlashModel & UnderstandModel;
+
 /**
  * The record's own Slash over the included model: `endpointModel`'s draft, first plan and page headlines, the same
  * instructions and the same input, read by the same `answerOf`. Every failure is a throw, which the record reads as "the
@@ -235,7 +243,7 @@ export function includedInference(env: SlashEnv, most: () => number | Promise<nu
  * writes no row, and its rules draft. A record of 150 lists is 186 and is still asked. The package is imported only
  * when the record's model is asked, by which time the meter has imported it already (`slash-meter.ts`).
  */
-export function includedModel(env: SlashEnv): SlashModel | undefined {
+export function includedModel(env: SlashEnv): WorkerSlashModel | undefined {
   const inference = includedInference(env, recordAskMost);
   if (inference === undefined) return undefined;
   const ask = async (instructions: string, input: unknown, schema: JsonSchema): Promise<unknown> => {
@@ -255,6 +263,8 @@ export function includedModel(env: SlashEnv): SlashModel | undefined {
     draft: (input) => ask(SLASH_INSTRUCTIONS, input, DRAFTS),
     form: (input) => ask(SLASH_PLAN_INSTRUCTIONS, input, PLAN),
     headline: (input) => ask(SLASH_HEADLINE_INSTRUCTIONS, input, LINES),
+    resolve: (input) => ask(SLASH_RESOLVE_INSTRUCTIONS, input, VERDICTS),
+    mentions: (input) => ask(SLASH_MENTIONS_INSTRUCTIONS, input, MENTIONS),
   };
 }
 
@@ -312,12 +322,12 @@ const NO_MODEL_HERE = 'Slash answers on your own key on this host, and none is c
  * handed in to read a choice from. That is what `/api/version`'s `slash` reads, so a Worker that can open a key says it
  * has Slash, and Settings is where it is set up.
  */
-export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kernel'>, options: SlashWire = {}): SlashModel | undefined {
+export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kernel'>, options: SlashWire = {}): WorkerSlashModel | undefined {
   const included = includedModel(env);
   const store = options.store;
   if (store === undefined || !isBound(env.KEK)) return included;
   const own = () => slashOwnKeyOf(store());
-  const chosen = (): SlashModel => {
+  const chosen = (): WorkerSlashModel => {
     const key = own();
     if (key === null) {
       if (included === undefined) throw new NotSent(NO_MODEL_HERE);
@@ -354,6 +364,9 @@ export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kern
       if (model.headline === undefined) throw new NotSent('The model Slash answers with here writes no headlines.');
       return model.headline(input);
     },
+    /* WHO IS WHO, the model-jobs pass's two asks, through the same choice: the doubtful pairs and the night's notes. */
+    resolve: async (input) => chosen().resolve(input),
+    mentions: async (input) => chosen().mentions(input),
   };
 }
 
@@ -591,6 +604,23 @@ const monthOf = (ms: number, add: number): string => {
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const grouped = (n: number): string => String(n).replace(/\B(?=([0-9]{3})+(?![0-9]))/gu, ',');
 
+/* EVERY CALL BUT HIS OWN KEY'S. A call on tier `b` went to his provider on his bill and spent none of the operator's
+   neurons, so it is not counted here, and while he is on it the ceiling does not apply at all (`agents.md` §5 item 7). */
+const callsMade = (deps: { sql: Sql; clock: Clock }): number =>
+  deps.sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND ts >= ?", monthOf(deps.clock.now(), 0))?.n ?? 0;
+
+/**
+ * Whether the operator's ceiling has turned this month's calls on the included model away, for a background ask no engine
+ * method carries (`slash-meter.ts` `workerUnderstandLedger`). `false` on his own key and where the included model is off.
+ *
+ * THE CEILING ITSELF AND NOT `status()`, which says his own `ask_cap` wherever that is the lower: read there, a Free record
+ * whose month of asks was spent at the palette lost its reading of who is who, which is the background's and never his.
+ */
+export async function includedCeilingReached(env: SlashEnv, deps: { sql: Sql; clock: Clock }): Promise<boolean> {
+  if (includedInference(env) === undefined || onOwnKey(deps.sql)) return false;
+  return callsMade(deps) >= Math.floor(includedMonthNeurons(env) / (await recordAskMost()));
+}
+
 /**
  * The engine, with the operator's monthly ceiling over every call it makes on the included model (`INCLUDED_MONTH_NEURONS`).
  *
@@ -609,11 +639,7 @@ const grouped = (n: number): string => String(n).replace(/\B(?=([0-9]{3})+(?![0-
  * propose. That is one call of at most 232 neurons past a ceiling counted at 232 a call.
  */
 function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, asks: number): Slash {
-  /* EVERY CALL BUT HIS OWN KEY'S. A call on tier `b` went to his provider on his bill and spent none of the operator's
-     neurons, so it is not counted here, and while he is on it the ceiling does not apply at all (`agents.md` §5 item 7). */
-  const made = (): number =>
-    deps.sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND ts >= ?", monthOf(deps.clock.now(), 0))?.n ??
-    0;
+  const made = (): number => callsMade(deps);
   const spent = (): boolean => !onOwnKey(deps.sql) && made() >= asks;
   const until = (): string => monthOf(deps.clock.now(), 1);
   const refused = <T>(): Result<T> =>

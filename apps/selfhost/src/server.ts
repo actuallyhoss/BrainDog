@@ -1285,11 +1285,6 @@ export async function start(options: {
      record's `answersSlash` below and `/api/version`'s `slash` are one fact. Before this, a self-host with a model
      refused `ask_slash` at install as if it had none (`test/slash-answers.test.ts`). */
   const answers = slashAnswersFor(slashConfig, () => api, options.keys, { sql: slashSql, clock });
-  /* AND WHAT ANSWERS THE RECORD'S MODEL JOBS, a pattern's draft and a digest's prose, from the same config and the same
-     Slash SQLite, whose `slash_call` table the background allowance is counted out of (`@braindog/host/model-jobs`).
-     `undefined` with no model, and then the jobs wait `pending`, as they always have here. */
-  const modelJobs = slashModelJobs(slashConfig, () => api, options.keys, { sql: slashSql, clock });
-  const jobsMeter = backgroundMeter(slashSql);
   /* AND THE LEDGER THE RECORD'S OWN TWO ASKS ARE SPENT FROM, the press and the first plan, in the same Slash SQLite and
      under the same `ask_cap` a read and an automation's question are (`@braindog/host` `slashRecordMeter`). Without it
      the record asks `slashModel` unmetered, which it did on both hosts until this
@@ -1308,6 +1303,12 @@ export async function start(options: {
       })),
     model: 'glm-5.3-flash',
   });
+  /* AND WHAT ANSWERS THE RECORD'S MODEL JOBS, a pattern's draft and a digest's prose, from the same config and the same
+     Slash SQLite, whose `slash_call` table the background allowance is counted out of (`@braindog/host/model-jobs`).
+     Who is who is asked through `slashMeter` above, so each pair and each night's notes are a background row under
+     `UNDERSTAND_ASK`. `undefined` with no model, and then the jobs wait `pending`, as they always have here. */
+  const modelJobs = slashModelJobs(slashConfig, () => api, options.keys, { sql: slashSql, clock }, slashMeter);
+  const jobsMeter = backgroundMeter(slashSql);
 
   /**
    * Drain everything due, then re-arm.
@@ -1335,7 +1336,7 @@ export async function start(options: {
   /* AND A MODEL JOB IS NOT A DELIVERER'S WHERE `serveModelJobs` SERVES IT, for the same reason: acked `done` with no
      result, a draft files nothing and a digest goes without its prose. With no model the list is left as it was given. */
   const delivers: readonly OutboxKind[] = (options.delivers ?? []).filter(
-    (k) => k !== 'infer.ask' && (!options.actions || k !== 'pull.fetch') && (!modelJobs || (k !== 'infer.draft' && k !== 'infer.prose')),
+    (k) => k !== 'infer.ask' && (!options.actions || k !== 'pull.fetch') && (!modelJobs || (k !== 'infer.draft' && k !== 'infer.prose' && k !== 'infer.resolve')),
   );
 
   /**
@@ -1481,6 +1482,7 @@ export async function start(options: {
           meter: jobsMeter,
           now: () => clock.now(),
           scheduler,
+          store: slashSql,
           log: (line) => console.error('slash jobs:', line),
         });
       } catch (e) {

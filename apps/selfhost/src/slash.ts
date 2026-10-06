@@ -42,8 +42,9 @@ import {
   type SlashHostConfig,
   type SlashHostDeps,
 } from '@braindog/host/slash';
-import { slashAskDoor, type SlashAskDoor } from '@braindog/host';
+import { slashAskDoor, type SlashAskDoor, type SlashRecordMeter } from '@braindog/host';
 import type { ModelJobInference, SlashAnswer } from '@braindog/host/slash-answers';
+import { understandingOver } from '@braindog/host/understand';
 import { no, type Clock, type Refusal, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SlashModel } from '@braindog/record';
 import type { Slash } from '@braindog/slash';
@@ -255,8 +256,12 @@ export function slashModelJobs(
   api: () => RecordApi,
   store: KeyStore | undefined,
   deps: SlashEngineDeps,
+  meter: SlashRecordMeter,
 ): ModelJobInference | undefined {
   if (!config || slashInferenceOf(config, wireOf(config, api, store)) === undefined) return undefined;
+  /* AND WHO IS WHO, over the record's own model on the same endpoint: the doubtful pairs of `infer.resolve` and the
+     night's notes, each held in `meter`'s background ledger under `UNDERSTAND_ASK` (`@braindog/host/understand`). */
+  const model = slashModelOf(config, wireOf(config, api, store));
   let built: Promise<Slash | undefined> | null = null;
   const engine = async (): Promise<Slash> => {
     const slash = await (built ??= slashEngineFor(config, api, store, deps).catch((e: unknown) => {
@@ -270,6 +275,7 @@ export function slashModelJobs(
   return {
     draft: async (samples) => (await engine()).draftPattern(samples),
     prose: async (digest) => (await engine()).digestProse(digest),
+    ...(model ? understandingOver(model, meter) : {}),
   };
 }
 

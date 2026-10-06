@@ -576,6 +576,8 @@ export class Record$ extends DurableObject<Env> {
    */
   #jobs: ModelJobInference | undefined;
   #jobsMeter: ModelJobMeter | undefined;
+  /** This object's Slash storage, where who is who keeps the verdicts it was given and the notes it read (`understand.ts`). */
+  #jobsStore: Sql | undefined;
 
   /** The scripts running from this object's alarm, and the rules each is held to (`script.ts`). */
   #scripts = new ScriptRuns();
@@ -705,6 +707,7 @@ export class Record$ extends DurableObject<Env> {
        background allowance is counted out of the one `slash_call` table (`@braindog/host/model-jobs`). */
     this.#jobs = workerModelJobs(this.env, () => api, { sql, clock: { now: () => Date.now() } });
     this.#jobsMeter = backgroundMeter(sql);
+    this.#jobsStore = sql;
     /* THE RECORD'S COPIES, IN THE BUCKET THE NIGHT WRITES TO (`copies.ts`). Taken, listed and gone back to from inside
        this object, because `onNextSessionRestoreBookmark` is this storage's and nothing outside the object can call it.
        No `BLOBS` and there is no port, so the record answers `NOT_IN_THIS_BUILD` as it always did. */
@@ -966,6 +969,9 @@ export class Record$ extends DurableObject<Env> {
         meter: this.#jobsMeter,
         now: () => Date.now(),
         scheduler: this.#alarm,
+        /* WHERE WHO IS WHO KEEPS THE VERDICTS IT WAS GIVEN AND THE NOTES IT READ. `infer.resolve` is on no deliverer's
+           list, as `infer.draft` and `infer.prose` are not: only this pass leases it. */
+        store: this.#jobsStore,
         log: (line) => op({ op: 'slash.jobs', rec, ok: false, error: line }),
       });
     } catch (e) {

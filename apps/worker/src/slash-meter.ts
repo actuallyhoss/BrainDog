@@ -25,20 +25,22 @@
  * meter that threw as a ledger it could not read, and its own rules draft.
  */
 
-import { slashRecordMeter } from '@braindog/host';
+import { slashRecordMeter, type SlashRecordMeter } from '@braindog/host';
+import type { UnderstandLedger } from '@braindog/host/understand';
 import { METER_TRIES } from '@braindog/host/actions';
 import type { Result, Sql } from '@braindog/ports';
 import type { RecordApi, SlashMeter } from '@braindog/record';
 import { SLASH_DAYS, type SlashDay, type SlashTally } from '@braindog/record/directory';
 
-import { includedInference, workerSlashEngine, type SlashEngineDeps, type SlashEnv } from './slash.ts';
+import { includedCeilingReached, includedInference, workerSlashEngine, type SlashEngineDeps, type SlashEnv } from './slash.ts';
 
 /** The routing name the package's own tier `a` rows carry, and so the one the ceiling and `status()` count under. */
 const INCLUDED_MODEL = 'glm-5.3-flash';
 
-export function workerSlashMeter(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): SlashMeter {
-  let built: Promise<SlashMeter> | null = null;
-  const meterOf = (): Promise<SlashMeter> =>
+/** The ledger over this object's engine, built once on the first ask. */
+function meterBuilder(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): () => Promise<SlashRecordMeter> {
+  let built: Promise<SlashRecordMeter> | null = null;
+  return () =>
     (built ??= (async () => {
       const engine = await workerSlashEngine(env, api, deps);
       const included = includedInference(env) !== undefined;
@@ -48,7 +50,45 @@ export function workerSlashMeter(env: SlashEnv, api: () => RecordApi, deps: Slas
       built = null;
       throw e;
     }));
-  return { hold: async (kind) => (await meterOf()).hold(kind) };
+}
+
+/**
+ * THE PRESS AND THE FIRST PLAN ONLY, AND NO BACKGROUND ASK. `slashRecordMeter`'s `background` counts the month's own
+ * allowance and not the operator's ceiling, so handed to the record it let the daily look reach the binding at a
+ * ceiling of 0 (`test/slash-ceiling-all.test.ts`). The record reads a meter without it as "the look asks nothing".
+ */
+export function workerSlashMeter(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): SlashMeter {
+  const built = meterBuilder(env, api, deps);
+  return { hold: async (kind) => (await built()).hold(kind) };
+}
+
+/**
+ * The ledger the model-jobs pass's reading of who is who is held in (`slash-jobs.ts`, `understandingOver`): one
+ * background ask under `UNDERSTAND_ASK`, from the understanding share of the month.
+ *
+ * AND UNDER THE OPERATOR'S CEILING TOO, which `background` alone does not read. Where it has turned the month's calls on
+ * the included model away, nothing is held and nothing is asked. His own `ask_cap` does not bind it, as it binds no
+ * background ask: on his own key there is no ceiling of the operator's, and only the share binds.
+ */
+export function workerUnderstandLedger(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): UnderstandLedger {
+  const built = meterBuilder(env, api, deps);
+  return {
+    background: async (kind) => {
+      const meter = await built();
+      if (await includedCeilingReached(env, deps)) {
+        const at = new Date(deps.clock.now());
+        const resets = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
+        return {
+          ok: false,
+          refusal: {
+            code: 'SLASH_BUDGET_SPENT',
+            fix: `Slash has asked this host's model as often as one record may in a month, so the doubtful names wait until ${resets}.`,
+          },
+        };
+      }
+      return meter.background(kind);
+    },
+  };
 }
 
 /* ── the account's copy of the asks ───────────────────────────────────────────────────────────────────────────────── */
