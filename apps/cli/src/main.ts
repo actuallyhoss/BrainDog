@@ -226,7 +226,7 @@ const usage = () =>
     'braindog import <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder|address>] [--host <host>] [--dry-run] | --draft-setup | --since <day|last>',
     "  Move another tool's export into this BrainDog through its adapter: a pack id such as one in packs/, or the path of a module. Running it again updates what it added, and no key value is ever read.",
     'braindog people harvest [--since <day>] [--dry-run] [--host <host>]',
-    "  Meet everybody who committed to the repositories your projects list and those in this folder, grouped by address, each with the project they worked in. Bots, machines and your own commits are left out. With --dry-run it prints who it would meet and sends nothing.",
+    "  Meet everybody with two or more commits in the repositories your projects list, by remote or folder, grouped by address, each with the project they worked in, at most 200 a run. Repositories no project lists, bots, machines and your own commits are left out. With --dry-run it prints who it would meet and sends nothing.",
     'braindog token create [--name <name>] [--scope <read|propose|write>] [--days <n>] [--inbox] [--host <host>]',
     "  Mint a token for an agent and print it once. It reads unless --scope names more, and with --inbox it may also read the money inbox.",
     "  The owner approves the one mint in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",

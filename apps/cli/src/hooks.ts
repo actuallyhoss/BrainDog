@@ -20,7 +20,7 @@ import { refused } from '@braindog/ports';
 
 import { briefing, cardOf, nextLine, words, type Moved, type Where } from './brief.ts';
 import { budgetOf, clientFor, hostsPath, readHosts, sameHost, target, type Target } from './http.ts';
-import { authoredIn, childHeads, LOG_FORMAT, meeter, meetingOf, ownKeys, type MeetCall, type Meeting } from './people.ts';
+import { authoredIn, childHeads, commitsBy, listedBy, localRepo, LOG_FORMAT, meeter, meetingOf, MIN_COMMITS, ownerOf, readLayout, type Layout, type MeetCall, type Meeting, type Owner, type Reader } from './people.ts';
 import { git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
 import { syncSkills, type AgentIo } from './skills.ts';
 import { depositor, scanTools } from './tools.ts';
@@ -562,15 +562,16 @@ export type MovedRepo = { dir: string; repo: string; from: string };
  * The authors of several logs in `LOG_FORMAT`, each with its repository's name, newest commit first within each, each
  * author once by key, at most ten, as `meet` takes them.
  *
- * NOBODY TO MEET: a bot, a CI or machine user, the owner by any of his keys, and an author with no address, because a
- * name alone is what `meet` never joins on (`authoredIn` in `people.ts`).
+ * NOBODY TO MEET: a bot, a CI or machine user, the owner by any of his keys or names, an author with no address,
+ * because a name alone is what `meet` never joins on (`authoredIn` in `people.ts`), and an author with fewer than
+ * `MIN_COMMITS` in the repositories' whole history (`commits`), so one drive-by commit pulled in is nobody yet.
  */
-export function authorsOf(logs: readonly { log: string; repo: string }[], own: ReadonlySet<string>): Meeting[] {
+export function authorsOf(logs: readonly { log: string; repo: string }[], own: Owner, commits: ReadonlyMap<string, number>): Meeting[] {
   const seen = new Set<string>();
   const out: Meeting[] = [];
   for (const { log, repo } of logs)
     for (const a of authoredIn(log, own)) {
-      if (seen.has(a.key)) continue;
+      if (seen.has(a.key) || (commits.get(a.key) ?? 0) < MIN_COMMITS) continue;
       seen.add(a.key);
       out.push(meetingOf(a, repo));
       if (out.length === MET_PER_SESSION) return out;
@@ -579,21 +580,40 @@ export function authorsOf(logs: readonly { log: string; repo: string }[], own: R
 }
 
 /**
- * Send the authors of the commits made since the run began, in every repository that moved, to `meet`, as the run.
+ * Send the authors of the commits made since the run began, in every repository that moved and a project lists, to
+ * `meet`, as the run.
  *
- * IT ONLY READS THE REPOSITORIES, AND IT IS SILENT. The owner's keys are read once, from his own row and from each
- * repository's `git config user.email`, and only when a repository moved. Any refusal ends it, People switched off
- * and a host that is down included, except one author's malformed address, which skips that author. None of this is
- * the session's to hear about.
+ * IT ONLY READS THE REPOSITORIES, AND IT IS SILENT. The record's projects and the owner's own row are read once, and
+ * only when a repository moved; a repository no project lists by its remote or its folder is not read at all
+ * (`listedBy` in `people.ts`). Any refusal ends it, People switched off and a host that is down included, except one
+ * author's malformed address, which skips that author. None of this is the session's to hear about.
  */
-export async function harvest(moved: readonly MovedRepo[], list: Client['list'] | null, meet: MeetCall, until: number): Promise<void> {
-  const logs = (await Promise.all(moved.map(async (m) => ({ log: await git(m.dir, 'log', LOG_FORMAT, `${m.from}..HEAD`), repo: m.repo })))).filter(
-    (l): l is { log: string; repo: string } => l.log !== null,
-  );
-  if (logs.length === 0 || Date.now() >= until) return;
-  const own = await ownKeys(list, moved.map((m) => m.dir));
+export async function harvest(moved: readonly MovedRepo[], reader: Reader | null, meet: MeetCall, until: number): Promise<void> {
+  if (reader === null || moved.length === 0) return;
+  /* THE READ STOPS AT THE DEADLINE TOO: a record with many lists, or a slow host, must not spend the handoff's time. */
+  let layout: Layout | null;
+  try {
+    layout = await Promise.race([readLayout(reader), new Promise<null>((done) => setTimeout(done, Math.max(0, until - Date.now()), null).unref())]);
+  } catch {
+    return;
+  }
+  if (layout === null) return;
+  const places = await Promise.all(moved.map((m) => localRepo(m.dir)));
+  const listed = moved.filter((_, i) => {
+    const at = places[i] ?? null;
+    return at !== null && listedBy(layout.projects, at) !== null;
+  });
+  if (listed.length === 0 || Date.now() >= until) return;
+  const [logs, counts, own] = await Promise.all([
+    Promise.all(listed.map(async (m) => ({ log: await git(m.dir, 'log', LOG_FORMAT, `${m.from}..HEAD`), repo: m.repo }))),
+    Promise.all(listed.map((m) => commitsBy(m.dir))),
+    ownerOf(layout.self, listed.map((m) => m.dir)),
+  ]);
+  const commits = new Map<string, number>();
+  for (const one of counts) for (const [key, n] of one) commits.set(key, (commits.get(key) ?? 0) + n);
+  const read = logs.filter((l): l is { log: string; repo: string } => l.log !== null);
   const send = meeter(meet);
-  for (const who of authorsOf(logs, own)) {
+  for (const who of authorsOf(read, own, commits)) {
     if (Date.now() >= until) return;
     const out = await send(who);
     if (refused(out) && out.refusal.code !== 'VALUE_MALFORMED') return;
@@ -655,7 +675,7 @@ export async function hookEnd(io: Io): Promise<void> {
      for, keeps time to land. */
   const until = Date.now() + budget / 2;
   const moved = await movedRepos(event.cwd, held, at.repo);
-  if (moved.length > 0) await harvest(moved, client.list, (args) => client.call('meet', args), until);
+  if (moved.length > 0) await harvest(moved, client, (args) => client.call('meet', args), until);
   await client.handoff({
     state: 'idle',
     ...(at.branch === null ? {} : { branch: at.branch }),

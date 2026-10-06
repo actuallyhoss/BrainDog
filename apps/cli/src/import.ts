@@ -37,7 +37,7 @@ import { parseArgs } from 'node:util';
 
 import { satisfies } from '@braindog/declare';
 import type { KnownKeys } from '@braindog/declare/catalogue';
-import { coerce, looksLikeCredential, type FieldDecl } from '@braindog/kernel';
+import { coerce, isPublicMail, looksLikeCredential, type FieldDecl } from '@braindog/kernel';
 import { no, ok, refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
@@ -45,7 +45,7 @@ import { pollPack } from '@braindog/seed/usecases/founder-poll';
 
 import { TOOLS, folderCatalogue, holdsKey, isRef, loadAdapter, packFrom, type CatalogueRead, type ImportMap, type Offer, type Plan, type PlannedRow, type Settled, type Skipped } from './adapter.ts';
 import { knownKeys } from './catalogue.ts';
-import { keysOfRow, meeter, metOf, PUBLIC_MAIL, sameName, type Meeting } from './people.ts';
+import { keysOfRow, meeter, metOf, sameName, type Meeting } from './people.ts';
 import type { AgentIo } from './skills.ts';
 import { readSource } from './usecase.ts';
 
@@ -278,7 +278,7 @@ function roleOf(decl: Record<string, unknown>): Role | null {
 function roleKeys(fields: Record<string, unknown>, role: Role): string[] {
   const out = new Set(keysOfRow({ email: role.email && fields[role.email], keys: role.keys && fields[role.keys], handles: role.handles && fields[role.handles] }));
   const domain = role.domain === undefined ? null : fields[role.domain];
-  for (const d of [domain].flat()) if (typeof d === 'string' && d.trim() && !PUBLIC_MAIL.has(d.trim().toLowerCase())) out.add(`domain:${d.trim().toLowerCase()}`);
+  for (const d of [domain].flat()) if (typeof d === 'string' && d.trim() && !isPublicMail(d)) out.add(`domain:${d.trim().toLowerCase()}`);
   return [...out];
 }
 
@@ -1021,7 +1021,7 @@ export async function applyPlan(
    * A NEW PERSON OR ORGANISATION GOES THROUGH RESOLUTION BEFORE IT IS CREATED, so an imported "Sam" folds into the
    * owner's own row and an address the record already knows lands on its person rather than a second one.
    *
-   *   1. By key, here: a live row of the list holding one of the row's addresses, keys or handles (`keyOfAny`).
+   *   1. By key, here: a live row of the list holding one of the row's addresses, keys or handles (`keysOfRow`).
    *   2. By the owner's own names: a person named as the list's `self` row is named, or by one of its aliases.
    *   3. Through `meet`, when the door has it and the row carries a key: the record matches it, or makes the row, and
    *      the import fills in the rest. A name alone is never sent, because the record keeps that only as a mention.

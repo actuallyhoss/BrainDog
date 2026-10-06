@@ -3,98 +3,79 @@
  * and `meet` as the record takes it. Used by the end hook (`harvest` in `hooks.ts`) for one session's commits, and by
  * `braindog people harvest` for the whole history of the repositories the record's projects list.
  *
- * AN AUTHOR IS THEIR KEYS, NEVER THEIR NAME. `email:` lower-cased, with dots and `+tags` folded for Gmail only, and
- * `github:` for GitHub's private address, as `loop/contract-17.md` writes them. Two identities sharing a key are one
- * author here; anything weaker (the same name, a login that looks like a local part) is the record's to judge, because
- * its strong rules and its questions keep the evidence and this command keeps nothing.
+ * AN AUTHOR IS THEIR KEYS, NEVER THEIR NAME, and a key is the kernel's (`keyOf` in `identity-keys.ts`), not a copy: a
+ * key this command made one way and the record another was refused as malformed and the author silently skipped. Two
+ * identities sharing a key are one author here; anything weaker (the same name, a login that looks like a local part)
+ * is the record's to judge, because its strong rules and its questions keep the evidence and this command keeps nothing.
  *
- * NOBODY TO MEET: a bot, a CI or machine user, and the owner. The owner's keys are read once from the self row of the
- * list People keeps, with this machine's `git config user.email` beside them, so his own commits are never met however
- * many addresses he commits under.
+ * ONLY THE REPOSITORIES A PROJECT LISTS, by its remote or by its very folder. A clone of somebody else's work, or a
+ * folder that merely sits beside a project's, is not the person's work, and meeting everybody in an open-source
+ * history filled People with strangers. An identity is met once it has made two commits, and one run meets at most
+ * `MEETS_PER_RUN`, the busiest first.
+ *
+ * NOBODY TO MEET: a bot, a CI or machine user, and the owner. The owner is read from the self row of whichever list
+ * declares `meets:`, by the part it names `self`: every key on that row and every name and alias it goes by, with this
+ * machine's `git config user.email` beside them, so his own commits are never met however many addresses he commits
+ * under.
  *
  * `meet` IS SENT IN THE CONTRACT'S SHAPE (`keys`, `kind`, `source`) and, when a record older than that refuses one of
  * those by name, once more in the shape it takes (`name`, `email`, `handle`, `where`), and in that shape for the rest of
  * the run.
  */
 
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { basename, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import type { Client } from '@braindog/client';
+import { isPublicMail, keyFrom, keyOf, keysOf, remoteKey } from '@braindog/kernel';
 import { refused, type Result } from '@braindog/ports';
 
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { git, normaliseRemote, sessionHeaders, type Position } from './position.ts';
 import { isObject, type AgentIo } from './skills.ts';
 
-/* ── keys ──────────────────────────────────────────────────────────────── */
+/* ── machines ──────────────────────────────────────────────────────────── */
 
-/** Mail domains anybody can sign up at, which say nothing about whom a person works for. */
-export const PUBLIC_MAIL: ReadonlySet<string> = new Set([
-  'gmail.com',
-  'googlemail.com',
-  'outlook.com',
-  'hotmail.com',
-  'live.com',
-  'msn.com',
-  'icloud.com',
-  'me.com',
-  'mac.com',
-  'yahoo.com',
-  'proton.me',
-  'protonmail.com',
-  'aol.com',
-  'gmx.com',
-  'yandex.com',
-  'mail.com',
-]);
+/** Names a machine goes by when nobody set one, the CI users, and the bots that sign commits, as a whole name or local part. */
+const MACHINE_NAMES =
+  /^(?:ubuntu|root|runner|ec2-user|centos|debian|vagrant|admin|administrator|jenkins|git|github|github-actions|actions-user|dependabot|renovate|renovate-bot|greenkeeper|snyk-bot|semantic-release-bot|pre-commit-ci|imgbot|allcontributors|mergify|codecov|bot|ci|build|builder|buildbot|deploy|deployer|automation|travis|circleci|gitlab-runner)$/i;
 
-/* GitHub's private address names an account and reaches nobody, so it is the account's key. */
-const GITHUB_PRIVATE = /^(?:[0-9]+\+)?([^@\s]+)@users\.noreply\.github\.com$/;
+/** The bots known by name wherever it appears in a name or an address. */
+const BOTS = /github-actions|dependabot|renovate|greenkeeper|snyk-bot|semantic-release|pre-commit-ci|imgbot|allcontributors|mergify/i;
 
-/** An address as a key, `email:ada@example.com`, or `github:ada` for GitHub's private one; `null` for no address. */
-export function keyOfAddress(raw: string): string | null {
-  const email = raw.trim().toLowerCase();
-  const at = email.lastIndexOf('@');
-  if (at <= 0 || at === email.length - 1 || /\s/.test(email)) return null;
-  const account = GITHUB_PRIVATE.exec(email)?.[1];
-  if (account !== undefined) return `github:${account}`;
-  let local = email.slice(0, at);
-  const domain = email.slice(at + 1);
-  if (domain === 'gmail.com' || domain === 'googlemail.com') local = local.replace(/\+.*$/, '').replaceAll('.', '');
-  return `email:${local}@${domain === 'googlemail.com' ? 'gmail.com' : domain}`;
-}
-
-/** Every key a value a row or a person holds could be: an address, a `kind:value` key, or a `provider:name` handle. */
-export function keyOfAny(raw: string): string | null {
-  const text = raw.trim();
-  if (text.includes('@') && !text.startsWith('@')) {
-    const colon = text.indexOf(':');
-    /* `email:ada@example.com` is already a key; its address is folded as any other. */
-    return keyOfAddress(colon > 0 && colon < text.indexOf('@') ? text.slice(colon + 1) : text);
-  }
-  const m = /^([a-z][a-z0-9.-]*):@?(\S+)$/i.exec(text);
-  return m ? `${m[1]!.toLowerCase()}:${m[2]!.toLowerCase()}` : null;
-}
-
-/** Names a machine goes by when nobody set one, and the bots that sign commits. */
-const MACHINE_NAMES = /^(?:ubuntu|root|runner|github-actions|dependabot|ec2-user|admin|administrator|jenkins)$/i;
+/** A local part that is a machine's whatever else it says: `noreply-1234`, `notifications+abc`, `bounce-…`, `ci-bot`. */
+const MACHINE_LOCAL = /(?:^|[._+-])(?:no-?reply|do-?not-?reply|notifications?|mailer|mailer-daemon|bounces?|bot)(?:[._+-]|$)/;
 
 /**
- * Whether an author is a machine and not a person: a `[bot]`, a no-reply sender, GitHub Actions or Dependabot, a CI
- * user named for what it does ("Jenkins Schema Sync", "Brightloom Repos") at an organisation's domain, a machine's
- * default user (`Ubuntu`, `root`, `runner`), or an address at a machine's own name rather than a domain.
+ * A name that ends in what a service is, never what a person is called: "Release Bot", "Acme CI", "GitLab Runner".
+ * `CI` only in capitals and `Runner` only after a CI's own name, because Ci and Runner are surnames too.
+ */
+const SERVICE_NAME = /(?:^|\s)(?:bot|automation|(?:gitlab|github|actions|azure|build|self-hosted|ci)\s+runner)$/i;
+const CI_NAME = /(?:^|\s)CI(?:\/CD)?$/;
+
+/** A name a team gives its own jobs ("Jenkins Schema Sync", "Brightloom Repos"), a machine when it signs at an organisation's domain. */
+const TEAM_JOB = /(?:^|\s)(?:sync|repos|mirror|service)$/i;
+
+/**
+ * Whether an author is a machine and not a person: a `[bot]` or any `-bot`, a no-reply sender, GitHub Actions,
+ * Dependabot, Renovate and their kind, a CI user ("Acme CI", "Jenkins", "GitLab Runner"), a team's job named for what
+ * it does ("Jenkins Schema Sync", "Brightloom Repos") at an organisation's domain, a machine's default user (`Ubuntu`,
+ * `root`, `runner`, `ec2-user`), or an address at a machine's own name rather than a domain.
+ *
+ * NEVER A SURNAME. "Sarah Jenkins" and "Ada Talbot" are people: a word counts only as the whole name, the whole local
+ * part, or a name's first word for Jenkins.
  */
 export function isMachine(name: string, address: string): boolean {
   const n = name.trim();
   const email = address.trim().toLowerCase();
   const local = email.split('@')[0] ?? '';
   const domain = email.includes('@') ? email.slice(email.lastIndexOf('@') + 1) : '';
-  if (/\[bot\]$/i.test(n) || /\[bot\]$/.test(local) || /^no-?reply$/.test(local)) return true;
-  if (/github-actions|dependabot/i.test(n) || /github-actions|dependabot/.test(local)) return true;
-  if (MACHINE_NAMES.test(n) || MACHINE_NAMES.test(local)) return true;
-  if (/(?:^|\s)(?:sync|repos)$/i.test(n) && domain !== '' && !PUBLIC_MAIL.has(domain)) return true;
+  if (/\[bot\]$/i.test(n) || /\[bot\]$/.test(local) || MACHINE_LOCAL.test(local)) return true;
+  if (BOTS.test(n) || BOTS.test(local)) return true;
+  if (MACHINE_NAMES.test(n) || MACHINE_NAMES.test(local) || /^jenkins(?:\s|$)/i.test(n) || /^jenkins[._+-]/.test(local)) return true;
+  if (SERVICE_NAME.test(n) || CI_NAME.test(n)) return true;
+  if (TEAM_JOB.test(n) && domain !== '' && !isPublicMail(domain)) return true;
   return domain !== '' && (!domain.includes('.') || /\.(?:local|localdomain|internal|lan)$/.test(domain));
 }
 
@@ -107,17 +88,31 @@ export const LOG_FORMAT = '--format=%an%x1f%ae%x1f%H%x1f%aI';
 export type Authored = { name: string; email: string; key: string; commit: string; at: string };
 
 /**
- * The authors of a log in `LOG_FORMAT`, newest first, with the machines, the owner's keys and anybody with no address
- * left out. Each commit is one entry: grouping is the caller's.
+ * The authors of a log in `LOG_FORMAT`, newest first, with the machines, the owner by any key or name of his, and
+ * anybody with no address left out. Each commit is one entry: grouping is the caller's.
  */
-export function authoredIn(log: string, own: ReadonlySet<string>): Authored[] {
+export function authoredIn(log: string, own: Owner): Authored[] {
   const out: Authored[] = [];
   for (const line of log.split('\n')) {
     const [name = '', email = '', commit = '', at = ''] = line.split('\x1f').map((s) => s.trim());
     if (!commit) continue;
-    const key = keyOfAddress(email);
-    if (key === null || isMachine(name, email) || own.has(key)) continue;
+    const key = keyOf('email', email);
+    if (key === null || isMachine(name, email) || isOwner(own, key, name)) continue;
     out.push({ name, email: email.toLowerCase(), key, commit, at });
+  }
+  return out;
+}
+
+/** The fewest commits an identity has made before it is met: one commit is a drive-by, two is somebody in the work. */
+export const MIN_COMMITS = 2;
+
+/** Each author's commits in a repository's whole history, by key, for `MIN_COMMITS` when only a few commits are read. */
+export async function commitsBy(dir: string): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const log = await git(dir, 'log', '--format=%ae', 'HEAD');
+  for (const email of (log ?? '').split('\n')) {
+    const key = keyOf('email', email);
+    if (key !== null) out.set(key, (out.get(key) ?? 0) + 1);
   }
   return out;
 }
@@ -137,64 +132,128 @@ export function meetingOf(a: Authored, repo: string): Meeting {
   };
 }
 
-/* ── the owner ─────────────────────────────────────────────────────────── */
-
-/** The list `meet` writes on a record whose People declares no other. */
-export const PEOPLE_LIST = 'people';
+/* ── the record: its projects and the owner ────────────────────────────── */
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' ? [v] : []);
 
-/** What one person row says identifies them: its address, its keys and its handles, each as a key. */
+/** What one person row says identifies them: its address, its keys and its handles, each as the kernel keys it. */
 export function keysOfRow(fields: Record<string, unknown>): string[] {
-  const out = new Set<string>();
-  for (const v of [...strings(fields.email), ...strings(fields.keys), ...strings(fields.handles)]) {
-    const key = keyOfAny(v);
+  const out = new Set(keysOf({ emails: strings(fields.email), keys: strings(fields.keys), handles: strings(fields.handles) }));
+  /* A bare address kept among the keys is still that address's key. */
+  for (const v of [...strings(fields.keys), ...strings(fields.handles)]) {
+    const key = keyFrom(v) === null ? keyOf('email', v) : null;
     if (key !== null) out.add(key);
   }
   return [...out];
 }
 
-/** The names one person row goes by: its name and its aliases, as two mentions compare them. */
-export function namesOfRow(fields: Record<string, unknown>): string[] {
-  return [...strings(fields.name), ...strings(fields.aliases)].map(sameName).filter((n) => n !== '');
-}
-
 /** A name as two mentions of one person share it: trimmed, spaces collapsed, lower case. */
 export const sameName = (name: string): string => name.trim().replace(/\s+/g, ' ').toLowerCase();
 
-/** The self rows of People: the owner's own, whichever list declares it, read once. */
-export type Self = { id: string; seq: number | null; version: number; fields: Record<string, unknown> };
+/** The owner as a harvest leaves him out: every key he is known by, and every name and alias he goes by. */
+export type Owner = { keys: ReadonlySet<string>; names: ReadonlySet<string> };
+
+/** Nobody: a record with no self row, before this machine's own address is added. */
+export const NOBODY: Owner = { keys: new Set(), names: new Set() };
+
+/** Whether one commit's author is the owner, by any key of his or by his name or one of his aliases. */
+export const isOwner = (own: Owner, key: string, name: string): boolean => own.keys.has(key) || (name.trim() !== '' && own.names.has(sameName(name)));
+
+/** A project as this command reads it: its name, and the repositories and folders it lists. */
+export type Project = { name: string; repos: string[]; folders: string[] };
+
+/** What a harvest reads of the record: its projects, and the owner as the list declaring `meets:` keeps him. */
+export type Layout = { projects: Project[]; self: Owner };
+
+/** The reads a harvest makes. */
+export type Reader = Pick<Client, 'boot' | 'schema' | 'list'>;
 
 /**
- * The rows of People marked as the record's own person (`self`), or none when the list has no such field, the caller
- * cannot read it, or the host does not answer. Never a guess by name.
+ * The projects and the owner, from the lists that declare them: `scopes:` for the projects, `meets:` for the people,
+ * whose `self` part names the field marking the owner's own row. No projects and nobody when the record declares
+ * neither or the caller cannot read it, never a guess by a list's name. Throws `unreachable` when the host does not
+ * answer at all.
  */
-export async function selfRows(list: Client['list']): Promise<Self[]> {
+export async function readLayout(reader: Reader): Promise<Layout> {
+  const boot = await reader.boot();
+  if (!boot.ok) {
+    if (refused(boot) && boot.refusal.code === 'UNREACHABLE') throw new Error('unreachable');
+    return { projects: [], self: NOBODY };
+  }
+  const decls = (await Promise.all(boot.value.registers.map((r) => reader.schema(r.id)))).flatMap((d) => (d.ok && isObject(d.value) && typeof d.value.id === 'string' ? [d.value] : []));
+  const [projects, self] = await Promise.all([readProjects(reader, decls), readSelf(reader, decls)]);
+  return { projects, self };
+}
+
+/** The project list: the one list declaring `scopes:`, its rows read to the end. */
+async function readProjects(reader: Reader, decls: readonly Record<string, unknown>[]): Promise<Project[]> {
+  const home = decls.find((d) => isObject(d.scopes));
+  if (!home || !isObject(home.scopes)) return [];
+  const { repos, folders } = home.scopes as { repos?: string; folders?: string };
+  const title = typeof home.title === 'string' ? home.title : 'name';
+  const out: Project[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 50; page++) {
+    const got: Result<{ rows: unknown[]; cursor: string | null }> = await reader.list({ register: String(home.id), limit: 200, ...(cursor ? { cursor } : {}) });
+    if (!got.ok) return out;
+    for (const r of got.value.rows)
+      if (isObject(r) && isObject(r.fields)) {
+        const f = r.fields;
+        out.push({ name: typeof f[title] === 'string' ? f[title] : 'a project', repos: repos ? strings(f[repos]) : [], folders: folders ? strings(f[folders]).map(real) : [] });
+      }
+    cursor = got.value.cursor;
+    if (!cursor) break;
+  }
+  return out;
+}
+
+/* A folder as git names it, through any link on the way, so `/tmp/x` and `/private/tmp/x` are one; as said when it is not here. */
+function real(folder: string): string {
   try {
-    const got = await list({ register: PEOPLE_LIST, where: { field: 'self', is: true }, limit: 5 });
-    if (!got.ok) return [];
-    return got.value.rows.filter(isObject).flatMap((r) =>
-      typeof r.id === 'string' && isObject(r.fields) && r.fields.self === true
-        ? [{ id: r.id, seq: typeof r.seq === 'number' ? r.seq : null, version: typeof r.version === 'number' ? r.version : 0, fields: r.fields }]
-        : [],
-    );
+    return realpathSync(folder);
   } catch {
-    return [];
+    return folder;
   }
 }
 
 /**
- * Every key the owner commits under: the self row's, and the address git signs with in each repository named.
+ * The owner as the list declaring `meets:` keeps him: the rows its `self` part marks, each with every key on it (its
+ * address, its keys, its handles) and every name it goes by (its name and its aliases), as that list's parts name them.
+ */
+async function readSelf(reader: Reader, decls: readonly Record<string, unknown>[]): Promise<Owner> {
+  const home = decls.find((d) => isObject(d.meets) && typeof d.meets.self === 'string');
+  if (!home || !isObject(home.meets)) return NOBODY;
+  const parts = home.meets as Record<string, unknown>;
+  const part = (p: string, fields: Record<string, unknown>): unknown => (typeof parts[p] === 'string' ? fields[parts[p]] : undefined);
+  const self = String(parts.self);
+  try {
+    const got = await reader.list({ register: String(home.id), where: { field: self, is: true }, limit: 5 });
+    if (!got.ok) return NOBODY;
+    const keys = new Set<string>();
+    const names = new Set<string>();
+    for (const r of got.value.rows)
+      if (isObject(r) && isObject(r.fields) && r.fields[self] === true) {
+        for (const k of keysOfRow({ email: part('email', r.fields), keys: part('keys', r.fields), handles: part('handles', r.fields) })) keys.add(k);
+        for (const n of [...strings(part('name', r.fields)), ...strings(part('aliases', r.fields))].map(sameName)) if (n !== '') names.add(n);
+      }
+    return { keys, names };
+  } catch {
+    return NOBODY;
+  }
+}
+
+/**
+ * The owner for this run: his own row's keys and names, with the address git signs with in each repository named.
  * Read once per run, so a session's end costs one read for however many authors it met.
  */
-export async function ownKeys(list: Client['list'] | null, dirs: readonly string[]): Promise<Set<string>> {
-  const [rows, ...configured] = await Promise.all([list === null ? [] : selfRows(list), ...dirs.map((d) => git(d, 'config', 'user.email'))]);
-  const out = new Set(rows.flatMap((r) => keysOfRow(r.fields)));
+export async function ownerOf(self: Owner, dirs: readonly string[]): Promise<Owner> {
+  const configured = await Promise.all(dirs.map((d) => git(d, 'config', 'user.email')));
+  const keys = new Set(self.keys);
   for (const email of configured) {
-    const key = email === null ? null : keyOfAddress(email);
-    if (key !== null) out.add(key);
+    const key = email === null ? null : keyOf('email', email);
+    if (key !== null) keys.add(key);
   }
-  return out;
+  return { keys, names: self.names };
 }
 
 /* ── meet ──────────────────────────────────────────────────────────────── */
@@ -308,60 +367,43 @@ export async function childHeads(top: string): Promise<Record<string, string>> {
   return out;
 }
 
-/* ── braindog people harvest ───────────────────────────────────────────── */
-
-const USAGE = 'braindog people harvest takes [--since <day>] [--dry-run] [--host <host>], as in braindog people harvest --since 2026-01-01 --dry-run.';
-
-/** A project as this command reads it: its name, and the repositories and folders it lists. */
-export type Project = { name: string; repos: string[]; folders: string[] };
-
 /** A repository on this machine: where it is, its name, and its remote as `host/owner/name`. */
 export type LocalRepo = { dir: string; name: string; remote: string | null };
 
-/** A remote as `host/owner/name`, lower case, whether a project lists it as a URL, `git@host:a/b` or bare. */
-export function remoteKey(said: string): string {
-  let s = said.trim().replace(/\/+$/, '').replace(/\.git$/i, '');
-  const scheme = /^[a-z][a-z0-9+.-]*:\/\//i.exec(s);
-  if (scheme) s = s.slice(scheme[0].length);
-  s = s.replace(/^[^@/]*@/, '');
-  let [host = '', ...rest] = s.split('/');
-  const colon = host.indexOf(':');
-  if (colon >= 0) {
-    if (!scheme) rest = [host.slice(colon + 1), ...rest];
-    host = host.slice(0, colon);
-  }
-  return [host, ...rest].filter((part) => part !== '').join('/').toLowerCase();
+/** A repository on this machine by its folder, or `null` when the folder is not one. */
+export async function localRepo(dir: string): Promise<LocalRepo | null> {
+  const top = await git(dir, 'rev-parse', '--show-toplevel');
+  if (top === null) return null;
+  const origin = await git(top, 'remote', 'get-url', 'origin');
+  return { dir: resolve(top), name: basename(resolve(top)), remote: origin === null ? null : normaliseRemote(origin) };
 }
-
-const lastName = (said: string): string =>
-  (
-    said
-      .trim()
-      .replace(/[\\/]+$/u, '')
-      .replace(/\.git$/iu, '')
-      .split(/[\\/:]+/u)
-      .filter((p) => p !== '')
-      .at(-1) ?? ''
-  ).toLowerCase();
 
 const pathKey = (p: string): string => p.trim().replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 
 /**
- * Which project a local repository belongs to: its remote listed, then a folder it is in, then its name when exactly one
- * project lists a place of that name. `null` when none does, or two do at the same rung.
+ * The project that lists a local repository: by its remote, as the kernel keys a remote, or by its very folder. `null`
+ * when none does, and then nobody in it is met.
+ *
+ * NEVER BY NAME, AND NEVER BY A FOLDER IT SITS UNDER. A project listing `inkwell` says nothing about a clone of
+ * somebody else's `inkwell`, and a project's folder holding a checkout of an open-source library does not make the
+ * library's authors the person's colleagues. A remote two projects list goes with the first.
  */
-export function projectOf(projects: readonly Project[], repo: LocalRepo): Project | null {
-  const one = (hits: Project[]) => (hits.length === 1 ? hits[0]! : null);
+export function listedBy(projects: readonly Project[], repo: LocalRepo): Project | null {
   if (repo.remote !== null) {
-    const hits = projects.filter((p) => p.repos.some((r) => remoteKey(r) === remoteKey(repo.remote!)));
-    if (hits.length > 0) return one(hits);
+    const at = remoteKey(repo.remote);
+    const hit = projects.find((p) => p.repos.some((r) => remoteKey(r) === at));
+    if (hit) return hit;
   }
   const dir = pathKey(repo.dir);
-  const under = projects.filter((p) => p.folders.some((f) => dir === pathKey(f) || dir.startsWith(`${pathKey(f)}/`)));
-  if (under.length > 0) return one(under);
-  const name = repo.name.toLowerCase();
-  return one(projects.filter((p) => [...p.repos, ...p.folders].some((place) => lastName(place) === name)));
+  return projects.find((p) => p.folders.some((f) => pathKey(f) === dir)) ?? null;
 }
+
+/* ── braindog people harvest ───────────────────────────────────────────── */
+
+const USAGE = 'braindog people harvest takes [--since <day>] [--dry-run] [--host <host>], as in braindog people harvest --since 2026-01-01 --dry-run.';
+
+/** The most people one run meets, the busiest first, so a long history cannot fill People in one go. */
+export const MEETS_PER_RUN = 200;
 
 /** One author across every repository read: the names they signed with, their keys, and where and when. */
 export type Cluster = {
@@ -371,7 +413,7 @@ export type Cluster = {
   commits: number;
   /** The newest commit in each repository, by repository name, for the source line. */
   newest: Map<string, string>;
-  /** Commits by project name, `''` for none. */
+  /** Commits by project name. */
   projects: Map<string, number>;
   last: string;
 };
@@ -420,40 +462,25 @@ export function clusterLines(c: Cluster): string[] {
   return [head, `  ${keys.join(', ')}`];
 }
 
-/** The project list: the one list declaring `scopes:`, its rows read to the end, or `null` when the record has none. */
-async function readProjects(client: Client): Promise<Project[] | null> {
-  const boot = await client.boot();
-  if (!boot.ok) {
-    if (refused(boot) && boot.refusal.code === 'UNREACHABLE') throw new Error('unreachable');
-    return null;
-  }
-  const decls = await Promise.all(boot.value.registers.map((r) => client.schema(r.id)));
-  const home = decls.map((d) => (d.ok && isObject(d.value) ? d.value : null)).find((d) => d !== null && isObject(d.scopes));
-  if (!home || typeof home.id !== 'string' || !isObject(home.scopes)) return null;
-  const { repos, folders } = home.scopes as { repos?: string; folders?: string };
-  const title = typeof home.title === 'string' ? home.title : 'name';
-  const out: Project[] = [];
-  let cursor: string | null = null;
-  for (let page = 0; page < 50; page++) {
-    const got: Result<{ rows: unknown[]; cursor: string | null }> = await client.list({ register: home.id, limit: 200, ...(cursor ? { cursor } : {}) });
-    if (!got.ok) return null;
-    for (const r of got.value.rows)
-      if (isObject(r) && isObject(r.fields)) {
-        const f = r.fields;
-        out.push({ name: typeof f[title] === 'string' ? f[title] : 'a project', repos: repos ? strings(f[repos]) : [], folders: folders ? strings(f[folders]) : [] });
-      }
-    cursor = got.value.cursor;
-    if (!cursor) break;
-  }
-  return out;
+/**
+ * Who of the clusters is met in one run, and what was left out and why: the identities with fewer than `MIN_COMMITS`,
+ * and those past `MEETS_PER_RUN`, the quietest first.
+ */
+export function chooseMet(clusters: readonly Cluster[]): { met: Cluster[]; few: number; over: number } {
+  const enough = clusters.filter((c) => c.commits >= MIN_COMMITS);
+  return { met: enough.slice(0, MEETS_PER_RUN), few: clusters.length - enough.length, over: Math.max(0, enough.length - MEETS_PER_RUN) };
 }
 
-/** A repository on this machine by its folder, or `null` when the folder is not one. */
-async function localRepo(dir: string): Promise<LocalRepo | null> {
-  const top = await git(dir, 'rev-parse', '--show-toplevel');
-  if (top === null) return null;
-  const origin = await git(top, 'remote', 'get-url', 'origin');
-  return { dir: resolve(top), name: basename(resolve(top)), remote: origin === null ? null : normaliseRemote(origin) };
+/* The first three repositories' names, so a folder holding dozens is one short line and not a wall of names. */
+const firstNames = (repos: readonly LocalRepo[]): string => and(repos.slice(0, 3).map((r) => r.name));
+
+/** What a run left out, one sentence a reason, for the dry run and the real one alike. */
+function leftOut(few: number, over: number, unlisted: readonly LocalRepo[]): string[] {
+  return [
+    few > 0 ? `Not met: ${plural(few, 'person', 'people')} with fewer than ${String(MIN_COMMITS)} commits.` : '',
+    over > 0 ? `Not met: ${String(over)} more, past the ${String(MEETS_PER_RUN)} a run meets.` : '',
+    unlisted.length === 0 ? '' : unlisted.length <= 3 ? `Not read: ${and(unlisted.map((r) => r.name))}, which no project lists.` : `Not read: ${String(unlisted.length)} repositories no project lists, such as ${firstNames(unlisted)}.`,
+  ].filter((l) => l !== '');
 }
 
 /** The headers one project's run sends: a client id of its own, and the place of one of its repositories. */
@@ -466,14 +493,15 @@ function runHeaders(at: LocalRepo, host: string, client: string): Record<string,
 const MEETS_AT_ONCE = 4;
 
 /**
- * `braindog people harvest [--since <day>] [--dry-run] [--host <host>]`: everybody who committed to the repositories the
- * record's projects list, found on this machine, and to the repositories in and under this folder, met with the project
- * each worked in. The exit code: 0 done, 1 refused or a local error, 3 unreachable.
+ * `braindog people harvest [--since <day>] [--dry-run] [--host <host>]`: everybody who committed at least twice to the
+ * repositories the record's projects list, found in and under this folder and in each folder a project lists, met with
+ * the project each worked in, at most `MEETS_PER_RUN` of them. The exit code: 0 done, 1 refused or a local error, 3
+ * unreachable.
  *
  * ONE RUN PER PROJECT, EACH OF ITS OWN. A meet links a person to the project of the run it is made in, so each project's
  * meets go as a run placed there by one of its repositories, and that run is ended `done` once its last meet answers.
- * Authors in a repository no project lists are met with no project. Nothing is sent with `--dry-run`, which prints the
- * people it would meet, grouped by key, with every address each signed with.
+ * A repository no project lists is not read, and says so. Nothing is sent with `--dry-run`, which prints the people it
+ * would meet, grouped by key, with every address each signed with, and what it would leave out.
  */
 export async function peopleCommand(args: string[], io: AgentIo): Promise<number> {
   let parsed: { values: { since?: string | undefined; 'dry-run'?: boolean | undefined; host?: string | undefined }; positionals: string[] };
@@ -501,53 +529,74 @@ export async function peopleCommand(args: string[], io: AgentIo): Promise<number
   const machine = folder['x-braindog-host'] ?? 'this-machine';
   const ms = budgetOf(io.env);
   const reader = clientFor(to, async () => ({ ...(folder['x-braindog-host'] === undefined ? {} : { 'x-braindog-host': machine }) }), AbortSignal.timeout(ms * 20));
-  let projects: Project[];
+  let layout: Layout;
   try {
-    projects = (await readProjects(reader)) ?? [];
+    layout = await readLayout(reader);
   } catch {
     io.say(`${to.key} did not answer.`);
     return 3;
   }
 
-  /* THE REPOSITORIES: this folder's own, those under it, and each folder a project lists that is one on this machine. */
+  /* THE REPOSITORIES: this folder's own, those under it, and each folder a project lists that is one on this machine,
+     then only those a project lists. */
   const dirs = new Set<string>();
   const here = await localRepo(io.cwd);
   if (here !== null) dirs.add(here.dir);
   else for (const rel of childRepos(io.cwd)) dirs.add(resolve(io.cwd, rel));
-  for (const p of projects) for (const f of p.folders) if (existsSync(join(f, '.git'))) dirs.add(resolve(f));
+  for (const p of layout.projects) for (const f of p.folders) if (existsSync(join(f, '.git'))) dirs.add(resolve(f));
   const repos = (await Promise.all([...dirs].map(localRepo))).filter((r): r is LocalRepo => r !== null);
   const unique = [...new Map(repos.map((r) => [r.dir, r])).values()];
+  const listed = unique.flatMap((repo) => {
+    const project = listedBy(layout.projects, repo);
+    return project === null ? [] : [{ repo, project }];
+  });
+  const unlisted = unique.filter((r) => !listed.some((l) => l.repo === r));
   if (unique.length === 0) {
     io.out('No repository was found here or in the folders your projects list, so nobody was met.');
     return 0;
   }
+  if (listed.length === 0) {
+    const which = unlisted.length <= 3 ? firstNames(unlisted) : `any of the ${String(unlisted.length)} repositories here, such as ${firstNames(unlisted)}`;
+    io.out(`No project lists ${which}, so nobody was met. Add a repository's remote to its project to meet the people who commit to it.`);
+    return 0;
+  }
 
-  const own = await ownKeys(reader.list, unique.map((r) => r.dir));
+  const own = await ownerOf(layout.self, listed.map((l) => l.repo.dir));
   const read = await Promise.all(
-    unique.map(async (repo) => {
+    listed.map(async ({ repo, project }) => {
       const log = await git(repo.dir, 'log', LOG_FORMAT, ...(since === undefined ? [] : [`--since=${since}`]));
-      return { repo, project: projectOf(projects, repo), authored: log === null ? [] : authoredIn(log, own) };
+      return { repo, project, authored: log === null ? [] : authoredIn(log, own) };
     }),
   );
   const clusters = clustersOf(read);
+  const { met, few, over } = chooseMet(clusters);
+  const notes = leftOut(few, over, unlisted);
+  const from = plural(listed.length, 'repository', 'repositories');
+  const window = since === undefined ? '' : ` since ${since}`;
   if (clusters.length === 0) {
-    io.out(`Nobody but you${since === undefined ? '' : ` since ${since}`} committed to ${plural(unique.length, 'repository', 'repositories')}, so nobody was met.`);
+    io.out(`Nobody but you${window} committed to ${from}, so nobody was met.`);
+    for (const line of notes) io.out(line);
+    return 0;
+  }
+  if (met.length === 0) {
+    io.out(`Nobody${window} made ${String(MIN_COMMITS)} or more commits to ${from}, so nobody was met.`);
+    for (const line of notes) io.out(line);
     return 0;
   }
 
   if (dryRun) {
-    io.out(`${plural(clusters.length, 'person', 'people')} committed to ${plural(unique.length, 'repository', 'repositories')}${since === undefined ? '' : ` since ${since}`}. Nothing was sent:`);
-    for (const c of clusters) for (const line of clusterLines(c)) io.out(line);
+    io.out(`${plural(met.length, 'person', 'people')} would be met from ${from}${window}. Nothing was sent:`);
+    for (const c of met) for (const line of clusterLines(c)) io.out(line);
+    for (const line of notes) io.out(line);
     return 0;
   }
 
-  /* ONE RUN A PROJECT, and one for the repositories no project lists. */
+  /* ONE RUN A PROJECT. */
   const groups = new Map<string, { repo: LocalRepo; repos: Set<string> }>();
-  for (const { repo, project } of read) {
-    const name = project?.name ?? '';
-    const g = groups.get(name) ?? { repo, repos: new Set<string>() };
+  for (const { repo, project } of listed) {
+    const g = groups.get(project.name) ?? { repo, repos: new Set<string>() };
     g.repos.add(repo.name);
-    groups.set(name, g);
+    groups.set(project.name, g);
   }
   const stamp = crypto.randomUUID();
   /** What each person's first meet answered, so somebody met in two projects is counted once. */
@@ -560,7 +609,7 @@ export async function peopleCommand(args: string[], io: AgentIo): Promise<number
     const meet = meeter((a) => client.call('meet', a));
     let sent = 0;
     let stop: string | null = null;
-    const queue = clusters.filter((c) => (c.projects.get(project) ?? 0) > 0);
+    const queue = met.filter((c) => (c.projects.get(project) ?? 0) > 0);
     const worker = async () => {
       for (let c = queue.shift(); c !== undefined && stop === null; c = queue.shift()) {
         const repo = [...c.newest.keys()].find((r) => g.repos.has(r)) ?? [...c.newest.keys()][0]!;
@@ -590,14 +639,15 @@ export async function peopleCommand(args: string[], io: AgentIo): Promise<number
       if (/stopped answering/.test(stop)) break;
     }
     if (sent > 0) {
-      const ended = await client.handoff({ state: 'done', doing: project ? `People from the commits in ${project}` : 'People from the commits in repositories no project lists', note: `${plural(sent, 'person', 'people')} met.` });
-      if (!ended.ok && refused(ended) && ended.refusal.code !== 'UNREACHABLE') refusedLines.push(`The run for ${project || 'repositories no project lists'} could not be ended: ${ended.refusal.fix}`);
+      const ended = await client.handoff({ state: 'done', doing: `People from the commits in ${project}`, note: `${plural(sent, 'person', 'people')} met.` });
+      if (!ended.ok && refused(ended) && ended.refusal.code !== 'UNREACHABLE') refusedLines.push(`The run for ${project} could not be ended: ${ended.refusal.fix}`);
     }
   }
   const count = (k: 'new' | 'known' | 'noted') => [...outcome.values()].filter((v) => v === k).length;
   const total = outcome.size;
   const parts = [count('new') > 0 ? `${String(count('new'))} new` : '', count('known') > 0 ? `${String(count('known'))} already known` : '', count('noted') > 0 ? `${String(count('noted'))} noted by name only` : ''].filter((x) => x !== '');
-  io.out(`Met ${plural(total, 'person', 'people')} from ${plural(unique.length, 'repository', 'repositories')}${parts.length > 0 ? `: ${and(parts)}` : ''}. Your own commits and the machines' were left out.`);
+  io.out(`Met ${plural(total, 'person', 'people')} from ${from}${parts.length > 0 ? `: ${and(parts)}` : ''}. Your own commits and the machines' were left out.`);
+  for (const line of notes) io.out(line);
   for (const line of [...new Set(refusedLines)]) io.say(line);
   return refusedLines.some((l) => /stopped answering/.test(l)) ? 3 : refusedLines.length > 0 ? 1 : 0;
 }

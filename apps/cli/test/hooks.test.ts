@@ -60,7 +60,13 @@ const CONTEXT = {
  * the context carries the record's own card, as a host that draws one does. `context` answers the same context,
  * `boot` says the sign-in speaks for Sam, and `list` answers no rows, for the commands and the MCP server.
  */
-async function stubHost(t: { after: (fn: () => Promise<void>) => void }, hang = false, people = true, card?: string, o: { self?: Record<string, unknown>; legacy?: boolean } = {}) {
+async function stubHost(
+  t: { after: (fn: () => Promise<void>) => void },
+  hang = false,
+  people = true,
+  card?: string,
+  o: { self?: Record<string, unknown>; legacy?: boolean; projects?: { repos?: string[]; folders?: string[] }[] } = {},
+) {
   const seen: Seen[] = [];
   const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -81,7 +87,20 @@ async function stubHost(t: { after: (fn: () => Promise<void>) => void }, hang = 
         return answer({ ok: true, value: { session: row, spoken: 'S7', resumed: body.source !== 'startup', project: 'things#1', context: card === undefined ? CONTEXT : { ...CONTEXT, card } } });
       if (method === 'handoff') return answer({ ok: true, value: { ...row, state: body.state } });
       if (method === 'context') return answer({ ok: true, value: CONTEXT });
-      if (method === 'boot') return answer({ ok: true, value: { registers: [], now: '2026-10-02T09:00:00Z', me: { kind: 'token', person: 'p_owner', name: 'Sam', level: 'owner' } } });
+      /* With `projects`, a Projects list declaring `scopes:` and a People list declaring `meets:` with its self part. */
+      const registers = o.projects === undefined ? [] : [{ id: 'things', name: 'Projects', count: o.projects.length }, { id: 'people', name: 'People', count: 1 }];
+      if (method === 'boot') return answer({ ok: true, value: { registers, now: '2026-10-02T09:00:00Z', me: { kind: 'token', person: 'p_owner', name: 'Sam', level: 'owner' } } });
+      const register = String(body.register ?? new URLSearchParams(url.search).get('register'));
+      if (method === 'schema')
+        return answer({
+          ok: true,
+          value:
+            register === 'things'
+              ? { id: 'things', title: 'name', fields: [], scopes: { repos: 'repos', folders: 'folders' } }
+              : { id: 'people', title: 'name', fields: [], meets: { name: 'name', email: 'email', keys: 'keys', handles: 'handles', self: 'self', aliases: 'aliases' } },
+        });
+      if (method === 'list' && register === 'things')
+        return answer({ ok: true, value: { rows: (o.projects ?? []).map((p, i) => ({ id: `e_p${String(i)}`, seq: i + 1, version: 1, fields: { name: `Project ${String(i + 1)}`, ...p } })), matched: 0, cursor: null } });
       if (method === 'list')
         return answer({ ok: true, value: { rows: o.self === undefined ? [] : [{ id: 'p_self', seq: 1, version: 3, fields: { self: true, ...o.self } }], matched: 0, cursor: null } });
       /* A record from before the contract takes four arguments and refuses the first it does not know by name. */
@@ -330,15 +349,19 @@ function repository(dir = folder('repo')): { dir: string; commit: (author?: stri
   };
 }
 
-test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run goes idle: no bots, not the owner, at most ten, and silent when refused', async (t) => {
+test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run goes idle: no bots, not the owner, nobody with one commit, at most ten, and silent when refused', async (t) => {
   const repo = repository();
+  /* Ada's first commit is before the session, so her one commit in it is her second in the repository. */
+  repo.commit('Ada Lovelace <123+ada@users.noreply.github.com>');
   const start = repo.commit();
   repo.commit('dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>');
   repo.commit('Claude <noreply@anthropic.com>');
-  for (let i = 1; i <= 11; i++) repo.commit(`Person ${String(i)} <person${String(i)}@example.com>`);
+  for (let i = 1; i <= 11; i++) for (let twice = 0; twice < 2; twice++) repo.commit(`Person ${String(i)} <person${String(i)}@example.com>`);
   repo.commit('Person 11 <PERSON11@example.com>');
+  repo.commit('Drive By <drive@by.example>');
   repo.commit();
   const last = repo.commit('Ada Lovelace <123+ada@users.noreply.github.com>');
+  const projects = [{ folders: [realpathSync(repo.dir)] }];
   const name = repo.dir.split(/[\\/]/).at(-1)!;
   const end = JSON.stringify({ session_id: 'claude-run-3', cwd: repo.dir, hook_event_name: 'SessionEnd', reason: 'logout' });
   const signedIn = (base: string) => {
@@ -347,11 +370,11 @@ test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run 
     return env;
   };
 
-  const host = await stubHost(t);
+  const host = await stubHost(t, false, true, undefined, { projects });
   const out = await run(['hook', 'end'], signedIn(host.base), end);
   assert.deepEqual([out.code, out.stdout, out.stderr], [0, '', '']);
-  /* The owner's own row read once, then the meets, then the handoff. */
-  assert.deepEqual(host.seen.map((s) => s.method), ['list', ...Array<string>(10).fill('meet'), 'handoff']);
+  /* The record's projects and the owner's own row read once, then the meets, then the handoff. */
+  assert.deepEqual(host.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', ...Array<string>(10).fill('meet'), 'handoff']);
   const met = host.seen.filter((s) => s.method === 'meet');
   /* Newest first: GitHub's private address as a handle and a key, the owner's commit left out, and one person once. */
   const source = `commit ${last.slice(0, 7)} in ${name}`;
@@ -366,10 +389,17 @@ test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run 
   }
 
   /* People switched off: the first is refused, no more are sent, and the run still goes idle. */
-  const off = await stubHost(t, false, false);
+  const off = await stubHost(t, false, false, undefined, { projects });
   const quiet = await run(['hook', 'end'], signedIn(off.base), end);
   assert.deepEqual([quiet.code, quiet.stdout, quiet.stderr], [0, '', '']);
-  assert.deepEqual(off.seen.map((s) => s.method), ['list', 'meet', 'handoff']);
+  assert.deepEqual(off.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', 'meet', 'handoff']);
+
+  /* No project lists the repository: nobody is met, and the run still goes idle. */
+  const unlisted = await stubHost(t, false, true, undefined, { projects: [{ repos: ['github.com/acme/other'] }] });
+  const none = await run(['hook', 'end'], signedIn(unlisted.base), end);
+  assert.deepEqual([none.code, none.stdout, none.stderr], [0, '', '']);
+  assert.deepEqual(unlisted.seen.filter((s) => s.method === 'meet'), []);
+  assert.equal(unlisted.seen.at(-1)?.method, 'handoff');
 
   /* A port nobody listens on: nothing said, and exit 0. */
   const down = await run(['hook', 'end'], signedIn('http://127.0.0.1:9'), end);
@@ -538,32 +568,54 @@ test('A SUBAGENT TAKES ITS PARENT RUN’S PLACE when it stands in no repository,
   assert.deepEqual([headers['x-braindog-parent'], headers['x-braindog-repo'], headers['x-braindog-cwd'], headers['x-braindog-remote']], ['S5', 'glaze', '/work/glaze', undefined]);
 });
 
-test('THE END HOOK READS EVERY REPOSITORY THAT MOVED UNDER A FOLDER THAT IS NOT ONE, leaves out the owner by every key on his own row and the machines, and speaks to an older record in its words', async (t) => {
+test('THE END HOOK READS EVERY REPOSITORY THAT MOVED UNDER A FOLDER THAT IS NOT ONE AND A PROJECT LISTS, leaves out the owner by every key and alias on his own row and the machines, and speaks to an older record in its words', async (t) => {
   const top = realpathSync(folder('developer'));
   const a = repository(join(top, 'glaze'));
   const b = repository(join(top, 'studio', 'kiln'));
+  /* Moved too, and no project lists it. */
+  const c = repository(join(top, 'oss'));
   a.commit();
+  a.commit('Grace Hopper <grace@navy.example>');
   b.commit();
+  b.commit('Linus <linus@example.org>');
+  c.commit('Stranger <stranger@example.org>');
   /* Not searched: a hidden folder and a dependency tree. */
   repository(join(top, '.cache', 'x')).commit();
   repository(join(top, 'node_modules', 'y')).commit();
-  const host = await stubHost(t, false, true, undefined, { self: { email: 'sam@avery.example', keys: ['email:sam.avery@example.com', 'github:actuallyhoss'] }, legacy: true });
+  const host = await stubHost(t, false, true, undefined, {
+    self: { name: 'Sam Avery', aliases: ['Sam'], email: 'sam@avery.example', keys: ['email:sam.avery@example.com', 'github:actuallyhoss'] },
+    legacy: true,
+    projects: [{ folders: [join(top, 'glaze')] }, { folders: [join(top, 'studio', 'kiln')] }],
+  });
   const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
   const start = await run(['hook', 'start'], env, event(top, { session_id: 'claude-run-dev', source: 'startup' }));
   assert.equal(start.code, 0, start.stderr);
-  assert.deepEqual(Object.keys(readSession(sessionPath(env, top, 'claude-run-dev'))?.heads ?? {}), ['glaze', 'studio/kiln']);
+  assert.deepEqual(Object.keys(readSession(sessionPath(env, top, 'claude-run-dev'))?.heads ?? {}), ['glaze', 'oss', 'studio/kiln']);
 
   const grace = a.commit('Grace Hopper <grace@navy.example>');
-  for (const machine of ['Jenkins Schema Sync <jenkins@brightloom.example>', 'Brightloom Repos <repos@brightloom.example>', 'Ubuntu <ubuntu@ip-10-0-0-1>', 'root <root@build.example>', 'runner <runner@gh.example>', 'github-actions <41898282+github-actions[bot]@users.noreply.github.com>'])
-    a.commit(machine);
-  for (const self of ['Sam <sam@avery.example>', 'Sam Avery <sam.avery+work@googlemail.com>', 'Sam <1234+actuallyhoss@users.noreply.github.com>']) a.commit(self);
+  for (const machine of [
+    'Jenkins Schema Sync <jenkins@brightloom.example>',
+    'Brightloom Repos <repos@brightloom.example>',
+    'Ubuntu <ubuntu@ip-10-0-0-1>',
+    'root <root@build.example>',
+    'runner <runner@gh.example>',
+    'github-actions <41898282+github-actions[bot]@users.noreply.github.com>',
+    'Renovate Bot <bot@renovateapp.com>',
+  ])
+    for (let twice = 0; twice < 2; twice++) a.commit(machine);
+  /* Every key on his row, and his aliases at an address the row does not hold yet. */
+  for (const self of ['Sam <sam@avery.example>', 'Sam Avery <sam.avery+work@googlemail.com>', 'Sam <1234+actuallyhoss@users.noreply.github.com>', 'Sam <sam@new-job.example>', 'Sam <sam@new-job.example>'])
+    a.commit(self);
   const linus = b.commit('Linus <linus@example.org>');
+  c.commit('Stranger <stranger@example.org>');
   host.seen.splice(0);
 
   const end = await run(['hook', 'end'], env, JSON.stringify({ session_id: 'claude-run-dev', cwd: top, hook_event_name: 'SessionEnd', reason: 'logout' }));
   assert.deepEqual([end.code, end.stdout, end.stderr], [0, '', '']);
-  const list = host.seen.find((s) => s.method === 'list');
-  assert.ok(list && /"field":"self"/.test(list.query + JSON.stringify(list.body)), 'the owner’s own row was not asked for');
+  assert.ok(
+    host.seen.some((s) => s.method === 'list' && /"field":"self"/.test(s.query + JSON.stringify(s.body))),
+    'the owner’s own row was not asked for',
+  );
   const met = host.seen.filter((s) => s.method === 'meet').map((s) => s.body);
   /* The first in the contract's words, refused for keys; then in the four words this record takes, for the rest. */
   assert.deepEqual(met, [

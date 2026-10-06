@@ -15,11 +15,12 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { keyOf } from '@braindog/kernel';
 import { ok, type Result } from '@braindog/ports';
 
 import type { Plan, PlannedRow } from '../src/adapter.ts';
 import { applyPlan, type Door } from '../src/import.ts';
-import { clustersOf, isMachine, keyOfAddress, meeter, metOf, peopleCommand, projectOf, authoredIn, type LocalRepo } from '../src/people.ts';
+import { authoredIn, chooseMet, clustersOf, isMachine, listedBy, meeter, MEETS_PER_RUN, metOf, NOBODY, peopleCommand, type Cluster, type LocalRepo, type Owner } from '../src/people.ts';
 import type { AgentIo } from '../src/skills.ts';
 
 const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'braindog-people-')));
@@ -27,49 +28,74 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 
 /* ── keys and machines ─────────────────────────────────────────────────── */
 
-test('A KEY IS AN ADDRESS FOLDED ONLY WHERE THE MAIL SERVICE FOLDS IT, and GitHub’s private address is the account', () => {
-  assert.equal(keyOfAddress('sam.avery+work@GoogleMail.com'), 'email:sam.avery@example.com');
-  assert.equal(keyOfAddress('sam.avery+work@encore.example'), 'email:sam.avery+work@encore.example');
-  assert.equal(keyOfAddress('49699333+Ada@users.noreply.github.com'), 'github:ada');
-  assert.equal(keyOfAddress('ada@users.noreply.github.com'), 'github:ada');
-  assert.equal(keyOfAddress('no address'), null);
-  assert.equal(keyOfAddress(''), null);
+const line = (name: string, email: string, n: number) => [name, email, String(n).repeat(40).slice(0, 40), '2026-10-01T10:00:00Z'].join('\x1f');
+
+test('A KEY IS THE KERNEL’S: every address is keyed as the record keys it, so a dotted GitHub login is never refused as malformed', () => {
+  const addresses = ['sam.avery+work@GoogleMail.com', 'sam.avery+work@encore.example', '49699333+Ada@users.noreply.github.com', 'ada@users.noreply.github.com', '12+a.b@users.noreply.github.com'];
+  const authored = authoredIn(addresses.map((a, i) => line(`Person ${String(i)}`, a, i + 1)).join('\n'), NOBODY);
+  assert.deepEqual(
+    authored.map((a) => a.key),
+    addresses.map((a) => keyOf('email', a)),
+  );
+  assert.deepEqual(authored.slice(0, 3).map((a) => a.key), ['email:sam.avery@example.com', 'email:sam.avery+work@encore.example', 'github:ada']);
+  /* No address, no author. */
+  assert.deepEqual(authoredIn([line('Nobody', 'no address', 1), line('Empty', '', 2)].join('\n'), NOBODY), []);
 });
 
-test('MACHINES ARE NOT PEOPLE: bots, CI users named for what they do at an organisation’s domain, and a machine’s own users', () => {
+test('MACHINES ARE NOT PEOPLE: bots, CI users, a team’s jobs at an organisation’s domain, and a machine’s own users', () => {
   for (const [name, email] of [
     ['dependabot[bot]', '49699333+dependabot[bot]@users.noreply.github.com'],
     ['github-actions', '41898282+github-actions[bot]@users.noreply.github.com'],
+    ['renovate[bot]', '29139614+renovate[bot]@users.noreply.github.com'],
+    ['Renovate Bot', 'bot@renovateapp.com'],
+    ['Release Bot', 'release-bot@acme.example'],
+    ['Acme CI', 'ci@acme.example'],
+    ['GitLab Runner', 'gitlab-runner@acme.example'],
+    ['Jenkins', 'jenkins@acme.example'],
     ['Jenkins Schema Sync', 'jenkins@brightloomit.example'],
     ['Brightloom Repos', 'repos@brightloomit.example'],
+    ['Docs Mirror', 'mirror@acme.example'],
     ['Ubuntu', 'ubuntu@ip-172-31-0-1.eu-west-1.compute.internal'],
+    ['ec2-user', 'ec2-user@ip-10-0-0-1.example'],
     ['root', 'root@build.example'],
     ['runner', 'runner@fv-az123.example'],
     ['Claude', 'noreply@anthropic.com'],
+    ['GitHub', 'noreply@github.com'],
+    ['Deploy', 'deploy@acme.example'],
     ['Somebody', 'somebody@macbook.local'],
+    ['Somebody', 'somebody@localhost'],
   ])
     assert.equal(isMachine(name!, email!), true, `${name!} <${email!}>`);
   for (const [name, email] of [
     ['Rohan Mehta', 'rohan@encore.example'],
     ['Ada Sync', 'ada.sync@gmail.com'],
+    ['Sarah Jenkins', 'sarah.jenkins@acme.example'],
+    ['Li Ci', 'li.ci@acme.example'],
+    ['Jane Runner', 'jane@acme.example'],
+    ['Ada Talbot', 'talbot@acme.example'],
+    ['Abbot Kinney', 'abbot@acme.example'],
     ['Madan Neriyanur', 'madann@users.noreply.github.com'],
   ])
     assert.equal(isMachine(name!, email!), false, `${name!} <${email!}>`);
 });
 
-test('AUTHORS GROUP BY KEY: one person under two spellings of one address is one, and the owner’s keys are left out', () => {
+test('AUTHORS GROUP BY KEY: one person under two spellings of one address is one, and the owner is left out by every key and every name he goes by', () => {
   const log = [
     ['Rohan Mehta', 'Rohan@Encore.example', 'a'.repeat(40), '2026-10-01T10:00:00Z'],
     ['rohanm', 'rohan@encore.example', 'b'.repeat(40), '2026-09-30T10:00:00Z'],
     ['Sam', 'sam@avery.example', 'c'.repeat(40), '2026-09-29T10:00:00Z'],
     ['Madan', '12+madann@users.noreply.github.com', 'd'.repeat(40), '2026-09-28T10:00:00Z'],
     ['Jenkins Schema Sync', 'jenkins@encore.example', 'e'.repeat(40), '2026-09-27T10:00:00Z'],
+    /* His alias, at an address his row does not hold yet. */
+    ['sam', 'ahmed@oldjob.example', 'f'.repeat(40), '2026-09-26T10:00:00Z'],
+    ['Ahmed  Avery', 'a.avery@contractor.example', '1'.repeat(40), '2026-09-25T10:00:00Z'],
   ]
     .map((l) => l.join('\x1f'))
     .join('\n');
+  const own: Owner = { keys: new Set(['email:sam@avery.example']), names: new Set(['ahmed avery', 'sam']) };
   const repo: LocalRepo = { dir: '/work/encore', name: 'encore', remote: 'github.com/brightloom/encore' };
   const project = { name: 'Encore', repos: ['github.com/brightloom/encore'], folders: [] };
-  const clusters = clustersOf([{ repo, project, authored: authoredIn(log, new Set(['email:sam@avery.example'])) }]);
+  const clusters = clustersOf([{ repo, project, authored: authoredIn(log, own) }]);
   assert.deepEqual(
     clusters.map((c) => [[...c.keys], c.commits, [...c.names.keys()], [...c.projects.keys()]]),
     [
@@ -79,20 +105,30 @@ test('AUTHORS GROUP BY KEY: one person under two spellings of one address is one
   );
 });
 
-test('A REPOSITORY FINDS ITS PROJECT by its remote, then a folder it is in, then a name only one project lists', () => {
+test('ONLY A REPOSITORY A PROJECT LISTS IS READ: by its remote, or by its very folder, never by a name or a folder it sits under', () => {
   const projects = [
     { name: 'BrainDog', repos: ['https://github.com/actuallyhoss/BrainDog.git'], folders: [] },
     { name: 'Nook', repos: [], folders: ['C:/Repos/nook', '/Users/sam/Developer/nook'] },
     { name: 'Fernly', repos: ['inkwell'], folders: [] },
-    { name: 'App one', repos: ['github.com/a/app'], folders: [] },
-    { name: 'App two', repos: ['github.com/b/app'], folders: [] },
+    { name: 'Developer', repos: [], folders: ['/Users/sam/Developer'] },
   ];
   const at = (dir: string, remote: string | null): LocalRepo => ({ dir, name: dir.split('/').at(-1)!, remote });
-  assert.equal(projectOf(projects, at('/x/braindog', 'github.com/actuallyhoss/braindog'))?.name, 'BrainDog');
-  assert.equal(projectOf(projects, at('/Users/sam/Developer/nook', null))?.name, 'Nook');
-  assert.equal(projectOf(projects, at('/x/inkwell', null))?.name, 'Fernly');
-  assert.equal(projectOf(projects, at('/x/app', null)), null, 'two projects list an app, so neither is picked');
-  assert.equal(projectOf(projects, at('/x/elsewhere', 'github.com/c/elsewhere')), null);
+  assert.equal(listedBy(projects, at('/x/braindog', 'github.com/actuallyhoss/braindog'))?.name, 'BrainDog');
+  assert.equal(listedBy(projects, at('/x/braindog', 'git@github.com:actuallyhoss/braindog.git'))?.name, 'BrainDog');
+  assert.equal(listedBy(projects, at('/Users/sam/Developer/nook/', null))?.name, 'Nook');
+  assert.equal(listedBy(projects, at('/x/inkwell', null)), null, 'a name a project lists is not a listing');
+  assert.equal(listedBy(projects, at('/Users/sam/Developer/linux', 'github.com/torvalds/linux')), null, 'a clone under a project’s folder is not the project’s');
+  assert.equal(listedBy(projects, at('/x/elsewhere', 'github.com/c/elsewhere')), null);
+});
+
+test('ONE RUN MEETS AT MOST 200, the busiest first, and nobody with a single commit', () => {
+  const cluster = (commits: number): Cluster => ({ names: new Map(), keys: new Set([`email:p${String(commits)}@x.example`]), emails: new Set(), commits, newest: new Map(), projects: new Map(), last: '' });
+  const clusters = [...Array.from({ length: MEETS_PER_RUN + 5 }, (_, i) => cluster(MEETS_PER_RUN + 10 - i)), cluster(1), cluster(1)];
+  const { met, few, over } = chooseMet(clusters);
+  assert.equal(met.length, MEETS_PER_RUN);
+  assert.equal(met.at(-1)!.commits, 11);
+  assert.deepEqual([few, over], [2, 5]);
+  assert.deepEqual(chooseMet([cluster(2), cluster(1)]).met.map((c) => c.commits), [2]);
 });
 
 /* ── meet ──────────────────────────────────────────────────────────────── */
@@ -263,7 +299,11 @@ function repository(dir: string): (author?: string) => string {
 
 type Seen = { method: string; body: Record<string, unknown>; headers: Record<string, string | string[] | undefined> };
 
-/** A record with a Projects list declaring `scopes:`, one project naming the glaze repository by its folder. */
+/**
+ * A record with a Projects list declaring `scopes:`, one project naming the glaze repository by its folder and one
+ * naming kiln by its remote, and a People list called `contacts` declaring `meets:` with the owner's own row, so the
+ * self row is found by the declaration and never by a list's name.
+ */
 async function harvestHost(t: { after: (fn: () => Promise<void>) => void }, glaze: string) {
   const seen: Seen[] = [];
   const server = createServer((req, res) => {
@@ -279,15 +319,26 @@ async function harvestHost(t: { after: (fn: () => Promise<void>) => void }, glaz
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ ok: true, value }));
       };
-      if (method === 'boot') return answer({ registers: [{ id: 'things', name: 'Projects', count: 1 }, { id: 'people', name: 'People', count: 1 }], now: '2026-10-06T09:00:00Z' });
-      if (method === 'schema') return answer(String(body.register) === 'things' ? { id: 'things', title: 'name', fields: [], scopes: { repos: 'repos', folders: 'folders' } } : { id: 'people', title: 'name', fields: [] });
+      if (method === 'boot') return answer({ registers: [{ id: 'things', name: 'Projects', count: 2 }, { id: 'contacts', name: 'People', count: 1 }], now: '2026-10-06T09:00:00Z' });
+      if (method === 'schema')
+        return answer(
+          String(body.register) === 'things'
+            ? { id: 'things', title: 'name', fields: [], scopes: { repos: 'repos', folders: 'folders' } }
+            : { id: 'contacts', title: 'name', fields: [], meets: { name: 'name', email: 'email', keys: 'keys', self: 'self', aliases: 'aliases' } },
+        );
       if (method === 'list')
         return answer(
           String(body.register) === 'things'
-            ? { rows: [{ id: 'e_p', seq: 1, version: 1, fields: { name: 'Glaze', repos: [], folders: [glaze] } }], cursor: null }
-            : { rows: [{ id: 'e_self', seq: 1, version: 1, fields: { name: 'Sam', self: true, keys: ['email:sam@avery.example'] } }], cursor: null },
+            ? {
+                rows: [
+                  { id: 'e_p', seq: 1, version: 1, fields: { name: 'Glaze', repos: [], folders: [glaze] } },
+                  { id: 'e_q', seq: 2, version: 1, fields: { name: 'Kiln', repos: ['https://github.com/acme/kiln.git'], folders: [] } },
+                ],
+                cursor: null,
+              }
+            : { rows: [{ id: 'e_self', seq: 1, version: 1, fields: { name: 'Sam Avery', aliases: ['Sam'], self: true, keys: ['email:sam@avery.example'] } }], cursor: null },
         );
-      if (method === 'meet') return answer({ row: { register: 'people', id: 'e_x', seq: 5, name: body.name }, created: true, matched_by: 'none' });
+      if (method === 'meet') return answer({ row: { register: 'contacts', id: 'e_x', seq: 5, name: body.name }, created: true, matched_by: 'none' });
       if (method === 'handoff') return answer({ id: 'e_run', seq: 1, state: 'done', version: 2, fields: {} });
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `not ${method}` } }));
@@ -304,17 +355,27 @@ async function harvestHost(t: { after: (fn: () => Promise<void>) => void }, glaz
   return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, seen };
 }
 
-test('BRAINDOG PEOPLE HARVEST groups everyone who committed by key, prints them on --dry-run, and meets each with their project as a run of its own', async (t) => {
+test('BRAINDOG PEOPLE HARVEST reads only the repositories a project lists, meets who committed twice or more, leaves the owner out by his own row, and prints it all on --dry-run', async (t) => {
   const top = join(scratch, 'developer');
   const glaze = join(top, 'glaze');
   const commitGlaze = repository(glaze);
+  const commitKiln = repository(join(top, 'kiln'));
+  execFileSync('git', ['remote', 'add', 'origin', 'git@github.com:acme/kiln.git'], { cwd: join(top, 'kiln') });
   const commitLoose = repository(join(top, 'loose', 'sketch'));
   commitGlaze('Grace Hopper <grace@navy.example>');
   commitGlaze('Grace H <Grace@Navy.example>');
   commitGlaze('Sam <sam@avery.example>');
+  /* His alias, from an address his row does not hold. */
+  commitGlaze('Sam <sam@oldjob.example>');
+  commitGlaze('Sam <sam@oldjob.example>');
   commitGlaze();
   commitGlaze('dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>');
-  const linus = commitLoose('Linus <linus@example.org>');
+  commitGlaze('Renovate Bot <bot@renovateapp.com>');
+  commitGlaze('Drive By <drive@by.example>');
+  commitKiln('Linus <linus@example.org>');
+  const linus = commitKiln('Linus <linus@example.org>');
+  /* A folder no project lists: its author is never read, however busy. */
+  for (let i = 0; i < 3; i++) commitLoose('Stranger <stranger@example.org>');
   const host = await harvestHost(t, glaze);
   const out: string[] = [];
   const said: string[] = [];
@@ -329,13 +390,17 @@ test('BRAINDOG PEOPLE HARVEST groups everyone who committed by key, prints them 
 
   assert.equal(await peopleCommand(['harvest', '--dry-run'], io), 0, said.join('\n'));
   assert.deepEqual(out, [
-    '2 people committed to 2 repositories. Nothing was sent:',
+    '2 people would be met from 2 repositories. Nothing was sent:',
     'Grace Hopper (also Grace H): 2 commits in glaze, Glaze',
     '  grace@navy.example',
-    'Linus: 1 commit in sketch',
+    'Linus: 2 commits in kiln, Kiln',
     '  linus@example.org',
+    'Not met: 1 person with fewer than 2 commits.',
+    'Not read: sketch, which no project lists.',
   ]);
   assert.equal(host.seen.filter((s) => s.method === 'meet').length, 0);
+  /* The owner's row was asked of the list declaring meets:, by its self part. */
+  assert.ok(host.seen.some((s) => s.method === 'list' && JSON.stringify(s.body).includes('contacts') && JSON.stringify(s.body).includes('self')), 'the owner’s own row was not asked for');
 
   out.splice(0);
   host.seen.splice(0);
@@ -345,15 +410,27 @@ test('BRAINDOG PEOPLE HARVEST groups everyone who committed by key, prints them 
     meets.map((s) => [s.body.name, s.body.keys, s.headers['x-braindog-repo'], s.headers['x-braindog-agent']]),
     [
       ['Grace Hopper', ['email:grace@navy.example'], 'glaze', 'other'],
-      ['Linus', ['email:linus@example.org'], 'sketch', 'other'],
+      ['Linus', ['email:linus@example.org'], 'kiln', 'other'],
     ],
   );
-  assert.equal(meets[1]!.body.source, `commit ${linus.slice(0, 7)} in sketch`);
+  assert.equal(meets[1]!.body.source, `commit ${linus.slice(0, 7)} in kiln`);
   /* One run a project, each its own client id, and each ended once its meets answered. */
   const clients = new Set(meets.map((s) => s.headers['x-braindog-client']));
   assert.equal(clients.size, 2);
   assert.equal(host.seen.filter((s) => s.method === 'handoff').length, 2);
-  assert.deepEqual(out, ['Met 2 people from 2 repositories: 2 new. Your own commits and the machines\' were left out.']);
+  assert.deepEqual(out, [
+    'Met 2 people from 2 repositories: 2 new. Your own commits and the machines\' were left out.',
+    'Not met: 1 person with fewer than 2 commits.',
+    'Not read: sketch, which no project lists.',
+  ]);
+
+  /* Only unlisted repositories, on a record whose project folder is not on this machine: nothing is read, and it says
+     what would make them count. */
+  const away = await harvestHost(t, join(scratch, 'not-here'));
+  out.splice(0);
+  assert.equal(await peopleCommand(['harvest'], { ...io, env: { ...io.env, BRAINDOG_HOST: away.base }, cwd: join(top, 'loose') }), 0, said.join('\n'));
+  assert.deepEqual(out, ['No project lists sketch, so nobody was met. Add a repository\'s remote to its project to meet the people who commit to it.']);
+  assert.equal(away.seen.filter((s) => s.method === 'meet').length, 0);
 
   assert.equal(await peopleCommand(['harvest', '--since', 'yesterday'], io), 1);
   assert.match(said.at(-1)!, /^braindog people harvest takes/);
