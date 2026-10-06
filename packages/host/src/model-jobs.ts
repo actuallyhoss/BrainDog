@@ -1,7 +1,8 @@
 /**
- * The pass that serves the record's model jobs on either host: lease the `infer.draft`, `infer.prose` and `infer.embed`
- * rows, answer each through the Slash engine the host hands in, and ack each in the shape `packages/kernel/src/outbox.ts`'s
- * `ack` reads.
+ * The pass that serves the record's model jobs on either host: lease the `infer.draft`, `infer.prose`, `infer.resolve` and
+ * `infer.embed` rows, answer each through the Slash engine the host hands in, and ack each in the shape
+ * `packages/kernel/src/outbox.ts`'s `ack` reads. Once a night it also reads the notes changed on people, organisations and
+ * projects (`understand.ts`, `serveNotes`).
  *
  * ONE PASS FOR BOTH HOSTS, AND THE RECORD STAYS THE JUDGE. The Worker calls this from `alarm()` as `#model`, after `#ask`,
  * and the self-host from `poll`, after its asks. The kernel files a draft through its one gate in the ack's transaction and
@@ -15,10 +16,12 @@
  *     two-way `options` question carrying the finding's own sentence, so every finding reaches Decide at no cost.
  * A digest's prose is acked as `{ text }`, and `''` sends the digest as figures. An embedding is acked as
  * `{ model, dims, vectors }`, one vector for each text the hourly sweep queued, which the kernel writes to `entry_vec`.
+ * A doubtful pair is acked as `{ verdicts: [{ hash, same, confidence }] }`, from the cache first (`understand.ts`).
  *
  * METERED ON THE BACKGROUND ALLOWANCE, NEVER ON HIS ASKS. The daily look, an automation's question, a digest's prose and a
  * pattern's draft share `BACKGROUND_ASKS_MONTH` (60) a month, less the page headlines' own share (`HEADLINE_ASKS_MONTH`); his
- * 80 are his own (`packages/slash/src/types.ts`). The pass
+ * 80 are his own (`packages/slash/src/types.ts`). Understanding who is who spends at most `UNDERSTAND_ASKS_MONTH` of that
+ * rest. The pass
  * asks the meter BEFORE it leases and leases no more jobs than the month has left, so a spent month leaves the jobs
  * `pending`, where they never walk the retry ladder to dead, and the next month serves them.
  *
@@ -27,12 +30,15 @@
  * `apps/selfhost/src/slash.ts` `slashModelJobs`), so a host with no model never evaluates the package (`46 §5.1`).
  */
 
-import { shapeOf, type Kernel, type OutboxRow } from '@braindog/kernel';
+import { shapeOf, type Kernel, type OutboxKind, type OutboxRow } from '@braindog/kernel';
 import { codeOf, fixOf, type Result, type Scheduler, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi } from '@braindog/record';
 
 import type { DraftSample, ModelJobInference } from './slash-answers.ts';
 import { slashSamplesOf } from './slash.ts';
+import { serveNotes, settleResolve, UNDERSTAND_ASK, UNDERSTAND_ASKS_MONTH, type NotesKernel, type UnderstandStore } from './understand.ts';
+
+export { UNDERSTAND_ASK, UNDERSTAND_ASKS_MONTH } from './understand.ts';
 
 /** How many model jobs one pass leases. A pass that leased all five may have left more, and the host runs another. */
 export const MODEL_JOBS_PER_PASS = 5;
@@ -58,6 +64,9 @@ export const HEADLINE_ASKS_MONTH = 30;
 
 /** The question a headline ask's ledger row is written with, and what the meters count it by. */
 export const HEADLINE_ASK = "Slash's page headlines";
+
+/** The kernel's job for a doubtful pair (`loop/contract-17.md`), migration 23's kind in `OUTBOX_KINDS`. */
+const RESOLVE: OutboxKind = 'infer.resolve';
 
 /** How many arrivals of one shape a finding's pattern is drafted from, newest first and handed over oldest first. */
 const SHAPE_SAMPLES_MOST = 5;
@@ -92,8 +101,11 @@ export type ModelJobEmbeddings = { model: string; dims: number; vectors: Int8Arr
  */
 export type ModelJobEmbed = { embed?: ((texts: readonly string[]) => Promise<Result<ModelJobEmbeddings>>) | undefined };
 
-/** The three kernel methods this pass calls, and not the kernel. */
-export type ModelJobsKernel = Pick<Kernel, 'leaseOutbox' | 'ackOutbox' | 'tail'>;
+/**
+ * The kernel methods this pass calls, and not the kernel. The notes pass's four are optional, so a host or a test that
+ * hands the queue alone still has its jobs served, and the notes are not read.
+ */
+export type ModelJobsKernel = Pick<Kernel, 'leaseOutbox' | 'ackOutbox' | 'tail'> & Partial<NotesKernel>;
 
 /** What the pass reads on the record: its kernel for the queue, and the inbox a draft's samples come from. */
 export type ModelJobsApi = Pick<RecordApi, 'inbox'> & { kernel: ModelJobsKernel };
@@ -109,6 +121,11 @@ export type ModelJobMeter = {
   cap: number;
   /** The model jobs spent since `since`, the first instant of this month as an ISO string. */
   spent(since: string): number;
+  /**
+   * The part of this meter's month that understanding may spend (`UNDERSTAND_ASKS_MONTH`), counted inside it.
+   * ABSENT, nothing is spent on understanding: `infer.resolve` waits `pending` and the notes are not read.
+   */
+  understand?: ModelJobMeter | undefined;
 };
 
 export type ModelJobsDeps = {
@@ -120,6 +137,11 @@ export type ModelJobsDeps = {
   scheduler?: Scheduler | undefined;
   /** Where a line about the pass goes: a spent month, an ack that did not land. The message only, never a payload. */
   log?: ((line: string) => void) | undefined;
+  /**
+   * The host's Slash store, where understanding keeps the verdicts it was given and the notes it read (`understand.ts`).
+   * ABSENT, every pair is asked as it comes and the nightly notes pass does not run.
+   */
+  store?: UnderstandStore | undefined;
 };
 
 /** The ack for one job, without its id and lease. */
@@ -152,35 +174,43 @@ const warn = (line: string): void => console.error(line);
  * NO LEDGER YET IS NOTHING SPENT. The engine creates the table on its first call, so a host that has not built it has
  * spent nothing this month; any other failure to count is read as spent, so a count nobody can read never lets a call through.
  */
-export function backgroundMeter(sql: Pick<Sql, 'one'>, cap = BACKGROUND_JOBS_MONTH, share: 'work' | 'headline' = 'work'): ModelJobMeter {
+export function backgroundMeter(sql: Pick<Sql, 'one'>, cap = BACKGROUND_JOBS_MONTH, share: 'work' | 'headline' | 'understand' = 'work'): ModelJobMeter {
   /* IN PROPORTION, so a smaller cap keeps both shares: a flat thirty under a cap of ten would leave the work none. */
   const headlines = Math.round((cap * HEADLINE_ASKS_MONTH) / BACKGROUND_JOBS_MONTH);
-  const held = share === 'headline' ? headlines : cap - headlines;
+  /* UNDERSTANDING IS CARVED INSIDE THE WORK'S SHARE AND NOT BESIDE IT, as `EMBED_KEPT_SHARE` is: it counts in the work's
+     month and may spend no more than its own ten of it, so a month of judging pairs cannot leave the digests without
+     prose, and the headlines are untouched by either. */
+  const understand = Math.round((cap * UNDERSTAND_ASKS_MONTH) / BACKGROUND_JOBS_MONTH);
+  const held = share === 'headline' ? headlines : share === 'understand' ? understand : cap - headlines;
   return {
     cap: held,
     spent(since) {
       const spent = backgroundSpent(sql, since);
       if (spent === null) return held;
-      return share === 'headline' ? spent.headlines : spent.all - spent.headlines;
+      return share === 'headline' ? spent.headlines : share === 'understand' ? spent.understand : spent.all - spent.headlines;
     },
+    ...(share === 'work' ? { understand: backgroundMeter(sql, cap, 'understand') } : {}),
   };
 }
 
 /**
- * Every background ask this month and the headlines among them, as the status door shows the whole allowance spent, or
- * `null` when the ledger could not be read. No ledger yet is nothing spent (`backgroundMeter`).
+ * Every background ask this month, the headlines among them and the understanding asks among them, as the status door
+ * shows the whole allowance spent, or `null` when the ledger could not be read. No ledger yet is nothing spent
+ * (`backgroundMeter`).
  */
-export function backgroundSpent(sql: Pick<Sql, 'one'>, since: string): { all: number; headlines: number } | null {
+export function backgroundSpent(sql: Pick<Sql, 'one'>, since: string): { all: number; headlines: number; understand: number } | null {
   try {
-    const row = sql.one<{ n: number; h: number | null }>(
-      `SELECT COUNT(*) AS n, SUM(CASE WHEN kind = 'pattern' AND question = ? THEN 1 ELSE 0 END) AS h FROM slash_call
+    const row = sql.one<{ n: number; h: number | null; u: number | null }>(
+      `SELECT COUNT(*) AS n, SUM(CASE WHEN kind = 'pattern' AND question = ? THEN 1 ELSE 0 END) AS h,
+       SUM(CASE WHEN kind = 'pattern' AND question = ? THEN 1 ELSE 0 END) AS u FROM slash_call
        WHERE kind IN ('pattern', 'prose', 'embed') AND filed IS NULL AND model <> '-' AND ts >= ?`,
       HEADLINE_ASK,
+      UNDERSTAND_ASK,
       since,
     );
-    return { all: row?.n ?? 0, headlines: row?.h ?? 0 };
+    return { all: row?.n ?? 0, headlines: row?.h ?? 0, understand: row?.u ?? 0 };
   } catch (e) {
-    return /no such table/iu.test(said(e)) ? { all: 0, headlines: 0 } : null;
+    return /no such table/iu.test(said(e)) ? { all: 0, headlines: 0, understand: 0 } : null;
   }
 }
 
@@ -306,8 +336,17 @@ async function settleEmbed(embed: NonNullable<ModelJobEmbed['embed']>, job: Outb
   return refusedAck(out, { state: 'done' });
 }
 
-async function settle(api: ModelJobsApi, inference: ModelJobInference & ModelJobEmbed, job: OutboxRow, log: (line: string) => void): Promise<Settled> {
+async function settle(
+  api: ModelJobsApi,
+  inference: ModelJobInference & ModelJobEmbed,
+  job: OutboxRow,
+  log: (line: string) => void,
+  store: UnderstandStore | undefined,
+  now: number,
+): Promise<Settled> {
   try {
+    if (job.kind === RESOLVE)
+      return inference.resolve ? await settleResolve(inference.resolve, job, store, now, log) : { state: 'failed', error: 'This host has no model to judge pairs with.' };
     if (job.kind === 'infer.embed')
       return inference.embed ? await settleEmbed(inference.embed, job) : { state: 'failed', error: 'This host has no model to embed with.' };
     if (job.kind === 'infer.prose') return await settleProse(inference, job);
@@ -323,8 +362,12 @@ async function settle(api: ModelJobsApi, inference: ModelJobInference & ModelJob
  * THE JOBS ARE ANSWERED TOGETHER AND NOT IN TURN, for `serveAsks`'s reason: `INFER_LEASE_MS` is 120 seconds and a model
  * call may take thirty, so the fifth of five in turn would be acked after its lease. Each is acked as it settles.
  *
- * THE DRAFTS AND THE PROSE ARE LEASED FIRST, and `infer.embed` takes what room they leave, only where the host can embed
- * and only while more than `EMBED_KEPT_SHARE` of the month is left: a digest never waits behind the index.
+ * THE DRAFTS AND THE PROSE ARE LEASED FIRST, then `infer.resolve` while understanding's own share has room, and
+ * `infer.embed` takes what room they leave, only where the host can embed and only while more than `EMBED_KEPT_SHARE` of
+ * the month is left: a digest never waits behind the index, nor behind a pair.
+ *
+ * AND THE NOTES PASS LAST, once its night has come (`serveNotes`), where the host hands a store, a kernel that reads and
+ * a model that reads notes. Its ask is understanding's too, so it is held to the same share and the work's month.
  *
  * AN ACK THAT WILL NOT LAND IS LOGGED AND NOT A REASON TO ABANDON THE REST: the lease expires and the job is reclaimed.
  */
@@ -340,20 +383,24 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
     /* THE JOBS WAIT, AND THE LINE SAYS WHY, once a month: leasing nothing leaves them `pending`, off the retry ladder. */
     if (told.get(meter) !== month) {
       told.set(meter, month);
-      log(`Slash's ${meter.cap} background model jobs this month, apart from the page headlines, are spent until ${monthOf(now, 1).slice(0, 10)}, so the record's pattern drafts, digest prose and embeddings wait until then.`);
+      log(`Slash's ${meter.cap} background model jobs this month, apart from the page headlines, are spent until ${monthOf(now, 1).slice(0, 10)}, so the record's pattern drafts, digest prose, embeddings and its reading of who is who wait until then.`);
     }
     return false;
   }
 
   const n = Math.min(MODEL_JOBS_PER_PASS, left);
   const asked = api.kernel.leaseOutbox(['infer.draft', 'infer.prose'], n);
-  const room = Math.min(n, left - Math.ceil(meter.cap * EMBED_KEPT_SHARE)) - asked.length;
-  const jobs = inference.embed && room > 0 ? [...asked, ...api.kernel.leaseOutbox(['infer.embed'], room)] : asked;
+  /* A PAIR IS ONE ASK AT MOST AND OFTEN NONE (the cache), and it is leased no further than understanding's month has left. */
+  const understandLeft = meter.understand ? meter.understand.cap - meter.understand.spent(month) : 0;
+  const judging = Math.min(n - asked.length, understandLeft);
+  const judged = inference.resolve && judging > 0 ? api.kernel.leaseOutbox([RESOLVE], judging) : [];
+  const room = Math.min(n, left - Math.ceil(meter.cap * EMBED_KEPT_SHARE)) - asked.length - judged.length;
+  const jobs = [...asked, ...judged, ...(inference.embed && room > 0 ? api.kernel.leaseOutbox(['infer.embed'], room) : [])];
   let acked = 0;
 
   await Promise.all(
     jobs.map(async (job) => {
-      const settled = await settle(api, inference, job, log);
+      const settled = await settle(api, inference, job, log, deps.store, now);
       try {
         const landed = api.kernel.ackOutbox({ id: job.id, ...settled, leasedUntil: job.leasedUntil });
         if (landed.ok) acked++;
@@ -365,5 +412,18 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
   );
 
   if (acked > 0 && deps.scheduler) await api.kernel.tail(deps.scheduler);
+
+  /* THE NOTES, AFTER THE JOBS AND ON WHAT THE MONTH STILL HAS: the understanding share, held under the work's. */
+  const { registers, list, meetsList, propose } = api.kernel;
+  if (inference.mentions && deps.store && meter.understand && registers && list && meetsList && propose) {
+    const work = meter;
+    const understand = meter.understand;
+    const held: ModelJobMeter = { cap: understand.cap, spent: (since) => Math.max(understand.spent(since), understand.cap - (work.cap - work.spent(since))) };
+    try {
+      await serveNotes({ registers, list, meetsList, propose }, { mentions: inference.mentions, meter: held, store: deps.store, now: deps.now, log });
+    } catch (e) {
+      log(`notes: ${said(e)}`);
+    }
+  }
   return jobs.length >= MODEL_JOBS_PER_PASS;
 }

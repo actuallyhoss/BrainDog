@@ -97,7 +97,7 @@ export const AUTOMATION_GRAMMAR = {
       '{"script":{"id":"<script>","input":{"<name>":"<text>"},"as":"<answer>"}}: starts the script and goes on without waiting for it; what it writes lands when this host runs it. as keeps the id of its queued run, never what the script answers. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused',
     ask_slash: '{"ask_slash":{"question":"<text>","as":"<answer>","shape":"text"}}: shape is text, number or choice, and choice needs choices',
     ask_person: '{"ask_person":{"question":"<text>","options":["yes","no"],"as":"<answer>","wait":"2d","to":"<member>"}}: two options or more, each once. The question opens in Decide. to is optional: the id of one member, typed or filled from a field of the row, and only that member or an owner answers it; without to, anyone who decides answers it. The run waits 7d when wait is left out, and stops if nobody answers',
-    meet: '{"meet":{"name":"<text>","email":"<text>","handle":"<site>:<name>","where":"<text>"}}: meets one person into the list People keeps, as the rule. Matched by email, then handle, never by name; added when nobody matches; where is kept on them as a dated line, such as mail: {{trigger.body.subject}}; a name shared with somebody else opens one merge question in Decide. One of name, email or handle, and where. A key that fills with nothing is left out, and when all three do, nobody is met and the run goes on',
+    meet: '{"meet":{"kind":"person","name":"<text>","email":"<text>","handle":"<site>:<name>","keys":["<kind>:<value>"],"where":"<text>"}}: meets one person, or with kind organisation one organisation, as the rule. Matched by a key (email, handle, or keys such as bank:{{trigger.row.counterparty_text}} or domain:<site>), never by name: a name with no key is only noted; added when no key matches; where is kept as a dated line, such as mail: {{trigger.body.subject}}; a doubtful match opens one question in Decide. A key that fills with nothing is left out, and when every one does, nobody is met and the run goes on',
     run_job:
       '{"run_job":{"kind":"job.<id>","args":{"<arg>":"<text>"},"as":"<answer>"}}: queues one job of a kind the owner approved in Decide, to run on his own machine, with args filling the kind\'s own. The run waits up to 1d for it to end and keeps ok, needs_decision or error under as. A kind not approved, or args it does not take, stops the run with its sentence; a write trigger needs once_per',
     actions:
@@ -137,15 +137,28 @@ export const AUTOMATION_GRAMMAR = {
       },
     },
     /* AN ARRIVAL NAMES NO LIST, SO THE ROW DECIDES: an arrival filed into a list with no counterparty meets nobody and
-       the run goes on (`flow.ts`'s `meetOne`), so this meets the other side of each transaction an arrival files. */
+       the run goes on (`flow.ts`'s `meetOne`), so this meets the other side of each transaction an arrival files.
+       AN ORGANISATION BY ITS BANK PAYEE, NEVER A PERSON BY NAME. It met `{{trigger.row.counterparty}}` as a name, and
+       every card payment made a person of its merchant, one new row a transaction: "GEIDEA*CHILLOUT 4" and "Chillout"
+       were two people. The payee is a key the record folds (`bank:` drops the processor's prefix and the trailing city
+       and digits), so five spellings of one shop meet one organisation, and a private payee is never made a person. */
     {
       id: 'rule.meet-counterparty',
       kind: 'rule',
       body: {
         rule: 'meet-counterparty',
-        name: 'Meet the other side of each filed transaction',
+        name: 'Meet the business on the other side of each filed transaction',
         on: { arrival: { state: ['matched'] } },
-        steps: [{ meet: { name: '{{trigger.row.counterparty}}', where: 'transaction: {{trigger.row.what}}' } }],
+        steps: [
+          {
+            meet: {
+              kind: 'organisation',
+              name: '{{trigger.row.counterparty_text}}',
+              keys: ['bank:{{trigger.row.counterparty_text}}'],
+              where: 'bank text: {{trigger.row.what}}',
+            },
+          },
+        ],
       },
     },
     {

@@ -267,7 +267,8 @@ export const KERNEL_FIELDS: Readonly<Record<string, string>> = {
 };
 
 /**
- * The second backend's fields, `34 §1.9` exactly: `from to subject body channel state ts` and nothing else.
+ * The second backend's fields: `34 §1.9`'s `from to subject body channel state ts`, and the sender read out of `from`
+ * as `from_name from_address from_domain`, ten names and nothing else.
  *
  * IT IS HERE BECAUSE THE GRAMMAR IS HERE. An ingest `match:` asks a question about an arrival rather than a
  * row, and `extract` is the package that asks it — but which names are legal, and what each one holds, is a
@@ -305,6 +306,12 @@ export const INBOX_RAW: Schema = {
   fields: {
     /* `json_extract(headers, '$.<name>')`, lower-cased on arrival. */
     from: { type: 'text' },
+    /* THE SENDER READ ONCE, beside `from` and never instead of it: `"Sara Ali" <sara@bank.example>` is `Sara Ali`,
+       `sara@bank.example` and `bank.example`, so a pattern says `{ field: from_domain, is: bank.example }` and never
+       takes the header apart with `contains`. The kernel fills them on arrival (`senderOf`); empty when it cannot. */
+    from_name: { type: 'text' },
+    from_address: { type: 'text' },
+    from_domain: { type: 'text' },
     to: { type: 'text' },
     subject: { type: 'text' },
     /* The body AS STORED. `43 §5.2` step 1 is explicit that it is not the normalised copy, so that this

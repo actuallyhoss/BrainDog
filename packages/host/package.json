@@ -16,7 +16,8 @@
     "./slash": "./src/slash.ts",
     "./slash-answers": "./src/slash-answers.ts",
     "./stripe-sign": "./src/stripe-sign.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./understand": "./src/understand.ts"
   },
   "dependencies": {
     "@braindog/connect": "workspace:*",

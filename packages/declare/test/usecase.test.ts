@@ -215,7 +215,9 @@ test("THE LISTS' WORDS FILL WHAT ROOM IS LEFT, names before singulars and own li
 
 test('EVERY FIRST-PARTY LIST A PERSON NAMES HAS ITS WORDS, and each word table names only real lists', () => {
   const lists = Object.values(MODULE_LISTS).flatMap((m) => m.lists);
-  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'fx', 'snapshots']);
+  /* AND `organisations`, People's since 3.0.0: words for it would give every use case with People two more settings and
+     a version to bump, so it keeps its own. */
+  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'fx', 'organisations', 'snapshots']);
   assert.deepEqual(Object.keys(MODULE_WORDS).filter((l) => !lists.includes(l)), []);
 });
 

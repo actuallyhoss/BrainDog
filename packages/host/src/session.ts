@@ -1,7 +1,7 @@
 /**
  * What an agent says about its run, read off a request and checked.
  *
- * NINE HINTS, EACH WITH ITS GRAMMAR (`44 §4.2`). A value that
+ * TEN HINTS, EACH WITH ITS GRAMMAR (`44 §4.2`). A value that
  * fails is dropped, never corrected and never refused: these are hints, and a call whose hint is
  * wrong is still a call the record answers. The kernel writes what reaches it into a row as given,
  * so this is the one place a stranger's text is held to a shape first.
@@ -22,6 +22,8 @@ export type SessionHints = {
   /** The app the run is in and its version, as MCP's `clientInfo` names them: `claude-code`, `2.1.4`. */
   client?: string | undefined;
   client_version?: string | undefined;
+  /** The run a subagent works for, by its spoken id, `S5`, as the command line sends it for a run started inside another. */
+  parent?: string | undefined;
 };
 
 type Key = keyof SessionHints;
@@ -46,6 +48,9 @@ export const HINTS: Readonly<Record<Key, { header: string; grammar: RegExp }>> =
   client: { header: 'x-braindog-client-name', grammar: printable(128) },
   /* A version as apps write one: `2.1.4`, `0.44.0-alpha.1`, `1.0.0+build.7`. */
   client_version: { header: 'x-braindog-client-version', grammar: /^[A-Za-z0-9._+-]{1,64}$/ },
+  /* A RUN'S NAME, held to `spoken`'s grammar: the run this one was started from, so the record can say whose subagent
+     it is. Only a run, never a question or a row. */
+  parent: { header: 'x-braindog-parent', grammar: /^S[1-9][0-9]*$/ },
 };
 
 const KEYS = Object.keys(HINTS) as Key[];

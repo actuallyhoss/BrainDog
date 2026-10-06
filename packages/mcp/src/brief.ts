@@ -533,16 +533,47 @@ export function activityBrief(args: Record<string, unknown>, page: Page, look: L
   return [head, ...lines, ...folded, ...(more ? [more] : [])].join('\n');
 }
 
+/** The money in a question's body and the rows it names by handle, said the way `gist` keeps them: what tells two apart. */
+function bodyOf(body: unknown, title?: (spoken: string) => string | undefined, depth = 0): string[] {
+  if (depth > 4 || body === null || typeof body !== 'object') return [];
+  const amount = moneyIn(body);
+  if (amount) return [`${amount.currency}${String(amount.amount)}`];
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
+    if ((k === 'at' || k === 'about') && typeof v === 'string') {
+      const words = title?.(v);
+      if (words) out.push(words.toLowerCase());
+    } else out.push(...bodyOf(v, title, depth + 1));
+  }
+  return out;
+}
+
+/**
+ * The key two questions share when they are one question asked twice: who opened it, its kind of body, what it says
+ * once ids are set aside (`gist`), and the amounts and named rows of its body.
+ *
+ * NEVER TWO QUESTIONS BY DIFFERENT HANDS OR ABOUT DIFFERENT THINGS. By text alone, a merge question about two people and
+ * one about two others read alike, and "3 like it" hid decisions the person had to make one by one
+ * (`loop/research-audit-14-15a-38.md`, H1). A question with no text keeps a key of its own.
+ */
+export function alikeKey(row: { question?: unknown; opened_by?: unknown; body_kind?: unknown; body?: unknown }, title?: (spoken: string) => string | undefined): string {
+  const words = typeof row.question === 'string' ? gist(row.question, title) : '';
+  if (words === '') return '';
+  const by = typeof row.opened_by === 'string' ? row.opened_by : '';
+  const kind = typeof row.body_kind === 'string' ? row.body_kind : '';
+  return [by, kind, words, ...bodyOf(row.body, title).sort()].join('\u0000');
+}
+
 /**
  * Questions that read the same once their ids and case are set aside, as one entry with how many it stands for.
  *
  * THE OWNER'S QUEUE HELD THREE OF ONE QUESTION, two word for word, and the briefing printed each. They are still three
  * questions in the record and in the full answer; a brief answer says the first and how many more read like it.
  */
-export function alike<T extends { question?: unknown; id?: unknown }>(rows: readonly T[]): { first: T; also: string[] }[] {
+export function alike<T extends { question?: unknown; id?: unknown }>(rows: readonly T[], title?: (spoken: string) => string | undefined): { first: T; also: string[] }[] {
   const groups = new Map<string, { first: T; also: string[] }>();
   for (const row of rows) {
-    const key = typeof row.question === 'string' ? gist(row.question) : '';
+    const key = alikeKey(row as Record<string, unknown>, title);
     const held = key === '' ? undefined : groups.get(key);
     if (held) held.also.push(String(row.id ?? ''));
     else groups.set(key === '' ? `#${String(groups.size)}` : key, { first: row, also: [] });
@@ -562,7 +593,7 @@ export function governanceBrief(args: Record<string, unknown>, value: unknown, l
   const head = `${what} · ${ofMatched(rows.length, page.matched)}`;
   const lines =
     register === 'suggestion'
-      ? alike(rows).map(({ first, also }) => {
+      ? alike(rows, (h) => look.title(h)).map(({ first, also }) => {
           const id = String(first.id ?? '');
           const asked = typeof first.question === 'string' ? clip(plainOf(first.question, look), 100) : '';
           const like = also.length === 0 ? '' : `, and ${also.length === 1 ? also[0]! : `${String(also.length)} more`} like it`;
@@ -757,21 +788,77 @@ export function handoffBrief(run: Shaped): string {
     .join(' · ');
 }
 
-/** `meet`: who it was, whether they were new, and whether they are now on the caller's project. */
-export function metBrief(met: Record<string, unknown>, name: string, look: Look): string {
-  const person = typeof met.person === 'string' ? met.person : '';
-  const words = look.title(person) ?? name;
-  /* `merge` IS THE QUESTION THE KERNEL FILED when the person may be one already met (`nearMatch`), `SG7`, and not a row:
-     it was said "maybe the same person as SG7". The question names both, so it is said whole, in words. */
-  const merge = typeof met.merge === 'string' && met.merge !== '' ? met.merge : null;
-  const asked = merge === null ? undefined : look.title(merge);
-  return [
-    `${met.created === true ? 'Added' : 'Matched'} ${namedIn(words, person, look)}`,
-    met.linked === true ? 'linked to your project' : null,
-    merge ? (asked ? `asked ${look.decider}: ${clip(plainOf(asked, look), 160)} (${merge})` : `maybe someone already met; asked ${look.decider} (${merge})`) : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+/** What `meet` answered, as the tool shaped it, and what the answer is said with beside it. */
+export type MetSaid = {
+  /** The kept row's handle, `P6`, when somebody was matched or added. */
+  person?: string;
+  /** Their name as the record keeps it. */
+  name?: string;
+  created: boolean;
+  /** How the record matched them: by a key, by its strong rules (folding a new row into one known), or not at all. */
+  matched_by?: 'key' | 'strong' | 'none';
+  /** How they were matched, in words: `email`, `GitHub handle`, `name and address or organisation`. */
+  how?: string;
+  mention?: boolean;
+  /** The question a doubtful match opened, `SG7`, and its words where the answer read them. */
+  question?: string;
+  asked?: string;
+  linked?: boolean;
+  /** The handle the record matched, where it was merged into `person`, and its name. */
+  merged_from?: string;
+  merged_name?: string;
+  /** The organisation and projects they are with, by name. */
+  with?: string[];
+  /** The name the call gave, and whether it met a person or an organisation. */
+  said?: string;
+  kind?: 'person' | 'organisation';
+  /** The caller's project by name, where a name alone was noted on it. */
+  on?: string;
+};
+
+/**
+ * `meet`, in names, with how it matched: who, what they are with, and the handle to act on last.
+ *
+ *     Matched Priya Raman (Encore, Prism) by email · P6
+ *     Added Dario (Crumb.gg) · P12
+ *     Noted Ahmed on Encore; add an email or handle to add them
+ *     Maybe Rohan Mehta (Encore): asked Sam on Decide: Are Rohan Mehta and rohanmehta one person? · P6 · SG7
+ *     Matched Sam Avery by email; Ahmed H. (P9) was merged into them · P6
+ *     Merged into Rohan Mehta (Encore) by name and address or organisation; Sam can undo it in BrainDog · P7
+ *
+ * THE FIRST WORD SAYS WHAT HAPPENED, because the three outcomes ask three different things of the agent: nothing, to
+ * carry on, or to find an address. A name with no address is never a person in the record (`loop/contract-17.md`), so
+ * the answer says what would make one. A doubtful match waits on the person, and is said as theirs to answer. A merge
+ * the record's strong rules made on their own is said as a merge, with whose Undo it is, since the agent did not ask
+ * for one and the person may not want it.
+ */
+export function metBrief(met: MetSaid, look: Look): string {
+  const it = met.kind === 'organisation';
+  if (met.mention === true && met.person === undefined) {
+    const who = met.said ? clip(met.said, 60) : it ? 'the organisation' : 'the person';
+    return `Noted ${who}${met.on ? ` on ${clip(met.on, 40)}` : ''}; add ${it ? 'a domain or bank payee to add it' : 'an email or handle to add them'}`;
+  }
+  const spoken = met.person ?? '';
+  const words = met.name ?? (spoken ? look.title(spoken) : undefined) ?? met.said ?? '';
+  const withWho = (met.with ?? []).slice(0, 3).map((w) => clip(w, 30));
+  const who = words ? `${clip(words, 60)}${withWho.length > 0 ? ` (${withWho.join(', ')})` : ''}` : spoken || 'someone';
+  /* A QUESTION BY ITS HANDLE OR BY ITS WORDS ALONE, as a record that sends the contract's answer may word it and give no
+     handle: either way a doubtful match is said, never dropped. */
+  const doubt = Boolean(met.question || met.asked);
+  const asked = doubt ? `asked ${look.decider} on Decide${met.asked ? `: ${clip(plainOf(met.asked, look), 140)}` : ''}` : null;
+  /* A ROW WITH NO WORDS IS SAID BY ITS HANDLE ALREADY, and not twice: "Matched P6 · P6". */
+  const handles = [words ? spoken : '', met.question].filter((h): h is string => typeof h === 'string' && h !== '');
+  const tail = handles.length > 0 ? ` · ${handles.join(' · ')}` : '';
+  if (met.created) {
+    const where = withWho.length === 0 && met.linked === true ? ' to your project' : '';
+    const why = met.asked ? '' : ` whether ${it ? 'it is one' : 'they are someone'} already met`;
+    return `Added ${who}${where}${asked ? `; ${asked}${why}` : ''}${tail}`;
+  }
+  if (asked) return `Maybe ${who}: ${asked}${tail}`;
+  if (met.matched_by === 'strong') return `Merged into ${who}${met.how ? ` by ${met.how}` : ''}; ${look.decider} can undo it in BrainDog${tail}`;
+  /* THE FOLDED ROW BY ITS NAME, with its handle beside it: a handle alone names nobody. */
+  const folded = met.merged_from ? `; ${namedIn(met.merged_name ?? '', met.merged_from, look, 40)} was merged into ${it ? 'it' : 'them'}` : '';
+  return `Matched ${who}${met.how ? ` by ${met.how}` : ''}${folded}${tail}`;
 }
 
 /** `triage`: what became of the arrival, by the entry it was filed as when it was filed. */

@@ -58,6 +58,40 @@ test('A LIST INSIDE THE ANSWER IS CUT WHERE IT IS, and a long text is shortened 
   assert.equal(fittedJson(small), small, 'an answer that fits is handed back as it is');
 });
 
+test('A CUT rows ANYWHERE TAKES ITS CURSOR WITH IT, and the answer\'s own, since following either would skip what went', () => {
+  const rows = Array.from({ length: 600 }, (_, i) => ({ spoken: `tasks#${String(i + 1)}`, note: `Line ${String(i)} `.repeat(12) }));
+  const fitted = fittedJson({ card: 'BrainDog', page: { rows, cursor: 'c_page' }, cursor: 'c_top' });
+  assert.ok(JSON.stringify(fitted).length <= ANSWER_MOST);
+  const page = fitted.page as Record<string, unknown>;
+  assert.ok((page.rows as unknown[]).length < 600);
+  assert.equal(page.cursor, undefined, 'the cursor beside a cut page.rows was kept');
+  assert.equal(fitted.cursor, undefined, 'the answer\'s own cursor was kept past cut rows');
+  assert.match(String(fitted.cut), /page\.rows \d+ of 600\./u);
+  assert.match(String(fitted.cut), /The cursor went with what was cut/u);
+
+  /* A CURSOR THE RECORD GAVE AS A NUMBER OR AN OBJECT GOES THE SAME WAY. */
+  const raw = fittedJson({ owed: { rows, cursor: 412 }, paid: { rows: [], cursor: { after: 'x' } } });
+  assert.equal((raw.owed as Record<string, unknown>).cursor, undefined, 'a number cursor beside cut rows was kept');
+  assert.deepEqual((raw.paid as Record<string, unknown>).cursor, { after: 'x' }, 'a cursor beside rows that were not cut was dropped');
+
+  /* A LIST THAT IS NOT ROWS LEAVES A CURSOR WHERE IT IS. */
+  const events = Array.from({ length: 600 }, (_, i) => ({ note: `Event ${String(i)} `.repeat(12) }));
+  const other = fittedJson({ events, cursor: 'c_next' });
+  assert.equal(other.cursor, 'c_next');
+});
+
+test('A CUT LIST THAT CARRIED MONEY SAYS ITS TOTALS STILL COUNT WHAT WENT, and one without money says nothing of totals', () => {
+  const rows = Array.from({ length: 700 }, (_, i) => ({ spoken: `transactions#${String(i + 1)}`, amount: { amount: -1250 - i, currency: 'GBP' }, note: `Card ${String(i)} `.repeat(10) }));
+  const total = { amount: rows.reduce((t, r) => t + r.amount.amount, 0), currency: 'GBP' };
+  const fitted = fittedJson({ rows, total });
+  assert.ok(JSON.stringify(fitted).length <= ANSWER_MOST);
+  assert.deepEqual(fitted.total, total, 'the total was changed');
+  assert.match(String(fitted.cut), /Any total here still counts what was cut from rows, so it no longer adds up to the entries shown\./u);
+
+  const plain = fittedJson({ rows: rows.map(({ spoken, note }) => ({ spoken, note })) });
+  assert.doesNotMatch(String(plain.cut), /total/u);
+});
+
 test('OVER THE WIRE, structuredContent IS HELD TO ONE ANSWER, and format full answers JSON a client can parse', async () => {
   const events = Array.from({ length: 1_500 }, (_, i) => ({ ts: '2026-10-01T09:00:00Z', actor: 'p_ada', kind: 'note', note: `Checked the proof again, round ${String(i)}. `.repeat(3) }));
   const { surface } = stub({ history: async () => ({ ok: true, value: events }) });
@@ -169,8 +203,11 @@ test('A LOG LINE ABOUT A QUESTION SAYS IT IS ONE, and a list by its name', () =>
 });
 
 test('MEETING SOMEONE WHO MAY BE ONE ALREADY MET SAYS THE QUESTION, in names, and not its number alone', () => {
-  const said = metBrief({ person: 'people#9', created: true, linked: false, merge: 'SG7' }, 'Ann Lee', look);
-  assert.equal(said, 'Added Ann Lee (people#9) · asked Ada: Are Ann Lee (people#3) and Ann Lee (people#9) the same person, Ann Lee? Accepting folds Ann Lee (people#9) into Ann Lee (people#3). (SG7)');
+  const said = metBrief({ person: 'people#9', created: true, question: 'SG7', asked: TITLES.get('SG7')!, said: 'Ann Lee' }, look);
+  assert.equal(
+    said,
+    'Added Ann Lee; asked Ada on Decide: Are Ann Lee (people#3) and Ann Lee (people#9) the same person, Ann Lee? Accepting folds Ann Lee (people#9) into Ann Lee (people#3). · people#9 · SG7',
+  );
 });
 
 /* ── on a real record ───────────────────────────────────────────────────── */

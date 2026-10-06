@@ -225,9 +225,11 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { digest: 'text' } },
   { name: 'pages', group: 'READ+', writes: false, what: 'Every page this record can draw, templates expanded.' },
   /* `filter` IS THE READER'S OWN CHOICE over the page's declared filters, a field to the value chosen, so it is JSON: on a
-     GET it is `?filter={"project":"bake"}`. What it may name is the record's question (`kernel.page`), not this table's. */
+     GET it is `?filter={"project":"bake"}`. What it may name is the record's question (`kernel.page`), not this table's.
+     `walk` IS HOW FAR A FORECAST LOOKS when the reader asks past the two years walked unasked: `?walk=1825` or
+     `?walk=last`. It is text because one answer is a word; the record turns a digit string into days. */
   { name: 'page', group: 'READ+', writes: false, what: 'One page, with every block run: rows and figures, never markup. A filter narrows it to what you chose.',
-    takes: { slug: 'text', filter: 'json' } },
+    takes: { slug: 'text', filter: 'json', walk: 'text' } },
   { name: 'metric', group: 'READ+', writes: false, what: 'One figure, with its target and how it compares.',
     takes: { metric: 'text' } },
   /* EVERY FIGURE, AND NOT ONLY A DRAWN ONE. `metric` reads an id already known and `page`
@@ -348,7 +350,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'update', group: 'DATA', writes: true, what: 'Change a row, against the version you read.' },
   { name: 'attach', group: 'DATA', writes: true, what: 'Say which run this agent is and where it stands. A token only: a person is never a run.' },
   { name: 'handoff', group: 'DATA', writes: true, what: "Keep a run's handoff true: the next step, what was tried, a note, its state." },
-  { name: 'meet', group: 'DATA', writes: true, what: 'Someone met in the work: matched by email or handle, or added, and linked to your project.' },
+  { name: 'meet', group: 'DATA', writes: true, what: 'Someone or some organisation met in the work: matched by a key (email, handle, domain), or added; a name alone is only noted.' },
   /* THE SAVED VIEWS. Reading one is READ+ and held to the list it belongs to, because a view names
      that list's fields and the values somebody filtered on; saving and retiring one change what the
      list offers everybody who opens it, which is the ADMIN argument `setDeclaration` already makes. */

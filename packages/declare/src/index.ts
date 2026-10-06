@@ -239,6 +239,19 @@ export type Installed = {
    */
   detached?: Record<string, { was: string; body: string }>;
   /**
+   * What the installed packs' manifests hand on, by declaration id: the pack each `hands` sends it to (`handedOf`).
+   *
+   * WHAT LETS A LIST GO TO A PACK THE RECORD ALREADY HAS. Founder 2.0.0 hands `register.organisations` to People, and a
+   * record holding Founder holds People too. Without this the hand was planned as a retire, because the receiver's later
+   * updates could not tell the list was given to it: it sat under People's name, its file did not declare it, and every
+   * update of People was `WOULD_ORPHAN` (`handover.test.ts`). With it, the receiver's plan reads that an installed pack
+   * handed the list to it and leaves it where it is, so the giver may hand it, rows and all, and the receiver's version
+   * that declares it takes it as its own.
+   *
+   * OPTIONAL, as `used` is: a caller that cannot say gets a handover to an installed pack planned as the retire it was.
+   */
+  handed?: Readonly<Record<string, string>>;
+  /**
    * The title of the row an id names, so an action's key line says the project by name and not by a row id.
    * OPTIONAL: without it the id is said as the declaration wrote it.
    */
@@ -1526,6 +1539,10 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
       conflicts.push({ id: decl.id, pack: mine, handed: true });
       continue;
     }
+    /* AN INSTALLED PACK HANDED IT HERE, so it is not this pack's to retire either: it stays live under this pack, rows
+       and all, until a version of this pack declares it. Retired, every update of the receiver orphaned the rows of a
+       list another pack had given it (`Installed.handed`). */
+    if (installed.handed?.[decl.id] === mine) continue;
     const register = decl.id.startsWith('register.') ? decl.id.slice('register.'.length) : null;
     const rows = register ? (installed.rows[register] ?? 0) : 0;
     /* A DECLARATION THIS VERSION HANDS ON IS NOT RETIRED, SO IT ORPHANS NOTHING. It is staged again under the pack it
@@ -1541,8 +1558,11 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
        filed a row). The rest is retired like any declaration this version stops declaring, so the record holds no pack
        it never chose, and the receiver, installed later, declares it afresh. A caller that passes no `used` cannot say,
        and gets everything handed as before. */
+    /* AND TO AN INSTALLED PACK WHEN THE RECORD CAN SAY WHAT WAS HANDED (`Installed.handed`): that pack's plans then leave
+       the list where it is until a version of it declares the list, so the handover no longer locks it. */
     const inUse = installed.used === undefined || rows > 0 || installed.used.includes(decl.id);
-    const to = Object.hasOwn(hands, decl.id) && inUse && !installed.packs.some((p) => p.id === hands[decl.id]) ? hands[decl.id] : undefined;
+    const takes = (to: string): boolean => installed.handed !== undefined || !installed.packs.some((p) => p.id === to);
+    const to = Object.hasOwn(hands, decl.id) && inUse && takes(hands[decl.id]!) ? hands[decl.id] : undefined;
     const body = to === undefined ? null : handedBody(decl.body, to);
     if (to !== undefined && body !== null) {
       retires.push({ id: decl.id, rows, to, body });
@@ -3054,7 +3074,29 @@ export function plannedState(installed: Installed, pack: Pack, diff: Diff): Inst
     rows,
     config: chosen.length === 0 ? config : { ...config, [mine]: Object.fromEntries(chosen.map((c) => [c.key, c.value])) },
     detached,
+    /* WHAT THIS PACK HANDS IS HANDED FROM NOW ON, so the receiver planned next in the same arrangement leaves it be. */
+    ...(installed.handed === undefined ? {} : { handed: { ...installed.handed, ...(pack.manifest.hands ?? {}) } }),
   };
+}
+
+/**
+ * What the installed packs hand on, read off their stored manifests: each declaration id `hands` names, to the pack it
+ * goes to. The record passes it as `Installed.handed`. A manifest that does not parse, or hands nothing, adds nothing;
+ * two packs handing one id to two packs keep the first, in the order given.
+ */
+export function handedOf(manifests: readonly string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const text of manifests) {
+    let hands: unknown;
+    try {
+      hands = (JSON.parse(text) as { hands?: unknown } | null)?.hands;
+    } catch {
+      continue;
+    }
+    if (hands === null || typeof hands !== 'object' || Array.isArray(hands)) continue;
+    for (const [id, to] of Object.entries(hands)) if (typeof to === 'string' && !Object.hasOwn(out, id)) out[id] = to;
+  }
+  return out;
 }
 
 /**

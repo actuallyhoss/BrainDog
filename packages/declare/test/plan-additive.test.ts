@@ -50,6 +50,9 @@ const portfolio = (n: number, fields: Field[]): Doc => {
 };
 
 const DOMAINS: Field = { id: 'domains', label: 'Domains', type: 'list', of: 'text' };
+/* ON THE SHIPPED PORTFOLIO, WHICH DECLARES `domains` ITSELF SINCE PROJECTS LEARNED THEIR DOMAINS (`loop/contract-17.md`),
+   the owner's own field is another one. */
+const HOSTING: Field = { id: 'hosting', label: 'Hosting', type: 'list', of: 'text' };
 const LAUNCHED: Field = { id: 'launched', label: 'Launched', type: 'day' };
 
 test('a field added to Projects through setDeclaration survives a portfolio update that adds a field of its own', async () => {
@@ -64,31 +67,31 @@ test('a field added to Projects through setDeclaration survives a portfolio upda
 
   const live = k.declarations().find((d) => d.id === 'register.things')!;
   const b = JSON.parse(live.body) as { fields: Field[] };
-  said(await api.setDeclaration({ body: { register: 'things', ...b, fields: [...b.fields, DOMAINS] }, version: live.version } as never, owner));
+  said(await api.setDeclaration({ body: { register: 'things', ...b, fields: [...b.fields, HOSTING] }, version: live.version } as never, owner));
   assert.deepEqual(k.detached().map((d) => [d.id, d.was]), [['register.things', 'portfolio']], 'the edit lost the record of whose list it was');
-  const made = said<{ id: string }>(k.create('things', { name: 'acme.example', lane: 'earning', domains: ['acme.example'] }, { actor: 'p_1' }));
+  const made = said<{ id: string }>(k.create('things', { name: 'acme.example', lane: 'earning', hosting: ['acme.example'] }, { actor: 'p_1' }));
 
   const next = portfolio(1, [LAUNCHED]);
   const planned = said<{ diff: Diff }>(await api.planPack({ doc: next, source: { kind: 'local' } } as never, owner));
   assert.deepEqual(planned.diff.conflicts, [], 'an added field locked the list against its pack');
-  assert.deepEqual(planned.diff.kept.map((x) => [x.id, x.adds]), [['register.things', ['domains']]]);
+  assert.deepEqual(planned.diff.kept.map((x) => [x.id, x.adds]), [['register.things', ['hosting']]]);
   said(await api.installPack({ doc: next, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
 
   assert.equal(k.packStates().find((p) => p.id === 'portfolio')?.version, step(1));
   const after = k.declarations().find((d) => d.id === 'register.things')!;
   const ids = (JSON.parse(after.body) as { fields: Field[] }).fields.map((f) => f.id);
-  assert.ok(ids.includes('launched') && ids.includes('domains'), `things holds ${ids.join(', ')}`);
-  assert.equal(after.pack_id, null, 'the owner’s list became the pack’s, and a later uninstall could take domains');
+  assert.ok(ids.includes('launched') && ids.includes('hosting'), `things holds ${ids.join(', ')}`);
+  assert.equal(after.pack_id, null, 'the owner’s list became the pack’s, and a later uninstall could take hosting');
   /* THE DETACHED RECORD MOVES TO THE NEW PACK BODY, or the next update compares against the old one and reads the
      pack's own `launched` as a field the owner added. */
   const detached = k.detached().find((d) => d.id === 'register.things')!;
   assert.equal(detached.was, 'portfolio');
   assert.ok((JSON.parse(detached.body) as { fields: Field[] }).fields.some((f) => f.id === 'launched'));
-  assert.ok(!(JSON.parse(detached.body) as { fields: Field[] }).fields.some((f) => f.id === 'domains'));
+  assert.ok(!(JSON.parse(detached.body) as { fields: Field[] }).fields.some((f) => f.id === 'hosting'));
 
   said(k.update('things', made.id, { launched: '2026-09-01' }, { actor: 'p_1' }));
   const row = k.get(made.id)!;
-  assert.deepEqual([row.fields.domains, row.fields.launched], [['acme.example'], '2026-09-01']);
+  assert.deepEqual([row.fields.hosting, row.fields.launched], [['acme.example'], '2026-09-01']);
 
   /* AND THE ONE AFTER THAT, which is the lock measured: not one update let through, every update. */
   const again = portfolio(2, [LAUNCHED, { id: 'stage', type: 'text' }]);
@@ -96,7 +99,7 @@ test('a field added to Projects through setDeclaration survives a portfolio upda
   assert.deepEqual(second.diff.conflicts, []);
   said(await api.installPack({ doc: again, source: { kind: 'local' }, planHash: second.diff.planHash, approve: second.diff.approve } as never, owner));
   const third = (JSON.parse(k.declarations().find((d) => d.id === 'register.things')!.body) as { fields: Field[] }).fields.map((f) => f.id);
-  assert.deepEqual(third.slice(-3), ['launched', 'stage', 'domains']);
+  assert.deepEqual(third.slice(-3), ['launched', 'stage', 'hosting']);
   sql.close();
 });
 

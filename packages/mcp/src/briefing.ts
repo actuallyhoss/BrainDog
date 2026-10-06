@@ -4,6 +4,7 @@
  *     BrainDog · run S731 · project BrainDog · Claude Code on MacBook
  *     Next     Cut page answers to block summaries. (S729, Claude Code, 5h ago, check before acting)
  *     Waiting  2 on Sam: Update prism to match this Mac? · 3 bank texts the pattern couldn't read
+ *     Who      Priya Raman (client), Rohan Mehta (Prism), Dario, +4 · for Encore
  *     Learned  Money is minor units plus currency. Never add two currencies.
  *     More     3 dead ends, 5 learnings and 41 keys by name · call context {"format":"full"}
  *
@@ -21,8 +22,8 @@
  * PURE, as `brief.ts` is: the tools in `index.ts` read the record, and this decides what is said.
  */
 
-import { handlesIn, namedIn, plainOf, rowLine, titleOf, type Decl, type Look, type Shaped } from './brief.ts';
-import { agentOf, ago, callOf, clip, counted, gist, grouped, runnerOf } from './words.ts';
+import { alikeKey, handlesIn, namedIn, plainOf, rowLine, titleOf, type Decl, type Look, type Shaped } from './brief.ts';
+import { agentOf, ago, callOf, clip, counted, grouped, runnerOf, ULID } from './words.ts';
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 const text = (x: unknown): string | null => (typeof x === 'string' && x.trim() !== '' ? x : null);
@@ -158,6 +159,67 @@ export function teach(c: { session: string | null; project: string | null; tasks
   ];
 }
 
+/** The people the Who slot names, and how many more. */
+const WHO_SHOWN = 3;
+
+/** A person's or an organisation's words as `context` sends them: a name, or a handle whose words this answer read. */
+function wordsOf(value: unknown, look: Look): string | null {
+  if (typeof value === 'string') {
+    const said = value.trim();
+    if (said === '' || ULID.test(said)) return null;
+    /* A HANDLE IS SAID BY ITS WORDS OR NOT AT ALL: the slot names people, and `O3` names nobody. */
+    if (/^(?:[A-Z]{1,4}[1-9][0-9]*|[a-z][a-z0-9_]*#[1-9][0-9]*)$/u.test(said)) return look.title(said) ?? null;
+    return said;
+  }
+  if (isObject(value)) return wordsOf(value.name ?? value.title, look);
+  return null;
+}
+
+/** When somebody was last in touch, as a number to sort by, or `null` where `context` did not say. */
+const touched = (p: Record<string, unknown>): number | null => {
+  for (const k of ['in_touch', 'last_in_touch', 'touched_at']) {
+    const at = typeof p[k] === 'string' ? Date.parse(p[k]) : NaN;
+    if (Number.isFinite(at)) return at;
+  }
+  return null;
+};
+
+/**
+ * The Who slot: the three people most recently in touch on this project, each with their role or organisation, how many
+ * more, and the organisation the project is for.
+ *
+ *     Who      Priya Raman (client), Rohan Mehta (Prism), Dario, +4 · for Encore
+ *
+ * IT REPLACED "6 people met here" UNDER MORE. An agent about to write to somebody, or told "ask Priya", read a count and
+ * had to list People to learn who that was. The record sends up to ten people linked to the project, the most recently
+ * touched first (`context`'s `people`), with a name and, where the list says them, a role, an organisation and when they
+ * were last in touch; the person whose record it is (`self`) is not somebody met. Nothing is said where nothing is
+ * known, and no handle is said for a person, because the slot is read by a person through the agent.
+ */
+export function whoSaid(c: Record<string, unknown>, project: Record<string, unknown> | null, look: Look): string | null {
+  const people = (Array.isArray(c.people) ? c.people : []).filter(isObject).filter((p) => p.self !== true);
+  const order = people.map((p, i) => ({ p, i, at: touched(p) }));
+  /* THE DATED FIRST, NEWEST AT THE TOP, and anybody `context` sent no date for after them in the order it sent: a
+     comparison that fell back to the order only between two undated people could put one above somebody in touch today. */
+  order.sort((a, z) => (a.at === z.at ? a.i - z.i : a.at === null ? 1 : z.at === null ? -1 : z.at - a.at));
+  const named = order
+    .map(({ p }) => {
+      const name = wordsOf(p.name, look) ?? wordsOf(titleOf(shapedOf(p).fields, undefined), look);
+      if (name === null) return null;
+      const about = wordsOf(p.role, look) ?? wordsOf(p.org, look) ?? wordsOf(p.organisation, look);
+      return about && about.toLowerCase() !== name.toLowerCase() ? `${clip(name, 40)} (${clip(about, 30)})` : clip(name, 40);
+    })
+    .filter((n): n is string => n !== null);
+  const total = typeof c.people_total === 'number' && c.people_total >= named.length ? c.people_total : named.length;
+  const rest = total - Math.min(named.length, WHO_SHOWN);
+  const orgs = [project?.org, project?.organisation, ...(Array.isArray(c.organisations) ? c.organisations : [])];
+  const org = orgs.map((o) => wordsOf(o, look)).find((o): o is string => o !== null) ?? null;
+  /* ONE THING FOR THE PEOPLE AND ONE FOR THE ORGANISATION, as every slot names at most three. */
+  const who = [...named.slice(0, WHO_SHOWN), ...(rest > 0 ? [`+${grouped(rest)}`] : [])].join(', ');
+  const parts = [...(who ? [who] : []), ...(org ? [`for ${clip(org, 40)}`] : [])];
+  return parts.length === 0 ? null : parts.join(' · ');
+}
+
 /**
  * The briefing, lean, with its card, and the text an agent reads: the card, then what else applies here.
  */
@@ -247,10 +309,11 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
 
   const asked = (Array.isArray(c.waiting) ? c.waiting : []).filter(isObject).filter((w) => typeof w.question === 'string');
   /* MERGED WHEN THEY READ THE SAME once ids and case are set aside (`gist`): the owner's queue held three questions about
-     bank texts one pattern could not read, two of them word for word, and the briefing printed each. */
+     bank texts one pattern could not read, two of them word for word, and the briefing printed each. By the same key
+     `governance` groups by (`alikeKey`), so a name, an amount or a row's words that differ keep two questions two. */
   const merged = new Map<string, { id: string; question: string; alike: string[] }>();
   for (const w of asked) {
-    const key = gist(String(w.question)) || `#${String(w.id)}`;
+    const key = alikeKey(w, (h) => look.title(h)) || `#${String(w.id)}`;
     const held = merged.get(key);
     if (held) held.alike.push(String(w.id));
     else merged.set(key, { id: String(w.id), question: String(w.question), alike: [] });
@@ -298,6 +361,9 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     card.push(slot('Waiting', `${grouped(distinct)} on ${look.decider}: ${shown.join(' · ')}${rest > 0 ? ` · ${grouped(rest)} more` : ''}`));
   }
 
+  const who = whoSaid(c, project, look);
+  if (who) card.push(slot('Who', who));
+
   if (shownLessons.length > 0) card.push(slot('Learned', shownLessons.map((l) => clip(plainOf(l.words, look), 130)).join(' · ')));
 
   const more: string[] = [];
@@ -311,8 +377,8 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     const keys = g.decl?.fields.some((f) => f.type === 'secret') === true;
     more.push(`${grouped(n)}${g.truncated ? '+' : ''} ${g.name.toLowerCase()}${keys ? ' by name' : ''}`);
   }
+  /* THE PEOPLE ARE THE WHO SLOT NOW, by name, and not a count under More. */
   const people = (Array.isArray(c.people) ? c.people : []).filter(isObject);
-  if (people.length > 0) more.push(counted(people.length, 'person met here', 'people met here'));
   /* ONE PHRASE OF COUNTS AND THE CALL THAT OPENS THEM, so this slot holds two things and not six. */
   if (more.length > 0) card.push(slot('More', `${spokenList(more.slice(0, 5))} · call ${callOf('context', { format: 'full' })}`));
 
@@ -330,8 +396,14 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     );
   }
   const ambiguous = Array.isArray(c.ambiguous) ? c.ambiguous.filter((a): a is string => typeof a === 'string') : [];
-  if (ambiguous.length > 0)
-    lines.push(`This folder matches ${ambiguous.slice(0, 3).map((a) => namedIn(look.title(a) ?? '', a, look, 40)).join(', ')}, so you work in no project until one is set.`);
+  /* ONE QUESTION, which the agent can put to the person as it stands: which of these this folder is. It was a statement
+     of what the record could not tell, with the consequence after it, and nothing for anybody to answer. */
+  if (ambiguous.length > 0) {
+    const named = ambiguous.slice(0, 3).map((a) => namedIn(look.title(a) ?? '', a, look, 40));
+    const rest = ambiguous.length - named.length;
+    const choices = rest > 0 ? `${named.join(', ')} or one of ${grouped(rest)} more` : named.length === 1 ? named[0]! : `${named.slice(0, -1).join(', ')} or ${named.at(-1)!}`;
+    lines.push(`Which project is this folder, ${choices}? Until one is set you work in no project.`);
+  }
   for (const g of groups) {
     if (g.kind !== 'work') continue;
     const rows = [...g.rows, ...g.inherited];

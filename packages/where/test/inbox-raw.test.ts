@@ -52,6 +52,14 @@ test('A REFUSAL NEVER NAMES A FIELD THE NEXT CALL REFUSES', () => {
     assert.deepEqual(codes({ field: name, present: true }), [], `the refusal offered ${name} and then refused it`);
 });
 
-test('AND THE LIST IT OFFERS IS THE SEVEN, not the seven plus the record\'s five', () => {
-  assert.deepEqual(addressable(INBOX_RAW), ['from', 'to', 'subject', 'body', 'channel', 'state', 'ts']);
+test('AND THE LIST IT OFFERS IS THE TEN, not the ten plus the record\'s five', () => {
+  assert.deepEqual(addressable(INBOX_RAW), ['from', 'from_name', 'from_address', 'from_domain', 'to', 'subject', 'body', 'channel', 'state', 'ts']);
+});
+
+test('A PATTERN CAN NAME THE SENDER\'S DOMAIN, and it is asked as `is`, never taken apart with `contains`', () => {
+  assert.deepEqual(codes({ field: 'from_domain', is: 'bank.example' }), []);
+  assert.deepEqual(codes({ field: 'from_address', is: 'alerts@bank.example' }), []);
+  assert.deepEqual(codes({ field: 'from_name', contains: 'Sara' }), []);
+  assert.equal(evaluate({ field: 'from_domain', is: 'bank.example' } as never, { from: '"Sara Ali" <sara@bank.example>', from_domain: 'bank.example' }, INBOX_RAW), true);
+  assert.equal(evaluate({ field: 'from_domain', is: 'bank.example' } as never, { from: 'x@other.example', from_domain: 'other.example' }, INBOX_RAW), false);
 });

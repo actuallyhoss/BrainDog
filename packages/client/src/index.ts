@@ -109,6 +109,11 @@ export type Boot = {
   /** Each person on the record by name, by id: sent only to a caller who may read the membership list or People. */
   names?: Record<string, string>;
   /**
+   * The slug of the caller's Home page, the one the shell opens first, or `null` where the record names none. The record
+   * sends it on every boot; the type keeps it required so a reader cannot forget the `null`.
+   */
+  home: string | null;
+  /**
    * Which host is serving the record, when the host said. ABSENT IS A HOST THAT DID NOT SAY, a test, the CLI or a host
    * older than the field, and not a guess at either: a reader keeps whatever it inferred before the field existed.
    */
@@ -302,8 +307,28 @@ export type Attached = {
   context?: Context;
 };
 
-/** `meet`: who they turned out to be, whether they were added or linked, and the merge question it opened. */
-export type Met = { person: string; created: boolean; linked: boolean; merge: string | null };
+/**
+ * What `meet` is told (`loop/contract-17.md`): a name and whatever identifies them, an email, a handle or `kind:value`
+ * keys, whether it is a person or an organisation, and where they were met, as a short plain phrase.
+ */
+export type Meet = {
+  name?: string;
+  email?: string;
+  handle?: string;
+  keys?: readonly string[];
+  kind?: 'person' | 'organisation';
+  org?: string;
+  domain?: string;
+  role?: string;
+  where?: string;
+  source?: string;
+};
+
+/**
+ * `meet`: the row they turned out to be by its handle and name, or `null` for a name kept only as a mention; whether it
+ * was added; how it matched; and the question a doubtful match opened on Decide. See `Meeting` in `@braindog/record`.
+ */
+export type Met = Answer<'meet'>;
 
 /** `packs`: one pack, on or off. `version` is `null` for a pack the seed owns by its bodies. See `PackState` in `@braindog/kernel`. */
 export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
@@ -1050,9 +1075,17 @@ export function createClient(options: ClientOptions) {
        written against `call('governance', { … })` gets no help with the argument name and no error
        when the route is renamed, which is the whole reason the table is typed at all. */
     pages: () => call<unknown[]>('pages'),
-    /** One page, narrowed by the reader's own filter choices (a field to the value chosen). An empty filter is no filter. */
-    page: (slug: string, filter?: Readonly<Record<string, string>>) =>
-      call<unknown>('page', filter && Object.keys(filter).length ? { slug, filter } : { slug }),
+    /**
+     * One page, narrowed by the reader's own filter choices (a field to the value chosen). An empty filter is no filter.
+     * `walk` is how far a forecast looks past the two years walked unasked, in days or to the `last` bill; it goes as
+     * text, which the record turns back into days.
+     */
+    page: (slug: string, filter?: Readonly<Record<string, string>>, opts: { walk?: number | 'last' } = {}) =>
+      call<unknown>('page', {
+        slug,
+        ...(filter && Object.keys(filter).length ? { filter } : {}),
+        ...(opts.walk === undefined ? {} : { walk: String(opts.walk) }),
+      }),
     metric: (metric: string) => call<unknown>('metric', { metric }),
     /** Every figure the caller may read, whichever pack declared it and whether or not a page draws it. */
     figures: () => call<FigureEntry[]>('figures'),
@@ -1220,8 +1253,8 @@ export function createClient(options: ClientOptions) {
     sessionsLive: () => call<LiveRun[]>('sessionsLive'),
     /** Where the caller stands: its run, its project, the last handoff, who is live, and what applies. */
     context: () => call<Context>('context'),
-    /** Someone met in the work, a commit author or a sender, as the caller's run. */
-    meet: (args: { name?: string; email?: string; handle?: string; where: string }) => call<Met>('meet', args as Record<string, unknown>),
+    /** Someone or some organisation met in the work, a commit author, a sender or a payee, as the caller's run. */
+    meet: (args: Meet) => call<Met>('meet', args as Record<string, unknown>),
 
     /* THE SCHEDULED ACTIONS. `actions` is READ+; `resumeAction` is ADMIN, so a browser session, and it is the only
        thing that starts a paused action again. */

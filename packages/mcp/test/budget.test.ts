@@ -31,6 +31,11 @@
  * `44-SPEC-MCP` §5.8's rule: `triage` adds 172, and `log`'s `spoken` made optional, with the clause saying so, adds 4,
  * so the list is 2,720 of 2,760; the run's diagnostic below is the figure that holds. Everything added after it, in any
  * workflow, is paid out of the same 2,760 by cutting words elsewhere.
+ *
+ * `meet`'s five new parts (kind, keys, org, domain, role) and the instructions' line saying whom to meet were paid that
+ * way: out of `meet`'s own examples, four descriptions that said a thing twice, and the opening line's list of what a
+ * record holds. It measured 2,755 after, and 2,759 once `keys` said its items are text (Gemini refuses an array schema
+ * without them), paid for by `handoff`'s `state` dropping a `type` its enum already says.
  */
 
 import { test } from 'node:test';

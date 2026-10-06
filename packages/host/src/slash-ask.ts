@@ -78,7 +78,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { SlashBackground, SlashMeter } from '@braindog/record';
 
 import { httpStatus } from './index.ts';
-import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK } from './model-jobs.ts';
+import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK, UNDERSTAND_ASK } from './model-jobs.ts';
 import { slashBaseUrlOf, slashKeySave } from './slash.ts';
 import { VAULT_HEADERS } from './vault.ts';
 
@@ -630,14 +630,26 @@ const monthResets = (ms: number): string => {
   return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
 };
 
-/** The record's `SlashMeter` with its background ask always there, which this host's ledger counts. */
-export type SlashRecordMeter = SlashMeter & { background: NonNullable<SlashMeter['background']> };
+/**
+ * What a background ask is for: the record's own three, and `understand`, the host's reading of who is who
+ * (`understand.ts` `understandingOver`), which the record never asks for itself.
+ */
+export type SlashBackgroundAsk = SlashBackground | 'understand';
 
-/** The question a background ask's ledger row is written with, by what it is for. `HEADLINE_ASK` is what the meters count. */
-const BACKGROUND_ASK: Record<SlashBackground, string> = {
+/** The record's `SlashMeter` with its background ask always there, which this host's ledger counts. */
+export type SlashRecordMeter = SlashMeter & {
+  background(kind?: SlashBackgroundAsk): ReturnType<NonNullable<SlashMeter['background']>>;
+};
+
+/**
+ * The question a background ask's ledger row is written with, by what it is for. `HEADLINE_ASK` and `UNDERSTAND_ASK` are
+ * what the meters count.
+ */
+const BACKGROUND_ASK: Record<SlashBackgroundAsk, string> = {
   skill: "Slash's skill draft",
   look: "Slash's daily look",
   headline: HEADLINE_ASK,
+  understand: UNDERSTAND_ASK,
 };
 
 export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
@@ -718,12 +730,15 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
      * month of drafts and digests cannot leave the pages without their line, nor the headlines the digests without prose.
      * `ask` is optional because a record a release behind calls `background()` for its skill drafts alone.
      */
-    async background(ask: SlashBackground = 'skill') {
+    async background(ask: SlashBackgroundAsk = 'skill') {
       const engine = await deps.engine();
       if (engine === undefined) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Slash has no ledger on this host to count the draft in.' } };
       const status = engine.status() as { tier?: unknown; model?: unknown } | undefined;
       const meter = backgroundMeter(deps.sql, BACKGROUND_JOBS_MONTH, ask === 'headline' ? 'headline' : 'work');
-      if (meter.spent(monthStart(deps.clock.now())) >= meter.cap)
+      const since = monthStart(deps.clock.now());
+      /* UNDERSTANDING IS HELD TO ITS OWN TEN AND TO THE WORK'S MONTH IT IS COUNTED IN, both. */
+      const understanding = ask === 'understand' ? meter.understand : undefined;
+      if (meter.spent(since) >= meter.cap || (understanding !== undefined && understanding.spent(since) >= understanding.cap))
         return {
           ok: false,
           refusal: {
@@ -731,7 +746,9 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
             fix:
               ask === 'headline'
                 ? `This month's Slash headlines are spent until ${monthResets(deps.clock.now())}, so each page keeps its own line until then.`
-                : `This month's background Slash asks are spent until ${monthResets(deps.clock.now())}.`,
+                : ask === 'understand'
+                  ? `This month's Slash reading of who is who is spent until ${monthResets(deps.clock.now())}, so the doubtful names wait until then.`
+                  : `This month's background Slash asks are spent until ${monthResets(deps.clock.now())}.`,
           },
         };
       const tier = typeof status?.tier === 'string' ? status.tier : 'a';

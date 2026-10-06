@@ -26,7 +26,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { tokenBudget } from './tokens.ts';
 
 const NOW = Date.UTC(2026, 8, 22, 9);
-const LABELS = ['Next', 'Waiting', 'Learned', 'More'] as const;
+const LABELS = ['Next', 'Waiting', 'Who', 'Learned', 'More'] as const;
 const HOUR = 3_600;
 
 /** The card's lines after the header, as `[label, body]`, each held to the column the labels make. */

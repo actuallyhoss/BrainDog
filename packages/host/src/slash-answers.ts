@@ -18,7 +18,7 @@
  * `answer` method, the key opened in the rule's name and the tier all stay the app's to build; `31 §2` puts the package at
  * row 13 and `46 §5.1` has only the app `import()` it, which is the rule `slash.ts` states at its own header.
  *
- * AND THE SHAPE OF WHAT ANSWERS THE RECORD'S OTHER MODEL JOBS, `infer.draft` and `infer.prose`, sits at the foot of this
+ * AND THE SHAPE OF WHAT ANSWERS THE RECORD'S OTHER MODEL JOBS, `infer.draft`, `infer.prose` and `infer.resolve`, sits at the foot of this
  * file for the same reason (`ModelJobInference`): the pass that leases them is `model-jobs.ts`'s, and Slash is handed in.
  */
 
@@ -26,6 +26,7 @@ import type { Kernel, OutboxRow } from '@braindog/kernel';
 import { codeOf, fixOf, type Result, type Scheduler } from '@braindog/ports';
 
 import type { ModelJobEmbed } from './model-jobs.ts';
+import type { ModelJobUnderstand } from './understand.ts';
 
 /**
  * One question, as `flow.ts` `ask()` queues it and `@braindog/slash`'s `answer` takes it.
@@ -246,4 +247,11 @@ export type ModelJobInference = {
    * annotated one by hand.
    */
   embed?: ModelJobEmbed['embed'];
+  /**
+   * OPTIONAL, AS `embed` IS: the doubtful pairs of `infer.resolve` and the night's notes (`understand.ts`), each answering
+   * the model's JSON unread for the pass to check, and each written in the ledger under `UNDERSTAND_ASK`. A host builds
+   * both over its `SlashModel` with `understandingOver`. Absent, the pairs wait `pending` and the notes are not read.
+   */
+  resolve?: ModelJobUnderstand['resolve'];
+  mentions?: ModelJobUnderstand['mentions'];
 };

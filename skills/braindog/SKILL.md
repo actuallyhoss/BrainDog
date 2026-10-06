@@ -26,3 +26,5 @@ Never put a token in a row, a note, a commit or a message.
 
 Call `context` first. It names your run and your project, gives you the next step, and says what applies here. The
 server's instructions carry the rules you keep.
+
+Meet everyone you work with or are told about with `meet`, and give their email or handle when you have one.

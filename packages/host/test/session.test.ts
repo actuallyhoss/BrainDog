@@ -3,7 +3,7 @@
  *
  * A hint is held to its grammar and dropped when it fails, and the call it came with still goes
  * through: a wrong hint is a run found less well, never a refused write. `_meta.session` over `/mcp` is
- * held to the same grammar, because it is the same nine things said in a body.
+ * held to the same grammar, because it is the same ten things said in a body.
  */
 
 import { test } from 'node:test';
@@ -24,6 +24,7 @@ const GOOD: Record<string, string> = {
   'x-braindog-agent': 'claude',
   'x-braindog-client-name': 'Claude Code',
   'x-braindog-client-version': '2.1.4',
+  'x-braindog-parent': 'S5',
 };
 
 const KEPT = {
@@ -36,6 +37,7 @@ const KEPT = {
   agent: 'claude',
   client: 'Claude Code',
   client_version: '2.1.4',
+  parent: 'S5',
 };
 
 test('EVERY HINT THAT FITS ITS GRAMMAR IS KEPT, under the field it names', () => {
@@ -69,6 +71,9 @@ test('A HINT THAT FAILS ITS GRAMMAR IS DROPPED, and every other hint is kept', (
     ['x-braindog-client-version', '2.1.4 beta'],
     ['x-braindog-client-version', '2/1'],
     ['x-braindog-client-version', 'x'.repeat(65)],
+    ['x-braindog-parent', 'S0'],
+    ['x-braindog-parent', 'SG5'],
+    ['x-braindog-parent', 'people#5'],
   ];
   for (const [name, value] of bad) {
     const headers = new Headers(GOOD);
@@ -97,6 +102,7 @@ test('_meta.session IS HELD TO THE SAME GRAMMAR, and only its own string keys ar
     spoken: 'S12',
     client_id: 'a1b2-c3:d4.e_5',
     remote: 'github.com/acme/braindog',
+    parent: 'S5',
   });
   assert.deepEqual(hintsOf(JSON.parse('{"__proto__":{"repo":"braindog"}}')), {});
   assert.deepEqual(hintsOf(Object.create({ repo: 'braindog' })), {}, 'an inherited key was read as a hint');
@@ -241,7 +247,9 @@ test('MEET IS A DATA WRITE THROUGH THE SHARED WIRING: 422 where People is switch
   assert.ok((await api.kernel.install([THINGS, PEOPLE])).ok);
   const on = await post(said);
   assert.equal(on.status, 200);
-  assert.deepEqual([on.body.value?.person, on.body.value?.created], ['people#1', true]);
+  /* THE CONTRACT'S ANSWER (`loop/contract-17.md`): the row by its list, number and name, and how it matched. */
+  const row = on.body.value?.row as { register?: string; seq?: number; name?: string } | undefined;
+  assert.deepEqual([row?.register, row?.seq, row?.name, on.body.value?.created, on.body.value?.matched_by], ['people', 1, 'Ada Lovelace', true, 'none']);
   sql.close();
 });
 

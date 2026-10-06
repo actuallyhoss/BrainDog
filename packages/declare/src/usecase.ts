@@ -99,7 +99,7 @@ export type ModuleId = (typeof MODULES)[number];
  */
 export const MODULE_LISTS: Readonly<Record<ModuleId, { name: string; lists: readonly string[] }>> = {
   portfolio: { name: 'Portfolio', lists: ['things'] },
-  people: { name: 'People', lists: ['people'] },
+  people: { name: 'People', lists: ['people', 'organisations'] },
   'money-core': {
     name: 'Money',
     lists: ['accounts', 'balances', 'books', 'categories', 'fx', 'installments', 'obligations', 'recurring', 'snapshots', 'transactions'],

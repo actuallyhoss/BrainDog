@@ -88,7 +88,9 @@ export const isCurrency = (code: unknown): code is string => typeof code === 'st
 export function money(minor: number, currency: string): string {
   const code = currency.toUpperCase();
   if (!Number.isFinite(minor)) return `${code}, an amount that could not be read`;
-  const near = Math.round(minor);
+  /* HALVES AWAY FROM ZERO, ON BOTH SIDES: `Math.round` takes -101.5 up to -101, so a debit read a penny smaller than
+     the same credit read larger. */
+  const near = Math.sign(minor) * Math.round(Math.abs(minor));
   if (!Number.isSafeInteger(near)) return `${code} ${String(minor)}`;
   const exp = EXPONENT[code] ?? 2;
   const digits = String(Math.abs(near)).padStart(exp + 1, '0');
@@ -379,6 +381,13 @@ export function cursorIn(said: unknown): unknown {
   }
 }
 
+/** An amount beside its currency's code, either way round, or after a sign: `GBP 1,200`, `12.50 EUR`, `£12`. */
+const AMOUNT_AFTER = /\b([A-Z]{3})\s?(-?\d[\d,]*(?:\.\d+)?)/gu;
+const AMOUNT_BEFORE = /(-?\d[\d,]*(?:\.\d+)?)\s?([A-Z]{3})\b/gu;
+const AMOUNT_SIGN = /([£$€¥])\s?(-?\d[\d,]*(?:\.\d+)?)/gu;
+/** A name of three or more hyphenated parts each capitalised, `Jean-Luc-Marie`: a person's, never a door's. */
+const HYPHENED_NAME = /^\p{Lu}\p{Ll}+(?:-\p{Lu}\p{Ll}+)+$/u;
+
 /**
  * What a question says once its ids and its case are set aside, for telling two questions that read the same.
  *
@@ -386,17 +395,34 @@ export function cursorIn(said: unknown): unknown {
  * were three questions, two of them word for word, and a fourth told the same thing about a second pattern. A spoken
  * id, a row id, a path, a number and a name made of three or more hyphenated parts (a door's or a pattern's) are taken
  * out before two are compared, so the queue says it once with how many it stands for.
+ *
+ * AND NOTHING THAT TELLS TWO REAL QUESTIONS APART IS TAKEN OUT WITH THEM (`loop/research-audit-14-15a-38.md`, H1). This
+ * kept only a to z, so two merge questions about different people named in Arabic both read "are and the same person",
+ * "Pay GBP 12 to Acme?" read as "Pay GBP 1,200 to Acme?", and "Jean-Luc-Marie" went as a door's name would. So every
+ * letter of every script is kept with its marks (a Devanagari vowel sign, an Arabic vowel), an amount beside its
+ * currency is kept whole after the words, a hyphenated name whose parts are capitalised stays, and a handle whose words
+ * the answer read (`title`) is said by them, so two questions about two rows of different names are two.
  */
-export function gist(question: string): string {
-  return oneLine(question)
-    .toLowerCase()
-    .replace(/[a-z][a-z0-9_]*#\d+/gu, ' ')
-    .replace(/\b[a-z]{1,4}\d+\b/gu, ' ')
-    .replace(/[0-9a-hjkmnp-tv-z]{26}/gu, ' ')
+export function gist(question: string, title?: (spoken: string) => string | undefined): string {
+  const amounts: string[] = [];
+  const kept = (code: string, digits: string): string => {
+    amounts.push(`${code}${digits.replace(/,/gu, '')}`);
+    return ' ';
+  };
+  const named = (handle: string): string => ` ${title?.(handle) ?? ''} `;
+  const words = oneLine(question)
+    .replace(AMOUNT_AFTER, (all, code: string, digits: string) => (isCurrency(code) ? kept(code, digits) : all))
+    .replace(AMOUNT_BEFORE, (all, digits: string, code: string) => (isCurrency(code) ? kept(code, digits) : all))
+    .replace(AMOUNT_SIGN, (_, sign: string, digits: string) => kept(sign, digits))
+    .replace(/[a-z][a-z0-9_]*#\d+/giu, named)
+    .replace(/\b[a-z]{1,4}\d+\b/giu, named)
+    .replace(/[0-9a-hjkmnp-tv-z]{26}/giu, named)
     .replace(/(?:~|\.{1,2})?\/[^\s,;]+/gu, ' ')
-    .replace(/\b[a-z0-9]+(?:-[a-z0-9]+){2,}\b/gu, ' ')
+    .replace(/\b[a-z0-9]+(?:-[a-z0-9]+){2,}\b/giu, (part) => (HYPHENED_NAME.test(part) ? part : ' '))
     .replace(/\d[\d,.]*/gu, ' ')
-    .replace(/[^a-z\s]/gu, ' ')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{M}\s]/gu, ' ')
     .replace(/\s+/gu, ' ')
     .trim();
+  return amounts.length === 0 ? words : `${words} | ${amounts.join(' ')}`;
 }

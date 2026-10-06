@@ -109,6 +109,8 @@ import {
   listBrief,
   loggedBrief,
   metBrief,
+  namedIn,
+  type MetSaid,
   proposedBrief,
   refusalBrief,
   rowWhole,
@@ -124,7 +126,7 @@ import {
   type Shaped,
 } from './brief.ts';
 import { briefed, handlesIn } from './briefing.ts';
-import { actorWords, bare, callOf, clip, closest, counted, cursorIn, cursorOut, grouped, runnerOf } from './words.ts';
+import { actorWords, bare, callOf, clip, closest, counted, cursorIn, cursorOut, grouped, moneyIn, runnerOf } from './words.ts';
 
 type Answer<T = unknown> = Promise<Result<T>>;
 type Args = Record<string, unknown>;
@@ -329,7 +331,7 @@ export const TOOLS: readonly Tool[] = [
     /* AND ITS FIGURES, BECAUSE NOTHING ELSE AN AGENT CALLS NAMES ONE. With the one tool
        that read figures gone, the probe called all nine reads with their most helpful arguments and not one answer
        named a figure the record holds; they were resources, and a client that reads no resources had none. */
-    description: 'Its registers, with how many rows each, its figures and its version: the cheap way to learn register names.',
+    description: 'Its registers with how many rows each, and its figures: the cheap way to learn register names.',
     input: obj({ format: FORMAT }),
     writes: false,
   },
@@ -339,7 +341,7 @@ export const TOOLS: readonly Tool[] = [
     /* THAT IT IS THE FIRST CALL IS THE INSTRUCTIONS' FIRST RULE, which a client shows in the same payload. What is left
        is what comes back, and since the card it is the card's five slots, in the order the card says them. */
     description:
-      'Your briefing: run, project, next step, what waits, what was learned and the Home page, by name. Call it again after a long pause.',
+      'Your briefing by name: run, project, next step, what waits, what was learned. Call it again after a long pause.',
     input: obj({ format: FORMAT }),
     writes: false,
   },
@@ -421,7 +423,7 @@ export const TOOLS: readonly Tool[] = [
     name: 'activity',
     title: 'See recent changes',
     description:
-      'What changed in the whole record lately, newest first, and who changed it. Read it to pick up after another session.',
+      'What changed lately, newest first, and who changed it. Read it to pick up after another session.',
     /* A CURSOR NOW, AND TWENTY BY DEFAULT. It took a limit alone, up to the record's 200 and 50 when asked for none, so
        the default read on the owner's record was 13 KB with 70 row ids in it, and a session that wanted the page below
        had no way to ask. Paged as `list` is, the closing line says what is left and the call that reads it. */
@@ -475,7 +477,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'create',
     title: 'Add something',
-    description: 'Add a row to a register, which comes back with the number the record gave it.',
+    description: 'Add a row to a register; it comes back with its number.',
     /* MONEY IS SAID WHERE IT IS WRITTEN. The instructions carried it as their second rule, read on every call; it
        matters on the two calls that write a value, and a brief answer now says every amount as a person reads it. */
     input: obj(
@@ -535,8 +537,9 @@ export const TOOLS: readonly Tool[] = [
       note: str('Appends.'),
       /* `doing`, the kernel's own field: `title` is a reserved field id, and the record refuses it. */
       doing: str('A few words, verb first.'),
+      /* AN ENUM ALONE, as every other in this list: its `type` paid for `meet`'s `keys` saying its items are text, which
+         a client that checks arrays (Gemini's) refuses a tool list without. */
       state: {
-        type: 'string',
         enum: ['idle', 'handoff', 'done'],
         description: 'handoff asks another run to take it on; done clears next.',
       },
@@ -546,15 +549,22 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'meet',
     title: 'Note someone you met',
-    /* WHEN TO CALL IT WAS THE INSTRUCTIONS' EIGHTH RULE, "such as a commit author, a sender or a client", and it is the
-       description's first clause now, read when the tool is chosen. */
-    description:
-      'Someone you met in the work, such as a commit author, a sender or a client: matched by email or handle, added if new, linked to your project.',
+    /* WHEN TO CALL IT IS THE INSTRUCTIONS' LINE AGAIN, "meet everyone you work with or are told about", and the
+       description says what a call does with what it is given: a key (an address, a handle, a bank payee, a domain)
+       matches or adds, and a name alone is only noted, because the record never makes a person out of a name
+       (`loop/contract-17.md`). `kind`, `org`, `domain`, `role` and `keys` are the contract's input, paid for out of the
+       description's examples and `handle`'s sentence, which `keys` now says for every kind of key. */
+    description: 'A person or organisation in the work, matched by email, handle or key. A name alone is only noted.',
     input: obj(
       {
-        name: str('As written in the work.'),
+        name: { type: 'string' },
+        kind: { enum: ['person', 'organisation'] },
         email: str('Only as seen.'),
-        handle: str('provider:name, such as github:octocat.'),
+        handle: { type: 'string' },
+        keys: { type: 'array', items: { type: 'string' }, description: 'Such as domain:acme.com.' },
+        org: { type: 'string' },
+        domain: { type: 'string' },
+        role: { type: 'string' },
         where: str('Such as commit 4464966 in braindog.'),
       },
       ['where'],
@@ -586,6 +596,51 @@ export const TOOLS: readonly Tool[] = [
     writes: true,
   },
 ];
+
+/** The most merges `get` and `meet` follow from a folded row to the one kept. */
+const MERGE_HOPS = 4;
+
+/** The fields of a person or an organisation that say who they are with, read in this order for the answer to `meet`. */
+const WITH_FIELDS: readonly string[] = ['org', 'organisation', 'projects', 'project', 'things'];
+
+/** A key's kind as a person says it: `email:` is an email, `bank:` a bank payee. */
+const KEY_WORDS: Readonly<Record<string, string>> = {
+  email: 'email',
+  github: 'GitHub handle',
+  discord: 'Discord handle',
+  slack: 'Slack handle',
+  phone: 'phone number',
+  bank: 'bank payee',
+  domain: 'domain',
+  remote: 'repository',
+  folder: 'folder',
+};
+
+/**
+ * How `meet` matched who it met, in words, from what the record answered and what the call sent: `email`, `GitHub
+ * handle`, `name and address or organisation` for the record's strong rule, or `null` where it matched nobody.
+ *
+ * THE KEY ITSELF IS NEVER SAID, only its kind: an address is the person's, and the answer is read out to somebody else.
+ */
+export function matchedHow(raw: Record<string, unknown>, args: Args): string | null {
+  if (raw.created === true || raw.mention === true) return null;
+  /* THE KERNEL'S STRONG RULE (`strong` in people.ts) is one full name plus a shared address, login or organisation, so
+     "name and address" alone was untrue of a merge made on the organisation. */
+  if (raw.matched_by === 'strong') return 'name and address or organisation';
+  if (raw.matched_by === 'none') return null;
+  const kindOf = (key: unknown): string | null => {
+    const kind = typeof key === 'string' ? /^([a-z]+):/u.exec(key.trim())?.[1] : undefined;
+    return kind === undefined ? null : (KEY_WORDS[kind] ?? 'key');
+  };
+  const sent = Array.isArray(args.keys) ? args.keys : [];
+  return (
+    kindOf(raw.key) ??
+    (typeof args.email === 'string' && args.email.trim() !== '' ? 'email' : null) ??
+    (typeof args.handle === 'string' && args.handle.trim() !== '' ? (kindOf(args.handle) ?? 'handle') : null) ??
+    kindOf(sent[0]) ??
+    (raw.matched_by === 'key' ? 'key' : null)
+  );
+}
 
 /** `tasks#41`, the way a person says a row. */
 const QUALIFIED = /^([a-z][a-z0-9_]{0,31})#([1-9][0-9]*)$/;
@@ -1089,6 +1144,27 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     return out;
   };
 
+  /**
+   * The row kept for one that was merged into another, by following `merged_into` until a row is not merged: the row
+   * itself when it never was, and the row first read beside it when it was.
+   *
+   * A FOLDED ROW IS STILL READ AS IT WAS. A merge left the fold behind with `merged_into` set, and `get` of its handle
+   * answered the fold, so an agent holding `P9` from an older answer wrote a note on a person who was no longer kept
+   * (`loop/contract-17.md`: "get and meet follow merged_into to the kept row"). `MERGE_HOPS` bounds a chain, and a row
+   * that points at itself or cannot be read stops it where it is.
+   */
+  const keptOf = async (entry: Entry, ctx: C): Promise<{ entry: Entry; from: Entry | null }> => {
+    let at = entry;
+    for (let hop = 0; hop < MERGE_HOPS; hop++) {
+      const to = at.fields.merged_into;
+      if (typeof to !== 'string' || to === '') break;
+      const got = await surface.get(parse(to) ?? { spoken: to }, ctx);
+      if (!got.ok || !isEntry(got.value) || got.value.id === at.id) break;
+      at = got.value;
+    }
+    return { entry: at, from: at === entry ? null : entry };
+  };
+
   /** A not-ok answer with the row a conflict carries made the shape the first copy was read in. A refusal as it came. */
   const failed = async (r: Result<unknown>, ctx: C, turn: Turn): Promise<Result<unknown>> => {
     const conflict = (r as { conflict?: { current?: unknown } }).conflict;
@@ -1512,7 +1588,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (turn.titles.has(h)) continue;
       const at = parse(h);
       if (at) by.set(at.register, [...(by.get(at.register) ?? []), at.seq]);
-      else if (ROW_ID.test(h) && ids.length < IDS_NAMED) ids.push(h);
+      else if ((ROW_ID.test(h) || PREFIXED.test(h)) && ids.length < IDS_NAMED) ids.push(h);
     }
     await Promise.all([
       ...[...by].slice(0, LISTS_NAMED).map(async ([register, seqs]) => {
@@ -1530,6 +1606,11 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         if (!got.ok || !isEntry(got.value) || got.value.seq === null) return;
         const spoken = await addressOf(got.value.register, got.value.seq, ctx);
         const words = titleOf(got.value.fields, decls.get(got.value.register));
+        /* A PREFIXED HANDLE IS A HANDLE ALREADY, and keeps the words alone, as a `register#number` does above. */
+        if (PREFIXED.test(id)) {
+          if (words) turn.titles.set(id, words);
+          return;
+        }
         const one = decls.get(got.value.register)?.one;
         turn.titles.set(id, words ? `${clip(words, 40)} (${spoken})` : typeof one === 'string' && one !== '' ? `Untitled ${one} (${spoken})` : spoken);
       }),
@@ -1562,6 +1643,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       ...[step.next, ...(Array.isArray(step.tried) ? step.tried : [])].flatMap((t) => (typeof t === 'string' ? handlesIn(t) : [])),
       ...(Array.isArray(c.ambiguous) ? c.ambiguous.filter((a): a is string => typeof a === 'string') : []),
       ...learned.flatMap((r) => (isObject(r) ? Object.values(r).flatMap((v) => (typeof v === 'string' && v.includes('#') ? handlesIn(v) : [])) : [])),
+      /* AND THE ORGANISATIONS THE WHO SLOT NAMES, which the record sends as handles: each person's, and the project's. */
+      ...[
+        ...(Array.isArray(c.people) ? c.people : []).filter(isObject).flatMap((p) => [p.org, p.organisation]),
+        ...(isObject(c.project) ? [c.project.org, c.project.organisation] : []),
+        ...(Array.isArray(c.organisations) ? c.organisations : []),
+      ].filter((h): h is string => typeof h === 'string' && (PREFIXED.test(h) || parse(h) !== null)),
     ];
     const [boot, runs] = await Promise.all([
       bootOf(ctx, turn),
@@ -1689,10 +1776,20 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           const value = bare(got.value);
           return { result: { ok: true, value } };
         }
-        const entry = got.value;
+        /* A ROW MERGED INTO ANOTHER IS ANSWERED AS THE ONE KEPT, with the handle asked for beside it (`keptOf`). */
+        const kept = await keptOf(got.value, ctx);
+        const entry = kept.entry;
         const row = await entryOut(entry, ctx, turn);
-        const value = fittedRow(row);
-        return { result: { ok: true, value }, say: (look) => rowWhole(value as Shaped, entry.register, look).join('\n') };
+        const folded = kept.from === null ? null : await addressOf(kept.from.register, kept.from.seq ?? 0, ctx);
+        const value = { ...fittedRow(row), ...(folded === null ? {} : { merged_from: folded }) };
+        return {
+          result: { ok: true, value },
+          say: (look) =>
+            [
+              ...(folded === null ? [] : [`${namedIn(titleOf(kept.from!.fields, look.decl(kept.from!.register)), folded, look)} was merged into this one:`]),
+              ...rowWhole(value as Shaped, entry.register, look),
+            ].join('\n'),
+        };
       }
       if (!FIGURE.test(said)) return { result: badSpoken(ROW_OR_ID) };
       /**
@@ -2065,21 +2162,95 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       return { result: { ok: true, value: row }, say: () => handoffBrief(row as Shaped) };
     },
 
+    /**
+     * WHO WAS MET, SAID BY NAME WITH HOW THEY WERE MATCHED, and the row kept for them read whole, so the answer can say
+     * which organisation and projects they are with and never a duplicate that was folded away.
+     *
+     * BOTH ANSWERS THE RECORD GIVES ARE READ: the contract's `{ row, created, matched_by, question, mention }`
+     * (`loop/contract-17.md`) and the older `{ person, created, linked, merge }`, because this server is deployed
+     * apart from the record it talks to. The row id the newer one carries is not passed on; the handle is.
+     *
+     * A ROW FOLDED INTO ANOTHER IS FOLLOWED TO THE ONE KEPT (`keptOf`), as `get` follows it, so an agent never meets a
+     * person who was merged away and writes to them.
+     */
     meet: async (args, ctx, turn) => {
       if (!surface.meet) return { result: unbuilt('meet', 'If there is a people register, add the person there with create.') };
       const out = await surface.meet(args, ctx);
       if (!out.ok || !isObject(out.value)) return { result: out };
-      const value = bare(out.value) as Record<string, unknown>;
-      /* THE PERSON'S WORDS, AND THE QUESTION A LIKELY DUPLICATE OPENED, read for an answer said in words: the person was
-         said by handle when `name` was not sent, and the duplicate as "SG7". The question names both rows, by handle. */
-      const merge = typeof value.merge === 'string' && value.merge !== '' ? value.merge : null;
-      if (turn.text) {
-        const asked = merge === null ? null : await surface.governance({ register: 'suggestion', id: merge } as never, ctx);
-        const question = asked?.ok && isObject(asked.value) && typeof asked.value.question === 'string' ? asked.value.question : null;
-        if (merge !== null && question !== null) turn.titles.set(merge, question);
-        await handlesNamed([...(typeof value.person === 'string' ? [value.person] : []), ...(question === null ? [] : handlesIn(question))], ctx, turn);
+      const raw = bare(out.value) as Record<string, unknown>;
+      const row = isObject(raw.row) ? raw.row : null;
+      let spoken: string | null =
+        row && typeof row.register === 'string' && typeof row.seq === 'number'
+          ? await addressOf(row.register, row.seq, ctx)
+          : typeof raw.person === 'string' && raw.person !== ''
+            ? raw.person
+            : null;
+      let words = row && typeof row.name === 'string' ? row.name : '';
+      let mergedFrom: string | null = null;
+      let mergedName = '';
+      const about: string[] = [];
+      if (spoken !== null) {
+        const got = await surface.get(parse(spoken) ?? { spoken }, ctx);
+        if (got.ok && isEntry(got.value)) {
+          const kept = await keptOf(got.value, ctx);
+          const shaped = await entryOut(kept.entry, ctx, turn);
+          if (kept.from) {
+            mergedFrom = spoken;
+            mergedName = titleOf(kept.from.fields, decls.get(kept.from.register));
+          }
+          spoken = String(shaped.spoken);
+          words = titleOf(kept.entry.fields, decls.get(kept.entry.register)) || words;
+          const fields = isObject(shaped.fields) ? shaped.fields : {};
+          for (const id of WITH_FIELDS)
+            for (const h of Array.isArray(fields[id]) ? fields[id] : [fields[id]]) {
+              const named = typeof h === 'string' ? turn.titles.get(h) : undefined;
+              if (named && !about.includes(named)) about.push(named);
+            }
+        }
       }
-      return { result: { ok: true, value }, say: (look) => metBrief(value, typeof args.name === 'string' ? args.name : '', look), names: { people: merge !== null } };
+      const said = typeof args.name === 'string' ? args.name.trim() : '';
+      const asked = typeof raw.question === 'string' && raw.question !== '' ? raw.question : typeof raw.merge === 'string' && raw.merge !== '' ? raw.merge : null;
+      /* A QUESTION IS ITS HANDLE, `SG7`, from either answer, or its own words where the record sent those instead. */
+      const question = asked !== null && /^SG[1-9][0-9]*$/u.test(asked) ? asked : null;
+      let questionWords = asked !== null && question === null ? asked : null;
+      const mention = raw.mention === true;
+      let on: string | null = null;
+      if (turn.text) {
+        if (question !== null) {
+          const read = await surface.governance({ register: 'suggestion', id: question } as never, ctx);
+          questionWords = read?.ok && isObject(read.value) && typeof read.value.question === 'string' ? read.value.question : null;
+          if (questionWords !== null) turn.titles.set(question, questionWords);
+        }
+        if (questionWords !== null) await handlesNamed(handlesIn(questionWords), ctx, turn);
+        /* A NAME ALONE IS NOTED ON THE CALLER'S PROJECT, which is said by name: "Noted Ahmed on Encore". */
+        if (mention && surface.context) {
+          const c = await surface.context({}, ctx);
+          on = c.ok && isObject(c.value) && isObject(c.value.project) && typeof c.value.project.name === 'string' ? c.value.project.name : null;
+        }
+      }
+      const how = matchedHow(raw, args);
+      const value: Record<string, unknown> = {
+        ...(spoken === null ? {} : { person: spoken }),
+        ...(words ? { name: words } : {}),
+        created: raw.created === true,
+        ...(typeof raw.matched_by === 'string' ? { matched_by: raw.matched_by } : {}),
+        ...(how === null ? {} : { how }),
+        ...(typeof raw.confidence === 'number' ? { confidence: raw.confidence } : {}),
+        ...(mention ? { mention: true } : {}),
+        ...(question === null ? {} : { question }),
+        ...(raw.linked === true ? { linked: true } : {}),
+        ...(mergedFrom === null ? {} : { merged_from: mergedFrom }),
+        ...(about.length > 0 ? { with: about } : {}),
+      };
+      const met: MetSaid = {
+        ...(value as MetSaid),
+        said,
+        kind: args.kind === 'organisation' ? 'organisation' : 'person',
+        ...(questionWords === null ? {} : { asked: questionWords }),
+        ...(on === null ? {} : { on }),
+        ...(mergedName ? { merged_name: mergedName } : {}),
+      };
+      return { result: { ok: true, value }, say: (look) => metBrief(met, look), names: { people: questionWords !== null } };
     },
 
     /**
@@ -2589,6 +2760,11 @@ const JSON_TEXT_MOST = 2_000;
  * two thousand characters is shortened. A list keeps its first entry, because an empty list reads as "there are none".
  * A `cursor` beside a cut `rows` goes too, since it points past the rows that were dropped and following it would skip
  * them. An answer that still does not fit, one object with thousands of keys, is answered as its keys and the sentence.
+ *
+ * ANY `rows`, AT ANY DEPTH, TAKES THE CURSOR BESIDE IT AND THE ANSWER'S OWN: only `rows` at the top was asked of, so a
+ * page's `x.rows` cut under its own cursor kept one that skipped what was dropped (`loop/research-audit-16.md`, L11).
+ * AND A CUT LIST THAT CARRIED MONEY SAYS ITS TOTALS STILL COUNT WHAT WENT: a total beside it was summed by the record over
+ * every entry, and read against the entries left it no longer adds up.
  */
 export function fittedJson(value: Record<string, unknown>, most = ANSWER_MOST): Record<string, unknown> {
   const size = (v: unknown): number => JSON.stringify(v)?.length ?? 0;
@@ -2596,14 +2772,15 @@ export function fittedJson(value: Record<string, unknown>, most = ANSWER_MOST): 
   /* ROOM FOR THE SENTENCE, which names each list it cut. */
   const room = most - 600;
   const out = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
-  const cuts = new Map<string, { kept: number; of: number }>();
+  const cuts = new Map<string, { kept: number; of: number; holder: object; key: string | number; money: boolean }>();
   let now = size(out);
   for (let tries = 0; tries < 64 && now > room; tries += 1) {
     const big = largestList(out);
     if (big === null) break;
     const keep = Math.min(big.list.length - 1, Math.max(1, Math.floor((big.list.length * Math.max(0, big.bytes - (now - room))) / big.bytes)));
     (big.holder as Record<string | number, unknown>)[big.key] = big.list.slice(0, keep);
-    cuts.set(big.path, { kept: keep, of: cuts.get(big.path)?.of ?? big.list.length });
+    const had = cuts.get(big.path);
+    cuts.set(big.path, { kept: keep, of: had?.of ?? big.list.length, holder: big.holder, key: big.key, money: (had?.money ?? false) || big.list.slice(keep).some((e) => carriesMoney(e)) });
     now = size(out);
   }
   let texts = 0;
@@ -2616,9 +2793,21 @@ export function fittedJson(value: Record<string, unknown>, most = ANSWER_MOST): 
   const parts = [...cuts].slice(0, 4).map(([path, c]) => `${path} ${grouped(c.kept)} of ${grouped(c.of)}`);
   if (cuts.size > 4) parts.push(`${counted(cuts.size - 4, 'more list')} cut`);
   if (texts > 0) parts.push(`${counted(texts, 'long text')} shortened`);
-  const dropped = cuts.has('rows') && typeof out.cursor === 'string';
-  if (dropped) delete out.cursor;
-  const said = `Cut at ${grouped(most)} characters, the most one answer carries${parts.length > 0 ? `: ${parts.join(', ')}` : ''}.${
+  let dropped = false;
+  const rowsCut = [...cuts.values()].filter((c) => c.key === 'rows');
+  for (const holder of [out, ...rowsCut.map((c) => c.holder)])
+    /* WHATEVER SHAPE THE CURSOR HAS: this server says one as text, but an answer passed through as the record gave it
+       may carry a number or an object, and either still points past the rows that went. */
+    if (rowsCut.length > 0 && isObject(holder) && holder.cursor !== undefined && holder.cursor !== null) {
+      delete holder.cursor;
+      dropped = true;
+    }
+  const money = [...cuts].filter(([, c]) => c.money).map(([path]) => path);
+  const totals =
+    money.length === 0
+      ? ''
+      : ` Any total here still counts what was cut from ${money.slice(0, 2).join(' and ')}${money.length > 2 ? ' and the rest' : ''}, so it no longer adds up to the entries shown.`;
+  const said = `Cut at ${grouped(most)} characters, the most one answer carries${parts.length > 0 ? `: ${parts.join(', ')}` : ''}.${totals}${
     dropped ? ' The cursor went with what was cut, so ask again with a smaller limit.' : ''
   } Narrow the call or ask fewer.`;
   const before = typeof out.cut === 'string' ? `${out.cut} ` : '';
@@ -2627,6 +2816,14 @@ export function fittedJson(value: Record<string, unknown>, most = ANSWER_MOST): 
     cut: `This answer is ${grouped(size(value))} characters, past the ${grouped(most)} one answer carries, and nothing in it could be cut to fit. Narrow the call.`,
     keys: Object.keys(value).slice(0, 200),
   };
+}
+
+/** Whether a JSON value holds an amount of money, `{ amount, currency }`, four levels down at most. */
+function carriesMoney(value: unknown, depth = 0): boolean {
+  if (moneyIn(value) !== null) return true;
+  if (depth >= 4) return false;
+  if (Array.isArray(value)) return value.some((v) => carriesMoney(v, depth + 1));
+  return isObject(value) && Object.values(value).some((v) => carriesMoney(v, depth + 1));
 }
 
 /** The largest list in a JSON value with more than one entry, four levels down at most: where it is, and its size. */

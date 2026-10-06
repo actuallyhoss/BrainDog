@@ -270,7 +270,8 @@ test('MONEY ALONE ON AN EMPTY RECORD IS REFUSED, and the first-party five still 
   const alone = await record();
   const money = value<Pack>(await normalise(firstPartyDocument('money-core')));
   const diff = await plan(money, stateOf(alone.k));
-  assert.deepEqual(diff.unresolved.map((u) => u.register).sort(), ['people', 'things']);
+  /* `organisations` TOO, which a ledger row's party points at, and People declares since 3.0.0. */
+  assert.deepEqual(diff.unresolved.map((u) => u.register).sort(), ['organisations', 'people', 'things']);
   const r = refusal(await install(money, diff, hostFor(alone.k), diff.planHash));
   assert.equal(r.code, 'REGISTER_UNRESOLVED');
   assert.ok(/Install (people and portfolio|portfolio and people) first: they declare/.test(r.fix), r.fix);
