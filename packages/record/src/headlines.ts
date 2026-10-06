@@ -20,6 +20,11 @@
  * AND A NEW LINE IS WRITTEN THE SAME DAY, ONCE. A page whose basis moves after the night's ask is asked about again on a
  * later tick, on the background allowance, and never more than `HEADLINE_ASKS_DAY` headline asks are made in one day
  * (`HEADLINES_ASKED`), so a busy day costs one extra ask and not one a write.
+ *
+ * AND THE SAME ASK ARRANGES THE PAGE (DIRECTION §38, `compose-look.ts`). Each page is handed its blocks by `key` and a
+ * few of the rows it draws by their handle and title, and the model may answer `{ headline, order, next }` in place of
+ * the bare line: what leads after the lead note, and the one thing to do next. No extra ask, so the look costs Free
+ * nothing beyond the headline it already had.
  */
 
 import type { Json } from '@braindog/kernel';
@@ -50,7 +55,7 @@ export const HEADLINE_LOOK_MS = 15 * 60_000;
 export const HEADLINES_ASKED = 'headlines.asked';
 
 /** The words a person never reads about their own things (DIRECTION §35): the system's, not theirs. */
-const SYSTEM_WORDS = /\b(?:rows?|lists?|registers?|blocks?)\b/iu;
+export const SYSTEM_WORDS = /\b(?:rows?|lists?|registers?|blocks?)\b/iu;
 
 /** One figure the model is handed: its path as the note writes it, its value as a person reads it, and how far it moved. */
 export type HeadlineFigure = { id: string; value: string; change?: string };
@@ -58,14 +63,48 @@ export type HeadlineFigure = { id: string; value: string; change?: string };
 /** One thing late or due on a page's lists, by its own title: late, due today, or due tomorrow. No day, so no number. */
 export type HeadlineItem = { title: string; when: 'late' | 'today' | 'tomorrow' };
 
+/** At most this many of a page's blocks are handed by key, the lead note first, so the ask stays one ask's size. */
+export const HEADLINE_BLOCKS_MOST = 12;
+
+/** At most this many of the rows a page draws are handed, one of which the model may name as the next thing to do. */
+export const HEADLINE_ROWS_MOST = 5;
+
+/**
+ * One block of a page as the model is handed it: its `key` (declared, or the kernel's hash of kind, source and heading),
+ * its kind, the heading a person reads, and `lead` on the lead note, which stays first whatever order comes back.
+ */
+export type HeadlineBlock = { key: string; kind: string; heading?: string; lead?: true };
+
+/**
+ * One row a page draws, as the model is handed it: `row` is its handle (`tasks#4`), never shown to a person, beside the
+ * `title` that is. The model's `next` names one of these by its handle, and nothing else.
+ */
+export type HeadlineRow = { row: string; title: string };
+
 /**
  * One page the model is asked to say a line for. `rules` is the line the rules say today, filled. `items` are the titles
  * of what is late or due on its lists, most pressing first, and `question` the first open question about them; each is
  * left out when there is none, so a page with nothing pressing is handed what it always was.
+ *
+ * `blocks` and `rows` ARE WHAT THE LOOK IS MADE OF (`compose-look.ts`): the page's blocks by key, and a few rows it draws.
+ * Home has neither, since its look is Today's own.
  */
-export type HeadlinePage = { page: string; title: string; rules: string; figures: HeadlineFigure[]; items?: HeadlineItem[]; question?: string };
+export type HeadlinePage = {
+  page: string;
+  title: string;
+  rules: string;
+  figures: HeadlineFigure[];
+  items?: HeadlineItem[];
+  question?: string;
+  blocks?: HeadlineBlock[];
+  rows?: HeadlineRow[];
+};
 
-/** What `SlashModel.headline` is handed. The host answers `{"lines":{"<page>":"..."}}`. */
+/**
+ * What `SlashModel.headline` is handed. The host answers `{"lines":{"<page>":"..."}}`, or for a page handed blocks,
+ * `{"lines":{"<page>":{"headline":"...","order":["<key>",...],"next":{"row":"<handle>","text":"..."}}}}`. Either is read
+ * (`lineOf` for the line, `lookAnswerOf` in `compose-look.ts` for the rest).
+ */
 export type HeadlineInput = { today: string; pages: HeadlinePage[] };
 
 /**
@@ -101,7 +140,7 @@ export const holesOf = (template: string): string[] => [...new Set([...template.
  * A short hash of a text. Not a secret and not a check against tampering, only "has this changed": cyrb53, so it needs no
  * async digest and is the same in Node and in the Worker.
  */
-function hashOf(text: string): string {
+export function hashOf(text: string): string {
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
   for (let i = 0; i < text.length; i++) {
@@ -266,4 +305,13 @@ export function linesIn(raw: unknown): Record<string, unknown> | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const lines = (raw as { lines?: unknown }).lines;
   return lines !== null && typeof lines === 'object' && !Array.isArray(lines) ? (lines as Record<string, unknown>) : null;
+}
+
+/**
+ * The line in one page's answer: the bare line as it always was, or the `headline` of an answer that also arranges the
+ * page. Anything else is handed on as it is, so `headlineFault` says why it was not kept.
+ */
+export function lineOf(answer: unknown): unknown {
+  if (answer === null || typeof answer !== 'object' || Array.isArray(answer)) return answer;
+  return (answer as { headline?: unknown }).headline;
 }

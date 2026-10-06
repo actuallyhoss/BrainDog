@@ -121,16 +121,23 @@ test('THE NIGHT WRITES ONE LINE A PAGE IN ONE BACKGROUND ASK, the page read carr
   assert.ok(first.ran);
   /* ONE ASK, FOR THE ONE PAGE WITH A LEAD NOTE, handed its title, the rules' own line and each figure as it reads. */
   assert.equal(heard.length, 1);
-  assert.deepEqual(heard[0]!.pages, [
-    {
-      page: 'desk',
-      title: 'Launch desk',
-      rules: '1 of 2 steps are done.',
-      figures: [
-        { id: 'done-steps', value: '1' },
-        { id: 'tasks.count', value: '2' },
-      ],
-    },
+  assert.equal(heard[0]!.pages.length, 1);
+  const { blocks, rows: handed, ...desk } = heard[0]!.pages[0]!;
+  assert.deepEqual(desk, {
+    page: 'desk',
+    title: 'Launch desk',
+    rules: '1 of 2 steps are done.',
+    figures: [
+      { id: 'done-steps', value: '1' },
+      { id: 'tasks.count', value: '2' },
+    ],
+  });
+  /* AND WHAT ITS LOOK IS MADE OF, in the same ask (`compose-look.ts`): its blocks by key, the lead note first, and the
+     rows it draws by handle beside the title a person reads. */
+  assert.deepEqual(blocks?.map((b) => [b.kind, b.lead === true, typeof b.key]), [['note', true, 'string'], ['table', false, 'string']]);
+  assert.deepEqual(handed, [
+    { row: 'tasks#2', title: 'Cut the pattern' },
+    { row: 'tasks#1', title: 'Sample the fit' },
   ]);
   /* BOTH THE LOOK'S DRAFT AND THE HEADLINES ARE THE BACKGROUND ALLOWANCE'S, each named, and not one of the person's asks
      was held. */

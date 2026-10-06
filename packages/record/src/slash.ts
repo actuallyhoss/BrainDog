@@ -25,7 +25,7 @@ import type { FigureTest, Grows } from './arrange.ts';
 import { subjectOf } from './automations.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { Json, Kernel, Tried } from '@braindog/kernel';
-import { coerce } from '@braindog/kernel';
+import { coerce, slugify } from '@braindog/kernel';
 import { MODULE_WORDS, labelSetting, voiceSetting } from '@braindog/declare';
 import { KINDS, isKind } from 'braindog-render';
 import type { HeadlineInput } from './headlines.ts';
@@ -50,6 +50,17 @@ const AGENT_SHARE = 2 / 3;
 const LABEL_MOST = 40;
 /** A description line is a sentence's worth, as `declare` `usecase.ts` holds one. */
 const HOLDS_MOST = 280;
+/**
+ * A person, an organisation or a project earns a page of its own once it is met this often or this many things here name
+ * it (DIRECTION §38): five dated `met` lines, or three rows in other lists pointing at it.
+ */
+export const ENTITY_PAGE = { met: 5, linked: 3 };
+/** At most this many of those are drafted in one look, the strongest first, so Decide is not a column of names. */
+const ENTITY_DRAFTS_MOST = 2;
+/** At most this many entities are carried in the reading, which the model is handed whole. */
+const ENTITIES_READ_MOST = 6;
+/** At most this many lists naming one entity are drawn on its page, under the card. */
+const ENTITY_LINKS_MOST = 3;
 
 /**
  * One of a list, from its name and in its case, or `null` where its ending does not say: Issues, Issue; HSBC cards,
@@ -155,6 +166,26 @@ export type AgentUse = { actor: string; writes30: number; days30: number; lists:
 
 export type PackUse = { id: string; title: string; on: boolean; usecase: boolean; since: string | null };
 
+/**
+ * A person, an organisation or a project that has crossed `ENTITY_PAGE`: who it is, in which list, how often it was met,
+ * and the lists that name it. `facts` and `lead` are the list's own fields its page would draw: the card's, each with its
+ * label, and the one its lead line says.
+ */
+export type EntityUse = {
+  kind: 'person' | 'organisation' | 'project';
+  list: string;
+  listName: string;
+  seq: number;
+  name: string;
+  /** The list's title field, which the card draws as the name and a page finds the row by. */
+  title: string;
+  met: number;
+  linked: number;
+  links: { list: string; name: string; field: string; many: boolean; rows: number }[];
+  facts: { field: string; label: string; as: 'fact' | 'when' }[];
+  lead: { field: string; label: string } | null;
+};
+
 export type Usage = {
   at: string;
   /** The oldest event or row this record holds, and how many days ago that was. */
@@ -179,6 +210,11 @@ export type Usage = {
   tone: Tone | null;
   /** The skill names the record holds, or `null` when it has no Skills list. */
   skills: string[] | null;
+  /**
+   * The people, organisations and projects met often enough or named by enough things to earn a page (`ENTITY_PAGE`),
+   * strongest first, from the lists the caller reads. Absent on a reading made before they were read.
+   */
+  entities?: EntityUse[];
 };
 
 /** A thing Slash noticed, said in one sentence. */
@@ -374,6 +410,8 @@ export function readUsage(
 
   const lists: ListUse[] = [];
   const pages: PageUse[] = [];
+  /** The lists that hold people, organisations and projects, as their declarations say (`entityRole`). */
+  const roles: EntityRole[] = [];
   /** The lists `reads` refused, for the words below that name one. */
   const held = new Set<string>();
   for (const d of declared) {
@@ -390,6 +428,8 @@ export function readUsage(
         held.add(bare);
         continue;
       }
+      const role = entityRole(bare, body);
+      if (role !== null) roles.push(role);
       const a = added.get(bare);
       lists.push({
         id: bare,
@@ -443,6 +483,8 @@ export function readUsage(
     return { id: p.id, title: titles.get(p.id) ?? p.id, on: p.disabled_at === null, usecase: p.id.startsWith('usecase-'), since: mine[0] ?? null };
   });
 
+  const entities = entitiesOf(sql, kernel, roles, reads, (id) => lists.find((l) => l.id === id)?.name ?? kernel.register(id)?.name ?? id);
+
   return {
     at: instantOf(nowMs),
     firstWrite,
@@ -463,7 +505,123 @@ export function readUsage(
           .all<{ name: string | null }>("SELECT json_extract(fields, '$.name') AS name FROM entry WHERE register = 'skills' AND deleted_at IS NULL")
           .flatMap((r) => (typeof r.name === 'string' ? [r.name] : []))
       : null,
+    entities,
   };
+}
+
+/** A list that holds people, organisations or projects, and the fields its role names. */
+type EntityRole = { list: string; kind: EntityUse['kind']; met: string | null; merged: string | null; self: string | null };
+
+/**
+ * Whether a list holds people (`meets:`), organisations (`org:`) or projects (`scopes:`), as its declaration says, or
+ * by the name a record from before the keys still reads (`people`, `organisations`). A part the role does not name is
+ * read by its own name, as `roles.ts` reads a keyless list.
+ */
+function entityRole(list: string, body: Record<string, unknown>): EntityRole | null {
+  const parts = (v: unknown): Record<string, unknown> | null => (v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
+  const field = (said: Record<string, unknown> | null, part: string, fallback: string | null): string | null =>
+    typeof said?.[part] === 'string' ? (said[part] as string) : fallback;
+  const meets = parts(body.meets);
+  if (meets !== null || (list === 'people' && body.meets === undefined && body.org === undefined))
+    return { list, kind: 'person', met: field(meets, 'met', 'met'), merged: field(meets, 'merged_into', 'merged_into'), self: field(meets, 'self', 'self') };
+  const org = parts(body.org);
+  if (org !== null || list === 'organisations') return { list, kind: 'organisation', met: field(org, 'met', null), merged: field(org, 'merged_into', 'merged_into'), self: null };
+  if (parts(body.scopes) !== null) return { list, kind: 'project', met: null, merged: null, self: null };
+  return null;
+}
+
+/** The field types a card says as a fact about someone, and the one it says as when. Never money, notes or secrets. */
+const FACT_TYPES: ReadonlySet<string> = new Set(['enum', 'ref', 'email', 'url']);
+const WHEN_TYPES: ReadonlySet<string> = new Set(['day', 'instant']);
+
+/** A list's field ids a role keeps to itself, which a card about the row does not draw. */
+const KEPT_PARTS: ReadonlySet<string> = new Set(['merged_into', 'met', 'aliases', 'keys', 'handles']);
+
+/**
+ * The people, organisations and projects that have crossed `ENTITY_PAGE`, strongest first and at most
+ * `ENTITIES_READ_MOST`: each live row of an entity list, not an example and not folded into another, with how many `met`
+ * lines it holds and how many rows of the other lists the caller reads point at it.
+ *
+ * ONE PASS A LIST: a row's met lines from its own fields, and the rows naming it grouped by the field that points, so a
+ * record of a thousand people is a few queries and not one a person.
+ */
+function entitiesOf(sql: Sql, kernel: Kernel, roles: readonly EntityRole[], reads: (list: string) => boolean, nameOf: (list: string) => string): EntityUse[] {
+  const out: EntityUse[] = [];
+  const registers = [...kernel.registers()];
+  for (const role of roles) {
+    const decl = kernel.register(role.list);
+    if (!decl || !decl.title) continue;
+    /* WHO NAMES IT: every ref, or list of refs, in another list the caller reads that points at this one. An example a
+       pack seeded names nobody. */
+    const pointing = registers.flatMap(([id, other]) =>
+      id === role.list || !reads(id)
+        ? []
+        : other.fields
+            .filter((f) => f.retired !== true && f.to === role.list && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')))
+            .map((f) => ({ list: id, name: nameOf(id), field: f.id, many: f.type === 'list' })),
+    );
+    const counts = new Map<string, { list: string; name: string; field: string; many: boolean; rows: number }[]>();
+    for (const p of pointing) {
+      const path = `$.${p.field}`;
+      const grouped = p.many
+        ? sql.all<{ v: string; n: number }>(
+            `SELECT j.value AS v, count(DISTINCT entry.id) AS n FROM entry, json_each(entry.fields, ?) j
+              WHERE entry.register = ? AND entry.deleted_at IS NULL AND json_type(entry.fields, ?) = 'array'
+                AND coalesce(json_extract(entry.fields, '$.tags'), '') NOT LIKE '%"example"%' GROUP BY j.value`,
+            path,
+            p.list,
+            path,
+          )
+        : sql.all<{ v: string; n: number }>(
+            `SELECT json_extract(fields, ?) AS v, count(*) AS n FROM entry
+              WHERE register = ? AND deleted_at IS NULL AND json_type(fields, ?) = 'text'
+                AND coalesce(json_extract(fields, '$.tags'), '') NOT LIKE '%"example"%' GROUP BY v`,
+            path,
+            p.list,
+            path,
+          );
+      for (const g of grouped) {
+        if (typeof g.v !== 'string') continue;
+        const at = counts.get(g.v) ?? [];
+        at.push({ ...p, rows: Number(g.n) });
+        counts.set(g.v, at);
+      }
+    }
+    const fields = decl.fields.filter((f) => f.retired !== true && f.id !== decl.title && !KEPT_PARTS.has(f.id) && f.id !== role.met && f.id !== role.merged);
+    const facts: EntityUse['facts'] = fields.filter((f) => FACT_TYPES.has(f.type)).slice(0, 3).map((f) => ({ field: f.id, label: f.label ?? f.id, as: 'fact' as const }));
+    const when = fields.find((f) => WHEN_TYPES.has(f.type));
+    if (when) facts.push({ field: when.id, label: when.label ?? when.id, as: 'when' });
+    /* WHAT A PAGE MAY LEAD ON: when it was last, else what it is. Each row leads on the first of these it holds, so a
+       page never opens on a label with nothing after it. */
+    const leads = [...(when ? [when] : []), ...fields.filter((f) => f.type === 'enum')];
+    for (const r of sql.all<{ id: string; seq: number | null; fields: string }>(
+      `SELECT id, seq, fields FROM entry WHERE register = ? AND deleted_at IS NULL
+          AND coalesce(json_extract(fields, '$.tags'), '') NOT LIKE '%"example"%' ORDER BY seq LIMIT 5000`,
+      role.list,
+    )) {
+      if (r.seq === null) continue;
+      let row: Record<string, unknown>;
+      try {
+        row = JSON.parse(r.fields) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      const name = typeof row[decl.title] === 'string' ? (row[decl.title] as string).trim() : '';
+      if (name === '') continue;
+      /* A ROW FOLDED INTO ANOTHER IS THAT ONE, and earns nothing of its own. */
+      if (role.merged !== null && typeof row[role.merged] === 'string' && row[role.merged] !== '') continue;
+      /* THE RECORD'S OWN PERSON (`self`) IS MET IN EVERYTHING THEY DO, and "you have met them" is not said of them. */
+      if (role.self !== null && row[role.self] === true) continue;
+      const metLines = role.met !== null && Array.isArray(row[role.met]) ? (row[role.met] as unknown[]).length : 0;
+      const links = (counts.get(r.id) ?? []).sort((a, b) => b.rows - a.rows);
+      const linked = links.reduce((n, l) => n + l.rows, 0);
+      if (metLines < ENTITY_PAGE.met && linked < ENTITY_PAGE.linked) continue;
+      const leadField = leads.find((f) => row[f.id] !== undefined && row[f.id] !== null && row[f.id] !== '');
+      const lead = leadField ? { field: leadField.id, label: leadField.label ?? leadField.id } : null;
+      out.push({ kind: role.kind, list: role.list, listName: nameOf(role.list), seq: r.seq, name, title: decl.title, met: metLines, linked, links, facts, lead });
+    }
+  }
+  return out.sort((a, b) => b.met + 2 * b.linked - (a.met + 2 * a.linked) || a.name.localeCompare(b.name)).slice(0, ENTITIES_READ_MOST);
 }
 
 /** A setting that is one of a use case's words: a voice line, a label, a list's singular or what it holds. */
@@ -588,6 +746,10 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
       });
     }
   }
+
+  /* WHO AND WHAT COMES UP MOST: a person, an organisation or a project met often or named by many things, with no page
+     of its own yet, gets one drafted, held to the same bar a model's page is (`entityDrafts`). */
+  drafts.push(...entityDrafts(usage));
 
   /* WHAT AGENTS WRITE. */
   const working = usage.agents.filter((a) => a.writes30 >= AGENTS.writes && a.days30 >= AGENTS.days);
@@ -808,6 +970,99 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
   return { noticed, drafts: keyed(drafts), quiet: null };
 }
 
+/**
+ * A name a `where:` can say as it is: one clause, so no comma, and no word the sentence reads as its own (`or` between
+ * values, a hole, a quote). A name that cannot is not drafted a page, rather than one that finds the wrong row.
+ */
+const sayable = (name: string): boolean => !/[,{}"'\n]/u.test(name) && !/\s(?:or|and)\s/iu.test(name) && name.length <= 80;
+
+/** The words each kind of entity is said in: a person is they, an organisation or a project it. */
+const THEM: Readonly<Record<EntityUse['kind'], { them: string; own: string; has: string }>> = {
+  person: { them: 'them', own: 'their own', has: 'they have' },
+  organisation: { them: 'it', own: 'its own', has: 'it has' },
+  project: { them: 'it', own: 'its own', has: 'it has' },
+};
+
+/**
+ * A page for each person, organisation and project in the reading that has none: `ENTITY_DRAFTS_MOST` at most, the
+ * strongest first. The page opens on one lead line with a figure from the row itself, its card under it, and up to
+ * `ENTITY_LINKS_MOST` of the lists that name it, each filtered to it; it sits in the rail beside the pages of its list.
+ *
+ * HELD TO THE PAGE BAR BEFORE IT IS EVER FILED. Every draft is measured by `calmFaults`, the bar a model's page is
+ * repaired to in `describe`, and one that would not pass (a heading in the system's words, a hole in a row) is not
+ * drafted. And it goes to the model as one of the rules' drafts on the look, as every rule draft does, so a model may
+ * improve it, through `fromModel` and `prepare` like anything it answers.
+ *
+ * A PAGE IS NOT DRAFTED TWICE FOR ONE NAME: a page somebody wrote with that title, or at that address, is its page.
+ */
+export function entityDrafts(usage: Usage): SlashDraft[] {
+  const out: SlashDraft[] = [];
+  const titles = new Set(usage.pages.map((p) => p.title.trim().toLowerCase()));
+  const slugs = new Set(usage.pages.map((p) => p.slug));
+  for (const e of usage.entities ?? []) {
+    if (out.length >= ENTITY_DRAFTS_MOST) break;
+    if (!sayable(e.name) || titles.has(e.name.toLowerCase()) || e.lead === null || !/^[a-z][a-z0-9_]*$/u.test(e.list)) continue;
+    const base = slugify(e.name);
+    if (base === '' || slugs.has(base)) continue;
+    const { them, own, has } = THEM[e.kind];
+    const lead = `${e.lead.label.charAt(0).toUpperCase()}${e.lead.label.slice(1)}: {{${e.list}#${e.seq}.${e.lead.field}}}`;
+    const links = e.links.filter((l) => usage.lists.some((x) => x.id === l.list)).slice(0, ENTITY_LINKS_MOST);
+    const blocks: Record<string, unknown>[] = [
+      { kind: 'note', lead: true, span: 12, body: lead },
+      {
+        kind: 'cards',
+        source: `register.${e.list}`,
+        where: `${e.title} is ${e.name}`,
+        columns: [{ field: e.title, label: 'Name', as: 'title' }, ...e.facts.map((f) => ({ field: f.field, label: f.label, as: f.as }))],
+        limit: 1,
+        span: 12,
+        empty: `Nothing is kept about ${e.name} yet.`,
+      },
+      ...links.map((l) => ({
+        kind: 'table',
+        heading: l.name,
+        source: `register.${l.list}`,
+        where: `${l.field} ${l.many ? 'has' : 'is'} ${e.name}`,
+        order: [{ field: 'seq', dir: 'desc' }],
+        limit: 10,
+        span: 12,
+        empty: `Nothing in ${l.name} names ${e.name} yet.`,
+      })),
+    ];
+    const id = `page.${base}`;
+    if (calmFaults([{ id, blocks }]).length > 0) continue;
+    const section = usage.pages.find((p) => p.pack !== null && p.registers.includes(e.list))?.title ?? e.listName;
+    const said = [
+      ...(e.met >= ENTITY_PAGE.met ? [`you have met ${them} ${plural(e.met, 'time')}`] : []),
+      ...(e.linked >= ENTITY_PAGE.linked ? [`${plural(e.linked, 'thing')} here ${e.linked === 1 ? 'names' : 'name'} ${them}`] : []),
+    ];
+    const why = `${opening(joinNames(said))}, and ${has} no page yet.`;
+    slugs.add(base);
+    out.push({
+      key: '',
+      question: `Give ${e.name} a page of ${own}? ${why}`,
+      body_kind: 'arrange',
+      body: {
+        why: [why],
+        pages: [
+          {
+            id,
+            body: {
+              page: base,
+              title: e.name,
+              nav: { section, order: 60 },
+              requires: [...new Set([e.list, ...links.map((l) => l.list)])].map((l) => `register.${l}`),
+              blocks,
+            },
+          },
+        ],
+      },
+      by: 'rules',
+    });
+  }
+  return out;
+}
+
 /** A skill's moment without what it then does: "when a ticket is opened, to set its priority" is "when a ticket is opened". */
 const momentOf = (trigger: string): string => trigger.split(', to ')[0]!.trim();
 
@@ -839,7 +1094,8 @@ export interface SlashModel {
   /**
    * One plain line a page saying what matters now, from its lead note's figures (`headlineFault` checks each line).
    * OPTIONAL: a model without it writes no headline, and each page's lead note says the rules' line as it always has. The
-   * host answers `{"lines":{"<page>":"..."}}` and passes `@braindog/host`'s `SLASH_HEADLINE_INSTRUCTIONS`.
+   * host answers `{"lines":{"<page>":"..."}}`, or for a page handed its blocks `{ headline, order, next }` in place of the
+   * line (`compose-look.ts` checks the rest), and passes `@braindog/host`'s `SLASH_HEADLINE_INSTRUCTIONS`.
    */
   headline?(input: HeadlineInput): Promise<unknown>;
 }

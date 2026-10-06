@@ -61,6 +61,7 @@ import {
   type OutboxKind,
   carryingOf,
   headline,
+  keysOf,
   mutedFor,
   type Decided,
   type GovernRegister,
@@ -73,8 +74,6 @@ import {
   type SessionHints,
   type WriteContext,
   PEOPLE,
-  type MeetArgs,
-  type Met,
   type Approved,
   type Arrival,
   type Arrived,
@@ -122,6 +121,7 @@ import {
   askedOn,
   factsBasis,
   figureText,
+  hashOf,
   HEADLINE_ASKS_DAY,
   HEADLINE_ITEMS_MOST,
   HEADLINE_LOOK_MS,
@@ -135,6 +135,7 @@ import {
   homeBasis,
   homeRulesLine,
   leadBlockOf,
+  lineOf as answeredLine,
   linesIn,
   rulesLine,
   storedHeadline,
@@ -145,6 +146,7 @@ import {
   type HeadlinesAsked,
   type SlashHeadline,
 } from './headlines.ts';
+import { composeLooks, keepLook as keepLookOf, keptBy, lookHeld, lookInputOf, undoLook as undoLookOf, type LookNext } from './compose-look.ts';
 import {
   BODY_DEPTH,
   SAID_DEPTH,
@@ -548,7 +550,11 @@ const POSITION = ['agent', 'host', 'repo', 'remote', 'cwd', 'branch', 'head', 'd
 /** Why `attach` was called: the hook that fired, or the command line. */
 export const SOURCES = ['startup', 'resume', 'clear', 'compact', 'cli'] as const;
 const HANDOFF = ['next', 'tried', 'note', 'doing', 'state', 'branch', 'head', 'session'] as const;
-const MEET = ['name', 'email', 'handle', 'where'] as const;
+const MEET = ['name', 'email', 'handle', 'keys', 'kind', 'org', 'domain', 'role', 'where', 'source'] as const;
+/** The kinds `meet` tells apart. A person is never folded into an organisation, nor one into the other. */
+const MEET_KINDS = ['person', 'organisation'] as const;
+/** The keys one `meet` may carry, each `kind:value` (`keyOf` in the kernel normalises them). */
+const MEET_KEYS_MOST = 20;
 /**
  * A refusal on its way out of a transaction that has already written something.
  *
@@ -602,8 +608,12 @@ const CLIENT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
 /** A register's rows `context` shows from the project, and again from everywhere, newest first. */
 const SHOWN = 20;
-/** The people linked to the project, most recently touched first. */
+/** The people linked to the project, most recently in touch first. */
 const MET = 10;
+/** The people linked to the project read to choose those `MET` from, by when they were last in touch. */
+const LINKED = 50;
+/** The organisations `context` names for the project: its own, then the ones its people work for. */
+const ORGS = 5;
 /** The open questions, newest first. */
 const ASKED = 8;
 /**
@@ -927,6 +937,12 @@ export type Boot = {
     about: { register: string; seq: number | null; updated_at: string } | null;
   }[];
   /**
+   * The page Home draws, by slug: the Home page of the use case the record speaks in (`speakingNow`, `home-<use case>`)
+   * when the caller may open it, else the page called `home` when they may open that, else `null` and Home draws the
+   * house figures. The app reads it here rather than working the voice rule out again.
+   */
+  home: string | null;
+  /**
    * How many questions wait on a person, and how many arrivals wait in the inbox.
    *
    * COUNTS AND NOT LISTS. `waiting` is capped for the first paint and a rail badge is the whole number. The inbox holds
@@ -1078,6 +1094,61 @@ export type Attached = {
  */
 export type Brief = { spoken: string; version: number; scope: 'project' | 'global'; state: string | null } & Record<string, unknown>;
 
+/**
+ * A person linked to the project, as `context` shows them: the row as `Brief` has it, and what the briefing card names
+ * them by. `role` is what they do, `org` the name of the organisation they are with, and `in_touch` the last day
+ * anybody was in touch, each `null` when the list keeps none or the caller may not read the organisations. `self` is
+ * the person whose record it is, whom the briefing does not count as somebody met.
+ */
+export type PersonBrief = Brief & { name: string; role: string | null; org: string | null; in_touch: string | null; self: boolean };
+
+/** An organisation of the project, as `context` names it: its own, or the one a person here is with. */
+export type OrgBrief = { spoken: string; name: string; kind: string | null };
+
+/**
+ * What `meet` is told (`loop/contract-17.md`): who, by a name, an address, a handle or keys (`kind:value`), whether a person
+ * or an organisation, the organisation a person is with and its domain, their role, and where they were met. `source` is
+ * a short plain phrase (`commit 4464966 in braindog`, `mail from encore.example`); `where` is the older word for it.
+ */
+export type MeetSaid = {
+  name?: string;
+  email?: string;
+  handle?: string;
+  keys?: readonly string[];
+  kind?: 'person' | 'organisation';
+  org?: string;
+  domain?: string;
+  role?: string;
+  where?: string;
+  source?: string;
+};
+
+/**
+ * What `meet` answers (`loop/contract-17.md`): the row they turned out to be, by its handle and name, or `null` when a
+ * name with no key was only kept as a mention; whether it was added; how it matched; and the question a doubtful match
+ * opened on Decide, by its handle.
+ */
+export type Meeting = {
+  row: { register: string; id: string; seq: number | null; name: string } | null;
+  created: boolean;
+  matched_by: 'key' | 'strong' | 'none';
+  confidence?: number;
+  question?: string;
+  mention?: boolean;
+  /** The batch that undoes a merge the strong rules made, for the Undo beside "Merged rohanmehta into Rohan Mehta". */
+  undo?: string;
+};
+
+/**
+ * A merge question about several rows, as Decide draws it: every candidate by name with its evidence, the one kept
+ * first, and the three answers. Merge all and Keep apart are `decide` with the option given; Pick is `decide` with
+ * `accept` and `rows`, the `rows` of each candidate picked, so only those are folded into the one kept.
+ */
+export type MergeCluster = {
+  candidates: { name: string; row: string; keeps: boolean; org: string | null; seen: string[]; known_by: string[]; rows: number[] }[];
+  options: { option: 'merge all' | 'keep apart' | 'pick'; says: string; decide: { option: 'accept' | 'reject' } }[];
+};
+
 /** Another run that is live now, as `context` shows it. */
 export type LiveBrief = {
   spoken: string;
@@ -1111,8 +1182,21 @@ export type Context = {
   waiting: { id: string; question: string }[];
   /** Every register with a scope field the caller may read: the project's open rows, then the global ones nearer-wins leaves. */
   registers: { id: string; name: string; rows: Brief[]; inherited: Brief[]; truncated: boolean }[];
-  /** The people linked to this project, most recently touched first. */
-  people: Brief[];
+  /** The people linked to this project, most recently in touch first, each with their role and organisation. */
+  people: PersonBrief[];
+  /** How many people other than the record's own are linked here, sent only when there are more than `people` holds. */
+  people_total?: number;
+  /**
+   * The record's own person as the list `meet` writes marks them (`self`): every key they are known by, `kind:value`, so
+   * a CLI tells his own commits from a colleague's without listing People. `null` when the list marks nobody or the
+   * caller may not read it.
+   */
+  self: { keys: string[] } | null;
+  /**
+   * The organisations of this project, by name: the ones linked to it, then the ones its people are with, most people
+   * first. Empty when no list declares `org:` or the caller may not read it.
+   */
+  organisations: OrgBrief[];
   /** Rows of a fading register left out because nobody confirmed them in ninety days. */
   faded: number;
   /** One sentence: what to call next. */
@@ -2512,6 +2596,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         figures.push({ id, value, ...(change === undefined ? {} : { change }) });
       }
       if (figures.length === 0) continue;
+      /* AND WHAT ITS LOOK IS MADE OF, in the same ask (`compose-look.ts`): its blocks by key and a few rows it draws, so the
+         model may answer an order and one next step beside the line, at no ask beyond it. */
+      const look = lookInputOf(read.value.blocks, (list) => kernel.register(list)?.title ?? null);
       due.push({
         page: {
           page: p.slug,
@@ -2520,6 +2607,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           figures,
           ...(named.items.length > 0 ? { items: named.items } : {}),
           ...(named.question === undefined ? {} : { question: named.question }),
+          ...(look.blocks.length > 0 ? { blocks: look.blocks } : {}),
+          ...(look.rows.length > 0 ? { rows: look.rows } : {}),
         },
         basis,
         ...(facts === undefined ? {} : { facts }),
@@ -2546,7 +2635,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const said: string[] = [];
     const dropped: string[] = [];
     for (const d of due) {
-      const text = Object.hasOwn(lines, d.page.page) ? lines[d.page.page] : undefined;
+      /* A BARE LINE, OR THE `headline` OF AN ANSWER THAT ALSO ARRANGES THE PAGE (`lineOf` in `headlines.ts`). */
+      const text = answeredLine(Object.hasOwn(lines, d.page.page) ? lines[d.page.page] : undefined);
       const fault = headlineFault(text, d.page);
       if (fault) {
         dropped.push(`${fault} Its own line stands.`);
@@ -2556,6 +2646,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       kernel.setPref(SLASH, headlineKey(d.page.page), kept);
       said.push(d.page.page);
     }
+    /* THEN THE LOOK STEP, from the same answer: Slash's order and next step over each page that answered more than a line,
+       written as a versioned look so Undo restores the one before, and never over a look the person set. */
+    const looked = await composeLooks(kernel, due, lines);
+    for (const page of looked.said) if (!said.includes(page)) said.push(page);
+    dropped.push(...looked.dropped);
     return { said, dropped };
   };
 
@@ -2580,21 +2675,66 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * A LINE THAT NAMES THINGS (`facts`) IS SENT ONLY TO SOMEBODY WHO READS ALL OF EVERY LIST THE PAGE DOES, and only while the
    * same things are still late or due: a bill named late is not named once it is paid.
    */
-  const headlineFor = (slug: string, blocks: readonly unknown[], ctx: CallContext): { at: number; text: string } | null => {
-    if (slug === HOME_PAGE) return null;
+  const headlineFor = (slug: string, blocks: readonly unknown[], ctx: CallContext): { line: { at: number; text: string } | null; next: LookNext | null } => {
+    const none = { line: null, next: null };
+    if (slug === HOME_PAGE) return none;
     const lead = leadBlockOf(blocks);
-    if (lead === null) return null;
-    const stored = storedHeadline(kernel.prefsOf(SLASH)[headlineKey(slug)]);
-    if (stored === null || stored.basis !== headlineBasis(slug, lead)) return null;
-    if (stored.facts !== undefined) {
+    if (lead === null) return none;
+    const basis = headlineBasis(slug, lead);
+    /* WHAT IS PRESSING ON THE PAGE'S LISTS, asked only when a line or a look was written from it, and only for a reader of
+       all of every list it reads: `undefined` for anybody else, which no basis written from named things equals. */
+    let named: string | undefined | null = null;
+    const facts = (): string | undefined => {
+      if (named !== null) return named;
       const lists = listsRead(blocks);
       /* AND READS ALL OF EACH: a grant narrowed to some of a list's things (`wheres`) may not see the title the line names. */
-      if ([...lists].some((l) => readable(ctx, l) !== null || whereFor(ctx.wheres, l) !== undefined)) return null;
-      const named = pressingOf(pressingRead(slashDay()), lists);
-      if (factsBasis(named.items, named.question) !== stored.facts) return null;
-    }
-    return { at: lead.at, text: stored.text };
+      if ([...lists].some((l) => readable(ctx, l) !== null || whereFor(ctx.wheres, l) !== undefined)) return (named = undefined);
+      const read = pressingOf(pressingRead(slashDay()), lists);
+      return (named = factsBasis(read.items, read.question));
+    };
+    /* THE PAGE'S LOOK FIRST: a headline the person fixed is the line, and Slash's is not sent over it. Slash's next step
+       goes out while what it was written from holds and the thing it names is drawn for this reader. */
+    const look = lookHeld(kernel, slug, basis, facts, blocks);
+    if (look.ownerHeadline) return { line: null, next: look.next };
+    const stored = storedHeadline(kernel.prefsOf(SLASH)[headlineKey(slug)]);
+    if (stored === null || stored.basis !== basis) return { line: null, next: look.next };
+    if (stored.facts !== undefined && facts() !== stored.facts) return { line: null, next: look.next };
+    return { line: { at: lead.at, text: stored.text }, next: look.next };
   };
+
+  /**
+   * The page's look (`loop/contract-17.md`) as this caller is sent it: the kernel lays it over the page before any block is
+   * held, so its one next action may name a row of a block she is not shown, in words that say what the row is. Kept
+   * only when the row it names is drawn in a block she is shown. Slash's next goes out only while what it was written
+   * from still holds (`held`, `lookHeld` in `compose-look.ts`). The order, the lead, what is hidden and what is pinned name
+   * blocks by key, and every block is sent, held or not, so those go as they are, a held block's under the key it was
+   * sent with (`rekeyed`).
+   */
+  const lookShown = (
+    look: Record<string, unknown> | undefined,
+    blocks: readonly unknown[],
+    held: LookNext | null,
+    rekeyed: ReadonlyMap<string, string>,
+  ): Record<string, unknown> | undefined => {
+    if (look === undefined || look === null || typeof look !== 'object') return undefined;
+    const { next: said, ...rest } = look;
+    const as = (k: unknown): unknown => (typeof k === 'string' ? (rekeyed.get(k) ?? k) : k);
+    for (const part of ['order', 'hide', 'pinned'] as const) if (Array.isArray(rest[part])) rest[part] = (rest[part] as unknown[]).map(as);
+    if (rest.lead !== undefined) rest.lead = as(rest.lead);
+    const asked = said !== null && typeof said === 'object' ? (said as Partial<LookNext>) : null;
+    const next = look.by === 'slash' ? held : typeof asked?.row === 'string' && typeof asked.text === 'string' && drawnFor(blocks, asked.row) ? (asked as LookNext) : null;
+    return next === null ? rest : { ...rest, next };
+  };
+
+  /** Whether a row, by its handle, or a question, by its id, is drawn in a block this caller is shown. */
+  const drawnFor = (blocks: readonly unknown[], ref: string): boolean =>
+    blocks.some((raw) => {
+      const b = (raw ?? {}) as { drawn?: unknown; refusals?: unknown; rows?: unknown; queue?: unknown };
+      if (b.drawn === false || (Array.isArray(b.refusals) && b.refusals.length > 0)) return false;
+      const rows = Array.isArray(b.rows) ? (b.rows as { register?: unknown; seq?: unknown; fields?: Record<string, unknown> }[]) : [];
+      if (rows.some((r) => `${String(r?.register)}#${String(r?.seq)}` === ref || r?.fields?.row === ref)) return true;
+      return Array.isArray(b.queue) && (b.queue as { id?: unknown }[]).some((q) => q?.id === ref);
+    });
 
   /**
    * Home's line (`headline.home`), when it was written today from the reading Today holds now, or `null`. Only for
@@ -2833,6 +2973,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const WRITTEN = ['from', 'cells', 'opening', 'sell', 'about'] as const;
 
+  /** A key the kernel made for a block that declares none (`defaultBlockKey`), with the `-2` that parts a second alike. */
+  const DEFAULT_KEY = /^k[0-9a-z]{7}(-\d+)?$/u;
+
   /**
    * One drawn block as this caller may see it: whole, or blanked with the one sentence that says why.
    *
@@ -2852,6 +2995,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     }
     if (!beyond) return b;
     return shellOf(b, beyond, log !== null);
+  };
+
+  /**
+   * The page's blocks as held, each with a key no other block of the page has. A held block keyed again without its
+   * source (`shellOf`) may meet another keyed the same way, two figures with no heading over two lists she may not read,
+   * and one key for two blocks broke the web's keying and the look's naming of either. Such a block is parted from the
+   * keys already given, in page order, as the kernel parts its own (`keyedBlocks`): `-2`, then `-3`.
+   */
+  const partedKeys = <T>(drawn: readonly { key?: unknown }[], held: T[]): T[] => {
+    const taken = new Set<string>();
+    held.forEach((b, i) => {
+      const key = (b as { key?: unknown }).key;
+      if (typeof key === 'string' && key === drawn[i]?.key) taken.add(key);
+    });
+    return held.map((b, i) => {
+      const key = (b as { key?: unknown }).key;
+      if (typeof key !== 'string' || key === drawn[i]?.key) return b;
+      let parted = key;
+      for (let n = 2; taken.has(parted); n += 1) parted = `${key}-${n}`;
+      taken.add(parted);
+      return parted === key ? b : { ...b, key: parted };
+    });
   };
 
   /**
@@ -2879,6 +3044,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       delete kept.row;
       delete kept.columns;
     }
+    /* AND THE KEY THE KERNEL MADE FROM THAT SOURCE (`defaultBlockKey`, a hash of kind, source and heading), which told a
+       block over a list she may not read from one over a list nobody declared as surely as the source did: a figure over
+       `metric.diary-count` and one over `metric.nosuch-count` answered two keys (`test/preview-page-guard.test.ts`). A key
+       the author wrote is the page's own word and stays; a made one is made again from what is still shown, with no `-2`,
+       which said another block read the same source. Two held blocks alike are parted again by the page (`partedKeys`). */
+    const key = (b as { key?: unknown }).key;
+    const made = typeof key === 'string' && DEFAULT_KEY.test(key);
+    const hid = kept.source !== b.source || kept.register !== (b as { register?: unknown }).register;
+    if (made && hid) kept.key = `k${hashOf(JSON.stringify([b.kind, null, (b as { heading?: unknown }).heading ?? null]))}`;
     return {
       ...(kept as typeof b),
       rows: [],
@@ -3699,10 +3873,97 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * with its options and not what they were options for, so an agent reading the queue saw "Block it"
    * and "Keep it open" and had to go to `context` to learn what was being asked.
    */
-  const asked = <T>(register: string, row: T): T =>
-    register === 'suggestion' && row !== null && typeof row === 'object' && typeof (row as { id?: unknown }).id === 'string'
-      ? ({ ...row, question: kernel.question((row as unknown as { id: string }).id) ?? '' } as T)
-      : row;
+  /* AND A MERGE ASKED ABOUT SEVERAL ROWS CARRIES EACH OF THEM, with where each was seen (`clusterOf`), so Decide draws one
+     card with Merge all, Keep apart and Pick instead of a rowset of patches nobody can read. */
+  const asked = <T>(ctx: CallContext, register: string, row: T): T => {
+    if (register !== 'suggestion' || row === null || typeof row !== 'object' || typeof (row as { id?: unknown }).id !== 'string') return row;
+    const merge = clusterOf(ctx, row as Record<string, unknown>);
+    return { ...row, question: kernel.question((row as unknown as { id: string }).id) ?? '', ...(merge === null ? {} : { merge }) } as T;
+  };
+
+  /**
+   * A merge question as Decide draws it (`MergeCluster`), or `null` for any other question: a `rowset` on the list
+   * declaring `meets:` or `org:` whose rows fold one or more rows into another through `merged_into`.
+   *
+   * EVERY CANDIDATE BY NAME, the one kept first, each with the evidence a person decides on: the organisation they are
+   * with, where they were seen (a `met` line's words, a run of commits in one repository said as one), and which kinds of
+   * key they are known by, never the keys themselves. `rows` is the rowset rows that fold that candidate, which `decide`
+   * accepts alone to merge only the ones picked. The row that gathers every candidate's handles onto the kept one goes
+   * with Merge all and with no pick, so a pick never hands the kept row a candidate the person left out.
+   */
+  const clusterOf = (ctx: CallContext, row: Record<string, unknown>): MergeCluster | null => {
+    if (row.body_kind !== 'rowset' || row.body === null || typeof row.body !== 'object') return null;
+    const body = row.body as { register?: unknown; rows?: unknown };
+    const people = kernel.meetsList();
+    const orgs = orgsList();
+    const parts = (body.register === people?.register ? people?.fields : body.register === orgs?.register ? orgs?.fields : undefined) as
+      | Record<string, string | undefined>
+      | undefined;
+    if (parts?.merged_into === undefined || !Array.isArray(body.rows)) return null;
+    const into = parts.merged_into;
+    const folds = new Map<string, number[]>();
+    let kept: string | null = null;
+    for (const [n, r] of (body.rows as unknown[]).entries()) {
+      const at = (r as { at?: unknown } | null)?.at;
+      const target = ((r as { patch?: Record<string, unknown> } | null)?.patch ?? {})[into];
+      if (typeof at !== 'string' || typeof target !== 'string') continue;
+      if (kept !== null && kept !== target) return null;
+      kept = target;
+      folds.set(at, [...(folds.get(at) ?? []), n]);
+    }
+    if (kept === null || folds.size === 0) return null;
+    const register = String(body.register);
+    const title = kernel.register(register)?.title;
+    const strip = (line: string): string => line.replace(/^\d{4}-\d{2}-\d{2}\s*·\s*/u, '').trim();
+    const candidate = (ref: string, keeps: boolean, rows: number[]): MergeCluster['candidates'][number] | null => {
+      const r = kernel.get(ref, { includeDeleted: true });
+      if (!r || r.register !== register) return null;
+      const name = (title === undefined ? null : text(r.fields[title])) ?? kernel.nameOf(r.id);
+      /* WHERE THEY WERE SEEN, newest first: commits in one repository counted as one line, anything else as it was said. */
+      const lines = (parts.met === undefined ? [] : listOf(r.fields[parts.met])).map(strip).filter(Boolean).reverse();
+      const commits = new Map<string, number>();
+      const seen: string[] = [];
+      for (const line of lines) {
+        const repo = /^commit \S+ in (.+)$/u.exec(line)?.[1];
+        if (repo !== undefined) {
+          if (!commits.has(repo)) seen.push(`commits in ${repo}`);
+          commits.set(repo, (commits.get(repo) ?? 0) + 1);
+        } else if (!seen.includes(line)) seen.push(line);
+      }
+      const said = seen.map((line) => {
+        const repo = line.startsWith('commits in ') ? line.slice('commits in '.length) : null;
+        const n = repo === null ? 0 : (commits.get(repo) ?? 0);
+        return repo === null ? line : n === 1 ? `a commit in ${repo}` : `${n} commits in ${repo}`;
+      });
+      const kinds = new Set<string>();
+      if (parts.email !== undefined && text(r.fields[parts.email]) !== null) kinds.add('email');
+      if (parts.domain !== undefined && text(r.fields[parts.domain]) !== null) kinds.add('domain');
+      for (const part of [parts.handles, parts.keys])
+        if (part !== undefined) for (const k of listOf(r.fields[part])) if (k.includes(':')) kinds.add(k.slice(0, k.indexOf(':')).toLowerCase());
+      /* THE ORGANISATION BY NAME ONLY TO A READER OF THE ORGANISATIONS, as `context` names it. */
+      const org = parts.org === undefined || orgs === null || readable(ctx, orgs.register) ? null : text(r.fields[parts.org]);
+      return {
+        name,
+        row: kernel.nameOf(r.id),
+        keeps,
+        org: org === null || orgs === null ? null : (orgBrief(orgs, org)?.name ?? null),
+        seen: said.slice(0, 3),
+        known_by: [...kinds],
+        rows,
+      };
+    };
+    const first = candidate(kept, true, []);
+    const rest = [...folds].map(([ref, rows]) => candidate(ref, false, rows));
+    if (first === null || rest.some((c) => c === null)) return null;
+    return {
+      candidates: [first, ...(rest as MergeCluster['candidates'])],
+      options: [
+        { option: 'merge all', says: 'Merge all', decide: { option: 'accept' } },
+        { option: 'keep apart', says: 'Keep apart', decide: { option: 'reject' } },
+        { option: 'pick', says: 'Pick the ones that are the same', decide: { option: 'accept' } },
+      ],
+    };
+  };
 
   /**
    * Whether the caller reads the record as a whole, rather than the registers they were invited to.
@@ -4483,7 +4744,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return { currency: kernel.homeCurrency() ?? (money.length === 1 ? money[0]! : null), money };
   };
 
-  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'counts' | 'pen' | 'whatsNew' | 'names'> => {
+  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
@@ -4496,6 +4757,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        which lists a page already reads and which slugs are taken. */
     const every = kernel.pages();
     const drawn = drawnIn(ctx);
+    const opens = every.filter((page) => seesPage(ctx, page));
+    /* HOME FOLLOWS THE VOICE, as the use case's own page (`homePageOf` in `@braindog/seed`, `home-<use case>`), and only
+       a page this caller may open: a member held to one list is never handed a slug she would be refused. */
+    const speaker = speakingNow(kernel);
+    const voiced = speaker === null ? null : `home-${speaker.replace(/^usecase-/u, '')}`;
+    const home = voiced !== null && opens.some((page) => page.slug === voiced) ? voiced : opens.some((page) => page.slug === 'home') ? 'home' : null;
     return {
       record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawn } : null,
       ...drawn,
@@ -4510,8 +4777,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(p.kind === 'person' ? { prefs } : {}),
       },
       /* THE SAME FILTER `pages` RUNS, and the register list stays behind for the same reason. */
-      pages: every
-        .filter((page) => seesPage(ctx, page))
+      pages: opens
         /* THE ONE LIST A PAGE DRAWS, when it draws one this caller reads, so a saved view sits under its list in the rail.
            A name the kernel gives a read across the whole record is not a list (`*`, a character no register id holds). */
         .map((page) => ({
@@ -4526,6 +4792,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
              draws 15. It names no row the caller cannot read: `seesPage` above already drops a page about one. */
           about: page.about,
         })),
+      home,
       counts: {
         decide: open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0,
         /* AN OWNER, AND A TOKEN AN OWNER GAVE THE `inbox` REACH, held to the whole record as `inbox` itself is: the agent
@@ -4585,6 +4852,48 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   const text = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
+
+  /**
+   * The list `meet` writes organisations into and the field playing each of its parts (`loop/contract-17.md`), or
+   * `null`: the kernel's own answer (`kernel.orgsList()`, `orgRole` in `packages/kernel/src/roles.ts`), so this guard
+   * and the write it guards can never name two lists. TWO DECLARING LISTS ARE NONE, as for `meets:`, and the list
+   * `meet` files people in is never also the organisations.
+   */
+  const orgsList = (): { register: string; fields: Record<string, string> } | null => {
+    const role = kernel.orgsList();
+    return role === null ? null : { register: role.register, fields: Object.fromEntries(Object.entries(role.fields).filter((e): e is [string, string] => typeof e[1] === 'string')) };
+  };
+
+  /**
+   * A row folded into another, read by the handle it had: a person or an organisation `merged_into` some other row, which
+   * the merge soft-deleted. Answered as it is, `merged_into` and all, so an agent holding the old handle (`P9`) can follow
+   * it to the row that was kept instead of meeting nothing. Any other deleted row is still nothing.
+   */
+  const folded = (said: string): Entry | null => {
+    const row = kernel.get(said, { includeDeleted: true });
+    if (!row) return null;
+    const into = [kernel.meetsList(), orgsList()].find((l) => l?.register === row.register)?.fields.merged_into;
+    return into !== undefined && text(row.fields[into]) !== null ? row : null;
+  };
+
+  /**
+   * An organisation row by id as `context` names it, followed through `merged_into` to the one it was folded into, or
+   * `null` for a row that is gone or not an organisation. A few steps at most, so a loop written by hand ends.
+   */
+  const orgBrief = (orgs: { register: string; fields: Record<string, string> }, id: string): OrgBrief | null => {
+    let row = kernel.get(id);
+    for (let hop = 0; hop < 4 && row; hop += 1) {
+      const into = orgs.fields.merged_into === undefined ? null : text(row.fields[orgs.fields.merged_into]);
+      if (into === null) break;
+      row = kernel.get(into);
+    }
+    if (!row || row.register !== orgs.register) return null;
+    const decl = kernel.register(orgs.register);
+    const name = text(row.fields[orgs.fields.name ?? decl?.title ?? 'name']) ?? (decl ? text(row.fields[decl.title]) : null);
+    if (name === null) return null;
+    const kind = orgs.fields.kind === undefined ? null : text(row.fields[orgs.fields.kind]);
+    return { spoken: kernel.nameOf(row.id), name, kind };
+  };
 
   /**
    * Where the caller stands, in one read of each thing. It never
@@ -4675,15 +4984,55 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        scope links a row to projects, as people are linked, is who is here rather than what applies. */
     const cutoff = new Date(clock.now() - FADE_MS).toISOString().slice(0, 10);
     const registers: Context['registers'] = [];
-    let people: Brief[] = [];
+    const met: PersonBrief[] = [];
+    /* EVERYBODY LINKED HERE BUT THE RECORD'S OWN PERSON, counted in full: the read below stops at `LINKED`. */
+    let everyone = 0;
+    const orgLinked: string[] = [];
+    const orgNamed: string[] = [];
     let faded = 0;
     let fading = false;
+    /* WHO IS HERE, NAMED: the list `meet` writes and the one declaring `org:`, each read only by a caller who reads it, so
+       a person's organisation is a name she was allowed, never a row handle she cannot open. */
+    const meets = kernel.meetsList();
+    const orgs = ((list) => (list === null || readable(ctx, list.register) ? null : list))(orgsList());
+    const parts = (meets?.fields ?? {}) as Record<string, string | undefined>;
     for (const [id, decl] of kernel.registers()) {
       const f = decl.fields.find((field) => field.scope !== undefined && !field.retired);
       if (!f || readable(ctx, id)) continue;
       if (f.scope?.links === true) {
-        const met = home ? kernel.inScope(id, home.id, { limit: MET }) : null;
-        if (met?.ok) people = [...people, ...met.value.rows.map((row) => brief(decl, f.id, row, 'project'))].slice(0, MET);
+        /* MORE THAN ARE SHOWN, so the ones in touch latest can be chosen from them: the kernel orders by the row's last
+           change, and a person whose note was edited is not a person who was in touch. */
+        const linked = home ? kernel.inScope(id, home.id, { limit: LINKED }) : null;
+        if (!linked?.ok || !home) continue;
+        /* AN ORGANISATION LINKED TO THE PROJECT IS NOT A PERSON HERE, and is named under `organisations`. */
+        if (id === orgs?.register) {
+          orgLinked.push(...linked.value.rows.map((row) => row.id));
+          continue;
+        }
+        const own = id === meets?.register;
+        /* `role` IS A PART WHEN THE LIST NAMES ONE, and otherwise the list's own field of that name, which People has. */
+        const roleAt = own ? (parts.role ?? (decl.fields.some((field) => field.id === 'role' && !field.retired) ? 'role' : undefined)) : undefined;
+        const selfAt = own ? parts.self : undefined;
+        /* A FULL READ IS COUNTED AS IT CAME; ONE THAT STOPPED AT `LINKED` IS COUNTED BY THE STORE, as `inScope` matches. */
+        if (linked.value.rows.length < LINKED) everyone += linked.value.rows.filter((row) => selfAt === undefined || row.fields[selfAt] !== true).length;
+        else {
+          const at = `'$.${f.id}'`;
+          const here = f.type === 'list' ? `EXISTS (SELECT 1 FROM json_each(fields, ${at}) WHERE value = ?)` : `json_extract(fields, ${at}) = ?`;
+          const notSelf = selfAt === undefined ? '' : ` AND coalesce(json_extract(fields, '$.${selfAt}'), 0) != 1`;
+          everyone += sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${here}${notSelf}`, id, home.id)?.n ?? 0;
+        }
+        for (const row of linked.value.rows) {
+          const org = own && orgs && parts.org !== undefined ? text(row.fields[parts.org]) : null;
+          met.push({
+            ...brief(decl, f.id, row, 'project'),
+            name: text(row.fields[decl.title]) ?? kernel.nameOf(row.id),
+            role: roleAt === undefined ? null : text(row.fields[roleAt]),
+            org: org === null || orgs === null ? null : (orgBrief(orgs, org)?.name ?? null),
+            in_touch: own && parts.in_touch !== undefined ? text(row.fields[parts.in_touch]) : null,
+            self: selfAt !== undefined && row.fields[selfAt] === true,
+          });
+          if (org !== null) orgNamed.push(org);
+        }
         continue;
       }
       const fades = decl.fields.some((field) => field.id === FADES && field.type === 'day' && !field.retired);
@@ -4724,10 +5073,164 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       live: { same_repo: others.filter((r) => r.same_repo).map(liveBrief), elsewhere: others.filter((r) => !r.same_repo).map(liveBrief) },
       waiting: waitingFor(ctx).slice(0, ASKED).map(({ id, question }) => ({ id, question })),
       registers,
-      people,
+      /* IN TOUCH LATEST FIRST, and the kernel's newest-changed order among people with the same day or none. */
+      people: met
+        .map((person, i) => [person, i] as const)
+        .sort(([a, i], [b, j]) => (b.in_touch ?? '').localeCompare(a.in_touch ?? '') || i - j)
+        .map(([person]) => person)
+        .slice(0, MET),
+      ...(met.length > MET ? { people_total: everyone } : {}),
+      self: selfOf(ctx),
+      organisations: orgs === null ? [] : organisationsOf(orgs, orgLinked, orgNamed),
       faded,
       next,
     };
+  };
+
+  /**
+   * The record's own person's keys, for `context`: every row of the list `meet` writes that its `self` part marks, read
+   * only by a caller who reads that list and that row, each key normalised as the kernel keys it (`rowKeys`). `null` when
+   * the list has no `self` part or marks nobody she may read.
+   */
+  const selfOf = (ctx: CallContext): { keys: string[] } | null => {
+    const meets = kernel.meetsList();
+    const at = meets?.fields as Record<string, string | undefined> | undefined;
+    if (!meets || at?.self === undefined || readable(ctx, meets.register)) return null;
+    const got = kernel.list({ register: meets.register, where: { field: at.self, is: true } as Predicate, limit: 5 });
+    if (!got.ok) return null;
+    const rows = got.value.rows.filter((row) => rowAdmitted(ctx, meets.register, row.seq));
+    if (rows.length === 0) return null;
+    const read = (row: Entry, part: string): unknown => (at[part] === undefined ? undefined : row.fields[at[part]!]);
+    const many = (v: unknown): string[] | undefined => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : undefined);
+    const keys = rows.flatMap((row) =>
+      keysOf({ email: text(read(row, 'email')) ?? undefined, handles: many(read(row, 'handles')), keys: many(read(row, 'keys')) }),
+    );
+    return { keys: [...new Set(keys)] };
+  };
+
+  /**
+   * A key the row being written would carry that already belongs to another live row of its list, said as a refusal
+   * naming that row and sending the caller to `meet`, or `null`. ONLY ON THE LISTS PLAYING `meets:` OR `org:`, whose keys
+   * are how one person or organisation is known across every source (`loop/contract-17.md`): a second row under a key
+   * one row already holds is the duplicate the understanding layer exists to prevent, and `meet` is the call that adds
+   * to the row that has it. The kernel's key table keeps the first holder and lets a row written past this door simply
+   * not answer to the key (`entities.ts`), so this door is where the duplicate is stopped.
+   *
+   * THE KEYS ARE READ OFF THE ROLE'S PARTS AS THE KERNEL READS THEM (`rowKeys`): a person's `email`, `handles` and `keys`,
+   * an organisation's `keys` and `domain`, each normalised by `keysOf`, so `Ada@Example.com` is the key `ada@example.com`
+   * is. The holder is `entity_key`'s, where a merged row's keys point at the row it was folded into, so an address of
+   * somebody already merged names the person it was merged into. `self` is the row an update writes, which keeps its own.
+   *
+   * A ROW THE CALLER MAY NOT READ IS NOT NAMED: she is told a row already holds the key, and still sent to `meet`.
+   *
+   * A PERSON IN THE APP IS TOLD IN HER OWN WORDS: the row by its name alone and the key as she would write it
+   * (`ada@example.com`, `ada on github`), with no handle and no `meet`, which is an agent's call and not a thing she can press.
+   */
+  const keyHeld = (ctx: CallContext, register: string, fields: unknown, self: string | null): Refusal | null => {
+    if (fields === null || typeof fields !== 'object' || Array.isArray(fields)) return null;
+    const said = fields as Record<string, unknown>;
+    const people = kernel.meetsList();
+    const orgs = orgsList();
+    const person = register === people?.register;
+    const parts = (person ? people.fields : register === orgs?.register ? orgs.fields : null) as Record<string, string | undefined> | null;
+    if (parts === null) return null;
+    const raw = (part: string): unknown => (parts[part] === undefined ? undefined : said[parts[part]!]);
+    const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+    const list = (v: unknown): string[] | undefined => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : undefined);
+    const keys: { key: string; at: string }[] = [];
+    const take = (part: string, found: string[]): void => {
+      for (const key of found) keys.push({ key, at: parts[part]! });
+    };
+    if (person) {
+      take('email', keysOf({ email: str(raw('email')) }));
+      take('handles', keysOf({ handles: list(raw('handles')) }));
+    } else take('domain', keysOf({ domain: str(raw('domain')) }));
+    take('keys', keysOf({ keys: list(raw('keys')) }));
+    if (keys.length === 0) return null;
+
+    for (const { key, at } of keys) {
+      const owned = sql.one<{ row_id: string }>('SELECT row_id FROM entity_key WHERE key = ? AND register = ?', key, register);
+      if (!owned) continue;
+      /* FOLLOWED TO THE ROW IT WAS FOLDED INTO, a few steps at most, so a loop written by hand ends. */
+      let holder = kernel.get(owned.row_id, { includeDeleted: true });
+      for (let hop = 0; hop < 4 && holder && parts.merged_into !== undefined && typeof holder.fields[parts.merged_into] === 'string'; hop += 1)
+        holder = kernel.get(String(holder.fields[parts.merged_into]), { includeDeleted: true });
+      if (!holder || holder.deleted_at !== null || holder.register !== register || holder.id === self) continue;
+      const title = kernel.register(register)?.title;
+      const name = title === undefined ? null : text(holder.fields[title]);
+      const shown = readable(ctx, register) === null;
+      if (ctx.principal.kind === 'person') {
+        const kind = key.slice(0, key.indexOf(':'));
+        const said = key.slice(key.indexOf(':') + 1);
+        const plain = kind === 'email' || kind === 'domain' ? said : `${said} on ${kind}`;
+        const holds = shown && name !== null ? name : person ? 'Someone on this list' : 'An organisation on this list';
+        return { code: 'ALREADY_KNOWN', fix: `${holds} already has ${plain}. Add what you know to ${person ? 'them' : 'it'} rather than adding ${person ? 'them' : 'it'} twice.`, at };
+      }
+      const who = !shown ? (person ? 'someone on this list' : 'an organisation on this list') : name === null ? kernel.nameOf(holder.id) : `${name} (${kernel.nameOf(holder.id)})`;
+      return {
+        code: 'ALREADY_KNOWN',
+        fix: `${key} already belongs to ${who}. Call meet with it to add what you know to ${!shown ? 'them' : (name ?? kernel.nameOf(holder.id))}, rather than adding them twice.`,
+        at,
+      };
+    }
+    return null;
+  };
+
+  /**
+   * The kernel's answer to `meet` as the contract says it (`loop/contract-17.md`), with the row by its handle and its
+   * name, and the question by the handle this caller is handed, never a row's own id.
+   *
+   * AND THE ANSWER THE KERNEL GAVE BEFORE THE CONTRACT, `{ person, created, linked, merge }`, read into the same shape:
+   * `person` is the row's handle and `merge` the question it opened, so a reader of `meet` meets one answer whichever
+   * kernel is underneath.
+   */
+  const meeting = (ctx: CallContext, out: Result<unknown>): Result<Meeting> => {
+    if (!out.ok) return out as Result<never>;
+    const said = (out.value ?? {}) as Record<string, unknown>;
+    const row = said.row !== null && typeof said.row === 'object' ? (said.row as { id?: unknown; name?: unknown }) : null;
+    const ref = typeof row?.id === 'string' ? row.id : typeof said.person === 'string' ? said.person : null;
+    const at = ref === null ? null : kernel.get(ref);
+    const title = at ? kernel.register(at.register)?.title : undefined;
+    const asked = typeof said.question === 'string' ? said.question : typeof said.merge === 'string' ? said.merge : null;
+    /* A QUESTION THE KERNEL NAMES BY ITS NUMBER goes out as `nameOf` hands it; anything else it said is its own words. */
+    const question = asked === null ? null : kernel.governanceRow('suggestion', asked) ? nameOf(ctx, 'suggestion', asked) : asked;
+    const by = said.matched_by;
+    return ok({
+      row: at
+        ? {
+            register: at.register,
+            id: kernel.nameOf(at.id),
+            seq: at.seq,
+            name: (title === undefined ? null : text(at.fields[title])) ?? (typeof row?.name === 'string' ? row.name : kernel.nameOf(at.id)),
+          }
+        : null,
+      created: said.created === true,
+      matched_by: by === 'key' || by === 'strong' || by === 'none' ? by : at !== null && said.created !== true ? 'key' : 'none',
+      ...(typeof said.confidence === 'number' ? { confidence: said.confidence } : {}),
+      ...(question === null ? {} : { question }),
+      ...(said.mention === true ? { mention: true } : {}),
+      ...(typeof said.undo === 'string' ? { undo: said.undo } : {}),
+    });
+  };
+
+  /**
+   * The project's organisations, each once: the ones linked to it first, then the ones its people are with, most people
+   * first and the first met first among equals, and at most `ORGS`. A row folded into another counts as the survivor.
+   */
+  const organisationsOf = (orgs: { register: string; fields: Record<string, string> }, linked: readonly string[], named: readonly string[]): OrgBrief[] => {
+    const seen = new Map<string, { org: OrgBrief; own: boolean; n: number; first: number }>();
+    for (const [i, id] of [...linked, ...named].entries()) {
+      const org = orgBrief(orgs, id);
+      if (org === null) continue;
+      const own = i < linked.length;
+      const had = seen.get(org.spoken);
+      if (!had) seen.set(org.spoken, { org, own, n: own ? 0 : 1, first: i });
+      else if (!own) had.n += 1;
+    }
+    return [...seen.values()]
+      .sort((a, b) => Number(b.own) - Number(a.own) || b.n - a.n || a.first - b.first)
+      .slice(0, ORGS)
+      .map((o) => o.org);
   };
 
   /** An argument that is a line of text, `undefined` when it was not sent, or the refusal saying why not. */
@@ -4920,10 +5423,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               `No register you can read numbers its rows ${/^[A-Z]+/.exec(said)?.[0] ?? said}. A suggestion (SG) or a decision (D) is read with governance.`,
               { at: 'spoken' },
             );
-          const owned = kernel.get(said);
+          const owned = kernel.get(said) ?? folded(said);
           return ok(owned && rowAdmitted(ctx, owner.id, owned.seq) ? owned : null);
         }
-        const row = kernel.get(said);
+        const row = kernel.get(said) ?? folded(said);
         return ok(row && !readable(ctx, row.register) && rowAdmitted(ctx, row.register, row.seq) ? row : null);
       }
       const missing = named(args, true);
@@ -5033,6 +5536,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          dropping it quietly would be a write that did less than it was asked. `delete` is how a row goes. */
       if (args.fields && typeof args.fields === 'object' && Object.hasOwn(args.fields, 'deleted_at'))
         return no('FIELD_UNKNOWN', 'deleted_at is kept by the record, and a new row cannot arrive deleted. Create it, then delete it.', { at: 'deleted_at' });
+      /* ONE ROW PER KEY ON PEOPLE AND ORGANISATIONS: a key another row holds is that row, met again (`keyHeld`). */
+      const known = keyHeld(ctx, args.register, args.fields, null);
+      if (known) return { ok: false, refusal: known };
       return tail(
         offRegister(
           args.register,
@@ -5128,6 +5634,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'write', args.register);
       if (stop) return { ok: false, refusal: stop };
+      const known = keyHeld(ctx, args.register, args.patch, kernel.get(`${args.register}#${args.seq}`)?.id ?? null);
+      if (known) return { ok: false, refusal: known };
       return tail(
         offRegister(
           args.register,
@@ -5451,8 +5959,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * kernel, which narrows every block over a list with the field and answers what each filter could take. A filter
      * whose values were counted from a list this reader may not read (its `reads`) is held back as a held block is, with
      * no values and nothing chosen, and its choice narrows nothing.
+     *
+     * `walk` IS A LENGTH THE READER PICKED on a forecast's horizon knob, whole days or `last`, handed to the kernel, which
+     * walks it in full only where a block offers it (`walkReach` in `packages/kernel/src/pages.ts`). Unasked, a walk
+     * reaches past what it opens on to `WALK_UNASKED` at most, so the longest lengths are a press away, not every load.
      */
-    async page(args: { slug: string; filter?: unknown }, ctx: CallContext) {
+    async page(args: { slug: string; filter?: unknown; walk?: unknown }, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       /* THE OTHER HALF OF "never read, never rendered" (24 §4.2). One row per page per day, and the
@@ -5465,6 +5977,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('REQUIRED_MISSING', 'A page is asked for by its slug.', { at: 'slug' });
       const filter = filterOf(args.filter);
       if (filter === false) return no('VALUE_MALFORMED', 'filter is a value by field the page filters on, such as {"project":"12"}.', { at: 'filter' });
+      /* A QUERY STRING SAYS A LENGTH AS TEXT, so `"365"` is 365 days. Anything else is refused here rather than walked. */
+      const walk: number | 'last' | undefined =
+        args?.walk === undefined || args.walk === null
+          ? undefined
+          : args.walk === 'last'
+            ? 'last'
+            : typeof args.walk === 'number' || (typeof args.walk === 'string' && /^\d+$/u.test(args.walk))
+              ? Number(args.walk)
+              : Number.NaN;
+      if (typeof walk === 'number' && (!Number.isInteger(walk) || walk < 1))
+        return no('VALUE_MALFORMED', 'walk is how far ahead to walk cash, in whole days such as 365, or last.', { at: 'walk' });
+      const reach = walk === undefined ? {} : { walk };
       /* A PAGE THIS CALLER CANNOT SEE IS A PAGE THAT DOES NOT EXIST, AND `allowed` IS WHAT THEY MAY OPEN.
          Measured: `pages` hid a page and `page` served it by its slug, so a member invited to Obligations read a diary
          entry's full text as the title and body of the page made for its row, and an ordinary page's title, prose, a
@@ -5489,7 +6013,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           refusal: { ...said, fix: said.fix.split(NOWHERE).join(args.slug), ...(said.allowed ? { allowed: said.allowed.filter((slug) => shown.has(slug)) } : {}) },
         };
       }
-      let out = kernel.page(args.slug, filter);
+      let out = kernel.page(args.slug, filter, reach);
       /* A FILTER IS HELD BY THE LISTS IT WAS COUNTED FROM, as a block is by the list it reads. The kernel counts every
          list the page's blocks read and names each link by its row's title, so a member invited to Tasks alone was handed
          the titles of projects she may not read, and how many tasks each holds. Her choice on it is dropped and the page
@@ -5498,7 +6022,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (out.ok && filter && (out.value.filters as PageFilter[] | undefined)?.some((f) => unseen(f) && Object.hasOwn(filter, f.field))) {
         const kept = { ...filter };
         for (const f of out.value.filters as PageFilter[]) if (unseen(f)) delete kept[f.field];
-        out = kernel.page(args.slug, kept);
+        out = kernel.page(args.slug, kept, reach);
       }
       /* AND THE OBSERVATION IS AFTER THE ANSWER, not before it. It ran first, on the caller's raw
          slug, so `GET /api/page?slug=<anything>` inserted a row keyed by whatever a reader typed and
@@ -5510,14 +6034,34 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!out.ok) return out;
       /* THE VERSION A WRITE OVER THIS PAGE CARRIES (`setDeclaration`). A page declared `for:` rows has none of its own slug. */
       const declared = pageDeclaredAt(args.slug);
-      const blocks = out.value.blocks.map((b) => heldBlock(ctx, b));
+      const blocks = partedKeys(
+        out.value.blocks,
+        out.value.blocks.map((b) => heldBlock(ctx, b)),
+      );
       /* THE MODEL'S LINE ON THE LEAD NOTE, AS `said`, while its figures hold (`slashHeadlines`). */
-      const line = headlineFor(args.slug, blocks, ctx);
+      const { line, next } = headlineFor(args.slug, blocks, ctx);
       const filters = out.value.filters as PageFilter[] | undefined;
+      /* A BLOCK HELD FROM HER IS KEYED AGAIN WITHOUT ITS SOURCE (`shellOf`), and the look names it by the new key too. */
+      const rekeyed = new Map<string, string>();
+      out.value.blocks.forEach((b, i) => {
+        const now = (blocks[i] as { key?: unknown } | undefined)?.key;
+        if (typeof b.key === 'string' && typeof now === 'string' && now !== b.key) rekeyed.set(b.key, now);
+      });
+      const shownLook = lookShown(out.value.look as Record<string, unknown> | undefined, blocks, next, rekeyed);
+      /* WHO KEPT SLASH'S ARRANGEMENT, BY NAME, so the history line "Slash arranged · Sam kept" survives a reload and the
+         Undo is not offered again (`keepLook`). A reader who may not know who is here reads Someone, as everywhere. */
+      const look =
+        shownLook?.by === 'slash'
+          ? {
+              ...shownLook,
+              kept: ((who) => (who === null ? null : (namesFor(ctx)?.[who] ?? 'Someone')))(keptBy(kernel, typeof shownLook.look === 'string' ? shownLook.look : args.slug)),
+            }
+          : shownLook;
       return ok({
         ...out.value,
         ...(declared ? { declared_version: declared.version } : {}),
         ...(filters ? { filters: filters.map((f) => (unseen(f) ? { ...f, chosen: null, values: [], reads: [] } : f)) } : {}),
+        ...(look === undefined ? {} : { look }),
         blocks: line === null ? blocks : blocks.map((b, i) => (i === line.at ? { ...b, said: line.text } : b)),
       });
     },
@@ -5683,13 +6227,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return null;
       });
 
-      /* A KNOB'S LONGER LENGTHS ARE OFFERED IN A PREVIEW ONLY AS FAR AS A PREVIEW WALKS. The kernel walked to the longest
-         of `horizons:` (`walkReach` in `packages/kernel/src/pages.ts`), so a body opening on 30 days and offering 3,650,
-         or `last`, walked that far under a guard that read 30 (`loop/research-audit-11-13.md` item 1). Refusing such a
-         block refused Money's own Cash ahead, which offers two years, in every "As it will look". So the lengths past
-         `PREVIEW_HORIZON_MOST`, and `last`, are left off the drawn block, and the walk reaches no further whatever the
-         kernel does with the rest; the renderer offers a length only as far as the walk reaches, so nothing on screen
-         changes. Installed, the page offers them all. A list the kernel refuses (more than eight lengths, or one that is
+      /* A KNOB'S LONGER LENGTHS ARE OFFERED IN A PREVIEW ONLY AS FAR AS A PREVIEW WALKS. The kernel once walked to the
+         longest of `horizons:`, so a body opening on 30 days and offering 3,650, or `last`, walked that far under a guard
+         that read 30 (`loop/research-audit-11-13.md` item 1). It now walks unasked to `WALK_UNASKED` at most, two years and
+         a day (`walkReach` in `packages/kernel/src/pages.ts`), and further only for a length a reader picks, which a
+         preview never passes. That is still past `PREVIEW_HORIZON_MOST`, and refusing such a block refused Money's own
+         Cash ahead, which offers two years, in every "As it will look". So the lengths past `PREVIEW_HORIZON_MOST`, and
+         `last`, are left off the drawn block, and the walk reaches no further; the renderer offers a length only as far as
+         the walk reaches, so nothing on screen changes. Installed, the page offers them all. A list the kernel refuses (more than eight lengths, or one that is
          not whole days or `last`, `horizonsOk`) is left as written, so the preview refuses it as the page would. */
       const previewed = (block: unknown): unknown => {
         const w = block as { source?: unknown; horizons?: unknown };
@@ -5726,7 +6271,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* TODAY'S BODY IS HOME (`todayHome` in the app, drawn here and never installed), so its lead note carries Home's
          line as `said`, as `page` carries a page's: written today from the reading Today holds now (`homeLineFor`). */
       const homeLine = decl.page === 'today' && leadBlockOf(drawnBlocks)?.at === 0 ? homeLineFor(ctx) : null;
-      const blocks = homeLine === null ? drawnBlocks : drawnBlocks.map((d, i) => (i === 0 ? { ...d, said: homeLine } : d));
+      /* EACH BLOCK KEYED BY ITS PLACE, OR BY THE KEY ITS AUTHOR WROTE. The key the kernel makes is a hash of the source a
+         block reads, and in a body she wrote, a source over a list she may not read and one over a list nobody declared
+         came back as two keys where every other word of the two answers was the same (`test/preview-page-guard.test.ts`).
+         A preview is drawn once and never recomposed, so its place is key enough, and two alike are parted (`partedKeys`). */
+      const keyed = partedKeys(
+        drawnBlocks.map(() => ({})),
+        drawnBlocks.map((d, i) => {
+          const own = (written[i] as { key?: unknown } | null)?.key;
+          return { ...d, key: typeof own === 'string' && /^[a-z][a-z0-9_-]{0,47}$/u.test(own) ? own : `p${i + 1}` };
+        }),
+      );
+      const blocks = homeLine === null ? keyed : keyed.map((d, i) => (i === 0 ? { ...d, said: homeLine } : d));
 
       /* AND WHAT THE DRAWN BLOCKS ANSWER, TOGETHER. Each table is inside `page`'s limit of 500 rows, and 24 of them are
          12,000 rows; a row may be as long as its list lets it be. Rows and a walk's steps are counted, then bytes. */
@@ -6434,8 +6990,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* ── PEOPLE ─────────────────────────────── */
 
     /**
-     * Someone met in the work: matched by email or handle, or added, with where they were met, and linked to
-     * the project of the caller's run. Needs `propose` on the list it writes.
+     * Someone met in the work, a person or an organisation: matched by a key (an email, a handle, a domain), or added,
+     * with where they were met, and a person linked to the project of the caller's run. A name with no key is kept as a
+     * mention and makes no row. Needs `propose` on the list the kind writes, and on the organisations too when a person
+     * is met with the organisation they are with.
      *
      * THE KERNEL WRITES AS THE CALLER'S RUN, found by the ladder as every token write is, so the person is
      * signed by the run and placed in its project. A person in the app is never a run, and links none.
@@ -6443,19 +7001,68 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * PEOPLE IS A MODULE THE OWNER MAY SWITCH OFF. Without the register this is `REGISTER_UNKNOWN`, and the
      * kernel writes nothing, a run included.
      */
-    async meet(args: MeetArgs, ctx: CallContext): Promise<Result<Met>> {
-      /* THE LIST THE KERNEL WILL WRITE, by the kernel's own rule (`kernel.meetsList()`). Guarded on `people` alone, a
-         token held to `people` met somebody into `contacts`, which declared `meets:`, and one held to `contacts` was
-         refused at a list the record did not have (`meet-role.test.ts`).
+    async meet(args: MeetSaid, ctx: CallContext): Promise<Result<Meeting>> {
+      const said = (args ?? {}) as Record<string, unknown>;
+      const kind = said.kind ?? 'person';
+      if (kind !== 'person' && kind !== 'organisation')
+        return no('ENUM_VALUE_UNKNOWN', `kind is person or organisation, and ${JSON.stringify(kind)} is neither.`, { at: 'kind', allowed: [...MEET_KINDS] });
+      /* THE LIST THE KERNEL WILL WRITE, by the kernel's own rule: `kernel.meetsList()` for a person, `orgsList` for an
+         organisation. Guarded on `people` alone, a token held to `people` met somebody into `contacts`, which
+         declared `meets:`, and one held to `contacts` was refused at a list the record did not have (`meet-role.test.ts`).
          WHEN NO LIST PLAYS THE PART, `propose` ON THE RECORD, and the kernel's `REGISTER_UNKNOWN` answers, writing
          nothing. The fallback to `people` told a token held to `contacts`, with the `meets:` pack switched off, that it
          "does not reach people", a list the record did not have, so it was sent to ask for a grant that would not help. */
-      const stop = guard(ctx, 'propose', kernel.meetsList()?.register);
+      const people = kernel.meetsList();
+      const orgs = orgsList();
+      const stop = guard(ctx, 'propose', kind === 'organisation' ? orgs?.register : people?.register);
       if (stop) return { ok: false, refusal: stop };
-      const said = (args ?? {}) as Record<string, unknown>;
       const wrong = stray(said, MEET);
       if (wrong) return { ok: false, refusal: wrong };
-      return tail(kernel.meet(said as MeetArgs, writerOf(ctx)));
+      for (const key of ['name', 'email', 'handle', 'org', 'domain', 'role', 'where', 'source'] as const)
+        if (said[key] !== undefined && said[key] !== null && typeof said[key] !== 'string')
+          return no('VALUE_MALFORMED', `${key} takes a line of text.`, { at: key });
+      if (said.keys !== undefined && said.keys !== null) {
+        const keys = said.keys;
+        if (!Array.isArray(keys) || keys.length > MEET_KEYS_MOST || keys.some((k) => typeof k !== 'string' || !/^[a-z][a-z0-9.-]*:\S/iu.test(k.trim())))
+          return no('VALUE_MALFORMED', `keys is a list of at most ${MEET_KEYS_MOST}, each kind:value, as github:ada or domain:encore.example.`, { at: 'keys' });
+      }
+      /* EACH KIND IS MET BY ITS OWN ROLE'S PARTS. An organisation is with no organisation, its `role` is what kind it is
+         (`vendor`, `merchant`, the kernel's word), and an address or a handle is one of its keys, so each goes only where
+         the organisations keep that part: a call that mixes the two kinds would fold a person into a company. */
+      if (kind === 'organisation') {
+        if (orgs === null) return no('REGISTER_UNKNOWN', 'No list declares org:, so no organisation can be met. Nothing was written.', { at: 'kind' });
+        const given = (key: string): boolean => said[key] !== undefined && said[key] !== null;
+        const takes = [
+          'name',
+          ...(orgs.fields.keys === undefined ? [] : ['keys', 'email', 'handle']),
+          ...(orgs.fields.domain === undefined && orgs.fields.keys === undefined ? [] : ['domain']),
+          ...(orgs.fields.kind === undefined ? [] : ['role']),
+          'where',
+          'source',
+        ];
+        const theirs = ['org', 'email', 'handle', 'keys', 'domain', 'role'].find((key) => given(key) && !takes.includes(key));
+        if (theirs)
+          return no(
+            'FIELD_UNKNOWN',
+            theirs === 'org'
+              ? 'org is the organisation a person is with. Meet the person on their own with org naming this one.'
+              : `${orgs.register} keeps no ${theirs === 'role' ? 'kind' : theirs === 'domain' ? 'domain' : 'keys'} for an organisation, so there is nowhere to put ${theirs}. Meet it without.`,
+            { at: theirs, allowed: takes },
+          );
+      } else if (people !== null) {
+        const parts = people.fields as Record<string, string | undefined>;
+        /* THE ORGANISATION A PERSON IS WITH IS A ROW TOO, found or added by the kernel, so the caller reaches that list as well. */
+        if ((said.org !== undefined && said.org !== null) || (said.domain !== undefined && said.domain !== null)) {
+          const at = said.org !== undefined && said.org !== null ? 'org' : 'domain';
+          if (orgs === null || parts.org === undefined)
+            return no('FIELD_UNKNOWN', `${people.register}'s meets: names no org, so there is nowhere to say who they are with. Meet them without ${at}.`, { at });
+          const held = guard(ctx, 'propose', orgs.register);
+          if (held) return { ok: false, refusal: held };
+        }
+        if (said.role !== undefined && said.role !== null && parts.role === undefined && !kernel.register(people.register)?.fields.some((f) => f.id === 'role' && !f.retired))
+          return no('FIELD_UNKNOWN', `${people.register} keeps no role. Meet them without one.`, { at: 'role' });
+      }
+      return tail(meeting(ctx, kernel.meet(said as never, writerOf(ctx)) as Result<unknown>));
     },
 
     /* ── THE DECISION GATE ─────────────────────────── */
@@ -6476,7 +7083,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          event goes on as it came and is answered as a number naming no row (`question-handles.ts`). */
       const id = args?.id ? spokenIn(String(args.id)) : undefined;
       const cursor = typeof args?.cursor === 'string' ? spokenIn(args.cursor) : args?.cursor;
-      const out = <T>(row: T): T | null => handed(ctx, register, asked(register, row));
+      const out = <T>(row: T): T | null => handed(ctx, register, asked(ctx, register, row));
       if (id !== undefined) {
         /* AND ONE BY ID ANSWERS TO THE SAME CEILING. The list path was filtered and this was not,
            and the ids are sequential — `SG1`, `SG2` — so one extra query parameter walked the whole
@@ -7120,6 +7727,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       const expect = args.version === undefined ? undefined : { id: decl.id, version: args.version };
       return tail(await kernel.install([{ id: decl.id, kind: decl.kind, body: decl.body as never }], expect, { actor: actorOf(ctx) }));
+    },
+
+    /**
+     * Put back how a page was arranged before Slash arranged it: the 6-second Undo the app offers when Slash's look lands
+     * while the person is looking (DIRECTION §37). The look it replaced comes back, or the page goes back to the rules when
+     * there was none, and only while Slash's look is still the one it wrote (`undoLook` in `compose-look.ts`).
+     */
+    async undoLook(args: { page: string } | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'put back how Slash arranged a page');
+      if (stop) return { ok: false as const, refusal: stop };
+      if (typeof args?.page !== 'string' || args.page === '') return no('REQUIRED_MISSING', 'page is the page to put back.', { at: 'page' });
+      const title = kernel.pages().find((p) => p.slug === args.page)?.title ?? args.page;
+      return tail(await undoLookOf(kernel, args.page, title, actorOf(ctx)));
+    },
+
+    /**
+     * Keep how Slash arranged a page, once its Undo has passed: who kept it is written beside the version they saw, and the
+     * page read answers their name as `look.kept`, so "Slash arranged · Sam kept" holds after a reload. Nothing about the
+     * look itself changes.
+     */
+    async keepLook(args: { page: string } | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'keep how Slash arranged a page');
+      if (stop) return { ok: false as const, refusal: stop };
+      if (typeof args?.page !== 'string' || args.page === '') return no('REQUIRED_MISSING', 'page is the page whose arrangement to keep.', { at: 'page' });
+      const title = kernel.pages().find((p) => p.slug === args.page)?.title ?? args.page;
+      return tail(keepLookOf(kernel, args.page, title, actorOf(ctx)));
     },
 
     /** Retire one. Its rows stay; a declaration is a shape, not the things under it. */

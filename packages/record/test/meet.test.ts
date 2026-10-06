@@ -10,9 +10,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { Entry, Met } from '@braindog/kernel';
+import type { Entry } from '@braindog/kernel';
 
-import { createRecordApi, type CallContext } from '../src/index.ts';
+import { createRecordApi, type CallContext, type Meeting } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 15, 12);
@@ -93,8 +93,8 @@ const counts = (sql: NodeSql) => ({
 
 test('SOMEBODY NEW IS ADDED, signed by the run that met them and linked to its project', async () => {
   const { api, sql, project } = await record();
-  const met = value<Met>(await api.meet({ name: 'Ada Lovelace', email: 'Ada@Example.com', where: 'commit 4464966 in braindog' }, agent()));
-  assert.deepEqual(met, { person: 'people#1', created: true, linked: true, merge: null });
+  const met = value<Meeting>(await api.meet({ name: 'Ada Lovelace', email: 'Ada@Example.com', where: 'commit 4464966 in braindog' }, agent()));
+  assert.deepEqual(met, { row: { register: 'people', id: 'people#1', seq: 1, name: 'Ada Lovelace' }, created: true, matched_by: 'none' });
 
   const ada = person(sql);
   assert.deepEqual(
@@ -109,10 +109,10 @@ test('SOMEBODY NEW IS ADDED, signed by the run that met them and linked to its p
 test('SOMEBODY ALREADY THERE IS MATCHED, and gains the line and the handle and nothing else', async () => {
   const { api, sql } = await record();
   value(await api.meet({ name: 'Ada Lovelace', email: 'ada@example.com', where: 'commit 4464966 in braindog' }, agent()));
-  const again = value<Met>(
+  const again = value<Meeting>(
     await api.meet({ name: 'A. Lovelace', email: 'ADA@example.com', handle: 'github:ada', where: 'commit 5a7b1c2 in braindog' }, agent()),
   );
-  assert.deepEqual(again, { person: 'people#1', created: false, linked: false, merge: null });
+  assert.deepEqual([again.row, again.created, again.matched_by], [{ register: 'people', id: 'people#1', seq: 1, name: 'Ada Lovelace' }, false, 'key']);
 
   const ada = person(sql);
   assert.equal(ada.fields.name, 'Ada Lovelace', 'what a commit said overwrote the name already held');
@@ -138,6 +138,10 @@ test('IT TAKES WHAT MEET TAKES AND NEEDS PROPOSE ON PEOPLE, and a person in the 
   assert.equal(refusal(await api.meet(said, agent({ registers: ['things'] }))), 'FORBIDDEN');
   assert.equal(sql.all("SELECT 1 FROM entry WHERE register IN ('people', 'session')").length, 0);
 
-  assert.deepEqual(value<Met>(await api.meet({ ...said, name: 'Ada Lovelace' }, owner)), { person: 'people#1', created: true, linked: false, merge: null });
+  assert.deepEqual(value<Meeting>(await api.meet({ ...said, name: 'Ada Lovelace' }, owner)), {
+    row: { register: 'people', id: 'people#1', seq: 1, name: 'Ada Lovelace' },
+    created: true,
+    matched_by: 'none',
+  });
   sql.close();
 });

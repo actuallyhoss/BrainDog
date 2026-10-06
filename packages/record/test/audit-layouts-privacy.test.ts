@@ -257,10 +257,11 @@ test('Q1 A QUEUE IS HELD FROM A MEMBER WHO DOES NOT READ EVERY LIST, as governan
   const wren: CallContext = { principal: { kind: 'person', id: 'p_9', level: held.level }, registers: held.registers ?? '*', levels: held.levels };
   const asked = value<{ question: string }[]>(await api.governance({} as never, wren));
   assert.equal(JSON.stringify(asked).includes('Add the diary line?'), false, 'the premise: governance holds the rowset back');
-  const queue = value<{ blocks: Block[] }>(await api.page({ slug: 'calls' }, wren)).blocks[1]!;
+  /* BY ITS KIND, since the page answers its blocks in its look's order (`applyLook`), not the order they are declared. */
+  const queue = value<{ blocks: Block[] }>(await api.page({ slug: 'calls' }, wren)).blocks.find((b) => b.kind === 'queue')!;
   assert.equal(JSON.stringify(queue).includes('Add the diary line?'), false, JSON.stringify(queue).slice(0, 400));
   assert.equal(queue.refusals[0]?.code, 'FORBIDDEN');
   /* THE OWNER'S QUEUE STILL HOLDS IT. */
-  const own = value<{ blocks: Block[] }>(await api.page({ slug: 'calls' }, owner)).blocks[1]!;
+  const own = value<{ blocks: Block[] }>(await api.page({ slug: 'calls' }, owner)).blocks.find((b) => b.kind === 'queue')!;
   assert.equal(JSON.stringify(own).includes('Add the diary line?'), true);
 });

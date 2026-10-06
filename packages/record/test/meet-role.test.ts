@@ -20,9 +20,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { Entry, Met } from '@braindog/kernel';
+import type { Entry } from '@braindog/kernel';
 
-import { createRecordApi, type CallContext } from '../src/index.ts';
+import { createRecordApi, type CallContext, type Meeting } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 15, 12);
@@ -85,8 +85,8 @@ async function record() {
 
 test('THE OWNER MEETS SOMEBODY INTO contacts, the list that declares meets:, under its own field names', async () => {
   const { api, sql } = await record();
-  const met = value<Met>(await api.meet({ name: 'Ada Lovelace', email: 'Ada@Example.com', handle: 'github:ada', where: 'a call about the site' }, owner));
-  assert.deepEqual(met, { person: 'contacts#1', created: true, linked: false, merge: null });
+  const met = value<Meeting>(await api.meet({ name: 'Ada Lovelace', email: 'Ada@Example.com', handle: 'github:ada', where: 'a call about the site' }, owner));
+  assert.deepEqual(met, { row: { register: 'contacts', id: 'contacts#1', seq: 1, name: 'Ada Lovelace' }, created: true, matched_by: 'none' });
 
   const rows = sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'contacts'");
   assert.deepEqual(
@@ -99,8 +99,8 @@ test('THE OWNER MEETS SOMEBODY INTO contacts, the list that declares meets:, und
 
 test('A RUN IN A PROJECT IS RECORDED AND LINKED TO NOTHING, because the list has no projects part', async () => {
   const { api, sql } = await record();
-  const met = value<Met>(await api.meet({ name: 'Grace Hopper', email: 'grace@example.com', where: 'commit 1da177e in braindog' }, agent()));
-  assert.deepEqual(met, { person: 'contacts#1', created: true, linked: false, merge: null });
+  const met = value<Meeting>(await api.meet({ name: 'Grace Hopper', email: 'grace@example.com', where: 'commit 1da177e in braindog' }, agent()));
+  assert.deepEqual(met, { row: { register: 'contacts', id: 'contacts#1', seq: 1, name: 'Grace Hopper' }, created: true, matched_by: 'none' });
   sql.close();
 });
 
@@ -111,8 +111,8 @@ test('A RUN IN A PROJECT IS RECORDED AND LINKED TO NOTHING, because the list has
  */
 test('A TOKEN THAT MAY PROPOSE ON contacts ALONE MEETS INTO contacts, the list declaring meets:', async () => {
   const { api, sql } = await record();
-  const met = value<Met>(await api.meet({ name: 'Ada', where: 'commit 4464966 in braindog' }, agent(['contacts'])));
-  assert.equal(met.person, 'contacts#1');
+  const met = value<Meeting>(await api.meet({ name: 'Ada', email: 'ada@example.com', where: 'commit 4464966 in braindog' }, agent(['contacts'])));
+  assert.equal(met.row?.id, 'contacts#1');
   sql.close();
 });
 
