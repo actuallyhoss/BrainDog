@@ -27,6 +27,7 @@ import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { FIRST_PARTY_LISTS } from './usecase.ts';
+import { cardsFault } from './cards.ts';
 import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, rowRegisterOf, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
@@ -43,6 +44,7 @@ export type { Egress };
 /* A use case: a pack with a front, its modules, signals and voice. */
 export { SHARED_MOST_BYTES, SHARED_SUFFIX, exampleFields, exportUseCase, kindUnknownSentence, laterVersion, nextVersion, readShared, sharedFileName, unfilled, type ExportParts, type Shared, type VersionStep } from './shared.ts';
 export { looksLikeCredential } from './credentials.ts';
+export { CARDS_FOLD, CARDS_FOLD_MOST, cardsFault } from './cards.ts';
 export { AUDIENCES, FIRST_PARTY_LISTS, LABEL_KEY, MODULES, MODULE_LISTS, MODULE_WORDS, SHARED_VERSION, SPEAKS, VOICE_KEYS, VOICE_TAB_CHARS, VOICE_TAB_KEYS, labelKeyOf, labelSetting, labelsOf, speakingPack, voiceWhenAdding, voiceWrites, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, type Audience, type ExampleLink, type ModuleId, type SpeakingState, type UseCase, type VoiceKey } from './usecase.ts';
 
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
@@ -887,6 +889,11 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   }
 
   const registers = new Map(declarations.filter((d) => d.kind === 'register').map((d) => [d.body.id as string, d.body]));
+  /* A CARDS BLOCK'S `group` IS A REF ON THE LIST IT READS, asked here of the lists this pack declares (`cards.ts`). */
+  for (const d of declarations) {
+    const grouped = d.kind === 'page' ? cardsFault(d.id, d.body, registers) : null;
+    if (grouped) return grouped as Result<Pack>;
+  }
   const seeds: Seed[] = [];
   /* A FEW EXAMPLES PER LIST, NOT ONE. A guide opens on the six stages a project passes and a board on more than one
      ticket, so one row per list made a use case open half told. The ceiling keeps an example set an example. */

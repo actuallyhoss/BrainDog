@@ -1206,6 +1206,12 @@ export function createClient(options: ClientOptions) {
     examples: () => call<{ untouched: number; touched: number; registers: Record<string, number>; others: number }>('examples'),
     /** Delete every untouched example row. A row somebody edited, or one a row of theirs points at, stays. */
     clearExamples: () => call<{ cleared: number; kept: number }>('clearExamples'),
+    /* SLASH'S LOOK OVER A PAGE, ANSWERED BY THE PERSON WHO SAW IT LAND: ADMIN, so a browser session. `page` is the
+       page's slug, as the rail links it. */
+    /** Put a page back the way it was before Slash arranged it: `previous` when an arrangement came back, `rules` when there was none. */
+    undoLook: (args: { page: string }) => call<Answer<'undoLook'>>('undoLook', args as Record<string, unknown>),
+    /** Keep how Slash arranged a page once its Undo has passed, so the page says who kept it. */
+    keepLook: (args: { page: string }) => call<Answer<'keepLook'>>('keepLook', args as Record<string, unknown>),
     /** Delete this record. `slug` is its name, typed to confirm. */
     deleteRecord: (args: { slug: string }) => call<{ slug: string; deleted: true }>('deleteRecord', args as Record<string, unknown>),
 

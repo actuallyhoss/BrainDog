@@ -15,8 +15,8 @@ const hook: RawArrival = { id: 'r2', ts: '2026-08-29T10:00:00Z', channel: 'webho
 
 /* ── the subject ─────────────────────────────────────────────────────────── */
 
-test('the subject is 34 §1.9’s seven fields and nothing else', () => {
-  assert.deepEqual(Object.keys(subjectOf(email)).sort(), ['body', 'channel', 'from', 'state', 'subject', 'to', 'ts']);
+test('the subject is 34 §1.9’s seven fields and the sender read out of from, and nothing else', () => {
+  assert.deepEqual(Object.keys(subjectOf(email)).sort(), ['body', 'channel', 'from', 'from_address', 'from_domain', 'state', 'subject', 'to', 'ts']);
 });
 
 test('state is untriaged, because this runs before the arrival is triaged', () => {
@@ -27,6 +27,39 @@ test('a header that is not there is absent, not empty', () => {
   const s = subjectOf(hook);
   assert.equal(Object.hasOwn(s, 'subject'), false);
   assert.equal(Object.hasOwn(s, 'from'), false);
+});
+
+test('the sender is read out of from, beside it and never instead of it', () => {
+  const s = subjectOf({ ...email, headers: { from: '"Sara Ali" <Sara@Bank.Example>' } });
+  assert.equal(s.from, '"Sara Ali" <Sara@Bank.Example>');
+  assert.equal(s.from_name, 'Sara Ali');
+  assert.equal(s.from_address, 'sara@bank.example');
+  assert.equal(s.from_domain, 'bank.example');
+  assert.equal(matches({ match: { field: 'from_domain', is: 'bank.example' } }, { ...email, headers: { from: 'Sara Ali <sara@bank.example>' } }), true);
+});
+
+test('a bare address has no name, and an address alone said twice is no name either', () => {
+  assert.equal(Object.hasOwn(subjectOf(email), 'from_name'), false);
+  assert.equal(subjectOf(email).from_address, 'alerts@hsbc.com');
+  assert.equal(Object.hasOwn(subjectOf({ ...email, headers: { from: 'ada@x.com <ada@x.com>' } }), 'from_name'), false);
+});
+
+test('the sender is read as the stored arrival reads it: encoded names, a list, a comma inside quotes', () => {
+  assert.equal(subjectOf({ ...email, headers: { from: '=?UTF-8?B?U2FyYSBBbGk=?= <sara@bank.example>' } }).from_name, 'Sara Ali');
+  const two = subjectOf({ ...email, headers: { from: 'Ada <ada@x.com>, Bo <bo@y.com>' } });
+  assert.equal(two.from_address, 'ada@x.com');
+  assert.equal(two.from_name, 'Ada');
+  assert.equal(subjectOf({ ...email, headers: { from: '"Ali, Sara" <sara@bank.example>' } }).from_name, 'Ali, Sara');
+  assert.equal(subjectOf({ ...email, headers: { from: 'root@localhost' } }).from_domain, 'localhost');
+});
+
+test('a from that names no one address leaves the sender absent, not empty', () => {
+  for (const from of ['', 'Undisclosed', 'not an address <nope>']) {
+    const s = subjectOf({ ...email, headers: { from } });
+    assert.equal(s.from, from);
+    for (const k of ['from_name', 'from_address', 'from_domain']) assert.equal(Object.hasOwn(s, k), false, `${from}: ${k}`);
+  }
+  for (const k of ['from_name', 'from_address', 'from_domain']) assert.equal(Object.hasOwn(subjectOf(hook), k), false);
 });
 
 test('the body is the one as stored, not the normalised one', () => {

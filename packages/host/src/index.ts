@@ -303,6 +303,10 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'setPackConfig', group: 'ADMIN', writes: true, what: "Change a pack's settings. They are read the next time the pack is planned and installed." },
   { name: 'setDeclaration', group: 'ADMIN', writes: true, what: 'Set one declaration from the app, through the same lint a pack gets.' },
   { name: 'retireDeclaration', group: 'ADMIN', writes: true, what: 'Retire one. Its rows stay; a declaration is a shape.' },
+  /* SLASH'S LOOK OVER A PAGE, ANSWERED BY THE PERSON WHO SAW IT LAND (DIRECTION §37's Undo). ADMIN for
+     `setDeclaration`'s reason: a look is a declaration, and what it puts back or keeps is the page everybody opens. */
+  { name: 'undoLook', group: 'ADMIN', writes: true, what: 'Put a page back the way it was before Slash arranged it. Only while that arrangement is still the one Slash wrote.' },
+  { name: 'keepLook', group: 'ADMIN', writes: true, what: 'Keep how Slash arranged a page once its Undo has passed, so the page says who kept it. The arrangement itself is not changed.' },
   { name: 'ruleApply', group: 'ADMIN', writes: true, what: 'Run one rule over the rows already there. `dry` first: there is no undo.' },
   { name: 'examples', group: 'ADMIN', writes: false, what: 'The example rows setting up planted that nobody has touched, counted by list. It writes nothing.' },
   { name: 'clearExamples', group: 'ADMIN', writes: true, what: 'Delete every example row nobody has touched. A row somebody edited, or one a row of theirs points at, stays.' },
@@ -580,6 +584,8 @@ export type RecordSurface = {
   setPackConfig(args: never, ctx: never): Promise<Result<unknown>>;
   setDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
   retireDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
+  undoLook(args: never, ctx: never): Promise<Result<unknown>>;
+  keepLook(args: never, ctx: never): Promise<Result<unknown>>;
   ruleApply(args: never, ctx: never): Promise<Result<unknown>>;
   examples(args: never, ctx: never): Promise<Result<unknown>>;
   clearExamples(args: never, ctx: never): Promise<Result<unknown>>;
@@ -682,6 +688,8 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     setPackConfig: (a, ctx) => api.setPackConfig(a as never, ctx as never),
     setDeclaration: (a, ctx) => api.setDeclaration(a as never, ctx as never),
     retireDeclaration: (a, ctx) => api.retireDeclaration(a as never, ctx as never),
+    undoLook: (a, ctx) => api.undoLook(a as never, ctx as never),
+    keepLook: (a, ctx) => api.keepLook(a as never, ctx as never),
     ruleApply: (a, ctx) => api.ruleApply(a as never, ctx as never),
     examples: (a, ctx) => api.examples(a as never, ctx as never),
     clearExamples: (a, ctx) => api.clearExamples(a as never, ctx as never),
