@@ -34,7 +34,7 @@
   import { joinsWithOr, registerHref } from '$lib/record/where.ts';
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
-  import { fileAt, resolverOf, type LiveBlock } from '$lib/record/page-live.ts';
+  import { fileAt, resolverOf, type LiveBlock, type Walked } from '$lib/record/page-live.ts';
   import { glyphSet, glyphSetNow, isGlyph, pathOf } from '$lib/ui/icons.ts';
   import { agentKindOf, liveOf } from '../ui/face.ts';
   import { AGENT_MARKS, isMarked } from '$lib/ui/agent-marks.ts';
@@ -67,6 +67,7 @@
     rows = null,
     verbs = null,
     pick = null,
+    walk = null,
   }: {
     block: LiveBlock;
     /** The block's declared index, which its id, its heading's id and its held rows are keyed by. */
@@ -99,6 +100,11 @@
     verbs?: { onopen: (row: Row) => void; onmenu: (row: Row, anchor: HTMLElement) => void } | null;
     /** The page's choice of questions to answer at once, which a queue of two or more questions adds to. */
     pick?: Picked | null;
+    /**
+     * Reads the page again with a forecast walked as far as a reader picked, past where it reaches unasked (`PageBody`'s
+     * `onwalk`). `null` where the page is not read again.
+     */
+    walk?: ((length: Walked) => void) | null;
   } = $props();
 
   /* A `{{path}}` IS ANSWERED BY THE RECORD on the block's `values`; a missing value is marked. `now` is the clock the
@@ -151,6 +157,8 @@
     now,
     /* A forecast's knobs and its readout: arithmetic over the walk already on the page, kept in memory. */
     scenario: true,
+    /* AND A LENGTH PAST THE WALK'S REACH, which the record is asked to walk (`walkFor`). */
+    ...(walk ? { walk: walkFor } : {}),
     /* EVERY LINK THE RENDERER DRAWS, under the app: the record writes `/decide`, and the tab is on `/app/<slug>`. */
     href: inApp,
     icon,
@@ -194,6 +202,19 @@
   /** How many days a forecast's walk ran: as far as it reached, else the length it opened on, else the block's. */
   const walkedDays = (b: LiveBlock): number =>
     typeof b.walk?.reach === 'number' ? b.walk.reach : typeof b.walk?.horizon === 'number' ? b.walk.horizon : typeof b.horizon === 'number' ? b.horizon : 180;
+
+  /**
+   * A LENGTH PICKED PAST HOW FAR THE WALK REACHES IS WALKED, not cut to it. The kernel walks two years at most unasked
+   * (`WALK_UNASKED`), so five years on Cash ahead is asked for when somebody picks it: the page is read again walking
+   * that far, and the chart stays as it is until the longer walk lands. A length the walk already reaches, or one the
+   * block does not offer, asks nothing, since the record would only walk what it walked.
+   */
+  function walkFor(length: Walked) {
+    if (!walk || (block.kind !== 'forecast' && block.source !== 'forecast.runway')) return;
+    if (!(block.horizons ?? []).includes(length)) return;
+    if (length !== 'last' && length <= walkedDays(block)) return;
+    walk(length);
+  }
 
   /**
    * The predicate a reader sees, MINUS the clause that names the page they are already on.

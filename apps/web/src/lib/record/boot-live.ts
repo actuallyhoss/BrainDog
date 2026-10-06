@@ -855,6 +855,6 @@ export const onNoRecord = (said: { code: string; fix: string } | null | undefine
   said !== null && said !== undefined && said.code === 'FORBIDDEN' && said.fix === NO_RECORD_FIX;
 
 export const refusedShell = (said: { code: string; fix: string } | null = refusal): Shell => ({
-  ...layoutOf({ registers: [], now: new Date().toISOString() }),
+  ...layoutOf({ registers: [], now: new Date().toISOString(), home: null }),
   ...(said ? { refused: said } : {}),
 });

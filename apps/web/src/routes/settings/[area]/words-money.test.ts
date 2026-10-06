@@ -71,31 +71,33 @@ test('renaming a list offers its singular', () => {
   assert.equal(oneFor('Deliveries'), 'delivery');
 });
 
-test('the singular keeps the case it was typed in, and knows -es, -ies and the words that do not change', () => {
+test('the singular is the record\'s: the last word turns where English says how, and a name that does not say offers none', () => {
   /* THE AUDIT'S THREE: "HSBC cards" was "hsbc card", "Boxes" "boxe", "Series" "sery". */
   assert.equal(oneFor('HSBC cards'), 'HSBC card');
   assert.equal(oneFor('Boxes'), 'box');
-  assert.equal(oneFor('Series'), 'series');
-  const cases: [string, string][] = [
+  assert.equal(oneFor('Series'), null);
+  const cases: [string, string | null][] = [
     ['Churches', 'church'],
     ['Addresses', 'address'],
     ['Taxes', 'tax'],
     ['Wishes', 'wish'],
-    ['Statuses', 'status'],
     ['Houses', 'house'],
     ['Prizes', 'prize'],
     ['Sizes', 'size'],
-    ['Movies', 'movie'],
-    ['Client companies', 'Client company'],
-    ['Acme orders', 'Acme order'],
-    ['DELIVERIES', 'DELIVERIES'.slice(0, -3) + 'Y'],
+    ['APIs', 'API'],
+    ['Client companies', 'client company'],
+    ['Acme orders', 'acme order'],
+    ['DELIVERIES', 'DELIVERY'],
     ['iPhones', 'iPhone'],
-    ['People', 'person'],
-    ['Key People', 'Key Person'],
-    ['Status', 'status'],
-    ['Campus', 'campus'],
-    ['bake', 'bake'],
-    ['   ', ''],
+    /* WHAT SLASH WOULD NOT TURN, THIS SCREEN DOES NOT EITHER: one already, an irregular plural, a word it would turn wrong. */
+    ['Statuses', null],
+    ['Movies', null],
+    ['People', null],
+    ['Status', null],
+    ['Campus', null],
+    ['Heroes', null],
+    ['bake', null],
+    ['   ', null],
   ];
   for (const [name, one] of cases) assert.equal(oneFor(name), one, name);
 });

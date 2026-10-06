@@ -28,7 +28,7 @@
   import type { Snippet } from 'svelte';
   import { overlays } from '../a11y/keys.svelte.ts';
   import Icon from './Icon.svelte';
-  import { NARROW, Pull, scrims, settled, unstall } from './panel.ts';
+  import { PHONE_WIDTH, Pull, scrims, settled, unstall } from './panel.ts';
 
   let {
     open = $bindable(false),
@@ -192,8 +192,8 @@
    *
    * THE HANDLE'S STRIP AND THE HEAD TAKE THE PULL, EXCEPT WHERE THE HEAD HOLDS SOMETHING TO PRESS.
    * Pointer capture sends the release to the element that captured it, so a pull that began on
-   * Close would swallow its click; a press there is left to the button. Only below 900px: from there
-   * up the sheet is a drawer with no handle to pull.
+   * Close would swallow its click; a press there is left to the button. Only on a phone (`PHONE` in `panel.ts`, the
+   * 900 of the `@media` below): from there up the sheet is a drawer with no handle to pull.
    *
    * `translate` IS WRITTEN ON THE ELEMENT AS THE FINGER MOVES, not a custom property through
    * Svelte: a property the whole sheet inherits restyles every row in it on every move, and
@@ -204,7 +204,7 @@
 
   function grab(e: PointerEvent) {
     const from = e.currentTarget as HTMLElement;
-    if (!el || !e.isPrimary || e.button !== 0 || !matchMedia(NARROW).matches) return;
+    if (!el || !e.isPrimary || e.button !== 0 || !matchMedia(PHONE_WIDTH).matches) return;
     /* Asked of the strip or the head and not past it, since the page around the sheet can hold a control. */
     const pressed = e.target instanceof Element ? e.target.closest(PRESSABLE) : null;
     if (pressed && from.contains(pressed)) return;

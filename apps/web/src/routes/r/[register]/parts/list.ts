@@ -14,6 +14,7 @@ import { copy } from '../../../../lib/copy.ts';
 import { seqWidth } from '../../../../lib/record/api.ts';
 import { declaredValue } from '../../../../lib/record/where.ts';
 import { isMoney, type Entry, type FieldDecl, type Filter, type RegisterDecl } from '../../../../lib/record/schema.ts';
+import { orgFieldOf } from '../people.ts';
 
 /**
  * WHAT JUST HAPPENED TO A ROW, DRAWN WHERE THE ROW WAS.
@@ -249,10 +250,24 @@ const DAY_RE = /^\d{4}-\d{2}-\d{2}$/u;
  * did. A board is asked for only where the list has lanes to draw (`laneFieldOf`); anywhere else it is the table. The
  * field the lanes are is `?lane=`, chosen in Display, and absent means the state.
  */
-export type View = 'table' | 'board' | 'cards';
+export type View = 'table' | 'board' | 'cards' | 'groups';
 
-export const viewOf = (asked: string | null, decl: RegisterDecl | undefined): View =>
-  asked === 'cards' ? 'cards' : asked === 'board' && laneFieldOf(decl) ? 'board' : 'table';
+/**
+ * WHAT A BARE ADDRESS OPENS ON: the table, except on a list of people that says which organisation each is with
+ * (`orgFieldOf`), which opens grouped by it, since twenty-four colleagues of one company read as one line and not as
+ * twenty-four. That list's table is then `?view=table`, so a link to it still opens the table.
+ */
+export const homeViewOf = (decl: RegisterDecl | undefined): View => (orgFieldOf(decl) ? 'groups' : 'table');
+
+export const viewOf = (asked: string | null, decl: RegisterDecl | undefined): View => {
+  if (asked === 'cards' || asked === 'table') return asked;
+  if (asked === 'board' && laneFieldOf(decl)) return 'board';
+  if (asked === 'groups' && orgFieldOf(decl)) return 'groups';
+  return homeViewOf(decl);
+};
+
+/** A view as the address and a kept default spell it, or nothing for a word that is not one. */
+const viewWord = (v: unknown): View | undefined => (v === 'board' || v === 'cards' || v === 'table' || v === 'groups' ? v : undefined);
 
 /**
  * THE FIELDS A BOARD CAN BE LAID OUT BY: every live choice field of two to twelve values, the list's state first and the
@@ -312,7 +327,7 @@ export function lanesOf(decl: RegisterDecl | undefined, entries: readonly Entry[
 export type ListDefault = {
   /** `field:dir`, as `?sort=` spells it. Absent is the list's own order. */
   sort?: string | undefined;
-  view?: 'board' | 'cards' | undefined;
+  view?: View | undefined;
   /** The field a board's lanes are, when it is not the one the board takes by itself. */
   lane?: string | undefined;
   hidden: string[];
@@ -344,7 +359,7 @@ export function readDefault(store: Keep | null, key: string): ListDefault | null
     const text = (x: unknown) => (typeof x === 'string' && x !== '' ? x : undefined);
     return {
       sort: text(v.sort),
-      view: v.view === 'board' || v.view === 'cards' ? v.view : undefined,
+      view: viewWord(v.view),
       lane: text(v.lane),
       hidden: Array.isArray(v.hidden) ? v.hidden.filter((h): h is string => typeof h === 'string') : [],
     };
@@ -373,7 +388,7 @@ export function defaultFrom(p: URLSearchParams, hidden: ReadonlySet<string>): Li
   const view = p.get('view');
   return {
     sort: p.get('sort') || undefined,
-    view: view === 'board' || view === 'cards' ? view : undefined,
+    view: viewWord(view),
     lane: (view === 'board' && p.get('lane')) || undefined,
     hidden: [...hidden].sort(),
   };
@@ -393,7 +408,10 @@ export function defaultParams(d: ListDefault, decl: RegisterDecl | undefined): {
   const params = new URLSearchParams();
   const [field, dir] = (d.sort ?? '').split(':');
   if (field && fields.has(field)) params.set('sort', `${field}:${dir === 'desc' ? 'desc' : 'asc'}`);
-  if (d.view === 'cards' || (d.view === 'board' && laneFieldOf(decl))) params.set('view', d.view);
+  /* A KEPT VIEW THE LIST OPENS ON ANYWAY WRITES NOTHING, and one it can no longer draw is dropped: a board with no lanes,
+     a grouping with no organisation to group by. */
+  const fits = d.view === 'cards' || d.view === 'table' || (d.view === 'board' && laneFieldOf(decl)) || (d.view === 'groups' && orgFieldOf(decl));
+  if (d.view && fits && d.view !== homeViewOf(decl)) params.set('view', d.view);
   if (d.view === 'board' && d.lane && laneChoicesOf(decl).some((f) => f.id === d.lane)) params.set('lane', d.lane);
   return { params, hidden: d.hidden.filter((h) => fields.has(h) && h !== decl?.title) };
 }

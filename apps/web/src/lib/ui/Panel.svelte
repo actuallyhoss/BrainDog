@@ -2,27 +2,35 @@
   The docked detail panel: opening a task or a question keeps the list in view, and nothing needs a page
   change. Work and Decide draw it.
 
-  FROM 900PX UP IT IS DOCKED at the window's end edge: 440 wide (380 on a narrower desktop), inset `--inset` from the
+  FROM 1,280 UP IT IS DOCKED (`DOCKS` in `panel.ts`) at the window's end edge: 440 wide (380 below 1,360), inset `--inset` from the
   window, radius `--r-lg`. Its head is glass (a close circle, the title at `--t-group`, and the caller's verbs) and its
   body is `--bg` and scrolls. It is a NON-MODAL `<dialog>` opened with `show()`, so the list beside it keeps its pointer
   and its keyboard, and focus stays where it was: `j` and `k` go on walking the list and the panel follows.
 
-  BELOW 900PX IT IS A BOTTOM SHEET: the same element opened with `showModal()`, over the scrim, holding the overlay lock
-  as `Sheet.svelte` does. The form is read from the window while the panel is open, and a panel open when the window
-  crosses 900px reopens in the other form rather than closing (`panel.ts`). The form it opened in is written on the
-  element as `data-form`, and the styles key on that rather than on `:modal`, because a closing panel is no longer modal
-  and still has its close to play in the shape it opened in.
+  BELOW 1,280 IT IS A SHEET: the same element opened with `showModal()`, over the scrim, holding the overlay lock as
+  `Sheet.svelte` does. Drawn as every sheet is at that width: a drawer at the end edge from the phone's 900 up, where
+  it looks as the docked panel does and only the scrim says the list is not live, and a bottom sheet on a phone. The
+  form is read from the window while the panel is open, and a panel open when the window crosses 1,280 reopens in the
+  other form rather than closing (`panel.ts`). The form it opened in is written on the element as `data-form`, and the
+  styles key on that rather than on `:modal`, because a closing panel is no longer modal and still has its close to
+  play in the shape it opened in.
 
   THE CONTENT NARROWS BESIDE IT, NEVER UNDER IT. While a docked panel is open the root carries `--dock-w`, the inline
   space the panel takes from the window's end edge: its width, its inset from the window, and the 12 between it and the
-  content. It is `0px` otherwise, and `0px` below 900px, where the panel is a sheet.
+  content. It is `0px` otherwise, and `0px` below 1,280, where the panel is a sheet.
   A page that draws a Panel pads its content's inline end with it:
 
       padding-inline-end: max(var(--gutter), var(--dock-w));
 
   It is written by CSS alone (`:root:has(...)`), so there is no script to forget and nothing to clean up on a route
-  change: the root loses it the moment the element closes or goes. The shell is to give the panel a track of its own,
-  and the panel slides into it by transform, so nothing about it moves but the panel.
+  change: the root loses it the moment the element closes or goes. The shell's column for it reads `--dock-col`, the
+  same width given only once the panel has landed (below), so the panel slides in over the work's end and the work
+  narrows under it in one reflow, with no empty ground showing while it travels. Closing gives the column back at once
+  and the panel slides out over the work as it widens.
+
+  OUT OF A SCREEN'S CROSS-FADE. The work is named `page` while one screen fades to the next (`+layout.svelte`), and a
+  docked panel inside it would be painted into the work's two pictures, its glass cut off from the ground. So for that
+  moment the docked panel is named `dock`, a picture of its own that stands where it is (`app.css`).
 
   IT MOVES THE SAME WAY OUT AS IN, AND FASTER. In from past the end edge, `translateX(100% + 16px)`, over `--d-panel`
   on `--ease-sheet`, with no fade; out along the same path in `--d-panel-out`. The sheet rises from below the screen and
@@ -49,7 +57,7 @@
   import { overlays } from '../a11y/keys.svelte.ts';
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
-  import { NARROW, Pull, formOf, scrims, settled, step, unstall } from './panel.ts';
+  import { NARROW, PHONE_WIDTH, Pull, formOf, scrims, settled, step, unstall } from './panel.ts';
 
   let {
     open = $bindable(false),
@@ -77,7 +85,7 @@
 
   let el = $state<HTMLDialogElement>();
 
-  /** Whether the window is a phone's, followed while the panel lives so an open panel can change form. */
+  /** Whether the window is narrower than `DOCKS`, followed while the panel lives so an open panel can change form. */
   let narrow = $state(false);
 
   $effect(() => {
@@ -119,7 +127,9 @@
     if (todo === 'close' || todo === 'reopen') {
       switching = todo === 'reopen';
       el.close();
-      release();
+      /* A REOPEN PLAYS NO CLOSE, so the sheet's scrim is lifted at once rather than after an exit that never runs, and
+         the toasts held under it are not kept waiting out the stall after a window is widened. */
+      release(todo === 'reopen');
       if (todo === 'close') return;
     }
     /* THE FORM GOES ON THE ELEMENT BEFORE IT OPENS, so its first frame is drawn in it, and it stays through the close.
@@ -222,7 +232,7 @@
 
   function grab(e: PointerEvent) {
     const head = e.currentTarget as HTMLElement;
-    if (!el || el.dataset.form !== 'sheet' || !e.isPrimary || e.button !== 0) return;
+    if (!el || el.dataset.form !== 'sheet' || !e.isPrimary || e.button !== 0 || !matchMedia(PHONE_WIDTH).matches) return;
     /* Asked of the head and not past it: the page around the panel can be a focusable grid. */
     const pressed = e.target instanceof Element ? e.target.closest(PRESSABLE) : null;
     if (pressed && head.contains(pressed)) return;
@@ -283,9 +293,23 @@
     }
   }
 
-  /* `:not(:modal)`: the sheet form covers the list over a scrim and takes no width from it. */
+  /* `:not(:modal)`: the sheet form covers the list over a scrim and takes no width from it.
+     `--dock-col` IS THE SAME WIDTH FOR THE SHELL'S COLUMN, registered as a length (`app.css`) so it can wait: opening,
+     it is given once the panel's slide is over, so the work narrows under a panel already there; closing, it goes at
+     once, as the rule after this one says, so the work widens under a panel already leaving. */
+  :global(:root) {
+    transition-property: --dock-col;
+  }
+
   :global(:root:has(dialog.dock[open]:not(:modal))) {
     --dock-w: calc(var(--dock-panel) + 2 * var(--inset));
+    --dock-col: var(--dock-w);
+    transition-delay: var(--d-panel);
+  }
+
+  /* WHILE A SCREEN CROSS-FADES, a picture of its own, so it is not painted into the work's (`app.css`). */
+  :global(html[data-moving]) .dock[open]:not(:modal) {
+    view-transition-name: dock;
   }
 
   /* DOCKED. Every UA default a `<dialog>` brings (centred, `fit-content`, a border, `Canvas`) is taken back here. */
@@ -462,20 +486,50 @@
     }
   }
 
-  /* BELOW 900PX, THE BOTTOM SHEET: against the bottom of the screen, above the keyboard, as tall as what it holds. It
-     rises from below the screen and goes back down it. */
+  /* THE SHEET FORM FROM 900 TO 1,280 IS THE DOCKED PANEL'S SHAPE over a scrim, at the sheets' depth. */
   .dock:global([data-form='sheet']) {
-    --dock-off: translateY(calc(100% + var(--kb)));
-
-    inset-block: auto var(--kb);
-    inset-inline: 0;
-    inline-size: 100%;
-    max-inline-size: 100%;
-    block-size: auto;
-    max-block-size: calc(88dvh - var(--kb));
-    border-end-start-radius: 0;
-    border-end-end-radius: 0;
     box-shadow: var(--e3);
+  }
+
+  /* ON A PHONE (`PHONE` in `panel.ts`), THE BOTTOM SHEET: against the bottom of the screen, above the keyboard, as tall
+     as what it holds. It rises from below the screen and goes back down it. */
+  @media (width < 900px) {
+    .dock:global([data-form='sheet']) {
+      --dock-off: translateY(calc(100% + var(--kb)));
+
+      inset-block: auto var(--kb);
+      inset-inline: 0;
+      inline-size: 100%;
+      max-inline-size: 100%;
+      block-size: auto;
+      max-block-size: calc(88dvh - var(--kb));
+      border-end-start-radius: 0;
+      border-end-end-radius: 0;
+    }
+
+    /* THE HANDLE: a short pill in the head's top padding, which reads as "this pulls". The head is what takes the
+       pull, and `touch-action: none` keeps a pull on it from scrolling or zooming the page underneath. */
+    .dock:global([data-form='sheet']) .dock-head {
+      position: relative;
+      padding-block-start: var(--sp-5);
+      touch-action: none;
+    }
+
+    .dock:global([data-form='sheet']) .dock-head::before {
+      content: '';
+      position: absolute;
+      inset-block-start: var(--sp-2);
+      inset-inline: 0;
+      inline-size: var(--sp-6);
+      block-size: var(--sp-1);
+      margin-inline: auto;
+      background: var(--line);
+      border-radius: var(--r-pill);
+    }
+
+    .dock:global([data-form='sheet']) .dock-body {
+      padding-block-end: calc(var(--sp-4) + max(0px, calc(env(safe-area-inset-bottom) - var(--kb))));
+    }
   }
 
   /* The scrim comes and goes with the sheet. Only the sheet form, which is modal, draws one. */
@@ -497,30 +551,6 @@
     .dock[open]::backdrop {
       opacity: 0;
     }
-  }
-
-  /* THE HANDLE: a short pill in the head's top padding, which reads as "this pulls". The head is what takes the pull,
-     and `touch-action: none` keeps a pull on it from scrolling or zooming the page underneath. */
-  .dock:global([data-form='sheet']) .dock-head {
-    position: relative;
-    padding-block-start: var(--sp-5);
-    touch-action: none;
-  }
-
-  .dock:global([data-form='sheet']) .dock-head::before {
-    content: '';
-    position: absolute;
-    inset-block-start: var(--sp-2);
-    inset-inline: 0;
-    inline-size: var(--sp-6);
-    block-size: var(--sp-1);
-    margin-inline: auto;
-    background: var(--line);
-    border-radius: var(--r-pill);
-  }
-
-  .dock:global([data-form='sheet']) .dock-body {
-    padding-block-end: calc(var(--sp-4) + max(0px, calc(env(safe-area-inset-bottom) - var(--kb))));
   }
 
   /* A FADE IN PLACE OF EVERY MOVE: the panel and the sheet fade where they stand, and a switch fades without settling.

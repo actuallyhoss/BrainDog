@@ -268,8 +268,12 @@ export function display(
   names?: Names,
 ): string | null {
   if (value === null || value === undefined || value === '') return null;
-  /* A LIST READS AS ITS ELEMENTS, and never with the tags the record keeps for itself (`tags.ts`). */
-  if (Array.isArray(value)) return listLine(value);
+  /* A LIST READS AS ITS ELEMENTS, and never with the tags the record keeps for itself (`tags.ts`). A LIST OF LINKS reads
+     as the names of the rows it points at, as one link does, never as their numbers: a person's "Met in" read "3, 5". */
+  if (Array.isArray(value)) {
+    const f = decl(register, field);
+    return listLine(f?.type === 'list' && f.of === 'ref' ? value.map((v) => refName(f, register, v, names)) : value);
+  }
   /* AN AGENT BY ITS NAME: the field holds what the agent signs with, `claude`, and a card read "claude" beside "Changed by
      Claude". A lower-case word is said with its capital, on any list; anything else is left as it was typed. */
   if (field === 'agent' && typeof value === 'string' && /^[a-z][a-z0-9-]*$/u.test(value)) return value.charAt(0).toUpperCase() + value.slice(1);
@@ -338,11 +342,7 @@ export function display(
        * ONLY source: a number the record did not name draws as `<list>#<number>`, which is a row
        * somebody can open, rather than as whatever the built-in sample happens to call that number.
        */
-      if (names) return names.get(`${f.to}#${value}`) || unnamed(f.to ?? register, String(value), f.label);
-      /* AND WITHOUT `names`, THE NAMES THIS TAB HAS LEARNT (`held.ts` `TITLES`). This read the sample's rows, so a
-         caller that handed none drew the sample's name for whatever number the record's ref held. */
-      const said = f.to ? TITLES.get(f.to)?.get(Number(value)) : undefined;
-      return said === undefined || said === '' ? unnamed(f.to ?? register, String(value), f.label) : said;
+      return refName(f, register, value, names);
     }
     case 'secret':
       return '••••••••';
@@ -351,6 +351,15 @@ export function display(
       if (register === 'session' && field === 'project') return spokenRow(value, names)?.label ?? String(value);
       return String(value);
   }
+}
+
+/** The name of the row one link of `f` points at, by the record's names where a screen has them. */
+function refName(f: FieldDecl, register: string, value: unknown, names?: Names): string {
+  if (names) return names.get(`${f.to}#${value}`) || unnamed(f.to ?? register, String(value), f.label);
+  /* AND WITHOUT `names`, THE NAMES THIS TAB HAS LEARNT (`held.ts` `TITLES`). This read the sample's rows, so a
+     caller that handed none drew the sample's name for whatever number the record's ref held. */
+  const said = f.to ? TITLES.get(f.to)?.get(Number(value)) : undefined;
+  return said === undefined || said === '' ? unnamed(f.to ?? register, String(value), f.label) : said;
 }
 
 /**
@@ -851,7 +860,8 @@ function compareRows(register: string, a: Entry, b: Entry, field: string, sign: 
    * frozen `NOW`, which was the only reason the sort of a live list imported the sample's clock at all.
    */
   const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
-  if (decl?.type === 'ref') {
+  /* AND A LIST OF LINKS BY THE NAMES IT SHOWS, for the same reason: its cell is the names, never the numbers. */
+  if (decl?.type === 'ref' || (decl?.type === 'list' && decl.of === 'ref')) {
     const sx = display(register, field, x, undefined, names) ?? '';
     const sy = display(register, field, y, undefined, names) ?? '';
     return textOrder(sx, sy) * sign;
@@ -1412,7 +1422,7 @@ export function walkTable(
  * `MeasureLatest` (`packages/kernel/src/measures.ts`), which its index does not export, as the page reader narrows it.
  * `value` is in major units of `unit`, as a series holds it, and `day` is the record's local day it was read on.
  */
-export type MeasureLatest = { measure: string; value: number; unit: string; at: string; day: string };
+export type MeasureLatest = { measure: string; of?: string; value: number; unit: string; at: string; day: string };
 
 /**
  * A grouped figure's whole and its parts, as a `bar` or a `split` draws them. A part's `label` is its name where its key

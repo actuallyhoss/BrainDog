@@ -1058,7 +1058,7 @@ function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSp
      measures reported once after them as one list of their readings (`linesAndLatest`). */
   if (block.kind === 'lines' && (block.register || block.measures) && !block.authored?.length) {
     const { lines, latest } = linesAndLatest(measuresFor(block), block.readOnce);
-    return parse([linesText(lines), latestText(latest, lines.length > 0)].filter(Boolean).join('\n\n'), { page: true });
+    return parse([linesText(lines, latest), latestText(latest, lines.length > 0, lines)].filter(Boolean).join('\n\n'), { page: true });
   }
   /* A CAPTURE'S HEADING GOES THROUGH TOO, because it is not a caption: it is the field's placeholder and its
      accessible name (`captioned` leaves it off the figure), and without it the field asks "Add to Tasks" where
@@ -1572,12 +1572,19 @@ export function draw(
 }
 
 /**
- * How a cell of a block of `kind` says its money: a tile's figure and a bar's or a split's value as a headline, a table's
- * to the penny, and the rest as a sentence. A BAR'S VALUE IS A FIGURE STANDING ON ITS OWN, read against the bars beside
- * it: "EGP 1,086,213.41" beside each book on Today was a ledger's figure in a chart (DIRECTION §37).
+ * How a cell of a block of `kind` says its money: a tile's figure as a headline, a bar's or a split's value as a figure,
+ * a table's to the penny, and the rest as a sentence. A BAR'S VALUE IS A FIGURE READ AGAINST THE BARS BESIDE IT, in the
+ * record's own sign and exact, never rounded to whole units: two books a few piastres apart must not read the same
+ * (research audit M6). Only a tile's figure, standing alone, drops them from ten thousand up (DIRECTION §37).
  */
-const exactness = (kind: string, cell: number): 'headline' | 'exact' | 'sentence' =>
-  (kind === 'stat' || kind === 'bar' || kind === 'split') && cell === 1 ? 'headline' : kind === 'table' || kind === 'comparison' ? 'exact' : 'sentence';
+const exactness = (kind: string, cell: number): 'headline' | 'figure' | 'exact' | 'sentence' =>
+  cell === 1 && kind === 'stat'
+    ? 'headline'
+    : cell === 1 && (kind === 'bar' || kind === 'split')
+      ? 'figure'
+      : kind === 'table' || kind === 'comparison'
+        ? 'exact'
+        : 'sentence';
 
 /**
  * A `where:` clause as a person would read it.

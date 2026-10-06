@@ -14,7 +14,7 @@
  * PLAIN TYPESCRIPT, SO A TEST CAN LOAD IT IN NODE.
  */
 
-import { VOICE_LINES, labelsOf, type VoiceKey } from '../../../lib/voice.ts';
+import { VOICE_LINES, labelsOf, oneOf, type VoiceKey } from '../../../lib/voice.ts';
 import { labelOf, type ConfigDecl, type PackConfig, type PackState } from '../../../lib/record/packs.ts';
 
 /** The setting a home currency is kept under, the kernel's `HOME_CURRENCY_SETTING`, spelt as `packs.ts` spells it. */
@@ -97,67 +97,16 @@ export function changesOf(words: readonly Word[], typed: Readonly<Record<string,
 export const undoOf = (words: readonly Word[], sent: Readonly<Record<string, unknown>>): Record<string, string | null> =>
   Object.fromEntries(words.filter((w) => Object.hasOwn(sent, w.setting)).map((w) => [w.setting, w.value === w.fallback ? null : w.value]));
 
-/* WORDS WHOSE PLURAL IS NOT THE RULE'S, by the last word of a name, lower case. A business names its lists with these
-   often enough that "Person" under "People" and "Series" under "Series" are worth a line each. */
-const IRREGULAR: Readonly<Record<string, string>> = {
-  people: 'person',
-  children: 'child',
-  men: 'man',
-  women: 'woman',
-  series: 'series',
-  species: 'species',
-  news: 'news',
-  data: 'data',
-  media: 'media',
-  staff: 'staff',
-  feet: 'foot',
-  teeth: 'tooth',
-  mice: 'mouse',
-};
-/* -IES WORDS THAT ARE NOT -Y WORDS: "Movies" is one movie, not one movy. */
-const IE = new Set(['movies', 'cookies', 'calories', 'zombies', 'rookies', 'selfies', 'smoothies', 'hoodies', 'freebies', 'goalies', 'brownies', 'pies', 'ties', 'lies', 'dies']);
-
-/** `to` written in the case of `like`: capitals where it is all capitals, a capital first where it starts with one. */
-function cased(to: string, like: string): string {
-  if (like.length > 1 && like === like.toUpperCase() && like !== like.toLowerCase()) return to.toUpperCase();
-  if (/^\p{Lu}/u.test(like)) return to.charAt(0).toUpperCase() + to.slice(1);
-  return to;
-}
-
-/** One word made singular, keeping its own case: the ending is cut, and anything added is written in the word's case. */
-function singular(word: string): string {
-  const low = word.toLowerCase();
-  const irregular = IRREGULAR[low];
-  if (irregular !== undefined) return cased(irregular, word);
-  const cut = (n: number, add = ''): string => word.slice(0, word.length - n) + cased(add, word.slice(-n) || word);
-  if (low.endsWith('ies') && low.length > 4 && !IE.has(low)) return cut(3, 'y');
-  /* NOT -ZES: "Sizes", "Prizes" and "Mazes" lose only the -s, and a "Quizzes" list is rarer than any of them. */
-  if (/(?:ss|x|ch|sh)es$/u.test(low)) return cut(2);
-  /* -USES: "Statuses" and "Bonuses" lose -es, "Houses", "Causes" and "Excuses" only the -s. */
-  if (/[^aeiouc]uses$/u.test(low)) return cut(2);
-  /* ALREADY ONE: "Status", "Address", "Analysis" end in an -s that is no plural. */
-  if (/(?:ss|us|is)$/u.test(low)) return word;
-  if (low.endsWith('s') && low.length > 1) return cut(1);
-  return word;
-}
-
 /**
  * The singular a renamed list is offered while nobody has typed one: "Bakes" offers "bake", "HSBC cards" "HSBC card",
- * "Boxes" "box", "Deliveries" "delivery", "Series" "series".
+ * "Boxes" "box", "Deliveries" "delivery", and "Series" nothing, so the box keeps what it held.
  *
- * THE CASE IS THE PERSON'S, AND IT WAS LOST. This took the record's rule (`voice.ts` `singularOf`), which lowercases the
- * whole name and knows only -ies and -s, so "HSBC cards" offered "hsbc card", "Boxes" "boxe" and "Series" "sery". Only
- * the last word is made singular, and every word keeps the case it was typed in, with one exception: a name that is one
- * capitalised word ("Bakes") is a list's title, and its singular is said mid-sentence ("New bake"), as the use cases'
- * own singulars are. "Acme orders" keeps its capital, because there is no telling a name from a title in two words.
+ * THE RECORD'S RULE AND NOT A SECOND ONE (`oneOf` in `voice.ts`, which is `singularOf` in `packages/record/src/slash.ts`
+ * word for word). This screen had its own, with a table of irregular words and other endings, so renaming a list here
+ * and Slash renaming it offered two singulars for one name. A name whose ending does not say is offered nothing (`null`)
+ * rather than a guess, and the person types the singular in the box beside it.
  */
-export function oneFor(name: string): string {
-  const words = name.trim().split(/\s+/u);
-  const last = words.pop() ?? '';
-  if (last === '') return '';
-  const one = [...words, singular(last)].join(' ');
-  return words.length === 0 && /^\p{Lu}\p{Ll}+$/u.test(last) ? one.charAt(0).toLowerCase() + one.slice(1) : one;
-}
+export const oneFor = (name: string): string | null => oneOf(name);
 
 /**
  * THE LIMITS A NEW HOME CURRENCY MOVES, by the names their add-ons give them (the audit's finding 13).

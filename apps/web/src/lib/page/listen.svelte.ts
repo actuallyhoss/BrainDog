@@ -5,6 +5,15 @@
  * The record's version is `live.version`, which the shell's poll (`lib/data/live.ts`, about every 1.5 s while the tab has focus) moves only when it
  * hears a different one. This follows it from a component: call `listen` while the component initialises, and the
  * effects it makes go with the component, so it stops on unmount with no teardown of the caller's.
+ *
+ * THE OLD CONTENT STAYS UNTIL THE NEW READ LANDS (DIRECTION §36: no blank flash, no spinner where the old content can
+ * stay). `reread` is the caller's read that draws over the page only once it has answered, and a read that fails draws
+ * nothing, so the page as drawn stands until there is a newer one to move to (`recompose.ts` then plays the move).
+ *
+ * AND A CHANGE HEARD WHILE NOBODY IS LOOKING IS READ WHEN SOMEBODY IS. A tab in the background answers no recomposition
+ * (`recompose.ts` draws a hidden page in one frame), so a page read there changed with nobody to see it move, and read
+ * again on the poll that follows anyway. The read waits for the tab to be shown, and the change then moves in place in
+ * front of the reader, once, however many versions passed while it was away.
  */
 import { untrack } from 'svelte';
 import { live } from '$lib/data/live.svelte.ts';
@@ -28,6 +37,21 @@ export function listen(reread: () => Promise<void>, busy: () => boolean): void {
   let out = false;
   let wait: ReturnType<typeof setTimeout> | null = null;
   let gone = false;
+  /* THE LISTENER WAITING FOR THE TAB TO BE SHOWN, while a change is held for it. */
+  let shown: (() => void) | null = null;
+
+  const hidden = (): boolean => typeof document !== 'undefined' && document.hidden;
+
+  const whenShown = () => {
+    if (shown !== null || gone) return;
+    shown = () => {
+      if (hidden()) return;
+      document.removeEventListener('visibilitychange', shown!);
+      shown = null;
+      void settle();
+    };
+    document.addEventListener('visibilitychange', shown);
+  };
 
   const later = () => {
     if (wait === null && !gone) wait = setTimeout(() => ((wait = null), void settle()), RETRY_MS);
@@ -35,6 +59,7 @@ export function listen(reread: () => Promise<void>, busy: () => boolean): void {
 
   async function settle(): Promise<void> {
     if (gone || !owed || out) return;
+    if (hidden()) return whenShown();
     if (busy()) return later();
     owed = false;
     out = true;
@@ -62,5 +87,7 @@ export function listen(reread: () => Promise<void>, busy: () => boolean): void {
     gone = true;
     if (wait !== null) clearTimeout(wait);
     wait = null;
+    if (shown !== null) document.removeEventListener('visibilitychange', shown);
+    shown = null;
   });
 }

@@ -36,7 +36,7 @@
   import { covered, typing } from '$lib/a11y/keys.svelte.ts';
   import { hueOf, iconFor } from '$lib/record/api.ts';
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
-  import type { LiveBlock, Opened } from '$lib/record/page-live.ts';
+  import { askWalk, forgetWalks, walkAsked, type LiveBlock, type Opened, type Walked } from '$lib/record/page-live.ts';
   import type { PageBlock } from '$lib/record/schema.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -64,6 +64,8 @@
   import { RowHost } from './row-host.svelte.ts';
   import RowPanel from './RowPanel.svelte';
   import RowVerbMenu from './RowVerbMenu.svelte';
+  import { blockKeys } from './recompose.ts';
+  import { arrivedNow, keepLook, keptHere, lookOrder, lookPage, offerKey, offered, offerUndo, placedOf, undoLook } from './look.ts';
 
   let {
     slug,
@@ -279,6 +281,83 @@
     }
   }
 
+  /* ── the look ──────────────────────────────────────────────────────────────
+     HOW THE ENGINE ARRANGED THE PAGE (`look.ts`), and the page it is the look of: the page the record answered, which on
+     a home is the page Home read (`home`) and not the screen's own address. */
+  const look = $derived(live?.page.page.look ?? null);
+  const answered = $derived(lookPage(live?.page.page.page ?? slug, look));
+
+  /** The page's blocks by key, in the order they are drawn now: what Pin this keeps. */
+  function drawnKeys(): string[] {
+    const blocks = live?.page.blocks ?? [];
+    const keyed = blockKeys(blocks);
+    return lookOrder(
+      blocks.map((b, i) => placedOf(b, keyed[i]!)),
+      look,
+    )
+      .filter((i) => blocks[i]?.drawn)
+      .map((i) => keyed[i]!);
+  }
+
+  /**
+   * WHAT SLASH ARRANGES WHILE THE PERSON IS LOOKING IS OFFERED BACK FOR SIX SECONDS, and kept once they pass (DIRECTION
+   * §37's Undo, `look.ts` `offerUndo`): when the page is read again under a new arrangement of Slash's, once an
+   * arrangement in this tab, to the owner, who alone may write a look. The look a page opens on was arranged while
+   * nobody was there, and is not offered: the menu says who arranged it, and Pin answers it. Undo puts back the look
+   * Slash's replaced and reads the page again; keeping says who kept it, which the look's history reads.
+   */
+  let lookWas: { page: string; look: typeof look } | null = null;
+  $effect(() => {
+    /* ONLY A PAGE THE RECORD ANSWERED: the blank while a new page is read is no look, and no arrangement before one. */
+    if (!live) return;
+    const l = look;
+    const on = answered;
+    /* BY THE PAGE READ, so moving between two pages drawn from one template is two pages opened, not one rearranged. */
+    const read = live.page.page.page;
+    const before = lookWas?.page === read ? lookWas.look : undefined;
+    lookWas = { page: read, look: l };
+    if (mode === 'preview' || !arrivedNow(on, before, l) || shell?.me?.owner !== true) return;
+    untrack(() => {
+      const k = offerKey(on, l!);
+      if (offered.has(k)) return;
+      offered.add(k);
+      const title = live?.page.page.title ?? '';
+      const who = shell.names?.[shell.me.person] ?? words.owner;
+      offerUndo({
+        push: (undo, life) => toasts.push(words.arranged(title), { undo, life }),
+        alive: (id) => toasts.items.some((t) => t.id === id),
+        undo: () =>
+          void undoLook(apiBase(), on).then(async (back) => {
+            if (!back.ok) toasts.push(back.fix, { intent: 'warn' });
+            await reread();
+          }),
+        /* KEPT QUIETLY: keeping changes nothing on the page, and a keep that did not land is offered no second time. */
+        keep: () => {
+          keptHere.set(k, who);
+          void keepLook(apiBase(), on);
+        },
+      });
+    });
+  });
+
+  /* ── a forecast walked further ─────────────────────────────────────────────
+     A LENGTH PICKED PAST HOW FAR A WALK REACHES IS ASKED OF THE RECORD (`page-live.ts` `askWalk`), and the page read
+     again walking it, with the chart as it is until the longer walk lands. Asked once: a second press on the same length
+     reads nothing again. */
+  function onwalk(length: Walked) {
+    /* THE PAGE AS IT IS READ, which the reader asks for by this name: a page drawn from a template is read at its own. */
+    const on = live?.page.page.page ?? slug;
+    if (walkAsked(on) === length) return;
+    askWalk(on, length);
+    void reread();
+  }
+
+  /* A PAGE LEFT LETS GO OF WHAT WAS ASKED ON THE ONE BEFORE, so the next visit opens on what that page opens on. */
+  $effect.pre(() => {
+    const on = mode === 'preview' ? null : (live?.page.page.page ?? null);
+    if (on) untrack(() => forgetWalks(on));
+  });
+
   /* ── a preview beside the page as it is ─────────────────────────────────────
      Both are drawn from 900px up, side by side; below it one at a time, chosen with the switch, and the change first,
      because the change is what is being decided. */
@@ -334,7 +413,7 @@
              four controls in a row over every page, and a reader uses Share far more often than the other three. The
              menu is `ChangePage.svelte`; Edit layout's way in is `Arrange.svelte`'s, handed over as `entry()`. -->
         <ShareMenu {slug} />
-        <ChangePage {slug} title={live.page.page.title} {showSource} {reread} onarrange={arranger?.entry() ?? null} />
+        <ChangePage {slug} title={live.page.page.title} {showSource} {reread} onarrange={arranger?.entry() ?? null} {look} keys={drawnKeys} />
       {/if}
       <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={live.page.blocks} {all} bind:extra {showSource} {reread} />
     {/snippet}
@@ -362,6 +441,7 @@
       strip={strip && led ? narrow : null}
       host={hosting ? host : null}
       pick={hosting ? picked : null}
+      {onwalk}
     />
     {#if hosting}<BatchBar {picked} />{/if}
   {/if}
@@ -387,6 +467,8 @@
             {reread}
             source={kept.installed ? `/p/${kept.id}?src=1` : null}
             change={kept.installed}
+            {look}
+            keys={drawnKeys}
             onarrange={arranger?.entry() ? () => void arrangeHome() : null}
           />
         {/if}
@@ -414,6 +496,7 @@
       ids="home-"
       pick={select && !arranging ? picked : null}
       arrangement={kept ? arrangement : null}
+      {onwalk}
     />
   </div>
   {#if select && !arranging}<BatchBar {picked} />{/if}

@@ -1,6 +1,12 @@
 <!--
-  The page menu in a declared page's head: one "⋯" beside Share, holding "Change this page", "How this is built" and
-  Edit layout.
+  The page menu in a declared page's head: one "⋯" beside Share, holding "Change this page", Pin this or Unpin, "How
+  this is built" and Edit layout.
+
+  PIN THIS KEEPS THE PAGE AS IT IS DRAWN (DIRECTION §38: a composition is a proposal the person can pin, change or undo,
+  and his pins always win): every block in its place, as the person's own look (`look.ts`), so the engine stops
+  arranging it. Unpin lets the engine arrange it again. Either says what it did with an Undo. Under them, in a quiet
+  line, how the page came to look as it does: "Slash arranged · Sam kept", or that it is pinned. Only the owner pins,
+  as only the owner sets a declaration.
 
   ONE MENU AT EVERY WIDTH. The head drew four controls side by side from 900px up (How this is built, Share, Change this
   page, Edit layout), which is chrome a reader meets on every page and uses on few (DIRECTION §35: fewer things on
@@ -25,7 +31,12 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { apiBase } from '$lib/at.ts';
+  import type { LiveLook } from '$lib/record/page-live.ts';
   import AskPage from './AskPage.svelte';
+  import { bodyOf, historyOf, isPinned, keptHere, lookPage, offerKey, pinBody, retireLook, writeLook } from './look.ts';
+  import { words as pageWords } from './words.ts';
 
   let {
     slug,
@@ -35,6 +46,8 @@
     onarrange = null,
     source = 'here',
     change = true,
+    look = null,
+    keys = () => [],
   }: {
     /** The page's address, which the description is about. */
     slug: string;
@@ -50,6 +63,10 @@
     source?: 'here' | string | null;
     /** Whether Change this page is offered, for a page the record holds. */
     change?: boolean;
+    /** How the engine arranged the page, as the record answered it, or `null` where it sent none. */
+    look?: LiveLook | null;
+    /** The page's blocks by key, in the order they are drawn now, which Pin this keeps. */
+    keys?: () => readonly string[];
   } = $props();
 
   let open = $state(false);
@@ -79,8 +96,48 @@
     else if (source) void goto(at(source));
   }
 
+  /* ── the pin ───────────────────────────────────────────────────────────────
+     THE OWNER'S, as setting any declaration is, and only on a page the record holds. */
+  const mayPin = $derived(change && page.data.me?.owner === true);
+  const pinned = $derived(isPinned(look));
+  /** The page the look is written under: the declaration it is laid over, which a template's pages share. */
+  const under = $derived(lookPage(slug, look));
+  /* READ AGAIN AS THE MENU OPENS, so an arrangement kept a moment ago in this tab says who kept it (`keptHere`). */
+  const history = $derived((void menu, historyOf(look, look ? (keptHere.get(offerKey(under, look)) ?? null) : null)));
+  let pinning = false;
+
+  /** Writes the pin, or takes it away, reads the page as it now stands, and says so with the way back. */
+  async function pin(on: boolean) {
+    if (pinning) return;
+    pinning = true;
+    const was = look;
+    try {
+      const at = under;
+      const out = on ? await writeLook(apiBase(), pinBody(at, was, keys())) : await retireLook(apiBase(), at);
+      if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
+      await reread();
+      toasts.push(on ? pageWords.pinned(title) : pageWords.unpinned(title), {
+        /* THE WAY BACK IS THE LOOK AS IT WAS: the one stored before written again, Slash's or the person's, or none where
+           the rules arranged the page, since the rules' look is worked out and never stored. The person's comes back
+           without the headline and next action the engine filled in around their pins (`mergeLook`), or putting it back
+           would freeze the engine's line of that moment as theirs. */
+        undo: () =>
+          void (
+            was && was.by !== 'rule'
+              ? writeLook(apiBase(), bodyOf(at, was.by === 'owner' ? { ...was, headline: null, next: null } : was))
+              : retireLook(apiBase(), at)
+          ).then(async (back) => {
+            if (!back.ok) toasts.push(back.fix, { intent: 'warn' });
+            await reread();
+          }),
+      });
+    } finally {
+      pinning = false;
+    }
+  }
+
   /** Whether the menu holds anything at this width; one that would open on nothing is not drawn. */
-  const offers = $derived(mayChange || source !== null || (onarrange !== null && wide.current));
+  const offers = $derived(mayChange || mayPin || source !== null || (onarrange !== null && wide.current));
 </script>
 
 <!-- `page-more` and `data-arrange` NAME THE WAY INTO EDIT LAYOUT for a gate, which opened it from its own button. -->
@@ -91,6 +148,16 @@
     <span class="change-more"><Icon name="more" size="s" /><span class="change-vh">{words.more(title)}</span></span>
   {/snippet}
   {#if mayChange}<button type="button" class="mi" role="menuitem" onclick={() => (open = true)}><Icon name="ask" size="s" />{words.change}</button>{/if}
+  {#if mayPin}
+    <!-- THE PIN, NAMED BY HOW THE PAGE CAME TO LOOK AS IT DOES, which is drawn under it as a quiet line and said to a
+         screen reader as the group's name. -->
+    <div role="group" aria-label={history ?? undefined}>
+      <button type="button" class="mi" role="menuitem" onclick={() => void pin(!pinned)}
+        ><Icon name={pinned ? 'slash' : 'lock'} size="s" />{pinned ? pageWords.unpin : pageWords.pin}</button
+      >
+      {#if history}<p class="change-history" aria-hidden="true">{history}</p>{/if}
+    </div>
+  {/if}
   {#if source === 'here'}
     <button type="button" class="mi" role="menuitem" onclick={() => toggle(!showSource)}
       ><Icon name="code" size="s" />{showSource ? copy.pageBack : copy.pageSource}</button
@@ -144,6 +211,15 @@
   .page-more :global(.menu-trigger[aria-expanded='true'] > .change-more) {
     background: var(--hover-wash);
     color: var(--ink);
+  }
+
+  /* HOW THE PAGE CAME TO LOOK AS IT DOES: a caption under the pin, in the menu's quiet ink, never a control. */
+  .change-history {
+    margin: 0;
+    padding: 0 var(--sp-3) var(--sp-2) calc(var(--sp-3) + 16px + var(--sp-2));
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 1.45;
   }
 
   .change-vh {

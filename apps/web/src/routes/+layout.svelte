@@ -71,7 +71,7 @@
   import Icon, { type IconName } from '$lib/ui/Icon.svelte';
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import Pull from '$lib/ui/Pull.svelte';
-  import { tick, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import { beforeNavigate, goto, onNavigate } from '$app/navigation';
   import { page } from '$app/state';
 
@@ -414,47 +414,94 @@
    *
    * The rail card takes its new width in one frame and its glass is scaled from the old width to the new one
    * (`Sidebar.svelte`), so without this the work jumped 156 pixels sideways at the start of a movement the rail then
-   * made smoothly. This is the same movement told from the other side, FLIP: read where the work's edge was, let the
-   * grid take the new width, and play the work from where it was to where it is on `translate`, over `--d-move` on
-   * `--ease-out`, which are the rail's own timing, so the two edges travel together. Nothing is laid out again while it
-   * moves.
+   * made smoothly. This is the same movement told from the other side, FLIP: the rail's column is watched, and when it
+   * changes width the work is played from where its edge was to where it is on `translate`, over `--rail-d` on
+   * `--rail-ease`, which are the rail's own timing, so the two edges travel together. Nothing is laid out again while it
+   * moves. WATCHED RATHER THAN TOLD, so the chord, a Settings change and anything else that moves the rail all slide
+   * the same way; the observer answers after layout and before paint, so the jump is never drawn.
    *
-   * A FADE INSTEAD OF A MOVE, two times over. For somebody who asked for less motion, the work fades up from 0.6
-   * over 120ms and does not travel; the a11y layer stills the tokens themselves to 1ms, so that one number is
-   * written here, and it is `--d-menu`'s. And for a screen holding something placed on the window (a docked panel,
-   * the bar of picked items), because a `translate` on `#main` is the box a fixed descendant is placed against, and
-   * that would carry the panel along with the work.
+   * NOT WHEN THE WINDOW CHANGED, which moves the rail for a reason of its own (crossing to the phone's tab bar), and not
+   * for somebody who asked for less motion: the work is simply where it is, with no fade standing in for the move.
+   *
+   * NOR WHILE SOMETHING IS PLACED ON THE WINDOW from inside the work (a docked panel, the bar of picked items): a
+   * `translate` on `#main` makes it the box a fixed descendant is placed against, which would carry the panel along
+   * with the work and put it in the work's column. Then the work takes its place in one frame. Asked of the few things
+   * that can be so placed, never of every node in the work.
    */
   let sliding: Animation | null = null;
-  const STILL_FADE = 120;
+  let railSlot = $state<HTMLElement>();
+
+  /** What inside the work can be placed on the window: an open non-modal dialog, or what says it is (`data-fixed`). */
+  const PINNED = 'dialog[open]:not(:modal), [data-fixed]';
 
   function holdsFixed(el: HTMLElement): boolean {
     /* Drawn, and not merely declared: a closed panel is `position: fixed` and `display: none`, and has no box. */
-    for (const n of el.querySelectorAll('*')) if (getComputedStyle(n).position === 'fixed' && n.getClientRects().length > 0) return true;
+    for (const n of el.querySelectorAll(PINNED)) if (getComputedStyle(n).position === 'fixed' && n.getClientRects().length > 0) return true;
     return false;
   }
 
-  /* THE EDGE BESIDE THE RAIL, which is the right one under `dir="rtl"`: the work's far edge stays where it is. */
-  const railEdge = (el: HTMLElement): number => {
-    const r = el.getBoundingClientRect();
-    return getComputedStyle(el).direction === 'rtl' ? r.right : r.left;
-  };
+  /** A duration token in milliseconds, whichever unit it is written in (`240ms`, `0.24s`), as `Sidebar.svelte` reads it. */
+  function ms(raw: string, fallback: number): number {
+    const said = raw.trim();
+    const n = Number.parseFloat(said);
+    if (!Number.isFinite(n)) return fallback;
+    return said.endsWith('ms') ? n : said.endsWith('s') ? n * 1000 : n;
+  }
 
-  function slide(el: HTMLElement, was: number) {
-    const dx = was - railEdge(el);
-    if (Math.abs(dx) < 1) return;
+  /** How far the work is drawn from where it stands now, mid-slide, on the inline axis. */
+  function offset(el: HTMLElement): number {
+    const n = Number.parseFloat(getComputedStyle(el).translate);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  /**
+   * Plays the work from `dx` pixels off where it stands, back to it. A slide still running ends first, and the new one
+   * starts from where the old one had the work drawn, so a second press mid-flight turns round rather than jumping.
+   */
+  function slide(el: HTMLElement, dx: number) {
+    const from = dx + (sliding ? offset(el) : 0);
+    sliding?.cancel();
+    sliding = null;
+    if (Math.abs(from) < 1 || matchMedia('(prefers-reduced-motion: reduce)').matches || holdsFixed(el)) return;
     const style = getComputedStyle(el);
-    const token = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
-    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
     try {
-      sliding =
-        still || holdsFixed(el)
-          ? el.animate({ opacity: [0.6, 1] }, { duration: STILL_FADE, easing: token('--ease-fade', 'ease-out') })
-          : el.animate({ translate: [`${dx}px 0`, '0 0'] }, { duration: Number.parseFloat(token('--rail-d', '240')), easing: token('--rail-ease', 'ease-out') });
+      sliding = el.animate(
+        { translate: [`${from}px 0`, '0 0'] },
+        { duration: ms(style.getPropertyValue('--rail-d'), 240), easing: style.getPropertyValue('--rail-ease').trim() || 'ease-out' },
+      );
+      const done = sliding;
+      void done.finished.then(
+        () => {
+          if (sliding === done) sliding = null;
+        },
+        () => undefined,
+      );
     } catch {
       /* A timing the browser cannot read is the old jump, and nothing worse. */
     }
   }
+
+  $effect(() => {
+    const slot = railSlot;
+    if (!slot || typeof ResizeObserver !== 'function') return;
+    let width = -1;
+    let view = window.innerWidth;
+    const seen = new ResizeObserver(() => {
+      const now = slot.getBoundingClientRect().width;
+      const was = width;
+      const viewWas = view;
+      width = now;
+      view = window.innerWidth;
+      /* The first answer is the rail as it was drawn; a rail that is not drawn (a phone) has no edge to slide. */
+      if (was <= 0 || now <= 0 || view !== viewWas) return;
+      const el = document.getElementById('main');
+      if (!el) return;
+      /* THE EDGE BESIDE THE RAIL, which is the right one under `dir="rtl"`: a wider rail moves it the other way. */
+      slide(el, getComputedStyle(el).direction === 'rtl' ? now - was : was - now);
+    });
+    seen.observe(slot);
+    return () => seen.disconnect();
+  });
 
   /* One function, because the chord and the restore control are the same act and a second copy of
      two lines is a second place for the preference to be written differently. */
@@ -463,14 +510,8 @@
        shapes it wrote a preference that nothing on screen could show, so the one feedback the chord
        gives was that nothing happened. It does nothing where there is no rail to narrow. */
     if (shape !== 'rail') return;
-    /* A slide still running ends first, so the edge is read where it stands and not mid-flight. */
-    sliding?.cancel();
-    sliding = null;
-    const el = document.getElementById('main');
-    const was = el ? railEdge(el) : undefined;
     railIcons = !railIcons;
     pref.write({ sidebar: !railIcons });
-    if (el && was !== undefined) void tick().then(() => slide(el, was));
   }
   const go = new GoPrefix();
 
@@ -631,7 +672,7 @@
 {:else}
   <div class="shell" data-rail={railIcons ? 'icons' : undefined} data-shape={shape}>
     {#if shape === 'rail'}
-      <div class="rail-slot">
+      <div class="rail-slot" bind:this={railSlot}>
         <Sidebar
           icons={railIcons}
           ontoggle={toggleRail}
@@ -1171,32 +1212,37 @@
   }
 
   /**
-   * THE DOCKED PANEL'S OWN COLUMN, FROM 1,280 UP (DIRECTION 37: a docked right panel).
+   * THE DOCKED PANEL'S OWN COLUMN, FROM 1,280 UP (DIRECTION 37: a docked right panel; `DOCKS` in `panel.ts`).
    *
    * `Panel.svelte` is a fixed card at the window's end edge, and it writes `--dock-w` on the root while it is open
-   * docked: its width and the inset either side, `0px` otherwise. Here that is the width of a third column, so opening
-   * a task or a question narrows the work beside it rather than drawing over it, and the work's scrollbar, a sticky head
-   * and anything full width all stop where the panel starts, which page padding could not do. The panel slides into
-   * the empty column on its own transform, so the work reflows once and nothing moves but the panel.
+   * docked: its width and the inset either side, `0px` otherwise. `--dock-col` is the same width for this column, so
+   * opening a task or a question narrows the work beside it rather than drawing over it, and the work's scrollbar, a
+   * sticky head and anything full width all stop where the panel starts, which page padding could not do.
+   *
+   * ONE REFLOW, IN STEP WITH THE SLIDE. Animating the column would lay the whole work out again on every frame, and
+   * taking it at once left an empty band of ground where the panel had yet to arrive. So the column is given when the
+   * panel's slide is over (`--dock-col` waits `--d-panel`), and until then the panel slides in over the work's end; the
+   * work narrows once, under a panel that is already there. Closing, the column goes at once and the panel slides out
+   * over the work as it widens.
    *
    * THE WORK THEN PADS NOTHING EXTRA. A screen that draws a panel pads its end by `max(var(--gutter), var(--dock-w))`,
    * which was how it kept clear before the panel had a column; inside `#main` that is `0px` here, so the space is given
    * up once and not twice. The root keeps the real width, for the toasts that centre beside it.
    *
-   * BELOW 1,280 THE PANEL KEEPS THE PAGE'S PADDING TO STAND ON, and below 900 it is a sheet over the screen
-   * (`panel.ts`). A window that narrow has no width to give a column.
+   * BELOW 1,280 THE PANEL IS A SHEET over the screen (`panel.ts`), a drawer at the end edge from 900 and a bottom
+   * sheet on a phone. A window that narrow has no width to give a column.
    *
    * ON THE OTHER TWO SHAPES the strip sits over the work's column only, so both are placed by hand: left to the grid,
    * the work would take the second column of the strip's row.
    */
   @media (width >= 1280px) {
     .shell {
-      grid-template-columns: auto minmax(0, 1fr) var(--dock-w, 0px);
+      grid-template-columns: auto minmax(0, 1fr) var(--dock-col, 0px);
     }
 
     .shell[data-shape='bar'],
     .shell[data-shape='menu'] {
-      grid-template-columns: minmax(0, 1fr) var(--dock-w, 0px);
+      grid-template-columns: minmax(0, 1fr) var(--dock-col, 0px);
     }
 
     .shell[data-shape='bar'] .bar-slot,

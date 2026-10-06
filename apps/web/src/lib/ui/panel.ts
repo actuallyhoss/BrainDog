@@ -3,16 +3,32 @@
  * things every overlay in `lib/ui` shares: how a bottom sheet is let go, when a scrim is over the window, and when an
  * exit is over.
  *
- * THE PANEL HAS TWO FORMS. From 900px up it is docked at the window's end edge, beside the content,
- * which narrows for it: a non-modal `<dialog>` opened with `show()`, so the list behind it keeps its keyboard and its
- * pointer. Below 900px it is a bottom sheet: the same `<dialog>`, opened with `showModal()`, over the scrim.
+ * THE PANEL HAS TWO FORMS. From `DOCKS` (1,280) up it is docked at the window's end edge, in a column of its own
+ * beside the content, which narrows for it: a non-modal `<dialog>` opened with `show()`, so the list behind it keeps
+ * its keyboard and its pointer. Below that it is a bottom sheet: the same `<dialog>`, opened with `showModal()`, over
+ * the scrim.
  *
- * A PANEL THAT IS OPEN WHEN THE WINDOW CROSSES 900PX CHANGES FORM WITHOUT CLOSING. `step` says what the element has to
- * do to match what was asked, and one of its answers is to reopen in the other form.
+ * ONE WIDTH FOR THE PANEL, AND ONE FOR THE PHONE, BOTH HERE. Between the phone's 900 and 1,280 the rail is still drawn
+ * but the window is a tablet's or a narrowed laptop's, and a docked panel there would leave the work a column under 400
+ * wide, so the panel is a sheet. The shell's dock column (`+layout.svelte`) opens at the same `DOCKS`, and the sheets'
+ * phone form (`Sheet.svelte`, its pull) at `PHONE`. Stylesheets cannot import, so each `@media` that means one of these
+ * says so beside its number.
+ *
+ * A PANEL THAT IS OPEN WHEN THE WINDOW CROSSES `DOCKS` CHANGES FORM WITHOUT CLOSING. `step` says what the element has
+ * to do to match what was asked, and one of its answers is to reopen in the other form.
  */
 
-/** Below this the panel is a bottom sheet. */
-export const NARROW = '(width < 1280px)';
+/** From this width up the panel docks beside the work in a column of its own. */
+export const DOCKS = 1280;
+
+/** Below this the window is a phone's: the tab bar for the rail, and every sheet rising from the bottom. */
+export const PHONE = 900;
+
+/** Below `DOCKS` the panel is a bottom sheet. */
+export const NARROW = `(width < ${DOCKS}px)`;
+
+/** A phone's window, where a sheet is pulled down by its head. */
+export const PHONE_WIDTH = `(width < ${PHONE}px)`;
 
 export type Form = 'docked' | 'sheet';
 

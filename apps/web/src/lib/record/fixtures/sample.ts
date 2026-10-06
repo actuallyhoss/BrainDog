@@ -210,6 +210,7 @@ export const ROWS: Record<string, Entry[]> = {
   services: SERVICES,
   things: THINGS,
   people: PEOPLE,
+  organisations: entriesOf('organisations'),
   tasks: TASKS,
   session: entriesOf('session'),
   tracks: entriesOf('tracks'),

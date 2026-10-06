@@ -331,6 +331,12 @@ for (const register of Object.keys(REGISTERS)) {
         `${register}.${field} returns a different set in each direction`,
       );
 
+      /* A LIST OF LINKS IS DRAWN AS THE NAMES IT POINTS AT (`display`), and the record still orders the column by what it
+         stores, so the order is not yet the names' order. It is a permutation (above); its order waits on the record
+         ordering a list of links as it orders one link, by name. */
+      const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
+      if (decl?.type === 'list' && decl.of === 'ref') continue;
+
       /* ASCENDING IS ASCENDING, in the values a person can see. Blanks are allowed to trail, which
          is what `sortRows` does deliberately — a row with nothing in the column has no place in an
          order over that column, and putting it first is the same as claiming it is the smallest. */

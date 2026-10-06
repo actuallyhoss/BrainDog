@@ -42,14 +42,16 @@
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './arranged.ts';
   import { proposedOf } from './proposed.ts';
   import { updatesOf, words as changeWords } from './changes.ts';
-  import { pickableOf, rowsToSend, words as pickWords } from './picked.ts';
+  import { joinedCount, pickableOf, rowsToSend, words as pickWords } from './picked.ts';
   import { answerFor, type Answer } from '$lib/record/answer.ts';
   import { COMMENT_MOST, sayComment } from '$lib/record/comments.ts';
   import { everyGovernance, plainOf, readOne, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
   import { visualOf, type Visual } from '$lib/page/queue-answer.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
-  import { acceptKey, declineKey, keyAct, labelOf, movesOf, notedAfter, suggestionShown, twoWords } from '../press.ts';
+  import { acceptKey, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, suggestionShown, twoWords, type Held } from '../press.ts';
+  import { mergeOf, words as mergeWords, type Press } from '../merge.ts';
+  import MergeCard from '../MergeCard.svelte';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../../settings/billing.ts';
@@ -179,8 +181,18 @@
   const sidebarNow = (): Map<string, string> =>
     new Map(((page.data.nav ?? []) as { href: string; title: string }[]).map((n) => [n.href, n.title]));
 
-  /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. */
-  const updates = $derived(question && live ? updatesOf(live.rowset, live.registers, live.rows, plainOf(live.registers)) : []);
+  /* A MERGE IS ASKED AS WHO IS WHO (`../merge.ts`): the names, where each was seen, Merge all, Keep apart and Pick. */
+  const merge = $derived(
+    question && from === 'live' && live ? mergeOf(live.about, question.options.map((o) => o.key), live.rowset ? (live.rows[live.rowset.register] ?? []) : []) : null,
+  );
+
+  /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. A merge's
+     patches are the card's names, and drawn as a diff they were the record's handles and a deleted day. */
+  const updates = $derived(question && live && !merge ? updatesOf(live.rowset, live.registers, live.rows, plainOf(live.registers)) : []);
+
+  /* A QUESTION THAT GATHERED SEVERAL, each arrival joining the one already open (`kernel/ingest.ts` `openRowset`), says
+     how many it holds beside its title, so a reader never accepts twelve having read one. */
+  const joined = $derived(merge ? undefined : joinedCount(about?.kind, about?.body));
 
   /** The answer on its way, so a second press waits for the first; and what the record refused, in its own sentence. */
   let sending = $state<string | null>(null);
@@ -239,7 +251,7 @@
       toasts.push(whyNot, { intent: 'warn' });
       return;
     }
-    if (sending !== null || !question) return;
+    if (sending !== null || holding !== null || !question) return;
     deferring = false;
     fix = '';
     noneTicked = key === 'accept' && pickable.length > 0 && picked === null;
@@ -252,6 +264,81 @@
     }
     void send(key);
   }
+
+  /* ── an answer held for its Undo ─────────────────────────────────────── */
+
+  /**
+   * THE PRESS BEING HELD FOR ITS UNDO: a merge's answer, and a decline Backspace gave. Neither can be taken back once it
+   * is in (a declined question is never reopened, and a pair kept apart is never asked about again), so the press waits
+   * six seconds with Undo on the line it leaves, and only then goes to the record (`press.ts` `hold`).
+   */
+  let holding = $state<{ key: string; id: string; held: Held; toast: number } | null>(null);
+  /** Whether this screen is still the one drawn, so a press that outlives it is sent without touching the next one. */
+  let mounted = true;
+
+  function held(key: string, line: string, rows?: number[]) {
+    if (!answerable) {
+      toasts.push(whyNot, { intent: 'warn' });
+      return;
+    }
+    if (sending !== null || holding !== null || !question) return;
+    /* WITH THE RECORD'S ONE LINE OPEN, the answer goes with the words the record asked for, as any press does there. */
+    if (asked !== null) return choose(key);
+    const id = question.id;
+    deferring = false;
+    fix = '';
+    const h = hold(() => {
+      if (holding) toasts.dismiss(holding.toast);
+      holding = null;
+      /* SENT FROM HERE ONLY WHILE THIS SCREEN STILL SHOWS THE QUESTION IT WAS GIVEN ON. `j`, `k` and Next keep the gate
+         and change its question, and `send` answers whichever question the gate holds now. */
+      if (mounted && question?.id === id && String(page.params.id) === id) void send(key, undefined, rows);
+      else void sendAway(id, key, rows);
+    });
+    holding = { key, id, held: h, toast: toasts.push(line, { undo: unhold, life: HOLD_MS, intent: 'good' }) };
+  }
+
+  /** Undo, from the line or with ⌘Z: the press is taken back and nothing is sent, unless it has already gone. */
+  function unhold() {
+    const was = holding;
+    if (!was) return void toasts.push(mergeWords.tooLate);
+    if (!was.held.undo()) return void toasts.push(mergeWords.tooLate);
+    holding = null;
+    toasts.push(mergeWords.undone);
+    void tick().then(() => document.getElementById(`opt-${was.key}`)?.focus());
+  }
+
+  /** A merge's press, held for its Undo. */
+  const pressMerge = (press: Press, line: string) => held(press.option, line, press.rows);
+
+  /**
+   * A HELD PRESS THAT OUTLIVED ITS SCREEN, sent on its own: the reader moved on to the next question inside the six
+   * seconds, and the answer they gave is still theirs. Only a refusal is said, as a warning, since nothing on the screen
+   * they are on now is about it.
+   */
+  async function sendAway(id: string, option: string, rows?: number[]) {
+    const out = await answerQuestion(apiBase(), id, option, undefined, undefined, rows);
+    if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
+  }
+
+  /* LEAVING THE SCREEN, OR THE TAB, SENDS WHAT IS HELD AT ONCE rather than dropping it. */
+  $effect(() => {
+    const leave = () => holding?.held.flush();
+    window.addEventListener('pagehide', leave);
+    return () => {
+      window.removeEventListener('pagehide', leave);
+      mounted = false;
+      leave();
+    };
+  });
+
+  /* AND MOVING ON TO ANOTHER QUESTION SENDS IT TOO, so the next question's answers are not held off behind it. */
+  $effect(() => {
+    const id = String(page.params.id);
+    untrack(() => {
+      if (holding && holding.id !== id) holding.held.flush();
+    });
+  });
 
   function defer() {
     /* AND THE THIRD VERB IS A DECISION TOO. A defer takes a reason and a wake date and is sent to
@@ -319,8 +406,9 @@
       else document.getElementById('opt-accept')?.focus();
       return;
     }
-    /* AND THE ONE TEST FOR TYPING, not a narrower copy. */
-    if (typing()) return;
+    /* AND THE ONE TEST FOR TYPING, not a narrower copy, with the key's own target beside it: a key that starts inside a
+       field or a box is that field's, whatever holds the focus by now (`press.ts` `fromInput`). */
+    if (typing() || fromInput(e.target)) return;
     if (silenced(e)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
 
@@ -344,9 +432,16 @@
         document.getElementById(`opt-${question.options[0]?.key ?? ''}`)?.focus();
         return;
       }
+      /* BACKSPACE IS HELD FOR ITS UNDO: a decline is never reopened, and a merge kept apart is never asked again. */
+      if (act === 'decline' && merge) {
+        e.preventDefault();
+        pressMerge(merge.apart, mergeWords.keptApart);
+        return;
+      }
       if (key === null) return;
       e.preventDefault();
-      choose(key);
+      if (act === 'decline') held(key, gate.declinedHeld(question.title));
+      else choose(key);
       return;
     }
     if (act === 'edit') {
@@ -389,13 +484,13 @@
   /* THE THREAD UNDER THE QUESTION IS READ AGAIN once a note is kept in it, so the note is there to be seen. */
   let threadRead = $state(0);
 
-  async function send(key: string, said?: string) {
+  async function send(key: string, said?: string, only?: number[]) {
     const a = answerFor(question, key, new Date(now).toISOString());
     if (!a || from !== 'live' || !client || sending !== null) return;
     sending = key;
     const accepting = a.option === 'accept' && about !== undefined && isArranging(about.kind) ? about : null;
     const had = accepting ? sidebarNow() : null;
-    const rows = a.option === 'accept' && picked ? picked : undefined;
+    const rows = only ?? (a.option === 'accept' && picked ? picked : undefined);
     const out = await answerQuestion(apiBase(), a.question, a.option, said, undefined, rows);
     sending = null;
     /* THE RECORD KEEPS A REASON FOR THIS ONE: the line opens under the answers, focused, with the choice kept. */
@@ -481,7 +576,7 @@
 
   /** Parking it: sent to `decide` with the day and the why. */
   async function deferIt() {
-    if (from !== 'live' || !client || !question || sending !== null) return;
+    if (from !== 'live' || !client || !question || sending !== null || holding !== null) return;
     sending = 'defer';
     const out = await parkQuestion(apiBase(), question.id, wake, parkWhy);
     sending = null;
@@ -630,7 +725,7 @@
 {:else}
   <!-- THE QUESTION IS THE TITLE, and the sentence under it says how many ways there are to answer, which one is
        suggested, and how long it has been open. -->
-  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={question.title} sentence={gateSaid} />
+  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={question.title} count={joined} sentence={gateSaid} />
 
   <div class="page">
     <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news and the reason the options came back. -->
@@ -728,7 +823,7 @@
           data-suggested={marked ? '' : undefined}
           data-on={asked === option.key ? '' : undefined}
           aria-pressed={asked === null ? undefined : asked === option.key}
-          disabled={!answerable}
+          disabled={!answerable || holding !== null}
           aria-describedby={answerable ? undefined : 'cannot-decide'}
           onclick={() => choose(option.key)}
         >
@@ -737,9 +832,18 @@
       {/snippet}
 
       <!-- A COUNT ONLY OVER A QUESTION'S OWN OPTIONS: over Accept and Decline it would count the buttons. -->
-      <Tile icon="decide" title={copy.theOptions} count={two ? undefined : question.options.length}>
+      <Tile icon={merge ? 'people' : 'decide'} title={merge ? mergeWords.heading : copy.theOptions} count={two || merge ? undefined : question.options.length}>
         <section class="options">
-          {#if two}
+          {#if merge}
+            <!-- WHO IS WHO: each name and where it was seen, and one press each, held for its Undo. -->
+            <MergeCard
+              {merge}
+              {answerable}
+              holding={holding?.key ?? null}
+              titleOf={(key) => question.options.find((o) => o.key === key)?.title}
+              onpress={pressMerge}
+            />
+          {:else if two}
             <!-- THE RECORD'S TWO ANSWERS ARE TWO BUTTONS, Accept and Decline, side by side, with what accepting changes
                  open in the tile under them. Two cards whose only content was a button was the walk's #29. -->
             <div class="two">

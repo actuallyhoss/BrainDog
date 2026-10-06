@@ -158,12 +158,6 @@ async function addModule(client: Client, id: string, held: readonly PackState[],
   return put.ok ? null : fixOf(put, '');
 }
 
-/** The row a spoken id such as `people#3` names, or `null`. */
-function rowOf(spoken: string): { register: string; seq: number } | null {
-  const m = /^([a-z][a-z0-9_]*)#(\d+)$/u.exec(spoken);
-  return m && m[1] !== undefined && m[2] !== undefined ? { register: m[1], seq: Number.parseInt(m[2], 10) } : null;
-}
-
 /** The spoken id of the entry `create` answered, `<list>#<seq>`, which a link field takes, or `null`. */
 function spokenOf(entry: unknown): string | null {
   const e = entry as { register?: unknown; seq?: unknown } | null;
@@ -255,15 +249,23 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
      with People off was said back on the preview and is stored nowhere. */
   const met = introduce(who, asked.email, states);
   if (met) {
-    const out = (await client.meet(met)) as Wire<{ person: string; created: boolean }>;
-    if (out.ok) {
+    const out = (await client.meet(met)) as Wire<{ row: { register: string; seq: number | null } | null; created: boolean }>;
+    const row = out.ok ? out.value.row : null;
+    if (row && row.seq !== null) {
       /* THE WORDS AFTER THE NAME ARE THE PERSON'S NOTE, which is where a sentence these rules could not read is kept. */
-      const row = rowOf(out.value.person);
-      if (row && out.value.created && who.bio !== '') await client.update({ register: row.register, seq: row.seq, patch: { note: who.bio } }).catch(() => null);
+      if (out.ok && out.value.created && who.bio !== '') await client.update({ register: row.register, seq: row.seq, patch: { note: who.bio } }).catch(() => null);
+      /* THIS IS THEM, SO THE ROW SAYS SO (People's `self`, `loop/contract-17.md`): their own commits and mail are never
+         met as somebody new, and an imported copy of them folds into this row. A People list older than the part refuses
+         it, and the row stays an ordinary person. */
+      await client.update({ register: row.register, seq: row.seq, patch: { self: true } }).catch(() => null);
     } else {
       /* A PEOPLE LIST WITH NO PROJECTS TO LINK, a student's or a guide's, is one `meet` refuses (it writes the agents
-         pack's fields), so the person is written as a plain entry instead, and is in People like anybody else. */
-      const plain = (await client.create({ register: PEOPLE, fields: personRow(met, who.bio) }).catch(() => null)) as Wire<unknown> | null;
+         pack's fields), so the person is written as a plain entry instead, and is in People like anybody else. A name
+         with no address is only a mention to `meet`, which keeps no row, and the person the record belongs to is no
+         mention: they are written the same way. Marked as them where the list has the part, plain where it does not. */
+      const fields = personRow(met, who.bio);
+      let plain = (await client.create({ register: PEOPLE, fields: { ...fields, self: true } }).catch(() => null)) as Wire<unknown> | null;
+      if (!plain?.ok) plain = (await client.create({ register: PEOPLE, fields }).catch(() => null)) as Wire<unknown> | null;
       if (!plain?.ok) failed.push({ said: firstRun.notMet(met.name), why: fixOf(plain ?? out, '') });
     }
   }

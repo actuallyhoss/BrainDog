@@ -76,12 +76,12 @@ test('TWO CURRENCIES ARE NEVER GUESSED BETWEEN, and no money is no currency', ()
 
 test("THE SHELL IS DRAWN IN THE RECORD'S ONE CURRENCY where nobody chose, and its choice wins where somebody did", () => {
   try {
-    assert.equal(layoutOf({ registers: [], now: NOW, record: { ...RECORD, currency: null } }, { setting: null, held: ['GBP'] }).index.currency, 'GBP');
+    assert.equal(layoutOf({ registers: [], home: null, now: NOW, record: { ...RECORD, currency: null } }, { setting: null, held: ['GBP'] }).index.currency, 'GBP');
     assert.equal(homeCurrency(), 'GBP');
-    assert.equal(layoutOf({ registers: [], now: NOW, record: { ...RECORD, currency: null } }, { setting: null, held: ['GBP', 'USD'] }).index.currency, null);
+    assert.equal(layoutOf({ registers: [], home: null, now: NOW, record: { ...RECORD, currency: null } }, { setting: null, held: ['GBP', 'USD'] }).index.currency, null);
     assert.equal(homeCurrency(), null, 'a record in two currencies was drawn in one of them');
-    assert.equal(layoutOf({ registers: [], now: NOW, record: { ...RECORD, currency: 'EUR' } }, { setting: null, held: ['GBP'] }).index.currency, 'EUR');
-    assert.equal(layoutOf({ registers: [], now: NOW, record: { ...RECORD, currency: null } }, { setting: 'JPY', held: ['GBP'] }).index.currency, 'JPY');
+    assert.equal(layoutOf({ registers: [], home: null, now: NOW, record: { ...RECORD, currency: 'EUR' } }, { setting: null, held: ['GBP'] }).index.currency, 'EUR');
+    assert.equal(layoutOf({ registers: [], home: null, now: NOW, record: { ...RECORD, currency: null } }, { setting: 'JPY', held: ['GBP'] }).index.currency, 'JPY');
     assert.equal(refusedShell({ code: 'FORBIDDEN', fix: 'Ask the owner.' }).index.currency, null, 'a refusal forgot the last record');
   } finally {
     learnHome(null);
@@ -102,7 +102,7 @@ test('THE MONEY IS READ BY ITS TWO ENDS: a field in one currency answers it, a f
 
 test('A LIST WITH NO MONEY IS NOT READ FOR ROWS, and an empty list is not read at all', async () => {
   const { io, sent } = host({ record: { ...RECORD, currency: null }, lists: { tasks: { fields: [{ id: 'title', type: 'text' }], money: {} } } });
-  const b = { registers: [{ id: 'tasks', name: 'Tasks', count: 4 }, { id: 'bills', name: 'Bills', count: 0 }], now: NOW, record: { ...RECORD, currency: null } };
+  const b = { registers: [{ id: 'tasks', name: 'Tasks', count: 4 }, { id: 'bills', name: 'Bills', count: 0 }], now: NOW, home: null, record: { ...RECORD, currency: null } };
   assert.deepEqual(await read(io, b), { setting: null, held: [] });
   assert.deepEqual(sent, ['schema']);
 });
@@ -149,11 +149,11 @@ test('A RECORD NOBODY NAMED STILL DRAWS ITS SHELL IN ITS HOME CURRENCY, which it
   /* THE GATES' RECORD, AND ANY SELF-HOST BEFORE ITS FIRST RUN: `record` is `null` there, and the shell read that as no
      currency, so every sentence on Money, Decide and Today said "£39 GBP". */
   try {
-    assert.equal(layoutOf({ registers: [], now: NOW, record: null, currency: 'GBP', money: ['GBP'] }).index.currency, 'GBP');
+    assert.equal(layoutOf({ registers: [], home: null, now: NOW, record: null, currency: 'GBP', money: ['GBP'] }).index.currency, 'GBP');
     assert.equal(homeCurrency(), 'GBP');
-    assert.equal(layoutOf({ registers: [], now: NOW, record: null, currency: null, money: ['GBP', 'USD'] }).index.currency, null);
+    assert.equal(layoutOf({ registers: [], home: null, now: NOW, record: null, currency: null, money: ['GBP', 'USD'] }).index.currency, null);
     /* A HOST OLDER THAN THE FIELD SAYS NOTHING, and nothing is guessed for it. */
-    assert.equal(layoutOf({ registers: [], now: NOW, record: null }, { setting: null, held: ['GBP'] }).index.currency, null);
+    assert.equal(layoutOf({ registers: [], home: null, now: NOW, record: null }, { setting: null, held: ['GBP'] }).index.currency, null);
   } finally {
     learnHome(null);
   }

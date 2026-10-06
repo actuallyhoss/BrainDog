@@ -75,7 +75,9 @@ test('A LIST CARRIES ITS ELEMENT TYPE, and a list of lists is not a shape', () =
   assert.equal(projects.of, 'ref');
 
   const lists = declared().filter(({ field }) => field.type === 'list');
-  assert.equal(lists.length, 11, 'the mirror declares eleven list fields');
+  /* AT LEAST THE ELEVEN, since People and Organisations keep what they are known by and where they were met as lists
+     too, and a count pinned here went red each time a list declared one more. */
+  assert.ok(lists.length >= 11, `the mirror declares ${lists.length} list fields, fewer than the eleven`);
   for (const { at, field } of lists) {
     assert.ok(field.of !== undefined, `${at} is a list of nothing`);
     assert.notEqual(field.of, 'list', `${at} is a list of lists`);

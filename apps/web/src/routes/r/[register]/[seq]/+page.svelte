@@ -34,6 +34,7 @@
   import { money, since, TONES } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
+  import { goto } from '$app/navigation';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
@@ -93,7 +94,7 @@
   import { METRICS } from '$lib/record/declared.ts';
   import { handFor } from '$lib/record/hand.ts';
   import type { Backlink } from '$lib/record/api.ts';
-  import { actor, listName, nameWords } from '$lib/record/names.ts';
+  import { actor, listName, nameWords, personWords } from '$lib/record/names.ts';
   import { movable, scopeFieldOf } from '$lib/record/scope-move.ts';
   import ScopeMove from './ScopeMove.svelte';
   import Thread from '$lib/ui/Thread.svelte';
@@ -102,6 +103,7 @@
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { reachWords } from '../reach.ts';
+  import { knownOf, lastDayOf, meetsOf, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Named } from '../people.ts';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
@@ -180,6 +182,9 @@
   let askedFor = '';
   let reader: RowReader | null = null;
 
+  /** A row's address in the app, outside `readRow`, whose `at` is the read's own bracket. */
+  const rowHref = (register: string, n: number): string => at(`/r/${register}/${n}`);
+
   async function readRow(register: string, n: number) {
     const key = `${register}#${n}`;
     askedFor = key;
@@ -207,6 +212,12 @@
     closed(!current || (r.from !== 'refused' && h.from !== 'refused'), at);
     if (!current) return;
     clock = Date.now();
+    /* A NUMBER MERGED INTO ANOTHER ROW IS NEVER THE ADDRESS: the answer is the kept row, and the page moves to its number,
+       in place of this entry in the history, so Back does not land on the folded one again. */
+    if (r.from === 'live' && r.folded !== undefined && r.entry && r.entry.seq !== n) {
+      void goto(rowHref(register, r.entry.seq), { replaceState: true });
+      return;
+    }
     got = r;
     told = h;
     linked = l;
@@ -579,7 +590,7 @@
   /* EVERY EMPTY FIELD IS A CHIP. A person with four unset fields was a column of four "Not set" rows,
      then one line of names with a separator trailing the last; a chip names its field, wraps whole, and on a row you can
      write to it opens that field. */
-  const unsetFields = $derived(row ? listed.filter((f) => unsetValue(row.fields[f.id]) && editing !== f.id) : []);
+  const unsetFields = $derived(row ? listed.filter((f) => unsetValue(row.fields[f.id]) && editing !== f.id && !recordKept.has(f.id)) : []);
   const shownFields = $derived(listed.filter((f) => !unsetFields.includes(f)));
 
   /**
@@ -590,13 +601,105 @@
    */
   const PROPS: ReadonlySet<string> = new Set(['enum', 'ref', 'day', 'bool']);
   const isProp = (f: FieldDecl): boolean => PROPS.has(f.type);
-  const pills = $derived(shownFields.filter((f) => isProp(f) && f.id !== decl?.title));
-  const facts = $derived(shownFields.filter((f) => !pills.includes(f)));
+  const pills = $derived(shownFields.filter((f) => isProp(f) && f.id !== decl?.title && !evidence.has(f.id)));
+  const facts = $derived(shownFields.filter((f) => !pills.includes(f) && !evidence.has(f.id)));
   const unsetProps = $derived(unsetFields.filter(isProp));
   /* THE PROPERTY WHOSE BOX IS OPEN, drawn under the strip that holds its pill. */
   const propEditing = $derived(pills.find((f) => f.id === editing));
   /* A RUN'S PROJECT OPENS THE PROJECT, so its pill is a link to read and not a button to press. */
   const opensRow = (f: FieldDecl, value: unknown): boolean => id === 'session' && f.id === 'project' && spokenRow(value, names) !== null;
+
+  /**
+   * A PERSON'S PAGE LEADS WITH WHO THEY ARE, AND AN ORGANISATION'S WITH WHAT IT IS, on a list that declares the role
+   * (`people.ts`): the people `meet` writes (`meets:`) or the organisations (`org:`). Never by the list's name, so any
+   * record's people read this way, whoever it belongs to.
+   *
+   * THE SENTENCE UNDER A PERSON'S NAME is who they are, "Contractor at Encore, on Kiln and Portage.", each name opening
+   * its own page, then the last day they were in touch. An organisation's is its kind and how many people and projects
+   * are with it. Then, on the ground, where the person was seen and what they are known by, which the lines `meet`
+   * wrote said in an agent's words ("2026-08-27 · commit 8b1e4d0 in portage") and now say in a person's; then Details,
+   * then the history beside them. A field said in one of those places is not listed again under Details.
+   */
+  const meets = $derived.by(() => (void got, meetsOf(decl)));
+  const orgRole = $derived.by(() => (void got, meetsOf(decl) ? null : orgRoleOf(decl)));
+  const fieldTo = (field: string | undefined): string | undefined => (field ? decl?.fields.find((f) => f.id === field)?.to : undefined);
+  /** A ref as a name that opens its row, or nothing while the record has not named it: never its number. */
+  const namedRef = (to: string | undefined, v: unknown): Named | null => {
+    const n = typeof v === 'number' ? v : typeof v === 'string' && /^\d+$/u.test(v) ? Number(v) : NaN;
+    if (!to || !Number.isInteger(n) || n < 1) return null;
+    const name = names?.get(`${to}#${n}`)?.trim();
+    return name ? { name, href: at(`/r/${to}/${n}`) } : null;
+  };
+  /* WHETHER THE ROW IS THE PERSON WHOSE RECORD THIS IS, by the list's own `self` part. */
+  const self = $derived(Boolean(meets?.self && row?.fields[meets.self] === true));
+  /* A LIST OF PROJECTS, by what it declares: rows with a mark and a hue, or the list that says it scopes the rest. */
+  const isProjects = (list: string): boolean => REGISTERS[list]?.identity !== undefined || (REGISTERS[list] as { scopes?: unknown } | undefined)?.scopes !== undefined;
+  /** The projects a list-of-links field names, by name, each opening its page; one the record has not named is left out. */
+  const projectsOf = (field: string | undefined): Named[] => {
+    const v = field && row ? row.fields[field] : null;
+    return Array.isArray(v) ? v.map((x) => namedRef(fieldTo(field), x)).filter((x): x is Named => x !== null) : [];
+  };
+  /**
+   * THE LINE UNDER THE NAME. A person: "Contractor at Encore, on Kiln and Portage. Last in touch 2 Sep." An
+   * organisation: "Client · 24 people, on Kiln and Portage." Each part only when the row has it.
+   */
+  const lead = $derived.by(() => {
+    if (!row || (!meets && !orgRole)) return null;
+    if (meets) {
+      const role = roleFieldOf(decl);
+      const projects = projectsOf(meets.projects);
+      const day = lastDayOf(row.fields, meets);
+      return {
+        parts: whoParts({
+          role: role ? display(id, role, row.fields[role], clock, names) : null,
+          org: meets.org ? namedRef(fieldTo(meets.org), row.fields[meets.org]) : null,
+          projects,
+        }),
+        named: projects.length > 0,
+        last: day ? seenWords.lastInTouch(daySaid(day, clock)) : null,
+      };
+    }
+    const people = incoming.filter((g) => meetsOf(REGISTERS[g.register]) !== null).reduce((n, g) => n + g.total, 0);
+    const projects = projectsOf(orgRole?.projects);
+    const pointing = incoming.filter((g) => isProjects(g.register)).reduce((n, g) => n + g.total, 0);
+    const kind = orgRole?.kind ? display(id, orgRole.kind, row.fields[orgRole.kind], clock, names) : null;
+    const said = orgSaid({ kind, people, projects: projects.length > 0 ? 0 : pointing });
+    return { parts: whoParts({ role: said, org: null, projects }), named: projects.length > 0, last: null };
+  });
+  const seen = $derived(row && (meets?.met || orgRole?.met) ? seenOf(row.fields[(meets?.met ?? orgRole?.met)!]) : []);
+  const knownParts = $derived(
+    meets ? { email: meets.email, keys: meets.keys, handles: meets.handles, aliases: meets.aliases } : { keys: orgRole?.keys, domain: orgRole?.domain },
+  );
+  const known = $derived(row && (meets || orgRole) ? knownOf(row.fields, knownParts) : []);
+  /* THE FIELDS "Known by" SAYS, each still changed from there, by the pencil Details would have drawn. */
+  const knownFields = $derived(
+    meets || orgRole ? readable.filter((f) => Object.values(knownParts).includes(f.id) && row !== undefined && !unsetValue(row.fields[f.id])) : [],
+  );
+  /* WHAT THE RECORD KEEPS ABOUT WHO SOMEBODY IS, AND NOBODY TYPES: where they were met, the row they were merged into,
+     and whether they are the person whose record it is. None is offered as a chip to fill in. */
+  const recordKept = $derived(
+    new Set([meets?.met, meets?.merged_into, meets?.self, orgRole?.met, orgRole?.merged_into].filter((x): x is string => Boolean(x))),
+  );
+  /* SAID ABOVE DETAILS, SO NOT AGAIN IN THEM: where they were seen, what they are known by, the projects the line under
+     the name names, and the person whose record it is, which is their face's mark. */
+  const evidence = $derived(
+    new Set(
+      [
+        ...knownFields.map((f) => f.id),
+        meets?.met ?? orgRole?.met,
+        meets?.self,
+        meets?.merged_into ?? orgRole?.merged_into,
+        lead?.named ? (meets?.projects ?? orgRole?.projects) : undefined,
+      ].filter((x): x is string => Boolean(x) && editing !== x),
+    ),
+  );
+  /**
+   * WHAT POINTS AT AN ORGANISATION, IN THE ORDER IT IS ASKED ABOUT: its people, then its projects, then its money, then
+   * the rest (services, documents), each list in the order the record gave. Any other row keeps the record's order.
+   */
+  const rankOf = (g: Backlink): number =>
+    meetsOf(REGISTERS[g.register]) ? 0 : isProjects(g.register) ? 1 : REGISTERS[g.register]?.fields.some((f) => f.type === 'money') ? 2 : 3;
+  const related = $derived(orgRole ? [...incoming].sort((a, b) => rankOf(a) - rankOf(b)) : incoming);
 
   /**
    * A RUN'S PAGE LEADS WITH ITS HANDOFF: what it is doing, where, the next step, what it already tried and its
@@ -664,6 +767,8 @@
 
   /* AN AMOUNT AS A TILE WRITES ONE: the symbol where the record's currency has one, and no fraction of all zeros. */
   const moneySaid = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), true);
+  /* A CHART'S VALUES, BY THE FIGURE'S RULE: a bar and a spark point say what they are, where the tile's figure is a headline. */
+  const figureSaid = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), 'figure');
 
   /* EVERY VALUE IN A ROW'S PROSE IS A HOLE UNTIL PAGES READ THEM. The sample's own values answered them off the
      row, and pressing one said what would have happened; neither has a record behind it. */
@@ -746,6 +851,9 @@
   <!-- THE SENTENCE, IN PIECES FROM `said.ts`: the state's word through `stateSaid`, and the late phrase coloured, red
        once the day has passed (`data-needs`, the title row's one red) and amber while it is close. -->
   {#snippet sentenceLine()}{#each sentence as piece, i (i)}{#if piece.kind === 'state'}<span class="lead-word">{stateSaid(decl, stateValue)}</span>{:else if piece.kind === 'late'}<span class="said-late" data-tone={piece.tone} data-needs={piece.tone === 'bad' ? '' : undefined}>{piece.text}</span>{:else}{piece.text}{/if}{/each}{/snippet}
+
+  <!-- WHO A PERSON IS, OR WHAT AN ORGANISATION IS, in place of the sentence a row of any other list leads with. -->
+  {#snippet whoLine()}{#each lead?.parts ?? [] as part, i (i)}{#if part.href}<a class="who-link" href={part.href}>{part.text}</a>{:else}{part.text}{/if}{/each}{#if lead?.parts && lead.last}{' '}{/if}{lead?.last ?? ''}{/snippet}
 
   <!-- A VALUE AS THE PAGE SAYS IT, in a pill and in Details alike. -->
   {#snippet shown(f: FieldDecl, value: unknown)}
@@ -864,6 +972,40 @@
     </button>
   {/snippet}
 
+  <!-- WHAT A PERSON OR AN ORGANISATION IS KNOWN BY: an address, a login, a website, each by its kind. Each field it is read
+       from keeps its way to be changed, under the list, as Details would have offered it. -->
+  {#snippet knownBy()}
+    {#if known.length > 0 || knownFields.some((f) => editing === f.id)}
+      <Section title={!self ? seenWords.knownBy : owner ? personWords.identities : personWords.identitiesOf(String(row.fields[decl.title] ?? '') || decl.one)}>
+        <dl class="field-list known">
+          {#each known as k, i (i)}
+            <div class="fact">
+              <dt class="field-label">{k.label}</dt>
+              <dd class="field-value" dir="auto">{k.value}</dd>
+            </div>
+          {/each}
+        </dl>
+        {#each knownFields as f (f.id)}
+          {#if editing === f.id}
+            <div class="prop-editor">
+              <p class="prop-editor-label">{labelOf(f)}</p>
+              {@render fieldEditor(f, row.fields[f.id])}
+            </div>
+          {/if}
+        {/each}
+        {#if changes && knownFields.some((f) => editable(f) && editing !== f.id)}
+          <ul class="unset" aria-label={seenWords.knownBy}>
+            {#each knownFields.filter((f) => editable(f) && editing !== f.id) as f (f.id)}
+              <li>
+                <button type="button" class="unset-chip tap" onclick={() => startEdit(f)}><Icon name="edit" size="s" /><span>{copy.editValue(labelOf(f))}</span></button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </Section>
+    {/if}
+  {/snippet}
+
   <!-- THE ROW'S AMOUNT, as big as a figure is set (`--t-figure`), in the lead tile or, with nothing to chart, on the
        ground. A container, so the figure answers the room it has and not the width of the window. -->
   {#snippet hero()}
@@ -886,7 +1028,7 @@
 
   <!-- THE LIST'S NAME IS THE WAY BACK: a link above the title from 900px, and the chevron in the
        phone's bar below it. No number follows the title; it is in Details. -->
-  <PageHead icon={iconFor(decl?.icon, 'rows')} kicker={listName(id)} back={`/r/${id}`} title={String(row.fields[decl.title] ?? '')} sentence={sentenceLine}>
+  <PageHead icon={iconFor(decl?.icon, 'rows')} kicker={listName(id)} back={`/r/${id}`} title={String(row.fields[decl.title] ?? '')} sentence={!archived && (lead?.parts || lead?.last) ? whoLine : sentenceLine}>
     {#snippet actions()}
       <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER, AND IT LIVES BESIDE THE NUMBER NOW. A row's
            page led with a developer verb: the first control a person saw on an invoice was the one
@@ -940,9 +1082,11 @@
          list, drawn from the name in the title above; `Face` is `aria-hidden` because that name is already said. Each
          pill is its label and its value, and on a row you can write to it opens its box under the strip; each dashed
          pill is a property the row has not answered. -->
-    {#if ofPeople(decl) || pills.length > 0 || unsetProps.length > 0}
+    {#if ofPeople(decl) || meets || pills.length > 0 || unsetProps.length > 0}
       <ul class="props" aria-label={rowWords.props}>
-        {#if ofPeople(decl)}<li class="lead-face"><Face name={String(row.fields[decl.title] ?? '')} kind="person" size="l" /></li>{/if}
+        {#if ofPeople(decl) || meets}<li class="lead-face"><Face name={String(row.fields[decl.title] ?? '')} kind="person" you={self && owner} size="l" /></li>{/if}
+        <!-- THE PERSON WHOSE RECORD THIS IS, MARKED: the list's `self` part, which Details leaves out because it is said here. -->
+        {#if self}<li><span class="prop"><span class="prop-value">{personWords.self}</span></span></li>{/if}
         {#each pills as f (f.id)}
           {@const value = row.fields[f.id]}
           {@const overdue = f.id === dueField?.id && lateTone === 'bad'}
@@ -1010,7 +1154,7 @@
           >
             {@render hero()}
             {#if compared}
-              <Bars items={compared.items} format={(n) => moneySaid(n, compared.currency)} summary={comparedSaid(compared)} />
+              <Bars items={compared.items} format={(n) => figureSaid(n, compared.currency)} summary={comparedSaid(compared)} />
               <p class="reading">{comparedSaid(compared)}</p>
             {/if}
             {#if steps}
@@ -1025,7 +1169,7 @@
             <div class="stat">
               <p class="tile-figure num">{moneySaid(moneyIn.total, moneyIn.currency)}<span class="tile-figure-note">{rowWords.months(moneyIn.months.length)}</span></p>
               <div class="stat-line">
-                <Sparkline values={moneyIn.months.map((m) => m.value)} tone="earn" mark="high" subject={rowWords.moneyIn} format={(n) => moneySaid(n, moneyIn?.currency ?? '')} />
+                <Sparkline values={moneyIn.months.map((m) => m.value)} tone="earn" mark="high" subject={rowWords.moneyIn} format={(n) => figureSaid(n, moneyIn?.currency ?? '')} />
               </div>
             </div>
             <p class="reading">{moneyInSaid(moneyIn, clock, moneySaid)}</p>
@@ -1110,6 +1254,33 @@
           </Section>
         {/each}
 
+        <!-- WHAT THEY ARE KNOWN BY, LEADING ON THE PAGE OF THE PERSON WHOSE RECORD THIS IS: their own addresses and
+             handles are what their page is for. Anyone else's leads with where they were seen. -->
+        {#if self}{@render knownBy()}{/if}
+
+        <!-- WHERE A PERSON WAS SEEN: each place once, newest first, with how often and when, in a person's words. -->
+        {#if seen.length > 0}
+          <Section title={seenWords.seenIn}>
+            <ul class="ledger ledger-lead" aria-label={seenWords.seenIn}>
+              {#each seen as place (place.where)}
+                <li>
+                  <div class="line line-tall">
+                    <span class="line-mark"><IconWell name={place.kind === 'mail' ? 'inbox' : place.kind === 'commit' ? 'code' : 'link'} size="l" /></span>
+                    <span class="line-main">
+                      <span class="line-title" dir="auto">{place.where}</span>
+                      {#if place.about.length > 0}<span class="line-detail" dir="auto">{place.about.slice(0, 3).join(' · ')}</span>{/if}
+                    </span>
+                    <span></span>
+                    <span class="line-when">{timesSaid(place, (d) => daySaid(d, clock))}</span>
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          </Section>
+        {/if}
+
+        {#if !self}{@render knownBy()}{/if}
+
         <!-- DETAILS: every fact that is not a property, its number and when it was added. "This row" said what you are
              already looking at, and "Spoken id" and "Version" are both the record's own vocabulary: one is the thing you
              say out loud, which is what the row is called, and the other is a compare-and-set counter that means nothing
@@ -1188,7 +1359,7 @@
              place and mean different things — an update's `track` is what it is about and its `supersedes` is what it
              replaces. Each row leads with its list's icon and what it is, its other values as its meta line, and the
              list's tone as its dot. -->
-        {#each incoming as rel}
+        {#each related as rel}
           {@const twice = incoming.filter((r) => r.name === rel.name).length > 1}
           <Section title={rel.name} count={rel.total}>
             {#snippet aside()}
@@ -1284,6 +1455,26 @@
   }
 
   /* ── the sentence's pieces ─────────────────────────────────────────── */
+
+  /* A NAME IN A PERSON'S SENTENCE OPENS ITS PAGE: the sentence's own ink at 500, underlined only under a pointer, so the
+     line reads as a sentence and not as a row of links. */
+  .who-link {
+    color: inherit;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .who-link:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  .who-link:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 
   /* Sentence case in the stylesheet, so the text stays the record's own word. */
   .lead-word {

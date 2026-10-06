@@ -74,7 +74,8 @@
   /** The run that opened each key last, by the key's row id, from `usedBy`. A key missing here says only its counts. */
   let lastBy = $state<ReadonlyMap<string, UsedByRun>>(new Map());
   let names: ReadonlyMap<string, string> & { marks?: ReadonlyMap<string, ProjectMark> } = $state(new Map());
-  let client: ReturnType<typeof createClient> | null = null;
+  /* RAW, as a client is a thing to call and not data to follow inside; the passphrase box is handed it once it is made. */
+  let client = $state.raw<ReturnType<typeof createClient> | null>(null);
 
   /**
    * WHAT THE RECORD SAID TO THREE OF THE FOUR READS, kept rather than dropped.

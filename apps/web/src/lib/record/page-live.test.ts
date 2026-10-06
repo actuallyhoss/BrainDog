@@ -18,7 +18,7 @@ import { METRICS } from './declared.ts';
 import { feedTable } from './api.ts';
 import { ROWS } from './fixtures/sample.ts';
 import { toSegments } from './blocks.ts';
-import { blockOf, liveWords, pageReader, resolverOf, tileOf, type Fetch } from './page-live.ts';
+import { askWalk, blockOf, forgetWalks, liveWords, pageReader, resolverOf, tileOf, walkAsked, type Fetch } from './page-live.ts';
 
 const BASE = 'http://record.test';
 const AT = Date.UTC(2026, 8, 15, 12);
@@ -1069,13 +1069,14 @@ test('A FIGURE GROUPED BY A REF NAMES EACH PART BY ITS ROW, the record’s own l
   assert.deepEqual(named.cells.slice(0, 2), ['Sam (personal)', 'Quartz']);
   assert.ok(!named.sent.includes('list'), 'a list was walked for names the record had already said');
 
-  /* AND DRAWN WHOLE, A BAR'S VALUE IS A HEADLINE IN THE RECORD'S OWN SIGN: E£1,086,213, never EGP 1,086,213.41. */
+  /* AND DRAWN WHOLE, A BAR'S VALUE IS A FIGURE, EXACT IN THE RECORD'S OWN SIGN: E£1,086,213.41, never EGP 1,086,213.41,
+     and never rounded, since it is read against the bars beside it (`money.ts` `figure`). A fraction of zeros is dropped. */
   const { draw } = await import('./blocks.ts');
   const { learnHome } = await import('./api.ts');
   learnHome('EGP');
   try {
     const figures = draw(walked.block).segments.flatMap((s) => (s.type === 'block' ? s.rows.map((r) => r.cells[1]) : []));
-    assert.deepEqual(figures, ['E£1,086,213', 'E£120,000', 'E£9,512']);
+    assert.deepEqual(figures, ['E£1,086,213.41', 'E£120,000', 'E£9,382.59']);
   } finally {
     learnHome(null);
   }
@@ -1277,4 +1278,74 @@ test("A LEAD NOTE SAYS THE MODEL'S LINE WHEN THE RECORD SENT ONE, and the rules'
 /* WHAT THIS PATH SAYS FOR ITSELF NAMES NO SYSTEM THING (DIRECTION §35): a part of the page, never a block. */
 test('the sentences a live page says for itself name no block, row or list', () => {
   for (const line of Object.values(liveWords)) assert.doesNotMatch(line, /\b(blocks?|rows?|lists?|registers?)\b/iu, line);
+});
+
+/* ── the look, block keys and a walk asked for ─────────────────────────────── */
+
+/** A record whose one page leads with a sentence, carries a key on each block, and is arranged by Slash. */
+function arranged(seen: URL[]) {
+  return host((method, url) => {
+    seen.push(url);
+    if (method !== 'page') return refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.');
+    return json(200, {
+      ok: true,
+      value: {
+        page: 'money',
+        title: 'Money',
+        look: { by: 'slash', basis: 'b7', lead: 'cash', order: ['cash'], next: { row: 'tasks#4', text: 'Pay the studio rent' } },
+        blocks: [
+          { kind: 'note', key: 'line', lead: true, body: 'Cash is fine', rows: [], matched: 0, refusals: [] },
+          { kind: 'note', key: 'cash', body: 'Two bills this week', rows: [], matched: 0, refusals: [] },
+          { kind: 'note', key: 42, body: 'A key that is no key', rows: [], matched: 0, refusals: [] },
+        ],
+      },
+    });
+  });
+}
+
+test("each block carries the key the record answered for it, and the page carries the engine's look", async () => {
+  const seen: URL[] = [];
+  const out = await pageReader(BASE, arranged(seen).io, () => AT).read('money');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  assert.deepEqual(
+    out.page.blocks.map((b) => b.key),
+    ['line', 'cash', undefined],
+    'a key that is not text is left off, and the page works one out',
+  );
+  assert.equal(out.page.page.look?.by, 'slash');
+  assert.equal(out.page.page.look?.lead, 'cash');
+  assert.deepEqual(out.page.page.look?.next, { row: 'tasks#4', text: 'Pay the studio rent' });
+  assert.equal('look' in out.page.page && out.page.page.look?.kept, null);
+});
+
+test('a page whose look this build cannot read is drawn without one', async () => {
+  const io = host(() => json(200, { ok: true, value: { page: 'money', title: 'Money', look: { lead: 'cash' }, blocks: [] } })).io;
+  const out = await pageReader(BASE, io, () => AT).read('money');
+  assert.equal(out.from === 'live' && 'look' in out.page.page, false);
+});
+
+test('a length picked past the walk is asked of the record on every read of that page, until the page is left', async () => {
+  forgetWalks();
+  const seen: URL[] = [];
+  const reader = pageReader(BASE, arranged(seen).io, () => AT);
+  await reader.read('money');
+  assert.equal(seen.at(-1)!.searchParams.get('walk'), null, 'nothing asked, nothing sent');
+
+  askWalk('money', 1825);
+  await reader.read('money', { project: '12' });
+  assert.equal(seen.at(-1)!.searchParams.get('walk'), '1825');
+  assert.equal(seen.at(-1)!.searchParams.get('filter'), '{"project":"12"}', 'the choice the page was narrowed by still goes');
+  await pageReader(BASE, arranged(seen).io, () => AT).read('money');
+  assert.equal(seen.at(-1)!.searchParams.get('walk'), '1825', 'a new reader of the same page asks it too, as Home reads');
+  await reader.read('kiln');
+  assert.equal(seen.at(-1)!.searchParams.get('walk'), null, 'another page asks nothing');
+
+  await reader.read('money', undefined, { walk: 'last' });
+  assert.equal(seen.at(-1)!.searchParams.get('walk'), 'last');
+
+  askWalk('money', 0);
+  assert.equal(walkAsked('money'), 1825, 'a length that is none is not asked');
+  forgetWalks('kiln');
+  assert.equal(walkAsked('money'), undefined, 'a page left lets its length go');
 });

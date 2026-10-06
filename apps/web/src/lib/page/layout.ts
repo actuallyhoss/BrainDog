@@ -197,10 +197,14 @@ export function widened(blocks: readonly Placed[], columns: number = COLUMNS): n
 export type Pairable = Placed & { readonly kind: string; readonly columns?: number; readonly lead?: boolean };
 
 /**
- * THE WIDTH FROM WHICH A FLOW OF FULL-WIDTH BLOCKS IS TWO COLUMNS (DIRECTION §36, §38): a 1,512 or 1,728 laptop drawn
- * with every list as wide as the window is lines stretched across the screen, not the screen used.
+ * THE WIDTH OF THE WORK COLUMN FROM WHICH A FLOW OF FULL-WIDTH BLOCKS IS TWO COLUMNS (DIRECTION §36, §38): a 1,512 or
+ * 1,728 laptop drawn with every list as wide as the window is lines stretched across the screen, not the screen used.
+ *
+ * THE COLUMN'S OWN WIDTH, MEASURED, NOT THE WINDOW'S (`PageBody.svelte`): the rail and a docked panel each take a column
+ * of their own beside it. 1,100 is a 1,440 window with the rail open and nothing docked, about 1,140 inside its gutters,
+ * so each half is at least 540; with a panel open at 1,440 (about 700) or at 1,728 (about 950) the page is one column.
  */
-export const PAIR_FROM = 1440;
+export const PAIR_FROM = 1100;
 
 /**
  * THE KINDS THAT ARE NEVER HALF A ROW, whatever their floor: a heading, a field to type into, the page's own controls,

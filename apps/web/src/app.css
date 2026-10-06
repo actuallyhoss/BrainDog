@@ -12,6 +12,14 @@
  * The layer statement still lands first, because `tokens.css` is the first of those imports.
  */
 
+/* THE SHELL'S COLUMN FOR A DOCKED PANEL, as a length so that it can wait for the panel to land (`Panel.svelte`). At the
+   top level and not in the layer, where every engine that registers a property reads it. */
+@property --dock-col {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
 @layer components {
   /* THE WINDOW IS THE GROUND, and `base.css` paints it on `body` with its one soft light from the top (DIRECTION 37).
      This sheet used to paint `body` flat `--sunk` over that, from the days of the board, and so took the light away on
@@ -56,6 +64,20 @@
   ::view-transition-new(page) {
     animation-duration: var(--d-page);
     animation-timing-function: var(--ease-fade);
+  }
+
+  /* A DOCKED PANEL STAYS WHERE IT IS THROUGH THE FADE. It is named `dock` for the moment (`Panel.svelte`), so it is not
+     painted into the work's two pictures; held on both sides of a navigation, the new picture stands over the old one
+     with nothing played, and the panel does not move or dip. One the new screen does not draw fades with the work. */
+  ::view-transition-group(dock) {
+    animation-duration: var(--d-page);
+    animation-timing-function: var(--ease-fade);
+  }
+
+  ::view-transition-old(dock):not(:only-child),
+  ::view-transition-new(dock):not(:only-child) {
+    animation: none;
+    mix-blend-mode: normal;
   }
 
   /* EVERY HEADING IN THE RECORD IS GEIST. The shared base sets headings in the

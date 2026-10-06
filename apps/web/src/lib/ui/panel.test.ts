@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { EXIT_MOST, FLICK, FLICK_MIN, FLICK_WINDOW, LET_GO, Pull, STALL, Scrims, formOf, letGo, settled, step, unstall } from './panel.ts';
+import { DOCKS, EXIT_MOST, FLICK, FLICK_MIN, FLICK_WINDOW, LET_GO, NARROW, PHONE, PHONE_WIDTH, Pull, STALL, Scrims, formOf, letGo, settled, step, unstall } from './panel.ts';
 
 /** Every promise the code under test has settled, handled. */
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -10,6 +10,15 @@ const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 test('a narrow window gets a bottom sheet, and a wide one the docked panel', () => {
   assert.equal(formOf(true), 'sheet');
   assert.equal(formOf(false), 'docked');
+});
+
+test('the panel docks from one width, and a phone starts at another below it, both said once', () => {
+  assert.equal(NARROW, `(width < ${DOCKS}px)`);
+  assert.equal(PHONE_WIDTH, `(width < ${PHONE}px)`);
+  assert.ok(PHONE < DOCKS);
+  /* THE SHELL'S DOCK COLUMN OPENS WHERE THE PANEL DOCKS, so a docked panel always has its column and a sheet never does. */
+  const shell = readFileSync(new URL('../../routes/+layout.svelte', import.meta.url), 'utf8');
+  assert.match(shell, new RegExp(`@media \\(width >= ${DOCKS}px\\) \\{\\s*\\.shell \\{\\s*grid-template-columns: [^;]*var\\(--dock-col`));
 });
 
 test('opening shows the docked panel without a modal, and the sheet with one', () => {
@@ -22,7 +31,7 @@ test('an open panel in the form asked for is left alone', () => {
   assert.equal(step({ open: true, form: 'sheet' }, { open: true, modal: true }), null);
 });
 
-test('crossing 900px while open reopens it in the other form rather than closing it', () => {
+test('crossing 1,280 while open reopens it in the other form rather than closing it', () => {
   assert.equal(step({ open: true, form: 'sheet' }, { open: true, modal: false }), 'reopen');
   assert.equal(step({ open: true, form: 'docked' }, { open: true, modal: true }), 'reopen');
 });

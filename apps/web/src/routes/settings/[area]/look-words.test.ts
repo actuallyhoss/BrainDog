@@ -28,6 +28,15 @@ test("Notifications names Today's feed, by the record's own words, and no digest
   assert.match(src, /words\.tellersWhy\(said\('since_away'\), said\('home'\)\)/u);
 });
 
+test("Notifications says a muted rule's notices leave Today's feed and its urgent ones still show", () => {
+  const words = wordsOf(area('Notifications'));
+  const why = /tellersWhy: \(feed: string, home: string\) => `([^`]*)`/u.exec(words)?.[1];
+  assert.ok(why, 'the line under the switches is where it was');
+  const said = why.replace('${feed}', 'Since you were away').replace('${home}', 'Today');
+  assert.equal(said, 'Turn one off and its notices leave “Since you were away” on Today, for you alone. Its urgent ones still show there.');
+  assert.doesNotMatch(said, /—|reaches you/u, 'urgent notices are said to still show, where they show');
+});
+
 test('Words asks for a singular without "a" or "an", titles the lists in the voice, and names the limits a currency strands', () => {
   const src = area('Words');
   const words = wordsOf(src);

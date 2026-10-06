@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { acceptKey, amountSaid, declineKey, keyAct, labelOf, movesOf, notedAfter, suggestionShown, twoWords } from './press.ts';
+import { acceptKey, amountSaid, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, suggestionShown, twoWords } from './press.ts';
 import { words } from './words.ts';
 
 const change = (band = 'rows') => ({
@@ -28,6 +28,54 @@ test('Enter accepts, e edits, Backspace declines, and no other key is Decide’s
   assert.equal(keyAct('e'), 'edit');
   assert.equal(keyAct('Backspace'), 'decline');
   for (const key of ['j', 'k', 'E', 'Delete', ' ', 'a', '1']) assert.equal(keyAct(key), null, key);
+});
+
+test('a key that starts inside a field, a box or anything editable is never Decide’s', () => {
+  /* WHAT `closest` WOULD FIND, as the DOM answers it: the element itself when it is one, else an ancestor that is. */
+  const el = (inside: boolean, editable = false) => ({ closest: (s: string) => (inside && /input/u.test(s) ? {} : null), isContentEditable: editable });
+  assert.equal(fromInput(el(true)), true, 'Backspace on a tick declined the question under it');
+  assert.equal(fromInput(el(false, true)), true);
+  assert.equal(fromInput(el(false)), false);
+  assert.equal(fromInput(null), false);
+  assert.equal(fromInput({}), false);
+});
+
+test('an answer that cannot be taken back is held six seconds with Undo, and sent once', () => {
+  assert.equal(HOLD_MS, 6_000);
+  /* A CLOCK THE TEST TURNS BY HAND. */
+  const due = new Map<number, () => void>();
+  let next = 0;
+  const clock = {
+    set: ((fn: () => void, ms: number) => {
+      assert.equal(ms, HOLD_MS);
+      due.set(++next, fn);
+      return next;
+    }) as unknown as typeof setTimeout,
+    clear: ((id: number) => void due.delete(id)) as unknown as typeof clearTimeout,
+  };
+  const tick = () => [...due.values()].forEach((fn) => fn());
+
+  let sent = 0;
+  const a = hold(() => sent++, HOLD_MS, clock);
+  assert.equal(a.done, false);
+  tick();
+  assert.equal(sent, 1, 'the held answer was not sent when its time was up');
+  assert.equal(a.undo(), false, 'an answer already sent was taken back');
+  a.flush();
+  assert.equal(sent, 1, 'an answer was sent twice');
+
+  const b = hold(() => sent++, HOLD_MS, clock);
+  assert.equal(b.undo(), true);
+  tick();
+  b.flush();
+  assert.equal(sent, 1, 'an undone answer was sent');
+
+  /* LEAVING THE PAGE SENDS IT AT ONCE, and its time running out after that sends nothing more. */
+  const c = hold(() => sent++, HOLD_MS, clock);
+  c.flush();
+  tick();
+  assert.equal(sent, 2);
+  assert.equal(c.done, true);
 });
 
 test('the suggestion is drawn only where the choice can be taken back, and never where money moves', () => {
@@ -89,13 +137,22 @@ test('the money accepting writes is summed in each currency and never across two
   assert.deepEqual(movesOf({ register: 'tasks', rows: [{ title: 'Call Halden' }] }, registers), []);
   assert.deepEqual(movesOf({ register: 'expenses', rows: [{ amount: { amount: 0, currency: 'GBP' } }] }, registers), []);
   assert.deepEqual(movesOf(undefined, registers), []);
-  /* AMOUNTS THAT CANCEL STILL MOVE MONEY: £3 out of one account and £3 into another is £3 moved, and a key never
+  /* AMOUNTS THAT CANCEL STILL MOVE MONEY: £3 out of one account and £3 into another is £6 written, and a key never
      accepts it. */
   const transfer = movesOf(
     { register: 'expenses', rows: [{ amount: { amount: -300, currency: 'GBP' } }, { amount: { amount: 300, currency: 'GBP' } }] },
     registers,
   );
-  assert.deepEqual(transfer, [{ amount: 300, currency: 'GBP' }]);
+  assert.deepEqual(transfer, [{ amount: 600, currency: 'GBP' }]);
+  /* AND AMOUNTS THAT POINT BOTH WAYS NAME ALL THEY MOVE, never the net (audit M5): -£5 and +£3 is £8 written, not £2. */
+  const mixed = { register: 'expenses', rows: [{ amount: { amount: -500, currency: 'GBP' } }, { amount: { amount: 300, currency: 'GBP' } }] };
+  assert.deepEqual(movesOf(mixed, registers), [{ amount: 800, currency: 'GBP' }]);
+  /* AMOUNTS THAT ALL POINT ONE WAY KEEP THEIR NET, sign and all: the net is what moves. */
+  const out = { register: 'expenses', rows: [{ amount: { amount: -500, currency: 'GBP' } }, { amount: { amount: -300, currency: 'GBP' } }] };
+  assert.deepEqual(movesOf(out, registers), [{ amount: -800, currency: 'GBP' }]);
+  /* EACH CURRENCY ON ITS OWN, never added to another. */
+  const two = { register: 'expenses', rows: [{ amount: { amount: -500, currency: 'GBP' } }, { amount: { amount: 300, currency: 'USD' } }] };
+  assert.deepEqual(movesOf(two, registers), [{ amount: -500, currency: 'GBP' }, { amount: 300, currency: 'USD' }]);
   assert.equal(acceptKey(change(), transfer.length > 0), null, 'Enter accepts money that cancels out');
   assert.equal(suggestionShown('rows', transfer.length > 0), false, 'money that cancels out is drawn with its suggestion');
 });
@@ -156,6 +213,19 @@ test('on the queue a key presses the card’s own button, and Enter answers only
     /if \(held\) return held;\n\s+if \(on instanceof HTMLElement && on\.closest\('button, a\[href\], summary, select, dialog'\) !== null\) return null;/u,
     'a key on a control outside every card answers the card the ring was left on',
   );
+});
+
+test('on the queue Backspace is held six seconds with Undo, and never fires from inside a field or a box', () => {
+  const at = queue.indexOf('function onkey(e: KeyboardEvent) {');
+  const onkey = queue.slice(at, queue.indexOf('\n  }\n', at));
+  assert.match(onkey, /if \(covered\(\) \|\| typing\(\) \|\| fromInput\(e\.target\) \|\| silenced\(e\)\) return;/u, 'a key from inside a field reaches Decide');
+  assert.match(onkey, /if \(act === 'decline'\) return void holdDecline\(card\);\n\s+press\.click\(\);/u, 'Backspace declines at once, with no Undo');
+  const held = queue.slice(queue.indexOf('function holdDecline(card: HTMLElement) {'));
+  assert.match(held, /const held = hold\(/u, 'the decline is not held for its Undo');
+  assert.match(held, /reject\.click\(\)/u, 'the held decline sends past the card’s own button');
+  assert.match(held, /life: HOLD_MS/u, 'the Undo line does not last as long as the hold');
+  /* AND A DECLINE STILL HELD WHEN THE PAGE GOES IS SENT, not dropped. */
+  assert.match(queue, /mounted = false;\n\s+leave\(\);/u, 'a held decline is dropped when the page goes');
 });
 
 test('the suggestion on the queue is an outline with a dot, and is not drawn where the choice is hard to undo', () => {

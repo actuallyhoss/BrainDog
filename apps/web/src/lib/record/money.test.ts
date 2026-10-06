@@ -410,28 +410,47 @@ test('A SENTENCE AND A HEADLINE DROP A FRACTION OF ALL ZEROS, and a ledger keeps
 test('A HEADLINE IS WHOLE UNITS IN THE RECORD’S OWN SIGN: "EGP 1,086,213.41" over Today is "E£1,086,213"', () => {
   assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'headline'), 'E£1,086,213');
   assert.equal(symbolText('EGP 1,086,213.50', 'EGP', 'headline'), 'E£1,086,214', 'a half rounds up');
-  assert.equal(symbolText('EGP −999.99', 'EGP', 'headline'), '−E£1,000', 'and carries into the thousands');
+  assert.equal(symbolText('EGP −99,999.99', 'EGP', 'headline'), '−E£100,000', 'and carries into the next thousand');
   assert.equal(symbolText('EGP 58,185.00', 'EGP', true), 'E£58,185', '`true` is the headline the lead line asks for');
   assert.equal(symbolText('GBP 33,850.50', 'GBP', true), '£33,851');
   assert.equal(symbolText('Cash is EGP 1,086,213.41 across 13 accounts', 'EGP', true), 'Cash is E£1,086,213 across 13 accounts');
   assert.deepEqual(drawn('EGP 1,086,213.41', 'EGP', true), { lead: 'E£', whole: '1,086,213', fraction: '', iso: null });
 
-  /* UNDER A HUNDRED THE FRACTION IS MOST OF THE FIGURE, so it stays where it is not all zeros. */
+  /* UNDER TEN THOUSAND THE AMOUNT IS EXACT, so its fraction stays where it is not all zeros. */
   assert.equal(symbolText('GBP 4.37', 'GBP', 'headline'), '£4.37');
   assert.equal(symbolText('GBP 12.00', 'GBP', 'headline'), '£12');
 
   /* ONLY THE RECORD'S OWN CURRENCY TAKES THE SIGN: any other is said by its code, which already names it. */
   assert.equal(symbolText('EGP 412,300.00', 'GBP', 'headline'), 'EGP 412,300');
-  assert.equal(symbolText('USD 4,800.70', 'EGP', 'headline'), '$4,801\u00a0USD');
+  assert.equal(symbolText('USD 48,000.70', 'EGP', 'headline'), '$48,001\u00a0USD');
   /* AND ONLY A SIGN THE FIGURES ARE READ BACK BY: a narrow form that is letters keeps the code, as one with none does. */
   assert.equal(symbolText('SEK 1,200.00', 'SEK', 'headline'), 'SEK 1,200');
-  assert.equal(symbolText('KWD 1,234.567', 'KWD', 'headline'), 'KWD 1,235');
+  assert.equal(symbolText('KWD 12,345.678', 'KWD', 'headline'), 'KWD 12,346');
   assert.equal(symbolText('JPY 1,299', 'JPY', 'headline'), '¥1,299');
 
   /* A SENTENCE AND A LEDGER ARE AS THEY WERE. */
   assert.equal(symbolText('EGP 1,086,213.41', 'EGP'), 'EGP 1,086,213.41');
   assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'exact'), 'EGP 1,086,213.41');
   assert.deepEqual(drawn('EGP 58,185.54', 'EGP'), { lead: 'EGP ', whole: '58,185', fraction: '.54', iso: null });
+});
+
+/**
+ * A SMALLER AMOUNT ROUNDED IS A DIFFERENT AMOUNT (research audit 14-15a, M6): any headline of a hundred or more lost its
+ * fraction, so £100.49 was "£100" and £999.50 "£1,000", on a tile read against the ledger rows it counts.
+ */
+test('A HEADLINE IS ROUNDED ONLY FROM TEN THOUSAND UP, and a bar\'s value is never rounded', () => {
+  assert.equal(symbolText('GBP 100.49', 'GBP', 'headline'), '£100.49');
+  assert.equal(symbolText('GBP 999.50', 'GBP', 'headline'), '£999.50');
+  assert.equal(symbolText('GBP 9,999.99', 'GBP', 'headline'), '£9,999.99', 'the last amount under the line stays exact');
+  assert.equal(symbolText('GBP 10,000.49', 'GBP', 'headline'), '£10,000', 'and the first at it is whole units');
+  assert.equal(symbolText('GBP 10,000.00', 'GBP', 'headline'), '£10,000');
+  assert.deepEqual(drawn('GBP 999.50', 'GBP', true), { lead: '£', whole: '999', fraction: '.50', iso: null });
+
+  /* A BAR'S VALUE IS READ AGAINST THE BARS BESIDE IT, so it takes the record's sign and keeps every minor unit. */
+  assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'figure'), 'E£1,086,213.41');
+  assert.equal(symbolText('EGP 58,185.00', 'EGP', 'figure'), 'E£58,185', 'a fraction of all zeros still goes');
+  assert.equal(symbolText('USD 48,000.70', 'EGP', 'figure'), '$48,000.70\u00a0USD');
+  assert.deepEqual(drawn('EGP 1,086,213.41', 'EGP', 'figure'), { lead: 'E£', whole: '1,086,213', fraction: '.41', iso: null });
 });
 
 test('ANY OTHER CURRENCY KEEPS ITS CODE IN EVERY SETTING, a headline too, and the home one never carries it', () => {
@@ -453,13 +472,13 @@ test('THE HOME CURRENCY IS THE ONE THE RECORD SAID, and the shell and the figure
   const record = (currency: string | null) => ({ slug: 'nile', name: 'Nile', locale: 'en', currency });
   assert.equal(homeCurrency(), null, "the record's currency was counted from the rows this tab holds");
 
-  assert.equal(layoutOf({ registers: [], now, record: record('EGP') }).index.currency, 'EGP');
+  assert.equal(layoutOf({ registers: [], home: null, now, record: record('EGP') }).index.currency, 'EGP');
   assert.equal(homeCurrency(), 'EGP', 'the shell and the figures name two currencies');
 
-  assert.equal(layoutOf({ registers: [], now, record: record(null) }).index.currency, null);
+  assert.equal(layoutOf({ registers: [], home: null, now, record: record(null) }).index.currency, null);
   assert.equal(homeCurrency(), null, "a record with no currency chosen is drawn in the last one's");
 
-  layoutOf({ registers: [], now, record: record('EGP') });
+  layoutOf({ registers: [], home: null, now, record: record('EGP') });
   assert.equal(refusedShell({ code: 'FORBIDDEN', fix: 'This record is not yours to read.' }).index.currency, null);
   assert.equal(homeCurrency(), null, "a record that refused is drawn in the last one's currency");
 });

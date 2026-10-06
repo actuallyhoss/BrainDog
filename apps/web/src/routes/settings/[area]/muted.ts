@@ -4,7 +4,8 @@
  *
  * A PERSON'S OWN, NOT THE RECORD'S. `notify.muted` is a pref (`PREF_KEYS` in `packages/record/src/index.ts`): the
  * rules, as the actor their notes are signed with (`rule:installment-due-soon`), whose notices leave this person's
- * digest. Nobody else's notices move, and an urgent one still reaches them (`kernel/src/digest.ts` `mutedFor`).
+ * feed on Today (`unmuted` in `packages/record`). Nobody else's notices move, and an urgent one still shows
+ * (`kernel/src/digest.ts` `mutedFor`).
  *
  * PLAIN TYPESCRIPT, SO A TEST CAN LOAD IT IN NODE.
  */

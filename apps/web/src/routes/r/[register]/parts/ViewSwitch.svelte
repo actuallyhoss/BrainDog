@@ -1,6 +1,7 @@
 <!--
   How the list is drawn, from 640px up: the table, the board or the cards (a segmented control in the
-  toolbar). Glass on the ground, and the chosen view a white pill lifted by a tiny shadow (`controls.css`).
+  toolbar), and first, on a list of people that says who is with which organisation, those people in groups.
+  Glass on the ground, and the chosen view a white pill lifted by a tiny shadow (`controls.css`).
 
   THE CHOICE IS THE ADDRESS'S (`?view=`), written by the page's `setView`, so a link to a board opens on the board and
   Back undoes a switch. The board is offered only where the list has lanes to draw (`laneFieldOf`). Below 640 there is
@@ -14,19 +15,31 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import type { View } from './list.ts';
 
-  let { view, board, onview }: { view: View; board: boolean; onview: (view: View) => void } = $props();
+  let {
+    view,
+    board,
+    groups = false,
+    onview,
+  }: {
+    view: View;
+    board: boolean;
+    /** A list of people by organisation, which opens grouped and offers it first. */
+    groups?: boolean;
+    onview: (view: View) => void;
+  } = $props();
 
   /* This part's own words. */
-  const words = { group: 'Show the list as', table: 'Table', board: 'Board', cards: 'Cards' } as const;
+  const words = { group: 'Show the list as', groups: 'Groups', table: 'Table', board: 'Board', cards: 'Cards' } as const;
 
   const views = $derived(
     (
       [
+        ['groups', 'people'],
         ['table', 'rows'],
         ['board', 'board'],
         ['cards', 'grid'],
       ] as const satisfies readonly (readonly [View, IconName])[]
-    ).filter(([v]) => v !== 'board' || board),
+    ).filter(([v]) => (v !== 'board' || board) && (v !== 'groups' || groups)),
   );
 </script>
 

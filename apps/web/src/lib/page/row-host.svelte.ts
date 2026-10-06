@@ -148,13 +148,24 @@ export class RowHost {
     const on = this.#on;
     const got = await createClient({ base: this.#deps.base(), ...(io ? { fetch: io } : {}) }).get(row.register, row.seq);
     if (!got.ok && 'refusal' in got) return words.unread(got.refusal.fix);
-    if (got.ok && got.value === null) return words.gone;
-    let whole = got.ok ? wholeOf(cut, got.value as RecordRow) : null;
+    /* A ROW `get` NO LONGER ANSWERS may have been merged into another, which deletes the row it folds: read again, it is
+       either the kept row (below) or gone. */
+    let whole = got.ok && got.value !== null ? wholeOf(cut, got.value as RecordRow) : null;
     if (!whole) {
       /* THE ROW MOVED ON SINCE THE PAGE READ IT, so nothing of that read is the row now. */
       const again = await rowReader(this.#deps.base(), io).read(row.register, row.seq);
       if (again.from !== 'live') return words.unread(again.fix);
       if (!again.entry) return words.gone;
+      /* MERGED INTO ANOTHER ROW SINCE: the kept row is the one changed, at its own number, so the folded number is never
+         what the panel is on. */
+      if (again.folded !== undefined) {
+        const to: RowAt = { register: row.register, seq: again.entry.seq };
+        if (on === this.#on) {
+          this.#land(keyOf(to), again.entry);
+          if (this.opened && keyOf(this.opened) === keyOf(row)) this.opened = to;
+        }
+        return again.entry;
+      }
       whole = again.entry;
     }
     /* KEPT ONLY FOR THE PAGE IT WAS ASKED ON: a page opened meanwhile starts from its own read. */

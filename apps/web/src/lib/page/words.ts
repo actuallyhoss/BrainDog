@@ -38,6 +38,19 @@ export const words = {
   markAdded: 'Added',
   /* ANSWERING SEVERAL QUESTIONS AT ONCE: the box each card leads with, said with its question. */
   pick: (question: string) => `Choose “${question}” to answer with others`,
+  /* THE PAGE'S LOOK (`look.ts`): a pin that keeps it as it is, and what Slash arranged, offered back and then kept. */
+  pin: 'Pin this',
+  unpin: 'Unpin',
+  pinned: (title: string) => `Pinned ${title}. It stays as it is until you unpin it.`,
+  unpinned: (title: string) => `Unpinned ${title}. Slash may arrange it again.`,
+  arranged: (title: string) => `Slash arranged ${title}.`,
+  slashArranged: 'Slash arranged',
+  slashKept: (who: string) => `Slash arranged · ${who} kept`,
+  pinnedLine: 'Pinned as it is',
+  /** Who kept what Slash arranged, where the record names nobody for the reader. */
+  owner: 'the owner',
+  /** The next action under the headline, for a screen reader: the line itself says what it is. */
+  next: 'Next step',
 } as const;
 
 /** "a", "a and b", "a, b and c". */

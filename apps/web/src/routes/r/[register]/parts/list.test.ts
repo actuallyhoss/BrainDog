@@ -91,6 +91,31 @@ test('a list with no state is a board by its first choice field', () => {
   assert.equal(viewOf('board', people), 'table');
 });
 
+/* A list of people that says which organisation each is with: `meets:` naming an `org` that links to one row. */
+const contacts = {
+  ...leads,
+  id: 'contacts',
+  meets: { name: 'name', org: 'org' },
+  fields: [
+    { id: 'name', type: 'text' },
+    { id: 'org', type: 'ref', to: 'companies' },
+  ],
+} as unknown as RegisterDecl;
+
+test('A LIST OF PEOPLE BY ORGANISATION OPENS GROUPED, and its table is still one address away', () => {
+  assert.equal(viewOf(null, contacts), 'groups');
+  assert.equal(viewOf('table', contacts), 'table');
+  assert.equal(viewOf('groups', contacts), 'groups');
+  assert.equal(viewOf(null, leads), 'table');
+  assert.equal(viewOf('groups', leads), 'table', 'a list with nothing to group by is never grouped');
+
+  assert.equal(defaultParams({ view: 'table', hidden: [] }, contacts).params.toString(), 'view=table');
+  assert.equal(defaultParams({ view: 'groups', hidden: [] }, contacts).params.toString(), '');
+  assert.equal(defaultParams({ view: 'groups', hidden: [] }, leads).params.toString(), '');
+  assert.equal(defaultParams({ view: 'table', hidden: [] }, leads).params.toString(), '');
+  assert.deepEqual(defaultFrom(new URLSearchParams('view=table'), new Set()).view, 'table');
+});
+
 test('keeping a default and reading it back, per record, person and list', () => {
   const map = new Map<string, string>();
   const store: Keep = { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => void map.set(k, v), removeItem: (k) => void map.delete(k) };

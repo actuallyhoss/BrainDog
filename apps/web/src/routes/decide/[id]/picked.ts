@@ -30,6 +30,16 @@ export function pickableOf(kind: string | undefined, body: Row | undefined): Pic
 }
 
 /**
+ * HOW MANY A QUESTION HOLDS, for the count beside its title: a proposal of two or more, which is what a question becomes
+ * once later arrivals join it (`kernel/ingest.ts` `openRowset`) and its words stay those of the first. `undefined` for a
+ * question of one, or one that is not a list of changes.
+ */
+export function joinedCount(kind: string | undefined, body: Row | undefined): number | undefined {
+  if (kind !== 'rowset' || !body || !Array.isArray(body.rows)) return undefined;
+  return body.rows.length >= 2 ? body.rows.length : undefined;
+}
+
+/**
  * What Accept sends: `undefined` when every row is ticked (the whole proposal), the ticked places when some are, and
  * `null` when none are, which is a decline and not an accept.
  */

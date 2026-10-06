@@ -184,7 +184,31 @@ type Answered = {
  * `declared_version` is the version the record holds the page at, which arranging it writes against. `filters` is
  * what the page may be narrowed by, as the record answered it; `filtersOf` (`$lib/page/filters.ts`) reads it.
  */
-export type LivePageDecl = Omit<PageDecl, 'blocks' | 'requires'> & { requires?: readonly string[]; declared_version?: number; filters?: unknown };
+export type LivePageDecl = Omit<PageDecl, 'blocks' | 'requires'> & { requires?: readonly string[]; declared_version?: number; filters?: unknown; look?: LiveLook };
+
+/**
+ * HOW THE ENGINE ARRANGED THE PAGE (`loop/contract-17.md`, the look overlay), as the record answers it beside the
+ * blocks: which block leads, the order of the rest by their keys, what it hid, the line it leads with, the one next
+ * action, the blocks pinned in place, and who arranged it (the rules, Slash, or the person). The record answers it as
+ * `PageResult.look` (`packages/kernel/src/compose.ts` `LookBody`), already applied to the blocks. `kept` names the
+ * person who kept what Slash arranged, where the record says it.
+ *
+ * NARROWED HERE (`lookOf`), because the record checks a look against the block grammar and the app's type still says
+ * more than the record checked: a key that is not text is no key, and a look with no `by` is no look at all.
+ */
+export type LiveLook = {
+  /** The page declaration the look is laid over, which every page drawn from one template shares; a look is `look.<page>`. */
+  page: string | null;
+  basis: string | null;
+  lead: string | null;
+  order: readonly string[];
+  hide: readonly string[];
+  headline: string | null;
+  next: { row: string; text: string } | null;
+  pinned: readonly string[];
+  by: 'rule' | 'slash' | 'owner';
+  kept: string | null;
+};
 
 type AnsweredPage = LivePageDecl & { blocks?: Answered[]; [key: string]: unknown };
 
@@ -203,6 +227,12 @@ export type LiveBlock = BlockResult & {
   home?: string | null;
   /** A block with a column `as: scope`: what each of those cells draws its chip from (`scopeCellsOf`). */
   scopeCells?: ScopeCells;
+  /**
+   * WHAT THE BLOCK IS, AS THE RECORD NAMES IT: its declared `key`, or the record's stable hash of its kind, source and
+   * heading. A page recomposing follows a block by this and never by its place (`$lib/page/recompose.ts`). Absent from a
+   * record older than the look overlay, where the page works one out the same way.
+   */
+  key?: string;
 };
 
 /** The mark and hue of the project a row applies to, as the kernel answers them beside `scopes` (`scope_marks`). */
@@ -625,6 +655,44 @@ function walkOf(v: unknown): Walk | null {
   };
 }
 
+/** The longest key a block or a look may carry: a key is a handle, never a paragraph. */
+const KEY_MOST = 160;
+
+/** A block's key as the record answered it, when it is one: short text with something in it. */
+export function keyOf(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() !== '' && v.length <= KEY_MOST ? v : null;
+}
+
+/** Keys as the record answered them, each once, in its order; anything that is not a key is left out. */
+const keysOf = (v: unknown): string[] => (Array.isArray(v) ? [...new Set(v.map(keyOf).filter((k): k is string => k !== null))] : []);
+
+const LOOK_BY: readonly LiveLook['by'][] = ['rule', 'slash', 'owner'];
+
+/**
+ * A page's look as the record answered it, or `null` where it sent none or one this build cannot read. One with no
+ * `by` is none: who arranged a page is what decides whether a person is offered Undo, and a guess at it would offer
+ * Undo on the person's own arrangement.
+ */
+export function lookOf(v: unknown): LiveLook | null {
+  if (!isObject(v)) return null;
+  const by = LOOK_BY.find((w) => w === v.by);
+  if (!by) return null;
+  const said = (x: unknown): string | null => (typeof x === 'string' && x.trim() !== '' ? x.trim() : null);
+  const next = isObject(v.next) && keyOf(v.next.row) !== null && said(v.next.text) !== null ? { row: v.next.row as string, text: said(v.next.text)! } : null;
+  return {
+    page: typeof v.look === 'string' && /^[a-z][a-z0-9_-]{0,63}$/u.test(v.look) ? v.look : null,
+    basis: said(v.basis),
+    lead: keyOf(v.lead),
+    order: keysOf(v.order),
+    hide: keysOf(v.hide),
+    headline: said(v.headline),
+    next,
+    pinned: keysOf(v.pinned),
+    by,
+    kept: said(v.kept),
+  };
+}
+
 const FEED_BY: readonly FeedRow['by'][] = ['agent', 'rule', 'you'];
 const textOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string';
 
@@ -791,6 +859,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     open: openSteps,
     /* THE MODEL'S LINE FOR A LEAD NOTE, taken by name so it never rides through `rest` onto a block that is not one. */
     said: modelSaid,
+    /* WHAT THE BLOCK IS, taken by name and narrowed by `keyOf`, so a page never keys its blocks by something that is not text. */
+    key: keyed,
     ...rest
   } = b;
 
@@ -847,6 +917,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     stale_at: new Date(now).toISOString(),
     metrics: undefined,
     ...(values ? { values } : {}),
+    ...(keyOf(keyed) === null ? {} : { key: keyOf(keyed)! }),
   };
   const cannot: LiveBlock = { ...shell, cannot: liveWords.cannot };
 
@@ -1308,7 +1379,32 @@ const heldOf = (listed: unknown): { address: string; title?: string }[] =>
  * Every block over a list with that field is narrowed by the kernel, and the answer's `filters` carries what may be
  * chosen next; an empty choice is no choice, and the page is asked for by its slug alone.
  */
-export type PageReader = { read(slug: string, filter?: Readonly<Record<string, string>>): Promise<Opened> };
+export type PageReader = { read(slug: string, filter?: Readonly<Record<string, string>>, opts?: { walk?: Walked }): Promise<Opened> };
+
+/** A length a reader picked on a forecast's horizon knob: whole days, or `last`, to the last dated movement. */
+export type Walked = number | 'last';
+
+/**
+ * THE LENGTHS READERS PICKED PAST HOW FAR A WALK REACHES, by page. A forecast walks two years at most unasked (the
+ * kernel's `WALK_UNASKED`), so five years is a length the page asks the record for when somebody picks it, and every
+ * read of that page after it asks again: a re-read when the record moves would otherwise walk two years and pull the
+ * chart back from under the reader. Held for the tab and not by one reader, because Home reads its page through a new
+ * reader each time. A page left lets it go (`forgetWalks`), so the next visit opens on what the page opens on.
+ */
+const WALKS = new Map<string, Walked>();
+
+/** Asks every later read of `slug` to walk `length` (`BlockSlot.svelte`, as the horizon knob is pressed). */
+export function askWalk(slug: string, length: Walked): void {
+  if (length === 'last' || (Number.isInteger(length) && length > 0)) WALKS.set(slug, length);
+}
+
+/** The length asked for on `slug`, if any. */
+export const walkAsked = (slug: string): Walked | undefined => WALKS.get(slug);
+
+/** Lets go of every length asked, but the one on the page still being read. */
+export function forgetWalks(but: string | null = null): void {
+  for (const slug of [...WALKS.keys()]) if (slug !== but) WALKS.delete(slug);
+}
 
 /** A page reader for one tab. `base` is the page's own origin; the app never holds a token. */
 export function pageReader(base: string, io?: Fetch, clock: () => number = () => Date.now()): PageReader {
@@ -1346,10 +1442,18 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
   }
 
   return {
-    async read(slug, filter) {
+    async read(slug, filter, opts = {}) {
       /* `client.page` drops an empty choice, so the page is asked for by its slug alone. A record that does not read
-         `filter` answers the whole page. */
-      const out = await client.page(slug, filter);
+         `filter` answers the whole page.
+
+         AND A LENGTH PICKED PAST THE WALK'S REACH IS ASKED FOR BY NAME (`walk`), which the record hands the kernel and
+         the kernel walks only where a block offers it. Through `call`, as the client's `page` takes no length yet; a
+         record that does not read `walk` keeps it as text it never looks at, and answers the walk it would have. */
+      const walk = opts.walk ?? WALKS.get(slug);
+      const out =
+        walk === undefined
+          ? await client.page(slug, filter)
+          : await client.call<unknown>('page', { slug, ...(filter && Object.keys(filter).length ? { filter } : {}), walk });
       if (!out.ok) {
         if (!('refusal' in out)) return { from: 'refused', fix: liveWords.changed };
         if (out.refusal.code === 'PAGE_UNKNOWN') {
@@ -1359,7 +1463,10 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         return { from: 'refused', fix: out.refusal.fix };
       }
 
-      const { blocks = [], read_at, ...page } = out.value as AnsweredPage;
+      const { blocks = [], read_at, look: arranged, ...bare } = out.value as AnsweredPage;
+      /* HOW THE ENGINE ARRANGED IT, narrowed, and left off a page whose look this build cannot read. */
+      const look = lookOf(arranged);
+      const page: LivePageDecl = look ? { ...bare, look } : bare;
       /* TODAY IS THE RECORD'S, where it says what its clock read, so a record pinned to a day draws its own late rows,
          out-of-date balances and forecast from that day. A record that does not say is read against this clock. */
       const said = typeof read_at === 'string' ? Date.parse(read_at) : Number.NaN;

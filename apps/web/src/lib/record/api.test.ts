@@ -1232,8 +1232,8 @@ test('EVERY MONTH IS SPLIT BY WHAT IT IS FOR, at monthly shares, and what no cat
   if (segment?.type !== 'block') return;
   const last = segment.rows.at(-1)!;
   assert.match(String(last.cells[0]), /Uncategorised/u);
-  /* A SPLIT'S VALUE IS A HEADLINE, in whole units: the 12,345 pence no part holds are £123. */
-  assert.match(String(last.cells[1]), /£123$/u);
+  /* A SPLIT'S VALUE IS A FIGURE, exact in the record's own sign: the 12,345 pence no part holds are £123.45. */
+  assert.match(String(last.cells[1]), /£123\.45$/u);
   assert.equal(segment.rows.length, Math.min(parts.groups.length, split.limit ?? 99) + 1);
 });
 

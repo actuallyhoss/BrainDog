@@ -30,7 +30,7 @@
 </script>
 
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
   import { invalidateAll } from '$app/navigation';
   import { QUEUE_REASONS, queueCost, queueReasoned, since } from 'braindog-render';
@@ -43,11 +43,15 @@
   import { may } from '$lib/record/may.ts';
   import Button from '$lib/ui/Button.svelte';
   import Face from '$lib/ui/Face.svelte';
-  import { changesSomething, laterLine, proposer, queueWords, saidOf, waysOf, type Way } from './queue-answer.ts';
+  import { changesSomething, laterLine, proposer, queueMergeOf, queueWords, saidOf, waysOf, type Way } from './queue-answer.ts';
   import LeadPreview from './LeadPreview.svelte';
   import type { Picked } from './picked.svelte.ts';
   import { words } from './words.ts';
   import { words as decide } from '../../routes/decide/words.ts';
+  import { words as mergeWords, type Press } from '../../routes/decide/merge.ts';
+  import { HOLD_MS, hold, type Held } from '../../routes/decide/press.ts';
+  import MergeCard from '../../routes/decide/MergeCard.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
 
   let {
     question,
@@ -70,6 +74,17 @@
      record on an older build sends neither. */
   const does = $derived(lead && typeof (question as { does?: unknown }).does === 'string' ? (question as { does: string }).does : '');
   const filed = $derived(typeof (question as { body_kind?: unknown }).body_kind === 'string' ? (question as { body_kind: string }).body_kind : question.kind);
+  /* A QUESTION ABOUT WHO IS WHO IS DRAWN AS ONE, here as on its own page: the names the record thinks may be one, where
+     each was seen, and Merge all, Keep apart and Pick (`merge.ts`). Read off the `candidates` the record sends beside
+     the question (`queueMergeOf`), so a record on an older build draws the options as it always did. */
+  const ways0 = $derived(waysOf(question));
+  const merge = $derived(queueMergeOf(question, ways0.map((w) => w.key)));
+  /* HOW MANY THINGS A JOINED QUESTION CHANGES, said beside it, where the record counts them. Not on a merge, whose
+     names already say what it changes. */
+  const joined = $derived.by(() => {
+    const n = (question as { held?: unknown }).held;
+    return merge === null && typeof n === 'number' && Number.isInteger(n) && n > 1 ? n : 0;
+  });
   const chosenForAll = $derived(pick?.has(question.id) ?? false);
   const bulkFix = $derived(pick?.fixes.get(question.id) ?? '');
 
@@ -82,7 +97,7 @@
   const answerable = $derived(me !== null && (me.owner || may({ me }, 'decide')));
 
   const asker = $derived(proposer(question.who, me?.person ?? null, names));
-  const ways = $derived(waysOf(question));
+  const ways = $derived(ways0);
   /* ONLY THE FIRST CARD SAYS WHY, the question's reason and one under each option, whether or not the block leads with
      it. Every other card keeps them in a fold under its pills, by the renderer's own rule (`queueReasoned`), so one
      queue reads the same whichever of the two drew it. */
@@ -220,6 +235,36 @@
     field?.scrollIntoView({ block: 'nearest' });
   }
 
+  /**
+   * A MERGE'S PRESS IS HELD FOR ITS UNDO, NOT SENT, as it is on the question's own page (`press.ts` `hold`): a merge folds
+   * a person away and a pair kept apart is never asked about again. It goes after six seconds, or at once when the card
+   * leaves the page, and while one is held the answers wait.
+   */
+  let holding = $state<{ key: string; held: Held; toast: number } | null>(null);
+
+  function pressMerge(p: Press, line: string) {
+    if (busy || holding !== null) return;
+    const way = ways.find((w) => w.key === p.option);
+    if (!way) return;
+    const h = hold(() => {
+      if (holding) toasts.dismiss(holding.toast);
+      holding = null;
+      chosen = way;
+      void send(way);
+    });
+    holding = { key: p.option, held: h, toast: toasts.push(line, { undo: unholdMerge, life: HOLD_MS, intent: 'good' }) };
+  }
+
+  function unholdMerge() {
+    const was = holding;
+    if (!was || !was.held.undo()) return void toasts.push(mergeWords.tooLate);
+    holding = null;
+    toasts.push(mergeWords.undone);
+  }
+
+  /* A CARD THAT LEAVES THE PAGE SENDS WHAT IT HELD: the answer given is still the reader's. */
+  $effect(() => () => untrack(() => holding)?.held.flush());
+
   /* AND AGAIN ONCE THE KEYBOARD HAS OPENED, because it arrives after the focus that summoned it and `--kb` grows then. */
   $effect(() => {
     if (phase !== 'asking') return;
@@ -276,13 +321,24 @@
       <p class="queue-by">
         <Face name={asker.name} kind={asker.kind} size="s" /><span class="queue-who">{asker.name}</span><span class="queue-when">{when}</span>
       </p>
-      <h3 class="queue-question" dir="auto">{saidOf(question.question)}</h3>
+      <h3 class="queue-question" dir="auto">
+        {saidOf(question.question)}{#if joined}{' '}<span class="qa-joined num">{queueWords.joined(joined)}</span>{/if}
+      </h3>
       {#if reasoned && why}<p class="queue-why" dir="auto">{why}</p>{/if}
       {#if later}<p class="qa-later" dir="auto">{later}</p>{/if}
       {#if does}<ul class="queue-does"><li class="queue-does-line" dir="auto">{does}</li></ul>{/if}
       {#if changesSomething(question)}
         <a class="qa-see tap" href={at(`/decide/${encodeURIComponent(question.id)}`)}>{queueWords.seeWhole}</a>
       {/if}
+      {#if merge}
+        <MergeCard
+          {merge}
+          {answerable}
+          holding={holding?.key ?? (busy ? '' : null)}
+          titleOf={(key) => ways.find((w) => w.key === key)?.label}
+          onpress={pressMerge}
+        />
+      {:else}
       <ul class="queue-options">
         {#each ways as way (way.key)}
           <li class="queue-option" data-recommended={way.recommended && suggests ? '' : undefined}>
@@ -311,6 +367,7 @@
           </li>
         {/each}
       </ul>
+      {/if}
       <!-- WHAT THE ANSWER COSTS SITS AFTER THE OPTIONS, at the end of their row, as the renderer draws it: it is about the
            answer, so it belongs beside the answers and not on the by-line. -->
       {#if band}<span class="queue-cost" data-cost={question.cost}>{band}</span>{/if}
@@ -383,7 +440,7 @@
     border-color: var(--ink2);
   }
 
-  /* THE BULK BOX IS THE RENDERER'S (`kinds/queue.css` `.queue-select`), in its own track at the card's start. It is a
+  /* THE BULK BOX IS THE RENDERER'S (`kinds/queue.css` `.queue-select`), in the card's second track at its end. It is a
      secondary control, drawn on hover or focus of its card (DIRECTION §35), and on every card once one is chosen so the
      choice can be widened; under a thumb, where nothing hovers, it is always there. Its track stays either way, so the
      card's edge does not move. */
@@ -405,6 +462,14 @@
   /* A CARD CHOSEN FOR A BULK ANSWER keeps an ink edge, a shape and not a shade. */
   .queue-card[data-selected] {
     box-shadow: inset 0 0 0 1.5px var(--ink2);
+  }
+
+  /* HOW MANY THINGS A JOINED QUESTION CHANGES, quiet beside its words. */
+  .qa-joined {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 400;
+    white-space: nowrap;
   }
 
   /* QUIET: the day a put-off question comes back is a note under it, in the second ink and the small size. */

@@ -34,7 +34,7 @@
     tellers: 'Rules that tell you',
     /* WHERE A MUTED RULE'S NOTICES STOP SHOWING, BY THE NAMES THIS RECORD GIVES THEM: Today's feed, which the record now
        reads without them (`unmuted` in `packages/record`). It said "your digest", and no digest carries a rule's notices. */
-    tellersWhy: (feed: string, home: string) => `Turn one off and its notices leave “${feed}” on ${home}. Only for you: anything urgent still reaches you.`,
+    tellersWhy: (feed: string, home: string) => `Turn one off and its notices leave “${feed}” on ${home}, for you alone. Its urgent ones still show there.`,
     tells: (name: string) => `${name} tells you`,
     muted: 'Off for you',
   } as const;
@@ -99,7 +99,7 @@
      ONE QUIET SWITCH A RULE, AND ONLY FOR A RULE THAT TELLS YOU SOMETHING: a rule with a `notify` step that is not
      urgent, read off the automations this person may read (`lib/flow/source.ts`), each body asked for once. Off puts the
      rule in this person's `notify.muted`, through the same `setPref` Navigation writes, so its notices leave their
-     digest and nobody else's; anything urgent still reaches them. A record with no such rule draws no section. */
+     Today feed and nobody else's (`unmuted` in `packages/record`); an urgent one still shows there. A record with no such rule draws no section. */
   type Teller = { actor: string; name: string };
   let tellers = $state<Teller[]>([]);
   /** This person's muted rules: the shell's answer, then what the last switch kept. */

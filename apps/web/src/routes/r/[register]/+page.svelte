@@ -65,6 +65,7 @@
     sameDefault,
     toggleChip,
     viewOf,
+    homeViewOf,
     weighed,
     writeDefault,
     type Keep,
@@ -78,6 +79,8 @@
   import ListEmpty from './parts/ListEmpty.svelte';
   import BulkBar from './parts/BulkBar.svelte';
   import ListCards from './parts/ListCards.svelte';
+  import ListPeople from './parts/ListPeople.svelte';
+  import { orgFieldOf } from './people.ts';
   import ListBoard from './parts/ListBoard.svelte';
   import ListSummary from './parts/ListSummary.svelte';
   import ViewSwitch from './parts/ViewSwitch.svelte';
@@ -871,9 +874,12 @@
    */
   const view = $derived(viewOf(page.url.searchParams.get('view'), decl));
   const boardable = $derived(laneFieldOf(decl) !== undefined);
+  /* A LIST OF PEOPLE THAT SAYS WHICH ORGANISATION EACH IS WITH opens grouped by it (`homeViewOf`), so its bare address is
+     the groups and its table is `?view=table`. */
+  const groupable = $derived(orgFieldOf(decl) !== null);
   const setView = (v: View) =>
     setParam((p) => {
-      if (v === 'table') p.delete('view');
+      if (v === homeViewOf(decl)) p.delete('view');
       else p.set('view', v);
     });
 
@@ -2348,7 +2354,7 @@
   >
     {#snippet actions()}
       <!-- THE TOOLBAR: glass, 36 high and 6 apart, the view switch first and the one ink primary last. -->
-      {#if result.total > 0}<ViewSwitch {view} board={boardable} onview={setView} />{/if}
+      {#if result.total > 0}<ViewSwitch {view} board={boardable} groups={groupable} onview={setView} />{/if}
       <!-- THE VIEW OVER WHAT IS HANDED TO YOU, on a list that says who holds its rows. -->
       {#if handedToMeHref}<Button weight="glass" href={handedToMeHref}>{copy.handedToMe}</Button>{/if}
       <!-- THE LIST'S FIELDS, opened from its head: add any kind, rename one, or retire one (`ListEditor.svelte`). -->
@@ -2447,7 +2453,17 @@
            view the address asks for, the grid, the board or the cards. `body` wraps them all, so the
            observer finds whichever sentinel is drawn and `showRow` finds whichever row is new. -->
       <div class="body-slot" bind:this={body}>
-      {#if rowsAsCards()}
+      <!-- PEOPLE BY ORGANISATION, at every width: a phone reads the groups as a laptop does, since a group is one line. -->
+      {#if view === 'groups'}
+        <ListPeople
+          register={id}
+          {decl}
+          entries={result.entries.slice(0, DOM_CAP)}
+          {now}
+          names={result.names ?? undefined}
+          more={cursor !== null && loaded < DOM_CAP}
+        />
+      {:else if rowsAsCards()}
         <ListCards
           register={id}
           entries={result.entries.slice(0, DOM_CAP)}

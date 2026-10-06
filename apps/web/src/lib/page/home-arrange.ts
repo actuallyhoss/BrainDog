@@ -29,10 +29,11 @@ import { createClient } from '@braindog/client';
 import { copy } from '../copy.ts';
 import type { Holds, HomeVoice } from '../home/default-home.ts';
 import type { Shell } from '../record/boot-live.ts';
+import { REGISTERS } from '../record/held.ts';
 import { may } from '../record/may.ts';
 import type { LiveBlock, LivePageDecl } from '../record/page-live.ts';
 import type { PageBody } from '../record/pages-live.ts';
-import { VOICE_LINES, type VoiceKey } from '../voice.ts';
+import { VOICE_LINES, labels, relabel, singularOf, type Labels, type VoiceKey } from '../voice.ts';
 import { TASKS } from '../work/list.ts';
 
 type Fetch = NonNullable<Parameters<typeof createClient>[0]['fetch']>;
@@ -53,10 +54,19 @@ export function keptAs(slug: string, pages: readonly string[]): Kept | null {
   return pages.includes(slug) ? { id: slug, installed: true } : null;
 }
 
-/** What Today's body is built around, read off the shell as Home reads it. */
-export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>): Holds {
-  const tasks = shell.lists.some((l) => l.id === TASKS);
-  return { tasks, adds: tasks && may(shell, 'append', TASKS), money: shell.pages.includes('money') };
+/**
+ * What Today's body is built around, read off the shell as Home reads it: whether the record keeps tasks and the reader
+ * may add one, whether it has Money, and ONE OF THE TASKS LIST AS THE RECORD WORDS IT, which names the line a task is
+ * typed into ("Add a job" on a record that calls its tasks jobs). The word the record's labels give the list, else its
+ * declared singular, else its name made singular, as a list's own screen says it. `heard` is the record's labels, the
+ * ones this tab heard by default.
+ */
+export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Labels = labels()): Holds {
+  const list = shell.lists.find((l) => l.id === TASKS);
+  const tasks = list !== undefined;
+  const bare = REGISTERS[TASKS] ?? (list ? { id: TASKS, name: list.name, one: singularOf(list.name) } : undefined);
+  const one = tasks && bare ? relabel(bare, heard).one : undefined;
+  return { tasks, adds: tasks && may(shell, 'append', TASKS), money: shell.pages.includes('money'), ...(one ? { one } : {}) };
 }
 
 /** Today's headings in the voice that speaks, as Home asks for them. */

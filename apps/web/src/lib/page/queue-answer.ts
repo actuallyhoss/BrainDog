@@ -15,6 +15,7 @@ import { citedWords } from '../cite.ts';
 import { copy } from '../copy.ts';
 import { moneyInText } from '../record/money.ts';
 import { actor, type Actor } from '../record/names.ts';
+import { mergeOf, type Merge } from '../../routes/decide/merge.ts';
 
 /**
  * THE CARD'S OWN WORDS, in a `words` object in a module this card owns rather than the copy aggregate, by the rule every
@@ -38,6 +39,8 @@ export const queueWords = {
   answered: (option: string, when: string) => `${option} · you, ${when}`,
   /** A question put off (`governance.later`): the day it comes back to the reader. */
   back: (when: string) => `Comes back ${when}`,
+  /** Beside a question joined from several: how many things answering it changes. */
+  joined: (n: number) => `· ${n.toLocaleString('en-GB')} changes`,
 } as const;
 
 /**
@@ -135,3 +138,32 @@ export function laterLine(q: { until?: unknown; until_why?: unknown }, now: numb
  * is a choice between the answers written on the card itself.
  */
 export const changesSomething = (q: Pick<QueueQuestion, 'kind'>): boolean => q.kind !== 'options';
+
+/**
+ * THE MERGE A QUEUE QUESTION ASKS, from the `candidates` the record sends beside it (`QueueQuestion`), or `null` for a
+ * question that is not one or a record on an older build that sends none.
+ *
+ * A QUESTION OF OPTIONS IS READ AS ITS OWN PAGE READS IT (`merge.ts` `mergeOf`). A ROWSET IS READ OFF ITS CANDIDATES, since
+ * the queue does not carry the rows the question's page checks: the record's own cluster question (`people.ts`
+ * `askCluster`) names every one it is about, one of them kept, and folds the others into it, one row each plus at most
+ * one on the kept row. A rowset whose count of rows is not that is some other change, and keeps its two answers. Accept is
+ * Merge all and Reject is Keep apart, and a rowset is answered whole, so no candidate carries a Pick.
+ */
+export function queueMergeOf(q: { kind: string; body_kind?: unknown; candidates?: unknown; held?: unknown }, offered: readonly string[]): Merge | null {
+  const candidates = q.candidates;
+  if (!Array.isArray(candidates)) return null;
+  const kind = typeof q.body_kind === 'string' ? q.body_kind : q.kind;
+  if (kind === 'options') return mergeOf({ kind, body: { candidates } }, offered);
+  if (kind !== 'rowset' || !offered.includes('accept') || !offered.includes('reject')) return null;
+  /* THE NAMES AND WHERE EACH WAS SEEN, worded as a question of options words them: no handle drawn as a name. */
+  const read = mergeOf({ kind: 'options', body: { candidates } }, ['merge', 'apart']);
+  if (read === null) return null;
+  const kept = read.candidates.filter((c) => c.kept);
+  const n = read.candidates.length;
+  if (kept.length !== 1 || (q.held !== n - 1 && q.held !== n)) return null;
+  return {
+    candidates: [...kept, ...read.candidates.filter((c) => !c.kept)].map((c) => ({ ...c, pick: null })),
+    all: { option: 'accept' },
+    apart: { option: 'reject' },
+  };
+}

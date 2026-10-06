@@ -25,9 +25,7 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { heard, homePage, said } from '$lib/voice.svelte.ts';
-  import { VOICE_LINES, homeSlugOf, relabel, singularOf } from '$lib/voice.ts';
-  import { REGISTERS } from '$lib/record/held.ts';
-  import { TASKS } from '$lib/work/list.ts';
+  import { VOICE_LINES, homeSlugOf } from '$lib/voice.ts';
   import type { Opened } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -68,18 +66,12 @@
      body arranged is the body drawn. */
   const voice = $derived<HomeVoice>(voiceOf(said));
 
-  /* ONE OF THE TASKS LIST AS THE RECORD WORDS IT, which names the line a task is typed into: the word the voice gives
-     the list, else its declared singular, else its name made singular, as a list's own screen says it. Read again when
-     the voice is heard, so a list renamed in Settings › Words renames the line too. */
-  const one = $derived.by(() => {
-    const name = data.lists.find((l) => l.id === TASKS)?.name;
-    const bare = REGISTERS[TASKS] ?? (name ? { id: TASKS, name, one: singularOf(name) } : undefined);
-    return bare ? relabel(bare, heard()).one : undefined;
-  });
-
   /* WHAT TODAY'S BODY IS BUILT AROUND, read off the shell, by that same mode's helper: a block over a list the record
-     does not keep is not asked for. */
-  const holds = $derived<Holds>({ ...holdsOf(data), ...(one === undefined ? {} : { one }) });
+     does not keep is not asked for. It carries one of the tasks list as the record words it (`one`), which names the
+     line a task is typed into, read again when the voice is heard so a list renamed in Settings › Words renames the
+     line too. */
+  const holds = $derived<Holds>(holdsOf(data, heard()));
+  const one = $derived(holds.one);
 
   /**
    * ONLY A PAGE THE RECORD HOLDS IS ASKED FOR. A use case may declare no Home page (a reading club shared as a file), and

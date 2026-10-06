@@ -70,7 +70,7 @@ test('the reader’s level reaches the screen at all', () => {
 test('every option’s own button is off for a reader who may not answer, and says why', () => {
   assert.match(
     page,
-    /disabled=\{!answerable\}\n\s+aria-describedby=\{answerable \? undefined : 'cannot-decide'\}\n\s+onclick=\{\(\) => choose\(option\.key\)\}/u,
+    /disabled=\{!answerable \|\| holding !== null\}\n\s+aria-describedby=\{answerable \? undefined : 'cannot-decide'\}\n\s+onclick=\{\(\) => choose\(option\.key\)\}/u,
     'the option buttons are live for a reader who may not answer',
   );
 });
@@ -136,7 +136,10 @@ test('the options come first, and what accepting does is one folded tile after t
   const before = page.slice(head, options).match(/<Tile\b[^>]*>/gu) ?? [];
   assert.deepEqual(
     before,
-    ['<Tile>', '<Tile icon="decide" title={copy.theOptions} count={two ? undefined : question.options.length}>'],
+    [
+      '<Tile>',
+      "<Tile icon={merge ? 'people' : 'decide'} title={merge ? mergeWords.heading : copy.theOptions} count={two || merge ? undefined : question.options.length}>",
+    ],
     'a tile is drawn above the options again',
   );
   /* ONE TILE HOLDS EVERY PART, folded shut. */
@@ -155,7 +158,12 @@ test('no option carries a key cap, and no sentence is typed into the gate', () =
 
 test('both doors refuse before they open, not only the buttons on them', () => {
   const guard = /if \(!answerable\) \{\n\s+toasts\.push\(whyNot, \{ intent: 'warn' \}\);\n\s+return;\n\s+\}/gu;
-  assert.equal([...page.matchAll(guard)].length, 2, 'choose and defer do not both refuse a reader who may not answer');
+  /* THREE DOORS NOW: a press, a defer, and a press held for its Undo (a merge's answer, or Backspace's decline). */
+  assert.equal([...page.matchAll(guard)].length, 3, 'choose, defer and a held press do not all refuse a reader who may not answer');
+  const heldAt = page.indexOf('function held(key: string, line: string, rows?: number[]) {');
+  const holdAt = page.indexOf('const h = hold(', heldAt);
+  assert.ok(heldAt >= 0 && holdAt > heldAt, 'a held press no longer reads the way this test assumes');
+  assert.ok(page.slice(heldAt, holdAt).search(guard) >= 0, 'a press is held for its Undo before anybody checks whether it may');
 
   /* AND BEFORE ANYTHING IS SENT OR SET, because the keyboard reaches both with no button in the way:
      Enter and Backspace call `choose`, `d` calls `defer`, and `?defer` on the URL calls `defer` on
@@ -198,8 +206,10 @@ test('nothing a reader was invited to read is hidden from them', () => {
       .map((line) => line.trim()),
     [
       '{#if !answerable}',
-      'disabled={!answerable}',
+      'disabled={!answerable || holding !== null}',
       "aria-describedby={answerable ? undefined : 'cannot-decide'}",
+      /* THE MERGE CARD IS HANDED THE FLAG, and turns its presses off with it as the snippet above does (`MergeCard.svelte`). */
+      '{answerable}',
       "<Button disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} onclick={defer}>{copy.defer}</Button>",
     ],
     'the markup reads `answerable` somewhere new, so something a reader was invited to read may now turn on whether they may answer',
@@ -276,4 +286,34 @@ test('a reloaded receipt never quotes the sentence the record wrote for a press 
     /\{#if settled\.reason\.trim\(\) !== '' && !pressedOnly\(settled\.reason\)\}<p class="settled-reason">/u,
     'the receipt quotes the record’s own sentence for a press, or quotes nothing at all',
   );
+});
+
+/**
+ * A MERGE IS ASKED AS WHO IS WHO (DIRECTION §38), and an answer that cannot be taken back waits six seconds for its Undo:
+ * a merge's presses, and Backspace's decline on any question, since a declined question is never reopened and a pair
+ * kept apart is never asked about again. A key that starts in a field or a box is never the gate's.
+ */
+test('a merge is the one decision card with Undo, and Backspace is held and never fires from a field', () => {
+  assert.match(page, /\{#if merge\}\n(\s+<!--[^]*?-->\n)?\s+<MergeCard\n/u, 'a merge question is drawn as a plain Accept and Decline');
+  assert.match(page, /onpress=\{pressMerge\}/u, 'the merge card’s presses are not held for their Undo');
+  assert.match(page, /const pressMerge = \(press: Press, line: string\) => held\(press\.option, line, press\.rows\);/u);
+
+  const start = page.indexOf('function onkeydown(e: KeyboardEvent) {');
+  const handler = page.slice(start, page.indexOf('\n  }\n', start));
+  assert.match(handler, /if \(typing\(\) \|\| fromInput\(e\.target\)\) return;/u, 'a key from inside a field or a box reaches the gate');
+  assert.match(handler, /pressMerge\(merge\.apart, mergeWords\.keptApart\);/u, 'Backspace keeps a merge apart with no Undo');
+  assert.match(handler, /if \(act === 'decline'\) held\(key, gate\.declinedHeld\(question\.title\)\);\n\s+else choose\(key\);/u, 'Backspace declines at once, with no Undo');
+
+  /* HELD FOR SIX SECONDS, ON THE LINE IT LEAVES, AND SENT WHEN THE SCREEN GOES rather than dropped. */
+  assert.match(page, /toasts\.push\(line, \{ undo: unhold, life: HOLD_MS, intent: 'good' \}\)/u, 'the Undo line does not last as long as the hold');
+  assert.match(page, /mounted = false;\n\s+leave\(\);/u, 'a held press is dropped when the screen goes');
+  assert.match(
+    page,
+    /if \(mounted && question\?\.id === id && String\(page\.params\.id\) === id\) void send\(key, undefined, rows\);\n\s+else void sendAway\(id, key, rows\);/u,
+    'a held press that outlives its screen, or its question, answers the next question',
+  );
+  assert.match(page, /if \(holding && holding\.id !== id\) holding\.held\.flush\(\);/u, 'moving on to the next question leaves a held press holding its answers off');
+
+  /* AND A QUESTION THAT GATHERED SEVERAL SAYS HOW MANY BESIDE ITS TITLE. */
+  assert.match(page, /title=\{question\.title\} count=\{joined\}/u, 'a joined question’s count is not in its heading');
 });

@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { layoutOf } from './boot-live.ts';
 
-const BOOT = { registers: [], now: '2026-09-15T12:00:00.000Z' };
+const BOOT = { registers: [], now: '2026-09-15T12:00:00.000Z', home: null };
 
 test('the shell says the host `boot` named, and nothing for a host that did not name one', () => {
   assert.equal(layoutOf({ ...BOOT, host: 'self-host' }).host, 'self-host');

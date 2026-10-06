@@ -11,6 +11,42 @@
 
 import { article, list } from './english.ts';
 
+/**
+ * THE LETTERS WHOSE NAMES ARE SAID WITH A VOWEL FIRST: "an HSBC card", "an SMS", "an FX trade", "an NHS letter". `U` is
+ * "you" and takes `a`, so it is not here.
+ */
+const VOWEL_NAMED = new Set(['A', 'E', 'F', 'H', 'I', 'L', 'M', 'N', 'O', 'R', 'S', 'X']);
+
+/** A word in capitals: two letters or more and no small one, so "HSBC" and "SMS" and never "I". */
+const ALL_CAPS = /^[A-Z][A-Z0-9&]+$/u;
+
+/**
+ * `a` or `an` before a noun as it will be printed. A WORD IN CAPITALS IS SAID LETTER BY LETTER when its first two
+ * letters are not a sound ("HSBC", "SMS", "UK") and the article follows the first letter's name; one that opens on a
+ * syllable ("SIM", "PIN", "ISA") is said as a word and takes the word's article. Any other noun is `article`'s.
+ */
+const articleFor = (noun: string): string => {
+  const first = noun.trim().split(/\s+/u)[0] ?? '';
+  if (!ALL_CAPS.test(first)) return article(noun);
+  /* A CAPITAL U IS "YOU" WHETHER SPELLED OR SAID: "a URL", "a USB stick", "a UNICEF grant", never "an". */
+  if (first.startsWith('U')) return 'a';
+  const spelled = first.length < 3 || !/^[^AEIOU]?[AEIOU]/u.test(first);
+  return spelled ? (VOWEL_NAMED.has(first.charAt(0)) ? 'an' : 'a') : article(first.toLowerCase());
+};
+
+/**
+ * A list's `one:` AS IT GOES MID-SENTENCE. A word in capitals or with a capital inside it is a name ("HSBC", "GitHub")
+ * and keeps its case wherever it stands, as does any capitalised word after the first, which an author only types for
+ * a name. The first word alone is lowered when it is capitalised the way a sentence opens ("Item", "Bank card"), since
+ * a declaration is often typed that way and "Add a Bank card" reads as a typo.
+ */
+const midSentence = (one: string): string =>
+  one
+    .trim()
+    .split(/(\s+)/u)
+    .map((w, i) => (i === 0 && /^\p{Lu}[\p{Ll}\d'’-]*$/u.test(w) ? w.toLowerCase() : w))
+    .join('');
+
 export const lists = {
   rowActions: 'What you can do here',
   /* A LIST THAT SAYS WHO HOLDS ITS ROWS (`hand:`) offers this view over its own, filtered to what is handed to you. */
@@ -54,8 +90,12 @@ export const lists = {
   moreOn: (row: string) => `More on ${row}`,
 
   /* The capture line: one field at the top of a register, and the only decision in it is the words.
-     IT SPELT THE ARTICLE ITSELF and got it wrong on two of the nine registers the seed ships. */
-  captureIn: (one: string) => `Add ${article(one)} ${one.toLowerCase()}`,
+     IT SPELT THE ARTICLE ITSELF and got it wrong on two of the nine registers the seed ships. AND IT LOWERED A NAME:
+     a list of cards one bank issues said "Add a hsbc card", where a person writes "Add an HSBC card". */
+  captureIn: (one: string) => {
+    const said = midSentence(one);
+    return `Add ${articleFor(said)} ${said}`;
+  },
   captureAdd: 'Add',
 
   /* the register grid */

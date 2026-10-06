@@ -28,6 +28,53 @@ export type KeyAct = 'accept' | 'edit' | 'decline';
 /** Enter accepts, `e` edits, Backspace declines. Every other key is not Decide's. */
 export const keyAct = (key: string): KeyAct | null => (key === 'Enter' ? 'accept' : key === 'e' ? 'edit' : key === 'Backspace' ? 'decline' : null);
 
+/**
+ * WHETHER A KEY CAME FROM INSIDE SOMETHING A PERSON TYPES OR TICKS IN: a field, a box, a choice or anything editable.
+ *
+ * READ OFF THE KEY'S OWN TARGET, NOT ONLY OFF THE FOCUS. Backspace on a row's tick, or in a field a card had just
+ * opened, declined the question under it, and a declined merge is never asked again (`people.ts`). So a key that
+ * starts inside any input is the input's, whatever the focus says by the time the page reads it.
+ */
+export function fromInput(target: unknown): boolean {
+  const el = target as { closest?: (s: string) => unknown; isContentEditable?: unknown } | null;
+  if (!el || typeof el.closest !== 'function') return false;
+  return el.isContentEditable === true || el.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') !== null;
+}
+
+/** How long a held answer waits for its Undo before it goes to the record: the six seconds every Undo in the app gives. */
+export const HOLD_MS = 6_000;
+
+/** An answer held for its Undo: `undo` takes it back while it waits, and `flush` sends it at once. */
+export type Held = { undo: () => boolean; flush: () => void; readonly done: boolean };
+
+/**
+ * AN ANSWER THAT CANNOT BE TAKEN BACK IS HELD, NOT CONFIRMED. A declined question is never reopened and a declined
+ * merge is never asked again, so the press is kept for `HOLD_MS` with Undo beside it, and only then sent. `flush` sends
+ * it early, for a reader who leaves the page before the time is up; whichever comes first, it is sent once.
+ */
+export function hold(send: () => void, ms = HOLD_MS, clock: { set: typeof setTimeout; clear: typeof clearTimeout } = { set: setTimeout, clear: clearTimeout }): Held {
+  let done = false;
+  const fire = () => {
+    if (done) return;
+    done = true;
+    clock.clear(timer);
+    send();
+  };
+  const timer = clock.set(fire, ms);
+  return {
+    undo: () => {
+      if (done) return false;
+      done = true;
+      clock.clear(timer);
+      return true;
+    },
+    flush: fire,
+    get done() {
+      return done;
+    },
+  };
+}
+
 /** The band a question is in when accepting it is hard to take back (`@braindog/kernel` `weigh.ts`). */
 export const HARD_TO_UNDO = 'undo';
 
@@ -79,9 +126,10 @@ type Declared = { fields: readonly { id: string; type: string }[] };
  * and never across two, in the order the currencies are first met. Only the rows `picked` names when some are left out,
  * and nothing when the proposal writes no money or its list declares none.
  *
- * A SUM THAT COMES TO NOTHING STILL MOVES MONEY when what it adds up is not nothing: £3 out of one account and £3 into
- * another is £3 moved, and summed it said no amount, drew the suggestion and let Enter accept it. So a currency whose
- * amounts cancel names what went in, which is what went out.
+ * THE NET WHEN EVERY AMOUNT POINTS ONE WAY, AND WHAT MOVES WHEN THEY DO NOT. Amounts of -£5 and +£3 netted to £2 on the
+ * button, though £8 is written (audit M5), and a transfer of £3 out and £3 in netted to nothing at all, drew the
+ * suggestion and let Enter accept it. So a currency whose amounts point both ways names all of them, each counted once
+ * whichever way it goes, and a button never says less than what accepting writes.
  */
 export function movesOf(
   rowset: { register: string; rows: readonly Record<string, unknown>[] } | undefined,
@@ -100,10 +148,10 @@ export function movesOf(
       const m = moneyIn(values[f]);
       if (!m) continue;
       const sum = sums.get(m.currency) ?? { net: 0, moved: 0 };
-      sums.set(m.currency, { net: sum.net + m.amount, moved: sum.moved + Math.max(0, m.amount) });
+      sums.set(m.currency, { net: sum.net + m.amount, moved: sum.moved + Math.abs(m.amount) });
     }
   });
-  return [...sums].flatMap(([currency, { net, moved }]) => (net !== 0 ? [{ amount: net, currency }] : moved !== 0 ? [{ amount: moved, currency }] : []));
+  return [...sums].flatMap(([currency, { net, moved }]) => (moved === 0 ? [] : [{ amount: Math.abs(net) === moved ? net : moved, currency }]));
 }
 
 /**

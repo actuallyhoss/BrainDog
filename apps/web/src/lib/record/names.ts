@@ -187,3 +187,157 @@ export function actor(by: string, me: string | null = null, names: ReadonlyMap<s
   if (who === '' || who.includes('_') || who.includes(':')) return { name: copy.feedSomeone, kind: 'person' };
   return { name: who, kind: 'person' };
 }
+
+/* ── a person or an organisation, as their own row says them ─────────────── */
+
+/**
+ * THE WORDS A PERSON'S OR AN ORGANISATION'S ROW SAYS ABOUT WHO THEY ARE, beside the only code that composes them. `self`
+ * is the marker on the row of the person whose record it is, and `identities` the heading over the addresses and
+ * handles that row is known by, said to that person; anyone else reads them under the row's own name.
+ */
+export const personWords = {
+  self: 'Self',
+  identities: 'Your identities',
+  identitiesOf: (name: string) => `What ${name} is known by`,
+  seen: 'Seen in',
+  org: 'Organisation',
+} as const;
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** `27 Aug`, with the year only when it is not this one: how a person says a day. */
+function daySaid(day: string, nowMs: number): string {
+  const said = `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1] ?? ''}`;
+  return day.slice(0, 4) === new Date(nowMs).toISOString().slice(0, 4) ? said : `${said} ${day.slice(0, 4)}`;
+}
+
+/** A domain as the organisation a person reads it as: `encore.example` is Encore, and `mail.acme.co.uk` Acme. */
+function domainSaid(domain: string): string {
+  const parts = domain.toLowerCase().replace(/^@/u, '').split('.').filter(Boolean);
+  /* THE LABEL BEFORE THE SUFFIX, where a two-letter country sits under a short second level (`co.uk`, `com.eg`). */
+  const cut = parts.length >= 3 && parts.at(-1)!.length === 2 && parts.at(-2)!.length <= 3 ? 3 : 2;
+  const name = parts.at(-cut) ?? parts[0] ?? domain;
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/** A word a met line carries that must not reach a person as it is: a ULID, a commit's hash, a path or a run's number. */
+const UNSAID = /[0-9A-HJKMNP-TV-Z]{26}|\b(?=[a-f]*\d)[0-9a-f]{7,40}\b|(?:^|\s)(?:~|\.{0,2})\/\S*|\b[A-Z]{1,4}\d+\b/gu;
+
+/** One meeting, read: what kind of place it was, where, and on which day. */
+type Seen = { kind: 'commit' | 'mail' | 'mail-from' | 'bank' | 'import' | 'agent' | 'other'; place: string; day: string };
+
+/**
+ * A met line as `meet` writes it (`2026-08-27 · commit 3f2a91c in portage`, `2026-09-28 · mail: Renewal quote`,
+ * `2026-10-02 · mail from encore.example`, `bank text`, `import`, `agent run S740`), read into its parts, or `null` for a
+ * line with no day in front.
+ */
+function seenOf(line: string): Seen | null {
+  const m = /^(\d{4}-\d{2}-\d{2})\s*·\s*(.*)$/u.exec(line.trim());
+  if (!m) return null;
+  const [, day = '', where = ''] = m;
+  const commit = /^commits?\b(?:\s+\S+)?\s+in\s+(.+)$/iu.exec(where);
+  /* A REPOSITORY NAMED BY ITS FOLDER OR ITS ADDRESS IS SAID BY ITS LAST PART: `~/Developer/portage` is portage. */
+  if (commit) return { kind: 'commit', place: commit[1]!.trim().replace(/\.git$/u, '').split(/[/\\:]/u).filter(Boolean).at(-1) ?? '', day };
+  const from = /^mail from\s+(\S+)$/iu.exec(where);
+  if (from) return { kind: 'mail-from', place: domainSaid(from[1]!), day };
+  const mail = /^mail\s*:\s*(.*)$/iu.exec(where);
+  if (mail) return { kind: 'mail', place: mail[1]!.trim(), day };
+  if (/^bank\b/iu.test(where)) return { kind: 'bank', place: '', day };
+  if (/^import\b/iu.test(where)) return { kind: 'import', place: '', day };
+  if (/^agent\b/iu.test(where)) return { kind: 'agent', place: '', day };
+  /* AND A WORD LEFT HANGING WHERE THE ID WAS: "note <id> in <path>" is "note", not "note in". */
+  const said = where.replace(UNSAID, ' ').replace(/\s+/gu, ' ').trim().replace(/(?:\s+(?:in|at|on|from|to|of|by))+$/iu, '');
+  return { kind: 'other', place: said, day };
+}
+
+/** What `n` meetings of one kind in one place are, in words, without the day. */
+function seenSaid(kind: Seen['kind'], place: string, n: number): string {
+  const many = n > 1;
+  switch (kind) {
+    case 'commit':
+      if (place === '') return many ? `${n} commits` : 'A commit';
+      return many ? `${n} commits in ${place}` : `A commit in ${place}`;
+    case 'mail':
+      return place === '' ? (many ? `${n} mails` : 'A mail') : many ? `${n} mails about “${place}”` : `A mail about “${place}”`;
+    case 'mail-from':
+      return many ? `${n} mails from ${place}` : `A mail from ${place}`;
+    case 'bank':
+      return many ? `${n} bank texts` : 'A bank text';
+    case 'import':
+      return many ? `${n} imports` : 'An import';
+    case 'agent':
+      return many ? `${n} agent runs` : 'An agent run';
+    default:
+      return place === '' ? (many ? `${n} times in the work` : 'In the work') : place.charAt(0).toUpperCase() + place.slice(1);
+  }
+}
+
+/**
+ * WHERE A PERSON OR AN ORGANISATION WAS MET, in plain words, newest first: "3 commits in portage, last on 2 Sep",
+ * "A mail about “Renewal quote”, 28 Sep", "A bank text, 3 Oct".
+ *
+ * THE EVIDENCE IS KEPT AND SAID, NEVER THE MECHANISM. `meet` keeps one dated line a meeting in an agent's words
+ * ("2026-08-27 · commit 8b1e4d0 in portage"), and a commit's hash, a run's number or a folder is an id a person
+ * does not read. Meetings of one kind in one place are one line with their count and the last day, so 47 commits in
+ * one repository is one line and not 47. A mail keeps its subject, which is the one thing that tells two apart. A
+ * line in no shape `meet` writes is said as written, less anything that looks like an id or a path.
+ */
+export function seenIn(lines: readonly unknown[], nowMs: number = Date.now()): string[] {
+  const groups = new Map<string, { kind: Seen['kind']; place: string; n: number; last: string }>();
+  for (const raw of lines) {
+    if (typeof raw !== 'string') continue;
+    const s = seenOf(raw);
+    if (s === null) continue;
+    const key = `${s.kind}\u0000${s.place.toLowerCase()}`;
+    const held = groups.get(key);
+    if (held) {
+      held.n += 1;
+      if (s.day > held.last) held.last = s.day;
+    } else groups.set(key, { kind: s.kind, place: s.place, n: 1, last: s.day });
+  }
+  return [...groups.values()]
+    .sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : 0))
+    .map((g) => `${seenSaid(g.kind, g.place, g.n)}, ${g.n > 1 ? `last on ${daySaid(g.last, nowMs)}` : daySaid(g.last, nowMs)}`);
+}
+
+/** The services a key may name, as a person writes them. */
+const SERVICES: Readonly<Record<string, string>> = {
+  github: 'GitHub',
+  git: 'Git',
+  gitlab: 'GitLab',
+  discord: 'Discord',
+  slack: 'Slack',
+  x: 'X',
+  twitter: 'X',
+  linkedin: 'LinkedIn',
+  telegram: 'Telegram',
+  whatsapp: 'WhatsApp',
+  bank: 'Bank payee',
+};
+
+/**
+ * ONE ADDRESS OR HANDLE A PERSON IS KNOWN BY, as they read it: `email:sam@brain.dog` is "sam@brain.dog",
+ * `github:sam` "GitHub · sam", `phone:+201…` the number. `null` for a key that is a place rather than a name (a
+ * folder, a repository's address, a domain), which is a path or a hostname and never said on a person's row.
+ */
+export function identitySaid(key: string): string | null {
+  const m = /^([a-z][a-z0-9-]*):@?(.+)$/u.exec(key.trim());
+  if (!m) return key.includes('@') && !key.includes('/') ? key.trim() : null;
+  const [, kind = '', value = ''] = m;
+  if (kind === 'email' || kind === 'phone') return value;
+  if (kind === 'folder' || kind === 'remote' || kind === 'domain' || kind === 'url') return null;
+  return `${SERVICES[kind] ?? humanize(kind)} · ${value}`;
+}
+
+/**
+ * Every address and handle a row is known by, each once, as `identitySaid` says them: its email, then its keys, its
+ * handles and its other names, in the order the row holds them.
+ */
+export function identitiesOf(fields: { email?: unknown; keys?: unknown; handles?: unknown; aliases?: unknown }): string[] {
+  const list = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' && v !== '' ? [v] : []);
+  const said = [...list(fields.email).map((e) => `email:${e}`), ...list(fields.keys), ...list(fields.handles)].map(identitySaid);
+  const aliases = list(fields.aliases).filter((a) => !ULID.test(a));
+  const out: string[] = [];
+  for (const s of [...said, ...aliases]) if (s !== null && s.trim() !== '' && !out.some((o) => o.toLowerCase() === s.toLowerCase())) out.push(s);
+  return out;
+}

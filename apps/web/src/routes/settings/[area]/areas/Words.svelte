@@ -241,7 +241,11 @@
   /* RENAMING A LIST OFFERS ITS SINGULAR, until one is typed by hand: "Bakes" with "task" under it is two words for one list. */
   function rename(list: string, name: Word, one: Word | null, text: string): void {
     typed[name.setting] = text;
-    if (one && !oneTyped[list] && text.trim() !== '') typed[one.setting] = oneFor(text);
+    if (!one || oneTyped[list] || text.trim() === '') return;
+    /* A NAME WHOSE ENDING DOES NOT SAY ITS SINGULAR OFFERS NONE, and the box goes back to the word it held. */
+    const offered = oneFor(text);
+    if (offered === null) delete typed[one.setting];
+    else typed[one.setting] = offered;
   }
 
   async function sendWords(values: Record<string, string | null>, undoing = false): Promise<void> {

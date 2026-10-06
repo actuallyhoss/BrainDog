@@ -289,12 +289,19 @@ export function headlineSignOf(currency: string): string | null {
 }
 
 /**
- * A HEADLINE'S AMOUNT IN WHOLE UNITS, from its digits: "1,086,213" and ".41" are "1,086,213", and a half rounds up. Under a
- * hundred units the fraction is most of the figure, "£4.37" a cup, so it stays where it is not all zeros.
+ * THE SMALLEST AMOUNT A TILE SAYS IN WHOLE UNITS: ten thousand of the currency. Below it the fraction is a part of the
+ * figure a person checks against a statement, and "£100" for £100.49 or "£1,000" for £999.50 was a different amount
+ * (research audit 14-15a, M6). From ten thousand up the fraction is a rounding a glance does not miss.
+ */
+const WHOLE_FROM = 10_000;
+
+/**
+ * A TILE'S AMOUNT IN WHOLE UNITS, from its digits: "1,086,213" and ".41" are "1,086,213", and a half rounds up. Under
+ * `WHOLE_FROM` units the amount is exact, and only a fraction of all zeros goes.
  */
 function wholeUnits(whole: string, fraction: string): { whole: string; fraction: string } {
   const digits = whole.replace(/,/gu, '');
-  if (Number(digits) < 100) return { whole, fraction: /^\.0+$/u.test(fraction) ? '' : fraction };
+  if (Number(digits) < WHOLE_FROM) return { whole, fraction: /^\.0+$/u.test(fraction) ? '' : fraction };
   return { whole: /^\.[5-9]/u.test(fraction) ? grouped(String(Number(digits) + 1)) : whole, fraction: '' };
 }
 
@@ -312,15 +319,17 @@ export type Drawn = { lead: string; whole: string; fraction: string; iso: string
 const WRITTEN = /^([A-Z]{3}) (−?)([\d,]+)(\.\d+)?$/u;
 
 /**
- * `headline` IS A FIGURE STANDING ON ITS OWN (a tile, the page's one line, a bar's value): the record's own currency is
- * written by its sign where English has only a code (`headlineSignOf`), and the amount is in whole units (`wholeUnits`).
+ * `headline` IS A TILE'S FIGURE, OR THE PAGE'S ONE LINE: the record's own currency is written by its sign where English
+ * has only a code (`headlineSignOf`), and an amount of ten thousand or more is in whole units (`wholeUnits`). `figure`
+ * takes the sign and keeps the amount exact, for a bar's value or any figure read against others. `true` is `headline`.
  */
-export function drawn(text: string, home: string | null, headline = false): Drawn | null {
+export function drawn(text: string, home: string | null, setting: boolean | 'headline' | 'figure' = false): Drawn | null {
   const m = WRITTEN.exec(text);
   if (!m) return null;
   const [, currency, minus, whole, fraction] = m as unknown as [string, string, string, string, string | undefined];
-  const symbol = symbolOf(currency) ?? (headline && currency === home ? headlineSignOf(currency) : null);
-  const amount = headline ? wholeUnits(whole, fraction ?? '') : { whole, fraction: fraction ?? '' };
+  const standing = setting !== false;
+  const symbol = symbolOf(currency) ?? (standing && currency === home ? headlineSignOf(currency) : null);
+  const amount = setting === true || setting === 'headline' ? wholeUnits(whole, fraction ?? '') : { whole, fraction: fraction ?? '' };
   return {
     lead: symbol === null ? `${currency} ${minus}` : `${minus}${symbol}`,
     whole: amount.whole,
@@ -332,10 +341,11 @@ export function drawn(text: string, home: string | null, headline = false): Draw
 /**
  * How a figure is set where it stands: `exact` in a ledger or a table, every minor unit shown, since that is where
  * amounts are compared; `sentence` in words a person reads, a note, a question, a line of the feed, where a fraction
- * of all zeros says nothing ("£39", "−£9,190"); and `headline`, a figure standing on its own in a tile, a bar or the
- * page's one line, in whole units and in the record's own sign ("E£1,086,213").
+ * of all zeros says nothing ("£39", "−£9,190"); `figure`, a value standing alone that is still read against others, a
+ * bar's or a split's, in the record's own sign and exact ("E£58,185.54"); and `headline`, a tile's figure or the page's
+ * one line, in the record's own sign and in whole units from ten thousand up ("E£1,086,213").
  */
-export type Setting = 'exact' | 'sentence' | 'headline';
+export type Setting = 'exact' | 'sentence' | 'figure' | 'headline';
 
 /**
  * A sentence with every figure `money()` wrote in it redrawn the same way, as plain text.
@@ -346,16 +356,16 @@ export type Setting = 'exact' | 'sentence' | 'headline';
  *
  * A FRACTION OF ALL ZEROS IS DROPPED OUTSIDE A LEDGER: "£33,850" and "EGP 58,185", because ".00" in a sentence is width
  * a phone does not have and says nothing a round figure does not. A fraction that is not all zeros is part of the figure
- * and stays in a sentence. A HEADLINE IS WHOLE UNITS (DIRECTION §37): "EGP 1,086,213.41" over Today is "E£1,086,213",
- * in the record's own sign and with the piastres gone, and a figure under a hundred keeps a fraction that is most of
- * it. `true` is `headline` and `false` is `sentence`, as the callers that predate the settings pass them; a table cell
- * asks for `exact`.
+ * and stays. A HEADLINE OF TEN THOUSAND OR MORE IS WHOLE UNITS (DIRECTION §37): "EGP 1,086,213.41" over Today is
+ * "E£1,086,213", in the record's own sign and with the piastres gone; "£999.50" stays "£999.50", since a smaller
+ * amount rounded is a different amount (research audit M6). A bar asks for `figure`, which is never rounded. `true` is
+ * `headline` and `false` is `sentence`, as the callers that predate the settings pass them; a table cell asks for `exact`.
  */
 export function symbolText(text: string, home: string | null, setting: Setting | boolean = 'sentence'): string {
   const exact = setting === 'exact';
-  const headline = setting === 'headline' || setting === true;
+  const standing = setting === true || setting === 'headline' ? 'headline' : setting === 'figure' ? 'figure' : false;
   return text.replace(/\b[A-Z]{3} −?[\d,]+(?:\.\d+)?/gu, (hit) => {
-    const d = drawn(hit, home, headline);
+    const d = drawn(hit, home, standing);
     /* THREE CAPITALS THE RUNTIME DOES NOT LIST AS TENDER ARE NOT MONEY, and their figure is left as it was written. */
     if (!d || !TENDER.has(hit.slice(0, 3))) return hit;
     const fraction = !exact && /^\.0+$/u.test(d.fraction) ? '' : d.fraction;

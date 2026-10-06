@@ -36,6 +36,7 @@
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
+import { defaultBlockKey } from '@braindog/kernel';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -112,10 +113,23 @@ const RUN: ReadonlySet<string> = new Set([
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 
+/**
+ * Whether a block's `key` is the one the record named it by because it declared none (`defaultBlockKey`, parted with
+ * `-2` where two blocks of a page are alike). That key is the answer's: written back, it would freeze a name the
+ * record works out afresh from the block's kind, source and heading, so a heading changed later would keep the old one.
+ */
+const keyByDefault = (answered: Record<string, unknown>): boolean => {
+  const key = answered.key;
+  if (typeof key !== 'string') return false;
+  const named = defaultBlockKey(answered);
+  return key === named || (key.startsWith(`${named}-`) && /^\d+$/u.test(key.slice(named.length + 1)));
+};
+
 /** One answered block with the run taken off it, leaving the declaration underneath. */
 export function bodyOfBlock(answered: Record<string, unknown>): BlockBody {
   const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(answered)) if (!RUN.has(key)) out[key] = value;
+  const byDefault = keyByDefault(answered);
+  for (const [key, value] of Object.entries(answered)) if (!RUN.has(key) && !(key === 'key' && byDefault)) out[key] = value;
   /* A BLOCK WITH NO `kind` IS NOT ONE THIS RECORD COULD HAVE STORED. It is carried as the empty
      string rather than dropped, because a body that came back malformed should stay countable
      instead of losing a block on the way through and reading as a shorter page. */
@@ -132,8 +146,9 @@ export function bodyOfBlock(answered: Record<string, unknown>): BlockBody {
  */
 function bodyOf(slug: string, answered: Record<string, unknown>): PageBody {
   /* `read_at` AND `declared_version` ARE THE ANSWER'S, the clock it was read by and the version it was read at, and a body
-     carrying them back would declare one moment's reading. */
-  const { blocks, read_at: _clock, declared_version: _version, ...rest } = answered;
+     carrying them back would declare one moment's reading. So is `look`, the arrangement the page was read under, which
+     is a declaration of its own (`look.<page>`) and which a page refuses as a key it does not have. */
+  const { blocks, read_at: _clock, declared_version: _version, look: _look, ...rest } = answered;
   /* `page` IS THE FIRST KEY, because the record reads a declaration's kind from its first key and the answer does not keep
      the order a page was declared in: a body read back with `nav` first was refused as a declaration that begins with nav. */
   const named = { page: typeof rest.page === 'string' ? rest.page : slug, title: typeof rest.title === 'string' ? rest.title : '' };

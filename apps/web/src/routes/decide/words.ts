@@ -38,6 +38,8 @@ export const words = {
   decline: 'Decline',
   /** Accept, when accepting moves money: the button names the amount. */
   acceptFor: (amount: string) => `Accept ${amount}`,
+  /** The line a decline Backspace gave leaves, with Undo beside it for six seconds before it is sent. */
+  declinedHeld: (title: string) => `Declined “${title}”.`,
   /** Over the one line a question opens when the record still keeps a reason for it. */
   reasonAsked: 'This one needs a reason before it is kept. One line is enough.',
   send: 'Send',

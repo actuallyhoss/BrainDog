@@ -23,7 +23,7 @@
   import { doorOf } from './door.ts';
   import type { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { COLUMNS, dropInto, nearestInArea, setAreaAt, type Slot } from '$lib/record/arrange.ts';
-  import type { LiveBlock, LivePageDecl } from '$lib/record/page-live.ts';
+  import type { LiveBlock, LivePageDecl, Walked } from '$lib/record/page-live.ts';
   import BlockBar from '$lib/ui/BlockBar.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -37,7 +37,9 @@
   import { rowOfKey } from './row-verbs.ts';
   import JustChanged from './JustChanged.svelte';
   import { leadIndex } from './lead.ts';
-  import { blockKeys, recomposer } from './recompose.ts';
+  import { blockKeys, recomposer, rewritten } from './recompose.ts';
+  import { lookOrder, nextOf, placedOf } from './look.ts';
+  import NextStep from './NextStep.svelte';
 
   let {
     mode,
@@ -52,6 +54,7 @@
     strip = null,
     host = null,
     pick = null,
+    onwalk = null,
   }: {
     /**
      * `page` is `/p/<slug>`, with its block keys. `home` is a home's body: its blocks that hold nothing are not drawn, a
@@ -82,6 +85,11 @@
     host?: RowHost | null;
     /** The page's choice of questions to answer at once, or `null` where a queue answers one card at a time. */
     pick?: Picked | null;
+    /**
+     * Reads the page again walking a forecast as far as a reader picked, past where it reaches unasked (`page-live.ts`
+     * `askWalk`), or `null` where the page is not read again (a preview).
+     */
+    onwalk?: ((length: Walked) => void) | null;
   } = $props();
 
   const arranging = $derived(arrangement?.editing ?? false);
@@ -106,6 +114,26 @@
   const quiet = $derived(emptyHidden(blocks, mode === 'page'));
   const drawable = $derived(mode === 'preview' || arranging ? blocks : quiet);
 
+  /** Whether a block leads the page (its line, a lead figure row, a lead queue), which keeps the whole row. */
+  const isLead = (b: LiveBlock): boolean => (b as { lead?: unknown }).lead === true;
+
+  /**
+   * EACH BLOCK'S KEY, by declared index: the record's own where it answered one (`recompose.ts` `blockKeys`). What the
+   * page's elements are keyed by, so a block the look moves is the same element moving, and what the look orders by.
+   */
+  const keys = $derived(blockKeys(blocks));
+
+  /* ── the look ──────────────────────────────────────────────────────────────
+     HOW THE ENGINE ARRANGED THE PAGE (`look.ts`): its lead under the page's sentence and the order it named, applied as
+     a view over the declared blocks, so every index the page writes by stays the block's own. Not while arranging,
+     where the order on screen is the one being written. */
+  const look = $derived(page.look ?? null);
+  const order = $derived(lookOrder(blocks.map((b, i) => placedOf(b, keys[i]!)), look));
+  /* THE ONE NEXT ACTION THE LOOK NAMES, under the headline: a row of the page, or a question on it waiting on the
+     reader. Not in a preview, which is inert. */
+  const questions = $derived(new Set(blocks.flatMap((b) => (b.queue ?? []).map((q) => q.id))));
+  const next = $derived(mode === 'preview' ? null : nextOf(look, questions));
+
   /**
    * The blocks in the order and at the widths currently in force, each carrying the index it had in the declaration.
    *
@@ -114,7 +142,7 @@
    * every width: the layout you confirmed was not the layout you got.
    */
   const laid = $derived.by(() => {
-    const slots = arrangement?.slots ?? drawable.map((b, i) => slotOf(b, i, layout));
+    const slots = arrangement?.slots ?? order.map((i) => slotOf(drawable[i]!, i, layout));
     return slots.map((slot) => ({ slot, block: drawable[slot.i] })).filter((x): x is { slot: Slot; block: LiveBlock } => Boolean(x.block));
   });
 
@@ -135,6 +163,11 @@
     const at = leadIndex(pairs.map((x) => x.block));
     return at < 0 ? null : (pairs[at] ?? null);
   });
+  /**
+   * THE HEADLINE WHEREVER IT IS DRAWN: lifted over the page, or the page's sentence in the flow. The look's next action
+   * sits straight under it.
+   */
+  const headline = $derived(lifted ?? pairs.find((x) => x.block.drawn && x.block.kind === 'note' && isLead(x.block)) ?? null);
   /** Each column's pairs, less the headline lifted over both: a sentence declared in the rail is lifted too, and drawn once. */
   const mainRest = $derived(lifted ? split.main.filter((x) => x !== lifted) : split.main);
   const railRest = $derived(lifted ? split.rail.filter((x) => x !== lifted) : split.rail);
@@ -172,16 +205,40 @@
   const mainShown = $derived(mainRest.some((x) => x.block.drawn));
   const railShown = $derived(railRest.some((x) => x.block.drawn));
 
+  /* THE PAGE'S OWN ELEMENT, declared before the effects that read it: a `$effect.pre` runs while the component is
+     still being set up, and reading a `let` the script has not reached yet is a TDZ error that blanks the page. */
+  let pageEl = $state<HTMLElement | null>(null);
   /**
-   * WHETHER THE PAGE IS TWO COLUMNS OF BLOCKS: from 1,440px, on a page whose one flow has the whole width, because no
-   * rail is declared or the rail draws nothing (`layout.ts` `paired`). A page with a rail is already a lead column and a
-   * side column. Not in a preview, which is drawn inside another screen at half its width.
+   * WHETHER THE PAGE IS TWO COLUMNS OF BLOCKS: once the work column itself is `PAIR_FROM` wide, on a page whose one flow
+   * has the whole width, because no rail is declared or the rail draws nothing (`layout.ts` `paired`). A page with a
+   * rail is already a lead column and a side column. Not in a preview, which is drawn inside another screen at half its
+   * width.
+   *
+   * THE COLUMN, MEASURED, AND NOT THE WINDOW. A docked panel takes its own column beside the work (`+layout.svelte`), and
+   * the rail its own, so a 1,440 window with a task open is a work column of about 740: paired by the window's width,
+   * each half was 340 and a table or a forecast was squeezed into it. Measured, the page pairs where there is room for
+   * two and goes back to one as a panel opens, the change played as a recomposition (below). `null` until the page is
+   * first measured, which happens before it is first painted.
    */
-  const roomy = new MediaQuery(`(width >= ${PAIR_FROM}px)`, false);
-  const twoUp = $derived(roomy.current && mode !== 'preview' && (!layout || !railShown));
-
-  /** Whether a block leads the page (its line, a lead figure row, a lead queue), which keeps the whole row. */
-  const isLead = (b: LiveBlock): boolean => (b as { lead?: unknown }).lead === true;
+  let workWidth = $state<number | null>(null);
+  $effect(() => {
+    const el = pageEl;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const take = (w: number) => {
+      const px = Math.round(w);
+      if (px !== workWidth) workWidth = px;
+    };
+    const s = getComputedStyle(el);
+    /* UNTRACKED, or the width this writes would be one this effect reads, and every measure would set the watch up again. */
+    untrack(() => take(el.clientWidth - (Number.parseFloat(s.paddingInlineStart) || 0) - (Number.parseFloat(s.paddingInlineEnd) || 0)));
+    const watch = new ResizeObserver((seen) => {
+      const box = seen.at(-1)?.contentRect;
+      if (box) take(box.width);
+    });
+    watch.observe(el);
+    return () => watch.disconnect();
+  });
+  const twoUp = $derived(workWidth !== null && workWidth >= PAIR_FROM && mode !== 'preview' && (!layout || !railShown));
 
   /**
    * THE WIDTHS A ROW IS DRAWN AT ONCE ITS HIDDEN BLOCKS ARE GONE, by declared index, for the blocks whose width changes
@@ -221,26 +278,39 @@
      the page draws the answer and played from where it was to where it is, a new block fades and rises in, and one
      that left fades out where it stood. Never on the first draw of a page, never on a page that is another page, never
      as the arrange mode opens or shuts (every block takes a bar, which is the mode and not the record moving), and
-     never in a preview. */
-  const keys = $derived(blockKeys(blocks));
+     never in a preview.
+
+     A HEADLINE WRITTEN AGAIN CROSSFADES where it stands (`rewritten`): the sentence the look or the model wrote anew
+     fades over the one it replaces, and the blocks under it move to where the new answer puts them. */
   const motion = recomposer();
   let drewFor: string | null = null;
-  /* THE PAGE'S OWN ELEMENT, declared before the effects that read it: a `$effect.pre` runs while the component is
-     still being set up, and reading a `let` the script has not reached yet is a TDZ error that blanks the page. */
-  let pageEl = $state<HTMLElement | null>(null);
   let wasArranging = false;
+  /** Whether the work column had been measured when the page was last drawn: its first measure is part of the first draw. */
+  let wasSized = false;
+  /* A YES OR NO, DERIVED, so the change below reads whether the column is measured and not its width: read as the
+     width, every frame of a window being dragged wider ran it again, and its `stop` cut short the recomposition that
+     pairing or unpairing the page had just started. */
+  const sized = $derived(workWidth !== null);
+  /** What each drawn headline said when the page was last drawn, by key. */
+  let saidWas = new Map<string, string>();
   $effect.pre(() => {
     void spans;
-    const next = new Set(laid.filter((x) => x.block.drawn).map((x) => keys[x.slot.i]!));
+    const drawnNow = laid.filter((x) => x.block.drawn);
+    const shown = new Set(drawnNow.map((x) => keys[x.slot.i]!));
+    const said = new Map(drawnNow.filter((x) => x.block.kind === 'note' && isLead(x.block)).map((x) => [keys[x.slot.i]!, x.block.body ?? '']));
     const on = page.page;
     const moving = arranging;
+    const isSized = sized;
     untrack(() => {
       const el = pageEl;
-      const same = drewFor === on && wasArranging === moving;
+      const same = drewFor === on && wasArranging === moving && wasSized === isSized;
+      const swap = same ? rewritten(saidWas, said) : new Set<string>();
       drewFor = on;
       wasArranging = moving;
+      wasSized = isSized;
+      saidWas = said;
       if (mode === 'preview' || !el || !same) return motion.stop();
-      const play = motion.before(el, next);
+      const play = motion.before(el, shown, swap);
       if (play) void tick().then(play);
     });
   });
@@ -776,10 +846,13 @@
         rows={mode === 'home' || (mode === 'page' && host) ? { cursor: cursorIn(slot.i), onrowfocus: rowFocus(slot.i) } : null}
         verbs={verbsFor(slot.i)}
         pick={mode === 'preview' ? null : pick}
+        walk={mode === 'preview' ? null : onwalk}
       />
     </div>
+    <!-- UNDER THE HEADLINE: the one next action the look names, wherever the headline is drawn. -->
+    {#if next && !arranging && headline?.at === at}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
     {#if lifted?.at === at}
-      <!-- UNDER THE HEADLINE: what narrows the page, then what changed on it, before what it holds. -->
+      <!-- THEN what narrows the page, then what changed on it, before what it holds. -->
       {#if strip}<div class="page-strip">{@render strip()}</div>{/if}
       {#if host && mode === 'page'}<JustChanged {host} />{/if}
     {/if}
@@ -793,11 +866,11 @@
     {#if run.box}
       {#if run.items.some((x) => x.block.drawn)}
         <div class="box">
-          {#each run.items as x (x.slot.i)}{@render slotted(x)}{/each}
+          {#each run.items as x (keys[x.slot.i])}{@render slotted(x)}{/each}
         </div>
       {/if}
     {:else}
-      {#each run.items as x (x.slot.i)}{@render slotted(x)}{/each}
+      {#each run.items as x (keys[x.slot.i])}{@render slotted(x)}{/each}
     {/if}
   {/each}
 {/snippet}
@@ -840,6 +913,8 @@
 <div class="page" data-mode={mode} data-headed={lifted ? '' : undefined} role={arranging && !layout ? 'list' : undefined} bind:this={pageEl}>
   <!-- JUST CHANGED OPENS THE PAGE, before what it holds; on a page whose head rides over its lead tile it follows that
        tile instead, or the head would sit over it. -->
+  <!-- A PAGE WITH NO HEADLINE STILL OPENS ON THE LOOK'S NEXT ACTION, before what narrows it. -->
+  {#if next && !headline && !arranging}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
   {#if strip && !lifted}<div class="page-strip">{@render strip()}</div>{/if}
   {#if host && mode === 'page' && !arranging && !lifted}<JustChanged {host} />{/if}
   {#if layout}
@@ -872,8 +947,9 @@
      surface of its own; the ground and its light are the shell's.
 
      NO CAP ON THE PAGE, ONLY ON THE PROSE (DIRECTION §36, §38). The page is as wide as the window, inside the fluid
-     gutters, and from 1,440px its full-width blocks pair into two columns (`twoUp`) rather than stretching into lines
-     nobody reads to the end; running text keeps its own measure (`--measure`, 72ch) inside the block that has it.
+     gutters, and once the work column is wide enough its full-width blocks pair into two columns (`twoUp`) rather than
+     stretching into lines nobody reads to the end; running text keeps its own measure (`--measure`, 72ch) inside the
+     block that has it.
 
      `position: relative` IS FOR A BLOCK FADING OUT, which is laid over the place it held (`recompose.ts`). */
   .page {
@@ -918,8 +994,10 @@
 
   /* A RAIL WITH NOTHING IN IT IS NOT DRAWN, and the main column then takes the page rather than leaving a third of it
      empty beside itself. A MAIN COLUMN WITH NOTHING IN IT is not drawn either, and the rail takes the page the same way. */
-  .area[data-area='main']:last-child,
-  .area[data-area='rail']:first-child {
+  /* BY THE AREAS AND NOT BY THE PAGE'S CHILDREN, since a block fading out is laid in the page as a child of its own
+     (`recompose.ts`), and `:last-child` lost the main column its width for the length of the fade. */
+  .area[data-area='main']:not(:has(~ .area)),
+  .area[data-area='rail']:not(.area ~ .area) {
     grid-column: 1 / -1;
   }
 

@@ -173,6 +173,15 @@ export type RegisterDecl = {
   pack?: string;
   /** What its rows are spoken as instead of `register#n`: `S` for the kernel's agent runs, `S1`. */
   seq_prefix?: string;
+  /**
+   * THE ROLES A LIST THAT KEEPS PEOPLE OR ORGANISATIONS DECLARES, each part's field by name: `meets:` on People (`met`,
+   * `merged_into`, `org`, `self`), `org:` on Organisations (the kernel's `roles.ts`). They arrive as the declaration
+   * says them, because `declOf` spreads it whole.
+   */
+  meets?: Readonly<Record<string, string>>;
+  org?: Readonly<Record<string, string>>;
+  /** The kernel's scope roles, as declared and read by the kernel alone. */
+  scopes?: unknown;
 };
 
 /**

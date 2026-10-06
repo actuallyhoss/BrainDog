@@ -52,8 +52,9 @@
   } = $props();
 </script>
 
-<!-- It wraps rather than scrolls, so the verbs survive a phone. -->
-<div class="picked-bar" role="toolbar" aria-label="{count} {copy.selected}">
+<!-- It wraps rather than scrolls, so the verbs survive a phone. `data-fixed` because it is placed on the window, which
+     the shell's rail slide has to know so it does not carry the bar along with the work (`+layout.svelte`). -->
+<div class="picked-bar" data-fixed role="toolbar" aria-label="{count} {copy.selected}">
   <span class="picked-n num">{count}</span>
   <span class="picked-word">{copy.selected}</span>
   <Button weight="quiet" onclick={() => copyIds()}>

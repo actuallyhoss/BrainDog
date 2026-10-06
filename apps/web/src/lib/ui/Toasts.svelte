@@ -29,7 +29,13 @@
   `panel.ts`) the stack HOLDS: its toasts drop back out of sight and their countdown stops, and when the last sheet has
   gone they rise into place with their whole time still to run. `⌘Z` reaches the newest Undo meanwhile, as it always
   does. Holding rather than raising, because a toast raised over a phone sheet lands on the sheet's own footer, which
-  is where its one primary sits.
+  is where its one primary sits. A held toast is inert as well as out of sight, so Tab never lands on an Undo nobody
+  can see.
+
+  EXCEPT A FAILURE. "Couldn't save" said while a sheet is up is the one toast that must not wait for the sheet to go,
+  so a `bad` one is not held: the stack is lifted into the top layer above the newest sheet for as long as one is
+  showing (a manual popover, raised again over each sheet that opens after it), and the receipts beside it stay held.
+  Lifted, it stands on the scrim beside the sheet, or at the top on a phone, never on the sheet's footer.
 -->
 <script lang="ts">
   import { tick, untrack } from 'svelte';
@@ -100,6 +106,30 @@
     if (!pointed && !focused && !covered) toasts.release();
   }
 
+  /** Whether a toast is a failure, which is never held under a sheet. */
+  const failed = (t: Toast): boolean => t.intent === 'bad';
+
+  /**
+   * THE STACK IN THE TOP LAYER WHILE A FAILURE IS SHOWING UNDER A SHEET, and out of it otherwise: a top-layer element
+   * ignores `z-index`, so the stack is put there only for as long as it has to be over something. Shown again (hidden
+   * and shown in one task, which draws nothing between) whenever another overlay opens, because the top layer is
+   * ordered by who was shown last. A browser without popovers keeps the stack where it was.
+   */
+  $effect(() => {
+    const el = stack;
+    const lift = covered && drawn.some((d) => !d.gone && failed(d.toast));
+    void overlays.depth;
+    void scrimmed;
+    if (!el || typeof el.showPopover !== 'function') return;
+    untrack(() => {
+      if (el.matches(':popover-open')) el.hidePopover();
+      if (lift) {
+        el.popover = 'manual';
+        el.showPopover();
+      } else el.removeAttribute('popover');
+    });
+  });
+
   /** Once a toast that has gone has played its exit, it leaves the stack. */
   function letGo(id: number) {
     const forget = () => (drawn = drawn.filter((d) => d.toast.id !== id));
@@ -136,12 +166,14 @@
 >
   {#each drawn as { toast, gone } (toast.id)}
     {@const said = toast.undo ? parts(toast.text) : null}
+    {@const held = covered && !failed(toast)}
     <div
       class="toast"
       data-intent={toast.intent}
       data-toast={toast.id}
       data-leaving={gone ? '' : undefined}
-      inert={gone}
+      data-held={held ? '' : undefined}
+      inert={gone || held}
       aria-hidden={gone ? 'true' : undefined}
     >
       {#if toast.intent}
@@ -182,6 +214,17 @@
     gap: var(--sp-2);
     padding-inline: var(--sp-4);
     pointer-events: none;
+    /* WHAT A POPOVER IS GIVEN BY THE BROWSER, taken back, so lifted into the top layer the stack stands where it did:
+       no box, no centring margin, no fit-content size, and no top edge pulling it to the window's top. */
+    inset-block-start: auto;
+    inline-size: auto;
+    block-size: auto;
+    margin: 0;
+    padding-block: 0;
+    overflow: visible;
+    background: none;
+    border: 0;
+    color: inherit;
   }
 
   /* THE RAIL'S WIDTH AS THE RAIL SAYS IT, `--rail-w` (`Sidebar.svelte`), at whichever of its widths it is drawn. */
@@ -251,9 +294,16 @@
     transition-timing-function: var(--ease-in);
   }
 
-  /* HELD UNDER A SHEET: every toast drops back as a leaving one does, and nothing on it can be pressed. When the sheet
-     has gone they rise into place on the arriving step, from where they went. */
-  .stack[data-covered] > .toast {
+  /* LIFTED OVER A SHEET, A FAILURE STANDS ON THE SCRIM BESIDE IT and never on the sheet, whose footer holds its primary:
+     clear of the widest drawer at the end edge (`Sheet.svelte`, 480 and its inset), from the window's own inset, since
+     the scrim covers the rail too. On a phone it goes to the top, below (`popover` is on the stack only while lifted). */
+  .stack:global([popover]) {
+    inset-inline: var(--inset) calc(min(480px, 100vw - 2 * var(--inset)) + 2 * var(--inset));
+  }
+
+  /* HELD UNDER A SHEET: every toast but a failure drops back as a leaving one does, inert. When the sheet has gone they
+     rise into place on the arriving step, from where they went. */
+  .toast[data-held] {
     transform: var(--toast-gone);
     opacity: 0;
     pointer-events: none;
@@ -370,6 +420,14 @@
        bar, so the height this clears is not there any more and the keyboard is. */
     :global(html[data-kb]) .stack {
       inset-block-end: calc(var(--kb) + var(--sp-3));
+    }
+
+    /* A FAILURE LIFTED OVER A PHONE'S SHEET STANDS AT THE TOP, on the scrim the sheet leaves above it, and not over the
+       sheet's footer, where its one primary sits. With the keyboard up as well. */
+    .stack:global([popover]),
+    :global(html[data-kb]) .stack:global([popover]) {
+      inset-inline: var(--inset);
+      inset-block: calc(env(safe-area-inset-top) + var(--inset)) auto;
     }
   }
 

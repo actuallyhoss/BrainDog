@@ -111,6 +111,34 @@ function lastOf(values: readonly (number | null)[]): { value: number; at: number
   return null;
 }
 
+/** A reading read once, with the project it was reported for where the record said it (`MeasureLatest.of` in the kernel). */
+type Latest = MeasureLatest & { of?: string | undefined };
+
+/** What names a measure on screen: its name, and the project it was reported for when the record said. */
+type Named = { name: string; of?: string | undefined };
+
+/** The names more than one project reported a measure under, among every measure a block draws. */
+function sharedNames(measures: Iterable<Named>): Set<string> {
+  const projects = new Map<string, Set<string>>();
+  for (const m of measures) {
+    const of = m.of?.trim() ?? '';
+    const seen = projects.get(m.name) ?? new Set<string>();
+    seen.add(of);
+    projects.set(m.name, seen);
+  }
+  return new Set([...projects].filter(([, of]) => of.size > 1).map(([name]) => name));
+}
+
+/**
+ * A MEASURE'S LABEL: its name, and its project after a middle dot when another project reports a measure of the same
+ * name in the same block ("Orders · Kiln" beside "Orders · Portage"). Two charts both headed "Orders" read as one
+ * measure drawn twice. A name only one project uses stays as it is, since the page already says whose it is.
+ */
+export function measureLabel(m: Named, shared: ReadonlySet<string>): string {
+  const of = m.of?.trim();
+  return of && shared.has(m.name) ? `${m.name} · ${of}` : m.name;
+}
+
 /**
  * The change a tile says under its figure: the period's last reading against the period before at the same point,
  * or why there is none.
@@ -130,29 +158,34 @@ export function changeLine(m: Measure): string {
  * period's days as its small line.
  */
 export function tileRows(measures: readonly Measure[]): string[] {
-  return measures.slice(0, TILES_MOST).map((m) => {
+  const shown = measures.slice(0, TILES_MOST);
+  const shared = sharedNames(shown);
+  return shown.map((m) => {
     /* A TILE'S FIGURE KEEPS ITS CURRENCY AND DROPS ANY OTHER UNIT, which its name already says: "476 customers" under
        "Active customers" is a tile wrapped over two lines to say one word twice. */
     const figure = m.latest ? figureOf(m.latest.value, isCurrency(m.unit) ? m.unit : '') : '';
     const trend = m.now.some((v) => v !== null) ? ` | ${m.now.map((v) => (v === null ? '-' : String(v))).join(' ')}` : '';
-    return `${escapeCell(m.name)} | ${escapeCell(figure)} | ${escapeCell(changeLine(m))}${trend}`;
+    return `${escapeCell(measureLabel(m, shared))} | ${escapeCell(figure)} | ${escapeCell(changeLine(m))}${trend}`;
   });
 }
 
 /**
  * The `lines` fences: one chart a measure, the period as the line and the period before as the dashed one, each under
- * the measure's name as its heading. A block hands this only its measures with a line to draw (`linesAndLatest`).
+ * the measure's name as its heading. A block hands this only its measures with a line to draw (`linesAndLatest`), and
+ * `beside` the ones read once it draws under them, so a name two projects share is told apart across both.
  */
-export function linesText(measures: readonly Measure[]): string {
-  return measures
-    .slice(0, CHARTS_MOST)
+export function linesText(measures: readonly Measure[], beside: readonly Latest[] = []): string {
+  const shown = measures.slice(0, CHARTS_MOST);
+  const shared = sharedNames([...shown, ...beside.slice(0, CHARTS_MOST).map((m) => ({ name: m.measure, of: m.of }))]);
+  return shown
     .map((m) => {
-      const head = `${escapeCell(copy.seriesAxis[m.bucket] ?? 'Day')} | ${escapeCell(m.name)} | was: ${escapeCell(copy.measurePrevious(m.keys.length, m.bucket === 'week'))}`;
+      const label = measureLabel(m, shared);
+      const head = `${escapeCell(copy.seriesAxis[m.bucket] ?? 'Day')} | ${escapeCell(label)} | was: ${escapeCell(copy.measurePrevious(m.keys.length, m.bucket === 'week'))}`;
       const rows = m.keys.map((d, i) => {
         const cell = (v: number | null | undefined) => (v === null || v === undefined ? '' : escapeCell(figureOf(v, m.unit)));
         return `${escapeCell(dayLabel(d))} | ${cell(m.now[i])} | ${cell(m.was[i])}`;
       });
-      return ['```lines | ' + escapeCell(m.name), head, ...rows, '```'].join('\n');
+      return ['```lines | ' + escapeCell(label), head, ...rows, '```'].join('\n');
     })
     .join('\n\n');
 }
@@ -169,11 +202,13 @@ const pointsIn = (m: Measure): number => m.now.filter((v) => v !== null && v !==
  * holds the measures read once: so both draw one page. 227 of the 261 measures a real record had read that month held
  * one reading, and the block was a wall of one-dot charts.
  */
-export function linesAndLatest(measures: readonly Measure[], latest?: readonly MeasureLatest[]): { lines: Measure[]; latest: MeasureLatest[] } {
+export function linesAndLatest(measures: readonly Measure[], latest?: readonly MeasureLatest[]): { lines: Measure[]; latest: Latest[] } {
   if (latest) return { lines: [...measures], latest: [...latest] };
   return {
     lines: measures.filter((m) => pointsIn(m) >= 2),
-    latest: measures.flatMap((m) => (pointsIn(m) === 1 && m.latest ? [{ measure: m.name, value: m.latest.value, unit: m.unit, at: m.latest.at, day: m.latest.day }] : [])),
+    latest: measures.flatMap((m) =>
+      pointsIn(m) === 1 && m.latest ? [{ measure: m.name, ...(m.of !== undefined ? { of: m.of } : {}), value: m.latest.value, unit: m.unit, at: m.latest.at, day: m.latest.day }] : [],
+    ),
   };
 }
 
@@ -186,10 +221,13 @@ export const measureWords = {
 /**
  * THE MEASURES READ ONCE, AS ONE QUIET LIST: each measure's name, its reading and the day it was read, a line each, in
  * the record's order (newest first). A list and not a tile a measure (DIRECTION §37: tiles only for figures and charts,
- * and fewer things on screen), headed only where lines stand above it, so it is not taken for one of them.
+ * and fewer things on screen), headed only where lines stand above it, so it is not taken for one of them. `beside` is
+ * the lines above, so "Orders" read once for one project and charted for another is told apart.
  */
-export function latestText(latest: readonly MeasureLatest[], underLines: boolean): string {
+export function latestText(latest: readonly Latest[], underLines: boolean, beside: readonly Measure[] = []): string {
   if (latest.length === 0) return '';
-  const rows = latest.slice(0, CHARTS_MOST).map((m) => `${escapeCell(m.measure)} | ${escapeCell(figureOf(m.value, m.unit))} | ${escapeCell(dayLabel(m.day))}`);
+  const shown = latest.slice(0, CHARTS_MOST);
+  const shared = sharedNames([...shown.map((m) => ({ name: m.measure, of: m.of })), ...beside.slice(0, CHARTS_MOST)]);
+  const rows = shown.map((m) => `${escapeCell(measureLabel({ name: m.measure, of: m.of }, shared))} | ${escapeCell(figureOf(m.value, m.unit))} | ${escapeCell(dayLabel(m.day))}`);
   return [`\`\`\`spec${underLines ? ` | ${escapeCell(measureWords.readOnce)}` : ''}`, ...rows, '```'].join('\n');
 }

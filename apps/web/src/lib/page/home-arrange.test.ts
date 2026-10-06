@@ -53,8 +53,16 @@ test('an installed home is arranged where it is, and an address that is neither 
 
 test("Today's body is built from what the shell says the record holds", () => {
   const owner = { level: 'owner', owner: true, person: 'p_1', lists: null } as never;
-  assert.deepEqual(holdsOf({ lists: [{ id: 'tasks', name: 'Tasks' }], pages: ['money'], me: owner }), { tasks: true, adds: true, money: true });
-  assert.deepEqual(holdsOf({ lists: [{ id: 'notes', name: 'Notes' }], pages: [], me: owner }), { tasks: false, adds: false, money: false });
+  assert.deepEqual(holdsOf({ lists: [{ id: 'tasks', name: 'Tasks' }], pages: ['money'], me: owner }, {}), { tasks: true, adds: true, money: true, one: 'task' });
+  assert.deepEqual(holdsOf({ lists: [{ id: 'notes', name: 'Notes' }], pages: [], me: owner }, {}), { tasks: false, adds: false, money: false });
+});
+
+test('the line a task is typed into is named by the tasks list as the record words it, and Home and the arrange mode agree', () => {
+  const owner = { level: 'owner', owner: true, person: 'p_1', lists: null } as never;
+  const shell = { lists: [{ id: 'tasks', name: 'Tasks' }], pages: [], me: owner };
+  assert.equal(holdsOf(shell, { 'tasks:one': 'job' }).one, 'job', "the record's own word for one of them");
+  assert.equal(holdsOf(shell, { tasks: 'Chores' }).one, 'chore', 'a list renamed says one of its new name');
+  assert.equal(holdsOf({ ...shell, lists: [] }, { 'tasks:one': 'job' }).one, undefined, 'no tasks list, no word for one');
 });
 
 test('the headings are asked of the voice that speaks', () => {

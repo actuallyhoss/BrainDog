@@ -10,11 +10,19 @@
  *
  * A BLOCK IS KNOWN BY WHAT IT IS, NOT BY ITS PLACE. The page keys every id and write by a block's declared index, so a
  * page written again with a block put in at the top would have "block 3" be another block; following the index would
- * slide the wrong tile. `blockKeys` names each block by its kind, its source and its heading, which a regenerated page
- * keeps for the block that is the same block.
+ * slide the wrong tile. `blockKeys` names each block by the `key` the record answered for it (its declared key, or the
+ * record's hash of its kind, source and heading), and works the same name out where a record older than the look
+ * overlay sent none, so a regenerated or rearranged page keeps each block's name for the block that is the same block.
+ * The page keys its elements by it too (`PageBody.svelte`), so a block the look moves is the same element moving, with
+ * what it holds (a fold opened, a length picked) going with it.
  *
- * WITHIN THE SKIN'S MOTION AND UNDER 300ms. A reader who asked for less motion sees only opacity: a new block fades in,
- * one that left fades out, and one that moved is simply where it is.
+ * A HEADLINE WRITTEN AGAIN CROSSFADES (`swap`): the block stays where it is and its old words fade out over the new
+ * ones fading in, rather than changing in one frame under the reader's eye.
+ *
+ * WITHIN THE SKIN'S MOTION AND UNDER 300ms, ON ITS OWN TWO STEPS: a block that moves, arrives or leaves takes
+ * `--d-recompose` (220) and a headline written again `--d-swap` (160), so a skin or `a11y.css` that changes the scale
+ * changes this with it. A reader who asked for less motion sees only opacity: a new block fades in, one that left fades
+ * out, and one that moved is simply where it is.
  *
  * THE PLAN IS PURE (`planOf`), so `recompose.test.ts` holds which block does what; `recompose` is the half that touches
  * the page.
@@ -40,10 +48,17 @@ const STILL = 0.5;
  * Each block's key, by index: its kind, its source or list, and its heading, with a count where two blocks on one page
  * would share them. Every block is named, drawn or not, so a block that comes back keeps the name it had.
  */
-export function blockKeys(blocks: readonly { kind: string; source?: string | undefined; register?: string | undefined; heading?: string | undefined; lead?: unknown }[]): string[] {
+export function blockKeys(
+  blocks: readonly { kind: string; key?: string | undefined; source?: string | undefined; register?: string | undefined; heading?: string | undefined; lead?: unknown }[],
+): string[] {
   const seen = new Map<string, number>();
   return blocks.map((b) => {
-    const base = [b.kind, b.lead === true ? 'lead' : '', b.source ?? b.register ?? '', (b.heading ?? '').trim().toLowerCase()].join('|');
+    /* THE RECORD'S KEY WHERE IT SENT ONE, which is the name the look orders, hides and pins by. */
+    const base =
+      typeof b.key === 'string' && b.key !== ''
+        ? b.key
+        : [b.kind, b.lead === true ? 'lead' : '', b.source ?? b.register ?? '', (b.heading ?? '').trim().toLowerCase()].join('|');
+    /* TWO ALIKE ARE TOLD APART BY THEIR ORDER, so no two elements of the page ever share a key. */
     const n = seen.get(base) ?? 0;
     seen.set(base, n + 1);
     return n === 0 ? base : `${base}#${n}`;
@@ -67,6 +82,32 @@ export function planOf(before: ReadonlyMap<string, Box>, after: ReadonlyMap<stri
   }
   for (const [key, box] of before) if (!after.has(key)) leaves.push({ key, box });
   return { moves, enters, leaves };
+}
+
+/**
+ * The headlines written again in place: under a key in both answers, saying something else. Each is crossfaded rather
+ * than moved (`recomposer`'s `swap`). A headline that came or went is a block that came or went, and is not here.
+ */
+export function rewritten(was: ReadonlyMap<string, string>, now: ReadonlyMap<string, string>): Set<string> {
+  const out = new Set<string>();
+  for (const [key, said] of now) {
+    const before = was.get(key);
+    if (before !== undefined && before !== said) out.add(key);
+  }
+  return out;
+}
+
+/**
+ * Whether a block now drawn stands over the place one that left held, by more than a pixel each way. Such a place is
+ * taken, and the one that left goes at once rather than fading under its successor (`recomposer`).
+ */
+export function covered(box: Box, now: Iterable<Box>): boolean {
+  for (const b of now) {
+    const w = Math.min(box.x + box.w, b.x + b.w) - Math.max(box.x, b.x);
+    const h = Math.min(box.y + box.h, b.y + b.h) - Math.max(box.y, b.y);
+    if (w > 1 && h > 1) return true;
+  }
+  return false;
 }
 
 /* ── the page ──────────────────────────────────────────────────────────────── */
@@ -110,10 +151,13 @@ const still = (): boolean => typeof matchMedia === 'function' && matchMedia('(pr
  * yet, a page that is another page, a tab nobody is looking at), and the new answer is simply drawn.
  *
  * A LEAVING BLOCK IS ITS OWN ELEMENT, COPIED BEFORE IT GOES, laid over the place it held, out of the flow so nothing
- * moves under it, and taken away once it has faded. A copy and not the element itself, because the page keys its
- * elements by place and may already have drawn another block into the one that held it.
+ * moves under it, and taken away once it has faded. A copy and not the element itself, because the page has already
+ * taken that element out of the document by the time the change plays.
  */
-export function recomposer(): { before: (page: HTMLElement, next: ReadonlySet<string>) => (() => void) | null; stop: () => void } {
+export function recomposer(): {
+  before: (page: HTMLElement, next: ReadonlySet<string>, swap?: ReadonlySet<string>) => (() => void) | null;
+  stop: () => void;
+} {
   let running: Animation[] = [];
   let ghosts: HTMLElement[] = [];
 
@@ -122,22 +166,76 @@ export function recomposer(): { before: (page: HTMLElement, next: ReadonlySet<st
     for (const g of ghosts.splice(0)) g.remove();
   }
 
-  function before(page: HTMLElement, next: ReadonlySet<string>): (() => void) | null {
+  /** A copy of a block as it is drawn now, styled to stand where it stood once the page has moved on. */
+  function copyOf(el: HTMLElement): { node: HTMLElement; style: Partial<CSSStyleDeclaration> } {
+    const s = getComputedStyle(el);
+    return {
+      node: el.cloneNode(true) as HTMLElement,
+      style: { padding: s.padding, background: s.background, borderRadius: s.borderRadius, boxShadow: s.boxShadow },
+    };
+  }
+
+  /**
+   * Lays a copy over the place a block held and fades it out, then takes it away.
+   *
+   * A BLOCK THAT LEFT FADES UNDER THE PAGE (`under`), never over it: it goes in as the page's first child, so the blocks
+   * drawn after it, which are positioned too, paint over it, and a block that moved into the place it held is read at
+   * once rather than through the old one for the length of the fade. It was appended last, at `z-index: 0`, and
+   * the old content lay over the new block, which under reduced motion does not even move out from under it.
+   * A HEADLINE'S OLD WORDS ARE OVER their new ones, which is the crossfade.
+   */
+  function ghost(page: HTMLElement, copy: { node: HTMLElement; style: Partial<CSSStyleDeclaration> }, box: Box, leave: KeyframeAnimationOptions, under: boolean) {
+    const g = copy.node;
+    /* NOTHING IN A GHOST IS THE PAGE'S: no id twice in the document, nothing to focus or press, nothing read out. */
+    for (const n of [g, ...g.querySelectorAll('[id]')]) n.removeAttribute('id');
+    for (const n of g.querySelectorAll('[data-row]')) n.removeAttribute('data-row');
+    /* NOR THE CURSOR'S RING OR A LANDING LINE (`PageBody.svelte`): a ring round a block that has gone, and a landing
+       line raised over the page (`--z-raise`), would both be read as the live page's for the length of the fade. */
+    for (const n of [g, ...g.querySelectorAll('[data-cursor], [data-row-cursor], [data-drop]')]) {
+      n.removeAttribute('data-cursor');
+      n.removeAttribute('data-row-cursor');
+      n.removeAttribute('data-drop');
+    }
+    g.setAttribute('data-leaving', '');
+    g.setAttribute('aria-hidden', 'true');
+    g.inert = true;
+    Object.assign(g.style, copy.style, {
+      position: 'absolute',
+      left: `${box.x}px`,
+      top: `${box.y}px`,
+      width: `${box.w}px`,
+      height: `${box.h}px`,
+      margin: '0',
+      gridColumn: 'auto',
+      gridRow: 'auto',
+      boxSizing: 'border-box',
+      pointerEvents: 'none',
+    });
+    if (under) page.prepend(g);
+    else page.append(g);
+    ghosts.push(g);
+    const a = g.animate({ opacity: [1, 0] }, { ...leave, fill: 'forwards' });
+    running.push(a);
+    void a.finished.then(
+      () => g.remove(),
+      () => g.remove(),
+    );
+  }
+
+  function before(page: HTMLElement, next: ReadonlySet<string>, swap: ReadonlySet<string> = new Set()): (() => void) | null {
     /* A CHANGE STILL PLAYING ENDS HERE, so the next one starts from the page and not from its middle. */
     stop();
     if (typeof document !== 'undefined' && document.hidden) return null;
     if (typeof Element === 'undefined' || typeof Element.prototype.animate !== 'function') return null;
     const was = measure(page);
     if (was.size === 0) return null;
-    /* THE BLOCKS THAT ARE LEAVING, copied while they are still drawn as they were. */
+    /* THE BLOCKS THAT ARE LEAVING, and the ones whose words are written again, copied while they are still drawn as
+       they were. */
     const copies = new Map<string, { node: HTMLElement; style: Partial<CSSStyleDeclaration> }>();
+    const swaps = new Map<string, { node: HTMLElement; style: Partial<CSSStyleDeclaration> }>();
     for (const [key, { el }] of was) {
-      if (next.has(key)) continue;
-      const s = getComputedStyle(el);
-      copies.set(key, {
-        node: el.cloneNode(true) as HTMLElement,
-        style: { padding: s.padding, background: s.background, borderRadius: s.borderRadius, boxShadow: s.boxShadow },
-      });
+      if (!next.has(key)) copies.set(key, copyOf(el));
+      else if (swap.has(key)) swaps.set(key, copyOf(el));
     }
     return () => {
       const now = measure(page);
@@ -145,9 +243,13 @@ export function recomposer(): { before: (page: HTMLElement, next: ReadonlySet<st
       const style = getComputedStyle(page);
       const less = still();
       const ease = (token: string, fallback: string) => style.getPropertyValue(token).trim() || fallback;
-      const move = { duration: ms(style, '--d-move', 240), easing: ease('--ease-out', 'ease-out') };
-      const enter = { duration: ms(style, '--d-page', 200), easing: ease('--ease-out', 'ease-out') };
-      const leave = { duration: ms(style, '--d-rows', 180), easing: ease('--ease-in', 'ease-in') };
+      /* ONE STEP FOR THE PAGE MOVING, `--d-recompose`, on the curves the scale names for it: what changes place rides the
+         standard curve, what arrives the emphasised one, and what leaves accelerates away. */
+      const recompose = ms(style, '--d-recompose', 220);
+      const move = { duration: recompose, easing: ease('--ease-standard', 'ease-in-out') };
+      const enter = { duration: recompose, easing: ease('--ease-emphasis', 'ease-out') };
+      const leave = { duration: recompose, easing: ease('--ease-in', 'ease-in') };
+      const swapped = { duration: ms(style, '--d-swap', 160), easing: ease('--ease-standard', 'ease-in-out') };
       try {
         if (!less)
           for (const { key, dx, dy } of plan.moves) {
@@ -159,37 +261,32 @@ export function recomposer(): { before: (page: HTMLElement, next: ReadonlySet<st
           if (!el) continue;
           running.push(el.animate(less ? { opacity: [0, 1] } : { opacity: [0, 1], transform: ['translateY(8px)', 'none'] }, { ...enter, fill: 'backwards' }));
         }
+        /* A PLACE ANOTHER BLOCK NOW TAKES IS LET GO OF QUICKLY. Under it is not enough: a list drawn without a box has
+           no ground, so the old block's words read through the new one's for the whole fade. It fades on the shorter
+           step and front-loaded, gone before the block moving in has landed; for a reader who asked for less motion,
+           where the block is simply there, it is not drawn at all. */
+        const drawn = [...now.values()].map((v) => v.box);
+        const quick = { duration: swapped.duration, easing: ease('--ease-out', 'ease-out') };
         for (const { key, box } of plan.leaves) {
           const copy = copies.get(key);
           if (!copy) continue;
-          const g = copy.node;
-          /* NOTHING IN A GHOST IS THE PAGE'S: no id twice in the document, nothing to focus or press, nothing read out. */
-          for (const n of [g, ...g.querySelectorAll('[id]')]) n.removeAttribute('id');
-          for (const n of g.querySelectorAll('[data-row]')) n.removeAttribute('data-row');
-          g.setAttribute('data-leaving', '');
-          g.setAttribute('aria-hidden', 'true');
-          g.inert = true;
-          Object.assign(g.style, copy.style, {
-            position: 'absolute',
-            left: `${box.x}px`,
-            top: `${box.y}px`,
-            width: `${box.w}px`,
-            height: `${box.h}px`,
-            margin: '0',
-            gridColumn: 'auto',
-            gridRow: 'auto',
-            boxSizing: 'border-box',
-            pointerEvents: 'none',
-            zIndex: '0',
-          });
-          page.append(g);
-          ghosts.push(g);
-          const a = g.animate({ opacity: [1, 0] }, { ...leave, fill: 'forwards' });
-          running.push(a);
-          void a.finished.then(
-            () => g.remove(),
-            () => g.remove(),
-          );
+          const taken = covered(box, drawn);
+          if (taken && less) continue;
+          ghost(page, copy, box, taken ? quick : leave, true);
+        }
+        /* A HEADLINE WRITTEN AGAIN: its old words fade out where they stood, over the new ones fading in. Opacity only,
+           so a reader who asked for less motion sees it too, as the soft change it is. A swap that also moved is laid
+           where it was, since that is where the eye still is.
+
+           THE WORDS CROSSFADE AND THE TILE STAYS. The copy carries no surface of its own and the tile is not faded,
+           only what is in it: a copy with the tile's ground would dim the tile for the length of the fade and lie over
+           the page's head, which rides over the top of the headline's tile (`PageHead`'s `over`). */
+        for (const [key, copy] of swaps) {
+          const el = now.get(key)?.el;
+          const box = was.get(key)?.box;
+          if (!el || !box) continue;
+          ghost(page, { node: copy.node, style: { ...copy.style, background: 'transparent', boxShadow: 'none' } }, box, swapped, false);
+          for (const child of el.children) running.push(child.animate({ opacity: [0, 1] }, { ...swapped, fill: 'backwards' }));
         }
       } catch {
         /* A timing a browser cannot read is a page that changes in one frame, which is what it did before. */

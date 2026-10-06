@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type QueueQuestion } from '@braindog/kernel';
 import type { Fetch, LiveBlock } from '../../lib/record/page-live.ts';
-import { callsRead, DECIDE_HOME, decideBlockOf, decideDrawn, decideHome, readDecide, type Call } from './views.ts';
+import { callsRead, DECIDE_HOME, decideBlockOf, decideDrawn, decideHome, readDecide, waitingOf, type Call } from './views.ts';
 import { words } from './words.ts';
 
 const CLOCK = Date.UTC(2026, 9, 2, 12);
@@ -120,6 +120,9 @@ test('the record draws the page: the first question whole, the rest after it onc
   const blocks = got.page.blocks;
   assert.ok(blocks.every((b) => b.cannot === undefined), JSON.stringify(blocks.map((b) => [b.source, b.cannot])));
 
+  /* THE RECORD'S OWN COUNTS RIDE ON BOTH OPEN QUEUES to the page, which says them in place of counting what it drew. */
+  for (const b of blocks.filter((x) => x.source === 'governance.open')) assert.deepEqual(waitingOf(b), { stale: 0, hardToUndo: 0 });
+
   const shaped = decideDrawn(blocks, got.now, (q) => (q.who === 'slash' ? 'Slash' : ''));
   const [note, lead, rest, , later, , decided] = shaped.blocks;
   /* THE LINE WENT TO THE HEAD, and says how many wait and what the first suggests. */
@@ -191,6 +194,30 @@ test('the head says the record’s count with no quota in red, and red only for 
   /* THE REST HOLD NOTHING BUT THE FIRST, so they are not drawn, and the indexes stay. */
   assert.equal(one.blocks.length, 3);
   assert.equal(one.blocks[2]?.drawn, false);
+});
+
+test('the head counts what is hard to undo and what has waited from the record, over every question and not the few drawn', () => {
+  const withCounts = (b: LiveBlock, waiting: unknown): LiveBlock => ({ ...b, waiting }) as LiveBlock;
+  const qs = ['q1', 'q2', 'q3'].map((id) => question(id));
+  /* THE RECORD SAYS 12 OPEN, 4 OF THEM HARD TO UNDO AND 3 PAST TWO WEEKS, though the three drawn are none of those. */
+  const lead = withCounts(queueBlock(qs.slice(0, 1), 12, true), { stale: 3, hardToUndo: 4 });
+  const rest = withCounts(queueBlock(qs, 12), { stale: 3, hardToUndo: 4 });
+  const shaped = decideDrawn([noteBlock(), lead, rest], CLOCK);
+  assert.equal(shaped.sentence.text, '12 questions wait on you, three of them for over two weeks. The first four are hard to undo.');
+  assert.equal(shaped.sentence.needs, 'three of them for over two weeks');
+
+  /* THE MOST EITHER QUEUE SAID, since both count every open question. */
+  const most = decideDrawn([noteBlock(), withCounts(queueBlock(qs.slice(0, 1), 12, true), { stale: 0, hardToUndo: 1 }), rest], CLOCK);
+  assert.equal(most.sentence.text, shaped.sentence.text);
+
+  /* NOUGHT FROM THE RECORD IS NOUGHT, even where the questions drawn would say otherwise. */
+  const old = qs.map((q) => ({ ...q, cost: 'undo' as const, at: new Date(CLOCK - 20 * DAY).toISOString() }));
+  const none = decideDrawn([noteBlock(), withCounts(queueBlock(old.slice(0, 1), 3, true), { stale: 0, hardToUndo: 0 }), withCounts(queueBlock(old, 3), { stale: 0, hardToUndo: 0 })], CLOCK);
+  assert.equal(none.sentence.text, 'Three questions wait on you.');
+
+  /* A RECORD OLDER THAN THE COUNTS, or one that sent them in a shape this cannot read, is counted from what was drawn. */
+  const counted = decideDrawn([noteBlock(), queueBlock(old.slice(0, 1), 3, true), withCounts(queueBlock(old, 3), { stale: 'three' })], CLOCK);
+  assert.equal(counted.sentence.text, 'Three questions wait on you, all of them for over two weeks. All of them are hard to undo.');
 });
 
 test('nothing waiting says the calm line, with when the last one was decided, and draws nothing that holds nothing', () => {

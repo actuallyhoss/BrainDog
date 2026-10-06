@@ -214,6 +214,19 @@ const isLead = (b: LiveBlock): boolean => isOpen(b) && (b as { lead?: unknown })
 /** How many questions a queue holds: every one open, though it draws a few. */
 const asked = (b: LiveBlock): number => Math.max(b.total, b.queue?.length ?? 0);
 
+/**
+ * THE RECORD'S OWN COUNTS OF WHAT WAITS, when the queue answered them (`waiting` on a `governance.open` queue): how many
+ * are hard to undo and how many have waited past two weeks, over every open question and not over the few drawn.
+ * `null` from a record older than the key, or a count that is not a whole number.
+ */
+export function waitingOf(b: LiveBlock): { hardToUndo: number; stale: number } | null {
+  const w = (b as { waiting?: unknown }).waiting;
+  if (typeof w !== 'object' || w === null) return null;
+  const { hardToUndo, stale } = w as { hardToUndo?: unknown; stale?: unknown };
+  const whole = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+  return whole(hardToUndo) && whole(stale) ? { hardToUndo, stale } : null;
+}
+
 /** Decide's page as drawn, and the line its head says. */
 export type DecideDrawn = {
   blocks: LiveBlock[];
@@ -241,7 +254,10 @@ export function decideDrawn(blocks: readonly LiveBlock[], now: number, who: (q: 
   const drawn = new Set<string>();
   let first: QueueQuestion | undefined;
   let open = 0;
-  /* EACH QUESTION ONCE, by id, for how many are hard to undo and how many have waited past two weeks. */
+  /* THE RECORD'S COUNTS OF HOW MANY ARE HARD TO UNDO AND HOW MANY HAVE WAITED PAST TWO WEEKS, the most any open queue
+     answered, since each counts every open question and the first is cut to one. Only where no queue answered them
+     are they counted here, each question once by id, over the questions drawn. */
+  let counted: { hardToUndo: number; stale: number } | null = null;
   const hard = new Set<string>();
   const late = new Set<string>();
   let decided: string | null = null;
@@ -261,6 +277,8 @@ export function decideDrawn(blocks: readonly LiveBlock[], now: number, who: (q: 
     }
     if (!isOpen(b) || !b.queue) return b;
     open = Math.max(open, asked(b));
+    const said = waitingOf(b);
+    if (said) counted = { hardToUndo: Math.max(counted?.hardToUndo ?? 0, said.hardToUndo), stale: Math.max(counted?.stale ?? 0, said.stale) };
     for (const q of b.queue) {
       if (q.cost === 'undo') hard.add(q.id);
       if (ageDays(q.at, now) > STALE_DAYS) late.add(q.id);
@@ -277,7 +295,8 @@ export function decideDrawn(blocks: readonly LiveBlock[], now: number, who: (q: 
   });
   first ??= shaped.find((b) => isOpen(b) && b.drawn && b.queue?.length)?.queue?.[0];
   const option = first?.options.find((o) => o.recommended)?.label;
-  const waiting = countSentence(open, hard.size, option, first ? who(first) : '', late.size);
+  const tally = counted as { hardToUndo: number; stale: number } | null;
+  const waiting = countSentence(open, tally?.hardToUndo ?? hard.size, option, first ? who(first) : '', tally?.stale ?? late.size);
   const quiet = decided ? words.lastDecided(since(decided, now)) : (calm ?? words.nothingWaiting);
   const out = emptyHidden(shaped);
   return { blocks: out, sentence: waiting ?? { text: quiet, needs: '' }, open, drawsAny: out.some((b) => b.drawn) };

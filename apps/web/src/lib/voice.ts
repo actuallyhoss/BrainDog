@@ -220,8 +220,63 @@ export function labelsOf(values: Readonly<Record<string, unknown>>, config: Read
   return out;
 }
 
-/** One of a list, from its name, the way `remote.ts` `declOf` says it when a declaration does not: Issues, issue. */
-export const singularOf = (name: string): string => name.toLowerCase().replace(/ies$/u, 'y').replace(/([^s])s$/u, '$1');
+/**
+ * Words ending in s that `oneOf` must not cut: one already (Series, News, Canvas), a field rather than a count
+ * (Analytics, Savings), or a plural it would turn wrong (Movies to movy, Caches to cach, Statuses to statuse, Shelves to
+ * shelve, Analyses to analyse).
+ *
+ * THE RECORD'S OWN LIST, WORD FOR WORD (`NOT_PLURAL` in `packages/record/src/slash.ts`), so the singular Slash drafts
+ * when it renames a list and the one this screen says for a renamed list are one word. `voice-singular.test.ts` holds the two equal.
+ */
+export const NOT_PLURAL: ReadonlySet<string> = new Set([
+  'series', 'species', 'news', 'means', 'lens', 'thanks', 'canvas', 'atlas', 'alias', 'bias', 'chaos', 'christmas', 'gas',
+  'analytics', 'logistics', 'economics', 'mathematics', 'physics', 'ethics', 'politics', 'athletics', 'aerobics',
+  'movies', 'cookies', 'calories', 'zombies', 'rookies', 'selfies', 'smoothies', 'brownies', 'goalies', 'hippies', 'pies', 'ties', 'lies',
+  'caches', 'niches', 'headaches', 'avalanches', 'cliches', 'moustaches', 'mustaches', 'quiches',
+  'buses', 'statuses', 'bonuses', 'campuses', 'viruses', 'censuses', 'surpluses', 'choruses',
+  'knives', 'wives', 'lives', 'halves', 'shelves', 'wolves', 'calves', 'loaves', 'thieves', 'scarves', 'hooves', 'elves', 'selves',
+  'analyses', 'crises', 'theses', 'hypotheses', 'diagnoses', 'synopses', 'lenses', 'oases', 'premises',
+  'clothes', 'goods', 'savings', 'earnings', 'belongings', 'headquarters', 'whereabouts', 'outskirts',
+]);
+
+/**
+ * A name as it reads inside a sentence: each word that is only capitalised (Issues, Client) in lower case, and every
+ * other word as it was typed (HSBC, iPhone). The record's `inSentence` (`slash.ts`), word for word.
+ */
+export const inSentence = (name: string): string => name.replace(/\p{L}+/gu, (w) => (/^\p{Lu}\p{Ll}*$/u.test(w) ? w.toLowerCase() : w));
+
+/**
+ * One of a list, from its name, said mid-sentence, or `null` where its ending does not say: Issues, issue; HSBC cards,
+ * HSBC card; Deliveries, delivery; Boxes, box; APIs, API; Series, nothing.
+ *
+ * THE RECORD'S RULE, EXACTLY (`singularOf` then `inSentence` in `packages/record/src/slash.ts`). This file had its own,
+ * which lowercased the whole name and cut any final s, so "HSBC cards" was "hsbc card", Boxes "boxe" and Series
+ * "sery", while Slash, renaming the same list, drafted "HSBC card" or nothing. Only the last word turns, and only where
+ * English says how; what it cannot turn with confidence comes back `null`.
+ */
+export const oneOf = (name: string): string | null => {
+  const m = /^(.*?)(\p{L}+)$/u.exec(name.trim());
+  if (!m) return null;
+  const [, head = '', last = ''] = m;
+  const low = last.toLowerCase();
+  const turned = ((): string | null => {
+    /* AN ACRONYM'S PLURAL IS ITS LETTERS AND A SMALL s: APIs, IDs, URLs. */
+    if (/^\p{Lu}{2,}s$/u.test(last)) return last.slice(0, -1);
+    if (low.length < 4 || !low.endsWith('s') || /(?:ss|us|is)$/u.test(low) || NOT_PLURAL.has(low)) return null;
+    if (low.endsWith('ies')) return /[^aeiou]ies$/u.test(low) ? `${last.slice(0, -3)}${/\p{Lu}/u.test(last.at(-1)!) ? 'Y' : 'y'}` : null;
+    if (/(?:sses|xes|ches|shes)$/u.test(low)) return last.slice(0, -2);
+    if (/(?:zzes|oes)$/u.test(low)) return null;
+    return last.slice(0, -1);
+  })();
+  return turned === null ? null : inSentence(`${head}${turned}`);
+};
+
+/**
+ * One of a list where a word has to be said, the way `remote.ts` `declOf` says it when a declaration does not: `oneOf`,
+ * else the name itself mid-sentence ("series", "news"), which is still the list's own word where "ticket" under a list
+ * renamed Issues was another list's.
+ */
+export const singularOf = (name: string): string => oneOf(name) ?? inSentence(name.trim());
 
 /** A list's name: the record's label for it, or the name its declaration gives. */
 export const listNamed = (labels: Labels, list: string, declared: string): string => labels[list] ?? declared;
