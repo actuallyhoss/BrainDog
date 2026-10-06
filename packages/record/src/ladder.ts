@@ -133,7 +133,10 @@ export function ladder(deps: LadderDeps) {
    * `others` floor reads; a new row has none.
    */
   const gate = (c: Caller, list: string, op: 'create' | 'update' | 'delete', patch: Record<string, unknown>, selfId: string | null): Gate => {
-    const kinds = kindsOfWrite({ list, op, patch, shape: shapeIn(sql, list), madeBy: selfId === null ? null : madeByIn(sql, selfId), person: c.person });
+    /* WHAT THE ROW HOLDS NOW, so a row sent back whole with its unchanged nulls is not read as clearing them. */
+    const held = selfId === null ? undefined : sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', selfId)?.fields;
+    const was = held === undefined ? null : (JSON.parse(held) as Record<string, unknown>);
+    const kinds = kindsOfWrite({ list, op, patch, shape: shapeIn(sql, list), madeBy: selfId === null ? null : madeByIn(sql, selfId), person: c.person, was });
     const from = untrusted(c);
     if (from !== null) return { write: false, kinds, why: `This run read ${from}, so its changes ask for the rest of it.` };
     const floor = kinds.find((k) => k.floor !== null);
@@ -320,7 +323,7 @@ export function ladder(deps: LadderDeps) {
   /** Who climbs for a question's filer: a grant, or Slash, and `null` for a person, a rule or the system. */
   const agentOfActor = (actor: string): string | null => (actor === SLASH ? SLASH : ladderAgentOf(sql, actor));
 
-  return { grantOf, untrusted, markUntrusted, gate, noteFault, kept, declined, drop, anomaly, clientChanged, answered, agentOfActor };
+  return { grantOf, untrusted, markUntrusted, gate, rungFor, noteFault, kept, declined, drop, anomaly, clientChanged, answered, agentOfActor };
 }
 
 /** The floors as a person reads them, each the start of a sentence. */
@@ -329,6 +332,7 @@ const FLOOR_SAID: Record<string, string> = {
   keys: 'It is about keys',
   money: 'It sets an amount of money',
   sharing: 'It changes who can see something',
+  identity: 'It changes who someone is',
   others: 'It changes something another person made',
   addons: 'It changes an add-on',
   outside: 'It reaches outside the record',

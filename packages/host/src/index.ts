@@ -592,10 +592,8 @@ export type RecordSurface = {
   retireDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
   undoLook(args: never, ctx: never): Promise<Result<unknown>>;
   keepLook(args: never, ctx: never): Promise<Result<unknown>>;
-  /* OPTIONAL FOR `scriptTry`'s REASON: a record built before server undo answers `NOT_IN_THIS_BUILD` from its handler
-     below, never a 500 from calling a method that is not there. */
-  undo?(args: never, ctx: never): Promise<Result<unknown>>;
-  undoRun?(args: never, ctx: never): Promise<Result<unknown>>;
+  undo(args: never, ctx: never): Promise<Result<unknown>>;
+  undoRun(args: never, ctx: never): Promise<Result<unknown>>;
   ruleApply(args: never, ctx: never): Promise<Result<unknown>>;
   examples(args: never, ctx: never): Promise<Result<unknown>>;
   clearExamples(args: never, ctx: never): Promise<Result<unknown>>;
@@ -700,14 +698,8 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     retireDeclaration: (a, ctx) => api.retireDeclaration(a as never, ctx as never),
     undoLook: (a, ctx) => api.undoLook(a as never, ctx as never),
     keepLook: (a, ctx) => api.keepLook(a as never, ctx as never),
-    undo: async (a, ctx) =>
-      api.undo
-        ? api.undo(a as never, ctx as never)
-        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot put changes back yet, so nothing was changed. Change it back by hand where it was made.' } },
-    undoRun: async (a, ctx) =>
-      api.undoRun
-        ? api.undoRun(a as never, ctx as never)
-        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot put a run back yet, so nothing was changed. Change back by hand what the run did.' } },
+    undo: (a, ctx) => api.undo(a as never, ctx as never),
+    undoRun: (a, ctx) => api.undoRun(a as never, ctx as never),
     ruleApply: (a, ctx) => api.ruleApply(a as never, ctx as never),
     examples: (a, ctx) => api.examples(a as never, ctx as never),
     clearExamples: (a, ctx) => api.clearExamples(a as never, ctx as never),

@@ -149,7 +149,7 @@ test('THE GIVER DECLARING IT AGAIN IS TOLD THE HOLDER IS NOT INSTALLED, and remo
   sql.close();
 });
 
-test('A RECEIVER THAT DOES DECLARE IT still takes it over, and a pack already installed still retires what it stops declaring', async () => {
+test('A RECEIVER THAT DOES DECLARE IT still takes it over, and a later version that stops declaring it keeps it, rows and all', async () => {
   const { sql, api, k } = await handed(1);
   /* THE BODY AS IT WAS HANDED, 1.8.0's, and not the shipped holdings pack's. That one has no `gold`, the row here is gold,
      and a take-over that keeps a value the body lacks leaves the list the record's own (`handover.test.ts`), so the
@@ -163,10 +163,16 @@ test('A RECEIVER THAT DOES DECLARE IT still takes it over, and a pack already in
   said(took.out);
   assert.equal(live(k, 'register.holdings')?.pack_id, 'notes-pack');
 
-  /* INSTALLED NOW, so a version of it without the list is the ordinary retire, and the rows still refuse it. */
+  /* A VERSION OF IT WITHOUT THE LIST LEAVES IT WHERE IT IS. This was the ordinary retire, refused `WOULD_ORPHAN` for the
+     row. The record now says what was handed (`Installed.handed`), and money-core's manifest still hands the list here,
+     so the plan reads it as given to this pack and never retires it: the list stays live under notes-pack with its row,
+     which is what the handover promised, and taking notes-pack out is what retires it. */
   const later = { ...notesPack(), version: '2.0.0' };
   const step = await put(api, later);
   assert.deepEqual(step.diff.conflicts, []);
-  assert.equal(step.out.refusal?.code, 'WOULD_ORPHAN');
+  assert.deepEqual(step.diff.retires.filter((r) => r.id === 'register.holdings'), []);
+  said(step.out);
+  assert.equal(live(k, 'register.holdings')?.pack_id, 'notes-pack');
+  assert.equal(k.count('holdings'), 1);
   sql.close();
 });

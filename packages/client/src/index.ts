@@ -618,6 +618,26 @@ export type Restored = { bookmark: string; at: string; kept: string | null };
 /** `erase`: what the cascade touched, store by store. The subject is never in it. */
 export type EraseReport = { id: string; at: string; subjects: number; rows: number; counts: Record<string, number>; keys: number };
 
+/**
+ * What `understand` answers, the shape the client names until the record's own type reaches it (`AnswerOr`): one slice
+ * of the nightly walk. `kinds` counts what it looked at and linked, payments, runs and services; `writes` is the first
+ * changes in names ("Link LOWRY ST STUDIOS RENT AUG to Lowry St Studios") and `more` how many it did not name;
+ * `questions` is what it would not do on its own. Not dry, `filed` is each question put on Decide, `undo` each change's
+ * batch, to put back with `understand({ undo })`, and `dropped` each line about what was not asked.
+ */
+export type Understood = {
+  dry: boolean;
+  kinds: { kind: string; looked: number; linked: number; refused: number; organisations?: number }[];
+  writes: string[];
+  more: number;
+  questions: string[];
+  asks: Record<string, number>;
+  done: boolean;
+  undo?: string[];
+  filed?: { id: string; question: string }[];
+  dropped?: string[];
+};
+
 const WRITES = new Set(ROUTES.filter((r) => r.writes).map((r) => r.name));
 const NAMES = new Set(ROUTES.map((r) => r.name));
 
@@ -1217,9 +1237,18 @@ export function createClient(options: ClientOptions) {
        somebody made since is skipped and said, never overwritten. */
     /** Put back one set of changes (`batch`) or what one decision did (`decision`). */
     undo: (args: ({ batch: string } | { decision: string }) & { dry?: boolean; hash?: string }) =>
-      call<AnswerOr<'undo', unknown>>('undo', args as Record<string, unknown>),
+      call<Answer<'undo'>>('undo', args as Record<string, unknown>),
     /** Put back every change one agent run made. */
-    undoRun: (args: { run: string; dry?: boolean; hash?: string }) => call<AnswerOr<'undoRun', unknown>>('undoRun', args as Record<string, unknown>),
+    undoRun: (args: { run: string; dry?: boolean; hash?: string }) => call<Answer<'undoRun'>>('undoRun', args as Record<string, unknown>),
+    /* UNDERSTANDING, ON ASK (DIRECTION §38): ADMIN, so a browser session, and no token reaches it. The nightly walk over
+       what the record holds, run now: what is certain is linked, the rest is asked on Decide. A record built before it
+       answers 501 `NOT_IN_THIS_BUILD`. */
+    /**
+     * Read the record for who and what each thing is about, now. `dry: true` says what it would link and ask, and changes
+     * nothing; `undo` puts back what an earlier run of it did, by the batches that run answered.
+     */
+    understand: (args: { dry?: boolean; undo?: readonly string[] } = {}) =>
+      call<AnswerOr<'understand', Understood>>('understand', args as Record<string, unknown>),
     /** Delete this record. `slug` is its name, typed to confirm. */
     deleteRecord: (args: { slug: string }) => call<{ slug: string; deleted: true }>('deleteRecord', args as Record<string, unknown>),
 

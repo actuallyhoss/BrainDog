@@ -1,6 +1,7 @@
 /**
- * `undo` and `undoRun`, the server's Undo (DIRECTION §37): routed as ADMIN writes, handed to the record method of the same
- * name with the arguments as sent, and answered `NOT_IN_THIS_BUILD` by a record built before it had them, never a 500.
+ * `undo` and `undoRun`, the server's Undo (DIRECTION §37): routed as ADMIN writes and handed to the record method of the
+ * same name with the arguments as sent. The record has both now (`record/src/methods/undo.ts`), so the host calls them
+ * as it calls every other method of its own table.
  */
 
 import { test } from 'node:test';
@@ -50,16 +51,14 @@ test('THEY REACH THE RECORD METHOD OF THEIR NAME, with the arguments as sent, an
   sql.close();
 });
 
-test('A RECORD WITHOUT THEM ANSWERS 501 WITH A SENTENCE, and nothing is changed', async () => {
+test('THE RECORD ANSWERS THEM ITSELF NOW: asked for nothing, each says what it needs, and nothing is changed', async () => {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 9, 6)) });
-  const older = Object.assign(Object.create(api) as typeof api, { undo: undefined, undoRun: undefined });
-  const handlers = handlersFor(older as never);
-  for (const [name, body] of [['undo', { decision: 'D1' }], ['undoRun', { run: 'S4', dry: true }]] as const) {
-    const out = await ask(handlers, name, body);
-    assert.equal(out.status, 501, `${name} answered ${out.status}`);
-    assert.equal(out.body.refusal?.code, 'NOT_IN_THIS_BUILD');
-    assert.ok((out.body.refusal?.fix ?? '').length > 30);
+  const handlers = handlersFor(api);
+  for (const [name, at] of [['undo', 'batch'], ['undoRun', 'run']] as const) {
+    const out = await ask(handlers, name, { dry: true });
+    assert.equal(out.body.refusal?.code, 'REQUIRED_MISSING', `${name} answered ${JSON.stringify(out.body)}`);
+    assert.equal((out.body.refusal as { at?: string } | undefined)?.at, at);
     assert.doesNotMatch(out.body.refusal?.fix ?? '', /—|\brows?\b/u, `${name}'s sentence`);
   }
   sql.close();

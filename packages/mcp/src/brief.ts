@@ -186,9 +186,36 @@ export function namedIn(words: string, spoken: string, look: Look, room = 80): s
 }
 
 /**
+ * A mail address, bare or behind `mailto:`: `jo@kiln.example`, and GitHub's `101+jo@users.noreply.github.com`.
+ *
+ * ITS LAST PART IS LETTERS, as every mail domain's is, because a step an agent left reads "Pin node@24.13.0" and
+ * `@braindog/mcp@0.3.1`, and both were said "Pin someone" and "@braindog/someone".
+ */
+const ADDRESS = /(?:mailto:)?[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}(?![\p{L}\p{N}-])/gu;
+
+/** An address in brackets beside a name, `Jo <jo@kiln.example>` or `Jo (jo@kiln.example)`, with the space before it. */
+const BRACKETED = new RegExp(String.raw`\s*[<(\[]\s*${ADDRESS.source}\s*[>)\]]`, 'gu');
+
+/**
+ * A sentence with its mail addresses taken out (audit 19, M11: names, never addresses). One in brackets beside a name
+ * goes, and the name stays; one standing where a name would is said `someone`, since the sentence still reads with a
+ * person there and the address is theirs, never the reader's to pass on.
+ */
+export const unaddressed = (said: string): string => said.replace(BRACKETED, '').replace(ADDRESS, 'someone');
+
+/**
+ * A name as a person reads it, or `null` where it was only an address: `Jo <jo@kiln.example>` is `Jo`, and
+ * `jo@kiln.example` names nobody. The record keeps an address as somebody's name when it knew no other.
+ */
+export function nameOnly(said: string): string | null {
+  const kept = said.replace(BRACKETED, '').trim();
+  return kept === '' || new RegExp(ADDRESS.source, 'u').test(kept) ? null : kept;
+}
+
+/**
  * Somebody's sentence with what a person should never be read taken out of it: a machine's own name becomes the kind of
- * machine it is, a file's path becomes the file's name, a person's id becomes their name, and a row's handle or id
- * becomes its words with the handle beside them, where this answer read them.
+ * machine it is, a file's path becomes the file's name, a mail address goes (`unaddressed`), a person's id becomes their
+ * name, and a row's handle or id becomes its words with the handle beside them, where this answer read them.
  *
  * THE QUESTIONS ARE WRITTEN BY THE RECORD'S OWN AUTOMATIONS, and one on the owner's record read "Change tools#8 to how
  * fly-prism is set up in ~/.claude.json on Maras-MacBook-Pro.local?", the machine's name, a path in his home
@@ -200,20 +227,26 @@ export function namedIn(words: string, spoken: string, look: Look, room = 80): s
  * tools#8"); a row id is its words and handle, or "an entry you cannot open", never the 26 characters.
  */
 export function plainOf(said: string, look: Look, handles = true): string {
-  let out = oneLine(said)
+  /* THE ADDRESSES FIRST, because `jo@studio.local` would otherwise lose its machine's name and keep its person's. */
+  let out = unaddressed(oneLine(said))
     .replace(/(?<![\w./\\-])[A-Za-z0-9][A-Za-z0-9-]*\.local(?![\w-]|\.\w)/gu, (host) => deviceOf(host) ?? 'this machine')
     .replace(/\b(?:DESKTOP|LAPTOP)-[A-Z0-9]{4,}\b/gu, (host) => deviceOf(host) ?? 'this machine')
     .replace(/(?<=^|[\s("'])(?:~|\.{1,2})?\/[^\s,;)"']+/gu, (path) => path.replace(/\/+$/u, '').split('/').at(-1) || 'a folder');
   if (handles)
     out = out.replace(HANDLE, (handle) => {
-      const words = look.title(handle);
+      /* A ROW'S WORDS MAY BE AN ADDRESS, a person met by mail before anybody knew their name, so they pass too. */
+      const title = look.title(handle);
+      const words = title === undefined ? null : nameOnly(title);
       if (words) return named(words, handle, 40);
       const one = oneOf(handle, look);
       return one ? `the ${one} ${handle}` : handle;
     });
   /* AFTER THE HANDLES, because a row id's words carry its handle, which the pass above would name a second time. */
   return out
-    .replace(new RegExp(ULID.source, 'gu'), (id) => look.title(id) ?? 'an entry you cannot open')
+    .replace(new RegExp(ULID.source, 'gu'), (id) => {
+      const title = look.title(id);
+      return title === undefined ? 'an entry you cannot open' : unaddressed(title);
+    })
     .replace(new RegExp(PERSON.source, 'gu'), (id) => look.actor(id));
 }
 
@@ -816,9 +849,11 @@ export function ruledBrief(ruled: Ruled, registers: readonly string[], look: Loo
     return `Done, as you may${on} · ${look.decider} can undo it`;
   }
   const { id, question, why, decide } = ruled.filed;
-  const asked = question.trim() === '' ? `Filed for ${look.decider} to decide (${id})` : `Filed for ${look.decider} to decide: ${clip(question, 160)} (${id})`;
+  /* IN NAMES, as every question is said (`plainOf`): the record words a filed write from the row it would make, and a
+     row's words can be an address or name another row by its handle. */
+  const asked = question.trim() === '' ? `Filed for ${look.decider} to decide (${id})` : `Filed for ${look.decider} to decide: ${clip(plainOf(question, look), 160)} (${id})`;
   const unwritten = `Nothing is written until ${look.decider} accepts it in BrainDog${decide ? ` at ${decide}` : ''}.`;
-  return [asked, why === undefined ? unwritten : `${clip(why, 200)} ${unwritten}`].join('\n');
+  return [asked, why === undefined ? unwritten : `${clip(plainOf(why, look), 200)} ${unwritten}`].join('\n');
 }
 
 /** `log`: where the note went, and the version it left the entry at. */
@@ -929,9 +964,13 @@ export function triagedBrief(settled: Record<string, unknown>, entry: Shaped | n
  *
  * THE PERSON DECIDES IN BRAINDOG, and the answer says so in the words an agent can pass on, with the link to the
  * question itself when the host serves the app somewhere.
+ *
+ * THE QUESTION IN NAMES (`plainOf`, audit 19 M11): it is the agent's own sentence, and an agent writes the ids and
+ * addresses it was handed ("Merge 01M3… into rohan@encore.example?"). Said back as written, the agent reads its own
+ * ids as the way to name things and passes them on. Its handle stays beside it, the one thing to act on.
  */
 export function proposedBrief(filed: Record<string, unknown>, question: string, look: Look): string {
   const id = typeof filed.id === 'string' && filed.id !== '' ? ` (${filed.id})` : '';
   const at = typeof filed.decide === 'string' ? ` at ${filed.decide}` : '';
-  return [`Asked ${look.decider}: ${clip(question, 160)}${id}`, `${sentence(look.decider)} decides in BrainDog${at}.`].join('\n');
+  return [`Asked ${look.decider}: ${clip(plainOf(question, look), 160)}${id}`, `${sentence(look.decider)} decides in BrainDog${at}.`].join('\n');
 }

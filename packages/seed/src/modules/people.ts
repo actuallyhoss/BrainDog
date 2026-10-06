@@ -105,11 +105,12 @@ export const PEOPLE: Fields[] = [
  * can send a mail and write any name above it: a forged `"Rohan Mehta" <rohanmehta@evil.test>` made a person, the
  * strong rules then folded it into the real Rohan on the same two words and a long enough local part, and his keys
  * took the stranger's address, so every later mail from that domain was filed as his. Spam made a person a sender. So
- * `rule.meet-senders` keeps the sender's name as a mention, with where it came from, and writes no person: a mention
- * holds no key, matches nobody and is never merged, and it is what a person or an agent who knows them turns into
- * somebody. Meeting the sender as a person once the owner has written to them, or once their domain is an
- * organisation the record already knows, is the kernel's to check, since only it can read the lists while it meets
- * (the batch report names what it needs); the rule moves to that the day the check exists.
+ * `rule.meet-senders` meets the sender `only: 'known'`: the kernel writes a person only when the address is already
+ * somebody's key, when its domain is an organisation the record holds, or when the record's own person has written to
+ * it, since only the kernel can read the lists while it meets (`meetPerson` in `packages/kernel/src/people.ts`).
+ * Anybody else is kept as a mention, the name and where it came from: a mention holds no key, matches nobody and is
+ * never merged, and it is what a person or an agent who knows them turns into somebody. NEVER A STRONG MERGE AND NO
+ * KEY CARRIED under it, so a forged name above a stranger's address reaches nobody's keys.
  *
  * AND A NO-REPLY SENDER NOBODY'S PATTERN CLAIMED IS NOBODY TO MEET: a newsletter, a notification, or a forgery of
  * either. One a door's pattern reads, a bank's alert, is met by `rule.meet-sender-organisations` below.
@@ -169,10 +170,11 @@ export const PEOPLE_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [
       { set_var: { name: 'sender', to: '{{trigger.body.from_address}}' } },
       {
-        /* A NAME AND WHERE, AND NO ADDRESS: `meet` keeps a name alone as a mention and writes no row (`meetPerson` in
-           `packages/kernel/src/people.ts`). A sender with no name leaves nothing to keep, and the run goes on. */
+        /* THE ADDRESS, ONLY WHERE IT IS KNOWN (`only: 'known'`): somebody's key, an organisation's domain, or an address
+           the record's own person wrote to is met as the person; anybody else is kept as a mention of the name, and
+           writes no row. A sender with neither name nor a known address leaves nothing to keep, and the run goes on. */
         if: { none: [{ field: 'sender', empty: true }, ...NO_REPLY.map((word) => ({ field: 'sender', contains: word }))] },
-        then: [{ meet: { name: '{{trigger.body.from_name}}', where: MAIL_FROM, source: MAIL_FROM } }],
+        then: [{ meet: { name: '{{trigger.body.from_name}}', email: '{{trigger.body.from_address}}', only: 'known', where: MAIL_FROM, source: MAIL_FROM } }],
       },
     ],
   },

@@ -112,6 +112,7 @@ import {
   namedIn,
   type MetSaid,
   type Filed,
+  plainOf,
   proposedBrief,
   ruledBrief,
   ruledOf,
@@ -1643,7 +1644,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     ]);
     const handles = [
       ...asked.flatMap((w) => (typeof w.question === 'string' ? handlesIn(w.question) : [])),
-      ...[step.next, ...(Array.isArray(step.tried) ? step.tried : [])].flatMap((t) => (typeof t === 'string' ? handlesIn(t) : [])),
+      ...[step.next, c.next, ...(Array.isArray(step.tried) ? step.tried : [])].flatMap((t) => (typeof t === 'string' ? handlesIn(t) : [])),
       ...(Array.isArray(c.ambiguous) ? c.ambiguous.filter((a): a is string => typeof a === 'string') : []),
       ...learned.flatMap((r) => (isObject(r) ? Object.values(r).flatMap((v) => (typeof v === 'string' && v.includes('#') ? handlesIn(v) : [])) : [])),
       /* AND THE ORGANISATIONS THE WHO SLOT NAMES, which the record sends as handles: each person's, and the project's. */
@@ -2071,12 +2072,16 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const ruled = ruledOf(out);
       const lists = isObject(body) && typeof body.register === 'string' ? [body.register] : [];
       for (const list of ruled === null ? [] : lists) if (!prefixes.has(list)) await learnPrefix(list, ctx);
+      /* THE ROWS THE QUESTION NAMES ARE READ BEFORE IT IS SAID, so a handle or an id in it is said by its words with the
+         handle beside them, never alone (audit 19, M11). */
+      const dry = out.dry_run === undefined ? null : clip(JSON.stringify(out.dry_run), 1_500);
+      if (turn.text) await handlesNamed(handlesIn([question, ruled !== null && 'filed' in ruled ? `${ruled.filed.question} ${ruled.filed.why ?? ''}` : '', dry ?? ''].join(' ')), ctx, turn);
       return {
         result: { ok: true, value: out },
         say: (look) =>
           [
             ruled !== null && 'rung' in ruled ? ruledBrief(ruled, lists, look) : proposedBrief(out, question, look),
-            ...(out.dry_run === undefined ? [] : [`What it would do: ${clip(JSON.stringify(out.dry_run), 1_500)}`]),
+            ...(dry === null ? [] : [`What it would do: ${plainOf(dry, look, false)}`]),
           ].join('\n'),
         names: { people: true },
       };

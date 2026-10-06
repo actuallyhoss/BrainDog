@@ -179,13 +179,16 @@ test('MAIL NOBODY CLAIMED MAKES NOBODY: its sender is kept as a name and where, 
   const said = JSON.stringify(senders.steps);
   assert.ok(said.includes('{{trigger.body.from_name}}'));
   assert.ok(!said.includes('{{trigger.body.from}}'), 'the raw header is passed as an email again');
-  /* NO ADDRESS REACHES `meet`, so nothing a stranger writes makes a person or joins one (audit 17, H1). */
+  /* THE ADDRESS REACHES `meet` ONLY UNDER `only: 'known'`, so nothing a stranger writes makes a person or joins one
+     (audit 17, H1): the kernel writes a person only for an address it already knows. */
   const branch = senders.steps.find((s) => 'if' in s) as { if: { none: { field: string; contains?: string; empty?: boolean }[] }; then: { meet: Record<string, string> }[]; else?: unknown };
   assert.ok(branch.if.none.some((c) => c.contains === 'noreply'), 'a no-reply sender is noted');
   assert.ok(branch.if.none.some((c) => c.empty === true), 'a mail with no address is noted');
   assert.equal(branch.else, undefined, 'a no-reply sender nobody claimed is met as something');
   const noted = branch.then[0]!.meet;
-  assert.deepEqual(Object.keys(noted).sort(), ['name', 'source', 'where']);
+  assert.deepEqual(Object.keys(noted).sort(), ['email', 'name', 'only', 'source', 'where']);
+  assert.equal(noted.only, 'known', 'a stranger\'s address is met as a person');
+  assert.equal(noted.email, '{{trigger.body.from_address}}');
   /* WHERE IS THE DOMAIN, NEVER THE SUBJECT (audit 17, M2). */
   for (const rule of AUTOMATIONS.filter((a) => String(a.rule).startsWith('meet-sender')))
     assert.ok(!JSON.stringify(rule).includes('subject'), `${String(rule.rule)} writes a mail's subject into the record`);
@@ -235,6 +238,25 @@ test('A FORGED SENDER MAKES NOBODY AND JOINS NOBODY: a stranger writing under a 
   const people = k.list({ register: 'people', limit: 100 });
   assert.ok(people.ok);
   assert.doesNotMatch(JSON.stringify(people.value.rows.map((r) => r.fields)), /Invoice 2026-041/u);
+});
+
+test('A KNOWN SENDER IS MET: an address somebody holds is them, and one at an organisation the record holds is a person', async () => {
+  const k = await seeded();
+  const before = k.count('people');
+  const named = (name: string) => {
+    const out = k.list({ register: 'people', where: `name is "${name}"` });
+    assert.ok(out.ok, sayOf(out));
+    return out.value.rows;
+  };
+  const mara = named('Mara Lindqvist')[0]!.fields;
+  /* MARA'S OWN ADDRESS UNDER ANOTHER NAME IS STILL MARA, and a colleague at Ravensworth, whose domain the record holds,
+     is somebody. */
+  for (const [n, from] of ['"M. Lindqvist" <mara@halden.example>', 'Jonas Berg <jonas@ravensworth.example>'].entries())
+    assert.ok(k.arrive({ channel: 'email', headers: { from, subject: 'Re: the March invoice' }, body: 'Thanks.', sha256: `known-${n}`, verified: true }).ok);
+  await k.drain();
+  assert.equal(k.count('people'), before + 1, 'a known sender was not met, or a known person was met twice');
+  assert.deepEqual(named('Mara Lindqvist')[0]!.fields.keys, mara.keys, 'Mara gained a key from her own address');
+  assert.equal(named('Jonas Berg').length, 1, 'a sender at an organisation the record holds is nobody');
 });
 
 test('A PERSON\'S PAGE SAYS THEIR ORGANISATION AND WHERE THEY WERE SEEN, NEVER A KEY, and an organisation\'s lists its people', async () => {

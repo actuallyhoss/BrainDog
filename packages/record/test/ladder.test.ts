@@ -129,10 +129,11 @@ test('A RUNG LETS ITS KIND THROUGH AND NO OTHER, and the floor always asks', asy
 test('A PROPOSAL ITS RUNG LETS THROUGH IS ACCEPTED BY THE LADDER, with the decision Undo takes back', async () => {
   const { api, sql } = await record();
   climb(sql, 'tasks:add');
-  const filed = value<{ id: string; landed?: boolean; decision?: string; undo?: { decision: string } }>(
+  const filed = value<{ id: string; landed?: boolean; decision?: string; undo?: { decision: string }; rung?: string }>(
     await api.propose({ question: 'Add Ship?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ name: 'Ship' }] } }, agent()),
   );
   assert.equal(filed.landed, true);
+  assert.equal(filed.rung, 'tell', 'the answer says the rung it landed at, so the agent says Done and not Asked');
   assert.equal(tasks(sql), 1);
   assert.equal(sql.one<{ decided_by: string }>('SELECT decided_by FROM decision')?.decided_by, 'rule:ladder');
   /* AND UNDO PUTS IT BACK, AND TAKES THE KIND BACK TO ASK. */

@@ -318,6 +318,9 @@ importers:
       '@braindog/ports':
         specifier: workspace:*
         version: link:../ports
+      '@braindog/seed':
+        specifier: workspace:*
+        version: link:../seed
       '@braindog/theme':
         specifier: workspace:*
         version: link:../theme

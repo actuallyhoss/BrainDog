@@ -294,6 +294,11 @@ export function useCases(d: UseCaseDeps) {
     const states = kernel.packStates();
     const base = d.installed();
     let state: Installed = { ...base, packs: [...base.packs], declarations: [...base.declarations] };
+    /* WHAT THE COMING USE CASE HANDS ON IS HANDED BEFORE ITS MODULES ARE PLANNED, so a module that takes a list over from
+       the use case's older version plans it as taken over rather than as a conflict. Without it the order cycled on a
+       Founder 1.x record: People first was PROVIDES_CONFLICT at register.organisations, Founder first PAGE_UNKNOWN. */
+    const hands = shared.value.pack?.manifest.hands;
+    if (hands !== undefined) state = { ...state, handed: { ...(state.handed ?? {}), ...hands } };
     const enable: string[] = [];
     const packs: PlannedPack[] = [];
     const holds = (s: Installed) => s.declarations.filter((x) => x.kind === 'register').map((x) => x.id.slice('register.'.length));

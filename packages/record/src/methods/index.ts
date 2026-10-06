@@ -18,7 +18,7 @@ import type { Result } from '@braindog/ports';
 import type { Kernel } from '@braindog/kernel';
 
 import type { Directory } from '../directory.ts';
-import type { CallContext, Need } from '../index.ts';
+import type { CallContext, Need, Understanding } from '../index.ts';
 import type { SlashDrafted, SlashPreviewer } from '../slash.ts';
 
 /* METHODS: the imports, one line per file under this folder, named for the file. */
@@ -35,6 +35,7 @@ import { methods as retype } from './retype.ts';
 import { methods as pattern } from './pattern.ts';
 import { methods as personName } from './person-name.ts';
 import { methods as undo } from './undo.ts';
+import { methods as understand } from './understand.ts';
 /* END METHODS */
 
 /**
@@ -74,6 +75,12 @@ export type RecordDeps = {
    * `slashDraft` answers `NOT_IN_THIS_BUILD`.
    */
   slashDescribed?: (args: { asked: string; page?: string }, ctx: CallContext, preview: SlashPreviewer | null) => Promise<Result<SlashDrafted>>;
+  /**
+   * The next slice of the walk over what the record holds, looked at (`dry`) or done (`understandNow` in `index.ts`), which
+   * `understand.ts` answers `understand` with, because the cursor the night keeps and Slash's filing are the record's.
+   * Absent, `understand` answers `NOT_IN_THIS_BUILD` for anything but an undo.
+   */
+  understood?: (dry: boolean, ctx: CallContext) => Promise<Result<Understanding>>;
 };
 
 export function methods(deps: RecordDeps) {
@@ -92,6 +99,7 @@ export function methods(deps: RecordDeps) {
     ...pattern(deps),
     ...personName(deps),
     ...undo(deps),
+    ...understand(deps),
     /* END METHODS */
   };
 }

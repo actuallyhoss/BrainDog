@@ -329,7 +329,11 @@ export type Diff = {
    * their history stay as they are.
    */
   adds: { id: string; summary: string; handed?: true }[];
-  changes: { id: string; from_version: number; summary: string }[];
+  /**
+   * `from` IS THE PACK THIS ONE TAKES THE DECLARATION OVER FROM, because that pack hands it here (`Installed.handed`).
+   * Absent on a change to this pack's own declaration.
+   */
+  changes: { id: string; from_version: number; summary: string; from?: string }[];
   /**
    * What this version stops declaring. `to` IS THE PACK IT HANDS THE DECLARATION TO (the manifest's `hands`): it is not
    * retired and orphans nothing, it is staged again under `to` with `body`, the live body as JCS text with `pack` set to
@@ -1505,6 +1509,20 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
        so a later `uninstall` of anything cannot take it, and a pack that claims the same id is a
        `PROVIDES_CONFLICT` rather than a silent overwrite." The comparison is against `mine` now, so
        the only declarations a pack may change are its own. */
+    /* EXCEPT ONE THE PACK THAT HOLDS IT HANDS TO THIS ONE (`Installed.handed`), which this install takes over: a change
+       under this pack, as the owner reads it, and never a conflict. People 3.0.0 planned beside Founder 1.x, told that
+       Founder 2.0.0 hands it `register.organisations`, was `PROVIDES_CONFLICT` at that list, and Founder 2.0.0 could not
+       go first either, since its pages read the organisations as only People 3.0.0 lays them. So the use case cycled.
+       What the list holds and this body lacks stays, as it does for a list handed before this pack was installed. */
+    if (already.pack_id !== null && already.pack_id !== mine && installed.handed?.[decl.id] === mine) {
+      changes.push({ id: decl.id, from_version: already.version, summary: summarise(decl), from: already.pack_id });
+      if (decl.kind !== 'register') continue;
+      const over = carried(already.body, decl.body);
+      if (over !== null) kept.push({ id: decl.id, adds: over.adds, rebased: over.body });
+      const rows = installed.rows[decl.id.slice('register.'.length)] ?? 0;
+      if (rows > 0) unreadable(over === null ? decl : { ...decl, body: JSON.parse(over.body) as Record<string, Json> }, already.body, rows, retypes, newlyRequired);
+      continue;
+    }
     if (already.pack_id !== mine) {
       conflicts.push({ id: decl.id, pack: already.pack_id ?? OWN });
       continue;

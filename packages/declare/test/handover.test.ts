@@ -180,17 +180,23 @@ test('GUARDS: a drop without hands still orphans, and a pack hands did not name 
  * A HANDOVER TO A PACK THE RECORD ALREADY HAS WAS A LIST THAT PACK COULD NEVER LET GO OF. Measured:
  * money-core 2.0.0 handing `register.holdings` to `work`, which is installed and does not declare it,
  * went through, and from then on every update of `work`, and a reinstall of the same file, was `WOULD_ORPHAN`
- * ("work upgrades away register.holdings"), because the list now sat under a pack whose own file never named it. Any
- * pack's file could do that to any installed pack. The taking-over path is for a pack that is not installed yet, so a
- * handover to one that is gets planned as the retire it would be without `hands`.
+ * ("work upgrades away register.holdings"), because the list now sat under a pack whose own file never named it.
+ *
+ * THE RECORD NOW SAYS WHAT WAS HANDED (`Installed.handed`, read off the installed manifests), so the handover goes
+ * through with the row, and `work`'s own updates leave the list it was handed where it is. A caller that cannot say
+ * still gets the retire, and `hands-installed.test.ts` holds that half on the kernel.
  */
-test('A HANDOVER TO AN INSTALLED PACK IS PLANNED AS A RETIRE, and that pack still updates', async () => {
+test('A HANDOVER TO AN INSTALLED PACK GOES THROUGH WITH ITS ROW, and that pack still updates', async () => {
   const { sql, api, k } = await record();
   const step = await put(api, moneyCore('work'));
-  assert.deepEqual(step.diff.retires.map(({ id, rows, to }) => ({ id, rows, to })), [{ id: 'register.holdings', rows: 1, to: undefined }]);
-  assert.equal(step.out.refusal?.code, 'WOULD_ORPHAN');
-  assert.equal(live(k, 'register.holdings')?.pack_id, 'money-core');
-  said((await put(api, firstPartyDocument('work'))).out);
+  assert.deepEqual(step.diff.retires.map(({ id, rows, to }) => ({ id, rows, to })), [{ id: 'register.holdings', rows: 1, to: 'work' }]);
+  said(step.out);
+  assert.equal(live(k, 'register.holdings')?.pack_id, 'work');
+  const again = await put(api, firstPartyDocument('work'));
+  said(again.out);
+  assert.deepEqual(again.diff.retires, [], 'work retired the list it was handed');
+  assert.equal(live(k, 'register.holdings')?.pack_id, 'work');
+  assert.equal(k.count('holdings'), 1);
   sql.close();
 });
 

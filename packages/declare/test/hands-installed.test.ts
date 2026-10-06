@@ -156,3 +156,63 @@ test('handedOf READS EACH MANIFEST\'S hands, and passes over one that does not p
     { 'register.organisations': 'people' },
   );
 });
+
+/* THE OTHER ORDER: THE RECEIVER FIRST, TOLD WHAT THE GIVER'S COMING VERSION HANDS IT. A use case plans its modules before
+   its own pack, so People 3.0.0 met `register.organisations` still under Founder 1.x and was `PROVIDES_CONFLICT`, while
+   Founder 2.0.0 could not go first (`seed/test/founder-estate.test.ts`). Told the hand, the receiver takes the list over. */
+const workWithHoldings = (k: Kernel, drop?: string): Doc => {
+  const { register: _register, ...rest } = JSON.parse(live(k, 'register.holdings')!.body) as Body;
+  const fields = (rest.fields as Body[]).filter((f) => f.id !== drop);
+  const work = structuredClone(firstPartyDocument('work')) as unknown as Doc;
+  work.version = '99.0.0';
+  work.declarations = [...work.declarations, { register: 'holdings', ...rest, fields, name: 'Holdings at work', pack: 'work' }];
+  return work;
+};
+
+const planOver = async (k: Kernel, sql: NodeSql, doc: Doc, hands: Record<string, string> | null) => {
+  const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
+  const state = stateOf(k, sql, true);
+  const diff = await plan(pack, hands === null ? state : { ...state, handed: { ...state.handed, ...hands } });
+  return { diff, out: (await install(pack, diff, hostFor(k), diff.planHash, diff.approve)) as Out };
+};
+
+test('A PACK TOLD THE HOLDER HANDS IT A LIST TAKES IT OVER as a change, and the holder then hands nothing twice', async () => {
+  const { k, sql, row } = await record();
+  const was = JSON.stringify(k.get(row));
+  const take = await planOver(k, sql, workWithHoldings(k), { 'register.holdings': 'work' });
+  value(take.out);
+  assert.deepEqual(take.diff.conflicts, []);
+  assert.deepEqual(
+    take.diff.changes.filter((c) => c.id === 'register.holdings').map(({ id, from }) => ({ id, from })),
+    [{ id: 'register.holdings', from: 'money-core' }],
+  );
+  assert.equal(live(k, 'register.holdings')?.pack_id, 'work');
+  assert.equal(JSON.stringify(k.get(row)), was, 'the row moved');
+  /* AND THE HOLDER'S NEXT VERSION, WHICH HANDS IT, MEETS A LIST THAT IS NOT ITS OWN ANY MORE, and leaves it. */
+  const giver = await attempt(k, sql, moneyCore('work'));
+  value(giver.out);
+  assert.deepEqual(giver.diff.retires.filter((r) => r.id === 'register.holdings'), []);
+  assert.equal(live(k, 'register.holdings')?.pack_id, 'work');
+  assert.equal(k.count('holdings'), 1);
+  sql.close();
+});
+
+test('WHAT THE LIST HOLDS AND THE TAKER LACKS STAYS, so a row written under it still reads', async () => {
+  const { k, sql, row } = await record();
+  const take = await planOver(k, sql, workWithHoldings(k, 'unit_cost'), { 'register.holdings': 'work' });
+  value(take.out);
+  assert.deepEqual(take.diff.kept.find((x) => x.id === 'register.holdings')?.adds, ['unit_cost']);
+  assert.deepEqual((k.get(row) as { fields: Body }).fields.unit_cost, { amount: 4120000, currency: 'EGP' });
+  sql.close();
+});
+
+test('UNTOLD, OR TOLD IT GOES ELSEWHERE, ANOTHER PACK\'S LIST IS STILL A CONFLICT', async () => {
+  for (const hands of [null, { 'register.holdings': 'notes-pack' }]) {
+    const { k, sql } = await record();
+    const take = await planOver(k, sql, workWithHoldings(k), hands);
+    assert.deepEqual(take.diff.conflicts.map(({ id, pack }) => ({ id, pack })), [{ id: 'register.holdings', pack: 'money-core' }]);
+    assert.equal(take.out.refusal?.code, 'PROVIDES_CONFLICT');
+    assert.equal(live(k, 'register.holdings')?.pack_id, 'money-core');
+    sql.close();
+  }
+});

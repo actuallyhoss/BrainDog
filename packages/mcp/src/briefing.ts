@@ -22,7 +22,7 @@
  * PURE, as `brief.ts` is: the tools in `index.ts` read the record, and this decides what is said.
  */
 
-import { alikeKey, handlesIn, namedIn, plainOf, rowLine, titleOf, type Decl, type Look, type Shaped } from './brief.ts';
+import { alikeKey, handlesIn, nameOnly, namedIn, plainOf, rowLine, titleOf, unaddressed, type Decl, type Look, type Shaped } from './brief.ts';
 import { agentOf, ago, callOf, clip, counted, grouped, runnerOf, ULID } from './words.ts';
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -162,14 +162,23 @@ export function teach(c: { session: string | null; project: string | null; tasks
 /** The people the Who slot names, and how many more. */
 const WHO_SHOWN = 3;
 
-/** A person's or an organisation's words as `context` sends them: a name, or a handle whose words this answer read. */
+/**
+ * A person's or an organisation's words as `context` sends them: a name, or a handle whose words this answer read.
+ *
+ * NEVER AN ADDRESS (audit 19, M11). The record keeps a person met by mail under their address until somebody says their
+ * name, so `jo@kiln.example` came to the Who slot as a name. One beside a name goes and the name stays; an address alone
+ * names nobody, and the slot says the people it can name.
+ */
 function wordsOf(value: unknown, look: Look): string | null {
   if (typeof value === 'string') {
     const said = value.trim();
     if (said === '' || ULID.test(said)) return null;
     /* A HANDLE IS SAID BY ITS WORDS OR NOT AT ALL: the slot names people, and `O3` names nobody. */
-    if (/^(?:[A-Z]{1,4}[1-9][0-9]*|[a-z][a-z0-9_]*#[1-9][0-9]*)$/u.test(said)) return look.title(said) ?? null;
-    return said;
+    if (/^(?:[A-Z]{1,4}[1-9][0-9]*|[a-z][a-z0-9_]*#[1-9][0-9]*)$/u.test(said)) {
+      const title = look.title(said);
+      return title === undefined ? null : nameOnly(title);
+    }
+    return nameOnly(said);
   }
   if (isObject(value)) return wordsOf(value.name ?? value.title, look);
   return null;
@@ -359,7 +368,7 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
   if (handoff) {
     const about = [from, by, age === null ? null : ago(age), check ? 'check before acting' : null].filter(Boolean).join(', ');
     card.push(slot('Next', `${clip(plainOf(String(handoff.next), look), 180)} (${about})`));
-  } else if (text(c.next)) card.push(slot('Next', clip(String(c.next), 200)));
+  } else if (text(c.next)) card.push(slot('Next', clip(plainOf(String(c.next), look), 200)));
 
   if (questions.length > 0) {
     const shown = questions.slice(0, SLOT_MOST).map((q) => {
@@ -403,7 +412,7 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     const as = agentOf(r.agent, true);
     const same = text(mine.agent) === null || r.agent === mine.agent;
     lines.push(
-      `Two sessions: ${as} (${String(r.spoken)}) is live in this folder too${typeof r.age_s === 'number' ? `, seen ${ago(r.age_s)}` : ''}${text(r.doing) ? `, ${clip(String(r.doing), 60)}` : ''}. Two sessions in one working tree overwrite each other${same ? '; if that is not you, coordinate or stop' : '. Coordinate or stop'}.`,
+      `Two sessions: ${as} (${String(r.spoken)}) is live in this folder too${typeof r.age_s === 'number' ? `, seen ${ago(r.age_s)}` : ''}${text(r.doing) ? `, ${clip(plainOf(String(r.doing), look), 60)}` : ''}. Two sessions in one working tree overwrite each other${same ? '; if that is not you, coordinate or stop' : '. Coordinate or stop'}.`,
     );
   }
   const ambiguous = Array.isArray(c.ambiguous) ? c.ambiguous.filter((a): a is string => typeof a === 'string') : [];
@@ -421,7 +430,9 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     if (rows.length === 0) continue;
     const where = g.rows.length > 0 ? 'here' : 'everywhere';
     lines.push(`Open ${where} · ${g.name} · ${rows.length > WORK_SHOWN ? `${String(WORK_SHOWN)} of ${grouped(rows.length)}${g.truncated ? '+' : ''}` : grouped(rows.length)}`);
-    for (const r of rows.slice(0, WORK_SHOWN)) lines.push(rowLine(shapedOf(r), g.id, look));
+    /* A TASK'S WORDS CAN BE AN ADDRESS ("Reply to jo@kiln.example"), and the briefing is read, never a field to copy, so
+       it goes here as it does from a step (audit 19, M11). `get` still answers a person's email field as written. */
+    for (const r of rows.slice(0, WORK_SHOWN)) lines.push(unaddressed(rowLine(shapedOf(r), g.id, look)));
     if (rows.length > WORK_SHOWN) lines.push(`More: ${callOf('list', { register: g.id, where: openHere(g.decl, g.rows.length > 0 && project ? String(project.spoken) : null) })}`);
   }
   if (b.home) lines.push(`Home page: ${clip(b.home.title, 60)}. Read it at braindog:page/home.`);
@@ -440,15 +451,16 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
             from,
             ...(by ? { by } : {}),
             ...(age === null ? {} : { age: ago(age), age_s: age }),
-            next: handoff.next,
-            ...(tried.length > 0 ? { tried } : {}),
+            next: unaddressed(String(handoff.next)),
+            ...(tried.length > 0 ? { tried: tried.map(unaddressed) } : {}),
             ...(text(handoff.head) ? { head: handoff.head } : {}),
             ...(check ? { check: true } : {}),
           },
         }
       : {}),
     ...(here.length > 0 || elsewhere.length > 0 ? { live: { ...(here.length > 0 ? { same_repo: here.map(runOf) } : {}), ...(elsewhere.length > 0 ? { elsewhere: elsewhere.length } : {}) } } : {}),
-    ...(total > 0 ? { waiting: { count: total, shown: questions.map((q) => ({ id: q.id, question: q.question, ...(q.alike.length > 0 ? { alike: q.alike } : {}) })) } } : {}),
+    /* THE QUESTIONS AND THE STEP KEEP THEIR HANDLES HERE, which an agent acts on, and lose any address, which it never does. */
+    ...(total > 0 ? { waiting: { count: total, shown: questions.map((q) => ({ id: q.id, question: unaddressed(q.question), ...(q.alike.length > 0 ? { alike: q.alike } : {}) })) } } : {}),
     registers,
     ...(people.length > 0 ? { people: people.slice(0, PEOPLE_MOST).map((p) => lean(p, false, KEPT_TEXT)) } : {}),
     ...(typeof c.faded === 'number' && c.faded > 0 ? { faded: c.faded } : {}),

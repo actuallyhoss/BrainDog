@@ -177,7 +177,7 @@ async function onEarlier(): Promise<{ k: Kernel; before: Record<string, unknown>
    already under the receiver's name. Founder first is `PAGE_UNKNOWN` at `adds.page.relation`, and without its `adds`
    `FIELD_UNKNOWN` at `page.dashboard`, which reads `merged_into` on the organisations as only People 3.0.0 lays it. The
    test runs and says what it meets. */
-test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN THE CURRENT VERSION, and neither loses a row or a page of what it held', { todo: 'needs @braindog/declare to take a list from the pack whose coming version hands it' }, async () => {
+test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN THE CURRENT VERSION, and neither loses a row or a page of what it held', async () => {
   const { k } = await onEarlier();
   const org = value<{ id: string }>(k.create('organisations', { name: 'Harbour Studio', kind: 'company', currency: 'GBP' }, OWNER));
   value(k.create('datapoints', { name: 'Sign-ups', value: 12, organisation: org.id, source: 'reported', at: new Date(NOW).toISOString() }, OWNER));

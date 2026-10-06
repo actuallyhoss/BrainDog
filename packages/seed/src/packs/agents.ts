@@ -280,8 +280,7 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
 };
 
 /**
- * The pack's pages: the agents home at `/p/agents`, and a page per skill with its
- * versions.
+ * The pack's pages: the agents home at `/p/agents`, a page per skill with its versions, and a page per run.
  *
  * THE HOME IS THE RUNS, SINCE 1.5.0 (DIRECTION §37, "Stop the harm"): who is working now, where the stopped runs left
  * off, and what they added to the brain, in that order. Until 1.3.0 it was a grid of cards per list, each of the same
@@ -459,6 +458,18 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
       },
     ],
   },
+  /* A RUN'S OWN PAGE, SINCE 1.7.0 (DIRECTION §37, "the run docked beside"): one per row of the kernel's list of runs,
+     named by what it was doing. What it did and Undo this run are the host's (`panel: run`, `RunPanel.svelte`), drawn
+     under the one section, by the run's handle and never its id. No `nav:`, so the runs never grow the rail: a run's
+     card on the agents home opens it. */
+  run: {
+    page: 'run',
+    title: '{{doing}}',
+    for: { register: 'session' },
+    icon: 'session',
+    requires: ['register.session'],
+    blocks: [{ kind: 'section', heading: 'What it did', icon: 'history', span: 12, panel: 'run' }],
+  },
 };
 
 /*
@@ -490,8 +501,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      1.6.0 ADDS AND REGROUPS, SO IT IS MINOR: the agents home groups the runs under Needs you, Working, Today and
      Earlier (DIRECTION §37), over the new `runs-today` and `runs-earlier`; Working now is called Working, and Where
      they left off goes into Today and Earlier, whose cards carry each run's next step. `runs-left-next` stays, read by
-     the line. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.6.0', requires: ['register.things'] },
+     the line. No list, field or figure goes.
+     1.7.0 ONLY ADDS, SO IT IS MINOR: `page.run`, a page per run, whose one section draws what the run did and Undo this
+     run under `panel: run`. */
+  manifest: { id: 'agents', version: '1.7.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

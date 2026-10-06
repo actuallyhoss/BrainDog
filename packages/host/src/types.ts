@@ -63,8 +63,8 @@ export type Answer<M extends keyof RecordApi> = RecordApi[M] extends (...args: n
 /**
  * `Answer<M>` for a method the record may not have in this build, and `Else` while it has not.
  *
- * FOR A ROUTE THE HOST SERVES BEFORE THE RECORD ANSWERS IT, as `undo` and `undoRun` are (their handlers answer
- * `NOT_IN_THIS_BUILD` until then). The client's method is typed from the record the moment the record has it, and
- * nothing here is written a second time.
+ * FOR A ROUTE THE HOST SERVES BEFORE THE RECORD ANSWERS IT, as a row under `routes/` is: its handler answers
+ * `NOT_IN_THIS_BUILD` until the record has the method of its name (`understand` was the first). The client's method is
+ * typed from the record the moment the record has it, and nothing here is written a second time.
  */
 export type AnswerOr<M extends string, Else> = M extends keyof RecordApi ? Answer<M> : Else;

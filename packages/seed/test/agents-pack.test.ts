@@ -45,10 +45,10 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.6.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.7.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.6.0');
+  assert.equal(pack.manifest.version, '1.7.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
@@ -65,6 +65,7 @@ const PROVIDES = [
   'metric.skills-active',
   'metric.tools-by-week',
   'page.agents',
+  'page.run',
   'page.skill',
   'register.credentials',
   'register.learnings',
@@ -75,7 +76,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.6.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.7.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -299,6 +300,21 @@ test('A SKILL IN USE HAS A PAGE: its trigger, then its versions; a retired one h
   assert.equal(versions?.kind, 'diff');
   assert.deepEqual(versions?.refusals, []);
   assert.deepEqual(versions?.history?.map((v) => v.text), [row.body], 'a seeded skill has one version, the text it holds');
+  sql.close();
+});
+
+test('A RUN HAS A PAGE, named by what it was doing, whose one section asks the host for what it did', async () => {
+  const { k, sql } = await seeded();
+  value(k.create('session', { doing: 'Tidy the release notes', agent: 'claude', state: 'idle' } as never, { actor: 'p_seed' }));
+  const page = k.pages().find((p) => p.title === 'Tidy the release notes');
+  assert.ok(page, k.pages().map((p) => p.title).join(', '));
+  const [section, ...rest] = opened(k, page.slug);
+  assert.equal(section?.kind, 'section');
+  assert.equal(section?.heading, 'What it did');
+  assert.equal((section as { panel?: unknown }).panel, 'run');
+  assert.deepEqual(rest, []);
+  /* NO RAIL ENTRY PER RUN: the page carries no `nav`. */
+  assert.equal((AGENTS_PAGES.run as { nav?: unknown }).nav, undefined);
   sql.close();
 });
 

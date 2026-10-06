@@ -43,6 +43,9 @@ import {
   fill,
   GRANT_KINDS,
   agentOf as kindOf,
+  clipTitle,
+  keysOfStamp,
+  type QueueQuestion,
   isQuiet,
   isStale,
   runAge,
@@ -94,6 +97,7 @@ import {
   isUlid,
   slugify,
   SLASH,
+  BACKFILL_ACTOR,
   type BackfillSliceName,
   type BackfillSuggestion,
   type Backfilled,
@@ -1110,8 +1114,32 @@ export type Brief = { spoken: string; version: number; scope: 'project' | 'globa
  */
 export type PersonBrief = Brief & { name: string; role: string | null; org: string | null; in_touch: string | null; self: boolean };
 
-/** An organisation of the project, as `context` names it: its own, or the one a person here is with. */
-export type OrgBrief = { spoken: string; name: string; kind: string | null };
+/**
+ * An organisation of the project, as `context` names it: its own, or the one a person here is with. `linked` is true for
+ * the project's own, which the briefing's Who slot says "for" of, and false for one only its people are with.
+ */
+export type OrgBrief = { spoken: string; name: string; kind: string | null; linked: boolean };
+
+/**
+ * What `understand` answers (DIRECTION §38): the next slice of the walk over what the record already holds, looked at
+ * (`dry`) or done. `kinds` is each kind of thing it reads, how many it read, linked (or would) and the record refused, and
+ * for payments how many organisations it made; `writes` the first changes in names and `more` how many past them;
+ * `questions` the first things it would not do on its own, as a person is asked them, and `asks` how many of each kind.
+ * `done` is true when this slice read to the end. Not dry, `undo` is what `understand({ undo })` takes back, `filed` the
+ * questions filed on Decide, and `dropped` the ones that were not, with why.
+ */
+export type Understanding = {
+  dry: boolean;
+  kinds: { kind: 'payments' | 'runs' | 'services'; looked: number; linked: number; refused: number; organisations?: number }[];
+  writes: string[];
+  more: number;
+  questions: string[];
+  asks: Record<string, number>;
+  done: boolean;
+  undo?: string[];
+  filed?: { id: string; question: string }[];
+  dropped?: string[];
+};
 
 /**
  * What `meet` is told (`loop/contract-17.md`): who, by a name, an address, a handle or keys (`kind:value`), whether a person
@@ -2477,8 +2505,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       done = after.ledger === null && after.runs === null && after.services === null;
     }
     kernel.setPref(SLASH, UNDERSTAND_NEXT, done ? null : after);
-    const drafts = [...asked.values()].flatMap((one) => understoodDraft(one));
-    if (drafts.length === 0) return { filed: [], dropped };
+    const filing = await understoodFiling([...asked.values()]);
+    return { filed: filing.filed, dropped: [...dropped, ...filing.dropped] };
+  };
+
+  /** Where the walk goes on from, as the last night or the last `understand` left it. */
+  const understandCursor = (): Record<BackfillSliceName, string | null> => {
+    const stored = kernel.prefsOf(SLASH)[UNDERSTAND_NEXT] as Record<string, unknown> | undefined;
+    const cursor = (k: BackfillSliceName): string | null => (typeof stored?.[k] === 'string' ? (stored[k] as string) : null);
+    return { ledger: cursor('ledger'), runs: cursor('runs'), services: cursor('services') };
+  };
+
+  /** What the walk would not do on its own, filed as Slash's questions once each, with each choice kept beside its question. */
+  const understoodFiling = async (asked: readonly BackfillSuggestion[]): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
+    const drafts = asked.flatMap((one) => understoodDraft(one));
+    if (drafts.length === 0) return { filed: [], dropped: [] };
     const { filed, filedKeys, skipped } = await slashFiling(drafts.map((d) => d.draft), slashReading());
     /* A CHOICE IS KEPT BESIDE ITS QUESTION, by the option ids it was filed with, until it is answered. */
     const choices = new Map(drafts.flatMap((d) => (d.choice === null ? [] : [[stableKey(d.draft.body), d.choice] as const])));
@@ -2487,7 +2528,221 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (choice !== undefined) kernel.setPref(UNDERSTAND_ASKED, f.id, choice);
     });
     /* A NO HOLDS QUIETLY, as it does for "Start a project?". */
-    return { filed, dropped: [...dropped, ...skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`)] };
+    return { filed, dropped: skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`) };
+  };
+
+  /**
+   * THE WALK ASKED FOR BY HAND (`understand`, DIRECTION §38): the next slice of what the nightly walk reads, from where it
+   * stopped, either looked at (`dry`) or done.
+   *
+   * DRY IS THE SLICE RUN AND TAKEN BACK. The kernel's walk is the only reader of which payee, run and service it would
+   * link, so it runs in a transaction that is unwound once its writes are read, as `wouldRefuse` tries a write: nothing
+   * of it is kept, the cursor does not move, and nothing is filed. What the answer says is what the same slice would do
+   * now, said in names (`understoodLines`).
+   *
+   * NOT DRY IS ONE SLICE, the one the next night would have walked, and the cursor moves on as the night's does, so the
+   * night carries on after it. What it would not do on its own is filed as the night files it. Each kind it wrote to
+   * is one batch, handed back as `undo` for `understand({ undo })`.
+   */
+  const understandNow = async (dry: boolean, ctx: CallContext): Promise<Result<Understanding>> => {
+    const after = understandCursor();
+    if (dry) {
+      const tried = unwound<Understanding>(() =>
+        kernel.transaction(() => {
+          const walked = kernel.backfill({ after });
+          throw new Unwind(ok(understandingOf(walked, true)) as unknown as Result<never>);
+        }),
+      );
+      return tried;
+    }
+    const broken = kernel.refused();
+    if (broken) return { ok: false, refusal: broken };
+    let walked: Backfilled;
+    try {
+      walked = kernel.backfill({ after });
+    } catch {
+      return no('VALUE_MALFORMED', 'The read of what this BrainDog holds stopped partway, and nothing of it was kept. Try again, or leave it to tonight.');
+    }
+    const next = { ledger: walked.ledger.next, runs: walked.runs.next, services: walked.services.next };
+    kernel.setPref(SLASH, UNDERSTAND_NEXT, next.ledger === null && next.runs === null && next.services === null ? null : next);
+    const answer = understandingOf(walked, false);
+    const filing = await understoodFiling(walked.suggestions);
+    return ok({
+      ...answer,
+      filed: filing.filed.map((f) => ({ id: nameOf(ctx, 'suggestion', f.id) ?? f.id, question: f.question })),
+      ...(filing.dropped.length === 0 ? {} : { dropped: filing.dropped }),
+    });
+  };
+
+  /**
+   * BRAINDOG'S OWN UPDATES REACH THE RECORD ON THEIR OWN (DIRECTION §37): every first-party module this build ships at a
+   * newer version than the record holds is planned against the record as it is, put in when the plan loses nothing the
+   * person changed, and asked about once on Decide when it would (`updateFirstParty` in `@braindog/seed/packs/quiet`,
+   * which decides; this lends it the record).
+   *
+   * ONCE A DEPLOY AND ONCE A NIGHT, from the host's tick (`slashTick`): when the versions this build ships differ from the
+   * ones it last ran with, and otherwise once a UTC day, whether or not Slash is on, since keeping the record's own modules
+   * current is not Slash's look. The steps are kept beside the versions (`FIRST_PARTY_LAST`), each said in names.
+   *
+   * WHO WRITES IT IS THE RECORD ITSELF (`system`), as the kernel signs its own housekeeping, and its question is filed
+   * through the same `prepare` an owner's install is, so accepting it installs the module from this host's document.
+   * NOTHING NAMES A PACK OR A RECORD (§27): it is whatever first-party module is behind, on every record.
+   */
+  const FIRST_PARTY_HOLDER = 'braindog:updates';
+  const FIRST_PARTY_LAST = 'first-party';
+  const firstPartyTick = async (today: string): Promise<string[]> => {
+    const { updateFirstParty } = await import('@braindog/seed/packs/quiet');
+    const { FIRST_PARTY_VERSIONS, firstPartyManifest } = await import('@braindog/seed/packs');
+    const { moduleDocument, dayOf } = await import('@braindog/seed/usecases/install');
+    const { useCase } = await import('@braindog/seed/usecases');
+    const { moduleName } = await import('@braindog/seed/usecases/names');
+    const shipped = JSON.stringify(FIRST_PARTY_VERSIONS);
+    const last = kernel.prefsOf(FIRST_PARTY_HOLDER)[FIRST_PARTY_LAST] as { versions?: unknown; day?: unknown } | undefined;
+    if (last?.versions === shipped && last.day === today) return [];
+    const actor = 'system';
+    const host = packHost({ principal: { kind: 'system', id: actor } });
+    const speaking = speakingNow(kernel);
+    const u = speaking === null ? undefined : useCase(speaking.replace(/^usecase-/u, ''));
+    const planned = async (doc: Record<string, unknown>): Promise<Result<{ pack: Parameters<typeof plan>[0]; diff: Awaited<ReturnType<typeof plan>> }>> => {
+      const pack = await normaliseChecked(doc, { kind: 'local' });
+      if (!pack.ok) return pack;
+      const diff = await plan(pack.value, installedState());
+      const unheld = unresolvedFault(diff);
+      return unheld ? { ok: false, refusal: unheld } : ok({ pack: pack.value, diff });
+    };
+    let steps: Awaited<ReturnType<typeof updateFirstParty>> = [];
+    let stopped = false;
+    try {
+      steps = await updateFirstParty({
+        held: () => kernel.packStates().map((p) => ({ id: p.id, version: p.version, on: p.disabled_at === null })),
+        document: (id) => {
+          const own = firstPartyManifest(id as Parameters<typeof firstPartyManifest>[0]).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice('register.'.length));
+          return moduleDocument(u ?? null, id, { today: dayOf(clock.now()), holds: new Set([...[...kernel.registers()].map(([list]) => list), ...own]) });
+        },
+        plan: async (doc) => {
+          const got = await planned(doc);
+          return got.ok ? ok(got.value.diff) : got;
+        },
+        install: async (doc, planHash) => {
+          const got = await planned(doc);
+          if (!got.ok) return got;
+          const id = got.value.pack.manifest.pack;
+          const from = kernel.packStates().find((p) => p.id === id)?.version ?? null;
+          const put = await install(got.value.pack, got.value.diff, host, planHash, []);
+          if (put.ok) await carryUpdate(deps.catalogue ?? [], kernel, id, from, actor);
+          return put;
+        },
+        asking: (id) =>
+          sql.one("SELECT 1 AS y FROM suggestion WHERE status = 'open' AND body_kind = 'pack' AND json_valid(body) AND json_extract(body, '$.install') = ? LIMIT 1", id) !== undefined,
+        propose: async (q) => {
+          const prepared = await arrangement.prepare('pack', q.body);
+          return prepared.ok ? kernel.propose({ question: q.question, body_kind: 'pack', body: prepared.value }, actor) : prepared;
+        },
+        nameOf: (id) => {
+          const body = kernel.declarations().find((d) => d.id === id)?.body as { name?: unknown; title?: unknown } | undefined;
+          return typeof body?.name === 'string' ? body.name : typeof body?.title === 'string' ? body.title : null;
+        },
+      });
+    } catch {
+      stopped = true;
+    }
+    const name = (id: string): string => moduleName(id);
+    const listed = (lose: readonly string[] | undefined): string =>
+      lose === undefined || lose.length === 0 ? 'change what you made' : lose.length === 1 ? lose[0]! : `${lose.slice(0, -1).join(', ')} and ${lose.at(-1)!}`;
+    const said = steps.map((st) =>
+      st.did === 'updated'
+        ? `${name(st.pack)} was updated to ${st.to}.`
+        : st.did === 'asked'
+          ? `${name(st.pack)} ${st.to} is asked about on Decide, since updating it would ${listed(st.lose)}.`
+          : st.did === 'waiting'
+            ? `${name(st.pack)} ${st.to} is still waiting on Decide.`
+            : `${name(st.pack)} ${st.to} could not go in yet: ${st.why ?? 'its plan was refused'}`,
+    );
+    if (stopped) said.push("The check for BrainDog's own updates stopped partway, and runs again tomorrow.");
+    kernel.setPref(FIRST_PARTY_HOLDER, FIRST_PARTY_LAST, { versions: shipped, day: today, steps: said });
+    if (steps.some((st) => st.did === 'updated' || st.did === 'asked') && scheduler) await kernel.tail(scheduler);
+    return said;
+  };
+
+  /** How many writes `understand` names, the first ones, so a large slice is still a short answer. */
+  const UNDERSTAND_SAID = 10;
+
+  /** One walk as `understand` answers it: each kind with its counts, the first writes and questions in names. */
+  const understandingOf = (walked: Backfilled, dry: boolean): Understanding => {
+    const kinds: Understanding['kinds'] = [
+      { kind: 'payments', looked: walked.ledger.looked, linked: walked.ledger.wrote, refused: walked.ledger.refused, organisations: walked.ledger.organisations },
+      { kind: 'runs', looked: walked.runs.looked, linked: walked.runs.wrote, refused: walked.runs.refused },
+      { kind: 'services', looked: walked.services.looked, linked: walked.services.wrote, refused: walked.services.refused },
+    ];
+    const batches = [walked.ledger.batch, walked.runs.batch, walked.services.batch].filter((b): b is string => b !== null);
+    const lines = understoodLines(batches, dry);
+    const asks: Record<string, number> = {};
+    for (const q of walked.suggestions) asks[q.kind] = (asks[q.kind] ?? 0) + 1;
+    return {
+      dry,
+      kinds,
+      writes: lines.slice(0, UNDERSTAND_SAID),
+      more: Math.max(0, lines.length - UNDERSTAND_SAID),
+      questions: walked.suggestions.slice(0, UNDERSTAND_SAID).map((q) => q.question),
+      asks,
+      done: walked.ledger.next === null && walked.runs.next === null && walked.services.next === null,
+      ...(dry || batches.length === 0 ? {} : { undo: batches }),
+    };
+  };
+
+  /**
+   * What one walk wrote, each change once and in names: "Link LOWRY ST STUDIOS RENT AUG to Lowry St Studios", "Add
+   * Lowry St Studios to Organisations", "Place Fix the retry in Tallow". Said as what it will do when `dry`, and as done
+   * when not. A key given to an organisation is left unsaid: it is how the record knows a payee, and never words a
+   * person reads. One with no title is said as one of its list ("a payment", "a run"), never as a row or an id.
+   */
+  const understoodLines = (batches: readonly string[], dry: boolean): string[] => {
+    if (batches.length === 0) return [];
+    const events = sql.all<{ kind: string; target: string; field: string | null; to_v: string | null }>(
+      `SELECT kind, target, field, to_v FROM event WHERE batch IN (${batches.map(() => '?').join(', ')}) AND actor = ? AND target LIKE 'entry:%' ORDER BY rowid`,
+      ...batches,
+      BACKFILL_ACTOR,
+    );
+    const titled = (ref: string | null | undefined): string | null => {
+      const said = typeof ref === 'string' && ref !== '' ? kernel.titleOfRow(ref) : null;
+      return said === null ? null : (scrubbed(said.length > 80 ? `${said.slice(0, 79)}…` : said) ?? null);
+    };
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const say = (key: string, line: string) => {
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(line);
+    };
+    for (const e of events) {
+      const id = e.target.slice('entry:'.length);
+      const row = kernel.get(id, { includeDeleted: true });
+      if (!row) continue;
+      const decl = kernel.register(row.register);
+      const one = decl?.name.trim().toLowerCase().replace(/ies$/u, 'y').replace(/([^s])s$/u, '$1');
+      const name = titled(id) ?? (row.register === SESSION ? 'a run' : one ? `${/^[aeiou]/u.test(one) ? 'an' : 'a'} ${one}` : 'something');
+      if (e.kind === 'create') {
+        say(`create ${id}`, `${dry ? 'Add' : 'Added'} ${name} to ${decl?.name ?? 'a list'}`);
+        continue;
+      }
+      if (e.kind !== 'edit' && e.kind !== 'link') continue;
+      if (row.register === SESSION) {
+        const project = titled(typeof row.fields.project === 'string' ? row.fields.project : null);
+        if (project !== null) say(`place ${id}`, `${dry ? 'Place' : 'Placed'} ${name} in ${project}`);
+        continue;
+      }
+      const spec = e.field === null ? undefined : decl?.fields.find((f) => f.id === e.field);
+      if (spec?.type !== 'ref' || e.to_v === null) continue;
+      let to: unknown;
+      try {
+        to = JSON.parse(e.to_v);
+      } catch {
+        continue;
+      }
+      const target = titled(typeof to === 'string' ? to : null);
+      if (target !== null) say(`link ${id} ${e.field}`, `${dry ? 'Link' : 'Linked'} ${name} to ${target}`);
+    }
+    return out;
   };
 
   /** What a choice the walk asked does when it is answered: the project each option names, and what it is about. */
@@ -4221,10 +4476,100 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   /* AND A MERGE ASKED ABOUT SEVERAL ROWS CARRIES EACH OF THEM, with where each was seen (`clusterOf`), so Decide draws one
      card with Merge all, Keep apart and Pick instead of a rowset of patches nobody can read. */
+  /* AND THE DECISION CARD'S FACTS (`cardFactsOf`), so /decide/<id> says who asked from which app, what money moves and
+     what changes from what to what, as the queue's card does (`loop/research-audit-19.md` H3). */
   const asked = <T>(ctx: CallContext, register: string, row: T): T => {
     if (register !== 'suggestion' || row === null || typeof row !== 'object' || typeof (row as { id?: unknown }).id !== 'string') return row;
     const merge = clusterOf(ctx, row as Record<string, unknown>);
-    return { ...row, question: kernel.question((row as unknown as { id: string }).id) ?? '', ...(merge === null ? {} : { merge }) } as T;
+    return {
+      ...row,
+      question: kernel.question((row as unknown as { id: string }).id) ?? '',
+      ...cardFactsOf(ctx, row as Record<string, unknown>),
+      ...(merge === null ? {} : { merge }),
+    } as T;
+  };
+
+  /** The card's facts for one suggestion by its id, or none when there is no such row. */
+  const factsOf = (ctx: CallContext, id: string): Partial<QueueQuestion> => {
+    const row = kernel.governanceRow('suggestion', id);
+    return row ? cardFactsOf(ctx, row) : {};
+  };
+
+  /** A value that is money: a whole number of minor units with a three-letter currency. */
+  const moneyIn = (v: unknown): { amount: number; currency: string } | null => {
+    if (v === null || typeof v !== 'object' || Array.isArray(v)) return null;
+    const m = v as { amount?: unknown; currency?: unknown };
+    return typeof m.amount === 'number' && Number.isSafeInteger(m.amount) && typeof m.currency === 'string' && /^[A-Z]{3}$/u.test(m.currency)
+      ? { amount: m.amount, currency: m.currency }
+      : null;
+  };
+
+  /**
+   * WHAT THE DECISION CARD SAYS BESIDE A QUESTION, wherever the record answers one outside a page's queue: `governance`
+   * (which /decide/<id> reads) and `propose` (which an agent says back). The same facts the kernel puts on a queue's
+   * question (`pages.ts` `QueueQuestion`): the run that asked, by its handle beside what it was doing and the app it ran
+   * in; who drafted it; the money accepting writes, one value a row it writes and never two currencies added; what
+   * changes on the one row a question updates, each value said as a person reads it; and the kinds of change it is.
+   *
+   * NOTHING INVENTED: a fact the record cannot say is left off. A link is said by the title of the row it points at and a
+   * link to no row leaves its change off, so no id reaches the card; a secret or a file is never said.
+   *
+   * THE RUN AND THE CHANGES ONLY TO A READER OF EVERY LIST, as the kernel draws the queue only for one: what a run was
+   * doing, a row's value now and the title a link points at may sit on lists a member invited to one of them cannot
+   * read. Anybody the question reaches gets its money, who drafted it and its kinds, which its own body and stamp say.
+   */
+  const cardFactsOf = (ctx: CallContext, row: Record<string, unknown>): Partial<QueueQuestion> => {
+    const out: Partial<QueueQuestion> = {};
+    const every = readsEveryList(ctx);
+    const id = String(row.id);
+    const kind = String(row.body_kind ?? '');
+    const body = (row.body !== null && typeof row.body === 'object' && !Array.isArray(row.body) ? row.body : {}) as Record<string, unknown>;
+    const by = String(row.opened_by ?? '');
+    const run = /^[A-Z][1-9][0-9]*$/u.test(by) ? kernel.get(by, { includeDeleted: true }) : null;
+    if (every && run && run.register === SESSION) {
+      const doing = text(run.fields.doing)?.trim() || null;
+      const hints = {
+        ...(typeof run.fields.agent === 'string' ? { agent: run.fields.agent } : {}),
+        ...(typeof run.fields.client === 'string' ? { client: run.fields.client } : {}),
+      };
+      out.run = { id: by, ...(doing === null ? {} : { name: clipTitle(doing) }), app: kindOf(hints).name };
+    }
+    const stamped = sql.one<{ drafted_by: string | null; kind: string | null }>('SELECT drafted_by, kind FROM suggestion WHERE id = ?', id);
+    if (stamped?.drafted_by) out.drafted_by = stamped.drafted_by;
+    const kinds = keysOfStamp(stamped?.kind ?? null);
+    if (kinds.length > 0) out.kinds = kinds;
+    if (kind !== 'rowset' || !Array.isArray(body.rows)) return out;
+    const register = typeof body.register === 'string' ? body.register : '';
+    const rows = (body.rows as unknown[]).filter((x): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x));
+    const writes = rows.map((x) => ('at' in x ? x.patch : x)).filter((x): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x));
+    const money = writes.flatMap((w) => Object.values(w).flatMap((v) => moneyIn(v) ?? []));
+    if (money.length > 0) out.money = money;
+    const [only] = rows;
+    if (!every || rows.length !== 1 || only === undefined || typeof only.at !== 'string' || writes.length !== 1) return out;
+    const target = kernel.get(only.at, { includeDeleted: true });
+    const list = kernel.register(register);
+    if (!target || target.register !== register || !list) return out;
+    const named = (type: string | undefined, labels: Readonly<Record<string, string>> | undefined, v: unknown): JsonValue | null | undefined => {
+      if (v === null || v === undefined || v === '') return null;
+      if (Array.isArray(v)) {
+        const each = v.map((x) => named(type, labels, x));
+        return each.includes(undefined) ? undefined : (each as JsonValue[]);
+      }
+      if (type === 'ref') return typeof v === 'string' ? (kernel.titleOfRow(v) ?? undefined) : undefined;
+      if (type === 'enum' && typeof v === 'string') return labels?.[v] ?? v;
+      return v as JsonValue;
+    };
+    const changes = Object.entries(writes[0]!).flatMap(([field, after]) => {
+      const spec = list.fields.find((f) => f.id === field);
+      const type = spec?.type === 'list' ? spec.of : spec?.type;
+      if (!spec || type === 'secret' || type === 'file') return [];
+      const label = typeof spec.label === 'string' && spec.label.trim() !== '' ? spec.label.trim() : undefined;
+      const before = named(type, spec.labels, target.fields[field]);
+      const now = named(type, spec.labels, after);
+      return before === undefined || now === undefined ? [] : [{ field, ...(label ? { label } : {}), before, after: now }];
+    });
+    if (changes.length > 0) out.changes = changes;
+    return out;
   };
 
   /**
@@ -4774,8 +5119,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * NOT FOR A RUN THAT READ TEXT FROM OUTSIDE THE RECORD, which asks for the rest of it whatever its rung. A burst of
    * writes or a change of app takes the grant back to Ask before the gate reads the rung.
+   *
+   * AND THE RUNG IT LANDED AT (`rung`), the lowest of its kinds as the gate read them, so the agent says "Done, as you
+   * may on Tasks" as a write's answer lets it, and not "Asked". Read before the kept change is counted, which may offer
+   * the next rung but never sets it.
    */
-  const byLadder = (ctx: CallContext, id: string): { landed: true; decision: string; undo: { decision: string } } | null => {
+  const byLadder = (ctx: CallContext, id: string): { landed: true; decision: string; undo: { decision: string }; rung?: 'tell' | 'quiet' } | null => {
     const caller = callerOf(ctx);
     if (caller === null) return null;
     trust.clientChanged(caller, SESSION);
@@ -4783,11 +5132,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (trust.untrusted(caller) !== null) return null;
     const by = kernel.governanceRow('suggestion', id)?.opened_by;
     if (typeof by !== 'string') return null;
+    const body = kernel.governanceRow('suggestion', id)?.body;
+    const rung = trust.rungFor(caller.token, caller.scope, kindsOfProposal('rowset', body, recordReader(sql, by)));
     const out = kernel.decide(id, { rule: 'ladder' }, by);
     if (!out.ok || out.value.decision === null) return null;
     ladderAnswered(id, 'accept', true);
     const decision = nameOf(ctx, 'decision', out.value.decision) ?? out.value.decision;
-    return { landed: true, decision, undo: { decision } };
+    return { landed: true, decision, undo: { decision }, ...(rung === 'tell' || rung === 'quiet' ? { rung } : {}) };
   };
 
   /**
@@ -5408,7 +5759,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * An organisation row by id as `context` names it, followed through `merged_into` to the one it was folded into, or
    * `null` for a row that is gone or not an organisation. A few steps at most, so a loop written by hand ends.
    */
-  const orgBrief = (orgs: { register: string; fields: Record<string, string> }, id: string): OrgBrief | null => {
+  const orgBrief = (orgs: { register: string; fields: Record<string, string> }, id: string): Omit<OrgBrief, 'linked'> | null => {
     let row = kernel.get(id);
     for (let hop = 0; hop < 4 && row; hop += 1) {
       const into = orgs.fields.merged_into === undefined ? null : text(row.fields[orgs.fields.merged_into]);
@@ -5785,7 +6136,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * first and the first met first among equals, and at most `ORGS`. A row folded into another counts as the survivor.
    */
   const organisationsOf = (orgs: { register: string; fields: Record<string, string> }, linked: readonly string[], named: readonly string[]): OrgBrief[] => {
-    const seen = new Map<string, { org: OrgBrief; own: boolean; n: number; first: number }>();
+    const seen = new Map<string, { org: Omit<OrgBrief, 'linked'>; own: boolean; n: number; first: number }>();
     for (const [i, id] of [...linked, ...named].entries()) {
       const org = orgBrief(orgs, id);
       if (org === null) continue;
@@ -5797,7 +6148,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return [...seen.values()]
       .sort((a, b) => Number(b.own) - Number(a.own) || b.n - a.n || a.first - b.first)
       .slice(0, ORGS)
-      .map((o) => o.org);
+      .map((o) => ({ ...o.org, linked: o.own }));
   };
 
   /** An argument that is a line of text, `undefined` when it was not sent, or the refusal saying why not. */
@@ -6456,9 +6807,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     async slashTick(): Promise<{ ran: false; why: 'off' | 'today' | 'unopened' } | { ran: true; by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] }> {
       if (kernel.refused()) return { ran: false, why: 'unopened' };
+      const today = new Date(clock.now()).toISOString().slice(0, 10);
+      /* BRAINDOG'S OWN MODULES FIRST, ONCE A DEPLOY AND ONCE A DAY, whether Slash is on or not (`firstPartyTick`). A check
+         that breaks outside its own try (a module of this build that will not load) never costs the day its look. */
+      const updates = await firstPartyTick(today).catch(() => ["The check for BrainDog's own updates could not run, and runs again on the next tick."]);
       const state = slashDailyState();
       if (!state.on) return { ran: false, why: 'off' };
-      const today = new Date(clock.now()).toISOString().slice(0, 10);
       if (state.last === today) {
         /* THE DAY'S LOOK IS DONE, BUT A PAGE WHOSE FIGURES MOVED SINCE MAY BE ASKED ABOUT ONCE MORE (`slashHeadlinesAgain`). */
         await slashHeadlinesAgain(today).catch(() => {});
@@ -6466,6 +6820,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       kernel.setPref(SLASH, SLASH_LAST, today);
       const out = await slashFile(undefined, true);
+      out.dropped.push(...updates);
       /* THE SKILL STEP COMES AFTER, so a skill's next version takes a slot on Decide the look's own drafts left, and what
          it passed over or found unchanged is said in the same log (`dropped`). */
       const skills = await slashSkills();
@@ -7696,7 +8051,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const caller = callerOf(ctx);
       const doubted = said.untrusted === true || (caller !== null && trust.untrusted(caller) !== null);
       const { untrusted: _said, ...met } = said;
-      return tail(meeting(ctx, kernel.meet({ ...met, ...(doubted ? { untrusted: true } : {}) } as never, writerOf(ctx)) as Result<unknown>));
+      /* A PERSON AT HER OWN KEYBOARD SAYS SO (`principal: person`), so what she types is believed whatever its source says,
+         unless it says it arrived (`PeopleDeps.typed` in the kernel). A token, a rule or the system never does. */
+      const by = ctx.principal.kind === 'person' ? { ...writerOf(ctx), principal: { kind: 'person' as const } } : writerOf(ctx);
+      return tail(meeting(ctx, kernel.meet({ ...met, ...(doubted ? { untrusted: true } : {}) } as never, by) as Result<unknown>));
     },
 
     /* ── THE DECISION GATE ─────────────────────────── */
@@ -7791,11 +8149,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             return no('FIELD_UNKNOWN', 'An arrangement you propose carries no rows. Propose rows as body_kind rowset, one list at a time.', { at: 'body.rows' });
           const filed = await arrangement.prepare(args.body_kind, body);
           if (!filed.ok) return filed;
-          return tail(filedAs(ctx, kernel.propose({ ...args, body: filed.value }, writerOf(ctx))));
+          const opened = kernel.propose({ ...args, body: filed.value }, writerOf(ctx));
+          return tail(filedAs(ctx, opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened));
         }
       }
-      /* A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are. */
-      const filed = kernel.propose(args, writerOf(ctx));
+      /* A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are. AND IT IS ANSWERED WITH THE CARD'S FACTS
+         (`cardFactsOf`), read before anything answers it, so the agent can say what money it asked to move and what
+         it asked to change as the person will read it. */
+      const opened = kernel.propose(args, writerOf(ctx));
+      const filed = opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened;
       if (filed.ok && args?.body_kind === 'rowset') {
         /* ROWS ITS RUNG LETS THROUGH ARE ACCEPTED BY THE LADDER AND LAND NOW, with the Undo every decision has. */
         const landed = byLadder(ctx, filed.value.id);
@@ -9834,7 +10196,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        handed the guards above rather than a copy of them, so a method there is held to the same ladder as every method
        in this file; the `guards` gate reads those files as it reads this one, and refuses a name two files both define,
        since the later one would win here without a word. */
-    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted }),
+    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow }),
     /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/`: the owner's, in a browser, and a runner's,
        for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin` as every ADMIN method
        here is, and a runner's admit the one principal every guard above refuses. */

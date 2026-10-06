@@ -131,10 +131,10 @@ test("THE PROJECT'S ORGANISATIONS: its own first, then the ones its people are w
   const { api, sql } = await record();
   const here = value<Context>(await api.context(undefined, agent()));
   assert.deepEqual(
-    here.organisations.map((o) => [o.name, o.kind]),
+    here.organisations.map((o) => [o.name, o.kind, o.linked]),
     [
-      ['Encore', 'client'],
-      ['Brightloom Infotech', 'company'],
+      ['Encore', 'client', true],
+      ['Brightloom Infotech', 'company', false],
     ],
   );
   /* AN ORGANISATION IS NOT A PERSON HERE, though its list links it to the project the same way. */
