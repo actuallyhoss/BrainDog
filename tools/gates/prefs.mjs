@@ -692,8 +692,12 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       let drew = '';
       for (const said of test.values) {
         const value = typeof said === 'function' ? said(drew) : said;
-        /* `@record` IS WHAT THE RECORD KEEPS FOR THE PERSON, and never goes in the cookie. */
-        const { '@record': kept, ...cookie } = value;
+        /* `@record` IS WHAT THE RECORD KEEPS FOR THE PERSON, and never goes in the cookie.
+           A LOAD THAT SAYS NOTHING OF THE RECORD MEETS ONE THAT KEEPS NOTHING, and not the gate's record as earlier loads
+           left it. Every load is a new browser with an unstamped cookie, and `theme/follow.ts` sends such a cookie's look to
+           the record once where it has no word; the next load's cookie then lost to that word, by design, so `text` read
+           its first value three times. */
+        const { '@record': kept = {}, ...cookie } = value;
         const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', bypassCSP: true });
         /* THE COOKIE, NOT A CLICK. `50 §4.7` has the shell read `bd_pref` in a one-statement inline
            script before first paint, so setting it is exactly what the product does. It keeps this
@@ -701,7 +705,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
            which the a11y and layout gates already drive. */
         await context.addCookies([
           { name: 'bd_pref', value: encodeURIComponent(JSON.stringify(cookie)), url: `http://localhost:${PORT}` },
-          ...(kept === undefined ? [] : [{ name: RECORD_PREFS, value: encodeURIComponent(JSON.stringify(kept)), url: `http://localhost:${PORT}` }]),
+          { name: RECORD_PREFS, value: encodeURIComponent(JSON.stringify(kept)), url: `http://localhost:${PORT}` },
         ]);
         const page = await context.newPage();
         await page.goto(`http://localhost:${PORT}${APP_BASE}${test.route}`, { waitUntil: 'networkidle' });
