@@ -20,7 +20,7 @@ import { ok, type Result } from '@braindog/ports';
 
 import type { Plan, PlannedRow } from '../src/adapter.ts';
 import { applyPlan, type Door } from '../src/import.ts';
-import { authoredIn, chooseMet, clustersOf, DRY_RUN_SHOWN, dryRunLines, isMachine, listedBy, meeter, MEETS_PER_RUN, metOf, namedBy, NOBODY, ownCommits, ownerIn, peopleCommand, type Cluster, type LocalRepo, type Owner } from '../src/people.ts';
+import { authoredIn, chooseMet, clustersOf, DRY_RUN_SHOWN, dryRunLines, isAgent, isMachine, joinedIn, listedBy, meeter, MEETS_PER_RUN, metOf, namedBy, NOBODY, ownCommits, ownerIn, peopleCommand, type Cluster, type LocalRepo, type Owner } from '../src/people.ts';
 import type { AgentIo } from '../src/skills.ts';
 
 const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'braindog-people-')));
@@ -77,9 +77,63 @@ test('MACHINES ARE NOT PEOPLE: bots, CI users, a team’s jobs at an organisatio
     assert.equal(isMachine(name!, email!), false, `${name!} <${email!}>`);
 });
 
+test('A CODING AGENT IS NOBODY: by the name it signs with, its maker’s address, or its GitHub login; a person at its maker’s domain, or called Devin, is a person', () => {
+  for (const [name, email] of [
+    ['Claude', 'noreply@anthropic.com'],
+    ['Claude Code', 'ada@acme.example'],
+    ['Claude Sonnet 4.5', 'ada@acme.example'],
+    ['Somebody', 'claude@anthropic.com'],
+    ['Codex', 'codex@openai.com'],
+    ['OpenAI Codex', 'ada@acme.example'],
+    ['Codex CLI', 'ada@acme.example'],
+    ['Cursor Agent', 'cursoragent@cursor.com'],
+    ['Cursor', 'ada@acme.example'],
+    ['Somebody', 'agent@cursor.com'],
+    ['Copilot', '198982749+Copilot@users.noreply.github.com'],
+    ['GitHub Copilot', 'ada@acme.example'],
+    ['copilot-swe-agent', '198982749+copilot-swe-agent@users.noreply.github.com'],
+    ['Devin AI', '158243242+devin-ai-integration[bot]@users.noreply.github.com'],
+    ['Devin', 'devin@cognition.ai'],
+    ['Gemini', 'ada@acme.example'],
+    ['Gemini Code Assist', 'ada@acme.example'],
+    ['gemini-code-assist[bot]', '176961590+gemini-code-assist[bot]@users.noreply.github.com'],
+    ['Ada Lovelace (aider)', 'ada@lovelace.example'],
+    ['Somebody', 'no-reply@openai.com'],
+  ])
+    assert.equal(isMachine(name!, email!), true, `${name!} <${email!}>`);
+  for (const [name, email] of [
+    ['Devin Park', 'devin@acme.example'],
+    ['Devin', 'devin@acme.example'],
+    ['Jules', 'jules@acme.example'],
+    ['Claude Monet', 'claude@monet.example'],
+    ['Ada Lovelace', 'ada@anthropic.com'],
+    ['Cursor Fan', '123+cursorfan@users.noreply.github.com'],
+  ]) {
+    assert.equal(isAgent(name!, email!), false, `${name!} <${email!}>`);
+    assert.equal(isMachine(name!, email!), false, `${name!} <${email!}>`);
+  }
+});
+
+test('A REPOSITORY JOINS ITS PROJECT WHEN THE PROJECT FIRST NAMES IT, again after it was taken off, and never when the history does not show it', () => {
+  const at: LocalRepo = { dir: '/w/glaze', name: 'glaze', remote: 'github.com/acme/glaze' };
+  const project = { name: 'Glaze', repos: ['github.com/acme/glaze'], folders: [], row: { register: 'things', seq: 1, repos: 'repos', folders: 'folders' } };
+  const made = { ts: '2026-01-01T00:00:00Z', kind: 'create', field: null, to: { name: 'Glaze', repos: [] } };
+  const listed = { ts: '2026-03-01T00:00:00Z', kind: 'update', field: 'repos', to: ['https://github.com/acme/glaze.git'] };
+  assert.equal(joinedIn([made, listed], project, at), '2026-03-01T00:00:00Z');
+  assert.equal(joinedIn([{ ...made, to: { name: 'Glaze', repos: ['git@github.com:acme/glaze.git'] } }, { ts: '2026-02-01T00:00:00Z', kind: 'update', field: 'name', to: 'Glaze 2' }], project, at), '2026-01-01T00:00:00Z');
+  /* Taken off and listed again: from the second time. */
+  assert.equal(joinedIn([made, listed, { ...listed, ts: '2026-04-01T00:00:00Z', to: [] }, { ...listed, ts: '2026-05-01T00:00:00Z' }], project, at), '2026-05-01T00:00:00Z');
+  /* By its folder, kept among the repositories. */
+  assert.equal(joinedIn([made, { ...listed, to: ['/w/glaze'] }], project, { ...at, remote: null }), '2026-03-01T00:00:00Z');
+  /* A history that never names it, an empty one, and a project with no row to read. */
+  assert.equal(joinedIn([made], project, at), null);
+  assert.equal(joinedIn([], project, at), null);
+  assert.equal(joinedIn([made, listed], { name: 'Glaze', repos: project.repos, folders: [] }, at), null);
+});
+
 /* CI AND RUNNER ARE SURNAMES TOO. The kernel's service-name rule reads `ci` and `runner` in any case at a name's end, so
    until it takes `CI` only in capitals and `Runner` only after a CI's own name, these two people are left out. */
-test('MACHINES ARE NOT PEOPLE: a surname that is also a CI word is a person', { todo: 'the kernel’s SERVICE_NAME in identity-keys.ts' }, () => {
+test('MACHINES ARE NOT PEOPLE: a surname that is also a CI word is a person', () => {
   for (const [name, email] of [
     ['Li Ci', 'li.ci@acme.example'],
     ['Jane Runner', 'jane@acme.example'],
@@ -370,7 +424,7 @@ type Seen = { method: string; body: Record<string, unknown>; headers: Record<str
  * naming kiln by its remote, and a People list called `contacts` declaring `meets:` with the owner's own row, so the
  * self row is found by the declaration and never by a list's name.
  */
-async function harvestHost(t: { after: (fn: () => Promise<void>) => void }, glaze: string, projects?: Record<string, unknown>[]) {
+async function harvestHost(t: { after: (fn: () => Promise<void>) => void }, glaze: string, projects?: Record<string, unknown>[], self: 'row' | 'none' | 'refused' = 'row') {
   const seen: Seen[] = [];
   const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -392,6 +446,11 @@ async function harvestHost(t: { after: (fn: () => Promise<void>) => void }, glaz
             ? { id: 'things', title: 'name', fields: [], scopes: { repos: 'repos', folders: 'folders' } }
             : { id: 'contacts', title: 'name', fields: [], meets: { name: 'name', email: 'email', keys: 'keys', self: 'self', aliases: 'aliases' } },
         );
+      if (method === 'list' && self === 'refused' && String(body.register) === 'contacts') {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'This key does not read People.' } }));
+      }
+      if (method === 'list' && self === 'none' && String(body.register) === 'contacts') return answer({ rows: [], cursor: null });
       if (method === 'list')
         return answer(
           String(body.register) === 'things'
@@ -507,6 +566,32 @@ test('BRAINDOG PEOPLE HARVEST reads only the repositories a project lists, meets
 
   assert.equal(await peopleCommand(['harvest', '--since', 'yesterday'], io), 1);
   assert.match(said.at(-1)!, /^braindog people harvest takes/);
+});
+
+test('BRAINDOG PEOPLE HARVEST FAILS CLOSED when the owner’s own row cannot be read: it meets nobody, the dry run included, and says so', async (t) => {
+  const top = join(scratch, 'closed');
+  const glaze = join(top, 'glaze');
+  const commitGlaze = repository(glaze);
+  for (let i = 0; i < 2; i++) commitGlaze('Grace Hopper <grace@navy.example>');
+  for (const self of ['none', 'refused'] as const) {
+    const host = await harvestHost(t, glaze, undefined, self);
+    const out: string[] = [];
+    const said: string[] = [];
+    const io: AgentIo = {
+      env: { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: 'rec_01TESTTESTTESTTESTTESTTEST.people-harvest', XDG_CONFIG_HOME: join(scratch, 'config') },
+      cwd: top,
+      home: scratch,
+      out: (l) => void out.push(l),
+      say: (l) => void said.push(l),
+      headers: async () => ({ 'x-braindog-host': 'box' }),
+    };
+    const why = self === 'none' ? 'People does not say which person is you yet' : 'BrainDog could not read which person in People is you';
+    assert.equal(await peopleCommand(['harvest', '--dry-run'], io), 0, self);
+    assert.match(out.join('\n'), new RegExp(`^${why}, so a run would meet nobody`));
+    assert.equal(await peopleCommand(['harvest'], io), 1, self);
+    assert.match(said.join('\n'), new RegExp(`^${why}, so nobody was met`));
+    assert.deepEqual(host.seen.filter((s) => s.method === 'meet'), [], self);
+  }
 });
 
 test('BRAINDOG PEOPLE HARVEST ON AN OLDER RECORD reads a folder kept among a project’s repositories, and a bare name only where the owner committed', async (t) => {

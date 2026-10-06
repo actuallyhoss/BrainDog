@@ -20,7 +20,7 @@ import { refused } from '@braindog/ports';
 
 import { briefing, cardOf, nextLine, words, type Moved, type Where } from './brief.ts';
 import { budgetOf, clientFor, hostsPath, readHosts, sameHost, target, type Target } from './http.ts';
-import { authoredIn, childHeads, commitsBy, listedBy, localRepo, LOG_FORMAT, meeter, meetingOf, MIN_COMMITS, ownerOf, readLayout, type Layout, type MeetCall, type Meeting, type Owner, type Reader } from './people.ts';
+import { authoredIn, childHeads, commitsBy, joinedAt, listedBy, localRepo, LOG_FORMAT, meeter, meetingOf, MIN_COMMITS, ownerOf, readLayout, type Layout, type MeetCall, type Meeting, type Owner, type Reader } from './people.ts';
 import { git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
 import { syncSkills, type AgentIo } from './skills.ts';
 import { depositor, scanTools } from './tools.ts';
@@ -562,9 +562,10 @@ export type MovedRepo = { dir: string; repo: string; from: string };
  * The authors of several logs in `LOG_FORMAT`, each with its repository's name, newest commit first within each, each
  * author once by key, at most ten, as `meet` takes them.
  *
- * NOBODY TO MEET: a bot, a CI or machine user, the owner by any of his keys or names, an author with no address,
- * because a name alone is what `meet` never joins on (`authoredIn` in `people.ts`), and an author with fewer than
- * `MIN_COMMITS` in the repositories' whole history (`commits`), so one drive-by commit pulled in is nobody yet.
+ * NOBODY TO MEET: a bot, a CI or machine user, a coding agent, the owner by any of his keys or names, an author with no
+ * address, because a name alone is what `meet` never joins on (`authoredIn` in `people.ts`), and an author with fewer
+ * than `MIN_COMMITS` since the repositories joined their projects (`commits`), so one drive-by commit pulled in is
+ * nobody yet.
  */
 export function authorsOf(logs: readonly { log: string; repo: string }[], own: Owner, commits: ReadonlyMap<string, number>): Meeting[] {
   const seen = new Set<string>();
@@ -587,6 +588,9 @@ export function authorsOf(logs: readonly { log: string; repo: string }[], own: O
  * only when a repository moved; a repository no project lists by its remote or its folder is not read at all
  * (`listedBy` in `people.ts`). Any refusal ends it, People switched off and a host that is down included, except one
  * author's malformed address, which skips that author. None of this is the session's to hear about.
+ *
+ * IT FAILS CLOSED. Nobody is met when the owner's own row cannot be read, and only the commits made since a repository
+ * joined its project count, each once by its hash, so pulling a listed fork's upstream meets nobody from upstream.
  */
 export async function harvest(moved: readonly MovedRepo[], reader: Reader | null, meet: MeetCall, until: number): Promise<void> {
   if (reader === null || moved.length === 0) return;
@@ -597,20 +601,28 @@ export async function harvest(moved: readonly MovedRepo[], reader: Reader | null
   } catch {
     return;
   }
-  if (layout === null) return;
+  /* NOBODY WHEN THE OWNER'S OWN ROW CANNOT BE READ: his commits under another address would be met as a stranger's. */
+  if (layout === null || layout.self === null) return;
+  const self = layout.self;
   const places = await Promise.all(moved.map((m) => localRepo(m.dir)));
-  const listed = moved.filter((_, i) => {
-    const at = places[i] ?? null;
-    return at !== null && listedBy(layout.projects, at) !== null;
-  });
+  /* EACH WITH WHEN IT JOINED ITS PROJECT, and one whose joining the record does not show is not read. */
+  const joined = await Promise.all(
+    moved.map(async (_, i) => {
+      const at = places[i] ?? null;
+      const project = at === null ? null : listedBy(layout.projects, at);
+      return at === null || project === null ? null : joinedAt(reader, project, at);
+    }),
+  );
+  const listed = moved.flatMap((m, i) => (joined[i] ? [{ ...m, since: joined[i] }] : []));
   if (listed.length === 0 || Date.now() >= until) return;
-  const [logs, counts, own] = await Promise.all([
-    Promise.all(listed.map(async (m) => ({ log: await git(m.dir, 'log', LOG_FORMAT, `${m.from}..HEAD`), repo: m.repo }))),
-    Promise.all(listed.map((m) => commitsBy(m.dir))),
-    ownerOf(layout.self, listed.map((m) => m.dir)),
+  /* ONE COMMIT COUNTS ONCE, by its hash, however many checkouts under this folder hold it. */
+  const counted = new Map<string, Set<string>>();
+  const [logs, own] = await Promise.all([
+    Promise.all(listed.map(async (m) => ({ log: await git(m.dir, 'log', LOG_FORMAT, `--since=${m.since}`, `${m.from}..HEAD`), repo: m.repo }))),
+    ownerOf(self, listed.map((m) => m.dir)),
+    ...listed.map((m) => commitsBy(m.dir, m.since, counted)),
   ]);
-  const commits = new Map<string, number>();
-  for (const one of counts) for (const [key, n] of one) commits.set(key, (commits.get(key) ?? 0) + n);
+  const commits = new Map([...counted].map(([key, shas]) => [key, shas.size]));
   const read = logs.filter((l): l is { log: string; repo: string } => l.log !== null);
   const send = meeter(meet);
   for (const who of authorsOf(read, own, commits)) {

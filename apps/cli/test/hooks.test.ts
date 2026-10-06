@@ -65,7 +65,7 @@ async function stubHost(
   hang = false,
   people = true,
   card?: string,
-  o: { self?: Record<string, unknown>; legacy?: boolean; projects?: { repos?: string[]; folders?: string[] }[] } = {},
+  o: { self?: Record<string, unknown>; legacy?: boolean; projects?: { repos?: string[]; folders?: string[] }[]; joined?: string | null } = {},
 ) {
   const seen: Seen[] = [];
   const server = createServer((req, res) => {
@@ -99,6 +99,13 @@ async function stubHost(
               ? { id: 'things', title: 'name', fields: [], scopes: { repos: 'repos', folders: 'folders' } }
               : { id: 'people', title: 'name', fields: [], meets: { name: 'name', email: 'email', keys: 'keys', handles: 'handles', self: 'self', aliases: 'aliases' } },
         });
+      /* A project's history: made long ago with what it lists now, or at `joined`; with `joined: null`, not readable. */
+      if (method === 'history' && register === 'things') {
+        const seq = Number(body.seq ?? new URLSearchParams(url.search).get('seq'));
+        const p = o.projects?.[seq - 1];
+        if (o.joined === null || p === undefined) return answer({ ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: 'No history here.', at: 'register' } });
+        return answer({ ok: true, value: [{ ts: o.joined ?? '2000-01-01T00:00:00Z', actor: 'p_owner', kind: 'create', field: null, to: { name: `Project ${String(seq)}`, ...p } }] });
+      }
       if (method === 'list' && register === 'things')
         return answer({ ok: true, value: { rows: (o.projects ?? []).map((p, i) => ({ id: `e_p${String(i)}`, seq: i + 1, version: 1, fields: { name: `Project ${String(i + 1)}`, ...p } })), matched: 0, cursor: null } });
       if (method === 'list')
@@ -370,11 +377,12 @@ test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run 
     return env;
   };
 
-  const host = await stubHost(t, false, true, undefined, { projects });
+  const self = { name: 'Owner', email: 'owner@example.com' };
+  const host = await stubHost(t, false, true, undefined, { projects, self });
   const out = await run(['hook', 'end'], signedIn(host.base), end);
   assert.deepEqual([out.code, out.stdout, out.stderr], [0, '', '']);
-  /* The record's projects and the owner's own row read once, then the meets, then the handoff. */
-  assert.deepEqual(host.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', ...Array<string>(10).fill('meet'), 'handoff']);
+  /* The record's projects and the owner's own row read once, when the repository joined its project, then the meets, then the handoff. */
+  assert.deepEqual(host.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', 'history', ...Array<string>(10).fill('meet'), 'handoff']);
   const met = host.seen.filter((s) => s.method === 'meet');
   /* Newest first: GitHub's private address as a handle and a key, the owner's commit left out, and one person once. */
   const source = `commit ${last.slice(0, 7)} in ${name}`;
@@ -389,13 +397,23 @@ test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run 
   }
 
   /* People switched off: the first is refused, no more are sent, and the run still goes idle. */
-  const off = await stubHost(t, false, false, undefined, { projects });
+  const off = await stubHost(t, false, false, undefined, { projects, self });
   const quiet = await run(['hook', 'end'], signedIn(off.base), end);
   assert.deepEqual([quiet.code, quiet.stdout, quiet.stderr], [0, '', '']);
-  assert.deepEqual(off.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', 'meet', 'handoff']);
+  assert.deepEqual(off.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', 'history', 'meet', 'handoff']);
+
+  /* FAIL CLOSED: no row marked the owner's, the project's history unreadable, or a time in it that is no time. Nobody is
+     met, nothing is said, and the run still goes idle. */
+  for (const o of [{ projects }, { projects, self, joined: null }, { projects, self, joined: '2999-01-01T00:00:00Z' }, { projects, self, joined: 'soon' }]) {
+    const closed = await stubHost(t, false, true, undefined, o);
+    const said = await run(['hook', 'end'], signedIn(closed.base), end);
+    assert.deepEqual([said.code, said.stdout, said.stderr], [0, '', '']);
+    assert.deepEqual(closed.seen.filter((s) => s.method === 'meet'), [], JSON.stringify(o));
+    assert.equal(closed.seen.at(-1)?.method, 'handoff');
+  }
 
   /* No project lists the repository: nobody is met, and the run still goes idle. */
-  const unlisted = await stubHost(t, false, true, undefined, { projects: [{ repos: ['github.com/acme/other'] }] });
+  const unlisted = await stubHost(t, false, true, undefined, { projects: [{ repos: ['github.com/acme/other'] }], self });
   const none = await run(['hook', 'end'], signedIn(unlisted.base), end);
   assert.deepEqual([none.code, none.stdout, none.stderr], [0, '', '']);
   assert.deepEqual(unlisted.seen.filter((s) => s.method === 'meet'), []);
@@ -624,6 +642,48 @@ test('THE END HOOK READS EVERY REPOSITORY THAT MOVED UNDER A FOLDER THAT IS NOT 
     { name: 'Linus', email: 'linus@example.org', where: `commit ${linus.slice(0, 7)} in kiln` },
   ]);
   assert.equal(host.seen.at(-1)?.method, 'handoff');
+});
+
+test('THE END HOOK COUNTS ONLY SINCE A REPOSITORY JOINED ITS PROJECT, each commit once across two checkouts, and meets no coding agent', async (t) => {
+  const top = realpathSync(folder('fork'));
+  const a = join(top, 'glaze');
+  const b = join(top, 'glaze-copy');
+  const git = (cwd: string, args: string[], at?: string) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, env: { ...process.env, ...(at === undefined ? {} : { GIT_AUTHOR_DATE: at, GIT_COMMITTER_DATE: at }) } }).trim();
+  mkdirSync(a, { recursive: true });
+  git(a, ['init', '--quiet']);
+  const commit = (cwd: string, author: string, at?: string) => git(cwd, ['commit', '--quiet', '--allow-empty', '-m', 'change', '--author', author], at);
+  for (const [k, v] of [['user.name', 'Owner'], ['user.email', 'owner@example.com'], ['commit.gpgsign', 'false']] as const) git(a, ['config', k, v]);
+  commit(a, 'Owner <owner@example.com>');
+  git(top, ['clone', '--quiet', a, b]);
+  for (const [k, v] of [['user.name', 'Owner'], ['user.email', 'owner@example.com'], ['commit.gpgsign', 'false'], ['pull.ff', 'only']] as const) git(b, ['config', k, v]);
+  const host = await stubHost(t, false, true, undefined, { self: { name: 'Owner', email: 'owner@example.com' }, projects: [{ folders: [a, b] }], joined: '2026-01-01T00:00:00Z' });
+  const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+  assert.equal((await run(['hook', 'start'], env, event(top, { session_id: 'claude-run-fork', source: 'startup' }))).code, 0);
+
+  /* Upstream's history, pulled in: two commits each, made before the repository joined its project. */
+  for (const who of ['Upstream One <one@upstream.example>', 'Upstream Two <two@upstream.example>']) for (let twice = 0; twice < 2; twice++) commit(a, who, '2020-03-01T12:00:00Z');
+  /* One commit, in both checkouts once the copy pulls it: one commit, so nobody yet. */
+  commit(a, 'Drive By <drive@by.example>');
+  /* Coding agents, twice each. */
+  for (const agent of [
+    'Claude <noreply@anthropic.com>',
+    'Claude Code <claude@anthropic.com>',
+    'Cursor Agent <cursoragent@cursor.com>',
+    'Copilot <198982749+Copilot@users.noreply.github.com>',
+    'Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>',
+    'Codex <codex@openai.com>',
+    'gemini-code-assist[bot] <176961590+gemini-code-assist[bot]@users.noreply.github.com>',
+    'Ada Lovelace (aider) <ada@lovelace.example>',
+  ])
+    for (let twice = 0; twice < 2; twice++) commit(a, agent);
+  for (let twice = 0; twice < 2; twice++) commit(a, 'Grace Hopper <grace@navy.example>');
+  git(b, ['pull', '--quiet']);
+  host.seen.splice(0);
+
+  const end = await run(['hook', 'end'], env, JSON.stringify({ session_id: 'claude-run-fork', cwd: top, hook_event_name: 'SessionEnd', reason: 'logout' }));
+  assert.deepEqual([end.code, end.stdout, end.stderr], [0, '', '']);
+  assert.deepEqual(host.seen.filter((s) => s.method === 'meet').map((s) => s.body.name), ['Grace Hopper']);
 });
 
 test('THE START HOOK KEEPS THE WINDOW IT RAN UNDER, when Claude Code says it, and nothing that is not a process id', async (t) => {

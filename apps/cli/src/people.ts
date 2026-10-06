@@ -13,10 +13,10 @@
  * history filled People with strangers. An identity is met once it has made two commits, and one run meets at most
  * `MEETS_PER_RUN`, the busiest first.
  *
- * NOBODY TO MEET: a bot, a CI or machine user, and the owner. The owner is read from the self row of whichever list
- * declares `meets:`, by the part it names `self`: every key on that row and every name and alias it goes by, with this
- * machine's `git config user.email` beside them, so his own commits are never met however many addresses he commits
- * under.
+ * NOBODY TO MEET: a bot, a CI or machine user, a coding agent, and the owner. The owner is read from the self row of
+ * whichever list declares `meets:`, by the part it names `self`: every key on that row and every name and alias it goes
+ * by, with this machine's `git config user.email` beside them, so his own commits are never met however many addresses
+ * he commits under. WHEN THAT ROW CANNOT BE READ, NOBODY IS MET, and the command says so.
  *
  * `meet` IS SENT IN THE CONTRACT'S SHAPE (`keys`, `kind`, `source`) and, when a record older than that refuses one of
  * those by name, once more in the shape it takes (`name`, `email`, `handle`, `where`), and in that shape for the rest of
@@ -29,7 +29,7 @@ import { basename, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import type { Client } from '@braindog/client';
-import { isMachineIdentity, keyFrom, keyOf, keysOf, remoteKey } from '@braindog/kernel';
+import { githubOfAddress, isMachineIdentity, keyFrom, keyOf, keysOf, remoteKey } from '@braindog/kernel';
 import { refused, type Result } from '@braindog/ports';
 
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
@@ -44,7 +44,31 @@ import { isObject, type AgentIo } from './skills.ts';
  * at a machine's own name. One reading for the record and this command, so a commit the hook leaves out is one the
  * record would too.
  */
-export const isMachine = (name: string, address: string): boolean => isMachineIdentity({ name, email: address });
+export const isMachine = (name: string, address: string): boolean => isMachineIdentity({ name, email: address }) || isAgent(name, address);
+
+/*
+ * A CODING AGENT IS A MACHINE TOO, here even on a kernel that does not know it yet: an agent that commits under its own
+ * name (`Claude`, `Cursor Agent`, `Copilot`, `Ada (aider)`) or its maker's address (`noreply@anthropic.com`,
+ * `cursoragent@cursor.com`) is nobody in the work. `Devin` and `Jules` are people's names as well, so those two count
+ * only at an agent's address; anybody else at an agent maker's domain is a person who works there.
+ */
+const AGENT_NAME =
+  /^(?:claude(?: code| agent| (?:opus|sonnet|haiku)\b.*)?|(?:openai )?codex(?: cli)?|cursor(?: ?agent)?|(?:github )?copilot(?: swe agent)?|devin ai|gemini(?: cli| code assist)?|aider|google jules)$|\(aider\)$/i;
+const AGENT_LOCAL = /^(?:no-?reply|claude(?:-code)?|codex|cursor-?agent|cursor|copilot(?:-swe-agent)?|devin(?:-ai(?:-integration)?)?|gemini(?:-code-assist)?|aider|jules|agent)$/;
+const AGENT_HOST = /(?:^|\.)(?:anthropic\.com|claude\.ai|openai\.com|chatgpt\.com|cursor\.com|cursor\.sh|anysphere\.co|cognition\.ai|cognition-labs\.com|devin\.ai|aider\.chat)$/;
+const AGENT_LOGIN = /^(?:claude|codex|cursor|cursoragent|copilot|copilot-swe-agent|devin-ai-integration|gemini-code-assist|google-labs-jules|chatgpt-codex-connector)(?:\[bot\])?$/;
+
+/** Whether an author is a coding agent, by the name it signs with or the address it commits from. */
+export function isAgent(name: string, address: string): boolean {
+  if (AGENT_NAME.test(name.trim().replace(/\s+/g, ' '))) return true;
+  const at = address.trim().toLowerCase().lastIndexOf('@');
+  if (at <= 0) return false;
+  const local = address.trim().toLowerCase().slice(0, at).replace(/\+.*$/, '');
+  const host = address.trim().toLowerCase().slice(at + 1);
+  const login = githubOfAddress(address.trim().toLowerCase());
+  if (login !== null) return AGENT_LOGIN.test(login);
+  return AGENT_HOST.test(host) && AGENT_LOCAL.test(local);
+}
 
 /* ── authors ───────────────────────────────────────────────────────────── */
 
@@ -73,15 +97,24 @@ export function authoredIn(log: string, own: Owner): Authored[] {
 /** The fewest commits an identity has made before it is met: one commit is a drive-by, two is somebody in the work. */
 export const MIN_COMMITS = 2;
 
-/** Each author's commits in a repository's whole history, by key, for `MIN_COMMITS` when only a few commits are read. */
-export async function commitsBy(dir: string): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
-  const log = await git(dir, 'log', '--format=%ae', 'HEAD');
-  for (const email of (log ?? '').split('\n')) {
+/**
+ * Each author's commits in a repository since `since`, by key, each commit by its full hash, for `MIN_COMMITS` when only
+ * a few commits are read. Into `into` when it is given, so several checkouts of one repository count a commit once.
+ *
+ * ONLY SINCE THE REPOSITORY JOINED ITS PROJECT (`joinedIn`). A listed fork or a vendored upstream holds years of other
+ * people's history, and one `git pull` would otherwise make every upstream contributor somebody in the work.
+ */
+export async function commitsBy(dir: string, since: string, into = new Map<string, Set<string>>()): Promise<Map<string, Set<string>>> {
+  const log = await git(dir, 'log', '--format=%ae%x1f%H', `--since=${since}`, 'HEAD');
+  for (const line of (log ?? '').split('\n')) {
+    const [email = '', commit = ''] = line.split('\x1f').map((x) => x.trim());
     const key = keyOf('email', email);
-    if (key !== null) out.set(key, (out.get(key) ?? 0) + 1);
+    if (key === null || !commit) continue;
+    const seen = into.get(key) ?? new Set<string>();
+    seen.add(commit);
+    into.set(key, seen);
   }
-  return out;
+  return into;
 }
 
 /** An author as `meet` is told about them: the name, one address or handle, and every key. */
@@ -120,24 +153,37 @@ export const sameName = (name: string): string => name.trim().replace(/\s+/g, ' 
 /** The owner as a harvest leaves him out: every key he is known by, and every name and alias he goes by. */
 export type Owner = { keys: ReadonlySet<string>; names: ReadonlySet<string> };
 
-/** Nobody: a record with no self row, before this machine's own address is added. */
+/** Nobody: an owner known by no key and no name, before this machine's own address is added. */
 export const NOBODY: Owner = { keys: new Set(), names: new Set() };
 
 /** Whether one commit's author is the owner, by any key of his or by his name or one of his aliases. */
 export const isOwner = (own: Owner, key: string, name: string): boolean => own.keys.has(key) || (name.trim() !== '' && own.names.has(sameName(name)));
 
-/** A project as this command reads it: its name, and the repositories and folders it lists. */
-export type Project = { name: string; repos: string[]; folders: string[] };
+/**
+ * A project as this command reads it: its name, and the repositories and folders it lists. `row` is where its history
+ * is read, for when a repository joined it (`joinedAt`): its list, its number, and the two fields the list keeps them in.
+ */
+export type Project = { name: string; repos: string[]; folders: string[]; row?: { register: string; seq: number; repos?: string; folders?: string } };
 
-/** What a harvest reads of the record: its projects, and the owner as the list declaring `meets:` keeps him. */
-export type Layout = { projects: Project[]; self: Owner };
+/**
+ * What a harvest reads of the record: its projects, and the owner as the list declaring `meets:` keeps him. `self` is
+ * `null` when his own row could not be read, and then nobody is met (`readSelf`).
+ */
+export type Layout = { projects: Project[]; self: Owner | null; why?: Unknown };
 
 /** The reads a harvest makes. */
-export type Reader = Pick<Client, 'boot' | 'schema' | 'list'>;
+export type Reader = Pick<Client, 'boot' | 'schema' | 'list' | 'history'>;
+
+/** What a harvest says when the owner's own row could not be read, and so meets nobody. */
+export const noSelf = (dry: boolean, why: Unknown = 'unread'): string =>
+  `${why === 'unread' ? 'BrainDog could not read which person in People is you' : 'People does not say which person is you yet'}, so ${dry ? 'a run would meet nobody' : 'nobody was met'}: it could not tell your own commits from somebody else's. Run it again once People marks you.`;
+
+/** Why the owner is not known: People keeps no mark for him, no row carries it, or his row could not be read. */
+export type Unknown = 'unmarked' | 'unread';
 
 /**
  * The projects and the owner, from the lists that declare them: `scopes:` for the projects, `meets:` for the people,
- * whose `self` part names the field marking the owner's own row. No projects and nobody when the record declares
+ * whose `self` part names the field marking the owner's own row. No projects, and no owner, when the record declares
  * neither or the caller cannot read it, never a guess by a list's name. Throws `unreachable` when the host does not
  * answer at all.
  */
@@ -145,11 +191,11 @@ export async function readLayout(reader: Reader): Promise<Layout> {
   const boot = await reader.boot();
   if (!boot.ok) {
     if (refused(boot) && boot.refusal.code === 'UNREACHABLE') throw new Error('unreachable');
-    return { projects: [], self: NOBODY };
+    return { projects: [], self: null, why: 'unread' };
   }
   const decls = (await Promise.all(boot.value.registers.map((r) => reader.schema(r.id)))).flatMap((d) => (d.ok && isObject(d.value) && typeof d.value.id === 'string' ? [d.value] : []));
   const [projects, self] = await Promise.all([readProjects(reader, decls), readSelf(reader, decls)]);
-  return { projects, self };
+  return typeof self === 'string' ? { projects, self: null, why: self } : { projects, self };
 }
 
 /** The project list: the one list declaring `scopes:`, its rows read to the end. */
@@ -172,6 +218,7 @@ async function readProjects(reader: Reader, decls: readonly Record<string, unkno
           name: typeof f[title] === 'string' ? f[title] : 'a project',
           repos: said.filter((r) => !isFolder(r)),
           folders: [...(folders ? strings(f[folders]) : []), ...said.filter(isFolder)].map(real),
+          ...(typeof r.seq === 'number' ? { row: { register: String(home.id), seq: r.seq, ...(repos ? { repos } : {}), ...(folders ? { folders } : {}) } } : {}),
         });
       }
     cursor = got.value.cursor;
@@ -196,26 +243,73 @@ function real(folder: string): string {
 /**
  * The owner as the list declaring `meets:` keeps him: the rows its `self` part marks, each with every key on it (its
  * address, its keys, its handles) and every name it goes by (its name and its aliases), as that list's parts name them.
+ *
+ * WHY HE IS NOT KNOWN WHEN HE CANNOT BE READ, AND THEN NOBODY IS MET: `unmarked` for no list declaring a `self` part or
+ * no row marked his, `unread` for a read refused or thrown. Only this machine's git address would be left to know him by, so every other address and name he
+ * has committed under would be met as a stranger and folded into People.
  */
-async function readSelf(reader: Reader, decls: readonly Record<string, unknown>[]): Promise<Owner> {
+async function readSelf(reader: Reader, decls: readonly Record<string, unknown>[]): Promise<Owner | Unknown> {
   const home = decls.find((d) => isObject(d.meets) && typeof d.meets.self === 'string');
-  if (!home || !isObject(home.meets)) return NOBODY;
+  if (!home || !isObject(home.meets)) return 'unmarked';
   const parts = home.meets as Record<string, unknown>;
   const part = (p: string, fields: Record<string, unknown>): unknown => (typeof parts[p] === 'string' ? fields[parts[p]] : undefined);
   const self = String(parts.self);
   try {
     const got = await reader.list({ register: String(home.id), where: { field: self, is: true }, limit: 5 });
-    if (!got.ok) return NOBODY;
+    if (!got.ok) return 'unread';
     const keys = new Set<string>();
     const names = new Set<string>();
+    let rows = 0;
     for (const r of got.value.rows)
       if (isObject(r) && isObject(r.fields) && r.fields[self] === true) {
+        rows++;
         for (const k of keysOfRow({ email: part('email', r.fields), keys: part('keys', r.fields), handles: part('handles', r.fields) })) keys.add(k);
         for (const n of [...strings(part('name', r.fields)), ...strings(part('aliases', r.fields))].map(sameName)) if (n !== '') names.add(n);
       }
-    return { keys, names };
+    return rows === 0 ? 'unmarked' : { keys, names };
   } catch {
-    return NOBODY;
+    return 'unread';
+  }
+}
+
+/**
+ * When a repository joined the project that lists it, from that project row's history: the time of the write after
+ * which its repositories or folders last came to name it, as `listedBy` reads them. `null` when the history does not
+ * show it naming the repository, and then nothing in the repository counts.
+ */
+export function joinedIn(events: readonly unknown[], project: Project, repo: LocalRepo): string | null {
+  const parts = project.row;
+  if (parts === undefined) return null;
+  let repos: unknown = undefined;
+  let folders: unknown = undefined;
+  let joined: string | null = null;
+  for (const e of events) {
+    if (!isObject(e) || typeof e.ts !== 'string') continue;
+    if (e.field === null && isObject(e.to)) {
+      repos = parts.repos === undefined ? undefined : e.to[parts.repos];
+      folders = parts.folders === undefined ? undefined : e.to[parts.folders];
+    } else if (typeof e.field === 'string' && e.field === parts.repos) repos = e.to;
+    else if (typeof e.field === 'string' && e.field === parts.folders) folders = e.to;
+    else continue;
+    const said = strings(repos);
+    const then: Project = { name: project.name, repos: said.filter((r) => !isFolder(r)), folders: [...strings(folders), ...said.filter(isFolder)].map(real) };
+    const names = listedBy([then], repo) !== null;
+    if (!names) joined = null;
+    else joined ??= e.ts;
+  }
+  return joined;
+}
+
+/** When a repository joined the project that lists it (`joinedIn`), read from the record; `null` when it cannot be read. */
+export async function joinedAt(reader: Pick<Client, 'history'>, project: Project, repo: LocalRepo): Promise<string | null> {
+  if (project.row === undefined) return null;
+  try {
+    const got = await reader.history(project.row.register, project.row.seq);
+    const at = got.ok && Array.isArray(got.value) ? Date.parse(joinedIn(got.value, project, repo) ?? '') : NaN;
+    /* A TIME GIT CAN READ, and never one ahead of now, which git reads as no limit at all past 2099. */
+    return Number.isFinite(at) && at <= Date.now() ? new Date(at).toISOString() : null;
+  } catch {
+    return null;
   }
 }
 
@@ -592,6 +686,13 @@ export async function peopleCommand(args: string[], io: AgentIo): Promise<number
     io.say(`${to.key} did not answer.`);
     return 3;
   }
+  /* FAIL CLOSED ON THE OWNER: a run that cannot tell his commits from a stranger's meets nobody, the dry run included. */
+  if (layout.self === null) {
+    if (dryRun) io.out(noSelf(true, layout.why));
+    else io.say(noSelf(false, layout.why));
+    return dryRun ? 0 : 1;
+  }
+  const self = layout.self;
 
   /* THE REPOSITORIES: this folder's own, those under it, and each folder a project lists that is one on this machine,
      then only those a project lists. */
@@ -615,7 +716,7 @@ export async function peopleCommand(args: string[], io: AgentIo): Promise<number
     return project === null ? [] : [{ repo, project, byName: named !== null }];
   });
   const logs = await Promise.all(candidates.map((c) => git(c.repo.dir, 'log', LOG_FORMAT, ...(since === undefined ? [] : [`--since=${since}`]))));
-  const own = ownerIn(await ownerOf(layout.self, candidates.map((l) => l.repo.dir)), logs);
+  const own = ownerIn(await ownerOf(self, candidates.map((l) => l.repo.dir)), logs);
   /* His commits over the whole history, so a window he did not commit in does not disown a repository of his. */
   const mine = await Promise.all(
     candidates.map(async (c, i) => {
