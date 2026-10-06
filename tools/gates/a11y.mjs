@@ -521,7 +521,8 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
                honour the media query, but a `transition` on a hover or focus colour is not covered by it,
                and axe measuring a colour halfway through one is a contrast finding that appears and
                disappears between runs. A gate that fails one run in ten is a gate people re-run until it
-               passes, which is the same as not having one. */
+               passes, which is the same as not having one. It does not reach a transition the app forces
+               `!important` inside a layer, and `audit` waits those out. */
             await page.addStyleTag({
               content:
                 '.rowgroup{content-visibility:visible !important}' +
@@ -551,6 +552,26 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
           };
 
           const audit = async (where) => {
+            /* AND WHAT THE KILL ABOVE CANNOT REACH, IT WAITS OUT. `a11y.css` keeps a 120ms fade under reduced motion,
+               written `!important` inside `@layer a11y`, and an important declaration in a layer outranks an
+               unlayered important one, so the `transition:none` this gate injects loses to it. A menu or a sheet
+               opened by a click is audited the instant it is open, at 0.6 of its opacity, and axe measures every
+               word on it blended into the ground: dim at 2.6:1 and ink-2 at 3.7:1 in dark, colours no token
+               has. So every finite animation still running is let finish first, and the page is measured as a
+               reader sees it once it has arrived. Bounded by the readiness wait, so a stuck one cannot hang a run. */
+            await page.evaluate(
+              (cap) =>
+                Promise.race([
+                  Promise.all(
+                    document
+                      .getAnimations()
+                      .filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime))
+                      .map((a) => a.finished.catch(() => {})),
+                  ),
+                  new Promise((r) => setTimeout(r, cap)),
+                ]),
+              budget('ready').settleTimeoutMs,
+            );
             const result = await page.evaluate(async () => {
               // @ts-expect-error injected
               return await window.axe.run(document, {
