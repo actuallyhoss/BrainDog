@@ -1,7 +1,7 @@
 /**
  * The people in the work as git shows them: who an author is by key, which authors are machines, the owner's own keys,
  * and `meet` as the record takes it. Used by the end hook (`harvest` in `hooks.ts`) for one session's commits, and by
- * `braindog people harvest` for the whole history of the repositories the record's projects list.
+ * `braindog people harvest` for the repositories the record's projects list, from when each joined its project.
  *
  * AN AUTHOR IS THEIR KEYS, NEVER THEIR NAME, and a key is the kernel's (`keyOf` in `identity-keys.ts`), not a copy: a
  * key this command made one way and the record another was refused as malformed and the author silently skipped. Two
@@ -176,10 +176,15 @@ export type Reader = Pick<Client, 'boot' | 'schema' | 'list' | 'history'>;
 
 /** What a harvest says when the owner's own row could not be read, and so meets nobody. */
 export const noSelf = (dry: boolean, why: Unknown = 'unread'): string =>
-  `${why === 'unread' ? 'BrainDog could not read which person in People is you' : 'People does not say which person is you yet'}, so ${dry ? 'a run would meet nobody' : 'nobody was met'}: it could not tell your own commits from somebody else's. Run it again once People marks you.`;
+  why === 'older'
+    ? `Your record's People is older than this command and cannot mark which person is you, so ${dry ? 'a run would meet nobody' : 'nobody was met'}: it could not tell your own commits from somebody else's. It will once your record is updated.`
+    : `${why === 'unread' ? 'BrainDog could not read which person in People is you' : 'People does not say which person is you yet'}, so ${dry ? 'a run would meet nobody' : 'nobody was met'}: it could not tell your own commits from somebody else's. Run it again once People marks you.`;
 
-/** Why the owner is not known: People keeps no mark for him, no row carries it, or his row could not be read. */
-export type Unknown = 'unmarked' | 'unread';
+/**
+ * Why the owner is not known: People's list is from before it could mark him (`older`), no list or row marks him
+ * (`unmarked`), or his row could not be read (`unread`).
+ */
+export type Unknown = 'older' | 'unmarked' | 'unread';
 
 /**
  * The projects and the owner, from the lists that declare them: `scopes:` for the projects, `meets:` for the people,
@@ -244,13 +249,14 @@ function real(folder: string): string {
  * The owner as the list declaring `meets:` keeps him: the rows its `self` part marks, each with every key on it (its
  * address, its keys, its handles) and every name it goes by (its name and its aliases), as that list's parts name them.
  *
- * WHY HE IS NOT KNOWN WHEN HE CANNOT BE READ, AND THEN NOBODY IS MET: `unmarked` for no list declaring a `self` part or
- * no row marked his, `unread` for a read refused or thrown. Only this machine's git address would be left to know him by, so every other address and name he
+ * WHY HE IS NOT KNOWN WHEN HE CANNOT BE READ, AND THEN NOBODY IS MET: `older` for a list declaring `meets:` with no
+ * `self` part, a People from before it could mark him, which no mark of his can mend until the record is updated;
+ * `unmarked` for no list declaring `meets:` or no row marked his; `unread` for a read refused or thrown. Only this machine's git address would be left to know him by, so every other address and name he
  * has committed under would be met as a stranger and folded into People.
  */
 async function readSelf(reader: Reader, decls: readonly Record<string, unknown>[]): Promise<Owner | Unknown> {
   const home = decls.find((d) => isObject(d.meets) && typeof d.meets.self === 'string');
-  if (!home || !isObject(home.meets)) return 'unmarked';
+  if (!home || !isObject(home.meets)) return decls.some((d) => isObject(d.meets)) ? 'older' : 'unmarked';
   const parts = home.meets as Record<string, unknown>;
   const part = (p: string, fields: Record<string, unknown>): unknown => (typeof parts[p] === 'string' ? fields[parts[p]] : undefined);
   const self = String(parts.self);
@@ -274,10 +280,11 @@ async function readSelf(reader: Reader, decls: readonly Record<string, unknown>[
 
 /**
  * When a repository joined the project that lists it, from that project row's history: the time of the write after
- * which its repositories or folders last came to name it, as `listedBy` reads them. `null` when the history does not
- * show it naming the repository, and then nothing in the repository counts.
+ * which its repositories or folders last came to name it, as `listedBy` reads them, and by its bare name too
+ * (`namedBy`) when `byName` says that is how the project lists it today. `null` when the history does not show it
+ * naming the repository, and then nothing in the repository counts.
  */
-export function joinedIn(events: readonly unknown[], project: Project, repo: LocalRepo): string | null {
+export function joinedIn(events: readonly unknown[], project: Project, repo: LocalRepo, byName = false): string | null {
   const parts = project.row;
   if (parts === undefined) return null;
   let repos: unknown = undefined;
@@ -293,7 +300,7 @@ export function joinedIn(events: readonly unknown[], project: Project, repo: Loc
     else continue;
     const said = strings(repos);
     const then: Project = { name: project.name, repos: said.filter((r) => !isFolder(r)), folders: [...strings(folders), ...said.filter(isFolder)].map(real) };
-    const names = listedBy([then], repo) !== null;
+    const names = (listedBy([then], repo) ?? (byName ? namedBy([then], repo) : null)) !== null;
     if (!names) joined = null;
     else joined ??= e.ts;
   }
@@ -301,11 +308,11 @@ export function joinedIn(events: readonly unknown[], project: Project, repo: Loc
 }
 
 /** When a repository joined the project that lists it (`joinedIn`), read from the record; `null` when it cannot be read. */
-export async function joinedAt(reader: Pick<Client, 'history'>, project: Project, repo: LocalRepo): Promise<string | null> {
+export async function joinedAt(reader: Pick<Client, 'history'>, project: Project, repo: LocalRepo, byName = false): Promise<string | null> {
   if (project.row === undefined) return null;
   try {
     const got = await reader.history(project.row.register, project.row.seq);
-    const at = got.ok && Array.isArray(got.value) ? Date.parse(joinedIn(got.value, project, repo) ?? '') : NaN;
+    const at = got.ok && Array.isArray(got.value) ? Date.parse(joinedIn(got.value, project, repo, byName) ?? '') : NaN;
     /* A TIME GIT CAN READ, and never one ahead of now, which git reads as no limit at all past 2099. */
     return Number.isFinite(at) && at <= Date.now() ? new Date(at).toISOString() : null;
   } catch {
@@ -517,7 +524,7 @@ export function ownCommits(log: string, own: Owner): number {
 
 /* ── braindog people harvest ───────────────────────────────────────────── */
 
-const USAGE = 'braindog people harvest takes [--since <day>] [--dry-run] [--host <host>], as in braindog people harvest --since 2026-01-01 --dry-run.';
+const USAGE = 'braindog people harvest takes [--since <day>] [--whole-history] [--dry-run] [--host <host>], as in braindog people harvest --dry-run.';
 
 /** The most people one run meets, the busiest first, so a long history cannot fill People in one go. */
 export const MEETS_PER_RUN = 200;
@@ -585,17 +592,22 @@ const and = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -
 /** The most people a dry run names under one project, the busiest; the rest are counted. */
 export const DRY_RUN_SHOWN = 10;
 
+/** A day as a person reads it: `1 March 2026`. */
+export const dayOf = (at: string): string => new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
 /**
  * What a dry run says, project by project: each person who would be met there with their commits to it, the busiest
  * `DRY_RUN_SHOWN` first and the rest counted, and under each, when the key folded several names or addresses into one
- * person, which. A person in two projects is in both, each with that project's commits.
+ * person, which. A person in two projects is in both, each with that project's commits. `since` is the day each
+ * project's commits are counted from, when they are not counted over the whole history.
  */
-export function dryRunLines(met: readonly Cluster[], projects: readonly string[]): string[] {
+export function dryRunLines(met: readonly Cluster[], projects: readonly string[], since: ReadonlyMap<string, string> = new Map()): string[] {
   const out: string[] = [];
   for (const project of projects) {
     const here = met.filter((c) => (c.projects.get(project) ?? 0) > 0).sort((a, b) => (b.projects.get(project) ?? 0) - (a.projects.get(project) ?? 0) || nameOf(a).localeCompare(nameOf(b)));
     if (here.length === 0) continue;
-    out.push('', `${project}: ${plural(here.length, 'person', 'people')}`);
+    const from = since.get(project);
+    out.push('', `${project}: ${plural(here.length, 'person', 'people')}${from === undefined ? '' : ` since ${dayOf(from)}`}`);
     for (const c of here.slice(0, DRY_RUN_SHOWN)) {
       out.push(`  ${nameOf(c)}, ${plural(c.projects.get(project) ?? 0, 'commit')}`);
       if (c.identities.size > 1) out.push(`    signed as ${and([...c.identities.keys()])}`);
@@ -623,12 +635,20 @@ export function chooseMet(clusters: readonly Cluster[]): { met: Cluster[]; few: 
 const firstNames = (repos: readonly LocalRepo[]): string => and(repos.slice(0, 3).map((r) => r.name));
 
 /** What a run left out, one sentence a reason, for the dry run and the real one alike. */
-function leftOut(few: number, over: number, unlisted: readonly LocalRepo[], strangers: readonly LocalRepo[] = []): string[] {
+function leftOut(few: number, over: number, unlisted: readonly LocalRepo[], strangers: readonly LocalRepo[] = [], unjoined: readonly { repo: LocalRepo; project: Project }[] = []): string[] {
+  const one = unjoined[0];
   return [
     few > 0 ? `Not met: ${plural(few, 'person', 'people')} with fewer than ${String(MIN_COMMITS)} commits.` : '',
     over > 0 ? `Not met: ${String(over)} more, past the ${String(MEETS_PER_RUN)} a run meets.` : '',
     unlisted.length === 0 ? '' : unlisted.length <= 3 ? `Not read: ${and(unlisted.map((r) => r.name))}, which no project lists.` : `Not read: ${String(unlisted.length)} repositories no project lists, such as ${firstNames(unlisted)}.`,
     strangers.length === 0 ? '' : strangers.length <= 3 ? `Not read: ${and(strangers.map((r) => r.name))}, which a project names but you never committed to.` : `Not read: ${String(strangers.length)} repositories a project names but you never committed to, such as ${firstNames(strangers)}.`,
+    one === undefined
+      ? ''
+      : unjoined.length === 1
+        ? `Not read: ${one.repo.name}, because ${one.project.name} does not show when it was added. Add --whole-history to read all of it.`
+        : unjoined.length <= 3
+          ? `Not read: ${and(unjoined.map((u) => u.repo.name))}, because their projects do not show when each was added. Add --whole-history to read all of them.`
+          : `Not read: ${String(unjoined.length)} repositories whose projects do not show when each was added, such as ${firstNames(unjoined.map((u) => u.repo))}. Add --whole-history to read all of them.`,
   ].filter((l) => l !== '');
 }
 
@@ -641,11 +661,19 @@ function runHeaders(at: LocalRepo, host: string, client: string): Record<string,
 /** At most this many meets in flight at once, for one project's run. */
 const MEETS_AT_ONCE = 4;
 
+/** The later of a repository's joining and `--since`, as git reads either. */
+const later = (joined: string, since: string | undefined): string => (since !== undefined && Date.parse(since) > Date.parse(joined) ? since : joined);
+
 /**
- * `braindog people harvest [--since <day>] [--dry-run] [--host <host>]`: everybody who committed at least twice to the
- * repositories the record's projects list, found in and under this folder and in each folder a project lists, met with
- * the project each worked in, at most `MEETS_PER_RUN` of them. The exit code: 0 done, 1 refused or a local error, 3
- * unreachable.
+ * `braindog people harvest [--since <day>] [--whole-history] [--dry-run] [--host <host>]`: everybody who committed at
+ * least twice to the repositories the record's projects list, found in and under this folder and in each folder a
+ * project lists, met with the project each worked in, at most `MEETS_PER_RUN` of them. The exit code: 0 done, 1 refused
+ * or a local error, 3 unreachable.
+ *
+ * ONLY THE COMMITS SINCE A REPOSITORY JOINED ITS PROJECT, as the end hook counts them (`joinedAt`): a listed fork or a
+ * vendored upstream holds years of other people's history, and one run over all of it would meet every upstream
+ * contributor. A repository whose project's history does not show when it was added is not read, and says so.
+ * `--whole-history` reads every commit, as this command did before.
  *
  * ONE RUN PER PROJECT, EACH OF ITS OWN. A meet links a person to the project of the run it is made in, so each project's
  * meets go as a run placed there by one of its repositories, and that run is ended `done` once its last meet answers.
@@ -654,15 +682,16 @@ const MEETS_AT_ONCE = 4;
  * would leave out.
  */
 export async function peopleCommand(args: string[], io: AgentIo): Promise<number> {
-  let parsed: { values: { since?: string | undefined; 'dry-run'?: boolean | undefined; host?: string | undefined }; positionals: string[] };
+  let parsed: { values: { since?: string | undefined; 'whole-history'?: boolean | undefined; 'dry-run'?: boolean | undefined; host?: string | undefined }; positionals: string[] };
   try {
-    parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { since: { type: 'string' }, 'dry-run': { type: 'boolean' }, host: { type: 'string' } } });
+    parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { since: { type: 'string' }, 'whole-history': { type: 'boolean' }, 'dry-run': { type: 'boolean' }, host: { type: 'string' } } });
   } catch {
     io.say(USAGE);
     return 1;
   }
   const { since, host } = parsed.values;
   const dryRun = parsed.values['dry-run'] === true;
+  const whole = parsed.values['whole-history'] === true;
   if (parsed.positionals.length !== 1 || parsed.positionals[0] !== 'harvest' || (since !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(since))) {
     io.say(USAGE);
     return 1;
@@ -715,23 +744,37 @@ export async function peopleCommand(args: string[], io: AgentIo): Promise<number
     const project = listed ?? named;
     return project === null ? [] : [{ repo, project, byName: named !== null }];
   });
-  const logs = await Promise.all(candidates.map((c) => git(c.repo.dir, 'log', LOG_FORMAT, ...(since === undefined ? [] : [`--since=${since}`]))));
+  /* FROM WHEN EACH JOINED ITS PROJECT, by the project's own history, or `--since` when that is later; `null` when the
+     history does not show it, and then it is not read. Over everything, or from `--since`, with --whole-history. */
+  const joined = await Promise.all(candidates.map((c) => (whole ? null : joinedAt(reader, c.project, c.repo, c.byName))));
+  const unjoined = (i: number): boolean => !whole && joined[i] === null;
+  const windows = candidates.map((_, i) => {
+    const at = joined[i];
+    return whole || at === null || at === undefined ? since : later(at, since);
+  });
+  const logs = await Promise.all(candidates.map((c, i) => (unjoined(i) ? null : git(c.repo.dir, 'log', LOG_FORMAT, ...(windows[i] === undefined ? [] : [`--since=${windows[i]}`])))));
   const own = ownerIn(await ownerOf(self, candidates.map((l) => l.repo.dir)), logs);
   /* His commits over the whole history, so a window he did not commit in does not disown a repository of his. */
   const mine = await Promise.all(
     candidates.map(async (c, i) => {
       if (!c.byName) return true;
-      const log = since === undefined ? logs[i] : await git(c.repo.dir, 'log', LOG_FORMAT);
+      const log = windows[i] === undefined && !unjoined(i) ? logs[i] : await git(c.repo.dir, 'log', LOG_FORMAT);
       return log !== null && log !== undefined && ownCommits(log, own) > 0;
     }),
   );
   const read = candidates.flatMap((c, i) => {
     const log = logs[i] ?? null;
-    return mine[i] ? [{ repo: c.repo, project: c.project, authored: log === null ? [] : authoredIn(log, own) }] : [];
+    return mine[i] && !unjoined(i) ? [{ repo: c.repo, project: c.project, authored: log === null ? [] : authoredIn(log, own), since: windows[i] }] : [];
   });
   const listed = read.map(({ repo, project }) => ({ repo, project }));
   const strangers = candidates.filter((_, i) => !mine[i]).map((c) => c.repo);
-  const unlisted = unique.filter((r) => !listed.some((l) => l.repo === r) && !strangers.includes(r));
+  const late = candidates.filter((_, i) => mine[i] && unjoined(i)).map(({ repo, project }) => ({ repo, project }));
+  const unlisted = unique.filter((r) => !listed.some((l) => l.repo === r) && !strangers.includes(r) && !late.some((l) => l.repo === r));
+  if (listed.length === 0 && late.length > 0) {
+    io.out('No repository here could be counted from when it joined its project, so nobody was met.');
+    for (const line of leftOut(0, 0, unlisted, strangers, late)) io.out(line);
+    return 0;
+  }
   if (listed.length === 0) {
     const all = [...unlisted, ...strangers];
     const which = all.length <= 3 ? firstNames(all) : `any of the ${String(all.length)} repositories here, such as ${firstNames(all)}`;
@@ -741,24 +784,31 @@ export async function peopleCommand(args: string[], io: AgentIo): Promise<number
 
   const clusters = clustersOf(read);
   const { met, few, over } = chooseMet(clusters);
-  const notes = leftOut(few, over, unlisted, strangers);
+  const notes = leftOut(few, over, unlisted, strangers, late);
   const from = plural(listed.length, 'repository', 'repositories');
-  const window = since === undefined ? '' : ` since ${since}`;
+  const window = whole ? (since === undefined ? '' : ` since ${since}`) : since === undefined ? ' since each joined its project' : ` since ${since}, or since each joined its project when that is later`;
   if (clusters.length === 0) {
-    io.out(`Nobody but you${window} committed to ${from}, so nobody was met.`);
+    io.out(`Nobody but you committed to ${from}${window}, so nobody was met.`);
     for (const line of notes) io.out(line);
     return 0;
   }
   if (met.length === 0) {
-    io.out(`Nobody${window} made ${String(MIN_COMMITS)} or more commits to ${from}, so nobody was met.`);
+    io.out(`Nobody made ${String(MIN_COMMITS)} or more commits to ${from}${window}, so nobody was met.`);
     for (const line of notes) io.out(line);
     return 0;
   }
 
   if (dryRun) {
     const names = [...new Set(listed.map((l) => l.project.name))].sort((a, b) => a.localeCompare(b));
+    /* Each project from the earliest day any of its repositories is counted from. */
+    const counted = new Map<string, string>();
+    if (!whole)
+      for (const r of read) {
+        const was = counted.get(r.project.name);
+        if (r.since !== undefined && (was === undefined || Date.parse(r.since) < Date.parse(was))) counted.set(r.project.name, r.since);
+      }
     io.out(`${plural(met.length, 'person', 'people')} would be met from ${from}${window}. Nothing was sent.`);
-    for (const line of dryRunLines(met, names)) io.out(line);
+    for (const line of dryRunLines(met, names, counted)) io.out(line);
     if (notes.length > 0) io.out('');
     for (const line of notes) io.out(line);
     return 0;
@@ -819,7 +869,7 @@ export async function peopleCommand(args: string[], io: AgentIo): Promise<number
   const count = (k: 'new' | 'known' | 'noted') => [...outcome.values()].filter((v) => v === k).length;
   const total = outcome.size;
   const parts = [count('new') > 0 ? `${String(count('new'))} new` : '', count('known') > 0 ? `${String(count('known'))} already known` : '', count('noted') > 0 ? `${String(count('noted'))} noted by name only` : ''].filter((x) => x !== '');
-  io.out(`Met ${plural(total, 'person', 'people')} from ${from}${parts.length > 0 ? `: ${and(parts)}` : ''}. Your own commits and the machines' were left out.`);
+  io.out(`Met ${plural(total, 'person', 'people')} from ${from}${window}${parts.length > 0 ? `: ${and(parts)}` : ''}. Your own commits and the machines' were left out.`);
   for (const line of notes) io.out(line);
   for (const line of [...new Set(refusedLines)]) io.say(line);
   return refusedLines.some((l) => /stopped answering/.test(l)) ? 3 : refusedLines.length > 0 ? 1 : 0;

@@ -52,6 +52,10 @@ const reachable = <T>(r: Result<T>): Result<T> =>
  * for its own (`automation_try`), for `previewPage`'s reason: each backs `propose` with `"try"`, on a bundle and on a
  * rule change, and left off this list a stdio agent would be told this record cannot draw a change or try a rule when
  * its host can.
+ *
+ * `understandPlan` JOINED WITH ITS TOOL (`understand`), for the same lesson: an agent working for the owner from the
+ * command line sees what the record would link before it meets anyone, as it does over `POST /mcp`. Who may read it is
+ * the record's to say.
  */
 const LATER = [
   'context',
@@ -68,6 +72,7 @@ const LATER = [
   'triage',
   'previewChange',
   'tryAutomation',
+  'understandPlan',
 ] as const;
 
 export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpSurface<Ctx>> {

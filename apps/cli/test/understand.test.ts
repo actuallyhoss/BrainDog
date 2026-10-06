@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { AgentIo } from '../src/skills.ts';
-import { dryLines, kindLine, PLANNED_SHOWN, readDry, understandCommand } from '../src/understand.ts';
+import { dryLines, kindLine, PLANNED_SHOWN, readDry, readLine, understandCommand } from '../src/understand.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-understand-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -37,6 +37,7 @@ const answer = (over: Record<string, unknown> = {}) => ({
 
 test('A DRY WALK IS READ AS THE RECORD GIVES IT: what each kind would link, the changes it names and how many more, and its questions', () => {
   assert.deepEqual(readDry(answer({ more: 14, asks: { organisation: 6, 'run-project': 2 }, done: false })), {
+    looked: [['payments', 200], ['runs', 200], ['services', 9]],
     counts: [['payments', 41], ['organisations', 2], ['runs', 1]],
     planned: ['Link LOWRY ST STUDIOS RENT AUG to Lowry St Studios', 'Add Lowry St Studios to Organisations'],
     plannedAll: 16,
@@ -45,15 +46,17 @@ test('A DRY WALK IS READ AS THE RECORD GIVES IT: what each kind would link, the 
     done: false,
     dropped: [],
   });
-  assert.deepEqual(readDry(null), { counts: [], planned: [], plannedAll: 0, asked: [], askedAll: 0, done: true, dropped: [] });
+  assert.deepEqual(readDry(null), { looked: [], counts: [], planned: [], plannedAll: 0, asked: [], askedAll: 0, done: true, dropped: [] });
   assert.equal(kindLine('payments', 1), '1 payment linked to who it was with');
   assert.equal(kindLine('run-project', 1200), '1,200 run project');
+  assert.equal(readLine('payments', 1), '1 payment');
+  assert.equal(readLine('services', 1200), '1,200 services');
 });
 
 test('A DRY RUN SAYS ITS COUNTS, THE FIRST CHANGES AND ITS QUESTIONS in quiet groups, how many more, and that nothing was changed', () => {
   const planned = Array.from({ length: PLANNED_SHOWN }, (_, i) => `Link Payee ${String(i + 1)} to Payee`);
-  assert.deepEqual(dryLines({ counts: [['payments', 41], ['runs', 1]], planned, plannedAll: PLANNED_SHOWN + 2, asked: ['Which project is glaze for'], askedAll: 3, done: false, dropped: ['Two more questions wait for tomorrow.'] }), [
-    'A dry run: nothing was changed and nothing was asked.',
+  assert.deepEqual(dryLines({ looked: [['payments', 200], ['runs', 40]], counts: [['payments', 41], ['runs', 1]], planned, plannedAll: PLANNED_SHOWN + 2, asked: ['Which project is glaze for'], askedAll: 3, done: false, dropped: ['Two more questions wait for tomorrow.'] }), [
+    'A dry run over 200 payments and 40 runs: nothing was changed and nothing was asked.',
     '',
     'It would link',
     '  41 payments linked to who they were with',
@@ -71,21 +74,23 @@ test('A DRY RUN SAYS ITS COUNTS, THE FIRST CHANGES AND ITS QUESTIONS in quiet gr
     '',
     'Two more questions wait for tomorrow.',
   ]);
-  const none = { counts: [], planned: [], plannedAll: 0, asked: [], askedAll: 0, dropped: [] };
+  const none = { looked: [] as [string, number][], counts: [], planned: [], plannedAll: 0, asked: [], askedAll: 0, dropped: [] };
   assert.deepEqual(dryLines({ ...none, done: true }), ['Nothing to link and nothing to ask: everything your record holds is already understood.']);
   assert.deepEqual(dryLines({ ...none, done: false }), ['Nothing to link and nothing to ask in the next part of your record. The rest is read on later nights.']);
+  assert.deepEqual(dryLines({ ...none, looked: [['payments', 217], ['runs', 1]], done: true }), ['Nothing to link and nothing to ask in 217 payments and 1 run: everything your record holds is already understood.']);
+  assert.deepEqual(dryLines({ ...none, looked: [['runs', 200]], done: false }), ['Nothing to link and nothing to ask in the next 200 runs of your record. The rest is read on later nights.']);
 });
 
-/** A host whose `understand` answers `value`, or refuses with `refusal`. */
+/** A host whose `understandPlan` answers `value`, or refuses with `refusal`. */
 async function host(t: { after: (fn: () => Promise<void>) => void }, answer: { value?: unknown; refusal?: { code: string; fix: string } }) {
-  const seen: { method: string; body: Record<string, unknown> }[] = [];
+  const seen: { method: string; verb: string | undefined; body: Record<string, unknown> }[] = [];
   const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => chunks.push(c));
     req.on('end', () => {
       const method = new URL(req.url ?? '/', 'http://stub').pathname.replace(/^\/api\//, '');
       const raw = Buffer.concat(chunks).toString('utf8');
-      seen.push({ method, body: (raw ? JSON.parse(raw) : {}) as Record<string, unknown> });
+      seen.push({ method, verb: req.method, body: (raw ? JSON.parse(raw) : {}) as Record<string, unknown> });
       res.writeHead(answer.refusal ? 403 : 200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(answer.refusal ? { ok: false, refusal: answer.refusal } : { ok: true, value: answer.value }));
     });
@@ -116,12 +121,13 @@ function io(base: string): AgentIo & { lines: string[]; said: string[] } {
   };
 }
 
-test('BRAINDOG UNDERSTAND --DRY-RUN asks the record with dry, prints what it would link, and never runs the walk itself', async (t) => {
+test('BRAINDOG UNDERSTAND --DRY-RUN reads the record\'s plan, prints what it read and would link in names, and never runs the walk itself', async (t) => {
   const h = await host(t, { value: answer({ kinds: [{ kind: 'runs', looked: 40, linked: 2, refused: 0 }], writes: ['Place Fix the retry in Glaze', 'Place Fire the kiln in Kiln'], questions: [], asks: {} }) });
   const one = io(h.base);
   assert.equal(await understandCommand(['--dry-run'], one), 0, one.said.join('\n'));
-  assert.deepEqual(h.seen, [{ method: 'understand', body: { dry: true } }]);
-  assert.deepEqual(one.lines, ['A dry run: nothing was changed and nothing was asked.', '', 'It would link', '  2 runs placed in their projects', '', 'The changes', '  Place Fix the retry in Glaze.', '  Place Fire the kiln in Kiln.']);
+  /* A read: the plan, as a GET, and never the walk. */
+  assert.deepEqual(h.seen, [{ method: 'understandPlan', verb: 'GET', body: {} }]);
+  assert.deepEqual(one.lines, ['A dry run over 40 runs: nothing was changed and nothing was asked.', '', 'It would link', '  2 runs placed in their projects', '', 'The changes', '  Place Fix the retry in Glaze.', '  Place Fire the kiln in Kiln.']);
 
   /* Without --dry-run nothing is sent, and it says where the walk is done. */
   const two = io(h.base);
@@ -132,15 +138,25 @@ test('BRAINDOG UNDERSTAND --DRY-RUN asks the record with dry, prints what it wou
   assert.match(two.said.at(-1)!, /^braindog understand takes --dry-run/);
 });
 
-test('BRAINDOG UNDERSTAND --DRY-RUN SAYS PLAINLY why the record would not read it: a token it does not let in, or a record without the walk', async (t) => {
+test('BRAINDOG UNDERSTAND --DRY-RUN SAYS PLAINLY why the record would not read it: a token it does not let in, a record older than the plan, or a caller who does not read the whole record', async (t) => {
   const browser = await host(t, { refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this record is.' } });
   const one = io(browser.base);
   assert.equal(await understandCommand(['--dry-run'], one), 1);
   assert.deepEqual(one.said, ["Only you, signed in to the app, can read this. A key on this machine cannot."]);
   assert.deepEqual(one.lines, []);
 
-  const older = await host(t, { refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This host has no understand.' } });
-  const two = io(older.base);
-  assert.equal(await understandCommand(['--dry-run'], two), 1);
-  assert.match(two.said[0]!, /^Your record cannot do this yet/);
+  /* A record older than the plan: it has no such method, by either word a host uses for that. */
+  for (const code of ['NOT_IN_THIS_BUILD', 'ROUTE_UNKNOWN']) {
+    const older = await host(t, { refusal: { code, fix: 'This host has no understandPlan.' } });
+    const two = io(older.base);
+    assert.equal(await understandCommand(['--dry-run'], two), 1);
+    assert.deepEqual(two.said, ['Your record is older than this command and cannot say this yet. It will once it is updated.']);
+  }
+
+  /* Somebody who does not read the whole record: the record's own reason, as it gives it. */
+  const narrow = await host(t, { refusal: { code: 'FORBIDDEN', fix: 'Only the owner, reading every list, can see what the record would link.' } });
+  const three = io(narrow.base);
+  assert.equal(await understandCommand(['--dry-run'], three), 1);
+  assert.deepEqual(three.said, ['Only the owner, reading every list, can see what the record would link.']);
+  assert.deepEqual(three.lines, []);
 });

@@ -403,7 +403,7 @@ test('A MEET THAT LANDS IN ANOTHER LIST, or on a row the import did not read, ne
 
 /* ── braindog people harvest ───────────────────────────────────────────── */
 
-function repository(dir: string): (author?: string) => string {
+function repository(dir: string): (author?: string, at?: string) => string {
   mkdirSync(dir, { recursive: true });
   const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', windowsHide: true }).trim();
   git('init', '--quiet');
@@ -411,20 +411,27 @@ function repository(dir: string): (author?: string) => string {
   git('config', 'user.email', 'owner@example.com');
   git('config', 'commit.gpgsign', 'false');
   let n = 0;
-  return (author) => {
-    git('commit', '--quiet', '--allow-empty', '-m', `change ${String(++n)}`, ...(author === undefined ? [] : ['--author', author]));
+  return (author, at) => {
+    const args = ['commit', '--quiet', '--allow-empty', '-m', `change ${String(++n)}`, ...(author === undefined ? [] : ['--author', author])];
+    /* A commit made on a day of its own, author and committer both, which is the date `git log --since` reads. */
+    if (at === undefined) git(...args);
+    else execFileSync('git', args, { cwd: dir, windowsHide: true, env: { ...process.env, GIT_AUTHOR_DATE: at, GIT_COMMITTER_DATE: at } });
     return git('rev-parse', 'HEAD');
   };
 }
 
 type Seen = { method: string; body: Record<string, unknown>; headers: Record<string, string | string[] | undefined> };
 
+/** When the stub's projects were made, naming their repositories from the first: the day a harvest counts from. */
+const JOINED = '2026-01-15T12:00:00Z';
+
 /**
  * A record with a Projects list declaring `scopes:`, one project naming the glaze repository by its folder and one
  * naming kiln by its remote, and a People list called `contacts` declaring `meets:` with the owner's own row, so the
- * self row is found by the declaration and never by a list's name.
+ * self row is found by the declaration and never by a list's name. Each project's history is one write, made `joined`
+ * (each its own when it is a list) with the fields it has now; `null` is a history that shows nothing.
  */
-async function harvestHost(t: { after: (fn: () => Promise<void>) => void }, glaze: string, projects?: Record<string, unknown>[], self: 'row' | 'none' | 'refused' = 'row') {
+async function harvestHost(t: { after: (fn: () => Promise<void>) => void }, glaze: string, projects?: Record<string, unknown>[], self: 'row' | 'none' | 'refused' | 'older' = 'row', joined: string | null | (string | null)[] = JOINED) {
   const seen: Seen[] = [];
   const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -444,7 +451,9 @@ async function harvestHost(t: { after: (fn: () => Promise<void>) => void }, glaz
         return answer(
           String(body.register) === 'things'
             ? { id: 'things', title: 'name', fields: [], scopes: { repos: 'repos', folders: 'folders' } }
-            : { id: 'contacts', title: 'name', fields: [], meets: { name: 'name', email: 'email', keys: 'keys', self: 'self', aliases: 'aliases' } },
+            : self === 'older'
+              ? { id: 'contacts', title: 'name', fields: [], meets: { name: 'name', email: 'email', handles: 'handles' } }
+              : { id: 'contacts', title: 'name', fields: [], meets: { name: 'name', email: 'email', keys: 'keys', self: 'self', aliases: 'aliases' } },
         );
       if (method === 'list' && self === 'refused' && String(body.register) === 'contacts') {
         res.writeHead(403, { 'content-type': 'application/json' });
@@ -465,6 +474,12 @@ async function harvestHost(t: { after: (fn: () => Promise<void>) => void }, glaz
               }
             : { rows: [{ id: 'e_self', seq: 1, version: 1, fields: { name: 'Sam Avery', aliases: ['Sam'], self: true, keys: ['email:sam@avery.example'] } }], cursor: null },
         );
+      if (method === 'history') {
+        const i = Number(body.seq) - 1;
+        const fields = (projects ?? [{ name: 'Glaze', repos: [], folders: [glaze] }, { name: 'Kiln', repos: ['https://github.com/acme/kiln.git'], folders: [] }])[i];
+        const ts = Array.isArray(joined) ? joined[i] : joined;
+        return answer(ts === null || ts === undefined || fields === undefined ? [] : [{ ts, kind: 'create', field: null, to: fields }]);
+      }
       if (method === 'meet') return answer({ row: { register: 'contacts', id: 'e_x', seq: 5, name: body.name }, created: true, matched_by: 'none' });
       if (method === 'handoff') return answer({ id: 'e_run', seq: 1, state: 'done', version: 2, fields: {} });
       res.writeHead(404, { 'content-type': 'application/json' });
@@ -518,13 +533,13 @@ test('BRAINDOG PEOPLE HARVEST reads only the repositories a project lists, meets
   assert.equal(await peopleCommand(['harvest', '--dry-run'], io), 0, said.join('\n'));
   /* Project by project: who, their commits there, and which names and addresses one key folded into one person. */
   assert.deepEqual(out, [
-    '2 people would be met from 2 repositories. Nothing was sent.',
+    '2 people would be met from 2 repositories since each joined its project. Nothing was sent.',
     '',
-    'Glaze: 1 person',
+    'Glaze: 1 person since 15 January 2026',
     '  Grace Hopper, 2 commits',
     '    signed as Grace H <grace@navy.example> and Grace Hopper <grace@navy.example>',
     '',
-    'Kiln: 1 person',
+    'Kiln: 1 person since 15 January 2026',
     '  Linus, 2 commits',
     '',
     'Not met: 1 person with fewer than 2 commits.',
@@ -551,7 +566,7 @@ test('BRAINDOG PEOPLE HARVEST reads only the repositories a project lists, meets
   assert.equal(clients.size, 2);
   assert.equal(host.seen.filter((s) => s.method === 'handoff').length, 2);
   assert.deepEqual(out, [
-    'Met 2 people from 2 repositories: 2 new. Your own commits and the machines\' were left out.',
+    'Met 2 people from 2 repositories since each joined its project: 2 new. Your own commits and the machines\' were left out.',
     'Not met: 1 person with fewer than 2 commits.',
     'Not read: sketch, which no project lists.',
   ]);
@@ -573,7 +588,7 @@ test('BRAINDOG PEOPLE HARVEST FAILS CLOSED when the owner’s own row cannot be 
   const glaze = join(top, 'glaze');
   const commitGlaze = repository(glaze);
   for (let i = 0; i < 2; i++) commitGlaze('Grace Hopper <grace@navy.example>');
-  for (const self of ['none', 'refused'] as const) {
+  for (const self of ['none', 'refused', 'older'] as const) {
     const host = await harvestHost(t, glaze, undefined, self);
     const out: string[] = [];
     const said: string[] = [];
@@ -585,11 +600,13 @@ test('BRAINDOG PEOPLE HARVEST FAILS CLOSED when the owner’s own row cannot be 
       say: (l) => void said.push(l),
       headers: async () => ({ 'x-braindog-host': 'box' }),
     };
-    const why = self === 'none' ? 'People does not say which person is you yet' : 'BrainDog could not read which person in People is you';
+    /* A People from before it could mark him says the record is older, since no mark of his would mend it. */
+    const why = self === 'none' ? 'People does not say which person is you yet' : self === 'older' ? "Your record's People is older than this command and cannot mark which person is you" : 'BrainDog could not read which person in People is you';
     assert.equal(await peopleCommand(['harvest', '--dry-run'], io), 0, self);
     assert.match(out.join('\n'), new RegExp(`^${why}, so a run would meet nobody`));
     assert.equal(await peopleCommand(['harvest'], io), 1, self);
     assert.match(said.join('\n'), new RegExp(`^${why}, so nobody was met`));
+    if (self === 'older') assert.match(said.join('\n'), /It will once your record is updated\.$/);
     assert.deepEqual(host.seen.filter((s) => s.method === 'meet'), [], self);
   }
 });
@@ -624,15 +641,82 @@ test('BRAINDOG PEOPLE HARVEST ON AN OLDER RECORD reads a folder kept among a pro
   };
   assert.equal(await peopleCommand(['harvest', '--dry-run'], io), 0, said.join('\n'));
   assert.deepEqual(out, [
-    '2 people would be met from 2 repositories. Nothing was sent.',
+    '2 people would be met from 2 repositories since each joined its project. Nothing was sent.',
     '',
-    'Glaze: 1 person',
+    'Glaze: 1 person since 15 January 2026',
     '  Grace Hopper, 2 commits',
     '',
-    'Kiln: 1 person',
+    'Kiln: 1 person since 15 January 2026',
     '  Linus, 2 commits',
     '',
     'Not read: inkwell, which a project names but you never committed to.',
   ]);
   assert.equal(host.seen.filter((s) => s.method === 'meet').length, 0);
+});
+
+test('BRAINDOG PEOPLE HARVEST COUNTS FROM WHEN EACH REPOSITORY JOINED ITS PROJECT: an upstream’s older commits meet nobody, --whole-history reads them all, and a project with no date says so', async (t) => {
+  const top = join(scratch, 'joined');
+  const commitGlaze = repository(join(top, 'glaze'));
+  const commitKiln = repository(join(top, 'kiln'));
+  /* Upstream's history before the fork joined Glaze, then the work since. */
+  commitGlaze('Upstream Author <upstream@lib.example>', '2025-06-01T10:00:00Z');
+  commitGlaze('Upstream Author <upstream@lib.example>', '2025-07-01T10:00:00Z');
+  commitGlaze('Upstream Author <upstream@lib.example>', '2026-03-01T10:00:00Z');
+  commitGlaze('Grace Hopper <grace@navy.example>', '2026-03-02T10:00:00Z');
+  commitGlaze('Grace Hopper <grace@navy.example>', '2026-03-03T10:00:00Z');
+  commitKiln('Linus <linus@example.org>', '2026-03-01T10:00:00Z');
+  commitKiln('Linus <linus@example.org>', '2026-03-02T10:00:00Z');
+  const projects = [
+    { name: 'Glaze', repos: [join(top, 'glaze')], folders: [] },
+    { name: 'Kiln', repos: [join(top, 'kiln')], folders: [] },
+  ];
+  const host = await harvestHost(t, '', projects, 'row', ['2026-02-01T12:00:00Z', null]);
+  const out: string[] = [];
+  const said: string[] = [];
+  const io: AgentIo = {
+    env: { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: 'rec_01TESTTESTTESTTESTTESTTEST.people-harvest', XDG_CONFIG_HOME: join(scratch, 'config') },
+    cwd: top,
+    home: scratch,
+    out: (l) => void out.push(l),
+    say: (l) => void said.push(l),
+    headers: async () => ({ 'x-braindog-host': 'box' }),
+  };
+  assert.equal(await peopleCommand(['harvest', '--dry-run'], io), 0, said.join('\n'));
+  assert.deepEqual(out, [
+    '1 person would be met from 1 repository since each joined its project. Nothing was sent.',
+    '',
+    'Glaze: 1 person since 1 February 2026',
+    '  Grace Hopper, 2 commits',
+    '',
+    'Not met: 1 person with fewer than 2 commits.',
+    'Not read: kiln, because Kiln does not show when it was added. Add --whole-history to read all of it.',
+  ]);
+
+  out.splice(0);
+  assert.equal(await peopleCommand(['harvest', '--dry-run', '--whole-history'], io), 0, said.join('\n'));
+  assert.deepEqual(out, [
+    '3 people would be met from 2 repositories. Nothing was sent.',
+    '',
+    'Glaze: 2 people',
+    '  Upstream Author, 3 commits',
+    '  Grace Hopper, 2 commits',
+    '',
+    'Kiln: 1 person',
+    '  Linus, 2 commits',
+  ]);
+
+  /* --since later than the joining wins, and both are said. */
+  out.splice(0);
+  assert.equal(await peopleCommand(['harvest', '--dry-run', '--since', '2026-03-04'], io), 0, said.join('\n'));
+  assert.equal(out[0], 'Nobody but you committed to 1 repository since 2026-03-04, or since each joined its project when that is later, so nobody was met.');
+
+  /* No project shows when its repository joined: nothing is read, and it says how to read everything. */
+  const blind = await harvestHost(t, '', projects, 'row', null);
+  out.splice(0);
+  assert.equal(await peopleCommand(['harvest'], { ...io, env: { ...io.env, BRAINDOG_HOST: blind.base } }), 0, said.join('\n'));
+  assert.deepEqual(out, [
+    'No repository here could be counted from when it joined its project, so nobody was met.',
+    'Not read: glaze and kiln, because their projects do not show when each was added. Add --whole-history to read all of them.',
+  ]);
+  assert.equal([...host.seen, ...blind.seen].filter((s) => s.method === 'meet').length, 0);
 });

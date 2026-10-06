@@ -1,20 +1,20 @@
 /**
  * `braindog understand --dry-run`: what the record's walk over what it already holds would do now (DIRECTION §38,
- * "understanding is the engine's first job"), read from the record's `understand` with `dry: true`. How many things of
- * each kind it would link, the first of those links, and what it would ask on Decide, all in names.
+ * "understanding is the engine's first job"), read from the record's `understandPlan`. How much of each kind it read,
+ * how many of each it would link, the first of those links, and what it would ask on Decide, all in names.
  *
  * ONLY THE DRY RUN. The walk itself links rows on every list it reads and files questions for the whole record, so it is
  * the record's own each night and an owner's in the app on ask; this command never starts it. Without `--dry-run` it says
  * so and sends nothing.
  *
- * BUILT AS THE RECORD TAKES IT, AND ITS REFUSAL SHOWN, as `automations run` is: `understand` is ADMIN, and the record's
- * `admin()` refuses a token, so a login from this machine is told where the walk is read today. The day the record lets a
- * token read the dry run, this prints it with no change here.
+ * `understandPlan` IS A READ, the walk's dry half as a GET a token may send, so a login from this machine reads it. Who
+ * may is the record's to say (the owner, reading the whole record), and its refusal is shown as it gives it. A record
+ * built before the read answers that it has no such method, and is told it is older than this command.
  *
  * THE ANSWER IS READ AS THE RECORD GIVES IT (`Understood` in `@braindog/client`), a part it leaves out read as nothing:
- * what each kind would link, the first changes in names and how many more, its questions and how many in all, and
- * whether the slice reaches the end. Every line is scrubbed for the terminal first (`printable`), and under `--json` the
- * record's value goes to the agent untouched.
+ * how much of each kind it read and would link, the first changes in names and how many more, its questions and how
+ * many in all, and whether the slice reaches the end. Every line is scrubbed for the terminal first (`printable`), and
+ * under `--json` the record's value goes to the agent untouched.
  */
 
 import { parseArgs } from 'node:util';
@@ -34,6 +34,13 @@ export const PLANNED_SHOWN = 10;
 /** The most questions a dry run names; the rest are counted. */
 export const ASKED_SHOWN = 5;
 
+/** What each kind is called after a count of how many were read. */
+const READ: Record<string, [one: string, many: string]> = {
+  payments: ['payment', 'payments'],
+  runs: ['run', 'runs'],
+  services: ['service', 'services'],
+};
+
 /** What one kind reads as after its count, in the words a person uses for their own things. */
 const KINDS: Record<string, [one: string, many: string]> = {
   payments: ['payment linked to who it was with', 'payments linked to who they were with'],
@@ -52,11 +59,18 @@ export function kindLine(kind: string, n: number): string {
   return `${n.toLocaleString('en-GB')} ${words}`;
 }
 
+/** How many of one kind a walk read: `200 payments`, and any other kind with its dashes as spaces. */
+export function readLine(kind: string, n: number): string {
+  const said = READ[kind.toLowerCase()];
+  return `${n.toLocaleString('en-GB')} ${said === undefined ? kind.replace(/[-_.]+/g, ' ').trim() : said[n === 1 ? 0 : 1]}`;
+}
+
 /**
- * What a dry run reads as: what it would link by kind, the changes it names and how many in all, the questions it names
- * and how many in all, whether this slice reaches the end of the record, and what it left out.
+ * What a dry run reads as: how many of each kind it read, what it would link by kind, the changes it names and how many
+ * in all, the questions it names and how many in all, whether this slice reaches the end of the record, and what it
+ * left out.
  */
-export type DryRead = { counts: [string, number][]; planned: string[]; plannedAll: number; asked: string[]; askedAll: number; done: boolean; dropped: string[] };
+export type DryRead = { looked: [string, number][]; counts: [string, number][]; planned: string[]; plannedAll: number; asked: string[]; askedAll: number; done: boolean; dropped: string[] };
 
 /**
  * The record's dry answer (`Understood` in `@braindog/client`), read as `unknown` so an answer missing a part reads as
@@ -65,9 +79,12 @@ export type DryRead = { counts: [string, number][]; planned: string[]; plannedAl
  */
 export function readDry(value: unknown): DryRead {
   const v = isObject(value) ? value : {};
+  const looked = new Map<string, number>();
   const counts = new Map<string, number>();
   for (const one of Array.isArray(v.kinds) ? v.kinds : [])
     if (isObject(one) && typeof one.kind === 'string') {
+      const read = count(one.looked);
+      if (read !== null) looked.set(one.kind, (looked.get(one.kind) ?? 0) + read);
       const n = count(one.linked);
       if (n !== null) counts.set(one.kind, (counts.get(one.kind) ?? 0) + n);
       const orgs = count(one.organisations);
@@ -77,6 +94,7 @@ export function readDry(value: unknown): DryRead {
   const asked = sentences(v.questions);
   const asks = isObject(v.asks) ? Object.values(v.asks).reduce<number>((sum, n) => sum + (count(n) ?? 0), 0) : 0;
   return {
+    looked: [...looked].filter(([, n]) => n > 0),
     counts: [...counts].filter(([, n]) => n > 0),
     planned,
     plannedAll: planned.length + (count(v.more) ?? 0),
@@ -90,16 +108,25 @@ export function readDry(value: unknown): DryRead {
 /** A sentence closed with a full stop only when it has none of its own. */
 const closed = (s: string): string => (/[.!?]$/.test(s) ? s : `${s}.`);
 
-/** What a dry run says, in quiet groups: what it would link, the first of those changes, and what it would ask. */
+const and = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)!}`);
+
+/**
+ * What a dry run says, in quiet groups: how much it read, what it would link, the first of those changes, and what it
+ * would ask.
+ */
 export function dryLines(read: DryRead): string[] {
-  const { counts, planned, plannedAll, asked, askedAll, done, dropped } = read;
+  const { looked, counts, planned, plannedAll, asked, askedAll, done, dropped } = read;
   const rest = done ? [] : ['', 'This is the next part of what your record holds. The rest is read on later nights.'];
+  const reads = and(looked.map(([k, n]) => readLine(k, n)));
+  const over = reads === '' ? '' : ` over ${reads}`;
   if (counts.length === 0 && planned.length === 0 && asked.length === 0)
     return [
-      done ? 'Nothing to link and nothing to ask: everything your record holds is already understood.' : 'Nothing to link and nothing to ask in the next part of your record. The rest is read on later nights.',
+      done
+        ? `Nothing to link and nothing to ask${reads === '' ? '' : ` in ${reads}`}: everything your record holds is already understood.`
+        : `Nothing to link and nothing to ask in the next ${reads === '' ? 'part' : reads} of your record. The rest is read on later nights.`,
       ...dropped.map(closed),
     ];
-  const out = ['A dry run: nothing was changed and nothing was asked.'];
+  const out = [`A dry run${over}: nothing was changed and nothing was asked.`];
   if (counts.length > 0) out.push('', 'It would link', ...counts.map(([k, n]) => `  ${kindLine(k, n)}`));
   if (planned.length > 0) {
     const shown = planned.slice(0, PLANNED_SHOWN);
@@ -122,7 +149,7 @@ function refusalLine(r: Result<unknown>, to: Target): string {
   const { code } = r.refusal;
   if (code === 'UNREACHABLE') return `${to.key} did not answer.`;
   if (code === 'ROUTE_UNKNOWN' || code === 'NOT_IN_THIS_BUILD')
-    return 'Your record cannot do this yet. It will once it is on the version that reads what it already holds.';
+    return 'Your record is older than this command and cannot say this yet. It will once it is updated.';
   if (code === 'NEEDS_BROWSER_SESSION') return "Only you, signed in to the app, can read this. A key on this machine cannot.";
   return printable(fixOf(r));
 }
@@ -150,7 +177,7 @@ export async function understandCommand(args: string[], io: AgentIo): Promise<nu
   const headers = await io.headers(to.key);
   /* A WALK OVER THE WHOLE RECORD is slower than one read, so it is given several reads' time. */
   const client = clientFor(to, async () => headers, AbortSignal.timeout(budgetOf(io.env) * 10));
-  const answer: Result<unknown> = await client.understand({ dry: true });
+  const answer: Result<unknown> = await client.understandPlan();
   if (!answer.ok) return refuse(io, answer, refusalLine(answer, to));
   io.answer?.({ value: answer.value });
   for (const line of dryLines(printable(readDry(answer.value)))) io.out(line);
