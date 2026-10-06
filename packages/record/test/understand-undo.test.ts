@@ -129,7 +129,7 @@ test('THE LAST WALK IS KEPT WHERE UNDO FINDS IT', async () => {
   const back = value<{ undone: number; said: string }>(await api.understand({ undo: 'last' }, owner));
   /* THE TWO RUNS AND THE REPOSITORY LISTED ON THE PROJECT. */
   assert.equal(back.undone, 3);
-  assert.equal(back.said, 'Put back 3 changes.');
+  assert.equal(back.said, 'Put back 3 changes the last walk made to Agent runs and Projects.');
   for (const id of mine) assert.equal(api.kernel.get(id)?.fields.project ?? null, null);
   /* AGAIN IS NOTHING. */
   assert.equal(value<{ undone: number }>(await api.understand({ undo: 'last' }, owner)).undone, 0);

@@ -215,6 +215,9 @@ export {
   type SlashHeadline,
 } from './headlines.ts';
 
+/** A payee the nightly walk would not give a held organisation's key on its own (`HeldAsk` in `kernel/src/backfill.ts`). */
+type HeldAsk = Backfilled['held'][number];
+
 /**
  * What proves a caller is the sender an ingest expects, as the record can answer it today.
  *
@@ -599,8 +602,8 @@ class Unwind extends Error {
  * out of a transaction it unwinds (`meet`), so the ladder reads it against the row as it still is.
  */
 class Asserting extends Error {
-  asserted: { register: string; id: string; patch: Record<string, JsonValue | null> };
-  constructor(asserted: { register: string; id: string; patch: Record<string, JsonValue | null> }) {
+  asserted: { register: string; id: string; patch: Record<string, JsonValue | null>; by: 'key' | 'strong' };
+  constructor(asserted: { register: string; id: string; patch: Record<string, JsonValue | null>; by: 'key' | 'strong' }) {
     super('asserting');
     this.asserted = asserted;
   }
@@ -1528,6 +1531,71 @@ const readDay = (text: string, format: string): string | null => {
     return null;
   }
 };
+
+/* ── who the record's own person is ─────────────────────────────────── */
+
+/** Where the self step keeps what it asked and marked, under a name no person holds. */
+const SELF_HOLDER = 'braindog:self';
+/* THE MARK FILED ONCE, by its question's id: an Undo puts the question back on Decide, and the next night marking the
+   same person again would take the Undo back. */
+const SELF_MARKED = 'marked';
+
+/** Whether a person's own address, or one of their keys, is `address` (a key as `keyOf('email', …)` makes it). */
+const holdsAddress = (parts: Record<string, string | undefined>, fields: Record<string, unknown>, address: string): boolean =>
+  [parts.email === undefined ? null : fields[parts.email], ...(parts.keys !== undefined && Array.isArray(fields[parts.keys]) ? (fields[parts.keys] as unknown[]) : [])].some(
+    (v) => typeof v === 'string' && keyOfAny(v) === address,
+  );
+
+/**
+ * The one person holding the owner's sign-in address marked as them: filed as "Mark <name> as you?" and accepted at once
+ * by the record, so it is one decision in one batch, on Decide as done, with Undo. Kept by its question's id, so it is
+ * done once and an Undo holds. Answers the line the day's log reads.
+ */
+function markHolder(kernel: Kernel, people: { register: string; self: string }, row: { id: string; version: number }): string {
+  /* A PERSON MET ONLY BY THE ADDRESS IS SAID BY THE PART BEFORE ITS `@`, never the address. */
+  const title = kernel.titleOfRow(row.id);
+  const name = (title === null ? null : spokenName(title.length > 80 ? `${title.slice(0, 79)}…` : title)) ?? 'This person';
+  const put = kernel.propose(
+    { question: `Mark ${name} as you?`, body_kind: 'rowset', body: { register: people.register, rows: [{ at: kernel.nameOf(row.id), version: row.version, patch: { [people.self]: true } }] } },
+    'system',
+  );
+  if (!put.ok) return `${name} holds the address you sign in with, and could not be marked as you yet: ${'refusal' in put ? put.refusal.fix : 'the record moved'}`;
+  kernel.setPref(SELF_HOLDER, SELF_MARKED, put.value.id);
+  const done = kernel.decide(put.value.id, { decide: { option: 'accept', reason: `${name} holds the address you sign in with, so they are you.` } }, 'system');
+  if (!done.ok) return `${name} holds the address you sign in with, so marking them as you waits on Decide.`;
+  return `${name} holds the address you sign in with, so they are marked as you. Undo is on Decide.`;
+}
+
+/**
+ * THE RECORD'S OWN STEP THAT MARKS ITS OWNER'S ROW, for a host holding a kernel and the address its owner signs in with
+ * (the deploy, and `tools/understand-eval/run.mjs`): the step the nightly tick takes (`selfTick` in `createRecordApi`),
+ * on the address alone. The one person in People holding `signIn` is marked as the owner, as one decision with Undo.
+ * Nothing is marked when People has no `self` part, somebody is marked already, the mark was made once before (an Undo
+ * holds), or nobody or several hold the address; the tick asks "Which of these is you?" for those, since only it knows
+ * the owner's name. Never on a name alone. `said` is the line a person reads, or `null` when nothing was done.
+ */
+export async function markOwnRow(kernel: Kernel, signIn: string): Promise<Result<{ marked: boolean; said: string | null }>> {
+  const address = typeof signIn === 'string' ? keyOf('email', signIn) : null;
+  if (address === null) return no('VALUE_MALFORMED', 'Say the address the owner signs in with, such as sam@example.com.', { at: 'signIn' });
+  const meets = kernel.meetsList();
+  const parts = (meets?.fields ?? {}) as Record<string, string | undefined>;
+  const self = parts.self;
+  if (meets === null || self === undefined || !kernel.register(meets.register)?.fields.some((f) => f.id === self && f.retired !== true)) return ok({ marked: false, said: null });
+  const rows: Entry[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = kernel.list({ register: meets.register, limit: 500, ...(cursor === null ? {} : { cursor }) });
+    if (!page.ok) return page;
+    rows.push(...page.value.rows);
+    cursor = page.value.cursor;
+  } while (cursor !== null);
+  const live = rows.filter((r) => parts.merged_into === undefined || typeof r.fields[parts.merged_into] !== 'string' || r.fields[parts.merged_into] === '');
+  if (live.some((r) => r.fields[self] === true) || typeof kernel.prefsOf(SELF_HOLDER)[SELF_MARKED] === 'string') return ok({ marked: false, said: null });
+  const held = live.filter((r) => holdsAddress(parts, r.fields, address));
+  if (held.length !== 1) return ok({ marked: false, said: null });
+  const said = markHolder(kernel, { register: meets.register, self }, held[0]!);
+  return ok({ marked: kernel.get(held[0]!.id)?.fields[self] === true, said });
+}
 
 export async function createRecordApi(deps: RecordDeps) {
   const opened = await openRecord(deps.sql, deps.clock, {
@@ -2512,6 +2580,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const cursor = (k: BackfillSliceName): string | null => (typeof stored?.[k] === 'string' ? (stored[k] as string) : null);
     let after: Record<BackfillSliceName, string | null> = { ledger: cursor('ledger'), runs: cursor('runs'), services: cursor('services') };
     const asked = new Map<string, BackfillSuggestion>();
+    const held = new Map<string, HeldAsk>();
     const batches: string[] = [];
     let done = false;
     for (let n = 0; n < UNDERSTAND_SLICES && !done; n += 1) {
@@ -2523,13 +2592,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         break;
       }
       for (const one of walked.suggestions) if (!asked.has(one.key)) asked.set(one.key, one);
+      for (const one of walked.held ?? []) if (!held.has(one.key)) held.set(one.key, one);
       batches.push(...sliceBatches(walked));
       after = { ledger: walked.ledger.next, runs: walked.runs.next, services: walked.services.next };
       done = after.ledger === null && after.runs === null && after.services === null;
     }
     kernel.setPref(SLASH, UNDERSTAND_NEXT, done ? null : after);
     keepWalked(batches);
-    const filing = await understoodFiling([...asked.values()]);
+    const filing = await understoodFiling([...asked.values()], [...held.values()]);
     return { filed: filing.filed, dropped: [...dropped, ...filing.dropped] };
   };
 
@@ -2569,10 +2639,42 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return { ledger: cursor('ledger'), runs: cursor('runs'), services: cursor('services') };
   };
 
-  /** What the walk would not do on its own, filed as Slash's questions once each, with each choice kept beside its question. */
-  const understoodFiling = async (asked: readonly BackfillSuggestion[]): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
-    const drafts = asked.flatMap((one) => understoodDraft(one));
-    if (drafts.length === 0) return { filed: [], dropped: [] };
+  /**
+   * What the walk would not do on its own, filed as Slash's questions once each, with each choice kept beside its question.
+   *
+   * IN ORDER OF WHAT AN ANSWER DOES, since `SLASH_OPEN_CAP` holds Slash to a few open questions and the rest wait for a
+   * later night: where runs belong first, the most runs first, then a project's remote, a service's project, a payee
+   * that may be an organisation the person holds, and last a payee that may be a company. Filed in the walk's order, the
+   * night's first few payees took every slot and not one run question was asked (the evaluation's 0 of 20).
+   *
+   * A RUN QUESTION THAT NAMES NO PLACE IS NOT FILED, and the day's log says why: a yes places exactly the places the walk
+   * asked about (`wheres`), and with none it would place nothing. Nor is a remote to list on a project that a run
+   * question offers the same project, whose yes lists it.
+   */
+  const understoodFiling = async (
+    asked: readonly BackfillSuggestion[],
+    held: readonly HeldAsk[] = [],
+  ): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
+    const placeless: string[] = [];
+    const rank = (one: BackfillSuggestion | HeldAsk): number =>
+      one.kind === 'run-project' ? 0 : one.kind === 'project-remote' ? 1 : one.kind === 'service-project' ? 2 : one.kind === 'organisation-key' ? 3 : 4;
+    const weight = (one: BackfillSuggestion | HeldAsk): number => (one.kind === 'run-project' ? one.runs : one.kind === 'organisation' || one.kind === 'organisation-key' ? one.payments : 0);
+    const ordered = [...asked, ...held]
+      .map((one, i) => ({ one, i }))
+      .sort((a, b) => rank(a.one) - rank(b.one) || weight(b.one) - weight(a.one) || a.i - b.i)
+      .map((x) => x.one);
+    /* A REMOTE A RUN QUESTION ALREADY OFFERS TO THE SAME PROJECT IS NOT ASKED TWICE: its yes lists the remote too. */
+    const offered = new Set(asked.flatMap((one) => (one.kind === 'run-project' ? placesOf(one).flatMap((w) => one.projects.map((p) => `${p.id} ${w}`)) : [])));
+    const drafts = ordered.flatMap((one) => {
+      if (one.kind === 'organisation-key') return heldDraft(one);
+      if (one.kind === 'project-remote' && offered.has(`${one.project.id} ${keyOf('remote', one.remote) ?? ''}`)) return [];
+      if (one.kind === 'run-project' && placesOf(one).length === 0) {
+        placeless.push(`${one.question} was not filed: its runs say only a repository's name and not where it is, so a yes would place nothing.`);
+        return [];
+      }
+      return understoodDraft(one);
+    });
+    if (drafts.length === 0) return { filed: [], dropped: placeless };
     const { filed, filedKeys, skipped } = await slashFiling(drafts.map((d) => d.draft), slashReading());
     /* A CHOICE IS KEPT BESIDE ITS QUESTION, by the option ids it was filed with, until it is answered. */
     const choices = new Map(drafts.flatMap((d) => (d.choice === null ? [] : [[stableKey(d.draft.body), d.choice] as const])));
@@ -2581,7 +2683,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (choice !== undefined) kernel.setPref(UNDERSTAND_ASKED, f.id, choice);
     });
     /* A NO HOLDS QUIETLY, as it does for "Start a project?". */
-    return { filed, dropped: skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`) };
+    return { filed, dropped: [...placeless, ...skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`)] };
   };
 
   /**
@@ -2621,7 +2723,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     kernel.setPref(SLASH, UNDERSTAND_NEXT, next.ledger === null && next.runs === null && next.services === null ? null : next);
     keepWalked(sliceBatches(walked));
     const answer = understandingOf(walked, false);
-    const filing = await understoodFiling(walked.suggestions);
+    const filing = await understoodFiling(walked.suggestions, walked.held ?? []);
     return ok({
       ...answer,
       filed: filing.filed.map((f) => ({ id: nameOf(ctx, 'suggestion', f.id) ?? f.id, question: f.question })),
@@ -2644,12 +2746,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * ONE OWNER: with several, whose address is "yours" is not one person's, and nothing is marked or asked. NOTHING NAMES
    * A RECORD (§27): it is whichever person holds the owner's address, on every record.
    */
-  const SELF_HOLDER = 'braindog:self';
   /** The question asked once when nobody holds the owner's address, by its id. */
   const SELF_ASKED = 'asked';
-  /* THE MARK FILED ONCE, by its question's id: an Undo puts the question back on Decide, and the next night marking the
-     same person again would take the Undo back. */
-  const SELF_MARKED = 'marked';
   const SELF_ASKED_MOST = 5;
   type SelfPeople = { register: string; self: string; rows: { id: string; version: number; fields: Record<string, JsonValue> }[] };
   /** The People list when it declares the self part, with its live people (none folded into another), or `null`. */
@@ -2676,31 +2774,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const address = owners.length === 1 && typeof owners[0]!.email === 'string' ? keyOf('email', owners[0]!.email) : null;
     if (address === null) return [];
     const parts = (kernel.meetsList()?.fields ?? {}) as Record<string, string | undefined>;
-    const holds = (r: SelfPeople['rows'][number]): boolean =>
-      [parts.email === undefined ? null : r.fields[parts.email], ...(parts.keys !== undefined && Array.isArray(r.fields[parts.keys]) ? (r.fields[parts.keys] as unknown[]) : [])].some(
-        (v) => typeof v === 'string' && keyOfAny(v) === address,
-      );
+    const holds = (r: SelfPeople['rows'][number]): boolean => holdsAddress(parts, r.fields, address);
     const nameOfRow = (id: string): string | null => {
       const t = kernel.titleOfRow(id);
       return t === null ? null : nameOnly(t.length > 80 ? `${t.slice(0, 79)}…` : t);
     };
     const held = people.rows.filter(holds);
     const kept = kernel.prefsOf(SELF_HOLDER);
-    if (held.length === 1 && typeof kept[SELF_MARKED] !== 'string') {
-      const row = held[0]!;
-      /* A PERSON MET ONLY BY THE ADDRESS IS SAID BY THE PART BEFORE ITS `@`, never the address. */
-      const title = kernel.titleOfRow(row.id);
-      const name = (title === null ? null : spokenName(title.length > 80 ? `${title.slice(0, 79)}…` : title)) ?? 'This person';
-      const put = kernel.propose(
-        { question: `Mark ${name} as you?`, body_kind: 'rowset', body: { register: people.register, rows: [{ at: kernel.nameOf(row.id), version: row.version, patch: { [people.self]: true } }] } },
-        'system',
-      );
-      if (!put.ok) return [`${name} holds the address you sign in with, and could not be marked as you yet: ${'refusal' in put ? put.refusal.fix : 'the record moved'}`];
-      kernel.setPref(SELF_HOLDER, SELF_MARKED, put.value.id);
-      const done = kernel.decide(put.value.id, { decide: { option: 'accept', reason: `${name} holds the address you sign in with, so they are you.` } }, 'system');
-      if (!done.ok) return [`${name} holds the address you sign in with, so marking them as you waits on Decide.`];
-      return [`${name} holds the address you sign in with, so they are marked as you. Undo is on Decide.`];
-    }
+    if (held.length === 1 && typeof kept[SELF_MARKED] !== 'string') return [markHolder(kernel, people, held[0]!)];
     /* ONCE: a question still waiting, or one answered either way, is never asked again, and neither is a mark the owner
        took back with Undo, which is waiting on Decide again. */
     if (typeof kept[SELF_ASKED] === 'string' || typeof kept[SELF_MARKED] === 'string') return [];
@@ -2732,6 +2813,55 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     kernel.setPref(SELF_HOLDER, SELF_ASKED, put.value.id);
     kernel.setPref(SELF_HOLDER, put.value.id, { rows });
     return [several ? 'Which of these is you is asked on Decide, since more than one person holds the address you sign in with.' : 'Which of these is you is asked on Decide, since nobody in People holds the address you sign in with.'];
+  };
+
+  /**
+   * "MARK X AS YOU?" ACCEPTED AFTER AN UNDO PUT IT BACK. Its row was read at the version the mark was made on, and the
+   * mark and its Undo have moved it since, so accepting it as it stands is refused as stale and the owner could never
+   * say yes. When the person is still there and still unmarked, the question is let go as asked on an older copy and
+   * asked again on them as they are now, accepted by the owner in the same transaction, so it is one decision with Undo
+   * as the first was. `null` when the question is current, which `decide` answers the usual way.
+   */
+  const selfMarkedAgain = (id: string, reason: string, actor: string): Result<Decided> | null => {
+    const asked = kernel.governanceRow('suggestion', id) as { body?: unknown; body_kind?: unknown; status?: unknown } | null;
+    const people = selfPeople();
+    if (!asked || asked.body_kind !== 'rowset' || asked.status !== 'open' || people === null) return null;
+    const body = (typeof asked.body === 'string' ? JSON.parse(asked.body) : asked.body) as { rows?: { at?: unknown; version?: unknown }[] } | null;
+    const one = body?.rows?.[0];
+    const row = typeof one?.at === 'string' ? kernel.get(one.at) : null;
+    if (!row || row.register !== people.register || row.version === one?.version || row.fields[people.self] === true) return null;
+    /* ONE PERSON IS THE OWNER: somebody marked as them since the Undo keeps the mark, and a yes here would make two. */
+    const marked = people.rows.find((r) => r.id !== row.id && r.fields[people.self] === true);
+    if (marked) {
+      const t = kernel.titleOfRow(marked.id);
+      const name = (t === null ? null : spokenName(t.length > 80 ? `${t.slice(0, 79)}…` : t)) ?? 'Somebody else';
+      return no('ALREADY_KNOWN', `${name} is marked as you already. Take that off them first if this one is you instead.`, { at: 'id' });
+    }
+    const question = kernel.question(id) ?? 'Mark this person as you?';
+    const halted: { refusal: Refusal | null } = { refusal: null };
+    const stop = (out: Result<unknown>): never => {
+      halted.refusal = 'refusal' in out && out.refusal ? out.refusal : { code: 'VERSION_STALE', fix: 'The record moved while this was answered. Answer it again.' };
+      throw halted;
+    };
+    try {
+      return kernel.transaction(() => {
+        const gone = kernel.decide(id, { resolved_as: 'incorrect', reason: 'Asked again on the person as they are now.' }, actor);
+        if (!gone.ok) stop(gone);
+        const put = kernel.propose(
+          { question, body_kind: 'rowset', body: { register: people.register, rows: [{ at: kernel.nameOf(row.id), version: row.version, patch: { [people.self]: true } }] } },
+          'system',
+        );
+        if (!put.ok) stop(put);
+        const fresh = (put as { ok: true; value: { id: string } }).value.id;
+        kernel.setPref(SELF_HOLDER, SELF_MARKED, fresh);
+        const done = kernel.decide(fresh, { decide: { option: 'accept', reason } }, actor);
+        if (!done.ok) stop(done);
+        return done;
+      });
+    } catch (e) {
+      if (e !== halted) throw e;
+      return { ok: false, refusal: halted.refusal! };
+    }
   };
 
   /** The self question answered: the person picked is marked as the owner, in one write the owner can undo. */
@@ -3040,8 +3170,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /** What a choice the walk asked does when it is answered: the project each option names, and what it is about. */
-  /* `wheres` IS EVERY PLACE THE RUNS ASKED ABOUT WORKED IN, each whole (`whereOf`), kept when it was asked; a choice kept
-     before it was read again from `place` when it is answered. */
+  /* `wheres` IS EVERY PLACE THE RUNS ASKED ABOUT WORKED IN, each whole (`whereOf`), as the kernel said them when it
+     asked; a choice kept without them places nothing (`placesOf`). */
   type UnderstoodChoice =
     | { kind: 'service-project'; service: string; projects: Record<string, string> }
     | { kind: 'run-project'; place: string; projects: Record<string, string>; wheres?: string[] };
@@ -3057,16 +3187,6 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return typeof fields.cwd === 'string' && fields.cwd.trim() !== '' ? keyOf('folder', fields.cwd) : null;
   };
 
-  /** The place a run is asked about by, as the walk names it (`backfill.ts`): its repository, or the last name of its remote or folder. */
-  const placeOf = (fields: Record<string, unknown>): string => {
-    const said = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
-    const last = (v: string): string => v.replace(/[\\/]+$/u, '').replace(/\.git$/iu, '').split(/[\\/:]+/u).filter((p) => p !== '').at(-1) ?? '';
-    const repo = said(fields.repo);
-    if (repo !== null) return repo;
-    const remote = said(fields.remote);
-    return remote !== null ? last(remote) : last(said(fields.cwd) ?? '');
-  };
-
   /** The live runs no project holds yet, read whole, for the walk's question about them. */
   const unplacedRuns = (): { id: string; version: number; fields: Record<string, JsonValue>; updated_at: string }[] =>
     sql
@@ -3076,16 +3196,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       )
       .map((r) => ({ ...r, fields: JSON.parse(r.fields) as Record<string, JsonValue> }));
 
-  /** Every whole place the runs named by `place` worked in, which is what a question about them is answered for. */
-  const wheresOf = (place: string): string[] => {
-    const named = place.trim().toLowerCase();
-    const out = new Set<string>();
-    for (const r of unplacedRuns()) {
-      if (placeOf(r.fields).toLowerCase() !== named) continue;
-      const at = whereOf(r.fields);
-      if (at !== null) out.add(at);
-    }
-    return [...out].sort();
+  /**
+   * The whole places a run question is about, as the kernel said them when it asked (`wheres`), and nothing else. NEVER
+   * READ AGAIN FROM ITS LAST NAME (research-audit-22 H2): every unplaced run whose remote or folder ended in `app` was
+   * once taken for the question's, so a yes about one `app` placed somebody else's on another host with it.
+   */
+  const placesOf = (one: { wheres?: unknown }): string[] =>
+    Array.isArray(one.wheres) ? [...new Set(one.wheres.filter((w): w is string => typeof w === 'string' && w !== ''))].sort() : [];
+
+  /**
+   * A payee that may be an organisation the person holds (`held` in the walk's answer), asked as one `rowset` that gives
+   * the organisation the payee's bank key: a yes, and the next walk links every line by it; a no, and both stay as they
+   * are. Nothing when Organisations keeps no keys, the organisation is gone, or it holds the key already.
+   */
+  const heldDraft = (one: HeldAsk): { draft: SlashDraft; choice: null }[] => {
+    const orgs = orgsList();
+    const keys = orgs?.fields.keys;
+    const row = kernel.get(one.organisation.id);
+    if (orgs === null || keys === undefined || !row || row.register !== orgs.register || looksLikeCredential(one.payee)) return [];
+    const held = Array.isArray(row.fields[keys]) ? (row.fields[keys] as unknown[]).filter((k): k is string => typeof k === 'string') : [];
+    if (held.includes(one.bank)) return [];
+    const body = { register: orgs.register, rows: [{ at: kernel.nameOf(row.id), version: row.version, patch: { [keys]: [...held, one.bank] } }], understand_key: one.key };
+    return [{ draft: { key: stableKey(body), question: one.question, body_kind: 'rowset', body, by: 'rules' }, choice: null }];
   };
 
   /** The list projects are kept in, and its field of repositories: the one list declaring `scopes:`, as `slashProjects` reads it. */
@@ -3148,9 +3280,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ...(about === '' ? {} : { about }),
           options: [...options, { id: 'none', label: single ? 'No' : 'Neither', because: `Nothing is ${single ? 'placed' : 'linked'}, and this is not asked again.` }],
         };
-        /* THE KERNEL'S OWN WHERES WHEN IT SAYS THEM, and otherwise every whole place the runs by that name work in now. */
-        const told = one.kind === 'run-project' ? (one as { wheres?: unknown }).wheres : undefined;
-        const wheres = Array.isArray(told) ? told.filter((w): w is string => typeof w === 'string') : one.kind === 'run-project' ? wheresOf(one.place) : [];
+        /* THE KERNEL'S OWN WHERES, and only those (`placesOf`). */
+        const wheres = one.kind === 'run-project' ? placesOf(one) : [];
         const choice: UnderstoodChoice =
           one.kind === 'service-project' ? { kind: one.kind, service: one.service.id, projects } : { kind: one.kind, place: one.place, projects, wheres };
         return [{ draft: draft(one.question, 'options', body), choice }];
@@ -3166,7 +3297,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `rule:backfill` with the version each was read at, so a throw places none of them, and the owner's Undo takes them all
    * back the walk's way (`methods/undo.ts`), which no run's own row would let the general undo do. ONLY THE PLACES ASKED
    * ABOUT, WHOLE: a run is placed when its remote, or its folder when it has none, is one the question was about
-   * (`whereOf`), never because its last name matches, so somebody else's `app` on another host stays where it is. AND ONLY
+   * (`whereOf`) as the kernel said them when it asked (`placesOf`), never because its last name matches, so somebody
+   * else's `app` on another host, or in another folder, stays where it is. AND ONLY
    * A RUN THAT HAS GONE QUIET, as the walk's own slice, since a run still working places itself on its next call and a
    * write here would make that call a conflict.
    */
@@ -3184,7 +3316,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (service && field) kernel.update(service.register, service.id, { [field.id]: row.id }, { actor, version: service.version });
       return;
     }
-    const wheres = new Set(Array.isArray(held.wheres) ? held.wheres : wheresOf(held.place));
+    /* A CHOICE KEPT WITH NO PLACES PLACES NOTHING: never every run that shares its last name. */
+    const wheres = new Set(placesOf(held));
     if (wheres.size === 0) return;
     const now = clock.now();
     const placed = kernel.nameOf(row.id);
@@ -5297,9 +5430,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * lines came back as rowids 10 and 6 with the three Diary writes she cannot see at 7, 8 and 9. So this asks
    * `lineOf`'s own question of every list she holds at a level of its own. A list raised to `write` still reads. Who
    * holds a rowid is `holdsRowids`, which asks this and more.
+   *
+   * AND A GRANT NARROWED TO SOME OF A LIST'S THINGS (`wheres`) DOES NOT READ EVERY LIST (research-audit-22 H1). A token
+   * at `read` on the whole record held to one project's rows passed this, and `understandPlan` and the question card
+   * named payments, payees and runs from the rest of the record to it. Reading every list is reading all of each.
    */
   const readsEveryList = (ctx: CallContext): boolean =>
-    wholeRecord(ctx) && Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
+    wholeRecord(ctx) && Object.keys(ctx.wheres ?? {}).length === 0 && Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
 
   /**
    * Whether the gap between two of this caller's lines counts nothing they may not read, which is who may hold a rowid.
@@ -6400,7 +6537,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!holder || holder.deleted_at !== null || holder.register !== register || holder.id === self) continue;
       const title = kernel.register(register)?.title;
       const name = title === undefined ? null : text(holder.fields[title]);
-      const shown = readable(ctx, register) === null;
+      /* SHOWN ONLY TO SOMEBODY WHO READS ALL OF THE LIST (research-audit-22 M5): a grant narrowed to some of its rows
+         (`wheres`) may not be shown the name of a row outside them. */
+      const shown = readable(ctx, register) === null && whereFor(ctx.wheres, register) === undefined;
       if (ctx.principal.kind === 'person') {
         const kind = key.slice(0, key.indexOf(':'));
         const said = key.slice(key.indexOf(':') + 1);
@@ -6460,19 +6599,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return ok({
       ...answer,
       row: { register: self.register, id: kernel.nameOf(self.id), seq: self.seq, name: kernel.titleOfRow(self.id) ?? kernel.nameOf(self.id) },
-      matched_by: 'key',
+      matched_by: asserted.by,
       ...(question.value === null ? {} : { question: question.value }),
     });
   };
 
   /**
    * What one meeting wrote onto a row that was already there, past the meeting's own parts, read from the events it left
-   * after `mark`: each field it changed, as the row now holds it, or `null` when it added the row, only folded rows by the
-   * strong rules, or wrote nothing but where and when they were met.
+   * after `mark`: each field it changed, as the row now holds it, or `null` when it added the row or wrote nothing but
+   * where and when they were met. A fold by the strong rules is read on the row kept, as a key match is.
    */
   const assertedOn = (met: unknown, mark: number): Asserting['asserted'] | null => {
     const m = (met ?? {}) as { row?: { id?: unknown } | null; created?: unknown; matched_by?: unknown };
-    if (m.created === true || m.matched_by !== 'key' || typeof m.row?.id !== 'string') return null;
+    /* A STRONG FOLD IS READ AS A KEY MATCH IS (research-audit-22 M1): the row folded in was the agent's, and what it
+       carried onto the person kept (a key above all) is an assertion about somebody the record already held. */
+    if (m.created === true || (m.matched_by !== 'key' && m.matched_by !== 'strong') || typeof m.row?.id !== 'string') return null;
     const row = kernel.get(m.row.id);
     if (!row) return null;
     const own = meetingParts(row.register);
@@ -6481,7 +6622,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       .map((e) => e.field)
       .filter((f) => !own.has(f));
     if (fields.length === 0) return null;
-    return { register: row.register, id: row.id, patch: Object.fromEntries(fields.map((f) => [f, (row.fields[f] ?? null) as JsonValue | null])) };
+    return { register: row.register, id: row.id, patch: Object.fromEntries(fields.map((f) => [f, (row.fields[f] ?? null) as JsonValue | null])), by: m.matched_by };
   };
 
   /** The fields a meeting writes of its own on a person or an organisation: where and when they were met, and the run's project. */
@@ -8657,6 +8798,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          through `settledAs`, which would swap the number for the question's handle and so say that it exists. */
       const target = kernel.governanceRow('suggestion', String(args.id));
       if (target && holds(ctx, target)) return no('OUT_OF_BOUNDS', `There is no suggestion called ${given}.`, { at: 'id' });
+      /* "MARK X AS YOU?" IS THE OWNER'S ALONE TO ANSWER, as "Which of these is you?" is (`selfAnswered`). The record
+         answers it itself when the sign-in address proves it, and an Undo puts it back on Decide, where another admin's
+         yes would have made somebody else the owner's own person. Put off is anybody's. */
+      if (args.defer === undefined && kernel.prefsOf(SELF_HOLDER)[SELF_MARKED] === String(args.id) && !selfOwners().some((o) => o.id === actorOf(ctx)))
+        return no('FORBIDDEN', 'Only the owner says which person in People is them. Leave this one for them.', { at: 'id' });
+      if (args.decide?.option === 'accept' && kernel.prefsOf(SELF_HOLDER)[SELF_MARKED] === String(args.id)) {
+        const again = selfMarkedAgain(String(args.id), args.decide.reason, actorOf(ctx));
+        if (again !== null) return tail(settledAs(ctx, given, again));
+      }
       const run = target && args.decide !== undefined ? ruleAsked(target) : null;
       const answering = run ? answersNot(ctx, run) : null;
       if (answering) return { ok: false as const, refusal: answering };

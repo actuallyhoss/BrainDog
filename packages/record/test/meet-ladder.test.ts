@@ -1,7 +1,7 @@
 /**
  * `meet` at the agent's rung (research-audit-20 H4, DIRECTION §38): what a meeting does on its own stays automatic, a
- * person added and the line of where they were met; what an agent asserts on somebody already known (a handle carried
- * onto them) is held to the ladder, and where it would ask it is a mention and one question instead of a write. An
+ * person added and the line of where they were met; what an agent asserts on somebody already known (an address a fold
+ * by the strong rules would carry onto them) is held to the ladder, and where it would ask it is a mention and one question instead of a write. An
  * agent on a Suggest grant only ever leaves mentions.
  */
 
@@ -20,11 +20,12 @@ const PEOPLE = {
     id: 'people',
     name: 'People',
     title: 'name',
-    meets: { name: 'name', email: 'email', handles: 'handles', met: 'met', merged_into: 'merged_into' },
+    meets: { name: 'name', email: 'email', handles: 'handles', keys: 'keys', met: 'met', merged_into: 'merged_into' },
     fields: [
       { id: 'name', type: 'text', required: true },
       { id: 'email', type: 'email', unique: true, index: true },
       { id: 'handles', type: 'list', of: 'text', label: 'Handles' },
+      { id: 'keys', type: 'list', of: 'text', label: 'Keys' },
       { id: 'met', type: 'list', of: 'text' },
       { id: 'merged_into', type: 'ref', to: 'people' },
     ],
@@ -73,26 +74,28 @@ test('SOMEBODY NEW IS ADDED ON ITS OWN, and meeting them again with nothing new 
   sql.close();
 });
 
-test('WHAT AN AGENT ASSERTS ON SOMEBODY KNOWN ASKS AT ITS RUNG: a mention and one question, and nothing written', async () => {
+test('WHAT AN AGENT CARRIES ONTO SOMEBODY KNOWN BY A STRONG FOLD ASKS AT ITS RUNG: a mention and one question, and nothing written', async () => {
   const { api, sql } = await record();
   const claude = agent('t_claude', 'write');
-  value(await api.meet({ name: 'Ada Lovelace', email: 'ada@example.com', source: 'commit 4464966 in braindog' }, claude));
+  value(await api.meet({ name: 'Lakshmi Vadlamudi', email: 'lakshmi.vadlamudi@brightloom.example', source: 'commit 1 in braindog' }, claude));
   const before = people(sql)[0]!;
-  /* NOT A COMMIT: a commit's keys are never carried onto whoever holds one (research-audit-21 M9), so there would be
-     nothing asserted to hold to the ladder. */
-  const said = { email: 'ada@example.com', handle: 'github:ada', source: 'session in braindog' };
+  /* AN AGENT'S KEY IS HELD TO A COMMIT'S WORD (research-audit-21 H2), so a key match carries nothing onto her. A second
+     address under her name is a fold by the strong rules, which would carry it onto her: that is an assertion about
+     somebody the record already holds, and it goes through the ladder as a key match would (research-audit-22 M1). */
+  const said = { name: 'Lakshmi Vadlamudi', email: 'lakshmivadlamudi@gmail.com', source: 'commit 2 in braindog' };
   const asked = value<Meeting>(await api.meet(said, claude));
   assert.equal(asked.mention, true);
   assert.equal(asked.created, false);
-  assert.equal(asked.row?.name, 'Ada Lovelace');
+  assert.equal(asked.matched_by, 'strong');
+  assert.equal(asked.row?.name, 'Lakshmi Vadlamudi');
   assert.ok(asked.question, 'one question filed');
-  const ada = people(sql)[0]!;
-  assert.deepEqual(ada.fields, before.fields, 'nothing written onto her');
-  assert.deepEqual(mentions(sql), [{ name: 'Ada Lovelace', kind: 'person' }]);
+  assert.equal(people(sql).length, 1, 'no second row was kept');
+  assert.deepEqual(people(sql)[0]!.fields, before.fields, 'nothing written onto her');
+  assert.deepEqual(mentions(sql), [{ name: 'Lakshmi Vadlamudi', kind: 'person' }]);
   const filed = open(sql);
   assert.equal(filed.length, 1);
   const q = value<{ question: string }>(await api.governance({ register: 'suggestion', id: filed[0]!.id }, owner));
-  assert.equal(q.question, 'Add handles to Ada Lovelace?');
+  assert.equal(q.question, 'Add keys to Lakshmi Vadlamudi?');
 
   /* AT MOST ONE: the same meeting again is answered by the question already waiting. */
   const twice = value<Meeting>(await api.meet(said, claude));
@@ -101,7 +104,7 @@ test('WHAT AN AGENT ASSERTS ON SOMEBODY KNOWN ASKS AT ITS RUNG: a mention and on
 
   /* ACCEPTED, IT IS WRITTEN AS THE AGENT'S CHANGE. */
   value(await api.decide({ id: filed[0]!.id, decide: { option: 'accept', reason: 'yes' } }, owner));
-  assert.deepEqual(people(sql)[0]!.fields.handles, ['github:ada']);
+  assert.ok((people(sql)[0]!.fields.keys as string[]).includes('email:lakshmivadlamudi@gmail.com'), JSON.stringify(people(sql)[0]!.fields));
   sql.close();
 });
 

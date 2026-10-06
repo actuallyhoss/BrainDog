@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import type { Entry } from '@braindog/kernel';
 
-import { createRecordApi, type CallContext } from '../src/index.ts';
+import { createRecordApi, markOwnRow, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 7, 3);
@@ -122,5 +122,68 @@ test('A RECORD WHOSE PERSON IS MARKED ALREADY IS LEFT AS IT IS', async () => {
   await api.slashTick();
   assert.equal(selfOf(api, rows[1]!.id), null);
   assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE opened_by = 'system'")?.n, 0);
+  sql.close();
+});
+
+test('"Mark X as you?" PUT BACK BY UNDO IS ANSWERED BY THE OWNER ALONE', async () => {
+  const { api, sql, rows } = await record([{ name: 'Sam', email: 'sam@example.com' }]);
+  await api.slashTick();
+  const decision = sql.one<{ id: string }>("SELECT id FROM decision WHERE decided_by = 'system' ORDER BY rowid DESC LIMIT 1")!.id;
+  const plan = value<{ hash: string }>(await api.undo({ decision, dry: true }, owner));
+  value(await api.undo({ decision, hash: plan.hash }, owner));
+  const asked = sql.one<{ id: string; status: string }>("SELECT id, status FROM suggestion WHERE opened_by = 'system' AND body_kind = 'rowset'")!;
+  assert.equal(asked.status, 'open');
+  /* ANOTHER ADMIN'S YES WOULD MAKE SOMEBODY ELSE THE OWNER'S OWN PERSON. */
+  const member: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'owner' }, credentialed: true };
+  const refused = (await api.decide({ id: asked.id, decide: { option: 'accept', reason: 'That is him.' } }, member)) as { ok: boolean; refusal?: { code: string; at?: string } };
+  assert.equal(refused.ok, false);
+  assert.equal(refused.refusal?.code, 'FORBIDDEN');
+  assert.equal(sql.one<{ status: string }>('SELECT status FROM suggestion WHERE id = ?', asked.id)?.status, 'open');
+  assert.notEqual(selfOf(api, rows[0]!.id), true);
+  /* THE OWNER'S YES MARKS THEM, asked again on them as they are now since the mark and its Undo moved them. */
+  value(await api.decide({ id: asked.id, decide: { option: 'accept', reason: 'That is me.' } }, owner));
+  assert.equal(selfOf(api, rows[0]!.id), true);
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE opened_by = 'system' AND status = 'open'")?.n, 0);
+  /* AND IT IS ONE DECISION WITH UNDO, as the first was. */
+  const again = sql.one<{ id: string }>("SELECT id FROM decision WHERE decided_by = 'p_1' ORDER BY rowid DESC LIMIT 1")!.id;
+  const back = value<{ hash: string }>(await api.undo({ decision: again, dry: true }, owner));
+  value(await api.undo({ decision: again, hash: back.hash }, owner));
+  assert.notEqual(selfOf(api, rows[0]!.id), true);
+  sql.close();
+});
+
+test('markOwnRow MARKS THE ONE PERSON HOLDING THE SIGN-IN ADDRESS, for a host holding only a kernel', async () => {
+  const { api, sql, rows } = await record([{ name: 'Ada Vine', email: 'ada@kiln.example' }, { name: 'Sam', keys: ['email:Sam@Example.com'] }]);
+  const out = value<{ marked: boolean; said: string | null }>(await markOwnRow(api.kernel, 'sam@example.com'));
+  assert.equal(out.marked, true);
+  assert.equal(out.said, 'Sam holds the address you sign in with, so they are marked as you. Undo is on Decide.');
+  assert.equal(selfOf(api, rows[1]!.id), true);
+  /* ONCE: a second call does nothing, and nor does the night. */
+  assert.deepEqual(value(await markOwnRow(api.kernel, 'sam@example.com')), { marked: false, said: null });
+  await api.slashTick();
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE opened_by = 'system'")?.n, 1);
+  /* A NAME ALONE NEVER MARKS: nobody holds this address. */
+  const other = await record([{ name: 'Sam Kamal' }]);
+  assert.deepEqual(value(await markOwnRow(other.api.kernel, 'sam@example.com')), { marked: false, said: null });
+  assert.notEqual(selfOf(other.api, other.rows[0]!.id), true);
+  other.sql.close();
+  sql.close();
+});
+
+test('"Mark X as you?" PUT BACK BY UNDO IS NOT ACCEPTED ONTO A SECOND PERSON once somebody else is marked', async () => {
+  const { api, sql, rows } = await record([{ name: 'Sam', email: 'sam@example.com' }, { name: 'Ada Vine', email: 'ada@kiln.example' }]);
+  await api.slashTick();
+  const decision = sql.one<{ id: string }>("SELECT id FROM decision WHERE decided_by = 'system' ORDER BY rowid DESC LIMIT 1")!.id;
+  const plan = value<{ hash: string }>(await api.undo({ decision, dry: true }, owner));
+  value(await api.undo({ decision, hash: plan.hash }, owner));
+  /* THE OWNER MARKS SOMEBODY ELSE HIMSELF, then finds the old question. */
+  const ada = api.kernel.get(rows[1]!.id)!;
+  value(api.kernel.update('people', ada.id, { self: true }, { actor: 'p_1', version: ada.version }));
+  const asked = sql.one<{ id: string }>("SELECT id FROM suggestion WHERE opened_by = 'system' AND body_kind = 'rowset' AND status = 'open'")!;
+  const out = (await api.decide({ id: asked.id, decide: { option: 'accept', reason: 'That is me.' } }, owner)) as { ok: boolean; refusal?: { code: string; fix: string } };
+  assert.equal(out.ok, false);
+  assert.equal(out.refusal?.code, 'ALREADY_KNOWN');
+  assert.equal(out.refusal?.fix, 'Ada Vine is marked as you already. Take that off them first if this one is you instead.');
+  assert.notEqual(selfOf(api, rows[0]!.id), true);
   sql.close();
 });

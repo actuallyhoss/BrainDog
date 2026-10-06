@@ -166,6 +166,8 @@ export function methods(deps: RecordDeps) {
       if (!row || !reads(row.register)) continue;
       const title = titled(row.id, row.register);
       const list = kernel.register(row.register)?.name;
+      /* EACH STEP SAYS ITS ROW AS `undo({ row })` TAKES IT BACK, so "Only this one" on a walk's line works as on any other. */
+      const at = { register: row.register, ...(row.seq === null ? {} : { seq: row.seq }) };
       let to: unknown = null;
       let from: unknown = null;
       try {
@@ -176,21 +178,21 @@ export function methods(deps: RecordDeps) {
       }
       if (line.kind === 'create') {
         if (linkedTo(row.id)) leave(row.id, title, 'something else links to it now');
-        else step({ do: 'delete', row: row.id, title, ...(list === undefined ? {} : { list }) }, `Remove ${title}${list === undefined ? '' : ` from ${list}`}`);
+        else step({ ...at, do: 'delete', row: row.id, title, ...(list === undefined ? {} : { list }) }, `Remove ${title}${list === undefined ? '' : ` from ${list}`}`);
       } else if (line.kind === 'edit' && row.register === SESSION && (line.field === null || line.field === 'project')) {
         const held = typeof row.fields.project === 'string' && row.fields.project.trim() !== '' ? row.fields.project : null;
         if (held === null) continue;
         const since = sql.one('SELECT 1 AS y FROM event WHERE target = ? AND rowid > ? AND (batch IS NULL OR batch <> ?) LIMIT 1', line.target, line.at, batch);
         const ours = line.field === null ? !since : same(held, to);
         const project = kernel.titleOfRow(held);
-        if (ours) step({ do: 'set', row: row.id, title, ...(project === null ? {} : { from: project }) }, project === null ? `Take ${title} out of its project` : `Take ${title} out of ${project}`);
+        if (ours) step({ ...at, do: 'set', row: row.id, title, ...(project === null ? {} : { from: project }) }, project === null ? `Take ${title} out of its project` : `Take ${title} out of ${project}`);
         else leave(row.id, title, 'it has been moved since');
       } else if (line.kind === 'tag' && line.field !== null) {
         const held = Array.isArray(row.fields[line.field]) ? (row.fields[line.field] as unknown[]).map(String) : [];
         /* A REPOSITORY LISTED ON A PROJECT WHEN ITS QUESTION WAS ANSWERED is said by its own last name, never its host. */
         const repo = kernel.register(row.register)?.scopes?.repos === line.field ? String(to).replace(/[\\/]+$/u, '').replace(/\.git$/iu, '').split(/[\\/:]+/u).at(-1) : undefined;
         if (held.includes(String(to)))
-          step({ do: 'untag', row: row.id, title }, repo ? `Take the repository ${repo} off ${title}` : `Forget a name ${title} was matched by`);
+          step({ ...at, do: 'untag', row: row.id, title }, repo ? `Take the repository ${repo} off ${title}` : `Forget a name ${title} was matched by`);
       } else if (line.kind === 'edit' && line.field !== null) {
         if (!same(row.fields[line.field], to)) {
           leave(row.id, title, 'it has been changed since');
@@ -201,7 +203,7 @@ export function methods(deps: RecordDeps) {
         const label = typeof spec?.label === 'string' && spec.label.trim() !== '' ? spec.label.trim().toLowerCase() : (line.field ?? '').replace(/[_-]+/gu, ' ');
         /* WHAT IT HELD BEFORE COMES BACK, as `undoBackfill` writes it, so a field that had a value is never said as cleared. */
         const said = from !== null ? `Put ${label} on ${title} back as it was` : target === null ? `Clear ${label} on ${title}` : `Unlink ${title} from ${target}`;
-        step({ do: 'set', row: row.id, title, ...(target === null ? {} : { from: target }) }, said);
+        step({ ...at, do: 'set', row: row.id, title, ...(target === null ? {} : { from: target }) }, said);
         freed.set(row.id, (freed.get(row.id) ?? new Set<string>()).add(line.field));
       }
     }
@@ -226,17 +228,19 @@ export function methods(deps: RecordDeps) {
     );
 
   /**
-   * ONE ROW OF THE WALK'S BATCH PUT BACK, as `undoBackfill` puts back each of its lines, in one transaction and one batch
-   * of its own signed as the walk's, so the rest of the batch stays and can still be put back whole later. The batch
-   * is not marked undone, since most of it is not.
+   * SOME ROWS OF THE WALK'S BATCH PUT BACK, as `undoBackfill` puts back each of its lines, newest first, in one
+   * transaction and one batch of its own signed as the walk's, so the rest of the batch stays and can still be put back
+   * later. The batch is not marked undone, since not all of it is. For one row a person picked, and for every row the
+   * plan listed when the batch also wrote to a list the caller does not read (`walkUndo`).
    */
-  const walkRowUndo = (batch: string, only: string): number =>
+  const walkRowsUndo = (batch: string, only: ReadonlySet<string>): number =>
     kernel.transaction(() => {
       let minted: string | null = null;
       let undone = 0;
       const w = (version: number) => ({ actor: BACKFILL_ACTOR, batch: (minted ??= mint()), cascade: false, version });
-      for (const line of walkLines(batch, only)) {
-        const r = kernel.get(only);
+      const lines = only.size === 1 ? walkLines(batch, [...only][0]!) : walkLines(batch, null).filter((l) => only.has(l.target.slice('entry:'.length)));
+      for (const line of lines) {
+        const r = kernel.get(line.target.slice('entry:'.length));
         if (!r) continue;
         let to: unknown = null;
         let was: unknown = null;
@@ -270,8 +274,15 @@ export function methods(deps: RecordDeps) {
     const plan = walkPlan(batch, reads, only);
     if (plan.hash !== hash) return no('PLAN_STALE', 'Something changed since this undo was shown. Look at it again, then put it back.', { at: 'hash' });
     if (plan.already) return ok({ batch, put: 0, say: 'Nothing was put back: it was undone already.', lines: [], skipped: [] });
-    if (only !== null) {
-      const put = plan.steps.length === 0 ? 0 : walkRowUndo(batch, only);
+    /* ONLY THE LINES THE PLAN LISTED (research-audit-22 L1): a batch that also wrote to a list the caller does not read
+       is put back row by row, those rows alone, and `undoBackfill`, which reads every list, is not asked. */
+    const hidden = only === null && walkLines(batch, null).some((l) => {
+      const r = kernel.get(l.target.slice('entry:'.length));
+      return r !== null && !reads(r.register);
+    });
+    if (only !== null || hidden) {
+      const rows = new Set(plan.steps.flatMap((s) => (s.row === undefined ? [] : [s.row])));
+      const put = rows.size === 0 ? 0 : walkRowsUndo(batch, rows);
       return tail({
         ok: true as const,
         value: { batch, put, say: put === 0 ? 'Nothing was put back: it was changed since.' : put === 1 ? 'Put back 1 change.' : `Put back ${put} changes.`, lines: plan.steps.map((s) => s.line), skipped: plan.skipped },

@@ -34,8 +34,29 @@ export const LAST_WALK = 'last';
 
 const said = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 
+/** Names joined as a person says them: "Transactions and Projects". */
+const andList = (names: readonly string[]): string => new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(names);
+
 export function methods(deps: RecordDeps) {
-  const { kernel, admin, scoped, no, tail } = deps;
+  const { kernel, sql, admin, scoped, no, tail } = deps;
+
+  /**
+   * The lists a walk's batches wrote to, by name, in the order they were first written, which is what `undo: 'last'`
+   * says it took back from: the last walk is up to a night's slices of payments, runs and services, and a line that
+   * said only a number left a person to guess which.
+   */
+  const listsOf = (batches: readonly string[]): string[] => {
+    const named = new Set<string>();
+    for (const batch of batches)
+      for (const r of sql.all<{ register: string }>(
+        "SELECT e.register AS register FROM event v JOIN entry e ON e.id = substr(v.target, 7) WHERE v.batch = ? AND v.target LIKE 'entry:%' GROUP BY e.register ORDER BY min(v.rowid)",
+        batch,
+      )) {
+        const name = kernel.register(r.register)?.name?.trim();
+        if (name) named.add(name);
+      }
+    return [...named];
+  };
 
   /** Who signs the undo: the person in the browser. */
   const actorOf = (ctx: CallContext): string => (ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id);
@@ -57,8 +78,13 @@ export function methods(deps: RecordDeps) {
           return no('VALUE_MALFORMED', `undo is what an earlier understand answered as undo, as it was given, or ${LAST_WALK} for the last one.`, { at: 'undo' });
         if (a.dry === true) return no('VALUE_MALFORMED', 'Undo puts the changes back; it has no dry run. Leave dry out.', { at: 'dry' });
         if (batches.length === 0) return tail({ ok: true as const, value: { undone: 0, said: 'Nothing was put back: the walk has not linked anything yet.' } });
+        /* THE WALK WROTE TO EVERY LIST, and `undoBackfill` puts back all of it; somebody held apart from one of them puts
+           back what they can see row by row, from each row's Undo. */
+        if (deps.readsEveryList?.(ctx) === false)
+          return no('FORBIDDEN', "The walk wrote to lists you do not read, so it is not put back whole from here. Use Undo on each change you can see.", { at: 'undo' });
         const broken = kernel.refused();
         if (broken) return { ok: false, refusal: broken };
+        const lists = last ? listsOf(batches) : [];
         let undone = 0;
         for (const batch of batches) {
           const out = kernel.undoBackfill(batch.trim(), actorOf(ctx));
@@ -69,7 +95,10 @@ export function methods(deps: RecordDeps) {
           ok: true as const,
           value: {
             undone,
-            said: undone === 0 ? 'Nothing was put back: it was undone already, or changed since.' : undone === 1 ? 'Put back 1 change.' : `Put back ${undone} changes.`,
+            said:
+              undone === 0
+                ? 'Nothing was put back: it was undone already, or changed since.'
+                : `${undone === 1 ? 'Put back 1 change' : `Put back ${undone} changes`}${last ? ` the last walk made${lists.length === 0 ? '' : ` to ${andList(lists)}`}` : ''}.`,
           },
         });
       }
