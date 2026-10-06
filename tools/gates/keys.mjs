@@ -183,7 +183,8 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
         await page.waitForTimeout(120);
         const answerable = await page.evaluate(() => {
           const q = document.querySelector('li.q[data-cursor]');
-          return !!q && (q.querySelector('.rec') !== null || q.querySelector('[id$="-accept"]') !== null);
+          /* DecisionCard marks its suggestion `.queue-option[data-recommended]`; `.rec` is the older card's mark. */
+          return !!q && (q.querySelector('.queue-option[data-recommended], .rec') !== null || q.querySelector('[id$="-accept"]') !== null);
         });
         if (answerable) return;
       }
