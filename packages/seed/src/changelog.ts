@@ -86,6 +86,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.11.0',
+      notes:
+        'Money opens on Cash ahead, with when your money runs out, your accounts and any questions in a column beside it. What is coming up is open under it, and what already moved is folded under History.',
+    },
+    {
       version: '3.10.0',
       notes:
         'A payment says which organisation it was with, a shop, a supplier or a client, where it could only name a person, and keeps the payee as the bank wrote it, so the same shop is known however it is spelled. Cash ahead offers five years and To the end again, worked out when you pick them, so Money still opens fast.',
@@ -145,6 +150,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    {
+      version: '1.15.0',
+      notes:
+        'Work opens on how many tasks are late and how many wait on you. Late runs the whole width, a strip shows what is open, due and done this week, and This week, With an agent and Waiting on you sit side by side. Today is the top of This week.',
+    },
     {
       version: '1.14.0',
       notes: 'An empty Work page says Nothing is open right now, under the line to capture a task, instead of a tile for every band saying it is empty.',

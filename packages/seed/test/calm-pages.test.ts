@@ -9,7 +9,8 @@
  * WHAT IS COUNTED AS A TILE ABOVE THE FOLD is what can stand on the page at once. A lead is the page's line and is not
  * a tile, and neither is what stands in for one: a tile drawn only while something is missing (`when: { lt }`, the box
  * to add a first account), or one drawn exactly while a lead is not (Money's figure a book, while one Cash now over two
- * books would mean nothing). The rail is looked up beside the page and is not counted either.
+ * books would mean nothing). A boxed section and the blocks it holds are one tile. The rail is looked up beside the page
+ * and is not counted either.
  */
 
 import { test } from 'node:test';
@@ -19,7 +20,7 @@ import { AGENTS_PAGES, PAGES } from '../src/index.ts';
 import { USE_CASES } from '../src/usecases/index.ts';
 
 type When = { metric: string; gt?: number; gte?: number; lt?: number; lte?: number; is?: number };
-type Block = { kind: string; heading?: string; icon?: string; lead?: boolean; fold?: boolean; area?: string; when?: When; body?: string; cells?: { metric: string }[] };
+type Block = { kind: string; heading?: string; icon?: string; lead?: boolean; fold?: boolean; box?: boolean; area?: string; when?: When; body?: string; cells?: { metric: string }[] };
 type Page = { page: string; for?: unknown; blocks: Block[] };
 
 const pages: [string, Page][] = [
@@ -62,7 +63,16 @@ test(`NO PAGE SHOWS MORE THAN ${ABOVE_THE_FOLD} TILES BEFORE THE REST IS FOLDED 
       (b.when.lt !== undefined || leads.some((w) => w.metric === b.when!.metric && w.lt !== undefined && b.when!.gte === w.lt));
     const main = page.blocks.filter((b) => b.area !== 'rail');
     const fold = main.findIndex((b) => b.kind === 'section' && b.fold === true);
-    const above = (fold < 0 ? main : main.slice(0, fold)).filter((b) => !b.lead && !standsIn(b) && b.kind !== 'section');
+    /* A BOXED SECTION AND THE BLOCKS AFTER IT, UP TO THE NEXT SECTION, ARE ONE TILE, as the app draws them (`boxesOf` in
+       `apps/web/src/lib/page/layout.ts`): Money's Heads up is one tile of three lines, not three tiles. */
+    let boxed = false;
+    const above = (fold < 0 ? main : main.slice(0, fold)).filter((b) => {
+      if (b.kind === 'section') {
+        boxed = b.box === true;
+        return boxed;
+      }
+      return !boxed && !b.lead && !standsIn(b);
+    });
     assert.ok(above.length <= ABOVE_THE_FOLD, `${slug} shows ${above.length} tiles before its fold: ${above.map((b) => b.heading ?? b.kind).join(', ')}`);
   }
 });

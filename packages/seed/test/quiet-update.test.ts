@@ -204,3 +204,50 @@ test('WHAT THE PERSON TOOK OFF A MODULE AT THIS VERSION STAYS OFF: the relink af
   for (const id of off) assert.ok(!live.includes(id), `${id} stays off`);
   sql.close();
 });
+
+/**
+ * A MODULE WHOSE NEW VERSION ONLY LAYS ITS PAGES OUT AGAIN, AND ADDS A FIGURE TO DRAW ON, REACHES A RECORD ON ITS OWN.
+ * Money 3.11.0 and Work 1.15.0 move their tiles (DIRECTION §39) and Work gains `tasks-this-week-yours`; nothing is taken
+ * away, so a record holding the version before is updated with no question. The version before is made here from this
+ * build's document, its pages laid out differently and the new figure left out, which is the shape of the change.
+ */
+test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing', async () => {
+  const before = (version: string): string => {
+    const [major, minor] = version.split('.').map(Number);
+    return `${major}.${minor! - 1}.0`;
+  };
+  const earlier = (doc: Body, id: string): Body => {
+    const decls = (doc.declarations as Body[])
+      .filter((d) => d.metric !== 'tasks-this-week-yours')
+      .map((d) => {
+        if (typeof d.page !== 'string') return d;
+        const { layout: _layout, ...page } = d;
+        const blocks = (page.blocks as Body[]).filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'tasks-this-week-yours').map(({ area: _area, ...b }) => ({ ...b, span: 12 }));
+        return { ...page, blocks: [blocks[0]!, ...blocks.slice(1).reverse()] };
+      });
+    return { ...doc, version: before(FIRST_PARTY_VERSIONS[id as 'work']), declarations: decls };
+  };
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  for (const m of ['portfolio', 'people', 'money-core', 'work']) {
+    const doc = documentFor(k, m)!;
+    await put(k, sql, m === 'money-core' || m === 'work' ? earlier(doc, m) : doc);
+  }
+  assert.equal(k.packs().find((p) => p.id === 'work')?.version, before(FIRST_PARTY_VERSIONS.work));
+  const port = portOf(k, sql);
+
+  const steps = await updateFirstParty(port);
+  for (const id of ['money-core', 'work'] as const)
+    assert.deepEqual(
+      steps.find((s) => s.pack === id),
+      { pack: id, from: before(FIRST_PARTY_VERSIONS[id]), to: FIRST_PARTY_VERSIONS[id], did: 'updated' },
+      JSON.stringify(steps),
+    );
+  assert.deepEqual(port.asked, [], 'nothing was lost, so nothing was asked');
+  /* AND THE PAGES ARE THIS BUILD'S: Money's side column, and This week drawn on the new figure. */
+  const page = value<{ layout?: unknown; blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('money'));
+  assert.deepEqual(page.layout, { rail: 4 });
+  const work = value<{ blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('work'));
+  assert.equal(work.blocks.find((b) => b.heading === 'This week')?.when?.metric, 'tasks-this-week-yours');
+  sql.close();
+});

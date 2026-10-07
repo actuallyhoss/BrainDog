@@ -2258,6 +2258,14 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
    * cash is left out, and a part at nought cuts no length of the track (`splitPlan` in `packages/render/src/split.ts`).
    * A split is drawn only while it has a part to cut, here and on a book's page, so a month with nothing spent and a
    * record whose accounts all stand at nought draw no empty track.
+   *
+   * THE PICTURE FIRST, SINCE money-core 3.11.0 (DIRECTION §39, the design review's fix 3). Money's first screen held
+   * three questions drawn whole and no number: Cash ahead sat about 950px down. Now the walk leads the main column, and
+   * a side column of four twelfths stands beside it (`layout: { rail: 4 }`): when the money runs out, in the figure's
+   * own size and in the colour of a missed target, over the accounts that hold it, then the questions, which the app
+   * draws compact in a side column (`asks.ts`). Heads up follows the walk, and what comes in and goes out is open under
+   * it, with only the months behind and what already moved folded under History. When the money runs out is said once,
+   * in its tile, and no longer in the line, which says what there is.
    */
   money: {
     page: 'money',
@@ -2266,6 +2274,10 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
     icon: 'money',
     requires: ['register.accounts', 'register.obligations', 'register.transactions', 'register.recurring', 'register.installments', 'register.categories', 'register.books'],
     pack: 'money-core',
+    /* A SIDE COLUMN, SINCE money-core 3.11.0, so a figure and the accounts under it stand beside the walk as one column
+       of short tiles, and not as one tall tile stretched to the chart's height. A record with no account draws nothing
+       in it, and the main column then takes the page. */
+    layout: { rail: 4 },
     blocks: [
       {
         /* THE HEADLINE LINE, SAID FROM THE FIGURES: what the money is doing, in one sentence inside the page's headline
@@ -2279,12 +2291,15 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
 
            HOW FAR CASH MOVED IN A MONTH IS ITS OWN CLAUSE, SINCE money-core 3.3.0 (`{{cash-now.change}}`, "+8% on a month
            ago"), said against the point the night remembered thirty days back. A record with no point that old, or a
-           point in another currency, has no change, and the clause drops with nothing left of it. */
+           point in another currency, has no change, and the clause drops with nothing left of it.
+
+           WHEN IT RUNS OUT IS THE TILE'S, SINCE money-core 3.11.0: the side column says it in the figure's own size beside
+           the walk, and a line saying it as well would be the same fact twice on one screen. */
         kind: 'note',
         lead: true,
         span: 12,
         when: { metric: 'books-held', lt: 2 },
-        body: 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and on what is due it runs out in {{runway-days}} day(s).',
+        body: 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago.',
       },
       /* NO "WHAT YOU HAVE" TILE BESIDE THE LINE, SINCE money-core 3.4.0. It said Cash now, the accounts and how long it
          lasts, which are the three figures the line above says, so a person read them twice before reading anything
@@ -2323,7 +2338,8 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         kind: 'forecast',
         heading: 'Cash ahead',
         icon: 'chart-line',
-        /* THE WHOLE WIDTH SINCE money-core 3.4.0, with the tile that stood beside it gone into the line. */
+        /* THE WHOLE OF THE MAIN COLUMN, SINCE money-core 3.11.0: eight twelfths of the page, with when the money runs out
+           and the accounts holding it in the side column beside it. It was the whole width from 3.4.0. */
         span: 12,
         source: 'forecast.runway',
         opening: { metric: 'cash-now' },
@@ -2355,34 +2371,33 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            walk goes under inside a month. */
         late: 'days-late-in',
         under: 30,
-        /* THE LINE OVER THE PAGE ALREADY SAYS WHEN IT RUNS OUT, SINCE money-core 3.6.0, so the chart leaves its own
-           sentence off and keeps the flag on the day. Money said one fact three times: "runs out in 57 days" over "Goes
-           under on 30 Oct" over a flag reading 30 Oct. With two books there is no line, and the record answers no
-           `headline` (`headlineHeld` in `packages/kernel/src/pages.ts`), so the chart says it again. */
+        /* THE PAGE ALREADY SAYS WHEN IT RUNS OUT, SINCE money-core 3.6.0, so the chart leaves its own sentence off and
+           keeps the flag on the day. Money said one fact three times: "runs out in 57 days" over "Goes under on 30 Oct"
+           over a flag reading 30 Oct. The line said it until 3.11.0, and the tile beside the chart says it now. With two
+           books there is no line, and the record answers no `headline` (`headlineHeld` in
+           `packages/kernel/src/pages.ts`), so the chart says it again. */
         headline: 'under',
         when: { metric: 'cash-accounts', gt: 0 },
         empty: 'Nothing is dated ahead yet.',
       },
       {
-        /* WHAT A RULE OR AN AGENT HAS ASKED ABOUT MONEY, answered where it is shown, three at a time, and the rest are in
-           Decide. No `empty:` of its own: with nothing waiting the queue says its own line (`QUEUE_CLEARED` in
-           `packages/render/src/queue.ts`). RIGHT UNDER THE HEADLINE, SINCE money-core 3.3.0, because it is the one tile
-           here that needs the person, and what needs the person comes before what explains. */
-        kind: 'queue',
-        heading: 'Waiting on you',
-        icon: 'ask',
+        /* WHEN THE MONEY RUNS OUT, BESIDE THE WALK, SINCE money-core 3.11.0: the day count the line said until then, now
+           at the figure's own size at the top of the side column. Its figure misses its target whenever it has a value
+           (`runway-days`, a year), so the app draws it in the colour of a miss, and it is drawn only while it has one: a
+           record whose money lasts the year has no such day, and no tile says so.
+
+           A DAY COUNT AND NOT A DATE, because no figure the record reads says the day itself: the flag on the walk beside
+           it is on the day. */
+        kind: 'stat',
+        heading: 'Runs out',
+        icon: 'alert',
         span: 12,
-        source: 'governance.open',
-        /* ONLY WHILE SOMETHING IS ASKED, SINCE money-core 3.3.0 (`questions-open`, the record's own count of what is open
-           in Decide), so a record with nothing waiting draws no band under its headline. */
-        when: { metric: 'questions-open', gt: 0 },
-        /* EVERY LIST MONEY HOLDS, SINCE money-core 3.1.0, so a question an agent asks about a balance check, a category or
-           a book is answered here too, and not only in Decide. */
-        where: 'list is obligations or transactions or accounts or recurring or installments or balances or categories or books',
-        limit: 3,
-        /* ONE TILE A QUESTION, SINCE money-core 3.2.0, led by what its recommended answer shows, the ways to answer under
-           it, so "let it read the bank's texts?" is read as its options and not as a line in a list. */
-        tiles: true,
+        area: 'rail',
+        /* A MISS HERE IS THE DANGER COLOUR AND NOT A WARNING: money that runs out inside the year is the one figure on
+           the page that needs the person. A host draws a missed target in the block's tone where it declares one. */
+        tone: 'bad',
+        cells: [{ metric: 'runway-days', label: 'On what is due' }],
+        when: { metric: 'runway-days', gte: 0 },
       },
       {
         /* WHERE THE MONEY IS, SINCE money-core 3.3.0: Cash now cut into the accounts that hold it, each named as the
@@ -2392,9 +2407,10 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         kind: 'split',
         heading: 'Accounts',
         icon: 'landmark',
-        /* THE WHOLE WIDTH SINCE money-core 3.4.0. The next 30 days it stood beside is the first under the fold, with the
-           month it walks. ABOVE HEADS UP SINCE money-core 3.5.0, which reads its balances. */
+        /* IN THE SIDE COLUMN, UNDER WHEN THE MONEY RUNS OUT, SINCE money-core 3.11.0: the whole width from 3.4.0, and
+           above Heads up from 3.5.0, which reads its balances and is now under the walk beside it. */
         span: 12,
+        area: 'rail',
         source: 'metric.cash-by-account',
         limit: 6,
         /* ONLY WHILE THERE IS CASH TO CUT, SINCE money-core 3.8.0. An account at nought, or overdrawn, cuts no length of
@@ -2403,11 +2419,40 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         when: { metric: 'cash-now', gt: 0 },
       },
       {
+        /* WHAT A RULE OR AN AGENT HAS ASKED ABOUT MONEY, answered where it is shown, three at a time, and the rest are in
+           Decide. No `empty:` of its own: with nothing waiting the queue says its own line (`QUEUE_CLEARED` in
+           `packages/render/src/queue.ts`).
+
+           IN THE SIDE COLUMN, UNDER WHERE THE MONEY IS, SINCE money-core 3.11.0. It was right under the headline from
+           3.3.0, because it is the one tile here that needs the person, and three questions drawn whole were then the
+           first screen of Money, with no number on it (the design review's fix 1). The questions are still on the first
+           screen, beside the walk, and the app draws them compact there (`asks.ts`): the question and its suggested
+           answer, one press each. */
+        kind: 'queue',
+        heading: 'Waiting on you',
+        icon: 'ask',
+        span: 12,
+        area: 'rail',
+        source: 'governance.open',
+        /* ONLY WHILE SOMETHING IS ASKED, SINCE money-core 3.3.0 (`questions-open`, the record's own count of what is open
+           in Decide), so a record with nothing waiting draws no band under its headline. */
+        when: { metric: 'questions-open', gt: 0 },
+        /* EVERY LIST MONEY HOLDS, SINCE money-core 3.1.0, so a question an agent asks about a balance check, a category or
+           a book is answered here too, and not only in Decide. */
+        where: 'list is obligations or transactions or accounts or recurring or installments or balances or categories or books',
+        /* THREE AT MOST, AND NO TILE A QUESTION SINCE money-core 3.11.0: four twelfths of the page hold a question and its
+           answer on one line, and not its options laid out as a form. */
+        limit: 3,
+      },
+      {
         /* WHAT NEEDS A LOOK, AS ONE TILE OF THREE LINES, SINCE money-core 3.5.0: a balance more than a week old, money
            late coming in and money late going out were three tiles the whole width, each one line tall, stacked like
            three banners. A boxed section draws the blocks after it, up to the next section, on one surface, and each line
-           under it is drawn only while it is true, so the tile holds what is true today and nothing else. It sits last
-           above the fold, so the fold's section is what closes it. */
+           under it is drawn only while it is true, so the tile holds what is true today and nothing else. Coming and
+           going's section after it is what closes it.
+
+           UNDER THE WALK, IN THE MAIN COLUMN, SINCE money-core 3.11.0: where the money sits went into the side column, and
+           what needs a look about it stays where the eye goes after the chart. */
         kind: 'section',
         heading: 'Heads up',
         icon: 'bell',
@@ -2451,17 +2496,20 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         when: { metric: 'overdue', gt: 0 },
       },
       {
-        /* EVERYTHING AFTER ACCOUNTS AND HEADS UP IS FOLDED SHUT, SINCE money-core 3.4.0 ("i dont want a very 'busy' looking ui",
-           October 2nd). Above it the page answers what there is, how long it lasts, what needs the person and where the
-           money sits; under it are the month ahead and what already moved, a tap away and not on the page a person
-           reads each morning. */
+        /* WHAT COMES IN AND GOES OUT, OPEN, SINCE money-core 3.11.0: the month ahead, what is paid in parts and what is
+           being chased are what a person plans the next weeks by, so they are on the page. From 3.4.0 to 3.10.0
+           everything after Accounts was folded shut ("i dont want a very 'busy' looking ui", October 2nd), and a page
+           whose walk said when the money runs out hid the bills that make it run out. What already happened is still
+           folded, under History.
+
+           ONE TILE, its blocks parts of one surface under its heading (`box`), as Heads up is, so an open section is not
+           a heading drawn as a tile of its own over four more. */
         kind: 'section',
         heading: 'Coming and going',
-        /* A GLYPH THE APP DRAWS ON A FOLDED HEADING, SINCE money-core 3.5.0: `arrow-up-down` drew nothing there. */
         icon: 'calendar',
         span: 12,
-        fold: true,
-        /* ONCE THERE IS AN ACCOUNT, as every walk and list under it is: a fresh record reads no folded heading. */
+        box: true,
+        /* ONCE THERE IS AN ACCOUNT, as every walk and list under it is: a fresh record reads no heading over nothing. */
         when: { metric: 'cash-accounts', gt: 0 },
       },
       {
@@ -2513,27 +2561,6 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         when: { metric: 'installments-left', gt: 0 },
         empty: 'Nothing is being paid in parts.',
       },
-      /* ONE MONTHLY VIEW, SINCE money-core 3.4.0. Where this month's money went and Every month were two more splits of
-         what goes out in a month beside the chart under, which draws the same month among its twelve; a person read
-         monthly spending three times. What each category takes is on the categories' own list. */
-      {
-        /* MONTH BY MONTH: what moved in and out in the twelve months to now, read from `transactions`, and what is due in
-           the three after, with what was left each month as a line. The current month is so far, and the months ahead
-           are what is due once plus what repeats at its monthly share, in every one of them. */
-        kind: 'series',
-        heading: 'In and out, by month',
-        icon: 'chart-column',
-        span: 12,
-        series: [
-          { metric: 'in-by-month', then: 'in-due-by-month', each: 'every-month-in', label: 'Money in' },
-          { metric: 'out-by-month', then: 'out-due-by-month', each: 'every-month-out', label: 'Money out', dir: 'out' },
-        ],
-        back: 12,
-        ahead: 3,
-        net: true,
-        when: { metric: 'out-by-month', gt: 0 },
-        empty: 'Nothing moved or due in these months.',
-      },
       {
         /* WHAT SOMEBODY CHOSE TO CHASE, AND SINCE WHEN, from the answer in Decide (`invoice-chased`), oldest first. Only
            while something is being chased: a table that is empty on nearly every record is noise on the one page
@@ -2554,6 +2581,38 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         limit: 6,
         when: { metric: 'chasing', gt: 0 },
         empty: 'Nothing is being chased.',
+      },
+      {
+        /* WHAT ALREADY HAPPENED, FOLDED SHUT, SINCE money-core 3.11.0: the months behind and what moved, a tap away, so
+           the page a person reads each morning is what there is, how long it lasts and what is coming. */
+        kind: 'section',
+        heading: 'History',
+        /* A GLYPH THE APP DRAWS ON A FOLDED HEADING, as a project's History and notes wore. */
+        icon: 'history',
+        span: 12,
+        fold: true,
+        when: { metric: 'cash-accounts', gt: 0 },
+      },
+      /* ONE MONTHLY VIEW, SINCE money-core 3.4.0. Where this month's money went and Every month were two more splits of
+         what goes out in a month beside the chart under, which draws the same month among its twelve; a person read
+         monthly spending three times. What each category takes is on the categories' own list. */
+      {
+        /* MONTH BY MONTH: what moved in and out in the twelve months to now, read from `transactions`, and what is due in
+           the three after, with what was left each month as a line. The current month is so far, and the months ahead
+           are what is due once plus what repeats at its monthly share, in every one of them. */
+        kind: 'series',
+        heading: 'In and out, by month',
+        icon: 'chart-column',
+        span: 12,
+        series: [
+          { metric: 'in-by-month', then: 'in-due-by-month', each: 'every-month-in', label: 'Money in' },
+          { metric: 'out-by-month', then: 'out-due-by-month', each: 'every-month-out', label: 'Money out', dir: 'out' },
+        ],
+        back: 12,
+        ahead: 3,
+        net: true,
+        when: { metric: 'out-by-month', gt: 0 },
+        empty: 'Nothing moved or due in these months.',
       },
       {
         /* WHAT MOVED, NEWEST FIRST, AS A CALM LIST (`MOVED_COLUMNS`). Twelve, so the page stays a page; the list holds the

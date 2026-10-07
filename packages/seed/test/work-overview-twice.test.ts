@@ -89,7 +89,8 @@ const block = (page: PageResult, heading: string) => {
 };
 
 /* WHAT IS IN PLAY, BAND BY BAND, since work 1.10.0 drew the Work screen's bands; and Done recently, which ticks too. */
-const GROUPS = ['Late', 'Today', 'This week', 'After this week', 'No due day', 'Waiting on you', 'With an agent', 'Later'];
+/* TODAY IS THE TOP OF THIS WEEK SINCE work 1.15.0. */
+const GROUPS = ['Late', 'This week', 'After this week', 'No due day', 'Waiting on you', 'With an agent', 'Later'];
 const TICKS = [...GROUPS, 'Done recently'];
 
 test('NO TASK IS DRAWN UNDER TWO OF WORK’S LISTS AND NONE IS LEFT OUT, because a person ticking down the page would tick it twice or never', async () => {
@@ -145,7 +146,7 @@ test('NO TASK IS DRAWN UNDER TWO OF WORK’S LISTS AND NONE IS LEFT OUT, because
   assert.deepEqual(lists.map((b) => String(b.heading)).sort(), [...TICKS].sort(), 'the lists that tick are not the ones this names');
   assert.deepEqual(
     corners.map((c) => where.get(c.what)),
-    [['Waiting on you'], ['With an agent'], ['Later'], ['Late'], ['Waiting on you'], ['Today'], ['This week'], ['This week'], ['After this week'], ['No due day'], ['With an agent'], ['Later']],
+    [['Waiting on you'], ['With an agent'], ['Later'], ['Late'], ['Waiting on you'], ['This week'], ['This week'], ['This week'], ['After this week'], ['No due day'], ['With an agent'], ['Later']],
     'each corner is drawn once, under the heading that answers it',
   );
   sql.close();

@@ -385,13 +385,23 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   host names no organisation, neither rule writes a subject, Everyone is grouped by organisation and leaves out a
  *   person folded into another, and an organisation's page draws its projects and money where the record holds them
  *   (`placed` in `firstPartyDocument`, which makes those two lists People's links and not its needs).
+ * - money-core 3.11.0 and work 1.15.0: each page leads with its picture and no tile is half empty (DIRECTION §39, the
+ *   design review's fixes 3 and 8). Money opens on Cash ahead with a side column beside it (`layout: { rail: 4 }`):
+ *   when the money runs out, which the line no longer says, the accounts holding it and the questions; Heads up under
+ *   the walk; Coming and going open as one tile, and only the months behind and what moved folded under History. Work's
+ *   line says counts ("1 late, 3 waiting on you"), Late is a strip the whole width, the figures are one strip (Open, Due
+ *   this week, Done this week with its last seven nights), and This week, which now starts today, sits beside With an
+ *   agent and Waiting on you, a third each. Work gains `tasks-this-week-yours`, the figure This week is drawn on.
+ *   Blocks moved and a figure added, no list or field, so each step is a minor one and reaches a record on its own. The
+ *   project page moves with them, though no pack holds it (`crossPack`): its history, notes, money and what it runs on
+ *   are one More about tile where they were three folded sections (fix 9).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.14.0',
   people: '3.0.0',
-  'money-core': '3.10.0',
+  'money-core': '3.11.0',
   estate: '2.1.0',
-  work: '1.14.0',
+  work: '1.15.0',
 };
 
 type Body = Record<string, unknown>;

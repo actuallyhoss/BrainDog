@@ -1061,46 +1061,52 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'No task on {{name}} has a day yet.',
       },
       {
-        /* WHO WORKED ON IT AND WHAT IS WRITTEN ABOUT IT, FOLDED SHUT, SINCE portfolio 1.8.0 (DIRECTION §35): above the
-           fold the page answers what needs you, where it stands, what is open and the plan. */
+        /* EVERYTHING ELSE ABOUT IT, AS ONE TILE, SINCE work 1.15.0 (DIRECTION §39, the design review's fix 9). From
+           1.8.0 who worked on it and its notes, its money, and what it runs on were three sections folded shut, each a
+           tile 56px tall holding only its name and a Show button, which read as unfinished. Now they are one boxed tile
+           under the plan, its parts on one surface, each short: the last few changes and runs, the notes, the money by
+           month and the next bills, what keeps it running and the keys, tools and skills it uses. A part with nothing
+           in it is not drawn, so a new project's tile is its notes.
+
+           WHAT IT RUNS ON LEFT THE RAIL FOR IT, with the scheduled actions (Resume, Pause), which the host draws under
+           this heading (`panel: actions`). The rail keeps the short tiles beside the chart. */
         kind: 'section',
-        heading: 'History and notes',
-        icon: 'history',
+        heading: 'More about {{name}}',
+        icon: 'notebook-pen',
         span: 12,
-        fold: true,
+        box: true,
+        panel: 'actions',
       },
       {
-        /* CARDS, because an agent working on the project is a face and a sentence, not a row in a log.
-           Same span as the timeline it replaces: the page pairs its blocks 8 with 4 and 7 with 5. */
+        /* WHAT CHANGED ON THE PROJECT, from the record's own log, newest first: who said how it is going, what is next and
+           how far along, a person or an agent or a rule. `{{spoken}}` is this project's row, which is what an edit of it
+           names as its target. THREE, SINCE work 1.15.0, and the project's own history holds the rest. */
+        kind: 'feed',
+        heading: 'What changed',
+        icon: 'activity',
+        span: 6,
+        source: 'activity',
+        where: 'target is {{spoken}}',
+        first: 3,
+      },
+      {
+        /* CARDS, because an agent working on the project is a face and a sentence, not a row in a log. The last three
+           runs, beside what changed. */
         kind: 'cards',
         heading: 'Agents',
         icon: 'bot',
-        span: 7,
+        span: 6,
         columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
         source: 'register.session',
         /* BY `project`, WHICH HOLDS THE PROJECT'S SPOKEN ID, `things#1`. `{{spoken}}` is that id for the
            row the template is about, filled by both engines. */
         where: 'project is {{spoken}}',
         order: [{ field: 'last_seen', dir: 'desc' }],
-        limit: 6,
-        empty: 'No agent has touched {{name}}.',
-      },
-      {
-        /* WHAT CHANGED ON THE PROJECT, from the record's own log, newest first, beside the agents doing it: who said how it
-           is going, what is next and how far along, a person or an agent or a rule. `{{spoken}}` is this project's row,
-           which is what an edit of it names as its target. */
-        kind: 'feed',
-        heading: 'What changed',
-        icon: 'activity',
-        span: 5,
-        source: 'activity',
-        where: 'target is {{spoken}}',
-        first: 5,
-        empty: 'Nothing about {{name}} has changed yet.',
+        limit: 3,
       },
       {
         /* WHAT IS WRITTEN ABOUT THE PROJECT: its plan, what blocks it and what was decided, as the row's note holds it,
-           blocks and all. A project nobody has written about says so. */
+           blocks and all. A project nobody has written about says so, and where to write it. */
         kind: 'note',
         document: true,
         heading: 'Notes',
@@ -1110,79 +1116,48 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing is written about {{name}} yet. Its note is on the project.',
       },
       {
-        /* ITS MONEY, FOLDED SHUT, SINCE portfolio 1.8.0. A record that keeps no Money has no blocks under it, and the
-           section goes with them (`projectTemplate`). */
-        kind: 'section',
-        heading: 'Money',
-        icon: 'money',
-        span: 12,
-        fold: true,
-      },
-      {
         /* ITS MONEY MONTH BY MONTH, in and out, from what moved in the twelve months to now, with what was left each month
            as a line. Read from Money's transactions, so a record that keeps no Money has the page without it
-           (`PROJECT_LINKS`). A line names its figure with this project as its parameter, as a tile's cell does.
-           THE WHOLE WIDTH SINCE portfolio 1.8.0: the month so far beside it was the chart's newest month said again. */
+           (`PROJECT_LINKS`). A line names its figure with this project as its parameter, as a tile's cell does. HALF THE
+           TILE SINCE work 1.15.0, beside the bills and invoices. */
         kind: 'series',
         heading: 'Money by month',
         icon: 'chart-column',
-        span: 12,
+        span: 6,
         series: [
           { metric: 'project-in-by-month:{{name}}', label: 'Money in' },
           { metric: 'project-out-by-month:{{name}}', label: 'Money out', dir: 'out' },
         ],
         back: 12,
         net: true,
-        empty: 'No money has moved on {{name}} in the last twelve months.',
       },
       {
         kind: 'table',
-        /* BILLS AND INVOICES, SINCE portfolio 1.8.0, where it said Money under a section that now says it. */
         heading: 'Bills and invoices',
         icon: 'receipt',
-        /* THE WHOLE WIDTH, SINCE portfolio 1.6.0, when what keeps it running moved to the rail as cards. It was eight
-           beside that block's four. */
-        span: 12,
+        span: 6,
         source: 'register.obligations',
         where: 'thing is {{name}}',
         /* THE AMOUNT CARRIES ITS OWN SIGN, because this block holds money in and money out, and a column of unsigned
            amounts read down as one sum when the net is the other way. The sign is the row's direction, money out drawn
-           with a minus, so which way it goes is said by the figure and not by a column of words beside it. */
+           with a minus, so which way it goes is said by the figure and not by a column of words beside it. TWO COLUMNS
+           AND FOUR ROWS SINCE work 1.15.0, the soonest due first: the day is said by the order, and the rest are on
+           Money. */
         columns: [
-          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)' },
+          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
-          { field: 'due', label: 'Due', width: '15ch', align: 'end' },
         ],
         order: [{ field: 'due', dir: 'asc' }],
-        limit: 8,
-        empty: 'Nothing owed either way on {{name}}.',
-      },
-      /* THE PAGE ENDS WITH WHAT RUNS ON IT, IN THE RAIL, FOLDED SHUT SINCE portfolio 1.8.0, with what it costs to keep: its own keys, tools and skills, then the
-         ones that apply everywhere, faint beneath, one above the other at the rail's width. `panel: actions` names the
-         host panel a section draws under it, so `BlockSlot.svelte` attaches the scheduled actions list (Resume, Pause)
-         here without matching English text. A record without the agents pack, or with
-         none of a kind, says so through each block's own `empty:` rather than refusing: `runs_on` reads a list only
-         where the record holds it. */
-      {
-        kind: 'section',
-        heading: 'Runs on',
-        icon: 'plug',
-        span: 12,
-        area: 'rail',
-        panel: 'actions',
-        fold: true,
+        limit: 4,
       },
       {
-        /* WHAT KEEPS IT RUNNING, AS CARDS IN THE RAIL, SINCE portfolio 1.6.0: one card a service, its name, what it costs
-           a cycle and which cycle, the day it renews, and what the service's own note says about it ("the only copy of
-           the binaries"). It was a two-column spec in the main column, which had no room for the renewal day; in the rail
-           it is looked up beside the figures, as what the project runs on below it is. UNDER RUNS ON, FOLDED, SINCE
-           portfolio 1.8.0, beside the keys and tools it pays for. */
+        /* WHAT KEEPS IT RUNNING: one card a service, its name, what it costs a cycle and which cycle, and the day it
+           renews, what renews first first. No `when:`: a domain imported with no cost is still what the project runs on,
+           so a figure of what it costs cannot say whether there is anything here. */
         kind: 'cards',
         heading: 'Keeping it alive',
         icon: 'server',
-        span: 12,
-        area: 'rail',
+        span: 6,
         source: 'register.services',
         where: 'thing is {{name}}',
         columns: [
@@ -1192,18 +1167,13 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'note', label: 'Note', as: 'fact' },
           { field: 'renews', label: 'Renews', as: 'when' },
         ],
-        /* WHAT RENEWS FIRST, FIRST. With no order the record listed the newest six and the sample the oldest. */
         order: [{ field: 'renews', dir: 'asc' }],
-        limit: 6,
-        /* NO `when:`. A domain imported with no cost is still what the project runs on, so a figure of what it costs
-           cannot say whether there is anything here, and no figure counts a project's services. It is folded shut. */
-        empty: '{{name}} runs on nothing you pay for.',
+        limit: 3,
       },
       {
         /* `{{spoken}}` IS THIS PROJECT'S OWN ROW, `things#1`, which `runs_on` takes as `about:` and reads every kind
-           from, so the same three blocks below narrow one read to a kind apiece by `where:` rather than asking the
-           kernel three times. `about:` is read by a `cards` block (`block-keys.ts` `KEY_KINDS`), as it is by `table`.
-           Each takes the rail's whole width, since four twelfths of a page is too narrow to put two cards side by side.
+           from, so the blocks below narrow one read to a kind apiece by `where:` rather than asking the kernel three
+           times. `about:` is read by a `cards` block (`block-keys.ts` `KEY_KINDS`), as it is by `table`.
 
            NO BLOCK HERE NAMES `kind is action`: the scheduled actions are the panel the section above draws, with
            Resume and Pause, so a card for each as well would say every action twice.
@@ -1211,12 +1181,14 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            EACH CARD SAYS WHERE IT APPLIES AND WHO USED IT LAST. `scope` is the chip, the project's mark or the globe
            for everywhere, and the kernel answers the project's own first and the global ones after them.
            `used_by` is the run that last opened a key or called a tool, `S47`, which the card draws as that run's face,
-           and `used_at` when anybody last did; a skill has no use the record counts, so it names neither. */
+           and `used_at` when anybody last did; a skill has no use the record counts, so it names neither.
+
+           THREE OF EACH SINCE work 1.15.0, and none that says it is empty: a project with no key, tool or skill of
+           its own draws none of the three, where the rail said three sentences of nothing. */
         kind: 'cards',
         heading: 'Keys',
         icon: 'key',
-        span: 12,
-        area: 'rail',
+        span: 6,
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is key',
@@ -1227,15 +1199,13 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'used_by', label: 'Last used by', as: 'who' },
           { field: 'used_at', label: 'Last used', as: 'when' },
         ],
-        limit: 8,
-        empty: 'No key is kept for {{name}} yet. An agent working in its folder adds what it uses.',
+        limit: 3,
       },
       {
         kind: 'cards',
         heading: 'Tools and servers',
         icon: 'plug',
-        span: 12,
-        area: 'rail',
+        span: 6,
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is tool',
@@ -1246,15 +1216,13 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'used_by', label: 'Last used by', as: 'who' },
           { field: 'used_at', label: 'Last used', as: 'when' },
         ],
-        limit: 8,
-        empty: 'No tool or server is set up for {{name}} yet. An agent working in its folder adds what it uses.',
+        limit: 3,
       },
       {
         kind: 'cards',
         heading: 'Skills',
         icon: 'skill',
-        span: 12,
-        area: 'rail',
+        span: 6,
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is skill',
@@ -1263,8 +1231,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'scope', label: 'Applies to', as: 'scope' },
           { field: 'detail', label: 'Version', as: 'fact' },
         ],
-        limit: 8,
-        empty: 'No skill is written for {{name}} yet. An agent working in its folder adds what it uses.',
+        limit: 3,
       },
     ],
   },
@@ -1308,14 +1275,37 @@ export function projectTemplate(holds: Iterable<string>): SeedPage {
   /* A ROW OF FIGURES EVERY ONE OF WHICH READS A LIST THE RECORD DOES NOT HOLD GOES WHOLE, as a block over such a list
      does: made up from the tasks instead, it would say At a glance's figures a second time under a heading about money. */
   const cellsGone = (cells: unknown): boolean => Array.isArray(cells) && cells.length > 0 && cells.every((c) => figureGone((c as { metric?: unknown } | null)?.metric));
-  for (const block of page.blocks as Record<string, unknown>[]) {
+  /* WHERE EACH BLOCK STARTS IN ITS ROW, laid as the page lays them, each column a flow of its own: a block that would
+     run past the twelfth starts the next row. */
+  const declared = page.blocks as Record<string, unknown>[];
+  const used = new Map<unknown, number>();
+  const opensRow = declared.map((b) => {
+    const span = typeof b.span === 'number' ? b.span : 12;
+    const at = used.get(b.area) ?? 0;
+    const fresh = at === 0 || at + span > 12;
+    used.set(b.area, (fresh ? 0 : at) + span);
+    return fresh;
+  });
+  /* THE WIDTH THE BLOCKS THAT OPENED A ROW LEFT, owed to the next block kept in that row of their column. */
+  type Owed = { area: unknown; span: number };
+  let owed = null as Owed | null;
+  for (let [i, block] of declared.entries()) {
+    if (opensRow[i]) owed = null;
     if (gone(block.source) || linesGone(block.series) || cellsGone(block.cells)) {
       const before = blocks.at(-1);
-      /* ONLY WITHIN ONE COLUMN: a main block's width given to a rail block before it would widen the wrong column. */
-      if (before && before.area === block.area && typeof before.span === 'number' && typeof block.span === 'number')
+      if (typeof block.span !== 'number') continue;
+      /* TO A BLOCK IT SHARED A ROW WITH, ONLY WITHIN ONE COLUMN: a main block's width given to a rail block would widen
+         the wrong column. One that opened its row hands its width on to the next kept in that row, since portfolio
+         1.15.0, where giving it to the block before, already a whole row, dropped it and left its partner half a row
+         alone. */
+      if (owed !== null) owed = { area: owed.area, span: owed.span + block.span };
+      else if (opensRow[i]) owed = { area: block.area, span: block.span };
+      else if (before && before.area === block.area && typeof before.span === 'number')
         blocks[blocks.length - 1] = { ...before, span: Math.min(12, before.span + block.span) };
       continue;
     }
+    if (owed !== null && owed.area === block.area && typeof block.span === 'number') block = { ...block, span: Math.min(12, block.span + owed.span) };
+    owed = null;
     const cells = block.cells as { metric: string }[] | undefined;
     if (!cells) {
       blocks.push(block);

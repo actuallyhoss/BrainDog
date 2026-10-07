@@ -347,7 +347,7 @@ test('A PROJECT PAGE KEEPS WHERE IT STANDS AND WHAT IS HANDED BACK IN ONE COLUMN
   assert.equal(block(opened(k, 'portage'), 'Handed back or blocked').drawn, false, 'a tile saying nothing is handed back');
 });
 
-test('A PROJECT PAGE DRAWS ITS FINISHED WORK BY THE WEEK, SAYS ITS MONEY BY THE MONTH, AND KEEPS WHAT IT RUNS ON IN THE RAIL', async () => {
+test('A PROJECT PAGE DRAWS ITS FINISHED WORK BY THE WEEK, SAYS ITS MONEY BY THE MONTH, AND WHAT IT RUNS ON UNDER MORE ABOUT IT', async () => {
   const k = await seeded();
   /* THE SAMPLE MOVED NO MONEY ON KILN THIS MONTH, so two movements are written today, one each way, and the month's
      figures are asked about money that is there rather than three noughts that agree with anything. */
@@ -373,9 +373,10 @@ test('A PROJECT PAGE DRAWS ITS FINISHED WORK BY THE WEEK, SAYS ITS MONEY BY THE 
   assert.deepEqual(byMonth.bars?.values.map((line) => Math.abs(line.at(-1) ?? 0)), [50_000, 12_000]);
   assert.ok(!page.blocks.some((b) => b.heading === 'This month so far'), 'the month so far is said beside the chart that draws it');
 
-  /* WHAT IT RUNS ON IS CARDS IN THE RAIL, what renews first first, and the dates are weeks above the plan. */
+  /* WHAT IT RUNS ON IS CARDS, what renews first first, and the dates are weeks above the plan. IN THE MAIN COLUMN SINCE
+     work 1.15.0, a part of the one More about tile, where it was folded shut in the rail. */
   const alive = page.blocks.find((b) => b.heading === 'Keeping it alive')!;
-  assert.deepEqual([alive.kind, (alive as { area?: string }).area], ['cards', 'rail']);
+  assert.deepEqual([alive.kind, (alive as { area?: string }).area], ['cards', undefined]);
   const renews = alive.rows.map((r) => String(r.fields.renews ?? '')).filter((d) => d !== '');
   assert.deepEqual(renews, [...renews].sort());
   /* EACH DATE IS DRAWN ONCE, SINCE portfolio 1.8.0, on the plan: a calendar above it drew the same tasks again. */

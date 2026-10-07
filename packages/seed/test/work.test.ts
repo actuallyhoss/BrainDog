@@ -71,9 +71,12 @@ test('WORK’S OVERVIEW AND BOARD OPEN ON THE SAMPLE WITH NO BLOCK REFUSED, and 
   const k = await seeded();
   for (const slug of ['work', 'work-board']) for (const b of opened(k, slug).blocks) assert.deepEqual(b.refusals, [], `${slug} ${b.heading}`);
 
-  const figures = Object.fromEntries((block(opened(k, 'work'), 'How fast it moves').readings ?? []).map((r) => [r.metric, r.reading?.value]));
-  /* ONE FIGURE SINCE work 1.11.0, how much was finished, folded under Done lately: how much is open is the line's. */
+  const figures = Object.fromEntries((block(opened(k, 'work'), 'At a glance').readings ?? []).map((r) => [r.metric, r.reading?.value]));
+  /* THREE FIGURES AS ONE STRIP SINCE work 1.15.0: what is open, what falls due in the week, and what was finished in it.
+     What is late and what waits on you are the line's. */
   assert.deepEqual(figures, {
+    'open-tasks': TASKS.filter(open).length,
+    'tasks-due-7d': TASKS.filter((t) => live(t) && String(t.by) >= TODAY && String(t.by) < new Date(NOW + 8 * 86_400_000).toISOString().slice(0, 10)).length,
     'tasks-done-7d': TASKS.filter((t) => t.state === 'done' && String(t.done_on) > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)).length,
   });
   /* AND THE FIGURES THE BANDS ARE DRAWN ON, which the line says too. */
@@ -101,20 +104,22 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   /* THE PAGE'S LINE, THEN THE CAPTURE LINE, so a task is written down before anything else is read, then the Work
      screen's bands of what is still to do top to bottom, and what is further off and what was finished folded shut. The
      line has no heading: it is the sentence in the page's title, two of them on one figure since work 1.13.0, of which one
-     is drawn, and a third since work 1.14.0 for a list with nothing open. SINCE work 1.12.0 Today is the whole width over
-     Late and This week, which share a row. */
+     is drawn, and a third since work 1.14.0 for a list with nothing open. SINCE work 1.15.0 Late is a strip the whole width,
+     the figures are one strip under it, and Today is the top of This week. */
   assert.deepEqual(
     headings,
     [
-      undefined, undefined, undefined, 'What needs doing?', 'Today', 'Late', 'This week', 'With an agent', 'Waiting on you',
+      undefined, undefined, undefined, 'What needs doing?', 'Late', 'At a glance', 'This week', 'With an agent', 'Waiting on you',
       'Not this week', 'After this week', 'No due day', 'Later',
-      'Done lately', 'How fast it moves', 'Done recently',
+      'Done lately', 'Done recently',
     ],
     headings.join(', '),
   );
-  /* LATE AND THIS WEEK SHARE A ROW, SINCE work 1.12.0, half each, and every other band is the whole width. */
+  /* NO HALF-EMPTY TILE, SINCE work 1.15.0: Late the whole width, and This week, With an agent and Waiting on you a third
+     each, one row. */
   const spans = Object.fromEntries((PAGES.work!.blocks as { heading?: string; span?: number }[]).filter((b) => b.heading).map((b) => [b.heading, b.span]));
-  assert.deepEqual([spans.Today, spans.Late, spans['This week'], spans['With an agent']], [12, 6, 6, 12]);
+  assert.deepEqual([spans.Late, spans['At a glance'], spans['This week'], spans['With an agent'], spans['Waiting on you']], [12, 12, 4, 4, 4]);
+  assert.ok(!('Today' in spans), 'Today is a band of its own again');
   for (const folded of ['Not this week', 'Done lately'])
     assert.equal((page.blocks.find((b) => b.heading === folded) as { fold?: boolean }).fold, true, `${folded} is not folded`);
 
@@ -122,7 +127,10 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   const late = block(page, 'Late');
   assert.equal(late.kind, 'todo');
   assert.deepEqual(late.rows.map((r) => r.fields.what), ['Turn auto-renew back on for kilnfonts.example']);
-  assert.ok(!block(page, 'This week').rows.some((r) => String(r.fields.by) <= TODAY), 'This week holds what is late or due today');
+  /* THIS WEEK STARTS TODAY, BY THE DAY FIRST, SINCE work 1.15.0, and holds nothing late. */
+  const week = block(page, 'This week').rows.map((r) => String(r.fields.by));
+  assert.ok(!week.some((d) => d < TODAY), 'This week holds what is late');
+  assert.deepEqual(week, [...week].sort(), 'This week is not by the day first');
 
   /* DONE RECENTLY IS THE LAST SEVEN DAYS, NEWEST FIRST. */
   const done = block(page, 'Done recently').rows.map((r) => String(r.fields.done_on));
@@ -198,7 +206,7 @@ test('AN AGENT TAKES A TASK, SPLITS IT, HANDS IT BACK AND A PERSON FINISHES IT, 
   overview = opened(k, 'work');
   assert.ok(!block(overview, 'Waiting on you').rows.some((r) => r.fields.what === title));
   assert.ok(block(overview, 'Done recently').rows.some((r) => r.fields.what === title));
-  const done = (block(overview, 'How fast it moves').readings ?? []).find((r) => r.metric === 'tasks-done-7d');
+  const done = (block(overview, 'At a glance').readings ?? []).find((r) => r.metric === 'tasks-done-7d');
   assert.equal(done?.reading?.value, TASKS.filter((t) => t.state === 'done' && String(t.done_on) > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)).length + 1);
 });
 
@@ -273,7 +281,7 @@ test('WORK INSTALLS ALONE: a homework list with no Projects and no People, its p
   assert.ok(k.create('tasks', { what: 'Problem set 3', state: 'open', by: TODAY }, { actor: 'p_1' }).ok);
   const overview = opened(k, 'work');
   for (const b of overview.blocks) assert.deepEqual(b.refusals, [], `work ${b.heading}`);
-  assert.ok(block(overview, 'Today').rows.some((r) => r.fields.what === 'Problem set 3'));
+  assert.ok(block(overview, 'This week').rows.some((r) => r.fields.what === 'Problem set 3'));
   for (const b of opened(k, 'work-board').blocks) assert.deepEqual(b.refusals, [], `work-board ${b.heading}`);
 });
 
@@ -306,8 +314,11 @@ test('WORK OPENS ON ONE LINE SAID FROM ITS FIGURES, and every tile with a headin
     const lead = page.blocks[0]!;
     assert.equal(lead.kind, 'note', `${slug} does not open on its line`);
     assert.equal((lead as { lead?: boolean }).lead, true);
-    /* WORK'S LINE NAMES THE TASK LATE LONGEST WHILE ANY IS, SINCE work 1.13.0, and is the counts otherwise. */
-    const counts = page.blocks.find((b) => (b as { lead?: boolean }).lead === true && /\{\{open-tasks\}\} open task\(s\)/u.test(String((b as { body?: string }).body)));
+    /* WORK'S LINE IS COUNTS, SINCE work 1.15.0 ("1 late, 3 waiting on you"), where from 1.13.0 it named the task late
+       longest; the Board's is how much is on it. */
+    const counts = page.blocks.find(
+      (b) => (b as { lead?: boolean }).lead === true && /\{\{(open-tasks|tasks-late-yours)\}\} (open task\(s\)|late)/u.test(String((b as { body?: string }).body)),
+    );
     assert.ok(counts, `${slug} has no line of its counts`);
     const bare = page.blocks.filter((b) => typeof b.heading === 'string' && typeof (b as { icon?: unknown }).icon !== 'string').map((b) => b.heading);
     assert.deepEqual(bare, [], `${slug}: a heading with no glyph`);
@@ -319,14 +330,14 @@ test('WORK OPENS ON ONE LINE SAID FROM ITS FIGURES, and every tile with a headin
     assert.ok(!headings.includes(gone), `${gone} is still drawn`);
 });
 
-test('THE FIGURE ON HOW FAST IT MOVES IS REMEMBERED EACH NIGHT, so its tile draws a line', async () => {
+test('DONE THIS WEEK IS REMEMBERED EACH NIGHT, so the strip draws its last seven days', async () => {
   let now = NOW;
   const k = await openRecord(openSqlite(), { now: () => now });
   const out = await installSeed(k);
   assert.ok(out.ok, sayOf(out));
   now = NOW + 86_400_000;
   await k.drain();
-  const cells = block(opened(k, 'work'), 'How fast it moves').readings ?? [];
+  const cells = (block(opened(k, 'work'), 'At a glance').readings ?? []).filter((c) => c.metric === 'tasks-done-7d');
   assert.equal(cells.length, 1);
   for (const c of cells) assert.ok(c.trend, `${c.metric} draws no line after a night`);
 });
@@ -349,7 +360,7 @@ test('A PROJECT’S FINISHED WORK IS COUNTED BY THE WEEK, one project at a time,
  */
 test('NO BAND OF WORK IS DRAWN EMPTY, and the line’s late is the Late band’s count', async () => {
   const k = await seeded();
-  const gates: Record<string, string> = { Late: 'tasks-late-yours', Today: 'tasks-today-yours', 'This week': 'tasks-week-yours', 'With an agent': 'tasks-with-agents' };
+  const gates: Record<string, string> = { Late: 'tasks-late-yours', 'This week': 'tasks-this-week-yours', 'With an agent': 'tasks-with-agents' };
   const check = () => {
     const page = opened(k, 'work');
     for (const [heading, metric] of Object.entries(gates)) {
@@ -359,20 +370,18 @@ test('NO BAND OF WORK IS DRAWN EMPTY, and the line’s late is the Late band’s
       assert.equal(read.value.value, b.matched ?? b.rows.length, `${heading} holds what ${metric} does not count`);
       assert.equal(b.drawn !== false, (b.matched ?? b.rows.length) > 0, `${heading} is drawn ${b.drawn === false ? 'hidden over tasks' : 'empty'}`);
     }
-    /* THE LINE NAMES THE LATE BAND'S FIRST TASK AND COUNTS THE REST OF IT, or says nothing late when the band is empty. */
+    /* THE LINE COUNTS THE LATE BAND AND WHAT WAITS ON YOU, SINCE work 1.15.0, or says nothing is late when the band is
+       empty. */
     const late = block(page, 'Late');
     /* FOUND BY WHAT IT SAYS, since work 1.14.0 put the line for nothing open first. */
-    const lead = page.blocks.find((b) => b.kind === 'note' && /tasks-late-yours\.first/u.test(String((b as { body?: string }).body))) as
+    const lead = page.blocks.find((b) => b.kind === 'note' && /^\{\{tasks-late-yours\}\} late/u.test(String((b as { body?: string }).body))) as
       | { body?: string; drawn?: boolean; values?: Record<string, unknown> }
       | undefined;
-    assert.ok(lead, 'Work has no line naming the late task');
-    assert.match(String(lead.body), /^\{\{tasks-late-yours\.first\}\} is late, and \{\{tasks-late-yours\.more\}\} more task\(s\) are too$/u);
+    assert.ok(lead, 'Work has no line counting what is late');
+    assert.equal(lead.body, '{{tasks-late-yours}} late, {{tasks-waiting}} waiting on you');
     const count = late.matched ?? late.rows.length;
     assert.equal(lead.drawn !== false, count > 0);
-    if (count > 0) assert.equal(lead.values?.['tasks-late-yours.more'], count - 1);
-    /* AND THE TASK IT NAMES IS THE ONE LATE LONGEST, the earliest day in the band. */
-    const days = late.rows.map((r) => String(r.fields.by)).sort();
-    if (count > 0) assert.equal(late.rows.find((r) => r.fields.what === lead.values?.['tasks-late-yours.first'])?.fields.by, days[0]);
+    if (count > 0) assert.equal(lead.values?.['tasks-late-yours'], count);
   };
   check();
   const yesterday = new Date(NOW - 86_400_000).toISOString().slice(0, 10);

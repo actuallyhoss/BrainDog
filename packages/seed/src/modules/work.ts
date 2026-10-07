@@ -418,6 +418,19 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  /* TODAY AND THE REST OF THE WEEK AS ONE BAND, SINCE work 1.15.0, over that band's own clauses, so This week is drawn
+     exactly while it holds a task of yours due from today to a week out. Today and This week keep their own figures. */
+  'tasks-this-week-yours': {
+    metric: 'tasks-this-week-yours',
+    name: 'Yours, due today or this week',
+    source: 'register.tasks',
+    where: `${YOURS}, by after yesterday, by before +8d`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
   /* WHAT IS FOLDED UNDER NOT THIS WEEK, SINCE work 1.11.0, each over its band's own clauses, and the three together for
      the section over them, so no band is drawn empty and a record with nothing further off draws no folded heading. */
   'tasks-after-week-yours': {
@@ -711,6 +724,13 @@ export const WORK_PAGES: Record<string, SeedPage> = {
    * capture line, and only a line says what is empty. Every band said it in its own words ("Nothing due today.",
    * "Nothing waits on you."), so a record whose list held nothing, or whose project strip narrowed a band to nothing,
    * read eight tiles of white saying so. A band with nothing in it is not drawn now, under its figure or under the strip.
+   *
+   * NO HALF-EMPTY TILES, SINCE work 1.15.0 (DIRECTION §39, the design review's fix 8). A row of tiles stretches to its
+   * tallest, so Late beside This week was a tile 220px tall holding one line. Late is a strip the whole width, and
+   * This week, With an agent and Waiting on you share the row under it, a third each; Today is the top of This week,
+   * which is ordered by the day first. Over them, a strip of figures: what is open, what falls due this week, and what
+   * was finished, with its last seven days. The line says counts, "1 late, 3 waiting on you", where it named a task
+   * and read like one.
    */
   work: {
     page: 'work',
@@ -747,22 +767,24 @@ export const WORK_PAGES: Record<string, SeedPage> = {
            yours (`tasks-late-yours`), the count of the Late band under it, so the line and the band never disagree; an
            agent's late task is counted where it is drawn, with the agent or waiting on you.
 
-           IT NAMES THE LATE TASK, SINCE work 1.13.0 (the visual review of October 2nd), where it counted the table:
-           "Turn auto-renew back on is late, and 6 more tasks are too" rather than "15 open tasks, 1 late". The task is
-           the one late longest (`.first`), from whatever this record's tasks are. With nothing late the line is the
-           counts, as it was. */
+           COUNTS AND NOT A TASK, SINCE work 1.15.0 (the design review's fix 8): "1 late, 3 waiting on you". From 1.13.0
+           it named the task late longest ("Turn auto-renew back on for kilnfonts.example is late"), which read like a
+           task and not like the page's line; the task is the first of the Late strip under it. With nothing late the
+           line says so in as many words, so the two lines read alike. */
         kind: 'note',
         lead: true,
         span: 12,
         when: { metric: 'tasks-late-yours', gt: 0 },
-        body: '{{tasks-late-yours.first}} is late, and {{tasks-late-yours.more}} more task(s) are too',
+        body: '{{tasks-late-yours}} late, {{tasks-waiting}} waiting on you',
       },
       {
+        /* NOTHING LATE AND NOT HOW MANY ARE OPEN, SINCE work 1.15.0: Open is the first figure of the strip under the
+           capture line, and a tile does not say again what the line says. */
         kind: 'note',
         lead: true,
         span: 12,
         when: { metric: 'tasks-late-yours', is: 0 },
-        body: '{{open-tasks}} open task(s), {{tasks-waiting}} waiting on you',
+        body: 'Nothing is late, {{tasks-waiting}} waiting on you',
       },
       {
         /* CAPTURE FIRST, before any figure, because a task that is not written down the moment it comes to mind is the
@@ -775,28 +797,16 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         register: 'tasks',
       },
       {
-        kind: 'todo',
-        heading: 'Today',
-        icon: 'calendar',
-        span: 12,
-        source: 'register.tasks',
-        where: `${YOURS}, by is today`,
-        columns: [{ field: 'what' }, { field: 'thing' }],
-        order: TIER_THEN_DUE,
-        limit: 12,
-        when: { metric: 'tasks-today-yours', gt: 0 },
-      },
-      {
         /* A `todo` AND NOT A `table`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ. The host wires the tick onto
-           every `todo` row. Late, Today and This week are yours, cut at today and at a week, ordered by tier and then
-           by day.
+           every `todo` row. Late and This week are yours, cut at today and at a week, Late ordered by tier and then by
+           day.
 
-           LATE AND THIS WEEK SIDE BY SIDE, HALF EACH, UNDER TODAY, SINCE work 1.12.0: two short lists the whole width
-           each were two strips of white with a task at the left of each. Today keeps the whole width above them. */
+           A STRIP THE WHOLE WIDTH, SINCE work 1.15.0: beside This week it was a tile as tall as the longer list holding
+           one line, and it is the one band here that is already wrong. */
         kind: 'todo',
         heading: 'Late',
         icon: 'alert',
-        span: 6,
+        span: 12,
         source: 'register.tasks',
         where: `${YOURS}, by before today`,
         columns: [{ field: 'what' }, { field: 'by' }],
@@ -805,24 +815,47 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         when: { metric: 'tasks-late-yours', gt: 0 },
       },
       {
+        /* THE FIGURES, AS ONE STRIP, SINCE work 1.15.0, under what is late, which the page leads with when anything is
+           (`compose.ts`): how much is open, how much falls due in the week, and how much was finished in it, with its last
+           seven nights as a line (`snapshot` on `tasks-done-7d`). How fast it moves
+           was a tile of its own under Done lately, folded shut. Late and waiting on you are the line's, and not said
+           again here. Only while something is open, since with nothing open the line says so and nothing else is drawn. */
+        kind: 'stat',
+        heading: 'At a glance',
+        icon: 'gauge',
+        span: 12,
+        when: { metric: 'open-tasks', gt: 0 },
+        cells: [
+          { metric: 'open-tasks', label: 'Open' },
+          { metric: 'tasks-due-7d', label: 'Due this week' },
+          { metric: 'tasks-done-7d', label: 'Done this week', trend: '7d', note: '{{tasks-done-7d-agents}} of them by an agent' },
+        ],
+      },
+      {
+        /* TODAY AND THE REST OF THE WEEK, SINCE work 1.15.0, BY THE DAY FIRST, so what is due today heads it and says
+           "today" on its day. Today was a band of its own the whole width, and the page held a seventh tile above its
+           fold. A THIRD OF THE ROW, beside what agents hold and what waits on you. */
         kind: 'todo',
         heading: 'This week',
         icon: 'calendar-days',
-        span: 6,
+        span: 4,
         source: 'register.tasks',
-        where: `${YOURS}, by after today, by before +8d`,
+        where: `${YOURS}, by after yesterday, by before +8d`,
         columns: [{ field: 'what' }, { field: 'by' }],
-        order: TIER_THEN_DUE,
+        order: [
+          { field: 'by', dir: 'asc' },
+          { field: 'priority', dir: 'asc' },
+        ],
         limit: 12,
-        when: { metric: 'tasks-week-yours', gt: 0 },
+        when: { metric: 'tasks-this-week-yours', gt: 0 },
       },
       {
         /* WHAT AGENTS HOLD NOW, with the dot on the one an agent is on this minute. Not what they handed back: that
-           waits on you, below. */
+           waits on you, beside it. A THIRD OF THE ROW SINCE work 1.15.0. */
         kind: 'todo',
         heading: 'With an agent',
         icon: 'session',
-        span: 12,
+        span: 4,
         source: 'register.tasks',
         where: `${IN_HAND}, agent is set`,
         columns: [{ field: 'what' }, { field: 'agent' }],
@@ -835,11 +868,12 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         /* WHAT WAITS ON A PERSON, with the note as the reason it waits and, under it, when the task falls due and who
            changed it last. `todo` is `cells: 4, optional: 2` in `braindog-render`'s `kinds.ts`, and both renderers draw
            the third and fourth cells as one quiet line joined by a dot (`src/todo.ts`, held by
-           `test/waiting-due.test.ts`). `changed` is not a field of tasks; the kernel reads it from each row's history. */
+           `test/waiting-due.test.ts`). `changed` is not a field of tasks; the kernel reads it from each row's history.
+           A THIRD OF THE ROW SINCE work 1.15.0. */
         kind: 'todo',
         heading: 'Waiting on you',
         icon: 'hourglass',
-        span: 12,
+        span: 4,
         source: 'register.tasks',
         where: WAITING,
         columns: [{ field: 'what' }, { field: 'note' }, { field: 'by' }, { field: 'changed' }],
@@ -907,16 +941,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         fold: true,
         when: { metric: 'tasks-done-7d', gt: 0 },
       },
-      {
-        /* HOW FAST IT MOVES, DRAWING ITS EIGHT WEEKS AS A LINE from its nightly series (`snapshot` above). ONE FIGURE AND
-           NOT TWO, SINCE work 1.11.0: Open was the line's own first figure, said again under it. */
-        kind: 'stat',
-        heading: 'How fast it moves',
-        icon: 'chart-line',
-        span: 12,
-        when: { metric: 'tasks-done-7d', gt: 0 },
-        cells: [{ metric: 'tasks-done-7d', label: 'Done in 7 days', trend: '8w', note: '{{tasks-done-7d-agents}} of them by an agent' }],
-      },
+      /* NO HOW FAST IT MOVES SINCE work 1.15.0: Done this week, with its last seven nights, is the strip's third figure. */
       {
         /* WHAT WAS FINISHED IN THE LAST SEVEN DAYS, NEWEST FIRST, ticked, so a task closed by mistake is opened again
            from here. Over Done in 7 days' own clauses, and drawn while that figure has any. */

@@ -1240,6 +1240,49 @@ const DECLARED: Record<string, Version> = {
       "Each list's name and one of it, `setting.label_tasks` and `setting.one_tasks` among them, are titled by what the list is called where they read its id, \"Label: tasks\", and every name is declared before any singular -> 50b524406524baf6",
     ],
   },
+  /* VERSIONS AND NOT RESETS: founder 2.0.0 and team 2.15.1 are live. Each takes the project template of work 1.15.0. */
+  'founder@2.1.0': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported metric.due-this-week
+      metric.lapsing-30d metric.organisations-held page.dashboard page.home-founder page.project register.datapoints
+      setting.label_accounts setting.label_books setting.label_categories setting.label_datapoints
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories setting.one_datapoints
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: '680daedbd0e33a91',
+    history: [
+      "`page.project` takes the project template of work 1.15.0, its history, notes, money and what it runs on one More about tile where they were three folded sections, and draws the project's numbers before that tile -> 7e7dcc52e3d6e1c6",
+      "`page.project` draws Send numbers here under the project's numbers, before More about, where it sat under that tile a screen away from them -> 680daedbd0e33a91",
+    ],
+  },
+  'team@2.16.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles setting.holds_people setting.holds_tasks
+      setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people
+      setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan
+      setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: '9623e53bc787ff10',
+    history: [
+      "`page.project` takes the project template of work 1.15.0: what changed, who worked on it, its notes and what it runs on are one More about tile where they were folded sections -> 9623e53bc787ff10",
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

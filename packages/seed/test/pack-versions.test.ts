@@ -1194,6 +1194,48 @@ const DECLARED: Record<string, Version> = {
       'Nothing is open right now comes first of the lines on `page.work` and `page.work-board`, so the nightly line is never written for the counts at nought and drawn over it -> 76e5fcf955e52544',
     ],
   },
+  /* THE PICTURE FIRST (DIRECTION §39, the design review's fixes 3 and 8): each module's last version is live, so these
+     are versions and not resets. */
+  'money-core@3.11.0': {
+    holds: `
+      metric.arriving-30d metric.balances-stale metric.book-cash metric.book-spent-month metric.books-held metric.cash-accounts
+      metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-now metric.chasing metric.days-late-in metric.due-30d
+      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.in-30d
+      metric.in-by-month metric.in-due-by-month metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d
+      metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
+      metric.owed-to-you metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
+      metric.project-out-month metric.project-owed metric.received-30d metric.runway-days metric.spent-30d
+      metric.spent-by-category-month metric.txn-uncategorised
+      page.money page.money-book
+      register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
+      rule.recurring-stopped rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+    `,
+    declares: '81b9a70d88638dbe',
+    history: [
+      "`page.money` opens on Cash ahead with a side column beside it, `runway-days` as its own Runs out tile in the danger tone where the line said it, the accounts and the questions under it; Heads up under the walk; Coming and going open as one boxed tile; the months behind and what moved folded under History -> 81b9a70d88638dbe",
+    ],
+  },
+  'work@1.15.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-open metric.tasks-after-week-yours
+      metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-late-yours metric.tasks-later metric.tasks-not-this-week
+      metric.tasks-overdue metric.tasks-today-yours metric.tasks-undated-yours metric.tasks-waiting
+      metric.tasks-this-week-yours
+      metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
+      register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
+    `,
+    declares: '285a35e7197ac5cb',
+    history: [
+      "`page.work`'s line says counts, Late is a strip the whole width, At a glance draws `open-tasks`, `tasks-due-7d` and `tasks-done-7d` with its last seven nights, How fast it moves goes, and This week starts today over the new `tasks-this-week-yours`, a third of a row beside With an agent and Waiting on you -> 285a35e7197ac5cb",
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

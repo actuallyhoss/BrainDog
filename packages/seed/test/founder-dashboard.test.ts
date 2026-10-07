@@ -190,25 +190,24 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     'At a glance',
     'Where it stands',
     'Handed back or blocked',
-    /* THE TEMPLATE SINCE portfolio 1.8.0: the tiles above the fold, then who worked on it, its money, and in the rail
-       what it runs on, each folded shut. What is open went in 1.10.0, the plan drawing the same tasks. */
+    /* THE TEMPLATE SINCE work 1.15.0: the chart and the plan, then one More about tile holding what changed, who
+       worked on it, its notes, its money and what it runs on. What is open went in 1.10.0, the plan drawing the same
+       tasks. A LINE A MEASURE, SINCE founder 1.16.0, and where to send them, before the More about tile, which would
+       otherwise hold them. */
     'Done, by week',
     'The plan',
-    'History and notes',
-    'Agents',
+    'Numbers, 30 days',
+    'Send numbers here',
+    'More about Harbour app',
     'What changed',
+    'Agents',
     'Notes',
-    'Money',
     'Money by month',
     'Bills and invoices',
-    'Runs on',
     'Keeping it alive',
     'Keys',
     'Tools and servers',
     'Skills',
-    /* A LINE A MEASURE AND NO TILE BESIDE IT, SINCE founder 1.16.0. */
-    'Numbers, 30 days',
-    'Send numbers here',
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.deepEqual((blocks.find((b) => b.heading === 'At a glance') as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Owed to you', 'Costs a year'], 'with Estate present, what it costs a year takes the place the task figures held');

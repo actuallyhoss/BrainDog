@@ -66,6 +66,16 @@ const numbers = (where: string | null, when?: Record<string, unknown>): Record<s
 });
 
 /**
+ * A project template's blocks with `added` put in before its boxed section, More about it (work 1.15.0), so what a use
+ * case adds to the page stands on the board and is not taken into that tile, which holds every block after it up to
+ * the next section. At the end where the template has no box.
+ */
+const beforeMore = (blocks: readonly Record<string, unknown>[], ...added: Record<string, unknown>[]): Record<string, unknown>[] => {
+  const at = blocks.findIndex((b) => b.kind === 'section' && b.box === true);
+  return at < 0 ? [...blocks, ...added] : [...blocks.slice(0, at), ...added, ...blocks.slice(at)];
+};
+
+/**
  * WHERE A BUTTON ON A DECLARED PAGE OPENS THE NEW-ACTION SHEET. A path of this
  * BrainDog, which the app puts under the record's own address (`at` in `apps/web/src/lib/at.ts`), and the preset ids
  * are `PRESETS` in `apps/web/src/lib/record/action-draft.ts`: `numbers` is a door writing to this list, `watch` a
@@ -235,8 +245,12 @@ export const FOUNDER = {
      `country`, `currency` or `accounts`, so What you have, by organisation and the organisation's Balance go (books keep
      a company's money apart, and What you have, by book stays), the Dashboard lists each organisation by kind and
      website, and the numbers an organisation reports are added to People's page for it rather than drawn on a page of
-     this pack's own. A list and a page taken away, so a major step. */
-  version: '2.0.0',
+     this pack's own. A list and a page taken away, so a major step.
+
+     2.1.0: `page.project` takes the project template of work 1.15.0, its history, notes, money and what it runs on as one More
+     about tile where they were three folded sections, with the project's numbers before that tile. Blocks moved on a
+     page that is already there, so a minor step. */
+  version: '2.1.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -492,13 +506,16 @@ export const FOUNDER = {
            drives that order over a record rebuilt as 1.3.2 made it. */
         ...projectTemplate(HOLDS),
         requires: [...(projectTemplate(HOLDS).requires as string[]), 'register.datapoints'],
-        blocks: [
-          ...(projectTemplate(HOLDS).blocks as Record<string, unknown>[]),
+        /* THE NUMBERS AND WHERE THEY ARE SENT BEFORE THE TEMPLATE'S MORE ABOUT TILE, SINCE founder 2.1.0: a box holds
+           every block after it up to the next section, so under it the numbers would be a part of that tile and not the
+           project's own figures, and the key would sit under the tile, a screen away from the numbers it sends. */
+        blocks: beforeMore(
+          projectTemplate(HOLDS).blocks as Record<string, unknown>[],
           numbers('thing is {{name}}'),
-          /* IN THE MAIN COLUMN UNDER THE PROJECT'S NUMBERS, and the one place on the page the key is drawn: "Runs on" in
-             the rail draws the scheduled actions alone (`BlockSlot.svelte`). */
+          /* IN THE MAIN COLUMN UNDER THE PROJECT'S NUMBERS, and the one place on the page the key is drawn: More about
+             the project draws the scheduled actions alone (`BlockSlot.svelte`). */
           { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' },
-        ],
+        ),
       },
     ],
     seeds: [{ register: 'datapoints', fields: { name: 'Monthly recurring revenue', value: 4200, unit: 'GBP', source: 'example', at: '-1d' } }],

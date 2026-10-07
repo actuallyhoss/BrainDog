@@ -86,8 +86,10 @@ export const TEAM = {
      so a minor step. 2.14.0 is live.
      2.15.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name
      of the Tickets list"), not by its id ("Label: tasks"), and every list's name is declared before any
-     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step. */
-  version: '2.15.1',
+     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step.
+     2.16.0: a project's page takes the project template of work 1.15.0: what changed, who worked on it, its notes and what it
+     runs on are one More about tile where they were folded sections. Blocks moved, so a minor step. 2.15.1 is live. */
+  version: '2.16.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
