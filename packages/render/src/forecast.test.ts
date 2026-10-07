@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { against, baseKnobs, countsOf, forecastAverage, forecastModel, forecastPlan, horizonChoices, knobsIn, knobsMoved, largest, pairsOf, readoutAt, scenario, streamsOf, underNote, type ForecastModel } from './forecast.ts';
+import { against, axisFit, baseKnobs, countsOf, forecastAverage, forecastModel, forecastPlan, horizonChoices, knobsIn, knobsMoved, largest, pairsOf, readoutAt, scenario, streamsOf, underNote, type ForecastModel } from './forecast.ts';
 import { parse } from './parse.ts';
 import { toHTML } from './html.ts';
 
@@ -93,7 +93,7 @@ test('the horizon offers what fits, and the heaviest movements are summed by lab
   assert.deepEqual(largest(model())[0], { label: 'Tax', amount: '−£2,400.00' });
 });
 
-test('the plan holds zero in view, gaps in the past, a wash, a round axis and the crossing', () => {
+test('the plan holds the zero it crosses in view, gaps in the past, a wash, a round axis and the crossing', () => {
   const m = model();
   const s = scenario(m, baseKnobs(m));
   const plan = forecastPlan(m, s, null);
@@ -334,13 +334,114 @@ test('AN `of` ROW SPEAKS FOR THE STEP DIRECTLY ABOVE IT ONLY, and not for a step
 test('THE AXIS IS ROUND STEPS DOWN ONE SIDE, zero among them, said short, and the scale is the balances\' alone', () => {
   const m = model();
   const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
-  /* The walk runs from −£900 to £1,500, so the steps are a thousand: £2k, £1k, £0, −£1k, top first. */
-  assert.deepEqual(plan.axis.map((a) => a.label), ['£2k', '£1k', '£0', '−£1k']);
-  assert.deepEqual(plan.axis.map((a) => a.at), ['0', '0.3333', '0.6667', '1']);
+  /* The walk runs from −£900 to £1,500, so the steps are five hundred, from £1.5k down to −£1k, top first: steps of a
+     thousand reached £2k, a band of £500 over the line that nothing was drawn in. */
+  assert.deepEqual(plan.axis.map((a) => a.label), ['£1.5k', '£1k', '£500', '£0', '−£500', '−£1k']);
+  assert.deepEqual(plan.axis.map((a) => a.at), ['0', '0.2', '0.4', '0.6', '0.8', '1']);
   assert.deepEqual(plan.axis.filter((a) => a.zero).map((a) => a.label), ['£0']);
-  assert.equal(plan.zero, '66.67', 'the zero rule is where the axis says £0');
-  assert.equal(plan.grid, 'M0 0H1000 M0 33.33H1000 M0 100H1000', 'a faint rule at every other step');
-  assert.deepEqual([plan.lo, plan.hi], [-1000, 2000]);
+  assert.equal(plan.zero, '60', 'the zero rule is where the axis says £0');
+  assert.equal(plan.grid, 'M0 0H1000 M0 20H1000 M0 40H1000 M0 80H1000 M0 100H1000', 'a faint rule at every other step');
+  assert.deepEqual([plan.lo, plan.hi], [-1000, 1500]);
+});
+
+test('axisFit: ROUND LEVELS AROUND THE LOWEST AND THE HIGHEST, on the step that leaves the least empty band', () => {
+  assert.deepEqual(axisFit(-900, 1500), { lo: -1000, hi: 1500, step: 500, levels: [1500, 1000, 500, 0, -500, -1000] });
+  /* Steps of two thousand reached 6,000 over a walk that stops at 4,500. */
+  assert.deepEqual(axisFit(0, 4500).levels, [5000, 4000, 3000, 2000, 1000, 0]);
+  /* Two steps span the same: the larger is taken, for fewer names down the side. */
+  assert.deepEqual(axisFit(0, 4000).levels, [4000, 2000, 0]);
+  /* Never more than six names, whatever the range. */
+  for (const [a, b] of [[0, 1], [3, 977], [-41_250.5, 88_100], [12, 13.5], [990, 3010], [1e9, 7.3e9]] as const) {
+    const fit = axisFit(a, b);
+    assert.ok(fit.levels.length >= 2 && fit.levels.length <= 6, `${a} to ${b}: ${fit.levels.join(' ')}`);
+    assert.ok(fit.lo <= a && fit.hi >= b, `${a} to ${b} is inside ${fit.lo} to ${fit.hi}`);
+    assert.deepEqual(fit.levels, [...fit.levels].sort((x, y) => y - x), 'top first');
+    assert.ok(fit.levels.every((v) => Number.isInteger(v / fit.step)), 'every level a whole number of steps');
+    assert.ok([1, 2, 5].includes(fit.step / 10 ** Math.floor(Math.log10(fit.step))), `a round step: ${fit.step}`);
+  }
+  /* The two ends in either order, as a caller with one value on each side of nothing might hand them. */
+  assert.deepEqual(axisFit(1500, -900), axisFit(-900, 1500));
+});
+
+test('axisFit: ZERO IS HELD ONLY WHERE THE BALANCES CROSS IT OR COME NEAR', () => {
+  /* Far from zero: the axis is the balances' own band, where it was 0 to 40,000 with the line in its top tenth. */
+  assert.deepEqual(axisFit(31_200, 33_900).levels, [34_000, 33_000, 32_000, 31_000]);
+  assert.deepEqual(axisFit(-33_900, -31_200).levels, [-31_000, -32_000, -33_000, -34_000], 'and the same under zero');
+  /* Crossing it. */
+  assert.ok(axisFit(-200, 9000).levels.includes(0));
+  /* Near it: the lowest is within half the range of zero, so zero costs a third of the height at most. */
+  assert.deepEqual(axisFit(2000, 10_000).levels, [10_000, 5000, 0]);
+  assert.deepEqual(axisFit(-10_000, -2000).levels, [0, -5000, -10_000]);
+  /* Just past near: 5,000 to 10,000 is half its height empty with zero in it, and is drawn without. */
+  assert.equal(axisFit(5000, 10_000).lo, 5000);
+  assert.equal(axisFit(4000, 10_000).lo, 4000);
+  assert.equal(axisFit(3000, 9000).lo, 0, 'exactly half the range away is near');
+  /* Near, but the round steps from zero would run to 150,000 and leave the line under half the height: its own band. */
+  assert.deepEqual(axisFit(33_600, 101_800).levels, [120_000, 100_000, 80_000, 60_000, 40_000, 20_000]);
+  assert.deepEqual(axisFit(330, 1020).levels, [1200, 1000, 800, 600, 400, 200]);
+  assert.deepEqual(axisFit(-101_800, -33_600).levels, [-20_000, -40_000, -60_000, -80_000, -100_000, -120_000]);
+  /* Touching zero is zero, and it is 0 and not -0. */
+  assert.ok(axisFit(-3000, 0).levels.some((v) => Object.is(v, 0)));
+  assert.ok(!axisFit(-3000, 0).levels.some((v) => Object.is(v, -0)));
+});
+
+test('axisFit: A FLAT WALK IS NOT DRAWN AS A CLIFF, and a walk with nothing in it still has an axis', () => {
+  /* £50 on £31,000 is flat: the axis spans a twentieth of the balance at least, so the line stays a line. */
+  const still = axisFit(31_000, 31_050);
+  assert.ok(still.hi - still.lo >= 1550, `${still.lo} to ${still.hi}`);
+  assert.ok(still.lo > 0, 'and it does not go back to zero for it');
+  const one = axisFit(5000, 5000);
+  assert.ok(one.lo < 5000 && one.hi > 5000 && one.lo > 0, 'one balance sits inside its axis, not on its edge');
+  assert.deepEqual(axisFit(0, 0), { lo: 0, hi: 1, step: 1, levels: [1, 0] });
+  assert.deepEqual(axisFit(Number.NaN, 5), { lo: 0, hi: 1, step: 1, levels: [1, 0] }, 'a balance that is no number draws no scale of its own');
+  /* Never finer than one of the money's units: pence of movement is an axis of two whole pounds. */
+  assert.deepEqual(axisFit(0.4, 0.6).levels, [1, 0]);
+});
+
+test('axisFit: A STEP WHOSE LEVELS THE AXIS CANNOT SAY IS PASSED OVER for the next rounder one', () => {
+  const whole = (v: number): boolean => Number.isInteger(v / 1000);
+  /* Five hundreds fit 31,200 to 33,400 tighter, and an axis that says thousands would name 31,500 and 32,000 alike. */
+  assert.deepEqual(axisFit(31_200, 33_400).levels, [33_500, 33_000, 32_500, 32_000, 31_500, 31_000]);
+  assert.deepEqual(axisFit(31_200, 33_400, whole).levels, [34_000, 33_000, 32_000, 31_000]);
+  /* And where nothing passes, the axis is still drawn. */
+  assert.ok(axisFit(31_200, 33_400, () => false).levels.length >= 2);
+});
+
+test('A WALK FAR FROM ZERO IS DRAWN IN ITS OWN BAND: no zero on the axis, a rule at its foot, and the wash down to it', () => {
+  const m = forecastModel([
+    ['opening', '2026-09-17', 'Cash now', '£32,400.00'],
+    ['past', '2026-09-15', '', '£31,200.00'],
+    ['past', '2026-09-16', '', '£31,900.00'],
+    ['step', '2026-09-25', 'Invoice', '£1,500.00'],
+    ['step', '2026-10-05', 'Rent', '−£900.00'],
+    ['horizon', '30', '', ''],
+  ])!;
+  const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
+  assert.deepEqual(plan.axis.map((a) => a.label), ['£34k', '£33k', '£32k', '£31k']);
+  assert.deepEqual(plan.axis.filter((a) => a.zero), [], 'nothing on it is zero');
+  assert.deepEqual([plan.lo, plan.hi], [31_000, 34_000]);
+  assert.equal(plan.zero, '100', 'the rule is the foot of the axis');
+  assert.equal(plan.grid, 'M0 0H1000 M0 33.33H1000 M0 66.67H1000', 'and no faint rule is drawn over it');
+  assert.match(plan.area, /^M0 100 L0 /u);
+  assert.match(plan.area, /L1000 100Z$/u);
+  assert.equal(plan.below, '', 'nothing is under zero, so nothing is tinted');
+  const ys = [...`${plan.area} ${plan.past} ${plan.walk} ${plan.future}`.matchAll(/[ML][\d.]+ (-?[\d.]+)/gu)].map((x) => Number(x[1]));
+  assert.ok(ys.every((v) => v >= 0 && v <= 100), 'every point is inside the box');
+  /* The same walk overdrawn by 33k: the rule is the top of the axis, and all of the wash is the part under zero. */
+  const under = forecastModel([['opening', '2026-09-17', 'Cash now', '−£32,400.00'], ['step', '2026-09-25', 'Rent', '−£900.00'], ['horizon', '30', '', '']])!;
+  const red = forecastPlan(under, scenario(under, baseKnobs(under)), null);
+  assert.equal(red.zero, '0');
+  assert.equal(red.area, '');
+  assert.match(red.below, /^M0 0 L0 /u);
+  assert.ok(red.axis.every((a) => a.label.startsWith('−£') && !a.zero), red.axis.map((a) => a.label).join(' '));
+});
+
+test('THE AXIS NEVER NAMES TWO LEVELS ALIKE, whatever the walk', () => {
+  for (const [opening, delta] of [['£31,240.55', '−£1,180.20'], ['£1,040.00', '£130.00'], ['£99,600.00', '£900.00'], ['£12.00', '£1.50'], ['£1,234,000.00', '−£260,000.00'], ['£845.00', '−£1,300.00']] as const) {
+    const m = forecastModel([['opening', '2026-09-17', 'Cash now', opening], ['step', '2026-09-25', 'Move', delta], ['horizon', '30', '', '']])!;
+    const labels = forecastPlan(m, scenario(m, baseKnobs(m)), null).axis.map((a) => a.label);
+    assert.equal(new Set(labels).size, labels.length, `${opening} ${delta}: ${labels.join(' ')}`);
+  }
 });
 
 test('THE WASH IS ONE CLOSED SHAPE from the zero rule, under the remembered line and the walk', () => {
@@ -355,7 +456,7 @@ test('A FIGURE A HOST DREW WITH ITS CODE AFTER IT IS SAID SHORT on the axis, the
   const m = forecastModel(rows)!;
   const s = scenario(m, baseKnobs(m));
   const plan = forecastPlan(m, s, null);
-  assert.deepEqual(plan.axis.map((a) => a.label), ['£2k', '£1k', '£0', '−£1k'], 'not £2,000.00 GBP');
+  assert.deepEqual(plan.axis.map((a) => a.label), ['£1.5k', '£1k', '£500', '£0', '−£500', '−£1k'], 'not £1,500.00 GBP');
   assert.equal(readoutAt(m, s, plan, 1).balance, '−£900');
   assert.deepEqual(countsOf(m).out[0], { label: 'Tax', amount: '−£2,400' });
   const src = ['```forecast', ...rows.map((r) => r.join(' | ')), '```'].join('\n');
@@ -366,8 +467,8 @@ test('toHTML draws the wash, the axis down one side and no stems', () => {
   const src = ['```forecast', ...ROWS.map((r) => r.join(' | ')), '```'].join('\n');
   const html = toHTML(parse(src, { page: true }));
   assert.match(html, /<path class="forecast-area" fill="currentColor" fill-opacity="0\.06" stroke="none" d="M0 /u);
-  assert.match(html, /<ol class="forecast-axis" aria-hidden="true"><li class="forecast-axis-tick" style="--at:0">£2k<\/li>/u);
-  assert.match(html, /<li class="forecast-axis-tick" data-zero="" style="--at:0\.6667">£0<\/li>/u);
+  assert.match(html, /<ol class="forecast-axis" aria-hidden="true"><li class="forecast-axis-tick" style="--at:0">£1\.5k<\/li>/u);
+  assert.match(html, /<li class="forecast-axis-tick" data-zero="" style="--at:0\.6">£0<\/li>/u);
   assert.doesNotMatch(html, /forecast-stem|forecast-top|forecast-bottom/u);
 });
 

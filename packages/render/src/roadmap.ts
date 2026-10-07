@@ -560,6 +560,27 @@ const ROADMAP_NEAR = 60;
 export const ROADMAP_TODAY = 'Today';
 
 /**
+ * What a bar's colour says, for the key under the drawing: the row's tone as the host's stylesheet paints it, the
+ * accent while the work is in hand, amber at risk, red late and grey done. `tone` is absent on the accent's.
+ */
+export type RoadmapKey = { tone?: 'warn' | 'bad' | 'good'; label: string };
+
+/** The key's name for a screen reader, and its four words, in the order a plan is read: what is in hand first. */
+export const ROADMAP_LEGEND = 'What the colours mean';
+const ROADMAP_KEYS: readonly RoadmapKey[] = [{ label: 'Under way' }, { tone: 'warn', label: 'At risk' }, { tone: 'bad', label: 'Late' }, { tone: 'good', label: 'Done' }];
+
+/**
+ * The key under the drawing: each colour the rows drawn are in, named, and nothing where they are all one colour.
+ *
+ * ONLY THE COLOURS ON SCREEN, so the key never names a state no bar is in, and a plan in one colour, which has
+ * nothing to tell apart, carries no key at all. A tone with no colour of its own (`info`) is drawn in the accent.
+ */
+export function roadmapLegend(lines: readonly Pick<RoadmapLine, 'tone'>[]): RoadmapKey[] {
+  const drawn = new Set(lines.map((l) => (l.tone === 'warn' || l.tone === 'bad' || l.tone === 'good' ? l.tone : undefined)));
+  return drawn.size > 1 ? ROADMAP_KEYS.filter((k) => drawn.has(k.tone)) : [];
+}
+
+/**
  * Whether a row's days, said on hover, sit before its bar rather than after it: past seven tenths of the track there is
  * no room after the bar for `30 Aug – 6 Sep 2026`, and the words would run off the tile.
  */

@@ -159,7 +159,7 @@ interface KindSpec {
 | `todo` | list | title · detail · fact · fact (the two facts optional) | 4 | no | — | marker; the two facts are one quiet line under the title, joined by ` · `, and a row with both blank draws no line, so a two-cell row draws as it did before the facts existed |
 | `steps` | list | title · detail · state | 3 | no | — | ordered |
 | `timeline` | list | date · title · detail | 3 | yes | — | ordered |
-| `board` | grid | column · title · detail | 3 | no | — | |
+| `board` | grid | column · title · detail · second detail (optional) | 4 | no | — | |
 | `heat` | grid | day (`YYYY-MM-DD`) · value (optional, one when left off) | 2 | no | — | twelve weeks by weekday ending on the week of `RenderOptions.now`, over `days.ts`'s `heatGrid` and `washSteps`; rows on one day added; a gap is not a zero; a row whose day or value does not read is named under the grid, one outside the weeks counted and said; no tone, because the wash is the reading |
 | `roadmap` | list | title · by (`YYYY-MM-DD`, or `D Mon YYYY` as `day()` writes it, which is the form a page's reader projects) · effort in days (optional) | 3 | yes | — | a row with an effort is a bar ending on `by`, as many whole days long as the effort rounded up; one with none is a dated stem; a row whose date or effort does not read is named under the drawing, never placed; today's line from `RenderOptions.now`; every mark painted `currentColor` by presentation attributes, which a host rule overrides |
 | `code` | media | — verbatim | 0 | no | — | |

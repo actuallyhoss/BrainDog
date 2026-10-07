@@ -110,3 +110,21 @@ test('TODAY\'S WORD TAKES ITS PLACE ON THE AXIS ON BOTH SIDES, and the Monday be
   assert.match(svelte, /<li class="roadmap-today" style="--at:[\d.]+">Today<\/li>/u);
   assert.doesNotMatch(svelte, />31 Aug</u);
 });
+
+test('THE KEY AND EACH NAME\'S TITLE ARE ON BOTH SIDES: the colours drawn are named, and a name cut short is whole on hover', () => {
+  const src = '```roadmap\nA long name that the left column will cut with an ellipsis | 2026-09-20 | 5\nB | 2026-09-21 | 4 | good\nC | 2026-09-22 | 3 | bad\nD | 2026-09-28 | 2 | warn\n```';
+  const block = parse(src)[0] as BlockSegment;
+  const svelte = tree(render(Block, { props: { block, opts: { now: NOW } } }).body);
+  assert.equal(svelte, tree(toHTML([block], { now: NOW })));
+  assert.match(svelte, /<span class="roadmap-item-title" title="A long name that the left column will cut with an ellipsis">A long name/u);
+  assert.match(
+    svelte,
+    /<ul aria-label="What the colours mean" class="roadmap-legend"><li class="roadmap-key">Under way<\/li><li class="roadmap-key" data-key="warn">At risk<\/li><li class="roadmap-key" data-key="bad">Late<\/li><li class="roadmap-key" data-key="good">Done<\/li><\/ul>/u,
+  );
+  /* One colour has no key, on either side. */
+  const plain = parse(SHAPES['a fraction of a day, a link in a title, and today outside the span']!)[0] as BlockSegment;
+  const one = tree(render(Block, { props: { block: plain, opts: { now: NOW } } }).body);
+  assert.equal(one, tree(toHTML([plain], { now: NOW })));
+  assert.doesNotMatch(one, /roadmap-legend/u);
+  assert.match(one, /<span class="roadmap-item-title" title="Kiln">/u, 'a link in a name is said as its words');
+});

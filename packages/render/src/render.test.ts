@@ -1612,6 +1612,15 @@ test('a stored value is drawn as a word: a lane head starts with a capital, a ch
   assert.match(html, /<h3 class="board-head">Open<span class="board-count num">1<\/span><\/h3>/);
 });
 
+test('a board card draws its third and fourth cells as one line, and a card with no fourth draws what it drew', () => {
+  const html = toHTML(parse('```board\nDoing | Write the notes | due 24 Sep | Claude\nDoing | Proof |  | Codex\nDone | Fix login | due 20 Sep | \nDone | Send the quote | Amara\n```'));
+  assert.match(html, /<span class="card-detail">due 24 Sep · Claude<\/span>/);
+  assert.match(html, /<span class="card-title">Proof<\/span><span class="card-detail">Codex<\/span>/);
+  assert.match(html, /<span class="card-detail">due 20 Sep<\/span>/);
+  assert.equal(toHTML(parse('```board\nDone | Send the quote | Amara | \n```')), toHTML(parse('```board\nDone | Send the quote | Amara\n```')));
+  assert.match(toHTML(parse('```board\nDone | a | b | c | d\n```')), /data-code="DIALECT_ARITY"/);
+});
+
 /* ── stat's trend and lead, and sparkline ─────────────────────────────────── */
 
 test('A STAT ROW TAKES A FOURTH CELL, THE TREND, and a three-cell row with a tone keeps its tone', () => {

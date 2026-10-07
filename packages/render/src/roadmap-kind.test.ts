@@ -196,30 +196,30 @@ test('THE TIMELINE IS ONE LIST, NOT A STRETCHED DRAWING: no name is placed over 
 
 test('the rows are also a lane list a screen reader reads, each with its span of days, and the tone keeps its glyph', () => {
   const html = toHTML(parse(FENCE), { now: NOW });
-  assert.match(html, /<span class="roadmap-item-title">Build the kiln page<\/span> <span class="roadmap-item-when num">1 – 10 Sep 2026<\/span>/u);
-  assert.match(html, /<span class="roadmap-item-title">Launch<\/span> <span class="roadmap-item-when num">30 Sep 2026<\/span>/u);
+  assert.match(html, /<span class="roadmap-item-title"[^>]*>Build the kiln page<\/span> <span class="roadmap-item-when num">1 – 10 Sep 2026<\/span>/u);
+  assert.match(html, /<span class="roadmap-item-title"[^>]*>Launch<\/span> <span class="roadmap-item-when num">30 Sep 2026<\/span>/u);
   assert.doesNotMatch(html, /roadmap-table/u, 'no three-column table to break a name inside its words on a phone');
   assert.match(html, /Regate window<span class="glyph" role="img" aria-label="watch this">⚠︎<\/span>/u);
 });
 
 test('A ROW CARRIES ITS STATE, so a late one is drawn red and says so with its named dot', () => {
   const html = toHTML(parse('```roadmap | Kiln\nTurn auto-renew back on | 2026-09-10 | 1 | bad\nWrite the page | 2026-09-30 | 2\nShipped | 2026-09-12 | 2 | good\n```'), { now: NOW });
-  assert.match(html, /<li class="roadmap-item" data-intent="bad"[^>]*><span class="roadmap-item-title">Turn auto-renew back on<span class="glyph" role="img" aria-label="wrong">/u);
+  assert.match(html, /<li class="roadmap-item" data-intent="bad"[^>]*><span class="roadmap-item-title"[^>]*>Turn auto-renew back on<span class="glyph" role="img" aria-label="wrong">/u);
   assert.match(html, /<li class="roadmap-item" data-intent="good"/u);
-  assert.match(html, /<li class="roadmap-item"(?! data-intent)[^>]*><span class="roadmap-item-title">Write the page<\/span>/u, 'work in hand wears no intent');
+  assert.match(html, /<li class="roadmap-item"(?! data-intent)[^>]*><span class="roadmap-item-title"[^>]*>Write the page<\/span>/u, 'work in hand wears no intent');
 });
 
 test('THE TABLE KEEPS THE ORDER THE ROWS CAME IN, a date written first read first', () => {
   /* The plan hands back bars and then stems, so a table built in that order put every window ahead of every date.
      Removing the sort left the test above green, because its fence writes its date after its windows (measured). */
   const html = toHTML(parse('```roadmap | Order\nLaunch | 2026-09-30\nBuild | 2026-09-10 | 10\n```'), { now: NOW });
-  assert.deepEqual([...html.matchAll(/<span class="roadmap-item-title">([^<]+)<\/span>/gu)].map((m) => m[1]), ['Launch', 'Build']);
+  assert.deepEqual([...html.matchAll(/<span class="roadmap-item-title"[^>]*>([^<]+)<\/span>/gu)].map((m) => m[1]), ['Launch', 'Build']);
 });
 
 test('a row that could not be placed is named under the drawing, never drawn somewhere it does not belong', () => {
   const html = toHTML(parse(FENCE), { now: NOW });
   assert.match(html, /<p class="roadmap-skipped">[^<]*Someday[^<]*<\/p>/u);
-  assert.equal(/<span class="roadmap-item-title">Someday/u.test(html), false);
+  assert.equal(/<span class="roadmap-item-title"[^>]*>Someday/u.test(html), false);
 });
 
 /* ── a date the calendar cannot say ───────────────────────────────────────── */
@@ -233,7 +233,7 @@ test('AN EFFORT TOO LONG FOR THE CALENDAR IS A ROW SKIPPED, NOT A DOCUMENT THROW
     const html = toHTML(parse(fence(effort)), { now: NOW });
     assert.match(html, /Before/u);
     assert.match(html, /<p class="roadmap-skipped">[^<]*Too long[^<]*<\/p>/u);
-    assert.match(html, /<span class="roadmap-item-title">Fine<\/span>/u);
+    assert.match(html, /<span class="roadmap-item-title"[^>]*>Fine<\/span>/u);
   }
 });
 

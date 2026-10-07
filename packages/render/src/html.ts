@@ -47,7 +47,7 @@ import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRange
 import { figureLike } from './figure.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
-import { ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
+import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
 import { HEAT_DAY, HEAT_NONE, HEAT_VALUE, heatLines, heatMissed, heatOutside, heatPeopleMore, heatPeoplePlan, heatPersonSaid, heatPlan, heatSkipped, heatTitle, heatWeekTitle } from './heat.ts';
 import { CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from './calendar.ts';
@@ -252,6 +252,17 @@ const todoMeta = (cells: readonly string[], opts: RenderOptions): string => {
   return parts.length ? `<span class="item-meta" data-calm="">${parts.map((c) => renderInline(inline(c, opts), opts)).join(TODO_META_JOIN)}</span>` : '';
 };
 
+/**
+ * A board card's third and fourth cells, as the one quiet line under its title.
+ *
+ * THE THIRD CELL ALONE IS DRAWN AS IT ALWAYS WAS, empty span and all, so a three-cell board, or one a page
+ * padded to four with a blank, is the markup it was before a card could carry a second fact.
+ */
+const boardDetail = (cells: readonly string[], opts: RenderOptions): string => {
+  if ((cells[3] ?? '').trim() === '') return cell('card-detail', cells[2], opts);
+  return `<span class="card-detail">${metaCells(cells).map((c) => renderInline(inline(c, opts), opts)).join(TODO_META_JOIN)}</span>`;
+};
+
 /** The dot itself, said the same way `Table`, `Grid` and `List` say it. */
 /* AND A TOOLTIP, because a dot is not self-explaining to somebody looking at it. A screen reader has
    been told since this shipped; a sighted reader was left with a mark and no way to ask what it means.
@@ -344,7 +355,7 @@ function grid(b: Block, o: RenderOptions): string {
            and this did not: the two renderers differed on the head of every board in the record, and
            no shape in `parity.test.ts` was a board, so nothing said so. */
         return `<div class="board-col"><h3 class="board-head">${escape(valueWord(col, true))}<span class="board-count num">${cards.length}</span></h3>${cards
-          .map((r) => `<div class="card">${cell('card-title', r.cells[1], o)}${cell('card-detail', r.cells[2], o)}</div>`)
+          .map((r) => `<div class="card">${cell('card-title', r.cells[1], o)}${boardDetail(r.cells, o)}</div>`)
           .join('')}</div>`;
       })
       .join('');
@@ -1392,11 +1403,15 @@ function roadmap(b: Block, o: RenderOptions): string {
   const list = `<ol class="roadmap-list" aria-label="${escape(roadmapSentence(plan))}">${lines
     .map(
       (p) =>
-        `<li class="roadmap-item"${toneAttrs(p.tone)}${p.from === MISSING ? ' data-date=""' : ''}${roadmapFlip(p) ? ' data-flip=""' : ''} style="--at:${p.at};--span:${p.span}"><span class="roadmap-item-title">${escape(p.title)}${toneGlyph(p.tone)}</span> <span class="roadmap-item-when num">${escape(p.when)}</span><span class="roadmap-item-track" aria-hidden="true"><span class="roadmap-bar"></span></span></li>`,
+        `<li class="roadmap-item"${toneAttrs(p.tone)}${p.from === MISSING ? ' data-date=""' : ''}${roadmapFlip(p) ? ' data-flip=""' : ''} style="--at:${p.at};--span:${p.span}"><span class="roadmap-item-title"${p.title ? ` title="${escape(p.title)}"` : ''}>${escape(p.title)}${toneGlyph(p.tone)}</span> <span class="roadmap-item-when num">${escape(p.when)}</span><span class="roadmap-item-track" aria-hidden="true"><span class="roadmap-bar"></span></span></li>`,
     )
     .join('')}</ol>`;
 
-  return `<div class="roadmap" style="--rows:${lines.length}">${axis}${list}${skipped}</div>`;
+  const keys = roadmapLegend(lines);
+  const legend = keys.length
+    ? `<ul class="roadmap-legend" aria-label="${escape(ROADMAP_LEGEND)}">${keys.map((k) => `<li class="roadmap-key"${k.tone ? ` data-key="${escape(k.tone)}"` : ''}>${escape(k.label)}</li>`).join('')}</ul>`
+    : '';
+  return `<div class="roadmap" style="--rows:${lines.length}">${axis}${list}${legend}${skipped}</div>`;
 }
 
 /**

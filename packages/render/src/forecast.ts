@@ -3,9 +3,10 @@
  *
  * A forecast is a cash walk drawn as a line: the balance the record remembered up to today and the walk from today's
  * balance, one solid line as far as the record knows the movements, dashed only beyond it, over a soft wash down to the
- * zero rule, split there so what is under zero can be tinted on its own. The value axis is a few round steps that always
- * hold zero, said short (`£50k`, `£0`, `−£50k`); today is a dot with its balance beside it; and the first day the
- * balance goes under is marked, said in words, and tied to the line by a thin rule.
+ * zero rule, split there so what is under zero can be tinted on its own. The value axis is a few round steps fitted to
+ * the balances, said short (`£50k`, `£0`, `−£50k`), and holds zero only where the walk crosses it or comes near
+ * (`axisFit`); today is a dot with its balance beside it; and the first day the balance goes under is marked, said in
+ * words, and tied to the line by a thin rule.
  *
  * DASHED ONLY BEYOND WHAT IS KNOWN. The whole walk was dashed from today, so a year of entered bills and invoices read
  * as a guess from its first day (the money review: "make it a real chart"). The movements are the record's own, so
@@ -761,8 +762,9 @@ export type ForecastPlan = {
   /** Today's dot, where its balance is said (shares across and down), and the balance as a headline says it. */
   now: { d: string; at: string; y: string; label: string };
   base: string;
+  /** Where the solid rule is drawn: zero where the axis holds it, and else the end of the axis nearest zero. */
   zero: string;
-  /** The rules at the axis's other round steps, faint, and `''` when zero is the only one. */
+  /** The rules at the axis's other round steps, faint, and `''` when the rule at `zero` is the only one. */
   grid: string;
   /**
    * The crossing's dot, where its label sits as a fraction across, and the thin rule from the label at the chart's top
@@ -779,7 +781,7 @@ export type ForecastPlan = {
   hi: number;
   /**
    * The value axis, top first: each round step as a share of the height from the top (`--at`), said short, and which of
-   * them is zero. ONE SIDE AND ONE SCALE, where the axis was its top in the far corner and its bottom in the near one,
+   * them is zero, none where zero is out of view. ONE SIDE AND ONE SCALE, where the axis was its top in the far corner and its bottom in the near one,
    * each the walk's own extreme to the penny (`£31,035.00 GBP` over `−£127,489.90 GBP`), which no reader could read
    * a level between.
    */
@@ -787,8 +789,97 @@ export type ForecastPlan = {
   sentence: string;
 };
 
-/** About how many round steps the value axis is cut into; `roundStep` rounds up, so never more than this and one. */
+/** How many round steps the value axis is cut into at most, so at most one more name than this down its side. */
+const AXIS_MOST = 5;
+/** And at least, where the money's own unit allows it: an axis of its two ends says no level between them. */
+const AXIS_LEAST = 2;
+/** About how many steps it is cut into when no round step fits `AXIS_LEAST` to `AXIS_MOST`; `roundStep` rounds up. */
 const AXIS_STEPS = 4;
+/**
+ * How near zero the balances come, as a share of their own range, for the axis to hold zero: at half, zero takes a
+ * third of the height at most. A walk from £2k to £10k is read from zero; one from £31k to £34k is not.
+ */
+const ZERO_NEAR = 0.5;
+/**
+ * And the most of the axis zero may cost: with zero held the balances still fill half the height, or zero is let go.
+ * Round steps are coarse, so £34k to £102k reached from zero ran to £150k and the line had under half the chart.
+ */
+const ZERO_MOST = 2;
+/**
+ * The least the axis spans, as a share of the largest balance: a twentieth. A balance that moves £50 on £31,000 is
+ * flat, and an axis fitted to the £50 would draw it as a cliff.
+ */
+const AXIS_FLAT = 0.05;
+/** The round steps tried, each times a power of ten. */
+const AXIS_ROUND = [1, 2, 5] as const;
+
+/** The value axis: its two ends, the step between its levels, and the levels top first, zero written as `0`. */
+export type AxisFit = { lo: number; hi: number; step: number; levels: number[] };
+
+/**
+ * The value axis fitted to the balances: round levels from the one at or below the lowest to the one at or above the
+ * highest, on the round step that leaves the least empty band, and the larger step where two leave the same.
+ *
+ * ZERO IS HELD ONLY WHERE THE WALK CROSSES IT OR COMES NEAR (`ZERO_NEAR`). It was always held, so a balance between
+ * £31k and £34k was a line across the top tenth of the chart over nine tenths of nothing, and what it did in those
+ * months could not be read. And near is not enough where the round steps from zero would leave the balances under
+ * half the height (`ZERO_MOST`): the axis is then the balances' own band.
+ *
+ * `said` answers whether a level reads exactly as the axis writes it. An axis says `£31.5k` as `£32k`, so a step of
+ * five hundred there would name two levels alike; a step whose levels are not all said exactly is passed over for the
+ * next rounder one. Left out, every level is taken as said.
+ */
+export function axisFit(min: number, max: number, said: (level: number) => boolean = () => true): AxisFit {
+  let low = Math.min(min, max);
+  let high = Math.max(min, max);
+  if (!Number.isFinite(low) || !Number.isFinite(high)) low = high = 0;
+  const flat = Math.max(Math.abs(low), Math.abs(high)) * AXIS_FLAT;
+  if (high - low < flat) {
+    const mid = (low + high) / 2;
+    low = mid - flat / 2;
+    high = mid + flat / 2;
+  }
+  const range = high - low;
+  const own = axisOver(low, high, said);
+  const near = low > 0 ? low <= range * ZERO_NEAR : high < 0 && -high <= range * ZERO_NEAR;
+  if (!near) return own;
+  const held = axisOver(Math.min(low, 0), Math.max(high, 0), said);
+  return held.hi - held.lo <= range * ZERO_MOST ? held : own;
+}
+
+/** The round levels over one band, as `axisFit` chooses them once it has settled whether zero is in the band. */
+function axisOver(low: number, high: number, said: (level: number) => boolean): AxisFit {
+  const fit = (step: number): AxisFit => {
+    const lo = Math.floor(low / step) * step;
+    const hi = Math.max(lo + step, Math.ceil(high / step) * step);
+    const n = Math.round((hi - lo) / step);
+    /* TOP FIRST, each counted from the bottom so a long axis does not drift, and zero is `0` and never `-0`. */
+    const levels = Array.from({ length: n + 1 }, (_, i) => lo + (n - i) * step).map((v) => (Math.abs(v) < step / 2 ? 0 : v));
+    return { lo, hi, step, levels };
+  };
+  const tried: AxisFit[] = [];
+  if (high > low)
+    for (let e = Math.floor(Math.log10(high - low)) - 2; e <= Math.floor(Math.log10(high - low)) + 1; e++)
+      for (const m of AXIS_ROUND) if (m * 10 ** e >= 1) tried.push(fit(m * 10 ** e));
+  const steps = (a: AxisFit): number => a.levels.length - 1;
+  const best = (least: number): AxisFit | undefined =>
+    tried
+      .filter((a) => steps(a) >= least && steps(a) <= AXIS_MOST && a.levels.every(said))
+      .sort((a, b) => a.hi - a.lo - (b.hi - b.lo) || b.step - a.step)[0];
+  /* NEVER FINER THAN ONE OF THE MONEY'S UNITS, so a balance that moves by pence has an axis of its two ends. */
+  return best(AXIS_LEAST) ?? best(1) ?? fit(roundStep((high - low) / AXIS_STEPS));
+}
+
+/**
+ * Whether the axis says a level exactly: `axisFigure` keeps one decimal below ten of its step (`£1.6k`) and whole
+ * steps above (`£31k`), so `£31,500` is not said and `£1,500` is.
+ */
+function axisSays(level: number): boolean {
+  let n = Math.abs(level);
+  for (let i = 0; n >= 1_000 && i < 4; i++) n /= 1_000;
+  const kept = n >= 10 ? n : n * 10;
+  return Math.abs(kept - Math.round(kept)) < 1e-6;
+}
 
 /** How many month names the time axis holds at most, when it names every month. */
 const TICKS_MOST = 12;
@@ -820,21 +911,22 @@ function tickLabel(day: string, every: number): string {
 
 /**
  * The paths, the marks and the words for one scenario, with the baseline drawn faint when a knob has
- * moved. The value axis always holds zero, and runs from the round step at or below the lowest balance
- * to the one at or above the highest.
+ * moved. The value axis is fitted to the balances drawn (`axisFit`): it runs from the round step at or below
+ * the lowest to the one at or above the highest, and holds zero only where they cross it or come near.
+ *
+ * WHERE ZERO IS OUT OF VIEW THE RULE IS THE AXIS'S OWN END NEAREST IT, the bottom of a walk that stays above and the
+ * top of one that stays under, and the wash runs to it, so a drawer still has one rule to draw and one shape to fill.
  */
 export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenario | null = null): ForecastPlan {
   const start = model.past[0]?.day ?? model.today;
   const end = addDays(model.today, shown.horizon);
   const span = Math.max(1, daysBetween(start, end));
-  const values = [0, ...model.past.map((p) => p.value), ...shown.days.map((p) => p.balance), ...(base?.days.filter((p) => p.day <= end).map((p) => p.balance) ?? [])];
-  const step = roundStep((Math.max(...values) - Math.min(...values)) / AXIS_STEPS);
-  const lo = Math.floor(Math.min(...values) / step) * step;
-  const hi = Math.max(lo + step, Math.ceil(Math.max(...values) / step) * step);
+  const values = [...model.past.map((p) => p.value), ...shown.days.map((p) => p.balance), ...(base?.days.filter((p) => p.day <= end).map((p) => p.balance) ?? [])];
+  const { lo, hi, levels } = axisFit(Math.min(...values), Math.max(...values), axisSays);
+  /* THE RULE THE WASH RUNS TO: zero where the axis holds it, else the end of the axis nearest zero. */
+  const floor = Math.min(hi, Math.max(lo, 0));
   const x = (day: string) => at((daysBetween(start, day) / span) * 1000);
   const y = (v: number) => at(((hi - v) / (hi - lo)) * 100);
-  const levels: number[] = [];
-  for (let v = hi; v >= lo - step / 2; v -= step) levels.push(Math.abs(v) < step / 2 ? 0 : v);
 
   let past = '';
   let prev: string | null = null;
@@ -868,10 +960,10 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const xd = (d: number) => at((d / span) * 1000);
   const wash = (side: (v: number) => number, any: boolean) =>
     cut.length > 1 && any
-      ? `M${xd(cut[0]!.d)} ${y(0)} ${cut.map((p) => `L${xd(p.d)} ${y(side(p.v))}`).join(' ')} L${xd(cut.at(-1)!.d)} ${y(0)}Z`
+      ? `M${xd(cut[0]!.d)} ${y(floor)} ${cut.map((p) => `L${xd(p.d)} ${y(side(p.v))}`).join(' ')} L${xd(cut.at(-1)!.d)} ${y(floor)}Z`
       : '';
-  const area = wash((v) => Math.max(0, v), cut.some((p) => p.v > 0));
-  const below = wash((v) => Math.min(0, v), cut.some((p) => p.v < 0));
+  const area = wash((v) => Math.max(floor, v), cut.some((p) => p.v > 0));
+  const below = wash((v) => Math.min(floor, v), cut.some((p) => p.v < 0));
 
   const starts: { d: number; day: string }[] = [];
   for (let d = 0; d <= span; d++) {
@@ -925,8 +1017,8 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
       label: headlineFigure(figure(model.opening)),
     },
     base: base ? line(base.days) : '',
-    zero: y(0),
-    grid: levels.filter((v) => v !== 0).map((v) => `M0 ${y(v)}H1000`).join(' '),
+    zero: y(floor),
+    grid: levels.filter((v) => v !== floor).map((v) => `M0 ${y(v)}H1000`).join(' '),
     cross: c
       ? {
           d: `M${x(c.day)} ${y(c.balance)}h0`,

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { roadmapAxis, roadmapFlip, roadmapLines, roadmapPlan, roadmapWhen, type RoadmapRow } from './roadmap.ts';
+import { roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapWhen, type RoadmapRow } from './roadmap.ts';
 
 const TODAY = '2026-09-22';
 const win = (start: string, end: string, title = `${start} to ${end}`): RoadmapRow => ({ start, end, title });
@@ -287,4 +287,25 @@ test('A ROW\'S DAYS GO BEFORE ITS BAR past seven tenths of the track, where afte
   assert.equal(roadmapFlip({ at: '0.1', span: '0.2' }), false);
   assert.equal(roadmapFlip({ at: '0.6', span: '0.2' }), true);
   assert.equal(roadmapFlip({ at: '0.9', span: '0' }), true);
+});
+
+test('THE KEY NAMES ONLY THE COLOURS DRAWN, what is in hand first, and a plan in one colour has none', () => {
+  const key = (...tones: (RoadmapRow['tone'] | undefined)[]) => roadmapLegend(tones.map((tone) => (tone ? { tone } : {})));
+  assert.deepEqual(key('good', undefined, 'bad', 'warn', 'bad'), [
+    { label: 'Under way' },
+    { tone: 'warn', label: 'At risk' },
+    { tone: 'bad', label: 'Late' },
+    { tone: 'good', label: 'Done' },
+  ]);
+  assert.deepEqual(key('bad', undefined), [{ label: 'Under way' }, { tone: 'bad', label: 'Late' }], 'never a state no bar is in');
+  /* One colour is nothing to tell apart, whichever it is. */
+  assert.deepEqual(key(undefined, undefined), []);
+  assert.deepEqual(key('bad', 'bad'), []);
+  assert.deepEqual(key(), []);
+  /* A note has no colour of its own and is drawn in the accent, so it is in hand, and alone with it is one colour. */
+  assert.deepEqual(key('info', undefined), []);
+  assert.deepEqual(key('info', 'good'), [{ label: 'Under way' }, { tone: 'good', label: 'Done' }]);
+  /* From a plan: a row that is skipped is not drawn, so its colour is not in the key. */
+  const plan = roadmapPlan([{ start: '2026-09-01', end: '2026-09-05', title: 'A' }, { start: '', end: 'soon', title: 'B', tone: 'bad' }, { start: '', end: '2026-09-09', title: 'C', tone: 'good' }], '2026-09-03');
+  assert.deepEqual(roadmapLegend(roadmapLines(plan)).map((k) => k.label), ['Under way', 'Done']);
 });

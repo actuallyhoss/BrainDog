@@ -111,6 +111,10 @@ const SHAPES: Record<string, string> = {
   'a timeline whose newest row is being worked on': '```timeline\n3h ago | ●︎ Specimen page rebuild | Codex picked it up | warn\n2d ago | Variable axis QA | Claude finished\n```',
   'steps with one being worked on': '```steps\n●︎ Cut the masters | Codex | running\nProof the italics |  | waiting\n```',
   'a board with an agent on one card': '```board\nDoing | ●︎ Write the notes | Claude\nDone | Fix login | Codex\n```',
+  /* A BOARD CARD'S THIRD AND FOURTH CELLS ARE ONE LINE, as a todo's are: both, either alone, a blank fourth
+     as a page pads it, and a row of three. */
+  'a board whose cards carry a due day and who holds them':
+    '```board\nDoing | Write the notes | due 24 Sep | Claude\nDoing | Proof the italics |  | [Codex](/r/sessions/4)\nDone | Fix login | due 20 Sep | \nDone | Send the quote | Amara\nOpen | Book the printer |  | \n```',
   /* THE `table` PRIMITIVE, WHICH HAD NO SHAPE HERE AT ALL until adding one showed the two renderers
      drawing genuinely different trees: a scroll region on one side and none on the other, a
      `rowgroup` on one side and none on the other, `data-align` and `data-truncate` on every cell of

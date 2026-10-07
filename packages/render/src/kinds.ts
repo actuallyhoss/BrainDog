@@ -252,7 +252,11 @@ const TABLE = {
      `more | N`, as how many open steps the short view left out (`src/path.ts`). */
   steps: { primitive: 'list', cells: 3, forms: ['path'], tone: false, ordered: true, minSpan: 4, purpose: 'plan' },
   timeline: { primitive: 'list', cells: 3, tone: true, minSpan: 4, purpose: 'plan' },
-  board: { primitive: 'grid', cells: 3, tone: false, minSpan: 6, purpose: 'plan' },
+  /* A board row is `state | title | fact | fact`, the second fact optional: the two are ONE quiet line under the
+     card's title, joined by a dot, as a `todo`'s two are (`src/html.ts`, `svelte/p/Grid.svelte`). Work's board says
+     the day a card is due and who holds it, and a row of three cells, or one whose fourth is blank, draws exactly
+     as it did. */
+  board: { primitive: 'grid', cells: 4, optional: 1, tone: false, minSpan: 6, purpose: 'plan' },
   /* `day | value`: twelve weeks by weekday ending on this one, each day washed by how busy it was (`src/heat.ts`,
      over `src/days.ts`'s grid). On `grid`, because a day is a cell to read and point at and not a magnitude along a
      track, and a drawer that does not know the kind yet falls back to the grid's label and figure, which reads as the

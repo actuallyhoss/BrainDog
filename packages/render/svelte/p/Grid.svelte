@@ -16,6 +16,7 @@
   import { figureChars, headlineFigure, hrefFor, inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { columnAt, columnsOf, dropTarget, lanes, moveTarget, type Moves } from '../../src/board.ts';
   import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
+  import { TODO_META_JOIN, todoMeta } from '../../src/todo.ts';
   import { valueWord } from '../../src/format.ts';
   import Text from '../Text.svelte';
   import Cards from '../Cards.svelte';
@@ -265,7 +266,13 @@
   <span class="card-title">
     {#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} />
   </span>
-  <span class="card-detail"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
+  <!-- THE FOURTH CELL JOINS THE THIRD ON THE ONE LINE, by the dot a `todo`'s two facts are joined with, and a
+       card without one draws the line it always drew. -->
+  {#if (row.cells[3] ?? '').trim() !== ''}
+    <span class="card-detail">{#each todoMeta(row.cells) as part, n}{#if n > 0}{TODO_META_JOIN}{/if}<Text nodes={inline(part, opts)} {opts} />{/each}</span>
+  {:else}
+    <span class="card-detail"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
+  {/if}
   <!-- A WORD, NOT A COLOUR, so it needs no tone and draws no glyph: `13 §5.1` bans colour carrying
        meaning alone, and the way out of that rule is to say the thing rather than to tint it. The
        shape is the register's receipt chip, and it means what that chip means: the card is where

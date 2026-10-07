@@ -1,7 +1,8 @@
 <!--
   `roadmap`: tasks on one time axis, drawn as a timeline: each row its name in the left column and its window as a bar
   on a track in the right, a date as a dot on its day, the axis across the top and today's line down every track.
-  `src/roadmap.ts` decides every position, name and line; `roadmap` in `src/html.ts` is this file's twin, and
+  A name is one line, cut with an ellipsis where it is long, so it carries the whole of itself as its `title`; and a
+  key under the rows says what the bars' colours mean. `src/roadmap.ts` decides every position, name and line; `roadmap` in `src/html.ts` is this file's twin, and
   `roadmap-parity.test.ts` holds the two to one tree.
 
   IT IS ON `list` AND HAD NO ARM THERE, so the app drew a roadmap as the generic list: the title, the due day as
@@ -22,10 +23,12 @@
   import { inline, text, TONES, type Block, type RenderOptions, type Row } from '../../src/index.ts';
   import { MISSING } from '../../src/format.ts';
   import {
+    ROADMAP_LEGEND,
     ROADMAP_NONE,
     ROADMAP_TODAY,
     roadmapAxis,
     roadmapFlip,
+    roadmapLegend,
     roadmapLines,
     roadmapPlan,
     roadmapRow,
@@ -53,6 +56,7 @@
   const rows = $derived(block.rows.map((r) => roadmapRow(said(r, 0), said(r, 1), said(r, 2), r.tone)));
   const plan = $derived(roadmapPlan(rows, roadmapToday(opts.now)));
   const lines = $derived(plan.empty ? [] : roadmapLines(plan));
+  const keys = $derived(roadmapLegend(lines));
   const skipped = $derived(plan.skipped.length ? roadmapSkipped(plan.skipped.map((i) => rows[i]!.title || MISSING)) : '');
   /* The glyph only for a word `TONES` owns, as `toneGlyph` in the mirror checks: the parser has let
      `Object.prototype`'s names into the tone slot before, and a lookup on one of those is not a tone. */
@@ -154,7 +158,7 @@
     <ol class="roadmap-list" aria-label={roadmapSentence(plan)}>
       {#each lines as p}
         {@const date = p.from === MISSING}
-        <li class="roadmap-item" data-intent={p.tone} data-date={date ? '' : undefined} data-flip={roadmapFlip(p) ? '' : undefined} style={placeOf(p)}><span class="roadmap-item-title">{p.title}{@render mark(p.tone)}</span> <span class="roadmap-item-when num">{p.when}</span><span class="roadmap-item-track" aria-hidden="true">{#if onreschedule}<!-- A BAR IS A PICTURE THAT A POINTER CAN MOVE, inside a track no screen reader enters: the list says every row's days, and the row's own page sets them. --><!-- svelte-ignore a11y_no_static_element_interactions --><span
+        <li class="roadmap-item" data-intent={p.tone} data-date={date ? '' : undefined} data-flip={roadmapFlip(p) ? '' : undefined} style={placeOf(p)}><span class="roadmap-item-title" title={p.title || undefined}>{p.title}{@render mark(p.tone)}</span> <span class="roadmap-item-when num">{p.when}</span><span class="roadmap-item-track" aria-hidden="true">{#if onreschedule}<!-- A BAR IS A PICTURE THAT A POINTER CAN MOVE, inside a track no screen reader enters: the list says every row's days, and the row's own page sets them. --><!-- svelte-ignore a11y_no_static_element_interactions --><span
                 class="roadmap-bar"
                 data-grip=""
                 data-dragging={drag?.row === p.row ? '' : undefined}
@@ -167,6 +171,12 @@
               ></span>{:else}<span class="roadmap-bar"></span>{/if}</span></li>
       {/each}
     </ol>
+    <!-- WHAT THE COLOURS MEAN, only the ones drawn, and only where there are two to tell apart. -->
+    {#if keys.length}
+      <ul class="roadmap-legend" aria-label={ROADMAP_LEGEND}>
+        {#each keys as k}<li class="roadmap-key" data-key={k.tone}>{k.label}</li>{/each}
+      </ul>
+    {/if}
     {#if skipped}<p class="roadmap-skipped">{skipped}</p>{/if}
   </div>
 {/if}

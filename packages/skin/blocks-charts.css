@@ -2089,7 +2089,7 @@
      another or on a bar (the names over a stretched drawing collided at every width, DIRECTION §39). A date is a dot on
      its day. The axis names sit across the top, each with a hairline down every track, and today's line runs down them
      all in the ink. The bar's colour is the row's state: the accent while it is in hand, amber when it is at risk, red
-     when it is late, grey when it is done. A name is one line, cut with an ellipsis, in a column no wider than 260px,
+     when it is late, grey when it is done, and a key under the rows says so wherever two of them are drawn. A name is one line, cut with an ellipsis and whole in its `title`, in a column no wider than 260px,
      and a track is a hairline, so the bars are the only weight in the drawing. A row's days are said beside its bar on
      hover. In a narrow tile the list is the lane list: the name and its days on one line, the track under them. The list is the one thing a screen reader reads; its name is the plan's
      sentence and the axis is hidden from it. */
@@ -2304,6 +2304,50 @@
     background: var(--chart-late);
   }
 
+  /* THE KEY UNDER THE ROWS: a dot in each colour a bar is drawn in and its word, on one quiet line the width of the
+     tile. The dots take the bars' own paints, so the key cannot say a colour the drawing does not use. */
+  .roadmap-legend {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1) var(--sp-4);
+    margin: 0;
+    padding: 0;
+    padding-block-start: var(--sp-3);
+    padding-inline-start: var(--sp-2);
+    list-style: none;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .roadmap-key {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    white-space: nowrap;
+  }
+
+  .roadmap-key::before {
+    content: '';
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: var(--r-pill);
+    background: var(--chart-1);
+  }
+
+  .roadmap-key[data-key='bad']::before {
+    background: var(--chart-late);
+  }
+
+  .roadmap-key[data-key='warn']::before {
+    background: var(--chart-risk);
+  }
+
+  .roadmap-key[data-key='good']::before {
+    background: var(--chart-other);
+  }
+
   .roadmap-empty,
   .roadmap-skipped {
     margin: 0;
@@ -2377,6 +2421,10 @@
     .roadmap-item[data-date] .roadmap-bar {
       inset-block: -3px;
       inline-size: 10px;
+    }
+
+    .roadmap-legend {
+      padding-inline-start: 0;
     }
 
     /* ON A PHONE THE NAME WRAPS, so the late dot goes back after it. */
