@@ -1134,6 +1134,19 @@ test('a card whose quiet cell says anything is dimmed, and the cell itself is ne
   assert.equal(twice?.type, 'degraded', 'two quiet columns');
 });
 
+test('A RUN THE HOST HANDS IS NOT DIMMED, since its face says whether it went quiet, and wears its maker\'s mark', () => {
+  const [seg] = onPage('```cards\ntitle | who | when: Seen | quiet\nReconcile | S7 | 2h ago | quiet\nAxis QA | Claude | 1h ago | quiet\n```');
+  assert.equal(seg?.type, 'block');
+  const mark = { d: 'M0 0h24v24z', rule: 'nonzero' as const, tone: 'claude' };
+  const html = toHTML([seg!], {
+    runs: [{ run: 'S7', agent: 'claude-code', live: 'stopped' }, null],
+    agentMark: (name: string) => (/claude/iu.test(name) ? mark : null),
+  } as never);
+  assert.equal(html.match(/data-quiet=""/gu)?.length, 1, 'a handed run was dimmed, or a card that is no run was not');
+  assert.match(html, /<li class="cards-item" data-quiet=""><div class="cards-head"><h3 class="cards-title">Axis QA/u);
+  assert.match(html, /<path class="cards-run-agent" d="M0 0h24v24z" fill-rule="nonzero" clip-rule="nonzero" transform="translate\(10\.5 10\.5\) scale\(0\.625\)" fill="currentColor" data-tone="claude" style="fill:var\(--agent-claude, currentColor\)"><\/path>/u, 'the run wore a glyph and not its maker\'s mark');
+});
+
 test('a card grid with no cards says so in a sentence', () => {
   assert.match(toHTML(onPage('```cards\ntitle | fact: Role\n```')), /<p class="cards-empty">Nothing to show\.<\/p>/u);
 });
@@ -1192,8 +1205,9 @@ test('THE FEED KEEPS A MACHINE’S WORK APART FROM THE PERSON’S, and a burst i
     /<li class="feed-row" data-new data-row="\d+"><span class="feed-count num">14<\/span><span class="feed-face" aria-hidden="true">C<\/span><span class="feed-what"><span class="feed-who">Claude<\/span> saves on <a href="\/r\/things\/4">Variable axis QA<\/a><\/span><span class="feed-when" data-calm="">3h ago<\/span><\/li>/u,
   );
   assert.match(html, /<span class="feed-count num"><\/span>/u, 'a row with no count has a gap there, not a zero');
-  /* A RULE WEARS NO LETTER: `L` for Late fees, `C` for Categorise, said nothing a rule's name beside it does not. */
-  assert.match(html, /data-by="rule"><h3 class="feed-head">Rules<span class="feed-new num">2 new<\/span><\/h3><ul class="feed-rows"><li class="feed-row" data-new data-row="\d+"><span class="feed-count num">2<\/span><span class="feed-face" aria-hidden="true"><\/span>/u);
+  /* A RULE WEARS NO LETTER: `L` for Late fees, `C` for Categorise, said nothing a rule's name beside it does not. AND
+     NO EMPTY FACE: the slot kept its column, and every rule's line sat indented under nothing. */
+  assert.match(html, /data-by="rule"><h3 class="feed-head">Rules<span class="feed-new num">2 new<\/span><\/h3><ul class="feed-rows"><li class="feed-row" data-new data-row="\d+"><span class="feed-count num">2<\/span><span class="feed-what">/u);
   assert.doesNotMatch(html, /style=/u);
 });
 

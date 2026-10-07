@@ -249,15 +249,26 @@
 
   .cards-ring-track {
     fill: none;
-    stroke: var(--s1);
+    stroke: var(--chart-track);
     stroke-width: 4;
   }
 
+  /* THE ARC SAYS HOW IT IS GOING, from the card's own intent: the accent while it goes to plan, amber at risk (the
+     status dot's colour, so the ring and the dot agree), and the red only when it is off track and needs the person.
+     It was ink whatever the project said, so "At risk 60%" drew the same black arc as a project on track. */
   .cards-ring-fill {
     fill: none;
-    stroke: var(--chart-1);
+    stroke: var(--action);
     stroke-width: 4;
     stroke-linecap: round;
+  }
+
+  .cards-item[data-intent='warn'] .cards-ring-fill {
+    stroke: var(--status-waiting);
+  }
+
+  .cards-item[data-intent='bad'] .cards-ring-fill {
+    stroke: var(--status-late);
   }
 
   .cards-facts {

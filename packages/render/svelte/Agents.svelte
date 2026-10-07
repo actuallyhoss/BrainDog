@@ -4,8 +4,8 @@
   and compares the two.
 -->
 <script lang="ts">
-  import { AGENTS_EARLIER, TONES, agentsPlan, counted, initialOf, inline, text, type Block, type RenderOptions } from '../src/index.ts';
-  import { RUN_OPEN, runFaceOf, type RunFace } from '../src/cards.ts';
+  import { AGENTS_EARLIER, TONES, agentMarkFill, agentsPlan, counted, initialOf, inline, text, type Block, type RenderOptions } from '../src/index.ts';
+  import { RUN_OPEN, runFaceOf, runMarkOf, type RunFace } from '../src/cards.ts';
   import { hrefFor } from '../src/html.ts';
   import Text from './Text.svelte';
 
@@ -18,7 +18,7 @@
 
 <!-- A RUN'S FACE, as `Cards.svelte`'s own `runFace` snippet draws one: every place a run is named draws
      the agent face, and this block groups its lines by who did them, which is a run wherever `sessions.live` names one. -->
-{#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}<a
+{#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}{@const m = runMarkOf(f, opts.agentMark)}<a
     class="cards-face cards-run"
     style="background:none"
     href={hrefFor(opts, `/r/session/${f.seq}`)}
@@ -35,7 +35,16 @@
           stroke-width="2.5"
           stroke-dasharray={f.live === 'quiet' ? '4 3' : undefined}
           style="stroke:oklch(var(--mark-l) var(--mark-c) var(--run-hue))"
-        ></circle>{/if}{#if d}<path
+        ></circle>{/if}{#if m}{@const fill = agentMarkFill(m.tone)}<path
+          class="cards-run-agent"
+          d={m.d}
+          fill-rule={m.rule}
+          clip-rule={m.rule}
+          transform="translate(10.5 10.5) scale(0.625)"
+          fill="currentColor"
+          data-tone={m.tone}
+          style={fill ?? undefined}
+        ></path>{:else if d}<path
           d={d}
           transform="translate(9 9) scale(0.75)"
           fill="none"

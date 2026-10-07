@@ -272,6 +272,23 @@ export function runFaceOf(cell: string, host: RunCell | null | undefined, quiet:
 }
 
 /**
+ * The mark a run's face wears: its maker's, where the host draws one for the run's agent (`RenderOptions.agentMark`),
+ * else `null` and the face keeps its kind's glyph. A run of Claude's wore a robot and a run of Codex's a pair of
+ * brackets, beside the same agents' real marks in the feed under them (DIRECTION §34).
+ */
+export const runMarkOf = (f: RunFace, agentMark: ((name: string) => AgentMark | null) | undefined): AgentMark | null => {
+  const agent = (f.agent ?? '').trim();
+  return agent && agentMark ? agentMark(agent) : null;
+};
+
+/**
+ * Whether a card is drawn dimmed: its `quiet` cell says so, and it is not a run the host handed. A RUN'S FACE ALREADY
+ * SAYS IT, with a dashed ring once it has gone quiet, and a run that has stopped sits under Today or Earlier, which say
+ * when. Dimmed as well, a stopped run's card was grey words on a grey face, which nobody could read (DIRECTION §36).
+ */
+export const isDimmed = (L: CardLayout, cells: readonly string[], host: RunCell | null | undefined): boolean => isQuiet(L, cells) && !host;
+
+/**
  * How many cards the grid holds, as the `data-cards` word the host's stylesheet caps its columns at: `1`, `2`, `3`, or
  * `many` from `CARDS_WIDE` up, where as many columns as fit are already no more than there are cards.
  *

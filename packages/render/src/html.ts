@@ -26,7 +26,7 @@ import { kindSpec } from './kind-spec.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, counted, type AgentMark, initialOf, isQuiet, markOf, ringDash, ringOf, runFaceOf, trendOf, type RunCell, type RunFace } from './cards.ts';
+import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, counted, type AgentMark, initialOf, isDimmed, isQuiet, markOf, ringDash, ringOf, runFaceOf, runMarkOf, trendOf, type RunCell, type RunFace } from './cards.ts';
 import { FEED_EARLIER, feedBurst, feedCasedNodes, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
 import { QUEUE_DOES, QUEUE_REASONS, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueReasoned, queueSuggested, queueWays, type QueueShows } from './queue.ts';
@@ -784,7 +784,14 @@ function runFaceHtml(f: RunFace, o: RenderOptions): string {
     f.live !== 'stopped'
       ? `<circle class="cards-run-ring" cx="18" cy="18" r="16.5" fill="none" stroke-width="2.5"${f.live === 'quiet' ? ' stroke-dasharray="4 3"' : ''} style="stroke:oklch(var(--mark-l) var(--mark-c) var(--run-hue))"></circle>`
       : '';
-  const path = d ? `<path d="${escape(d)}" transform="translate(9 9) scale(0.75)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>` : '';
+  /* THE MAKER'S MARK WHERE THE HOST DRAWS ONE, filled in its tone and centred in the disc; else the kind's glyph. */
+  const m = runMarkOf(f, o.agentMark);
+  const fill = m ? agentMarkFill(m.tone) : null;
+  const path = m
+    ? `<path class="cards-run-agent" d="${escape(m.d)}" fill-rule="${m.rule}" clip-rule="${m.rule}" transform="translate(10.5 10.5) scale(0.625)" fill="currentColor" data-tone="${escape(m.tone)}"${fill ? ` style="${fill}"` : ''}></path>`
+    : d
+      ? `<path d="${escape(d)}" transform="translate(9 9) scale(0.75)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`
+      : '';
   return `<a class="cards-face cards-run" style="background:none" href="${escape(hrefFor(o, `/r/session/${f.seq}`))}" data-live="${f.live}" aria-label="${escape(RUN_OPEN)}"><svg class="cards-run-mark" viewBox="0 0 36 36" width="100%" height="100%" aria-hidden="true" style="--run-hue:${f.hue}"><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--bg))"></circle>${ring}${path}</svg></a>`;
 }
 
@@ -867,7 +874,7 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
       const whoLead = run ? runFaceHtml(run, o) : whoMark ? agentFaceHtml(whoMark, 'cards-face') : whoFace ? `<span class="cards-face" aria-hidden="true">${escape(whoFace)}</span>` : '';
       const who = L.who >= 0 && r.cells[L.who] ? `<div class="cards-who">${whoLead}<span class="cards-name">${drawn(r, L.who)}</span></div>` : '';
       /* DIMMED BY AN ATTRIBUTE, so the host's CSS decides how, and the card keeps every word it had. */
-      const quiet = isQuiet(L, r.cells) ? ' data-quiet=""' : '';
+      const quiet = isDimmed(L, r.cells, o.runs?.[n]) ? ' data-quiet=""' : '';
       /* THE REPLY IS THE LINE UNDER THE HEAD and the next step the card's last word before who is on it, and an empty
          cell draws neither: "Next:" over nothing says there is a step nobody wrote down. */
       const reply = L.reply >= 0 && r.cells[L.reply] ? `<p class="cards-reply">${drawn(r, L.reply)}</p>` : '';
@@ -945,11 +952,15 @@ function feed(b: Block, o: RenderOptions): string {
           const run = runFaceOf(who, null, false);
           const mark = g.by === 'rule' ? null : markFor(o, said(who));
           const face = g.by === 'rule' ? null : initialOf(said(who));
+          /* AND NO FACE AT ALL, not an empty one: an empty slot kept the column, and every rule's line sat indented
+             under nothing (`feed.css` gives a line with no face its column back). */
           const lead = run
             ? runFaceHtml(run, o)
             : mark
               ? agentFaceHtml(mark, 'feed-face')
-              : `<span class="feed-face" aria-hidden="true">${face ? escape(face) : ''}</span>`;
+              : g.by === 'rule'
+                ? ''
+                : `<span class="feed-face" aria-hidden="true">${face ? escape(face) : ''}</span>`;
           const line = i === g.earlier ? `<li class="feed-seen">${escape(FEED_EARLIER)}</li>` : '';
           return `${line}<li class="feed-row"${fresh ? ' data-new' : ''}${toneAttrs(r.tone)} data-row="${escape(rowKey(r, b.rows.indexOf(r)))}"><span class="feed-count num">${
             feedBurst(said(r.cells[2])) ? drawn(r.cells[2]) : ''

@@ -128,7 +128,8 @@
   }
 
   /* One line and one dot, for every small trend the renderer draws (`stat`, `sparkline`, and a card's in `cards.css`):
-     2px of ink with round joins and a 3px dot on the last point, the dot in the figure's tone when it has one. */
+     2px of the accent (`--chart-1`) with round joins and a 3px dot on the last point, the dot in the figure's tone when it
+     has one. */
   .trend-line {
     fill: none;
     stroke: var(--chart-1);

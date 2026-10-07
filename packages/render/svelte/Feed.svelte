@@ -12,7 +12,7 @@
 <script lang="ts">
   import { FEED_EARLIER, MISSING, TONES, agentMarkFill, feedBurst, feedNew, feedPlan, initialOf, inline, text, type AgentMark, type Block, type RenderOptions } from '../src/index.ts';
   import { feedCasedNodes } from '../src/feed.ts';
-  import { RUN_OPEN, runFaceOf, type RunFace } from '../src/cards.ts';
+  import { RUN_OPEN, runFaceOf, runMarkOf, type RunFace } from '../src/cards.ts';
   import { hrefFor } from '../src/html.ts';
   import { rowAt, rowKey } from '../src/cursor.ts';
   import type { Row } from '../src/parse.ts';
@@ -55,7 +55,7 @@
 
 <!-- A RUN'S FACE, as `Cards.svelte`'s own `runFace` snippet draws one: every place a run is named draws
      the agent face, and a feed line's actor is a run wherever `sessions.live` names one. -->
-{#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}<a
+{#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}{@const m = runMarkOf(f, opts.agentMark)}<a
     class="cards-face cards-run"
     style="background:none"
     href={hrefFor(opts, `/r/session/${f.seq}`)}
@@ -72,7 +72,16 @@
           stroke-width="2.5"
           stroke-dasharray={f.live === 'quiet' ? '4 3' : undefined}
           style="stroke:oklch(var(--mark-l) var(--mark-c) var(--run-hue))"
-        ></circle>{/if}{#if d}<path
+        ></circle>{/if}{#if m}{@const fill = agentMarkFill(m.tone)}<path
+          class="cards-run-agent"
+          d={m.d}
+          fill-rule={m.rule}
+          clip-rule={m.rule}
+          transform="translate(10.5 10.5) scale(0.625)"
+          fill="currentColor"
+          data-tone={m.tone}
+          style={fill ?? undefined}
+        ></path>{:else if d}<path
           d={d}
           transform="translate(9 9) scale(0.75)"
           fill="none"
@@ -95,14 +104,14 @@
           {#each g.rows as { row, fresh }, i}
             {@const who = row.cells[1] ?? ''}
             {@const run = runFaceOf(who, null, false)}
-            <!-- A RULE WEARS NO LETTER, an agent its maker's mark where the host draws one, and a person their initial. -->
+            <!-- A RULE WEARS NO FACE AT ALL, an agent its maker's mark where the host draws one, and a person their initial. -->
             {@const mark = g.by === 'rule' ? null : markFor(said(who))}
             {@const face = g.by === 'rule' ? null : initialOf(said(who))}
             {@const key = rowKey(row, block.rows.indexOf(row))}
             {#if i === g.earlier}<li class="feed-seen">{FEED_EARLIER}</li>{/if}
             <li class="feed-row" data-new={fresh ? '' : undefined} data-intent={row.tone} data-row={key} data-focused={cursor === key ? '' : undefined}>
               <span class="feed-count num">{#if feedBurst(said(row.cells[2]))}<Text nodes={nodes(row.cells[2])} {opts} />{/if}</span>
-              {#if run}{@render runFace(run)}{:else if mark}{@render agentFace(mark, 'feed-face')}{:else}<span class="feed-face" aria-hidden="true">{face ?? ''}</span>{/if}
+              {#if run}{@render runFace(run)}{:else if mark}{@render agentFace(mark, 'feed-face')}{:else if g.by !== 'rule'}<span class="feed-face" aria-hidden="true">{face ?? ''}</span>{/if}
               <!-- A RULE THAT WORDED ITS OWN LINE SENDS NO WHO, and draws none, as `html.ts`'s `feed`. -->
               <span class="feed-what"
                 >{#if who || g.by !== 'rule'}<span class="feed-who">{#if who}<Text nodes={nodes(who)} {opts} />{:else}{MISSING}{/if}</span>{' '}{/if}<Text

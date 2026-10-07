@@ -779,3 +779,21 @@ test('THE TWO RENDERERS DRAW ONE MARK FOR AN AGENT the host names, on a card, a 
     assert.equal(svelte, tree(toHTML([block], opts)), src);
   }
 });
+
+test("AND A RUN THE HOST HANDS WEARS ITS MAKER'S MARK IN BOTH, undimmed, and a run of an agent with no mark keeps its glyph", () => {
+  const marks: Record<string, { d: string; rule: 'evenodd' | 'nonzero'; tone: string }> = { 'claude-code': { d: 'M4 4h16v16H4z', rule: 'nonzero', tone: 'claude' } };
+  const opts = {
+    agentMark: (name: string) => marks[name] ?? null,
+    icon: (name: string) => (name === 'session' ? 'M3 3h18' : null),
+    runs: [
+      { run: 'S7', agent: 'claude-code', live: 'quiet' as const },
+      { run: 'S8', agent: 'night-shift', live: 'stopped' as const },
+    ],
+  };
+  const Marked = Block as unknown as Component<{ block: BlockSegment; opts: typeof opts }>;
+  const block = page('```cards\ntitle | who | when: Seen | quiet\nVariable axis QA | Claude | 3m ago | quiet\nReconcile | Night shift | 2h ago | quiet\n```');
+  const svelte = tree(render(Marked, { props: { block, opts } }).body);
+  assert.equal(svelte, tree(toHTML([block], opts)));
+  assert.equal(svelte.match(/class="cards-run-agent"/gu)?.length, 1, 'the run with a mark did not wear it, or the other did');
+  assert.doesNotMatch(svelte, /data-quiet/u, 'a run the host handed was dimmed');
+});

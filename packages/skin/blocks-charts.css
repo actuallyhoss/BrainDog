@@ -1008,7 +1008,13 @@
     container-type: inline-size;
   }
 
+  /* A LINE IS A THIN MARK, SO IT NEVER WEARS A LIGHT TINT: `--chart-2` is about 2.4:1 on a white tile, fine for a bar
+     and lost as a 2px line. The second series is the accent at 75% (about 3:1 or better in both schemes) and the
+     earlier period a mid grey, and the legend's swatch, the readout's and the line's end take the same, so key and
+     line agree. */
   .lines {
+    --lines-2: color-mix(in srgb, var(--chart-1) 75%, var(--tile));
+    --lines-was: color-mix(in srgb, var(--ink) 40%, var(--tile));
     gap: var(--sp-2);
   }
 
@@ -1075,7 +1081,7 @@
     flex: none;
     inline-size: 14px;
     block-size: 0;
-    border-block-start: 2px solid var(--chart-2);
+    border-block-start: 2px solid var(--lines-2);
   }
 
   .lines-key[data-step='0']:not([data-was]) .lines-swatch,
@@ -1085,7 +1091,7 @@
 
   .lines-key[data-was] .lines-swatch,
   .lines-readout-value[data-was] .lines-swatch {
-    border-block-start: 2px dashed var(--chart-other);
+    border-block-start: 2px dashed var(--lines-was);
   }
 
   .lines-plot {
@@ -1104,7 +1110,7 @@
 
   .lines-line {
     fill: none;
-    stroke: var(--chart-2);
+    stroke: var(--lines-2);
     stroke-width: 2px;
     stroke-linejoin: round;
     stroke-linecap: round;
@@ -1115,14 +1121,14 @@
   }
 
   .lines-line[data-was] {
-    stroke: var(--chart-other);
+    stroke: var(--lines-was);
     stroke-width: 1.5px;
     stroke-dasharray: 4 4;
   }
 
   .lines-end {
     fill: none;
-    stroke: var(--chart-2);
+    stroke: var(--lines-2);
     stroke-width: 6px;
     stroke-linecap: round;
   }
@@ -1402,8 +1408,10 @@
     stroke-dasharray: 5 4;
   }
 
+  /* The baseline a moved knob is read against: a quiet grey, but one that still reads as a 1.5px line (the earlier
+     period's grey in `.lines`). `--chart-other` is a fill, and as a dotted line it all but vanished. */
   .forecast-base {
-    stroke: var(--chart-other);
+    stroke: color-mix(in srgb, var(--ink) 40%, var(--tile));
     stroke-width: 1.5px;
     stroke-dasharray: 2 3;
   }

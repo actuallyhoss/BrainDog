@@ -32,7 +32,7 @@
     type Row,
   } from '../src/index.ts';
   /* From the module and not the root, which does not export it: the word is this drawer's and `html.ts`'s alone. */
-  import { CARDS_NEXT, RUN_OPEN, runFaceOf, type RunCell, type RunFace } from '../src/cards.ts';
+  import { CARDS_NEXT, RUN_OPEN, isDimmed, runFaceOf, runMarkOf, type RunCell, type RunFace } from '../src/cards.ts';
   import { hueOf } from '../src/cards.ts';
   import { pictureSrc } from '../src/gallery.ts';
   import { hrefFor } from '../src/html.ts';
@@ -78,7 +78,7 @@
 <!-- A RUN'S FACE, as `apps/web`'s `AgentFace` draws one: the kind's glyph on a disc washed in the run's
      hue, ringed in that hue while the run is open, solid while it works and dashed once it has gone quiet, and a door to
      the run's page. The hue is written on the drawing alone, so the card's own `--hue` is left as it was. -->
-{#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}<a
+{#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}{@const m = runMarkOf(f, opts.agentMark)}<a
     class="cards-face cards-run"
     style="background:none"
     href={hrefFor(opts, `/r/session/${f.seq}`)}
@@ -95,7 +95,16 @@
           stroke-width="2.5"
           stroke-dasharray={f.live === 'quiet' ? '4 3' : undefined}
           style="stroke:oklch(var(--mark-l) var(--mark-c) var(--run-hue))"
-        ></circle>{/if}{#if d}<path
+        ></circle>{/if}{#if m}{@const fill = agentMarkFill(m.tone)}<path
+          class="cards-run-agent"
+          d={m.d}
+          fill-rule={m.rule}
+          clip-rule={m.rule}
+          transform="translate(10.5 10.5) scale(0.625)"
+          fill="currentColor"
+          data-tone={m.tone}
+          style={fill ?? undefined}
+        ></path>{:else if d}<path
           d={d}
           transform="translate(9 9) scale(0.75)"
           fill="none"
@@ -134,7 +143,7 @@
         class="cards-item"
         data-lead={block.form === 'lead' && n === 0 ? '' : undefined}
         data-intent={r.tone}
-        data-quiet={isQuiet(L, r.cells) ? '' : undefined}
+        data-quiet={isDimmed(L, r.cells, opts.runs?.[n]) ? '' : undefined}
         style={hue === null ? undefined : `--hue:${hue}`}
       >
         {#if picture}<img class="cards-picture" src={hrefFor(opts, picture)} alt="" loading="lazy" />{/if}

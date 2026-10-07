@@ -147,16 +147,14 @@
     display: none;
   }
 
-  /* A RULE WEARS NO FACE, so its line gives the face's column back rather than keeping a gap for one. */
-  .feed-group[data-by='rule'] .feed-face:empty {
-    display: none;
-  }
-
-  .feed-group[data-by='rule'] .feed-row:has(> .feed-face:empty) {
+  /* A RULE WEARS NO FACE, AND THE RENDERER DRAWS NONE, so its line gives the face's column back rather than keeping a
+     gap for one. Keyed on the face being absent and not on an empty one: a drawer's empty text node is not `:empty`,
+     so every rule's line on Today sat indented under nothing. A run's face is a face too (`.cards-face`). */
+  .feed-row:not(:has(> .feed-face, > .cards-face)) {
     grid-template-columns: 3ch minmax(0, 1fr) auto;
   }
 
-  .feed-group[data-by='rule'] .feed-rows:not(:has(.feed-count:not(:empty))) .feed-row:has(> .feed-face:empty) {
+  .feed-rows:not(:has(.feed-count:not(:empty))) .feed-row:not(:has(> .feed-face, > .cards-face)) {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
