@@ -67,6 +67,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   people: [
     {
+      version: '3.2.0',
+      notes:
+        'People shows each person once. Gone quiet and Last in touch listed the same people who are on the cards under them, so both lists are gone and the cards stay, each with the day you were last in touch. Who has gone quiet is still said first, by name.',
+    },
+    {
       version: '3.1.0',
       notes:
         'People shows who has gone quiet and who you were last in touch with as two short lists, the one quiet longest first, each with the day. They take the place of In touch, 12 weeks, a grid of dots that said when and little else.',
@@ -168,6 +173,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    {
+      version: '1.17.0',
+      notes: 'A card on the Board says the day its task is due and who holds it, where it named the project. The project is still in the list under the board.',
+    },
     {
       version: '1.16.0',
       notes: 'The Board no longer says By status over its columns, since each column is headed by its status already.',

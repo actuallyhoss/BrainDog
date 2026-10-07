@@ -2832,3 +2832,27 @@ export function cashSeries(days = 90): { at: string; value: number }[] {
   }
   return out;
 }
+
+/**
+ * Those days as the points a nightly reading of `cash-now` leaves, for the sample to hold from the moment it is made.
+ *
+ * WRITTEN BY THE SEED, SINCE THE SAMPLE HAD NONE. A figure's `snapshot:` writes its first point the night after it is
+ * declared, so a record seeded a minute ago held no day of cash at all, and the line under Cash now on Today
+ * (`trend: 12w`) and "on a month ago" in Money's first sentence had nothing to read. A record somebody starts still
+ * begins with none, as `cashSeries` says: nothing is known of its cash before it was told.
+ *
+ * IN THE SAMPLE'S ONE CURRENCY, WITH HOW MANY ACCOUNTS WERE ADDED UP, which is what a night's own point says beside its
+ * value. The night after, the record writes its own next point and leaves these as they are.
+ *
+ * NO POINT AT ALL ONCE THE SAMPLE HOLDS TWO CURRENCIES. `cashSeries` adds the balances and the paid rows as they are
+ * written, which is a sum only while every one is in the same money; a second currency among them would be written here
+ * under the first one's name, so nothing is written and the line waits for the record's own nights, which roll each.
+ */
+export function cashPoints(days = 90): { series: string; grain: string; at: string; value: number; unit: string; n: number }[] {
+  const liquid = ACCOUNTS.filter((a) => a.liquid === true);
+  const paid = OBLIGATIONS.filter((o) => o.state === 'paid' && typeof o.settled === 'string');
+  const currencies = new Set([...liquid.map((a) => a.balance), ...paid.map((o) => o.amount)].map((m) => (m as { currency: string }).currency));
+  if (currencies.size !== 1) return [];
+  const [unit] = [...currencies] as [string];
+  return cashSeries(days).map((p) => ({ series: 'cash-now', grain: 'day', at: p.at, value: p.value, unit, n: liquid.length }));
+}

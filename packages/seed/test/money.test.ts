@@ -21,7 +21,7 @@ import { openRecord, type Kernel, type Leg } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { refused, sayOf } from '@braindog/ports';
 
-import { ACCOUNTS, CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, PAGES, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, day, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
+import { ACCOUNTS, CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, PAGES, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, cashPoints, cashSeries, day, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
 import { MONEY_HOME_SETTING, MONEY_METRICS, MONEY_PAGES, MONEY_TARGET_SETTINGS, nightOf } from '../src/modules/money.ts';
 import { USE_CASES } from '../src/usecases/index.ts';
 
@@ -859,8 +859,13 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   assert.deepEqual([lead.kind, lead.lead], ['note', true]);
   assert.notEqual(lead.drawn, false, 'a record with one set of money reads no line about it');
   /* NO DAY COUNT IN IT SINCE money-core 3.11.0: Runs out says it, beside the walk. */
-  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-accounts', 'cash-now']);
+  /* AND HOW FAR CASH MOVED ON A MONTH AGO, since the sample holds its nights from the moment it is made (`cashPoints`). */
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-accounts', 'cash-now', 'cash-now.change']);
   assert.equal(lead.values?.['cash-accounts'], reading(k, 'cash-accounts'));
+  const monthAgo = cashSeries().find((p) => p.at === new Date(NOW - 30 * 86_400_000).toISOString().slice(0, 10))!.value;
+  const moved = Math.round(((reading(k, 'cash-now')! - monthAgo) / monthAgo) * 100);
+  assert.ok(moved < 0, 'the sample held less a month ago, so this proves no sign');
+  assert.equal(lead.values?.['cash-now.change'], `−${-moved}%`);
   /* HOW FAR CASH MOVED IN A MONTH IS ITS OWN CLAUSE, so a record that has no night a month back to measure from loses
      that clause and keeps the rest. */
   assert.deepEqual(
@@ -1264,4 +1269,44 @@ test("A BOOK'S CASH AHEAD OFFERS FIVE YEARS AND TO THE END as Money's own does, 
   const ahead = (book.blocks as { heading?: string; horizon?: unknown; horizons?: unknown }[]).find((b) => b.heading === 'Cash ahead')!;
   assert.equal(ahead.horizon, 365);
   assert.deepEqual(ahead.horizons, [90, 180, 365, 730, 1825, 'last']);
+});
+
+/**
+ * THE SAMPLE HOLDS ITS NIGHTS OF CASH FROM THE MOMENT IT IS MADE. A figure's `snapshot:` writes its first point the night
+ * after it is declared, so a record seeded a minute ago had none, and the line under Cash now on Today (`trend: 12w`)
+ * had nothing to draw. The seed writes the days `cashSeries` walks back from the paid rows, as the night would have.
+ */
+test('THE SAMPLE REMEMBERS A DAY OF CASH FOR EACH NIGHT BEFORE IT WAS MADE, so the line under Cash now draws at once', async () => {
+  const sql = openSqlite();
+  let now = NOW;
+  const k = await openRecord(sql, { now: () => now });
+  const out = await installSeed(k);
+  assert.ok(out.ok, sayOf(out));
+  const held = () => sql.all<{ at: string; value: number; unit: string; n: number }>("SELECT at, value, unit, n FROM metric_point WHERE series = 'cash-now' AND grain = 'day' ORDER BY at");
+
+  /* A POINT A DAY, UP TO YESTERDAY, in the currency the figure is read in, and the last is what is held now. */
+  const before = held();
+  assert.deepEqual(before.map((p) => [p.at, p.value]), cashSeries().map((p) => [p.at, p.value]));
+  assert.equal(before.length, 90);
+  assert.equal(before.at(-1)!.at, day(-1));
+  const now_ = k.metric(METRICS['cash-now'] as never);
+  assert.ok(now_.ok, sayOf(now_));
+  assert.deepEqual([...new Set(before.map((p) => p.unit))], [now_.value.unit]);
+  assert.equal(before.at(-1)!.value, now_.value.value, 'the line would end somewhere other than Cash now');
+  assert.ok(new Set(before.map((p) => p.value)).size > 2, 'ninety days of one number is a flat line, which says nothing');
+  for (const p of cashPoints()) assert.ok(Number.isInteger(p.value) && p.unit !== '', JSON.stringify(p));
+
+  /* THE TILE TODAY DRAWS, a figure with its twelve weeks: every day of them has a value, where the record answered none. */
+  const tile = k.block({ kind: 'stat', cells: [{ metric: 'cash-now', trend: '12w' }] } as never);
+  assert.deepEqual(tile.refusals, []);
+  const trend = tile.readings?.[0]?.trend ?? [];
+  assert.equal(trend.length, 84);
+  assert.ok(trend.every((v) => typeof v === 'number'), 'a night of the twelve weeks has no point');
+
+  /* THE NIGHT AFTER, the record writes its own point and leaves the sample's as they are. */
+  now = NOW + 86_400_000;
+  await k.drain();
+  const after = held();
+  assert.deepEqual(after.slice(0, before.length), before);
+  assert.equal(after.at(-1)!.at, day(0));
 });

@@ -72,6 +72,9 @@ const SETTINGS: Readonly<Record<string, Readonly<Record<string, unknown>>>> = { 
 /** The lists each use case's older versions declared and its current one does not, by use case. */
 const KEPT: Readonly<Record<string, readonly Record<string, unknown>[]>> = { team: [EARLIER_TICKETS] };
 
+/** Those lists by id, for a caller that has to say which of them a record holds (`holds` on `useCaseDocument`). */
+export const keptLists = (id: string): string[] => (KEPT[id] ?? []).map((d) => String(d.register));
+
 export type Span = { at: number; text: string };
 export type Ranked = { usecase: UseCase; score: number; why: Span[] };
 export type Arrangement = { pick: UseCase | null; ranked: Ranked[] };

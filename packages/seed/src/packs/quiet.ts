@@ -28,13 +28,22 @@
  *
  * NO EXAMPLE ROWS. An update planted on its own writes no row nobody typed, so a document that carries any is sent
  * without them.
+ *
+ * AND THE AGENTS PACK AND THE USE CASES, AFTER THE FIVE (`loop/research-audit-30.md`, Medium 3). The loop walked
+ * `FIRST_PARTY` alone, so Agents 1.8.0 and the founder's and the team's page updates reached no record that already
+ * held them: their tests planned and installed by hand, and nothing ran at night. They are BrainDog's own as much as
+ * Money is, so they take the same road: Agents once the five are in, since it reads Projects, then each use case the
+ * record holds, since a use case's pages read the modules under it. Their documents are built here (`documentOf`),
+ * because the port lends a document for the five only.
  */
 
 import type { Diff } from '@braindog/declare';
 import { compareVersions } from '@braindog/declare/catalogue';
 import type { Result } from '@braindog/ports';
 
+import { USE_CASES, keptLists, useCaseDocument } from '../usecases/index.ts';
 import { moduleName, namesSaid } from '../usecases/names.ts';
+import { AGENTS_PACK, agentsPackDocument } from './agents.ts';
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS } from './first-party.ts';
 
 type Body = Record<string, unknown>;
@@ -64,6 +73,13 @@ export type QuietPort = {
    * first. Absent, nothing is known to have been taken off, and only an upgrade can lay one again.
    */
   tookOff?(): readonly string[] | Promise<readonly string[]>;
+  /**
+   * Whether a no to this pack's question is kept for the version asked about, so the next night does not ask again.
+   * Absent, it is kept for the five modules of `FIRST_PARTY` only, which is what a record kept before this loop took
+   * the agents pack and the use cases. One of those that would lose something is then said and not asked, because a
+   * question that comes back every night after a no is worse than an update that waits.
+   */
+  remembers?(id: string): boolean | Promise<boolean>;
 };
 
 /**
@@ -123,6 +139,9 @@ function unready(diff: Diff): string | null {
   return null;
 }
 
+/** What an update would lose, as the end of one sentence: "take away X, rename Y and reach a service outside BrainDog". */
+const lostSaid = (lose: readonly string[]): string => (lose.length === 1 ? lose[0]! : `${lose.slice(0, -1).join(', ')} and ${lose.at(-1)!}`);
+
 /** The sentence a refusal says, or that the record moved under the write for a conflict. */
 const fixOf = (r: Result<unknown>): string => (r.ok ? '' : 'refusal' in r ? r.refusal.fix : 'The record changed while this was being written. It is tried again next time.');
 
@@ -130,6 +149,28 @@ const without = (doc: Body): Body => {
   const { seeds: _seeds, ...rest } = doc;
   return rest;
 };
+
+const USE_CASE_PACK = /^usecase-(.+)$/u;
+const isFirstParty = (id: string): boolean => (FIRST_PARTY as readonly string[]).includes(id);
+
+/** A day for a document's example rows to be counted from. They are taken off before it is planned, so any day does. */
+const NO_DAY = '1970-01-01';
+
+/**
+ * THE VERSION THIS BUILD SHIPS OF ANYTHING THE LOOP KEEPS CURRENT, by pack id: one of the five modules, the agents pack,
+ * or a use case's pack (`usecase-founder`). Nothing for any other id, an add-on's among them, which is not BrainDog's to
+ * update unasked. A host that remembers which version a person said no to reads it here, so it remembers every one.
+ */
+export function shippedVersion(id: string): string | undefined {
+  if (isFirstParty(id)) return FIRST_PARTY_VERSIONS[id as keyof typeof FIRST_PARTY_VERSIONS];
+  if (id === AGENTS_PACK.manifest.id) return AGENTS_PACK.manifest.version;
+  const usecase = USE_CASE_PACK.exec(id)?.[1];
+  const version = usecase === undefined ? undefined : useCaseDocument(usecase, NO_DAY)?.version;
+  return typeof version === 'string' ? version : undefined;
+}
+
+/** The use-case packs this build ships, in the order it lists them. One that carries no pack has none to update. */
+const USE_CASE_PACKS: readonly string[] = USE_CASES.map((u) => `usecase-${u.usecase}`);
 
 /**
  * Every first-party module the record holds, on, at an older version than this build ships, in install order: put in
@@ -144,6 +185,10 @@ const without = (doc: Body): Body => {
  * record that gained organisations today holds a Money whose ledger names nobody, and a People whose page for an
  * organisation draws no money, both at the version this build ships. Planned again, each now adds what it left out;
  * put in only when that loses nothing, and never asked about, since nothing was offered that the person did not have.
+ * THE FIVE ONLY: a link left out is theirs alone, and the agents pack and a use case are never put in again at the
+ * version the record holds.
+ *
+ * THEN THE AGENTS PACK AND THE USE CASES THE RECORD HOLDS, in the first pass, after the five, each on the same terms.
  */
 export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
   const out: QuietStep[] = [];
@@ -155,12 +200,31 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
   const tookOff = new Set((await port.tookOff?.()) ?? []);
   const heldOf = async (id: string) => (await port.held()).find((p) => p.id === id && p.on && p.version !== null);
 
-  for (const id of FIRST_PARTY) {
+  /**
+   * A pack's document as it would go into this record now. One of the five is the port's, made for the lists the record
+   * holds. The agents pack is one document on every record. A use case's keeps a list an older version of it declared
+   * only where the record holds that list (`useCaseDocument`), and the port says nothing of lists, so it is planned
+   * once with every such list and each one the plan would ADD is a list the record does not hold, and is left out.
+   */
+  const documentOf = async (id: string): Promise<Body | null> => {
+    if (isFirstParty(id)) return port.document(id);
+    if (id === AGENTS_PACK.manifest.id) return agentsPackDocument();
+    const usecase = USE_CASE_PACK.exec(id)![1]!;
+    const kept = keptLists(usecase);
+    const whole = useCaseDocument(usecase, NO_DAY, kept);
+    if (!whole || kept.length === 0) return whole;
+    const probe = await port.plan(without(whole));
+    if (!probe.ok) return whole;
+    const lacks = new Set(probe.value.adds.map((a) => a.id));
+    return useCaseDocument(usecase, NO_DAY, kept.filter((list) => !lacks.has(`register.${list}`)));
+  };
+
+  for (const id of [...FIRST_PARTY, AGENTS_PACK.manifest.id, ...USE_CASE_PACKS]) {
     const held = await heldOf(id);
-    const to = FIRST_PARTY_VERSIONS[id];
-    if (!held || compareVersions(held.version!, to) >= 0) continue;
+    const to = shippedVersion(id);
+    if (!held || to === undefined || compareVersions(held.version!, to) >= 0) continue;
     const step = { pack: id, from: held.version!, to };
-    const given = await port.document(id);
+    const given = await documentOf(id);
     if (!given) continue;
     const doc = without(given);
     const planned = await port.plan(doc);
@@ -184,6 +248,10 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
     }
     if (await port.asking(id)) {
       out.push({ ...step, did: 'waiting', lose });
+      continue;
+    }
+    if (!isFirstParty(id) && (await port.remembers?.(id)) !== true) {
+      out.push({ ...step, did: 'refused', lose, why: `Updating it would ${lostSaid(lose)}, so it waits for you to update it yourself.` });
       continue;
     }
     const asked = await port.propose(questionFor(id, lose));
@@ -218,9 +286,8 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
  */
 export function questionFor(id: string, lose: readonly string[]): QuietQuestion {
   const name = moduleName(id);
-  const said = lose.length === 1 ? lose[0]! : `${lose.slice(0, -1).join(', ')} and ${lose.at(-1)!}`;
   return {
-    question: `${name} has a newer version. Updating it would ${said}. Update ${name}?`,
+    question: `${name} has a newer version. Updating it would ${lostSaid(lose)}. Update ${name}?`,
     body_kind: 'pack',
     body: { install: id },
   };

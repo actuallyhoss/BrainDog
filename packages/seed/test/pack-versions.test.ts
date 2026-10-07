@@ -1333,6 +1333,35 @@ const DECLARED: Record<string, Version> = {
       "The walk of the next thirty days on `page.money` wears no heading and no glyph, where it said The next 30 days straight under Coming and going's own heading -> 2e09983b40aba73e",
     ],
   },
+  'work@1.17.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-open metric.tasks-after-week-yours
+      metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-late-yours metric.tasks-later metric.tasks-not-this-week
+      metric.tasks-overdue metric.tasks-today-yours metric.tasks-undated-yours metric.tasks-waiting
+      metric.tasks-this-week-yours
+      metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
+      register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
+    `,
+    declares: '80b0e693090139ec',
+    history: [
+      "A card on `page.work-board`'s board says the day its task is due and who holds it, columns `by` and `owner` after the status and the task, where its third column was the project -> 80b0e693090139ec",
+    ],
+  },
+  'people@3.2.0': {
+    holds: `
+      metric.organisations-count metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-in-touch-90d
+      metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '5efd4fdc89f4f515',
+    history: [
+      "`page.people` draws each person once, on Everyone's cards with the day they were last in touch: the two tables over them, Gone quiet and Last in touch, are gone, and `people-in-touch-90d` stays declared and draws nothing -> 5efd4fdc89f4f515",
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

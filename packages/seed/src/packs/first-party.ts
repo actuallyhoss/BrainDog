@@ -414,13 +414,19 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   reaches a record on its own. The project page moves with them, though no pack holds it (`crossPack`): Done, by week
  *   is no tile of its own, and what was finished this week is At a glance's last figure, asking for its four weeks as
  *   a line.
+ * - work 1.17.0 and people 3.2.0: a card on the Board says the day its task is due and who holds it, where it named the
+ *   project, which the list under the board says; and People shows each person once, as a card with the day you were
+ *   last in touch, where Gone quiet and Last in touch listed the same people over the cards. Who has gone quiet is
+ *   still the page's first line, by name, and `people-in-touch-90d` stays declared and draws nothing. WORK 1.16.0 AND
+ *   PEOPLE 3.1.0 ARE RELEASED, so each is a version of its own. Blocks on pages a record already holds, no list, field
+ *   or figure, so each is a minor step that reaches a record on its own.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.15.0',
-  people: '3.1.0',
+  people: '3.2.0',
   'money-core': '3.13.0',
   estate: '2.1.0',
-  work: '1.16.0',
+  work: '1.17.0',
 };
 
 type Body = Record<string, unknown>;

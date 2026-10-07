@@ -242,6 +242,26 @@ test('WORK NEEDS NO PEOPLE: who holds a task is a link, left out on a record wit
   assert.ok(tasks.fields!.some((f) => f.id === 'agent'), 'the agent is the pack’s own field and stays');
 });
 
+/**
+ * A CARD ON THE BOARD SAYS WHEN ITS TASK IS DUE AND WHO HOLDS IT, SINCE work 1.17.0, where its one fact was the project.
+ * The day stands before the holder, so on a record without People the holder goes and the day stays where it was.
+ */
+test('A CARD ON THE BOARD SAYS THE DAY ITS TASK IS DUE AND WHO HOLDS IT, and keeps the day on a record without People', async () => {
+  const k = await seeded();
+  const board = opened(k, 'work-board').blocks.find((b) => b.kind === 'board')!;
+  assert.deepEqual(board.refusals, []);
+  assert.deepEqual(board.columns?.map((c) => c.field), ['state', 'what', 'by', 'owner']);
+  /* EACH CARD'S OWN DAY AND HOLDER, as the row holds them. */
+  const dated = TASKS.find((t) => t.state === 'doing' && typeof t.by === 'string' && typeof t.owner === 'number')!;
+  const card = board.rows.find((r) => r.fields.what === dated.what)!;
+  assert.equal(card.fields.by, dated.by);
+  assert.ok(typeof card.fields.owner === 'string' && card.fields.owner !== '', 'the card has no holder to say');
+
+  const alone = firstPartyDocument('work', { holds: ['things', 'tasks', 'tracks', 'updates'], seeds: [] })!;
+  const page = (alone.declarations as { page?: string; blocks?: { kind: string; columns?: { field: string }[] }[] }[]).find((d) => d.page === 'work-board')!;
+  assert.deepEqual(page.blocks!.find((b) => b.kind === 'board')!.columns!.map((c) => c.field), ['state', 'what', 'by']);
+});
+
 test('WORK INSTALLS ALONE: a homework list with no Projects and no People, its pages open and a task is written', async () => {
   const { install, normalise, plan } = await import('@braindog/declare');
   const k = await openRecord(openSqlite(), { now: () => NOW });

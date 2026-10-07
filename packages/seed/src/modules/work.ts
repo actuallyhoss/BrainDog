@@ -1008,7 +1008,11 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       {
         kind: 'board',
         span: 12,
-        columns: [{ field: 'state' }, { field: 'what' }, { field: 'thing' }],
+        /* A CARD SAYS WHEN IT IS DUE AND WHO HOLDS IT, SINCE work 1.17.0, where it named its project: a board is read
+           for what is next and whose it is, and the project is a column of the list under it. The day comes before the
+           holder, because who holds a task is a link that goes on a record without People (`LINKS` in
+           `packs/first-party.ts`), and the day must not move when it does. */
+        columns: [{ field: 'state' }, { field: 'what' }, { field: 'by' }, { field: 'owner' }],
         source: 'register.tasks',
         where: 'state is not dropped',
         /* EACH COLUMN BY TIER, THEN BY DUE DAY. A board keeps its rows in the order they are read within each column

@@ -27,7 +27,7 @@ import { AGENTS_PACK, AGENTS_REGISTERS, agentsPackDocument } from './packs/agent
 export { AGENTS_METRICS, AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
 export * from './modules/base.ts';
-export { ACCOUNTS, CATEGORIES, INSTALLMENTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, nightOf, snapshotRows } from './modules/money.ts';
+export { ACCOUNTS, CATEGORIES, INSTALLMENTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashPoints, cashSeries, nightOf, snapshotRows } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
 export { PROJECTS_SAID, THINGS } from './modules/portfolio.ts';
 export { ORGANISATIONS, PEOPLE } from './modules/people.ts';
@@ -48,6 +48,7 @@ import {
   RECURRING_ITEMS,
   SNAPSHOTS,
   TRANSACTIONS,
+  cashPoints,
   targetConfigOf,
 } from './modules/money.ts';
 export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
@@ -504,6 +505,12 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
     return { ok: true, value: null };
   });
   if (!wrote.ok) return wrote as unknown as Result<Seeded>;
+
+  /* AND THE NIGHTS BEFORE THIS ONE, FOR CASH (`cashPoints`): a figure remembers its first day the night after it is
+     declared, so the sample made a minute ago had no day of cash for Today's line to draw. Written as the nightly
+     reading writes them, a day a point, under the sample's name, and the record adds its own from the next night on. */
+  const nights = kernel.writePoints('sample', cashPoints());
+  if (!nights.ok) return nights as unknown as Result<Seeded>;
 
   /* THE QUESTIONS GO IN LAST, because SG30's rowset names rows of `things` at the version they were
      written at, and a proposal is checked against the rows it names when it is filed. So what the agents said goes in

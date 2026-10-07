@@ -97,54 +97,36 @@ test('PEOPLE OPENS ON ONE LINE SAID FROM ITS OWN FIGURES, and the figures count 
   assert.ok(Number(read('people-quiet')) > 0 && Number(read('people-in-touch-30d')) > 0, 'the sample has somebody quiet and somebody in touch, so the line says both');
 });
 
-test('WHO HAS GONE QUIET AND WHO WAS LAST IN TOUCH ARE TWO SHORT LISTS, the one quiet longest first, and everyone is listed the latest first', async () => {
+/**
+ * EACH PERSON ONCE, SINCE People 3.2.0. Gone quiet and Last in touch listed, over Everyone, the people whose cards say the
+ * same day under them, so every person with a day was on the page twice. The cards carry the day, so they are what stays.
+ */
+test('PEOPLE SHOWS EACH PERSON ONCE, as a card with the day they were last in touch, the latest first', async () => {
   const k = await seeded();
   const page = opened(k, 'people');
   /* NO CHART OF DOTS, SINCE People 3.1.0: twelve weeks a person said when, once each, and nothing else. */
   assert.ok(!page.blocks.some((b) => b.kind === 'heat'), 'People draws its twelve weeks of dots again');
-  const dayOfRow = (r: { fields: Record<string, unknown> }) => String(r.fields.in_touch);
-  const sample = (ok: (p: (typeof PEOPLE)[number]) => boolean) =>
-    PEOPLE.filter((p) => typeof p.in_touch === 'string' && ok(p))
-      .sort((a, b) => String(a.in_touch).localeCompare(String(b.in_touch)))
-      .map((p) => p.name);
+  /* AND NEITHER LIST OVER THE CARDS: one block reads the people, and it is Everyone. */
+  for (const heading of ['Gone quiet', 'Last in touch']) assert.ok(!page.blocks.some((b) => b.heading === heading), `People lists its people under ${heading} as well as on their cards`);
+  const over = page.blocks.filter((b) => (b as { source?: unknown }).source === 'register.people');
+  assert.deepEqual(over.map((b) => [b.kind, b.heading]), [['cards', 'Everyone']]);
 
-  /* GONE QUIET IS THE PEOPLE THE LINE COUNTS, in the colour of what needs the person, the one quiet longest first. */
-  const quiet = page.blocks.find((b) => b.heading === 'Gone quiet');
-  assert.ok(quiet, 'People has no Gone quiet');
-  assert.deepEqual([quiet.kind, quiet.drawn !== false, (quiet as { tone?: unknown }).tone], ['table', true, 'bad']);
-  assert.deepEqual(quiet.rows.map((r) => r.fields.name), sample((p) => String(p.in_touch) < on(-90)));
-  assert.deepEqual(quiet.rows.map((r) => r.fields.name), ['Ada Vine']);
-  const counted = k.metric(METRICS['people-quiet'] as never);
-  assert.ok(counted.ok, sayOf(counted));
-  assert.equal(quiet.rows.length, counted.value.value, 'the list and the line count different people');
-
-  /* LAST IN TOUCH IS EVERYBODY ELSE WITH A DAY, THE QUIETEST FIRST TOO, so it reads on from the list beside it. */
-  const lately = page.blocks.find((b) => b.heading === 'Last in touch');
-  assert.ok(lately, 'People has no Last in touch');
-  assert.deepEqual([lately.kind, lately.drawn !== false, (lately as { tone?: unknown }).tone], ['table', true, undefined]);
-  assert.deepEqual(lately.rows.map((r) => r.fields.name), sample((p) => String(p.in_touch) >= on(-90)));
-  assert.deepEqual(lately.rows.map((r) => r.fields.name), ['Tom Ashby', 'Mara Lindqvist', 'J. Okonkwo', 'S. Marchetti']);
-  const days = lately.rows.map(dayOfRow);
-  assert.deepEqual(days, [...days].sort(), 'Last in touch is not the quietest first');
-  const within = k.metric(METRICS['people-in-touch-90d'] as never);
-  assert.ok(within.ok, sayOf(within));
-  assert.equal(lately.rows.length, within.value.value, 'Last in touch is drawn on a figure that counts other people');
-
-  /* NOBODY IS IN BOTH, AND NOBODY WITH A DAY IS IN NEITHER: the two sentences cut at one day. */
-  const listed = [...quiet.rows, ...lately.rows].map((r) => r.fields.name);
-  assert.deepEqual([...listed].sort(), PEOPLE.filter((p) => typeof p.in_touch === 'string').map((p) => p.name).sort());
-  /* EACH A PERSON, WHO THEY ARE WITH AND THE DAY, half the row, side by side. */
-  for (const b of [quiet, lately]) {
-    assert.deepEqual(b.columns?.map((c) => c.field), ['name', 'org', 'in_touch'], String(b.heading));
-    assert.equal(b.span, 6, String(b.heading));
-  }
-
-  const cards = page.blocks.find((b) => b.kind === 'cards');
-  assert.ok(cards);
+  const cards = over[0]!;
+  /* THE CARD CARRIES THE DAY, which is why it is the one that stays. */
+  assert.deepEqual(cards.columns?.find((c) => c.field === 'in_touch'), { field: 'in_touch', label: 'Last in touch', as: 'when' });
+  const names = cards.rows.map((r) => r.fields.name);
+  assert.equal(new Set(names).size, names.length, 'somebody is on Everyone twice');
   const latest = cards.rows.map((r) => r.fields.in_touch).filter((d): d is string => typeof d === 'string');
   assert.deepEqual(latest, [...latest].sort().reverse(), 'Everyone is not in the order people were last in touch');
   assert.equal(cards.rows[0]?.fields.name, 'S. Marchetti');
   assert.equal(cards.rows.length, PEOPLE.length, 'somebody nobody has been in touch with is left off Everyone');
+
+  /* WHO HAS GONE QUIET IS STILL SAID FIRST, BY NAME, in the page's line, and the figure the second list drew on is kept. */
+  const line = page.blocks.find((b) => (b as { lead?: boolean }).lead === true && b.drawn !== false);
+  assert.match(String((line as { body?: unknown }).body), /\{\{people-quiet\.first\}\} has been quiet since/u);
+  const within = k.metric(METRICS['people-in-touch-90d'] as never);
+  assert.ok(within.ok, sayOf(within));
+  assert.equal(within.value.value, PEOPLE.filter((p) => typeof p.in_touch === 'string' && String(p.in_touch) >= on(-90)).length);
 
   /* EVERY TILE WITH A HEADING WEARS A GLYPH, on the person's own page too. */
   /* A PERSON'S OWN PAGE IS AT THEIR NAME. */
@@ -154,14 +136,14 @@ test('WHO HAS GONE QUIET AND WHO WAS LAST IN TOUCH ARE TWO SHORT LISTS, the one 
   }
 });
 
-test('A RECORD WHERE NOBODY WAS IN TOUCH DRAWS NEITHER LIST, and still says how many people it keeps', async () => {
+test('A RECORD WHERE NOBODY WAS IN TOUCH STILL SHOWS EVERYONE, and says how many people it keeps', async () => {
   const k = await seeded();
   const listed = k.list({ register: 'people', limit: 50 });
   assert.ok(listed.ok, sayOf(listed));
   /* NOT DELETED, which a person other rows name refuses: every day taken off, so nobody was ever in touch. */
   for (const r of listed.value.rows) assert.ok(k.update('people', `people#${r.seq}`, { in_touch: null }, { actor: 'p_1' }).ok);
   const page = opened(k, 'people');
-  for (const heading of ['Gone quiet', 'Last in touch']) assert.equal(page.blocks.find((b) => b.heading === heading)?.drawn, false, `${heading} is drawn over nobody`);
+  assert.equal(page.blocks.find((b) => b.heading === 'Everyone')?.rows.length, PEOPLE.length);
   assert.notEqual(page.blocks[0]?.drawn, false, 'the line is left off while there are people to name');
 });
 
