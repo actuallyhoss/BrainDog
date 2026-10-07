@@ -162,7 +162,7 @@ export function firedOf(raw: unknown): Map<string, string> {
  * for one the page read holds nothing from. A row with a last run is left as it came, since a run says more.
  */
 export const withFired = (rows: readonly AutomationRow[], fired: ReadonlyMap<string, string>): AutomationRow[] =>
-  rows.map((r) => (r.last !== null ? r : { ...r, acted: fired.get(r.id) ?? null }));
+  rows.map((r) => (r.last !== null || r.acted !== undefined ? r : { ...r, acted: fired.get(r.id) ?? null }));
 
 /** How many lines of the log are read for it: the record's largest page. */
 const FIRED_PAGE = 200;
@@ -243,6 +243,9 @@ export function rowOf(r: unknown): AutomationRow | null {
     body,
     runs,
     older: text(r.older),
+    /* WHEN IT LAST FIRED, FROM THE RECORD, which answers it for every rule: an inline rule leaves no run, and one page
+       of the log said "nothing lately" of a rule whose last firing sat below that page. */
+    ...('lastFired' in r ? { acted: text(r.lastFired) } : {}),
   };
 }
 
@@ -842,7 +845,7 @@ export async function openAutomations(io: Fetch, base = '', opts: { acted?: bool
   /* THE LOG IS ASKED ONLY BY A SCREEN THAT SAYS WHEN EACH LAST RAN (`acted`), and only when some turned-on row came
      with no last run to say. A log that will not read leaves the rows as they came: the list is the screen, and a row
      then says nothing about its last turn rather than something untrue. */
-  if (opts.acted && first.ok && first.value.some((r) => r.enabled && r.last === null)) {
+  if (opts.acted && first.ok && first.value.some((r) => r.enabled && r.last === null && r.acted === undefined)) {
     const fired = await source.fired();
     if (fired.ok) return { source, first: { ok: true, value: withFired(first.value, fired.value) }, absent: false };
   }

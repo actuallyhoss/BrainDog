@@ -339,3 +339,37 @@ test('a merge is the one decision card with Undo, and Backspace is held and neve
   /* AND A QUESTION THAT GATHERED SEVERAL SAYS HOW MANY BESIDE ITS TITLE. */
   assert.match(page, /title=\{spoken\(question\.title\)\} count=\{joined\}/u, 'a joined question’s count is not in its heading');
 });
+
+/**
+ * THE SIDE IS THERE ONLY WITH SOMETHING TO SAY (`side.ts`). MEASURED on the critic's second pass at 1,512: the side held
+ * "Asked by BrainDog 5w ago" and nothing else on most questions, a blank column beside the choices. With something to
+ * say it holds who asked, why, what answering changes, the evidence and what is linked; with nothing the tile is one
+ * centred column and who asked is the line over the answers.
+ */
+test('the side is drawn only with something in it, as groups and never landmarks, and the page is one centred column without it', () => {
+  assert.match(page, /import \{ sideOf, words as sideWords \} from '\.\/side\.ts';/u, 'the side is no longer read from its module');
+  assert.match(page, /const sided = \$derived\(side\?\.any === true\);/u, 'the side is drawn whether or not it has anything to say');
+  assert.match(page, /<div class="gate-form" data-side=\{sided \? '' : undefined\}>\n\s+\{#if sided\}/u, 'who asked keeps a column of its own with nothing beside it');
+  assert.match(page, /<div class="gate-main">\n\s+\{#if !sided\}\{@render askedBy\(true\)\}\{\/if\}/u, 'a question with no side no longer says who asked over its answers');
+  assert.match(page, /<div class="page" data-plain=\{sided \? undefined : ''\}>/u, 'a question with no side is not marked to be centred');
+  assert.match(page, /\.page\[data-plain\] :global\(\.tile\.gate\) \{\n\s+padding-inline: max\(20px, calc\(\(100% - 46rem\) \/ 2\)\);/u, 'a question with no side is not centred at a measure');
+
+  /* EVERY PART OF THE SIDE IS A GROUP WITH A NAME. A `section` with a name is a landmark, and five of them beside the
+     options made a rotor's list of the page longer than the page. */
+  const from = page.indexOf('<div class="gate-form"');
+  const to = page.indexOf('<!-- THE QUESTION\'S COMMENTS');
+  const form = page.slice(from, to);
+  const parts = form.match(/<div class="gate-part[^"]*" role="group" aria-labelledby="[a-z-]+">/gu) ?? [];
+  assert.equal(parts.length, 5, 'the side no longer has its five parts, each a named group');
+  assert.doesNotMatch(form, /<(section|aside)[^>]*class="gate-(part|side)/u, 'a part of the side is a landmark again');
+  for (const id of ['gate-by-h', 'gate-why-h', 'gate-changes-h', 'gate-ev-h', 'gate-linked-h']) {
+    assert.equal(form.split(`aria-labelledby="${id}"`).length, 2, `${id} names no part, or more than one`);
+    assert.equal(form.split(`id="${id}"`).length, 2, `${id} is not one heading`);
+  }
+  /* EACH ONLY WHERE THE RECORD HOLDS IT, and the rest of the side written after the answers, so a phone reads it there. */
+  for (const held of ['{#if question.context}', '{#if side.changes.length > 0}', '{#if side.evidence}', '{#if side.links.length > 0}']) assert.ok(form.includes(held), `${held} no longer guards its part`);
+  assert.ok(form.indexOf('<div class="gate-side gate-more">') > form.indexOf('<section class="does"'), 'the evidence and what is linked are read before the answers on a phone');
+  /* A LINK IN THE SIDE IS A 44px LINE UNDER A THUMB, and one column is the default, two only on a wide page with a side. */
+  assert.match(page, /@media \(pointer: coarse\) \{\n\s+\.gate-link \{\n\s+min-block-size: var\(--tap\);/u, 'a linked thing is a smaller target than a thumb');
+  assert.match(page, /@container \(inline-size >= 55rem\) \{\n\s+\.gate-form\[data-side\] \{\n\s+display: grid;/u, 'two columns are drawn without a side, or on a narrow page');
+});

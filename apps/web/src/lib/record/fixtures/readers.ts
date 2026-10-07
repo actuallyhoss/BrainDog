@@ -125,6 +125,8 @@ const RECORD: Kernel = await (async () => {
   if (!seeded.ok) throw new Error(`the seed did not install on the fixture's record: ${JSON.stringify(seeded)}`);
 
   for (const [series, points] of Object.entries(SERIES)) {
+    /* The seed writes the cash points itself now, with their currency. */
+    if (series === 'cash-now') continue;
     const format = METRICS[series]?.format;
     const unit = format?.startsWith('money.') ? format.slice('money.'.length) : '';
     const wrote = k.writePoints('sample', points.map((p) => ({ series, grain: 'day', at: p.at, value: p.value, unit, n: null })));

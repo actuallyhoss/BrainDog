@@ -52,10 +52,11 @@
   import '$lib/decide/form.css';
   import { cardWords, spoken } from '$lib/decide/card.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
-  import { acceptKey, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords, type Held } from '../press.ts';
+  import { acceptKey, amountSaid, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords, type Held } from '../press.ts';
   import { mergeListOf, mergeOf, words as mergeWords, type Press } from '../merge.ts';
   import MergeCard from '../MergeCard.svelte';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
+  import { sideOf, words as sideWords } from './side.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../../settings/billing.ts';
   import { goto, invalidateAll } from '$app/navigation';
@@ -71,6 +72,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Thread from '$lib/ui/Thread.svelte';
+  import Waffle from '$lib/viz/Waffle.svelte';
   import { WORDS as LEAD } from '../lead.ts';
   import { words as gate } from '../words.ts';
   import Face from '$lib/ui/Face.svelte';
@@ -707,6 +709,35 @@
   );
 
   /**
+   * THE SIDE BESIDE THE CHOICES (`side.ts`), for a question still open: what answering changes in a line each, the share
+   * the suggested answer's reason claims, and the things the reasons name, each only where the record holds it. Who
+   * asked and why it is asked lead it.
+   */
+  const side = $derived.by(() => {
+    if (!question || !costed) return null;
+    const body = about?.body;
+    return sideOf({
+      why: question.context ? spoken(question.context) : '',
+      reasons: question.options.map((o) => ({ text: reasonIn(body, o.key) ?? o.body, suggested: o.recommended === true })),
+      figures: figuresIn(body),
+      facts: {
+        arranged: story,
+        appears: story ? [] : (preview?.appears ?? []),
+        changed: updates.length,
+        added: picked === null ? 0 : (picked?.length ?? pickable.length),
+        list: listName(live?.rowset?.register),
+        money: moves.length > 0 ? cardWords.moves(amountSaid(moves)) : '',
+      },
+      now,
+    });
+  });
+  /* A QUESTION WITH NOTHING FOR THE SIDE HAS NONE: who asked is the quiet line over the answers, and the tile reads as
+     one centred column at a form's measure, never a blank column beside the choices. A receipt reads the same way. */
+  const sided = $derived(side?.any === true);
+  /** The side's parts under the answers on a phone, beside them on a laptop: what it changes, the evidence, what is linked. */
+  const sideMore = $derived(side !== null && (side.changes.length > 0 || side.evidence !== null || side.links.length > 0));
+
+  /**
    * DRAWN ONCE THE READ HAS ANSWERED LIVE. The read is bracketed by `opened()` and `closed()`, so a call
    * still out takes `data-screen` away whatever this says.
    */
@@ -797,7 +828,7 @@
        the trivia the reset took out (DIRECTION §39). -->
   <PageHead icon="decide" kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} />
 
-  <div class="page">
+  <div class="page" data-plain={sided ? undefined : ''}>
     <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news and the reason the options came back. -->
     {#if part && !settled}<Applied partial={part} />{/if}
 
@@ -868,28 +899,38 @@
           <p class="cannot" id="cannot-decide">{whyNot}</p>
         {/if}
 
-        <!-- THE FORM AND ITS SIDE (DIRECTION §39). On a wide tile who asked and why sit in a 280px column beside the
-             answers, so the right of the tile is not left empty; on a narrow one both are let go of and read as they
-             always did: who asked, why, then the answers and what accepting does. -->
-        <div class="gate-form">
-          <!-- WHO ASKED AND WHEN, quiet, then WHY it is asked, in the asker's own words, before the answers. -->
-          <div class="gate-side">
-            <section class="gate-part" aria-labelledby="gate-by-h">
-              <h2 class="gate-side-h" id="gate-by-h">{cardWords.askedBy}</h2>
-              <p class="gate-by">
-                {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{asker.name}</span>{/if}
-                <span class="gate-when">{since(question.opened, now)}</span>
-              </p>
-            </section>
-            {#if question.context}
-              <section class="gate-part" aria-labelledby="gate-why-h">
-                <h2 class="gate-side-h" id="gate-why-h">{cardWords.why}</h2>
-                <p class="gate-why">{symbolText(spoken(question.context))}</p>
-              </section>
-            {/if}
-          </div>
+        <!-- THE FORM AND ITS SIDE (DIRECTION §39). On a wide tile the answers and what accepting does are the first
+             column, and beside them a side says who asked and when, why, what answering changes, the evidence and what
+             is linked, each only where the record holds it. On a narrow one both are let go of and read in one column:
+             who asked, why, the answers, what accepting does, then the evidence and what is linked. A QUESTION WITH
+             NOTHING FOR THE SIDE HAS NO SIDE: who asked is one quiet line over the answers and the tile is one centred
+             column (`side.ts`). The side's parts are groups with a name, never landmarks of their own. -->
+        {#snippet askedBy(said: boolean)}
+          <p class="gate-by">
+            {#if said}<span class="dc-sr">{cardWords.askedBy}</span>{/if}
+            {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{asker.name}</span>{/if}
+            <span class="gate-when">{since(question.opened, now)}</span>
+          </p>
+        {/snippet}
+        <div class="gate-form" data-side={sided ? '' : undefined}>
+          {#if sided}
+            <!-- WHO ASKED AND WHEN, quiet, then WHY it is asked, in the asker's own words, before the answers. -->
+            <div class="gate-side">
+              <div class="gate-part" role="group" aria-labelledby="gate-by-h">
+                <h2 class="gate-side-h" id="gate-by-h">{cardWords.askedBy}</h2>
+                {@render askedBy(false)}
+              </div>
+              {#if question.context}
+                <div class="gate-part" role="group" aria-labelledby="gate-why-h">
+                  <h2 class="gate-side-h" id="gate-why-h">{cardWords.why}</h2>
+                  <p class="gate-why">{symbolText(spoken(question.context))}</p>
+                </div>
+              {/if}
+            </div>
+          {/if}
 
           <div class="gate-main">
+            {#if !sided}{@render askedBy(true)}{/if}
             <!-- ONE ANSWER'S BUTTON, for the record's own two answers: it says what it does (`press.ts` `labelOf`), Decline for
                  the record's Reject and the amount on Accept when money moves, and the care a hard one asks for in its words.
 
@@ -1130,6 +1171,47 @@
               </section>
             {/if}
           </div>
+
+          <!-- THE REST OF THE SIDE, written after the answers so a phone reads it under them: what answering changes in
+               a line each (beside the choices only, since a phone has the whole of it just above), the share the
+               suggested answer's reason claims, and the things the reasons name, each a link to it by its own name. -->
+          {#if side && sided && sideMore}
+            <div class="gate-side gate-more">
+              {#if side.changes.length > 0}
+                <div class="gate-part gate-changes" role="group" aria-labelledby="gate-changes-h">
+                  <h2 class="gate-side-h" id="gate-changes-h">{cardWords.changes}</h2>
+                  <ul class="gate-lines">
+                    {#each side.changes as line, i (i)}<li dir="auto">{line}</li>{/each}
+                  </ul>
+                </div>
+              {/if}
+              {#if side.evidence}
+                {@const ev = side.evidence}
+                <div class="gate-part" role="group" aria-labelledby="gate-ev-h">
+                  <h2 class="gate-side-h" id="gate-ev-h">{sideWords.evidence}</h2>
+                  <div class="gate-ev">
+                    <Waffle
+                      parts={[
+                        { label: '', value: ev.value, tone: 'ink' },
+                        { label: '', value: ev.max - ev.value, tone: 'g3' },
+                      ]}
+                      summary={ev.said}
+                    />
+                  </div>
+                  <p class="gate-ev-said">{ev.said}</p>
+                </div>
+              {/if}
+              {#if side.links.length > 0}
+                <div class="gate-part" role="group" aria-labelledby="gate-linked-h">
+                  <h2 class="gate-side-h" id="gate-linked-h">{sideWords.linked}</h2>
+                  <ul class="gate-links">
+                    {#each side.links as link (link.href)}<li><a class="gate-link" href={at(link.href)}>{link.title}</a></li>{/each}
+                    {#if side.more > 0}<li class="gate-links-more">{sideWords.more(side.more)}</li>{/if}
+                  </ul>
+                </div>
+              {/if}
+            </div>
+          {/if}
         </div>
       {/if}
 
@@ -1170,7 +1252,7 @@
   /* ── the form and its side ─────────────────────────────────────────────── */
 
   /* ONE COLUMN, ON A NARROW PAGE: the form and the side are let go of, and their parts are the tile's own, read in the
-     order a question always was: who asked, why, the answers, what accepting does. */
+     order a question always was: who asked, why, the answers, what accepting does, then the evidence and what is linked. */
   .gate-form,
   .gate-side,
   .gate-main,
@@ -1195,45 +1277,78 @@
     line-height: 1.4;
   }
 
-  /* TWO COLUMNS, ON A WIDE PAGE: the answers and what accepting does, and beside them a 280px side with who asked and
-     why under quiet headings, a hairline at its start, so the right of a wide tile is never left empty. The page is
-     the container, its tile 40px inside it, so the threshold is the card's (52rem of tile) and the tile's padding. */
+  /* THE PARTS UNDER THE ANSWERS KEEP THEIR HEADINGS at every width, since nothing about their place says what they are;
+     each is its heading and what is under it, a step apart. */
+  .gate-more .gate-part {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .gate-more .gate-side-h {
+    position: static;
+    inline-size: auto;
+    block-size: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+
+  /* WHAT IT CHANGES, IN A LINE EACH, IS THE SIDE'S ALONE: in one column the whole of it is just above, under the
+     answers, and the lines would say it twice. */
+  .gate-more .gate-changes {
+    display: none;
+  }
+
+  /* TWO COLUMNS, ON A WIDE PAGE WITH SOMETHING FOR THE SIDE: the answers and what accepting does, and beside them a
+     side under quiet headings, a hairline at its start. The side is written in two halves, who asked and why before the
+     answers and the rest after them, so one column reads in order; here both sit in the second column, one under the
+     other, and the answers span them. The page is the container, its tile 40px inside it, so the threshold is the
+     card's (52rem of tile) and the tile's padding. */
   @container (inline-size >= 55rem) {
-    .gate-form {
+    .gate-form[data-side] {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 280px;
+      grid-template-columns: minmax(0, 1fr) clamp(280px, 26cqi, 360px);
+      grid-template-rows: auto 1fr;
       column-gap: var(--sp-6);
       align-items: start;
     }
 
-    .gate-main {
+    .gate-form[data-side] > .gate-main {
       display: flex;
       flex-direction: column;
       gap: var(--sp-4);
-      grid-row: 1;
+      grid-row: 1 / span 2;
       grid-column: 1;
       min-inline-size: 0;
     }
 
-    .gate-side {
+    .gate-form[data-side] > .gate-side {
       display: flex;
       flex-direction: column;
       gap: var(--sp-5);
       grid-row: 1;
       grid-column: 2;
+      align-self: stretch;
       min-inline-size: 0;
       padding-inline-start: var(--sp-5);
       border-inline-start: 1px solid var(--rule);
     }
 
-    .gate-part {
+    .gate-form[data-side] > .gate-more {
+      grid-row: 2;
+      padding-block-start: var(--sp-5);
+    }
+
+    .gate-form[data-side] .gate-part,
+    .gate-form[data-side] .gate-more .gate-changes {
       display: flex;
       flex-direction: column;
       gap: var(--sp-2);
       min-inline-size: 0;
     }
 
-    .gate-side-h {
+    .gate-form[data-side] .gate-side-h {
       position: static;
       inline-size: auto;
       block-size: auto;
@@ -1247,6 +1362,63 @@
     }
   }
 
+  /* NO SIDE, SO ONE CENTRED COLUMN: the tile still runs the board's width, and what is read inside it (who asked, the
+     answers, what accepting does, a receipt, the comments) keeps a form's measure in its middle, with no blank column
+     beside it. On a narrow page the measure is wider than the tile and nothing moves. */
+  .page[data-plain] :global(.tile.gate) {
+    padding-inline: max(20px, calc((100% - 46rem) / 2));
+  }
+
+  /* ── the side's own parts ──────────────────────────────────────────────── */
+
+  .gate-lines,
+  .gate-links {
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    overflow-wrap: anywhere;
+  }
+
+  /* THE SHARE AS SQUARES, and under it the sentence it was read from, which is what the squares mean. */
+  .gate-ev {
+    max-inline-size: 20rem;
+  }
+
+  .gate-ev-said {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  .gate-link {
+    display: inline-flex;
+    align-items: center;
+    color: var(--link);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .gate-links-more {
+    color: var(--dim);
+    font-size: var(--fs-meta);
+  }
+
+  /* UNDER A THUMB EACH LINK IS A 44px LINE of its own, so two that sit one over the other never share a press. */
+  @media (pointer: coarse) {
+    .gate-link {
+      min-block-size: var(--tap);
+    }
+  }
+
   /* ── who asked, and why ────────────────────────────────────────────────── */
 
   .gate-by {
@@ -1257,6 +1429,11 @@
     margin: 0;
     color: var(--dim);
     font-size: var(--fs-meta);
+  }
+
+  /* WITH NO SIDE, WHO ASKED IS THE LINE OVER THE ANSWERS, close over them as a card's by-line is over its question. */
+  .gate-main > .gate-by {
+    margin-block-end: calc(var(--sp-1) * -1);
   }
 
   .gate-who {
