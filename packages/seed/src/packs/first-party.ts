@@ -395,11 +395,15 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   Blocks moved and a figure added, no list or field, so each step is a minor one and reaches a record on its own. The
  *   project page moves with them, though no pack holds it (`crossPack`): its history, notes, money and what it runs on
  *   are one More about tile where they were three folded sections (fix 9).
+ * - money-core 3.12.0: Runs out says the day. The tile beside Cash ahead draws the new `runs-out-on`, the day the walk
+ *   goes under (`zero_on` in `packages/kernel/src/money-figures.ts`), with the days left as the line under it, where it
+ *   drew the count alone: a count read yesterday is a day out this morning, and the day is the one the walk's flag
+ *   stands on. A figure added and one cell of a tile changed, so a minor step that reaches a record on its own.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.14.0',
   people: '3.0.0',
-  'money-core': '3.11.0',
+  'money-core': '3.12.0',
   estate: '2.1.0',
   work: '1.15.0',
 };

@@ -437,7 +437,7 @@ test('THE TILES AND THE BRIDGE ON `/p/money` ADD UP THE SAME MOVEMENTS, so no tw
   const leaving = figure('leaving-30d');
   assert.deepEqual([arriving.label, leaving.label], ['Coming in, 30 days', 'Going out, 30 days']);
   /* AND NO TILE ON MONEY SAYS THE LINE'S FIGURES AGAIN, SINCE money-core 3.4.0: What you have went into the line. The one
-     figure tile, Runs out since 3.11.0, says the day count the line no longer says. */
+     figure tile, Runs out since 3.11.0, says when the money runs out, which the line no longer says. */
   const line = (MONEY_PAGES.money!.blocks as { kind: string; lead?: boolean; body?: string }[]).filter((b) => b.kind === 'note' && b.lead).map((b) => String(b.body)).join(' ');
   for (const b of MONEY_PAGES.money!.blocks as { kind: string; cells?: { metric: string }[] }[])
     for (const c of b.cells ?? []) assert.ok(!line.includes(`{{${c.metric}}}`), `a tile beside the line says ${c.metric} again`);
@@ -743,12 +743,22 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.ok(drawn.some((b) => b.kind === 'note' && b.lead === true && b.drawn !== false), 'the sample draws no line over Money, so this asks nothing');
   assert.equal(drawn.find((b) => b.heading === 'Cash ahead')?.headline, 'under');
 
-  /* RUNS OUT SAYS THE DAYS THE WALK LASTS, SINCE money-core 3.11.0, and its figure misses its target, which the app draws
-     in the colour of a miss. The sample's money runs out inside the year, so the tile is drawn. */
-  const runs = drawn.find((b) => b.heading === 'Runs out')!;
+  /* RUNS OUT SAYS THE DAY THE WALK GOES UNDER, SINCE money-core 3.12.0 (the count of days from 3.11.0), and its figure
+     misses its target, which the app draws in the colour of a miss. The sample's money runs out inside the year, so the
+     tile is drawn. The day is the count's own: today and the days the money lasts, as whole days since 1970. */
+  const runs = drawn.find((b) => b.heading === 'Runs out')! as (typeof drawn)[number] & { tone?: string; cells?: { metric: string; note?: string }[] };
   assert.notEqual(runs.drawn, false, 'the sample runs out inside the year and draws no Runs out');
-  assert.equal(runs.readings?.[0]?.reading?.value, reading(k, 'runway-days'));
-  assert.deepEqual(runs.readings?.[0]?.target, { gte: 365 });
+  assert.equal(runs.tone, 'bad');
+  assert.deepEqual(runs.cells?.map((c) => c.metric), ['runs-out-on']);
+  assert.equal(runs.cells?.[0]?.note, 'In {{runway-days}}', 'the days left are the line under the day');
+  const days = reading(k, 'runway-days');
+  const on = runs.readings?.[0]?.reading?.value;
+  assert.equal(on, reading(k, 'runs-out-on'));
+  assert.ok(typeof days === 'number' && typeof on === 'number', `no day to hold the tile to: ${String(days)}, ${String(on)}`);
+  assert.equal(on, Math.floor(NOW / 86_400_000) + days, 'the day is not the count of days from today');
+  const target = runs.readings?.[0]?.target as { gte: number };
+  assert.ok(on < target.gte, 'a day the money runs out on meets its target');
+  assert.equal((METRICS['runs-out-on'] as { format?: string }).format, 'day');
 });
 
 /**

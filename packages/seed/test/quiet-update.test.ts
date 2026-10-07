@@ -207,8 +207,9 @@ test('WHAT THE PERSON TOOK OFF A MODULE AT THIS VERSION STAYS OFF: the relink af
 
 /**
  * A MODULE WHOSE NEW VERSION ONLY LAYS ITS PAGES OUT AGAIN, AND ADDS A FIGURE TO DRAW ON, REACHES A RECORD ON ITS OWN.
- * Money 3.11.0 and Work 1.15.0 move their tiles (DIRECTION §39) and Work gains `tasks-this-week-yours`; nothing is taken
- * away, so a record holding the version before is updated with no question. The version before is made here from this
+ * Money 3.11.0 and Work 1.15.0 move their tiles (DIRECTION §39) and Work gains `tasks-this-week-yours`; Money 3.12.0
+ * gains `runs-out-on` and draws it on Runs out; nothing is taken away, so a record holding the version before is
+ * updated with no question. The version before is made here from this
  * build's document, its pages laid out differently and the new figure left out, which is the shape of the change.
  */
 test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing', async () => {
@@ -218,11 +219,15 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
   };
   const earlier = (doc: Body, id: string): Body => {
     const decls = (doc.declarations as Body[])
-      .filter((d) => d.metric !== 'tasks-this-week-yours')
+      .filter((d) => d.metric !== 'tasks-this-week-yours' && d.metric !== 'runs-out-on')
       .map((d) => {
         if (typeof d.page !== 'string') return d;
         const { layout: _layout, ...page } = d;
-        const blocks = (page.blocks as Body[]).filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'tasks-this-week-yours').map(({ area: _area, ...b }) => ({ ...b, span: 12 }));
+        const blocks = (page.blocks as Body[])
+          .filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'tasks-this-week-yours')
+          /* AND RUNS OUT AS IT WAS BEFORE money-core 3.12.0: the count of days, with no day to draw and no line under it. */
+          .map((b) => (Array.isArray(b.cells) ? { ...b, cells: (b.cells as Body[]).map((c) => (c.metric === 'runs-out-on' ? { metric: 'runway-days', label: c.label } : c)) } : b))
+          .map(({ area: _area, ...b }) => ({ ...b, span: 12 }));
         return { ...page, blocks: [blocks[0]!, ...blocks.slice(1).reverse()] };
       });
     return { ...doc, version: before(FIRST_PARTY_VERSIONS[id as 'work']), declarations: decls };
@@ -249,5 +254,9 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
   assert.deepEqual(page.layout, { rail: 4 });
   const work = value<{ blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('work'));
   assert.equal(work.blocks.find((b) => b.heading === 'This week')?.when?.metric, 'tasks-this-week-yours');
+  /* AND RUNS OUT DRAWS THE DAY, over the figure the update brought with it (money-core 3.12.0). */
+  const runs = (page.blocks as { heading?: string; cells?: { metric: string }[] }[]).find((b) => b.heading === 'Runs out');
+  assert.deepEqual(runs?.cells?.map((c) => c.metric), ['runs-out-on']);
+  assert.ok(k.packClaims('money-core').includes('metric.runs-out-on'), 'the day the money runs out did not reach the record');
   sql.close();
 });

@@ -1237,6 +1237,9 @@ export function targetConfigOf(declarations: readonly Decl[]): Record<string, De
   return config;
 }
 
+/** The first of 2100 as whole days since 1970: a day no walk of a year reaches, which `runs-out-on` is held to. */
+const RUNS_OUT_NEVER = Date.UTC(2100, 0, 1) / 86_400_000;
+
 /**
  * EVERY LIST ON THIS RECORD THAT HOLDS A DATED AMOUNT, WRITTEN ONCE, and walked by everything that walks: Cash ahead,
  * the next thirty days under it, and the figures that read a walk (`runway-days`, `arriving-30d`, `leaving-30d`). One
@@ -1532,6 +1535,33 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
        weeks. A night the money lasts past the year has no value and writes no point, so the line is drawn only across
        the nights it did not, which is when it matters. */
     snapshot: { grain: 'day', into: 'series.runway-days' },
+  },
+
+  /**
+   * THE DAY THE MONEY RUNS OUT, SINCE money-core 3.12.0: the same crossing as `runway-days`, said as a day (`zero_on` in
+   * `packages/kernel/src/money-figures.ts`), which is what the Runs out tile draws. A count of days read yesterday is
+   * a day out by this morning, and "30 Oct" is the same on every screen that says it. Over the same legs from the same
+   * opening, a year ahead, so it has a value exactly when `runway-days` does and names the day the walk's flag is on.
+   *
+   * ANY DAY IT NAMES IS A MISS, as any count is for `runway-days`. A day is held as whole days since 1970, and a bound
+   * cannot say "a year from today", so the target is a day no walk of a year can reach, the first of 2100. It is never
+   * said on a screen: the tile's note says the days left in its place.
+   *
+   * NOT REMEMBERED EACH NIGHT: the line `runway-days` keeps is how long the money lasts, and a day drawn as a line says
+   * nothing a person reads.
+   */
+  'runs-out-on': {
+    metric: 'runs-out-on',
+    name: 'The day the money runs out',
+    pack: 'money-core',
+    source: 'forecast.runway',
+    legs: CASH_LEGS,
+    opening: { metric: 'cash-now' },
+    value: { walk: 'zero_on', within: '365d' },
+    format: 'day',
+    target: { gte: RUNS_OUT_NEVER },
+    window: '30d',
+    compare: 'none',
   },
 
   /**
@@ -2381,13 +2411,14 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing is dated ahead yet.',
       },
       {
-        /* WHEN THE MONEY RUNS OUT, BESIDE THE WALK, SINCE money-core 3.11.0: the day count the line said until then, now
-           at the figure's own size at the top of the side column. Its figure misses its target whenever it has a value
-           (`runway-days`, a year), so the app draws it in the colour of a miss, and it is drawn only while it has one: a
-           record whose money lasts the year has no such day, and no tile says so.
+        /* WHEN THE MONEY RUNS OUT, BESIDE THE WALK, SINCE money-core 3.11.0, at the figure's own size at the top of the
+           side column. Its figure misses its target whenever it has a value, so the app draws it in the colour of a
+           miss, and it is drawn only while it has one: a record whose money lasts the year has no such day, and no tile
+           says so.
 
-           A DAY COUNT AND NOT A DATE, because no figure the record reads says the day itself: the flag on the walk beside
-           it is on the day. */
+           THE DAY, SINCE money-core 3.12.0 (`runs-out-on`), where it was the count of days: "30 Oct" is the day the flag
+           on the walk beside it stands on, and it is still right tomorrow. The days left are the line under it, in the
+           place of a target nobody reads. */
         kind: 'stat',
         heading: 'Runs out',
         icon: 'alert',
@@ -2396,7 +2427,7 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         /* A MISS HERE IS THE DANGER COLOUR AND NOT A WARNING: money that runs out inside the year is the one figure on
            the page that needs the person. A host draws a missed target in the block's tone where it declares one. */
         tone: 'bad',
-        cells: [{ metric: 'runway-days', label: 'On what is due' }],
+        cells: [{ metric: 'runs-out-on', label: 'On what is due', note: 'In {{runway-days}}' }],
         when: { metric: 'runway-days', gte: 0 },
       },
       {

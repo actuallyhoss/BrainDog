@@ -86,6 +86,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.12.0',
+      notes: 'Runs out names the day your money runs out, with the days left under it, where it showed only a count of days.',
+    },
+    {
       version: '3.11.0',
       notes:
         'Money opens on Cash ahead, with when your money runs out, your accounts and any questions in a column beside it. What is coming up is open under it, and what already moved is folded under History.',
