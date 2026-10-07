@@ -32,7 +32,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
-  import { areaOf, boardRail, boxesOf, layoutOf, ONE_UNDER, PAIR_FROM, paired, slotOf, snapped, splitAreas, sticks, widened, type Run } from './layout.ts';
+  import { areaOf, boardRail, boxesOf, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, slotOf, snapped, splitAreas, sticks, widened, type Run } from './layout.ts';
   import { emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
@@ -61,6 +61,8 @@
     pick = null,
     onwalk = null,
     whole = false,
+    captured = -1,
+    under = null,
   }: {
     /**
      * `page` is `/p/<slug>`, with its block keys. `home` is a home's body: its blocks that hold nothing are not drawn, a
@@ -98,6 +100,13 @@
      * `askWalk`), or `null` where the page is not read again (a preview).
      */
     onwalk?: ((length: Walked) => void) | null;
+    /**
+     * The declared index of the line the page opens on to type into, when the page's header holds it (`layout.ts`
+     * `headCaptureAt`, `PageView.svelte`): it is not drawn as a tile here, and keeps its place in the list. `-1` for none.
+     */
+    captured?: number;
+    /** What the header hands back to sit under the headline: that same line on a phone, where the name's row has no room for it. */
+    under?: Snippet | null;
   } = $props();
 
   const arranging = $derived(arrangement?.editing ?? false);
@@ -121,6 +130,11 @@
    */
   const quiet = $derived(emptyHidden(blocks, mode === 'page'));
   const drawable = $derived(mode === 'preview' || arranging ? blocks : quiet);
+  /* AND THE LINE THE HEADER HOLDS IS NOT A TILE AS WELL (`captured`): not drawn here, and still at its place, so every
+     write finds its block. Never while authoring, where it is a block like any other. */
+  const tiled = $derived(
+    mode !== 'preview' && !arranging && drawable[captured]?.drawn ? drawable.map((b, i) => (i === captured ? { ...b, drawn: false } : b)) : drawable,
+  );
 
   /** The blocks that open a board without being a card on it: a line to type into, a form, a heading. */
   const OPENERS: ReadonlySet<string> = new Set(['capture', 'inputs', 'section']);
@@ -152,7 +166,7 @@
   const asks = $derived.by(() => {
     if (mode !== 'page' || arranging) return { order: looked, rail: new Set<number>(), compact: new Set<number>(), spans: new Map<number, number>() };
     const read = blocks.map((b, i) => {
-      const at = drawable[i] as (LiveBlock & { box?: unknown; joins?: unknown; lead?: unknown }) | undefined;
+      const at = tiled[i] as (LiveBlock & { box?: unknown; joins?: unknown; lead?: unknown }) | undefined;
       return {
         kind: b.kind,
         drawn: at?.drawn === true,
@@ -188,10 +202,10 @@
     const slots =
       arrangement?.slots ??
       order.map((i) => {
-        const slot = slotOf(drawable[i]!, i, layout);
+        const slot = slotOf(tiled[i]!, i, layout);
         return asks.rail.has(i) ? { ...slot, area: 'rail' as const } : slot;
       });
-    return slots.map((slot) => ({ slot, block: drawable[slot.i] })).filter((x): x is { slot: Slot; block: LiveBlock } => Boolean(x.block));
+    return slots.map((slot) => ({ slot, block: tiled[slot.i] })).filter((x): x is { slot: Slot; block: LiveBlock } => Boolean(x.block));
   });
 
   /** Every drawn pair with `at`, its index in `laid`, which is the index the arrangement moves by. */
@@ -258,6 +272,17 @@
   const railFirst = $derived(mode === 'page' && layout !== null && !wide.current);
 
   /**
+   * AND THE CHART THE MAIN COLUMN OPENS ON COMES BEFORE THE RAIL THERE (`layout.ts` `leadChartAt`): Money's Cash ahead
+   * is the page, and it sat under when the cash runs out, the accounts and three questions. `null` where the main
+   * column opens on anything else, and off a phone, where the two columns are side by side.
+   */
+  const leadFirst = $derived.by((): Laid | null => {
+    if (!railFirst || !railShown || arranging) return null;
+    return mainRest[leadChartAt(mainRest.map((x) => x.block))] ?? null;
+  });
+  const mainAfter = $derived(leadFirst ? mainRest.filter((x) => x !== leadFirst) : mainRest);
+
+  /**
    * THE ORDER A READER MEETS THE BLOCKS IN, which is the headline, the main column and then the rail (the rail first on
    * a phone): the order the page draws them in, and so the order `j` and `k` walk. On a page with no rail it is `laid`.
    *
@@ -267,7 +292,8 @@
   const reading = $derived.by(() => {
     if (!layout) return pairs.filter((x) => x.block.drawn);
     const top = lifted ? [lifted] : [];
-    return (railFirst ? [...top, ...railRest, ...mainRest] : [...top, ...mainRest, ...railRest]).filter((x) => x.block.drawn);
+    const first = leadFirst ? [leadFirst] : [];
+    return (railFirst ? [...top, ...first, ...railRest, ...mainAfter] : [...top, ...mainRest, ...railRest]).filter((x) => x.block.drawn);
   });
 
   /**
@@ -388,6 +414,8 @@
             drawn: x.block.drawn,
             lead: x === lifted || isLead(x.block),
             columns: x.block.columns.length,
+            /* A WIDTH ITS AUTHOR WROTE, the whole row included, is never halved beside a neighbour. */
+            declared: (x.block as { span?: unknown }).span !== undefined,
           })),
         );
       }
@@ -684,7 +712,7 @@
   /* AND AGAIN EACH TIME THE PAGE IS DRAWN AGAIN, since a re-read draws new elements and the mark was on the old ones. */
   $effect(() => {
     if (mode === 'preview') return;
-    void drawable;
+    void tiled;
     void rowKey;
     void tick().then(() => markRow(false));
   });
@@ -808,9 +836,8 @@
         break;
       }
       case 'n': {
-        /* ON A HOME THE LINE A TASK IS TYPED INTO SITS IN THE HEAD (`home/HeadCapture.svelte`), outside the body. */
-        const field =
-          pageEl?.querySelector<HTMLInputElement>('.capture-input') ?? (mode === 'home' ? document.querySelector<HTMLInputElement>('.head-capture .capture-input') : null);
+        /* THE LINE A PAGE OPENS ON SITS IN ITS HEAD (`home/HeadCapture.svelte`), outside the body, on a home and on a page. */
+        const field = pageEl?.querySelector<HTMLInputElement>('.capture-input') ?? document.querySelector<HTMLInputElement>('.head-capture .capture-input');
         if (!field) return;
         field.focus();
         break;
@@ -983,7 +1010,9 @@
     <!-- UNDER THE HEADLINE: the one next action the look names, wherever the headline is drawn. -->
     {#if next && !arranging && headline?.at === at}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
     {#if lifted?.at === at}
-      <!-- THEN what narrows the page, as part of its header, then what was just done on it, before what it holds. -->
+      <!-- THEN the line the page opens on, on a phone, under its sentence and never between the name and the sentence;
+           then what narrows the page, as part of its header, then what was just done on it, before what it holds. -->
+      {#if under}<div class="page-strip">{@render under()}</div>{/if}
       {#if strip}<div class="page-strip">{@render strip()}</div>{/if}
       {#if host && mode === 'page'}<JustChanged {host} />{/if}
     {/if}
@@ -1007,8 +1036,8 @@
 {/snippet}
 
 <!-- THE MAIN COLUMN AND THE RAIL, each a snippet so a phone can draw the rail first without a second copy of either. -->
-{#snippet mainArea()}
-  {#if layout && mainShown}
+{#snippet mainArea(list: Laid[])}
+  {#if layout && list.some((x) => x.block.drawn)}
     <div
       class="area"
       data-area="main"
@@ -1016,7 +1045,7 @@
       role={arranging ? 'list' : undefined}
       aria-label={arranging ? copy.mainColumn : undefined}
     >
-      {@render column(mainRest)}
+      {@render column(list)}
     </div>
   {/if}
 {/snippet}
@@ -1046,6 +1075,7 @@
        tile instead, or the head would sit over it. -->
   <!-- A PAGE WITH NO HEADLINE STILL OPENS ON THE LOOK'S NEXT ACTION, before what narrows it. -->
   {#if next && !headline && !arranging}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
+  {#if under && !lifted}<div class="page-strip">{@render under()}</div>{/if}
   {#if strip && !lifted}<div class="page-strip">{@render strip()}</div>{/if}
   {#if host && mode === 'page' && !arranging && !lifted}<JustChanged {host} />{/if}
   {#if layout}
@@ -1054,10 +1084,12 @@
          draws as one column rather than beside an empty part of the screen. The headline is over both. -->
     {#if lifted}{@render slotted(lifted)}{/if}
     {#if railFirst}
+      <!-- A PHONE: the chart the main column opens on, the rail, then the rest of the main column. -->
+      {#if leadFirst}{@render mainArea([leadFirst])}{/if}
       {@render railArea()}
-      {@render mainArea()}
+      {@render mainArea(mainAfter)}
     {:else}
-      {@render mainArea()}
+      {@render mainArea(mainRest)}
       {@render railArea()}
     {/if}
   {:else}
@@ -1076,8 +1108,9 @@
      order you declared is the order you get, at every width.
 
      ONE BOARD (DIRECTION §39): EVERY BLOCK IS A TILE ON IT, flat, opaque, no border and no shadow, radius 16, 20 in,
-     12 between tiles on both axes, and the tiles of one row stretch to one height, so a row reads as a row of tiles
-     rather than a skyline. Nothing floats on the board but the header. The page has no surface of its own; the board's
+     12 between tiles on both axes. A TILE IS AS TALL AS WHAT IT HOLDS, from the top of its row: stretched to one
+     height, a list of one line beside a tile of figures was a tile three quarters empty, and two rows beside eight
+     were 400px of white. Nothing floats on the board but the header. The page has no surface of its own; the board's
      colour is the shell's, and the tile's is `--tile` beside it (`packages/skin/tokens.css`).
 
      NO CAP ON THE PAGE, ONLY ON THE PROSE (DIRECTION §36, §38). The page is as wide as the window, inside the fluid
@@ -1165,6 +1198,8 @@
     min-inline-size: 0;
     /* The landing line is positioned against this. */
     position: relative;
+    /* As tall as its own rows, never its neighbour's (above). */
+    align-self: start;
     padding: var(--slot-pad);
     background: var(--tile);
     border-radius: var(--tile-r);

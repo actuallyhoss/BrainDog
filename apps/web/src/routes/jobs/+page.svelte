@@ -29,7 +29,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { TONES } from 'braindog-render';
-  import { apiBase, at } from '$lib/at.ts';
+  import { apiBase, at, slugOf } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { titleOf } from '$lib/title.ts';
   import { read } from '$lib/data/read.svelte.ts';
@@ -50,6 +50,8 @@
     type JobRow,
   } from '$lib/record/jobs.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { hostedHere } from '../settings/billing.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -67,6 +69,7 @@
   import { createClient } from '@braindog/client';
   import {
     detailOf,
+    enrolAddress,
     enrolledOf,
     enrolledSaid,
     groupsOf,
@@ -156,6 +159,15 @@
   let devices = $state.raw<ReturnType<typeof enrolledOf> | null>(null);
   /* The record's address, which changes with its slug and not with `?repo=`, so the read is not asked again per filter. */
   const recordBase = $derived(apiBase(page.url));
+  /* THE ADDRESS THE ENROL COMMAND IS PRINTED WITH (`enrolAddress`): this record's own, and for a hosted record never
+     this machine's `localhost`. Hosted is what `boot` named, as `hostedHere` reads it everywhere else. */
+  const enrolAt = $derived(
+    enrolAddress(
+      recordBase,
+      hostedHere(page.data as unknown as Shell),
+      slugOf(page.url.pathname) ?? ((page.data.index as { slug?: string } | undefined)?.slug || null),
+    ),
+  );
   $effect(() => {
     const base = recordBase;
     void createClient({ base })
@@ -308,7 +320,11 @@
   <Tile icon="monitor" title={said.machinesTitle} count={list.length > 0 ? list.length : undefined}>
     {#if list.length === 0}
       <p class="none-yet">{said.noMachines}</p>
-      <p class="enrol">{said.enrolHow}<code class="enrol-cmd">{said.enrolCommand(recordBase)}</code></p>
+      {#if enrolAt === null}
+        <p class="enrol">{said.enrolNoAddress}</p>
+      {:else}
+        <p class="enrol">{said.enrolHow}<code class="enrol-cmd">{said.enrolCommand(enrolAt)}</code></p>
+      {/if}
     {:else}
       <ul class="machines">
         {#each list as m (m.key)}

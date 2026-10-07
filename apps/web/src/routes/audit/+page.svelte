@@ -17,6 +17,7 @@
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
+  import { listName as declaredName } from '$lib/record/names.ts';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import Button from '$lib/ui/Button.svelte';
@@ -338,10 +339,17 @@
    * with the title the record sent beside the line (`readLog`'s `names`). `null` is a target with
    * nothing to say that is not an id, and the verb then stands alone.
    */
+  /* A LIST BY THE NAME THE RAIL GIVES IT. The shell holds every list's name, and a line's list was said from its id
+     where the declaration had not been read yet, so the rail's Instalments was "Installments" down this screen. */
+  const shellLists = $derived(
+    new Map(((route.data.lists ?? route.data.index?.registers ?? []) as { id: string; name: string }[]).map((l) => [l.id, l.name])),
+  );
+  const listSaid = (id: string): string => shellLists.get(id) ?? declaredName(id);
+
   const thingFor = (target: string): { text: string; href: string | null; list: string | null } | null => {
     const person = targetSaid(target, me, names);
     if (person) return { text: person.name, href: null, list: null };
-    return thingOf(target, live?.names.get(target) ?? null);
+    return thingOf(target, live?.names.get(target) ?? null, listSaid);
   };
 
   /**
@@ -399,7 +407,7 @@
   /* ONE LIST, WHICH TODAY LINKS TO: "12 changes to Tasks since you were last here" opens here narrowed to Tasks. It has no
      control of its own, since a list is chosen from Today or pasted, and the button in the toolbar says it and takes it off. */
   const list = $derived(route.url.searchParams.get('list') ?? '');
-  const listName = $derived(route.data.lists?.find((l: { id: string; name: string }) => l.id === list)?.name ?? list);
+  const listName = $derived(list === '' ? '' : listSaid(list));
 
   const matched = $derived(
     kept.filter(
@@ -415,7 +423,7 @@
   const shown = $derived(matched.slice(0, DOM_CAP));
   /* A BURST IS ONE LINE (`burstsOf`), folded from what is drawn, so the cap above still counts lines of the log and
      the cap line under the list still says how many of them there are. */
-  const told = $derived(burstsOf(shown));
+  const told = $derived(burstsOf(shown, listSaid));
   /* AND THE LINES SIT ONE TILE A DAY, each hour a subhead inside it (`dayGroups`). */
   const bands = $derived(dayGroups(told, clock));
 
@@ -610,8 +618,8 @@
           <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
           <span class="who"><Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
           <span class="detail-text"
-            >{by.name}{#if note}<span class="note" title={note}> · {note}</span>{/if}{#if thing?.list}<span class="where-inline">
-                · {thing.list}</span
+            >{by.name}{#if note}<span class="note" title={note}>{' · '}{note}</span>{/if}{#if thing?.list}<span class="where-inline"
+                >{' · '}{thing.list}</span
               >{/if}</span
           >
         </span>

@@ -6,7 +6,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { EVERYDAY, SOURCE_DAYS, countSaid, drawsLine, lastSaid, sourcesOf } from './sources.ts';
+import { readFileSync } from 'node:fs';
+
+import { EVERYDAY, SOURCE_DAYS, countSaid, drawsLine, lastSaid, nothingEver, quietWords, sourcesOf } from './sources.ts';
 
 const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
 const NOON = at(2026, 10, 7);
@@ -46,4 +48,36 @@ test('arrivals are counted by the day they came, today last, and the newest way 
   assert.equal(drawsLine(mail), false, 'one day is a count, not a line');
   assert.equal(out.find((s) => s.channel === 'api')?.last, null, 'a time that will not read is no last arrival');
   assert.equal(countSaid(1200), '1,200 in 14 days');
+});
+
+test('an inbox nothing has ever reached is one fact, told by the record\'s own tally', () => {
+  const none = { waiting: 0, filed: 0, archived: 0 };
+  const quiet = sourcesOf([], NOON);
+  assert.equal(nothingEver(none, quiet, 0), true);
+  assert.equal(nothingEver(none, null, 0), true, 'the tally is the count of every arrival; the ways in only cover a fortnight');
+  /* ANYTHING THAT EVER CAME IS NOT "NOTHING YET": something filed last year, something waiting, or a way in with an arrival. */
+  assert.equal(nothingEver({ ...none, filed: 3 }, quiet, 0), false);
+  assert.equal(nothingEver({ ...none, archived: 1 }, quiet, 0), false);
+  assert.equal(nothingEver({ ...none, waiting: 1 }, quiet, 0), false);
+  assert.equal(nothingEver(none, quiet, 2), false);
+  assert.equal(nothingEver(none, sourcesOf([{ channel: 'email', ts: iso(at(2026, 10, 6)) }], NOON), 0), false);
+  /* A RECORD THAT ANSWERED NO TALLY IS NOT SAID TO BE EMPTY: a quiet fortnight is not nothing yet. */
+  assert.equal(nothingEver(null, quiet, 0), false);
+  assert.doesNotMatch(`${quietWords.title} ${quietWords.why} ${quietWords.add}`, /—|\brow\b|entity/u);
+});
+
+test('the page draws that inbox as one tile, in place of the two tiles and the empty state under them', () => {
+  const src = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8').replace(/<!--[\s\S]*?-->/gu, '');
+  const markup = src.slice(src.indexOf('<div class="page">'), src.indexOf('{#snippet settledSeries()}'));
+  const never = markup.indexOf('{:else if never}');
+  const board = markup.indexOf('<div class="inbox">');
+  assert.ok(never > 0 && board > never, 'the one tile is not chosen before the board');
+  const one = markup.slice(never, markup.indexOf('{:else}', never));
+  assert.equal(one.match(/<Empty\b/gu)?.length, 1);
+  assert.doesNotMatch(one, /<Tile\b/u, 'the one tile still draws the ways in or the rules beside it');
+  assert.match(one, /title=\{quietWords\.title\} body=\{quietWords\.why\}/u);
+  assert.match(one, /<Button href="\/settings\/ingest">\{quietWords\.add\}<\/Button>/u);
+  /* IT WAITS FOR THE TALLY, so the cleared inbox is never drawn first and swapped a moment later. */
+  assert.match(markup, /\{:else if INBOX\.length === 0 && !tallied\}\s*<Waiting \/>\s*\{:else if never\}/u);
+  assert.match(src, /const never = \$derived\(patterns\.length === 0 && nothingEver\(tally, ways, INBOX\.length\)\);/u);
 });

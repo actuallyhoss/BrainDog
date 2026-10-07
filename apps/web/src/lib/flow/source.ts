@@ -83,6 +83,11 @@ export type AutomationRow = {
   runs: RunRow[];
   /** The run to pass as `before` for the page of runs after these, or `null` when these reach the first one kept. */
   older: string | null;
+  /**
+   * When the log last has a line signed by it, for one the record answered no last run for: `null` when the newest
+   * page of the log holds none, and absent when the log was not asked (`withFired`).
+   */
+  acted?: string | null | undefined;
 };
 
 /** `propose`'s answer: the suggestion's id, or `null` when the record filed it without saying which. */
@@ -124,6 +129,43 @@ export type Version = { version: number; at: string; live: boolean; enabled: boo
 
 /** What `setAutomation` answers: the version now live and whether it runs. */
 export type Switched = { version: number; enabled: boolean };
+
+/* ── when an automation with no runs last did something ───────────────────── */
+
+/**
+ * When each rule last signed a line of the log, by its bare id, from one page of `recentHistory`, newest first.
+ *
+ * AN AUTOMATION THAT RUNS INSIDE THE CHANGE THAT STARTS IT KEEPS NO RUN. The record counts runs (`automation_run`) and
+ * such a rule's firings are lines of the log, signed `rule:<id>`, so `automations` answers `last: null` for it for ever
+ * and the list said "Not run yet" on every one while Activity, reading that same log, listed what each had done. The
+ * log is the only place its last turn is written down, so that is where it is read.
+ *
+ * READ BY NAME, as `rowOf` reads: a line with no actor or no time is passed over, and anything that is not a page is
+ * no lines.
+ */
+export function firedOf(raw: unknown): Map<string, string> {
+  const out = new Map<string, string>();
+  const events = isObject(raw) && Array.isArray(raw.events) ? raw.events : [];
+  for (const e of events) {
+    if (!isObject(e)) continue;
+    const rule = /^rule[.:](.+)$/u.exec(text(e.actor) ?? '')?.[1];
+    const at = text(e.ts);
+    if (rule === undefined || at === null) continue;
+    const had = out.get(rule);
+    if (had === undefined || Date.parse(at) > Date.parse(had)) out.set(rule, at);
+  }
+  return out;
+}
+
+/**
+ * The rows with `acted` filled for each one the record answered no last run for: when the log last has it, or `null`
+ * for one the page read holds nothing from. A row with a last run is left as it came, since a run says more.
+ */
+export const withFired = (rows: readonly AutomationRow[], fired: ReadonlyMap<string, string>): AutomationRow[] =>
+  rows.map((r) => (r.last !== null ? r : { ...r, acted: fired.get(r.id) ?? null }));
+
+/** How many lines of the log are read for it: the record's largest page. */
+const FIRED_PAGE = 200;
 
 /* ── reading an answer written alongside this file ───────────────────────── */
 
@@ -597,9 +639,9 @@ function subjectOfBody(body: Body): string | null {
  * What starts a listed automation, in one sentence, from the summary alone when there is no body: the list answer
  * carries the trigger's kind and its list, which is enough for a change or a button and not for how often a clock runs.
  */
-export function rowTrigger(row: AutomationRow): string {
-  if (row.body) return sayTrigger(triggerOfBody(row.body));
-  if (row.trigger === 'written' && row.register) return sayTrigger({ written: { register: row.register } });
+export function rowTrigger(row: AutomationRow, listSaid?: (id: string) => string): string {
+  if (row.body) return sayTrigger(triggerOfBody(row.body), listSaid);
+  if (row.trigger === 'written' && row.register) return sayTrigger({ written: { register: row.register } }, listSaid);
   if (row.trigger === 'arrival') return sayTrigger({ arrival: {} });
   if (row.trigger === 'manual') return sayTrigger({ manual: true });
   return words.kinds[row.trigger] ?? row.trigger;
@@ -612,10 +654,28 @@ export function rowTrigger(row: AutomationRow): string {
 export function rowLine(row: AutomationRow, now: number): string {
   if (!row.enabled) return words.off;
   const next = row.next ? words.nextRun(since(row.next, now)) : '';
-  if (!row.last) return next || words.neverRun;
-  const last = words.lastRun(since(row.last.at, now), words.runState[row.last.state] ?? row.last.state);
-  const why = row.last.state === 'failed' && row.last.say ? ` ${row.last.say}` : '';
-  return [last + why, next].filter(Boolean).join(' ');
+  const last = lastSaid(row, now);
+  if (!row.last && !row.acted) return next || last;
+  return [last, next].filter(Boolean).join(' ');
+}
+
+/**
+ * When a turned-on automation last ran and how it went, in one sentence, or `''` when nothing true can be said.
+ *
+ * FOUR ANSWERS, AND "NOT RUN YET" IS ONLY ONE OF THEM. A last run is said with how it ended, and a failed one with the
+ * record's own sentence about why. One the record keeps no runs for is said from the log: when it last did something,
+ * or that the newest page holds nothing from it, which is "lately" and never "yet", because an older turn may sit
+ * below the page. With the log unread it says nothing rather than guess. Only one that would have left a run and has
+ * none has not run yet.
+ */
+export function lastSaid(row: AutomationRow, now: number): string {
+  if (row.last) {
+    const last = words.lastRun(since(row.last.at, now), words.runState[row.last.state] ?? row.last.state);
+    return row.last.state === 'failed' && row.last.say ? `${last} ${row.last.say}` : last;
+  }
+  if (row.acted) return words.lastActed(since(row.acted, now));
+  if (row.path === 'inline') return row.acted === null ? words.quiet : '';
+  return words.neverRun;
 }
 
 /* ── the wire ───────────────────────────────────────────────────────────── */
@@ -681,6 +741,8 @@ export type Source = {
   rows(register: string, now: number): Promise<Answer<Pickable[]>>;
   /** The newest arrivals, for a try's picker. An owner's read. */
   arrivals(now: number): Promise<Answer<Pickable[]>>;
+  /** When each rule last signed a line of the log, by its bare id, from the newest page of it. */
+  fired(): Promise<Answer<Map<string, string>>>;
 };
 
 /** How many rows or arrivals a try's picker offers. */
@@ -758,6 +820,10 @@ export function live(io: Fetch, base = ''): Source {
       const lines = Array.isArray(out.value?.arrivals) ? out.value.arrivals : [];
       return { ok: true, value: lines.map((a) => pickableArrival(a, now)).filter((x): x is Pickable => x !== null) };
     },
+    fired: async () => {
+      const out = await send<unknown>(io, `${base}/api/recentHistory?${new URLSearchParams({ limit: String(FIRED_PAGE) }).toString()}`);
+      return out.ok ? { ok: true, value: firedOf(out.value) } : out;
+    },
   };
 }
 
@@ -770,8 +836,15 @@ export type Opened = { source: Source; first: Answer<AutomationRow[]>; absent: b
  * IT TOOK THE SAMPLE'S CLOCK AS A THIRD ARGUMENT, and a sample was kept for the tab so the list and the editor agreed
  * about a flow that had been filed nowhere. Nothing read it once the sample went, and no caller passes it now.
  */
-export async function openAutomations(io: Fetch, base = ''): Promise<Opened> {
+export async function openAutomations(io: Fetch, base = '', opts: { acted?: boolean } = {}): Promise<Opened> {
   const source = live(io, base);
   const first = await source.automations();
+  /* THE LOG IS ASKED ONLY BY A SCREEN THAT SAYS WHEN EACH LAST RAN (`acted`), and only when some turned-on row came
+     with no last run to say. A log that will not read leaves the rows as they came: the list is the screen, and a row
+     then says nothing about its last turn rather than something untrue. */
+  if (opts.acted && first.ok && first.value.some((r) => r.enabled && r.last === null)) {
+    const fired = await source.fired();
+    if (fired.ok) return { source, first: { ok: true, value: withFired(first.value, fired.value) }, absent: false };
+  }
   return { source, first, absent: !first.ok && first.refusal.code === 'ROUTE_UNKNOWN' };
 }

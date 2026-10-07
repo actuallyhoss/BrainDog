@@ -40,6 +40,7 @@
   import { words } from '$lib/home/words.ts';
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
   import { untrack } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import { typing } from '$lib/a11y/keys.svelte.ts';
 
   import { closed, drew, opened } from '../ui/screen.svelte.ts';
@@ -184,6 +185,10 @@
   /* THE LINE A TASK IS TYPED INTO, in the head beside the name, where the page has one and its list can take a line. */
   const capture = $derived(shaped?.capture && view?.capturable(shaped.capture) ? shaped.capture : null);
 
+  /* BESIDE THE NAME FROM 900px, AND UNDER THE SENTENCE ON A PHONE (`PageHead`'s `below`): wrapped out of the name's
+     row there, it stood between "Today" and the line that says what today holds. Drawn once, in one place or the other. */
+  const wide = new MediaQuery('(width >= 900px)', true);
+
   /* NOTHING TO DRAW AT ALL: the line says so, and nothing under it. A host that cannot draw Today's body is calm too. */
   const calm = $derived((shaped !== null && !drawsAny(shaped.blocks)) || (settled && got === null));
 
@@ -232,10 +237,11 @@
   kicker={today}
   sentence={slashed ? slashSaid : lead?.text}
   needs={slashed ? undefined : lead?.needs || undefined}
-  actions={capture ? headCapture : undefined}
+  actions={capture && wide.current ? headCapture : undefined}
+  below={capture && !wide.current ? headCapture : undefined}
 />
 
-<!-- THE LINE A TASK IS TYPED INTO, at the right of the name (one line of its own under it on a phone). -->
+<!-- THE LINE A TASK IS TYPED INTO, at the right of the name (one line of its own under the sentence on a phone). -->
 {#snippet headCapture()}
   {#if capture}<HeadCapture block={capture} oncapture={(register, text, inherited) => view?.capture(register, text, inherited)} />{/if}
 {/snippet}
@@ -347,19 +353,6 @@
     }
   }
 
-  /* ON A PHONE THE LINE A TASK IS TYPED INTO IS A LINE OF ITS OWN under the name, the row's whole width. */
-  @media (width < 900px) {
-    :global(.head-main:has(.head-capture)) {
-      flex-wrap: wrap;
-      row-gap: var(--sp-2);
-    }
-
-    :global(.head-actions:has(> .head-capture)) {
-      flex: 1 0 100%;
-      justify-content: stretch;
-    }
-  }
-
   /* ── the page ─────────────────────────────────────────────────────────── */
 
   /* ONE COLUMN, the page's own: its blocks carry their spans and its rail, and Home adds no column of its own beside it. */
@@ -392,6 +385,15 @@
     overflow-wrap: normal;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* A FIGURE'S LINE RUNS THE TILE'S WIDTH UNDER ITS FIGURE, where the tile draws the figure as a row (the rail, a
+     phone): at the 120 it has beside a label it was a stub at the tile's left edge with two thirds of the row empty. */
+  @container stat (inline-size < 480px) {
+    .body :global(.block[data-kind='stat'] .cell-trend) {
+      inline-size: 100%;
+      block-size: 40px;
+    }
   }
 
   /* ── narrower ─────────────────────────────────────────────────────────── */

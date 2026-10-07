@@ -559,7 +559,9 @@
     flex-direction: column;
     box-sizing: border-box;
     inline-size: var(--rail-w);
-    block-size: 100%;
+    /* THE WINDOW'S HEIGHT, NOT `100%`: the shell's row is `auto`, so a percentage never resolved, the open list's own
+       height set the row, and `.scroll` never had less room than it wanted. The foot went off the bottom with it. */
+    block-size: 100dvh;
     padding: var(--sp-3) var(--sp-3) var(--sp-2);
   }
 

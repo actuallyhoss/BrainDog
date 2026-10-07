@@ -55,8 +55,9 @@ export const cardWords = {
   to: 'to',
   /** A value that was empty before, or is emptied. */
   nothing: 'nothing',
-  /** THE CARD'S SIDE, ON A WIDE TILE (DIRECTION §39): who asked, why, and what it changes, each under a quiet heading. */
+  /** Said to a screen reader before who asked, on the line over the question; the question's own page heads its side with it. */
   askedBy: 'Asked by',
+  /** THE CARD'S SIDE, ON A WIDE TILE (DIRECTION §39): why it is asked and what it changes, each under a quiet heading. */
   why: 'Why it’s asked',
   changes: 'What it changes',
 } as const;
@@ -332,8 +333,9 @@ export const INLINE_MOST = 3;
  * WHETHER THE ANSWERS ARE A ROW OF BUTTONS, each one press that decides, rather than the form's list of choices and
  * Decide. "Chase it" and "Not yet", "It went through" and "It stopped": two or three answers that say what they are in
  * their own name, with no line of what each does and nothing to show, are buttons, as the record's own Accept and
- * Decline always were. An answer that carries a line of what it does, or a fourth answer, keeps the form, where the
- * line is read before the press. A merge is neither; it has its own card.
+ * Decline always were. An answer that carries a line of what it does, or a fourth answer, keeps the form's list of
+ * full-width choices, where that line is read; one press on a choice decides there too where there are no more than
+ * three and none is hard to undo (`pressOf`). A merge is neither; it has its own card.
  *
  * `compact` IS A QUESTION SHOWN OUTSIDE DECIDE (Home, a declared page), which draws the question and its buttons only:
  * there a line of what each does is left to the question's own page, one press away, and only a fourth answer still
@@ -344,6 +346,18 @@ export function inlineOf(card: Pick<Card, 'ways' | 'decline' | 'merge'>, compact
   if (card.decline !== null) return true;
   if (card.ways.length < 2 || card.ways.length > INLINE_MOST) return false;
   return compact || card.ways.every((w) => w.because === '' && w.shows === null);
+}
+
+/**
+ * WHETHER ONE PRESS ON A CHOICE DECIDES, in the form's list: two or three answers, none of them hard to undo, whether or
+ * not each carries a line of what it does. The line is read on the choice itself, and the answer is held six seconds
+ * for its Undo like every other, so choosing first and pressing Decide after was a second press that guarded nothing.
+ * The ring and Decide stay where a press should be two: an answer that is hard to undo, and a fourth answer, which is a
+ * list to weigh. The record's own two and a merge have their own buttons.
+ */
+export function pressOf(card: Pick<Card, 'ways' | 'decline' | 'merge' | 'cost'>): boolean {
+  if (card.merge !== null || card.decline !== null || card.cost === 'undo') return false;
+  return card.ways.length >= 2 && card.ways.length <= INLINE_MOST;
 }
 
 /**

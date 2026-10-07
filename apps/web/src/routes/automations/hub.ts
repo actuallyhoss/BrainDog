@@ -18,7 +18,7 @@
 import { since } from 'braindog-render';
 
 import { VERB_LABELS, words as flowWords } from '../../lib/flow/flow.ts';
-import { lasted } from '../../lib/flow/source.ts';
+import { lastSaid, lasted } from '../../lib/flow/source.ts';
 import { humanize } from '../../lib/record/names.ts';
 
 import type { AutomationRow, RunRow } from '../../lib/flow/source.ts';
@@ -119,6 +119,8 @@ export const hubWords = {
   scripts: 'Scripts',
   today: 'Today',
   yesterday: 'Yesterday',
+  /* THE SWITCH AT THE END OF AN AUTOMATION'S ROW, named for a reader who cannot see which row it is on. */
+  switchOf: (name: string) => `Run ${name}`,
   /* THE RIGHT-HAND COLUMN OF AN AUTOMATION'S ROW, when it has a next turn. */
   nextAt: (when: string) => `Next ${when}`,
 
@@ -142,19 +144,25 @@ export const hubWords = {
 /* ── the leading mark of a row ──────────────────────────────────────────── */
 
 /**
- * The icon in an automation's well, by what starts it: a clock, a bell for an arrival, a press,
- * a tick for a decision, a document for a change to a list, and an eye for a figure that is watched.
+ * The icon in an automation's well, by what starts it: a clock, the inbox for an arrival, a press, Decide's own glyph
+ * for a decision, and an eye for a figure that is watched.
+ *
+ * A CHANGE TO A LIST WEARS THAT LIST'S OWN GLYPH, the one the rail draws it with. Most automations start on a change,
+ * so every one of them wore the same document and a page of eighteen had three icons between them: nothing to find
+ * the money ones by. `listIcon` is the caller's, read off the lists the shell holds; without it, or for a list the
+ * shell does not draw, it is the glyph of any list.
  */
 const TRIGGER_ICONS: Record<string, IconName> = {
   every: 'clock',
-  arrival: 'bell',
+  arrival: 'inbox',
   manual: 'play',
-  decided: 'check',
-  written: 'doc',
+  decided: 'decide',
+  written: 'rows',
   metric: 'observe',
 };
 
-export const triggerIcon = (kind: string): IconName => (Object.hasOwn(TRIGGER_ICONS, kind) ? TRIGGER_ICONS[kind]! : 'refresh');
+export const triggerIcon = (kind: string, listIcon?: IconName | undefined): IconName =>
+  kind === 'written' && listIcon !== undefined ? listIcon : Object.hasOwn(TRIGGER_ICONS, kind) ? TRIGGER_ICONS[kind]! : 'refresh';
 
 /** A scheduled action's well, by the way it reaches out: fetching, calling, or watching. */
 const CHANNEL_ICONS: Record<Channel, IconName> = { pull: 'download', call: 'globe', poll: 'observe' };
@@ -228,10 +236,7 @@ export function hubSentence(rows: readonly AutomationRow[]): Sentence | null {
  * (`nextOf`), so it is not said twice the way `rowLine` says it for a list that has no column to put it in.
  */
 export function lastLine(row: AutomationRow, now: number): string {
-  if (!row.enabled) return flowWords.off;
-  if (!row.last) return flowWords.neverRun;
-  const last = flowWords.lastRun(since(row.last.at, now), flowWords.runState[row.last.state] ?? row.last.state);
-  return row.last.state === 'failed' && row.last.say ? `${last} ${row.last.say}` : last;
+  return row.enabled ? lastSaid(row, now) : flowWords.off;
 }
 
 /** "Next in 2h", for a turned-on automation that has one. */
@@ -473,6 +478,8 @@ export type HubRow = {
   aside?: string | undefined;
   /** Whether the aside is a time in a feed, which is set in Geist Mono. */
   clock?: boolean | undefined;
+  /** A switch at the row's end, for a thing the reader may turn on and off: how it stands, and what the switch is called. */
+  toggle?: { on: boolean; label: string } | undefined;
 };
 
 export type RunKind = 'automation' | 'scheduled' | 'script';
@@ -657,7 +664,10 @@ export function pageSentence(row: AutomationRow | null, now: number): Sentence |
   if (!row) return null;
   if (!row.enabled) return { text: flowWords.off, needs: '' };
   const next = row.next ? flowWords.nextRun(since(row.next, now)) : '';
-  if (!row.last) return { text: [flowWords.neverRun, next].filter(Boolean).join(' '), needs: '' };
+  if (!row.last) {
+    const text = [lastSaid(row, now), next].filter(Boolean).join(' ');
+    return text === '' ? null : { text, needs: '' };
+  }
   const state = flowWords.runState[row.last.state] ?? row.last.state;
   const last = flowWords.lastRun(since(row.last.at, now), state);
   const why = row.last.state === 'failed' && row.last.say ? ` ${row.last.say}` : '';

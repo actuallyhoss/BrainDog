@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 
 import type { QueueQuestion } from '@braindog/kernel';
 
-import { answeredLine, askerOf, byWords, cardOf, inlineOf, movesOf, nameOrNull, pressSaid, pressTail, primaryOf, shiftsOf, spoken, startsOn } from './card.ts';
+import { answeredLine, askerOf, byWords, cardOf, inlineOf, movesOf, nameOrNull, pressOf, pressSaid, pressTail, primaryOf, shiftsOf, spoken, startsOn } from './card.ts';
 
 const now = Date.parse('2026-10-06T09:00:00Z');
 
@@ -244,8 +244,8 @@ test('A CHOICE IS CHOSEN AND DECIDE GIVES IT; a number key and Enter on a choice
   const card = src('./DecisionCard.svelte');
   /* A POINTER OR SPACE ON A CHOICE ONLY CHOOSES IT; a press from outside it (a page's number key) answers, as it did. */
   assert.match(card, /function onChoice\(e: MouseEvent, way: Way\) \{\n\s+if \(e\.detail === 0 && document\.activeElement !== e\.currentTarget\) return press\(way\);\n\s+selectWay\(way\);/u);
-  /* ENTER ON A CHOICE CHOOSES AND ANSWERS, as Enter sends a form. */
-  assert.match(card, /if \(e\.key === 'Enter'\) \{\n\s+e\.preventDefault\(\);\n\s+e\.stopPropagation\(\);\n\s+selectWay\(way\);\n\s+press\(way\);/u);
+  /* ENTER ON A CHOICE CHOOSES AND ANSWERS, as Enter sends a form; where one press decides there is nothing to choose first. */
+  assert.match(card, /if \(e\.key === 'Enter'\) \{\n\s+e\.preventDefault\(\);\n\s+e\.stopPropagation\(\);\n\s+if \(chooses\) selectWay\(way\);\n\s+press\(way\);/u);
   /* DECIDE CARRIES THE KEY'S MARK ONLY ON A CARD THAT COSTS NOTHING, with an answer chosen. */
   assert.match(card, /data-enter=\{card\.enter !== null && selected !== null \? '' : undefined\}/u);
   assert.match(card, /onclick=\{commit\}>\{pressSaid\(card, queueWords\.decide\)\}/u, 'Decide does not say the care a hard answer asks for');
@@ -260,7 +260,7 @@ test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the s
   assert.equal(inlineOf(cardOf(named(2), { now })), true, 'Chase it and Not yet are two buttons');
   assert.equal(inlineOf(cardOf(named(3), { now })), true);
   assert.equal(inlineOf(cardOf(named(4), { now })), false, 'a fourth answer keeps the form');
-  assert.equal(inlineOf(cardOf(ask(), { now })), false, 'an answer with a line of what it does keeps the form');
+  assert.equal(inlineOf(cardOf(ask(), { now })), false, 'an answer with a line of what it does keeps the form’s rectangles');
   assert.equal(inlineOf(cardOf(ask({ kind: 'rowset', options: [] }), { now })), true, 'Accept and Decline were always buttons');
   /* COMPACT, OUTSIDE DECIDE, the line of what each does waits on the question's page, and only a fourth answer does not fit. */
   assert.equal(inlineOf(cardOf(ask(), { now }), true), true);
@@ -286,10 +286,59 @@ test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the s
   assert.match(card, /<span class="dc-btn-name">\{way\.label\}<\/span>/u, 'the gate and the answered line read the name apart from the care said after it');
 });
 
+test('TWO OR THREE ANSWERS THAT CAN BE UNDONE ARE ONE PRESS EACH, even with a line of what each does', () => {
+  const described = (n: number, over: Record<string, unknown> = {}) =>
+    ask({
+      options: ['Retire it', 'Park it another year', 'Sell it', 'Give it away'].slice(0, n).map((label, i) => ({ key: `k${i}`, label, because: `What answer ${i + 1} does.`, recommended: false })),
+      ...over,
+    });
+  assert.equal(pressOf(cardOf(described(2), { now })), true, 'two answers with nothing suggested still waited on Decide');
+  assert.equal(pressOf(cardOf(described(3), { now })), true);
+  assert.equal(pressOf(cardOf(ask(), { now })), true, 'a suggestion does not bring Decide back');
+  assert.equal(pressOf(cardOf(described(4), { now })), false, 'a fourth answer is a list to weigh, chosen and then given');
+  assert.equal(pressOf(cardOf(described(2, { cost: 'undo' }), { now })), false, 'an answer that is hard to undo is two presses');
+  assert.equal(pressOf(cardOf(described(2, { cost: 'shape' }), { now })), true, 'a band that only warns does not ask for two');
+  assert.equal(pressOf(cardOf(ask({ kind: 'rowset', options: [] }), { now })), false, 'the record’s own two are a row of buttons');
+  /* THE ROW OF BUTTONS IS STILL ONLY FOR NAMES: an answer with a line stays a full-width rectangle that says it. */
+  assert.equal(inlineOf(cardOf(described(2), { now })), false);
+
+  const card = src('./DecisionCard.svelte');
+  /* NOT WHILE THE RECORD'S REASON LINE IS OPEN, NOR ON A HOST THAT ASKS FOR A REASON ITSELF, where a press only chooses. */
+  assert.match(card, /const oneTap = \$derived\(listed && answerable && onpress === undefined && phase !== 'asking' && pressOf\(card\)\);/u);
+  /* A BUTTON IN A LIST, NOT A RADIO, with no ring; the gate finds it as it finds every choice, and reads its name. */
+  const at = card.indexOf('{:else if oneTap}');
+  const list = card.slice(at, card.indexOf('{:else if listed}', at));
+  assert.ok(at > 0 && list.length > 0, 'the one-press choices are not drawn before the form’s');
+  assert.match(list, /<ul class="queue-options dc-choices" aria-label=\{queueWords\.choices\}>/u);
+  assert.match(list, /<li class="queue-option" data-recommended=\{way\.recommended \? '' : undefined\}>/u);
+  assert.match(list, /class="queue-act dc-choice"\n\s+data-press\n\s+id=\{optId\(way\.key\)\}\n\s+data-enter=\{way\.key === card\.enter \? '' : undefined\}\n\s+onclick=\{\(\) => press\(way\)\}/u);
+  assert.doesNotMatch(list, /role="radio|radiogroup|dc-ring|aria-checked/u, 'a choice that decides is drawn as a radio');
+  /* AND NO DECIDE UNDER THEM, so the queue gate's press is the answer. */
+  assert.match(card, /\{:else if phase !== 'asking' && !oneTap\}\n\s+<button\n\s+type="button"\n\s+class="dc-btn"\n\s+data-weight="primary"\n\s+data-decide/u);
+  const form = src('./form.css');
+  assert.match(form, /\.dc-actions:not\(:has\(\*\)\) \{\n\s+display: none;/u, 'an empty row of buttons keeps its room');
+  assert.match(form, /@media \(pointer: coarse\) \{\n\s+\.dc-choice \{\n\s+min-block-size: var\(--tap\);/u, 'a choice under a thumb is shorter than a thumb');
+});
+
+test('WHO ASKED IS ONE LINE OVER THE QUESTION AT EVERY WIDTH, and the side is drawn only with something in it', () => {
+  const card = src('./DecisionCard.svelte');
+  assert.match(card, /<div class="dc-main">\n\s+\{#if !compact\}\n(\s+<!--[^]*?-->\n)?\s+<p class="queue-by">\n\s+<span class="dc-sr">\{cardWords\.askedBy\}<\/span>/u);
+  assert.ok(card.indexOf('<p class="queue-by">') < card.indexOf('<h3 class="queue-question"'), 'who asked does not lead the question');
+  assert.match(card, /const side = \$derived\(!compact && \(card\.why !== '' \|\| changesAny\)\);/u);
+  assert.match(card, /\{#if side\}\n(\s+<!--[^]*?-->\n)?\s+<div class="dc-side">/u, 'a side is drawn for who asked alone');
+  assert.match(card, /data-side=\{side \? '' : undefined\}/u);
+  /* TWO COLUMNS ONLY FOR A CARD WITH A SIDE, and the parts are groups named once each, never sections. */
+  assert.match(card, /@container \(inline-size >= 52rem\) \{\n\s+\.dc\[data-side\]:not\(\[data-compact\]\) \{\n\s+grid-template-columns: minmax\(0, 1fr\) 280px;/u);
+  assert.doesNotMatch(card, /\.dc:not\(\[data-compact\]\)/u, 'a card with no side is laid out in two columns');
+  assert.doesNotMatch(card, /<section|dc-part-by/u);
+  assert.equal(card.match(/role="group" aria-labelledby=/gu)?.length, 2);
+  assert.match(card, /\.queue-by \{\n\s+align-items: center;\n\s+flex-wrap: wrap;\n\s+column-gap: var\(--sp-2\);\n\s+font-size: var\(--fs-meta\);/u, 'the meta line is not 13');
+});
+
 test('COMPACT, OUTSIDE DECIDE: the question and its buttons only, and at most three before a count that opens Decide', () => {
   const card = src('./DecisionCard.svelte');
   assert.match(card, /const inline = \$derived\(inlineOf\(card, compact\)\);/u);
-  assert.match(card, /\{#if !compact\}\n\s+<!-- WHO ASKED/u, 'a compact card still says who asked');
+  assert.match(card, /\{#if !compact\}\n\s+<!-- WHO ASKED[^]*?-->\n\s+<p class="queue-by">/u, 'a compact card still says who asked');
   assert.match(card, /\{#if link \|\| compact\}<a class="dc-open tap" href=\{at\(card\.href\)\}>/u, 'a compact question is not the door to its page');
   assert.match(card, /!link && !compact && onpress === undefined/u, 'a compact card offers Not now');
   const host = src('../page/QueueAnswer.svelte');

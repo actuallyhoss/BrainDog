@@ -527,8 +527,11 @@ export const account = {
   billing: 'Billing',
   billingSelfHost: 'This record runs on your own machine. There is nothing to bill and no subscription to lapse.',
 
-  /* On a live record the rest of Settings writes to it, so only the device half is said. */
-  keptOnDevice: 'The settings above are kept on this device.',
+  /* SAID ONLY UNDER AN AREA WHOSE CHOICES NEVER LEAVE THIS BROWSER (`KEEPS` in `settings/[area]/+page.svelte`), which
+     today is Keyboard. It read "The settings above are kept on this device." under Appearance too, where the code keeps
+     the look in the record and Appearance's own hint says "on every device you open it on", so the two lines on one
+     screen said opposite things. Appearance says where its look is kept itself, and this names what it is true of. */
+  keptOnDevice: 'These choices are kept on this device only.',
 
   /* ── the front door · `/signin` ───────────────────────────────────────────────────────────────
 

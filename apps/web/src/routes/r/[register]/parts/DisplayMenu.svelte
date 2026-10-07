@@ -27,6 +27,7 @@
     hidden,
     sortBy,
     unsort,
+    lateFirst = false,
     hide,
     showAll,
     board,
@@ -49,6 +50,8 @@
     hidden: ReadonlySet<string>;
     sortBy: (field: string) => void;
     unsort: () => void;
+    /** Whether the list's own order is late first: it has a deadline, so what is late leads (`lateFirst` in `list.ts`). */
+    lateFirst?: boolean;
     hide: (field: string, off: boolean) => void;
     showAll: () => void;
     /** The list is drawn as a board, so which field its lanes are is a choice to offer. */
@@ -67,6 +70,7 @@
   /* This part's own words: the order things were added in as one of the choices, and the direction's group. */
   const words = {
     rowOrder: 'Order added',
+    lateFirst: 'Late first',
     direction: 'Direction',
     lanes: 'Lanes by',
     keep: 'Keep as my default',
@@ -109,7 +113,7 @@
         <div class="filter-values">
           <label class="filter-value" data-on={sort ? undefined : ''}>
             <input type="radio" name="display-sort" checked={!sort} onchange={() => unsort()} />
-            {words.rowOrder}
+            {lateFirst ? words.lateFirst : words.rowOrder}
           </label>
           {#each sortable as c (c.field)}
             {@const on = sort?.field === c.field}

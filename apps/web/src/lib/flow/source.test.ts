@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 
 import { bodyOf, draftOf, faultsOf, proposalOf } from './flow.ts';
 import type { Body } from './flow.ts';
-import { answerWords, live, openAutomations, rowLine, rowOf, rowTrigger, rowsOf, type Fetch } from './source.ts';
+import { answerWords, firedOf, lastSaid, live, openAutomations, rowLine, rowOf, rowTrigger, rowsOf, withFired, type Fetch } from './source.ts';
 import { copy } from '../copy.ts';
 
 /**
@@ -223,4 +223,85 @@ test("A STEP'S ANSWER IS SAID AS NAME AND VALUE, not printed as the JSON the run
   assert.equal(answerWords('{"file": "File it", "n": 2}'), 'file File it, n 2');
   assert.equal(answerWords('plain words'), 'plain words');
   assert.equal(answerWords('[1,2]'), '1, 2');
+});
+
+/* EIGHTEEN AUTOMATIONS READ "Not run yet" WHILE ACTIVITY LISTED THEM RUNNING THAT MORNING. The record counts runs, and
+   one that runs inside the change that starts it keeps none: its turns are lines of the log, signed `rule:<id>`. */
+test('WHEN ONE WITH NO RUNS LAST DID SOMETHING IS READ FROM THE LOG, by the rule that signed each line', () => {
+  const page = {
+    cursor: 41,
+    events: [
+      { id: 'e9', ts: '2026-09-03T10:45:00.000Z', actor: 'rule:part-due', kind: 'note' },
+      { id: 'e8', ts: '2026-09-03T10:10:00.000Z', actor: 'rule:categorise', kind: 'edit' },
+      { id: 'e7', ts: '2026-09-03T09:00:00.000Z', actor: 'rule:part-due', kind: 'note' },
+      { id: 'e6', ts: '2026-09-03T08:00:00.000Z', actor: 'p_01M1KJ7RG0TYYA0AX15QPGJJ4', kind: 'edit' },
+      { id: 'e5', ts: '2026-09-03T07:00:00.000Z', actor: 'agent:claude', kind: 'edit' },
+      { id: 'e4', actor: 'rule:no-time' },
+      'not a line',
+    ],
+  };
+  const fired = firedOf(page);
+  assert.deepEqual([...fired], [['part-due', '2026-09-03T10:45:00.000Z'], ['categorise', '2026-09-03T10:10:00.000Z']]);
+  assert.equal(firedOf(null).size, 0);
+  assert.equal(firedOf({ events: 'none' }).size, 0);
+
+  const inline = rowOf({ rule: 'part-due', name: 'Say when a part falls due', trigger: 'written', path: 'inline', register: 'installments', enabled: true, last: null })!;
+  const quiet = rowOf({ rule: 'cash-stale', name: 'Keep balances current', trigger: 'written', path: 'inline', register: 'accounts', enabled: true, last: null })!;
+  const ran = rowOf({ rule: 'gold-rate', name: 'Gold rate', trigger: 'every', path: 'run', enabled: true, last: { run: 'R1', at: '2026-09-03T06:00:00.000Z', state: 'done', say: null } })!;
+  const [a, b, c] = withFired([inline, quiet, ran], fired);
+  assert.equal(a!.acted, '2026-09-03T10:45:00.000Z');
+  assert.equal(b!.acted, null, 'the page holds nothing from it, which is said as lately and not as never');
+  assert.equal(c!.acted, undefined, 'one with a run keeps its run, which says more');
+
+  const now = Date.parse('2026-09-03T12:45:00.000Z');
+  assert.equal(lastSaid(a!, now), 'Last ran 2h ago.');
+  assert.equal(lastSaid(b!, now), 'Has done nothing lately.');
+  assert.match(lastSaid(c!, now), /^Last run .*, done\.$/u);
+  assert.equal(lastSaid(inline, now), '', 'the log unread, nothing is claimed');
+  assert.equal(rowLine(a!, now), 'Last ran 2h ago.');
+  /* ONLY ONE THAT WOULD HAVE LEFT A RUN IS SAID NOT TO HAVE RUN YET. */
+  assert.equal(lastSaid(rowOf({ rule: 'new-clock', trigger: 'every', path: 'run', enabled: true, last: null })!, now), 'Not run yet.');
+});
+
+test('THE LIST ASKS THE LOG ONLY WHEN TOLD TO, and only when a turned-on row came with no last run', async () => {
+  const asked: string[] = [];
+  const list = [
+    { rule: 'part-due', name: 'Say when a part falls due', trigger: 'written', path: 'inline', register: 'installments', enabled: true, last: null },
+    { rule: 'off-one', name: 'Off one', trigger: 'written', path: 'inline', register: 'tasks', enabled: false, last: null },
+  ];
+  const io = (rows: unknown[], log: Response | null): Fetch => async (url) => {
+    asked.push(url);
+    if (url.includes('/api/recentHistory')) return log ?? answer(200, { ok: true, value: { cursor: null, events: [{ id: 'e1', ts: '2026-09-03T10:45:00.000Z', actor: 'rule:part-due', kind: 'note' }] } });
+    return answer(200, { ok: true, value: rows });
+  };
+
+  const plain = await openAutomations(io(list, null));
+  assert.deepEqual(asked, ['/api/automations'], 'a screen that does not say when each last ran pays for no second read');
+  assert.equal(plain.first.ok && plain.first.value[0]!.acted, undefined);
+
+  asked.length = 0;
+  const out = await openAutomations(io(list, null), '', { acted: true });
+  assert.deepEqual(asked, ['/api/automations', '/api/recentHistory?limit=200']);
+  assert.ok(out.first.ok);
+  assert.equal(out.first.value[0]!.acted, '2026-09-03T10:45:00.000Z');
+  assert.equal(out.first.value[1]!.acted, null);
+
+  /* EVERY TURNED-ON ROW HAS A RUN TO SAY: the log is not asked. */
+  asked.length = 0;
+  await openAutomations(io([{ rule: 'gold-rate', trigger: 'every', path: 'run', enabled: true, last: { at: '2026-09-03T06:00:00.000Z', state: 'done' } }], null), '', { acted: true });
+  assert.deepEqual(asked, ['/api/automations']);
+
+  /* A LOG THAT WILL NOT READ LEAVES THE LIST AS IT CAME, drawn, with nothing claimed about a last turn. */
+  const refused = await openAutomations(io(list, answer(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'An owner reads this.' } })), '', { acted: true });
+  assert.ok(refused.first.ok);
+  assert.equal(refused.first.value[0]!.acted, undefined);
+  assert.equal(refused.absent, false);
+});
+
+test('A ROW NAMES ITS LIST AS THE RAIL DOES, never by its id', () => {
+  const row = rowOf({ rule: 'part-due', trigger: 'written', path: 'inline', register: 'installments', enabled: true })!;
+  const said = (id: string): string => ({ installments: 'Instalments' })[id] ?? id;
+  assert.equal(rowTrigger(row, said), 'When an item in Instalments is added or changed');
+  assert.equal(rowTrigger({ ...row, body: { rule: 'part-due', register: 'installments', then: [{ tag: 'due' }] } }, said), 'When an item in Instalments is added or changed');
+  assert.equal(rowTrigger(row), 'When an item in installments is added or changed', 'with no names to hand it is said as written');
 });

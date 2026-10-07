@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { stepsOf } from './lead.ts';
+import { finishOf, stepsOf } from './lead.ts';
 
 const BILLS = {
   state: 'state',
@@ -34,4 +34,28 @@ test('NO WAY TO DRAW IS NO CHART: no state, one state, or a value the list does 
   assert.equal(stepsOf(BILLS, 'lost'), null);
   assert.equal(stepsOf({ state: 'state', fields: [{ id: 'state', values: ['only'] }] }, 'only'), null);
   assert.equal(stepsOf({ fields: [{ id: 'state', values: ['a', 'b'] }] }, 'a'), null);
+});
+
+test('AN OPEN ROW\'S ONE PRIMARY IS WHAT FINISHES IT, said by the label of the list\'s first finished state', () => {
+  assert.deepEqual(finishOf(BILLS, 'open'), { value: 'paid', said: 'Mark paid', done: 'Marked paid' });
+  assert.deepEqual(finishOf(BILLS, 'part'), { value: 'paid', said: 'Mark paid', done: 'Marked paid' });
+  const TASKS = { state: 'status', done: ['dropped', 'done'], fields: [{ id: 'status', values: ['todo', 'doing', 'done', 'dropped'], labels: { done: 'Done' } }] };
+  assert.deepEqual(finishOf(TASKS, 'doing'), { value: 'done', said: 'Mark done', done: 'Marked done' });
+  /* An initialism keeps its capitals inside the sentence. */
+  const CHECKS = { state: 's', done: ['qa', 'cut'], fields: [{ id: 's', values: ['open', 'qa', 'cut'], labels: { qa: 'QA passed' } }] };
+  assert.equal(finishOf(CHECKS, 'open')?.said, 'Mark QA passed');
+});
+
+test('A FINISHED ROW HAS NOTHING TO FINISH, and neither has a list that declares no finished state', () => {
+  assert.equal(finishOf(BILLS, 'paid'), null);
+  assert.equal(finishOf(BILLS, 'written_off'), null);
+  assert.equal(finishOf({ state: 'lane', fields: [{ id: 'lane', values: ['building', 'earning'] }] }, 'building'), null);
+  assert.equal(finishOf({ state: 'state', done: ['gone'], fields: [{ id: 'state', values: ['open'] }] }, 'open'), null);
+  assert.equal(finishOf(undefined, 'open'), null);
+});
+
+test('ONE FINISHED STATE MAY BE AN ENDING, so a live subscription is never led by "Mark cancelled"', () => {
+  const SERVICES = { state: 'state', done: ['cancelled'], fields: [{ id: 'state', values: ['live', 'lapsing', 'cancelled'] }] };
+  assert.equal(finishOf(SERVICES, 'live'), null);
+  assert.equal(finishOf({ state: 'state', done: ['retired'], fields: [{ id: 'state', values: ['live', 'retired'] }] }, 'live'), null);
 });

@@ -9,7 +9,7 @@
  * runes.
  */
 
-import { day, money, shortDay, since, symbolFigure, type Tone } from 'braindog-render';
+import { day, exponentOf, money, shortDay, since, symbolFigure, type Tone } from 'braindog-render';
 import { copy } from '../../../../lib/copy.ts';
 import { seqWidth } from '../../../../lib/record/api.ts';
 import { declaredValue } from '../../../../lib/record/where.ts';
@@ -656,13 +656,128 @@ export function figureOf(decl: RegisterDecl | undefined, entries: readonly Entry
   return { field, currency: field.type === 'money' ? ([...currencies][0] ?? null) : null, total, seen, valueOf };
 }
 
-/** A figure as a tile or a bar says it: money with its symbol ("£4,800.00"), anything else grouped ("9,800"). */
-export function figureSaid(fig: Pick<Figured, 'currency'>, n: number): string {
+/**
+ * A figure as a tile or a bar says it: money with its symbol ("£4,800.00"), anything else grouped ("9,800"). `whole`
+ * is the column's (`wholeMoney`): where every amount in it is a whole number of pounds, the sum is too, and its ".00"
+ * goes with theirs.
+ */
+export function figureSaid(fig: Pick<Figured, 'currency'>, n: number, whole = false): string {
   if (fig.currency) {
     const said = money(Math.round(n), fig.currency);
-    return symbolFigure(said) ?? said;
+    const drawn = symbolFigure(said) ?? said;
+    return whole ? withoutZeros(drawn) : drawn;
   }
   return n.toLocaleString('en-GB', { maximumFractionDigits: 2 });
+}
+
+/**
+ * THE MONEY COLUMNS WHERE EVERY AMOUNT IS WHOLE, by field: each row that holds one holds no pence, so ".00" after all
+ * thirty-eight says nothing and the column reads "£8,530". One amount with pence in it and every row keeps both
+ * places, since a column that mixes "£600" and "£4,240.50" no longer lines up on its point. Counted in each
+ * currency's own minor units, so a yen column was always whole and a dinar's three places are judged as three.
+ */
+export function wholeMoney(decl: RegisterDecl | undefined, entries: readonly Entry[]): Set<string> {
+  const out = new Set<string>();
+  for (const f of decl?.fields ?? []) {
+    if (f.type !== 'money') continue;
+    let seen = 0;
+    let whole = true;
+    for (const e of entries) {
+      const v = e.fields[f.id];
+      if (!isMoney(v)) continue;
+      seen += 1;
+      if (v.amount % 10 ** exponentOf(v.currency) !== 0) {
+        whole = false;
+        break;
+      }
+    }
+    if (whole && seen > 0) out.add(f.id);
+  }
+  return out;
+}
+
+/** A drawn amount without its zero minor units: "£8,530.00" as "£8,530". An amount with pence in it comes back as it was. */
+export const withoutZeros = (text: string): string => text.replace(/\.0+(?!\d)/u, '');
+
+/**
+ * THE FIELD A LIST'S NUMBER CANNOT BE ADDED ACROSS: the choice that says which way each amount goes, or what each is
+ * measured over. Money in and money out added together is a number, and it looks exactly like a right one: a list of
+ * bills and invoices totalled £168,794 of which some was owed to its owner and the rest by them.
+ *
+ * READ FROM THE DECLARATION, FOR ANY LIST. First the choice field that declares it qualifies the number
+ * (`qualifies:`, the declaration's own word for "this amount is not readable without me": a cost's cycle, an amount's
+ * direction). Where no field says so, a money list with exactly one required choice of two values that is not its
+ * state: every row must be one of two kinds, so the list holds two sums. Two such fields, and nothing says which
+ * divides the money, so it is totalled as one.
+ */
+export function directionOf(decl: RegisterDecl | undefined, figure: FieldDecl | undefined): FieldDecl | undefined {
+  if (!decl || !figure) return undefined;
+  const choices = decl.fields.filter((f) => f.type === 'enum' && !f.retired && f.id !== decl.state && (f.values?.length ?? 0) >= 2);
+  const declared = choices.find((f) => f.qualifies === figure.id);
+  if (declared) return declared;
+  if (figure.type !== 'money') return undefined;
+  const two = choices.filter((f) => f.required && f.values?.length === 2);
+  return two.length === 1 ? two[0] : undefined;
+}
+
+/** One side of a list's number: the declared value it is for (`null` for rows that hold none), its rows and their sum. */
+export type FigurePart = { value: string | null; entries: Entry[]; total: number; seen: number };
+
+/**
+ * THE LIST'S NUMBER, SAID ONCE FOR EACH WAY IT GOES (`directionOf`): one part per declared value that holds an amount,
+ * in the order the list declares them, and never their sum. A list with no such field has one part, the whole of it.
+ * Rows that hold an amount and none of the declared values are a last part of their own, so no money is left out of
+ * the tile because nobody said which way it went.
+ */
+export function figureParts(decl: RegisterDecl | undefined, entries: readonly Entry[]): { fig: Figured; by: FieldDecl | undefined; parts: FigurePart[] } | null {
+  const fig = figureOf(decl, entries);
+  if (!fig) return null;
+  const by = directionOf(decl, fig.field);
+  const part = (value: string | null, rows: Entry[]): FigurePart => {
+    let total = 0;
+    let seen = 0;
+    for (const e of rows) {
+      const n = fig.valueOf(e);
+      if (n === null) continue;
+      total += n;
+      seen += 1;
+    }
+    return { value, entries: rows, total, seen };
+  };
+  if (!by) return { fig, by, parts: [part(null, [...entries])] };
+  const values = by.values ?? [];
+  const parts = values.map((v) => part(v, entries.filter((e) => String(e.fields[by.id] ?? '') === v)));
+  const rest = part(null, entries.filter((e) => !values.includes(String(e.fields[by.id] ?? ''))));
+  return { fig, by, parts: [...parts, rest].filter((p) => p.seen > 0) };
+}
+
+/**
+ * THE ORDER A LIST WITH A DEADLINE OPENS IN, when nobody has asked for another: what is late first, the longest
+ * overdue leading; then what is still to do by the day it falls due; then what has no day; then what is finished.
+ * The head says "4 late", and the list under it opened in the order the rows were last touched, with the four spread
+ * through thirty-eight and none of them on the first screen.
+ *
+ * A LIST WITH NO DEADLINE KEEPS THE RECORD'S ORDER, and so does any list sorted in its address. Within a band the
+ * rows keep the order they came in, so two bills due the same day do not swap between two reads. `head` is the rows
+ * added on this screen, which stay first: a row somebody has just typed is the one they are looking for.
+ */
+export function lateFirst(decl: RegisterDecl | undefined, entries: readonly Entry[], now: number, head: ReadonlySet<number> = new Set()): Entry[] {
+  const dated = deadlineOf(decl);
+  if (!dated) return [...entries];
+  const dueOn = (e: Entry): string => {
+    const v = e.fields[dated];
+    return typeof v === 'string' && DAY_RE.test(v) ? v : '';
+  };
+  const band = (e: Entry): number => {
+    if (head.has(e.seq)) return 0;
+    if (isDone(decl, e)) return 4;
+    if (dueOn(e) === '') return 3;
+    return isLate(decl, e, now) ? 1 : 2;
+  };
+  return entries
+    .map((e, at) => ({ e, at, band: band(e) }))
+    .sort((a, b) => a.band - b.band || ((a.band === 1 || a.band === 2) && dueOn(a.e).localeCompare(dueOn(b.e))) || a.at - b.at)
+    .map((x) => x.e);
 }
 
 /**

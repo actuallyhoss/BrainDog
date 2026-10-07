@@ -5,14 +5,18 @@
  */
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { transcriptOf, type JobEvent, type JobRow } from '../../lib/record/jobs.ts';
 import {
   dayTitle,
   detailOf,
+  enrolAddress,
   enrolledOf,
   enrolledSaid,
+  isLoopback,
+  words as chartWords,
   groupsOf,
   iconOf,
   lanesOf,
@@ -267,4 +271,29 @@ test('the machines enrolled as runners, by the name a person gave them, the one 
   assert.deepEqual(out.map((m) => [m.key, m.name]), [['h4', 'build-box'], ['h1', 'Sam-MacBook-Pro'], ['h5', 'Unnamed machine']]);
   assert.equal(enrolledSaid(out[0]!, () => '1h ago'), 'Asked for work 1h ago');
   assert.equal(enrolledSaid(out[2]!, () => 'today'), 'Enrolled today, not seen since');
+});
+
+test('the enrol command never prints a localhost address on a hosted record', () => {
+  for (const here of ['http://localhost:5190', 'http://localhost:5190/app/studio', 'http://127.0.0.1:8787', 'http://[::1]:3000', 'http://app.localhost:5173', 'http://0.0.0.0:4173', 'not an address']) {
+    assert.equal(isLoopback(here), true, here);
+    const said = enrolAddress(here, true, 'studio');
+    assert.equal(said, 'https://brain.dog/app/studio', here);
+    assert.doesNotMatch(chartWords.enrolCommand(said!), /localhost|127\.|\[::1\]|0\.0\.0\.0/u);
+    /* WITH NO NAME TO PUT IN IT, no address is printed at all, and the sentence stands in for the command. */
+    assert.equal(enrolAddress(here, true, null), null);
+    assert.equal(enrolAddress(here, true, ''), null);
+  }
+  assert.doesNotMatch(chartWords.enrolNoAddress, /localhost|https?:|—/u);
+  /* A HOSTED RECORD OPENED AT ITS OWN ADDRESS KEEPS IT, whatever that is. */
+  assert.equal(enrolAddress('https://brain.dog/app/studio', true, 'studio'), 'https://brain.dog/app/studio');
+  assert.equal(enrolAddress('https://records.example.com/app/studio', true, 'studio'), 'https://records.example.com/app/studio');
+  /* A SELF-HOST IS WHEREVER ITS OWNER RUNS IT, a localhost included: that is the address its own runner enrols at. */
+  assert.equal(enrolAddress('http://localhost:8787', false, null), 'http://localhost:8787');
+  assert.equal(isLoopback('https://brain.dog'), false);
+  assert.equal(isLoopback('http://192.168.1.20:8787'), false, 'a machine on the network is reachable from another one');
+  assert.equal(isLoopback('https://localhost.example.com'), false);
+
+  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  assert.doesNotMatch(page, /enrolCommand\(recordBase\)/u, 'the page prints its own address without asking whether it is hosted');
+  assert.match(page, /enrolAddress\(\s*recordBase,\s*hostedHere\(page\.data as unknown as Shell\),/u);
 });

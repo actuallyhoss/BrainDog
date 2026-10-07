@@ -9,9 +9,11 @@
 
   A LIST ON THE GROUND, NOT A CARD. Each group is a group on the ground: its title at
   `--t-group` with a hairline under it, and the rows under that with no box round them. A row is the rail's own shape
-  at 1440, 36 tall with its glyph in a 28px well and the name at 14/500, and the current row is the rail's "here": the
-  wash, an ink well and the name at 600. Never the mark's red. Beside an open area it is quieter still (`data-beside`):
-  200 wide, the group titles at the meta step, and each row 32 tall at 13.
+  at 1440, 36 tall with its glyph and the name at 14/500, and the current row is the rail's "here", drawn as the rail
+  draws it: the tile's own fill under the row, the glyph in the working accent and the name at 600 in ink. It was a
+  tinted wash under an ink well, a second way of saying "you are here" two columns from the rail's. Never the mark's
+  red. Beside an open area it is quieter still (`data-beside`): 200 wide, the group titles at the meta step, each row
+  32 tall at 13, and its glyph bare, without a well, as the rail's are.
 
   WHAT A ROW SAYS UNDER ITS NAME IS FOR THE PHONE. There this list is all a person sees, and the line is how they tell
   the areas apart before opening one. Beside an open area the list is as narrow as the rail, where the line could only
@@ -36,7 +38,7 @@
           <!-- `wide-only` is one of `settings.css`'s shared rules: the row is not drawn below 900px. -->
           <li class={ONLY_WIDE.has(a.id) ? 'wide-only' : undefined}>
             <a class="area-row" href={at(`/settings/${a.id}`)} aria-current={a.id === current ? 'page' : undefined}>
-              <span class="area-icon"><IconWell name={a.icon} tone={a.id === current ? 'ink' : undefined} /></span>
+              <span class="area-icon"><IconWell name={a.icon} /></span>
               <span class="words">
                 <span class="name">{a.label}</span>
                 {#if a.line}<span class="area-line">{a.line}</span>{/if}
@@ -102,7 +104,7 @@
       color var(--d-state) var(--ease-out);
   }
 
-  /* THE WELL AT REST IS THE GROUND'S WHITE (`settings.css`), and the current row's is `IconWell`'s own ink; the change
+  /* THE WELL AT REST IS THE GROUND'S WHITE (`settings.css`), and the current row's glyph takes the accent; the change
      between them is the row's own 90ms. */
   .area-icon {
     display: inline-flex;
@@ -144,11 +146,17 @@
     scale: -1 1;
   }
 
-  /* THE CURRENT AREA IS THE ONE "HERE" THE PRODUCT HAS, drawn as the rail draws it: the wash, an ink well and the name
-     at 600 in ink. Never the accent. */
+  /* THE CURRENT AREA IS "HERE", DRAWN AS THE RAIL DRAWS ITS OWN: the tile's fill under the row, the glyph in the
+     working accent with no fill behind it, and the name at 600 in ink. One selection in the product, not two. */
   .area-row[aria-current='page'] {
-    background: var(--selected);
+    background: var(--tile);
     color: var(--ink);
+  }
+
+  /* TWO CLASSES AND THE ATTRIBUTE, so this outranks the ground's white well (`settings.css`) wherever the row is. */
+  .area-row[aria-current='page'] .area-icon :global(.well.well) {
+    background: transparent;
+    color: var(--action);
   }
 
   .area-row[aria-current='page'] .name {
@@ -192,15 +200,17 @@
       border-radius: var(--r-ctl);
     }
 
-    .index[data-beside] .area-icon :global(.well) {
+    /* BARE GLYPHS BESIDE AN AREA, as the rail's are: a white well on every row was twenty boxes down the column. */
+    .index[data-beside] .area-icon :global(.well.well) {
       inline-size: 24px;
       block-size: 24px;
       border-radius: var(--r-sm);
+      background: transparent;
     }
 
     .index[data-beside] .area-icon :global(.well .icon[data-size]) {
-      inline-size: 14px;
-      block-size: 14px;
+      inline-size: 16px;
+      block-size: 16px;
     }
 
     .index[data-beside] .name {

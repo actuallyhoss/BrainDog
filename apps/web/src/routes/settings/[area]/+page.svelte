@@ -197,8 +197,15 @@
    *
    * NAVIGATION IS NOT HERE: what it keeps is kept for the person on a record and on the device only without one, so it
    * says which of the two once, itself, and this line under it said the other.
+   *
+   * NOR IS APPEARANCE, for the same reason. The look is kept by the record, for the person, on every device they open
+   * it on (`pref.ts` `keep`, the `look.*` keys), and on this device alone only with no record or a record that cannot
+   * keep it. Its own hint says which of the three it is, read from `pref.whereKept()` after each choice settles, and
+   * this line under it said "kept on this device" a screen below a hint saying "on every device you open it on".
+   *
+   * KEYBOARD IS, and it is true there: the character-keys switch is a cookie (`pref.write({ chars })`) and is sent nowhere.
    */
-  const KEEPS = new Set(['appearance', 'keyboard']);
+  const KEEPS = new Set(['keyboard']);
 
   /**
    * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.

@@ -960,7 +960,8 @@ const rowsOfBlock = (block: BlockResult) =>
   toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
 
 test('THE BRIDGE ADDS UP BY CONSTRUCTION: cash now, what comes in, what goes out, and where it lands', () => {
-  const block = barOf('money', 'The next 30 days');
+  /* BY ITS KIND: the bridge sits under Coming and going with no heading of its own since money-core 3.13.0. */
+  const block = page('money')?.blocks.find((b) => b.kind === 'bridge');
   assert.ok(block?.walk, 'the bridge has no walk');
   const rows = rowsOfBlock(block);
   assert.equal(rows.length, 4);

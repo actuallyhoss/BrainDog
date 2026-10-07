@@ -428,8 +428,10 @@ export const words = {
   machinesTitle: 'Machines',
   noMachines: 'No machine is enrolled yet',
   enrolHow: 'Enrol one from its own terminal:',
-  /** The command takes the record's own address, which is where the runner is approved. */
+  /** The command takes the record's own address, which is where the runner is approved (`enrolAddress`). */
   enrolCommand: (address: string) => `braindog runner enrol ${address}`,
+  /* WHEN THERE IS NO ADDRESS ANOTHER MACHINE COULD REACH, the command is said without one rather than with a wrong one. */
+  enrolNoAddress: 'Enrol one from its own terminal, with braindog runner enrol and the address you open this record at.',
   askedAt: (at: string) => `asked for at ${at}`,
   turns: (n: number) => plural(n, 'turn', 'turns'),
   runs: (n: number) => plural(n, 'run', 'runs'),
@@ -469,6 +471,42 @@ export const words = {
   transcript: 'Transcript',
   cost: 'Cost',
 };
+
+/* ── the address a machine enrols at ────────────────────────────────────── */
+
+/** Where a hosted record is opened, which is the address its runners enrol at (`apps/cli/src/runner.ts`, `ENROL_USAGE`). */
+const HOSTED_ORIGIN = 'https://brain.dog';
+
+/**
+ * Whether an address is this machine's own and nobody else's: `localhost` and any name under it, the loopback numbers
+ * (`127.x`, `::1`) and `0.0.0.0`. An address that will not read as one is treated as loopback, since it is no use to
+ * another machine either.
+ */
+export function isLoopback(address: string): boolean {
+  let host: string;
+  try {
+    host = new URL(address).hostname.toLowerCase();
+  } catch {
+    return true;
+  }
+  const bare = host.replace(/^\[|\]$/gu, '');
+  return bare === 'localhost' || bare.endsWith('.localhost') || bare === '0.0.0.0' || bare === '::1' || /^127(?:\.\d{1,3}){3}$/u.test(bare);
+}
+
+/**
+ * The address the enrol command is printed with, or `null` when there is none worth printing.
+ *
+ * THE COMMAND IS TYPED ON ANOTHER MACHINE, so it takes the address that machine reaches the record at. This screen's own
+ * address is that for a self-host, whatever it is, a `localhost` included: the runner is then on the same machine or
+ * the owner knows their own host. FOR A HOSTED RECORD IT IS NEVER `localhost`. The app drawn from a machine's own port
+ * over a hosted record (a preview, a build under test) printed `braindog runner enrol http://localhost:5190`, which
+ * enrols nothing anywhere else; a hosted record is named by its own address, `https://brain.dog/app/<its name>`, and
+ * with no name to put there the command is not printed with an address at all.
+ */
+export function enrolAddress(here: string, hosted: boolean, slug: string | null): string | null {
+  if (!hosted || !isLoopback(here)) return here;
+  return slug === null || slug === '' ? null : `${HOSTED_ORIGIN}/app/${slug}`;
+}
 
 /* ── the machines enrolled to run jobs ──────────────────────────────────── */
 

@@ -4,13 +4,12 @@
   Below 640px the capture line is not drawn over the list, because it stood above the search box and
   the filters and put three rows of controls before the first card. This opens `CaptureLine`'s sheet,
   with the field focused and "All fields" beside Add. From 640px up it is not drawn at all: the line
-  is on the page there, and the head's New opens the whole form.
+  is on the page there, and it is the list's one way to add.
 
   A BUTTON NAMED BY WHAT IT DOES, "Add an item", since a bare "+" says nothing to a screen reader.
   The page owns whether the sheet is open, so this only asks for it.
 
-  IT IS THE PHONE'S ONE PRIMARY: the accent's square with the plus in the tile's colour (DIRECTION 39), where the
-  laptop's "New" stands, which a phone does without.
+  IT IS THE PHONE'S ONE PRIMARY: the accent's square with the plus in the tile's colour (DIRECTION 39).
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';

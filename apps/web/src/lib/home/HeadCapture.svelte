@@ -1,7 +1,8 @@
 <!--
-  The line a task is typed into, in Home's head (DIRECTION §39, "Today reads as one story"): a 320px field at the right
+  The line a task is typed into, in a page's head (DIRECTION §39, "Today reads as one story"): a 320px field at the right
   of the page's name, where it spent a whole tile on one field above the questions. On a phone it is one line of its own
-  under the name (`Home.svelte` wraps the head's row for it).
+  under the page's sentence (`PageHead`'s `below` on Home, the body's `under` on a declared page). Home draws it, and so
+  does any declared page whose main column opens on a lone capture (`page/layout.ts` `headCaptureAt`).
 
   THE SAME LINE AS THE TILE WAS. The page's `capture` block says which list it adds to and what a new row is filled
   with (`capturePlan`), the light syntax is read by the page's own write ("Chase Halden tomorrow #kiln"), and the receipt

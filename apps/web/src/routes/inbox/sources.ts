@@ -79,3 +79,33 @@ export const countSaid = (n: number): string => (n === 0 ? 'None in 14 days' : `
 
 /** The sentence a way in's line reads as. */
 export const lineSaid = (s: Source): string => `${s.name}: ${s.total.toLocaleString('en-GB')} arrived over the last 14 days`;
+
+/* ── an inbox nothing has ever reached ───────────────────────────────────── */
+
+/**
+ * Whether nothing has come in at all, by any way: the record's own tally is nought waiting, nought filed and nought
+ * archived, nothing is drawn waiting, and no way in has an arrival.
+ *
+ * THEN THE BOARD IS ONE TILE. It was three: "What comes in" with "Nothing has come in this way yet" on each of its
+ * three rows, "Your rules" with a nought and a line about rules, and "Nothing waits in the inbox" under both, which is
+ * one fact said five times. One tile says it once, with the one thing to do about it.
+ *
+ * THE TALLY DECIDES, because it is the record's count of every arrival there has been; the ways in only cover a
+ * fortnight. A record that answered no tally is not said to be empty: a quiet fortnight is not "nothing yet".
+ */
+export function nothingEver(
+  tally: { waiting: number; filed: number; archived: number } | null,
+  ways: readonly Pick<Source, 'last'>[] | null,
+  waiting: number,
+): boolean {
+  if (tally === null || waiting > 0) return false;
+  if (tally.waiting + tally.filed + tally.archived > 0) return false;
+  return ways === null || ways.every((w) => w.last === null);
+}
+
+/** The one tile's words: what the inbox is for, by the ways in a person has, and the press that adds one. */
+export const quietWords = {
+  title: 'Nothing has come in yet',
+  why: 'Mail, texts, other apps and your agents can all send things here. What a rule files goes straight to its list, and the rest waits here for you.',
+  add: 'Add a way in',
+} as const;

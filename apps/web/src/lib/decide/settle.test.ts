@@ -35,14 +35,14 @@ test('the card measures before the change and settles after it, on the answer, o
   assert.match(card, /void morph\(\(\) => \(phase = 'answered'\)\);\n\s+void send\(chosen, reason\);/u);
 });
 
-test('on a wide tile the card has a 280px side with who asked, why and what it changes; one column on a narrow one', () => {
+test('on a wide tile a card with why or what it changes has a 280px side; one column on a narrow one, and with neither', () => {
   const card = src('./DecisionCard.svelte');
-  for (const part of ['class="dc-main"', 'class="dc-side"', 'dc-part-by', 'dc-part-why', 'dc-part-changes', '{cardWords.askedBy}', '{cardWords.why}', '{cardWords.changes}'])
+  for (const part of ['class="dc-main"', 'class="dc-side"', 'dc-part-why', 'dc-part-changes', '{cardWords.askedBy}', '{cardWords.why}', '{cardWords.changes}'])
     assert.ok(card.includes(part), `the card no longer draws ${part}`);
-  assert.match(card, /@container \(inline-size >= 52rem\) \{\n\s+\.dc:not\(\[data-compact\]\) \{\n\s+grid-template-columns: minmax\(0, 1fr\) 280px;/u);
+  assert.match(card, /@container \(inline-size >= 52rem\) \{\n\s+\.dc\[data-side\]:not\(\[data-compact\]\) \{\n\s+grid-template-columns: minmax\(0, 1fr\) 280px;/u);
   /* ONE COLUMN BY DEFAULT: the wrappers are let go of, so a compact card and a narrow slot read as they always did. */
   assert.match(card, /\.dc-main,\n\s+\.dc-side,\n\s+\.dc-part \{\n\s+display: contents;/u);
-  /* WHO ASKED AND WHEN STAY ON SCREEN, now the by-line is a part's and not the card's own child. */
+  /* WHO ASKED AND WHEN STAY ON SCREEN, now the by-line is the form's and not the card's own child. */
   assert.match(card, /\.queue-by > :is\(\.queue-when, \.dc-from\) \{\n\s+opacity: 1;/u);
 });
 

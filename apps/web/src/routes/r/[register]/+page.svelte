@@ -53,6 +53,7 @@
   import {
     arrivedAt,
     chipOn,
+    deadlineOf,
     defaultFrom,
     defaultKey,
     defaultParams,
@@ -68,7 +69,10 @@
     toggleChip,
     viewOf,
     homeViewOf,
+    isLate,
+    lateFirst,
     weighed,
+    wholeMoney,
     writeDefault,
     type Keep,
     type ListDefault,
@@ -317,6 +321,13 @@
    */
   let held = $state(new Map<number, Held>());
 
+  /**
+   * THE ROWS ADDED ON THIS SCREEN, by number, which stay at the head of a list that opens late first (`ordered`): a row
+   * somebody has just typed has no day yet, and filed among the undated it would land below the fold as it was made.
+   * They go with the question, as the receipts do.
+   */
+  let added = $state(new Set<number>());
+
   const hold = (seq: number) => {
     if (held.has(seq)) return;
     const at = result.entries.findIndex((e) => e.seq === seq);
@@ -433,6 +444,8 @@
        just filtered to, is a mark about a different screen. */
     held = new Map();
     fresh = new Map();
+    added = new Set();
+    lateSeen = false;
     untrack(() => typedRows.clear());
     arrived = new Set();
     owed = false;
@@ -697,6 +710,20 @@
    * reading *Showing 2,000 of 2,545*, which is two answers to one question on one screen. Each
    * number was defensible alone and the pair was not.
    */
+  /**
+   * THE ORDER THE LIST OPENS IN: late first where it has a deadline (`lateFirst` in `parts/list.ts`), and the record's
+   * own order everywhere else. The head said "4 late" over a list in the order its rows were last touched, so the four
+   * were wherever they fell among thirty-eight.
+   *
+   * ONLY WHILE THE WHOLE ANSWER IS IN HAND AND NOBODY HAS ASKED FOR AN ORDER. A sort in the address is the reader's, and
+   * it wins. A list still being paged keeps the record's order, because putting page one in a new order and page two
+   * under it in the old one is an order nobody chose; and once a second page has been walked to, the rows stay where
+   * the reader scrolled past them.
+   */
+  const lateOwn = $derived(cursor === null && pages.length <= 1 && deadlineOf(decl) !== undefined);
+  const lateLeads = $derived(!sort && lateOwn);
+  const ordered = $derived(lateLeads ? lateFirst(decl, pages.flat(), now, added) : pages.flat());
+
   const result = $derived({
     total,
     /* THE ROWS IN HAND, not the whole answer. `matched` is the answer's SIZE — what the head counts
@@ -714,7 +741,7 @@
        was read at and brings back one the answer has since dropped — the reopened row that no longer matches the
        chip it was found under. The hold is released when the question changes, with the receipt it belongs to. */
     /* AND A LINE TYPED INTO THE CAPTURE IS AT THE HEAD BEFORE THE RECORD HAS IT (`typedRows`), until it lands. */
-    entries: typedRows.draw(holdInPlace(pages.flat(), held)).map((e) => {
+    entries: typedRows.draw(holdInPlace(ordered, held)).map((e) => {
       const patch = edits.get(e.seq);
       return patch ? { ...e, fields: { ...e.fields, ...patch } } : e;
     }),
@@ -801,18 +828,33 @@
    * to act on in bulk" was drawn and half was not.
    */
   /* The register's own projection. Which column carries the row's tone is `ListTable`'s (`deadlineOf` in `parts/list.ts`): the deadline, beside the date it is about. */
+  /* A LATE ROW SAYS HOW LATE BEFORE ITS DAY ("38 days late · 27 Jul 2026"), so the deadline's column takes the room for
+     both while any row in hand is late, and its fifteen characters otherwise. */
+  const anyLate = $derived(result.entries.some((e) => isLate(decl, e, now)));
+  /* AND IT KEEPS THAT ROOM FOR AS LONG AS THE QUESTION STANDS. Marking the last late bill paid would otherwise narrow
+     the column under the pointer that pressed it, and every column after it would move. */
+  let lateSeen = $state(false);
+  $effect(() => {
+    /* Read with the question, which puts the latch down above, so a new question over a list still late sets it again. */
+    void question;
+    if (anyLate) lateSeen = true;
+  });
   const projected = $derived(
     /* THE NUMBER IS THE ONE COLUMN OFF BY DEFAULT (no list has an id column until Display adds "Number"), so for
        it the stored set means the reverse: in the set, drawn. */
     columnsFor(id, decl, hidden.has('seq'))
       .filter((c) => c.field === 'seq' || !hidden.has(c.field))
-      .map((c) => weighed(c, c.field === decl?.title, result.entries)),
+      .map((c) => weighed(c, c.field === decl?.title, result.entries))
+      .map((c) => ((anyLate || lateSeen) && c.field === deadlineOf(decl) ? { ...c, width: '27ch' } : c)),
   );
 
+  /* THE MONEY COLUMNS WHERE EVERY AMOUNT IN HAND IS WHOLE, which the table draws without their ".00" (`wholeMoney`). */
+  const wholeColumns = $derived(wholeMoney(decl, result.entries));
+
+  /* NO COLUMN LEADS THE TITLE. The picker had one of its own, empty until a pointer arrived, so every row started 30px
+     in from the toolbar and the line that adds a row: three left edges in one tile. It is among the row's verbs now
+     (`ListTable`), and the toolbar, the add line and the rows start on the tile's one edge. */
   const columns = $derived([
-    ...(siftable
-      ? [{ field: 'select', label: copy.select, hideLabel: true, width: '3ch', align: 'start' as const, truncate: 'never' as const }]
-      : []),
     ...projected.filter((c) => c.field !== 'seq'),
     /* THE SPOKEN ID ENDS THE ROW, quiet, where a list keeps what you look up rather than read. It
        led the row, so every line opened on a number; the project's mark that shared its cell now
@@ -834,7 +876,7 @@
      * `hideLabel`, because the header of a column of controls is not a heading, and `truncate:
      * 'never'`, because a truncated verb is a different verb.
      */
-    { field: 'act', label: copy.rowActions, hideLabel: true, width: '11ch', align: 'end' as const, truncate: 'never' as const },
+    { field: 'act', label: copy.rowActions, hideLabel: true, width: siftable ? '13ch' : '11ch', align: 'end' as const, truncate: 'never' as const },
   ]);
 
   /**
@@ -1067,7 +1109,7 @@
   /* `act` IS A COLUMN OF CONTROLS, NOT OF VALUES, and Display on a phone offered to sort by it:
      "Sorted by" listed seven options and the last was `What you can do here`, which is the label of
      the row-actions column. There is nothing in it to put in an order. */
-  const sortable = $derived(columns.filter((c) => c.field !== 'select' && c.field !== 'act'));
+  const sortable = $derived(columns.filter((c) => c.field !== 'act'));
 
   /** A header pressed, or a row of Display's "Sorted by": the same toggle, into the same parameter. */
   const sortBy = (field: string) => setParam((p) => p.set('sort', nextSort(sort, field)));
@@ -1165,6 +1207,7 @@
       undo: takeBack(entry),
     });
     fresh = new Map(fresh).set(entry.seq, Date.now());
+    added = new Set(added).add(entry.seq);
     void showRow(entry.seq);
   }
 
@@ -1585,15 +1628,9 @@
    */
   const copyLink = (seq: number) => clipboard.putLink(id, seq);
 
-  /* Column 2, not 1: 0 is the picker and 1 is the spoken id, so the caret starts on the first cell
-     that says what the row IS. It was 1 when the id was the leading column.
-
-     AND THE PICKER IS NOT ALWAYS THERE. It is drawn only once the list is big enough to act on in
-     bulk, so on a short list the same cell is one column to the left. A caret that starts on the id
-     rather than on the title is a smaller mistake than one that starts past the end, which is why
-     this clamps rather than counting: `columns` is the list on screen and it is the only thing that
-     knows how long it is. */
-  let focus = $state({ row: 0, col: 2 });
+  /* THE CARET STARTS ON THE FIRST CELL, which says what the row IS: nothing leads the title now that the picker is among
+     the row's verbs. `columns` is the list on screen, and the effect below keeps the caret inside it. */
+  let focus = $state({ row: 0, col: 0 });
 
   /* THE CARET IS KEPT INSIDE THE COLUMNS THERE ARE. Arrowing already clamps, and the starting
      column did not: a register with two columns and no picker put the caret past the end of every
@@ -2297,7 +2334,7 @@
   const tiled = $derived(view === 'table' || view === 'groups' || rowsAsCards() || rows.length === 0);
 
   /* This screen's own words: the head's overflow, named with the list it is about. */
-  const headWords = { more: (list: string) => `More for ${list}` } as const;
+  const headWords = { more: (list: string) => `More for ${list}`, whole: 'Add one with all its fields' } as const;
 </script>
 
 <svelte:head><title>{titleOf(decl?.name)}</title></svelte:head>
@@ -2361,20 +2398,23 @@
     {#snippet actions()}
       <!-- THE HEAD HOLDS ONE PRIMARY AND AN OVERFLOW (DIRECTION 39). How the list is drawn, its search and its filters
            are about the rows, so they moved down into the list's own tile, where the rows are. -->
-      <!-- ON A PHONE THE "+" IS THE WAY IN, AND NEW GOES. The capture field and this button both started a row, and on
-           a phone the "+" opens the capture sheet, which starts one in fewer presses. New stays on the arrival
-           (`?first`), where neither is drawn, and on a laptop, where it opens the whole form. -->
-      {#if adds}
-        <span class="new-row" data-alone={arriving ? '' : undefined}>
+      <!-- ONE WAY TO ADD, AND IT IS THE LIST'S FIRST LINE. The head said "New item" over a line saying "Add an item",
+           two controls for one act a hand's width apart. The line stays, since a name and Enter is the cheapest add
+           there is; the whole form is `n` and the first entry of the overflow. On a phone the "+" opens the line as a
+           sheet. New stays only on the arrival (`?first`), where neither the line nor the "+" is drawn. -->
+      {#if adds && arriving}
+        <span class="new-row">
           <Button weight="primary" kbd="n" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{said('new_row')} {decl.one}</Button>
         </span>
-        {#if !arriving}<CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />{/if}
+      {:else if adds}
+        <CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />
       {/if}
-      <!-- THE REST OF WHAT A LIST OFFERS, IN THE OVERFLOW: the view over what is handed to you, on a list that says who
-           holds its rows, and the list's fields (`ListEditor.svelte`). -->
-      {#if handedToMe || proposes}
+      <!-- THE REST OF WHAT A LIST OFFERS, IN THE OVERFLOW: a row started with every field in front of you, the view over
+           what is handed to you, on a list that says who holds its rows, and the list's fields (`ListEditor.svelte`). -->
+      {#if handedToMe || proposes || (adds && !arriving)}
         <Menu label={headWords.more(decl.name)} align="end">
           {#snippet trigger()}<span class="head-more" title={headWords.more(decl.name)}><Icon name="more" size="m" /></span>{/snippet}
+          {#if adds && !arriving}<button type="button" role="menuitem" data-new-row onclick={() => (createOpen = true)}>{headWords.whole}</button>{/if}
           {#if handedToMe}<a role="menuitem" href={at(handedToMe)}>{copy.handedToMe}</a>{/if}
           {#if proposes}<button type="button" role="menuitem" data-fields-open onclick={() => (fieldsOpen = true)}>{sheetWords.open}</button>{/if}
         </Menu>
@@ -2514,6 +2554,9 @@
         rows={arrived.size === 0 ? rows : rows.map((r) => (arrived.has(r.key) ? { ...r, arrived: true } : r))}
         total={rowCount}
         {sort}
+        {now}
+        whole={wholeColumns}
+        pickable={siftable}
         {selected}
         {selectedKeys}
         bind:focus
@@ -2600,6 +2643,7 @@
     {hidden}
     {sortBy}
     {unsort}
+    lateFirst={lateOwn}
     {hide}
     {showAll}
     board={view === 'board'}
@@ -2782,17 +2826,12 @@
     font-size: var(--fs-meta);
   }
 
-  /* THE HEAD'S NEW BUTTON, which a phone does without: the "+" beside it opens the capture sheet, which starts a row in
-     fewer presses. It stays on the arrival (`data-alone`), where neither the line nor the "+" is drawn. */
+  /* THE HEAD'S NEW BUTTON, drawn only on the arrival, where neither the line that adds a row nor the "+" is. */
   .new-row {
     display: contents;
   }
 
   @media (width < 640px) {
-    .new-row:not([data-alone]) {
-      display: none;
-    }
-
     /* THE PHONE'S BOARD: one column, 12 from the edges (DIRECTION 39), and the list's tile a step tighter inside. */
     .page {
       padding: var(--sp-2) var(--sp-3) var(--sp-8);

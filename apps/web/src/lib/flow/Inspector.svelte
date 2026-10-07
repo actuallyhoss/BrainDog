@@ -122,7 +122,9 @@
   const register = $derived('written' in t ? t.written.register : '');
 
   const title = $derived(isTrigger ? words.trigger : verb ? VERB_LABELS[verb] : words.edit);
-  const subtitle = $derived(isTrigger ? sayTrigger(t) : undefined);
+  /* A LIST BY THE NAME THE RAIL GIVES IT, never its id, as the picker under this line already offers it. */
+  const listSaid = (id: string): string => lists.find((l) => l.id === id)?.name ?? id;
+  const subtitle = $derived(isTrigger ? sayTrigger(t, listSaid) : undefined);
 
   /* ── the focus, which a docked panel does not move by itself ──────────── */
 
@@ -484,7 +486,7 @@
             <button type="button" class="segment" aria-pressed={kind === k} data-on={kind === k ? '' : undefined} onclick={() => pick(k)}>{words.kinds[k]}</button>
           {/each}
         </div>
-        <p class="help">{words.triggerHelp[kind] ?? sayTrigger(t)}</p>
+        <p class="help">{words.triggerHelp[kind] ?? sayTrigger(t, listSaid)}</p>
 
         {#if 'written' in t}
           <label class="label" for="flow-register">In the list</label>

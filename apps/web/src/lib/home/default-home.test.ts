@@ -447,3 +447,35 @@ test('A HOME INSTALLED FROM TODAY KEEPS SPEAKING IN THE VOICE: a heading still i
   const own = homeDrawn([block({ kind: 'capture', heading: 'Jot it down', register: 'tasks' }), block({ kind: 'capture', heading: 'Add a task', register: 'notes' })], NOW, voice, 'errand');
   assert.deepEqual(own.blocks.map((b) => b.heading), ['Jot it down', 'Add a task']);
 });
+
+/* ── a figure's line ─────────────────────────────────────────────────────────── */
+
+/** The Money tile as the record answers it: cash now, with the line its `trend:` drew or none. */
+const cashTile = (trend?: (number | null)[]): LiveBlock =>
+  block({
+    kind: 'stat',
+    cells: [{ metric: 'cash-now', label: 'Cash now', trend: '12w' }] as never,
+    metrics: [{ id: 'cash-now', label: 'Cash now', value: 'GBP 33,850.00', note: '', ...(trend ? { trend } : {}) }] as never,
+    shown: 1,
+    total: 1,
+  });
+const lineOf = (b: LiveBlock): unknown => b.metrics?.[0]?.trend;
+
+test('A FIGURE`S LINE STARTS AT THE FIRST DAY THE RECORD KEPT, and a gap after it stays a gap', () => {
+  /* Twelve weeks asked for and a month kept: the line is the month, the tile's whole width. */
+  const month = [null, null, null, 3586000, 3586000, null, 4135000, 3385000];
+  assert.deepEqual(lineOf(homeDrawn([cashTile(month)], NOW).blocks[0]!), [3586000, 3586000, null, 4135000, 3385000]);
+  /* A line that was whole is the block it was handed. */
+  const whole = cashTile([1, 2, null, 4]);
+  assert.equal(homeDrawn([whole], NOW).blocks[0], whole);
+});
+
+test('FEWER THAN THREE DAYS KEPT IS A NUMBER, NOT A CHART, and a tile with no line is left as it was', () => {
+  const two = homeDrawn([cashTile([null, null, 5, 6])], NOW).blocks[0]!;
+  assert.equal(two.drawn, true);
+  assert.equal('trend' in two.metrics![0]!, false);
+  assert.equal(lineOf(homeDrawn([cashTile([null, null])], NOW).blocks[0]!), undefined);
+  assert.deepEqual(lineOf(homeDrawn([cashTile([null, 5, 6, 7])], NOW).blocks[0]!), [5, 6, 7]);
+  const none = cashTile();
+  assert.equal(homeDrawn([none], NOW).blocks[0], none);
+});

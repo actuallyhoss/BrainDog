@@ -8,6 +8,9 @@
  * Then the buttons: Decide (or Accept) filled with the accent, the rest quiet or words only. Rectangles at the control
  * radius, never pills; a band that warns is said in the button's own words, never a chip.
  *
+ * WHERE ONE PRESS DECIDES (`[data-press]`, the card's two or three answers that can be undone) the rectangle is the
+ * button: no ring, no Decide under it, and the suggested one wears the accent's edge.
+ *
  * UNLAYERED ON PURPOSE. The skin's `kinds/queue.css` sits in `@layer components` and still draws `.queue-act` as a pill
  * with an outline and a dot for the suggested one, which Today's read-only queue keeps. These classes go on the same
  * elements (the keys and the queue gate find a choice by `.queue-act`), and an unlayered rule wins over a layered one
@@ -17,8 +20,8 @@
 /* ── the choices ──────────────────────────────────────────────────────────── */
 
 /* A FORM'S MEASURE, NOT THE WINDOW'S: on a wide tile the choices stop where a line of what each does is still read in
-   one sweep, and the buttons under them start at the same edge. The side beside them (who asked, why, what it
-   changes) takes the rest of a wide tile, so the measure is the form column's, which on a laptop is all of it. */
+   one sweep, and the buttons under them start at the same edge. Where a card has a side (why it is asked, what it
+   changes) it takes the rest of a wide tile, so the measure is the form column's, which on a laptop is all of it. */
 .dc-choices {
   display: grid;
   gap: var(--sp-2);
@@ -264,6 +267,36 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   }
 }
 
+/* ── a choice that one press decides ─────────────────────────────────────────
+
+   The same rectangle with no ring, its words starting at its own edge. It is a button, so it answers like one: the
+   field's wash under a pointer, and the chosen tint for the moment it is held down, which is what the card's settle
+   then starts from. The suggested one is the accent's edge at rest, an outline and not a fill: said, not chosen. */
+.dc-choice[data-press] {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.dc-choice[data-press] > .dc-choice-main > .dc-choice-name {
+  grid-column: 1;
+}
+
+.dc-choice[data-press] > .dc-end {
+  grid-column: 2;
+}
+
+.dc-choice[data-press] > .dc-choice-main > :is(.dc-choice-does, .queue-visual) {
+  grid-column: 1 / -1;
+}
+
+.queue-option[data-recommended] > .dc-choice[data-press] {
+  border-color: var(--action);
+}
+
+.dc-choice[data-press]:active {
+  background: var(--action-tint-1);
+  border-color: var(--action);
+}
+
 /* SAID TO A SCREEN READER WITH THE NAME, where the eye reads it at the end of the line. */
 .dc-sr {
   position: absolute;
@@ -299,6 +332,11 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-2);
+}
+
+/* A ROW WITH NOTHING IN IT TAKES NO ROOM: the choices decided, and the host has its own way to put the question off. */
+.dc-actions:not(:has(*)) {
+  display: none;
 }
 
 .dc-btn {

@@ -88,6 +88,9 @@ export type Holds = {
   one?: string;
 };
 
+/** The fewest days a figure's line is drawn from (DIRECTION §39: a chart has at least three points, else the tile shows the number). */
+const LINE_LEAST = 3;
+
 /**
  * THE LINE A TASK IS TYPED INTO, named by the list's own singular as every list's capture line is ("Add a job" on a
  * record that calls its tasks jobs), with the article the house's one helper chooses (`captureIn`).
@@ -227,6 +230,38 @@ export const DEFAULT_HOME = todayHome({ tasks: true, adds: true, money: true });
 /* ── what Home does to the page it draws ───────────────────────────────── */
 
 const isRuns = (b: LiveBlock): boolean => b.source === 'sessions.live';
+/** How many days of a line hold a number. */
+const known = (line: readonly (number | null)[] | undefined): number => (line ?? []).filter((v) => v !== null).length;
+
+/**
+ * A FIGURE'S LINE AS HOME DRAWS IT: from the first day the record kept, and only when it is a line.
+ *
+ * THE RECORD ANSWERS THE WHOLE WINDOW ASKED FOR, a day with no point a gap (`trend: 12w` is eighty-four days). A
+ * figure kept for a week is then seven points in the last twelfth of the tile, a tick at its far edge under a number,
+ * and one kept for a day or two is a dot. So the days before the first one kept are left off, and the line runs the
+ * tile's width; a gap after that stays a gap, since a night nobody kept is not a nought. Fewer than three days kept is
+ * no line at all (DIRECTION §39), and the tile shows the number.
+ *
+ * A NEW OBJECT ONLY WHERE A LINE CHANGES, so a tile whose line is whole is the block it was handed.
+ */
+function linesKept(b: LiveBlock): LiveBlock {
+  if (b.kind !== 'stat' || !b.metrics?.some((m) => m.trend !== undefined)) return b;
+  let changed = false;
+  const metrics = b.metrics.map((m) => {
+    if (m.trend === undefined) return m;
+    const from = m.trend.findIndex((v) => v !== null);
+    if (from < 0 || known(m.trend) < LINE_LEAST) {
+      changed = true;
+      const { trend: _short, ...rest } = m;
+      return rest;
+    }
+    if (from === 0) return m;
+    changed = true;
+    return { ...m, trend: m.trend.slice(from) };
+  });
+  return changed ? { ...b, metrics } : b;
+}
+
 const isDue = (b: LiveBlock): boolean => b.source === 'deadlines';
 const isQueue = (b: LiveBlock): boolean => b.kind === 'queue';
 const isTodo = (b: LiveBlock): boolean => b.kind === 'todo';
@@ -349,6 +384,8 @@ export function slashLineOf(drawn: HomeDrawn, today: boolean): unknown {
  *
  * THE LINE A TASK IS TYPED INTO GOES TO THE HEAD, beside the page's name, as the page's line does under it.
  *
+ * A FIGURE'S LINE STARTS AT THE FIRST DAY THE RECORD KEPT, and is a line only from three days up (`linesKept`).
+ *
  * WHAT CHANGED IS ONLY WHAT IS NEW, and A BLOCK WITH NOTHING TO SHOW IS NOT DRAWN: an empty list on the page everybody
  * reads first is noise, and the line at the top already says the quiet half.
  *
@@ -408,7 +445,7 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
       shaped.push(gone === 0 && late.length === 0 ? b : pick(b, rest, undefined, rest.length === 0 ? 0 : b.total - gone - late.length));
       continue;
     }
-    shaped.push(newOnly(b));
+    shaped.push(linesKept(newOnly(b)));
   }
   const kept = shaped.map((b) => (b.drawn && hollow(b) ? { ...b, drawn: false } : b));
   /* WHAT CHANGED LEAVES OUT WHAT THE PAGE ALREADY SAYS, and goes if that was all of it. */

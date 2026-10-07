@@ -24,7 +24,11 @@
   AND WHAT LEFT IT IS STILL HERE. Waiting, Filed and Archived are one series of the same arrivals, chosen in the
   toolbar. The record's tally is the title row's sentence and the figure tile, what your rules filed this week.
 
-  TWO TILES OPEN THE BOARD, in every series: "What comes in", each way in as a 56px row with its well, its last arrival
+  AN INBOX NOTHING HAS EVER REACHED IS ONE TILE (`nothingEver`): what it is for and the press that adds a way in, in
+  place of the two tiles and the empty state under them, which said the one fact three times over. The series switch
+  goes with them, since all three series are empty.
+
+  OTHERWISE TWO TILES OPEN THE BOARD, in every series: "What comes in", each way in as a 56px row with its well, its last arrival
   and a fortnight's arrivals as a line, and the figure beside it. So an inbox with nothing waiting still says how things
   reach it and whether the rules are working, rather than one sentence on a bare board. Every filing and
   archiving, a person's or an agent's, names who did it and can be put back, through `triage`'s `back`.
@@ -62,7 +66,7 @@
   import { actor, listName } from '$lib/record/names.ts';
   import type { Pattern, Series, SettledItem, Tally } from './series.ts';
   import { daysOf, figureOf, sentenceOf, whoFiledOf } from './days.ts';
-  import { SOURCE_DAYS, countSaid, drawsLine, lastSaid, lineSaid, sourcesOf } from './sources.ts';
+  import { SOURCE_DAYS, countSaid, drawsLine, lastSaid, lineSaid, nothingEver, quietWords, sourcesOf } from './sources.ts';
 
   /**
    * THIS UNIT'S OWN WORDS, beside the one screen that says them. The press's cost is not named: the door meters it, and a
@@ -183,6 +187,9 @@
   const whoFiled = $derived(whoFiledOf(tally));
   const figure = $derived(figureOf(tally));
   let patterns = $state<Pattern[]>([]);
+  /* NOTHING HAS EVER COME IN, by the record's own tally, so the board is the one tile that says so. A pattern waiting
+     on Decide is something to show, so it keeps the board. */
+  const never = $derived(patterns.length === 0 && nothingEver(tally, ways, INBOX.length));
   let series = $state<{ state: Series; items: SettledItem[]; cursor: number | null } | null>(null);
   let seriesFix = $state<string | null>(null);
   let seriesOlder = $state(false);
@@ -194,10 +201,18 @@
     { v: 'ignored', label: words.archived, n: tally?.archived },
   ]);
 
+  /* WHETHER THE TALLY HAS ANSWERED, with a count or without one. An empty inbox waits on it before it draws, since the
+     tally is what tells one nothing ever reached from one that was cleared, and drawing the second first would be a
+     board that redraws itself a moment later. */
+  let tallied = $state(false);
   async function retally() {
-    const m = await import('./series.ts');
-    const read = await m.readTally(apiBase());
-    if (read) tally = read;
+    try {
+      const m = await import('./series.ts');
+      const read = await m.readTally(apiBase());
+      if (read) tally = read;
+    } finally {
+      tallied = true;
+    }
   }
 
   async function show(next: View) {
@@ -519,6 +534,7 @@
   {#if answered && !unrouted && !refused}
     <!-- FILED AND UNFILED AS ONE SERIES, three states of the same arrivals, so what was filed stays where it can be
          seen and put back rather than vanishing from the screen it left. The chosen one is the white pill. -->
+    {#if !never}
     <div class="segmented series" role="group" aria-label={words.series}>
       {#each segments as s (s.v)}
         <button
@@ -530,6 +546,7 @@
         >{s.label}{#if s.n}<span class="segment-n num">{s.n}</span>{/if}</button>
       {/each}
     </div>
+    {/if}
     {#if view === 'waiting' && INBOX.length > 0}
       <!-- WHERE A FILING GOES, AND SELECTING, ONLY WHILE SOMETHING WAITS: over an empty inbox both are controls for
            nothing. -->
@@ -565,6 +582,16 @@
   {:else if !answered || unrouted}
     <!-- Bars before the first answer, and nothing from a host that has no inbox to read. -->
     {#if !answered}<Waiting />{/if}
+  {:else if INBOX.length === 0 && !tallied}
+    <Waiting />
+  {:else if never}
+    <!-- ONE TILE, AND THE ONE THING TO DO: nothing has reached this record's inbox by any way, so the ways in, the
+         rules' figure and what waits would each say nothing, three times. -->
+    <div class="clear">
+      <Empty kind="no-data-yet" glyph="inbox" title={quietWords.title} body={quietWords.why}>
+        {#snippet actions()}<Button href="/settings/ingest">{quietWords.add}</Button>{/snippet}
+      </Empty>
+    </div>
   {:else}
     <div class="inbox">
       {#if ways || figure}

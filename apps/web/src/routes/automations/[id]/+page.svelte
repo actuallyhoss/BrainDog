@@ -44,7 +44,7 @@
   import { page } from '$app/state';
   import { since } from 'braindog-render';
   import { titleOf } from '$lib/title.ts';
-  import { actor } from '$lib/record/names.ts';
+  import { actor, listName } from '$lib/record/names.ts';
   import { installWords, openActions, type ActionRow, type CallOut } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -148,10 +148,15 @@
   const owner = $derived(page.data.me?.owner === true);
   const me = $derived(String(page.data.me?.person ?? ''));
   const names = $derived(new Map(Object.entries((page.data.names ?? {}) as Record<string, string>)));
+  /* A LIST BY THE NAME THE RAIL GIVES IT, never its id, in the sentence that says what starts it. */
+  const listSaid = (id: string): string =>
+    ((page.data.lists ?? page.data.index?.registers ?? []) as { id: string; name: string }[]).find((l) => l.id === id)?.name ?? listName(id);
 
   /** Take a freshly read automation: its row, its first page of runs, and its body on the canvas. */
   function take(one: AutomationRow) {
-    row = one;
+    /* WHEN THE LOG LAST HAS IT IS THE LIST'S TO KNOW (`openAutomations`, `acted`), and the read of one automation does
+       not carry it, so one read again keeps what the list said rather than going quiet about its last turn. */
+    row = one.acted === undefined && row?.id === one.id ? { ...one, acted: row.acted } : one;
     runs = one.runs;
     older = one.older;
     versions = null;
@@ -161,7 +166,7 @@
 
   async function load(want: string) {
     const at = opened();
-    const out = await openAutomations((url, init) => fetch(url, init), apiBase());
+    const out = await openAutomations((url, init) => fetch(url, init), apiBase(), { acted: true });
     source = out.source;
     const rows = out.first.ok ? out.first.value : [];
     taken = rows.map((r) => r.id);
@@ -206,7 +211,7 @@
       from = 'missing';
       return;
     }
-    take(one.value);
+    take({ ...one.value, acted: rows.find((r) => r.id === one.value.id)?.acted });
     from = 'ready';
   }
 
@@ -650,7 +655,7 @@
               <IconWell name={triggerIcon(kind)} size="l" tone={flow.selected === 'trigger' ? 'ink' : general.length > 0 || (served !== null && served.key === null) ? 'danger' : undefined} />
               <span class="trigger-main">
                 <span class="trigger-kicker">{words.trigger}</span>
-                <span class="trigger-said">{sayStart(flow.draft)}</span>
+                <span class="trigger-said">{sayStart(flow.draft, listSaid)}</span>
                 <span class="trigger-path">{flow.path === 'inline' ? words.inline : words.asRun}</span>
               </span>
             </button>

@@ -71,7 +71,7 @@ test('a day is said from today: Today, Yesterday, a weekday, then a date', () =>
   assert.equal(dayWord(local(29, 1), NOW), 'Today');
   assert.equal(dayWord(local(28, 23), NOW), 'Yesterday');
   assert.equal(dayWord(local(26, 12), NOW), 'Saturday');
-  assert.equal(dayWord(local(12, 12), NOW), '12 Sept');
+  assert.equal(dayWord(local(12, 12), NOW), '12 Sep', 'September is Sep here as on every other screen, never Sept');
 });
 
 test('today is banded by the hour, the first band says the day, and an older day is one band', () => {
@@ -374,4 +374,27 @@ test('a fold somebody opened stays open when the run writes its next line on top
   assert.ok(after && after.key !== opened.key, 'this test no longer moves the fold’s key');
   assert.equal(foldOpen(after, kept), true, 'the fold shut under the reader when the run wrote again');
   assert.equal(foldOpen(after, new Set()), false, 'a fold nobody opened is open');
+});
+
+test('a list is said by the name the page hands over, so Activity and the rail call it one thing', () => {
+  const rail = (id: string): string => ({ installments: 'Instalments' })[id] ?? id;
+  assert.equal(thingOf('installments#4', 'Halden licence, 3 of 4', rail)?.list, 'Instalments');
+  /* A BURST OVER SEVERAL ENTRIES NAMES ITS LIST THE SAME WAY. */
+  const run = [0, 1, 2].map((i) => ev(iso(29, 9, 30 - i), 'rule:categorise', 'edit', `installments#${i + 1}`, 'category set'));
+  const [told] = burstsOf(run, rail);
+  assert.equal(told?.many?.list, 'Instalments');
+});
+
+test('September is Sep down the whole screen, and the dot between two parts of a line keeps its spaces', () => {
+  const lines = readFileSync(new URL('./lines.ts', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
+  assert.doesNotMatch(lines, /month: 'short'/u, 'a month is spelled by Intl again, which writes Sept in British English');
+  assert.equal(dayWord(new Date(2025, 8, 12, 12).getTime(), NOW), '12 Sep 2025', 'another year is said with it');
+  for (let m = 0; m < 12; m++) assert.match(dayWord(new Date(2025, m, 12, 12).getTime(), NOW), /^12 [A-Z][a-z]{2} 2025$/u);
+  /* SVELTE DROPS THE WHITE SPACE AN ELEMENT OPENS WITH, so `<span> · {note}</span>` drew "falls due· Proofing press".
+     The dot and its two spaces are one expression now. */
+  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const markup = page.slice(page.indexOf('{#snippet entry('), page.indexOf('<PageHead'));
+  assert.doesNotMatch(markup, />\s+·/u, 'an element opens on white space and a dot');
+  assert.match(markup, /<span class="note" title=\{note\}>\{' · '\}\{note\}<\/span>/u);
+  assert.match(markup, /<span class="where-inline"\s*>\{' · '\}\{thing\.list\}<\/span/u);
 });

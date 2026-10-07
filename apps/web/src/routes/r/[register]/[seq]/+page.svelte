@@ -72,7 +72,7 @@
   import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
   import type { Entry, FieldDecl, Fields } from '$lib/record/schema.ts';
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
-  import { choicesOf, stateSaid } from './lead.ts';
+  import { choicesOf, finishOf, stateSaid } from './lead.ts';
   import { addedSaid, daySaid, dueSaid, localDay, rowWords, sentenceOf } from './said.ts';
   import {
     aboutOf,
@@ -444,6 +444,39 @@
     if (current) void refreshHistory(register, n);
   }
 
+  /**
+   * THE HEAD'S PRIMARY: the row moved to its list's finished state in one press (`finishOf`), through the write every
+   * other change on this page makes, with the same way back on its toast. Held to the version on screen, so a row
+   * somebody else moved meanwhile is a conflict that is said and never a quiet overwrite.
+   */
+  async function finishRow(to: { value: string; done: string }) {
+    if (!row || saving || !live || !decl?.state) return;
+    const register = id;
+    const n = seq;
+    const key = `${register}#${n}`;
+    const before = { ...row.fields };
+    const heldDecl = decl;
+    const patch: Fields = { [decl.state]: to.value };
+    const label = labelOf(decl.fields.find((f) => f.id === decl.state)!);
+    saving = true;
+    writer ??= rowWriter(apiBase());
+    const out = await writer.update(register, n, patch, row.version);
+    saving = false;
+    if (askedFor !== key) return;
+    if (!out.ok) {
+      if (out.why === 'conflict' && out.entry) got = { from: 'live', entry: out.entry, names: names ?? new Map() };
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    got = { from: 'live', entry: out.entry, names: names ?? new Map() };
+    if (editing === decl.state) stopEdit();
+    const version = out.entry.version;
+    toasts.push(to.done, {
+      undo: () => void putBack(register, n, label, putBackOf(before, patch, heldDecl), version),
+    });
+    void refreshHistory(register, n);
+  }
+
   /** Archive the row, or put it back: the same verb the list offers on the same row. */
   async function setArchived(to: boolean) {
     if (!row || saving || !live) return;
@@ -496,6 +529,8 @@
   const tone = $derived(decl?.done?.includes(stateValue) ? ('good' as const) : undefined);
   /* THE ROW IS IN ONE OF ITS LIST'S FINISHED STATES: "Paid", "Cleared", "Done". */
   const done = $derived(tone === 'good');
+  /* WHAT FINISHES IT, where it is still open and the reader may change it: the head's one primary (`finishOf`). */
+  const finish = $derived(changes && !archived ? finishOf(decl, stateValue) : null);
 
   /* A `document` is an argument, not a figure, so it never sits in the field list beside a date and
      a currency — it gets the room prose needs (05 §7.1). */
@@ -985,25 +1020,28 @@
            something to the invoice. "Copy link" is in the "…", and `y` still copies the id. -->
       <!-- WHERE THE ROW APPLIES, FIRST: the project's chip, or the globe and "Everywhere", which opens the move. -->
       <ScopeMove register={id} {row} {names} live={changes} title={String(row.fields[decl.title] ?? '')} onmoved={() => void rowMoved(id, seq)} />
-      <!-- THE ONE PRIMARY, AND ONLY ON A LIST WITH NO STATE: where a row has a status, moving it is the verb that
-           matters and it is the first of the facts; where it has none, editing it is the thing to do. -->
-      {#if changes}<Button weight={decl.state ? 'quiet' : 'primary'} onclick={editTitle}>{copy.editRow}</Button>{/if}
-      <!-- ARCHIVE IS THE LIST'S OWN VERB, on the row itself: a row that can be archived in one
-           place and not the other is two products. `Put back` stands where `Archive` was for as
-           long as this tab holds the row it just archived: see `archived` for why that moment is
-           the only one it can be offered in. -->
-      <!-- AND NEITHER FOR SOMEBODY WHO CANNOT CHANGE THE LIST, where the foot of the fields tile says why. -->
+      <!-- THE ONE PRIMARY (DIRECTION 39), AND THE REST IN THE "…". A row still open on a list that says what finishes
+           it leads with that: "Mark paid" on an invoice, "Mark done" on a task (`finishOf`). Anywhere else the thing to
+           do to a row is edit it, quietly once the row is finished. Edit and Archive stood beside each other at one
+           weight, and neither was what a person opens an unpaid invoice to do. -->
+      {#if finish}
+        <Button weight="primary" disabled={saving} data-finish onclick={() => void finishRow(finish)}>{finish.said}</Button>
+      {:else if changes && !archived}
+        <Button weight={done ? 'quiet' : 'primary'} onclick={editTitle}>{copy.editRow}</Button>
+      {/if}
+      <!-- `Put back` STANDS IN THE HEAD for as long as this tab holds the row it just archived: see `archived` for why
+           that moment is the only one it can be offered in. Archive itself is in the "…", the list's own verb on the
+           row itself, and neither is drawn for somebody who cannot change the list, where the foot of the fields tile
+           says why. -->
       {#if changes && archived}
-        <Button weight="quiet" disabled={saving} onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
-      {:else if changes}
-        <Button weight="quiet" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</Button>
+        <Button weight="primary" disabled={saving} onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
       {/if}
       <!-- "HAND TO": a teammate or an agent in one press, on a list that says who holds its rows, and while an
            agent holds this one, the run working on it or whose next session it waits for. -->
       {#if live && !archived}
         <HandSheet register={id} {row} {decl} trigger onhanded={() => void rowMoved(id, seq)} />
       {/if}
-      <!-- THE HEAD'S "…", LAST: the row's link. A 36px square in the buttons' shape, named for a screen reader by the
+      <!-- THE HEAD'S "…", LAST: the row's link, Archive, and Edit where the primary is the finishing verb. A 36px square in the buttons' shape, named for a screen reader by the
            hidden words and for a pointer by its tooltip. A new field for the list is at the foot of "Add a field". -->
       {#if live}
         <Menu label={copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)} align="end">
@@ -1012,7 +1050,9 @@
               ><Icon name="more" size="l" /><span class="head-vh">{copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)}</span></span
             >
           {/snippet}
+          {#if finish}<button type="button" class="mi" role="menuitem" onclick={editTitle}>{copy.editRow}</button>{/if}
           <button type="button" class="mi" role="menuitem" onclick={() => clipboard.putLink(id, row.seq)}>{copy.copyLink}</button>
+          {#if changes && !archived}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</button>{/if}
         </Menu>
       {/if}
     {/snippet}

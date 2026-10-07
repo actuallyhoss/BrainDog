@@ -3,17 +3,24 @@
   page and Decide (through `QueueAnswer.svelte`), Today's classic list (`home/Question.svelte`), Decide's classic screen
   (`Classic.svelte`) and Slash's palette. What it says is `card.ts`'s; this draws it and answers it.
 
-  IT READS LIKE A FORM (DIRECTION §39). Who asked and when, quiet; the question; why it is asked; then the answers as a
-  vertical list of full-width choices, each its name and one line of what it does, with "Suggested" in the accent's
-  words beside the one an agent suggests; then Decide, filled, and Not now, words only. The suggestion is already chosen
-  where a key may give it (`card.ts` `startsOn`), so Decide is still one press; where the answer is hard to undo or money
-  moves nothing is chosen for anybody, and the button says the care it asks for in its own words ("Decide, can’t be
-  undone easily"), never a chip. The drawing is `form.css`, which the question's own page draws its choices with too.
+  IT READS LIKE A FORM (DIRECTION §39). Who asked and when, one quiet line over the question on a laptop and a phone
+  alike; the question; why it is asked; then the answers as a vertical list of full-width choices, each its name and one
+  line of what it does, with "Suggested" in the accent's words beside the one an agent suggests. The drawing is
+  `form.css`, which the question's own page draws its choices with too.
+
+  TWO OR THREE ANSWERS ARE ONE PRESS EACH (`card.ts` `pressOf`), whether or not they carry a line of what they do: the
+  choices stay full-width rectangles, with no ring and no Decide under them, and pressing one decides, held for its Undo
+  like every answer. THE RING AND DECIDE STAY WHERE A PRESS SHOULD BE TWO: an answer that is hard to undo, where nothing
+  is chosen for anybody and the button says the care it asks for in its own words ("Decide, can’t be undone easily",
+  never a chip); a fourth answer, where the suggestion is already chosen where a key may give it (`startsOn`); a record
+  that asks for a reason, while its line is open; and a host that asks for one itself (`onpress`).
 
   TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS (`card.ts` `inlineOf`): "Chase it" and "Not yet",
   the record's own Accept and Decline. The suggested one, or else the first, is filled with the accent and the rest are
-  quiet, and one press decides, held for its Undo like every answer. The form's list stays for answers that carry a line
-  of what they do, and for a fourth.
+  quiet, and one press decides.
+
+  THE SIDE IS THERE ONLY WHEN IT HAS SOMETHING TO SAY: on a wide tile, why it is asked and what it changes sit in a
+  280px column beside the form. A question with neither is one column, and no column is kept for who asked alone.
 
   COMPACT, OUTSIDE DECIDE (Home, a declared page): the question, a link to its own page, and its answers as buttons,
   nothing else. Who asked, why and what it moves are read on its page; a question with more than three answers says
@@ -24,10 +31,10 @@
   only then is the answer sent (`press.ts` `hold`). Leaving the page, or the card leaving it, sends what was held at
   once. A record on an older build that still wants a reason opens one line under the card when the answer reaches it.
 
-  THE KEYS KEEP THEIR PATHS. A pointer or Space on a choice chooses it; Enter on a choice chooses it and answers, as Enter
-  in a form sends it; a page's number key (`PageBody.svelte`) presses a choice from outside it and answers with it, as it
-  always did; the host's Enter presses whichever button carries `data-enter`, which is only on a card that costs
-  nothing. The arrow keys walk the choices.
+  THE KEYS KEEP THEIR PATHS. Where Decide gives the answer, a pointer or Space on a choice chooses it; Enter on a choice
+  chooses it and answers, as Enter in a form sends it; a page's number key (`PageBody.svelte`) presses a choice from
+  outside it and answers with it, as it always did; the host's Enter presses whichever button carries `data-enter`,
+  which is only on a card that costs nothing. The arrow keys walk the choices, and choose only where a press does.
 
   A MERGE IS THE SAME CARD with `MergeCard` for its answers (Merge all, Keep apart, Pick), read off the record's own
   options question (`merge.ts`), and held for its Undo the same way.
@@ -66,7 +73,7 @@
   import type { Press } from '../../routes/decide/merge.ts';
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
-  import { answeredLine, cardOf, cardWords, inlineOf, pressSaid, pressTail, primaryOf, startsOn } from './card.ts';
+  import { answeredLine, cardOf, cardWords, inlineOf, pressOf, pressSaid, pressTail, primaryOf, startsOn } from './card.ts';
   import { footprint, settle } from './settle.ts';
 
   let {
@@ -138,6 +145,8 @@
   const seeWhole = $derived(card.seeWhole && whole && !link);
   /* WHETHER THE SIDE SAYS WHAT IT CHANGES: a line of what accepting does, money, a change from what to what, or the link. */
   const changesAny = $derived(card.does !== '' || card.money !== '' || card.shifts.length > 0 || seeWhole);
+  /* THE SIDE IS DRAWN ONLY WITH SOMETHING IN IT: why it is asked, or what it changes. Who asked is the line over the question. */
+  const side = $derived(!compact && (card.why !== '' || changesAny));
 
   /**
    * WHERE THE CARD IS. `open` offers the options; `asking` has one chosen and the reason line open under it, for a record
@@ -155,6 +164,9 @@
   let busy = $state(false);
   /** The answer held for its Undo, or `null` once it has gone or was taken back. */
   let holding = $state<Held | null>(null);
+  /* ONE PRESS ON A CHOICE DECIDES (`card.ts` `pressOf`): two or three answers, none hard to undo. Not while the record's
+     reason line is open, where the choice is changed and Send gives it, nor on a host that takes the press for itself. */
+  const oneTap = $derived(listed && answerable && onpress === undefined && phase !== 'asking' && pressOf(card));
 
   let field = $state<HTMLInputElement | null>(null);
   let done = $state<HTMLParagraphElement | null>(null);
@@ -311,15 +323,19 @@
     selectWay(way);
   }
 
-  /** Enter on a choice chooses it and answers, as Enter sends a form; the arrows walk the choices and choose as they go. */
+  /**
+   * Enter on a choice chooses it and answers, as Enter sends a form; the arrows walk the choices and choose as they go.
+   * Where one press decides (`oneTap`) there is nothing to choose first: Enter answers and the arrows only walk.
+   */
   function onChoiceKey(e: KeyboardEvent, i: number) {
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const way = card.ways[i];
     if (!way) return;
+    const chooses = !oneTap;
     if (e.key === 'Enter') {
       e.preventDefault();
       e.stopPropagation();
-      selectWay(way);
+      if (chooses) selectWay(way);
       press(way);
       return;
     }
@@ -329,7 +345,7 @@
     e.stopPropagation();
     const next = card.ways[(i + step + card.ways.length) % card.ways.length];
     if (!next) return;
-    selectWay(next);
+    if (chooses) selectWay(next);
     document.getElementById(optId(next.key))?.focus();
   }
 
@@ -433,6 +449,14 @@
   </span>
 {/snippet}
 
+<!-- THE END OF A CHOICE'S FIRST LINE: "Suggested", and the number key that presses it on a host whose keys do. -->
+{#snippet choiceEnd(way: Way, i: number)}
+  {#if way.recommended || (keys && i < 9)}<span class="dc-end"
+      >{#if way.recommended}<span class="dc-rec">{queueWords.suggested}</span>{/if}{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span
+        >{/if}</span
+    >{/if}
+{/snippet}
+
 {#if phase === 'answered' && chosen}
   <!-- ONE LINE, QUIET: what was chosen, by whom and when, where the card was, with Undo while the answer waits. -->
   <p class="qa-done" role="status" tabindex="-1" bind:this={done} data-held={holding ? '' : undefined}>
@@ -462,6 +486,7 @@
     aria-busy={busy}
     data-selected={chosenForAll ? '' : undefined}
     data-compact={compact ? '' : undefined}
+    data-side={side ? '' : undefined}
     bind:this={cardEl}
   >
     {#if pick && answerable && !compact}
@@ -476,10 +501,24 @@
         onclick={() => pick?.toggle(question)}><span aria-hidden="true">{chosenForAll ? '✓' : ''}</span></button
       >
     {/if}
-    <!-- THE FORM: the question, the answers and the buttons. On a wide tile it is the card's first column and the side
-         is beside it; on a narrow one both are let go of (`display: contents`) and their parts read in one column in
-         the order a question is read: who asked, the question, why, the answers, the buttons, what it changes. -->
+    <!-- THE FORM: who asked, the question, the answers and the buttons. On a wide tile with a side it is the card's first
+         column and the side is beside it; anywhere else both are let go of (`display: contents`) and their parts read in
+         one column in the order a question is read: who asked, the question, why, the answers, the buttons, what it
+         changes. -->
     <div class="dc-main">
+      {#if !compact}
+        <!-- WHO ASKED, WHERE AND WHEN, one quiet line over the question at every width: the face and name, the app it ran
+             in and the run, each only where it has a name. "Asked by" is said to a screen reader, where the eye reads
+             the line's place. The band is kept here for the keys and the ranking, and said in the answering button's
+             words instead. -->
+        <p class="queue-by">
+          <span class="dc-sr">{cardWords.askedBy}</span>
+          <Face name={card.by.name} kind={card.by.kind} size="s" /><span class="queue-who">{card.by.name}</span>
+          {#each from as part, i (i)}<span class="dc-from" dir="auto">{part}</span>{/each}
+          <span class="queue-when">{card.when}</span>
+          {#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
+        </p>
+      {/if}
       <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band
            is kept on it, unseen, for the keys and the ranking. -->
       <h3 class="queue-question" dir="auto">
@@ -490,6 +529,28 @@
       {#if !compact && card.later}<p class="qa-later" dir="auto">{card.later}</p>{/if}
       {#if card.merge && !compact}
         <MergeCard merge={card.merge} {answerable} holding={busy ? '' : null} titleOf={(key) => card.ways.find((w) => w.key === key)?.label} onpress={pressMerge} />
+      {:else if oneTap}
+        <!-- THE ANSWERS, ONE PRESS EACH: the same full-width rectangles, each its name and what it does, with no ring to
+             fill and no Decide under them. They are buttons in a list, not radios: nothing is chosen before it is given.
+             Only the one a key may press carries `data-enter`. -->
+        <ul class="queue-options dc-choices" aria-label={queueWords.choices}>
+          {#each card.ways as way, i (way.key)}
+            <li class="queue-option" data-recommended={way.recommended ? '' : undefined}>
+              <button
+                type="button"
+                class="queue-act dc-choice"
+                data-press
+                id={optId(way.key)}
+                data-enter={way.key === card.enter ? '' : undefined}
+                onclick={() => press(way)}
+                onkeydown={(e) => onChoiceKey(e, i)}
+              >
+                {@render choiceBody(way)}
+                {@render choiceEnd(way, i)}
+              </button>
+            </li>
+          {/each}
+        </ul>
       {:else if listed}
         <!-- THE ANSWERS, A LIST TO CHOOSE FROM: each a full-width choice with its name and what it does, the suggested
              one saying so in the accent's words. A press chooses; Decide answers (`form.css`). -->
@@ -511,11 +572,7 @@
                 >
                   <span class="dc-ring" aria-hidden="true"></span>
                   {@render choiceBody(way)}
-                  {#if marked || (keys && i < 9)}<span class="dc-end"
-                      >{#if marked}<span class="dc-rec">{queueWords.suggested}</span>{/if}{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true"
-                          >{i + 1}</span
-                        >{/if}</span
-                    >{/if}
+                  {@render choiceEnd(way, i)}
                 </button>
               {:else}
                 <div class="dc-choice" data-read>
@@ -529,7 +586,8 @@
       {/if}
       {#if answerable && (!card.merge || compact)}
         <!-- THE BUTTONS: a row of answers, one press each, or Decide with the answer chosen; then Not now. Only the one a
-             key may press carries `data-enter`: nothing hard to undo, nothing that moves money. -->
+             key may press carries `data-enter`: nothing hard to undo, nothing that moves money. Where the choices
+             themselves decide, only Not now is here, and with neither the row is not drawn (`form.css`). -->
         <div class="dc-actions" data-inline={inline ? '' : undefined}>
           {#if inline}
             <!-- ONE PRESS DECIDES: the suggested answer, or the first, filled with the accent, the rest quiet. Its name is
@@ -553,7 +611,7 @@
           {:else if compact}
             <!-- MORE ANSWERS THAN A ROW HOLDS, OR A MERGE: chosen on the question's own page. -->
             <a class="dc-btn" href={at(card.href)}>{queueWords.choose}</a>
-          {:else if phase !== 'asking'}
+          {:else if phase !== 'asking' && !oneTap}
             <button
               type="button"
               class="dc-btn"
@@ -580,23 +638,11 @@
       {/if}
       {#if fix || bulkFix}<p class="qa-fix" role="status">{fix || bulkFix}</p>{/if}
     </div>
-    {#if !compact}
-      <!-- WHO ASKED, WHERE AND WHEN, quiet: the face and name, the app it ran in and the run, each only where it has a
-           name. The band is kept here for the keys and the ranking, and said in the answering button's words instead.
-
-           THE CARD'S SIDE (DIRECTION §39): on a wide tile a 280px column beside the form, so the right of a tile is not
-           left empty, with who asked, why it is asked and what it changes, each under a quiet heading. On a narrow one
-           who asked leads the card, why follows the question, and what it changes comes under the buttons. -->
+    {#if side}
+      <!-- THE CARD'S SIDE (DIRECTION §39), only where there is something to put in it: on a wide tile a 280px column
+           beside the form with why it is asked and what it changes, each under a quiet heading. On a narrow one why
+           follows the question and what it changes comes under the buttons. -->
       <div class="dc-side">
-        <div class="dc-part dc-part-by" role="group" aria-labelledby="{uid}-by">
-          <h4 class="dc-h" id="{uid}-by">{cardWords.askedBy}</h4>
-          <p class="queue-by">
-            <Face name={card.by.name} kind={card.by.kind} size="s" /><span class="queue-who">{card.by.name}</span>
-            {#each from as part, i (i)}<span class="dc-from" dir="auto">{part}</span>{/each}
-            <span class="queue-when">{card.when}</span>
-            {#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
-          </p>
-        </div>
         <!-- WHY: under the question on a narrow card, beside it on a wide one, before what it moves. -->
         {#if card.why}
           <div class="dc-part dc-part-why" role="group" aria-labelledby="{uid}-why-h">
@@ -639,8 +685,8 @@
   /* ── one column: the form and the side let go of, their parts in the order a question is read ───────────────
 
      The skin lays every part of a card across both its tracks (`.queue-card > *`); the parts here are the wrappers'
-     children, so they say it themselves. Who asked leads, why follows the question, the answers and the buttons come
-     next, and what it changes is under them all. */
+     children, so they say it themselves. Who asked leads and the question follows it, as they are written; why comes
+     next, then the answers and the buttons, and what it changes is under them all. */
   .dc-main,
   .dc-side,
   .dc-part {
@@ -653,12 +699,9 @@
     grid-column: 1 / -1;
   }
 
-  /* A part let go of hands its order to its own children, which are the grid's items now. */
-  .dc-part-by > * {
-    order: -1;
-  }
-
-  .dc-main > :not(.queue-question) {
+  /* A part let go of hands its order to its own children, which are the grid's items now: why, written after the form,
+     is read before the form's answers. */
+  .dc-main > :not(.queue-by, .queue-question) {
     order: 1;
   }
 
@@ -667,7 +710,7 @@
   }
 
   /* THE BULK BOX SITS AT THE END OF THE BY-LINE, on its line, as the skin set it when the by-line was the card's own. */
-  .dc:has(> .qa-select) .dc-part-by > .queue-by {
+  .dc:has(> .qa-select) > .dc-main > .queue-by {
     grid-row: 1;
     grid-column: 1;
   }
@@ -677,8 +720,8 @@
     grid-column: 2;
   }
 
-  /* A QUIET HEADING OVER EACH PART OF THE SIDE: said to a screen reader in one column, where who asked and why sit
-     where a card always had them and need no name, and drawn only over what it changes, under the buttons. */
+  /* A QUIET HEADING OVER EACH PART OF THE SIDE: said to a screen reader in one column, where why sits where a card
+     always had it and needs no name, and drawn only over what it changes, under the buttons. */
   .dc-h {
     position: absolute;
     inline-size: 1px;
@@ -704,26 +747,27 @@
   }
 
   /* WHO ASKED AND WHEN ARE ALWAYS THERE (DIRECTION §37): the skin's by-line waits for a hover on its card before the
-     time shows, which it reads off a by-line that is the card's own child. This one is a part's, so it says it here. */
+     time shows, which it reads off a by-line that is the card's own child. This one is the form's, so it says it here. */
   .queue-by > :is(.queue-when, .dc-from) {
     opacity: 1;
     transition: none;
   }
 
-  /* ── two columns, on a wide tile: the form, and beside it a 280px side ───────────────────────────────────
+  /* ── two columns, on a wide tile with something for the side: the form, and beside it a 280px side ───────────
 
      The form takes what the side leaves, and the side reads down its own column under its quiet headings, a hairline
-     at its start, so the right of a wide tile holds who asked, why and what it changes and is never left empty. The
-     host's slot is the container (`QueueAnswer.svelte`'s `.qa`, Today's row, the palette's sheet), so a narrow slot
-     stays one column whatever the window. */
+     at its start, with why it is asked and what it changes. A card with neither keeps one column at any width: a
+     column that held only who asked and when was 280px of a tile for five words. The host's slot is the container
+     (`QueueAnswer.svelte`'s `.qa`, Today's row, the palette's sheet), so a narrow slot stays one column whatever the
+     window. */
   @container (inline-size >= 52rem) {
-    .dc:not([data-compact]) {
+    .dc[data-side]:not([data-compact]) {
       grid-template-columns: minmax(0, 1fr) 280px;
       column-gap: var(--sp-6);
       align-items: start;
     }
 
-    .dc:not([data-compact]) > .dc-main {
+    .dc[data-side]:not([data-compact]) > .dc-main {
       display: grid;
       grid-row: 1;
       grid-column: 1;
@@ -731,7 +775,7 @@
       row-gap: var(--sp-3);
     }
 
-    .dc:not([data-compact]) > .dc-side {
+    .dc[data-side]:not([data-compact]) > .dc-side {
       display: flex;
       flex-direction: column;
       gap: var(--sp-5);
@@ -742,14 +786,14 @@
       border-inline-start: 1px solid var(--rule);
     }
 
-    .dc:not([data-compact]) .dc-part {
+    .dc[data-side]:not([data-compact]) .dc-part {
       display: flex;
       flex-direction: column;
       gap: var(--sp-2);
       min-inline-size: 0;
     }
 
-    .dc:not([data-compact]) .dc-h {
+    .dc[data-side]:not([data-compact]) .dc-h {
       position: static;
       inline-size: auto;
       block-size: auto;
@@ -760,7 +804,7 @@
 
     /* The bulk box keeps the end of the side's first line, over the short heading there, and lifted over the side so a
        press reaches it. A row of its own would share the form's height with the side and push the side down. */
-    .dc:not([data-compact]) > .qa-select {
+    .dc[data-side]:not([data-compact]) > .qa-select {
       position: relative;
       z-index: var(--z-raise);
       justify-self: end;
@@ -768,23 +812,18 @@
     }
 
     /* The link to the whole change keeps its own width in the side's column. */
-    .dc:not([data-compact]) .dc-part > .qa-see {
+    .dc[data-side]:not([data-compact]) .dc-part > .qa-see {
       align-self: start;
     }
 
-    /* The by-line in the side wraps under its name rather than running out of a narrow column. */
-    .dc:not([data-compact]) .queue-by {
-      flex-wrap: wrap;
-    }
-
     /* Why, in the side, is the column's measure and the body's size. */
-    .dc:not([data-compact]) .dc-part-why > .queue-why {
+    .dc[data-side]:not([data-compact]) .dc-part-why > .queue-why {
       max-inline-size: none;
     }
   }
 
-  /* A FACE IN THE BY-LINE sits on the line's middle, not its baseline, or the disc rides above the words. Quiet: 13 in
-     the muted ink, the name a step darker. */
+  /* WHO ASKED AND WHEN, THE META LINE OVER THE QUESTION: 13 in the muted ink, the name a step darker. A face sits on the
+     line's middle, not its baseline, or the disc rides above the words. */
   .queue-by {
     align-items: center;
     flex-wrap: wrap;
@@ -798,13 +837,6 @@
     font-size: var(--fs-head);
     font-weight: var(--fw-semi);
     line-height: var(--lh-head);
-  }
-
-  /* ON A WIDE TILE NOTHING SITS ABOVE THE QUESTION: who asked is in the side. */
-  @container (inline-size >= 52rem) {
-    .dc:not([data-compact]) > .dc-main > .queue-question {
-      margin-block-start: 0;
-    }
   }
 
   /* COMPACT, A QUESTION IS ITS LINE AND ITS BUTTONS, a step apart, with no by-line above it to sit close under. */

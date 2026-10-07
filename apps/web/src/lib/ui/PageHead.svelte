@@ -21,7 +21,13 @@
 
   Below 900px the head is a phone's. A `--sticky` (52px) bar stays at the top: the back link on a detail page, the
   title on one line once the large one has scrolled away, and a 44px search button. Under it the name at 22 and the
-  sentence scroll away with the page.
+  sentence scroll away with the page. A PAGE WITH NO WAY BACK HAS NO ROW FOR THE BAR: it lies over the head's first
+  row, so the search button sits at the end of the name's row (or of the line over it) and no empty row opens the page.
+
+  A NAME BREAKS BETWEEN ITS WORDS, never inside one: "Invoice 2026-041" broke after the hyphen, as "2026-" and "041".
+
+  `below` IS WHAT GOES UNDER THE SENTENCE: the line a task is typed into on a phone (`home/HeadCapture.svelte`), which
+  stood between the name and its sentence when it wrapped out of the name's row.
 
   `led` AND `over` ARE KEPT FOR THE PAGES THAT PASS THEM, and change nothing: the header is the same on every page.
 -->
@@ -47,6 +53,7 @@
     sentence,
     needs,
     actions,
+    below,
     icon,
     hue,
     define,
@@ -81,6 +88,8 @@
     define?: Noun | undefined;
     /** The actions at the right of the name: one primary, the rest in the page's overflow. */
     actions?: Snippet | undefined;
+    /** What sits under the sentence, the gutter's width: one line a thing, such as the line a task is typed into on a phone. */
+    below?: Snippet | undefined;
     /** Kept for the pages that pass it: the header is drawn the same way with or without it. */
     led?: boolean | undefined;
     /** Kept for the pages that pass it: the header is drawn the same way with or without it. */
@@ -131,6 +140,19 @@
      The phone's back link keeps it, since that is a way out. */
   const crumb = $derived(kicker && kicker.trim().toLowerCase() !== title.trim().toLowerCase() ? kicker : undefined);
 
+  /* THE NAME, A WORD AT A TIME: each is drawn as one piece, so a line never ends inside one (a hyphen is a place a
+     browser may break at), and one longer than the row still breaks inside itself rather than running off the screen. */
+  const named = $derived(title.split(/\s+/u).filter((w) => w !== ''));
+
+  /* WHETHER THE PHONE'S BAR HAS A WAY BACK IN IT. Without one it holds only the search button, and takes no row. */
+  const wayBack = $derived(Boolean(kicker && back));
+
+  /* AND WHETHER IT THEN LIES OVER THE NAME ITSELF, with no line over the name to lie over instead. The name is under
+     the bar from the start, so the bar says the title as soon as anything has scrolled under it (`under`), which is
+     when it stops being clear: waiting for the name to leave the screen left a bar with nothing in it for a moment. */
+  const overName = $derived(!wayBack && !crumb);
+  const titled = $derived(overName ? under : past);
+
   /* THE SENTENCE AS WORDS, cut into its figures and the phrase that needs him (`shell/headline.ts`). */
   const parts = $derived(typeof sentence === 'string' ? partsOf(sentence, needs) : null);
 </script>
@@ -141,7 +163,7 @@
   away, and a sticky element sticks only inside its parent's box. Its title repeats the `h1` for the eye once the `h1`
   has gone, so it is hidden from a screen reader, which has already met the heading.
 -->
-<div class="head-bar" bind:this={bar} data-under={under ? '' : undefined} data-past={past ? '' : undefined}>
+<div class="head-bar" bind:this={bar} data-under={under ? '' : undefined} data-past={titled ? '' : undefined} data-solo={wayBack ? undefined : ''}>
   {#if kicker && back}
     <a class="back tap" href={at(back)}>
       <span class="back-mark"><Icon name="chevron" size="l" /></span><span class="back-name">{kicker}</span>
@@ -173,7 +195,7 @@
             <Icon name={icon} size="xl" />
           </span>
         {/if}
-        <span dir="auto">{title}</span>
+        <span dir="auto">{#each named as word, n}{n > 0 ? ' ' : ''}<span class="word">{word}</span>{/each}</span>
       </h1>
       <!--
         A COUNT OF NOTHING OVER AN EMPTY STATE IS THE SAME FACT TWICE, so a bare zero goes and a zero with a total beside
@@ -200,6 +222,7 @@
   list, and it still shows once and never again.
 -->
 {#if define}<p class="head-define"><Define noun={define} /></p>{/if}
+{#if below}<div class="head-below">{@render below()}</div>{/if}
 
 <style>
   /* Same size as the figure, dimmed: it modifies the number rather than being part of it. */
@@ -310,12 +333,25 @@
     transition: font-size var(--d-move) var(--ease-out);
   }
 
+  /* ONE WORD, ONE PIECE (`named`): a box of its own breaks only when it is wider than the row, and then inside itself. */
+  .word {
+    display: inline-block;
+    max-inline-size: 100%;
+    overflow-wrap: anywhere;
+  }
+
   .page-head[data-under] .page-name {
     overflow: hidden;
     font-size: var(--fs-head);
     letter-spacing: 0;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* ON THE COMPACT ROW'S ONE LINE A WORD IS TEXT AGAIN, so a name too long for the row is cut at a letter with its
+     ellipsis: a box that does not fit is dropped whole, and a name of one long word would be the ellipsis alone. */
+  .page-head[data-under] .word {
+    display: inline;
   }
 
   /* THE PAGE'S GLYPH, 24 before the name, in `--ink2`; a page about one thing wears that thing's own colour. */
@@ -410,6 +446,11 @@
     font-weight: var(--fw-medium);
   }
 
+  /* UNDER THE SENTENCE, in the gutter, a step below it. */
+  .head-below {
+    padding: var(--sp-3) var(--gutter) 0;
+  }
+
   @media (width < 900px) {
     /**
      * THE BAR: `--sticky` tall below the notch, and nothing sticky on a phone is taller. The notch is paid here, once,
@@ -446,16 +487,17 @@
       opacity: 1;
     }
 
-    /* The back link: a chevron and the parent's name, 44px tall, never more than two fifths of the bar. IT DOES NOT
-       GIVE WAY to the title beside it: shrinkable, it was squeezed to "D." on a question at 390, so it keeps its own
-       width up to the cap and the name inside it is what ellipses. */
+    /* The back link: a chevron and the parent's name, 44px tall. IT TAKES THE ROOM THERE IS: while the bar's title is
+       not showing, the title holds no room (below), so the name is cut only where it would reach the search button.
+       It was held to two fifths of the bar at all times, and read "Bills and invoi…" beside 200px of nothing. ONCE
+       THE TITLE SHOWS it is two fifths again and does not give way: shrinkable beside a long title, it was squeezed
+       to "D." on a question at 390, so it keeps its own width up to the cap and the name inside it is what ellipses. */
     .back {
       display: inline-flex;
       align-items: center;
       gap: var(--sp-1);
-      flex: none;
+      flex: 0 1 auto;
       min-inline-size: 0;
-      max-inline-size: 40%;
       min-block-size: var(--tap);
       padding-inline-end: var(--sp-2);
       color: var(--ink);
@@ -475,6 +517,11 @@
       scale: none;
     }
 
+    .head-bar[data-past] .back {
+      flex: none;
+      max-inline-size: 40%;
+    }
+
     .back-name {
       min-inline-size: 0;
       overflow: hidden;
@@ -482,9 +529,10 @@
       white-space: nowrap;
     }
 
-    /* The title on one line at 17, and only once the large one has gone under the bar. */
+    /* The title on one line at 17, and only once the large one has gone under the bar. Until then it asks for no
+       room of its own, only what the back link leaves. */
     .bar-title {
-      flex: 1 1 auto;
+      flex: 1 1 0;
       min-inline-size: 0;
       margin: 0;
       overflow: hidden;
@@ -497,7 +545,41 @@
     }
 
     .head-bar[data-past] .bar-title {
+      flex-basis: auto;
       opacity: 1;
+    }
+
+    /**
+     * NO WAY BACK, NO ROW. The bar lies over the head's first row, giving back the height it stands in, and the row
+     * under it keeps the bar's height and the search button's room at its end: the name's row, or the line over the
+     * name where there is one. It was an empty row holding one search icon over every such page. At rest a press
+     * falls through the bar to that row; once anything has scrolled under it the bar is the board again, and a
+     * press on it reaches nothing passing beneath.
+     */
+    .head-bar[data-solo] {
+      margin-block-end: calc(-1 * var(--sticky));
+    }
+
+    .head-bar[data-solo]:not([data-under]) {
+      pointer-events: none;
+    }
+
+    .head-bar[data-solo] .find {
+      pointer-events: auto;
+    }
+
+    .head-bar[data-solo] + .kicker {
+      display: flex;
+      align-items: center;
+      box-sizing: border-box;
+      inline-size: auto;
+      min-block-size: var(--sticky);
+      padding-inline-end: calc(var(--gutter) + var(--tap));
+    }
+
+    .head-bar[data-solo] + .page-head .head-main {
+      min-block-size: var(--sticky);
+      padding-inline-end: calc(var(--tap) + var(--sp-1));
     }
 
     /* SEARCH, AS A PHONE HOLDS IT: a 44px square target at the top right with the glyph in it, no disc round it. */
@@ -539,6 +621,10 @@
       line-height: calc(28 / 22);
       letter-spacing: -0.015em;
       white-space: normal;
+    }
+
+    .page-head[data-under] .word {
+      display: inline-block;
     }
 
     .name-icon,

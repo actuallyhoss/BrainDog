@@ -193,8 +193,11 @@ export function widened(blocks: readonly Placed[], columns: number = COLUMNS): n
   return out;
 }
 
-/** What `paired` reads off a block in a flow: its kind, its span in force, whether it is drawn and whether it leads the page. */
-export type Pairable = Placed & { readonly kind: string; readonly columns?: number; readonly lead?: boolean };
+/**
+ * What `paired` reads off a block in a flow: its kind, its span in force, whether it is drawn, whether it leads the
+ * page, and whether its author gave it a width of its own (`declared`), the whole row included.
+ */
+export type Pairable = Placed & { readonly kind: string; readonly columns?: number; readonly lead?: boolean; readonly declared?: boolean };
 
 /**
  * THE WIDTH OF THE WORK COLUMN FROM WHICH A FLOW OF FULL-WIDTH BLOCKS IS TWO COLUMNS (DIRECTION §36, §38): a 1,512 or
@@ -234,7 +237,11 @@ const WHOLE_ROW = new Set(['section', 'capture', 'inputs', 'cards', 'gallery', '
  * IN DECLARED ORDER, NEVER REORDERED: a block that may not be halved (a heading, a table, a forecast, the page's line)
  * stands on its own row and starts the pairing again after it, so a section's blocks pair under their heading. One left
  * over keeps the whole row rather than sitting beside a hole. A block the author gave a width of their own keeps it, and
- * a hidden block takes no place. PURE, so `layout.test.ts` holds the rule.
+ * a hidden block takes no place.
+ *
+ * `span: 12` WRITTEN DOWN IS A WIDTH OF THEIR OWN TOO (`declared`). Work declares Late at the whole row and was drawn
+ * as half of one beside At a glance, a tile of one line stretched to its neighbour's height. Only a block that names
+ * no width at all is the page's to halve. PURE, so `layout.test.ts` holds the rule.
  */
 export function paired(blocks: readonly Pairable[], columns: number = COLUMNS): number[] {
   const out = blocks.map((b) => b.span);
@@ -242,7 +249,7 @@ export function paired(blocks: readonly Pairable[], columns: number = COLUMNS): 
   let waiting: number | null = null;
   blocks.forEach((b, n) => {
     if (!b.drawn) return;
-    const fits = b.span >= columns && b.lead !== true && !WHOLE_ROW.has(b.kind) && floorFor(b.kind, b.columns ?? 0) < half;
+    const fits = b.span >= columns && b.declared !== true && b.lead !== true && !WHOLE_ROW.has(b.kind) && floorFor(b.kind, b.columns ?? 0) < half;
     if (!fits) {
       waiting = null;
       return;
@@ -333,3 +340,42 @@ export const boardRail = (layout: Layout): { main: number; rail: number } => {
   const [main, rail] = snapRow([mainSpan(layout), layout.rail], COLUMNS);
   return { main: main!, rail: rail! };
 };
+
+/** What the two rules below read off a block of the main column: its kind, whether it is drawn, and how it sits. */
+export type Opening = { readonly kind: string; readonly drawn: boolean; readonly lead?: unknown; readonly box?: unknown; readonly joins?: unknown };
+
+/**
+ * WHICH BLOCK IS THE LINE A PAGE OPENS ON TO TYPE INTO, which the page's header holds beside its name as Today's does
+ * (`home/HeadCapture.svelte`), or `-1`. Work spent a whole tile on "What needs doing?", over everything the page is for.
+ *
+ * A LONE CAPTURE, FIRST: the first block the main column draws after the page's sentence, standing on its own. One
+ * under a heading, on a surface with other blocks (`joins`), or further down the page is where its author put it and
+ * stays there. `blocks` is the main column in the order it is read; the answer is a place in it.
+ */
+export function headCaptureAt(blocks: readonly Opening[]): number {
+  const drawn = blocks.map((b, i) => ({ b, i })).filter((x) => x.b.drawn);
+  const at = drawn.findIndex((x) => !(x.b.kind === 'note' && x.b.lead === true));
+  const first = drawn[at];
+  if (at < 0 || !first || first.b.kind !== 'capture' || first.b.joins === true) return -1;
+  /* ONLY THE PAGE'S SENTENCE MAY STAND BEFORE IT, and nothing joins its surface after it. */
+  if (at > 1 || drawn[at + 1]?.b.joins === true) return -1;
+  return first.i;
+}
+
+/** THE PICTURES A PAGE LEADS WITH: a line or bars over time, wide and short, which a phone reads whole in its one column. */
+const LEAD_CHARTS = new Set(['forecast', 'series', 'lines', 'bridge']);
+
+/**
+ * WHICH BLOCK OF THE MAIN COLUMN A PHONE DRAWS BEFORE THE SIDE COLUMN, or `-1`: the chart the main column opens on.
+ *
+ * A PHONE DRAWS A PAGE'S SIDE COLUMN FIRST (`PageBody.svelte` `railFirst`), since its blocks are the page at a glance.
+ * On Money that put when the cash runs out, the accounts and three questions over Cash ahead, the picture the page is
+ * about, a screen and a half down. The chart a page opens on is the page, so it comes first, then the side column, then
+ * the rest. Only a chart standing on its own: one inside a boxed section or joined to its neighbour stays with them.
+ */
+export function leadChartAt(blocks: readonly Opening[]): number {
+  const at = blocks.findIndex((b) => b.drawn);
+  const first = blocks[at];
+  if (!first || !LEAD_CHARTS.has(first.kind) || first.box === true || first.joins === true) return -1;
+  return blocks.slice(at + 1).find((b) => b.drawn)?.joins === true ? -1 : at;
+}

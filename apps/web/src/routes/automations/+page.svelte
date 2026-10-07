@@ -85,7 +85,7 @@
 <div class="page">
   {#key drawn}
     {#if tab === 'automations'}
-      <AutomationsTab oncount={(n) => (count = n)} onsentence={(s) => (said = s)} />
+      <AutomationsTab {owner} oncount={(n) => (count = n)} onsentence={(s) => (said = s)} />
     {:else if tab === 'scheduled'}
       <ScheduledTab />
     {:else if tab === 'scripts'}
@@ -99,11 +99,12 @@
 <NewAction open={ask !== null} kind={ask?.kind ?? 'action'} preset={ask?.preset ?? null} onclose={shut} />
 
 <style>
-  /* THE LISTS SIT ON THE GROUND UNDER THEIR TILES, 20 apart, as wide as the page allows. */
+  /* THE LISTS ARE TILES UNDER THEIR CHARTS, 12 apart as every board's tiles are (`--tile-gap`), as wide as the page
+     allows. */
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--tile-gap);
     min-inline-size: 0;
     padding: var(--sp-4) var(--gutter) var(--sp-9);
   }

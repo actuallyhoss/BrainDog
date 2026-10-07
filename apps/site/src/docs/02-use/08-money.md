@@ -10,7 +10,7 @@ Money is one page, read from the same lists from top to bottom:
 - **Accounts**: each one with its type and the day its balance was last set, and a line to add another.
 - **Waiting on you**: the questions Money's rules have asked.
 - **Cash ahead**: a forecast walked forward from Cash now through every bill, invoice and repeating payment you have.
-- **The next 30 days**: how Cash now becomes the balance thirty days from now, step by step.
+- **Coming and going**: how Cash now becomes the balance thirty days from now, step by step.
 - **Where this month's money went**: this month's spending, cut by category.
 - **Coming up**, **Being chased**, and what is late to you and late to pay.
 - **In and out, by month**: money in and money out, what has moved and what is due.

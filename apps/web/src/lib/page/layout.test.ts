@@ -19,7 +19,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 
 import { blockOf } from '../record/page-live.ts';
-import { boardRail, boxesOf, paired, layoutOf, mainSpan, snapped, splitAreas, sticks, TILE_SPANS, widened, type Layout } from './layout.ts';
+import { boardRail, boxesOf, headCaptureAt, leadChartAt, paired, layoutOf, mainSpan, snapped, splitAreas, sticks, TILE_SPANS, widened, type Layout } from './layout.ts';
 
 const RAIL: Layout = { rail: 4, sticky: false };
 
@@ -264,7 +264,7 @@ test('A ROW THAT WAS NEVER WHOLE IS LEFT AS IT WAS, and a row with nothing drawn
 });
 
 /* ON A WIDE SCREEN A FLOW OF FULL-WIDTH LISTS IS TWO COLUMNS (DIRECTION §36, §38). */
-const k = (kind: string, span = 12, more: { drawn?: boolean; lead?: boolean; columns?: number } = {}) => ({ kind, span, drawn: more.drawn ?? true, ...more });
+const k = (kind: string, span = 12, more: { drawn?: boolean; lead?: boolean; columns?: number; declared?: boolean } = {}) => ({ kind, span, drawn: more.drawn ?? true, ...more });
 
 test('TWO WHOLE-ROW LISTS ONE AFTER THE OTHER ARE TWO HALVES, and one left over keeps the whole row', () => {
   assert.deepEqual(paired([k('todo'), k('feed'), k('timeline')]), [6, 6, 12]);
@@ -284,6 +284,55 @@ test('A BLOCK THAT MAY NOT BE HALVED STANDS ALONE and the pairing starts again a
 test('AN AUTHOR`S OWN WIDTH IS KEPT, and a hidden block takes no place between two that pair', () => {
   assert.deepEqual(paired([k('todo', 6), k('feed', 6), k('timeline')]), [6, 6, 12]);
   assert.deepEqual(paired([k('todo'), k('stat', 12, { drawn: false }), k('feed')]), [6, 12, 6]);
+});
+
+test('A BLOCK DECLARED AT THE WHOLE ROW IS NEVER HALF OF ONE: only a block that names no width is the page`s to pair', () => {
+  /* Work: Late says `span: 12` and At a glance says nothing. Late keeps its row, and the pairing starts again after it. */
+  assert.deepEqual(paired([k('todo', 12, { declared: true }), k('stat')]), [12, 12]);
+  assert.deepEqual(paired([k('stat'), k('todo', 12, { declared: true })]), [12, 12]);
+  assert.deepEqual(paired([k('todo', 12, { declared: true }), k('stat'), k('feed')]), [12, 6, 6]);
+  assert.deepEqual(paired([k('todo'), k('todo', 12, { declared: true }), k('feed')]), [12, 12, 12]);
+});
+
+/* ── the line a page opens on, in its header ─────────────────────────────────── */
+
+const o = (kind: string, more: { drawn?: boolean; lead?: boolean; box?: boolean; joins?: boolean } = {}) => ({ kind, drawn: more.drawn ?? true, ...more });
+
+test('A LONE CAPTURE THAT OPENS THE PAGE IS THE HEADER`S, after the page`s sentence or with none', () => {
+  assert.equal(headCaptureAt([o('note', { lead: true }), o('capture'), o('todo')]), 1);
+  assert.equal(headCaptureAt([o('capture'), o('todo')]), 0);
+  /* A block its `when:` left out is not what the page opens on. */
+  assert.equal(headCaptureAt([o('note', { lead: true }), o('stat', { drawn: false }), o('capture'), o('todo')]), 2);
+  assert.equal(headCaptureAt([o('capture')]), 0);
+});
+
+test('A CAPTURE ITS AUTHOR PUT SOMEWHERE STAYS THERE: further down, under a heading, or on a surface it shares', () => {
+  assert.equal(headCaptureAt([o('note', { lead: true }), o('todo'), o('capture')]), -1);
+  assert.equal(headCaptureAt([o('section', { box: true }), o('capture')]), -1);
+  assert.equal(headCaptureAt([o('section'), o('capture')]), -1);
+  assert.equal(headCaptureAt([o('capture'), o('todo', { joins: true })]), -1);
+  /* Two sentences and then the line: only the page's one sentence stands before it. */
+  assert.equal(headCaptureAt([o('note', { lead: true }), o('note', { lead: true }), o('capture')]), -1);
+  assert.equal(headCaptureAt([]), -1);
+  assert.equal(headCaptureAt([o('capture', { drawn: false }), o('todo')]), -1);
+});
+
+/* ── a phone's order ─────────────────────────────────────────────────────────── */
+
+test('ON A PHONE THE CHART THE MAIN COLUMN OPENS ON COMES BEFORE THE SIDE COLUMN', () => {
+  /* Money: Cash ahead, then the notes and what comes and goes. */
+  assert.equal(leadChartAt([o('forecast'), o('note'), o('bridge')]), 0);
+  assert.equal(leadChartAt([o('stat', { drawn: false }), o('forecast'), o('note')]), 1);
+  assert.equal(leadChartAt([o('lines')]), 0);
+});
+
+test('A MAIN COLUMN THAT OPENS ON ANYTHING ELSE KEEPS ITS ORDER, and so does a chart that shares its surface', () => {
+  assert.equal(leadChartAt([o('table'), o('forecast')]), -1);
+  assert.equal(leadChartAt([o('roadmap'), o('todo')]), -1);
+  assert.equal(leadChartAt([o('section', { box: true }), o('forecast')]), -1);
+  assert.equal(leadChartAt([o('forecast'), o('spec', { joins: true })]), -1);
+  assert.equal(leadChartAt([]), -1);
+  assert.equal(leadChartAt([o('forecast', { drawn: false })]), -1);
 });
 
 /* ── the board's widths (DIRECTION §39) ─────────────────────────────────────── */

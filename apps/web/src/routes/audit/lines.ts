@@ -224,8 +224,16 @@ const daysBetween = (a: number, b: number): number => Math.round((midnight(b) - 
 
 const WEEKDAY = new Intl.DateTimeFormat('en-GB', { weekday: 'long' });
 const WEEKDAY_SHORT = new Intl.DateTimeFormat('en-GB', { weekday: 'short' });
-const DATE = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
-const DATE_YEAR = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+/* A MONTH IS SPELLED HERE AND NOT BY `Intl`, whose British English writes September "Sept" where every other screen
+   says "Sep", so a day band read "3 Sept" over a line that said "the backup on 3 Sep". The hub's days and the week
+   strip spell theirs the same way (`automations/hub.ts`, `lib/viz/weekstrip.ts`). */
+const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/** A date on the reader's clock, "12 Sep", and with its year, "12 Sep 2025", when it is not this one. */
+const dateSaid = (ms: number, year: boolean): string => {
+  const d = new Date(ms);
+  return `${d.getDate()} ${MONTH[d.getMonth()]}${year ? ` ${d.getFullYear()}` : ''}`;
+};
 
 /** A day as a person says it from today: Today, Yesterday, a weekday within the week, else "12 Sep". */
 export function dayWord(ms: number, clock: number): string {
@@ -233,7 +241,7 @@ export function dayWord(ms: number, clock: number): string {
   if (back <= 0) return historyWords.today;
   if (back === 1) return historyWords.yesterday;
   if (back < 7) return WEEKDAY.format(ms);
-  return new Date(ms).getFullYear() === new Date(clock).getFullYear() ? DATE.format(ms) : DATE_YEAR.format(ms);
+  return dateSaid(ms, new Date(ms).getFullYear() !== new Date(clock).getFullYear());
 }
 
 /**
@@ -273,13 +281,17 @@ export const listOf = (target: string | undefined): string | null => (target ===
  * carries the list a row is in and not the project, so the list is the honest answer to "where".
  *
  * A PERSON NEVER GETS HERE: `targetSaid` in `who.ts` answers for one first, and says them by name.
+ *
+ * `nameOf` IS WHAT A LIST IS CALLED, and the page hands it the rail's own names. Without one a list is said from its
+ * declaration or its id in words (`listName`), which is how a list the person calls Instalments was "Installments"
+ * here and nowhere else.
  */
-export function thingOf(target: string, title: string | null): Thing | null {
+export function thingOf(target: string, title: string | null, nameOf: (list: string) => string = listName): Thing | null {
   const said = title !== null && title.trim() !== '' ? moneyInText(title) : null;
   const row = ROW.exec(target);
   /* A ROW GOES TO ITS OWN PAGE rather than through the spoken-id resolver, which took `services#6` only once the `#`
      was escaped out of the fragment. */
-  if (row) return { text: said ?? historyWords.aRow, href: `/r/${row[1]}/${row[2]}`, list: listName(row[1]!) };
+  if (row) return { text: said ?? historyWords.aRow, href: `/r/${row[1]}/${row[2]}`, list: nameOf(row[1]!) };
   const page = /^page\.([a-z0-9_-]+)$/u.exec(target)?.[1];
   if (page !== undefined) {
     const decl = Object.hasOwn(PAGES, page) ? PAGES[page] : undefined;
@@ -345,7 +357,7 @@ const joins = (prev: AuditEvent, next: AuditEvent, first: AuditEvent, list: stri
   Math.abs(Date.parse(prev.at) - Date.parse(next.at)) <= BURST_GAP_MS;
 
 /** The lines as drawn, newest first as they came, a burst being one. The walk is one pass: a run is read once. */
-export function burstsOf(events: readonly AuditEvent[]): Told[] {
+export function burstsOf(events: readonly AuditEvent[], nameOf: (list: string) => string = listName): Told[] {
   const out: Told[] = [];
   /* TWO LINES WITH NO PLACE IN THE LOG CAN SAY EXACTLY THE SAME, and a key drawn twice is a list that cannot be drawn. */
   const seen = new Map<string, number>();
@@ -374,7 +386,7 @@ export function burstsOf(events: readonly AuditEvent[]): Told[] {
       key: keyed(first),
       e: first,
       count: run.length,
-      many: rows > 1 ? { text: historyWords.rows(rows), href: `/r/${list}`, list: listName(list) } : null,
+      many: rows > 1 ? { text: historyWords.rows(rows), href: `/r/${list}`, list: nameOf(list) } : null,
       note: rows > 1 ? shared : [shared, historyWords.times(run.length)].filter(Boolean).join(' · '),
       from: run.at(-1)!.at,
     });

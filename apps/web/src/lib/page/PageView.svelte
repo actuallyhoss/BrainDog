@@ -29,6 +29,7 @@
   /* EVERY REGISTERED KIND'S STYLESHEET, with the screen that draws its blocks (`kinds/styles.ts`). */
   import './kinds/styles.ts';
   import { untrack } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { Filters } from 'braindog-render/svelte';
@@ -47,6 +48,8 @@
   import Arrange, { added } from './Arrange.svelte';
   import ChangePage from './ChangePage.svelte';
   import PageBody from './PageBody.svelte';
+  import HeadCapture from '$lib/home/HeadCapture.svelte';
+  import { areaOf, headCaptureAt, layoutOf } from './layout.ts';
   import { emptyHidden } from './home.ts';
   import { leadIndex } from './lead.ts';
   import SourceView from './SourceView.svelte';
@@ -282,6 +285,23 @@
   /** Declared, then added. One list, so ordering and spans do not care which is which. */
   const all = $derived<LiveBlock[]>(live ? [...laidFrom, ...extra.map((b) => added(b, laidFrom))] : []);
 
+  /* ── the line a page opens on ──────────────────────────────────────────────
+     A PAGE WHOSE MAIN COLUMN OPENS ON A LONE LINE TO TYPE INTO KEEPS IT IN ITS HEADER, as Today does (`layout.ts`
+     `headCaptureAt`, `home/HeadCapture.svelte`): beside the name from 900px, and under the page's sentence on a phone,
+     where the name's row has no room for it. Work spent a whole tile on "What needs doing?". By the declared order, so
+     the header does not change when the look moves a tile. Not while arranging or reading the source, where the line is
+     a block like any other, and only a line this reader's list can take. */
+  const wide = new MediaQuery('(width >= 900px)', true);
+  const headLine = $derived.by((): { at: number; block: LiveBlock } | null => {
+    if (!hosting || !live) return null;
+    const layout = layoutOf(live.page.page);
+    const main = emptyHidden(all, true)
+      .map((block, at) => ({ block, at }))
+      .filter((x) => areaOf(x.block, layout) === 'main');
+    const hit = main[headCaptureAt(main.map((x) => x.block))];
+    return hit && writes.capturable(hit.block) ? hit : null;
+  });
+
   /**
    * ⇧E toggles the declaration, on a page at its own address. Shift, not a bare `e`, because bare `e` means
    * edit-in-place inside a grid and a key's meaning must be a function of the object in focus rather than of the page
@@ -428,6 +448,7 @@
     define={headlined ? undefined : 'page'}
   >
     {#snippet actions()}
+      {#if headLine && wide.current}{@render lineInHead()}{/if}
       {#if !arranging}
         <!-- SHARE, AND ONE "⋯" FOR THE REST (DIRECTION §35): How this is built, Change this page and Edit layout were
              four controls in a row over every page, and a reader uses Share far more often than the other three. The
@@ -438,6 +459,11 @@
       <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={live.page.blocks} {all} bind:extra {showSource} {reread} />
     {/snippet}
   </PageHead>
+
+  <!-- THE LINE THE PAGE OPENS ON, drawn once: in the header's row, or handed to the body to sit under its sentence. -->
+  {#snippet lineInHead()}
+    {#if headLine}<HeadCapture block={headLine.block} oncapture={(register, text, inherited) => void writes.captureLine(register, text, inherited)} />{/if}
+  {/snippet}
 
   <!-- THE RENDERER'S STRIP, one group a field, "All" first, the rest behind one select (`braindog-render` `Filters`).
        Under the headline on a page that opens on one, and between the head and the first tile otherwise. -->
@@ -458,6 +484,8 @@
       {writes}
       {arrangement}
       headed={led}
+      captured={headLine?.at ?? -1}
+      under={headLine && !wide.current ? lineInHead : null}
       strip={strip && led ? narrow : null}
       host={hosting ? host : null}
       pick={hosting ? picked : null}

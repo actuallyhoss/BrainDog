@@ -27,6 +27,10 @@
   head's action slot opens this sheet with the field focused, "Add" as its primary, and "All fields"
   for a row that needs more than its name, which is the page's whole form.
 
+  IT IS THE LIST'S ONE WAY TO ADD. The head held "New item" over this line's "Add an item", two controls for one act;
+  the head's went, and the whole form is `n` and the first entry of the head's overflow. So the line's plus starts on
+  the tile's edge, where the search box above it and the rows under it start, and its words are in the second ink.
+
   THE LINE IS THE PAGE'S. `value` is bound to the page's `capture`, because the page empties it when
   the question changes and puts the typing back when the record refuses it; `open` is the page's
   too, since the "+" that opens the sheet is in the head; `captureRow` and `allFields` are the page's,
@@ -148,13 +152,19 @@
     background: none;
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--dim);
+    color: var(--ink2);
     transition: background var(--d-state) var(--ease-out);
+  }
+
+  /* THE PLUS STARTS ON THE TILE'S EDGE, where the search box above it and the rows under it start. Its strokes sit
+     5.25 of the glyph's 24 units inside its box, so the box is drawn that far back and the ink lands on the edge. */
+  .capture-field > :global(.icon) {
+    margin-inline-start: calc(var(--icon-m) * -5.25 / 24);
   }
 
   .capture-field:focus-within {
     background: var(--field);
-    color: var(--ink2);
+    color: var(--ink);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -193,8 +203,9 @@
     }
   }
 
+  /* THE LIST'S ONE WAY TO ADD, so its words are in the second ink and not the dimmest: read, without shouting. */
   .capture-input::placeholder {
-    color: var(--dim);
+    color: var(--ink2);
   }
 
   .capture-input:focus-visible {

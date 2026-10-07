@@ -585,15 +585,6 @@
                 <span class="line-title addon-name">{name}</span>
                 <span class="line-detail addon-line">{lineOf(state)}</span>
               </a>
-              <button
-                type="button"
-                class="switch"
-                role="switch"
-                aria-checked={!off}
-                aria-label={copy.packSwitch(name)}
-                disabled={busy !== null}
-                onclick={() => turn(state.id, off)}
-              ><span class="switch-track"></span></button>
               <span class="line-verbs">
                 <Menu label={market.more(name)} align="end">
                   {#snippet trigger()}<span class="more"><Icon name="more" size="m" /><span class="vh">{market.more(name)}</span></span>{/snippet}
@@ -604,6 +595,17 @@
                   {/if}
                 </Menu>
               </span>
+              <!-- THE SWITCH IS LAST, on the tile's own edge, so six of them make one column down the right of the tile.
+                   It sat inside the "…" that only shows under the pointer, 45px in from the edge with nothing after it. -->
+              <button
+                type="button"
+                class="switch"
+                role="switch"
+                aria-checked={!off}
+                aria-label={copy.packSwitch(name)}
+                disabled={busy !== null}
+                onclick={() => turn(state.id, off)}
+              ><span class="switch-track"></span></button>
               <!-- WHAT STOPPED THE SWITCH, AND THE ONE THING TO PRESS NEXT. The cascade is that press, never the first. -->
               {#if block}
                 <p class="addon-said" role="status">
@@ -693,15 +695,16 @@
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    gap: var(--tile-gap);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
-  /* NOT `.panel`, which `blocks.css` draws as a page block's box: the tab's content sits straight on the ground. */
+  /* NOT `.panel`, which `blocks.css` draws as a page block's box: the tab's content sits straight on the ground. ITS
+     TILES ARE 12 APART, the board's one gap (`--tile-gap`), as on every other screen; they were 32. */
   .tabpanel {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-6);
+    gap: var(--tile-gap);
     min-inline-size: 0;
   }
 
@@ -756,6 +759,12 @@
 
   .update {
     grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+  }
+
+  /* THE TRACK ENDS ON THE ROW'S EDGE AT EVERY TARGET SIZE: under a thumb the button is 44 wide round a 36px track, and
+     centred in it the track would sit four pixels inside the edge the tile's other rows end on. */
+  .addon > .switch {
+    justify-items: end;
   }
 
   /* THE NAME AND ITS LINE ARE ONE TARGET, the add-on's own page, so a thumb anywhere on the words opens it. */

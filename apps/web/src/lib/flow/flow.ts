@@ -990,7 +990,13 @@ export const words = {
   proposeNew: (name: string) => `Add the automation ${name}?`,
   proposeChange: (name: string) => `Save the changes to the automation ${name}?`,
   lastRun: (at: string, state: string) => `Last run ${at}, ${state}.`,
+  /* ONLY FOR ONE THE RECORD COUNTS RUNS OF. An automation that runs inside the change that starts it keeps no run, so
+     the record answers no last run for it however often it has run, and all eighteen on a busy record read "Not run
+     yet" while Activity listed what they had done that morning. Those say when the log last has them (`lastActed`), or
+     that it has nothing from them lately (`quiet`), and this line is left for one that has a run to wait for. */
   neverRun: 'Not run yet.',
+  lastActed: (at: string) => `Last ran ${at}.`,
+  quiet: 'Has done nothing lately.',
   nextRun: (at: string) => `Next run ${at}.`,
   off: 'Turned off.',
   reads: 'It can read',
@@ -1156,18 +1162,23 @@ function conditionWords(cond: unknown): string {
  * A tree the builder can read is said in its words, "amount is more than 500", and any other as "the condition holds",
  * which is less than it could say and is not nothing.
  */
-export function sayStart(d: Draft): string {
+export function sayStart(d: Draft, listSaid?: (id: string) => string): string {
   const filed = conditionOf(d);
   const cond = filed === null ? '' : sayCondition(filed);
-  return cond === '' ? sayTrigger(d.trigger) : `${sayTrigger(d.trigger)}, only when ${cond}`;
+  return cond === '' ? sayTrigger(d.trigger, listSaid) : `${sayTrigger(d.trigger, listSaid)}, only when ${cond}`;
 }
 
-/** What starts it, in one sentence. */
-export function sayTrigger(t: Trigger): string {
+/**
+ * What starts it, in one sentence.
+ *
+ * `listSaid` IS WHAT A LIST IS CALLED, for a caller that knows: the hub's rows hand it the shell's names, so a row says
+ * "an item in Instalments" as the rail does and never the list's id. Without it the list is said as it was written.
+ */
+export function sayTrigger(t: Trigger, listSaid: (id: string) => string = (id) => id): string {
   if ('written' in t) {
     const w = t.written;
     const ops = (w.op ?? []).map((o) => ({ create: 'added', update: 'changed', delete: 'deleted' })[o]);
-    const said = `When an item in ${w.register || 'a list'} is ${ops.length > 0 ? andList(ops, 'or') : 'added or changed'}`;
+    const said = `When an item in ${w.register ? listSaid(w.register) : 'a list'} is ${ops.length > 0 ? andList(ops, 'or') : 'added or changed'}`;
     const fields = w.fields && w.fields.length > 0 ? `, and only when ${andList(w.fields.map((f) => f.replace(/_/gu, ' ')), 'or')} changes` : '';
     return `${said}${fields}${w.from_rules ? ', including changes other automations make' : ''}`;
   }

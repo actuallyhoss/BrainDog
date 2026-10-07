@@ -35,7 +35,7 @@
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import Face from '$lib/ui/Face.svelte';
   import { ofPeople } from '$lib/ui/RowCards.svelte';
-  import { boxOf, deadlineOf, standOf, withoutGood, type Receipt } from './list.ts';
+  import { boxOf, deadlineOf, dueOf, standOf, withoutGood, withoutZeros, type Receipt } from './list.ts';
 
   let {
     register,
@@ -44,6 +44,9 @@
     rows,
     total,
     sort,
+    now,
+    whole,
+    pickable,
     selected,
     selectedKeys,
     focus = $bindable(),
@@ -77,6 +80,12 @@
     /** `aria-rowcount`'s data rows, which the page gives three states (`rowCount`). */
     total: number;
     sort: { field: string; dir: 'asc' | 'desc' } | undefined;
+    /** The record's instant, which a late row's days are counted from. */
+    now: number;
+    /** The money columns where every amount is whole (`wholeMoney`), drawn without their ".00". */
+    whole: ReadonlySet<string>;
+    /** Whether the list is long enough to pick rows from, which draws the picker among each row's verbs. */
+    pickable: boolean;
     /** The picked rows by number, which the picker draws. */
     selected: ReadonlySet<number>;
     /** The same rows as the keys `Table` speaks in (`register#seq`). */
@@ -128,6 +137,23 @@
   const calm = $derived(withoutGood(rows));
   /* A LIST OF PEOPLE, whose titles each wear a face rather than a project's mark (`RowCards`' `ofPeople`). */
   const faced = $derived(ofPeople(decl));
+
+  /** A value as its cell says it: an amount by its symbol, and without its ".00" where the whole column has none. */
+  const figureCell = (field: string, value: string): string => {
+    const drawn = symbolFigure(value) ?? value;
+    return whole.has(field) ? withoutZeros(drawn) : drawn;
+  };
+
+  /**
+   * A LATE ROW SAYS SO, ON THE DATE THAT MADE IT LATE: "38 days late" before the day, in the cell's one red. The head
+   * counted "4 late" over a list where a late row was told from the rest by the colour of its date alone.
+   */
+  const lateSaid = (row: TableRow, field: string): string | null => {
+    if (field !== dated || row.tone !== 'bad') return null;
+    const entry = rowAt(Number(row.key.split('#')[1]));
+    const due = entry ? dueOf(decl, entry, now) : null;
+    return due?.late ? due.text : null;
+  };
 </script>
 
 <div class="table-slot" data-picking={selected.size > 0 ? '' : undefined}>
@@ -153,6 +179,11 @@
       <span class="state" data-stand={standOf(decl, stored, row.tone === 'bad')}><span class="state-dot" aria-hidden="true"></span><span class="enum">{copy.valueWord(value)}</span></span>
     {:else}<span class="enum">{copy.valueWord(value)}</span>{/if}
   {/snippet}
+  <!-- ANY OTHER VALUE: an amount as the column draws it, and a late row's deadline with how late it is before the day. -->
+  {#snippet plainSaid(row: TableRow, field: string, value: string)}
+    {@const late = lateSaid(row, field)}
+    {#if late}<span class="late-word">{late}</span><span class="late-sep" aria-hidden="true"> · </span>{/if}{figureCell(field, value)}
+  {/snippet}
   <!-- ONE ROW HAS NOTHING TO SORT. `onsort` is optional and the table draws a plain label
        without it, so eight header buttons over a single row, each announcing
        `aria-sort="none"`, become eight headings. -->
@@ -175,25 +206,11 @@
       {@const ident = identityOf(register, column.field, rowAt(seq)?.fields[column.field], names)}
       {@const isTitle = column.field === decl.title}
       {@const isEnum = fieldOf(column.field)?.type === 'enum'}
-      {#if column.field === 'select'}
-        <!-- A LEADING COLUMN FOR THE SELECTION, and it is a column rather than a decoration on the id.
-             The control is `tabindex="-1"` on purpose. A grid is a composite widget with exactly one
-             tab stop, at 500 rows a focusable control per row is 500 tab stops, so the keyboard path
-             stays `x`, which the `?` sheet already advertises, and the pointer path is this. -->
-        <button
-          type="button"
-          class="pick tap"
-          tabindex="-1"
-          data-on={selected.has(seq) ? '' : undefined}
-          aria-label="{selected.has(seq) ? copy.deselect : copy.select} {display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? copy.thisRow}"
-          onclick={(e) => {
-            /* The cell activates the row. Without this, picking one opened it. */
-            e.stopPropagation();
-            toggleSelect(seq, e.shiftKey);
-          }}
-        >
-          {#if selected.has(seq)}<Icon name="check" size="s" />{/if}
-        </button>
+      {#if column.field === 'seq'}
+        <!-- EVERY ROW HERE HAS A NUMBER THE RECORD GAVE IT, and it is drawn as the number under the
+             column's name, with no "#" in front: the cell's text is `toRows`' spoken
+             form, which is for a sentence and not for a column headed Number.
+        --><span class="row-seq">{seq}</span>
       {:else if editing?.seq === seq && editing.field === column.field}
         <!--
           THE CELL BECOMES THE EDITOR, in the box the value is already drawn in.
@@ -370,6 +387,22 @@
           </span>
         {:else}
           <span class="verbs">
+            <!-- THE PICKER, AMONG THE ROW'S OWN VERBS. It led the row in a column of its own, which nothing is drawn in
+                 until a pointer arrives, so every title started 30px in from the search box and the heads above it. A
+                 grid is a composite widget with exactly one tab stop, so it is `tabindex="-1"` like the verbs beside it:
+                 the keyboard path is `x`, which the `?` sheet advertises, and the pointer path is this. -->
+            {#if pickable}<button
+              type="button"
+              class="pick tap"
+              tabindex="-1"
+              data-on={selected.has(seq) ? '' : undefined}
+              aria-label="{selected.has(seq) ? copy.deselect : copy.select} {name}"
+              onmousedown={(e) => e.preventDefault()}
+              onclick={(e) => {
+                /* The cell activates the row. Without this, picking one opened it. */
+                e.stopPropagation();
+                toggleSelect(seq, e.shiftKey);
+              }}>{#if selected.has(seq)}<Icon name="check" size="s" />{/if}</button>{/if}
             {#if archive}<button
               type="button"
               class="verb icon tap"
@@ -396,11 +429,6 @@
         <ScopeChip scope={scopeOf(register, rowAt(seq)?.fields ?? {}, names) ?? null} />
       {:else if ident}
         <IdentityMark identity={ident} />
-      {:else if column.field === 'seq'}
-        <!-- EVERY ROW HERE HAS A NUMBER THE RECORD GAVE IT, and it is drawn as the number under the
-             column's name, with no "#" in front: the cell's text is `toRows`' spoken
-             form, which is for a sentence and not for a column headed Number.
-        --><span class="row-seq">{seq}</span>
       {:else if value === null}
         <!-- AN EMPTY CELL DRAWS NOTHING. A dash in every gap was a column of marks that meant
              nothing; only a title says so, because a row with no name needs words to be found. -->
@@ -426,7 +454,7 @@
           control per cell is four thousand tab stops. The keyboard path is `e`, which the `?`
           sheet has advertised since the grid was written.
         -->
-        <span class="cell-said">{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{symbolFigure(value) ?? value}{/if}<button
+        <span class="cell-said">{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{@render plainSaid(row, column.field, value)}{/if}<button
             type="button"
             class="cell-pen"
             tabindex="-1"
@@ -436,7 +464,7 @@
               openEditor(seq, column.field);
             }}
           ><Icon name="edit" size="s" /></button></span>
-      {:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{symbolFigure(value) ?? value}{/if}{/if}
+      {:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{@render plainSaid(row, column.field, value)}{/if}{/if}
     {/snippet}
   </Table>
 </div>
@@ -604,6 +632,17 @@
      red state dot it was a third mark of one fact. */
   .table-slot :global(.tr[data-intent='bad'] .td[data-tone]) {
     color: var(--danger-text);
+  }
+
+  /* HOW LATE, BEFORE THE DAY, at the cell's weight plus one, so the words read first and the days still line up at the
+     column's end. */
+  /* The dot between how late and the day keeps its air where the cell lays its words out in a row. */
+  .late-sep {
+    margin-inline: 0.35em;
+  }
+
+  .late-word {
+    font-weight: var(--fw-medium);
   }
 
   .table-slot :global(.table[data-toned] .td[data-glyph]) {
@@ -813,15 +852,16 @@
      `tabindex="-1"` and every verb is a key the `?` sheet lists. The picker goes the same way while
      nothing is selected, and comes back on every row once something is. */
   @media (hover: hover) and (pointer: fine) {
-    .verbs,
-    .table-slot:not([data-picking]) .pick:not([data-on]) {
+    .verbs {
       transition: opacity var(--d-state) var(--ease-out);
     }
 
-    :global(.tr:not(:hover, :focus-within, [data-focused])) .verbs,
-    .table-slot:not([data-picking]) :global(.tr:not(:hover, :focus-within, [data-focused]) .pick:not([data-on])),
-    .table-slot:not(:focus-within) :global(.tr[data-focused]:not(:hover) .verbs),
-    .table-slot:not([data-picking], :focus-within) :global(.tr[data-focused]:not(:hover) .pick:not([data-on])) {
+    /* WHILE ROWS ARE PICKED THE PICKER STAYS ON EVERY ROW and the other verbs still wait for the row: the cell keeps
+       its box, and only the verbs that are not the picker go. */
+    .table-slot:not([data-picking]) :global(.tr:not(:hover, :focus-within, [data-focused]) .verbs),
+    .table-slot:not([data-picking], :focus-within) :global(.tr[data-focused]:not(:hover) .verbs),
+    .table-slot[data-picking] :global(.tr:not(:hover, :focus-within, [data-focused]) .verbs > :not(.pick)),
+    .table-slot[data-picking]:not(:focus-within) :global(.tr[data-focused]:not(:hover) .verbs > :not(.pick)) {
       opacity: 0;
     }
   }

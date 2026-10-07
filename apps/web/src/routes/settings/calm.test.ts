@@ -19,7 +19,38 @@ test('Navigation says where its choices are kept once, and no footer under it sa
   const nav = markup('Navigation');
   assert.equal(nav.match(/copy\.perPerson/gu)?.length, 1, 'perPerson is said more than once');
   assert.equal(nav.match(/copy\.perDevice/gu)?.length, 1, 'perDevice is said more than once');
-  assert.match(page, /const KEEPS = new Set\(\['appearance', 'keyboard'\]\)/u);
+  assert.match(page, /const KEEPS = new Set\(\['keyboard'\]\)/u);
+});
+
+test('the two sentences about where a look is kept agree with the code, which keeps it in the record', () => {
+  /* THE CODE: every look setting is sent to the record under a `look.*` key, and `whereKept` answers `record` once the
+     record has it. So "on every device you open it on" is the true one, and no line may say "this device" under it. */
+  const pref = strip(readFileSync(new URL('../../lib/pref.ts', import.meta.url), 'utf8'));
+  for (const key of ['scheme', 'text', 'density', 'contrast', 'theme']) assert.match(pref, new RegExp(`${key}: 'look\\.`, 'u'), `${key} is not a key the record keeps`);
+  assert.match(pref, /!follows\(\) \? 'device' : Object\.keys\(unsent\(\)\)\.length > 0 \? 'pending' : 'record'/u);
+  const look = area('Appearance');
+  assert.match(look, /kept === 'record' \? words\.hint\(props\.shell\.index\.name\) : kept === 'pending' \? words\.hintPending : words\.hintDevice/u);
+  assert.match(look, /on every device you open it on\./u);
+  /* NO FOOTER UNDER APPEARANCE SAYS OTHERWISE. Keyboard's switch is a cookie and is sent nowhere, so it keeps the line. */
+  assert.doesNotMatch(/const KEEPS = new Set\(\[([^\]]*)\]\)/u.exec(page)?.[1] ?? "'appearance'", /appearance/u);
+  assert.match(area('Keyboard'), /pref\.write\(\{ chars \}\)/u);
+  const account = strip(readFileSync(new URL('../../lib/copy/account.ts', import.meta.url), 'utf8'));
+  const line = /keptOnDevice: '([^']*)'/u.exec(account)?.[1] ?? '';
+  assert.equal(line, 'These choices are kept on this device only.');
+  assert.doesNotMatch(line, /settings above/u, 'the line still claims every setting on the screen');
+});
+
+test('the sub-nav draws "here" as the rail does: the tile under the row and the glyph in the accent', () => {
+  const index = strip(readFileSync(new URL('./[area]/SettingsIndex.svelte', import.meta.url), 'utf8'));
+  const here = /\.area-row\[aria-current='page'\] \{([^}]*)\}/u.exec(index)?.[1] ?? '';
+  assert.match(here, /background: var\(--tile\);/u);
+  assert.doesNotMatch(here, /--selected/u, 'the current area still wears the tinted wash');
+  const glyph = /\.area-row\[aria-current='page'\] \.area-icon :global\(\.well\.well\) \{([^}]*)\}/u.exec(index)?.[1] ?? '';
+  assert.match(glyph, /background: transparent;/u);
+  assert.match(glyph, /color: var\(--action\);/u);
+  assert.doesNotMatch(index, /tone=\{a\.id === current \? 'ink'/u, 'the current area still wears an ink well');
+  /* A ROW IS 44 UNDER A THUMB. */
+  assert.match(index, /@media \(pointer: coarse\) \{\s*\.area-row \{\s*min-block-size: var\(--tap\);/u);
 });
 
 test('each Navigation section draws at most one hint', () => {

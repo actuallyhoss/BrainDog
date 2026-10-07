@@ -7,6 +7,7 @@
  * constructor and the tests hold on any time zone.
  */
 
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -114,8 +115,56 @@ test('A ROW SAYS ITS LAST RUN ON ITS SECOND LINE AND ITS NEXT IN THE COLUMN, NEV
   assert.equal(nextOf(row, NOW), 'Next in 2h');
   assert.equal(nextOf({ ...row, enabled: false }, NOW), undefined);
   assert.equal(lastLine({ ...row, enabled: false }, NOW), 'Turned off.');
-  assert.equal(triggerIcon('arrival'), 'bell');
   assert.equal(triggerIcon('something new'), 'refresh');
+});
+
+test('A ROW WEARS THE ICON OF WHAT STARTS IT, and a change to a list wears that list\'s own', () => {
+  assert.equal(triggerIcon('every'), 'clock');
+  assert.equal(triggerIcon('arrival'), 'inbox');
+  assert.equal(triggerIcon('decided'), 'decide');
+  assert.equal(triggerIcon('manual'), 'play');
+  assert.equal(triggerIcon('metric'), 'observe');
+  assert.equal(triggerIcon('written', 'money'), 'money', 'a change to a list wears the glyph the rail draws that list with');
+  assert.equal(triggerIcon('written'), 'rows', 'a list the shell does not draw is the glyph of any list');
+  assert.equal(triggerIcon('every', 'money'), 'clock', 'only a change to a list takes the list\'s glyph');
+  /* EIGHTEEN ROWS WORE THREE ICONS BETWEEN THEM: every kind that can start one has its own now. */
+  const kinds = ['every', 'arrival', 'decided', 'manual', 'metric', 'written'];
+  assert.equal(new Set(kinds.map((k) => triggerIcon(k))).size, kinds.length);
+});
+
+test('ONE THE RECORD KEEPS NO RUNS OF SAYS WHEN THE LOG LAST HAS IT, never "Not run yet"', () => {
+  /* The record answers `last: null` for an automation that runs inside the change that starts it, however often it ran. */
+  const inline = auto('Keep balances current', { trigger: 'written', path: 'inline', register: 'accounts' });
+  assert.equal(lastLine({ ...inline, acted: iso(NOW - 2 * 3_600_000) }, NOW), 'Last ran 2h ago.');
+  assert.equal(lastLine({ ...inline, acted: null }, NOW), 'Has done nothing lately.', 'the newest page of the log holds nothing from it');
+  assert.equal(lastLine(inline, NOW), '', 'with the log unread it says nothing rather than guess');
+  for (const row of [inline, { ...inline, acted: null }, { ...inline, acted: iso(NOW) }]) assert.doesNotMatch(lastLine(row, NOW), /Not run yet/u);
+  /* ONE THAT WOULD HAVE LEFT A RUN AND HAS NONE HAS NOT RUN YET, and that is still said. */
+  assert.equal(lastLine(auto('Standup'), NOW), 'Not run yet.');
+  assert.equal(lastLine({ ...inline, enabled: false, acted: iso(NOW) }, NOW), 'Turned off.');
+  /* THE PAGE'S SENTENCE SAYS THE SAME, and a draft with nothing true to say has none. */
+  assert.deepEqual(pageSentence({ ...inline, acted: iso(NOW - 2 * 3_600_000) }, NOW), { text: 'Last ran 2h ago.', needs: '' });
+  assert.equal(pageSentence(inline, NOW), null);
+});
+
+test('AN OWNER\'S ROW ENDS IN A SWITCH, a row is a link only without one, and the switch is never inside a link', () => {
+  const rows = readFileSync(new URL('./HubRows.svelte', import.meta.url), 'utf8');
+  const markup = rows.slice(rows.indexOf('</script>'), rows.indexOf('<style>')).replace(/<!--[\s\S]*?-->/gu, '');
+  assert.match(markup, /role="switch"/u);
+  assert.match(markup, /aria-checked=\{t\.on\}/u);
+  assert.match(markup, /aria-label=\{t\.label\}/u);
+  /* The switched row is a `div`, and its name is the link stretched over it. */
+  const switched = markup.slice(markup.indexOf('{#if t && ontoggle}'), markup.indexOf('{:else if r.path}'));
+  assert.match(switched, /<div class="row line line-tall switched"/u);
+  assert.doesNotMatch(switched, /<a class="row/u, 'a switch sits inside a link');
+  assert.match(markup, /<a class="line-title name open tap"/u);
+  /* 44 UNDER A THUMB comes from the house switch, so the row must use it and not a drawing of its own. */
+  assert.match(switched, /class="switch"/u);
+  const controls = readFileSync(new URL('../../lib/ui/controls.css', import.meta.url), 'utf8');
+  assert.match(controls, /@media \(pointer: coarse\) \{\s*\.switch \{\s*min-inline-size: var\(--tap\);\s*min-block-size: var\(--tap\);/u);
+  const tab = readFileSync(new URL('./AutomationsTab.svelte', import.meta.url), 'utf8');
+  assert.match(tab, /toggle: owner \? \{ on: r\.enabled, label: w\.switchOf\(r\.name\) \} : undefined/u, 'the switch is drawn for somebody the record would refuse');
+  assert.match(tab, /openAutomations\(\(url, init\) => fetch\(url, init\), apiBase\(\), \{ acted: true \}\)/u);
 });
 
 test('THE BARS ARE THE BUSIEST SIX, THE TOP ONE INK, AND ONE WITH A FAILURE RED WITH ITS COUNT', () => {

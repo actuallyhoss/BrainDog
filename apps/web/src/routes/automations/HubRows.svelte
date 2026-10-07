@@ -14,22 +14,44 @@
 
   A DOT FOR WHAT NEEDS A LOOK, AND ONLY THAT, leading the sentence that says it, so the dot never stands alone (a
   status is a 6px dot and its word). Red for a failure, amber for a pause, and a hollow ring for off.
+
+  A ROW THE READER MAY TURN ON AND OFF ENDS IN A SWITCH (`toggle`), at the row's own edge so a column of them lines
+  up. A switch cannot sit inside a link, so such a row is not one: its name is the link, and the link's hit box is
+  stretched over the whole row (`.tap`, placed against the row), with the switch lifted over it. A press anywhere but
+  the switch still opens the thing, and the switch is 44 under a thumb (`controls.css`).
 -->
 <script lang="ts">
   import { at } from '$lib/at.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
   import type { HubRow } from './hub.ts';
 
-  let { rows, dim = false }: { rows: readonly HubRow[]; /** Draw the group quieter: the turned-off ones. */ dim?: boolean } = $props();
+  let {
+    rows,
+    dim = false,
+    ontoggle,
+    busy = null,
+  }: {
+    rows: readonly HubRow[];
+    /** Draw the group quieter: the turned-off ones. */
+    dim?: boolean;
+    /** A row's switch was pressed: its key, and what it should now be. */
+    ontoggle?: ((key: string, on: boolean) => void) | undefined;
+    /** The key of the row whose switch is out to the record now; every switch waits while one is. */
+    busy?: string | null;
+  } = $props();
 </script>
 
-{#snippet body(r: HubRow)}
+{#snippet body(r: HubRow, linked: boolean)}
   <IconWell name={r.icon ?? 'refresh'} size="l" />
   <span class="line-main">
-    <span class="line-title name">{r.name}</span>
+    {#if linked && r.path}
+      <a class="line-title name open tap" href={at(r.path)}>{r.name}</a>
+    {:else}
+      <span class="line-title name">{r.name}</span>
+    {/if}
     <span class="line-detail meta">
       {#if r.what}<span class="what">{r.what}</span>{/if}
-      <span class="said" data-dot={r.dot ?? undefined}>{r.said}</span>
+      {#if r.said}<span class="said" data-dot={r.dot ?? undefined}>{r.said}</span>{/if}
     </span>
   </span>
   {#if r.aside}<span class="line-when aside" data-clock={r.clock ? '' : undefined}>{r.aside}</span>{/if}
@@ -37,11 +59,25 @@
 
 <ul class="ledger ledger-lead hub-rows" data-dim={dim ? '' : undefined}>
   {#each rows as r (r.key)}
+    {@const t = r.toggle}
     <li>
-      {#if r.path}
-        <a class="row tap line line-tall" href={at(r.path)}>{@render body(r)}</a>
+      {#if t && ontoggle}
+        <div class="row line line-tall switched" data-off={t.on ? undefined : ''}>
+          {@render body(r, true)}
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            aria-checked={t.on}
+            aria-label={t.label}
+            disabled={busy !== null}
+            onclick={() => ontoggle(r.key, !t.on)}><span class="switch-track"></span></button
+          >
+        </div>
+      {:else if r.path}
+        <a class="row tap line line-tall" href={at(r.path)}>{@render body(r, false)}</a>
       {:else}
-        <div class="row line line-tall">{@render body(r)}</div>
+        <div class="row line line-tall">{@render body(r, false)}</div>
       {/if}
       {#if r.fix}
         <a class="fix tap" href={at(r.fix.path)}>{r.fix.label}</a>
@@ -82,8 +118,42 @@
     line-clamp: unset;
   }
 
-  .what::after {
+  /* THE DOT BETWEEN THE TWO ONLY WHERE THERE ARE TWO: a row with nothing to say of its last turn ends on what it is. */
+  .what:not(:last-child)::after {
     content: ' · ';
+  }
+
+  /* A ROW WITH A SWITCH: the same three columns and the switch as a fourth, at the row's own trailing edge. The row is
+     as tall as any other, because the switch's 32px target fits inside the 56. */
+  .switched {
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
+  }
+
+  .switched .switch {
+    grid-column: 4;
+    grid-row: 1;
+    z-index: var(--z-raise);
+    /* THE TRACK ENDS ON THE ROW'S EDGE AT EVERY TARGET SIZE: under a thumb the button is 44 wide round a 36px track,
+       and centred in it the track would sit four pixels inside the edge the rows above and below end on. */
+    justify-items: end;
+  }
+
+  /* THE NAME IS THE LINK AND THE ROW IS ITS TARGET: static, so the hit box `.tap` draws is placed against the row
+     (`rows.css` positions it), as Activity's rows do. The words keep the ink they had rather than a link's. */
+  .open {
+    position: static;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .open:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* OFF, AND STILL HERE: the name steps down to the second ink, as a turned-off add-on's does. Never red. */
+  .switched[data-off] .name {
+    color: var(--ink2);
   }
 
   .said[data-dot]::before {
@@ -116,7 +186,7 @@
   }
 
   /* THE TURNED-OFF GROUP, QUIETER AND NOT RED: the name steps down to the second ink. */
-  .hub-rows[data-dim] .name {
+  .hub-rows[data-dim] .line:not(.switched) .name {
     color: var(--ink2);
   }
 
@@ -137,6 +207,17 @@
   @media (hover: hover) and (pointer: fine) {
     .fix:hover {
       text-decoration-color: currentColor;
+    }
+
+    /* A ROW THAT IS NOT ITSELF A LINK STILL TAKES THE WASH UNDER THE POINTER, and its hairlines step aside for it, as
+       the shared rows' do. */
+    .switched:hover {
+      background: var(--hover-wash);
+    }
+
+    .hub-rows > li:has(> .switched:hover) > .line::after,
+    .hub-rows > li:has(> .switched:hover) + li > .line::after {
+      opacity: 0;
     }
   }
 
