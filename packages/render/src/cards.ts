@@ -160,7 +160,7 @@ function runTokens(value: string): string[] {
  * after it, because a dip to zero claims the value was zero (05 §7.4). `said` keeps what the author
  * wrote, so the accessible name reads the same numbers the shape was drawn from.
  */
-export function trendOf(value: string): { d: string; end: string; said: string[] } | null {
+export function trendOf(value: string): { d: string; end: string; said: string[]; bars: string | null } | null {
   const tokens = runTokens(value);
   const numbers = tokens.map((t) => {
     const n = t === '' ? Number.NaN : Number(t.replace(/−/gu, '-').replace(/,(?=\d{3}(?!\d))/gu, ''));
@@ -190,7 +190,15 @@ export function trendOf(value: string): { d: string; end: string; said: string[]
        point, drawn with attributes alone: a `circle` would stretch with the box. */
     end = `M${point}h0`;
   });
-  return { d, end, said: numbers.map((n, i) => (n === null ? 'no value' : tokens[i]!)) };
+  /* A SHORT RUN OF COUNTS IS BARS: seven points or fewer, none under nothing, are a week of days, each a thing
+     counted, and a line through them draws a slope between days that have none. One stroke a point, from the floor;
+     a nought still shows as a stub, so a day with nothing is told from a day unknown. */
+  const n = tokens.length;
+  const bars =
+    n <= 7 && lo >= 0
+      ? numbers.flatMap((v, i) => (v === null ? [] : [`M${at(((i + 0.5) / n) * 1000)} 100V${at(hi === 0 ? 96 : 100 - Math.max(4, (v / hi) * 90))}`])).join(' ')
+      : null;
+  return { d, end, said: numbers.map((n, i) => (n === null ? 'no value' : tokens[i]!)), bars };
 }
 
 /**

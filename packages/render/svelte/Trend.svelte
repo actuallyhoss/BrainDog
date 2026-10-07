@@ -12,7 +12,9 @@
   const name = $derived(t ? `${text(inline(label, opts)) || TREND}: ${t.said.join(', ')}` : '');
 </script>
 
-{#if t}<svg class={cls} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={name}
+{#if t && cls === 'cell-trend' && t.bars}<svg class={cls} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={name}
+    ><path class="trend-bar" d={t.bars} vector-effect="non-scaling-stroke"></path></svg
+  >{:else if t}<svg class={cls} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={name}
     ><path class="trend-line" d={t.d} vector-effect="non-scaling-stroke"></path><path
       class="trend-end"
       d={t.end}

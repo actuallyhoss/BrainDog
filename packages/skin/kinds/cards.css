@@ -62,8 +62,10 @@
     text-underline-offset: 3px;
   }
 
-  /* A RUN NOT HEARD FROM LATELY, dimmed and not hidden, so it still says what it was doing. */
-  .cards-item[data-quiet] {
+  /* A RUN NOT HEARD FROM LATELY, dimmed and not hidden, so it still says what it was doing. ONLY ITS FACE AND ITS FACTS
+     STEP BACK: the whole card at 0.6 put its name in grey on the tile's grey (DIRECTION §36, no grey on grey), and the
+     name is what a person looks for. */
+  .cards-item[data-quiet] :is(.cards-face, .cards-facts) {
     opacity: 0.6;
   }
 

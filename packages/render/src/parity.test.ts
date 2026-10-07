@@ -87,6 +87,8 @@ const SHAPES: Record<string, string> = {
   'a section that counts nothing': '```section | Working now\n | 0 | \n```',
   'a folded section with a glyph': '```section | Parked and retired\nthing | 4 | fold\n```',
   'a section that is only a heading': '```section | From everywhere\n```',
+  'a folded section whose well takes a tone': '```section | Needs you\nalert | 2 | fold | danger\n```',
+  'a section whose tone is a word the well does not know': '```section | Paid\ncheck | 4 |  | loud\n```',
   'a feed with bursts, a mark and a tone':
     '```feed\nagent | Claude | 14 | saves on [Variable axis QA](/r/things/4) | 3h ago\nrule | Late fees | 2 | reminders sent | 5h ago\n' +
     'seen | 2d ago\nagent | Codex |  | opened Kiln | 3d ago | bad\nyou | You | 1 | decision on Pricing | 4d ago\n```',
@@ -434,6 +436,14 @@ const DRAWN: Record<string, string> = {
     '```calendar | Dates\nKiln launch | 2026-09-12\nPrinter call | 12 Sep 2026 | warn\n[Site](/r/things/2) | 2026-09-12\nQuote | 2026-09-12\nRenewal | 2026-10-03T09:00:00Z\nSomeday | soon\n```',
   'a calendar with no day that reads': '```calendar\nSomeday | soon\n```',
   'a calendar with nothing on it': '```calendar\n```',
+  'lanes in a window of one day, one still going, one cut at the start, a link, a tone and now':
+    '```lanes | Today\nwindow | 2026-10-07T08:00:00+02:00 | 2026-10-07T18:00:00+02:00 | 2026-10-07T11:30:00+02:00\n' +
+    '[Kiln sync](/r/things/2) | 2026-10-07T09:00:00+02:00 | 2026-10-07T10:30:00+02:00\n●︎ Fix the export | 2026-10-07T10:00:00+02:00 |  | warn\n' +
+    'Night run | 2026-10-07T05:00:00+02:00 | 2026-10-07T08:30:00+02:00 | bad\nShipped | 2026-10-07T16:00:00+02:00 | 2026-10-07T16:00:00+02:00 | good\n' +
+    'Tomorrow | 2026-10-08T09:00:00+02:00 | 2026-10-08T10:00:00+02:00\nSomeday | soon\n```',
+  'lanes with no window, over whole days': '```lanes\nDesign | 2026-09-01 | 2026-09-10\nBuild | 2026-09-08 | 2026-09-30 | info\n```',
+  'lanes whose rows all fail to read': '```lanes\nSomeday | soon\n```',
+  'lanes with nothing in them': '```lanes\n```',
   'links of every kind of address, and one with none': '```link | Useful\nThe spec | https://www.example.com/spec | read first\nWrite to us | mailto:hello@example.com\nThe plan | /p/plan\nNo address |  | later\n |  https://example.org\n```',
   'a gallery of a picture, a file that is not one, a file the host cannot serve and a caption alone':
     '```gallery\nThe glaze | file:parts#2/photo\nThe quote | quote.pdf\nNot served | file:parts#3/scan\nJust words | \n```',

@@ -27,6 +27,7 @@ import { pathFault } from './path.ts';
 import { inputsFault } from './inputs.ts';
 import { linkFault } from './links.ts';
 import { embedFault } from './embed.ts';
+import { lanesFault } from './lanes.ts';
 
 /**
  * `page` is set by a page's own evaluator and never by a write-up. It admits the page-only kinds
@@ -56,7 +57,7 @@ export type Row = { cells: string[]; tone?: Tone; hole?: boolean; done?: boolean
 
 export type Block = {
   type: 'block';
-  /** One of the thirty-eight, or `block.<id>` for a kind a pack declared; `kindSpec` reads either. */
+  /** One of the thirty-nine, or `block.<id>` for a kind a pack declared; `kindSpec` reads either. */
   kind: BlockKind;
   /** The word after the kind in the fence, one of `KINDS[kind].forms`: ` ```stat lead ` is `lead`. */
   form?: string;
@@ -298,7 +299,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         fix: isPackKind(kind)
           ? `"${written}" is a block kind no installed pack declares. Install the pack that declares it. The block is shown as you wrote it.`
           : written
-          ? `"${written}" is not one of the thirty-eight kinds. The block is shown as you wrote it.`
+          ? `"${written}" is not one of the thirty-nine kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
         info,
@@ -434,6 +435,8 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
        nobody may draw, is the fault the author has to see. */
     const link = kind === 'link' ? linkFault(rows.map((r) => r.cells)) : null;
     const embed = kind === 'embed' ? embedFault(rows.map((r) => r.cells)) : null;
+    /* A LANES BLOCK'S WINDOW IS READ, NOT PRINTED: one that does not read would leave every span with nowhere to sit. */
+    const lanes = kind === 'lanes' ? lanesFault(rows.map((r) => r.cells)) : null;
     /* A STAT'S FOURTH CELL IS A TREND, and a word there is a note in the wrong column rather than a
        line with no points: before the trend it was a fifth cell and degraded, and it still does. */
     const trend = kind === 'stat' ? rows.find((r) => (r.cells[3] ?? '').trim() !== '' && !/\d/u.test(r.cells[3]!)) : undefined;
@@ -455,6 +458,8 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
                   ? link
                 : embed
                   ? `An embed block has ${embed}.`
+                : lanes
+                  ? `A lanes block has ${lanes}.`
                 : diff !== null
                   ? `A diff row starts with "- ", "+ " or two spaces, and "${diff}" does not.`
                   : null;
@@ -478,7 +483,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
 
     out.push({
       type: 'block',
-      /* `kindSpec` answered, so the name is one of the thirty-eight or an installed `block.<id>`. */
+      /* `kindSpec` answered, so the name is one of the thirty-nine or an installed `block.<id>`. */
       kind: kind as BlockKind,
       ...(form ? { form } : {}),
       ...(heading ? { heading } : {}),

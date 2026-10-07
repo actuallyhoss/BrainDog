@@ -99,10 +99,17 @@
     font-size: var(--t-sm);
   }
 
-  /* A FIGURE IS ALWAYS INK, even when it is wrong. The dot beside the label says so and the note
+  /* A FIGURE IS INK, even when it is off its target. The dot beside the label says so and the note
      under the figure says why; a red number is the loudest thing on a page and says the least. */
   .cell[data-intent] .cell-figure {
     color: var(--ink);
+  }
+
+  /* EXCEPT THE ONE A PAGE DECLARED `bad` AND THE RECORD FOUND MISSED: the day the cash runs out. That figure is the
+     thing that needs the person, so it is said in the red at the figure's own size, and no other tone reaches it
+     (`page-live.ts` `tileOf` answers `bad` only there; a missed target anywhere else is amber and stays ink). */
+  .cell[data-intent='bad'] .cell-figure {
+    color: var(--danger);
   }
 
   /* A STAT'S TREND IS ITS SPARKLINE, TOP RIGHT, 120 by 32 with no axes, on the label's line and never
@@ -142,6 +149,16 @@
     stroke: var(--tone, var(--chart-1));
     stroke-width: 6px;
     stroke-linecap: round;
+  }
+
+  /* A SHORT RUN IS BARS: seven points or fewer are a week of days, each a thing counted, and a line through them
+     draws a slope between days that have none. One thin stroke a point from the floor, in the accent, square at both
+     ends so a bar stops at the value it says (the renderer draws `.trend-bar` in place of the line for such a run). */
+  .trend-bar {
+    fill: none;
+    stroke: var(--chart-1);
+    stroke-width: 4px;
+    stroke-linecap: butt;
   }
 
   /* `stat lead`: the first figure is the screen's one lead figure, up to the page name's 28 (DIRECTION §39: a figure is

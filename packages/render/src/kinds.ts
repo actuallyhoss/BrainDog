@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the thirty-eight kinds, and the four intent words.
+ * The eight primitives, the thirty-nine kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -80,6 +80,19 @@ export const TONE_ALIAS: Record<string, Tone> = {
 /** `hole` is a tone, on `bar` only: the row that is a task, not a value (05 §7.5). */
 export const BAR_HOLE = 'hole';
 
+/**
+ * The tones a `section` heading's well may take, its row's fourth cell: `thing | 4 | fold | danger`.
+ *
+ * ROLES AND NOT INTENTS, because the well is a wash behind a glyph and not a claim about a row: `danger` is what
+ * needs the person, `action` what they can do next, `earn` what came in. Both drawers write the word as `data-tone`
+ * on the well and the host's stylesheet reads it there, so nothing here names a colour. Any other word draws the
+ * well as it always was.
+ */
+export const SECTION_TONES = ['danger', 'action', 'earn'] as const;
+export type SectionTone = (typeof SECTION_TONES)[number];
+export const sectionTone = (word: string | undefined): SectionTone | undefined =>
+  (SECTION_TONES as readonly string[]).includes(word ?? '') ? (word as SectionTone) : undefined;
+
 /** The head of the position column in a `sparkline`'s fold, where each drawn line's points are a column. */
 export const SPARKLINE_POINT = 'Point';
 
@@ -147,7 +160,7 @@ export type KindSpec = {
 };
 
 /**
- * Thirty-eight, counted. `diagram` is post-v1 and arrives as a
+ * Thirty-nine, counted. `diagram` is post-v1 and arrives as a
  * pack, which is the whole reason the primitive layer exists (05 §2).
  *
  * THE THIRTY-FOURTH, `inputs`, AND FIVE FORMS CAME TOGETHER, for one reason: a person building a desk of their own
@@ -274,7 +287,8 @@ const TABLE = {
   /* The `lead` form marks the first card for the host to draw two tracks wide, as `stat lead` marks its first figure:
      told, never inferred from the width (05 §4). */
   cards: { primitive: 'grid', cells: 0, forms: ['lead'], tone: true, header: true, pageOnly: true, minSpan: 4, purpose: 'list' },
-  section: { primitive: 'panel', cells: 3, tone: false, rows: 1, pageOnly: true, minSpan: 12, purpose: 'say' },
+  /* A section's fourth cell is its well's tone, one of `SECTION_TONES`, and may be left off. */
+  section: { primitive: 'panel', cells: 4, optional: 1, tone: false, rows: 1, pageOnly: true, minSpan: 12, purpose: 'say' },
 
   /* The agent path's two more, on existing primitives for the same reason. A `feed` row is
      `by | who | count | what | when`, plus a `seen` row where the reader last looked (`src/feed.ts`);
@@ -305,6 +319,12 @@ const TABLE = {
      its first rows and counting the rest, then an agenda of the days that hold anything (`src/calendar.ts`). On `list`,
      because a drawer that does not know the kind yet falls back to a dated list, as `roadmap` does. */
   calendar: { primitive: 'list', cells: 2, tone: true, minSpan: 6, purpose: 'plan' },
+  /* `title | start | end`, and a tone: one row a lane, its span placed between the two ends of a window of time, with
+     a line where now falls (`src/lanes.ts`). The first row may be the window itself, `window | from | to | now`, which
+     is why a row has room for four cells; with none, the window is the rows' own first start to last end. An end left
+     off is a span still going. On `list`, for `calendar`'s reason: a drawer that does not know the kind yet falls back
+     to a dated list of title, start and end. `optional` lets a row leave its end off and still take a tone word. */
+  lanes: { primitive: 'list', cells: 4, optional: 2, tone: true, minSpan: 6, purpose: 'plan' },
   /* `title | url | note | icon`: an https address, a mailto or a path of this BrainDog, the host under the title and
      nothing fetched, and a glyph's name drawn in a well before the title (`src/links.ts`). */
   link: { primitive: 'list', cells: 4, optional: 2, tone: false, minSpan: 3, purpose: 'list' },

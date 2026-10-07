@@ -6,7 +6,7 @@
   block, so `details` holds the state where the host's stylesheet can read it without script.
 -->
 <script lang="ts">
-  import { FOLD_HIDE, FOLD_SHOW, counted, inline, text, type Block, type RenderOptions } from '../src/index.ts';
+  import { FOLD_HIDE, FOLD_SHOW, counted, inline, sectionTone, text, type Block, type RenderOptions } from '../src/index.ts';
   import { glyphPath, glyphWaits } from '../src/inline.ts';
   import Text from './Text.svelte';
 
@@ -30,12 +30,16 @@
   });
   const count = $derived(block.rows[0]?.cells[1] ?? '');
   const fold = $derived(block.rows[0]?.cells[2] === 'fold');
+  /* THE WELL'S TONE, the row's fourth cell and one of three words (`SECTION_TONES`): written as `data-tone` on the
+     well, where the host's stylesheet reads it. This package names no colour, so a host that has no rule for the
+     attribute keeps the grey well it had. */
+  const tone = $derived(sectionTone(block.rows[0]?.cells[3]));
 </script>
 
 <div class="sec">
   {#if block.heading}
     <h2 class="sec-title">
-      {#if glyph}<span class="sec-glyph" data-glyph={glyph} aria-hidden="true"
+      {#if glyph}<span class="sec-glyph" data-glyph={glyph} data-tone={tone} aria-hidden="true"
           >{#if d}<svg
               viewBox="0 0 24 24"
               fill="none"

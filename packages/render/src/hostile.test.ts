@@ -116,6 +116,9 @@ const SHAPES: Readonly<Record<string, { rows: string[][] }>> = {
   /* A CALENDAR PLACES ONLY A ROW WHOSE DAY READS, so the first row is today and its title is hostile, which is the
      title written into a month's cell and into the agenda; the second stays generic, the row named under it as unread. */
   calendar: { rows: [[HOSTILE, new Date().toISOString().slice(0, 10)], [HOSTILE, HOSTILE]] },
+  /* A LANE IS PLACED ONLY WHEN ITS TIMES READ, so the first row's are real and its title is hostile, the title written
+     beside its bar; the second stays generic, the row named under the drawing as unread. */
+  lanes: { rows: [[HOSTILE, '2026-10-07T09:00:00Z', '2026-10-07T10:00:00Z'], [HOSTILE, HOSTILE, HOSTILE]] },
   /* A LINK'S ADDRESS HAS TO BE ONE, or the block degrades before any anchor is drawn. The title and the note, the cells
      written into the anchor and beside it, stay hostile. */
   link: { rows: [[HOSTILE, 'https://example.com/a', HOSTILE]] },
@@ -161,7 +164,7 @@ test('NO CELL BECOMES MARKUP, on any of the kinds there are', () => {
   /* The count is the guard on the guard: a kind quietly dropped from the loop is a kind nobody
      sweeps, and the number in the comment above would go on reading as though it had been. */
   assert.equal(drew, Object.keys(KINDS).length - NO_FENCE.size);
-  assert.equal(drew, 37);
+  assert.equal(drew, 38);
 });
 
 /**

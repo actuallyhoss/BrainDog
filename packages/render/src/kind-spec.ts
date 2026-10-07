@@ -1,7 +1,7 @@
 /**
  * The one lookup from a kind's name to its spec, for the built-in kinds and for the kinds a pack declares.
  *
- * A PACK'S KIND IS A ROW THE RECORD HOLDS, NOT ONE THIS TABLE DOES. `kinds.ts` is the thirty-eight compiled in; a kind a
+ * A PACK'S KIND IS A ROW THE RECORD HOLDS, NOT ONE THIS TABLE DOES. `kinds.ts` is the thirty-nine compiled in; a kind a
  * pack invented after this bundle shipped arrives as a `block.<id>` declaration, and the host hands the installed ones
  * in (`RenderOptions.kinds`, `ParseOptions.kinds`). Every reader asks here, so a first-party kind and a pack's travel
  * one code path from the fence to the primitive that draws them, which is what `kinds.ts` was written in the shape of a
@@ -16,7 +16,7 @@ import { KINDS, isKind, type Kind, type KindSpec } from './kinds.ts';
 /** A kind a pack declares, as a page and a fence name it: `block.` and the declaration's own id. */
 export type PackKind = `block.${string}`;
 
-/** A drawn block's kind: one of the thirty-eight, or one a pack declared. */
+/** A drawn block's kind: one of the thirty-nine, or one a pack declared. */
 export type BlockKind = Kind | PackKind;
 
 /** The prefix every pack kind carries, and the pattern the kernel admits under it (`declare.ts` `PACK_KIND`). */

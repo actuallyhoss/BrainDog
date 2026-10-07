@@ -57,7 +57,7 @@ a theme swap can never break a page, and an agent can never make a page ugly.
 
 ---
 
-## Thirty-eight kinds over eight primitives
+## Thirty-nine kinds over eight primitives
 
 Kinds are declarations over primitives, so primitives compose and kinds do not have to. `cards`,
 `section` and `feed` are page-only: a page's evaluator writes their rows and passes
@@ -74,7 +74,7 @@ and never a disabled field.
 | `rows` | label · value · note, one per line | `spec` `params` `inputs` |
 | `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` `sparkline` `split` `bridge` `series` `lines` `progress` `forecast` `ring` |
 | `inline` | a run of pills | `chips` |
-| `list` | title · detail · optional state marker; on a `todo`, up to two more facts as one quiet line under the title | `todo` `steps` `timeline` `feed` `agents` `queue` `roadmap` `calendar` `link` |
+| `list` | title · detail · optional state marker; on a `todo`, up to two more facts as one quiet line under the title | `todo` `steps` `timeline` `feed` `agents` `queue` `roadmap` `calendar` `lanes` `link` |
 | `table` | real columns, a header, per-column alignment | `comparison` `table` |
 | `media` | a figure with a caption | `code` `tree` `diff` |
 
@@ -110,6 +110,18 @@ table of weeks, Monday first, each day naming its first three rows and counting 
 every day that holds anything. Nothing is hidden behind a control, so the app, the mirror and the digest draw the
 same months; a busy day carries `data-count`, which a host drawing a month as a strip of days puts a dot on.
 
+A `lanes` row is `title | start | end`, and a tone, each end an instant with its offset (`2026-10-07T11:00:00+02:00`,
+or `Z`); an end left off is a span still going. The first row may be the window, `window | from | to | now`, and a
+block with none takes its window from its rows. One `lanes-item` a row, in the order they came, each with its title,
+how its time is said (`lanes-when`) and a `lanes-track` holding a `lanes-bar`, placed by `--at` and `--span` on the
+item, percentages of the track's width. A hidden `lanes-axis` names the hours or the days (`lanes-tick`) and holds
+now's line (`lanes-now`), each placed by `--at`. An item carries `data-open` while it is still going, `data-point`
+when it is one instant, and `data-before` or `data-after` when it is cut at an edge of the window. Times are said in
+the offset the window was written in, so the host writes its instants on the reader's clock.
+
+A `section` row is `glyph | count | fold | tone`. The tone is `danger`, `action` or `earn`, written as `data-tone` on
+the heading's well (`sec-glyph`); left off, or any other word, the well is drawn as it was.
+
 A `link` row is `title | url | note`. The address is an `https:` one, a `mailto:` or a path of this BrainDog, and any
 other degrades the block. The host is drawn under the title, and nothing is fetched: no favicon, no preview.
 
@@ -133,7 +145,7 @@ inlines**. Which is why a third party can add a kind without asking a designer: 
 it is a named composition of primitives shipped as data, and `PRIMITIVES_VERSION` is the integer a
 consumer checks.
 
-**The primitive set is the real API surface.** Eight is reviewable; thirty-eight kinds plus unbounded
+**The primitive set is the real API surface.** Eight is reviewable; thirty-nine kinds plus unbounded
 third-party kinds is not. Adding a primitive is easy; renaming or removing one breaks every pack ever
 written, so ship fewer than you think you need.
 

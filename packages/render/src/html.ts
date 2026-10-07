@@ -21,7 +21,7 @@
  * written only inside that option's `queue-visual`, and nothing on the page is drawn in it.
  */
 
-import { SPARKLINE_POINT, TONES, type KindSpec } from './kinds.ts';
+import { SPARKLINE_POINT, TONES, sectionTone, type KindSpec } from './kinds.ts';
 import { kindSpec } from './kind-spec.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
@@ -51,6 +51,7 @@ import { ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLines, ro
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
 import { HEAT_DAY, HEAT_NONE, HEAT_VALUE, heatLines, heatMissed, heatOutside, heatPeopleMore, heatPeoplePlan, heatPersonSaid, heatPlan, heatSkipped, heatTitle, heatWeekTitle } from './heat.ts';
 import { CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from './calendar.ts';
+import { LANES_NONE, LANES_NOW, lanesOutside, lanesPlan, lanesSentence, lanesSkipped } from './lanes.ts';
 import { LINKS_NONE, linkPlan } from './links.ts';
 import { GALLERY_NONE, galleryPlan, pictureSrc } from './gallery.ts';
 import { EMBED_NONE, embedOpen, embedPlan } from './embed.ts';
@@ -310,6 +311,9 @@ function trendSvg(cls: string, label: string, value: string, o: RenderOptions): 
   const t = trendOf(plain(inline(value, o)));
   if (!t) return '';
   const name = `${plain(inline(label, o)) || TREND}: ${t.said.join(', ')}`;
+  /* A STAT'S SHORT RUN IS BARS; a `sparkline` keeps its line. */
+  if (cls === 'cell-trend' && t.bars)
+    return `<svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(name)}"><path class="trend-bar" d="${t.bars}" vector-effect="non-scaling-stroke"></path></svg>`;
   return `<svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(name)}"><path class="trend-line" d="${t.d}" vector-effect="non-scaling-stroke"></path><path class="trend-end" d="${t.end}" vector-effect="non-scaling-stroke"></path></svg>`;
 }
 
@@ -477,6 +481,7 @@ function list(b: Block, o: RenderOptions): string {
   if (b.kind === 'roadmap') return roadmap(b, o);
   if (b.kind === 'steps' && b.form === 'path') return path(b, o);
   if (b.kind === 'calendar') return calendar(b, o);
+  if (b.kind === 'lanes') return lanes(b, o);
   if (b.kind === 'link') return links(b, o);
   const tag = kindSpec(b.kind, o.kinds)?.ordered ? 'ol' : 'ul';
   const days = b.kind === 'timeline' ? timelineDays(b.rows) : [];
@@ -901,8 +906,10 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
  * this block's; `details` carries the state so the host can read it without script.
  */
 function section(b: Block, o: RenderOptions): string {
-  const [glyph = '', count = '', fold = ''] = b.rows[0]?.cells ?? [];
-  const mark = glyph ? `<span class="sec-glyph" data-glyph="${escape(glyph)}" aria-hidden="true">${slotArt(glyph, o)}</span>` : '';
+  const [glyph = '', count = '', fold = '', toned = ''] = b.rows[0]?.cells ?? [];
+  /* The well's tone, a closed word (`SECTION_TONES`), so nothing a cell holds reaches the attribute unread. */
+  const tone = sectionTone(toned);
+  const mark = glyph ? `<span class="sec-glyph" data-glyph="${escape(glyph)}"${tone ? ` data-tone="${tone}"` : ''} aria-hidden="true">${slotArt(glyph, o)}</span>` : '';
   const n = counted(plain(inline(count, o))) ? `<span class="sec-count num">${renderInline(inline(count, o), o)}</span>` : '';
   const title = b.heading ? `<h2 class="sec-title">${mark}${renderInline(inline(b.heading, o), o)}${n}</h2>` : '';
   const toggle =
@@ -1510,6 +1517,34 @@ function heatPeople(b: Block, said: (r: Row, i: number) => string, o: RenderOpti
   const ticks = plan.ticks.map((t) => `<li class="heat-tick" style="--week:${t.week}">${escape(t.label)}</li>`).join('');
   const more = plan.more ? `<p class="heat-more">${escape(heatPeopleMore(plan.more))}</p>` : '';
   return `<div class="heat" data-form="who" style="--weeks:${plan.weeks}"><ol class="heat-people" aria-label="${escape(plan.name)}">${people}</ol><ol class="heat-ticks" aria-hidden="true">${ticks}</ol>${more}${skipped}</div>`;
+}
+
+/**
+ * `lanes`: one row a lane, its span placed in a window of time (`src/lanes.ts`). The names along the top and now's
+ * line are a hidden axis, as a roadmap's are; the list under it is what is read, each lane its title, how its time is
+ * said, and a track that holds the bar. `--at` and `--span` are percentages of the track's width, written inline.
+ * `svelte/Lanes.svelte` is this function's twin.
+ *
+ * A LANE SAYS WHAT ITS BAR SHOWS: `data-open` on one still going, `data-point` on one that is a single instant,
+ * `data-before` and `data-after` on one cut at an edge of the window, and its tone as `data-intent`.
+ */
+function lanes(b: Block, o: RenderOptions): string {
+  const said = (r: Row): string => plain(inline(r.cells[0] ?? '', o)) || MISSING;
+  const plan = lanesPlan(b.rows, o.now);
+  const under =
+    (plan.outside.length ? `<p class="lanes-outside">${escape(lanesOutside(plan.outside.map((i) => said(b.rows[i]!))))}</p>` : '') +
+    (plan.skipped.length ? `<p class="lanes-skipped">${escape(lanesSkipped(plan.skipped.map((i) => said(b.rows[i]!))))}</p>` : '');
+  if (plan.empty) return `<div class="lanes"><p class="lanes-empty">${escape(LANES_NONE)}</p>${under}</div>`;
+  const axis = `<ol class="lanes-axis" aria-hidden="true">${plan.ticks.map((t) => `<li class="lanes-tick" style="--at:${t.at}">${escape(t.label)}</li>`).join('')}${
+    plan.now === null ? '' : `<li class="lanes-now" style="--at:${plan.now}">${LANES_NOW}</li>`
+  }</ol>`;
+  const list = `<ol class="lanes-list" aria-label="${escape(lanesSentence(plan))}">${plan.lanes
+    .map(
+      (l) =>
+        `<li class="lanes-item"${toneAttrs(l.row.tone)}${l.open ? ' data-open=""' : ''}${l.point ? ' data-point=""' : ''}${l.before ? ' data-before=""' : ''}${l.after ? ' data-after=""' : ''} style="--at:${l.at};--span:${l.span}">${cell('lanes-title', l.row.cells[0] || MISSING, o)}${toneGlyph(l.row.tone)}<span class="lanes-when num">${escape(l.when)}</span><span class="lanes-track" aria-hidden="true"><span class="lanes-bar"></span></span></li>`,
+    )
+    .join('')}</ol>`;
+  return `<div class="lanes" style="--rows:${plan.lanes.length}">${axis}${list}${under}</div>`;
 }
 
 /**

@@ -1,7 +1,7 @@
 <!--
   One drawn block. Dispatches on its spec's primitive (`kindSpec`, with the kinds the host installed in `opts.kinds`) to
   one of the eight primitive components, which is why a kind a pack invented after this bundle shipped renders anyway. The few kinds with a drawer and a callback of their
-  own (`inputs`, `calendar`, `link`, `gallery`, `embed` and `steps path`) are asked for by name first, below.
+  own (`inputs`, `calendar`, `lanes`, `link`, `gallery`, `embed` and `steps path`) are asked for by name first, below.
 
   The `<figure>` skeleton, its classes and its data attributes are the same as `toHTML`'s, so the
   two accessibility trees are equal BY CONSTRUCTION rather than by a promise the parity gate has to
@@ -23,6 +23,7 @@
   import Media from './p/Media.svelte';
   import Inputs from './Inputs.svelte';
   import Calendar from './Calendar.svelte';
+  import Lanes from './Lanes.svelte';
   import Links from './Links.svelte';
   import Gallery from './Gallery.svelte';
   import Embed from './Embed.svelte';
@@ -174,11 +175,13 @@
          field's id as its label and its label as its value. `Inputs` draws the spec itself, in `Rows`' classes. -->
     <Inputs {block} {opts} {oninput} />
   {:else if block.kind === 'calendar'}
-    <!-- CALENDAR, LINK, GALLERY AND EMBED, EACH WITH A DRAWER OF ITS OWN, and the path, BY KIND AND BEFORE THE
+    <!-- CALENDAR, LANES, LINK, GALLERY AND EMBED, EACH WITH A DRAWER OF ITS OWN, and the path, BY KIND AND BEFORE THE
          PRIMITIVES, for `inputs`' reason: each sits on a primitive other kinds share, and asking here keeps a
          primitive's component from learning a kind it has no callback for. A drawer that does not know one of these
          kinds falls back to its primitive, which is why each is on one. -->
     <Calendar {block} {opts} />
+  {:else if block.kind === 'lanes'}
+    <Lanes {block} {opts} />
   {:else if block.kind === 'link'}
     <Links {block} {opts} />
   {:else if block.kind === 'gallery'}
