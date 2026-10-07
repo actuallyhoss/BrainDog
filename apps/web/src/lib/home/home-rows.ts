@@ -47,8 +47,15 @@ export type DayGroup = {
   lines: HomeLine[];
 };
 
+/**
+ * HOW MANY LATE THINGS EACH HALF OF THE LATE LIST HOLDS PAST WHAT IT DREW: the tasks, and the money that fell due. The
+ * joined list is drawn on one block with the count of both, so the block's own count cannot say which half was cut,
+ * and the door under the list has to open the half that was (`BlockSlot.svelte`).
+ */
+export type LateMore = { tasks: number; money: number };
+
 /** What Home draws a block as in place of the renderer's rows. */
-export type HomeRows = { kind: 'late'; lines: HomeLine[] } | { kind: 'days'; days: DayGroup[] };
+export type HomeRows = { kind: 'late'; lines: HomeLine[]; more?: LateMore } | { kind: 'days'; days: DayGroup[] };
 
 /** A block as Home may draw it: with `homeRows`, Home's own list is drawn instead of the renderer's. */
 export type WithRows = LiveBlock & { homeRows?: HomeRows };
@@ -166,3 +173,61 @@ export function dayGroups(b: LiveBlock, today: string): DayGroup[] {
 
 /** How many lines a block's own list holds, for its fold. */
 export const linesIn = (rows: HomeRows): number => (rows.kind === 'late' ? rows.lines.length : rows.days.reduce((n, d) => n + d.lines.length, 0));
+
+/* ── the doors under the late list ─────────────────────────────────────── */
+
+/** The words under a late list both of whose halves were cut, where "7 more" alone would not say of what. */
+export const lateWords = {
+  moreIn: (n: number, list: string) => `${n} more in ${list}`,
+} as const;
+
+const ROW_KEY = /^([a-z][a-z0-9_]*)#[1-9][0-9]*$/u;
+
+/**
+ * THE ONE LIST EVERY MONEY LINE SHOWN LIVES IN, by the lines' own keys (`obligations#2`), or `null`. What fell due is
+ * read across lists, so the rest of it has one door only where every line drawn came from one list; from several, or
+ * from a line that names no row, there is no one door, and none is drawn.
+ */
+export function moneyListOf(lines: readonly HomeLine[]): string | null {
+  const from = new Set(lines.filter((l) => l.tick === undefined).map((l) => ROW_KEY.exec(l.key)?.[1] ?? ''));
+  const list = from.size === 1 ? [...from][0]! : '';
+  return list === '' ? null : list;
+}
+
+/** What `lateWhere` reads of a list's declaration. */
+export type DueDecl = {
+  state?: string | undefined;
+  done?: readonly string[] | undefined;
+  fields: readonly { id: string; type: string; deadline?: boolean | undefined; retired?: boolean | undefined }[];
+};
+
+/**
+ * THE SENTENCE THAT KEEPS A LIST TO WHAT IS LATE, as the record reads what falls due: the one day its rows fall due on
+ * is before today, and the row is not finished. `undefined` where the list cannot say it in one sentence: it declares
+ * no day a row falls due on, or more than one, and a row late by either is not a filter a list's address holds. The
+ * door then opens the whole list, which is the honest wide answer (`registerHref`). A retired day is no day a row falls
+ * due on, as the record reads it.
+ */
+export function lateWhere(decl: DueDecl | undefined): string | undefined {
+  const dated = (decl?.fields ?? []).filter((f) => f.type === 'day' && f.deadline === true && f.retired !== true);
+  if (!decl || dated.length !== 1) return undefined;
+  const open = decl.state !== undefined && decl.done && decl.done.length > 0 ? `, ${decl.state} is not ${decl.done.join(' or ')}` : '';
+  return `${dated[0]!.id} before today${open}`;
+}
+
+/** One door under the late list: how many it leads to, and which half of the list they are. */
+export type LateDoor = { half: 'todo' | 'money'; more: number };
+
+/**
+ * THE DOORS UNDER THE LATE LIST, one for each half that was cut, the tasks first as the list is. One half cut is one
+ * door; both cut is two, because seven bills and three tasks more are in two places and one door opened one of them.
+ * `null` for a list that does not say its halves, whose door is the block's own.
+ */
+export function lateDoors(rows: HomeRows | undefined): LateDoor[] | null {
+  if (rows?.kind !== 'late' || !rows.more) return null;
+  const { tasks, money } = rows.more;
+  return [
+    ...(tasks > 0 ? [{ half: 'todo' as const, more: tasks }] : []),
+    ...(money > 0 ? [{ half: 'money' as const, more: money }] : []),
+  ];
+}

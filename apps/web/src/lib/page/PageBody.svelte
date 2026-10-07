@@ -24,6 +24,9 @@
   import type { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { COLUMNS, dropInto, nearestInArea, setAreaAt, type Slot } from '$lib/record/arrange.ts';
   import type { LiveBlock, LivePageDecl, Walked } from '$lib/record/page-live.ts';
+  import type { Headed } from '$lib/record/blocks.ts';
+  import type { WithRows } from '$lib/home/home-rows.ts';
+  import type { Toned } from './tile-head.ts';
   import BlockBar from '$lib/ui/BlockBar.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -215,6 +218,35 @@
   /** Each column's pairs, less the headline lifted over both: a sentence declared in the rail is lifted too, and drawn once. */
   const mainRest = $derived(lifted ? split.main.filter((x) => x !== lifted) : split.main);
   const railRest = $derived(lifted ? split.rail.filter((x) => x !== lifted) : split.rail);
+
+  /**
+   * EACH SECTION WITH THE BLOCKS IT HEADS, by its place in `laid`: the drawn blocks after it in its own column, up to the
+   * next section, said as a tile's heading reads its own block. The section's row takes its well's tone from them
+   * (`blocks.ts` `sectionWell`), so a folded section over what is late does not wear the quiet grey. A section is one
+   * block of the list and knows nothing of the next, so the page says it. Held here and not made in the markup, so the
+   * block a slot is handed is the same object until the page changes.
+   */
+  const sectioned = $derived.by(() => {
+    const out = new Map<number, LiveBlock>();
+    for (const list of layout ? [mainRest, railRest] : [pairs]) {
+      let open: { at: number; block: LiveBlock; under: Toned[] } | null = null;
+      const close = () => {
+        if (open && open.under.length > 0) out.set(open.at, { ...open.block, heads: open.under } as Headed<LiveBlock>);
+      };
+      for (const x of list) {
+        if (!x.block.drawn) continue;
+        if (x.block.kind === 'section') {
+          close();
+          open = { at: x.at, block: x.block, under: [] };
+        } else if (open) {
+          const b = x.block;
+          open.under.push({ kind: b.kind, icon: b.icon, tone: b.tone, where: b.where, late: (b as WithRows).homeRows?.kind === 'late' });
+        }
+      }
+      close();
+    }
+    return out;
+  });
 
   /**
    * ON A PHONE THE RAIL COMES FIRST, on a page at its own address: its blocks are the page at a glance (Kiln's figures,
@@ -932,7 +964,7 @@
         {/if}
       {/if}
       <BlockSlot
-        {block}
+        block={sectioned.get(at) ?? block}
         i={slot.i}
         {ids}
         {writes}
@@ -1239,6 +1271,25 @@
     .block-slot > :global(.block[data-kind='section'] .sec-toggle) {
       min-block-size: var(--tap);
     }
+  }
+
+  /* THE WELL SAYS WHAT IS UNDER IT, in the washes a tile's well takes (`ui/IconWell.svelte`): red where something under
+     the section is late or needs the person, the working accent's tint over questions waiting, the earn green over
+     cash. The row names the tone (`blocks.ts` `sectionWell`) and the renderer writes it on the well, naming no colour.
+     A section that says none keeps the quiet grey. */
+  .block-slot > :global(.block[data-kind='section'] .sec-glyph[data-tone='action']) {
+    background: var(--action-tint-1);
+    color: var(--action-text);
+  }
+
+  .block-slot > :global(.block[data-kind='section'] .sec-glyph[data-tone='danger']) {
+    background: color-mix(in srgb, var(--danger) 12%, var(--tile));
+    color: var(--danger);
+  }
+
+  .block-slot > :global(.block[data-kind='section'] .sec-glyph[data-tone='earn']) {
+    background: color-mix(in srgb, var(--earn) 12%, var(--tile));
+    color: var(--earn);
   }
 
   /* The figure's own bottom margin is the LIST's spacing, and the grid already provides it. */

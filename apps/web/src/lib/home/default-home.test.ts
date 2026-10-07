@@ -261,6 +261,26 @@ test('LATE IS ONE LIST: the late money joins the late tasks before it, every thi
   ]);
 });
 
+test('THE LATE LIST SAYS WHICH HALF RAN PAST ITS LIMIT, so the door under it opens the half that was cut', () => {
+  const tasks = (total: number) => ({ ...block({ kind: 'todo', heading: 'Late', source: 'register.tasks', columns: day('by') as never }, [{ by: '2026-09-30' }], [4]), total });
+  const money = (total: number) => ({
+    ...block({ kind: 'spec', heading: 'Late', source: 'deadlines' }, [{ row: 'obligations#2', day: '2026-09-29' }, { row: 'obligations#3', day: '2026-09-30' }]),
+    total,
+  });
+  const more = (blocks: LiveBlock[]) =>
+    shown(homeDrawn(blocks, NOW).blocks).map((b) => {
+      const rows = (b as WithRows).homeRows;
+      return [b.total, b.shown, rows?.kind === 'late' ? rows.more : null];
+    });
+  /* SEVEN BILLS MORE AND EVERY TASK DRAWN: the money was cut, and the one count of both does not say so. */
+  assert.deepEqual(more([tasks(1), money(9)]), [[10, 3, { tasks: 0, money: 7 }]]);
+  assert.deepEqual(more([tasks(4), money(2)]), [[6, 3, { tasks: 3, money: 0 }]]);
+  assert.deepEqual(more([tasks(4), money(9)]), [[13, 3, { tasks: 3, money: 7 }]]);
+  assert.deepEqual(more([tasks(1), money(2)]), [[3, 3, { tasks: 0, money: 0 }]]);
+  /* LATE MONEY WITH NO LATE TASK BESIDE IT is the list on its own block, and says its own half. */
+  assert.deepEqual(more([money(9)]), [[9, 2, { tasks: 0, money: 7 }]]);
+});
+
 test('COMING UP IS A FEW DAYS, each a chip with what falls due on it, and a feed never ends on a bare number', () => {
   const due = block({ kind: 'timeline', heading: 'Coming up', source: 'deadlines' }, [
     { row: 'obligations#2', day: '2026-10-02' },

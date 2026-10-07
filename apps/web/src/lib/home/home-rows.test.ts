@@ -5,8 +5,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { dayGroups, lateLines, linesIn } from './home-rows.ts';
+import { dayGroups, lateDoors, lateLines, lateWhere, lateWords, linesIn, moneyListOf, type HomeLine } from './home-rows.ts';
 import type { LiveBlock } from '../record/page-live.ts';
+import '../record/fixtures/fill.ts';
+import { REGISTERS } from '../record/held.ts';
+import { registerHref } from '../record/where.ts';
 
 const TODAY = '2026-10-02';
 
@@ -96,4 +99,49 @@ test('COMING UP IS BY DAY: one chip a day, today marked, and a row with no day l
     ],
   );
   assert.equal(linesIn({ kind: 'days', days }), 3);
+});
+
+test('THE DOORS UNDER THE LATE LIST ARE THE HALVES THAT WERE CUT: one each, the tasks first, and none where the list says no halves', () => {
+  const lines: HomeLine[] = [];
+  assert.equal(lateDoors({ kind: 'late', lines }), null);
+  assert.equal(lateDoors({ kind: 'days', days: [] }), null);
+  assert.equal(lateDoors(undefined), null);
+  assert.deepEqual(lateDoors({ kind: 'late', lines, more: { tasks: 0, money: 0 } }), []);
+  assert.deepEqual(lateDoors({ kind: 'late', lines, more: { tasks: 0, money: 7 } }), [{ half: 'money', more: 7 }]);
+  assert.deepEqual(lateDoors({ kind: 'late', lines, more: { tasks: 3, money: 0 } }), [{ half: 'todo', more: 3 }]);
+  assert.deepEqual(lateDoors({ kind: 'late', lines, more: { tasks: 3, money: 7 } }), [
+    { half: 'todo', more: 3 },
+    { half: 'money', more: 7 },
+  ]);
+  assert.equal(lateWords.moreIn(7, 'Bills'), '7 more in Bills');
+});
+
+test('THE MONEY HAS ONE DOOR ONLY WHERE EVERY MONEY LINE SHOWN LIVES IN ONE LIST, and a task is never counted as money', () => {
+  const line = (key: string, tick?: number): HomeLine => ({ key, title: key, late: true, ...(tick === undefined ? {} : { tick }) });
+  assert.equal(moneyListOf([line('tasks#4', 4), line('obligations#2'), line('obligations#9')]), 'obligations');
+  assert.equal(moneyListOf([line('obligations#2'), line('services#1')]), null);
+  /* A LINE THAT NAMES NO ROW could be from anywhere, so there is no one door. */
+  assert.equal(moneyListOf([line('obligations#2'), line('deadlines@1')]), null);
+  assert.equal(moneyListOf([line('tasks#4', 4)]), null);
+});
+
+test('A LIST IS KEPT TO WHAT IS LATE BY THE ONE DAY ITS ROWS FALL DUE ON, not finished, and says nothing where it has none or two', () => {
+  const due = { id: 'due', type: 'day', deadline: true };
+  const fields = [{ id: 'what', type: 'text' }, { id: 'issued', type: 'day' }, due];
+  assert.equal(lateWhere({ state: 'state', done: ['paid', 'void'], fields }), 'due before today, state is not paid or void');
+  assert.equal(lateWhere({ fields }), 'due before today');
+  assert.equal(lateWhere({ state: 'state', done: [], fields }), 'due before today');
+  assert.equal(lateWhere({ fields: [...fields, { id: 'renews', type: 'day', deadline: true }] }), undefined);
+  assert.equal(lateWhere({ fields: [{ id: 'issued', type: 'day' }] }), undefined);
+  /* A RETIRED DAY IS NOT ONE A ROW FALLS DUE ON, as the record reads it: it neither filters nor makes two. */
+  assert.equal(lateWhere({ fields: [...fields, { id: 'renews', type: 'day', deadline: true, retired: true }] }), 'due before today');
+  assert.equal(lateWhere({ fields: [{ id: 'renews', type: 'day', deadline: true, retired: true }] }), undefined);
+  assert.equal(lateWhere(undefined), undefined);
+});
+
+test('A LIST`S ADDRESS CAN SAY WHAT IS LATE: the money under Late opens at what fell due and is not finished', () => {
+  const tasks = REGISTERS.tasks!;
+  assert.equal(registerHref('tasks', lateWhere(tasks)), `/r/tasks?f=by:before:today&f=${tasks.state}:not-in:${(tasks.done ?? []).join(',')}`);
+  /* A LIST WITH NO DAY TO BE LATE BY opens whole, which is the honest wide answer. */
+  assert.equal(registerHref('people', lateWhere(REGISTERS.people)), '/r/people');
 });

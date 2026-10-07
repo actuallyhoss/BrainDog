@@ -392,7 +392,10 @@ export function readiness(gate, timeoutMs, root) {
          locally can miss the window, or catch the record mid-boot and draw its error card; that is the
          runner, not the screen. A screen that fails twice is the screen. The count is printed, so a run
          that leans on the second look says so. */
-      if (state === null || (state === 'refused' && live)) {
+      /* A REFUSAL THAT IS MEANT IS NOT THE RUNNER'S FAULT, so it is not looked at twice: reloading `/nowhere` bought
+         nothing and, on a loaded runner, lost the screen it had. */
+      const meant = state === 'refused' && [...MAY_REFUSE].some((r) => new URL(page.url()).pathname.endsWith(r));
+      if (state === null || (state === 'refused' && live && !meant)) {
         const again = await page.reload().then(once, () => null);
         if (again !== null && again !== 'refused') retried++;
         /* THE SECOND LOOK IS THE ANSWER, even when it is none: the page was reloaded, so the first look describes a

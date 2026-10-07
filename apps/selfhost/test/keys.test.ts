@@ -288,10 +288,12 @@ const RACERS = 8;
  * that agreement would be this test passing while proving nothing.
  */
 const OPENER = `
-const [mod, file, at] = process.argv.slice(2);
+const [mod, file] = process.argv.slice(2);
 const { openKeyStore } = await import(mod);
+process.stdout.write('ready\\n');
+const at = Number(await new Promise((go) => process.stdin.once('data', (d) => go(String(d).trim()))));
 const ready = Date.now();
-while (Date.now() < Number(at)) {}
+while (Date.now() < at) {}
 try {
   const { kekId } = await (await openKeyStore(file)).current();
   process.stdout.write(JSON.stringify({ ready, kekId }));
@@ -302,17 +304,26 @@ try {
 
 type Ran = { code: number | null; said: { ready: number; kekId?: string; error?: string } };
 
-const race = (runner: string, mod: string, file: string, at: number): Promise<Ran> =>
-  new Promise((done) => {
-    const kid = spawn(process.execPath, [runner, mod, file, String(at)], { stdio: ['ignore', 'pipe', 'pipe'] });
-    let out = '';
-    let err = '';
-    kid.stdout.on('data', (d) => (out += String(d)));
-    kid.stderr.on('data', (d) => (err += String(d)));
+/* A RACER SAYS "ready" ONCE IT HAS IMPORTED THE MODULE AND THEN WAITS FOR THE SHARED DEADLINE ON STDIN.
+   `said` settles when it exits; `ready` settles when it has said ready, or when it died before it could. */
+const race = (runner: string, mod: string, file: string) => {
+  const kid = spawn(process.execPath, [runner, mod, file], { stdio: ['pipe', 'pipe', 'pipe'] });
+  let out = '';
+  let err = '';
+  let sayReady: () => void;
+  const ready = new Promise<void>((r) => (sayReady = r));
+  kid.stdout.on('data', (d) => {
+    out += String(d);
+    if (out.includes('ready\n')) sayReady();
+  });
+  kid.stderr.on('data', (d) => (err += String(d)));
+  kid.stdin.on('error', () => {});
+  const said = new Promise<Ran>((done) => {
     kid.on('close', (code) => {
+      sayReady();
       let said: Ran['said'];
       try {
-        said = JSON.parse(out) as Ran['said'];
+        said = JSON.parse(out.replace(/^ready\n/, '')) as Ran['said'];
       } catch {
         /* A process that died before it could answer answers here instead, so one assertion below
            covers "it refused" and "it crashed" rather than the second reaching a `JSON.parse`. */
@@ -321,6 +332,8 @@ const race = (runner: string, mod: string, file: string, at: number): Promise<Ra
       done({ code, said });
     });
   });
+  return { ready, said, go: (at: number) => kid.stdin.end(`${at}\n`) };
+};
 
 /**
  * THE TEST THE COMMENT AT THE HEAD OF THIS FILE WAS ALWAYS ABOUT.
@@ -355,16 +368,18 @@ test('EIGHT PROCESSES MINTING AT ONCE ALL END UP WITH THE SAME KEY', async () =>
     writeFileSync(runner, OPENER);
     const mod = new URL('../src/keys.ts', import.meta.url).href;
 
-    const at = Date.now() + 10_000;
-    /* 10000, NOT 5000: a full test run runs many workspaces' tests at once under `--workspace-concurrency=2`, and
-       eight Node processes each loading TypeScript missed a 5000 ms deadline under that load (2 of 8 started late)
-       while passing alone. Doubled off that failure, the same wall-clock deadline this test needs to prove the race
-       happened at all, not a CPU budget it is measuring. */
-    const ran = await Promise.all(Array.from({ length: RACERS }, () => race(runner, mod, file, at)));
+    /* NO GUESSING WHEN THEY ARRIVE. Each racer imports, says ready and waits; once all eight have, one
+       shared deadline 250 ms out goes to each, so a slow import on a loaded runner delays the start
+       instead of missing it. */
+    const racers = Array.from({ length: RACERS }, () => race(runner, mod, file));
+    await Promise.all(racers.map((r) => r.ready));
+    const at = Date.now() + 250;
+    for (const r of racers) r.go(at);
+    const ran = await Promise.all(racers.map((r) => r.said));
 
-    /* THE RACE HAPPENED. Every process reached the spin loop before the deadline, so all eight were
-       inside `openKeyStore` together. If this is what fails, the machine is slower than the 10000 ms
-       allowed and the test proved nothing yet; raise the deadline rather than deleting the check. */
+    /* THE RACE HAPPENED. Every process was in the spin loop before the deadline, so all eight were
+       inside `openKeyStore` together. True by construction unless a process died or was starved for
+       250 ms, and then this says so rather than passing quietly. */
     const late = ran.filter((r) => r.said.ready === 0 || r.said.ready > at);
     assert.equal(late.length, 0, `${late.length} of ${RACERS} processes started after the deadline, so nothing raced`);
 

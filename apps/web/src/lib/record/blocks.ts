@@ -39,7 +39,7 @@
 
 import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from '@braindog/kernel';
 import { day as longDay, money, parse, since, workingCell, WORKING_MARK, type Block } from 'braindog-render';
-import { KINDS, kindSpec, showsOf, type CardRole, type KindSpec } from 'braindog-render';
+import { KINDS, SECTION_TONES, kindSpec, showsOf, type CardRole, type KindSpec, type SectionTone } from 'braindog-render';
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
 import { isPictureMime } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
@@ -52,6 +52,8 @@ import { citedWords } from '../cite.ts';
 import { moneyInText } from './money.ts';
 /* THE KINDS THAT DRAW THEMSELVES, asked first in `draw`. */
 import { drawerOf } from '../page/kinds/index.ts';
+/* WHAT A TILE'S WELL SAYS BY ITS COLOUR, which a section's well says for the tiles it heads (`sectionWell`). */
+import { headTone, type Toned } from '../page/tile-head.ts';
 
 /**
  * The instant a block was read at, which is the clock everything drawn from it is told against.
@@ -793,17 +795,40 @@ function staleAt(block: BlockResult, entry: BlockResult['entries'][number] | und
 }
 
 /**
- * A section's one row: `glyph | count | fold`.
+ * A SECTION WITH THE BLOCKS IT HEADS, as the page hands it over: `heads` is each drawn block after it, up to the next
+ * section, read as a tile's heading reads its own block (`tile-head.ts` `Toned`). A section is one block of the page's
+ * list and is drawn knowing nothing of the next, so only the page can say what is under it (`PageBody.svelte`).
+ */
+export type Headed<B> = B & { heads?: readonly Toned[] };
+
+/**
+ * THE TONE OF A SECTION'S WELL, by the rule a tile's well takes its own (`headTone`), asked of the section and of every
+ * block it heads: red where one of them is late or declared bad, the working accent where one is questions waiting, the
+ * earn green where one is cash or the section's own glyph is money, else none and the quiet grey. Red first, so what
+ * needs the person is never said under a calmer colour.
+ *
+ * A FOLDED SECTION IS WHY: its tiles are hidden, so its heading is all that says seven things under it are late, and
+ * a grey well over them read as nothing to see.
+ */
+export function sectionWell(block: Toned, under: readonly Toned[] = []): SectionTone | undefined {
+  const tones = new Set<string | undefined>([block, ...under].map(headTone));
+  return SECTION_TONES.find((t) => tones.has(t));
+}
+
+/**
+ * A section's one row: `glyph | count | fold`, and its well's tone as a fourth cell where it has one.
  *
  * Over a register it counts what its `where:` admits, so the heading says how many are under it.
  * Without a source it counts nothing and draws no number, a gap rather than a zero. `icon:` and
  * `fold:` are read through a local type because `PageBlock` does not carry them yet.
  */
 function sectionRow(block: BlockResult): string {
-  const { icon, fold } = block as BlockResult & { icon?: string; fold?: boolean };
+  const { icon, fold, heads } = block as Headed<BlockResult> & { icon?: string; fold?: boolean };
   /* `total` AND NOT `matched.length`: a live answer sends the count and only the rows that fit. */
   const count = block.register ? String(block.total) : '';
-  return `${escapeCell(icon ?? '')} | ${count} | ${fold ? 'fold' : ''}`;
+  const tone = sectionWell({ kind: block.kind, icon, tone: block.tone, where: block.where }, heads);
+  /* NO TONE, NO CELL, so a section that says none is the three cells it always was. */
+  return `${escapeCell(icon ?? '')} | ${count} | ${fold ? 'fold' : ''}${tone ? ` | ${tone}` : ''}`;
 }
 
 /**

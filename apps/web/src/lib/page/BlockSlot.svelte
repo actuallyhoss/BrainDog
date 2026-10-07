@@ -56,7 +56,7 @@
   import { foldOf } from './home.ts';
   import { headCount, headIcon, headTone } from './tile-head.ts';
   import HomeRows from '$lib/home/HomeRows.svelte';
-  import { linesIn, type WithRows } from '$lib/home/home-rows.ts';
+  import { lateDoors, lateWhere, lateWords, linesIn, moneyListOf, type WithRows } from '$lib/home/home-rows.ts';
   import { words } from './words.ts';
   import { blockWords } from '$lib/record/block-edit.ts';
 
@@ -318,24 +318,30 @@
   const homeFold = $derived(homeRows && fold ? foldOf('todo', linesIn(homeRows), open) : null);
 
   /**
-   * WHERE "N MORE" UNDER HOME'S JOINED LATE LIST OPENS, when what was cut is the money and not the tasks.
+   * WHERE "N MORE" UNDER HOME'S LATE LIST OPENS: the half that was cut, each half its own door.
    *
-   * The list is drawn on the tasks' block with the count of both (`default-home.ts` `lateTile`), so its door went to
-   * Tasks whichever half ran past its limit: seven bills more, and a press that opened a list with none of them. The
-   * block's own rows are the tasks it drew, so tasks under their limit are all there and the rest is money. That money
-   * is read across lists, so it opens the one list every money line shown lives in, and where they live in several
-   * there is no one door, which is said by drawing none. Late money with no late task beside it is the same list on its
-   * own block and opens the same way. `undefined` is every other block, whose door is its own.
+   * The joined list is drawn on the tasks' block with the count of both (`default-home.ts` `lateTile`), so its door went
+   * to Tasks whichever half ran past its limit: seven bills more, and a press that opened a list with none of them. It
+   * was then guessed from the tasks' limit, which a task drawn in a block above or ticked since made wrong. The list
+   * says each half's own count now (`home-rows.ts` `LateMore`), so nothing is guessed: tasks cut open the tasks at the
+   * block's own filter, money cut opens the money, and both cut are two doors, each named by its list.
+   *
+   * THE MONEY OPENS FILTERED TO WHAT IS LATE where its list's address can say that (`lateWhere`), since "7 more" under
+   * Late that opened every bill ever kept was a door to somewhere else. It is read across lists, so it has a door only
+   * where every money line shown lives in one list; from several there is no one door, said by drawing none. `null` is
+   * every other block, whose door is its own.
    */
-  const lateDoor = $derived.by((): string | null | undefined => {
-    if (homeRows?.kind !== 'late') return undefined;
-    const owed = homeRows.lines.filter((l) => l.tick === undefined);
-    if (owed.length === 0) return undefined;
-    /* Tasks drawn up to their limit may be the half that was cut, and their own list is then the door, as it was. */
-    if (owed.length < homeRows.lines.length && typeof block.limit === 'number' && block.rows.length >= block.limit) return undefined;
-    const from = new Set(owed.map((l) => /^([a-z][a-z0-9_]*)#[1-9][0-9]*$/u.exec(l.key)?.[1] ?? ''));
-    const list = from.size === 1 ? [...from][0] : '';
-    return list && listNamed(list) ? `/r/${list}` : null;
+  const lateSlice = $derived.by(() => {
+    const doors = lateDoors(homeRows);
+    if (!doors || doors.length === 0 || homeRows?.kind !== 'late') return null;
+    const list = moneyListOf(homeRows.lines);
+    const named = list ? listNamed(list) : null;
+    const own = openHref(block);
+    return doors.map((d) => {
+      const name = d.half === 'todo' ? source : named;
+      const href = d.half === 'todo' ? (own && source ? own : null) : list && named ? registerHref(list, lateWhere(REGISTERS[list])) : null;
+      return { half: d.half, href, said: doors.length > 1 && name ? lateWords.moreIn(d.more, name) : words.more(d.more) };
+    });
   });
 
   /* WHAT THE PAGE HOLDS TICKED on Home's late list, so a refusal or an Undo takes the tick back (`heldDone`). */
@@ -532,8 +538,15 @@
      three-month label. -->
 {#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown && !folded && !homeFold}
   {@const to = openHref(block)}
-  {@const door = lateDoor !== undefined ? lateDoor : to && source ? to : block.register ? null : doorOf(block)}
-  {#if block.source === 'forecast.runway'}
+  {@const door = to && source ? to : block.register ? null : doorOf(block)}
+  {#if lateSlice}
+    <!-- THE LATE LIST'S OWN DOORS, the half that was cut and both where both were. -->
+    <div class="block-doors">
+      {#each lateSlice as d (d.half)}
+        {#if d.href}<a class="block-more tap" href={inApp(d.href)}>{d.said}</a>{:else}<p class="block-slice" role="status">{d.said}</p>{/if}
+      {/each}
+    </div>
+  {:else if block.source === 'forecast.runway'}
     <p class="block-slice" role="status">
       {copy.ofWhichWalked(block.shown, block.total, walkedDays(block))}.{#if to && source}{' '}
         <a class="tap" href={inApp(to)}>{copy.openTheRest(source)}</a>
@@ -732,6 +745,14 @@
   /* AS A DOOR, it is as wide as its words, so the row beside it is not a link too. */
   a.block-more {
     display: inline-block;
+  }
+
+  /* TWO DOORS UNDER ONE LIST sit on one line with room between them, and fold under each other where they do not fit. */
+  .block-doors {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--sp-5);
   }
 
   .block-more:hover {

@@ -543,18 +543,23 @@ function lateTasks(b: LiveBlock | undefined, today: string): b is LiveBlock {
   });
 }
 
+/** How many rows a block holds past the ones it drew. */
+const beyond = (b: LiveBlock): number => Math.max(0, b.total - b.rows.length);
+
 /**
  * ONE LATE LIST, in place (`home-rows.ts`): the late part of what falls due at `at` and the late tasks just before it
  * are drawn as one list on the tasks' block, under their heading, with the count of both, and the money's own block is
  * not drawn. Their heading says "or due today" while one of the tasks is. Money late with no late tasks before it is the
  * list on its own block. Both stay at their places in the list, so every write still finds its block.
+ *
+ * THE LIST SAYS WHICH HALF RAN PAST ITS LIMIT (`more`), so "7 more" under it opens the bills when it was the bills.
  */
 function lateTile(blocks: LiveBlock[], at: number, today: string, voice: HomeVoice): void {
   const money = blocks[at]!;
   const owes = money.drawn && aligned(money);
   const tasks = blocks[at - 1];
   if (!lateTasks(tasks, today) || !aligned(tasks)) {
-    if (owes) blocks[at] = { ...money, homeRows: { kind: 'late', lines: lateLines([money], today) } } as WithRows;
+    if (owes) blocks[at] = { ...money, homeRows: { kind: 'late', lines: lateLines([money], today), more: { tasks: 0, money: beyond(money) } } } as WithRows;
     return;
   }
   const heading = tasks.heading === voice.overdue && tasks.entries.some((e) => dayIn(tasks, e.fields as Record<string, unknown>) === today) ? words.lateOrToday : tasks.heading;
@@ -562,7 +567,8 @@ function lateTile(blocks: LiveBlock[], at: number, today: string, voice: HomeVoi
   blocks[at - 1] = {
     ...tasks,
     ...(heading === undefined ? {} : { heading }),
-    homeRows: { kind: 'late', lines: lateLines(both, today) },
+    /* EACH HALF'S OWN COUNT PAST WHAT IT DREW, which the one count of both below cannot say (`LateMore`). */
+    homeRows: { kind: 'late', lines: lateLines(both, today), more: { tasks: beyond(tasks), money: owes ? beyond(money) : 0 } },
     shown: both.reduce((n, b) => n + b.rows.length, 0),
     total: both.reduce((n, b) => n + b.total, 0),
   } as WithRows;

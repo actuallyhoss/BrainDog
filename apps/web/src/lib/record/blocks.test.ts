@@ -40,7 +40,7 @@ import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
 import { metric, page } from './fixtures/readers.ts';
 import { blockOf as liveBlockOf } from './page-live.ts';
-import { draw, toSegments } from './blocks.ts';
+import { draw, sectionWell, toSegments } from './blocks.ts';
 import { copy } from '../copy.ts';
 
 /** The rows a block DRAWS, through the one conversion every surface uses, because a sign is a drawing. */
@@ -404,4 +404,66 @@ test('THE CARD’S TITLE IS ASKED BEFORE ITS OTHER COLUMNS, and what it is calle
   assert.equal(byTitle[0]?.tone, 'warn');
   const said = drawnRows(projectCards([project(1, 'At risk', null)], { tones: { at_risk: 'warn' } })).slice(1);
   assert.equal(said[0]?.tone, undefined, 'the stored value is matched, not the words it is said in');
+});
+
+/* ── a section's well ─────────────────────────────────────────────────────── */
+
+/** A section as the page hands it to `draw`: a heading with a glyph, folded, and the blocks it heads. */
+const sectionOf = (over: Record<string, unknown> = {}): Parameters<typeof draw>[0] =>
+  ({
+    kind: 'section',
+    heading: 'Parked',
+    icon: 'clock',
+    fold: true,
+    columns: [],
+    rows: [],
+    entries: [],
+    matched: [],
+    refusals: [],
+    shown: 0,
+    total: 0,
+    drawn: true,
+    stale_at: '2026-10-02T12:00:00Z',
+    ...over,
+  }) as never;
+
+/** The one row a section draws, as the renderer reads it: glyph, count, fold and the well's tone. */
+const sectionCells = (block: Parameters<typeof draw>[0]): string[] => {
+  const seg = draw(block).segments.find((s) => s.type === 'block');
+  assert.ok(seg && seg.type === 'block' && seg.kind === 'section', 'the section is drawn as a section and not a degraded fence');
+  return seg.rows[0]!.cells;
+};
+
+test('A SECTION`S WELL TAKES ITS TONE FROM WHAT IT HEADS, by the rule a tile`s well takes its own, red first', () => {
+  const late = { kind: 'todo', where: 'state is not done, by before +1d' };
+  const bad = { kind: 'note', tone: 'bad' };
+  const drawnLate = { kind: 'spec', late: true };
+  const asks = { kind: 'queue' };
+  const cash = { kind: 'stat', icon: 'wallet' };
+  const walk = { kind: 'forecast' };
+  const quiet = { kind: 'table', where: 'state is open' };
+  const own = { kind: 'section', icon: 'clock' };
+  assert.equal(sectionWell(own), undefined);
+  assert.equal(sectionWell(own, [quiet]), undefined);
+  for (const b of [late, bad, drawnLate]) assert.equal(sectionWell(own, [quiet, b]), 'danger');
+  assert.equal(sectionWell(own, [asks, quiet]), 'action');
+  for (const b of [cash, walk]) assert.equal(sectionWell(own, [b]), 'earn');
+  /* RED FIRST, THEN WHAT WAITS, THEN CASH, whatever order the blocks stand in. */
+  assert.equal(sectionWell(own, [cash, asks, late]), 'danger');
+  assert.equal(sectionWell(own, [cash, asks]), 'action');
+  /* AND THE SECTION ITSELF SAYS ITS OWN: its glyph is money, or its own filter keeps what fell due. */
+  assert.equal(sectionWell({ kind: 'section', icon: 'money' }), 'earn');
+  assert.equal(sectionWell({ kind: 'section', icon: 'clock', where: 'by before today' }), 'danger');
+  /* WHAT IS COMING IS NOT LATE, and a day something happened is history. */
+  assert.equal(sectionWell(own, [{ kind: 'todo', where: 'by before +8d' }, { kind: 'table', where: 'created before today' }]), undefined);
+});
+
+test('THE TONE IS THE SECTION ROW`S FOURTH CELL, written only where there is one, so a section that says none is the row it was', () => {
+  assert.deepEqual(sectionCells(sectionOf()), ['clock', '', 'fold']);
+  assert.deepEqual(sectionCells(sectionOf({ heads: [{ kind: 'table' }] })), ['clock', '', 'fold']);
+  assert.deepEqual(sectionCells(sectionOf({ heads: [{ kind: 'todo', where: 'by before today' }] })), ['clock', '', 'fold', 'danger']);
+  assert.deepEqual(sectionCells(sectionOf({ heads: [{ kind: 'queue' }] })), ['clock', '', 'fold', 'action']);
+  assert.deepEqual(sectionCells(sectionOf({ fold: false, icon: 'wallet' })), ['wallet', '', '', 'earn']);
+  /* THE COUNT KEEPS ITS CELL, and the tone comes after the fold whether or not the section folds. */
+  assert.deepEqual(sectionCells(sectionOf({ register: 'tasks', total: 7, fold: false, heads: [{ kind: 'spec', late: true }] })), ['clock', '7', '', 'danger']);
 });
