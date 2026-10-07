@@ -249,8 +249,12 @@ export const FOUNDER = {
 
      2.1.0: `page.project` takes the project template of work 1.15.0, its history, notes, money and what it runs on as one More
      about tile where they were three folded sections, with the project's numbers before that tile. Blocks moved on a
-     page that is already there, so a minor step. */
-  version: '2.1.0',
+     page that is already there, so a minor step.
+
+     2.2.0: Where it stands on `page.project` draws At risk in the warning colour and Off track in the danger colour, by
+     the template's `tones:`. On track wears no mark. A key added to a block that is already there, so a minor step.
+     2.1.0 is live, so the change is a version and not a reset. */
+  version: '2.2.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',

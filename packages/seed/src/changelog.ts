@@ -192,6 +192,12 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   agents: [
     {
+      version: '1.8.0',
+      notes:
+        'Agents opens on Today: the last 24 hours as one lane for each run, from when it started to when it was last heard from, with the runs still working in colour. It shows while a run was heard from today.',
+    },
+    { version: '1.7.0', notes: 'A run has a page of its own, named by what it was doing, with what it did and Undo this run.' },
+    {
       version: '1.6.0',
       notes: 'Agents groups the runs: what a run asked you first, then the runs working, the ones that stopped today and the ones from earlier, each with the next step it left. A run opens beside the page.',
     },

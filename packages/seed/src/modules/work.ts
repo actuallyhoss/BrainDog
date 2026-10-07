@@ -62,17 +62,18 @@ export const TASKS: Fields[] = [
  * Agent runs, S1 to S5, in the kernel's `session` register and in its field names.
  *
  * `project` is the spoken id of a project, `things#1`, which is what the ladder writes when it places
- * a run. `last_seen` uses `hours(n)` because a run's age is said in minutes and hours. Both are fields
- * only the record writes, so these rows go in through `openRun` below.
+ * a run. `last_seen` uses `hours(n)` because a run's age is said in minutes and hours, and `started` with it, so each
+ * run is a span of time the agents home can draw as a lane. All three are fields only the record writes, so these rows
+ * go in through `openRun` below.
  *
  * A person is never a run, so every run here is an agent's: three are Kiln's, and two are finished.
  */
 export const RUNS: Fields[] = [
-  { doing: 'Variable axis QA, instances 3 of 9', agent: 'claude', state: 'active', project: 'things#1', repo: 'kiln-type', host: 'kiln-mbp', branch: 'axis-qa', next: 'Sign off instances 4 to 6 once the mastering pass lands.', last_seen: hours(0.05) },
-  { doing: 'Drafting the specimen page copy', agent: 'codex', state: 'active', project: 'things#1', repo: 'kiln-site', host: 'kiln-mbp', branch: 'specimen-copy', last_seen: hours(0.2) },
-  { doing: 'Reconciling the Fenwick invoice against services', agent: 'claude', state: 'idle', project: 'things#3', repo: 'portage', host: 'studio-desktop', next: 'Propose merging the two Fenwick services, citing the rows read.', tried: ['Matching on the invoice total; two services share it.'], last_seen: hours(2) },
-  { doing: 'Drafting the chaser for invoice 2026-041', agent: 'cursor', state: 'done', project: 'things#2', host: 'studio-desktop', last_seen: hours(26) },
-  { doing: 'Kerning pass, lowercase', agent: 'claude', state: 'done', project: 'things#1', repo: 'kiln-type', host: 'kiln-mbp', last_seen: hours(34) },
+  { doing: 'Variable axis QA, instances 3 of 9', agent: 'claude', state: 'active', project: 'things#1', repo: 'kiln-type', host: 'kiln-mbp', branch: 'axis-qa', next: 'Sign off instances 4 to 6 once the mastering pass lands.', started: hours(3.5), last_seen: hours(0.05) },
+  { doing: 'Drafting the specimen page copy', agent: 'codex', state: 'active', project: 'things#1', repo: 'kiln-site', host: 'kiln-mbp', branch: 'specimen-copy', started: hours(1.4), last_seen: hours(0.2) },
+  { doing: 'Reconciling the Fenwick invoice against services', agent: 'claude', state: 'idle', project: 'things#3', repo: 'portage', host: 'studio-desktop', next: 'Propose merging the two Fenwick services, citing the rows read.', tried: ['Matching on the invoice total; two services share it.'], started: hours(5), last_seen: hours(2) },
+  { doing: 'Drafting the chaser for invoice 2026-041', agent: 'cursor', state: 'done', project: 'things#2', host: 'studio-desktop', started: hours(27), last_seen: hours(26) },
+  { doing: 'Kerning pass, lowercase', agent: 'claude', state: 'done', project: 'things#1', repo: 'kiln-type', host: 'kiln-mbp', started: hours(36.5), last_seen: hours(34) },
 ];
 
 /**

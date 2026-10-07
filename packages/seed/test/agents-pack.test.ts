@@ -45,10 +45,10 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.7.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.8.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.7.0');
+  assert.equal(pack.manifest.version, '1.8.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
@@ -59,6 +59,7 @@ const PROVIDES = [
   'metric.learnings-by-week',
   'metric.learnings-faded',
   'metric.runs-earlier',
+  'metric.runs-heard-today',
   'metric.runs-left-next',
   'metric.runs-today',
   'metric.skill-learnings',
@@ -76,7 +77,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.7.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.8.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -228,8 +229,10 @@ test('/p/agents: the runs grouped, what a run asked first, then working, today a
   value(k.propose({ question: 'Raise the retainer?', body_kind: 'options', body: OPTIONS }, 'agent:codex'));
   value(k.propose({ question: 'A rule asks about a bill', body_kind: 'options', body: OPTIONS }, 'rule:bills'));
   value(k.propose({ question: 'Slash asks about a page', body_kind: 'options', body: OPTIONS }, 'slash'));
-  const blocks = opened(k, 'agents');
-  for (const b of blocks) assert.deepEqual(b.refusals, [], `${b.heading}: ${JSON.stringify(b.refusals)}`);
+  const all = opened(k, 'agents');
+  for (const b of all) assert.deepEqual(b.refusals, [], `${b.heading}: ${JSON.stringify(b.refusals)}`);
+  /* THE GROUPS OF RUNS, without the day's lanes over them, which are headed Today as the runs that stopped today are. */
+  const blocks = all.filter((b) => b.kind !== 'lanes');
 
   const groups = blocks.filter((b) => ['Needs you', 'Working', 'Today', 'Earlier'].includes(String(b.heading))).map((b) => b.heading);
   assert.deepEqual(groups, ['Needs you', 'Working', 'Today', 'Earlier'], 'the runs are not grouped in the order the direction gives');
@@ -262,6 +265,58 @@ test('/p/agents: the runs grouped, what a run asked first, then working, today a
   assert.deepEqual(said.map((b) => b.heading), [], 'a block on the agents page draws its own empty line');
   /* THE WORD ON SCREEN IS RUN, never session. */
   for (const b of AGENTS_PAGES.agents!.blocks as { heading?: string; body?: string }[]) assert.doesNotMatch(`${b.heading ?? ''} ${b.body ?? ''}`, /session/iu);
+  sql.close();
+});
+
+/**
+ * THE DAY AS LANES, SINCE 1.8.0: the last 24 hours, one lane for each run from when it started to when it was last heard
+ * from, the working ones toned, under the page's line and over the groups. Read off a seeded record's page answer, so
+ * the block is declared against the field the kernel really keeps (`started`, its migration 26).
+ */
+test("TODAY'S LANES ARE THE RUNS OF THE LAST 24 HOURS, each from its start to when it was last heard from", async () => {
+  const { k, sql } = await seeded();
+  type Lanes = Drawn & { lanes?: { title: string; start: string; end: string | null; tone?: string; href?: string }[]; window?: { from: string; to: string } };
+  const declared = AGENTS_PAGES.agents!.blocks as { kind: string; lead?: boolean; heading?: string; limit?: number }[];
+  assert.deepEqual(declared.map((b) => (b.lead ? 'line' : b.kind)).slice(0, 3), ['line', 'line', 'lanes'], 'the lanes are not the first tile under the line');
+  assert.equal(declared.find((b) => b.kind === 'lanes')?.limit, undefined, 'lanes refuse a limit');
+
+  const block = opened(k, 'agents').find((b) => b.kind === 'lanes') as Lanes | undefined;
+  assert.ok(block, 'the agents page draws no lanes on a record with runs heard from today');
+  assert.equal(block.heading, 'Today');
+  assert.deepEqual(block.refusals, [], JSON.stringify(block.refusals));
+  /* EVERY RUN THAT OVERLAPS THE DAY, a finished one included, in the order they started; one that ended before is out. */
+  const from = NOW - 24 * 3_600_000;
+  const inDay = RUNS.filter((r) => Date.parse(String(r.last_seen)) >= from).sort((a, z) => String(a.started).localeCompare(String(z.started)));
+  assert.ok(inDay.length >= 3 && inDay.length < RUNS.length, 'the seed needs runs inside the day and outside it');
+  assert.deepEqual(
+    block.lanes?.map((l) => ({ title: l.title, start: l.start, end: l.end, tone: l.tone })),
+    inDay.map((r) => ({ title: r.doing, start: r.started, end: r.last_seen, tone: r.state === 'active' ? 'info' : undefined })),
+  );
+  for (const l of block.lanes ?? []) {
+    assert.ok(Date.parse(l.start) < Date.parse(String(l.end)), `${l.title} ends before it starts`);
+    assert.match(String(l.href), /^\/r\/session\/\d+$/u, `${l.title} opens no run`);
+  }
+  assert.equal(Date.parse(block.window!.to) - Date.parse(block.window!.from), 24 * 3_600_000);
+  /* AND THE FIGURE IT IS DRAWN ON COUNTS THE RUNS HEARD FROM TODAY, so a day nobody worked draws no empty track. */
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  const read = k.metric(k.metricDecl('runs-heard-today')!);
+  assert.ok(read.ok, JSON.stringify(read));
+  assert.equal(read.value.value, RUNS.filter((r) => String(r.last_seen).slice(0, 10) === today).length);
+  assert.deepEqual((AGENTS_PAGES.agents!.blocks as { kind: string; when?: unknown }[]).find((b) => b.kind === 'lanes')?.when, { metric: 'runs-heard-today', gt: 0 });
+  sql.close();
+});
+
+/** AND ON A DAY NO RUN WAS HEARD FROM THE TILE IS LEFT OUT, the same record read three days on: no empty track. */
+test("TODAY'S LANES ARE NOT DRAWN ON A DAY NO RUN WAS HEARD FROM", async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const k = await openRecord(sql, clock);
+  value(await installSeed(k));
+  const lanes = (): Drawn & { drawn?: boolean } => opened(k, 'agents').find((b) => b.kind === 'lanes')!;
+  assert.notEqual(lanes().drawn, false, 'the sample has runs heard from today');
+  clock.advance(3 * 24 * 3_600_000);
+  assert.equal(lanes().drawn, false, 'a quiet day draws the lanes');
+  assert.deepEqual(lanes().refusals, []);
   sql.close();
 });
 

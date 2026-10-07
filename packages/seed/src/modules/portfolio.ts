@@ -980,7 +980,11 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
 
            HOW IT IS GOING LEADS AND THE AGENT COMES LAST, SINCE portfolio 1.12.0. A card with no title is headed by its
            person, so the agent's name and mark were the first line of the tile; with the health as its title the card
-           reads "At risk", how far along, the day it aims for, and who is on it under them. */
+           reads "At risk", how far along, the day it aims for, and who is on it under them.
+
+           AT RISK AND OFF TRACK WEAR THEIR COLOUR, SINCE founder 2.2.0 and team 2.17.0: a card is toned by its title's
+           value, and the title is the health. On track wears no mark on purpose, since colour is for what needs the
+           person (DIRECTION §39, "status colours as small dots and text"). */
         kind: 'cards',
         heading: 'Where it stands',
         icon: 'target',
@@ -994,6 +998,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'aim', label: 'Aiming for', as: 'fact' },
           { field: 'agent', label: 'Agent', as: 'who' },
         ],
+        tones: { at_risk: 'warn', off_track: 'bad' },
         limit: 1,
         empty: 'Nobody has said where {{name}} stands yet.',
       },

@@ -272,6 +272,9 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
   /* THE TWO GROUPS OF STOPPED RUNS, SINCE 1.6.0, each over its cards' own clause, so a heading is drawn only over runs.
      Earlier counts only the runs still open, as `sessions.live` lists them, so a figure and its cards agree. */
   'runs-today': { metric: 'runs-today', name: 'Runs that stopped today', source: 'register.session', where: RUNS_TODAY, ...COUNT },
+  /* EVERY RUN HEARD FROM TODAY, SINCE 1.8.0, whatever it says it is doing, a finished one included: what Today's lanes
+     are drawn on, over the list they read. */
+  'runs-heard-today': { metric: 'runs-heard-today', name: 'Runs heard from today', source: 'register.session', where: 'last_seen is today', ...COUNT },
   'runs-earlier': { metric: 'runs-earlier', name: 'Runs last heard from before today', source: 'register.session', where: `state is active or idle or handoff, ${RUNS_EARLIER}`, ...COUNT },
   'learnings-active': { metric: 'learnings-active', name: 'Learnings in use', source: 'register.learnings', where: 'state is active', ...COUNT },
   'skills-active': { metric: 'skills-active', name: 'Skills in use', source: 'register.skills', where: 'state is active', ...COUNT },
@@ -296,6 +299,8 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
  * this is only what an agent's run asked (`ASKED_BY_A_RUN`). Where they left off goes into Today and Earlier, whose
  * cards say the next step each run left. Each card opens its run in the panel docked beside the page, which is the
  * host's (DIRECTION §34), so the page declares lists of runs and no panel of its own. The word on screen stays "run".
+ *
+ * THE DAY DRAWN OVER THEM, SINCE 1.8.0: Today's lanes, the last 24 hours of runs as spans of time, under the line.
  *
  * NO PEOPLE ON THEM. "People met lately" would make the page require `register.people`, and then a
  * record without People could not take this pack. The people an agent meets are on the People page.
@@ -326,7 +331,24 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         when: { metric: 'agents-working', is: 0 },
         body: 'No agent is working right now, and {{runs-left-next}} run(s) left a next step',
       },
-      /* WHAT A RUN ASKED YOU, FIRST, SINCE 1.6.0: the questions agents' runs opened, ranked as Decide ranks them, three
+      /* THE DAY AS A PICTURE, SINCE 1.8.0 (DIRECTION §39, the picture first): the last 24 hours, one lane a run, from when
+         it started (`started`, which the record stamps as a run opens) to when it was last heard from, the runs still
+         working in the accent and every other left neutral. Over the list of runs itself and not `sessions.live`, so a
+         run that finished this morning keeps its lane. No `limit:`, which lanes refuse: they draw every run in their
+         hours or none. Only while a run was heard from today (`runs-heard-today`), so a quiet day draws no empty track.
+         It shares its heading with the group of runs that stopped today further down: both are today. */
+      {
+        kind: 'lanes',
+        heading: 'Today',
+        icon: 'clock',
+        span: 12,
+        source: 'register.session',
+        columns: [{ field: 'doing' }, { field: 'started' }, { field: 'last_seen' }, { field: 'state' }],
+        tones: { active: 'info' },
+        hours: 24,
+        when: { metric: 'runs-heard-today', gt: 0 },
+      },
+      /* WHAT A RUN ASKED YOU, FIRST OF THE GROUPS, SINCE 1.6.0: the questions agents' runs opened, ranked as Decide ranks them, three
          drawn and the rest counted. Only while anything is open at all (`questions-open`, the record's own count); with
          none of them a run's, the queue has nothing in it and is not drawn. */
       {
@@ -503,8 +525,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      they left off goes into Today and Earlier, whose cards carry each run's next step. `runs-left-next` stays, read by
      the line. No list, field or figure goes.
      1.7.0 ONLY ADDS, SO IT IS MINOR: `page.run`, a page per run, whose one section draws what the run did and Undo this
-     run under `panel: run`. */
-  manifest: { id: 'agents', version: '1.7.0', requires: ['register.things'] },
+     run under `panel: run`.
+     1.8.0 ONLY ADDS, SO IT IS MINOR: Today's lanes at the top of the agents home, over the kernel's `started` on a run
+     (its migration 26), and the `runs-heard-today` figure they are drawn on. 1.7.0 is live. */
+  manifest: { id: 'agents', version: '1.8.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

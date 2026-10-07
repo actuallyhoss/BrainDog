@@ -12,12 +12,13 @@ import assert from 'node:assert/strict';
 
 import { handedOf, install, normalise, plan, type Diff, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
-import { updateFirstParty, type QuietPort, type QuietQuestion } from '@braindog/seed/packs/quiet';
+import { losses, updateFirstParty, type QuietPort, type QuietQuestion } from '@braindog/seed/packs/quiet';
 import type { Result } from '@braindog/ports';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 import { FIRST_PARTY_VERSIONS, NOW, firstPartyManifest } from '../src/index.ts';
-import { dayOf, moduleDocument } from '../src/usecases/install.ts';
+import { modulesFor, useCase } from '../src/usecases/index.ts';
+import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 import { peopleBefore3 } from './people-before-3.ts';
 
 type Body = Record<string, unknown>;
@@ -259,4 +260,46 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
   assert.deepEqual(runs?.cells?.map((c) => c.metric), ['runs-out-on']);
   assert.ok(k.packClaims('money-core').includes('metric.runs-out-on'), 'the day the money runs out did not reach the record');
   sql.close();
+});
+
+/**
+ * A USE CASE WHOSE NEW VERSION ONLY COLOURS A TILE THAT IS ALREADY THERE LOSES NOTHING EITHER. Founder 2.2.0 and Team
+ * 2.17.0 take the project template's `tones:` on Where it stands and nothing else, so over a record holding the version
+ * before, the plan is one page changed, nothing a person would be asked about, and it goes in. The version before is
+ * made from this build's document with the tones left off, which is the whole of the change.
+ */
+test("A USE CASE'S UPDATE THAT ONLY TONES A TILE LOSES NOTHING, and goes in over the version before", async () => {
+  const stands = (doc: Body): Body => ((doc.declarations as Body[]).find((d) => d.page === 'project')!.blocks as Body[]).find((b) => b.heading === 'Where it stands')!;
+  for (const id of ['founder', 'team']) {
+    const u = useCase(id)!;
+    const sql = openSqlite();
+    const k = await openRecord(sql, fixedClock(NOW));
+    for (const m of modulesFor(u, ['people'])) if (m !== 'agents') await put(k, sql, documentFor(k, m)!);
+
+    const now = carriedDocument(u, TODAY)!;
+    assert.deepEqual(stands(now).tones, { at_risk: 'warn', off_track: 'bad' }, `${id}: on track wears no mark`);
+    const [major, minor] = u.version.split('.').map(Number);
+    const before = `${major}.${minor! - 1}.0`;
+    const earlier: Body = {
+      ...now,
+      version: before,
+      declarations: (now.declarations as Body[]).map((d) =>
+        d.page === 'project' ? { ...d, blocks: (d.blocks as Body[]).map((b) => (b.heading === 'Where it stands' ? (({ tones: _tones, ...rest }) => rest)(b) : b)) } : d,
+      ),
+    };
+    await put(k, sql, earlier);
+    const pack = `usecase-${id}`;
+    assert.equal(k.packs().find((p) => p.id === pack)?.version, before);
+
+    const next = value<Pack>(await normalise(now, { kind: 'local' }));
+    const diff = await plan(next, stateOf(k, sql));
+    assert.deepEqual(losses(diff), [], `${id}: nothing would be lost`);
+    assert.deepEqual([diff.adds.length, diff.retires.length, diff.conflicts.length], [0, 0, 0], `${id}: only a page changed`);
+    value(await install(next, diff, hostFor(k), diff.planHash));
+    assert.equal(k.packs().find((p) => p.id === pack)?.version, u.version);
+    const held = (k.declarations() as { id: string; body: unknown }[]).find((d) => d.id === 'page.project')!;
+    const body = (typeof held.body === 'string' ? JSON.parse(held.body) : held.body) as { blocks: Body[] };
+    assert.deepEqual(body.blocks.find((b) => b.heading === 'Where it stands')?.tones, { at_risk: 'warn', off_track: 'bad' }, `${id}: the page is this build's`);
+    sql.close();
+  }
 });
