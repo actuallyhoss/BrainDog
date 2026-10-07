@@ -832,7 +832,8 @@ export function importBrainl(
        run is in. This record's ledger says both have run, so nothing else would ever put the row
        right. Migration 22's seat is keyed on its checksum, so it changes nothing when the file
        already holds it. */
-    if (touched.has('declaration')) execScript(sql, SEAT_SESSION);
+    /* OR ITS ROWS: a file that brings runs and no declarations still needs each run's `started`, which the seat fills. */
+    if (touched.has('declaration') || touched.has('entry')) execScript(sql, SEAT_SESSION);
 
     /* AND A FILE WRITTEN BEFORE MIGRATION 16 CARRIES THE ASSISTANT'S OLD NAME in the rows it brings, for the same
        reason: this record's ledger says the rename ran, so nothing else would rename them. The declaration bodies need

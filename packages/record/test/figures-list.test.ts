@@ -62,7 +62,7 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
      on, made it 63, and People 3.0.0's count of organisations, moved in from Founder with the organisations list, made it
      64. The number is asserted so that a pack shipping fewer figures is noticed here rather than read as the gap closing on its
      own. */
-  assert.equal(declared.length, 65);
+  assert.equal(declared.length, 66);
   const late = listed.find((f) => f.id === 'late-in');
   assert.deepEqual(late, { id: 'late-in', name: 'Late receivables', format: 'money', list: 'obligations', pack: 'money-core', param: false });
   /* AND THE TEMPLATES, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers named, as `project-owed:Kiln`:
@@ -150,7 +150,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 65);
+  assert.equal(listed.length, 66);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });
