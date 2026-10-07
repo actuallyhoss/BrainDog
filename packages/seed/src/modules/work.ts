@@ -732,6 +732,12 @@ export const WORK_PAGES: Record<string, SeedPage> = {
    * which is ordered by the day first. Over them, a strip of figures: what is open, what falls due this week, and what
    * was finished, with its last seven days. The line says counts, "1 late, 3 waiting on you", where it named a task
    * and read like one.
+   *
+   * THE LINE TO TYPE INTO IS THE HEADER'S, SINCE work 1.16.0 (DIRECTION §39, the second design review's fix 3), as
+   * Today's is: it is declared alone and first, straight after the page's sentence, which is what a host reads to hold
+   * it beside the page's name, where it spent a whole tile on one field. And every band says its own width: Late, the
+   * figures and the folds write `span: 12`, a width of their own that a host does not halve beside a neighbour, so Late
+   * is a strip whatever follows it.
    */
   work: {
     page: 'work',
@@ -790,7 +796,11 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       {
         /* CAPTURE FIRST, before any figure, because a task that is not written down the moment it comes to mind is the
            one carried in your head. The heading is the field's prompt (`render/src/capture.ts`), and a task added here
-           is To do with no day, so it lands under Not this week until somebody gives it one. */
+           is To do with no day, so it lands under Not this week until somebody gives it one.
+
+           ALONE AND FIRST AFTER THE SENTENCE, ON NO SURFACE BUT ITS OWN, SINCE work 1.16.0, AND IT STAYS SO: that is how
+           the page says the line is its header's, as Today's capture is. A block put before it, or a boxed section
+           round it, makes it a tile again. */
         kind: 'capture',
         heading: 'What needs doing?',
         icon: 'plus',
@@ -803,7 +813,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
            day.
 
            A STRIP THE WHOLE WIDTH, SINCE work 1.15.0: beside This week it was a tile as tall as the longer list holding
-           one line, and it is the one band here that is already wrong. */
+           one line, and it is the one band here that is already wrong. `span: 12` IS WRITTEN AND MEANT: a wide screen
+           set it beside At a glance as half a row, 235px tall over one task (the second design review's fix 3), and a
+           width an author wrote down is theirs to keep. */
         kind: 'todo',
         heading: 'Late',
         icon: 'alert',
@@ -965,6 +977,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
    *
    * AND THE SAME ONE SENTENCE FOR AN EMPTY LIST AS WORK'S, SINCE work 1.14.0: the line says nothing is open, and the
    * board and the list say nothing of their own, since a block with nothing in it is not drawn.
+   *
+   * NO HEADING OVER THE BOARD, SINCE work 1.16.0 (the second design review's fix 2). It read "By status" under a page
+   * called Board whose every column is headed by its status, so the tile said what it was three times.
    */
   'work-board': {
     page: 'work-board',
@@ -992,8 +1007,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       },
       {
         kind: 'board',
-        heading: 'By status',
-        icon: 'board',
         span: 12,
         columns: [{ field: 'state' }, { field: 'what' }, { field: 'thing' }],
         source: 'register.tasks',

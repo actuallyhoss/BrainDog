@@ -9,6 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 import { handedOf, install, normalise, plan, type Diff, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
@@ -16,8 +17,8 @@ import { losses, updateFirstParty, type QuietPort, type QuietQuestion } from '@b
 import type { Result } from '@braindog/ports';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
-import { FIRST_PARTY_VERSIONS, NOW, firstPartyManifest } from '../src/index.ts';
-import { modulesFor, useCase } from '../src/usecases/index.ts';
+import { FIRST_PARTY_VERSIONS, NOW, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
+import { modulesFor, useCase, useCaseDocument } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 import { peopleBefore3 } from './people-before-3.ts';
 
@@ -300,6 +301,222 @@ test("A USE CASE'S UPDATE THAT ONLY TONES A TILE LOSES NOTHING, and goes in over
     const held = (k.declarations() as { id: string; body: unknown }[]).find((d) => d.id === 'page.project')!;
     const body = (typeof held.body === 'string' ? JSON.parse(held.body) : held.body) as { blocks: Body[] };
     assert.deepEqual(body.blocks.find((b) => b.heading === 'Where it stands')?.tones, { at_risk: 'warn', off_track: 'bad' }, `${id}: the page is this build's`);
+    sql.close();
+  }
+});
+
+/* ── the second design review's fixes, over the versions before them ───────────────────────────────────────────────── */
+
+/** What a record on a version holds, hashed as `pack-versions.test.ts` and `usecase-versions.test.ts` hash it. */
+const fingerprintOf = (d: Body): string =>
+  createHash('sha256')
+    .update(JSON.stringify({ declarations: d.declarations, config: d.config ?? null }))
+    .digest('hex')
+    .slice(0, 16);
+
+/** A document with one page's blocks rewritten, and optionally some of its declarations left out. */
+const withPage = (doc: Body, page: string, blocks: (now: Body[]) => Body[], keep: (d: Body) => boolean = () => true): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[]).filter(keep).map((d) => (d.page === page ? { ...d, blocks: blocks(d.blocks as Body[]) } : d)),
+});
+
+/** A block with a heading and a glyph put back straight after its kind, where every block here writes them. */
+const headed = ({ kind, ...rest }: Body, heading: string, icon: string): Body => ({ kind, heading, icon, ...rest });
+
+/**
+ * EACH MODULE AS THE VERSION BEFORE DECLARED IT, made from this build's document by undoing the one change its new
+ * version makes (work 1.16.0, portfolio 1.15.0, people 3.1.0, money-core 3.13.0). NOT A GUESS AT WHAT SHIPPED: each is
+ * held below to the fingerprint `pack-versions.test.ts` records for the version it rebuilds, so the update is planned
+ * over what a record really holds, to the letter.
+ */
+const BEFORE: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
+  /* THE BOARD SAID BY STATUS, with its glyph. */
+  work: {
+    version: '1.15.0',
+    released: '285a35e7197ac5cb',
+    undo: (doc) => withPage(doc, 'work-board', (now) => now.map((b) => (b.kind === 'board' ? headed(b, 'By status', 'board') : b))),
+  },
+  /* THE WALK OF THE NEXT THIRTY DAYS HAD A HEADING OF ITS OWN under Coming and going's. */
+  'money-core': {
+    version: '3.12.0',
+    released: 'f7558a5590d4ee11',
+    undo: (doc) => withPage(doc, 'money', (now) => now.map((b) => (b.kind === 'bridge' ? headed(b, 'The next 30 days', 'scale') : b))),
+  },
+  /* TWELVE WEEKS OF DOTS where the two lists are, and no figure for the second of them. */
+  people: {
+    version: '3.0.0',
+    released: 'd6246046a52dcc45',
+    undo: (doc) =>
+      withPage(
+        doc,
+        'people',
+        (now) =>
+          now.flatMap((b) =>
+            b.heading === 'Last in touch'
+              ? []
+              : b.heading === 'Gone quiet'
+                ? [
+                    {
+                      kind: 'heat',
+                      heading: 'In touch, 12 weeks',
+                      icon: 'handshake',
+                      span: 12,
+                      who: true,
+                      source: 'register.people',
+                      where: 'in_touch after -84d',
+                      columns: [{ field: 'in_touch' }, { field: 'name' }],
+                      when: { metric: 'people-in-touch-12w', gt: 0 },
+                      empty: 'Nobody was in touch in the last twelve weeks.',
+                    },
+                  ]
+                : [b],
+          ),
+        (d) => d.metric !== 'people-in-touch-90d',
+      ),
+  },
+  /* BOTH HEADINGS FOLDED WHATEVER WAS UNDER THEM: no open tile, and each fold drawn on more than nought. */
+  portfolio: {
+    version: '1.14.0',
+    released: '51a2d8569a7b35e3',
+    undo: (doc) =>
+      withPage(doc, 'portfolio', (now) => {
+        const out: Body[] = [];
+        let open = false;
+        for (const b of now) {
+          if (b.kind === 'section') open = b.box === true;
+          if (open) continue;
+          out.push(b.kind === 'section' && b.fold === true ? { ...b, when: { ...(b.when as Body), gt: 0 } } : b);
+        }
+        return out;
+      }),
+  },
+};
+
+test('THE VERSIONS BEFORE THE SECOND DESIGN REVIEW, REBUILT, ARE THE ONES RELEASED, to the letter', () => {
+  for (const [id, was] of Object.entries(BEFORE)) {
+    const now = firstPartyDocument(id as never, { seeds: [] }) as unknown as Body;
+    assert.notEqual(FIRST_PARTY_VERSIONS[id as 'work'], was.version, `${id} has not moved on from ${was.version}`);
+    assert.equal(fingerprintOf(was.undo(now)), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
+    assert.notEqual(fingerprintOf(now), was.released, `${id}: this build declares what ${was.version} did under a new version`);
+  }
+});
+
+/**
+ * WORK 1.16.0, PROJECTS 1.15.0, PEOPLE 3.1.0 AND MONEY 3.13.0 REACH A RECORD ON THEIR OWN. Each changes headings and
+ * blocks on a page the record already holds, and People adds a figure; nothing is taken away, `people-in-touch-12w`
+ * included, which no page draws now and which stays declared for exactly this reason. So a record holding the four
+ * versions before is updated with no question, and its pages are this build's.
+ */
+test('THE SECOND DESIGN REVIEW’S PAGE FIXES GO IN ON THEIR OWN over the versions a record holds, and ask nothing', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  for (const m of ['portfolio', 'people', 'money-core', 'work']) {
+    const doc = documentFor(k, m)!;
+    await put(k, sql, { ...BEFORE[m]!.undo(doc), version: BEFORE[m]!.version });
+    assert.equal(k.packs().find((p) => p.id === m)?.version, BEFORE[m]!.version);
+  }
+  assert.ok(!k.packClaims('people').includes('metric.people-in-touch-90d'), 'the record starts without the figure the update brings');
+  const port = portOf(k, sql);
+
+  const steps = await updateFirstParty(port);
+  for (const id of ['portfolio', 'people', 'money-core', 'work'] as const)
+    assert.deepEqual(
+      steps.find((s) => s.pack === id && s.from !== s.to),
+      { pack: id, from: BEFORE[id]!.version, to: FIRST_PARTY_VERSIONS[id], did: 'updated' },
+      JSON.stringify(steps),
+    );
+  assert.deepEqual(port.asked, [], 'nothing was lost, so nothing was asked');
+
+  type Held = { kind: string; heading?: string; icon?: string; box?: boolean; fold?: boolean; tone?: string; when?: { metric?: string; gt?: number; lte?: number } };
+  const blocks = (slug: string): Held[] => value<{ blocks: Held[] }>(k.page(slug)).blocks;
+  /* THE BOARD AND THE WALK OF THIRTY DAYS WEAR NO HEADING. */
+  assert.deepEqual(blocks('work-board').filter((b) => b.kind === 'board').map((b) => [b.heading, b.icon]), [[undefined, undefined]]);
+  const money = blocks('money');
+  assert.deepEqual([money[money.findIndex((b) => b.heading === 'Coming and going') + 1]!.kind, money.find((b) => b.kind === 'bridge')!.heading], ['bridge', undefined]);
+  /* PEOPLE DRAWS ITS TWO LISTS, the first in the colour of what needs the person, and keeps the figure the chart drew on. */
+  const people = blocks('people');
+  assert.ok(!people.some((b) => b.kind === 'heat'), 'the twelve weeks of dots are still on People');
+  assert.deepEqual(people.filter((b) => b.kind === 'table').map((b) => [b.heading, b.tone, b.when?.metric]), [
+    ['Gone quiet', 'bad', 'people-quiet'],
+    ['Last in touch', undefined, 'people-in-touch-90d'],
+  ]);
+  for (const id of ['metric.people-in-touch-90d', 'metric.people-in-touch-12w']) assert.ok(k.packClaims('people').includes(id), `${id} is not on the record`);
+  /* AND PROJECTS HOLDS EACH HEADING TWICE, open while four or fewer are under it and folded past four. */
+  const sections = blocks('portfolio').filter((b) => b.kind === 'section');
+  assert.deepEqual(sections.map((b) => [b.heading, b.box === true ? 'open' : 'folded', b.when?.lte ?? b.when?.gt]), [
+    ['Earnings, agents and dates', 'open', 4],
+    ['Earnings, agents and dates', 'folded', 4],
+    ['Parked and finished', 'open', 4],
+    ['Parked and finished', 'folded', 4],
+  ]);
+
+  /* AND ONCE IN, THE NEXT RUN HAS NOTHING TO DO. */
+  assert.deepEqual(await updateFirstParty(port), []);
+  sql.close();
+});
+
+/** The chart a project's page drew until founder 2.3.0 and team 2.18.0, as the template declared it. */
+const DONE_BY_WEEK: Body = {
+  kind: 'series',
+  heading: 'Done, by week',
+  icon: 'chart-column',
+  span: 12,
+  series: [{ metric: 'project-done-by-week:{{name}}', label: 'Done' }],
+  back: 8,
+  empty: 'Nothing on {{name}} was finished in these weeks.',
+};
+
+/**
+ * A USE CASE'S PROJECT PAGE AS THE VERSION BEFORE DECLARED IT: Done, by week over the plan, and At a glance without what
+ * was finished this week as its last figure. Founder's row had no such figure; Team's, made up from its tasks, had it
+ * with no line asked for (`trend`).
+ */
+const projectBefore = (doc: Body, id: string): Body =>
+  withPage(doc, 'project', (now) =>
+    now.flatMap((b) => {
+      if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
+      if (b.heading !== 'At a glance') return [b];
+      const cells = (b.cells as Body[]).flatMap((c) => (c.metric !== 'project-done-7d:{{name}}' ? [c] : id === 'founder' ? [] : [(({ trend: _trend, ...cell }) => cell)(c)]));
+      return [{ ...b, cells }];
+    }),
+  );
+
+/** The version each use case was on, and what `usecase-versions.test.ts` records it declared. */
+const USECASE_BEFORE: Record<string, { version: string; released: string }> = {
+  founder: { version: '2.2.0', released: 'e298abda699c666d' },
+  team: { version: '2.17.0', released: 'c11cf821f8eb46c7' },
+};
+
+/**
+ * FOUNDER 2.3.0 AND TEAM 2.18.0 TAKE THE PROJECT TEMPLATE WITHOUT ITS CHART OF THE WEEKS, and lose nothing a person would
+ * be asked about: a block gone from a page and a cell added to another, on a page the use case already holds. The
+ * version before is rebuilt from this build's document and held to the fingerprint released under it.
+ */
+test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and goes in over the version released before it", async () => {
+  for (const id of ['founder', 'team']) {
+    const u = useCase(id)!;
+    const was = USECASE_BEFORE[id]!;
+    assert.notEqual(u.version, was.version);
+    assert.equal(fingerprintOf(projectBefore(useCaseDocument(id, TODAY) as Body, id)), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
+
+    const sql = openSqlite();
+    const k = await openRecord(sql, fixedClock(NOW));
+    for (const m of modulesFor(u, ['people'])) if (m !== 'agents') await put(k, sql, documentFor(k, m)!);
+    const now = carriedDocument(u, TODAY)!;
+    await put(k, sql, { ...projectBefore(now, id), version: was.version });
+    const pack = `usecase-${id}`;
+    assert.equal(k.packs().find((p) => p.id === pack)?.version, was.version);
+
+    const next = value<Pack>(await normalise(now, { kind: 'local' }));
+    const diff = await plan(next, stateOf(k, sql));
+    assert.deepEqual(losses(diff), [], `${id}: nothing would be lost`);
+    assert.deepEqual([diff.adds.length, diff.retires.length, diff.conflicts.length], [0, 0, 0], `${id}: only a page changed`);
+    value(await install(next, diff, hostFor(k), diff.planHash));
+    assert.equal(k.packs().find((p) => p.id === pack)?.version, u.version);
+    const held = (k.declarations() as { id: string; body: unknown }[]).find((d) => d.id === 'page.project')!;
+    const body = (typeof held.body === 'string' ? JSON.parse(held.body) : held.body) as { blocks: (Body & { cells?: Body[] })[] };
+    assert.ok(!body.blocks.some((b) => b.heading === 'Done, by week'), `${id}: the chart of the weeks is still on the page`);
+    assert.deepEqual(body.blocks.find((b) => b.heading === 'At a glance')!.cells!.at(-1), { metric: 'project-done-7d:{{name}}', label: 'Done this week', trend: '4w' }, `${id}: the page is this build's`);
     sql.close();
   }
 });

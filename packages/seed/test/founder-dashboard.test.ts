@@ -190,11 +190,11 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     'At a glance',
     'Where it stands',
     'Handed back or blocked',
-    /* THE TEMPLATE SINCE work 1.15.0: the chart and the plan, then one More about tile holding what changed, who
-       worked on it, its notes, its money and what it runs on. What is open went in 1.10.0, the plan drawing the same
-       tasks. A LINE A MEASURE, SINCE founder 1.16.0, and where to send them, before the More about tile, which would
-       otherwise hold them. */
-    'Done, by week',
+    /* THE TEMPLATE SINCE work 1.15.0: the plan, then one More about tile holding what changed, who worked on it, its
+       notes, its money and what it runs on. What is open went in 1.10.0, the plan drawing the same tasks, and Done, by
+       week in founder 2.3.0, a chart of ones and twos: what was finished this week is At a glance's last figure. A
+       LINE A MEASURE, SINCE founder 1.16.0, and where to send them, before the More about tile, which would otherwise
+       hold them. */
     'The plan',
     'Numbers, 30 days',
     'Send numbers here',
@@ -210,7 +210,7 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     'Skills',
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.deepEqual((blocks.find((b) => b.heading === 'At a glance') as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Owed to you', 'Costs a year'], 'with Estate present, what it costs a year takes the place the task figures held');
+  assert.deepEqual((blocks.find((b) => b.heading === 'At a glance') as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Owed to you', 'Costs a year', 'Done this week'], 'with Estate present, what it costs a year takes the place the task figures held');
   assert.equal(blocks[0]!.drawn, false, 'nothing is handed back, so that sentence is not drawn');
   assert.notEqual(blocks[1]!.drawn, false, 'and nothing is open, so that one is');
   /* THE PROJECT'S NOTE, which is where an imported plan and its decisions are written, and which this example has none of. */

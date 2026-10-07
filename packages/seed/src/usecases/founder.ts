@@ -253,8 +253,13 @@ export const FOUNDER = {
 
      2.2.0: Where it stands on `page.project` draws At risk in the warning colour and Off track in the danger colour, by
      the template's `tones:`. On track wears no mark. A key added to a block that is already there, so a minor step.
-     2.1.0 is live, so the change is a version and not a reset. */
-  version: '2.2.0',
+     2.1.0 is live, so the change is a version and not a reset.
+
+     2.3.0: `page.project` takes the template without Done, by week, a chart the whole of the main column for bars of 1
+     and 2 (the second design review's fix 5): what was finished this week is the last figure of At a glance, asking
+     for its four weeks as a line. A block gone from a page that is already there and a cell added to another, so a
+     minor step. 2.2.0 is live. */
+  version: '2.3.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',

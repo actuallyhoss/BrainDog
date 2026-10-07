@@ -442,7 +442,7 @@ test('THE TILES AND THE BRIDGE ON `/p/money` ADD UP THE SAME MOVEMENTS, so no tw
   for (const b of MONEY_PAGES.money!.blocks as { kind: string; cells?: { metric: string }[] }[])
     for (const c of b.cells ?? []) assert.ok(!line.includes(`{{${c.metric}}}`), `a tile beside the line says ${c.metric} again`);
 
-  const bridge = blockOf(k, 'money', 'The next 30 days');
+  const bridge = blockOf(k, 'money', 'bridge');
   const steps = bridge.walk?.steps;
   assert.ok(steps && steps.length > 0, 'the bridge draws its walk');
   const sum = (of: (s: { source: string; delta: number }) => boolean) => steps.filter(of).reduce((n, s) => n + s.delta, 0);
@@ -664,7 +664,8 @@ type DrawnBlock = {
 const blockOf = (k: Kernel, slug: string, heading: string): DrawnBlock => {
   const out = k.page(slug);
   assert.ok(out.ok, `${slug}: ${sayOf(out)}`);
-  const block = (out.value as { blocks: readonly DrawnBlock[] }).blocks.find((b) => b.heading === heading);
+  /* BY ITS KIND WHERE IT WEARS NO HEADING, as the walk of the next thirty days has not since money-core 3.13.0. */
+  const block = (out.value as { blocks: readonly (DrawnBlock & { kind?: string })[] }).blocks.find((b) => (b.heading ?? b.kind) === heading);
   assert.ok(block, `${slug} draws a block headed ${heading}`);
   assert.deepEqual(block.refusals, [], 'a block that refuses is a heading over a blank rectangle');
   return block;
@@ -704,7 +705,9 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     /* WHAT COMES IN AND GOES OUT IS OPEN, ONE TILE, SINCE money-core 3.11.0, and what already happened is folded under
        History. One view of the month is kept of three (3.4.0). */
     'Coming and going',
-    'The next 30 days',
+    /* THE NEXT THIRTY DAYS, WITH NO HEADING OF ITS OWN SINCE money-core 3.13.0: it is the first thing in the tile, so
+       the tile opened on two headings, one over the other. */
+    undefined,
     'Due in the next 30 days',
     'Instalments',
     'Being chased',
@@ -718,6 +721,10 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.deepEqual(blocks.filter((b) => b.area === 'rail').map((b) => b.heading), ['Runs out', 'Accounts', 'Waiting on you']);
   assert.deepEqual(blocks.filter((b) => b.fold === true).map((b) => b.heading), ['History']);
   assert.deepEqual(blocks.filter((b) => b.box === true).map((b) => b.heading), ['Heads up', 'Coming and going']);
+  /* ONE HEADING OVER COMING AND GOING, SINCE money-core 3.13.0: the block straight under the boxed heading is the walk
+     of the next thirty days, and it wears neither a heading nor a glyph of its own. */
+  const under = (page.blocks as { kind: string; heading?: string; icon?: string; horizon?: number }[])[blocks.findIndex((b) => b.heading === 'Coming and going') + 1]!;
+  assert.deepEqual([under.kind, under.horizon, under.heading, under.icon], ['bridge', 30, undefined, undefined]);
   /* NO LAW ON A PAGE EVERYBODY DRAWS: the late notes say what is late in words any record's owner reads. */
   assert.ok(!JSON.stringify(page).includes('Statutory'), 'a note speaks for one country');
 

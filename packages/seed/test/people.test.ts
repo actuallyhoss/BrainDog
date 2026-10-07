@@ -97,21 +97,52 @@ test('PEOPLE OPENS ON ONE LINE SAID FROM ITS OWN FIGURES, and the figures count 
   assert.ok(Number(read('people-quiet')) > 0 && Number(read('people-in-touch-30d')) > 0, 'the sample has somebody quiet and somebody in touch, so the line says both');
 });
 
-test('THE CHART MARKS EACH PERSON ON THE LAST DAY THEY WERE IN TOUCH, and everyone is listed the latest first', async () => {
+test('WHO HAS GONE QUIET AND WHO WAS LAST IN TOUCH ARE TWO SHORT LISTS, the one quiet longest first, and everyone is listed the latest first', async () => {
   const k = await seeded();
   const page = opened(k, 'people');
-  const chart = page.blocks.find((b) => b.kind === 'heat');
-  assert.ok(chart, 'People draws no chart');
-  assert.equal(chart.rows.length, PEOPLE.filter(after(-84)).length);
-  /* A LINE A PERSON, SINCE People 2.5.0 (`who:` since 2.6.0): the day then who, so each dot is drawn beside a name. */
-  assert.equal((chart as { who?: unknown }).who, true, 'the chart is not drawn a line a person');
-  assert.deepEqual(chart.columns?.map((c) => c.field), ['in_touch', 'name']);
-  assert.ok(chart.rows.every((r) => typeof r.fields.name === 'string' && r.fields.name !== ''), 'a mark on the chart names nobody');
+  /* NO CHART OF DOTS, SINCE People 3.1.0: twelve weeks a person said when, once each, and nothing else. */
+  assert.ok(!page.blocks.some((b) => b.kind === 'heat'), 'People draws its twelve weeks of dots again');
+  const dayOfRow = (r: { fields: Record<string, unknown> }) => String(r.fields.in_touch);
+  const sample = (ok: (p: (typeof PEOPLE)[number]) => boolean) =>
+    PEOPLE.filter((p) => typeof p.in_touch === 'string' && ok(p))
+      .sort((a, b) => String(a.in_touch).localeCompare(String(b.in_touch)))
+      .map((p) => p.name);
+
+  /* GONE QUIET IS THE PEOPLE THE LINE COUNTS, in the colour of what needs the person, the one quiet longest first. */
+  const quiet = page.blocks.find((b) => b.heading === 'Gone quiet');
+  assert.ok(quiet, 'People has no Gone quiet');
+  assert.deepEqual([quiet.kind, quiet.drawn !== false, (quiet as { tone?: unknown }).tone], ['table', true, 'bad']);
+  assert.deepEqual(quiet.rows.map((r) => r.fields.name), sample((p) => String(p.in_touch) < on(-90)));
+  assert.deepEqual(quiet.rows.map((r) => r.fields.name), ['Ada Vine']);
+  const counted = k.metric(METRICS['people-quiet'] as never);
+  assert.ok(counted.ok, sayOf(counted));
+  assert.equal(quiet.rows.length, counted.value.value, 'the list and the line count different people');
+
+  /* LAST IN TOUCH IS EVERYBODY ELSE WITH A DAY, THE QUIETEST FIRST TOO, so it reads on from the list beside it. */
+  const lately = page.blocks.find((b) => b.heading === 'Last in touch');
+  assert.ok(lately, 'People has no Last in touch');
+  assert.deepEqual([lately.kind, lately.drawn !== false, (lately as { tone?: unknown }).tone], ['table', true, undefined]);
+  assert.deepEqual(lately.rows.map((r) => r.fields.name), sample((p) => String(p.in_touch) >= on(-90)));
+  assert.deepEqual(lately.rows.map((r) => r.fields.name), ['Tom Ashby', 'Mara Lindqvist', 'J. Okonkwo', 'S. Marchetti']);
+  const days = lately.rows.map(dayOfRow);
+  assert.deepEqual(days, [...days].sort(), 'Last in touch is not the quietest first');
+  const within = k.metric(METRICS['people-in-touch-90d'] as never);
+  assert.ok(within.ok, sayOf(within));
+  assert.equal(lately.rows.length, within.value.value, 'Last in touch is drawn on a figure that counts other people');
+
+  /* NOBODY IS IN BOTH, AND NOBODY WITH A DAY IS IN NEITHER: the two sentences cut at one day. */
+  const listed = [...quiet.rows, ...lately.rows].map((r) => r.fields.name);
+  assert.deepEqual([...listed].sort(), PEOPLE.filter((p) => typeof p.in_touch === 'string').map((p) => p.name).sort());
+  /* EACH A PERSON, WHO THEY ARE WITH AND THE DAY, half the row, side by side. */
+  for (const b of [quiet, lately]) {
+    assert.deepEqual(b.columns?.map((c) => c.field), ['name', 'org', 'in_touch'], String(b.heading));
+    assert.equal(b.span, 6, String(b.heading));
+  }
 
   const cards = page.blocks.find((b) => b.kind === 'cards');
   assert.ok(cards);
-  const days = cards.rows.map((r) => r.fields.in_touch).filter((d): d is string => typeof d === 'string');
-  assert.deepEqual(days, [...days].sort().reverse(), 'Everyone is not in the order people were last in touch');
+  const latest = cards.rows.map((r) => r.fields.in_touch).filter((d): d is string => typeof d === 'string');
+  assert.deepEqual(latest, [...latest].sort().reverse(), 'Everyone is not in the order people were last in touch');
   assert.equal(cards.rows[0]?.fields.name, 'S. Marchetti');
   assert.equal(cards.rows.length, PEOPLE.length, 'somebody nobody has been in touch with is left off Everyone');
 
@@ -123,20 +154,20 @@ test('THE CHART MARKS EACH PERSON ON THE LAST DAY THEY WERE IN TOUCH, and everyo
   }
 });
 
-test('A RECORD WHERE NOBODY WAS IN TOUCH DRAWS NO CHART, and still says how many people it keeps', async () => {
+test('A RECORD WHERE NOBODY WAS IN TOUCH DRAWS NEITHER LIST, and still says how many people it keeps', async () => {
   const k = await seeded();
   const listed = k.list({ register: 'people', limit: 50 });
   assert.ok(listed.ok, sayOf(listed));
   /* NOT DELETED, which a person other rows name refuses: every day taken off, so nobody was ever in touch. */
   for (const r of listed.value.rows) assert.ok(k.update('people', `people#${r.seq}`, { in_touch: null }, { actor: 'p_1' }).ok);
   const page = opened(k, 'people');
-  assert.equal(page.blocks.find((b) => b.kind === 'heat')?.drawn, false, 'the chart is drawn over nobody');
+  for (const heading of ['Gone quiet', 'Last in touch']) assert.equal(page.blocks.find((b) => b.heading === heading)?.drawn, false, `${heading} is drawn over nobody`);
   assert.notEqual(page.blocks[0]?.drawn, false, 'the line is left off while there are people to name');
 });
 
 test('PEOPLE STILL NEEDS NO OTHER LIST: its figures read People alone', () => {
   assert.deepEqual(firstPartyManifest('people').requires, []);
-  for (const id of ['people-count', 'people-in-touch-30d', 'people-in-touch-12w', 'people-quiet'])
+  for (const id of ['people-count', 'people-in-touch-30d', 'people-in-touch-12w', 'people-in-touch-90d', 'people-quiet'])
     assert.equal((METRICS[id] as { source: string }).source, 'register.people', id);
 });
 

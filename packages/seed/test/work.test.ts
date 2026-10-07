@@ -62,6 +62,15 @@ const block = (p: PageResult, heading: string) => {
   return b;
 };
 
+/** The Board's board, which has worn no heading since work 1.16.0: the page is called Board and each column says its status. */
+const boardOf = (p: PageResult) => {
+  const b = p.blocks.find((x) => x.kind === 'board');
+  assert.ok(b, `${p.slug ?? 'the page'} has no board`);
+  assert.deepEqual(b.refusals, [], `the board: ${JSON.stringify(b.refusals)}`);
+  assert.equal(b.heading, undefined, 'the board says By status under a page called Board again');
+  return b;
+};
+
 const TODAY = new Date(NOW).toISOString().slice(0, 10);
 const live = (t: (typeof TASKS)[number]) => t.state !== 'done' && t.state !== 'dropped';
 /** What Open counts: work in play that is not kept for later. */
@@ -120,6 +129,19 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   const spans = Object.fromEntries((PAGES.work!.blocks as { heading?: string; span?: number }[]).filter((b) => b.heading).map((b) => [b.heading, b.span]));
   assert.deepEqual([spans.Late, spans['At a glance'], spans['This week'], spans['With an agent'], spans['Waiting on you']], [12, 12, 4, 4, 4]);
   assert.ok(!('Today' in spans), 'Today is a band of its own again');
+  /* THE LINE TO TYPE INTO IS THE HEADER'S, SINCE work 1.16.0, which a page says by where it puts it: the first block the
+     record draws after the page's sentence, a capture into tasks, with no heading or surface round it and nothing
+     before it. A host holds such a line beside the page's name, as it holds Today's. And Late's whole row is written
+     down, which is what keeps it a strip on a screen wide enough to set two tiles side by side. */
+  const drawn = page.blocks.filter((b) => b.drawn !== false);
+  const opening = drawn.findIndex((b) => !(b.kind === 'note' && (b as { lead?: boolean }).lead === true));
+  assert.equal(opening, 1, 'something stands between the page’s sentence and its capture line');
+  assert.deepEqual(
+    [drawn[opening]!.kind, (drawn[opening] as { register?: string }).register, (drawn[opening] as { box?: boolean }).box],
+    ['capture', 'tasks', undefined],
+  );
+  assert.ok(!drawn.some((b) => b.kind === 'section' && (b as { box?: boolean }).box === true), 'a boxed section would take the capture line onto its surface');
+  assert.equal(Object.hasOwn((PAGES.work!.blocks as { heading?: string }[]).find((b) => b.heading === 'Late')!, 'span'), true, 'Late names no width of its own');
   for (const folded of ['Not this week', 'Done lately'])
     assert.equal((page.blocks.find((b) => b.heading === folded) as { fold?: boolean }).fold, true, `${folded} is not folded`);
 
@@ -153,12 +175,12 @@ test('OPEN LEAVES OUT WORK KEPT FOR LATER AND SAYS IT BESIDE, and the sample boa
   const read = k.metric(METRICS['tasks-later'] as never);
   assert.ok(read.ok, sayOf(read));
   assert.equal(read.value.value, later);
-  assert.ok(block(opened(k, 'work-board'), 'By status').rows.some((r) => r.fields.state === 'backlog'), 'no Later column on the board');
+  assert.ok(boardOf(opened(k, 'work-board')).rows.some((r) => r.fields.state === 'backlog'), 'no Later column on the board');
 });
 
 test('THE BOARD HAS A COLUMN FOR WORK AN AGENT HANDED BACK, and progress is counted by the week work was finished', async () => {
   const k = await seeded();
-  const board = block(opened(k, 'work-board'), 'By status');
+  const board = boardOf(opened(k, 'work-board'));
   assert.ok(board.rows.some((r) => r.fields.state === 'review'));
   /* THE WEEKS ARE THE FIGURE'S, read whole, since the page draws them as Done in 7 days' line and a project's page draws
      its own (`project-done-by-week`). */

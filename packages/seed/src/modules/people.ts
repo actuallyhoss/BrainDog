@@ -363,6 +363,13 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
 const IN_TOUCH_30D = 'in_touch after -31d';
 
 /**
+ * Three months is where somebody has gone quiet, and the two sentences cut at the same day: quiet is a last day before
+ * ninety days ago, and in touch is that day or any after it. A person with no day at all is in neither.
+ */
+const QUIET = 'in_touch before -90d';
+const IN_TOUCH_90D = 'in_touch after -91d';
+
+/**
  * PEOPLE'S FIGURES, since People 2.4.0: how many people the record keeps, how many were in touch lately, and how many
  * have gone quiet. Counts of people and never a score, read from People's own list alone, so the figures install
  * wherever People does (the module note above says why People reads no other list).
@@ -389,12 +396,27 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
-  /* WHAT THE CHART DRAWS, counted, so the chart is left off a page with nobody in touch in its twelve weeks. */
+  /* WHAT THE CHART DREW, counted, until People 3.1.0, when the chart of twelve weeks went. STILL DECLARED, because a
+     record holds it and a page somebody made may draw on it: a figure taken away is something an update has to ask
+     about (`losses` in `packs/quiet.ts`), and this one costs nothing to keep. */
   'people-in-touch-12w': {
     metric: 'people-in-touch-12w',
     name: 'In touch, 12 weeks',
     source: 'register.people',
     where: 'in_touch after -84d',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /* WHO IS NOT QUIET, SINCE People 3.1.0: in touch inside the three months past which `people-quiet` counts, so the two
+     split everybody with a day between them and Last in touch is drawn only while it lists someone. */
+  'people-in-touch-90d': {
+    metric: 'people-in-touch-90d',
+    name: 'In touch, 3 months',
+    source: 'register.people',
+    where: IN_TOUCH_90D,
     value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },
@@ -419,7 +441,7 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     metric: 'people-quiet',
     name: 'Quiet for three months',
     source: 'register.people',
-    where: 'in_touch before -90d',
+    where: QUIET,
     value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },
@@ -427,6 +449,19 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 };
+
+/** A person, who they are with and the day you were last in touch: the three columns of the page's two short lists. */
+const LAST_IN_TOUCH = [
+  { field: 'name', label: 'Name', width: 'minmax(12ch,1fr)' },
+  { field: 'org', label: 'Organisation', width: 'minmax(10ch,1fr)' },
+  { field: 'in_touch', label: 'Last in touch', width: '14ch', align: 'end' },
+];
+
+/** The one quiet longest first, and of two last heard from on one day, the one met first. */
+const QUIETEST_FIRST = [
+  { field: 'in_touch', dir: 'asc' },
+  { field: 'seq', dir: 'asc' },
+];
 
 export const PEOPLE_PAGES: Record<string, SeedPage> = {
   /**
@@ -436,6 +471,12 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
    * gone quiet, said from People's own figures; then those days as a chart; then everyone, the one you spoke to last
    * first. A block with nothing to say is left off rather than drawn empty, so a record with nobody in it opens on its
    * cards' empty line alone. Every tile's heading wears a glyph (`icon:`), as the look asks.
+   *
+   * WHO, AND WHEN, IN PLACE OF THE CHART, SINCE People 3.1.0 (DIRECTION §39, the second design review's fix 7). In touch,
+   * 12 weeks drew a row of twelve dots a person, 48 grey and 4 blue on a record of four people: it said when, once
+   * each, at the cost of a grid. Now it is two short lists side by side, each a person and the day you were last in
+   * touch, the one quiet longest first: Gone quiet, whoever has been quiet three months, in the colour of what needs
+   * the person, and Last in touch, everybody else. Each is drawn only while it lists someone.
    */
   people: {
     page: 'people',
@@ -470,22 +511,41 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         body: '{{people-quiet.first}} has been quiet since {{people-quiet.since}}, and {{people-quiet.more}} other(s) have too',
       },
       {
-        /* WHEN YOU WERE LAST IN TOUCH, one mark on each person's last day, over twelve weeks. A person counts once, on
-           their latest day, so a busy week is many people and not one person written to often.
+        /* WHO HAS GONE QUIET, THE ONE QUIET LONGEST FIRST, SINCE People 3.1.0: the people the line counts
+           (`people-quiet`, the same sentence), each with who they are with and the day you were last in touch. A table
+           and not cards, because it is read down a column of days.
 
-           A LINE A PERSON, SINCE People 2.5.0 (`who: true` since 2.6.0, columns `day | who`): the grid of days said when
-           anybody was in touch and never who, so the chart now names each one beside their week. The latest are drawn
-           and the rest counted under them. */
-        kind: 'heat',
-        heading: 'In touch, 12 weeks',
-        icon: 'handshake',
-        span: 12,
-        who: true,
+           `tone: bad` IS THE RED, on the tile's heading, which is where a host says a tile needs the person. It marks
+           these people out from the list beside it and says nothing about any one of them: an accountant heard from
+           once a year is here and fine.
+
+           NEVER SOMEBODY FOLDED INTO ANOTHER, as Everyone below. Six at most, and the rest are counted under them. */
+        kind: 'table',
+        heading: 'Gone quiet',
+        icon: 'hourglass',
+        tone: 'bad',
+        span: 6,
         source: 'register.people',
-        where: 'in_touch after -84d',
-        columns: [{ field: 'in_touch' }, { field: 'name' }],
-        when: { metric: 'people-in-touch-12w', gt: 0 },
-        empty: 'Nobody was in touch in the last twelve weeks.',
+        where: `merged_into is empty, ${QUIET}`,
+        columns: LAST_IN_TOUCH,
+        order: QUIETEST_FIRST,
+        limit: 6,
+        when: { metric: 'people-quiet', gt: 0 },
+      },
+      {
+        /* AND EVERYBODY ELSE WITH A DAY, THE QUIETEST FIRST TOO, so the list reads on from the one beside it: who is
+           nearest to going quiet heads it, and who you spoke to yesterday ends it. Half the row beside Gone quiet, and
+           the whole of it on a record where nobody is quiet. */
+        kind: 'table',
+        heading: 'Last in touch',
+        icon: 'handshake',
+        span: 6,
+        source: 'register.people',
+        where: `merged_into is empty, ${IN_TOUCH_90D}`,
+        columns: LAST_IN_TOUCH,
+        order: QUIETEST_FIRST,
+        limit: 6,
+        when: { metric: 'people-in-touch-90d', gt: 0 },
       },
       {
         /* CARDS, with a face for each person, rather than a table of four columns read

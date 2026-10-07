@@ -12,7 +12,7 @@ import { openRecord, type Kernel, type PageResult } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
 
-import { NOW, PAGES, THINGS, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
+import { NOW, PAGES, TASKS, THINGS, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
 import { PORTFOLIO_REGISTERS, PROJECT_METRICS } from '../src/modules/portfolio.ts';
 
 function openSqlite(): Sql {
@@ -56,10 +56,21 @@ const opened = (k: Kernel, slug: string): PageResult => {
   return out.value;
 };
 
+/* THE ONE THE RECORD DREW, WHERE TWO SHARE A HEADING: since portfolio 1.15.0 the Overview declares what it holds under an
+   open heading and again under a folded one, on one figure, and a record reads exactly one of each pair. */
 const block = (p: PageResult, heading: string) => {
-  const b = p.blocks.find((x) => x.heading === heading);
+  const b = p.blocks.find((x) => x.heading === heading && x.drawn !== false) ?? p.blocks.find((x) => x.heading === heading);
   assert.ok(b, `${p.slug ?? 'the page'} has no ${heading}`);
   assert.deepEqual(b.refusals, [], `${heading}: ${JSON.stringify(b.refusals)}`);
+  return b;
+};
+
+/** The table of parked and finished projects as the Overview drew it: the block straight under the heading it drew. */
+const notInPlay = (p: PageResult) => {
+  const at = p.blocks.findIndex((x) => x.heading === 'Parked and finished' && x.drawn !== false);
+  assert.ok(at >= 0, 'the Overview draws no Parked and finished');
+  const b = p.blocks[at + 1]!;
+  assert.deepEqual([b.kind, b.drawn !== false, b.refusals], ['table', true, []]);
   return b;
 };
 
@@ -104,7 +115,7 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
   const parts = byHealth.value.groups ?? [];
   assert.equal(parts.reduce((n, g) => n + Number(g.value), 0), THINGS.filter(inPlay).length, 'every project in play is a part');
   assert.deepEqual((block(overview, 'How they are going') as { tones?: unknown }).tones, { on_track: 'good', at_risk: 'warn', off_track: 'bad' }, 'the record hands each part its intent to the page');
-  assert.deepEqual(names(block(overview, 'Not in play').rows), ['Tallow']);
+  assert.deepEqual(names(notInPlay(overview).rows), ['Tallow']);
 
   /* WHO SAID IT: the agent on a project, where it wrote where the project stands. */
   const held = block(overview, 'With an agent');
@@ -161,8 +172,8 @@ test('AN AGENT PROPOSES PARKING A PROJECT, NOTHING CHANGES UNTIL A PERSON ACCEPT
   assert.ok(decided.ok, sayOf(decided));
   const overview = opened(k, 'portfolio');
   assert.ok(!names(block(overview, 'In play').rows).includes('Portage'));
-  assert.equal(block(overview, 'Parked and finished').matched, 2);
-  const parked = block(overview, 'Not in play');
+  const parked = notInPlay(overview);
+  assert.deepEqual(names(parked.rows), ['Portage', 'Tallow']);
   const at = parked.rows.findIndex((r) => r.fields.name === 'Portage');
   assert.deepEqual([parked.changes?.[at]?.by, parked.changes?.[at]?.who], ['you', 'p_1'], 'the change is the person’s who accepted it');
 });
@@ -188,10 +199,94 @@ test('WITH NOTHING IN PLAY THE LINE SAYS SO AND HOW TO START, and Parked and fin
   assert.doesNotMatch(String(first?.body), /\{\{/u, `the nightly line is asked of a line of noughts: ${first?.body}`);
   assert.equal(block(overview, 'In play').drawn, false, 'In play is drawn over nothing');
 
-  const parked = block(overview, 'Parked and finished');
-  assert.equal(parked.matched, THINGS.length, 'the count is not every project parked or finished');
+  /* FOUR OR FEWER ARE AN OPEN TILE, SINCE portfolio 1.15.0, the projects themselves and no count over them. */
+  assert.equal(THINGS.length, 4, 'the sample is no longer four projects, so the open tile is not what this opens');
+  assert.equal(notInPlay(overview).rows.length, THINGS.length);
+
+  /* PAST FOUR THE HEADING FOLDS AND COUNTS, reading one project where it read every one whole. */
+  assert.ok(k.create('things', { name: 'Fathom', lane: 'retired' } as never, { actor: 'p_1' }).ok);
+  const longer = opened(k, 'portfolio');
+  const parked = block(longer, 'Parked and finished');
+  assert.equal((parked as { fold?: unknown }).fold, true, 'five parked projects are not folded');
+  assert.equal(parked.matched, THINGS.length + 1, 'the count is not every project parked or finished');
   assert.ok(parked.rows.length <= 1, `the section read ${parked.rows.length} projects to say one number`);
-  assert.equal(block(overview, 'Not in play').rows.length, THINGS.length, 'the projects themselves are the table under it');
+  assert.equal(notInPlay(longer).rows.length, THINGS.length + 1, 'the projects themselves are the table under it');
+});
+
+/**
+ * NO FOLDED HEADING OVER A SHORT LIST, SINCE portfolio 1.15.0 (the second design review's fix 6). The sample's Projects
+ * ended on two headings 56px tall, each a name and a Show button, over 240px of empty page. With four projects or fewer
+ * under it a heading is an open tile (`box`), and past four it folds as it did. One figure decides each, so a record
+ * reads one heading of the pair and the tiles under it, never both and never neither.
+ */
+test('PROJECTS OPENS WHAT IT HOLDS WHILE IT IS SHORT, and folds it only past four projects', async () => {
+  const k = await seeded();
+  type Read = PageResult['blocks'][number] & { fold?: unknown; box?: unknown; span?: number };
+  const pair = (p: PageResult, heading: string) => p.blocks.filter((b) => b.heading === heading) as Read[];
+  const under = (p: PageResult, heading: string): Read[] => {
+    const at = p.blocks.findIndex((b) => b.heading === heading && b.drawn !== false);
+    const rest = p.blocks.slice(at + 1);
+    const end = rest.findIndex((b) => b.kind === 'section');
+    return (end < 0 ? rest : rest.slice(0, end)) as Read[];
+  };
+
+  /* THE SAMPLE: three projects in play and one parked, so both are open tiles and nothing on the page is folded. */
+  const short = opened(k, 'portfolio');
+  for (const b of short.blocks) assert.deepEqual(b.refusals, [], String(b.heading));
+  for (const heading of ['Earnings, agents and dates', 'Parked and finished']) {
+    const [open, folded] = pair(short, heading);
+    assert.deepEqual([open!.drawn !== false, open!.box, open!.fold], [true, true, undefined], `${heading}: not an open tile`);
+    assert.deepEqual([folded!.drawn, folded!.fold], [false, true], `${heading}: folded over a short list`);
+  }
+  assert.ok(!short.blocks.some((b) => b.drawn !== false && (b as Read).fold === true), 'a short Projects still ends on a folded heading');
+  /* THE FOLDED TILES KEEP THE KEYS THEY HAD BEFORE 1.15.0, which a look a person saved names them by: the open ones
+     declare their own, so no folded tile is the second of two alike and takes `-2`. */
+  const keyOf = (b: unknown) => String((b as { key?: unknown }).key);
+  const twice = short.blocks.filter((b) => ['Earnings, agents and dates', 'What each one earns', 'With an agent', 'Coming up'].includes(String(b.heading)));
+  assert.deepEqual(twice.filter((b) => keyOf(b).startsWith('open-')).map(keyOf), ['open-earnings', 'open-earns', 'open-with-agent', 'open-coming-up']);
+  assert.deepEqual(twice.filter((b) => /-\d+$/u.test(keyOf(b))).map(keyOf), [], 'a folded tile lost its key to the open one');
+  const looked = under(short, 'Earnings, agents and dates');
+  assert.deepEqual(looked.map((b) => [b.heading, b.drawn !== false, b.span]), [
+    ['What each one earns', true, 12],
+    ['With an agent', true, 6],
+    ['Coming up', true, 6],
+  ]);
+  assert.deepEqual(names(looked[0]!.rows).sort(), THINGS.filter((t) => inPlay(t) && t.revenue !== undefined && t.revenue !== null).map((t) => String(t.name)).sort());
+  /* HALF A ROW HOLDS THREE COLUMNS: the project, who holds it and who changed it last. Its next step is on its card. */
+  assert.deepEqual(looked[1]!.columns?.map((c) => c.field), ['name', 'agent', 'changed']);
+  /* THE PARKED ARE THE TABLE ITSELF, under the tile's heading and none of its own. */
+  assert.deepEqual(under(short, 'Parked and finished').map((b) => [b.kind, b.heading, names(b.rows)]), [['table', undefined, ['Tallow']]]);
+  /* AND WHAT THE FOLDED HEADINGS HELD IS NOT READ AT ALL: a tile nobody sees costs no query. */
+  const hidden = short.blocks.filter((b) => b.drawn === false && ['What each one earns', 'With an agent', 'Coming up', 'Not in play'].includes(String(b.heading)));
+  assert.deepEqual(hidden.map((b) => [b.heading, b.rows.length]), [['What each one earns', 0], ['With an agent', 0], ['Coming up', 0], ['Not in play', 0]]);
+
+  /* PAST FOUR, EACH FOLDS AS IT DID: two more in play that say what they earn, and four more parked. */
+  for (const name of ['Fathom', 'Quire']) assert.ok(k.create('things', { name, lane: 'building', aim: TODAY } as never, { actor: 'p_1' }).ok);
+  for (const name of ['Ember', 'Latch', 'Marrow', 'Nettle']) assert.ok(k.create('things', { name, lane: 'parked' } as never, { actor: 'p_1' }).ok);
+  const long = opened(k, 'portfolio');
+  for (const b of long.blocks) assert.deepEqual(b.refusals, [], String(b.heading));
+  for (const heading of ['Earnings, agents and dates', 'Parked and finished']) {
+    const [open, folded] = pair(long, heading);
+    assert.equal(open!.drawn, false, `${heading}: an open tile over a long list`);
+    assert.deepEqual([folded!.drawn !== false, folded!.fold], [true, true], `${heading}: not folded past four`);
+  }
+  assert.deepEqual(under(long, 'Earnings, agents and dates').map((b) => [b.heading, b.drawn !== false, b.span]), [
+    ['What each one earns', true, 12],
+    ['With an agent', true, 12],
+    ['Coming up', true, 12],
+  ]);
+  assert.deepEqual(under(long, 'Parked and finished').map((b) => [b.heading, b.rows.length]), [['Not in play', 5]]);
+  assert.equal(block(long, 'Parked and finished').matched, 5);
+
+  /* WITH NOTHING UNDER EITHER, NEITHER HEADING IS DRAWN, open or folded, so such a Projects ends on its cards: every
+     project put in play, and none saying what it earns, who holds it or the day it aims for. An open tile has no
+     figure of more than nought to be drawn on; it goes because nothing under it is drawn. */
+  const bare = await seeded();
+  for (const n of THINGS.keys()) assert.ok(bare.update('things', `things#${n + 1}`, { lane: 'building', revenue: null, agent: null, aim: null } as never, { actor: 'p_1' }).ok);
+  const ends = opened(bare, 'portfolio');
+  assert.equal(block(ends, 'In play').rows.length, THINGS.length);
+  for (const heading of ['Earnings, agents and dates', 'Parked and finished'])
+    assert.deepEqual(pair(ends, heading).map((b) => b.drawn), [false, false], `${heading}: a heading over nothing`);
 });
 
 test('A PROJECT PAST THE DAY IT AIMED FOR IS ASKED ABOUT ON DECIDE, once, and nothing is written', async () => {
@@ -325,14 +420,16 @@ test('A PROJECT PAGE OPENS ON ONE LINE, its next step unless work waits to be ch
   assert.deepEqual(back.map((b) => (b as { body?: string }).body), ['Work on Kiln has been handed back, and it waits for you to check it.']);
 });
 
-test('A PROJECT PAGE KEEPS WHERE IT STANDS AND WHAT IS HANDED BACK IN ONE COLUMN BESIDE ITS CHART, and lists its open work once', async () => {
+test('A PROJECT PAGE KEEPS WHERE IT STANDS AND WHAT IS HANDED BACK IN ONE COLUMN BESIDE ITS PLAN, and lists its open work once', async () => {
   /* SINCE portfolio 1.10.0: Where it stands was five twelfths beside a chart twice its height, Handed back seven beside
      What is open, and What is open listed the tasks the plan under it draws again. */
   const k = await seeded();
   const page = opened(k, 'kiln');
   const of = (heading: string) => block(page, heading) as ReturnType<typeof block> & { area?: string; span?: number };
   assert.deepEqual(['At a glance', 'Where it stands', 'Handed back or blocked'].map((h) => of(h).area), ['rail', 'rail', 'rail']);
-  assert.deepEqual([of('Done, by week').area, of('Done, by week').span], [undefined, 12]);
+  /* AND NO CHART BESIDE THEM SINCE founder 2.3.0 and team 2.18.0: the plan leads the main column, the whole of it. */
+  assert.ok(!page.blocks.some((b) => b.heading === 'Done, by week'), 'the weeks are a tile of their own again');
+  assert.deepEqual([of('The plan').area, of('The plan').span], [undefined, 12]);
   assert.ok(!page.blocks.some((b) => b.heading === 'What is open'), 'the open tasks are listed twice');
   /* KILN HAS A BLOCKED TASK, so what is handed back is drawn; a project with none draws no tile saying so. */
   assert.notEqual(of('Handed back or blocked').drawn, false);
@@ -347,7 +444,7 @@ test('A PROJECT PAGE KEEPS WHERE IT STANDS AND WHAT IS HANDED BACK IN ONE COLUMN
   assert.equal(block(opened(k, 'portage'), 'Handed back or blocked').drawn, false, 'a tile saying nothing is handed back');
 });
 
-test('A PROJECT PAGE DRAWS ITS FINISHED WORK BY THE WEEK, SAYS ITS MONEY BY THE MONTH, AND WHAT IT RUNS ON UNDER MORE ABOUT IT', async () => {
+test('A PROJECT PAGE SAYS WHAT WAS FINISHED THIS WEEK AT A GLANCE, ITS MONEY BY THE MONTH, AND WHAT IT RUNS ON UNDER MORE ABOUT IT', async () => {
   const k = await seeded();
   /* THE SAMPLE MOVED NO MONEY ON KILN THIS MONTH, so two movements are written today, one each way, and the month's
      figures are asked about money that is there rather than three noughts that agree with anything. */
@@ -359,13 +456,29 @@ test('A PROJECT PAGE DRAWS ITS FINISHED WORK BY THE WEEK, SAYS ITS MONEY BY THE 
   const page = opened(k, 'kiln');
   const glance = Object.fromEntries((block(page, 'At a glance').readings ?? []).map((r) => [r.metric, r.reading?.value]));
 
-  /* ITS WEEKS ARE ITS OWN, since work 1.10.0: what was finished on Kiln each week, as counts and not money. */
-  const weeks = block(page, 'Done, by week');
-  assert.equal(weeks.kind, 'series');
-  assert.equal(weeks.bars?.bucket, 'week');
-  assert.equal(weeks.bars?.unit, null, 'counts, not money');
-  assert.ok((weeks.bars?.values[0] ?? []).reduce((n: number, v) => n + (v ?? 0), 0) > 0, 'nothing finished on Kiln in the weeks drawn');
+  /* WHAT WAS FINISHED ON IT IS A FIGURE OF AT A GLANCE, SINCE founder 2.3.0 and team 2.18.0, and no chart of its own:
+     Done, by week was a tile 280px tall for bars of 1 and 2 (the second design review's fix 5). The last of the four
+     figures, counted over Kiln's own tasks finished in the last seven days, and no other project's. */
+  assert.ok(!page.blocks.some((b) => b.heading === 'Done, by week' || (b.kind === 'series' && b.heading !== 'Money by month')), 'a project page charts its finished work by the week again');
+  assert.deepEqual((block(page, 'At a glance').readings ?? []).map((r) => r.label), ['Open', 'Owed to you', 'Costs a year', 'Done this week']);
+  const kiln = THINGS.findIndex((t) => t.name === 'Kiln') + 1;
+  const done = k.list({ register: 'tasks', where: 'state is done, done_on after -8d', limit: 50 } as never);
+  assert.ok(done.ok, sayOf(done));
+  const finished = done.value.rows.filter((r) => r.fields.thing === kilnRow.id).length;
+  assert.ok(finished > 0 && finished < done.value.rows.length, 'the sample finished nothing on Kiln this week, or nothing on any other project, so the figure agrees with anything');
+  assert.equal(glance['project-done-7d:Kiln'], finished);
+  assert.ok(TASKS.some((t) => t.thing === kiln && t.state === 'done'));
+  /* IT ASKS FOR ITS FOUR WEEKS AS A LINE (`trend:`), and the record answers a line only for a figure it keeps a night's
+     series of. It keeps none for a figure read a project at a time, so the cell is the figure alone and nothing is
+     refused; the day the record keeps one, the line is drawn with no word changed here. */
+  const cells = (PAGES.project!.blocks as { heading?: string; cells?: { metric: string; trend?: string }[] }[]).find((b) => b.heading === 'At a glance')!.cells!;
+  assert.deepEqual(cells.at(-1), { metric: 'project-done-7d:{{name}}', label: 'Done this week', trend: '4w' });
+  assert.deepEqual(block(page, 'At a glance').refusals, []);
   assert.ok(glance['project-open:Kiln'] !== undefined);
+  /* AND THE WEEKS THEMSELVES ARE STILL DRAWN, on the project's card on Projects, from the figure the chart drew. */
+  const cards = block(opened(k, 'portfolio'), 'In play');
+  const line = cards.trends?.[cards.rows.findIndex((r) => r.fields.name === 'Kiln')];
+  assert.ok(Array.isArray(line) && line.reduce((n: number, v) => n + (v ?? 0), 0) > 0, 'nothing finished on Kiln in the weeks its card draws');
 
   /* THIS MONTH IS THE CHART'S NEWEST MONTH, SINCE portfolio 1.8.0, and not a tile beside it saying it again: in and out
      to the minor unit, over the same rows. */
@@ -391,7 +504,18 @@ test('A PROJECT PAGE ON A RECORD WITH NO MONEY HAS NO MONTH OF MONEY, rather tha
   const headings = (team.blocks as { heading?: string }[]).map((b) => b.heading);
   assert.ok(!headings.includes('This month so far'), 'a row of money figures was made up from the tasks instead');
   assert.ok(!headings.includes('Money by month') && !headings.includes('Keeping it alive'));
-  assert.ok(headings.includes('Done, by week') && headings.includes('The plan'), 'what a record without Money still has');
+  assert.ok(!headings.includes('Done, by week') && headings.includes('The plan'), 'what a record without Money still has');
+  /* AND AT A GLANCE IS MADE UP FROM ITS TASKS, what was finished this week last, with its line, as on a record with
+     Money: Open, what falls due soon and what is handed back before it. */
+  const glance = (team.blocks as { heading?: string; cells?: { metric: string; label: string; trend?: string }[] }[]).find((b) => b.heading === 'At a glance')!.cells!;
+  assert.deepEqual(glance.map((c) => c.label), ['Open', 'Due soon', 'In review', 'Done this week']);
+  assert.equal(glance.at(-1)!.trend, '4w');
+  /* A RECORD WITH BILLS AND NO SERVICES LOSES ONE FIGURE, and what was finished is still the last of four. */
+  const some = projectTemplate(['things', 'tasks', 'people', 'obligations', 'transactions']);
+  assert.deepEqual(
+    (some.blocks as { heading?: string; cells?: { label: string }[] }[]).find((b) => b.heading === 'At a glance')!.cells!.map((c) => c.label),
+    ['Open', 'Owed to you', 'Due soon', 'Done this week'],
+  );
   /* AND NO FOLDED HEADING OVER NOTHING: the Money section goes with the blocks it held. */
   assert.ok(!headings.includes('Money'), 'a record without Money draws a Money section with nothing under it');
   /* AND A FULL RECORD'S PAGE LEAVES A USE CASE THREE BLOCKS UNDER THE CEILING OF TWENTY-FOUR. */

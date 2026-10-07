@@ -125,7 +125,7 @@ test("A FOUNDER'S PROJECT DRAWS WHAT IT RUNS ON: a domain pointed at it is on it
   assert.ok(page, 'a project has its own page');
   const blocks = drawn(k, page.slug) as (Drawn & { rows?: { fields: Record<string, unknown> }[] })[];
   const glance = blocks.find((b) => b.heading === 'At a glance');
-  assert.deepEqual((glance?.cells ?? []).map((c) => c.label), ['Open', 'Owed to you', 'Costs a year'], 'the cost tile is back now the services are held');
+  assert.deepEqual((glance?.cells ?? []).map((c) => c.label), ['Open', 'Owed to you', 'Costs a year', 'Done this week'], 'the cost tile is back now the services are held');
   const alive = blocks.find((b) => b.heading === 'Keeping it alive');
   assert.ok(alive, `no services block among ${blocks.map((b) => b.heading).join(', ')}`);
   assert.deepEqual(alive.rows?.map((r) => r.fields.name), ['harbour.example']);

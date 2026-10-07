@@ -2546,10 +2546,13 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
       {
         /* THE NEXT THIRTY DAYS AS ARITHMETIC: cash now, plus what arrives, less what leaves, and where that lands. It
            walks what Cash ahead walks, over a shorter horizon, and it is the same array, so a leg in one and not the
-           other cannot become two answers about the same thirty days. */
+           other cannot become two answers about the same thirty days.
+
+           NO HEADING OF ITS OWN, SINCE money-core 3.13.0 (the second design review's fix 8). It is the first thing under
+           Coming and going, so the tile opened on two headings, each with its glyph, one straight over the other. The
+           walk says what it is in its own rows, Coming in, Going out and In 30 days, under the one heading that names
+           them. */
         kind: 'bridge',
-        heading: 'The next 30 days',
-        icon: 'scale',
         span: 12,
         source: 'forecast.runway',
         opening: { metric: 'cash-now' },

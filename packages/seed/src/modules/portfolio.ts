@@ -616,6 +616,95 @@ export const PORTFOLIO_RULES: Record<string, SeedRule> = {
 
 const PROJECT = { field: 'name', label: 'Project', width: 'minmax(14ch,1fr)' } as const;
 
+/** What was finished on a project in the last seven days, and how that moved over four weeks: At a glance's last figure. */
+const PROJECT_DONE_CELL = { metric: 'project-done-7d:{{name}}', label: 'Done this week', trend: '4w' } as const;
+
+/**
+ * HOW MANY PROJECTS A TILE OF THE OVERVIEW HOLDS OPEN, since portfolio 1.15.0: past this many it folds shut. Four, the
+ * number past which How they are going is drawn, so the page changes shape once, when it stops being short.
+ */
+const FOLD_PAST = 4;
+
+/* THE TILES UNDER THE OVERVIEW'S TWO HEADINGS, each written once and drawn under whichever heading is: the open one
+   while the list is short and the folded one when it is long (`PORTFOLIO_PAGES.portfolio`). */
+
+/* WHAT EACH ONE EARNS, because the question a person asks of a portfolio after "what needs me" is "which of
+   these is carrying the others". A total says the studio earned GBP 22,600 and hides that one project is 81 per
+   cent of it. Two columns, so each part is the name against the money and nothing else.
+
+   ONE TRACK CUT INTO PARTS, SINCE portfolio 1.6.0, where it was a bar a project: the question is a share of one
+   whole, and a split says "81 per cent" by its length where bars side by side only say which is longest. The
+   rows, the order, the empty line and the heading are the bar's.
+
+   NO EARNING TILE BESIDE IT, SINCE portfolio 1.8.0. Its year was the sum of this split, said a second time; what each
+   project earns is read off the split, and the year before is on each project's row. */
+const EARNS = {
+  kind: 'split',
+  heading: 'What each one earns',
+  icon: 'coins',
+  span: 12,
+  source: 'register.things',
+  where: `${LIVE}, revenue is set`,
+  columns: [{ field: 'name' }, { field: 'revenue' }],
+  order: [{ field: 'revenue', dir: 'desc' }],
+  limit: 8,
+  when: { metric: 'projects-earning-said', gt: 0 },
+};
+
+/* WHAT AGENTS HOLD, and what each one is doing next on it. An agent takes a project by setting itself as its agent. */
+const WITH_AGENT = {
+  kind: 'table',
+  heading: 'With an agent',
+  icon: 'session',
+  span: 12,
+  source: 'register.things',
+  where: `${LIVE}, agent is set`,
+  columns: [
+    PROJECT,
+    { field: 'agent', label: 'Agent', width: '10ch' },
+    { field: 'next', label: 'Next', width: 'minmax(20ch,2fr)' },
+    { field: 'changed', label: 'Changed by', width: '16ch' },
+  ],
+  order: [{ field: 'name', dir: 'asc' }],
+  limit: 12,
+  when: { metric: 'projects-with-agent', gt: 0 },
+};
+
+const COMING_UP = {
+  kind: 'table',
+  heading: 'Coming up',
+  icon: 'calendar-clock',
+  span: 12,
+  source: 'register.things',
+  where: `${LIVE}, aim is set`,
+  columns: [
+    PROJECT,
+    { field: 'progress', label: 'How far along', width: '14ch', align: 'end' },
+    { field: 'aim', label: 'Aiming for', width: '14ch', align: 'end' },
+  ],
+  order: [{ field: 'aim', dir: 'asc' }],
+  limit: 8,
+  when: { metric: 'projects-aiming', gt: 0 },
+};
+
+const NOT_IN_PLAY = {
+  kind: 'table',
+  heading: 'Not in play',
+  icon: 'archive',
+  span: 12,
+  source: 'register.things',
+  where: 'lane is parked or retired',
+  columns: [
+    PROJECT,
+    { field: 'lane', label: 'Status', width: '10ch' },
+    { field: 'next', label: 'Next', width: 'minmax(18ch,2fr)' },
+    { field: 'changed', label: 'Changed by', width: '16ch' },
+  ],
+  order: [{ field: 'name', dir: 'asc' }],
+  limit: 20,
+  when: { metric: 'projects-not-in-play', gt: 0 },
+};
+
 export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
   /**
    * THE PORTFOLIO, LEADING WITH WHAT NEEDS YOU. "Which of my
@@ -634,6 +723,12 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * play the line says so and how to start, where it said every project in play was on track over a page with none,
    * and In play is drawn only while it holds one. Parked and finished is a heading that counts what is folded under
    * it, and it read every one of those projects whole, its notes included, to say one number.
+   *
+   * NO FOLD OVER A SHORT LIST, SINCE portfolio 1.15.0 (DIRECTION §39, the second design review's fix 6). With three
+   * projects in play the page ended on two folded headings, 56px each with a Show button, over 240px of empty page:
+   * the fold hid less than it took to say it was there. What each earns, what agents hold and what is coming up are one
+   * open tile while four projects or fewer are under it, and so are the parked and finished; past four each folds as
+   * it did, since a long page is what a fold is for. Four, as How they are going is drawn past four.
    */
   portfolio: {
     page: 'portfolio',
@@ -746,77 +841,61 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            project, is the line's now. */
         when: { metric: 'projects-live', gt: 0 },
       },
+      /* WHAT EACH EARNS, WHAT AGENTS HOLD AND WHAT IS COMING UP, OPEN WHILE SHORT AND FOLDED WHEN LONG, SINCE portfolio
+         1.15.0. Two headings on one figure, as the page's two lines are, and a heading whose `when:` says no hides the
+         tiles under it (`readPage`), so exactly one set is ever read. */
       {
-        /* WHAT EACH EARNS, WHAT AGENTS HOLD AND WHAT IS COMING UP ARE FOLDED SHUT, SINCE portfolio 1.8.0: the page a
-           person reads is the line, where the projects are, what needs them and the projects themselves. */
+        /* ONE OPEN TILE (`box`), its parts on one surface, while four projects or fewer are under it. No `when:` of
+           more than nought: a boxed heading with nothing drawn under it is not drawn either, so a fresh Projects still
+           ends on In play. */
+        kind: 'section',
+        heading: 'Earnings, agents and dates',
+        icon: 'rows',
+        span: 12,
+        box: true,
+        /* A KEY OF ITS OWN, AND ONE ON EACH TILE UNDER IT: a block with none is keyed by its kind, list and heading, and
+           the second of two alike takes `-2`. The folded ones are the ones a record already holds, so they keep the
+           keys they had and whatever a person pinned, moved or hid on a long Projects still names the same tile. */
+        key: 'open-earnings',
+        when: { metric: 'projects-looked-up', lte: FOLD_PAST },
+      },
+      { ...EARNS, key: 'open-earns' },
+      /* SIDE BY SIDE, HALF EACH, in the open tile, and a half holds three columns. So what an agent holds leaves its
+         next step out here: with four projects or fewer every one of them is a card straight above, and a card says
+         its next step. Who holds it and who changed it last stay, since no card says who last said where it stands. One
+         of the two tables alone takes the row. */
+      { ...WITH_AGENT, key: 'open-with-agent', span: 6, columns: WITH_AGENT.columns.filter((c) => c.field !== 'next'), limit: FOLD_PAST },
+      { ...COMING_UP, key: 'open-coming-up', span: 6, limit: FOLD_PAST },
+      {
+        /* FOLDED SHUT PAST FOUR, AS IT WAS SINCE portfolio 1.8.0: the page a person reads is the line, how the
+           projects are going and the projects themselves, and by then those are two rows of cards or more. */
         kind: 'section',
         heading: 'Earnings, agents and dates',
         /* A GLYPH THE APP DRAWS ON A FOLDED HEADING, SINCE portfolio 1.10.0: `layout-list` drew nothing there. */
         icon: 'rows',
         span: 12,
         fold: true,
-        /* ONLY WHILE ONE OF THE THREE UNDER IT HAS A PROJECT, so a fresh Overview ends on In play's line. */
-        when: { metric: 'projects-looked-up', gt: 0 },
+        when: { metric: 'projects-looked-up', gt: FOLD_PAST },
       },
+      EARNS,
+      WITH_AGENT,
+      COMING_UP,
       {
-        /* WHAT EACH ONE EARNS, because the question a person asks of a portfolio after "what needs me" is "which of
-           these is carrying the others". A total says the studio earned GBP 22,600 and hides that one project is 81 per
-           cent of it. Two columns, so each part is the name against the money and nothing else.
-
-           ONE TRACK CUT INTO PARTS, SINCE portfolio 1.6.0, where it was a bar a project: the question is a share of one
-           whole, and a split says "81 per cent" by its length where bars side by side only say which is longest. The
-           rows, the order, the empty line and the heading are the bar's. */
-        kind: 'split',
-        heading: 'What each one earns',
-        icon: 'coins',
+        /* THE PARKED AND FINISHED, OPEN WHILE FOUR OR FEWER, SINCE portfolio 1.15.0: one tile under its heading, the
+           table in it with no heading of its own, since the tile's says what they are. Shut by its own rule when
+           there is none (`emptyBoxesShut`). */
+        kind: 'section',
+        heading: 'Parked and finished',
+        icon: 'archive',
         span: 12,
-        source: 'register.things',
-        where: `${LIVE}, revenue is set`,
-        columns: [{ field: 'name' }, { field: 'revenue' }],
-        order: [{ field: 'revenue', dir: 'desc' }],
-        limit: 8,
-        when: { metric: 'projects-earning-said', gt: 0 },
+        box: true,
+        when: { metric: 'projects-not-in-play', lte: FOLD_PAST },
       },
-      /* NO EARNING TILE, SINCE portfolio 1.8.0. Its year was the sum of the split above, said a second time beside it;
-         what each project earns is read off the split, and the year before is on each project's row. */
-      {
-        /* WHAT AGENTS HOLD, and what each one is doing next on it. An agent takes a project by setting itself as its agent. */
-        kind: 'table',
-        heading: 'With an agent',
-        icon: 'session',
-        span: 12,
-        source: 'register.things',
-        where: `${LIVE}, agent is set`,
-        columns: [
-          PROJECT,
-          { field: 'agent', label: 'Agent', width: '10ch' },
-          { field: 'next', label: 'Next', width: 'minmax(20ch,2fr)' },
-          { field: 'changed', label: 'Changed by', width: '16ch' },
-        ],
-        order: [{ field: 'name', dir: 'asc' }],
-        limit: 12,
-        when: { metric: 'projects-with-agent', gt: 0 },
-      },
-      {
-        kind: 'table',
-        heading: 'Coming up',
-        icon: 'calendar-clock',
-        span: 12,
-        source: 'register.things',
-        where: `${LIVE}, aim is set`,
-        columns: [
-          PROJECT,
-          { field: 'progress', label: 'How far along', width: '14ch', align: 'end' },
-          { field: 'aim', label: 'Aiming for', width: '14ch', align: 'end' },
-        ],
-        order: [{ field: 'aim', dir: 'asc' }],
-        limit: 8,
-        when: { metric: 'projects-aiming', gt: 0 },
-      },
+      (({ heading: _heading, icon: _icon, ...table }) => ({ ...table, limit: FOLD_PAST }))(NOT_IN_PLAY),
       {
         /* A COUNT, SINCE portfolio 1.13.0: the heading says how many are folded under it, which the record answers with
            the whole match whatever it reads (`matched`), so one project is read where it read up to fifty, each with
-           its notes. The projects themselves are the table under it. */
+           its notes. The projects themselves are the table under it. FOLDED ONLY PAST FOUR since portfolio 1.15.0. */
         kind: 'section',
         heading: 'Parked and finished',
         icon: 'thing',
@@ -825,25 +904,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         source: 'register.things',
         where: 'lane is parked or retired',
         limit: 1,
-        when: { metric: 'projects-not-in-play', gt: 0 },
+        when: { metric: 'projects-not-in-play', gt: FOLD_PAST },
       },
-      {
-        kind: 'table',
-        heading: 'Not in play',
-        icon: 'archive',
-        span: 12,
-        source: 'register.things',
-        where: 'lane is parked or retired',
-        columns: [
-          PROJECT,
-          { field: 'lane', label: 'Status', width: '10ch' },
-          { field: 'next', label: 'Next', width: 'minmax(18ch,2fr)' },
-          { field: 'changed', label: 'Changed by', width: '16ch' },
-        ],
-        order: [{ field: 'name', dir: 'asc' }],
-        limit: 20,
-        when: { metric: 'projects-not-in-play', gt: 0 },
-      },
+      NOT_IN_PLAY,
     ],
   },
 
@@ -900,6 +963,11 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * EVEN ROWS, SINCE portfolio 1.10.0 (the visual review of October 2nd): where it stands and what is handed back sit in
    * the rail under At a glance, one column of short tiles beside the chart, which takes the main column; What is open
    * goes, the plan drawing the same tasks; and what is handed back is drawn only while it lists one. Twenty blocks.
+   *
+   * NO CHART OF ONES AND TWOS, SINCE founder 2.3.0 and team 2.18.0 (DIRECTION §39, "a chart is drawn only when it says
+   * something; else the tile shows the number", and the second design review's fix 5). Done, by week was a tile 280px
+   * tall, the whole of the main column, for bars of 1 and 2. What was finished this week is a figure of At a glance,
+   * with how it moved as the line beside it, and the plan leads the main column. Nineteen blocks.
    */
   project: {
     page: 'project',
@@ -965,6 +1033,13 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { metric: 'project-open:{{name}}', label: 'Open' },
           { metric: 'project-owed:{{name}}', label: 'Owed to you' },
           { metric: 'project-cost:{{name}}', label: 'Costs a year' },
+          /* HOW ITS WORK IS MOVING, AS A FIGURE WITH ITS LINE, where a chart of its own stood: what was finished on it
+             in the last seven days, and `trend:` asks for how that moved over four weeks, as Work's Done this week
+             draws its seven nights. THE LINE WAITS ON THE RECORD: a night's series is kept for a figure with no
+             parameter, and this one is read a project at a time, so until the record keeps one a project the cell is
+             the figure alone, which a cell with no points has always been (`trendOf` in the kernel's `pages.ts`).
+             The weeks themselves are still drawn, on the project's card on Projects. */
+          PROJECT_DONE_CELL,
         ],
       },
       {
@@ -1025,23 +1100,11 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         when: { metric: 'project-held-up:{{name}}', gt: 0 },
         empty: 'Nothing on {{name}} is handed back or blocked.',
       },
-      {
-        /* HOW ITS WORK IS MOVING, SINCE work 1.10.0: what was finished on it each of the last eight weeks, over Work's
-           `project-done-by-week`. It took the place of a tally of the open work by priority, which said again what the
-           plan draws on every task, so the page has a chart and not a row of chips.
-
-           THE WHOLE OF THE MAIN COLUMN, SINCE portfolio 1.10.0, beside the rail's column of where it stands and what is
-           handed back, so no row ends at two heights. */
-        kind: 'series',
-        heading: 'Done, by week',
-        icon: 'chart-column',
-        span: 12,
-        series: [{ metric: 'project-done-by-week:{{name}}', label: 'Done' }],
-        back: 8,
-        empty: 'Nothing on {{name}} was finished in these weeks.',
-      },
-      /* NO WHAT IS OPEN, SINCE portfolio 1.10.0: the plan under the chart draws every open task with a day, so the page
-         listed the same tasks twice, one tile above the other. A task with no day is on Work, narrowed to the project. */
+      /* NO DONE, BY WEEK, SINCE founder 2.3.0 and team 2.18.0: from work 1.10.0 it charted what was finished on the
+         project each of the last eight weeks, the whole of the main column, and on most projects that is a bar of 1
+         beside a bar of 2. Done this week is the last figure of At a glance. */
+      /* NO WHAT IS OPEN, SINCE portfolio 1.10.0: the plan draws every open task with a day, so the page listed the same
+         tasks twice, one tile above the other. A task with no day is on Work, narrowed to the project. */
       {
         /* ITS PLAN ON A TIME AXIS, AND ITS DATES ONCE, SINCE portfolio 1.8.0: a calendar of the month above it drew the
            same tasks on the same days a second time, so it went.
@@ -1074,7 +1137,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            in it is not drawn, so a new project's tile is its notes.
 
            WHAT IT RUNS ON LEFT THE RAIL FOR IT, with the scheduled actions (Resume, Pause), which the host draws under
-           this heading (`panel: actions`). The rail keeps the short tiles beside the chart. */
+           this heading (`panel: actions`). The rail keeps the short tiles beside the plan. */
         kind: 'section',
         heading: 'More about {{name}}',
         icon: 'notebook-pen',
@@ -1251,11 +1314,14 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
  */
 export const PROJECT_LINKS: readonly string[] = ['services', 'obligations', 'transactions'];
 
-/** What a project's stat row says from its tasks when a figure over money is left out, and how many figures the row holds. */
+/**
+ * What a project's stat row says from its tasks when a figure over money is left out, and how many figures the row
+ * holds. What was finished this week is not among them since founder 2.3.0 and team 2.18.0: At a glance declares it on
+ * every record (`PROJECT_DONE_CELL`), and it closes the row whatever was made up before it.
+ */
 const PROJECT_WORK_CELLS: readonly { metric: string; label: string }[] = [
   { metric: 'project-due-soon:{{name}}', label: 'Due soon' },
   { metric: 'project-in-review:{{name}}', label: 'In review' },
-  { metric: 'project-done-7d:{{name}}', label: 'Done this week' },
 ];
 const PROJECT_CELLS = 4;
 
@@ -1317,8 +1383,11 @@ export function projectTemplate(holds: Iterable<string>): SeedPage {
       continue;
     }
     const kept = cells.filter((c) => !figureGone(c.metric));
-    /* A ROW THAT LOST A FIGURE IS MADE UP FROM THE PROJECT'S TASKS, so a team's page does not lead with Open alone. */
-    const made = kept.length < cells.length ? [...kept, ...PROJECT_WORK_CELLS].slice(0, PROJECT_CELLS) : kept;
+    /* A ROW THAT LOST A FIGURE IS MADE UP FROM THE PROJECT'S TASKS, so a team's page does not lead with Open alone. What
+       was finished this week stays the row's last figure, with its line, and what is made up goes before it. */
+    const last = kept.filter((c) => c.metric === PROJECT_DONE_CELL.metric);
+    const rest = kept.filter((c) => c.metric !== PROJECT_DONE_CELL.metric);
+    const made = kept.length < cells.length ? [...[...rest, ...PROJECT_WORK_CELLS].slice(0, PROJECT_CELLS - last.length), ...last] : kept;
     blocks.push({ ...block, cells: made });
   }
   /* A SECTION WITH NOTHING LEFT UNDER IT GOES TOO, SINCE portfolio 1.8.0: on a record that keeps no Money the Money

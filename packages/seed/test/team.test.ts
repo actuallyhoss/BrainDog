@@ -154,11 +154,12 @@ test('A RECORD WITH TEAM 1.0.0 UPDATES TO TICKETS ON TASKS AND LOSES NOTHING', a
   assert.deepEqual([line.cycle, line.points], [cycle.id, 3]);
   assert.equal(k.get(String(line.task))?.fields.what, 'Ship the export');
 
-  type Page = { blocks: { heading?: string; refusals?: unknown[]; rows?: { fields: Record<string, unknown> }[] }[] };
+  type Page = { blocks: { kind?: string; heading?: string; refusals?: unknown[]; rows?: { fields: Record<string, unknown> }[] }[] };
   for (const slug of ['home-team', 'cycles', 'agent-work', 'work-board'])
     for (const b of value<Page>(k.page(slug)).blocks) assert.deepEqual(b.refusals ?? [], [], `${slug} ${b.heading}`);
   const board = value<Page>(k.page('work-board')).blocks;
-  assert.ok(board.find((b) => b.heading === 'By status')!.rows!.some((r) => r.fields.what === 'Ship the export'));
+  /* BY ITS KIND: Work's board has worn no heading since work 1.16.0. */
+  assert.ok(board.find((b) => b.kind === 'board')!.rows!.some((r) => r.fields.what === 'Ship the export'));
   sql.close();
 });
 

@@ -399,13 +399,28 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   goes under (`zero_on` in `packages/kernel/src/money-figures.ts`), with the days left as the line under it, where it
  *   drew the count alone: a count read yesterday is a day out this morning, and the day is the one the walk's flag
  *   stands on. A figure added and one cell of a tile changed, so a minor step that reaches a record on its own.
+ * - work 1.16.0, portfolio 1.15.0, people 3.1.0 and money-core 3.13.0: the second design review's fixes 2, 3, 5, 6, 7
+ *   and 8, in the declarations (`loop/research-design-critic-2.md`, DIRECTION §39). EVERY VERSION BEFORE THESE IS
+ *   RELEASED, People 3.0.0 among them, so each is a version and none a reset. Work's Board loses its By status heading,
+ *   and Work's line to type into is declared alone and first so a host holds it in the page's header, which is words
+ *   over the declaration and moves nothing. Projects keeps its two folds only past four projects under each: while
+ *   four or fewer, what each earns, what agents hold and what is coming up are one open tile and the parked and
+ *   finished another, where each was a 56px heading with a Show button over an empty page. People's twelve weeks of
+ *   dots are two short lists, Gone quiet in the colour of what needs the person and Last in touch beside it, the one
+ *   quiet longest first, and People gains `people-in-touch-90d`, the figure the second is drawn on;
+ *   `people-in-touch-12w` stays declared and draws nothing, since taking a figure away is a loss an update asks about.
+ *   Money's walk of the next thirty days loses its heading, the second of two under Coming and going. Headings and
+ *   blocks on pages that are already there and one figure added, no list or field, so each step is a minor one and
+ *   reaches a record on its own. The project page moves with them, though no pack holds it (`crossPack`): Done, by week
+ *   is no tile of its own, and what was finished this week is At a glance's last figure, asking for its four weeks as
+ *   a line.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.14.0',
-  people: '3.0.0',
-  'money-core': '3.12.0',
+  portfolio: '1.15.0',
+  people: '3.1.0',
+  'money-core': '3.13.0',
   estate: '2.1.0',
-  work: '1.15.0',
+  work: '1.16.0',
 };
 
 type Body = Record<string, unknown>;

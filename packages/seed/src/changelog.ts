@@ -21,6 +21,11 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.15.0',
+      notes:
+        'Projects no longer ends on folded headings over an empty page. With four projects or fewer, what each earns, what agents hold and what is coming up are open in one tile, and the parked and finished ones in another. Past four, each folds away as before.',
+    },
+    {
       version: '1.14.0',
       notes: 'A project keeps the domains it lives at, so mail and renewals about one are read as about the project. Repositories take a remote as git prints it.',
     },
@@ -62,6 +67,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   people: [
     {
+      version: '3.1.0',
+      notes:
+        'People shows who has gone quiet and who you were last in touch with as two short lists, the one quiet longest first, each with the day. They take the place of In touch, 12 weeks, a grid of dots that said when and little else.',
+    },
+    {
       version: '3.0.0',
       notes:
         'Organisations live here now, each with a page of its people, projects and money. People are grouped by the organisation they are with. A person keeps every address and handle they are known by and where they were seen. Mail a pattern reads meets the company behind it, unless it came from a free mail service; other mail only notes who wrote, so a stranger never becomes a contact. The payee on a bank text is one shop however the bank spells it.',
@@ -85,6 +95,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    {
+      version: '3.13.0',
+      notes: 'Coming and going opens on one heading. The next 30 days under it no longer has a second heading of its own.',
+    },
     {
       version: '3.12.0',
       notes: 'Runs out names the day your money runs out, with the days left under it, where it showed only a count of days.',
@@ -154,6 +168,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    {
+      version: '1.16.0',
+      notes: 'The Board no longer says By status over its columns, since each column is headed by its status already.',
+    },
     {
       version: '1.15.0',
       notes:

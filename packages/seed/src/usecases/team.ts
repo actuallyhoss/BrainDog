@@ -91,8 +91,11 @@ export const TEAM = {
      runs on are one More about tile where they were folded sections. Blocks moved, so a minor step. 2.15.1 is live.
      2.17.0: Where it stands on a project's page draws At risk in the warning colour and Off track in the danger colour,
      by the template's `tones:`. On track wears no mark. A key added to a block that is already there, so a minor
-     step. 2.16.0 is live. */
-  version: '2.17.0',
+     step. 2.16.0 is live.
+     2.18.0: a project's page takes the template without Done, by week: what was finished this week is the last figure of
+     At a glance, after Due soon and In review, asking for its four weeks as a line. A block gone and a cell kept, so a
+     minor step. 2.17.0 is live. */
+  version: '2.18.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

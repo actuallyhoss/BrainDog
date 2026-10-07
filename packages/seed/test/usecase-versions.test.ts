@@ -1326,6 +1326,50 @@ const DECLARED: Record<string, Version> = {
       "Where it stands on `page.project` wears `tones:`, At risk in the warning colour and Off track in the danger colour, where every health was drawn alike; On track wears no mark -> c11cf821f8eb46c7",
     ],
   },
+  /* VERSIONS AND NOT RESETS: founder 2.2.0 and team 2.17.0 are live. Each takes the project template without its chart
+     of the weeks (the second design review's fix 5), a block gone and a cell of At a glance added or changed, so the
+     ids are the ones before. `quiet-update.test.ts` rebuilds each version before and holds it to the value above. */
+  'founder@2.3.0': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported metric.due-this-week
+      metric.lapsing-30d metric.organisations-held page.dashboard page.home-founder page.project register.datapoints
+      setting.label_accounts setting.label_books setting.label_categories setting.label_datapoints
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories setting.one_datapoints
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: '05cb6eed5bd74666',
+    history: [
+      "`page.project` draws no Done, by week, a chart the whole of the main column for bars of 1 and 2; At a glance gains Done this week as its fourth figure, asking for its four weeks as a line -> 05cb6eed5bd74666",
+    ],
+  },
+  'team@2.18.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles setting.holds_people setting.holds_tasks
+      setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people
+      setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan
+      setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: '9ea6b93bfb8e78b7',
+    history: [
+      "`page.project` draws no Done, by week, a chart the whole of the main column for bars of 1 and 2; Done this week, already the last figure of At a glance, asks for its four weeks as a line -> 9ea6b93bfb8e78b7",
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

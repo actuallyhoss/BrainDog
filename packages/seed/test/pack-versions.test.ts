@@ -1261,6 +1261,78 @@ const DECLARED: Record<string, Version> = {
       "Runs out on `page.money` draws the new `runs-out-on`, the day the walk from `cash-now` goes under, with the days left from `runway-days` as the line under it, where it drew the count of days alone -> f7558a5590d4ee11",
     ],
   },
+  /* THE SECOND DESIGN REVIEW'S FIXES IN THE DECLARATIONS (`loop/research-design-critic-2.md`, fixes 2, 3, 6, 7 and 8):
+     work 1.15.0, portfolio 1.14.0, people 3.0.0 and money-core 3.12.0 are all live, so each of these is a version and
+     not a reset. Three hold the ids the version before held; People gains one figure and keeps the one its chart drew
+     on. `quiet-update.test.ts` rebuilds each version before from this build and holds it to the fingerprint above. */
+  'work@1.16.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-open metric.tasks-after-week-yours
+      metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-late-yours metric.tasks-later metric.tasks-not-this-week
+      metric.tasks-overdue metric.tasks-today-yours metric.tasks-undated-yours metric.tasks-waiting
+      metric.tasks-this-week-yours
+      metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
+      register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
+    `,
+    declares: 'b27c59050f32684d',
+    history: [
+      "`page.work-board`'s board wears no heading and no glyph, where it said By status under a page called Board whose every column is headed by its status -> b27c59050f32684d",
+    ],
+  },
+  'portfolio@1.15.0': {
+    holds: `
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-live
+      metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked
+      metric.projects-past-aim metric.projects-retired metric.projects-with-agent
+      page.portfolio
+      register.things
+      rule.project-past-aim
+    `,
+    declares: '982f163d9d8ab76f',
+    history: [
+      "`page.portfolio` declares each of its two headings twice on one figure: an open tile while `projects-looked-up` or `projects-not-in-play` is four or fewer, with what agents hold and what is coming up half a row each and the parked as a table with no heading of its own, and the fold it had only past four; the open tile and the three under it declare keys of their own, so the folded ones keep the keys they had -> 982f163d9d8ab76f",
+    ],
+  },
+  'people@3.1.0': {
+    holds: `
+      metric.organisations-count metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-in-touch-90d
+      metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '36328d2fcaeb58f3',
+    history: [
+      "`page.people` draws Gone quiet, in the bad tone and on `people-quiet`, beside Last in touch, on the new `people-in-touch-90d`, two tables of a person, their organisation and the day, the one quiet longest first, where In touch, 12 weeks drew a row of dots a person; `people-in-touch-12w` stays declared -> 36328d2fcaeb58f3",
+    ],
+  },
+  'money-core@3.13.0': {
+    holds: `
+      metric.arriving-30d metric.balances-stale metric.book-cash metric.book-spent-month metric.books-held metric.cash-accounts
+      metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-now metric.chasing metric.days-late-in metric.due-30d
+      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.in-30d
+      metric.in-by-month metric.in-due-by-month metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d
+      metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
+      metric.owed-to-you metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
+      metric.project-out-month metric.project-owed metric.received-30d metric.runs-out-on metric.runway-days metric.spent-30d
+      metric.spent-by-category-month metric.txn-uncategorised
+      page.money page.money-book
+      register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
+      rule.recurring-stopped rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+    `,
+    declares: '2e09983b40aba73e',
+    history: [
+      "The walk of the next thirty days on `page.money` wears no heading and no glyph, where it said The next 30 days straight under Coming and going's own heading -> 2e09983b40aba73e",
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */
