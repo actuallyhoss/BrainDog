@@ -384,7 +384,7 @@
                 <span class="rail-glyph">
                   <!-- ALWAYS ITS OWN BADGE, never a glyph: its initial on the hue the record sent, else the one its name
                        is drawn in, so a project does not change face between one load and the next. -->
-                  <span class="hue" style="--hue:{entry.hue ?? hueFor(entry.title)}" aria-hidden="true">{entry.title.trim().slice(0, 1)}</span>
+                  <span class="hue" style="--hue:{entry.hue ?? hueFor(entry.title)}" aria-hidden="true">{entry.title.trim().slice(0, 1).toUpperCase()}</span>
                 </span>
                 <span class="item-name">{entry.title}</span>
               </a>
@@ -896,8 +896,6 @@
     color: var(--on-action);
     font-size: var(--t-xs);
     font-weight: 600;
-    line-height: 1;
-    text-transform: uppercase;
   }
 
   /* "HERE" IS A TILE: the tile's own fill under the name and the glyph in ink. Never a pill, never the red. */
@@ -976,7 +974,6 @@
 
   .crew-marks {
     display: flex;
-    flex: none;
   }
 
   /* Each maker's mark on a round of the board's own colour, the next one tucked a little under the last. */
@@ -1013,13 +1010,12 @@
     white-space: nowrap;
   }
 
-  .rail[data-icons] .crew {
-    justify-content: center;
-    padding-inline: 0;
-  }
-
   .rail[data-icons] :is(.crew-marks, .crew-words) {
     display: none;
+  }
+
+  .rail[data-icons] .crew {
+    justify-content: center;
   }
 
   /* A 6px DOT IN THE WORKING COLOUR, breathing while the agents are at it. Its opacity moves and nothing else: no ring,
