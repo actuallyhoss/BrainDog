@@ -703,7 +703,9 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
               await page.keyboard.press(k);
               await page.waitForTimeout(120);
             }
-            if (!(await page.locator(st.expect).first().isVisible().catch(() => false))) {
+            /* TWO SECONDS TO ARRIVE, since a toast or a sheet follows a write and a loaded runner takes longer than a key's
+               120ms to answer one. A state that is there is found at once. */
+            if (!(await page.locator(st.expect).first().waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false))) {
               broken.push(`${app.name} ${st.name} ${scheme}@${width}: after ${st.click ? [st.click].flat().join(' then ') : st.keys.join(' ')}, no ${st.expect}`);
               process.stdout.write('?');
               continue;

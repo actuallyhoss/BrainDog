@@ -706,8 +706,6 @@
     grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
     padding: 0;
     list-style: none;
-    /* THE LAST NAME STAYS IN THE ROW: centred on a narrow bucket it ran a few pixels past a phone's edge. */
-    overflow-x: clip;
   }
 
   /* EACH TICK IS ITS OWN CONTAINER, so the label it shows follows the room its bucket actually has, measured, and not
@@ -740,8 +738,12 @@
       display: none;
     }
 
+    /* AND A SHORT NAME WIDER THAN ITS BUCKET IS CUT WITH IT, as the long one is: a month's name over a 35px bar ran
+       into the next one and, on the last bar, past a phone's edge. */
     .series-tick-short {
-      display: inline;
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   }
 
