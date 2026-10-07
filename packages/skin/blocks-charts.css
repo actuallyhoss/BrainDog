@@ -606,7 +606,9 @@
     inset-block-start: 0;
     inset-inline-start: calc(50% + 12px + var(--sp-2));
     z-index: var(--z-raise);
-    display: grid;
+    /* NOT IN THE PAGE UNTIL A POINTER IS OVER ITS BAR: unseen but laid out, it ran past a phone's edge and the
+       document scrolled sideways. */
+    display: none;
     gap: 2px;
     padding: var(--sp-2) var(--sp-3);
     border-radius: var(--r-sm);
@@ -641,6 +643,7 @@
     }
 
     .series-col:hover > .series-tip {
+      display: grid;
       opacity: 1;
     }
   }
@@ -703,6 +706,8 @@
     grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
     padding: 0;
     list-style: none;
+    /* THE LAST NAME STAYS IN THE ROW: centred on a narrow bucket it ran a few pixels past a phone's edge. */
+    overflow-x: clip;
   }
 
   /* EACH TICK IS ITS OWN CONTAINER, so the label it shows follows the room its bucket actually has, measured, and not

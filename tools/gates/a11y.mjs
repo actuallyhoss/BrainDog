@@ -694,6 +694,10 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
                runs and a gate nobody waits for. `Nine` was the count when this was written, and `STATES`
                holds fourteen. */
             await page.locator('[role="row"]').first().click({ timeout: 1200 }).catch(() => {});
+            /* AND WHAT THAT CLICK STARTED HAS LANDED. The first row is the header, and since the tables were redrawn its
+               middle is a column's sort: the list is read again in that order, and a key pressed while it arrives acts
+               on a row the answer then replaces. */
+            await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
             for (const sel of [st.click].flat().filter(Boolean)) await page.locator(sel).first().click({ timeout: 1200 }).catch(() => {});
             for (const k of st.keys ?? []) {
               await page.keyboard.press(k);

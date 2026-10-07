@@ -294,7 +294,7 @@
     font-weight: var(--fw-medium);
   }
 
-  .queue-options:has(.queue-because) .queue-act::after {
+  .queue-options:has(.queue-because) .queue-act::before {
     content: '';
     position: absolute;
     inset: 0;
