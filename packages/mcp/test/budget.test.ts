@@ -55,7 +55,9 @@ const listed = async () => {
   const { surface } = stub();
   const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, surface, { who: 'agent' })) as Reply;
   assert.ok('result' in reply);
-  return reply.result;
+  /* `resultType` is the envelope a client reads and drops, so it is not part of what a turn pays for. */
+  const { resultType: _envelope, ...paid } = reply.result as Record<string, unknown>;
+  return paid;
 };
 
 test('the estimator is the one 44 §5.8 specifies, on its own worked examples', () => {

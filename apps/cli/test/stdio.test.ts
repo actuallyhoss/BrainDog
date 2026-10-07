@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { TOOLS, tools, type McpSurface } from '@braindog/mcp';
-import { INSTRUCTIONS } from '@braindog/mcp/rpc';
+import { INSTRUCTIONS, VERSIONS } from '@braindog/mcp/rpc';
 import { UNREACHABLE_FIX } from '../src/surface.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -200,6 +200,22 @@ function launch(extra: Record<string, string>, options: { args?: string[]; confi
 const said = (reply: Rpc) => reply.result.structuredContent as Record<string, unknown>;
 
 /* ── the protocol ──────────────────────────────────────────────────────── */
+
+test('A CLIENT OF THE NEWEST REVISION IS HANDED A LIST IT ACCEPTS', async (t) => {
+  /* Every test here spoke as a 2025-06-18 client, so nothing asked what the newest one is answered. Claude Code asks
+     for the newest revision, was answered with it, and then refused `tools/list` for lacking `resultType`: connected,
+     with no tools, on every session. */
+  const host = await stubHost(t);
+  const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+
+  const init = await s.ask('initialize', { protocolVersion: VERSIONS[0], capabilities: {}, clientInfo: { name: 'claude-code', version: '2.2.0' } });
+  assert.equal(init.result.protocolVersion, VERSIONS[0]);
+  for (const method of ['tools/list', 'prompts/list', 'resources/templates/list']) {
+    const listed = await s.ask(method);
+    assert.equal(listed.result.resultType, 'complete', `${method} answered a ${VERSIONS[0]} client without resultType`);
+  }
+  assert.equal(((await s.ask('tools/list')).result.tools as unknown[]).length, TOOLS.length);
+});
 
 test('initialize and tools/list answer without touching the host, and the list is what the server serves', async (t) => {
   const host = await stubHost(t);

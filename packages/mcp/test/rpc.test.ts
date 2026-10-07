@@ -90,8 +90,32 @@ test('server/discover IS ANSWERED, with the versions, the capabilities, who this
 
 test('ping answers, and prompts are an empty list for now', async () => {
   const { surface } = stub();
-  assert.deepEqual(result(await handle(req('ping'), surface, ctx)), {});
-  assert.deepEqual(result(await handle(req('prompts/list'), surface, ctx)), { prompts: [], ttlMs: 3_600_000, cacheScope: 'private' });
+  assert.deepEqual(result(await handle(req('ping'), surface, ctx)), { resultType: 'complete' });
+  assert.deepEqual(result(await handle(req('prompts/list'), surface, ctx)), { resultType: 'complete', prompts: [], ttlMs: 3_600_000, cacheScope: 'private' });
+});
+
+test('EVERY RESULT BUT initialize SAYS IT IS WHOLE, because a 2026-07-28 client refuses a list that does not', async () => {
+  /* Claude Code took the handshake at this revision and then dropped every tool, on every session, because only
+     `server/discover` carried `resultType`. Every method is asked here as that client asks it. */
+  const { surface } = stub();
+  const asked: [string, Record<string, unknown>][] = [
+    ['server/discover', {}],
+    ['ping', {}],
+    ['tools/list', {}],
+    ['tools/call', { name: 'record_index', arguments: {} }],
+    ['resources/list', {}],
+    ['resources/templates/list', {}],
+    ['prompts/list', {}],
+  ];
+  for (const [method, params] of asked) {
+    const r = result<Record<string, unknown>>(await handle(req(method, params), surface, ctx));
+    assert.equal(r.resultType, 'complete', `${method} answered without resultType`);
+  }
+  assert.deepEqual(
+    METHODS.filter((m) => m !== 'initialize' && m !== 'resources/read' && !asked.some(([method]) => method === m)),
+    [],
+    'a method was added and is not asked here',
+  );
 });
 
 type Hints = { readOnlyHint?: boolean; destructiveHint?: boolean; openWorldHint?: boolean };

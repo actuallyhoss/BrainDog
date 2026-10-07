@@ -58,6 +58,16 @@ export type Reply =
 const RPC = { invalid: -32600, method: -32601, params: -32602, internal: -32603, resource: -32002 } as const;
 
 const answer = (id: Id, result: unknown): Reply => ({ jsonrpc: '2.0', id, result });
+/**
+ * A result of anything but `initialize`, which says it is whole.
+ *
+ * THE 2026-07-28 REVISION REQUIRES `resultType` ON EVERY RESULT, and this server answers `initialize` with that revision.
+ * Only `server/discover` carried the field, so a client of the revision took the handshake, then refused `tools/list`,
+ * `prompts/list` and both resource lists as invalid: Claude Code connected, read the instructions and exposed none of
+ * the tools, on every session, while every test here spoke as a 2025-06-18 client and passed. A client of an earlier
+ * revision reads past a field it does not know, as it already does `ttlMs` and `cacheScope`.
+ */
+const whole = (id: Id, result: Record<string, unknown>): Reply => answer(id, { resultType: 'complete', ...result });
 const fail: (id: Id | null, n: number, message: string, data?: unknown) => Reply = (id, code, message, data) => ({
   jsonrpc: '2.0',
   id,
@@ -210,8 +220,7 @@ async function dispatch<C>(
        the versions, the capabilities, who this is and the instructions. The same for every caller, so
        any cache may keep it. */
     case 'server/discover':
-      return answer(id, {
-        resultType: 'complete',
+      return whole(id, {
         supportedVersions: [...VERSIONS],
         capabilities: CAPABILITIES,
         _meta: { 'io.modelcontextprotocol/serverInfo': SERVER },
@@ -221,13 +230,13 @@ async function dispatch<C>(
       });
 
     case 'ping':
-      return answer(id, {});
+      return whole(id, {});
 
     /* THE INSTRUCTIONS ARE NOT SENT AGAIN HERE. They went out in `initialize`, or in `server/discover` for a client of the
        stateless revision, and a session that asked for both carried the whole text twice; Claude Code puts the
        instructions in every session's system prompt on its own. Once a connection is the specification's place for them. */
     case 'tools/list':
-      return answer(id, { tools: TOOLS.map(listedTool), ttlMs: HOUR, cacheScope: 'private' });
+      return whole(id, { tools: TOOLS.map(listedTool), ttlMs: HOUR, cacheScope: 'private' });
 
     case 'tools/call': {
       const args = params.arguments ?? {};
@@ -237,14 +246,14 @@ async function dispatch<C>(
       /* THE REVISION SENDS `inputResponses` ON A RETRY OF THE ORIGINAL REQUEST, and a client may put it in the request's
          params or among the tool's arguments, so both places are read. */
       if (params.name === 'propose' && (Object.hasOwn(params, 'inputResponses') || Object.hasOwn(args, 'inputResponses')))
-        return answer(id, render({ result: DECIDES_NOT, text: refusalBrief(DECIDES_NOT.refusal), structured: DECIDES_NOT.refusal }));
-      return answer(id, render(await mcp.answer(params.name, args, ctx)));
+        return whole(id, render({ result: DECIDES_NOT, text: refusalBrief(DECIDES_NOT.refusal), structured: DECIDES_NOT.refusal }));
+      return whole(id, render(await mcp.answer(params.name, args, ctx)));
     }
 
     /* A minute, not an hour: the list names pages, and a page appears when its row does. */
     case 'resources/list': {
       const listing = await mcp.resources(ctx);
-      return answer(id, {
+      return whole(id, {
         resources: listing.map(({ uri, name, description }) => ({ uri, name, description, mimeType: JSON_TYPE })),
         ttlMs: MINUTE,
         cacheScope: 'private',
@@ -252,7 +261,7 @@ async function dispatch<C>(
     }
 
     case 'resources/templates/list':
-      return answer(id, { resourceTemplates: TEMPLATES.map((t) => ({ ...t, mimeType: JSON_TYPE })), ttlMs: HOUR, cacheScope: 'private' });
+      return whole(id, { resourceTemplates: TEMPLATES.map((t) => ({ ...t, mimeType: JSON_TYPE })), ttlMs: HOUR, cacheScope: 'private' });
 
     case 'resources/read': {
       if (typeof params.uri !== 'string') return fail(id, RPC.params, 'resources/read needs a uri.');
@@ -261,7 +270,7 @@ async function dispatch<C>(
         return refused(r)
           ? fail(id, RPC.resource, r.refusal.fix, { refusal: r.refusal })
           : fail(id, RPC.resource, 'This resource did not answer. Read it again.');
-      return answer(id, {
+      return whole(id, {
         contents: [{ uri: params.uri, mimeType: JSON_TYPE, text: JSON.stringify(r.value ?? null) }],
         ttlMs: ttlOf(params.uri),
         cacheScope: 'private',
@@ -270,7 +279,7 @@ async function dispatch<C>(
 
     /* None yet. The skill and the instructions teach; a prompt library is a third thing to keep true. */
     case 'prompts/list':
-      return answer(id, { prompts: [], ttlMs: HOUR, cacheScope: 'private' });
+      return whole(id, { prompts: [], ttlMs: HOUR, cacheScope: 'private' });
 
     default:
       return fail(id, RPC.method, `There is no method called ${method}.`, { allowed: METHODS });

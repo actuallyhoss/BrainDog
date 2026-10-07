@@ -1394,6 +1394,20 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     return tried.ok ? { ok: true, value: { script_try: tried.value, proposed: false } } : tried;
   };
 
+  /** Run `work` over every item, at most `at` at a time, and answer in the order they were given. */
+  const pooled = async <T, R>(items: readonly T[], work: (item: T) => Promise<R>, at = 8): Promise<R[]> => {
+    const out = new Array<R>(items.length);
+    let next = 0;
+    const lane = async () => {
+      while (next < items.length) {
+        const i = next++;
+        out[i] = await work(items[i]!);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(at, items.length) }, lane));
+    return out;
+  };
+
   /**
    * The pages this caller may open, and the figures they draw. `resources/list` offers the first, and the second is
    * where a figure's id is found while no host answers `figures`.
@@ -1402,21 +1416,27 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * "Payroll, monthly" in a listing tells a caller what a register they cannot read is called.
    */
   const drawn = async (listed: readonly { slug: string; title: string }[], ctx: C): Promise<{ pages: Resource[]; figures: string[] }> => {
-    const out: Resource[] = [];
-    const seen: string[] = [];
-    for (const page of listed) {
-      if (!NAMED.test(page.slug)) continue;
-      const drew = await surface.page({ slug: page.slug }, ctx);
-      if (!drew.ok) continue;
-      const blocks =
-        (drew.value as { blocks?: { refusals?: { code: string }[]; readings?: { metric: string }[] }[] }).blocks ?? [];
-      if (blocks.length > 0 && blocks.every((b) => (b.refusals ?? []).some((r) => WITHHELD.has(r.code)))) continue;
-      /* The figures a page names, taken from what it drew rather than a second read of its
-         declaration, so a figure offered is one this page really carries. */
-      for (const block of blocks) for (const reading of block.readings ?? []) seen.push(reading.metric);
-      out.push(resource(`page/${page.slug}`, `${page.title}, with every block run: rows and figures, never markup.`));
-    }
-    return { pages: out, figures: seen };
+    /* A FEW AT ONCE, IN THE ORDER LISTED. One page after another is one round trip each for a caller that reaches the
+       record over a network: a record of fifty pages spent the bridge's whole 20 seconds here at every session start,
+       was cut off before its figures and skills, and kept the server pending in the client all that time. */
+    const drew = await pooled(
+      listed.filter((page) => NAMED.test(page.slug)),
+      async (page) => {
+        const drawn = await surface.page({ slug: page.slug }, ctx);
+        if (!drawn.ok) return null;
+        const blocks =
+          (drawn.value as { blocks?: { refusals?: { code: string }[]; readings?: { metric: string }[] }[] }).blocks ?? [];
+        if (blocks.length > 0 && blocks.every((b) => (b.refusals ?? []).some((r) => WITHHELD.has(r.code)))) return null;
+        return {
+          page: resource(`page/${page.slug}`, `${page.title}, with every block run: rows and figures, never markup.`),
+          /* The figures a page names, taken from what it drew rather than a second read of its
+             declaration, so a figure offered is one this page really carries. */
+          figures: blocks.flatMap((block) => (block.readings ?? []).map((reading) => reading.metric)),
+        };
+      },
+    );
+    const held = drew.filter((d) => d !== null);
+    return { pages: held.map((d) => d.page), figures: held.flatMap((d) => d.figures) };
   };
 
   /**
@@ -2716,11 +2736,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    */
   const resources = async (ctx: C): Promise<Resource[]> => {
     const out: Resource[] = [];
-    const offer = async (r: Resource) => {
-      if ((await read(r.uri, ctx, false)).ok) out.push(r);
-    };
-
-    for (const r of FIXED) await offer(r);
+    const offered = await pooled(FIXED, async (r) => ((await read(r.uri, ctx, false)).ok ? r : null));
+    out.push(...offered.filter((r) => r !== null));
 
     const boot = await surface.boot(ctx);
     const registers = boot.ok ? boot.value.registers : [];

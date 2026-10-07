@@ -723,7 +723,8 @@ What an install does change is read, never pushed:
 
 **Off, behind `const MRTR = false` in `rpc.ts`.** `rpc.ts` renders `propose` as it renders every tool (§5.4): the
 record's answer as JSON, carrying the suggestion's id, its `decide` link when the host handed an origin (§4.4), and
-`dry_run` or `script_try` when §4.4 adds one. No result carries `resultType`. The input-required shape is answered only
+`dry_run` or `script_try` when §4.4 adds one. Every result but `initialize` carries `resultType: 'complete'`, which the
+2026-07-28 revision requires and a client of it refuses a list without. The input-required shape is answered only
 to a request whose `_meta` carries the client capability the 2026-07-28 revision names for it, and that name could not
 be confirmed from the specification's own text, which this repository does not hold; the `requests` of kind
 `decision` below are this project's design, not a kind the revision is known to name. So the shape stays off and the
