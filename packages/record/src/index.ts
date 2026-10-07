@@ -3025,12 +3025,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       )
       .map((r) => r.id);
   const firstPartyTick = async (today: string): Promise<string[]> => {
-    const { updateFirstParty } = await import('@braindog/seed/packs/quiet');
-    const { FIRST_PARTY_VERSIONS, firstPartyManifest } = await import('@braindog/seed/packs');
+    const { shippedVersion, updateFirstParty } = await import('@braindog/seed/packs/quiet');
+    const { firstPartyManifest } = await import('@braindog/seed/packs');
     const { moduleDocument, dayOf } = await import('@braindog/seed/usecases/install');
     const { useCase } = await import('@braindog/seed/usecases');
     const { moduleName } = await import('@braindog/seed/usecases/names');
-    const shipped = JSON.stringify(FIRST_PARTY_VERSIONS);
+    /* WHAT THIS BUILD SHIPS OF EVERYTHING THE RECORD HOLDS THAT THE NIGHT KEEPS CURRENT, the agents pack and a use case
+       among them, in the order of their ids: a build that moves only one of those is a new deploy to this record too. */
+    const shipped = JSON.stringify(
+      kernel
+        .packStates()
+        .flatMap((p): [string, string][] => {
+          const version = shippedVersion(p.id);
+          return version === undefined ? [] : [[p.id, version]];
+        })
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    );
     const last = kernel.prefsOf(FIRST_PARTY_HOLDER)[FIRST_PARTY_LAST] as { versions?: unknown; day?: unknown } | undefined;
     if (last?.versions === shipped && last.day === today) return [];
     const actor = 'system';
@@ -3050,15 +3060,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const carryStopped = new Set<string>();
     /* A NO HOLDS FOR THAT VERSION (research-audit-21 item 6): a module the owner said no to at the version this build
        ships is left out of what the record holds for this check, so it is neither asked again nor put in on a later
-       night whose plan happens to lose nothing. A newer version than the one declined is asked about afresh. */
+       night whose plan happens to lose nothing. A newer version than the one declined is asked about afresh. THE AGENTS
+       PACK AND A USE CASE AS MUCH AS THE FIVE: the version is read from `shippedVersion`, which says it for each. */
     const declined = firstPartyDeclined();
-    const shippedOf = FIRST_PARTY_VERSIONS as Record<string, string>;
     try {
       steps = await updateFirstParty({
         held: () =>
           kernel
             .packStates()
-            .filter((p) => declined[p.id] === undefined || declined[p.id] !== shippedOf[p.id])
+            .filter((p) => declined[p.id] === undefined || declined[p.id] !== shippedVersion(p.id))
             .map((p) => ({ id: p.id, version: p.version, on: p.disabled_at === null })),
         document: (id) => {
           const own = firstPartyManifest(id as Parameters<typeof firstPartyManifest>[0]).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice('register.'.length));
@@ -3090,12 +3100,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const prepared = await arrangement.prepare('pack', q.body);
           const put = prepared.ok ? kernel.propose({ question: q.question, body_kind: 'pack', body: prepared.value }, actor) : prepared;
           /* THE VERSION ASKED ABOUT IS KEPT BESIDE THE QUESTION, so a no is remembered for that version (`firstPartyAnswered`). */
-          const to = shippedOf[q.body.install];
+          const to = shippedVersion(q.body.install);
           if (put.ok && to !== undefined) kernel.setPref(FIRST_PARTY_ASKED, put.value.id, { pack: q.body.install, version: to });
           return put;
         },
         /* WHAT THE PERSON TOOK OFF, read from the declaration log (research-audit-21 item 5), so an update never lays it again unasked. */
         tookOff: () => takenOff(),
+        /* A NO IS KEPT FOR ANY PACK ASKED ABOUT HERE (`propose` above, `firstPartyAnswered`), so the agents pack and a use
+           case are asked about as the five are, and not left waiting for the person to update them by hand. */
+        remembers: () => true,
         nameOf: (id) => {
           const body = kernel.declarations().find((d) => d.id === id)?.body as { name?: unknown; title?: unknown } | undefined;
           return typeof body?.name === 'string' ? body.name : typeof body?.title === 'string' ? body.title : null;
@@ -4119,8 +4132,104 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const heard = unmuted(ctx, b);
       return 'seen' in heard ? { ...heard, seen: markOf(readerOf(ctx)) } : heard;
     }
-    if (!beyond) return b;
+    if (!beyond) {
+      const part = narrowedSource(ctx, b);
+      return part === null ? b : ownRows(ctx, b, part);
+    }
     return shellOf(b, beyond, log !== null);
+  };
+
+  /** What a block worked out from a whole list says to a reader whose grant shows them part of that list. */
+  const PART: Refusal = { code: 'FORBIDDEN', fix: 'This is worked out from a whole list, and you are shown only part of that list.', at: 'source' };
+
+  /** The lists a block reads that this caller's grant narrows to some of their rows (`wheres`). */
+  const narrowedLists = (ctx: CallContext, b: Parameters<Kernel['blockRegisters']>[0]): string[] =>
+    Object.keys(ctx.wheres ?? {}).length === 0 ? [] : [...new Set([...kernel.blockRegisters(b), ...alsoReads(b)])].filter((list) => whereFor(ctx.wheres, list) !== undefined);
+
+  /** The list a block draws its rows from when this caller's grant narrows it, or `null`: `source: register.<id>`. */
+  const narrowedSource = (ctx: CallContext, b: Parameters<Kernel['blockRegisters']>[0]): string | null => {
+    const source = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
+    return source !== null && whereFor(ctx.wheres, source) !== undefined ? source : null;
+  };
+
+  /** What a block over more of her rows than one read gathers says, in place of a drawing cut short. */
+  const LONG: Refusal = { code: 'FORBIDDEN', fix: 'You are shown part of this list, and that part is too long to draw here. Open the list itself.', at: 'source' };
+
+  /** The most of her rows one block is drawn from: four reads of `list`'s own most. Past it the block is held (`LONG`). */
+  const NARROW_MOST = 2_000;
+
+  /**
+   * What a block over her own rows may answer: its rows, what is said one to a row, and what says nothing of any row.
+   * Every other answer key may be worked out from a read that is not the block's own rows (a figure in `cells`, the
+   * words a heading was filled with, a line's buckets), which the kernel still makes over the whole list, so a block
+   * holding one is held whole.
+   */
+  const ROW_SAFE: ReadonlySet<string> = new Set([
+    'rows', 'matched', 'refusals', 'drawn', 'seen', 'types', 'home', 'fills', 'window', 'fx', 'next', 'open',
+    'scopes', 'scope_marks', 'rings', 'nexts', 'trends', 'done_now', 'short_now', 'changes', 'working_now', 'quiet', 'files',
+  ]);
+
+  /** Whether an answer key holds anything: an empty list, an empty map, nought and `false` say nothing of a row. */
+  const saysSome = (v: unknown): boolean =>
+    v !== undefined && v !== null && v !== 0 && v !== false && !(Array.isArray(v) && v.length === 0) && !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0);
+
+  /**
+   * A block over a list this caller's grant narrows (`wheres`), drawn again from the rows their `where` admits and no
+   * others (research-audit-30 Medium 2).
+   *
+   * THE KERNEL DRAWS A PAGE FOR NOBODY IN PARTICULAR, so it reads the list whole, and `heldBy` asked only whether she may
+   * read the list at all. Measured (`test/page-wheres-narrowed.test.ts`): a token held to the paper jobs opened the Jobs
+   * page and was drawn the court jobs too, while `list` answered it two rows.
+   *
+   * DRAWN AGAIN, NOT CUT DOWN. Taking the rows she is not shown off the kernel's drawing left what the drawing was made
+   * from: a block cut to `limit: 1` came back empty when a hidden row sorted first, and a section, which counts and
+   * draws no row, was held when a hidden row matched its `where` and drawn when none did. `previewPage` is open at
+   * `read` and takes any `where`, so `what contains Fi` under either read a hidden title a letter at a time. So her rows
+   * are read first, as `list` reads them for her (the grant's rule, and `reads` for the titles a `where` names), and
+   * the kernel draws the block over exactly those, named by `seq`: the order, the cut, the count and what is said one
+   * to a row are then hers, and nothing in the answer moves when a row she is not shown does.
+   *
+   * WHAT THE PAGE PUT ON THE BLOCK STAYS: its key, a block another pack added, the refusal for a panel in the wrong
+   * place, and a block folded under a section that said no, which is not drawn at all.
+   */
+  const ownRows = (ctx: CallContext, b: ReturnType<Kernel['block']>, list: string): ReturnType<Kernel['block']> => {
+    type Block = ReturnType<Kernel['block']>;
+    if (b.drawn === false && (b.rows ?? []).length === 0) return b;
+    const { added, ...carried } = b as unknown as Record<string, unknown>;
+    const written: Record<string, unknown> = { ...carried };
+    for (const key of ANSWER_KEYS) delete written[key];
+    const page = { ...(carried.key === undefined ? {} : { key: carried.key }), ...(added === undefined ? {} : { added }) };
+    const bare = (refusals: Refusal[]): Block => ({ ...written, rows: [], matched: 0, refusals, ...page }) as unknown as Block;
+    /* A `where` NAMING A ROW OF A LIST SHE CANNOT READ IS ANSWERED AS `list` ANSWERS HER (`whereHeld`), before any read. */
+    const stop = whereHeld(ctx, written);
+    if (stop) return stop.shell ? shellOf(b, stop.refusal, false) : bare([stop.refusal]);
+    const rule = whereFor(ctx.wheres, list);
+    const reads = (other: string): boolean => readable(ctx, other) === null;
+    const seqs: number[] = [];
+    for (let cursor: string | null | undefined; cursor !== null; ) {
+      const read = kernel.list({ register: list, ...(written.where === undefined ? {} : { where: written.where as never }), limit: 500, reads, ...(cursor ? { cursor } : {}) }, rule);
+      if (!read.ok) return bare('refusal' in read ? [{ ...read.refusal, at: 'where' }] : []);
+      if (read.value.matched > NARROW_MOST) return shellOf(b, LONG, false);
+      for (const row of read.value.rows) if (row.seq !== null) seqs.push(row.seq);
+      cursor = read.value.cursor;
+    }
+    /* NO ROW HOLDS `seq` NOUGHT, which is how a block over none of her rows is asked for: `in` takes at least one. */
+    const hers = seqs.length > 0 ? { field: 'seq', in: seqs } : { field: 'seq', is: 0 };
+    const again = kernel.block({ ...written, where: hers } as never) as unknown as Record<string, unknown>;
+    const mine = new Set(seqs);
+    const rows = (Array.isArray(again.rows) ? again.rows : []) as Block['rows'];
+    if (rows.some((row) => row.register === list && (row.seq === null || !mine.has(row.seq)))) return shellOf(b, PART, false);
+    for (const key of ANSWER_KEYS) if (!ROW_SAFE.has(key) && saysSome(again[key])) return shellOf(b, PART, false);
+    const out: Record<string, unknown> = { ...again, ...page };
+    if (written.where === undefined) delete out.where;
+    else out.where = written.where;
+    /* AND WHETHER EACH CHANGE IS NEW TO HER, which the kernel says only inside a page, from the same read mark. */
+    const seen = markOf(readerOf(ctx));
+    if (Array.isArray(out.changes) && typeof seen === 'string')
+      out.changes = (out.changes as ({ at: string } | null)[]).map((c) => (c === null ? null : { ...c, unseen: c.at > seen }));
+    const said = (out.refusals as Refusal[] | undefined) ?? [];
+    const astray = (b.refusals ?? []).filter((r) => r.at === 'panel' && !said.some((s) => s.fix === r.fix));
+    return (astray.length === 0 ? out : { ...out, rows: [], matched: 0, refusals: [...said, ...astray] }) as unknown as Block;
   };
 
   /**
@@ -4226,8 +4335,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        her whole, and the queue drew her the Diary rowset's question that `governance` held back. So a queue is for
        whoever reads every list, and so are the questions put off and the ones answered, which name the same rowsets. */
     const whole = typeof b.source === 'string' && b.source.startsWith('governance.') ? readsEveryList(ctx) : wholeRecord(ctx);
+    /* NOR DOES A GRANT NARROWED TO SOME OF A LIST'S ROWS (`wheres`) READ ALL OF IT: the kernel's feed names every row
+       written, and a token held to the paper jobs was drawn "File at court" off a feed block (measured). */
+    const narrow = Object.keys(ctx.wheres ?? {}).length > 0;
     const log: Refusal | null =
-      typeof b.source === 'string' && ACROSS.has(b.source) && (!whole || allows(ctx, 'read') !== null)
+      typeof b.source === 'string' && ACROSS.has(b.source) && (!whole || narrow || allows(ctx, 'read') !== null)
         ? {
             code: 'FORBIDDEN',
             fix:
@@ -4244,7 +4356,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       [...kernel.blockRegisters(b), ...alsoReads(b)]
         .map((register) => readable(ctx, register))
         .find((said) => said !== null) ??
-      null;
+      /* AND A LIST HER GRANT NARROWS TO SOME OF ITS ROWS (`wheres`), READ ANY WAY BUT AS THE BLOCK'S OWN ROWS: a figure
+         over it, a walk's leg, the steps under a card, the list a group is named from. Each is worked out across rows
+         she is not shown, and nothing in the answer can be taken off a row at a time. A block whose `source:` is the
+         list is not held here: `heldBlock` draws it with her rows alone (`ownRows`), unless it reads the same list a
+         second way beside its rows (the steps under its own cards, the row a scope is named from). */
+      (narrowedLists(ctx, b).some((list) => list !== narrowedSource(ctx, b)) || alsoReads(b).some((list) => list === narrowedSource(ctx, b)) ? PART : null);
     return { log, beyond };
   };
 
@@ -5415,7 +5532,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const id = colon > 0 ? target.slice(colon + 1) : target;
     if (kind === 'entry') {
       const row = kernel.get(id, { includeDeleted: true });
-      if (!row || readable(ctx, row.register)) return null;
+      /* AND A ROW HER GRANT'S `where` DOES NOT ADMIT IS NOT HERS TO READ ABOUT (`rowAdmitted`), as `get` and `history`
+         hold it: a token held to the paper jobs read the court jobs' titles and fields off `whatsNew`. */
+      if (!row || readable(ctx, row.register) || !rowAdmitted(ctx, row.register, row.seq)) return null;
       const title = kernel.register(row.register)?.title;
       return { ...bare, register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') || null : null };
     }
@@ -7779,7 +7898,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          list the page's blocks read and names each link by its row's title, so a member invited to Tasks alone was handed
          the titles of projects she may not read, and how many tasks each holds. Her choice on it is dropped and the page
          read again, so a value she was never offered narrows nothing either. */
-      const unseen = (f: PageFilter): boolean => !everyList && f.reads.some((list) => readable(ctx, list) !== null);
+      /* AND BY A LIST HER GRANT NARROWS TO SOME OF ITS ROWS (`wheres`): the values are counted over every row of it. */
+      const unseen = (f: PageFilter): boolean => f.reads.some((list) => whereFor(ctx.wheres, list) !== undefined || (!everyList && readable(ctx, list) !== null));
       if (out.ok && filter && (out.value.filters as PageFilter[] | undefined)?.some((f) => unseen(f) && Object.hasOwn(filter, f.field))) {
         const kept = { ...filter };
         for (const f of out.value.filters as PageFilter[]) if (unseen(f)) delete kept[f.field];

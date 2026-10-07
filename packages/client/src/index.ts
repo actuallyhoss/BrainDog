@@ -473,6 +473,8 @@ export type AutomationRow = {
   /** Runs not finished: due, being taken, or parked on a wait. */
   open: number;
   last: { run: string; state: RunState; at: string; say: string | null } | null;
+  /** When it last fired: its newest run's start, or for an inline rule the newest line it signed. */
+  lastFired: string | null;
   /** This calendar month so far, UTC. An inline rule's firings are events and are not counted here. */
   month: { runs: number; done: number; failed: number; cancelled: number };
 };

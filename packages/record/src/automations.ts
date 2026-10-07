@@ -449,6 +449,11 @@ export type AutomationRow = {
   /** Runs not finished yet: due, being taken, or parked on a wait. */
   open: number;
   last: { run: string; state: RunState; at: string; say: string | null } | null;
+  /**
+   * The instant it last fired, or `null` when the record holds nothing from it: when its newest run started, and for an
+   * inline rule, which leaves no run, the newest line of the log it signed (`rule:<id>`).
+   */
+  lastFired: string | null;
   /** This calendar month so far, UTC, from the runs themselves. An inline rule's firings are events, not runs. */
   month: { runs: number; done: number; failed: number; cancelled: number };
 };
@@ -499,6 +504,13 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
     'SELECT id, state, started_at, finished_at, say FROM automation_run WHERE rule = ? ORDER BY started_at DESC, rowid DESC LIMIT 1',
     bare,
   );
+  /* AN INLINE RULE'S FIRINGS ARE EVENTS, NOT RUNS, so `last` is `null` for one however often it fired, and the web read
+     a page of the log to say when (`firedOf` in `apps/web/src/lib/flow/source.ts`), which says "nothing lately" of a
+     rule whose last turn sits below that page. The log is the record's own, and every write a rule makes is signed
+     `rule:<id>` (`rules.ts`), so the newest one is read here, by `event_actor`. A rule with runs fired when its newest
+     run started, since the lines after that are the same firing's steps. */
+  const signed = sql.one<{ ts: string | null }>('SELECT max(ts) AS ts FROM event WHERE actor = ?', `rule:${bare}`)?.ts ?? null;
+  const lastFired = last ? (signed !== null && pathOf(body) === 'inline' && signed > last.started_at ? signed : last.started_at) : signed;
   const month = { runs: 0, done: 0, failed: 0, cancelled: 0 };
   for (const r of sql.all<{ state: string; n: number }>(
     'SELECT state, count(*) AS n FROM automation_run WHERE rule = ? AND started_at >= ? GROUP BY state',
@@ -524,6 +536,7 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
       next: next?.due_at ?? null,
       open,
       last: last ? { run: last.id, state: last.state, at: last.finished_at ?? last.started_at, say: last.say } : null,
+      lastFired,
       month,
     },
   };
