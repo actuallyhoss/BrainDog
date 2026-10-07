@@ -281,9 +281,11 @@
 
   /* A LABEL AND ITS VALUE READ AS A PAIR. They sat at opposite edges of a
      340px card, so "Kind" and "Method" were 300px apart and a two-line "Next" was right-aligned prose.
-     The labels share a column the width of the longest one, and the value starts beside it. */
+     THE LABEL COLUMN IS ONE WIDTH ON EVERY CARD, 96px, so the values start on one edge down a column of cards and
+     across a row of them: a column the width of each card's own longest label put "Contractor" at 38px on one card and
+     "Client" at 86px on the next. A label longer than that breaks inside it. */
   .cards-facts {
-    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-columns: 96px minmax(0, 1fr);
     column-gap: var(--sp-3);
   }
 
@@ -293,8 +295,10 @@
   }
 
   .cards-fact dt {
+    min-inline-size: 0;
     color: var(--dim);
     font-size: var(--t-sm);
+    overflow-wrap: anywhere;
   }
 
   .cards-fact dd {

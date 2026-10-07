@@ -73,6 +73,18 @@
     justify-self: start;
   }
 
+  /* THE DOT IS FOR A FIGURE THAT MISSES ITS TARGET, amber or red, and for nothing else: a green dot beside "Open 15"
+     says nothing, and three of them in one tile made the one that mattered a fourth. Any other tone keeps its name for
+     a screen reader and draws nothing. */
+  .cell:not([data-intent='warn'], [data-intent='bad']) > .glyph {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   /* THE FIGURE AT THE TILE'S FIGURE STEP, tabular on a PROPORTIONAL face: a monospace face gives the thousands
      separator a full cell, so EGP 2,869 renders as EGP 2 , 869 at display size (13 §3.2). */
   .cell-figure {

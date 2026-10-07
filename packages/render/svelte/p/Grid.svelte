@@ -389,6 +389,10 @@
                 because a select draws no `::before` for `tap` to grow; `tap` is here for a host that draws it another
                 way. It is a tab stop only beside the card that holds the board's one, so a keyboard
                 walking the board meets it there and nowhere else, and a pointer that can drag still can.
+
+                NOT DRAWN WHERE A POINTER CAN DRAG (`kinds/board.css`): it said the lane's name again under every card.
+                It stays in the tree for that, never `hidden`, so the tab stop and a screen reader still have it and it
+                shows itself when a keyboard lands on it.
               -->
               <select
                 class="board-move tap"

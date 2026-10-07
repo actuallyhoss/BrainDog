@@ -11,7 +11,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
+    min-inline-size: 0;
+    padding: var(--sp-2);
   }
 
   .board-col:first-child {
@@ -28,12 +29,14 @@
     border-inline-start: 1px solid var(--rule);
   }
 
+  /* A LANE'S HEAD IS ITS NAME AND HOW MANY ARE IN IT, and nothing else: the name in the second ink so it reads as a
+     heading over its cards, the count quiet beside it. */
   .board-head {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: var(--sp-2);
     padding-block-end: var(--sp-1);
-    color: var(--dim);
+    color: var(--ink2);
     font-family: var(--font-ui);
     font-size: var(--t-sm);
     font-weight: 500;
@@ -48,19 +51,27 @@
   }
 
   /* Scoped to the lane: `.card` is a common name, and a page's own card must not inherit a board's.
-     A board card is the tile's second surface with no border; the lane's hairline is the structure. */
+     A CARD IS A PIECE OF THE BOARD SET INTO THE TILE: the page's own ground (`--board`), no border and no shadow, so
+     fifteen of them read as one quiet surface rather than fifteen grey boxes (it wore `--field`, a control's fill, and
+     the screen read as a wall of disabled buttons). The title is the body step in ink; the line under it is the quiet
+     one. `position` because the lane control below is taken out of flow where a pointer can drag. */
   .board-col .card {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--field);
-    border-radius: var(--r-ctl);
+    gap: var(--sp-1);
+    padding: var(--sp-3);
+    background: var(--board);
+    border-radius: 10px;
   }
 
+  /* A long word (an invoice number, an address) breaks rather than widening its lane past the others. */
   .board-col .card-title {
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
+    font-weight: 500;
+    line-height: var(--lh-head);
+    overflow-wrap: anywhere;
   }
 
   /* ── board: the move ────────────────────────────────────────────────────
@@ -108,9 +119,17 @@
     white-space: nowrap;
   }
 
+  /* THE META LINE: whatever the row carries beside its title (what it belongs to, the day it is due, who holds it), in
+     the small step and the quiet ink. A card with nothing there draws no line and no gap for one. */
   .board-col .card-detail {
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: var(--lh-head);
+    overflow-wrap: anywhere;
+  }
+
+  .board-col .card-detail:empty {
+    display: none;
   }
 
   /* THE TOUCH PATH, A CARD'S LANES AS A NATIVE SELECT (`p/Grid.svelte`), drawn quiet because a pointer that can drag
@@ -138,6 +157,25 @@
     }
   }
 
+  /* WHERE A POINTER CAN DRAG, THE CONTROL IS NOT DRAWN: it repeated the lane's own name on every card, fifteen selects
+     saying "Open" under a heading that says "Open". It is still in the tree and still the tab stop beside the focused
+     card, so a keyboard that tabs to it sees it appear in the card and can choose a lane; `⇧←  ⇧→` and the drag are
+     untouched. Under a finger nothing here applies, because there it is the only way to move a card. */
+  @media (hover: hover) and (pointer: fine) {
+    .board-move:not(:focus-visible) {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      min-block-size: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
   /**
    * A BOARD IN A NARROW SLOT IS A GROUPED LIST: each lane's heading with its count, then its cards as
    * rows with a hairline between them, and no box round any of them.
@@ -150,11 +188,12 @@
     container: board / inline-size;
   }
 
-  /* A LANE KEEPS ROOM FOR A TITLE, and a board with more lanes than its slot holds scrolls inside itself. Six lanes in
-     1000px were 165px each at 1440, and every title wrapped to three lines (design §2.11, Board). The page never
-     scrolls sideways; the block does, as a wide table's region does, and below 30rem the lanes stack anyway. */
+  /* A LANE KEEPS ROOM FOR A TITLE, and a board with more lanes than its slot holds scrolls inside itself. The floor is
+     11rem: at 13rem six lanes asked for 1248px of a 1160px tile at 1512, and the last lane was cut mid-word behind a
+     scroll nobody knew was there. Six now fit with room over; a seventh scrolls. The page never scrolls sideways; the
+     block does, as a wide table's region does, and below 30rem the lanes stack anyway. */
   .block[data-kind='board'] .grid {
-    grid-template-columns: repeat(var(--cells), minmax(13rem, 1fr));
+    grid-template-columns: repeat(var(--cells), minmax(11rem, 1fr));
     overflow-x: auto;
     overscroll-behavior-inline: contain;
   }
@@ -180,7 +219,7 @@
 
     .block[data-kind='board'] .board-col .card {
       gap: var(--sp-1);
-      padding: var(--sp-2) 0;
+      padding: var(--sp-3) 0;
       background: none;
       border-block-end: 1px solid var(--rule);
       border-radius: 0;

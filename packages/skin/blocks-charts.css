@@ -335,6 +335,21 @@
     rx: 3px;
   }
 
+  /* A STANDING BAR IS THIN, NEVER WIDER THAN 24px (DIRECTION §39), and stays in the middle of its column over its
+     label. The drawing is stretched to the tile, so a bar is six tenths of its column however wide that is: five steps
+     across a wide tile were 113px slabs. The plan's bar is left as it is and narrowed about its own centre by the share
+     24px is of it; `tan(atan2(a, b))` is a over b as a plain number, which a length over a length is not everywhere
+     yet. The corner is said in the drawing's units, which the narrowing squeezes with the bar: 100 over the count of
+     steps comes out 4px across, and 3.4 of the hundred the 120px stands on is 4px down. A browser without the
+     arithmetic keeps the wide bar. */
+  .bridge-chart .bridge-bar {
+    rx: calc(100px / var(--cells, 5));
+    ry: 3.4px;
+    transform-box: fill-box;
+    transform-origin: center;
+    scale: min(1, tan(atan2(24px, calc(60cqi / var(--cells, 5))))) 1;
+  }
+
   .bridge-bar[data-move='up'] {
     fill: var(--chart-2);
   }
@@ -371,19 +386,29 @@
     display: none;
   }
 
+  /* A STEP'S NAME BREAKS INSIDE ITS COLUMN rather than running under the next one: eight steps across a 480px tile
+     are 60px columns, and one long word was wider than that. It breaks at a hyphen where the language has one. */
   .bridge-label {
+    min-inline-size: 0;
+    max-inline-size: 100%;
     color: var(--ink2);
+    hyphens: auto;
+    overflow-wrap: anywhere;
   }
 
   .bridge-value {
+    max-inline-size: 100%;
     color: var(--ink);
     font-variant-numeric: tabular-nums;
     font-weight: 500;
   }
 
   .bridge-note {
+    min-inline-size: 0;
+    max-inline-size: 100%;
     color: var(--dim);
     font-size: var(--t-sm);
+    overflow-wrap: anywhere;
   }
 
   .bridge-inline {
@@ -2064,8 +2089,9 @@
      another or on a bar (the names over a stretched drawing collided at every width, DIRECTION §39). A date is a dot on
      its day. The axis names sit across the top, each with a hairline down every track, and today's line runs down them
      all in the ink. The bar's colour is the row's state: the accent while it is in hand, amber when it is at risk, red
-     when it is late, grey when it is done. A row's days are said beside its bar on hover. In a narrow tile the list is the lane list: the name and
-     its days on one line, the track under them. The list is the one thing a screen reader reads; its name is the plan's
+     when it is late, grey when it is done. A name is one line, cut with an ellipsis, in a column no wider than 260px,
+     and a track is a hairline, so the bars are the only weight in the drawing. A row's days are said beside its bar on
+     hover. In a narrow tile the list is the lane list: the name and its days on one line, the track under them. The list is the one thing a screen reader reads; its name is the plan's
      sentence and the axis is hidden from it. */
   .block[data-kind='roadmap'] {
     container-type: inline-size;
@@ -2075,7 +2101,7 @@
     --roadmap-row: 36px;
     --roadmap-head: 24px;
     display: grid;
-    grid-template-columns: clamp(9rem, 34%, 20rem) minmax(0, 1fr);
+    grid-template-columns: clamp(9rem, 34%, 260px) minmax(0, 1fr);
     grid-template-rows: var(--roadmap-head) auto;
     column-gap: var(--sp-4);
   }
@@ -2148,15 +2174,12 @@
     border-radius: var(--r-sm);
   }
 
-  /* A LONG NAME TAKES A SECOND LINE before it is cut, so a name is read whole in all but the longest; the row grows
-     with it and its bar stays centred on it. */
+  /* A NAME IS ONE LINE, cut with an ellipsis, so every row is the same height and the bars keep one rhythm: a name on
+     two lines made its row half as tall again and put its bar out of step with the rest. */
   .roadmap-item-title {
     grid-column: 1;
     grid-row: 1;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    display: block;
     min-inline-size: 0;
     padding-block: var(--sp-1);
     padding-inline-start: var(--sp-2);
@@ -2164,16 +2187,26 @@
     color: var(--ink);
     font-size: var(--t-base);
     line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  /* THE TRACK: a faint line the bar sits on, the full width of the axis. */
+  /* THE TRACK IS A HAIRLINE through the middle of the bar's height, the full width of the axis, in the rule the axis
+     draws its own lines with. A grey pill on every row was seven slabs the eye read before any bar. */
   .roadmap-item-track {
     grid-column: 2;
     grid-row: 1;
     position: relative;
     block-size: 12px;
-    border-radius: var(--r-pill);
-    background: var(--chart-track);
+  }
+
+  .roadmap-item-track::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 50%;
+    border-block-start: 1px solid var(--rule);
+    translate: 0 -50%;
   }
 
   .roadmap-bar {
@@ -2310,12 +2343,10 @@
 
     .roadmap-item-title,
     .roadmap-item[data-intent='bad'] > .roadmap-item-title {
-      display: block;
-      -webkit-line-clamp: none;
-      line-clamp: none;
       padding-block: 0;
       padding-inline-start: 0;
       font-weight: 500;
+      overflow-wrap: anywhere;
       white-space: normal;
       text-wrap: pretty;
     }
