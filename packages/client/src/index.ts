@@ -63,7 +63,8 @@ type Prefs = NonNullable<Answer<'boot'>['me']['prefs']>;
 
 /** `boot`, and `now` is the record's own instant. See `Boot` in `@braindog/record`. */
 export type Boot = {
-  registers: { id: string; name: string; count: number }[];
+  /** Each list the caller reads; `icon` is the glyph its declaration names, `null` for none, absent from an older host. */
+  registers: { id: string; name: string; count: number; icon?: string | null }[];
   /** ISO 8601, UTC. What day the record thinks it is, which is not always what day the reader does. */
   now: string;
   /* OPTIONAL, because a host older than the session register answers without them. */
@@ -135,8 +136,12 @@ export type Boot = {
     nav: { section: string; order: number; tabs?: true } | null;
     icon: string | null;
     list?: string | null;
-    /** `updated_at`, when that row last changed, picks the rail's five; absent from a host older than it. */
-    about?: { register: string; seq: number | null; updated_at?: string } | null;
+    /**
+     * `updated_at`, when that row last changed, picks the rail's five. `hue` is the row's frozen colour, the whole degree
+     * its list's `identity.accent` holds, `null` for a row that holds none and absent where the list names no accent.
+     * Each is absent from a host older than it.
+     */
+    about?: { register: string; seq: number | null; updated_at?: string; hue?: number | null } | null;
   }[];
   /**
    * How many questions wait on a person, how many arrivals wait in the inbox, and how many ever arrived: `null` when the

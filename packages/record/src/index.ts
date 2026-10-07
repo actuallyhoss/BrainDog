@@ -913,7 +913,11 @@ const MUTED_ACTOR = /^rule:[a-z0-9][a-z0-9_.-]{0,119}$/u;
  * record's instant and the reader's is constant, and the reader's own clock ticks.
  */
 export type Boot = {
-  registers: { id: string; name: string; count: number }[];
+  /**
+   * The lists the caller reads, each with its row count and the glyph its declaration names (`icon`), so the rail draws
+   * the list's own mark rather than one the web guesses from its id. `null` for a list that names none.
+   */
+  registers: { id: string; name: string; count: number; icon: string | null }[];
   /** ISO 8601, UTC. The instant the record answered as of. */
   now: string;
   /** The runs that are live now, as `sessionsLive` answers. Empty for a caller who may not read them. */
@@ -966,8 +970,13 @@ export type Boot = {
     nav: { section: string; order: number; tabs?: true } | null;
     icon: string | null;
     list: string | null;
-    /** `updated_at` is when that row last changed, so the rail can draw the rows touched last while tabs keep their order. */
-    about: { register: string; seq: number | null; updated_at: string } | null;
+    /**
+     * `updated_at` is when that row last changed, so the rail can draw the rows touched last while tabs keep their order.
+     * `hue` is the row's own frozen colour, the whole degree its list's `identity.accent` field holds, so a project's
+     * entry in the rail wears the mark its rows wear: `null` when the row holds none, and no key at all when its list
+     * names no accent, which is a list whose rows have no colour to wear.
+     */
+    about: { register: string; seq: number | null; updated_at: string; hue?: number | null } | null;
   }[];
   /**
    * The page Home draws, by slug: the Home page of the use case the record speaks in (`speakingNow`, `home-<use case>`)
@@ -6219,6 +6228,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const speaker = speakingNow(kernel);
     const voiced = speaker === null ? null : `home-${speaker.replace(/^usecase-/u, '')}`;
     const home = voiced !== null && opens.some((page) => page.slug === voiced) ? voiced : opens.some((page) => page.slug === 'home') ? 'home' : null;
+    /* THE HUE A PAGE'S ROW WEARS, read off the field its list names as `identity.accent`, a whole degree or nothing as
+       `markOf` reads it for a row's chip. Only a list that names an accent is read, one row per page made from it, and
+       only a page this caller may open is asked about, so it says nothing of a row she could not read. */
+    const accents = new Map<string, string | null>();
+    const accentOf = (list: string): string | null => {
+      if (!accents.has(list)) {
+        const said = (kernel.register(list) as { identity?: { accent?: unknown } } | undefined)?.identity?.accent;
+        accents.set(list, typeof said === 'string' && said !== '' ? said : null);
+      }
+      return accents.get(list)!;
+    };
+    const hueOf = (about: { register: string; seq: number | null }): number | null => {
+      const field = accentOf(about.register);
+      if (field === null || about.seq === null) return null;
+      const row = kernel.get({ register: about.register, seq: about.seq });
+      const hue = row && Object.hasOwn(row.fields, field) ? row.fields[field] : undefined;
+      return typeof hue === 'number' && Number.isInteger(hue) && hue >= 0 && hue <= 359 ? hue : null;
+    };
     return {
       record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawn } : null,
       ...drawn,
@@ -6246,7 +6273,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
              map copied four keys and dropped the kernel's fifth, so on a large record 72 of 72 rail pages arrived with no
              `about` and the shell drew one entry per project, service and skill where the sample, which has the key,
              draws 15. It names no row the caller cannot read: `seesPage` above already drops a page about one. */
-          about: page.about,
+          about: page.about === null || accentOf(page.about.register) === null ? page.about : { ...page.about, hue: hueOf(page.about) },
         })),
       home,
       counts: {
@@ -6993,13 +7020,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          everything else, and solved outside it, because the solve loads `@braindog/theme` on demand and a read
          transaction held open across an `await` is a snapshot another connection's writes wait behind. */
       const [answer, look] = kernel.transaction(() => {
-        const out: { id: string; name: string; count: number }[] = [];
+        const out: Boot['registers'] = [];
         for (const [id, decl] of kernel.registers()) {
           /* THE FILTER WAS THE CEILING'S, WHICH IS THE WRONG ONE. A register somebody holds `append`
              on is inside their ceiling by construction, so its name and its row count went out to the
              one level whose whole point is that it does not read. */
           if (readable(ctx, id)) continue;
-          out.push({ id, name: decl.name, count: kernel.count(id, whereFor(ctx.wheres, id)) });
+          /* THE GLYPH THE LIST DECLARES, as `icon` is checked at install (`declare.ts`): one the rail can draw by name. */
+          const icon = (decl as { icon?: unknown }).icon;
+          out.push({ id, name: decl.name, count: kernel.count(id, whereFor(ctx.wheres, id)), icon: typeof icon === 'string' && icon !== '' ? icon : null });
         }
         const answered: Omit<Boot, 'theme'> = {
           registers: out,

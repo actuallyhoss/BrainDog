@@ -81,6 +81,28 @@ const LISTED: ReadonlySet<string> = new Set([
 
 const DAY_MS = 86_400_000;
 
+/**
+ * THE PAGES THAT MAY LEAD WITH THE QUESTIONS: Today, which is a record's Home (`home`, or `home-<use case>` as
+ * `homePageOf` in `@braindog/seed` names it), and Decide. Every page is read by the same rule whichever record it is on.
+ */
+const ASKS_FIRST = /^(?:home|today|decide)(?:-[a-z0-9-]+)?$/u;
+
+/** Whether a block is the questions waiting on the reader, which every pack draws as a queue over `governance.open`. */
+const isQueue = (b: BlockResult): boolean => b.kind === 'queue' || b.source === 'governance.open';
+
+/**
+ * WHETHER THE QUESTIONS MAY LEAD THIS PAGE. On Today and Decide they are what the page is for. Everywhere else the page
+ * is about something of its own (Money's cash ahead, a project's work), and a queue the engine moved to the top put
+ * "Waiting on you" over the figures the person opened the page to read: so there the engine never leads with a queue
+ * nor moves one, and it stays where the page's author put it. A page drawn of nothing but questions is Decide whatever it
+ * is called. Only the engine is held to this: the person's own look leads with whatever he picked.
+ */
+export function questionsLead(page: string, blocks: readonly BlockResult[]): boolean {
+  if (ASKS_FIRST.test(page)) return true;
+  const read = blocks.filter((b) => areaOf(b) === 'main' && !STAYS.has(b.kind) && b.drawn !== false);
+  return read.length > 0 && read.every(isQueue);
+}
+
 type Area = 'main' | 'rail';
 const areaOf = (b: { area?: unknown }): Area => (b.area === 'rail' ? 'rail' : 'main');
 const keyOf = (b: BlockResult): string => b.key ?? blockKeyOf(b);
@@ -270,11 +292,14 @@ export function composeLook(input: ComposeInput): LookBody {
   const keys = blocks.map(keyOf);
   const weighed = blocks.map((b) => weigh(b, input));
   const fixedByKind = (i: number): boolean => pinned.has(keys[i]!) || isLeadNote(blocks[i]!) || blocks[i]!.refusals.length > 0;
+  /* A QUEUE ON A PAGE ABOUT SOMETHING ELSE stays where the author put it: it neither leads nor moves up its group. */
+  const asksFirst = questionsLead(input.page, blocks);
+  const keptInPlace = (i: number): boolean => !asksFirst && isQueue(blocks[i]!);
 
   /* THE LEAD. */
   let leadAt = -1;
   blocks.forEach((b, i) => {
-    if (areaOf(b) !== 'main' || STAYS.has(b.kind) || pinned.has(keys[i]!) || weighed[i]!.rank < RANK.changed) return;
+    if (areaOf(b) !== 'main' || STAYS.has(b.kind) || pinned.has(keys[i]!) || keptInPlace(i) || weighed[i]!.rank < RANK.changed) return;
     if (leadAt === -1 || weighed[i]!.rank > weighed[leadAt]!.rank) leadAt = i;
   });
   if (leadAt !== -1) {
@@ -310,7 +335,7 @@ export function composeLook(input: ComposeInput): LookBody {
   const groupOf = groupsOf(blocks);
   const groups: number[][] = [...new Set(groupOf)].map((g) =>
     blocks.flatMap((b, i) => {
-      const movable = !STAYS.has(b.kind) && !pinned.has(keys[i]!) && i !== leadAt && !hidden.has(keys[i]!) && b.drawn !== false;
+      const movable = !STAYS.has(b.kind) && !pinned.has(keys[i]!) && !keptInPlace(i) && i !== leadAt && !hidden.has(keys[i]!) && b.drawn !== false;
       return groupOf[i] === g && movable ? [i] : [];
     }),
   );
@@ -401,13 +426,16 @@ export function applyLook(blocks: readonly BlockResult[], look: LookBody): { blo
   });
   const pinned = (look.pinned ?? []).filter((k) => at.has(k));
   const pins = new Set(pinned);
-  const asked = look.lead !== undefined && at.has(look.lead) ? look.lead : undefined;
+  /* THE ENGINE'S LOOK NEVER LEADS WITH A QUEUE, NOR MOVES ONE, on a page that is about something else (`questionsLead`):
+     a look Slash wrote is held to it here, as the rules hold themselves. The person's own look is his. */
+  const kept = (k: string): boolean => look.by !== 'owner' && isQueue(blocks[at.get(k)!]!) && !questionsLead(look.look, blocks);
+  const asked = look.lead !== undefined && at.has(look.lead) && !kept(look.lead) ? look.lead : undefined;
 
   /* ORDER, A GROUP AT A TIME: the blocks between two headings in one column, as the rules order them. Named across two
      groups, each block keeps its own heading and takes its place among the others named under it, so a look can never
      carry a block out from under "Bills" into "Today". A heading is no block a look moves. */
   const groupOf = groupsOf(blocks);
-  const order = unique(look.order ?? []).filter((k) => at.has(k) && blocks[at.get(k)!]!.kind !== 'section' && (look.by === 'owner' || !pins.has(k)));
+  const order = unique(look.order ?? []).filter((k) => at.has(k) && blocks[at.get(k)!]!.kind !== 'section' && (look.by === 'owner' || !pins.has(k)) && !kept(k));
   const named = new Set(order);
   let out = [...blocks];
   for (const group of new Set(groupOf)) {

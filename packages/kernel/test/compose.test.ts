@@ -109,7 +109,8 @@ test('LATE BEATS NEEDS-YOU BEATS CHANGED BEATS FIGURES, inside a group, and the 
     block({ kind: 'table', source: 'register.tasks', heading: 'Now', rows: [row('tasks', 7, { what: 'Pay HSBC', by: '2026-10-03' })], matched: 1 }),
   );
   const [, cash, changed, needs, late] = keysOf(blocks);
-  const look = composeLook(input(blocks));
+  /* TODAY, WHERE THE QUESTIONS MAY MOVE UP: on a page about something else a queue stays put (below). */
+  const look = composeLook(input(blocks, { page: 'home' }));
   assert.equal(look.lead, late, 'the late block leads the page');
   assert.deepEqual(look.order, [needs, changed, cash], 'the rest of its group, most pressing first; the lead is placed on its own');
   assert.deepEqual(look.next, { row: 'tasks#7', text: 'Pay HSBC is 3 days late' }, 'the next action names the row, in words');
@@ -124,9 +125,12 @@ test('A DONE ROW IS NOT LATE, AND WITH NOTHING LATE THE FIRST QUESTION WAITING I
     block({ kind: 'table', source: 'register.tasks', heading: 'Now', rows: [row('tasks', 2, { what: 'Old', by: '2026-09-01' }, undefined, 'done')], matched: 1 }),
     block({ kind: 'queue', source: 'governance.open', heading: 'Needs you', matched: 1, queue: [{ id: 'SG3', question: 'Keep the Kiln page?', options: [] } as never] }),
   );
-  const look = composeLook(input(blocks));
+  const look = composeLook(input(blocks, { page: 'home-business' }));
   assert.deepEqual(look.next, { row: 'SG3', text: 'Keep the Kiln page?' });
-  assert.equal(look.lead, keysOf(blocks)[1]);
+  assert.equal(look.lead, keysOf(blocks)[1], 'on Today the question leads');
+  const elsewhere = composeLook(input(blocks));
+  assert.deepEqual(elsewhere.next, { row: 'SG3', text: 'Keep the Kiln page?' }, 'and on any page it is still the next action');
+  assert.equal(elsewhere.lead, undefined, 'but it leads no page about something else');
 });
 
 test('A DEADLINE ACROSS THE LISTS IS LATE BY ITS DAY, and the oldest late row is the one named', () => {
@@ -241,7 +245,7 @@ test('A BLOCK THAT ALREADY LEADS STAYS UNDER ITS HEADING, which is not left stan
     block({ kind: 'table', source: 'register.tasks', heading: 'Now', rows: [row('tasks', 1, { what: 'Write' })], matched: 1 }),
   );
   const [heading, queue, now] = keysOf(blocks);
-  const led = applyLook(blocks, composeLook(input(blocks)));
+  const led = applyLook(blocks, composeLook(input(blocks, { page: 'decide' })));
   assert.equal(led.look.lead, queue);
   assert.deepEqual(keysOf(led.blocks), [heading, queue, now]);
   assert.deepEqual(led.blocks.map((b) => b.drawn), [undefined, undefined, undefined]);
@@ -363,4 +367,65 @@ test('AN ORDER STAYS UNDER ITS HEADINGS: a block named across two groups keeps i
   const headed = applyLook(blocks, { look: 'desk', basis: 'x', by: 'owner', order: [bills!, today!, c!] });
   assert.deepEqual(keysOf(headed.blocks), keysOf(blocks), 'a heading is no block an order moves');
   assert.deepEqual(headed.look.order, [c]);
+});
+
+/* ── a queue leads only Today and Decide ─────────────────────────────────── */
+
+/* MONEY'S SHAPE: its sentence, the cash ahead, then what is waiting on the reader about money, then the accounts. */
+const moneyPage = (): BlockResult[] =>
+  keyed(
+    block({ kind: 'note', lead: true, body: 'Cash is £33,850 across 2 accounts' }),
+    block({ kind: 'forecast', source: 'forecast.runway', heading: 'Cash ahead' }),
+    block({
+      kind: 'queue',
+      source: 'governance.open',
+      heading: 'Waiting on you',
+      matched: 1,
+      queue: [{ id: 'SG4', question: 'Let it read the bank texts?', options: [] } as never],
+    }),
+    block({ kind: 'split', heading: 'Accounts', readings: [{ metric: 'cash-by-account', reading: { value: 3_385_000, unit: 'GBP', rows: 2 } as never }] }),
+  );
+
+test('A QUEUE NEVER LEADS A PAGE ABOUT SOMETHING ELSE: Money keeps its cash ahead on top, and the question where its author put it', () => {
+  const blocks = moneyPage();
+  const [sentence, ahead, waiting, accounts] = keysOf(blocks);
+  const look = composeLook(input(blocks, { page: 'money' }));
+  assert.equal(look.lead, undefined, 'the question waits on the reader, and still does not lead Money');
+  assert.equal(look.order, undefined, 'nor does it move up its group over the figures');
+  assert.deepEqual(look.next, { row: 'SG4', text: 'Let it read the bank texts?' }, 'it is still the one next action');
+  assert.deepEqual(keysOf(applyLook(blocks, look).blocks), [sentence, ahead, waiting, accounts]);
+
+  /* SOMETHING LATE STILL LEADS, AROUND THE QUEUE: the queue keeps its place while the late list takes the top. */
+  const late = keyed(...blocks, block({ kind: 'table', source: 'register.tasks', heading: 'Due', rows: [row('tasks', 3, { what: 'Pay rent', by: '2026-10-02' })], matched: 1 }));
+  const due = keysOf(late)[4];
+  const led = composeLook(input(late, { page: 'money' }));
+  assert.equal(led.lead, due);
+  assert.deepEqual(keysOf(applyLook(late, led).blocks), [sentence, due, ahead, waiting, accounts]);
+});
+
+test('A LOOK SLASH WROTE IS HELD TO IT TOO, and the person\'s own look leads with whatever he picked', () => {
+  const blocks = moneyPage();
+  const [sentence, ahead, waiting, accounts] = keysOf(blocks);
+  const slash = applyLook(blocks, { look: 'money', basis: 'x', by: 'slash', lead: waiting!, order: [waiting!, ahead!] });
+  assert.equal(slash.look.lead, undefined, 'Slash named the queue to lead Money, and it does not');
+  assert.deepEqual(slash.look.order, [ahead], 'nor to move up: the order keeps the rest of what it named');
+  assert.deepEqual(keysOf(slash.blocks), [sentence, ahead, waiting, accounts]);
+
+  const his = applyLook(blocks, { look: 'money', basis: 'x', by: 'owner', lead: waiting! });
+  assert.equal(his.look.lead, waiting, 'his pick stands');
+  assert.deepEqual(keysOf(his.blocks), [sentence, waiting, ahead, accounts]);
+});
+
+test('TODAY AND DECIDE MAY LEAD WITH THE QUESTIONS, and so may a page drawn of nothing but questions', () => {
+  const blocks = moneyPage();
+  const waiting = keysOf(blocks)[2];
+  for (const page of ['home', 'home-business', 'decide']) assert.equal(composeLook(input(blocks, { page })).lead, waiting, page);
+  assert.equal(applyLook(blocks, { look: 'home-founder', basis: 'x', by: 'slash', lead: waiting! }).look.lead, waiting);
+
+  const asks = keyed(
+    block({ kind: 'note', lead: true, body: '2 questions' }),
+    block({ kind: 'table', source: 'register.notes', heading: 'Nothing', drawn: false }),
+    block({ kind: 'queue', source: 'governance.open', heading: 'Agents', matched: 1, queue: [{ id: 'SG1', question: 'Merge the two Sams?', options: [] } as never] }),
+  );
+  assert.equal(composeLook(input(asks, { page: 'asks' })).lead, keysOf(asks)[2]);
 });
