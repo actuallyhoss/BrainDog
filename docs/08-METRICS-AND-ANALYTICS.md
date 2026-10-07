@@ -42,7 +42,7 @@ compare: previous            # the same window, immediately before
 | `source` | a register, **or `series.<id>`**, a time series written by a connector ([25-CONNECTORS](25-CONNECTORS.md) §8), or `forecast.runway`, the cash walk ahead (§2.7) | yes |
 | `where` | the one grammar | no (defaults to everything) |
 | `value` | an aggregation, or a **ratio** — see below. Over a `series.<id>` the legal set is `last · sum · avg · delta · min · max · trend` *(an earlier draft omitted `trend`, the one aggregation that is series-only)* | yes |
-| `format` | `money` · `money.<CUR>` · `int` · `decimal` · `pct` · `days` · `duration` · `day` (a figure that is a day: the `min` or `max` of a `day` field, kept as whole days since 1970 and drawn as `11 Sep`). `money` names no currency and is what a pack writes (§2.7); `money.<CUR>` is still read | yes |
+| `format` | `money` · `money.<CUR>` · `int` · `decimal` · `pct` · `days` · `duration` · `day` (a figure that is a day: the `min` or `max` of a `day` field, or the day a `zero_on` walk goes under (§2.7), kept as whole days since 1970 and drawn as `11 Sep`). `money` names no currency and is what a pack writes (§2.7); `money.<CUR>` is still read | yes |
 | `target` | what good looks like | **yes** |
 | `window` | over what period. For a register source it is the **comparison shift** — `compare` re-evaluates with `asOf = now − W`; for a `series.<id>` source it is the `at` filter ([45-SPEC-RECORD](45-SPEC-RECORD.md) §13 #3) | **yes** |
 | `compare` | `previous` · `year_ago` · `none` | no (default `previous`) |
@@ -53,7 +53,7 @@ compare: previous            # the same window, immediately before
 | `home` | a whole number from 1 to 9: the figure's place among the record's Home figures, lowest first; the `figures.home` page source draws the first of them ([06-PAGES](06-PAGES.md) §1.1 says how many) | no |
 | `sellable` | `true`: the figure is offered to a forecast's sell control, as something that could be turned into cash | no |
 | `legs` | the lists a `forecast.runway` figure walks, each as a forecast block's `from` names one (§2.7) | with `forecast.runway` only |
-| `opening` | `{ metric: <id> }`: what a `days_to_zero` walk starts from (§2.7) | with `walk: days_to_zero` only |
+| `opening` | `{ metric: <id> }`: what a `days_to_zero` or `zero_on` walk starts from (§2.7) | with `walk: days_to_zero` or `zero_on` only |
 
 The evaluator is one synchronous function in `record` — `evaluateMetric(decl, ctx, kernel, sql)`,
 [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.8 — called by `metric(id)`, by a page's `stat` cells and by the
@@ -383,11 +383,11 @@ compare: none
 
 | | |
 |---|---|
-| **`walk`** | `in`, the money arriving; `out`, the money leaving, as a positive amount; `net`, the two together, signed; `days_to_zero`, the days until the balance goes under |
-| **`within`** | how far ahead, `30d`, `4w` or `3m`; required, except that `days_to_zero` looks a year ahead without one |
+| **`walk`** | `in`, the money arriving; `out`, the money leaving, as a positive amount; `net`, the two together, signed; `days_to_zero`, the days until the balance goes under; `zero_on`, the day it first goes under, held as whole days since 1970 and declared `format: day`, so a tile can say "Runs out 30 Oct" where a count of days goes stale by the next morning. No other walk may declare `format: day`, and a `zero_on` figure declares no other |
+| **`within`** | how far ahead, `30d`, `4w` or `3m`; required, except that `days_to_zero` and `zero_on` look a year ahead without one |
 | **`legs`** | exactly what a forecast block's `from` names ([06-PAGES](06-PAGES.md)), walked by the same `runway` in `packages/kernel/src/forecast.ts`, so a tile and the forecast beside it add up the same movements. An overdue movement is in it, clamped to today |
-| **`opening`** | `{ metric: <id> }`, required by `days_to_zero` and refused elsewhere: the figure of what is held now that the walk starts from. It is never itself a walk. With no crossing inside the span the figure has no value |
-| **Currencies** | converted into the home currency as the walk converts them; with no way to add them, one amount per currency in `parts`, and `days_to_zero` has no value |
+| **`opening`** | `{ metric: <id> }`, required by `days_to_zero` and `zero_on` and refused elsewhere: the figure of what is held now that the walk starts from. It is never itself a walk. With no crossing inside the span the figure has no value, `zero_on` as much as `days_to_zero` |
+| **Currencies** | converted into the home currency as the walk converts them; with no way to add them, one amount per currency in `parts`, and `days_to_zero` and `zero_on` have no value |
 | **Money left out** | a leg the walk cannot read in full (an unreadable day, a cycle with no factor, the recurrence cap) refuses the figure with the walk's own sentence, because one number has no room for the list the forecast block draws |
 | **Keys it refuses** | `where`, `group_by` and `bucket`: each leg says which rows it reads. A figure over a list refuses `legs` and `opening` |
 

@@ -451,8 +451,8 @@ one declared, non-derived, non-`secret`, non-`file` field · `{ move: value }` �
 | `name` | text ≤ 60 | no | the id | — |
 | `source` | `register.<Id>` · `series.<Id>` · `forecast.runway` · `*` | yes | — | — |
 | `where` | predicate on the source register; on `*` and `series.*`, kernel fields only | no | every row | — |
-| `value` | an aggregation `{ agg: operand }`, a combinator `{ ratio: { of: agg, per: agg } } \| { diff: [agg, agg] } \| { product: [agg, agg] }`, or `{ running: agg, from: Json \| { field: Id }, stop?: { lt \| gt \| lte \| gte: number } }`; over a register, `{ rolled: { balance, as_of, checks?, moves } }`; over `forecast.runway`, `{ walk: in \| out \| net \| days_to_zero, within? }` | yes | — | `agg ∈ sum count avg min max delta median distinct last running trend` · `series` source: `last sum avg delta min max trend` |
-| `format` | — | yes | — | `money` `money.<Cur>` `int` `decimal` `pct` `days` `duration` `day` |
+| `value` | an aggregation `{ agg: operand }`, a combinator `{ ratio: { of: agg, per: agg } } \| { diff: [agg, agg] } \| { product: [agg, agg] }`, or `{ running: agg, from: Json \| { field: Id }, stop?: { lt \| gt \| lte \| gte: number } }`; over a register, `{ rolled: { balance, as_of, checks?, moves } }`; over `forecast.runway`, `{ walk: in \| out \| net \| days_to_zero \| zero_on, within? }` | yes | — | `agg ∈ sum count avg min max delta median distinct last running trend` · `series` source: `last sum avg delta min max trend` |
+| `format` | — | yes | — | `money` `money.<Cur>` `int` `decimal` `pct` `days` `duration` `day`; `day` is the earliest or latest of a day field or `walk: zero_on`, and `walk: zero_on` takes `day` and no other |
 | `target` | `{ lte \| gte \| lt \| gt \| eq: number \| money }` | **yes** | — | — |
 | `window` | `Window` | **yes** | — | — |
 | `compare` | — | no | `previous` | `previous year_ago none` |
@@ -464,7 +464,7 @@ one declared, non-derived, non-`secret`, non-`file` field · `{ move: value }` �
 | `home` | whole number 1 to 9, its place among the Home figures | no | none | none |
 | `sellable` | `true` | no | absent | none |
 | `legs` | 1 to 12 forecast legs, as a forecast block's `from` | with `forecast.runway` only | none | none |
-| `opening` | `{ metric: Id }` | with `walk: days_to_zero` only | none | none |
+| `opening` | `{ metric: Id }` | with `walk: days_to_zero` or `zero_on` only | none | none |
 
 An **operand** is a field id, `id` (rows), or a row-level `{ product: [a, b] } \| { diff: [a, b] }` where `a`/`b` is a
 field id or `{ lookup: Id, by: Id, as_of?: Id }`. Depth one in either direction; a `where` or `source` key inside an

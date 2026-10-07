@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SESSION_BODY } from '../src/migrations/0022_session_client.ts';
+import { SESSION_BODY } from '../src/migrations/0026_session_started.ts';
 import {
   KERNEL_WRITTEN,
   isStale,
@@ -285,11 +285,11 @@ test('UNIQUE NAMES THE ROW: a second run with the same client id is ALREADY_KNOW
 
 test('THE KERNEL-WRITTEN FIELDS are refused from a person and from a run alike', async () => {
   const { k, sql } = await record();
-  assert.deepEqual([...KERNEL_WRITTEN], ['last_seen', 'project', 'token_id']);
+  assert.deepEqual([...KERNEL_WRITTEN], ['last_seen', 'project', 'token_id', 'started']);
   value(k.create('session', { doing: 'Mine' }, { actor: 'p_owner' }));
 
   for (const key of KERNEL_WRITTEN) {
-    const said = key === 'last_seen' ? iso(NOW) : 'x';
+    const said = key === 'last_seen' || key === 'started' ? iso(NOW) : 'x';
     for (const out of [
       k.create('session', { doing: 'Another', [key]: said }, { actor: 'p_owner' }),
       k.update('session', 'S1', { [key]: said }, { actor: 'p_owner' }),

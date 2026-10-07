@@ -9,7 +9,7 @@ Derives from [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §1–§7, [34-GRAM
 ## 1 · Purpose and boundary
 
 **Does.** Takes a `document` string in the dialect of 34 §2 and returns segments (`parse`) or HTML (`toHTML`).
-Draws the thirty-eight kinds over the eight primitives. Resolves `{{path}}` through a function the caller supplies.
+Draws the thirty-nine kinds over the eight primitives. Resolves `{{path}}` through a function the caller supplies.
 Formats money, dates, quantities and references one way. Never renders nothing: a malformed block becomes a
 visible fence with one line above it (05 §3 invariant 1).
 
@@ -42,7 +42,7 @@ export function render(markdown: string, opts?: RenderOptions): string;      // 
 
 export const PRIMITIVES_VERSION: 1;
 export const PRIMITIVES: readonly ['panel', 'grid', 'rows', 'proportional', 'inline', 'list', 'table', 'media'];
-export const KINDS: Readonly<Record<Kind, KindSpec>>;                          // thirty-eight entries, §4
+export const KINDS: Readonly<Record<Kind, KindSpec>>;                          // thirty-nine entries, §4
 export function diffRows(before: string, after: string): string[];           // a `diff` fence's rows, §5.9
 
 export type { Segment, Markdown, Block, Degraded, Row, Inline, Kind, KindSpec, Primitive,
@@ -67,7 +67,7 @@ type LinkRef =
 | `parse` | fence scan, row split, tone, arity, inline tokens | never throws; every string yields a `Segment[]` (fuzz-tested, §9) |
 | `toHTML` | resolves, formats, escapes, emits | throws nothing of its own; an exception from `opts.resolve` or `opts.link` propagates — the host owns them |
 | `render` | `toHTML(parse(s), opts)` | as above |
-| `KINDS` | the thirty-eight kinds as data | — |
+| `KINDS` | the thirty-nine kinds as data | — |
 | `diffRows` | two texts as `- `, `+ ` and two-space rows, by a longest-common-run line diff over what differs between their shared head and tail | never throws; past 250,000 cells the changed middle is drawn as taken out and put back whole |
 | `PRIMITIVES` | the eight primitive names, in 05 §1 order | — |
 | `PRIMITIVES_VERSION` | `1` at stage 0 (31 §6) | — |
@@ -136,7 +136,7 @@ interface KindSpec {
 }
 ```
 
-`KINDS`, thirty-eight, counted:
+`KINDS`, thirty-nine, counted:
 
 | Kind | Primitive | Cells, in order | Arity | Tone | Row cap | Flags |
 |---|---|---|---|---|---|---|
@@ -174,6 +174,7 @@ interface KindSpec {
 | `queue` | list | a row per part: `q · id · who · when · question · why · cost`, `opt · id · key · label · because · recommended`, `more · n` | 7 | yes | none | pageOnly |
 | `capture` | panel | a row per part: `into · register · label · where` once and first, `set · field · value` for each value a new row inherits | 4 | no | none | pageOnly; the heading is the field's prompt and never a caption; the field and its Add only with the Svelte `Block`'s `oncapture`, and without it the list's name, a link where `where` is a path |
 | `calendar` | list | title · day (`YYYY-MM-DD`, an instant, or `D Mon YYYY`) | 2 | yes | none | every month from the first row's to the last row's as a table of weeks, Monday first, over `days.ts`'s `monthGrid`, each day naming three rows and counting the rest, then an agenda of every day that holds anything; a row whose day does not read is named under it |
+| `lanes` | list | title · start · end (optional; none is a lane still going), each an instant with its offset or a bare day; or, first and once, `window · from · to · now` | 4 | yes | none | one lane a row, its span placed between the two ends of a window of time with a line where now falls, over `lanes.ts`'s `lanesPlan`; with no window row the window is the rows' own first start to last end, reaching `RenderOptions.now` while one is still going; a lane keeps its own ends and is drawn only where it is inside the window; a row whose times do not read, or that falls outside the window, is named under the drawing; a window that does not read degrades |
 | `link` | list | title · url · note (optional) | 3 | no | none | the url `https:`, `mailto:` or a path of this BrainDog, anything else degrades; the host under the title, nothing fetched |
 | `gallery` | grid | caption · file (`file:<list>#<seq>/<field>` or a file's name) | 2 | no | none | a picture only through `RenderOptions.file` and only at a path of the host's own |
 | `embed` | panel | url · title · aspect (the last two optional) | 3 | no | 1 | pageOnly; the url one of `EMBED_PROVIDERS`, framed at the provider's own embed address; a facade in both drawers, and the frame only after the Svelte drawer's Load is pressed |
@@ -211,7 +212,7 @@ type Inline =
 Invariants, each a test in §9:
 
 1. Every non-blank input line belongs to exactly one segment. `Degraded.source` is the block's lines verbatim, both fences included.
-2. `Block.kind` is one of the thirty-eight and is never `table`; it is `cards`, `section` or `feed` only when `parse` was called with `{ page: true }`.
+2. `Block.kind` is one of the thirty-nine and is never `table`; it is `cards`, `section` or `feed` only when `parse` was called with `{ page: true }`.
 3. For a split kind, `Row.cells.length ≤ KINDS[kind].cells.length`; for `comparison`, ≤ the header row's count.
 4. `Row.tone === 'hole'` only when `Block.kind === 'bar'`.
 5. `Block.rows.length ≤ KINDS[kind].rows` where a cap is set.

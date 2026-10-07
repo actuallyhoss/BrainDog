@@ -23,7 +23,7 @@ import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, type Predicate } from 
 
 import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, looksLikeCredential, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
-import { SESSION_BODY } from './migrations/0022_session_client.ts';
+import { SESSION_BODY } from './migrations/0026_session_started.ts';
 import { checkInterval, intervalMs, type PullDecl } from './pull.ts';
 /* A SCHEDULED ACTION'S KEY AND CLOCK, read by the runner from the same lists this file checks against. */
 import { ACTION_AUTH_KINDS, reservedKeyHeader } from './actions.ts';

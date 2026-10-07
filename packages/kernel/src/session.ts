@@ -23,13 +23,13 @@ import type { Sql } from '@braindog/ports';
 
 import type { Json } from './coerce.ts';
 import type { Declaration } from './declare.ts';
-import { SESSION_BODY } from './migrations/0022_session_client.ts';
+import { SESSION_BODY } from './migrations/0026_session_started.ts';
 
 /** The register's id. */
 export const SESSION = 'session';
 
 /**
- * The kernel's declaration, parsed from the bytes of the newest migration that seats it, 22, so that there is one copy
+ * The kernel's declaration, parsed from the bytes of the newest migration that seats it, 26, so that there is one copy
  * of it.
  *
  * The id is read out of the body rather than written here: this is an envelope around the row the
@@ -37,7 +37,8 @@ export const SESSION = 'session';
  *
  * THE NEWEST, NOT THE FIRST. Migration 2's body lacks the app a run is in and three kinds of agent, so every default
  * read from it (`RUNS`, the kinds `agentOf` takes, a page's fields) described a register no record holds any more, and
- * installing it over a record that had run migration 22 wrote migration 2's body back as a newer version.
+ * installing it over a record that had run migration 22 wrote migration 2's body back as a newer version. Migration
+ * 22's lacks when a run started, for which the same holds.
  */
 export function sessionDeclaration(): Declaration {
   const body = JSON.parse(SESSION_BODY) as Record<string, Json>;
@@ -63,9 +64,9 @@ const KINDS: readonly string[] =
 
 /**
  * The fields only the record writes: when the run was last heard from, the project it resolved to,
- * and the token that opened it. A caller's patch naming one is refused `IMMUTABLE_FIELD`.
+ * the token that opened it, and when it started. A caller's patch naming one is refused `IMMUTABLE_FIELD`.
  */
-export const KERNEL_WRITTEN: readonly string[] = ['last_seen', 'project', 'token_id'];
+export const KERNEL_WRITTEN: readonly string[] = ['last_seen', 'project', 'token_id', 'started'];
 
 /**
  * A run not heard from in 45 minutes is stale: the ladder no longer adopts it for a write that names no run. Worked out
@@ -323,6 +324,24 @@ export type RunRegister = { has: (field: string) => boolean; kinds: readonly str
 const DECLARED_FIELDS = new Set((DECLARED.fields as { id: string }[]).map((f) => f.id));
 /** The kernel's own register, for a caller that has no live declaration to hand. */
 export const RUNS: RunRegister = { has: (field) => DECLARED_FIELDS.has(field), kinds: KINDS };
+
+/**
+ * What a run's row is stamped with as it is made, `now` being the instant the row is created at: when the run started,
+ * where the register keeps that.
+ *
+ * ONCE, AND NEVER MOVED. It is written only as the row is made, by the ladder's run and by one a person makes by hand
+ * alike, and `started` is one of `KERNEL_WRITTEN`, so no later write names it: a run that goes quiet, is written off by
+ * the sweep and re-attaches the next day is the same run, started when it first was. `last_seen` is the other end, and
+ * the two are what draws a run as a span of time. A run made before the field has its row's `created_at`, which is
+ * this same instant (migration 26).
+ *
+ * A START THE RECORD'S OWN STAMP ALREADY CARRIES IS LEFT AS IT IS, so the caller asks only where the row has none: a
+ * sample's runs are planted through `stamp` with the hours they are meant to span, and stamping the clock over that
+ * would start every one of them at the moment the sample was written.
+ */
+export function begun(now: string, register: RunRegister = RUNS): Record<string, Json> {
+  return register.has('started') ? { started: now } : {};
+}
 
 /**
  * The fields a run opened by the ladder starts with: every hint but its name, that the register declares a field for,

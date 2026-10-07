@@ -36,7 +36,7 @@
 import type { Refusal, Sql } from '@braindog/ports';
 
 import { FORMAT_VERSION, execScript } from './migrate.ts';
-import { SEAT_SESSION } from './migrations/0022_session_client.ts';
+import { SEAT_SESSION } from './migrations/0026_session_started.ts';
 import { RENAME_SLASH } from './migrations/0016_slash.ts';
 
 export type Section = 'header' | 'data' | 'origin' | 'governance' | 'local';

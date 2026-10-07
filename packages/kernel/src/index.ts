@@ -234,6 +234,7 @@ import {
   REVIVED,
   SESSION,
   agentOf as runAgentOf,
+  begun,
   clipTitle,
   findSession,
   isRunName,
@@ -3799,6 +3800,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          person's, and any key could name it. */
       if (register === SESSION && !current && w.principal?.kind === 'token' && w.principal.token !== undefined)
         merged.token_id = w.principal.token;
+      /* AND WHEN IT BEGAN, once, unless the record's own stamp already says (the seed plants its example runs so). */
+      if (register === SESSION && !current && merged.started === undefined) Object.assign(merged, begun(now, runRegister()));
       /* A RUN WRITTEN BY HAND IS PLACED BY WHERE IT SAYS IT WORKED, as one the ladder opens is: an import or a person
          carrying a run over from somewhere else names its repository and folder, and the record finds its project. A key's
          run is placed by the ladder, and a stamped project is the ladder's. */

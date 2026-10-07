@@ -161,7 +161,7 @@ the table.
 | `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool (**specified and not built**: no evaluator reads it, and a row that has somewhere to go is already a link in whole), tone_when? (**specified and not built**: no evaluator reads it, and a row's tone comes from its register's state field, not from its block), as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark \| next \| reply \| hue \| picture`, one figure and at most three facts. `picture` names a `file` field and leads the card with it, the row carrying the stored `{ sha256, mime, bytes, name }`; `hue` names an `int` field, 0 to 359, drawn only on the card's mark. Either over a field of another type is refused at read, naming the fields that are. A column's `label` is filled as a heading is, its `{{path}}`s answered in `values`. `next` names a field of the list whose rows are steps of the cards' rows (`steps:` on that list), and the block answers `nexts`, aligned with `rows`: that field of the first step under each card that is not done, in the order the steps declare, `null` for a card with no open step. `reply` is a field drawn under the card's title in a quieter voice, the second opinion under a note. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere. The block answers `scopes`, those names aligned with `rows`, and `scope_marks` beside them: `{ mark, hue }` of the project, read from the fields its list names in `identity:` (either `null` when the project holds none), or `null` for a row that applies everywhere. `sign: { field, minus }` on a money column writes each figure with `+` or `−`, `−` where the enum `field` holds `minus`: a word on the figure, never a colour. A column whose `field` is `changed`, on a register with no field of that name, says who changed the row last and the day, from its history. | — | `table`, `cards` |
 | `inherit` | bool. On a block over a register with a scope field ([02-DATA-MODEL](02-DATA-MODEL.md) §5), the rows of the project its `where` names, then the rows that apply everywhere. A project's row hides a global row of the same title where the field says `same: nearer`; otherwise both show. The project is named in `where` as `project is {{name}}` | `false` | no |
 | `order` | `[{ field, dir: asc \| desc }]` | the first indexed date descending, else `seq` descending ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5) | no |
-| `limit` | int. A `calendar` takes none (it draws every row in its months, at most 500); a `gallery` at most 24 | 50, at most 500 | no |
+| `limit` | int. A `calendar` takes none (it draws every row in its months, at most 500), nor does a `lanes` (every lane in its window, at most 200); a `gallery` at most 24 | 50, at most 500 | no |
 | `empty` | text, interpolatable | — | **yes, on every block with a `source`** |
 | `cells` | `[{ metric, label, trend?, note? }]`. `note` is the line under the figure in place of its target, and may name other figures as `{{id}}`; `N thing(s)` after a figure is said `1 thing` or `2 things` | — | `stat` |
 | `series` | 1–4 of `{ metric, then?, each?, label?, dir?: in \| out }`. On a `series`, each line is a metric grouped by a date and a bucket, every line the same bucket and one currency; `then` names the metric that answers the buckets after the current one (money due, where `metric` is money paid); `each`, on a series by month, names an ungrouped monthly figure added to every month after the current one (what repeats, at its monthly share), so a repeating bill is in every month ahead rather than only the one its next due day falls in. `in` stands on the zero rule, `out` hangs under it | — | `series` |
@@ -178,6 +178,8 @@ the table.
 | `headline` | `under`. On a `forecast`, the page's opening line already says when the money runs out, so the sentence over the chart is left off and the flag on the crossing stays. The record answers it only while a lead `note` on the page is drawn | absent | no |
 | `unset` | text. On a `bar` or `split`, the label of a last row holding what no part does (rows with no value in the grouped field, or the figure less its parts), linked to those rows; absent, those rows are not drawn apart | not drawn apart | no |
 | `tone` | intent | — | no |
+| `hours` | int, 1 to 168. On a `lanes`, how many hours back from now it shows | `24` | no |
+| `tones` | `{ <value>: good \| warn \| bad \| info }`, such as `{ off_track: bad }`. On a `bar` or `split`, the tone of a part by the value it groups; on a `cards`, of a card by its title's value; on a `lanes`, of a lane by the value of its fourth column, and refused where the lanes name three. A value it does not name is neutral | — | no |
 | `body` | markdown in the dialect | — | `note` |
 | `icon` | a glyph name, drawn beside a `section`'s heading | — | no |
 | `fold` | bool. A `section` that starts shut, folding the blocks after it up to the next section; one press opens it | `false` | no |
@@ -240,6 +242,18 @@ the record holds none, and a list a written-out file names is one of the block's
 (`packages/kernel/src/kinds/embed.ts`), and any other is refused at install naming them, without repeating the
 address. A `roadmap` over a list names two or three columns: the title, the day each row is due by and its
 effort in days, the effort optional. With none, one, or more than three it is refused, naming the three.
+
+**Lanes.** A `lanes` over a list names three or four columns, `columns: [title, start, end, tone column?]`: the
+title a text or a choice, the start and the end `instant` fields, and the fourth a choice, a text or a yes or no
+whose value `tones:` turns into a tone. It reads every row that overlaps the last `hours:` hours: started by now,
+and not ended before they open. A row with no end is still going; a row with no start is left out. It answers
+`window: { from, to, now }`, each an instant written in the record's zone, and `lanes`, each
+`{ title, start, end, tone?, href? }` aligned with `rows`, in start order. A lane keeps its own start and end,
+never cut to the window, so a host says "Since Monday" of one that began before it. Now is the as-of instant when
+the read has one. It takes no `limit`, since lanes that drew only the first rows read would show an hour as idle
+that was not: past 200 rows in its hours it is refused `OUT_OF_BOUNDS` with both numbers. Written out, a row is
+`{ cells: [title, start, end, value] }`, the end left empty while it is still going; a start that does not read,
+or an end before its start, is refused.
 
 A `feed` reads `{ source: activity, where: "actor is agent", since: seen, first: 20, empty: … }`: the
 rows are grouped as agents, rules and you, with counts, and a burst is one row, "Claude: 14 saves on

@@ -1026,7 +1026,7 @@ test('A FILE WRITTEN BEFORE MIGRATION 22 LANDS WITH THE REGISTER THAT KEEPS A RU
   /* The file's live kernel row is migration 2's, as a .brain written before 22 carries it, and the target's ledger
      says 22 has run, so the import is the only thing that can seat the newer body. */
   const source = await filled();
-  source.sql.exec("DELETE FROM declaration WHERE id = 'register.session' AND superseded_at IS NULL");
+  source.sql.exec("DELETE FROM declaration WHERE id = 'register.session' AND version > 1");
   source.sql.exec("UPDATE declaration SET superseded_at = NULL WHERE id = 'register.session'");
   const lines = value<string[]>(await source.k.export());
 

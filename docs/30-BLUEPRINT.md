@@ -494,7 +494,7 @@ write(register, id?, patch, ctx)          -- ctx: CallContext, built by the Work
  │                 `counter`; at create under `identity:`, store accent(existingHues) — the INJECTED chooser, the
  │                 kernel computes no hue (ADR-028); materialise a derived field that carries unique: true — THE
  │                 ONLY STORED DERIVATION; touch session.last_seen for the resolved session — a HEARTBEAT, not a
- │                 write: no version bump, no event (41)
+ │                 write: no version bump, no event (41); a session row made here is stamped `started`, once
  ├─ 6b PAIRS       the register's pairs: self-join for this row; mark, never hide
  ├─ 7  PROJECT     entry_fts by rowid — DELETE, then INSERT the declared `search:` text
  ├─ 8  EVENT       one `create` row (field NULL, to_v = JCS of fields), or one `edit` row per changed field;

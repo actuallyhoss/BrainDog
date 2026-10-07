@@ -1,15 +1,18 @@
 /**
  * The kernel's one register, and the spoken prefix that makes its rows `S1`, `S2`.
  *
- * Migrations 2 and 22 write the `register.session` rows by hand, because a migration's text cannot call the code that
+ * Migrations 2, 22 and 26 write the `register.session` rows by hand, because a migration's text cannot call the code that
  * installs declarations. So each row is held here to what `installDeclarations` writes for the same body: the canonical
  * bytes `jcs` makes, the checksum `digest` takes of them, the next version stamped at the instant the one before is
  * superseded, and the indexes `indexesFor` implies. A hand-written copy that drifts from the code path fails here.
  *
- * MIGRATION 2'S ROW IS WORKED OUT FROM THOSE FUNCTIONS, NOT BY INSTALLING. `validate` lets `register.session` through
- * only as the kernel's newest bytes, because migration 2's installed over 22's would write the older body back as a newer
- * version. Migration 22's row is installed by code too, over a record with 22's work taken away, and compared whole.
+ * THE OLDER ROWS ARE WORKED OUT FROM THOSE FUNCTIONS, NOT BY INSTALLING. `validate` lets `register.session` through
+ * only as the kernel's newest bytes, because an older body installed over the newest would be written back as a newer
+ * version. Migration 26's row is installed by code too, over a record with 26's work taken away, and compared whole.
  * `session.test.ts` installs the kernel's own declaration over a record and checks that nothing changes.
+ *
+ * AND WHEN A RUN STARTED, which migration 26 adds: stamped as the run's row is made, never moved, and given to a run
+ * that has none from its own row.
  */
 
 import { test } from 'node:test';
@@ -18,7 +21,8 @@ import assert from 'node:assert/strict';
 import { installDeclarations } from '../src/declare.ts';
 import { execScript } from '../src/migrate.ts';
 import { SESSION_BODY as MIGRATION_2_BODY } from '../src/migrations/0002_session.ts';
-import { SEAT_SESSION, SESSION_BODY } from '../src/migrations/0022_session_client.ts';
+import { SESSION_BODY as MIGRATION_22_BODY } from '../src/migrations/0022_session_client.ts';
+import { SEAT_SESSION, SESSION_BODY } from '../src/migrations/0026_session_started.ts';
 import {
   digest, indexesFor, jcs, openRecord, sessionDeclaration, validateDeclaration,
   type Declaration, type Entry, type Kernel, type SessionHints, type WriteContext,
@@ -27,13 +31,18 @@ import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 11, 12);
 
-/** The instants migrations 2 and 22 seat their versions at; the second is also when the first was superseded. */
+/** The instants migrations 2, 22 and 26 seat their versions at; each is also when the one before was superseded. */
 const DECLARED_2 = '2026-09-11T00:00:00.000Z';
-const SEATED = '2026-10-02T00:00:00.000Z';
+const SEATED_22 = '2026-10-02T00:00:00.000Z';
+const SEATED = '2026-10-07T00:00:00.000Z';
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+const iso = (ms: number): string => new Date(ms).toISOString();
 
-async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
+async function record(): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
   const sql = openSqlite();
-  return { k: await openRecord(sql, fixedClock(NOW)), sql };
+  const clock = fixedClock(NOW);
+  return { k: await openRecord(sql, clock), sql, clock };
 }
 
 const value = <T>(r: unknown): T => {
@@ -78,16 +87,16 @@ const written = async (version: number, body: string, created_at: string, supers
   created_at,
 });
 
-/** Migration 22's work taken away again: the record as migration 21 left it, with migration 2's row the live one. */
-function before22(sql: NodeSql): void {
+/** Migration 26's row taken away again: the register as migration 25 left it, with migration 22's row the live one. */
+function before26(sql: NodeSql): void {
   sql.exec("DELETE FROM declaration WHERE id = 'register.session' AND superseded_at IS NULL");
   sql.exec("UPDATE declaration SET superseded_at = NULL WHERE id = 'register.session' AND superseded_at = ?", SEATED);
 }
 
 /* ── the rows the migrations write ───────────────────────────────────────── */
 
-test('both bodies are canonical, and each is a shape the kernel accepts as a register', () => {
-  for (const body of [MIGRATION_2_BODY, SESSION_BODY]) {
+test('every body is canonical, and each is a shape the kernel accepts as a register', () => {
+  for (const body of [MIGRATION_2_BODY, MIGRATION_22_BODY, SESSION_BODY]) {
     assert.equal(jcs(JSON.parse(body)), body, 'the stored bytes are not the canonical form of themselves');
     /* UNDER ANOTHER NAME, because the arm of `validate` that names `register.session` is about who may declare it and
        which bytes are the kernel's own, not about its shape: everything else a register is checked for is checked. */
@@ -96,56 +105,70 @@ test('both bodies are canonical, and each is a shape the kernel accepts as a reg
   }
 });
 
-test('MIGRATIONS 2 AND 22 WRITE WHAT installDeclarations WRITES: each version in turn, superseded at one instant, and the indexes its body implies', async () => {
+test('MIGRATIONS 2, 22 AND 26 WRITE WHAT installDeclarations WRITES: each version in turn, superseded at one instant, and the indexes its body implies', async () => {
   const { sql } = await record();
-  assert.deepEqual(versions(sql), [await written(1, MIGRATION_2_BODY, DECLARED_2, SEATED), await written(2, SESSION_BODY, SEATED, null)]);
-  /* THE SAME EIGHT INDEXES FOR BOTH BODIES, because neither new field is indexed, so migration 22 builds none. */
+  assert.deepEqual(versions(sql), [
+    await written(1, MIGRATION_2_BODY, DECLARED_2, SEATED_22),
+    await written(2, MIGRATION_22_BODY, SEATED_22, SEATED),
+    await written(3, SESSION_BODY, SEATED, null),
+  ]);
+  /* THE SAME EIGHT INDEXES FOR ALL THREE BODIES, because no field migration 22 or 26 added is indexed, so neither
+     builds one. Eight is the most a list may index, so `started` could not be a ninth. */
   assert.equal(indexes(sql).length, 8);
   assert.deepEqual(indexes(sql), implied(MIGRATION_2_BODY));
+  assert.deepEqual(indexes(sql), implied(MIGRATION_22_BODY));
   assert.deepEqual(indexes(sql), implied(SESSION_BODY));
   sql.close();
 });
 
-test('AND INSTALLED BY CODE, the kernel’s declaration writes what migration 22 wrote, and migration 2’s bytes are no longer the kernel’s', async () => {
+test('AND INSTALLED BY CODE, the kernel’s declaration writes what migration 26 wrote, and the older bytes are no longer the kernel’s', async () => {
   const migrated = await record();
   const byHand = versions(migrated.sql);
   const byHandIndexes = indexes(migrated.sql);
 
-  /* The same record with migration 22's work and the indexes taken away, then the kernel's declaration installed by
-     code at 22's instant. */
+  /* The same record with migration 26's row and the indexes taken away, then the kernel's declaration installed by
+     code at 26's instant. */
   const fresh = await record();
-  before22(fresh.sql);
+  before26(fresh.sql);
   for (const { name } of indexes(fresh.sql)) fresh.sql.exec(`DROP INDEX ${name}`);
   value(await installDeclarations(fresh.sql, Date.parse(SEATED), [sessionDeclaration()], (fn) => fresh.sql.transactionSync(fn)));
   assert.deepEqual(versions(fresh.sql), byHand);
   assert.deepEqual(indexes(fresh.sql), byHandIndexes);
 
-  /* MIGRATION 2'S BYTES ARE REFUSED NOW, even as the kernel's: over 22's they would be the newest version, and every
-     run opened after it would lose its app again. */
-  const older = await installDeclarations(fresh.sql, NOW, [{ ...sessionDeclaration(), body: JSON.parse(MIGRATION_2_BODY) }], (fn) =>
-    fresh.sql.transactionSync(fn),
-  );
-  assert.equal(refusal(older).code, 'PROVIDES_CONFLICT');
-  assert.deepEqual(versions(fresh.sql), byHand, 'migration 2’s bytes were written over 22’s');
+  /* THE OLDER BYTES ARE REFUSED NOW, even as the kernel's: over 26's they would be the newest version, and every run
+     opened after would lose when it started, and under migration 2's its app again. */
+  for (const [was, body] of [['2', MIGRATION_2_BODY], ['22', MIGRATION_22_BODY]] as const) {
+    const older = await installDeclarations(fresh.sql, NOW, [{ ...sessionDeclaration(), body: JSON.parse(body) }], (fn) =>
+      fresh.sql.transactionSync(fn),
+    );
+    assert.equal(refusal(older).code, 'PROVIDES_CONFLICT');
+    assert.deepEqual(versions(fresh.sql), byHand, `migration ${was}’s bytes were written over 26’s`);
+  }
   migrated.sql.close();
   fresh.sql.close();
 });
 
-test('THE SEAT AN IMPORT RUNS writes migration 22’s row where migration 2’s is live, and nothing where it is already', async () => {
+test('THE SEAT AN IMPORT RUNS writes migration 26’s row where an older one is live, and nothing where it is already', async () => {
   const { sql } = await record();
   const seated = versions(sql);
   execScript(sql, SEAT_SESSION);
   assert.deepEqual(versions(sql), seated, 'seating it a second time wrote a version');
 
-  /* A file written before migration 22 carries migration 2's row as the live one. */
-  before22(sql);
+  /* A file written before migration 26 carries migration 22's row as the live one. */
+  before26(sql);
   execScript(sql, SEAT_SESSION);
-  assert.deepEqual(versions(sql), seated, 'the seat did not write what migration 22 writes');
+  assert.deepEqual(versions(sql), seated, 'the seat did not write what migration 26 writes');
+
+  /* One written before migration 22 carries migration 2's, and this body is the version after it. */
+  sql.exec("DELETE FROM declaration WHERE id = 'register.session' AND version > 1");
+  sql.exec("UPDATE declaration SET superseded_at = NULL WHERE id = 'register.session'");
+  execScript(sql, SEAT_SESSION);
+  assert.deepEqual(versions(sql), [{ ...seated[0], superseded_at: SEATED }, { ...seated[2], version: 2 }]);
 
   /* And a file older than migration 2 carries none at all, so this body is its first version. */
   sql.exec("DELETE FROM declaration WHERE id = 'register.session'");
   execScript(sql, SEAT_SESSION);
-  assert.deepEqual(versions(sql), [{ ...seated[1], version: 1 }]);
+  assert.deepEqual(versions(sql), [{ ...seated[2], version: 1 }]);
   sql.close();
 });
 
@@ -190,6 +213,125 @@ test('A RUN KEEPS THE APP IT IS IN and its version, and a Gemini, Copilot or Win
     ],
   );
   assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM observation WHERE kind = 'write.refused'")?.n ?? 0, 0, 'a run failed to open');
+  sql.close();
+});
+
+/* ── when a run started ──────────────────────────────────────────────────── */
+
+/** A run's row as it is stored, since a heartbeat moves no version and a read through the kernel shows only fields. */
+const stored = (sql: NodeSql, seq: number) => ({
+  ...sql.one<{ started: string | null; last_seen: string | null; created_at: string; updated_at: string; version: number; state: string | null }>(
+    `SELECT json_extract(fields, '$.started') AS started, json_extract(fields, '$.last_seen') AS last_seen, created_at, updated_at, version, state
+     FROM entry WHERE register = 'session' AND seq = ?`,
+    seq,
+  )!,
+});
+
+test('A NEW RUN CARRIES WHEN IT STARTED: the instant its row is made, for a run the ladder opens and one made by hand', async () => {
+  const { k, sql, clock } = await record();
+  value(await k.install([TASKS]));
+  assert.ok(k.register('session')?.fields.some((f) => f.id === 'started' && f.type === 'instant' && f.label === 'Started'));
+
+  value(k.create('tasks', { what: 'first' }, as('t_1', { client_id: 'c-1' })));
+  clock.advance(7 * MIN);
+  const byHand = value<Entry>(k.create('session', { doing: 'Carried over' }, { actor: 'p_1' }));
+  clock.advance(MIN);
+  const byKey = value<Entry>(k.create('session', { doing: 'A key’s own' }, as('t_2', {})));
+
+  assert.equal(k.get('S1')?.fields.started, iso(NOW));
+  assert.equal(byHand.fields.started, iso(NOW + 7 * MIN));
+  assert.equal(byKey.fields.started, iso(NOW + 8 * MIN));
+  for (const seq of [1, 2, 3]) assert.equal(stored(sql, seq).started, stored(sql, seq).created_at, `S${seq} did not start when its row was made`);
+
+  /* AND IT IS THE RECORD'S TO WRITE: no person and no run names it, as a row is made or after. */
+  for (const out of [
+    k.create('session', { doing: 'Backdated', started: iso(NOW - HOUR) }, { actor: 'p_1' }),
+    k.update('session', 'S1', { started: iso(NOW - HOUR) }, { actor: 'p_1', version: k.get('S1')!.version }),
+    k.update('session', 'S1', { started: iso(NOW - HOUR) }, as('t_1', { spoken: 'S1' })),
+  ]) {
+    const r = refusal(out);
+    assert.deepEqual([r.code, r.at], ['IMMUTABLE_FIELD', 'started']);
+  }
+  assert.equal(k.get('S1')?.fields.started, iso(NOW));
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM observation WHERE kind = 'write.refused' AND subject LIKE 'session.-%'")?.n ?? 0, 0, 'a run failed to open');
+  sql.close();
+});
+
+test('A RUN PLANTED WITH ITS START KEEPS IT: the record’s own stamp, which a sample’s runs come through, is not written over', async () => {
+  const { k, sql } = await record();
+  /* The in-process channel the seed plants a run through, with the fields only the record writes: no request carries one. */
+  const planted = value<Entry>(
+    k.create('session', { doing: 'Planted this morning' }, { actor: 'p_seed', stamp: { started: iso(NOW - 5 * HOUR), last_seen: iso(NOW - 2 * HOUR) } }),
+  );
+  assert.equal(planted.fields.started, iso(NOW - 5 * HOUR));
+  assert.deepEqual([stored(sql, 1).started, stored(sql, 1).last_seen, stored(sql, 1).created_at], [iso(NOW - 5 * HOUR), iso(NOW - 2 * HOUR), iso(NOW)]);
+  sql.close();
+});
+
+test('A RESUMED RUN KEEPS ITS FIRST START: through its heartbeat, its own writes, being finished, and coming back the next day', async () => {
+  const { k, sql, clock } = await record();
+  value(await k.install([TASKS]));
+  const said = as('t_1', { client_id: 'c-1', host: 'mbp', repo: 'braindog' });
+  value(k.create('tasks', { what: 'first' }, said));
+  const first = iso(NOW);
+  assert.equal(stored(sql, 1).started, first);
+
+  /* The heartbeat moves the other end and not this one. */
+  clock.advance(20 * MIN);
+  value(k.create('tasks', { what: 'second' }, said));
+  assert.deepEqual([stored(sql, 1).started, stored(sql, 1).last_seen], [first, iso(NOW + 20 * MIN)]);
+
+  /* A write to its own row, by the run and by a person. */
+  clock.advance(5 * MIN);
+  value(k.update('session', 'S1', { doing: 'Wire the device routes' }, { ...said, version: k.get('S1')!.version }));
+  value(k.update('session', 'S1', { next: 'Then the self-host' }, { actor: 'p_1', version: k.get('S1')!.version }));
+  assert.equal(stored(sql, 1).started, first);
+
+  /* Finished, then back a day later by its client id: the same run, revived, started when it first was. */
+  value(k.update('session', 'S1', { state: 'done' }, { actor: 'p_1', version: k.get('S1')!.version }));
+  clock.advance(26 * HOUR);
+  value(k.create('tasks', { what: 'third' }, said));
+  const back = stored(sql, 1);
+  assert.deepEqual([back.state, back.started, back.last_seen], ['active', first, iso(clock.now())]);
+  assert.equal(sql.all("SELECT 1 FROM entry WHERE register = 'session'").length, 1, 'coming back opened another run');
+  sql.close();
+});
+
+test('AN OLD RUN IS GIVEN ITS START FROM ITS OWN ROW, in place, and giving it again changes nothing', async () => {
+  const { k, sql, clock } = await record();
+  value(await k.install([TASKS]));
+  value(k.create('tasks', { what: 'first' }, as('t_1', { client_id: 'c-1' })));
+  clock.advance(2 * HOUR);
+  value(k.create('tasks', { what: 'second' }, as('t_2', { client_id: 'c-2' })));
+  clock.advance(HOUR);
+  value(k.create('tasks', { what: 'third' }, as('t_1', { client_id: 'c-1' })));
+
+  /* Two runs as a record held them before migration 26, the second binned since, and a third that already has a start
+     of its own, which is not its row's. */
+  value(k.create('session', { doing: 'Has one' }, { actor: 'p_1' }));
+  sql.exec("UPDATE entry SET fields = json_remove(fields, '$.started') WHERE register = 'session' AND seq IN (1, 2)");
+  sql.exec("UPDATE entry SET deleted_at = ? WHERE register = 'session' AND seq = 2", iso(clock.now()));
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.started', ?) WHERE register = 'session' AND seq = 3", iso(NOW - HOUR));
+  const all = () => sql.all('SELECT * FROM entry ORDER BY id').map((r) => ({ ...r }));
+  const history = () => sql.all('SELECT * FROM event ORDER BY rowid').map((r) => ({ ...r }));
+  const before = [1, 2, 3].map((seq) => stored(sql, seq));
+  const events = history();
+
+  execScript(sql, SEAT_SESSION);
+  const after = [1, 2, 3].map((seq) => stored(sql, seq));
+  assert.deepEqual(after.map((r) => r.started), [iso(NOW), iso(NOW + 2 * HOUR), iso(NOW - HOUR)]);
+  /* NOT AN EDIT ANYBODY MADE: no version, no `updated_at`, no line in the history, and the heartbeat where it was. */
+  assert.deepEqual(after.map(({ started: _, ...rest }) => rest), before.map(({ started: _, ...rest }) => rest));
+  assert.deepEqual(history(), events);
+  assert.equal(k.get('S1')?.fields.started, iso(NOW));
+
+  const given = all();
+  const seated = versions(sql);
+  execScript(sql, SEAT_SESSION);
+  execScript(sql, SEAT_SESSION);
+  assert.deepEqual(all(), given, 'giving it a second time changed a run');
+  assert.deepEqual(versions(sql), seated, 'seating it a second time wrote a version');
+  assert.deepEqual(history(), events);
   sql.close();
 });
 

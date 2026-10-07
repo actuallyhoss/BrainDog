@@ -44,6 +44,7 @@ import sessionClient0022 from './migrations/0022_session_client.ts';
 import entityKey0023 from './migrations/0023_entity_key.ts';
 import look0024 from './migrations/0024_look.ts';
 import trust0025 from './migrations/0025_trust.ts';
+import sessionStarted0026 from './migrations/0026_session_started.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -74,6 +75,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 23, slug: 'entity_key', sql: entityKey0023 },
   { version: 24, slug: 'look', sql: look0024 },
   { version: 25, slug: 'trust', sql: trust0025 },
+  { version: 26, slug: 'session_started', sql: sessionStarted0026 },
 ];
 
 /**
