@@ -261,8 +261,11 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       await page.locator('.picks input').first().waitFor({ timeout: 4000 });
     };
 
+    /* THE CARET'S OWN CELL, FOCUSED AND NOT CLICKED. The picker led every row in a cell of its own, and a click there
+       put focus in the grid without opening anything. It sits among the row's verbs now, so the first cell is the
+       title and a click on it opens the row: the grid's one tab stop is the way in a keyboard has. */
     const focusFirstCell = async (page) => {
-      await page.locator('[role="row"] .td').first().click();
+      await page.locator('[role="gridcell"][tabindex="0"]').first().focus();
     };
 
     /**

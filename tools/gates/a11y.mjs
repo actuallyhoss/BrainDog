@@ -310,8 +310,11 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
        it opens the cell for editing now, so the key this scenario was built on stopped raising a
        toast the day it started doing its job. Archive is the verb that still raises one, and it is
        the better subject anyway: it is the toast a person actually meets, it carries an Undo, and a
-       toast with a control in it is the harder thing for this gate to be right about. */
-    { name: 'toast', route: '/r/obligations', keys: ['Backspace'], expect: '.toast' },
+       toast with a control in it is the harder thing for this gate to be right about.
+
+       THREE ROWS DOWN FIRST. Late rows lead the list now, so the first row is `/r/obligations/1`, which is a route
+       this gate audits in the next pass: archiving it turned that screen into a refusal. */
+    { name: 'toast', route: '/r/obligations', keys: ['j', 'j', 'j', 'Backspace'], expect: '.toast' },
   ];
 
   const TYPES = {

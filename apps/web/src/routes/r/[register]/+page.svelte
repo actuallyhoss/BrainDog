@@ -1810,6 +1810,17 @@
 
   const dropFilter = (at: number) => setParam((p) => dropChip(p, at));
 
+  /**
+   * THE KEYBOARD'S FOCUS GOES WITH THE CARET. `j` and `k` moved the caret line and left focus on the cell it came
+   * from, where an arrow moved both: the next Tab left from a row the reader was no longer on, and a screen reader
+   * heard nothing. Only from inside the grid, so a key pressed with focus elsewhere does not pull it in.
+   */
+  function carry() {
+    const grid = document.activeElement?.closest('[role="grid"]');
+    const cell = grid?.querySelector(`.tr[aria-rowindex="${focus.row + 2}"]`)?.children[focus.col];
+    if (cell instanceof HTMLElement) cell.focus();
+  }
+
   function onkeydown(e: KeyboardEvent) {
     /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this handler is one of six on
        the routes under the shell, and none of them read the overlay depth, so a sheet made of
@@ -1889,9 +1900,11 @@
     if (e.key === 'j' || e.key === 'ArrowDown') {
       e.preventDefault();
       focus = { ...focus, row: Math.min(focus.row + 1, rows.length - 1) };
+      carry();
     } else if (e.key === 'k' || e.key === 'ArrowUp') {
       e.preventDefault();
       focus = { ...focus, row: Math.max(focus.row - 1, 0) };
+      carry();
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       focus = { ...focus, col: Math.min(focus.col + 1, columns.length - 1) };
