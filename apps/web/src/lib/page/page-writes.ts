@@ -161,6 +161,18 @@ export function pageWrites(deps: WritesDeps) {
     return marked(at, out, block);
   }
 
+  /**
+   * The rows of `register` block `at` holds ticked done now, by their number: what Home's own late list draws ticked
+   * (`home/HomeRows.svelte`), which draws no renderer rows for `keptSegment` to hold. A refusal or an Undo takes the
+   * hold back, and the tick with it.
+   */
+  function heldDone(at: number, register: string): ReadonlySet<number> {
+    const { kept } = stored();
+    const hold = kept.slug === deps.slug() ? kept.blocks.get(at) : undefined;
+    const lead = `${register}#`;
+    return new Set([...(hold?.held ?? [])].flatMap(([key, k]) => (k.done === true && key.startsWith(lead) ? [Number(key.slice(lead.length))] : [])));
+  }
+
   /** The rows of `segment` that arrived since block `at` was last drawn, marked. Rows the page drew from no record row are never marked. */
   function marked<S extends { rows: Row[] }>(at: number, segment: S, block?: LiveBlock): S {
     const seen = deps.arrivals;
@@ -565,7 +577,7 @@ export function pageWrites(deps: WritesDeps) {
   /* THE PAGE READ AGAIN, for a host panel that changed the record from beside a block (a run put back). */
   const reread = (): Promise<void> => deps.reread();
 
-  return { forPage, warm, keptSegment, arrivedTable, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar, onpath, stepable, addStep, reread };
+  return { forPage, warm, keptSegment, heldDone, arrivedTable, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar, onpath, stepable, addStep, reread };
 }
 
 /**

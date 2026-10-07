@@ -1,0 +1,81 @@
+/**
+ * What comes in, by the way it came: one line per way in, with when the last thing arrived by it and how many arrived
+ * on each of the last fourteen days.
+ *
+ * BY THE CHANNEL THE RECORD KEEPS, and nothing guessed from a sender. `email`, `webhook`, `api`, `pull` and `paste` are
+ * the kernel's own five (`CHANNELS` in `packages/kernel/src/ingest.ts`), and each is said as a person says it: mail,
+ * texts and other apps posting in, agents, imports, and what was pasted.
+ *
+ * THE THREE EVERYDAY WAYS IN ARE ALWAYS SAID, even before anything has come in by them, so a new record's Inbox says how
+ * things reach it rather than opening on a blank board. An import or a paste is said once something came in that way.
+ *
+ * COUNTED OVER WHAT WAS READ. The read stops after a few pages, so on a busy record the oldest days can be short, and
+ * `partial` says so rather than drawing a quiet fortnight that was not quiet.
+ *
+ * PURE, so `node --test` holds it.
+ */
+
+import { dayOf, daysBetween } from '../../lib/work/board.ts';
+import type { IconName } from '../../lib/ui/icons.ts';
+
+/** How many days the arrivals line covers, today included. */
+export const SOURCE_DAYS = 14;
+
+/** One way in, as the tile draws it. `days` is oldest first and ends today. */
+export type Source = { channel: string; name: string; icon: IconName; last: string | null; days: number[]; total: number };
+
+/** What each channel is called and the glyph its well wears. */
+const SAID: Readonly<Record<string, { name: string; icon: IconName }>> = {
+  email: { name: 'Mail', icon: 'inbox' },
+  webhook: { name: 'Texts and apps', icon: 'plug' },
+  api: { name: 'Agents', icon: 'session' },
+  pull: { name: 'Imports', icon: 'download' },
+  paste: { name: 'Pasted in', icon: 'copy' },
+};
+
+/** The ways in said even with nothing through them yet, in this order. */
+export const EVERYDAY: readonly string[] = ['email', 'webhook', 'api'];
+
+/** A channel the kernel adds later is said by its own word, with the inbox's glyph, until it has words here. */
+const saidOf = (channel: string): { name: string; icon: IconName } =>
+  SAID[channel] ?? { name: channel.charAt(0).toUpperCase() + channel.slice(1), icon: 'inbox' };
+
+/**
+ * Every way in, from the arrivals read, newest first by its last arrival and then the everyday ways nothing came by.
+ * An arrival whose time will not read is left out of the days and the last arrival, and still counted as having come.
+ */
+export function sourcesOf(lines: readonly { channel: string; ts: string }[], now: number): Source[] {
+  const today = dayOf(now);
+  const by = new Map<string, Source>();
+  const make = (channel: string): Source => ({ channel, ...saidOf(channel), last: null, days: Array<number>(SOURCE_DAYS).fill(0), total: 0 });
+  for (const line of lines) {
+    const s = by.get(line.channel) ?? make(line.channel);
+    by.set(line.channel, s);
+    const at = Date.parse(line.ts);
+    if (!Number.isFinite(at)) continue;
+    if (s.last === null || at > Date.parse(s.last)) s.last = line.ts;
+    const back = daysBetween(dayOf(at), today);
+    if (back >= 0 && back < SOURCE_DAYS) {
+      const i = SOURCE_DAYS - 1 - back;
+      s.days[i] = (s.days[i] ?? 0) + 1;
+      s.total++;
+    }
+  }
+  const came = [...by.values()].sort((a, b) => (Date.parse(b.last ?? '') || 0) - (Date.parse(a.last ?? '') || 0));
+  const quiet = EVERYDAY.filter((c) => !by.has(c)).map(make);
+  return [...came, ...quiet];
+}
+
+/** Whether a line is worth drawing: three days or more with something in them, else the count says it. */
+export const drawsLine = (s: Source): boolean => s.days.filter((n) => n > 0).length >= 3;
+
+/** The words under a way in's name. */
+export function lastSaid(s: Source, since: (iso: string) => string): string {
+  return s.last === null ? 'Nothing has come in this way yet' : `Last in ${since(s.last)}`;
+}
+
+/** The count at the right of a way in, for the fortnight. */
+export const countSaid = (n: number): string => (n === 0 ? 'None in 14 days' : `${n.toLocaleString('en-GB')} in 14 days`);
+
+/** The sentence a way in's line reads as. */
+export const lineSaid = (s: Source): string => `${s.name}: ${s.total.toLocaleString('en-GB')} arrived over the last 14 days`;

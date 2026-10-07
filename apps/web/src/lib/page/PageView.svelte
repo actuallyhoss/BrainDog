@@ -121,6 +121,18 @@
     },
   });
 
+  /**
+   * THE PAGE'S CAPTURE, FOR A LINE DRAWN OUTSIDE ITS BODY: Home lifts the line a task is typed into into its head
+   * (`home/HeadCapture.svelte`), and the line still writes through this page's writes, so its receipt, its Undo and the
+   * line drawn at the head of the list before the record has it are the page's, as they were in the tile.
+   */
+  export function capturable(block: LiveBlock): boolean {
+    return mode !== 'preview' && writes.capturable(block);
+  }
+  export function capture(register: string, text: string, inherited: Record<string, string>): void {
+    if (mode !== 'preview') void writes.captureLine(register, text, inherited);
+  }
+
   /* ── the rows a page hosts ─────────────────────────────────────────────────
      A PAGE AT ITS OWN ADDRESS HOSTS ITS ROWS AS WORK DID (`row-host.svelte.ts`): one open in the docked panel, one
      menu, and Just changed; and its questions, chosen several at a time and answered from one bar (`picked.svelte.ts`).

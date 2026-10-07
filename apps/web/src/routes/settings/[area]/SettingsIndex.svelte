@@ -10,7 +10,8 @@
   A LIST ON THE GROUND, NOT A CARD. Each group is a group on the ground: its title at
   `--t-group` with a hairline under it, and the rows under that with no box round them. A row is the rail's own shape
   at 1440, 36 tall with its glyph in a 28px well and the name at 14/500, and the current row is the rail's "here": the
-  wash, an ink well and the name at 600. Never the mark's red.
+  wash, an ink well and the name at 600. Never the mark's red. Beside an open area it is quieter still (`data-beside`):
+  200 wide, the group titles at the meta step, and each row 32 tall at 13.
 
   WHAT A ROW SAYS UNDER ITS NAME IS FOR THE PHONE. There this list is all a person sees, and the line is how they tell
   the areas apart before opening one. Beside an open area the list is as narrow as the rail, where the line could only
@@ -26,7 +27,7 @@
   let { groups, current }: { groups: readonly AreaGroup[]; current?: string | undefined } = $props();
 </script>
 
-<nav class="index" aria-label={copy.settings}>
+<nav class="index" aria-label={copy.settings} data-beside={current === undefined ? undefined : ''}>
   {#each groups as g, i (i)}
     <div class="group">
       <h2 class="group-title">{g.title}</h2>
@@ -164,6 +165,47 @@
   @media (pointer: coarse) {
     .area-row {
       min-block-size: var(--tap);
+    }
+  }
+
+  /* BESIDE AN OPEN AREA THE LIST IS QUIET: 200 wide, each group's title at the meta step in the quiet ink with no rule
+     under it, and each row 32 tall with a 24px well and its name at 13, so the area beside it is what the eye lands on. */
+  @media (width >= 900px) {
+    .index[data-beside] {
+      gap: var(--sp-4);
+    }
+
+    .index[data-beside] .group-title {
+      margin: 0 0 var(--sp-1);
+      padding: 0;
+      border: 0;
+      color: var(--dim);
+      font-size: var(--fs-meta);
+      font-weight: var(--fw-medium);
+      line-height: 18px;
+    }
+
+    .index[data-beside] .area-row {
+      grid-template-columns: 24px minmax(0, 1fr);
+      column-gap: var(--sp-2);
+      min-block-size: 32px;
+      border-radius: var(--r-ctl);
+    }
+
+    .index[data-beside] .area-icon :global(.well) {
+      inline-size: 24px;
+      block-size: 24px;
+      border-radius: var(--r-sm);
+    }
+
+    .index[data-beside] .area-icon :global(.well .icon[data-size]) {
+      inline-size: 14px;
+      block-size: 14px;
+    }
+
+    .index[data-beside] .name {
+      font-size: var(--fs-meta);
+      line-height: 18px;
     }
   }
 

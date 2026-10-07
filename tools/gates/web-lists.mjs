@@ -200,6 +200,14 @@ const HELD = {
     ids: ['people', 'services', 'work'],
     why: "the section names the nav orders a day by, the Work row's key and glyph, and the `work` word of the Work screen's address `/?work`.",
   },
+  'apps/web/src/lib/nav/rail.ts': {
+    ids: ['agents', 'people', 'work'],
+    why: "the section names the rail orders its places by, and the Work row's key, as `lib/nav.ts` names them.",
+  },
+  'apps/web/src/lib/page/tile-head.ts': {
+    ids: ['roadmap'],
+    why: 'a block kind called `roadmap`, whose tile counts what it holds, which is not the Roadmap pack.',
+  },
   'apps/web/src/routes/+page.svelte': {
     ids: ['work'],
     why: 'the `work` word in the query that opens the Work screen at `/?work`.',

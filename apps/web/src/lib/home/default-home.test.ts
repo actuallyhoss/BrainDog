@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, captureHeading, homeDrawn, railed, slashLineOf, todayHome, type HomeVoice } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
+import type { WithRows } from './home-rows.ts';
 
 const NOW = Date.parse('2026-10-02T09:00:00');
 
@@ -187,12 +188,14 @@ test('HOME HIDES WHAT HOLDS NOTHING BY THE PAGE READER`S RULE, even where an emp
     ],
     NOW,
   );
+  /* THE LINE A TASK IS TYPED INTO IS LIFTED INTO THE HEAD, and keeps its place in the list, not drawn. */
   assert.deepEqual(out.blocks.map((b) => [b.kind, b.drawn]), [
-    ['capture', true],
+    ['capture', false],
     ['section', false],
     ['table', false],
     ['stat', false],
   ]);
+  assert.equal(out.capture?.register, 'tasks');
 });
 
 test('WHEN EVERY DRAWN DEADLINE IS LATE, LATE KEEPS WHAT STANDS PAST THE LIMIT and the block for later days is not drawn empty', () => {
@@ -207,27 +210,87 @@ test('WHEN EVERY DRAWN DEADLINE IS LATE, LATE KEEPS WHAT STANDS PAST THE LIMIT a
   ]);
 });
 
-test('LATE IS ONE TILE: the late money joins the late tasks before it, under their name, which says "or due today" while one is', () => {
+test('LATE IS ONE LIST: the late money joins the late tasks before it, every thing in one shape, with the count of both', () => {
   const late = (by: string[]) => block({ kind: 'todo', heading: 'Late', source: 'register.tasks', columns: day('by') as never }, by.map((d) => ({ by: d })), by.map((_, n) => n + 4));
   const money = block({ kind: 'timeline', heading: 'Late', source: 'deadlines' }, [
     { row: 'tasks#4', day: '2026-09-30' },
     { row: 'obligations#2', day: '2026-09-29' },
   ]);
-  const page = (tasks: LiveBlock) => shown(homeDrawn([tasks, money], NOW).blocks).map((b) => [b.heading ?? '', (b as { joins?: boolean }).joins === true, b.entries.map((e) => e.seq)]);
+  const page = (tasks: LiveBlock) =>
+    shown(homeDrawn([tasks, money], NOW).blocks).map((b) => {
+      const rows = (b as WithRows).homeRows;
+      return [b.heading ?? '', b.total, rows?.kind === 'late' ? rows.lines.map((l) => [l.when, l.late, l.tick ?? null]) : null];
+    });
+  /* ONE LIST UNDER THE TASKS' NAME, the tasks first and each tickable, and the money's own block not drawn. */
   assert.deepEqual(page(late(['2026-09-30'])), [
-    ['Late', false, [4]],
-    ['', true, [2]],
+    [
+      'Late',
+      2,
+      [
+        ['2 days late', true, 4],
+        ['3 days late', true, null],
+      ],
+    ],
   ]);
+  /* A TASK ONLY DUE TODAY IS NOT LATE YET, and the name says so. */
   assert.deepEqual(page(late(['2026-09-30', '2026-10-02'])), [
-    ['Late or due today', false, [4, 5]],
-    ['', true, [2]],
+    [
+      'Late or due today',
+      3,
+      [
+        ['2 days late', true, 4],
+        ['Due today', false, 5],
+        ['3 days late', true, null],
+      ],
+    ],
   ]);
-  /* WITH NO LATE TASKS THE MONEY IS THE TILE, under its own name; and a list with work not yet due is not joined. */
-  assert.deepEqual(page(late([])), [['Late', false, [1, 2]]]);
+  /* WITH NO LATE TASKS THE MONEY IS THE LIST, under its own name; and a list with work not yet due is not joined. */
+  assert.deepEqual(page(late([])), [
+    [
+      'Late',
+      2,
+      [
+        ['2 days late', true, null],
+        ['3 days late', true, null],
+      ],
+    ],
+  ]);
   assert.deepEqual(page(late(['2026-09-30', '2026-10-09'])), [
-    ['Late', false, [4, 5]],
-    ['Late', false, [2]],
+    ['Late', 2, null],
+    ['Late', 1, [['3 days late', true, null]]],
   ]);
+});
+
+test('COMING UP IS A FEW DAYS, each a chip with what falls due on it, and a feed never ends on a bare number', () => {
+  const due = block({ kind: 'timeline', heading: 'Coming up', source: 'deadlines' }, [
+    { row: 'obligations#2', day: '2026-10-02' },
+    { row: 'obligations#3', day: '2026-10-02' },
+    { row: 'obligations#4', day: '2026-10-05' },
+  ]);
+  const out = shown(homeDrawn([due], NOW).blocks);
+  const rows = (out[0] as WithRows).homeRows;
+  assert.equal(rows?.kind, 'days');
+  if (rows?.kind !== 'days') return;
+  assert.deepEqual(
+    rows.days.map((d) => [d.weekday, d.date, d.today, d.lines.length]),
+    [
+      ['Fri', '2', true, 2],
+      ['Mon', '5', false, 1],
+    ],
+  );
+  const feed = block({ kind: 'feed', source: 'activity', feed: [{ at: '2026-10-02T08:30:00Z' }, { at: '2026-10-02T08:00:00Z' }] as never });
+  (feed as { rows: unknown[] }).rows = [
+    { key: 'a', cells: ['rule', '', '1', 'Categorised 3 payments', '1h ago'] },
+    { key: 'b', cells: ['rule', '', '248', '', '2h ago'] },
+  ];
+  const fed = shown(homeDrawn([feed], NOW).blocks)[0]!;
+  assert.deepEqual(
+    fed.rows.map((r) => [r.cells[2], r.cells[3]]),
+    [
+      ['1', 'Categorised 3 payments'],
+      ['', '248 changes'],
+    ],
+  );
 });
 
 test('THE HEAD SAYS SLASH`S LINE WHEN THE RECORD SENT ONE, red only where it says the rules` phrase, and the rules` line otherwise', () => {
@@ -350,14 +413,15 @@ test('A HOME INSTALLED FROM TODAY KEEPS SPEAKING IN THE VOICE: a heading still i
     block({ kind: 'timeline', heading: 'Coming up', source: 'deadlines' }, [{ row: 'obligations#2', day: '2026-10-08' }]),
   ];
   const out = homeDrawn(installed, NOW, voice, 'errand');
+  assert.equal(out.capture?.heading, 'Add an errand');
   assert.deepEqual(
     shown(out.blocks).map((b) => b.heading),
-    ['Add an errand', 'On your desk', 'Overdue', 'My own list', 'Next up'],
+    ['On your desk', 'Overdue', 'My own list', 'Next up'],
   );
-  assert.equal(shown(out.blocks)[1]!.empty, 'Your desk is clear.');
+  assert.equal(shown(out.blocks)[0]!.empty, 'Your desk is clear.');
   /* AND IN THE HOUSE VOICE, NOTHING IS TOUCHED: the very blocks handed in. */
   const house = homeDrawn(installed, NOW);
-  assert.equal(house.blocks[0], installed[0]);
+  assert.equal(house.capture, installed[0]);
   assert.equal(house.blocks[1], installed[1]);
   /* A CAPTURE LINE THE AUTHOR NAMED, or over another list, keeps its words. */
   const own = homeDrawn([block({ kind: 'capture', heading: 'Jot it down', register: 'tasks' }), block({ kind: 'capture', heading: 'Add a task', register: 'notes' })], NOW, voice, 'errand');

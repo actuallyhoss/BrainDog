@@ -1,7 +1,8 @@
 <!--
   Swimlanes: who was busy when, and what is running now (the design system: "time and overlap").
 
-  A lane a row, each on a quiet track, its finished spans in a grey and its live ones in `live`. The
+  A lane a row, each on a quiet track, its finished spans in the grey for "done" and its live ones in `live`, each
+  span growing from its start on the first draw. The
   now line runs through every lane in `live`, with a small pill at its top ("now 09:40"), and hour
   ticks sit under a hairline axis. `marks` add a dashed rule for a moment worth seeing ("you left
   21:40"). Times are epoch milliseconds; ticks and words are on the viewer's clock unless `format`
@@ -51,7 +52,7 @@
       <text class="viz-label" x="0" y={lane.labelY}>{lane.label}</text>
       <rect class="viz-track" x={g.gutter} y={lane.y} width={Math.max(0, W - g.gutter)} height={TRACK_H} rx={TRACK_H / 2} />
       {#each lane.spans as s, k (k)}
-        <rect class="viz-fill" data-tone={s.live ? 'live' : 'g3'} x={s.x} y={lane.y} width={s.w} height={TRACK_H} rx={s.rx} />
+        <rect class="viz-fill viz-grow-x" data-tone={s.live ? 'live' : 'done'} x={s.x} y={lane.y} width={s.w} height={TRACK_H} rx={s.rx} />
       {/each}
     {/each}
 

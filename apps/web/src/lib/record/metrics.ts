@@ -718,6 +718,8 @@ export const targetLine = (decl: MetricDecl, value?: number | null): string => {
      nobody broke, and says how far over once it does not: the tone already says which side it is on. */
   if (under && typeof value === 'number') return value <= bound ? '' : `${format(decl.format, value - bound).replace(/\.0+$/u, '')} over your limit`;
   if (under && bound === 0) return 'None expected';
+  /* A COUNT IS NEVER UNDER NOTHING, so a floor of zero on one is a line nobody can miss, and is not said. */
+  if (!under && bound === 0 && decl.format === 'int') return '';
   const figure = format(decl.format, bound).replace(/\.0+$/u, '');
   if (under) return `Limit ${figure}`;
   return bound === 0 ? `Keep above ${figure}` : `At least ${figure}`;

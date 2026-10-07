@@ -335,13 +335,24 @@ export type Working = {
   ran_s?: number;
 };
 
-/** The most runs the rail lists; Today and the run pages hold the rest. */
-const WORKING_SHOWN = 5;
+/**
+ * The most runs the rail counts. It draws none of them, only how many ("2 working"), so this is a ceiling on a count
+ * and not a list's length: past it the rail says the ceiling.
+ */
+export const WORKING_SHOWN = 50;
 
 /**
- * THE AGENTS AT WORK, READ THE WAY TODAY READS THEM (`drawn` in `today-live.ts`): the record draws `sessions.live` as a
- * page it holds nowhere, so the rail and Today name the same runs under the same project names. Only the runs still
- * `active`, most recently heard from first, as the record orders them.
+ * WHO IS WORKING, BY THE AGENTS PAGE'S OWN CLAUSE: active, and heard from today. It is `RUNS_WORKING` in
+ * `packages/seed/src/packs/agents.ts`, written out because the seed does not export that file (`boot-live.test.ts`
+ * holds the two equal). With `state is active` alone the rail counted a run the end hook never closed yesterday, so
+ * it said three working beside an Agents page that said two.
+ */
+export const RUNS_WORKING = 'state is active, last_seen is today';
+
+/**
+ * THE AGENTS AT WORK, READ THE WAY THE AGENTS PAGE READS THEM: the record draws `sessions.live` as a page it holds
+ * nowhere, over the same clause as Agents' Working group, so the rail's count and that group are the same runs. Most
+ * recently heard from first, as the record orders them.
  *
  * A REFUSAL IS NOBODY WORKING, never a failure of the shell: a colleague who may not read the runs sees no group, and
  * the screen beside the rail is not told anything went wrong. `now` is the clock "gone quiet" is judged against.
@@ -356,7 +367,7 @@ export async function readWorking(base: string, io?: Fetch, now = Date.now()): P
         kind: 'table',
         heading: 'Working now',
         source: 'sessions.live',
-        where: 'state is active',
+        where: RUNS_WORKING,
         columns: [{ field: 'agent' }, { field: 'doing' }, { field: 'last_seen' }],
         limit: WORKING_SHOWN,
       },
@@ -696,6 +707,25 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
 }
 
 /**
+ * The icon a list declares, as `boot` sends it beside the list, or `undefined` from a host older than the field. Read
+ * off the answer and not trusted to the type: anything but a word is no icon, and `iconFor` still turns a word it has
+ * no glyph for into the fallback.
+ */
+export const iconSent = (r: Boot['registers'][number]): string | undefined => {
+  const icon = (r as { icon?: unknown }).icon;
+  return typeof icon === 'string' && icon.trim() !== '' ? icon.trim() : undefined;
+};
+
+/**
+ * The hue a page's row is drawn in, as `boot` sends it on `about`, a turn from 0 to 359, or `undefined` from a host
+ * older than the field or a row with none.
+ */
+export const hueSent = (about: object): number | undefined => {
+  const hue = (about as { hue?: unknown }).hue;
+  return typeof hue === 'number' && Number.isFinite(hue) && hue >= 0 && hue < 360 ? hue : undefined;
+};
+
+/**
  * The record's `boot` in the shape the shell draws.
  *
  * WHAT THE RECORD DOES NOT SEND IS EMPTY, NOT SAMPLED. Saved views and the people with access are not in `boot`, so a
@@ -775,9 +805,9 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
             /* A PAGE ONE ROW MADE, which the flat nav leaves to its list's own page (`flatNav`). */
             ...(p.about ? { row: true as const } : {}),
             /* AND IT DRAWS AS THAT THING'S OWN COLOURED DOT in the rail, so each project is told from its neighbours:
-               the row's frozen hue where this tab holds the row, else the hue its name is always drawn in (`hueFor`),
-               which is the colour Today gives the same project. `boot` sends no hue of its own yet. */
-            ...(p.about ? { hue: (p.about.seq === null ? undefined : hueOf({ register: p.about.register, seq: p.about.seq })) ?? hueFor(p.title) } : {}),
+               the hue `boot` sends with the row (`about.hue`), else the row's frozen hue where this tab holds the row,
+               else the hue its name is always drawn in (`hueFor`), which is the colour Today gives the same project. */
+            ...(p.about ? { hue: hueSent(p.about) ?? (p.about.seq === null ? undefined : hueOf({ register: p.about.register, seq: p.about.seq })) ?? hueFor(p.title) } : {}),
           },
         ]
       : [],
@@ -792,7 +822,9 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
          all one currency (`readImplied`). A record with no name says it beside `record` (`drawnOf`); a `boot` that
          says neither has none, so its shell says none and forgets the last record's. */
       currency: learnHome(drawn?.currency ?? null, drawn ? implied?.setting : null, drawn ? (implied?.held ?? []) : []),
-      /* THE LISTS THAT HOLD SOMETHING, the sample's rule, and an icon from the declaration this build knows.
+      /* THE LISTS THAT HOLD SOMETHING, the sample's rule, each with the icon it declares: the one `boot` sends with the
+         list (`iconSent`), else the declaration this tab already holds. `REGISTERS` alone is empty at boot, so every
+         list in the rail wore the same `rows` glyph until a screen had read its schema.
          A LIST WITH A SAVED VIEW STAYS EVEN AT ZERO ROWS: the rail nests a view under its list and drops it from
          Views by matching against these, so dropping the list here strands the view under the generic heading.
          AND A COLLEAGUE'S OWN LIST STAYS AT ZERO ROWS: a list made for somebody is empty on the day they are sent
@@ -800,7 +832,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
          bookkeeper with a rail of nothing and the list reachable only by typing `/r/expenses`. */
       registers: b.registers
         .filter((r) => r.count > 0 || views.has(r.id) || theirs.has(r.id))
-        .map((r) => ({ id: r.id, name: r.name, count: r.count, icon: iconFor(REGISTERS[r.id]?.icon, 'rows'), views: views.get(r.id) ?? [] })),
+        .map((r) => ({ id: r.id, name: r.name, count: r.count, icon: iconFor(iconSent(r) ?? REGISTERS[r.id]?.icon, 'rows'), views: views.get(r.id) ?? [] })),
     },
     lists: b.registers.map((r) => ({ id: r.id, name: r.name })),
     pages: (b.pages ?? []).map((p) => p.slug),

@@ -17,11 +17,12 @@
 /* ── the choices ──────────────────────────────────────────────────────────── */
 
 /* A FORM'S MEASURE, NOT THE WINDOW'S: on a wide tile the choices stop where a line of what each does is still read in
-   one sweep, and the buttons under them start at the same edge. */
+   one sweep, and the buttons under them start at the same edge. The side beside them (who asked, why, what it
+   changes) takes the rest of a wide tile, so the measure is the form column's, which on a laptop is all of it. */
 .dc-choices {
   display: grid;
   gap: var(--sp-2);
-  max-inline-size: 46rem;
+  max-inline-size: 56rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -341,14 +342,11 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   color: var(--ink2);
 }
 
-/* A ROW OF ANSWERS KEEPS THE FORM'S MEASURE, and Not now stands at its far end, apart from the answers, so "Not yet"
-   and "Not now" are never read as two answers side by side. */
-.dc-actions[data-inline] {
-  max-inline-size: 46rem;
-}
-
-.dc-actions[data-inline] > .dc-later {
-  margin-inline-start: auto;
+/* NOT NOW STANDS IN THE ROW WITH THE ANSWERS, a step further off than they are from each other and in words only, so
+   "Not yet" and "Not now" are never read as two answers side by side. It stood at the far end of the form's measure,
+   which on a wide tile left it floating in the middle of the row, lined up with nothing. */
+.dc-actions > .dc-later {
+  margin-inline-start: var(--sp-2);
 }
 
 /* A NUMBER KEY ON THE FILLED BUTTON is in the button's own ink: the skin's dim cap vanished into the accent. */
@@ -416,6 +414,11 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 
   .dc-actions > .dc-btn:not([data-weight='bare']) {
     flex: 1 1 100%;
+  }
+
+  /* On its own line under a full-width answer, Not now starts where the answers do. */
+  .dc-actions > .dc-later {
+    margin-inline-start: 0;
   }
 
   /* A ROW OF SHORT ANSWERS SHARES ONE LINE where they fit ("Chase it", "Not yet"), each growing to fill it, and a long one

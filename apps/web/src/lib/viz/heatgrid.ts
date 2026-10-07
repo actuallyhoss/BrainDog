@@ -4,8 +4,9 @@
  * such as changes by hour).
  *
  * FIVE STEPS, NOT A GRADIENT: nothing, then four quarters of the busiest cell, drawn as the track and
- * then the ramp from light grey to ink. Four greys are what an eye can tell apart; a continuous
- * scale is a promise of precision the squares cannot keep.
+ * then four steps of the accent, from a wash (`h1`) through its two tints to the full accent. Four
+ * steps are what an eye can tell apart; a continuous scale is a promise of precision the squares
+ * cannot keep. None of them is the grey for "other", because a quiet hour is not another kind of thing.
  *
  * THE SQUARES FIT THE WIDTH, between 6px and 18px, 3px apart, so a phone gets smaller squares and a
  * wide tile does not get huge ones; the column labels thin out to stay 6px apart. A row is never
@@ -49,7 +50,7 @@ export function heatLevel(v: number, max: number): HeatLevel {
 }
 
 /** The tone each level is drawn in. */
-export const HEAT_TONES = ['track', 'g3', 'g2', 'g1', 'ink'] as const;
+export const HEAT_TONES = ['track', 'h1', 'g3', 'g2', 'ink'] as const;
 
 export function heatgrid(rows: readonly string[], cols: readonly string[], values: readonly (readonly number[])[], width: number): HeatGeometry {
   const gutter = Math.max(0, ...rows.map((r) => textWidth(r))) + 8;

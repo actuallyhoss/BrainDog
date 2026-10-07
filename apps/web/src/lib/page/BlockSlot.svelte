@@ -54,7 +54,9 @@
   import type { Row } from 'braindog-render';
   import AddStep from './AddStep.svelte';
   import { foldOf } from './home.ts';
-  import { headCount, headIcon } from './tile-head.ts';
+  import { headCount, headIcon, headTone } from './tile-head.ts';
+  import HomeRows from '$lib/home/HomeRows.svelte';
+  import { linesIn, type WithRows } from '$lib/home/home-rows.ts';
   import { words } from './words.ts';
   import { blockWords } from '$lib/record/block-edit.ts';
 
@@ -307,6 +309,26 @@
   const glyph = $derived(headIcon(block.kind, block.icon, isGlyph));
   const count = $derived(headCount({ kind: block.kind, total: block.total, refused: !!drawn.refusal || block.cannot !== undefined }));
 
+  /* HOME'S OWN LIST, where Home drew the block as one (`home/home-rows.ts`): what is late as one list, what comes up by
+     day. Its well says late in the red, as a block whose rows are late does anywhere (`headTone`). */
+  const homeRows = $derived((block as WithRows).homeRows);
+  const tone = $derived(
+    headTone({ kind: block.kind, icon: block.icon, tone: block.tone, where: block.where, late: homeRows?.kind === 'late' }),
+  );
+  const homeFold = $derived(homeRows && fold ? foldOf('todo', linesIn(homeRows), open) : null);
+
+  /* WHAT THE PAGE HOLDS TICKED on Home's late list, so a refusal or an Undo takes the tick back (`heldDone`). */
+  const homeDone = $derived(writes && homeRows?.kind === 'late' && block.register ? writes.heldDone(i, block.register) : undefined);
+
+  /** Ticks the task numbered `seq` done, through the row the renderer would have drawn for it. */
+  function tickAt(seq: number) {
+    const w = writes;
+    const seg = drawn.segments.find((s) => s.type === 'block');
+    if (!w || seg?.type !== 'block') return;
+    const row = seg.rows.find((r) => r.ref?.seq === seq);
+    if (row) w.tickTask(block, row, true, i, seg.rows);
+  }
+
   /* ── a folded group, opened in place ───────────────────────────────────────
      A CARD BLOCK IN GROUPS FOLDS EACH LONG GROUP behind "Show all 4 people at Encore" (`blocks.ts` `groupedSegments`),
      which went to the organisation's page. It opens here instead (`group-open.ts`): the block drawn a second time with
@@ -330,7 +352,7 @@
     <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
          rather than its braces. -->
-    {#if glyph && isGlyph(glyph)}<IconWell name={glyph} />{/if}
+    {#if glyph && isGlyph(glyph)}<IconWell name={glyph} {tone} />{/if}
     <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-name" id="{ids}h-{i + 1}"
       ><Text nodes={inline(block.heading, { icon })} opts={{ icon }} />{#if count !== null}<span class="block-count num">{count}</span>{/if}</svelte:element
     >
@@ -372,6 +394,9 @@
       {#if act}<Button href={act.href}>{act.label}</Button>{/if}
     {/snippet}
   </Empty>
+{:else if homeRows}
+  <HomeRows rows={homeRows} shown={homeFold?.shown ?? Infinity} done={homeDone} ontick={writes && block.kind === 'todo' ? tickAt : undefined} />
+  {#if homeFold}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, homeFold?.shown ?? 0)}>{words.more(homeFold.more)}</button>{/if}
 {:else if block.kind === 'table' && !block.answer && walkTables(block)}
   <!-- A TABLE OVER A WALK DRAWN ONCE PER CURRENCY: each currency's rows under its code, and why, once. -->
   {#each walkTables(block) ?? [] as part}
@@ -484,7 +509,7 @@
      are days, AND IT COUNTS THEM OVER THE DAYS THE RECORD WALKED (`walk.reach`), which since a walk opens on a shorter
      length than it runs to is further than the length it opened on: "of 1,825 over 90 days" counted five years under a
      three-month label. -->
-{#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown && !folded}
+{#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown && !folded && !homeFold}
   {@const to = openHref(block)}
   {@const door = to && source ? to : block.register ? null : doorOf(block)}
   {#if block.source === 'forecast.runway'}

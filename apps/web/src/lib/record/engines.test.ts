@@ -191,13 +191,13 @@ test('Kiln’s fenwick tool hides the global one, and keys and learnings add up,
   assert.ok(keys.kernel.rows.includes('Nordhaven API @ Everywhere') && keys.kernel.rows.includes('Fenwick deploy key @ Kiln'), keys.kernel.rows.join(', '));
 });
 
-test('KILN AND PORTAGE DRAW "RUNS ON" on the seeded record, with no block refused', () => {
-  for (const slug of ['kiln', 'portage']) {
+test('KILN AND PORTAGE DRAW WHAT THEY RUN ON under More about, with no block refused', () => {
+  for (const [slug, name] of [['kiln', 'Kiln'], ['portage', 'Portage']] as const) {
     const drawn = page(slug);
     assert.ok(drawn, `the demo has no /p/${slug}`);
-    const at = drawn.blocks.findIndex((b) => b.heading === 'Runs on');
-    assert.ok(at >= 0, `/p/${slug} has no Runs on`);
-    const after = drawn.blocks.slice(at + 1).filter((b) => b.heading !== 'Keeping it alive');
+    const at = drawn.blocks.findIndex((b) => b.heading === `More about ${name}`);
+    assert.ok(at >= 0, `/p/${slug} has no More about ${name}`);
+    const after = drawn.blocks.slice(at + 1).filter((b) => ['Keys', 'Tools and servers', 'Skills'].includes(String(b.heading)));
     assert.deepEqual(after.map((b) => b.heading), ['Keys', 'Tools and servers', 'Skills'], slug);
     for (const b of after) {
       assert.deepEqual(b.refusals, [], `${String(b.heading)} on ${slug}`);

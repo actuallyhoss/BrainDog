@@ -55,6 +55,10 @@ export const cardWords = {
   to: 'to',
   /** A value that was empty before, or is emptied. */
   nothing: 'nothing',
+  /** THE CARD'S SIDE, ON A WIDE TILE (DIRECTION §39): who asked, why, and what it changes, each under a quiet heading. */
+  askedBy: 'Asked by',
+  why: 'Why it’s asked',
+  changes: 'What it changes',
 } as const;
 
 /** Who asked, as the by-line says it: the face and name, the app it ran in, the run, each only where it is a name. */

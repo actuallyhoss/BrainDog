@@ -10,8 +10,8 @@ test('a named tone is a token, anything else is a project colour carried inline'
   assert.deepEqual(paint('#B35F1F', 'ink'), { tone: 'own', colour: '#B35F1F' });
 });
 
-test('the ramp steps down from ink and stays on its lightest grey', () => {
-  assert.deepEqual([0, 1, 2, 3, 4, 9].map(rampAt), ['ink', 'g1', 'g2', 'g3', 'g4', 'g4']);
+test('the ramp steps down from the accent through its tints and stays on "other"', () => {
+  assert.deepEqual([0, 1, 2, 3, 4, 9].map(rampAt), ['ink', 'g2', 'g3', 'g4', 'g4', 'g4']);
   assert.equal(rampAt(-1), 'ink');
 });
 

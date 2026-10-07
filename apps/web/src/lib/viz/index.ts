@@ -17,8 +17,9 @@
  * built from the data ("Kiln takings a day, 9 weeks, from 138 to 96, low 95"); `summary` replaces
  * that sentence outright when a screen can say it better.
  *
- * A `tone` is a name (`ink`, the greys `g1` to `g4`, `danger`, `earn`, `warn`, `live`) or a project's
- * own colour string, which is set inline as `--c` (`shared.ts`).
+ * A `tone` is a name (`ink` and `g1` to `g4`, drawn as the accent, its tints and the grey for "other";
+ * `danger`, `earn`, `warn`, `live`) or a project's own colour string, which is set inline as `--c`
+ * (`shared.ts`). Every chart grows in once on its first draw, and never under reduced motion (`viz.css`).
  */
 
 export { default as Bars } from './Bars.svelte';

@@ -80,7 +80,8 @@ export function sentenceOf(tally: Tally | null, oldest: string | null, now: numb
  *
  * THREE PARTS, AND THE MIDDLE ONE IS NOT A WEEK. `filed` is every filing the record holds, a rule's included, so what is
  * left once this week's rules are taken off is "filed earlier", and it is never said as a week's figure. What still
- * waits for a person is the ink part, the one that matters; the rest are greys. `null` from a host with no weekly count.
+ * waits for a person is `ink` (the accent), the one that matters; rules are its tint and the rest the grey for "other".
+ * `null` from a host with no weekly count.
  *
  * AND `null` WHEN IT HAS NOTHING TO SAY: no rule filed anything this week and nothing waits, so the tile would be a 0
  * over an empty bar beside an inbox that already says it is clear (DIRECTION §35, an unused part is not drawn).
@@ -103,5 +104,24 @@ export function whoFiledOf(tally: Tally | null): { figure: number; parts: { labe
       waiting === 0
         ? `Rules filed ${n(ruled)} this week, and nothing waits for a person.`
         : `Rules filed ${n(ruled)} this week; ${n(waiting)} still ${waiting === 1 ? 'waits' : 'wait'} for a person.`,
+  };
+}
+
+/**
+ * The figure over the Inbox: what the rules filed this week, said even at none, since it is the one number that says
+ * whether the rules are doing their work. `null` from a host with no weekly count, never a guessed zero.
+ */
+export function figureOf(tally: Tally | null): { figure: number; unit: string; reading: string } | null {
+  if (!tally || tally.ruled === null) return null;
+  const ruled = Math.max(0, tally.ruled);
+  return {
+    figure: ruled,
+    unit: 'filed by your rules this week',
+    reading:
+      ruled === 0
+        ? 'A rule files what comes in as it arrives. Make one from any message that comes in twice.'
+        : tally.waiting === 0
+          ? 'Nothing is waiting for you.'
+          : `${tally.waiting.toLocaleString('en-GB')} still ${tally.waiting === 1 ? 'waits' : 'wait'} for you.`,
   };
 }

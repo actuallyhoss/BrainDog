@@ -1,12 +1,12 @@
 <!--
   Horizontal bars, one row an item: the label, the bar, a note at its end, and the value at the right.
 
-  Bars are greys (`g2`) unless an item has a `tone`; give the one that matters `ink` and its label
-  turns ink with it (the design system: "one series highlighted in ink and the rest are greys"). `danger`,
-  `earn`, `warn` and `live` keep their meanings, and a project's colour works too.
+  Bars are the accent's tint (`g2`) unless an item has a `tone`; give the one that matters `ink`, which draws the
+  full accent, and its label turns ink with it (one series highlighted, the rest its tint). `danger`, `earn`, `warn`
+  and `live` keep their meanings, and a project's colour works too. A bar grows from its start on the first draw.
 
   PAIRED is two periods: pass `paired`, one earlier value per item, and each row draws
-  this period's bar over the earlier one's in a light grey. Alone, each bar sits on a track.
+  this period's bar over the earlier one's in the grey for "other". Alone, each bar sits on a track.
 
   THE SCALE IS SHARED WHEN YOU SAY SO: pass `max` to put several charts on one scale.
 
@@ -54,10 +54,10 @@
         <rect class="viz-track" x={g.track.x} y={row.bar.y} width={g.track.w} height={row.bar.h} rx="3" />
       {/if}
       {#if row.bar.w > 0}
-        <rect class="viz-fill" data-tone={p.tone} style:--c={p.colour} x={row.bar.x} y={row.bar.y} width={row.bar.w} height={row.bar.h} rx={row.bar.rx} />
+        <rect class="viz-fill viz-grow-x" data-tone={p.tone} style:--c={p.colour} x={row.bar.x} y={row.bar.y} width={row.bar.w} height={row.bar.h} rx={row.bar.rx} />
       {/if}
       {#if row.pair && row.pair.w > 0}
-        <rect class="viz-fill" data-tone="g4" x={row.pair.x} y={row.pair.y} width={row.pair.w} height={row.pair.h} rx={row.pair.rx} />
+        <rect class="viz-fill viz-grow-x" data-tone="g4" x={row.pair.x} y={row.pair.y} width={row.pair.w} height={row.pair.h} rx={row.pair.rx} />
       {/if}
       {#if items[i]?.note}
         <text class="viz-value" x={row.noteX} y={row.textY}>{items[i]?.note}</text>

@@ -481,7 +481,7 @@ function overUnsaidField(decl: MetricDecl): boolean {
 const isTarget = (v: unknown): v is { lte: number } | { gte: number } =>
   typeof v === 'object' && v !== null && (typeof (v as { lte?: unknown }).lte === 'number' || typeof (v as { gte?: unknown }).gte === 'number');
 
-export function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record<string, unknown>): Metric {
+export function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record<string, unknown>, missed: 'warn' | 'bad' = 'warn'): Metric {
   const at = cell.metric.indexOf(':');
   const template = METRICS[at < 0 ? cell.metric : cell.metric.slice(0, at)];
   const built = template && at >= 0 ? withParam(template, cell.metric.slice(at + 1)) : template;
@@ -551,7 +551,8 @@ export function tileOf(cell: NonNullable<Answered['readings']>[number], values?:
     /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared, and a converted
        figure says as of which day's rates. */
     note: [said(unsaid ? liveWords.unsaid : decl ? targetSaid(decl, r) : ''), across].filter(Boolean).join(' · '),
-    tone: met === null ? undefined : met ? 'good' : 'warn',
+    /* A MISSED TARGET IS AMBER, and red only on a tile its page declared `bad`: the day the cash runs out. */
+    tone: met === null ? undefined : met ? 'good' : missed,
     ...(door ? { href: door } : {}),
     /* AND IT SAYS SO, so a page being read leaves the tile out: "Earning £0" over projects none of which says what it
        earns is no figure at all. A page being arranged still draws it, with the sentence. */
@@ -1013,7 +1014,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     return { ...shell, register: into, fills: { ...(filled as Record<string, string>) } };
   }
   /* A STAT OVER A REGISTER AND NO FIGURES draws a tile a measure from the rows (`measures.ts`), as the kernel answers it. */
-  if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values)) };
+  if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values, b.tone === 'bad' ? 'bad' : 'warn')) };
   /* A BAR OR A SPLIT OVER A FIGURE draws the parts the record read, EACH BY ITS NAME: a part keyed by a ref is the row
      it points at, read from the walk `pageReader` made of that list, and never the ULID the key is. */
   if (typeof source === 'string' && source.startsWith('metric.')) {

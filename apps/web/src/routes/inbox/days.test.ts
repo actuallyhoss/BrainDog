@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { dayLabel, daysOf, sentenceOf, whoFiledOf } from './days.ts';
+import { dayLabel, daysOf, figureOf, sentenceOf, whoFiledOf } from './days.ts';
 
 /* Noon on Wednesday 30 September 2026, on this machine's own clock, so every day below is a local one. */
 const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
@@ -53,6 +53,14 @@ test('the tile: rules this week as the figure, what waits in ink, and filed earl
   assert.equal(whoFiledOf({ waiting: 0, filed: 5, archived: 0, ruled: 9 })?.parts[1]?.value, 0, 'clamped, never negative');
   assert.equal(whoFiledOf({ waiting: 1, filed: 5, archived: 0, ruled: null }), null, 'an older host has no weekly count to draw');
   assert.equal(whoFiledOf({ waiting: 0, filed: 5, archived: 1, ruled: 0 }), null, 'nothing filed this week and nothing waiting draws no tile');
+});
+
+test('the figure is what rules filed this week, said at none too, and absent without a weekly count', () => {
+  assert.deepEqual(figureOf({ waiting: 2, filed: 40, archived: 0, ruled: 17 }), { figure: 17, unit: 'filed by your rules this week', reading: '2 still wait for you.' });
+  assert.equal(figureOf({ waiting: 0, filed: 0, archived: 0, ruled: 0 })?.figure, 0);
+  assert.match(figureOf({ waiting: 0, filed: 0, archived: 0, ruled: 0 })?.reading ?? '', /^A rule files/u);
+  assert.equal(figureOf({ waiting: 0, filed: 0, archived: 0, ruled: null }), null);
+  assert.equal(figureOf(null), null);
 });
 
 test('the page keeps the gates\' hooks and the untrusted-text rule', () => {

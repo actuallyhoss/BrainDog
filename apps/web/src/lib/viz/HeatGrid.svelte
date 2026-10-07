@@ -1,8 +1,8 @@
 <!--
   A heat grid: how busy, by row and column (the design system: "intensity over time"), such as days by hour.
 
-  Each cell is a rounded square in one of five steps, from the track for nothing to ink for the
-  busiest quarter. Row names sit at the left and every few column names on top, at 12 in `dim`.
+  Each cell is a rounded square in one of five steps, from the track for nothing to the full accent
+  for the busiest quarter. The cells fade up on the first draw. Row names sit at the left and every few column names on top, at 12 in `dim`.
 
   A screen reader hears the busiest and quietest cells as the chart's sentence, and can walk every
   value in a table kept off the page.
@@ -49,7 +49,7 @@
       <text class="viz-label" x="0" y={label.y}>{label.text}</text>
     {/each}
     {#each g.cells as cell (`${cell.r}:${cell.c}`)}
-      <rect class="viz-fill" data-tone={HEAT_TONES[cell.level]} x={cell.x} y={cell.y} width={g.size} height={g.tall} rx={Math.min(3, g.size / 2)} />
+      <rect class="viz-fill viz-fade" data-tone={HEAT_TONES[cell.level]} x={cell.x} y={cell.y} width={g.size} height={g.tall} rx={Math.min(3, g.size / 2)} />
     {/each}
   </svg>
   <table class="viz-hidden">

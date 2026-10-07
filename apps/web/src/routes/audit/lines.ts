@@ -45,6 +45,7 @@ export const historyWords = {
   everyList: (name: string) => `Show everything, not only ${name}`,
   everyone: 'Everyone',
   everyKind: 'Every kind',
+  filters: 'Filters',
   /* THE SENTENCE UNDER THE TITLE. History, not need: nothing in it is red. */
   nothingNew: 'Nothing changed since you last looked.',
   oneAway: 'One thing changed while you were away',
@@ -485,6 +486,37 @@ export function hourGroups(told: readonly Told[], clock: number): Band[] {
     bands.set(key, { key, title, lines: [t] });
   }
   return [...bands.values()];
+}
+
+/** One day of the stream: its word, how many lines it holds, and its hours, each an hour's subhead over its lines. */
+export type DayBand = { key: string; title: string; count: number; hours: Band[] };
+
+/**
+ * The stream as one tile a day, newest first, with an hour subhead inside it for each hour that has a line.
+ *
+ * EVERY DAY IS SPLIT BY THE HOUR, inside its own tile: an hour was a tile of its own with the board between them, so a
+ * busy morning was six boxes for one morning. A day is the unit the eye groups by, and the hour is the place in it.
+ *
+ * A LINE IS PLACED BY ITS NEWEST MOMENT, as `hourGroups` places it, and a day or an hour met again takes its line.
+ */
+export function dayGroups(told: readonly Told[], clock: number): DayBand[] {
+  const days = new Map<string, DayBand & { by: Map<string, Band> }>();
+  for (const t of told) {
+    const ms = Date.parse(t.e.at);
+    const day = dayOf(ms);
+    const hour = `${two(new Date(ms).getHours())}:00`;
+    const band = days.get(day) ?? { key: day, title: dayWord(ms, clock), count: 0, hours: [], by: new Map<string, Band>() };
+    days.set(day, band);
+    band.count++;
+    const at = band.by.get(hour);
+    if (at) at.lines.push(t);
+    else {
+      const next: Band = { key: `${day}T${hour}`, title: hour, lines: [t] };
+      band.by.set(hour, next);
+      band.hours.push(next);
+    }
+  }
+  return [...days.values()].map(({ key, title, count, hours }) => ({ key, title, count, hours }));
 }
 
 /* ── who worked: the lanes ─────────────────────────────────────────────── */

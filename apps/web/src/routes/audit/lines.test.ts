@@ -25,6 +25,7 @@ import {
   fold,
   foldKeys,
   foldOpen,
+  dayGroups,
   hourGroups,
   HOURS,
   isBookkeeping,
@@ -91,6 +92,20 @@ test('today is banded by the hour, the first band says the day, and an older day
 test('a day on its own, as the day filter leaves it, is banded by the hour too', () => {
   const bands = hourGroups([iso(28, 23, 18), iso(28, 23, 2), iso(28, 22, 5)].map((at) => one(ev(at))), NOW);
   assert.deepEqual(bands.map((b) => b.title), ['Yesterday 23:00', '22:00']);
+});
+
+test('the stream is one band a day, each with its hours inside it, newest first', () => {
+  const lines = [iso(29, 9, 39), iso(29, 9, 31), iso(29, 8, 31), iso(28, 23, 18), iso(28, 22, 5), iso(26, 10), iso(29, 9, 2)].map((at) => one(ev(at)));
+  const days = dayGroups(lines, NOW);
+  assert.deepEqual(
+    days.map((d) => [d.title, d.count, d.hours.map((h) => [h.title, h.lines.length])]),
+    [
+      ['Today', 4, [['09:00', 3], ['08:00', 1]]],
+      ['Yesterday', 2, [['23:00', 1], ['22:00', 1]]],
+      ['Saturday', 1, [['10:00', 1]]],
+    ],
+  );
+  assert.equal(new Set(days.flatMap((d) => d.hours.map((h) => h.key))).size, 5, 'every hour has its own key, across days too');
 });
 
 test('a band met again takes its line rather than drawing a second heading', () => {

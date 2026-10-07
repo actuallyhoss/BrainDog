@@ -26,6 +26,7 @@ import type { LiveBlock } from '../record/page-live.ts';
 import { bare, emptyHidden, says } from '../page/home.ts';
 import { lists } from '../copy/lists.ts';
 import { lateSaid, sentenceOf, type Sentence } from './today-tiles.ts';
+import { dayGroups, lateLines, type WithRows } from './home-rows.ts';
 import { words } from './words.ts';
 /* THE LIST A TASK IS KEPT IN, named once for every work screen (`lib/work/list.ts`), never again here. */
 import { TASKS } from '../work/list.ts';
@@ -303,6 +304,11 @@ export type HomeDrawn = {
   blocks: LiveBlock[];
   /** The page's own line, when it declares one in plain words (`note lead`), lifted out to be the head's. */
   lead: string | null;
+  /**
+   * THE LINE A TASK IS TYPED INTO, lifted out to sit in the head beside the page's name (DIRECTION §39: a whole tile spent
+   * on one field), or `null` where the page has none. It stays in the list, not drawn, so every block keeps its place.
+   */
+  capture: LiveBlock | null;
   /** The line worked out from what is drawn, or `null` on a page that holds nothing it can be counted from. */
   sentence: Sentence | null;
   /**
@@ -336,9 +342,12 @@ export function slashLineOf(drawn: HomeDrawn, today: boolean): unknown {
  * already drawn is not drawn again in what falls due.
  *
  * WHAT FALLS DUE LEADS WITH WHAT IS ALREADY LATE: the late rows become a block of their own, headed Late, drawn
- * just before the rest. WHERE IT FOLLOWS THE LATE TASKS it is the same tile, under their name and with none of its own
- * (`joins`, which `layout.ts` `boxesOf` draws as one surface), so what is late is said once, the tasks first. The tasks'
- * name says "or due today" while one of them is only due today, since that one is not late yet.
+ * just before the rest. WHERE IT FOLLOWS THE LATE TASKS it is the same list, under their name and with the count of
+ * both (`lateTile`, `home-rows.ts`), so what is late is said once, every thing in one shape, the tasks first. The
+ * tasks' name says "or due today" while one of them is only due today, since that one is not late yet. What comes up
+ * after it is drawn a day at a time.
+ *
+ * THE LINE A TASK IS TYPED INTO GOES TO THE HEAD, beside the page's name, as the page's line does under it.
  *
  * WHAT CHANGED IS ONLY WHAT IS NEW, and A BLOCK WITH NOTHING TO SHOW IS NOT DRAWN: an empty list on the page everybody
  * reads first is noise, and the line at the top already says the quiet half.
@@ -351,6 +360,7 @@ export function slashLineOf(drawn: HomeDrawn, today: boolean): unknown {
 export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: HomeVoice = HOUSE, one?: string): HomeDrawn {
   const today = dayOf(now);
   let lead: string | null = null;
+  let capture: LiveBlock | null = null;
   let slash: unknown;
   const drawn = new Set<string>();
   const shaped: LiveBlock[] = [];
@@ -370,6 +380,11 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
         shaped.push({ ...b, drawn: false });
         continue;
       }
+    }
+    if (b.kind === 'capture' && capture === null) {
+      capture = b;
+      shaped.push({ ...b, drawn: false });
+      continue;
     }
     if (isTodo(b) && aligned(b)) {
       const list = listOf(b);
@@ -400,13 +415,17 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
   const told = toldOf(kept);
   const fed = kept.map((b) => {
     if (!b.drawn || says(b) || b.kind !== 'feed') return b;
-    const cut = untold(b, told);
+    const cut = worded(untold(b, told));
     return hollow(cut) ? { ...cut, drawn: false } : cut;
   });
   /* AND THEN THE READER'S OWN RULE, so a section over nothing goes with its blocks here as it does on the page. */
   const out = emptyHidden(fed);
   for (const at of lateAt) lateTile(out, at, today, voice);
-  return { blocks: out, lead, sentence: sentenceFrom(shaped, today), slash };
+  /* WHAT COMES UP, A DAY AT A TIME, each day a chip with what falls due on it beside it. */
+  for (const [n, b] of out.entries())
+    if (b.drawn && !says(b) && isDue(b) && b.kind === 'timeline' && aligned(b) && !(b as WithRows).homeRows)
+      out[n] = { ...b, homeRows: { kind: 'days', days: dayGroups(b, today) } } as WithRows;
+  return { blocks: out, lead, capture, sentence: sentenceFrom(shaped, today), slash };
 }
 
 /** Each house line Today's body writes that a voice may say its own way, by its key. */
@@ -492,6 +511,29 @@ function untold(b: LiveBlock, told: Told): LiveBlock {
   return { ...b, feed: left, rows, shown: Math.max(0, b.shown - gone), total: Math.max(left.length, b.total - gone) };
 }
 
+/**
+ * A FEED NEVER ENDS ON A BARE NUMBER. A burst the record could put no words to ("248" and nothing after it, under
+ * Rules) is said as what it is, that many changes, so the count is in the words and the line reads as a line.
+ */
+function worded(b: LiveBlock): LiveBlock {
+  const bare = (r: LiveBlock['rows'][number]): number | null => {
+    const cells = (r as { cells?: readonly (string | null)[] }).cells ?? [];
+    if (r.key === 'seen' || (cells[3] ?? '').trim() !== '') return null;
+    const n = Number.parseInt(cells[2] ?? '', 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  if (!b.rows.some((r) => bare(r) !== null)) return b;
+  const rows = b.rows.map((r) => {
+    const n = bare(r);
+    if (n === null) return r;
+    const cells = [...r.cells];
+    cells[2] = '';
+    cells[3] = words.changes(n);
+    return { ...r, cells };
+  });
+  return { ...b, rows };
+}
+
 /** Whether a drawn block is a list of tasks whose every row was due today or before. */
 function lateTasks(b: LiveBlock | undefined, today: string): b is LiveBlock {
   if (!b?.drawn || !isTodo(b) || b.entries.length === 0) return false;
@@ -502,18 +544,29 @@ function lateTasks(b: LiveBlock | undefined, today: string): b is LiveBlock {
 }
 
 /**
- * ONE LATE TILE, in place: the late part of what falls due at `at` joins the late tasks just before it, under their
- * heading, and their heading says "or due today" while one of them is. Both stay at their places in the list.
+ * ONE LATE LIST, in place (`home-rows.ts`): the late part of what falls due at `at` and the late tasks just before it
+ * are drawn as one list on the tasks' block, under their heading, with the count of both, and the money's own block is
+ * not drawn. Their heading says "or due today" while one of the tasks is. Money late with no late tasks before it is the
+ * list on its own block. Both stay at their places in the list, so every write still finds its block.
  */
 function lateTile(blocks: LiveBlock[], at: number, today: string, voice: HomeVoice): void {
-  const tasks = blocks[at - 1];
-  if (!lateTasks(tasks, today)) return;
-  if (tasks.heading === voice.overdue && tasks.entries.some((e) => dayIn(tasks, e.fields as Record<string, unknown>) === today))
-    blocks[at - 1] = { ...tasks, heading: words.lateOrToday };
   const money = blocks[at]!;
-  if (!money.drawn) return;
-  const { heading: _named, ...rest } = money;
-  blocks[at] = { ...rest, joins: true } as LiveBlock;
+  const owes = money.drawn && aligned(money);
+  const tasks = blocks[at - 1];
+  if (!lateTasks(tasks, today) || !aligned(tasks)) {
+    if (owes) blocks[at] = { ...money, homeRows: { kind: 'late', lines: lateLines([money], today) } } as WithRows;
+    return;
+  }
+  const heading = tasks.heading === voice.overdue && tasks.entries.some((e) => dayIn(tasks, e.fields as Record<string, unknown>) === today) ? words.lateOrToday : tasks.heading;
+  const both = owes ? [tasks, money] : [tasks];
+  blocks[at - 1] = {
+    ...tasks,
+    ...(heading === undefined ? {} : { heading }),
+    homeRows: { kind: 'late', lines: lateLines(both, today) },
+    shown: both.reduce((n, b) => n + b.rows.length, 0),
+    total: both.reduce((n, b) => n + b.total, 0),
+  } as WithRows;
+  if (owes) blocks[at] = { ...money, drawn: false };
 }
 
 /** A clause that keeps a day column before a day: `by before +1d`, `day before today`. */

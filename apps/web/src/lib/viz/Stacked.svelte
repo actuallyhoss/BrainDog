@@ -1,8 +1,9 @@
 <!--
   A stacked bar: part of a whole as one pill-ended bar, its parts 2px apart.
 
-  Parts with no `tone` step down the ramp in order, ink first, so put the part that matters first or
-  give it `ink` and the rest greys. A part's label sits under it, at its start, when it fits inside
+  Parts with no `tone` step down the ramp in order, the accent first, then its two tints, then the grey for
+  "other", so put the part that matters first or give it `ink` and the rest the tints. The bar wipes in from the
+  left on its first draw. A part's label sits under it, at its start, when it fits inside
   the part's width; at phone width the labels that no longer fit drop, and the sentence
   a screen reader hears always has every part.
 -->
@@ -41,11 +42,14 @@
     <defs>
       <clipPath id="{uid}-pill"><rect x="0" y="0" width={W} height={height} rx={height / 2} /></clipPath>
     </defs>
-    <g clip-path="url(#{uid}-pill)">
-      {#each g.parts as part (part.i)}
-        {@const p = paint(parts[part.i]?.tone, rampAt(part.i))}
-        <rect class="viz-fill" data-tone={p.tone} style:--c={p.colour} x={part.x} y="0" width={part.w} height={height} />
-      {/each}
+    <!-- The wipe is a clip of its own, so it goes on a group outside the pill's: on one element it would replace it. -->
+    <g class="viz-wipe">
+      <g clip-path="url(#{uid}-pill)">
+        {#each g.parts as part (part.i)}
+          {@const p = paint(parts[part.i]?.tone, rampAt(part.i))}
+          <rect class="viz-fill" data-tone={p.tone} style:--c={p.colour} x={part.x} y="0" width={part.w} height={height} />
+        {/each}
+      </g>
     </g>
     {#each g.parts as part (part.i)}
       {#if part.labelX !== null}

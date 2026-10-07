@@ -1,6 +1,6 @@
 <!--
-  The rail: the board's left column (DIRECTION §39). From the top, the record switcher, the ask field, the places, the
-  agents working now, each project, the lists, and at the foot More and the person.
+  The rail: the board's left column (DIRECTION §39). From the top, the record switcher, the ask field, the places, how
+  many agents are working, each project, the lists, and at the foot More and the person.
 
   FLAT, AND THE BOARD'S OWN COLOUR. It was a floating glass card with a shadow, which made the navigation the loudest
   thing on every screen. It is now the left 240 of the board, with no edge, no fill and no shadow, and the place you
@@ -18,8 +18,10 @@
   THE ASK FIELD IS THE PALETTE'S DOOR, drawn as the field it opens, with its `/` key. It is a button and not an input:
   the palette owns the typing.
 
-  WORKING NOW IS WHO IS AT IT, one line a run: a face in a `--live` ring, what the run says it is doing, and how long.
-  The app it runs in is in the line's name and its tooltip, not a second line. Absent while nobody works.
+  WHO IS WORKING IS ONE ROW, "2 working", with a pulsing dot, and it opens Agents. It was a group of its own, one line a
+  run with how long each had gone ("11 h 52"), which repeated the Agents page and disagreed with it on the time ("3 min
+  ago" there, for the same run). The runs and their times are Agents' to draw; the rail only says that some are at it,
+  counted by the same clause (`RUNS_WORKING`). Absent while nobody works.
 
   THE PAGE BESIDE IT MUST NOT JUMP, SO THE RAIL SAYS ITS WIDTH ON THE ROOT. `--rail-w` is the rail's width at whichever
   width it is drawn, and `--rail-d` and `--rail-ease` the time and curve the shell slides the work on when it changes.
@@ -36,8 +38,8 @@
   import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
   import Icon, { type IconName } from './Icon.svelte';
-  import AgentMark from './AgentMark.svelte';
-  import { AGENT_MARKS, isMarked } from './agent-marks.ts';
+  import { hueFor } from './face.ts';
+  import { agentsHref } from '../nav/rail.ts';
   import Kbd from './Kbd.svelte';
   import Mark from './Mark.svelte';
   import { palette } from '../palette/open.svelte.ts';
@@ -46,12 +48,6 @@
   import { levelWord, openRecord, type SwitcherRow } from '../record/switcher.ts';
   import type { Shell, Working } from '../record/boot-live.ts';
   import type { SpineKey } from '../spine.ts';
-
-  /**
-   * One run at work, and how long it has gone in seconds when the read says (`ran_s`, the record's `runAge`): to the
-   * clock while it works, and frozen where it was last heard from once it has gone quiet.
-   */
-  type Run = Working & { ran_s?: number };
 
   let {
     places,
@@ -90,8 +86,8 @@
     /** The spine as `spineOf` reads it: whether Inbox has been used, which puts its row under More. */
     spine?: readonly SpineKey[] | undefined;
     inbox?: number | undefined;
-    /** The agents at work now (`readWorking`); the group is not drawn while this is empty. */
-    working?: readonly Run[] | undefined;
+    /** The agents at work now (`readWorking`); the rail says how many, and nothing while this is empty. */
+    working?: readonly Working[] | undefined;
     /** The narrow rail: glyphs, with the names on hover and on focus. Per device, `pref.sidebar`. */
     icons?: boolean | undefined;
     ontoggle?: (() => void) | undefined;
@@ -107,20 +103,9 @@
     newList: 'New list',
     /* THE HOLDING PEN'S ROW: how many offers wait, and Settings, Navigation says what they are. */
     suggested: (n: number) => `${n} suggested`,
-    working: 'Working now',
-    quiet: 'gone quiet',
-    /* A RUNNER IS "Runner": what follows its colon is the machine it is on, and a machine's name is not for reading. */
-    runner: 'Runner',
-    /* AN AGENT NOBODY NAMES, by the last word it signs with, in words: `agent:night-shift` is "Night shift". `other` is
-       the record saying it does not know, which is no app, so it says nothing rather than "Other". */
-    agent: (name: string) => {
-      const tail = name.slice(name.lastIndexOf(':') + 1).replace(/[-_]+/gu, ' ').trim();
-      return tail.toLowerCase() === 'other' ? '' : tail.charAt(0).toUpperCase() + tail.slice(1);
-    },
-    /* A run with no words, no project and no app it can be known by. */
-    anAgent: 'An agent',
-    /* THE APPS A MAKER SHIPS MORE THAN ONE OF, by the app: Claude Code is not Claude in a browser. */
-    apps: { 'claude-code': 'Claude Code', 'claude code': 'Claude Code' } as Readonly<Record<string, string>>,
+    /* HOW MANY AGENTS ARE AT IT, the rail's one row about them, and what pressing it opens. */
+    working: (n: number) => `${n} working`,
+    workingOpen: 'Open Agents',
     you: 'You',
     account: 'Your account and settings',
   } as const;
@@ -240,35 +225,8 @@
     if (bottom > view.bottom) scroller.scrollTop += Math.min(bottom - view.bottom, box.top - view.top);
   }
 
-  /* HOW LONG EACH RUN HAS GONE, short: "8 min", "1 h 08", "2 d". The clock moves once a minute while anybody works. */
-  let now = $state(Date.now());
-  $effect(() => {
-    if (working.length === 0) return;
-    now = Date.now();
-    const t = setInterval(() => (now = Date.now()), 60_000);
-    return () => clearInterval(t);
-  });
-  /**
-   * A RUN'S AGE IS THE RECORD'S `runAge`, AND IT STOPS WHEN THE RUN DOES. A run at work is as old as the clock says, which
-   * is the minute tick above; a run gone quiet is as old as it was when last heard from, the `ran_s` its read carries.
-   */
-  function age(w: Run): string {
-    const from = w.since === null ? Number.NaN : Date.parse(w.since);
-    const seconds = w.quiet && w.ran_s !== undefined ? w.ran_s : (now - from) / 1000;
-    if (!Number.isFinite(seconds)) return '';
-    const min = Math.max(1, Math.floor(seconds / 60));
-    if (min < 60) return `${min} min`;
-    if (min < 24 * 60) return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
-    return `${Math.floor(min / (24 * 60))} d`;
-  }
-  /** The app a run is in, as a person knows it: "Claude Code", "Codex", a maker's name, else the agent's own word. */
-  function appOf(w: Working): string {
-    const key = w.agent.trim().toLowerCase().replace(/^agent:/u, '');
-    if (Object.hasOwn(words.apps, key)) return words.apps[key] ?? '';
-    if (w.kind === 'runner') return words.runner;
-    return isMarked(w.kind) ? AGENT_MARKS[w.kind].maker : words.agent(w.agent);
-  }
-  const runName = (w: Working): string => w.doing.trim() || w.project || appOf(w) || words.anAgent;
+  /* WHERE "2 WORKING" GOES: the Agents place, among the seven or under More (`agentsHref`). */
+  const agentsAt = $derived(agentsHref([...places, ...more]));
 
   /**
    * THE WORDS COME BACK AS THE RAIL WIDENS. The rail takes its new width in one frame (the shell slides the work beside
@@ -402,39 +360,14 @@
       {/each}
     </ul>
 
-    <!-- WORKING NOW: one line per run at work, and nothing at all while nobody is. -->
+    <!-- WHO IS WORKING, AS ONE ROW: how many, a dot that pulses while they are at it, and the door to Agents. Nothing
+         while nobody is. -->
     {#if working.length > 0}
-      <section class="part" aria-labelledby="rail-working">
-        {#if icons}<hr class="sep" />{/if}
-        <h2 class="sub" id="rail-working" data-clip={icons ? '' : undefined}><span class="sub-words">{words.working}</span></h2>
-        <ul class="group">
-          {#each working as w, i (w.seq ?? `run-${i}`)}
-            {@const name = runName(w)}
-            {@const app = appOf(w)}
-            {@const took = age(w)}
-            {@const both = !app || app === name ? name : `${name} · ${app}`}
-            <li>
-              <svelte:element
-                this={w.seq === null ? 'div' : 'a'}
-                class="item run tap"
-                href={w.seq === null ? undefined : at(`/r/session/${w.seq}`)}
-                data-label={both}
-                title={both}
-                aria-label={[!app || app === name ? name : `${app}: ${name}`, took, w.quiet ? words.quiet : ''].filter(Boolean).join(', ')}
-              >
-                <span class="rail-glyph" aria-hidden="true">
-                  <span class="face" data-quiet={w.quiet ? '' : undefined}>
-                    <svg class="ring" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="11" /></svg>
-                    <span class="face-disc" data-marked={isMarked(w.kind) ? '' : undefined}><AgentMark kind={w.kind} size="s" /></span>
-                  </span>
-                </span>
-                <span class="item-name" dir="auto" aria-hidden="true">{name}</span>
-                {#if took}<span class="tally num" aria-hidden="true">{took}</span>{/if}
-              </svelte:element>
-            </li>
-          {/each}
-        </ul>
-      </section>
+      <div class="part">
+        <a class="item working tap" href={at(agentsAt)} data-label={words.working(working.length)} title={words.workingOpen}>
+          <span class="rail-glyph" aria-hidden="true"><span class="pulse"></span></span><span class="item-name">{words.working(working.length)}</span>
+        </a>
+      </div>
     {/if}
 
     <!-- EACH SECTION'S OWN THINGS UNDER ITS NAME, a project per row under Projects, each in its own colour. The fold's
@@ -456,7 +389,9 @@
             <li>
               <a class="item tap" href={at(entry.href)} data-nav data-label={entry.title} aria-current={under(entry.href) ? 'page' : undefined}>
                 <span class="rail-glyph">
-                  {#if entry.hue !== undefined}<span class="hue" style="--hue:{entry.hue}" aria-hidden="true"></span>{:else}<Icon name={entry.icon} size="l" />{/if}
+                  <!-- ALWAYS ITS DOT, never a glyph: the hue the record sent, else the one its name is drawn in, so a
+                       project does not change face between one load and the next. -->
+                  <span class="hue" style="--hue:{entry.hue ?? hueFor(entry.title)}" aria-hidden="true"></span>
                 </span>
                 <span class="item-name">{entry.title}</span>
               </a>
@@ -991,56 +926,28 @@
     margin-block-start: var(--sp-2);
   }
 
-  /* ── Working now ─────────────────────────────────────────────────────────── */
+  /* ── Who is working ─────────────────────────────────────────────────── */
 
-  /* ONE LINE A RUN, the height of a place: the face where the glyph would be, the name, and how long. */
-  .run {
-    color: var(--ink);
-    font-weight: 400;
-  }
-
-  /* An 18px disc inside a 1.5px `--live` ring: whole while the run is heard from, faint once it has gone quiet. */
-  .face {
-    position: relative;
-    display: grid;
-    place-items: center;
-    inline-size: 22px;
-    block-size: 22px;
-  }
-
-  .ring {
-    position: absolute;
-    inset: 0;
-    inline-size: 100%;
-    block-size: 100%;
-    fill: none;
-    stroke: var(--live);
-    stroke-width: 1.5;
-  }
-
-  .face[data-quiet] .ring {
-    stroke-opacity: 0.35;
-  }
-
-  .face-disc {
-    display: grid;
-    place-items: center;
-    inline-size: 18px;
-    block-size: 18px;
-    background: var(--ink2);
+  /* A 6px DOT IN THE WORKING COLOUR, where a place's glyph would be, breathing while the agents are at it. Its opacity
+     moves and nothing else: no ring, no glow, no change of size that would nudge the name beside it. */
+  .pulse {
+    inline-size: 6px;
+    block-size: 6px;
     border-radius: var(--r-round);
-    color: var(--on-ink);
+    background: var(--status-working);
+    animation: rail-pulse calc(var(--d-panel) * 8) var(--ease-standard) infinite;
   }
 
-  .face-disc :global(svg) {
-    inline-size: 12px;
-    block-size: 12px;
+  @keyframes rail-pulse {
+    50% {
+      opacity: 0.35;
+    }
   }
 
-  /* A MAKER'S MARK ON A PLAIN DISC, in its own colours (`AgentMark`): an ink disc would turn Codex's black knot to nothing. */
-  .face-disc[data-marked] {
-    background: var(--rail-here);
-    color: var(--ink);
+  @media (prefers-reduced-motion: reduce) {
+    .pulse {
+      animation: none;
+    }
   }
 
   /* ── The foot ─────────────────────────────────────────────────────────── */
@@ -1168,8 +1075,7 @@
   .rail[data-icons] .record-name,
   .rail[data-icons] .ask-words,
   .rail[data-icons] .me-name,
-  .rail[data-icons] .item .tally:not([data-waiting]),
-  .sub[data-clip] {
+  .rail[data-icons] .item .tally:not([data-waiting]) {
     position: absolute;
     inline-size: 1px;
     block-size: 1px;
@@ -1180,7 +1086,6 @@
 
   .rail[data-icons] .ask-key,
   .rail[data-icons] .me-face,
-  .rail[data-icons] .run .tally,
   .rail[data-icons] .record :global(.icon) {
     display: none;
   }

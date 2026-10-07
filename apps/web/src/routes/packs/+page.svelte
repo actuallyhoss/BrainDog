@@ -16,7 +16,7 @@
   THE LOOK: the three tabs are a glass segmented control in the title row's toolbar, beside Browse, and
   the sentence under the title says how many are installed and how many have an update, in ink (an update is never
   urgent). Installed leads with one tile, what the add-ons hold between them as a stacked bar of lists, pages and rules
-  with its reading line; then the add-ons themselves as 56px rows on the ground, each with its icon well, its switch,
+  with its reading line; then the add-ons themselves as 56px rows on the ground, each with its own place's glyph (`glyph.ts`), its switch,
   and its "…" on hover. The counts are read from each add-on's own document (`$lib/market/adds.ts`), the reader the
   plan sheet's summary uses, and a list is counted from what the record says the add-on holds.
 -->
@@ -61,6 +61,7 @@
   import { browserStore, catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, trustForEntry, updatesFor } from './browse/catalogue.ts';
   import { askOnDecide, diffOf, install, notOwner, planFor, type OfferClient, type Planned } from './browse/[id]/offer.ts';
   import { words } from './words.ts';
+  import { glyphOf } from './glyph.ts';
   /* WHAT BRAINDOG ITSELF HAS IMPROVED, read from the one place Decide reads it too, so the Updates tab and the card on
      Decide never disagree about what waits. */
   import { declarationName, firstPartyUpdates } from '../decide/improved.ts';
@@ -579,7 +580,7 @@
                a refusal is waiting on keeps its verbs showing (`data-needs`). -->
           <li class="addon-row" data-off={off ? '' : undefined} data-needs={block ? '' : undefined}>
             <div class="line addon">
-              <span class="line-mark"><IconWell name="packs" size="l" /></span>
+              <span class="line-mark"><IconWell name={glyphOf(byId.get(state.id)?.pages, page.data.nav ?? [])} size="l" /></span>
               <a class="addon-main" href={at(`/packs/${state.id}`)}>
                 <span class="line-title addon-name">{name}</span>
                 <span class="line-detail addon-line">{lineOf(state)}</span>

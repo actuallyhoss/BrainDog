@@ -1,7 +1,8 @@
 <!--
   A sparkline: a trend's shape with no axes, for a stat tile's top right (120×32).
 
-  A 2px line with round joins, its area at 8%, and a 3px dot on the last point. `mark` names the
+  A 2px line in the accent with round joins, its area at 8%, and a 3px dot on the last point, wiped in from the
+  left on its first draw. `mark` names the
   point that matters: the last one (the default), or the low or the high, which then wears a dot of
   its own and, when `markLabel` is given, a direct label beside it ("low £388,000, 23 Nov"). A
   `threshold` is a dashed rule across the chart; `projectFrom` draws the line from that index on as a
@@ -36,7 +37,7 @@
     /** The most it is drawn at, in px; narrower when its box is. */
     width?: number | undefined;
     height?: number | undefined;
-    /** `ink` by default; `earn` for money in, `danger` for a fall that needs him, `live` for a run. A project's colour works too. */
+    /** `ink` (the accent) by default; `earn` for money in, `danger` for a fall that needs him, `live` for a run. A project's colour works too. */
     tone?: 'ink' | 'earn' | 'danger' | 'live' | Tone | undefined;
     mark?: TrendMark | undefined;
     /** What the line measures, which leads the sentence it reads as: "Kiln takings a day, 9 weeks". */
@@ -66,7 +67,7 @@
     {#if g.threshold !== null}
       <line class="viz-rule" x1="0" x2={W} y1={g.threshold} y2={g.threshold} />
     {/if}
-    <g data-tone={p.tone} style:--c={p.colour}>
+    <g class="viz-wipe" data-tone={p.tone} style:--c={p.colour}>
       {#if g.area}<polygon class="viz-area" points={g.area} />{/if}
       <polyline class="viz-line" points={g.line} />
       {#if g.projection}<polyline class="viz-line" data-projected points={g.projection} />{/if}

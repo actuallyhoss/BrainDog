@@ -118,9 +118,9 @@ export function sentenceOf(needing: number, late: readonly string[], agents: num
 export const projectColour = (hue: number | null | undefined): string | null =>
   typeof hue === 'number' && Number.isFinite(hue) ? `oklch(var(--mark-l) var(--mark-c) ${hue})` : null;
 
-/** A task on no project, and a bill, in the chart ramp's greys: a task a step darker, because it is work. */
-const TASK_GREY = 'var(--viz-g1)';
-const BILL_GREY = 'var(--viz-g2)';
+/** A task on no project, and a bill, in greys that read as a small dot: a task a step darker, because it is work. */
+const TASK_GREY = 'color-mix(in srgb, var(--ink) 76%, var(--tile))';
+const BILL_GREY = 'color-mix(in srgb, var(--ink) 48%, var(--tile))';
 
 /** How many days before today the strip starts, so the late dots of the last two days are on it. */
 export const STRIP_BEFORE = 2;

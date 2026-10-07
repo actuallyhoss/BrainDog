@@ -179,10 +179,6 @@ export const lists = {
   zToA: 'Z to A',
   firstAdded: 'first added',
   lastAdded: 'last added',
-  /** Under a row's Details: when it was added, and by whom, in the middle of a sentence. */
-  rowAddedBy: (when: string, who: string) => `${when} by ${who}`,
-  rowByYou: 'you',
-  rowBySomeone: 'someone on this record',
   matching: 'matching',
   /**
    * A SAVED VIEW'S FILTER, AS THE SENTENCE A PERSON WOULD SAY.
@@ -264,9 +260,6 @@ export const lists = {
   writeMarkSaved: 'Saved',
   writeBulk: (landed: number, total: number, state: string) =>
     landed === total ? `${total} ${total === 1 ? 'item' : 'items'} set to ${state}.` : `${landed} of ${total} set to ${state}.`,
-  noteLabel: 'Add a note',
-  notePlaceholder: 'Write a note…',
-  noteAdd: 'Add note',
   writeArchivedSome: (landed: number, total: number) => `${landed} of ${total} archived.`,
   writeMarkRestored: 'Restored',
   viewEmpty: 'Nothing matches this view yet.',
@@ -292,9 +285,6 @@ export const lists = {
   /* A SAVE THAT CHANGES NOTHING IS NOT A WRITE. Sending it would put a line in the row's history
      saying a field went from a value to the same value, which is a fact about a press, not the row. */
   editNoChange: 'Nothing was changed.',
-  /* What a field the row does not carry yet says, where a value would be. It is a fact about the
-     row — the register declares the field and this row has not answered it — and not an absence. */
-  editNotSet: 'Not set',
   /* Archive and put back, on the row itself, in the words the list already uses for the same verb. */
   rowArchive: 'Archive',
   rowRestore: 'Put back',

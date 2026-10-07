@@ -1,7 +1,8 @@
 <!--
-  Segments: progress as one cell per step or part. Done cells are ink, the rest a light
-  grey, and with `current` the next cell is an outline in `tone`: `danger` when that step waits on him
-  (a review, a part due), `live` when an agent is on it, a grey by default.
+  Segments: progress as one cell per step or part. Done cells are the accent, the rest the grey for
+  "other", and with `current` the next cell is an outline in `tone`: `danger` when that step waits on him
+  (a review, a part due), `live` when an agent is on it, the accent by default (an outline is a thin line, so never a
+  light tint). The cells wipe in from the left on the first draw.
 
   The cells share the width of the box, so put it in a box as wide as the steps should be ("step 4 of
   5" beside its words is about a hundred pixels; 23 payment parts can take the tile).
@@ -23,7 +24,7 @@
     done: number;
     /** Outline the step after the last done one, as the one in hand. */
     current?: boolean | undefined;
-    /** The current step's outline: `danger`, `live`, `warn`, or a grey (`g2`, the default). */
+    /** The current step's outline: `danger`, `live`, `warn`, or the accent (`ink`, the default). */
     tone?: Tone | undefined;
     /** What is being counted, which leads the sentence: "Lina, parts paid". */
     subject?: string | undefined;
@@ -34,28 +35,30 @@
   let measured = $state(0);
   const W = $derived(measured > 0 ? measured : 416);
   const cells = $derived(segments(total, done, W, current));
-  const p = $derived(paint(tone, 'g2'));
+  const p = $derived(paint(tone, 'ink'));
   const said = $derived(summary ?? describeSegments(total, done, subject, current));
 </script>
 
 <div class="viz viz-segments" bind:clientWidth={measured}>
   <svg viewBox="0 0 {W} {SEG_HEIGHT}" role="img" aria-label={said}>
-    {#each cells as cell, i (i)}
-      {#if cell.state === 'current'}
-        <!-- Inset by half the stroke, so the outline sits inside the cell it stands for. -->
-        <rect
-          class="viz-outline"
-          data-tone={p.tone}
-          style:--c={p.colour}
-          x={cell.x + 0.75}
-          y="0.75"
-          width={Math.max(0, cell.w - 1.5)}
-          height={SEG_HEIGHT - 1.5}
-          rx={Math.max(0, cell.rx - 0.5)}
-        />
-      {:else}
-        <rect class="viz-fill" data-tone={cell.state === 'done' ? 'ink' : 'g4'} x={cell.x} y="0" width={cell.w} height={SEG_HEIGHT} rx={cell.rx} />
-      {/if}
-    {/each}
+    <g class="viz-wipe">
+      {#each cells as cell, i (i)}
+        {#if cell.state === 'current'}
+          <!-- Inset by half the stroke, so the outline sits inside the cell it stands for. -->
+          <rect
+            class="viz-outline"
+            data-tone={p.tone}
+            style:--c={p.colour}
+            x={cell.x + 0.75}
+            y="0.75"
+            width={Math.max(0, cell.w - 1.5)}
+            height={SEG_HEIGHT - 1.5}
+            rx={Math.max(0, cell.rx - 0.5)}
+          />
+        {:else}
+          <rect class="viz-fill" data-tone={cell.state === 'done' ? 'ink' : 'g4'} x={cell.x} y="0" width={cell.w} height={SEG_HEIGHT} rx={cell.rx} />
+        {/if}
+      {/each}
+    </g>
   </svg>
 </div>

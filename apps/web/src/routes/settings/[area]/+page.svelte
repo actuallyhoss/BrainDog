@@ -392,7 +392,6 @@
     gap: var(--sp-5);
     padding-block: var(--sp-5) var(--sp-9);
     padding-inline: var(--gutter);
-    max-inline-size: var(--page-max);
   }
 
   .body {
@@ -408,13 +407,14 @@
     font-size: var(--t-xs);
   }
 
-  /* FROM 900PX UP, THE INDEX BESIDE THE AREA, at the rail's own width because it is the same kind of
-     list. It does not stick: with its groups it is taller than a short window, and a sticky column
-     taller than the window hides its own last rows until the page ends. */
+  /* FROM 900PX UP, THE INDEX BESIDE THE AREA, narrower than the rail at 200 with its rows at the meta step, so two
+     columns of navigation do not take a third of the screen before the area starts. It does not stick: with its groups
+     it is taller than a short window, and a sticky column taller than the window hides its own last rows until the page
+     ends. */
   @media (width >= 900px) {
     .settings-place {
-      grid-template-columns: var(--rail) minmax(0, 1fr);
-      column-gap: var(--sp-7);
+      grid-template-columns: 200px minmax(0, 1fr);
+      column-gap: var(--sp-6);
       align-items: start;
     }
 

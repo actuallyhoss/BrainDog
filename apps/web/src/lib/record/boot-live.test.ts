@@ -7,7 +7,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import './fixtures/fill.ts';
-import { forget, layoutOf, newsOf, readBoot, readWorking, refusedShell, signsIn, type Fetch } from './boot-live.ts';
+import { forget, layoutOf, newsOf, readBoot, readWorking, refusedShell, RUNS_WORKING, signsIn, type Fetch } from './boot-live.ts';
+import { AGENTS_METRICS } from '@braindog/seed';
+import { hueFor } from '../ui/face.ts';
 import { tabsOf } from '../page/tabs.ts';
 
 const BASE = 'http://record.test';
@@ -624,4 +626,51 @@ test('A QUIET RUN IS AS OLD AS IT WAS WHEN LAST HEARD FROM, and a run still at w
   assert.equal(busy?.ran_s, 60 * 60, 'a run still at work stopped counting');
   assert.equal(quiet?.quiet, true, 'a run not heard from in two hours is not quiet');
   assert.equal(quiet?.ran_s, 90 * 60, 'a quiet run went on ageing after it was last heard from');
+});
+
+/**
+ * EACH LIST WEARS THE ICON IT DECLARES, AS `boot` SENDS IT. The rail read the icon from `REGISTERS`, which is empty
+ * until a screen has read a list's schema, so every list in it wore the same `rows` glyph.
+ */
+test("a list in the rail wears the icon boot sends with it, and a word with no glyph falls back to the declaration's", () => {
+  const shell = layoutOf({
+    ...BOOT,
+    registers: [
+      { id: 'obligations', name: 'Obligations', count: 3, icon: 'calendar' },
+      { id: 'services', name: 'Services', count: 2, icon: 'no-such-icon' },
+      { id: 'notes', name: 'Notes', count: 1 },
+    ],
+  } as never);
+  const icons = Object.fromEntries(shell.index.registers.map((r) => [r.id, r.icon]));
+  assert.equal(icons.obligations, 'calendar', 'the icon boot sent was not drawn');
+  assert.notEqual(icons.services, 'no-such-icon', 'a word with no glyph reached the rail');
+  assert.equal(icons.notes, 'rows', 'a list nobody gave an icon did not take the plain one');
+});
+
+/** A PROJECT IS ALWAYS ITS HUE: the one `boot` sends on `about`, else the hue its name is drawn in elsewhere. */
+test("a page about a row carries the hue boot sends, else its name's", () => {
+  const shell = layoutOf({
+    ...BOOT,
+    pages: [
+      { slug: 'kiln', title: 'Kiln', nav: { section: 'Projects', order: 1 }, icon: null, about: { register: 'projects', seq: 41, hue: 210 } },
+      { slug: 'portage', title: 'Portage', nav: { section: 'Projects', order: 2 }, icon: null, about: { register: 'projects', seq: 42 } },
+      { slug: 'odd', title: 'Odd', nav: { section: 'Projects', order: 3 }, icon: null, about: { register: 'projects', seq: 43, hue: 'blue' } },
+    ],
+  } as never);
+  const hues = Object.fromEntries(shell.nav.map((n) => [n.id, n.hue]));
+  assert.equal(hues.kiln, 210, "the hue boot sent was not the project's");
+  assert.equal(hues.portage, hueFor('Portage'), 'a project with no hue sent did not fall back to its name');
+  assert.equal(hues.odd, hueFor('Odd'), 'a hue that is not a turn was drawn');
+});
+
+/** THE RAIL COUNTS WHO IS WORKING BY THE AGENTS PAGE'S OWN CLAUSE, so "2 working" and Agents' Working are the same runs. */
+test("the rail asks for the runs Agents' Working group draws, and no others", async () => {
+  assert.equal(RUNS_WORKING, AGENTS_METRICS['agents-working']?.where, "the rail's clause drifted from the Agents page's");
+  const bodies: unknown[] = [];
+  const io = (async (_url: string | URL | Request, init?: RequestInit) => {
+    bodies.push(JSON.parse(String(init?.body ?? '{}')));
+    return json(200, { ok: true, value: { blocks: [{ rows: [] }] } });
+  }) as Fetch;
+  assert.deepEqual(await readWorking(BASE, io), []);
+  assert.match(JSON.stringify(bodies), new RegExp(RUNS_WORKING), 'the rail asked for runs under another clause');
 });

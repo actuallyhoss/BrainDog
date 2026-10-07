@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { WORK, flatNav, isHere } from '../nav.ts';
-import { RAIL_MOST, railOf } from './rail.ts';
+import { AGENTS_PAGE, RAIL_MOST, agentsHref, railOf } from './rail.ts';
 
 type Entry = { title: string; href: string; icon: string; row?: true };
 
@@ -107,4 +107,12 @@ test("a section's second page is a view under its place, and a tabbed section's 
   );
   const placed = rail.places.find((i) => i.label === 'Team');
   assert.ok(placed && isHere(placed, '/p/agent-work'));
+});
+
+test('"2 working" opens the Agents place, wherever the rail put it, and the agents page on a record without one', () => {
+  const rail = railOf(flatNav(SECTIONS, 3, WORDS, { work: WORK }), 'Decide');
+  assert.equal(agentsHref([...rail.places, ...rail.more]), '/p/agents');
+  const renamed = [{ key: 'section:Agents', href: '/p/crew', label: 'Agents', icon: 'session', near: ['/p/crew'] }];
+  assert.equal(agentsHref(renamed), '/p/crew', 'the Agents place was passed over for the pack\'s page');
+  assert.equal(agentsHref(rail.places.filter((i) => i.label !== 'Agents')), AGENTS_PAGE);
 });

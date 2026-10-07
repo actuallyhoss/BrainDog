@@ -50,7 +50,7 @@
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
   import { proposer, queueMergeOf, queueWords, visualOf, type Visual } from '$lib/page/queue-answer.ts';
   import '$lib/decide/form.css';
-  import { spoken } from '$lib/decide/card.ts';
+  import { cardWords, spoken } from '$lib/decide/card.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
   import { acceptKey, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords, type Held } from '../press.ts';
   import { mergeListOf, mergeOf, words as mergeWords, type Press } from '../merge.ts';
@@ -863,257 +863,274 @@
       {:else}
         <!-- WHY THE ANSWERS ARE OFF COMES FIRST, ABOVE THE OPTIONS AND NOT AFTER A PRESS AND A PARAGRAPH. It is the
              record's own refusal, said before anybody has chosen anything, and it ends by saying that reading is what
-             this colleague still holds. Every answer's button and Not now point at it. -->
+             this colleague still holds. Every answer's button and Not now point at it. Over the form and its side both. -->
         {#if !answerable}
           <p class="cannot" id="cannot-decide">{whyNot}</p>
         {/if}
 
-        <!-- WHO ASKED AND WHEN, quiet, then WHY it is asked, in the asker's own words, before the answers. -->
-        <p class="gate-by">
-          {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{asker.name}</span>{/if}
-          <span class="gate-when">{since(question.opened, now)}</span>
-        </p>
-        {#if question.context}<p class="gate-why">{symbolText(spoken(question.context))}</p>{/if}
+        <!-- THE FORM AND ITS SIDE (DIRECTION §39). On a wide tile who asked and why sit in a 280px column beside the
+             answers, so the right of the tile is not left empty; on a narrow one both are let go of and read as they
+             always did: who asked, why, then the answers and what accepting does. -->
+        <div class="gate-form">
+          <!-- WHO ASKED AND WHEN, quiet, then WHY it is asked, in the asker's own words, before the answers. -->
+          <div class="gate-side">
+            <section class="gate-part" aria-labelledby="gate-by-h">
+              <h2 class="gate-side-h" id="gate-by-h">{cardWords.askedBy}</h2>
+              <p class="gate-by">
+                {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{asker.name}</span>{/if}
+                <span class="gate-when">{since(question.opened, now)}</span>
+              </p>
+            </section>
+            {#if question.context}
+              <section class="gate-part" aria-labelledby="gate-why-h">
+                <h2 class="gate-side-h" id="gate-why-h">{cardWords.why}</h2>
+                <p class="gate-why">{symbolText(spoken(question.context))}</p>
+              </section>
+            {/if}
+          </div>
 
-        <!-- ONE ANSWER'S BUTTON, for the record's own two answers: it says what it does (`press.ts` `labelOf`), Decline for
-             the record's Reject and the amount on Accept when money moves, and the care a hard one asks for in its words.
+          <div class="gate-main">
+            <!-- ONE ANSWER'S BUTTON, for the record's own two answers: it says what it does (`press.ts` `labelOf`), Decline for
+                 the record's Reject and the amount on Accept when money moves, and the care a hard one asks for in its words.
 
-             OFF FOR A READER WHO MAY NOT ANSWER, pointing at the sentence above the answers that says why.
-             `aria-describedby` rather than a title, so the reason is read out with the control and not only seen. -->
-        {#snippet answer(option: { key: string; title: string }, q: { options: readonly { key: string; title: string }[] })}
-          {@const marked = suggestedKey === option.key}
-          <button
-            type="button"
-            class="dc-btn"
-            id="opt-{option.key}"
-            data-answer={option.key}
-            data-suggested={marked ? '' : undefined}
-            data-weight={option.key === 'accept' ? 'primary' : undefined}
-            data-on={asked === option.key ? '' : undefined}
-            aria-pressed={asked === null ? undefined : asked === option.key}
-            disabled={!answerable || holding !== null}
-            aria-describedby={answerable ? undefined : 'cannot-decide'}
-            onclick={() => choose(option.key)}
-          >
-            {option.key === 'accept' ? pressSaid(labelOf(option, q, moves)) : labelOf(option, q, moves)}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}
-          </button>
-        {/snippet}
+                 OFF FOR A READER WHO MAY NOT ANSWER, pointing at the sentence above the answers that says why.
+                 `aria-describedby` rather than a title, so the reason is read out with the control and not only seen. -->
+            {#snippet answer(option: { key: string; title: string }, q: { options: readonly { key: string; title: string }[] })}
+              {@const marked = suggestedKey === option.key}
+              <button
+                type="button"
+                class="dc-btn"
+                id="opt-{option.key}"
+                data-answer={option.key}
+                data-suggested={marked ? '' : undefined}
+                data-weight={option.key === 'accept' ? 'primary' : undefined}
+                data-on={asked === option.key ? '' : undefined}
+                aria-pressed={asked === null ? undefined : asked === option.key}
+                disabled={!answerable || holding !== null}
+                aria-describedby={answerable ? undefined : 'cannot-decide'}
+                onclick={() => choose(option.key)}
+              >
+                {option.key === 'accept' ? pressSaid(labelOf(option, q, moves)) : labelOf(option, q, moves)}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}
+              </button>
+            {/snippet}
 
-        <section class="options" aria-label={merge ? mergeWords.heading : copy.theOptions}>
-          {#if merge}
-            <!-- WHO IS WHO: each name and where it was seen, and one press each, held for its Undo. -->
-            <MergeCard
-              {merge}
-              {answerable}
-              holding={holding?.key ?? null}
-              titleOf={(key) => spoken(question.options.find((o) => o.key === key)?.title ?? '')}
-              onpress={pressMerge}
-            />
-          {:else if two}
-            <!-- THE RECORD'S TWO ANSWERS ARE TWO BUTTONS, Accept and Decline, with Not now beside them. -->
-            <div class="dc-actions">
-              {#each question.options as option (option.key)}{@render answer(option, question)}{/each}
-              {@render later()}
-            </div>
-          {:else}
-            <!-- THE ANSWERS AS CHOICES: each a full-width rectangle with its name and what it does, the suggested one
-                 saying so in the accent's words, the one chosen ringed (`form.css`). A press chooses; Decide gives it. -->
-            <ul class="dc-choices" role="radiogroup" aria-label={copy.theOptions}>
-              {#each question.options as option}
-                <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list; where the body
-                     holds no reason, the words `questionOf` made of it. -->
-                {@const because = reasonIn(about?.body, option.key) ?? option.body}
-                {@const shows = visuals.get(option.key)}
-                {@const marked = suggestedKey === option.key}
-                {@const on = asked === null ? selectedKey === option.key : asked === option.key}
-                <li role="none">
-                  <div class="dc-choice" data-checked={on ? '' : undefined}>
-                    <span class="dc-ring" aria-hidden="true"></span>
-                    <span class="dc-choice-main">
-                      <!-- WHAT THE OPTION IS LEADS IT, inside its own box and nowhere else: a swatch writes its colour
-                           into `--swatch` on its chip alone, hidden from a screen reader because the name says it. -->
-                      {#if shows && 'swatch' in shows}
-                        <span class="card-visual" data-shows="swatch" aria-hidden="true">
-                          {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
-                        </span>
-                      {:else if shows}
-                        <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
-                      {/if}
-                      <button
-                        type="button"
-                        role="radio"
-                        class="dc-choice-hit"
-                        id="opt-{option.key}"
-                        data-answer={option.key}
-                        data-suggested={marked ? '' : undefined}
-                        aria-checked={on}
-                        disabled={!answerable || holding !== null}
-                        aria-describedby={answerable ? undefined : 'cannot-decide'}
-                        onclick={() => pick(option.key)}
-                        onkeydown={(e) => onChoiceKey(e, option.key)}
-                        >{labelOf(option, question, moves)}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}</button
-                      >
-                      <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name. -->
-                      {#if because.trim() !== ''}
-                        <span class="dc-choice-does card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></span>
-                      {/if}
-                    </span>
-                    {#if marked}<span class="dc-rec" aria-hidden="true">{gate.suggested}</span>{/if}
-                  </div>
-                </li>
-              {/each}
-            </ul>
-            <div class="dc-actions">
-              {#if asked === null}
-                <button
-                  type="button"
-                  class="dc-btn"
-                  data-weight="primary"
-                  id="gate-decide"
-                  aria-disabled={selectedKey === null}
-                  disabled={!answerable || holding !== null || sending !== null}
-                  aria-describedby={answerable ? undefined : 'cannot-decide'}
-                  onclick={commit}>{pressSaid(gate.decide)}</button
-                >
-              {/if}
-              {@render later()}
-            </div>
-          {/if}
-
-          <!-- THE ONE LINE THE RECORD ASKS FOR, only when it answers the press with `wants: 'reason'`, with the answer
-               kept: what was pressed is said, and the line is the one thing left to do. -->
-          {#if asked}
-            <form class="line-form" onsubmit={sendReason}>
-              <label class="line-label" for="asked-why">{gate.reasonAsked}</label>
-              <div class="line-row">
-                <input
-                  id="asked-why"
-                  class="line-field"
-                  bind:this={field}
-                  bind:value={reason}
-                  autocomplete="off"
-                  spellcheck="true"
+            <section class="options" aria-label={merge ? mergeWords.heading : copy.theOptions}>
+              {#if merge}
+                <!-- WHO IS WHO: each name and where it was seen, and one press each, held for its Undo. -->
+                <MergeCard
+                  {merge}
+                  {answerable}
+                  holding={holding?.key ?? null}
+                  titleOf={(key) => spoken(question.options.find((o) => o.key === key)?.title ?? '')}
+                  onpress={pressMerge}
                 />
-                <Button type="submit" weight="primary" disabled={sending !== null}>{gate.send}</Button>
-              </div>
-            </form>
-          {/if}
-          {#if noneTicked}<p class="commit-fix" role="status" data-intent="bad">{pickWords.none}</p>{/if}
-          {#if fix && !deferring}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
-        </section>
-
-        <!-- NOT NOW OPENS THE STEP THAT PUTS IT OFF, in the same tile: why not yet, and until when. -->
-        {#if deferring}
-          <section class="commit" aria-labelledby="defer-title">
-            <h2 class="commit-title" id="defer-title">{copy.deferTitle}</h2>
-            <!-- A FIELD WITH ITS LABEL ABOVE IT, so the words stay once somebody types. -->
-            <label class="commit-label" for="defer-why">{copy.deferHint}</label>
-            <textarea
-              id="defer-why"
-              bind:this={parkField}
-              bind:value={parkWhy}
-              class="commit-field"
-              rows="2"
-              spellcheck="true"
-            ></textarea>
-            <label class="commit-wake">
-              {copy.wakeOn}
-              <input class="commit-date" type="date" bind:value={wake} />
-            </label>
-            <div class="commit-actions">
-              <Button weight="primary" disabled={!parkWhy.trim() || !wake || sending !== null} onclick={deferIt}>
-                {copy.deferAction}
-              </Button>
-              <Button weight="bare" onclick={() => (deferring = false)}>{copy.arrangeCancel}</Button>
-            </div>
-            {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
-          </section>
-        {/if}
-
-        <!-- WHAT ACCEPTING DOES, A PLAIN PART OF THE SAME TILE under the answers: what an arrangement does, what a
-             proposal puts in place, the rows to tick, the rows it changes, what it calls out, and what deciding late
-             costs. Each under its own small heading, open, read before the press and never in the way of it. -->
-        {#if doesAny}
-          <section class="does" aria-labelledby="does-title">
-            <h2 class="gate-h" id="does-title">{LEAD.does}</h2>
-            <div class="does-parts">
-              {#if story && !settled}
-                <section class="changed" aria-label={story.lead}>
-                  <Arranged arranged={story} />
-                </section>
-              {/if}
-
-              {#if preview && !settled}
-                <section class="changed">
-                  <h3 class="does-h">{copy.proposalWillAppear}</h3>
-                  <Proposed proposed={preview} />
-                  <!-- A SCRIPT'S SOURCE, WHOLE AND FOLDED: it is what runs, and code keeps its lines, which a line of the
-                       preview cannot. A scrolling box a keyboard can reach, as the canvas's written body is. -->
-                  {#each preview.appears.filter((a) => a.source !== undefined) as a, i (i)}
-                    <details class="source-fold">
-                      <summary>{copy.proposalSource(a.title)}</summary>
-                      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                      <pre class="source" tabindex="0">{a.source}</pre>
-                    </details>
+              {:else if two}
+                <!-- THE RECORD'S TWO ANSWERS ARE TWO BUTTONS, Accept and Decline, with Not now beside them. -->
+                <div class="dc-actions">
+                  {#each question.options as option (option.key)}{@render answer(option, question)}{/each}
+                  {@render later()}
+                </div>
+              {:else}
+                <!-- THE ANSWERS AS CHOICES: each a full-width rectangle with its name and what it does, the suggested one
+                     saying so in the accent's words, the one chosen ringed (`form.css`). A press chooses; Decide gives it. -->
+                <ul class="dc-choices" role="radiogroup" aria-label={copy.theOptions}>
+                  {#each question.options as option}
+                    <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list; where the body
+                         holds no reason, the words `questionOf` made of it. -->
+                    {@const because = reasonIn(about?.body, option.key) ?? option.body}
+                    {@const shows = visuals.get(option.key)}
+                    {@const marked = suggestedKey === option.key}
+                    {@const on = asked === null ? selectedKey === option.key : asked === option.key}
+                    <li role="none">
+                      <div class="dc-choice" data-checked={on ? '' : undefined}>
+                        <span class="dc-ring" aria-hidden="true"></span>
+                        <span class="dc-choice-main">
+                          <!-- WHAT THE OPTION IS LEADS IT, inside its own box and nowhere else: a swatch writes its colour
+                               into `--swatch` on its chip alone, hidden from a screen reader because the name says it. -->
+                          {#if shows && 'swatch' in shows}
+                            <span class="card-visual" data-shows="swatch" aria-hidden="true">
+                              {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
+                            </span>
+                          {:else if shows}
+                            <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
+                          {/if}
+                          <button
+                            type="button"
+                            role="radio"
+                            class="dc-choice-hit"
+                            id="opt-{option.key}"
+                            data-answer={option.key}
+                            data-suggested={marked ? '' : undefined}
+                            aria-checked={on}
+                            disabled={!answerable || holding !== null}
+                            aria-describedby={answerable ? undefined : 'cannot-decide'}
+                            onclick={() => pick(option.key)}
+                            onkeydown={(e) => onChoiceKey(e, option.key)}
+                            >{labelOf(option, question, moves)}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}</button
+                          >
+                          <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name. -->
+                          {#if because.trim() !== ''}
+                            <span class="dc-choice-does card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></span>
+                          {/if}
+                        </span>
+                        {#if marked}<span class="dc-rec" aria-hidden="true">{gate.suggested}</span>{/if}
+                      </div>
+                    </li>
                   {/each}
-                </section>
+                </ul>
+                <div class="dc-actions">
+                  {#if asked === null}
+                    <button
+                      type="button"
+                      class="dc-btn"
+                      data-weight="primary"
+                      id="gate-decide"
+                      aria-disabled={selectedKey === null}
+                      disabled={!answerable || holding !== null || sending !== null}
+                      aria-describedby={answerable ? undefined : 'cannot-decide'}
+                      onclick={commit}>{pressSaid(gate.decide)}</button
+                    >
+                  {/if}
+                  {@render later()}
+                </div>
               {/if}
 
-              {#if picking}
-                <section class="changed">
-                  <h3 class="does-h">{pickWords.heading}</h3>
-                  <p class="pick-hint">{pickWords.hint}</p>
-                  <ul class="picks">
-                    {#each pickable as row (row.n)}
-                      <li>
-                        <label class="pick">
-                          <input
-                            type="checkbox"
-                            checked={!unticked.includes(row.n)}
-                            aria-label={pickWords.keep(row.title)}
-                            onchange={(e) => {
-                              unticked = e.currentTarget.checked ? unticked.filter((n) => n !== row.n) : [...unticked, row.n];
-                              noneTicked = false;
-                            }}
-                          />
-                          <span class="pick-title">{row.title}</span>
-                          {#if row.detail}<span class="pick-detail">{row.detail}</span>{/if}
-                        </label>
-                      </li>
-                    {/each}
-                  </ul>
-                  {#if picked}<p class="pick-hint" role="status">{pickWords.some(picked.length, pickable.length)}</p>{/if}
-                </section>
+              <!-- THE ONE LINE THE RECORD ASKS FOR, only when it answers the press with `wants: 'reason'`, with the answer
+                   kept: what was pressed is said, and the line is the one thing left to do. -->
+              {#if asked}
+                <form class="line-form" onsubmit={sendReason}>
+                  <label class="line-label" for="asked-why">{gate.reasonAsked}</label>
+                  <div class="line-row">
+                    <input
+                      id="asked-why"
+                      class="line-field"
+                      bind:this={field}
+                      bind:value={reason}
+                      autocomplete="off"
+                      spellcheck="true"
+                    />
+                    <Button type="submit" weight="primary" disabled={sending !== null}>{gate.send}</Button>
+                  </div>
+                </form>
               {/if}
+              {#if noneTicked}<p class="commit-fix" role="status" data-intent="bad">{pickWords.none}</p>{/if}
+              {#if fix && !deferring}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
+            </section>
 
-              {#if updates.length}
-                <section class="changed">
-                  <h3 class="does-h">{changeWords.heading}</h3>
-                  <Changes {updates} />
-                </section>
-              {/if}
+            <!-- NOT NOW OPENS THE STEP THAT PUTS IT OFF, in the same tile: why not yet, and until when. -->
+            {#if deferring}
+              <section class="commit" aria-labelledby="defer-title">
+                <h2 class="commit-title" id="defer-title">{copy.deferTitle}</h2>
+                <!-- A FIELD WITH ITS LABEL ABOVE IT, so the words stay once somebody types. -->
+                <label class="commit-label" for="defer-why">{copy.deferHint}</label>
+                <textarea
+                  id="defer-why"
+                  bind:this={parkField}
+                  bind:value={parkWhy}
+                  class="commit-field"
+                  rows="2"
+                  spellcheck="true"
+                ></textarea>
+                <label class="commit-wake">
+                  {copy.wakeOn}
+                  <input class="commit-date" type="date" bind:value={wake} />
+                </label>
+                <div class="commit-actions">
+                  <Button weight="primary" disabled={!parkWhy.trim() || !wake || sending !== null} onclick={deferIt}>
+                    {copy.deferAction}
+                  </Button>
+                  <Button weight="bare" onclick={() => (deferring = false)}>{copy.arrangeCancel}</Button>
+                </div>
+                {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
+              </section>
+            {/if}
 
-              <!-- WHAT ACCEPTING WOULD CALL OUT, before the press: every host, how often, the key by label and the fields
-                   sent, as the record worked them out when the proposal was filed. -->
-              {#if calling && live}
-                <section class="changed">
-                  <h3 class="does-h">{installWords.heading}</h3>
-                  <dl class="calls-out">
-                    <CallsOut calls={live.calls} hosted={hostedHere(page.data as unknown as Shell)} note={installWords.acceptApproves} />
-                  </dl>
-                </section>
-              {/if}
+            <!-- WHAT ACCEPTING DOES, A PLAIN PART OF THE SAME TILE under the answers: what an arrangement does, what a
+                 proposal puts in place, the rows to tick, the rows it changes, what it calls out, and what deciding late
+                 costs. Each under its own small heading, open, read before the press and never in the way of it. -->
+            {#if doesAny}
+              <section class="does" aria-labelledby="does-title">
+                <h2 class="gate-h" id="does-title">{LEAD.does}</h2>
+                <div class="does-parts">
+                  {#if story && !settled}
+                    <section class="changed" aria-label={story.lead}>
+                      <Arranged arranged={story} />
+                    </section>
+                  {/if}
 
-              <!-- WHAT DECIDING LATE COSTS, as whoever asked wrote it. What getting it wrong costs is said in the button. -->
-              {#if costed && question.cost}
-                <section class="cost">
-                  <h3 class="does-h">{copy.costOfDelay}</h3>
-                  <p class="cost-body">{symbolText(question.cost)}</p>
-                </section>
-              {/if}
-            </div>
-          </section>
-        {/if}
+                  {#if preview && !settled}
+                    <section class="changed">
+                      <h3 class="does-h">{copy.proposalWillAppear}</h3>
+                      <Proposed proposed={preview} />
+                      <!-- A SCRIPT'S SOURCE, WHOLE AND FOLDED: it is what runs, and code keeps its lines, which a line of the
+                           preview cannot. A scrolling box a keyboard can reach, as the canvas's written body is. -->
+                      {#each preview.appears.filter((a) => a.source !== undefined) as a, i (i)}
+                        <details class="source-fold">
+                          <summary>{copy.proposalSource(a.title)}</summary>
+                          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                          <pre class="source" tabindex="0">{a.source}</pre>
+                        </details>
+                      {/each}
+                    </section>
+                  {/if}
+
+                  {#if picking}
+                    <section class="changed">
+                      <h3 class="does-h">{pickWords.heading}</h3>
+                      <p class="pick-hint">{pickWords.hint}</p>
+                      <ul class="picks">
+                        {#each pickable as row (row.n)}
+                          <li>
+                            <label class="pick">
+                              <input
+                                type="checkbox"
+                                checked={!unticked.includes(row.n)}
+                                aria-label={pickWords.keep(row.title)}
+                                onchange={(e) => {
+                                  unticked = e.currentTarget.checked ? unticked.filter((n) => n !== row.n) : [...unticked, row.n];
+                                  noneTicked = false;
+                                }}
+                              />
+                              <span class="pick-title">{row.title}</span>
+                              {#if row.detail}<span class="pick-detail">{row.detail}</span>{/if}
+                            </label>
+                          </li>
+                        {/each}
+                      </ul>
+                      {#if picked}<p class="pick-hint" role="status">{pickWords.some(picked.length, pickable.length)}</p>{/if}
+                    </section>
+                  {/if}
+
+                  {#if updates.length}
+                    <section class="changed">
+                      <h3 class="does-h">{changeWords.heading}</h3>
+                      <Changes {updates} />
+                    </section>
+                  {/if}
+
+                  <!-- WHAT ACCEPTING WOULD CALL OUT, before the press: every host, how often, the key by label and the fields
+                       sent, as the record worked them out when the proposal was filed. -->
+                  {#if calling && live}
+                    <section class="changed">
+                      <h3 class="does-h">{installWords.heading}</h3>
+                      <dl class="calls-out">
+                        <CallsOut calls={live.calls} hosted={hostedHere(page.data as unknown as Shell)} note={installWords.acceptApproves} />
+                      </dl>
+                    </section>
+                  {/if}
+
+                  <!-- WHAT DECIDING LATE COSTS, as whoever asked wrote it. What getting it wrong costs is said in the button. -->
+                  {#if costed && question.cost}
+                    <section class="cost">
+                      <h3 class="does-h">{copy.costOfDelay}</h3>
+                      <p class="cost-body">{symbolText(question.cost)}</p>
+                    </section>
+                  {/if}
+                </div>
+              </section>
+            {/if}
+          </div>
+        </div>
       {/if}
 
       <!-- THE QUESTION'S COMMENTS, IN THE SAME TILE, open or settled, since what was said about it is worth as much after
@@ -1148,6 +1165,86 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
+  }
+
+  /* ── the form and its side ─────────────────────────────────────────────── */
+
+  /* ONE COLUMN, ON A NARROW PAGE: the form and the side are let go of, and their parts are the tile's own, read in the
+     order a question always was: who asked, why, the answers, what accepting does. */
+  .gate-form,
+  .gate-side,
+  .gate-main,
+  .gate-part {
+    display: contents;
+  }
+
+  /* A QUIET HEADING OVER EACH PART OF THE SIDE, said to a screen reader in one column, where who asked and why sit at
+     the top of the tile as they always did and need no name. */
+  .gate-side-h {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    color: var(--dim);
+    font-family: var(--font-ui);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    line-height: 1.4;
+  }
+
+  /* TWO COLUMNS, ON A WIDE PAGE: the answers and what accepting does, and beside them a 280px side with who asked and
+     why under quiet headings, a hairline at its start, so the right of a wide tile is never left empty. The page is
+     the container, its tile 40px inside it, so the threshold is the card's (52rem of tile) and the tile's padding. */
+  @container (inline-size >= 55rem) {
+    .gate-form {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      column-gap: var(--sp-6);
+      align-items: start;
+    }
+
+    .gate-main {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-4);
+      grid-row: 1;
+      grid-column: 1;
+      min-inline-size: 0;
+    }
+
+    .gate-side {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-5);
+      grid-row: 1;
+      grid-column: 2;
+      min-inline-size: 0;
+      padding-inline-start: var(--sp-5);
+      border-inline-start: 1px solid var(--rule);
+    }
+
+    .gate-part {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-2);
+      min-inline-size: 0;
+    }
+
+    .gate-side-h {
+      position: static;
+      inline-size: auto;
+      block-size: auto;
+      overflow: visible;
+      clip-path: none;
+    }
+
+    .gate-side .gate-why {
+      max-inline-size: none;
+      margin: 0;
+    }
   }
 
   /* ── who asked, and why ────────────────────────────────────────────────── */

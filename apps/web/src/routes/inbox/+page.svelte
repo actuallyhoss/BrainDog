@@ -22,7 +22,11 @@
   since one accepted pattern files every arrival like its samples from then on. Arrives, learned once, filed.
 
   AND WHAT LEFT IT IS STILL HERE. Waiting, Filed and Archived are one series of the same arrivals, chosen in the
-  toolbar. The record's tally is the title row's sentence and the one tile, "Who filed it". Every filing and
+  toolbar. The record's tally is the title row's sentence and the figure tile, what your rules filed this week.
+
+  TWO TILES OPEN THE BOARD, in every series: "What comes in", each way in as a 56px row with its well, its last arrival
+  and a fortnight's arrivals as a line, and the figure beside it. So an inbox with nothing waiting still says how things
+  reach it and whether the rules are working, rather than one sentence on a bare board. Every filing and
   archiving, a person's or an agent's, names who did it and can be put back, through `triage`'s `back`.
 -->
 <script lang="ts">
@@ -48,6 +52,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Stacked from '$lib/viz/Stacked.svelte';
+  import Sparkline from '$lib/viz/Sparkline.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { ALIKE, SAMPLES_MOST, groupsOf, type Group } from './shapes.ts';
   import { builderPath } from '$lib/pattern/draft.ts';
@@ -56,7 +61,8 @@
   import Face from '$lib/ui/Face.svelte';
   import { actor, listName } from '$lib/record/names.ts';
   import type { Pattern, Series, SettledItem, Tally } from './series.ts';
-  import { daysOf, sentenceOf, whoFiledOf } from './days.ts';
+  import { daysOf, figureOf, sentenceOf, whoFiledOf } from './days.ts';
+  import { SOURCE_DAYS, countSaid, drawsLine, lastSaid, lineSaid, sourcesOf } from './sources.ts';
 
   /**
    * THIS UNIT'S OWN WORDS, beside the one screen that says them. The press's cost is not named: the door meters it, and a
@@ -69,7 +75,11 @@
     unreached: 'BrainDog could not reach Slash. Nothing was drafted.',
     series: 'Show',
     whoFiled: 'Who filed it',
-    byRulesWeek: 'filed by rules this week',
+    comesIn: 'What comes in',
+    setUp: 'Add a way in',
+    rulesWeek: 'Your rules',
+    seeRules: 'Automations',
+    partial: 'Newest arrivals only',
     learn: 'Could file themselves',
     learnWhy: 'Messages alike from one sender are learned once, as a rule, and the rest are filed as they arrive.',
     alikeFrom: (n: number, from: string) => `${n} alike from ${from}`,
@@ -150,7 +160,15 @@
     void import('./series.ts')
       .then((m) => m.readPatterns(apiBase()))
       .then((read) => (patterns = read));
+    void import('./series.ts')
+      .then((m) => m.readArrivals(apiBase(), Date.now(), SOURCE_DAYS))
+      .then((read) => (arrivals = read));
   });
+
+  /* WHAT COMES IN, BY THE WAY IT CAME, from every arrival of the fortnight whatever became of it. `null` until read, and
+     a read that failed draws no tile rather than three quiet rows that would be a guess. */
+  let arrivals = $state.raw<{ lines: { channel: string; ts: string }[]; partial: boolean } | null>(null);
+  const ways = $derived(arrivals ? sourcesOf(arrivals.lines, clock) : null);
 
   /**
    * THE SERIES AND THE TALLY. What waits is the screen's first series; filed and archived are the record's `matched` and
@@ -163,6 +181,7 @@
      red: what has waited more than two days needs him. */
   const sentence = $derived(sentenceOf(tally, INBOX.at(-1)?.arrived ?? null, clock));
   const whoFiled = $derived(whoFiledOf(tally));
+  const figure = $derived(figureOf(tally));
   let patterns = $state<Pattern[]>([]);
   let series = $state<{ state: Series; items: SettledItem[]; cursor: number | null } | null>(null);
   let seriesFix = $state<string | null>(null);
@@ -529,6 +548,7 @@
 {/snippet}
 
 <PageHead
+  icon="inbox"
   title={said('inbox')}
   count={answered && !unrouted && !refused ? INBOX.length : undefined}
   atLeast={live !== null && live.cursor !== null}
@@ -546,17 +566,38 @@
     <!-- Bars before the first answer, and nothing from a host that has no inbox to read. -->
     {#if !answered}<Waiting />{/if}
   {:else}
-    <div class="inbox" data-split={whoFiled ? '' : undefined}>
-      <!-- WHO FILED IT, the record's own tally as one tile: what rules filed this week is the figure, and the bar is the
-           whole, with what still waits for a person in ink. Absent until the record answers with a weekly count,
-           never a guessed zero. First on a phone, and beside the list from a desk's width. -->
-      {#if whoFiled}
-        <div class="side">
-          <Tile icon="inbox" title={words.whoFiled}>
-            <p class="figure num">{whoFiled.figure.toLocaleString('en-GB')}<span class="figure-unit">{words.byRulesWeek}</span></p>
-            <Stacked parts={whoFiled.parts} subject={words.whoFiled} />
-            <p class="reading">{whoFiled.reading}</p>
-          </Tile>
+    <div class="inbox">
+      {#if ways || figure}
+        <!-- THE TWO TILES THAT SAY HOW THINGS ARRIVE, side by side from a desk's width and stacked on a phone. -->
+        <div class="top" data-pair={ways && figure ? '' : undefined}>
+          {#if ways}
+            <Tile icon="download" title={words.comesIn} meta={arrivals?.partial ? words.partial : undefined} href={arrivals?.partial ? undefined : '/settings/ingest'} hrefLabel={words.setUp}>
+              <ul class="ways">
+                {#each ways as w (w.channel)}
+                  <li class="way">
+                    <IconWell name={w.icon} size="l" tone={w.total > 0 ? 'action' : undefined} />
+                    <span class="way-main">
+                      <span class="way-name">{w.name}</span>
+                      <span class="way-last">{lastSaid(w, (iso) => since(iso, clock))}</span>
+                    </span>
+                    <span class="way-trend">
+                      {#if drawsLine(w)}<Sparkline values={w.days} width={140} height={32} summary={lineSaid(w)} />{/if}
+                      <!-- A WAY NOTHING EVER CAME BY SAYS SO ONCE, under its name, and no count repeats it. -->
+                      {#if w.last !== null}<span class="way-count num">{countSaid(w.total)}</span>{/if}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+            </Tile>
+          {/if}
+          {#if figure}
+            <!-- THE FIGURE, said at none too, and the whole as one bar once there is a whole to split. -->
+            <Tile icon="refresh" title={words.rulesWeek} href="/automations" hrefLabel={words.seeRules}>
+              <p class="figure num">{figure.figure.toLocaleString('en-GB')}<span class="figure-unit">{figure.unit}</span></p>
+              {#if whoFiled}<Stacked parts={whoFiled.parts} subject={words.whoFiled} />{/if}
+              <p class="reading">{figure.reading}</p>
+            </Tile>
+          {/if}
         </div>
       {/if}
 
@@ -669,12 +710,14 @@
       NEITHER DOOR IS INK. An empty inbox is good news, and the filled pill was the loudest shape on it,
       so both are the quiet secondary.
     -->
-    <Empty kind="no-data-yet" glyph="inbox" title={said('inbox_clear')} body={copy.inboxClearWhy}>
-      {#snippet actions()}
-        {#if Number(route.data.open ?? 0) > 0}<Button href="/decide">{copy.inboxOpenDecide}</Button>{/if}
-        <Button href="/settings/ingest">{copy.inboxConnect}</Button>
-      {/snippet}
-    </Empty>
+    <div class="clear">
+      <Empty kind="no-data-yet" glyph="inbox" title={said('inbox_clear')} body={copy.inboxClearWhy}>
+        {#snippet actions()}
+          {#if Number(route.data.open ?? 0) > 0}<Button href="/decide">{copy.inboxOpenDecide}</Button>{/if}
+          <Button href="/settings/ingest">{copy.inboxConnect}</Button>
+        {/snippet}
+      </Empty>
+    </div>
   {:else}
     {#if alike.length > 0}
       <!-- LEARNED ONCE. Each sender with two or more alike is one row: how many, from whom, and the newest of them.
@@ -890,39 +933,107 @@
 
   /* ── the layout ───────────────────────────────────────────────────────── */
 
-  /* ONE COLUMN, the tile first and the list under it. From a desk's width the list takes the room and the tile stands
-     beside it, held in view while the list scrolls. Measured on the page's own width, so a docked panel narrows it. */
+  /* THE BOARD: the two tiles that say how things arrive, then the series under them at the board's whole width. */
   .inbox {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tile-gap);
+    min-inline-size: 0;
+  }
+
+  /* SIDE BY SIDE FROM A DESK'S WIDTH, eight columns to four, measured on the page's own width so a docked panel narrows
+     it; one column on a phone, the ways in first. */
+  .top {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-5);
-    align-items: start;
+    gap: var(--tile-gap);
+    align-items: stretch;
   }
 
   @container (inline-size >= 860px) {
-    .inbox[data-split] {
-      grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-      column-gap: var(--sp-6);
+    .top[data-pair] {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     }
+  }
 
-    .inbox[data-split] .side {
-      position: sticky;
-      inset-block-start: calc(var(--inset) + 56px);
-      grid-column: 2;
-      grid-row: 1;
-    }
+  /* A WAY IN IS A 56PX ROW: its well, its name over when the last thing came, and at the right the fortnight as a line
+     with its count under it. A hairline between rows, inside the tile. */
+  .ways {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
 
-    .inbox[data-split] .main {
-      grid-column: 1;
-      grid-row: 1;
-    }
+  .way {
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    min-block-size: 56px;
+  }
+
+  .way + .way {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .way-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .way-name {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    line-height: 20px;
+  }
+
+  .way-last {
+    overflow: hidden;
+    color: var(--dim);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .way-trend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .way-trend :global(.viz-trend) {
+    inline-size: 140px;
+  }
+
+  .way-count {
+    min-inline-size: 11ch;
+    color: var(--ink2);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+    white-space: nowrap;
+  }
+
+  /* AN EMPTY INBOX IS A TILE ON THE BOARD like everything else on it, never a sentence floating on the ground. */
+  .clear {
+    padding: var(--tile-pad);
+    background: var(--tile);
+    border-radius: var(--tile-r);
   }
 
   .main,
   .days {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--tile-gap);
     min-inline-size: 0;
   }
 
@@ -1318,6 +1429,15 @@
     .batch {
       inline-size: auto;
       margin-inline: 0;
+    }
+
+    /* ON A PHONE A WAY IN KEEPS ITS COUNT, and the line under 640 is drawn narrower. */
+    .way-trend :global(.viz-trend) {
+      inline-size: 72px;
+    }
+
+    .way-count {
+      min-inline-size: 0;
     }
   }
 </style>

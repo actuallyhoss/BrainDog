@@ -418,6 +418,18 @@ export const words = {
   undated: 'No date',
   noMachine: 'No machine yet',
   aMachine: 'Unnamed machine',
+  /* The empty screen, and the machines. */
+  whatTitle: 'What a job is',
+  whatSteps: [
+    'You approve a kind of job once, in Decide: what it does and where it works.',
+    'A machine you enrolled takes each run and works on it with Claude.',
+    'You watch it here as it works, and stop it at any time.',
+  ],
+  machinesTitle: 'Machines',
+  noMachines: 'No machine is enrolled yet',
+  enrolHow: 'Enrol one from its own terminal:',
+  /** The command takes the record's own address, which is where the runner is approved. */
+  enrolCommand: (address: string) => `braindog runner enrol ${address}`,
   askedAt: (at: string) => `asked for at ${at}`,
   turns: (n: number) => plural(n, 'turn', 'turns'),
   runs: (n: number) => plural(n, 'run', 'runs'),
@@ -457,3 +469,27 @@ export const words = {
   transcript: 'Transcript',
   cost: 'Cost',
 };
+
+/* ── the machines enrolled to run jobs ──────────────────────────────────── */
+
+/** One machine enrolled as a runner, as the Jobs screen lists it: its name, and when it last asked for work. */
+export type Enrolled = { key: string; name: string; seen: string | null; since: string | null };
+
+/**
+ * The machines this record has enrolled as runners and not revoked, the one seen last first.
+ *
+ * A DEVICE GRANT'S LABEL IS THE COMMAND'S (`STUDIO-PC · braindog-cli · runner`), so the machine is its first part, said
+ * by `machineOf` as a person named it. The grant's handle keys the row and is never shown.
+ */
+export function enrolledOf(
+  devices: readonly { handle: string; reach: string; status: string; label: string | null; last_used: string | null; approved_at: string | null }[],
+): Enrolled[] {
+  return devices
+    .filter((d) => d.reach === 'runner' && (d.status === 'approved' || d.status === 'active'))
+    .map((d) => ({ key: d.handle, name: machineOf((d.label ?? '').split(' · ')[0]) ?? words.aMachine, seen: d.last_used, since: d.approved_at }))
+    .sort((a, b) => (b.seen ?? '').localeCompare(a.seen ?? ''));
+}
+
+/** What a machine's row says under its name. */
+export const enrolledSaid = (m: Enrolled, ago: (iso: string) => string): string =>
+  m.seen ? `Asked for work ${ago(m.seen)}` : m.since ? `Enrolled ${ago(m.since)}, not seen since` : 'Enrolled, not seen yet';

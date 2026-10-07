@@ -26,13 +26,14 @@
   import { copy } from '$lib/copy.ts';
   import { heard, homePage, said } from '$lib/voice.svelte.ts';
   import { VOICE_LINES, homeSlugOf } from '$lib/voice.ts';
-  import type { Opened } from '$lib/record/page-live.ts';
+  import type { LiveBlock, Opened } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import ClearExamples from '$lib/ui/ClearExamples.svelte';
   import PageView from '$lib/page/PageView.svelte';
+  import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
   import { holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
   import { drawsAny, homeDrawn, railed, slashLineOf, todayHome, type Holds, type HomeVoice } from '$lib/home/default-home.ts';
@@ -177,6 +178,12 @@
   });
   const slug = $derived(live?.page.page.page ?? declares ?? 'today');
 
+  /* THE READER THE BODY IS DRAWN BY, whose writes the line in the head adds through (`PageView`'s `capture`). */
+  let view = $state<{ capturable: (block: LiveBlock) => boolean; capture: (register: string, text: string, inherited: Record<string, string>) => void }>();
+
+  /* THE LINE A TASK IS TYPED INTO, in the head beside the name, where the page has one and its list can take a line. */
+  const capture = $derived(shaped?.capture && view?.capturable(shaped.capture) ? shaped.capture : null);
+
   /* NOTHING TO DRAW AT ALL: the line says so, and nothing under it. A host that cannot draw Today's body is calm too. */
   const calm = $derived((shaped !== null && !drawsAny(shaped.blocks)) || (settled && got === null));
 
@@ -219,7 +226,19 @@
 
 <!-- THE PAGE'S NAME WITH ITS ICON, as every place's header draws it (DIRECTION §39), the day over it and the one line
      under it. -->
-<PageHead {title} icon="today" kicker={today} sentence={slashed ? slashSaid : lead?.text} needs={slashed ? undefined : lead?.needs || undefined} />
+<PageHead
+  {title}
+  icon="today"
+  kicker={today}
+  sentence={slashed ? slashSaid : lead?.text}
+  needs={slashed ? undefined : lead?.needs || undefined}
+  actions={capture ? headCapture : undefined}
+/>
+
+<!-- THE LINE A TASK IS TYPED INTO, at the right of the name (one line of its own under it on a phone). -->
+{#snippet headCapture()}
+  {#if capture}<HeadCapture block={capture} oncapture={(register, text, inherited) => view?.capture(register, text, inherited)} />{/if}
+{/snippet}
 
 <!--
   THE MODEL'S LINE, in the head's own sentence: the same words in the same type, and the rules' red phrase where it says
@@ -281,9 +300,10 @@
       <Empty kind="cleared" title={nothing} body={said('fills_with')} />
     {/if}
 
-    {#if (drawn !== null && !calm) || !settled}
+    <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
+    {#if (drawn !== null && (!calm || shaped?.capture)) || !settled}
       <div class="body">
-        <PageView {slug} got={drawn} mode="home" {reread} />
+        <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} />
       </div>
     {/if}
   {/if}
@@ -324,6 +344,19 @@
   @media (prefers-reduced-motion: reduce) {
     .home-by {
       transition: none;
+    }
+  }
+
+  /* ON A PHONE THE LINE A TASK IS TYPED INTO IS A LINE OF ITS OWN under the name, the row's whole width. */
+  @media (width < 900px) {
+    :global(.head-main:has(.head-capture)) {
+      flex-wrap: wrap;
+      row-gap: var(--sp-2);
+    }
+
+    :global(.head-actions:has(> .head-capture)) {
+      flex: 1 0 100%;
+      justify-content: stretch;
     }
   }
 

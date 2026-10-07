@@ -9,9 +9,10 @@
   Which is why there is no delete control on this screen and no filter that can hide a row. A
   history you can edit is a history, and a history you cannot is a record.
 
-  THE SHAPE, as the design system draws Activity: the title and its sentence, the three filters in
-  the toolbar, the stream on the ground grouped by hour, and beside it three tiles, each with its chart and the one
-  line that says what the chart means: who worked in the last day, what changed, and the busy hours of the week.
+  THE SHAPE, as the design system draws Activity: the title and its sentence, the filters as one segmented control in
+  the toolbar, the stream as one tile a day with an hour subhead for each hour in it, and beside it three tiles, each
+  with its chart and the one line that says what the chart means: who worked in the last day, what changed, and the
+  busy hours of the week.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -65,6 +66,7 @@
     busySaid,
     changesOf,
     clockOf,
+    dayGroups,
     dayOf,
     dayWord,
     fold,
@@ -73,7 +75,6 @@
     GROUP_TONES,
     groupWords,
     historyWords,
-    hourGroups,
     HOURS,
     isAgent,
     isBookkeeping,
@@ -379,10 +380,6 @@
   const kinds = $derived([...new Set(kept.map((e) => e.kind))]);
   const perKind = $derived(kept.reduce((m, e) => m.set(e.kind, (m.get(e.kind) ?? 0) + 1), new Map<EventKind, number>()));
 
-  /* A SEGMENTED CONTROL WHERE THE NAMES ARE FEW AND SHORT, as in "Everyone | claude | codex", and a menu
-     where they are not: seven names in a strip is a toolbar wider than the title. */
-  const segmented = $derived(actors.length <= 4 && actors.every((a) => actorSaid(a, me, names).name.length <= 14));
-
   const who = $derived(route.url.searchParams.get('by') ?? '');
   const what = $derived(route.url.searchParams.get('kind') ?? '');
 
@@ -400,7 +397,7 @@
   const daySaid = (d: string): string => dayWord(new Date(`${d}T12:00`).getTime(), clock);
 
   /* ONE LIST, WHICH TODAY LINKS TO: "12 changes to Tasks since you were last here" opens here narrowed to Tasks. It has no
-     control of its own, since a list is chosen from Today or pasted, and the pill in the toolbar says it and takes it off. */
+     control of its own, since a list is chosen from Today or pasted, and the button in the toolbar says it and takes it off. */
   const list = $derived(route.url.searchParams.get('list') ?? '');
   const listName = $derived(route.data.lists?.find((l: { id: string; name: string }) => l.id === list)?.name ?? list);
 
@@ -419,8 +416,8 @@
   /* A BURST IS ONE LINE (`burstsOf`), folded from what is drawn, so the cap above still counts lines of the log and
      the cap line under the list still says how many of them there are. */
   const told = $derived(burstsOf(shown));
-  /* AND THE LINES SIT IN BANDS ON THE GROUND: today's by the hour, an older day as one (`hourGroups`). */
-  const bands = $derived(hourGroups(told, clock));
+  /* AND THE LINES SIT ONE TILE A DAY, each hour a subhead inside it (`dayGroups`). */
+  const bands = $derived(dayGroups(told, clock));
 
   /**
    * A RUN'S WORK IS ITS NEWEST LINE AND "+9 MORE" (`runFolds`), opened in place by a press. Open stays open: a fold that
@@ -505,93 +502,77 @@
 {#snippet tools()}
   <div class="tools">
     {#if list}
-      <!-- THE ONE LIST IT WAS OPENED ON, as a pill that takes itself off. -->
-      <Button weight="glass" onclick={() => setParam('list', '')} aria-label={historyWords.everyList(listName)}
+      <!-- THE ONE LIST IT WAS OPENED ON, as a quiet rectangle that takes itself off. -->
+      <Button weight="quiet" onclick={() => setParam('list', '')} aria-label={historyWords.everyList(listName)}
         >{historyWords.onlyList(listName)}<Icon name="close" size="s" /></Button
       >
     {/if}
 
-    {#if offerAll}
-      <!-- THE RECORD'S OWN BOOKKEEPING, ON OR OFF. A switch and not a filter: it is how much of the log is drawn, and
-           Clear filters leaves it as it is. Drawn only once the log read holds some, as every control here is. -->
-      <button
-        type="button"
-        class="pill everything"
-        role="switch"
-        aria-checked={everything}
-        data-on={everything ? '' : undefined}
-        onclick={() => setParam('everything', everything ? '' : '1')}
-      ><span class="pill-word">{historyWords.everything}</span></button>
-    {/if}
-
-    {#if actors.length > 1}
-      {#if segmented}
-        <div class="segmented" role="group" aria-label={copy.auditWho}>
-          <button type="button" class="segment" data-on={who === '' ? '' : undefined} aria-pressed={who === '' ? 'true' : 'false'} onclick={() => setParam('by', '')}
-            >{historyWords.everyone}</button
+    {#if offerAll || actors.length > 1 || kinds.length > 1 || days.length > 1}
+      <!-- THE FILTERS ARE ONE SEGMENTED CONTROL: one `--field` rectangle, each filter a segment in it, and a filter that
+           narrows the stream wears the chosen segment's tile fill, so a narrowed stream says so at a glance. Who and
+           what open their menus from their segment; the day is the native select, drawn as a segment. -->
+      <div class="segmented filters" role="group" aria-label={historyWords.filters}>
+        {#if offerAll}
+          <!-- THE RECORD'S OWN BOOKKEEPING, ON OR OFF. A switch and not a filter: it is how much of the log is drawn, and
+               Clear filters leaves it as it is. -->
+          <button
+            type="button"
+            class="segment"
+            aria-pressed={everything}
+            data-on={everything ? '' : undefined}
+            onclick={() => setParam('everything', everything ? '' : '1')}>{historyWords.everything}</button
           >
-          {#each actors as a (a)}
-            <button
-              type="button"
-              class="segment"
-              data-on={who === a ? '' : undefined}
-              aria-pressed={who === a ? 'true' : 'false'}
-              onclick={() => setParam('by', who === a ? '' : a)}>{actorSaid(a, me, names).name}</button
-            >
-          {/each}
-        </div>
-      {:else}
-        <Menu label={copy.auditWho} align="end">
-          {#snippet trigger()}
-            <span class="pill" data-on={who ? '' : undefined}>
-              <Icon name="people" size="s" /><span class="pill-word">{who ? actorSaid(who, me, names).name : historyWords.everyone}</span><Icon
-                name="chevronDown"
-                size="s"
-              />
-            </span>
-          {/snippet}
-          <button type="button" class="mi" role="menuitem" aria-current={who === '' ? 'true' : undefined} onclick={() => setParam('by', '')}>
-            <Icon name="people" size="s" /><span class="mi-name">{historyWords.everyone}</span>{#if who === ''}<Icon name="check" size="s" />{/if}
-          </button>
-          {#each actors as a (a)}
-            {@const by = actorSaid(a, me, names)}
-            <button type="button" class="mi" role="menuitem" aria-current={who === a ? 'true' : undefined} onclick={() => setParam('by', a)}>
-              <Face name={by.name} you={by.you} kind={by.kind} size="s" /><span class="mi-name">{by.name}</span>{#if who === a}<Icon name="check" size="s" />{/if}
+        {/if}
+
+        {#if actors.length > 1}
+          <Menu label={copy.auditWho} align="end">
+            {#snippet trigger()}
+              <span class="segment seg-menu" data-on={who ? '' : undefined}>
+                <span class="seg-word">{who ? actorSaid(who, me, names).name : historyWords.everyone}</span><Icon name="chevronDown" size="s" />
+              </span>
+            {/snippet}
+            <button type="button" class="mi" role="menuitem" aria-current={who === '' ? 'true' : undefined} onclick={() => setParam('by', '')}>
+              <Icon name="people" size="s" /><span class="mi-name">{historyWords.everyone}</span>{#if who === ''}<Icon name="check" size="s" />{/if}
             </button>
-          {/each}
-        </Menu>
-      {/if}
-    {/if}
+            {#each actors as a (a)}
+              {@const by = actorSaid(a, me, names)}
+              <button type="button" class="mi" role="menuitem" aria-current={who === a ? 'true' : undefined} onclick={() => setParam('by', a)}>
+                <Face name={by.name} you={by.you} kind={by.kind} size="s" /><span class="mi-name">{by.name}</span>{#if who === a}<Icon name="check" size="s" />{/if}
+              </button>
+            {/each}
+          </Menu>
+        {/if}
 
-    {#if kinds.length > 1}
-      <Menu label={copy.auditWhat} align="end">
-        {#snippet trigger()}
-          <span class="pill" data-on={what ? '' : undefined}>
-            <Icon name={isEventKind(what) ? kindOf(what).icon : 'filter'} size="s" /><span class="pill-word"
-              >{isEventKind(what) ? kindOf(what).word : historyWords.everyKind}</span
-            ><Icon name="chevronDown" size="s" />
-          </span>
-        {/snippet}
-        <button type="button" class="mi" role="menuitem" aria-current={what === '' ? 'true' : undefined} onclick={() => setParam('kind', '')}>
-          <Icon name="filter" size="s" /><span class="mi-name">{historyWords.everyKind}</span><span class="mi-n num">{kept.length}</span>
-        </button>
-        {#each kinds as k (k)}
-          <button type="button" class="mi" role="menuitem" aria-current={what === k ? 'true' : undefined} onclick={() => setParam('kind', k)}>
-            <Icon name={kindOf(k).icon} size="s" /><span class="mi-name">{kindOf(k).word}</span><span class="mi-n num">{perKind.get(k) ?? 0}</span>
-          </button>
-        {/each}
-      </Menu>
-    {/if}
+        {#if kinds.length > 1}
+          <Menu label={copy.auditWhat} align="end">
+            {#snippet trigger()}
+              <span class="segment seg-menu" data-on={what ? '' : undefined}>
+                <span class="seg-word">{isEventKind(what) ? kindOf(what).word : historyWords.everyKind}</span><Icon name="chevronDown" size="s" />
+              </span>
+            {/snippet}
+            <button type="button" class="mi" role="menuitem" aria-current={what === '' ? 'true' : undefined} onclick={() => setParam('kind', '')}>
+              <Icon name="filter" size="s" /><span class="mi-name">{historyWords.everyKind}</span><span class="mi-n num">{kept.length}</span>
+            </button>
+            {#each kinds as k (k)}
+              <button type="button" class="mi" role="menuitem" aria-current={what === k ? 'true' : undefined} onclick={() => setParam('kind', k)}>
+                <Icon name={kindOf(k).icon} size="s" /><span class="mi-name">{kindOf(k).word}</span><span class="mi-n num">{perKind.get(k) ?? 0}</span>
+              </button>
+            {/each}
+          </Menu>
+        {/if}
 
-    {#if days.length > 1}
-      <select class="on-select" aria-label={copy.auditWhen} value={when} onchange={(e) => setParam('on', e.currentTarget.value)}>
-        <option value="">{copy.auditAnyDay}</option>
-        {#each days as d (d)}<option value={d}>{daySaid(d)}</option>{/each}
-      </select>
+        {#if days.length > 1}
+          <select class="segment seg-select" data-on={when ? '' : undefined} aria-label={copy.auditWhen} value={when} onchange={(e) => setParam('on', e.currentTarget.value)}>
+            <option value="">{copy.auditAnyDay}</option>
+            {#each days as d (d)}<option value={d}>{daySaid(d)}</option>{/each}
+          </select>
+        {/if}
+      </div>
     {/if}
 
     {#if who || what || when || list}
-      <Button weight="bare" href={everything ? '/audit?everything=1' : '/audit'}><Icon name="close" size="s" />{copy.clearFilters}</Button>
+      <Button weight="bare" href={everything ? '/audit?everything=1' : '/audit'}>{copy.clearFilters}</Button>
     {/if}
   </div>
 {/snippet}
@@ -729,23 +710,27 @@
         </Empty>
       {/if}
 
-      {#each bands as band (band.key)}
-        <Section title={band.title} count={band.lines.length}>
-          <ul class="ledger">
-            <!-- ONE RUN'S WORK IS ITS NEWEST LINE, and the rest of it one press away in the same place (`runFolds`). -->
-            {#each runFolds(band.lines) as f (f.key)}
-              {@render entry(f.head)}
-              {#if f.rest.length > 0}
-                {#if foldOpen(f, unfolded)}
-                  {#each f.rest as t, i (t.key)}{@render entry(t, i === 0 ? t.key : undefined)}{/each}
-                {:else}
-                  <li class="fold-row">
-                    <button type="button" class="fold tap" aria-expanded="false" onclick={() => void unfold(f)}>{historyWords.more(f.rest.length)}</button>
-                  </li>
+      {#each bands as day (day.key)}
+        <Section title={day.title} count={day.count}>
+          {#each day.hours as band (band.key)}
+            <!-- THE HOUR IS A SUBHEAD INSIDE ITS DAY, in the meta step and tabular, so the times line up down the tile. -->
+            <h3 class="hour num">{band.title}</h3>
+            <ul class="ledger">
+              <!-- ONE RUN'S WORK IS ITS NEWEST LINE, and the rest of it one press away in the same place (`runFolds`). -->
+              {#each runFolds(band.lines) as f (f.key)}
+                {@render entry(f.head)}
+                {#if f.rest.length > 0}
+                  {#if foldOpen(f, unfolded)}
+                    {#each f.rest as t, i (t.key)}{@render entry(t, i === 0 ? t.key : undefined)}{/each}
+                  {:else}
+                    <li class="fold-row">
+                      <button type="button" class="fold tap" aria-expanded="false" onclick={() => void unfold(f)}>{historyWords.more(f.rest.length)}</button>
+                    </li>
+                  {/if}
                 {/if}
-              {/if}
-            {/each}
-          </ul>
+              {/each}
+            </ul>
+          {/each}
         </Section>
       {/each}
 
@@ -906,12 +891,6 @@
     cursor: pointer;
   }
 
-  /* THE SWITCH IS A PILL LIKE THE MENUS BESIDE IT, and when it is on it takes the chosen pill's lifted fill. */
-  .everything {
-    border: 0;
-    cursor: pointer;
-  }
-
   /* ── the toolbar ─────────────────────────────────────────────────────── */
 
   .tools {
@@ -919,94 +898,51 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
-    gap: 6px;
+    gap: var(--sp-2);
     min-inline-size: 0;
   }
 
-  /* A MENU'S TRIGGER IS A GLASS PILL: an icon, the word, and the chevron, 36 high. The focus ring follows
-     the pill, since the button round it is the thing focused. */
-  .tools :global(.menu-trigger) {
-    border-radius: var(--r-pill);
+  /* THE TRACK HOLDS ITS SEGMENTS IN ONE ROW and wraps only when the bar cannot hold it. A menu's trigger is a button
+     round its segment, so it sits in the track as the segment it draws; the focus ring follows the segment's corner. */
+  .filters {
+    align-items: center;
   }
 
-  .pill {
+  .filters :global(.menu-root) {
+    display: inline-flex;
+  }
+
+  .filters :global(.menu-trigger) {
+    border-radius: calc(var(--r-ctl) - 2px);
+  }
+
+  .seg-menu {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: 6px;
     box-sizing: border-box;
-    min-block-size: var(--ctl-h);
-    max-inline-size: 28ch;
-    padding: 0 var(--sp-3) 0 var(--sp-4);
-    background: var(--glass);
-    backdrop-filter: var(--glass-blur);
-    border-radius: var(--r-pill);
-    box-shadow: var(--glass-edge);
-    color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 500;
-    white-space: nowrap;
-    transition: background var(--d-state) var(--ease-out);
+    max-inline-size: 22ch;
   }
 
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    .pill {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
-  }
-
-  /* A MENU WITH A CHOICE MADE IS THE CHOSEN SEGMENT'S SHAPE: the tile's fill, lifted, so a narrowed stream says so. */
-  .pill[data-on] {
-    background: var(--bg);
-    box-shadow: var(--glass-edge), var(--e1);
-  }
-
-  .pill-word {
+  .seg-word {
     min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  @media (hover: hover) and (pointer: fine) {
-    .tools :global(.menu-trigger:hover .pill:not([data-on])) {
-      background: var(--glass-strong);
-    }
-  }
-
-  /* THE DAY IS A GLASS PILL TOO. `controls.css` gives every select its field fill and the house chevron; the fill is
-     taken back here and the chevron kept. */
-  .on-select {
-    min-block-size: var(--ctl-h);
-    background-color: var(--glass);
-    backdrop-filter: var(--glass-blur);
-    border-radius: var(--r-pill);
-    box-shadow: var(--glass-edge);
-    font: inherit;
-    font-size: var(--t-base);
-    font-weight: 500;
-  }
-
-  @supports (-webkit-backdrop-filter: none) {
-    .on-select {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
-  }
-
-  /* GLASS NEVER HOLDS GLASS: once the title row is the compact glass bar, the controls in it drop their own. */
-  :global(.head[data-under]) .pill,
-  :global(.head[data-under]) .on-select,
-  :global(.head[data-under]) .segmented {
+  /* THE DAY IS THE NATIVE SELECT, drawn as a segment: no fill of its own on the track until it narrows the stream, and
+     the house chevron `controls.css` gives every select kept. */
+  .seg-select {
     background-color: transparent;
-    backdrop-filter: none;
-    box-shadow: none;
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    padding-inline-end: var(--sp-6);
   }
 
-  @supports (-webkit-backdrop-filter: none) {
-    :global(.head[data-under]) .pill,
-    :global(.head[data-under]) .on-select,
-    :global(.head[data-under]) .segmented {
-      -webkit-backdrop-filter: none;
-    }
+  .seg-select[data-on] {
+    background-color: var(--tile);
   }
 
   /* A MENU ROW: an icon, the word, and how many lines of that kind were read, the chosen one ticked. */
@@ -1151,10 +1087,27 @@
     display: none;
   }
 
-  /* A TIME IN A FEED IS GEIST MONO, tabular, in the quiet ink. */
+  /* A TIME IN A FEED IS GEIST AT 13 WITH TABULAR FIGURES, in the quiet ink: the figures line up down the tile without a
+     typewriter face beside the words. */
   .line-when time {
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-ui);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* AN HOUR'S SUBHEAD: the meta step at 500 in the quiet ink, a step above its first line and a breath more above any
+     hour after the first, so the day reads as one tile with places in it. */
+  .hour {
+    margin: var(--sp-2) 0 var(--sp-1);
+    color: var(--dim);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    line-height: 18px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ledger + .hour {
+    margin-block-start: var(--sp-4);
   }
 
   /**

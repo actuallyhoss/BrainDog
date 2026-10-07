@@ -776,7 +776,9 @@
         break;
       }
       case 'n': {
-        const field = pageEl?.querySelector<HTMLInputElement>('.capture-input');
+        /* ON A HOME THE LINE A TASK IS TYPED INTO SITS IN THE HEAD (`home/HeadCapture.svelte`), outside the body. */
+        const field =
+          pageEl?.querySelector<HTMLInputElement>('.capture-input') ?? (mode === 'home' ? document.querySelector<HTMLInputElement>('.head-capture .capture-input') : null);
         if (!field) return;
         field.focus();
         break;

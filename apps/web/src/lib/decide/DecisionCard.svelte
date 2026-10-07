@@ -67,6 +67,7 @@
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
   import { answeredLine, cardOf, cardWords, inlineOf, pressSaid, pressTail, primaryOf, startsOn } from './card.ts';
+  import { footprint, settle } from './settle.ts';
 
   let {
     question,
@@ -133,6 +134,10 @@
   const chosenForAll = $derived(pick?.has(question.id) ?? false);
   const bulkFix = $derived(pick?.fixes.get(question.id) ?? '');
   const optId = (key: string): string => idOf?.(key) ?? `${uid}-opt-${key}`;
+  /* THE WHOLE CHANGE, ONE LINK AWAY, where it is worth a look and the host has no other door to the question. */
+  const seeWhole = $derived(card.seeWhole && whole && !link);
+  /* WHETHER THE SIDE SAYS WHAT IT CHANGES: a line of what accepting does, money, a change from what to what, or the link. */
+  const changesAny = $derived(card.does !== '' || card.money !== '' || card.shifts.length > 0 || seeWhole);
 
   /**
    * WHERE THE CARD IS. `open` offers the options; `asking` has one chosen and the reason line open under it, for a record
@@ -153,6 +158,19 @@
 
   let field = $state<HTMLInputElement | null>(null);
   let done = $state<HTMLParagraphElement | null>(null);
+  let cardEl = $state<HTMLElement | null>(null);
+
+  /**
+   * THE CARD BECOMES ITS LINE, OR THE LINE ITS CARD, WITHOUT A JUMP (`settle.ts`): the room it took is measured before
+   * the change, and the new one opens at that height and settles to its own over `--d-rows`, the cards under it riding
+   * up or down with it. Nothing moves for a reader who asked for less motion.
+   */
+  async function morph(change: () => void) {
+    const from = footprint(phase === 'answered' ? done : cardEl);
+    change();
+    await tick();
+    settle(phase === 'answered' ? done : cardEl, from);
+  }
 
   const line = $derived(
     chosen === null ? '' : mergeLine || answeredLine(card, chosen, person, since(answeredAt || new Date().toISOString(), Date.now())),
@@ -210,14 +228,16 @@
         return;
       }
       mergeLine = '';
+      /* A REFUSED ANSWER OPENS THE CARD BACK OUT OF ITS LINE as Undo does, rather than in one jump. */
       if (out.from === 'refused' && out.wants === 'reason') {
-        phase = 'asking';
-        await tick();
+        await morph(() => (phase = 'asking'));
         reveal();
         return;
       }
-      phase = 'open';
-      fix = out.from === 'conflict' ? queueWords.moved : out.fix;
+      await morph(() => {
+        phase = 'open';
+        fix = out.from === 'conflict' ? queueWords.moved : out.fix;
+      });
     } finally {
       busy = false;
     }
@@ -232,12 +252,13 @@
     chosen = way;
     mergeLine = said;
     answeredAt = new Date().toISOString();
-    phase = 'answered';
-    holding = hold(() => {
-      holding = null;
-      void send(way);
+    await morph(() => {
+      phase = 'answered';
+      holding = hold(() => {
+        holding = null;
+        void send(way);
+      });
     });
-    await tick();
     done?.focus();
   }
 
@@ -246,10 +267,9 @@
     const was = holding;
     if (!was?.undo()) return;
     holding = null;
-    phase = 'open';
     mergeLine = '';
     const key = chosen?.key;
-    await tick();
+    await morph(() => (phase = 'open'));
     if (key) document.getElementById(optId(key))?.focus();
   }
 
@@ -353,8 +373,8 @@
     e.preventDefault();
     if (!chosen) return;
     if (reason.trim() === '') return reveal();
-    phase = 'answered';
     answeredAt = new Date().toISOString();
+    void morph(() => (phase = 'answered'));
     void send(chosen, reason);
   }
 
@@ -442,6 +462,7 @@
     aria-busy={busy}
     data-selected={chosenForAll ? '' : undefined}
     data-compact={compact ? '' : undefined}
+    bind:this={cardEl}
   >
     {#if pick && answerable && !compact}
       <!-- THE BOX THE RENDERER'S QUEUE DRAWS FOR A BULK ANSWER, named for the question alone. `x` presses it from the
@@ -455,135 +476,156 @@
         onclick={() => pick?.toggle(question)}><span aria-hidden="true">{chosenForAll ? '✓' : ''}</span></button
       >
     {/if}
-    {#if !compact}
-      <!-- WHO ASKED, WHERE AND WHEN, quiet: the face and name, the app it ran in and the run, each only where it has a
-           name. The band is kept here for the keys and the ranking, and said in the answering button's words instead. -->
-      <p class="queue-by">
-        <Face name={card.by.name} kind={card.by.kind} size="s" /><span class="queue-who">{card.by.name}</span>
-        {#each from as part, i (i)}<span class="dc-from" dir="auto">{part}</span>{/each}
-        <span class="queue-when">{card.when}</span>
-        {#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
-      </p>
-    {/if}
-    <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band is
-         kept on it, unseen, for the keys and the ranking. -->
-    <h3 class="queue-question" dir="auto">
-      {#if link || compact}<a class="dc-open" href={at(card.href)}>{card.question}</a>{:else}{card.question}{/if}{#if card.joined}{' '}<span
-          class="qa-joined num">{queueWords.joined(card.joined)}</span
-        >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
-    </h3>
-    {#if !compact}
-      <!-- WHY, FIRST: under the question on every card, before what it moves and the answers. -->
-      {#if card.why}<p class="queue-why" dir="auto">{card.why}</p>{/if}
-      {#if card.later}<p class="qa-later" dir="auto">{card.later}</p>{/if}
-      {#if card.does}<p class="dc-does" dir="auto">{card.does}</p>{/if}
-      <!-- WHAT IT MOVES: the money accepting writes, and what changes from what to what. -->
-      {#if card.money || card.shifts.length > 0}
-        <ul class="dc-moves">
-          {#if card.money}<li class="dc-money num">{card.money}</li>{/if}
-          {#each card.shifts as s, i (i)}
-            <li class="dc-shift">
-              {#if s.what}<span class="dc-what">{s.what}</span>{/if}
-              <span class="dc-before" dir="auto">{s.before}</span><span class="dc-to"><Icon name="arrow" size="s" /><span class="dc-said">{cardWords.to}</span></span><span dir="auto">{s.after}</span>
+    <!-- THE FORM: the question, the answers and the buttons. On a wide tile it is the card's first column and the side
+         is beside it; on a narrow one both are let go of (`display: contents`) and their parts read in one column in
+         the order a question is read: who asked, the question, why, the answers, the buttons, what it changes. -->
+    <div class="dc-main">
+      <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band
+           is kept on it, unseen, for the keys and the ranking. -->
+      <h3 class="queue-question" dir="auto">
+        {#if link || compact}<a class="dc-open" href={at(card.href)}>{card.question}</a>{:else}{card.question}{/if}{#if card.joined}{' '}<span
+            class="qa-joined num">{queueWords.joined(card.joined)}</span
+          >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
+      </h3>
+      {#if !compact && card.later}<p class="qa-later" dir="auto">{card.later}</p>{/if}
+      {#if card.merge && !compact}
+        <MergeCard merge={card.merge} {answerable} holding={busy ? '' : null} titleOf={(key) => card.ways.find((w) => w.key === key)?.label} onpress={pressMerge} />
+      {:else if listed}
+        <!-- THE ANSWERS, A LIST TO CHOOSE FROM: each a full-width choice with its name and what it does, the suggested
+             one saying so in the accent's words. A press chooses; Decide answers (`form.css`). -->
+        <ul class="queue-options dc-choices" role={answerable ? 'radiogroup' : undefined} aria-label={queueWords.choices}>
+          {#each card.ways as way, i (way.key)}
+            {@const marked = way.recommended}
+            {@const on = phase === 'asking' ? chosen?.key === way.key : selected === way.key}
+            <li class="queue-option" data-recommended={marked ? '' : undefined} role={answerable ? 'none' : undefined}>
+              {#if answerable}
+                <button
+                  type="button"
+                  role="radio"
+                  class="queue-act dc-choice"
+                  id={optId(way.key)}
+                  aria-checked={on}
+                  data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
+                  onclick={(e) => onChoice(e, way)}
+                  onkeydown={(e) => onChoiceKey(e, i)}
+                >
+                  <span class="dc-ring" aria-hidden="true"></span>
+                  {@render choiceBody(way)}
+                  {#if marked || (keys && i < 9)}<span class="dc-end"
+                      >{#if marked}<span class="dc-rec">{queueWords.suggested}</span>{/if}{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true"
+                          >{i + 1}</span
+                        >{/if}</span
+                    >{/if}
+                </button>
+              {:else}
+                <div class="dc-choice" data-read>
+                  {@render choiceBody(way)}
+                  {#if marked}<span class="dc-rec">{queueWords.suggested}</span>{/if}
+                </div>
+              {/if}
             </li>
           {/each}
         </ul>
       {/if}
-      {#if card.seeWhole && whole && !link}
-        <a class="qa-see tap" href={at(card.href)}>{queueWords.seeWhole}</a>
-      {/if}
-    {/if}
-    {#if card.merge && !compact}
-      <MergeCard merge={card.merge} {answerable} holding={busy ? '' : null} titleOf={(key) => card.ways.find((w) => w.key === key)?.label} onpress={pressMerge} />
-    {:else if listed}
-      <!-- THE ANSWERS, A LIST TO CHOOSE FROM: each a full-width choice with its name and what it does, the suggested one
-           saying so in the accent's words. A press chooses; Decide answers (`form.css`). -->
-      <ul class="queue-options dc-choices" role={answerable ? 'radiogroup' : undefined} aria-label={queueWords.choices}>
-        {#each card.ways as way, i (way.key)}
-          {@const marked = way.recommended}
-          {@const on = phase === 'asking' ? chosen?.key === way.key : selected === way.key}
-          <li class="queue-option" data-recommended={marked ? '' : undefined} role={answerable ? 'none' : undefined}>
-            {#if answerable}
+      {#if answerable && (!card.merge || compact)}
+        <!-- THE BUTTONS: a row of answers, one press each, or Decide with the answer chosen; then Not now. Only the one a
+             key may press carries `data-enter`: nothing hard to undo, nothing that moves money. -->
+        <div class="dc-actions" data-inline={inline ? '' : undefined}>
+          {#if inline}
+            <!-- ONE PRESS DECIDES: the suggested answer, or the first, filled with the accent, the rest quiet. Its name is
+                 its own span, so the line it leaves and the queue gate read the name without the care said after it. -->
+            {#each card.ways as way, i (way.key)}
               <button
                 type="button"
-                role="radio"
-                class="queue-act dc-choice"
+                class="queue-act dc-btn"
+                data-weight={way.key === primary ? 'primary' : undefined}
+                data-recommended={way.recommended ? '' : undefined}
                 id={optId(way.key)}
-                aria-checked={on}
+                data-enter={way.key === card.enter ? '' : undefined}
                 data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
-                onclick={(e) => onChoice(e, way)}
-                onkeydown={(e) => onChoiceKey(e, i)}
+                aria-pressed={phase === 'asking' ? chosen?.key === way.key : undefined}
+                onclick={() => press(way)}
+                >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
+                  ><span class="dc-btn-name">{way.label}</span>{way.key === primary ? pressTail(card) : ''}</span
+                >{#if way.recommended}<span class="dc-sr">{queueWords.suggestedSaid}</span>{/if}</button
               >
-                <span class="dc-ring" aria-hidden="true"></span>
-                {@render choiceBody(way)}
-                {#if marked || (keys && i < 9)}<span class="dc-end"
-                    >{#if marked}<span class="dc-rec">{queueWords.suggested}</span>{/if}{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true"
-                        >{i + 1}</span
-                      >{/if}</span
-                  >{/if}
-              </button>
-            {:else}
-              <div class="dc-choice" data-read>
-                {@render choiceBody(way)}
-                {#if marked}<span class="dc-rec">{queueWords.suggested}</span>{/if}
-              </div>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
-    {#if answerable && (!card.merge || compact)}
-      <!-- THE BUTTONS: a row of answers, one press each, or Decide with the answer chosen; then Not now. Only the one a
-           key may press carries `data-enter`: nothing hard to undo, nothing that moves money. -->
-      <div class="dc-actions" data-inline={inline ? '' : undefined}>
-        {#if inline}
-          <!-- ONE PRESS DECIDES: the suggested answer, or the first, filled with the accent, the rest quiet. Its name is
-               its own span, so the line it leaves and the queue gate read the name without the care said after it. -->
-          {#each card.ways as way, i (way.key)}
+            {/each}
+          {:else if compact}
+            <!-- MORE ANSWERS THAN A ROW HOLDS, OR A MERGE: chosen on the question's own page. -->
+            <a class="dc-btn" href={at(card.href)}>{queueWords.choose}</a>
+          {:else if phase !== 'asking'}
             <button
               type="button"
-              class="queue-act dc-btn"
-              data-weight={way.key === primary ? 'primary' : undefined}
-              data-recommended={way.recommended ? '' : undefined}
-              id={optId(way.key)}
-              data-enter={way.key === card.enter ? '' : undefined}
-              data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
-              aria-pressed={phase === 'asking' ? chosen?.key === way.key : undefined}
-              onclick={() => press(way)}
-              >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
-                ><span class="dc-btn-name">{way.label}</span>{way.key === primary ? pressTail(card) : ''}</span
-              >{#if way.recommended}<span class="dc-sr">{queueWords.suggestedSaid}</span>{/if}</button
+              class="dc-btn"
+              data-weight="primary"
+              data-decide
+              data-enter={card.enter !== null && selected !== null ? '' : undefined}
+              aria-disabled={selected === null}
+              onclick={commit}>{pressSaid(card, queueWords.decide)}</button
             >
-          {/each}
-        {:else if compact}
-          <!-- MORE ANSWERS THAN A ROW HOLDS, OR A MERGE: chosen on the question's own page. -->
-          <a class="dc-btn" href={at(card.href)}>{queueWords.choose}</a>
-        {:else if phase !== 'asking'}
-          <button
-            type="button"
-            class="dc-btn"
-            data-weight="primary"
-            data-decide
-            data-enter={card.enter !== null && selected !== null ? '' : undefined}
-            aria-disabled={selected === null}
-            onclick={commit}>{pressSaid(card, queueWords.decide)}</button
-          >
+          {/if}
+          {#if notNow}<a class="dc-btn dc-later" data-weight="bare" href={at(`${card.href}?defer`)}>{queueWords.notNow}</a>{/if}
+        </div>
+      {/if}
+      {#if phase === 'asking' && chosen}
+        <form class="qa-reason" onsubmit={submit}>
+          <label class="qa-label" for="{uid}-why">{queueWords.why}</label>
+          <div class="qa-line">
+            <span class="field field-lg qa-field">
+              <input id="{uid}-why" class="field-input qa-input" type="text" autocomplete="off" enterkeyhint="send" required bind:value={reason} bind:this={field} {onkeydown} />
+            </span>
+            <Button type="submit">{queueWords.send}</Button>
+          </div>
+        </form>
+      {/if}
+      {#if fix || bulkFix}<p class="qa-fix" role="status">{fix || bulkFix}</p>{/if}
+    </div>
+    {#if !compact}
+      <!-- WHO ASKED, WHERE AND WHEN, quiet: the face and name, the app it ran in and the run, each only where it has a
+           name. The band is kept here for the keys and the ranking, and said in the answering button's words instead.
+
+           THE CARD'S SIDE (DIRECTION §39): on a wide tile a 280px column beside the form, so the right of a tile is not
+           left empty, with who asked, why it is asked and what it changes, each under a quiet heading. On a narrow one
+           who asked leads the card, why follows the question, and what it changes comes under the buttons. -->
+      <div class="dc-side">
+        <section class="dc-part dc-part-by" aria-labelledby="{uid}-by">
+          <h4 class="dc-h" id="{uid}-by">{cardWords.askedBy}</h4>
+          <p class="queue-by">
+            <Face name={card.by.name} kind={card.by.kind} size="s" /><span class="queue-who">{card.by.name}</span>
+            {#each from as part, i (i)}<span class="dc-from" dir="auto">{part}</span>{/each}
+            <span class="queue-when">{card.when}</span>
+            {#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
+          </p>
+        </section>
+        <!-- WHY: under the question on a narrow card, beside it on a wide one, before what it moves. -->
+        {#if card.why}
+          <section class="dc-part dc-part-why" aria-labelledby="{uid}-why-h">
+            <h4 class="dc-h" id="{uid}-why-h">{cardWords.why}</h4>
+            <p class="queue-why" dir="auto">{card.why}</p>
+          </section>
         {/if}
-        {#if notNow}<a class="dc-btn dc-later" data-weight="bare" href={at(`${card.href}?defer`)}>{queueWords.notNow}</a>{/if}
+        <!-- WHAT IT CHANGES: what accepting the lead does, the money it writes, what changes from what to what, and the
+             whole change one link away. -->
+        {#if changesAny}
+          <section class="dc-part dc-part-changes" aria-labelledby="{uid}-changes">
+            <h4 class="dc-h" id="{uid}-changes">{cardWords.changes}</h4>
+            {#if card.does}<p class="dc-does" dir="auto">{card.does}</p>{/if}
+            {#if card.money || card.shifts.length > 0}
+              <ul class="dc-moves">
+                {#if card.money}<li class="dc-money num">{card.money}</li>{/if}
+                {#each card.shifts as s, i (i)}
+                  <li class="dc-shift">
+                    {#if s.what}<span class="dc-what">{s.what}</span>{/if}
+                    <span class="dc-before" dir="auto">{s.before}</span><span class="dc-to"><Icon name="arrow" size="s" /><span class="dc-said">{cardWords.to}</span></span><span dir="auto">{s.after}</span>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+            {#if seeWhole}<a class="qa-see tap" href={at(card.href)}>{queueWords.seeWhole}</a>{/if}
+          </section>
+        {/if}
       </div>
     {/if}
-    {#if phase === 'asking' && chosen}
-      <form class="qa-reason" onsubmit={submit}>
-        <label class="qa-label" for="{uid}-why">{queueWords.why}</label>
-        <div class="qa-line">
-          <span class="field field-lg qa-field">
-            <input id="{uid}-why" class="field-input qa-input" type="text" autocomplete="off" enterkeyhint="send" required bind:value={reason} bind:this={field} {onkeydown} />
-          </span>
-          <Button type="submit">{queueWords.send}</Button>
-        </div>
-      </form>
-    {/if}
-    {#if fix || bulkFix}<p class="qa-fix" role="status">{fix || bulkFix}</p>{/if}
   </article>
   {#if lead && !compact}<LeadPreview id={question.id} kind={card.filed} />{/if}
 {/if}
@@ -592,6 +634,153 @@
   /* THE CARD IS A FORM'S COLUMN: who asked, the question, why, the choices, the buttons, at one steady step. */
   .dc {
     row-gap: var(--sp-3);
+  }
+
+  /* ── one column: the form and the side let go of, their parts in the order a question is read ───────────────
+
+     The skin lays every part of a card across both its tracks (`.queue-card > *`); the parts here are the wrappers'
+     children, so they say it themselves. Who asked leads, why follows the question, the answers and the buttons come
+     next, and what it changes is under them all. */
+  .dc-main,
+  .dc-side,
+  .dc-part {
+    display: contents;
+  }
+
+  .dc-main > *,
+  .dc-side > *,
+  .dc-part > * {
+    grid-column: 1 / -1;
+  }
+
+  /* A part let go of hands its order to its own children, which are the grid's items now. */
+  .dc-part-by > * {
+    order: -1;
+  }
+
+  .dc-main > :not(.queue-question) {
+    order: 1;
+  }
+
+  .dc-part-changes > * {
+    order: 2;
+  }
+
+  /* THE BULK BOX SITS AT THE END OF THE BY-LINE, on its line, as the skin set it when the by-line was the card's own. */
+  .dc:has(> .qa-select) .dc-part-by > .queue-by {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .dc > .qa-select {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  /* A QUIET HEADING OVER EACH PART OF THE SIDE: said to a screen reader in one column, where who asked and why sit
+     where a card always had them and need no name, and drawn only over what it changes, under the buttons. */
+  .dc-h {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    color: var(--dim);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    line-height: 1.4;
+  }
+
+  .dc-part-changes > .dc-h {
+    position: static;
+    inline-size: auto;
+    block-size: auto;
+    overflow: visible;
+    clip-path: none;
+    margin-block-start: var(--sp-2);
+    margin-block-end: calc(var(--sp-2) * -1);
+  }
+
+  /* WHO ASKED AND WHEN ARE ALWAYS THERE (DIRECTION §37): the skin's by-line waits for a hover on its card before the
+     time shows, which it reads off a by-line that is the card's own child. This one is a part's, so it says it here. */
+  .queue-by > :is(.queue-when, .dc-from) {
+    opacity: 1;
+    transition: none;
+  }
+
+  /* ── two columns, on a wide tile: the form, and beside it a 280px side ───────────────────────────────────
+
+     The form takes what the side leaves, and the side reads down its own column under its quiet headings, a hairline
+     at its start, so the right of a wide tile holds who asked, why and what it changes and is never left empty. The
+     host's slot is the container (`QueueAnswer.svelte`'s `.qa`, Today's row, the palette's sheet), so a narrow slot
+     stays one column whatever the window. */
+  @container (inline-size >= 52rem) {
+    .dc:not([data-compact]) {
+      grid-template-columns: minmax(0, 1fr) 280px;
+      column-gap: var(--sp-6);
+      align-items: start;
+    }
+
+    .dc:not([data-compact]) > .dc-main {
+      display: grid;
+      grid-row: 1;
+      grid-column: 1;
+      align-content: start;
+      row-gap: var(--sp-3);
+    }
+
+    .dc:not([data-compact]) > .dc-side {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-5);
+      grid-row: 1;
+      grid-column: 2;
+      min-inline-size: 0;
+      padding-inline-start: var(--sp-5);
+      border-inline-start: 1px solid var(--rule);
+    }
+
+    .dc:not([data-compact]) .dc-part {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-2);
+      min-inline-size: 0;
+    }
+
+    .dc:not([data-compact]) .dc-h {
+      position: static;
+      inline-size: auto;
+      block-size: auto;
+      margin: 0;
+      overflow: visible;
+      clip-path: none;
+    }
+
+    /* The bulk box keeps the end of the side's first line, over the short heading there, and lifted over the side so a
+       press reaches it. A row of its own would share the form's height with the side and push the side down. */
+    .dc:not([data-compact]) > .qa-select {
+      position: relative;
+      z-index: var(--z-raise);
+      justify-self: end;
+      align-self: start;
+    }
+
+    /* The link to the whole change keeps its own width in the side's column. */
+    .dc:not([data-compact]) .dc-part > .qa-see {
+      align-self: start;
+    }
+
+    /* The by-line in the side wraps under its name rather than running out of a narrow column. */
+    .dc:not([data-compact]) .queue-by {
+      flex-wrap: wrap;
+    }
+
+    /* Why, in the side, is the column's measure and the body's size. */
+    .dc:not([data-compact]) .dc-part-why > .queue-why {
+      max-inline-size: none;
+    }
   }
 
   /* A FACE IN THE BY-LINE sits on the line's middle, not its baseline, or the disc rides above the words. Quiet: 13 in
@@ -604,11 +793,18 @@
   }
 
   /* THE QUESTION, 17 AND SEMIBOLD, close under who asked it: the lead and every card alike, on a laptop and a phone. */
-  .dc > .queue-question {
+  .dc-main > .queue-question {
     margin-block-start: calc(var(--sp-1) * -1);
     font-size: var(--fs-head);
     font-weight: var(--fw-semi);
     line-height: var(--lh-head);
+  }
+
+  /* ON A WIDE TILE NOTHING SITS ABOVE THE QUESTION: who asked is in the side. */
+  @container (inline-size >= 52rem) {
+    .dc:not([data-compact]) > .dc-main > .queue-question {
+      margin-block-start: 0;
+    }
   }
 
   /* COMPACT, A QUESTION IS ITS LINE AND ITS BUTTONS, a step apart, with no by-line above it to sit close under. */
@@ -616,11 +812,11 @@
     row-gap: var(--sp-2);
   }
 
-  .dc[data-compact] > .queue-question {
+  .dc[data-compact] > .dc-main > .queue-question {
     margin-block-start: 0;
   }
 
-  .dc[data-compact] > .dc-actions {
+  .dc[data-compact] > .dc-main > .dc-actions {
     margin-block-start: var(--sp-1);
   }
 
@@ -634,7 +830,7 @@
   }
 
   /* THE BUTTONS SIT A LITTLE CLEAR OF THE LAST CHOICE, as a form's do. */
-  .dc > .dc-actions {
+  .dc-main > .dc-actions {
     margin-block-start: var(--sp-1);
   }
 
@@ -668,7 +864,7 @@
   }
 
   /* WHY IS READ, NOT SKIMMED: body size and air, in the second ink, at a measure. */
-  .dc > .queue-why {
+  .dc-part-why > .queue-why {
     font-size: var(--fs-body);
     line-height: var(--lh-body);
   }

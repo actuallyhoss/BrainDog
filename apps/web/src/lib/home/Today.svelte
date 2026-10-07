@@ -1324,29 +1324,29 @@
     white-space: nowrap;
   }
 
-  /* THE SWATCH IS THE STACKED BAR'S OWN STEP: ink, then the ramp's greys, mixed as the chart mixes them (`viz.css`). */
+  /* THE SWATCH IS THE STACKED BAR'S OWN STEP: the accent, then its tints, as the chart draws them (`viz.css`). */
   .swatch {
     flex: none;
     inline-size: 8px;
     block-size: 8px;
     border-radius: 2px;
-    background: var(--ink);
+    background: var(--chart-1);
   }
 
   .swatch[data-tone='g1'] {
-    background: color-mix(in srgb, var(--ink) 76%, var(--bg));
+    background: color-mix(in srgb, var(--chart-1) 76%, var(--tile));
   }
 
   .swatch[data-tone='g2'] {
-    background: color-mix(in srgb, var(--ink) 48%, var(--bg));
+    background: var(--chart-2);
   }
 
   .swatch[data-tone='g3'] {
-    background: color-mix(in srgb, var(--ink) 24%, var(--bg));
+    background: var(--chart-3);
   }
 
   .swatch[data-tone='g4'] {
-    background: color-mix(in srgb, var(--ink) 13%, var(--bg));
+    background: var(--chart-other);
   }
 
   @media (width < 640px) {

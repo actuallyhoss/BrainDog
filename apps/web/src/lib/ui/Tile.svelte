@@ -1,9 +1,10 @@
 <!--
   A content tile: the white surface that holds a figure, its chart and the one line saying what the chart means.
 
-  THE HEADING ROW IS THE TILE'S OWN, so every tile on every screen starts the same way: a 28px icon well, the title at
-  the row size and 600, an optional count in the quiet ink, and at the far end either a link word with its arrow or a
-  line of meta. `actions` sits there too, for a tile whose heading carries a control of its own.
+  THE HEADING ROW IS THE TILE'S OWN, so every tile on every screen starts the same way: a 28px icon well in the tone that
+  says what the tile is (`tone`), the title at the row size and 600, an optional count in the quiet ink, and at the far
+  end either a link word with its arrow or a line of meta. `actions` sits there too, for a tile whose heading carries a
+  control of its own.
 
   NO TILE INSIDE A TILE, NO GLASS UNDER ONE, NO BORDER ROUND IT, NO SHADOW. The tile is told from the board by its
   fill alone, in light and in dark.
@@ -18,6 +19,7 @@
 
   let {
     icon,
+    tone,
     title,
     count,
     meta,
@@ -31,6 +33,11 @@
   }: {
     /** The glyph in the heading's well. */
     icon?: IconName | undefined;
+    /**
+     * What the well says by its colour (`IconWell`'s tones): `action` for a question waiting, `danger` for what is late,
+     * `earn` for cash and what is earned. Left out, the well is the quiet grey.
+     */
+    tone?: 'action' | 'danger' | 'earn' | 'live' | 'warn' | undefined;
     title?: string | undefined;
     /** Beside the title in the quiet ink. A zero is a count too here, since a tile that holds a number says it. */
     count?: number | string | undefined;
@@ -54,7 +61,7 @@
 <section class={['tile', extra]} data-lead={lead ? '' : undefined} {...rest}>
   {#if head}
     <header class="tile-head">
-      {#if icon}<IconWell name={icon} size="m" />{/if}
+      {#if icon}<IconWell name={icon} size="m" {tone} />{/if}
       {#if title}
         <h2 class="tile-title">
           <span class="tile-name">{title}</span>

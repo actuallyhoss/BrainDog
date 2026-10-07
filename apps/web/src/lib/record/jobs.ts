@@ -386,7 +386,6 @@ export const words = {
   allJobs: 'All jobs',
   run: 'Run a job',
   none: 'No jobs have run yet',
-  noneWhy: 'A job is a run of Claude on a machine you enrolled, from a kind you approved in Decide. Start one here, and watch it work.',
   noneFor: (repo: string) => `No jobs have run in ${repo} yet`,
   older: 'Show older jobs',
   /* The list's columns, which label each fact on a card too. */

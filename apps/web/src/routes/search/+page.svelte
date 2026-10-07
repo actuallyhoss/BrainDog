@@ -19,6 +19,11 @@
 
   THE ANSWER IS THE RECORD'S, through `search-live.ts`, and a record that turns the search away says why.
 
+  BEFORE ANYTHING IS TYPED IT OFFERS WHERE TO JUMP: the field across the board's whole width at 48, and under it a tile
+  for each kind of place a person goes to most (a section's things in their colours, the people met lately with their
+  faces, the lists with their icons, and what changed last). `jump.ts` reads each from the record; a kind with nothing in
+  it draws no tile, and a record with nothing at all draws the empty state.
+
   THE QUERY IS IN THE URL because it is what you are looking at (`19 §5`), which also makes a result
   page a thing you can send somebody. The field writes it back with `replaceState`, throttled, for
   the reason the register's search box does: seven characters is not seven places you have been.
@@ -42,14 +47,69 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Bars from '$lib/viz/Bars.svelte';
+  import Face from '$lib/ui/Face.svelte';
+  import { isGlyph, type IconName } from '$lib/ui/icons.ts';
+  import { createClient } from '@braindog/client';
+  import { paletteReader } from '$lib/record/palette-live.ts';
+  import type { Recent } from '$lib/record/palette.ts';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
+  import { PER_TILE, listsOf, readDeclared, readPeople, thingsOf, type Place } from './jump.ts';
 
   /* THIS SCREEN'S OWN WORDS, beside it rather than in the copy aggregate, which this unit does not hold. */
   const words = {
     showAll: (n: number) => `Show all ${n.toLocaleString('en')}`,
     where: 'Where it matched',
     whereSubject: 'Matches by list',
+    jumpTo: 'Jump to',
+    lists: 'Lists',
+    recent: 'Changed lately',
+    entries: (n: number) => n.toLocaleString('en'),
   } as const;
+
+  /* ── where to jump, before anything is typed ── */
+
+  type Registers = { id: string; name: string; count: number; icon: IconName }[];
+  const registers = $derived<Registers>(route.data.index?.registers ?? []);
+  const nav = $derived<{ title: string; href: string; section: string; row?: boolean; hue?: number; icon: IconName }[]>(route.data.nav ?? []);
+  /* EACH SECTION OF THINGS WEARS ITS OWN PAGE'S GLYPH, the one the rail draws for it. */
+  const things = $derived(thingsOf(nav).map((t) => ({ ...t, icon: nav.find((n) => n.section === t.section && n.row !== true)?.icon ?? ('projects' as IconName) })));
+  let read = $state.raw<{ icons: ReadonlyMap<string, IconName>; people: Place[]; met: { name: string; icon: IconName } | null; recent: Recent[] } | null>(null);
+  const lists = $derived(listsOf(registers, read?.icons ?? new Map()));
+  const people = $derived(read?.met ? read.people : []);
+  const recent = $derived(read?.recent ?? []);
+  const jumps = $derived(things.length + (people.length > 0 ? 1 : 0) + (lists.length > 0 ? 1 : 0) + (recent.length > 0 ? 1 : 0));
+
+  /* ASKED ONCE A VISIT, and only while nothing is typed: a person who arrives with a query wants its answer, not these.
+     A read that fails leaves its tile out, and the lists and things the shell already holds still draw. */
+  let asking = false;
+  async function readJumps(held: Registers) {
+    if (asking) return;
+    asking = true;
+    const client = createClient({ base: apiBase() });
+    const [declared, lately] = await Promise.all([
+      readDeclared(client, held.filter((r) => r.count > 0), isGlyph).catch(() => null),
+      paletteReader(apiBase()).recent(held, PER_TILE).catch(() => [] as Recent[]),
+    ]);
+    const met = declared?.people ? await readPeople(client, declared.people).catch(() => [] as Place[]) : [];
+    /* A CHANGED ROW WEARS ITS LIST'S DECLARED GLYPH TOO, read in the same answers as the lists tile's. */
+    const icons = declared?.icons ?? new Map<string, IconName>();
+    /* THE PEOPLE TILE IS NAMED AND DRAWN AS THEIR LIST IS, whatever the record calls it. */
+    const role = declared?.people ?? null;
+    const list = role ? held.find((r) => r.id === role.register) : undefined;
+    read = {
+      icons,
+      people: met,
+      met: role && list ? { name: list.name, icon: icons.get(role.register) ?? list.icon } : null,
+      recent: lately.map((r) => ({ ...r, icon: icons.get(r.target.split('#')[0] ?? '') ?? r.icon })),
+    };
+  }
+
+  $effect(() => {
+    if (shown === 'idle' && read === null) {
+      const held = registers;
+      untrack(() => void readJumps(held));
+    }
+  });
 
   const q = $derived(route.url.searchParams.get('q') ?? '');
 
@@ -158,11 +218,12 @@
 
 <svelte:head><title>{titleOf(q || copy.search)}</title></svelte:head>
 
-<PageHead title={copy.search} count={q ? found.total : undefined} {sentence} />
+<PageHead icon="search" title={copy.search} count={q ? found.total : undefined} {sentence} />
 
 <div class="page">
-  <!-- THE FIELD ON THE GROUND, first under the sentence: 44 tall on the soft well, the glyph inside the label and the
-       input taking the rest. It is the fallback when the rail's Ask was not enough, so it is here on every visit. -->
+  <!-- THE FIELD ACROSS THE BOARD, first under the sentence: 48 tall on the tile's own fill, as wide as the tiles under
+       it, the glyph inside the label and the input taking the rest. It is the fallback when the rail's Ask was not
+       enough, so it is here on every visit. -->
   <label class="field field-lg search-field">
     <Icon name="search" size="m" />
     <!-- A NAME, NOT A PLACEHOLDER: the placeholder disappears the moment somebody types, taking the
@@ -182,7 +243,74 @@
     <!-- NOT AN ERROR AND NOT A RESULT. Arriving here with no query is the ordinary way in from the
          nav, and `19 §6`'s `no-data-yet` is the state for a surface waiting on you rather than on
          the record. -->
-    <Empty kind="no-data-yet" glyph="search" title={copy.searchWaiting} body={copy.searchWhere} />
+    {#if jumps > 0}
+      <section class="jump" aria-labelledby="jump-title">
+        <h2 class="jump-title" id="jump-title">{words.jumpTo}</h2>
+        <div class="jump-grid">
+          {#each things as t (t.section)}
+            <!-- A SECTION'S THINGS, EACH IN ITS OWN COLOUR, the dot the rail draws beside it. -->
+            <Tile icon={t.icon} title={t.section}>
+              <ul class="places">
+                {#each t.items as p (p.href)}
+                  <li>
+                    <a class="place" href={at(p.href)}>
+                      <span class="place-lead" aria-hidden="true">{#if p.hue !== undefined}<span class="hue" style="--hue:{p.hue}"></span>{:else}<Icon name={t.icon} size="m" />{/if}</span>
+                      <span class="place-name">{p.title}</span>
+                    </a>
+                  </li>
+                {/each}
+              </ul>
+            </Tile>
+          {/each}
+          {#if people.length > 0 && read?.met}
+            <Tile icon={read.met.icon} title={read.met.name}>
+              <ul class="places">
+                {#each people as p (p.href)}
+                  <li>
+                    <a class="place" href={at(p.href)}>
+                      <span class="place-lead"><Face name={p.title} size="m" /></span>
+                      <span class="place-name">{p.title}</span>
+                    </a>
+                  </li>
+                {/each}
+              </ul>
+            </Tile>
+          {/if}
+          {#if lists.length > 0}
+            <Tile icon="rows" title={words.lists}>
+              <ul class="places">
+                {#each lists as l (l.href)}
+                  <li>
+                    <a class="place" href={at(l.href)}>
+                      <span class="place-lead" aria-hidden="true"><Icon name={l.icon ?? 'rows'} size="m" /></span>
+                      <span class="place-name">{l.title}</span>
+                      <span class="place-n num">{words.entries(l.count)}</span>
+                    </a>
+                  </li>
+                {/each}
+              </ul>
+            </Tile>
+          {/if}
+          {#if recent.length > 0}
+            <Tile icon="clock" title={words.recent}>
+              <ul class="places">
+                {#each recent as r (r.href)}
+                  <li>
+                    <a class="place" href={at(r.href)}>
+                      <span class="place-lead" aria-hidden="true"><Icon name={r.icon} size="m" /></span>
+                      <span class="place-name">{r.title}</span>
+                      <span class="place-n">{r.list}</span>
+                    </a>
+                  </li>
+                {/each}
+              </ul>
+            </Tile>
+          {/if}
+        </div>
+      </section>
+    {:else}
+      <div class="quiet"><Empty kind="no-data-yet" glyph="search" title={copy.searchWaiting} body={copy.searchWhere} /></div>
+    {/if}
   {:else if shown === 'waiting'}
     <!-- Bars until the first answer, holding the shape the results will take. -->
     <Waiting />
@@ -268,14 +396,113 @@
     flex-direction: column;
     gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max);
   }
 
-  /* THE FIELD IS `controls.css`'s: the soft well with no border, 44 tall at `field-lg`, radius 12, and the ink ring on
-     the wrapper while the input inside it has focus. As wide as the palette, since it is the palette's question asked
-     again. */
+  /* THE FIELD IS `controls.css`'s, with the ink ring on the wrapper while the input inside it has focus, drawn here at
+     48 on the tile's own fill and as wide as the board, so it reads as the first tile rather than a box floating on it. */
   .search-field {
-    max-inline-size: 640px;
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-block-size: 48px;
+    background: var(--tile);
+    border-radius: var(--r-ctl);
+  }
+
+  /* ── where to jump ─────────────────────────────────────────────────────── */
+
+  .jump {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .jump-title {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    line-height: 18px;
+  }
+
+  /* FOUR ACROSS WHERE THERE IS ROOM, two on a narrow desk, one on a phone: the tiles keep a readable width and fill
+     the row, measured on the page's own width so a docked panel narrows it. */
+  .jump-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+    gap: var(--tile-gap);
+    align-items: start;
+  }
+
+  /* A PLACE IS A 36PX ROW, the rail's own height: its colour, face or glyph, its name, and what it holds at the end. */
+  .places {
+    display: flex;
+    flex-direction: column;
+    margin: 0 calc(-1 * var(--sp-2));
+    padding: 0;
+    list-style: none;
+  }
+
+  .place {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    min-block-size: 36px;
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+    text-decoration: none;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .place:hover {
+      background: var(--field-hover);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .place {
+      min-block-size: var(--tap);
+    }
+  }
+
+  .place-lead {
+    display: inline-grid;
+    place-items: center;
+    color: var(--ink2);
+  }
+
+  .hue {
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: var(--r-round);
+    background: oklch(var(--mark-l) var(--mark-c) var(--hue));
+  }
+
+  .place-name {
+    overflow: hidden;
+    font-size: var(--fs-body);
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .place-n {
+    max-inline-size: 14ch;
+    overflow: hidden;
+    color: var(--dim);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .quiet {
+    padding: var(--tile-pad);
+    background: var(--tile);
+    border-radius: var(--tile-r);
   }
 
   /* SIXTEEN PIXELS AT EVERY WIDTH, as every input in the product is, so a phone does not zoom the page

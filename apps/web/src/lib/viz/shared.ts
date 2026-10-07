@@ -5,8 +5,9 @@
  * PURE, AND NO SVELTE, so the geometry modules beside it (and their tests under `node --test`) can
  * use it without a component in sight.
  *
- * A TONE IS A NAME OR A PROJECT'S OWN COLOUR. The names are the chart ramp (`ink`,
- * then the greys `g1` to `g4`, darkest first) and the four meanings (`danger` for late or needs him,
+ * A TONE IS A NAME OR A PROJECT'S OWN COLOUR. The names are the chart ramp (`ink`, then `g1` to
+ * `g4`, darkest first, which `viz.css` draws as the accent, its tints and the grey for "other"; the
+ * names are older than the accent) and the four meanings (`danger` for late or needs him,
  * `earn` for money in, `warn` for waiting, `live` for running). Anything else is taken as a colour
  * the record holds (a project's `colour`) and is set inline as `--c`, which is the one way a colour
  * the theme does not own reaches a chart. `viz.css` turns a name into a token; a component never
@@ -20,8 +21,12 @@ export type NamedTone = (typeof NAMED_TONES)[number];
 /** A named tone, or any other string, which is a project's own colour. */
 export type Tone = NamedTone | (string & {});
 
-/** The chart ramp, darkest first: one series in ink, the rest in greys. */
-export const RAMP = ['ink', 'g1', 'g2', 'g3', 'g4'] as const satisfies readonly NamedTone[];
+/**
+ * The ramp a chart's untoned parts step down, darkest first: the accent, its two tints (`g2`, `g3`), then the grey
+ * for "other" for every part after. `g1` is left out because it is the accent at 76%, which beside the full accent
+ * in a stacked bar reads as the same part; a caller that names five tones itself can still use it.
+ */
+export const RAMP = ['ink', 'g2', 'g3', 'g4'] as const satisfies readonly NamedTone[];
 
 /**
  * How a mark is painted: `tone` goes on `data-tone`, and `colour`, when there is one, on `--c`.
@@ -38,10 +43,10 @@ export function paint(tone: Tone | undefined, fallback: NamedTone): Paint {
   return { tone: 'own', colour: tone };
 }
 
-/** The ramp step for the i-th series, so parts with no tone of their own step down the greys. */
+/** The ramp step for the i-th series, so parts with no tone of their own step down the tints to "other". */
 export const rampAt = (i: number): NamedTone => RAMP[Math.min(Math.max(Math.trunc(i), 0), RAMP.length - 1)] ?? 'g4';
 
-/** Is this a grey step (or nothing)? A label beside a grey mark stays quiet; beside a highlight it is ink. */
+/** Is this a quiet step (or nothing)? A label beside a tint stays quiet; beside the highlight it is ink. */
 export const isQuiet = (tone: Tone | undefined): boolean =>
   tone === undefined || tone === 'g1' || tone === 'g2' || tone === 'g3' || tone === 'g4';
 

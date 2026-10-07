@@ -446,12 +446,14 @@
       opacity: 1;
     }
 
-    /* The back link: a chevron and the parent's name, 44px tall, never more than two fifths of the bar. */
+    /* The back link: a chevron and the parent's name, 44px tall, never more than two fifths of the bar. IT DOES NOT
+       GIVE WAY to the title beside it: shrinkable, it was squeezed to "D." on a question at 390, so it keeps its own
+       width up to the cap and the name inside it is what ellipses. */
     .back {
       display: inline-flex;
       align-items: center;
       gap: var(--sp-1);
-      flex: 0 1 auto;
+      flex: none;
       min-inline-size: 0;
       max-inline-size: 40%;
       min-block-size: var(--tap);

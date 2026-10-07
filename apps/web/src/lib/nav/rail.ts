@@ -87,3 +87,15 @@ export function railOf<T extends { href: string; row?: boolean | undefined; tabs
   );
   return { places, things, more, views: drawn };
 }
+
+/** Where the agents work is read, when the record has no Agents place: the page the agents pack declares. */
+export const AGENTS_PAGE = '/p/agents';
+
+/**
+ * Where the rail's "2 working" row goes: the Agents place, wherever the rail put it (among the seven or under More), by
+ * the same plain name `PLACES` ranks it at, else the agents pack's own page.
+ */
+export function agentsHref(items: readonly FlatItem[]): string {
+  const place = items.find((i) => plainOf(i.key.replace(/^section:/u, '')) === 'agents' || i.href === AGENTS_PAGE);
+  return place?.href ?? AGENTS_PAGE;
+}

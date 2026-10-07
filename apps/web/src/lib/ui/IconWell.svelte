@@ -4,7 +4,7 @@
   18 in `--ink2` on `--field`, at the control's 8px corner.
 
   A TONE IS A MEANING, never decoration. `ink` is the chosen form, the rail's current place: an ink
-  fill with the icon in `--on-ink`. `action` is the working accent's tint, for a thing in progress or chosen.
+  fill with the icon in `--on-ink`. `action` is the working accent's tint, for a thing in progress or chosen and a tile of questions waiting on him.
   `danger`, `earn`, `warn` and `live` tint the icon in that intent and fill the well with a 12% tint of it (the `-fill` roles are saturated, so they would draw red on red). Red is for what needs him and nothing else.
 
   Decorative: the words beside a well say what it means, so the icon is hidden from assistive tech.

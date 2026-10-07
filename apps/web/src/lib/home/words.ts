@@ -35,6 +35,11 @@ export const words = {
   nothingUrgent: 'Nothing is marked urgent.',
   noneWorking: 'No agent is working.',
 
+  /** A burst in what changed that the record put no words to: how many changes it was, never a bare number. */
+  changes: (n: number) => (n === 1 ? 'One change' : `${n.toLocaleString('en-GB')} changes`),
+  /** The tick behind a late task's dot, for a screen reader and as its tooltip. */
+  markDone: (what: string) => `Mark “${what}” done`,
+
   /* WHO SAID THE LINE UNDER THE TITLE, when the model did (`home-line.ts`): shown on hover or focus, never at rest. */
   byline: 'Slash · today',
 

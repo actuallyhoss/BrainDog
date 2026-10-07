@@ -17,6 +17,10 @@
 
   `?repo=<name>` IS A PROJECT'S "RUNS ON" LINK: the runs of kinds that work in that repository, with a way back to all.
 
+  BEFORE THE FIRST RUN THE SCREEN SAYS WHAT A JOB IS, in a tile, with the machines enrolled to run one beside it, so a
+  record with no runs yet still shows what it can do and what it is waiting on. The machines stay listed under the
+  tiles once there are runs. Only an owner reads them (`listDevices` is the owner's); anybody else is shown no tile.
+
   "RUN A JOB" OPENS A SHEET that reads the approved kinds only when opened (`readKinds` in `lib/record/jobs.ts`), since
   the kinds come from the decided proposals and nobody reading the list needs them. It picks a kind, takes its
   arguments, starts it and opens the run, where the transcript fills in as the machine works.
@@ -59,8 +63,12 @@
   import Stacked from '$lib/viz/Stacked.svelte';
   import Swimlanes from '$lib/viz/Swimlanes.svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
+  import { since } from 'braindog-render';
+  import { createClient } from '@braindog/client';
   import {
     detailOf,
+    enrolledOf,
+    enrolledSaid,
     groupsOf,
     iconOf,
     lanesOf,
@@ -141,6 +149,23 @@
     return () => clearInterval(timer);
   });
 
+  /* ── the machines ── */
+
+  /* THE MACHINES ENROLLED AS RUNNERS, asked once for the record in the address. A refusal (anybody but an owner) or a
+     host older than the read is no tile, never an empty list that would say no machine is enrolled. */
+  let devices = $state.raw<ReturnType<typeof enrolledOf> | null>(null);
+  /* The record's address, which changes with its slug and not with `?repo=`, so the read is not asked again per filter. */
+  const recordBase = $derived(apiBase(page.url));
+  $effect(() => {
+    const base = recordBase;
+    void createClient({ base })
+      .listDevices()
+      .then(
+        (out) => (devices = out.ok ? enrolledOf(out.value) : null),
+        () => (devices = null),
+      );
+  });
+
   /* ── Run a job ── */
 
   let starting = $state(false);
@@ -194,7 +219,7 @@
 {#snippet sentence()}{#each told ?? [] as p, i (i)}{#if p.tone === 'live'}<span class="live-dot" aria-hidden="true"></span>{p.text}{:else if p.tone === 'needs'}<span data-needs>{p.text}</span>{:else}{p.text}{/if}{/each}{/snippet}
 
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's. -->
-<PageHead title={repo ? words.headingFor(repo) : words.heading} count={jobs.state === 'ready' ? rows.length : undefined} sentence={told ? sentence : undefined}>
+<PageHead icon="play" title={repo ? words.headingFor(repo) : words.heading} count={jobs.state === 'ready' ? rows.length : undefined} sentence={told ? sentence : undefined}>
   {#snippet actions()}
     {#if repo && !page.data.refused}<Button href="/jobs">{words.allJobs}</Button>{/if}
     {#if !page.data.refused}<Button weight="primary" onclick={() => void openRun()}><Icon name="play" size="s" />{words.run}</Button>{/if}
@@ -208,7 +233,16 @@
   {:else if jobs.state === 'waiting' || jobs.state === 'refused' || jobs.state === 'offline'}
     <ReadState state={jobs.state} refusal={jobs.refusal} onretry={jobs.reread} />
   {:else if jobs.state === 'empty'}
-    <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} />
+    <!-- NO RUN YET: what a job is, in three steps, and the machines that could take one, side by side. -->
+    <div class="first" data-pair={devices ? '' : undefined}>
+      <Tile icon="play" title={said.whatTitle}>
+        <p class="lead">{words.none}.</p>
+        <ol class="steps">
+          {#each said.whatSteps as step, i (i)}<li><span class="step-n num" aria-hidden="true">{i + 1}</span><span>{step}</span></li>{/each}
+        </ol>
+      </Tile>
+      {#if devices}{@render machines(devices)}{/if}
+    </div>
   {:else if rows.length === 0}
     <Empty kind="no-results" compact title={words.noneFor(repo ?? '')} />
   {:else}
@@ -226,6 +260,7 @@
           <Stacked parts={split} subject={said.splitSubject} />
           <p class="reading">{splitSaid(rows)}</p>
         </Tile>
+        {#if devices}{@render machines(devices)}{/if}
       </div>
 
       <div class="feed">
@@ -267,6 +302,28 @@
     </div>
   {/if}
 </div>
+
+{#snippet machines(list: NonNullable<typeof devices>)}
+  <!-- EACH MACHINE BY THE NAME IT WAS GIVEN, and when it last asked for work. None yet says how to enrol one. -->
+  <Tile icon="monitor" title={said.machinesTitle} count={list.length > 0 ? list.length : undefined}>
+    {#if list.length === 0}
+      <p class="none-yet">{said.noMachines}</p>
+      <p class="enrol">{said.enrolHow}<code class="enrol-cmd">{said.enrolCommand(recordBase)}</code></p>
+    {:else}
+      <ul class="machines">
+        {#each list as m (m.key)}
+          <li class="machine">
+            <IconWell name="monitor" size="l" tone={m.seen ? 'action' : undefined} />
+            <span class="machine-main">
+              <span class="machine-name">{m.name}</span>
+              <span class="machine-seen">{enrolledSaid(m, (iso) => since(iso, now))}</span>
+            </span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </Tile>
+{/snippet}
 
 <Sheet bind:open={starting} title={words.run}>
   {#if kinds === null}
@@ -327,6 +384,130 @@
     flex-direction: column;
     gap: var(--sp-4);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
+  }
+
+  /* THE FIRST VIEW: what a job is beside the machines, eight columns to four from a desk's width, one on a phone. */
+  .first {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--tile-gap);
+    align-items: stretch;
+  }
+
+  @container (width >= 860px) {
+    .first[data-pair] {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    }
+  }
+
+  .lead {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
+    line-height: var(--lh-head);
+  }
+
+  /* THREE STEPS, each a number in a small square and one line, at body size. */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .steps li {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: start;
+    column-gap: var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    line-height: 1.55;
+  }
+
+  .step-n {
+    display: inline-grid;
+    place-items: center;
+    block-size: 24px;
+    border-radius: var(--r-sm);
+    background: var(--action-tint-1);
+    color: var(--action-text);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-semi);
+  }
+
+  /* A MACHINE IS A 56PX ROW: its well, its name over when it last asked for work. */
+  .machines {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .machine {
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--sp-3);
+    min-block-size: 56px;
+  }
+
+  .none-yet {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+  }
+
+  .enrol {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    line-height: 1.55;
+  }
+
+  /* THE COMMAND IS THE ONE THING HERE TYPED AS IT IS, so it is set apart on the field's fill in the identifier face. */
+  .enrol-cmd {
+    padding: 2px var(--sp-2);
+    border-radius: var(--r-sm);
+    background: var(--field);
+    color: var(--ink);
+    font-family: var(--font-id);
+    font-size: var(--fs-meta);
+    overflow-wrap: anywhere;
+  }
+
+  .machine + .machine {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .machine-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .machine-name {
+    overflow: hidden;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .machine-seen {
+    color: var(--dim);
+    font-size: var(--fs-meta);
   }
 
   /* THE LIVE DOT IN THE SENTENCE: 6px of the one hue that means alive, still, before the clause it belongs to. */

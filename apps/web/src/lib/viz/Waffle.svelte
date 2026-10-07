@@ -2,7 +2,8 @@
   A waffle: part of a whole as one small square a thing, such as open tasks by tier.
 
   Parts fill in order, reading left to right and down. Parts with no `tone` step down the ramp from
-  ink; give the part that needs him `danger` ("1 urgent") and the others greys. Past 200 things each
+  the accent; give the part that needs him `danger` ("1 urgent") and the others the tints. The squares wipe in from
+  the left on the first draw. Past 200 things each
   square stands for an equal share (see `waffle.ts`), and the sentence still gives the real counts.
 
   With no `columns`, the squares run in one row as long as the box allows and then wrap; with
@@ -43,9 +44,11 @@
 
 <div class="viz viz-waffle" bind:clientWidth={measured}>
   <svg viewBox="0 0 {W} {g.height}" role="img" aria-label={said}>
-    {#each g.cells as cell, n (n)}
-      {@const p = paints[cell.part]}
-      <rect class="viz-fill" data-tone={p?.tone} style:--c={p?.colour} x={cell.x} y={cell.y} width={g.size} height={g.size} rx="2" />
-    {/each}
+    <g class="viz-wipe">
+      {#each g.cells as cell, n (n)}
+        {@const p = paints[cell.part]}
+        <rect class="viz-fill" data-tone={p?.tone} style:--c={p?.colour} x={cell.x} y={cell.y} width={g.size} height={g.size} rx="2" />
+      {/each}
+    </g>
   </svg>
 </div>

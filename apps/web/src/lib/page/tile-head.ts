@@ -47,6 +47,71 @@ const KIND_ICON: Readonly<Record<string, string>> = {
   code: 'code',
 };
 
+/**
+ * WHAT A TILE'S WELL SAYS BY ITS COLOUR (DIRECTION §39, one accent used): a question waiting on the person in the working
+ * accent's tint, cash and what is earned in the earn green, and everything else the quiet grey. Late is not a kind, so
+ * it is read off the block itself (`headTone`).
+ */
+const KIND_TONE: Readonly<Record<string, HeadTone>> = {
+  queue: 'action',
+  forecast: 'earn',
+  bridge: 'earn',
+};
+
+/** The glyphs that are money on any kind: a figure of cash on a `stat` wears the earn green as a forecast does. */
+const EARN_ICONS: ReadonlySet<string> = new Set(['money', 'wallet']);
+
+/** The tones a heading's well takes, `IconWell`'s own; `undefined` is the quiet grey. */
+export type HeadTone = 'action' | 'danger' | 'earn';
+
+/** What a heading reads to choose its well's tone. */
+export type Toned = {
+  readonly kind: string;
+  readonly icon?: string | undefined;
+  /** The block's declared intent: `bad` is something that needs the person now. */
+  readonly tone?: string | undefined;
+  readonly where?: string | undefined;
+  /** Set where the page drew the block as what is late (`home/home-rows.ts`). */
+  readonly late?: boolean | undefined;
+};
+
+/**
+ * A CLAUSE THAT KEEPS ONLY WHAT FELL DUE: `by before today`, `day before today`, `due before +1d` (what is due today at
+ * the latest). A bound further out (`by before +8d`) is what is coming, and one further back (`as_of before -7d`) is
+ * something else gone old, and neither is late.
+ */
+const LATE_CLAUSE = /^\s*([a-z][a-z0-9_]*)\s+before\s+(?:today|now|\+1d)\s*$/u;
+
+/** A floor on the same day that starts at yesterday or later: `by after yesterday` keeps what is due today, not late. */
+const FLOOR = /^\s*([a-z][a-z0-9_]*)\s+after\s+(?:yesterday|today|now|\+\d+d)\s*$/u;
+
+/**
+ * THE FIELDS THAT SAY WHEN SOMETHING HAPPENED, not when it falls due: `created before today` is everything older than
+ * today, which is history, not lateness.
+ */
+const WHEN_HAPPENED: ReadonlySet<string> = new Set(['at', 'created', 'created_at', 'updated', 'updated_at', 'as_of', 'seen', 'since', 'started', 'last', 'paid_on', 'done_on']);
+
+function keepsLate(where: string | undefined): boolean {
+  if (typeof where !== 'string') return false;
+  const clauses = where.split(',');
+  const floored = new Set(clauses.flatMap((c) => FLOOR.exec(c)?.[1] ?? []));
+  return clauses.some((c) => {
+    const field = LATE_CLAUSE.exec(c)?.[1];
+    return field !== undefined && !WHEN_HAPPENED.has(field) && !floored.has(field);
+  });
+}
+
+/**
+ * The tone of a tile's well: late or declared bad in the danger tint, then its kind's, then a money glyph's, else none.
+ * Red stays for what needs the person: only lateness and a `bad` intent reach it.
+ */
+export function headTone(b: Toned): HeadTone | undefined {
+  if (b.late === true || b.tone === 'bad' || keepsLate(b.where)) return 'danger';
+  const k = KIND_TONE[b.kind];
+  if (k) return k;
+  return b.icon !== undefined && EARN_ICONS.has(b.icon) ? 'earn' : undefined;
+}
+
 /** The glyph a tile's heading draws: its own where it names one the app draws, else its kind's, else a page's. */
 export function headIcon(kind: string, own: string | undefined, drawable: (name: string) => boolean): string | null {
   if (own && drawable(own)) return own;
