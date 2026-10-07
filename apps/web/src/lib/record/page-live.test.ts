@@ -1360,3 +1360,25 @@ test('a length picked past the walk is asked of the record on every read of that
   forgetWalks('kiln');
   assert.equal(walkAsked('money'), undefined, 'a page left lets its length go');
 });
+
+test('THE DAY THE MONEY RUNS OUT IS SAID AS A DAY, in the red only on a tile its page declared bad, and under no line about a bound nobody set', () => {
+  const days = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / 86_400_000;
+  const year = new Date().getUTCFullYear();
+  const reading = (value: number | string, met: boolean) => ({ value, unit: null, rows: 3, held: 3, met, refusals: [] });
+  const saved = METRICS['runs-out-on'];
+  METRICS['runs-out-on'] = { metric: 'runs-out-on', name: 'The day the money runs out', source: 'forecast.runway', value: { walk: 'zero_on' }, format: 'day', target: { gte: days('2100-01-01') }, window: '30d', compare: 'none' } as never;
+  try {
+    const missed = tileOf({ metric: 'runs-out-on', label: 'Runs out', reading: reading(days(`${year}-10-30`), false) } as never, undefined, 'bad');
+    assert.equal(missed.value, '30 Oct');
+    assert.equal(missed.tone, 'bad');
+    assert.equal(missed.note, '', 'a day is never held to "At least 1 Jan 2100" in words');
+    /* The same tile on a page that did not declare it bad is amber, which the skin keeps in the ink. */
+    assert.equal(tileOf({ metric: 'runs-out-on', reading: reading(days(`${year}-10-30`), false) } as never).tone, 'warn');
+    /* A day past the year it is says its year, and one that arrives as the day itself is the same day. */
+    assert.equal(tileOf({ metric: 'runs-out-on', reading: reading(days(`${year + 1}-01-04`), false) } as never).value, `4 Jan ${year + 1}`);
+    assert.equal(tileOf({ metric: 'runs-out-on', reading: reading(`${year}-10-30`, false) } as never).value, '30 Oct');
+  } finally {
+    if (saved) METRICS['runs-out-on'] = saved;
+    else delete METRICS['runs-out-on'];
+  }
+});

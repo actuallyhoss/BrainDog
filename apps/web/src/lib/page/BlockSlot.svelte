@@ -317,6 +317,27 @@
   );
   const homeFold = $derived(homeRows && fold ? foldOf('todo', linesIn(homeRows), open) : null);
 
+  /**
+   * WHERE "N MORE" UNDER HOME'S JOINED LATE LIST OPENS, when what was cut is the money and not the tasks.
+   *
+   * The list is drawn on the tasks' block with the count of both (`default-home.ts` `lateTile`), so its door went to
+   * Tasks whichever half ran past its limit: seven bills more, and a press that opened a list with none of them. The
+   * block's own rows are the tasks it drew, so tasks under their limit are all there and the rest is money. That money
+   * is read across lists, so it opens the one list every money line shown lives in, and where they live in several
+   * there is no one door, which is said by drawing none. Late money with no late task beside it is the same list on its
+   * own block and opens the same way. `undefined` is every other block, whose door is its own.
+   */
+  const lateDoor = $derived.by((): string | null | undefined => {
+    if (homeRows?.kind !== 'late') return undefined;
+    const owed = homeRows.lines.filter((l) => l.tick === undefined);
+    if (owed.length === 0) return undefined;
+    /* Tasks drawn up to their limit may be the half that was cut, and their own list is then the door, as it was. */
+    if (owed.length < homeRows.lines.length && typeof block.limit === 'number' && block.rows.length >= block.limit) return undefined;
+    const from = new Set(owed.map((l) => /^([a-z][a-z0-9_]*)#[1-9][0-9]*$/u.exec(l.key)?.[1] ?? ''));
+    const list = from.size === 1 ? [...from][0] : '';
+    return list && listNamed(list) ? `/r/${list}` : null;
+  });
+
   /* WHAT THE PAGE HOLDS TICKED on Home's late list, so a refusal or an Undo takes the tick back (`heldDone`). */
   const homeDone = $derived(writes && homeRows?.kind === 'late' && block.register ? writes.heldDone(i, block.register) : undefined);
 
@@ -511,7 +532,7 @@
      three-month label. -->
 {#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown && !folded && !homeFold}
   {@const to = openHref(block)}
-  {@const door = to && source ? to : block.register ? null : doorOf(block)}
+  {@const door = lateDoor !== undefined ? lateDoor : to && source ? to : block.register ? null : doorOf(block)}
   {#if block.source === 'forecast.runway'}
     <p class="block-slice" role="status">
       {copy.ofWhichWalked(block.shown, block.total, walkedDays(block))}.{#if to && source}{' '}

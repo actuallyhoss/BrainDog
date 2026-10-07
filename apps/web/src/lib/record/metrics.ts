@@ -323,6 +323,15 @@ const pairCurrencies = (rows: Entry[], pair: { of: Aggregation; per: Aggregation
   new Set([...currenciesOf(rows, pair.of), ...currenciesOf(rows, pair.per)]);
 
 /**
+ * A day as a figure says it: `30 Oct`, and `30 Oct 2027` when it is not in the year the clock is in, because a day
+ * said without its year is read as this year's. Text that is not a day is said as it came.
+ */
+function daySaid(day: string, now: number): string {
+  const said = shortDay(day);
+  return said === day || day.slice(0, 4) === new Date(now).toISOString().slice(0, 4) ? said : `${said} ${day.slice(0, 4)}`;
+}
+
+/**
  * How a figure is written. The format is declared, so two tiles of one number look the same.
  *
  * AND `format` IS OPTIONAL, which this did not survive. A declaration without one crashed on
@@ -330,8 +339,15 @@ const pairCurrencies = (rows: Entry[], pair: { of: Aggregation; per: Aggregation
  * optional and every other reader treats as optional. A number with no declared shape is written as
  * a number, which is the honest default and what the `default` branch below already said.
  */
-export function format(shape: string | undefined, n: number | null): string {
+export function format(shape: string | undefined, n: number | string | null, now: number = Date.now()): string {
   if (n === null) return '—';
+  /* A DAY MAY ARRIVE AS THE DAY ITSELF, `2026-10-30`, and is said as one. Any other text is a number written as text,
+     or is said as it came. */
+  if (typeof n === 'string') {
+    if (shape === 'day' && /^\d{4}-\d{2}-\d{2}/u.test(n)) return daySaid(n.slice(0, 10), now);
+    const parsed = n.trim() === '' ? Number.NaN : Number(n);
+    return Number.isFinite(parsed) ? format(shape, parsed, now) : n;
+  }
   if (!shape) return n.toLocaleString('en', { maximumFractionDigits: 2 });
   if (shape.startsWith('money.')) return money(Math.round(n), shape.slice('money.'.length));
   /* A BARE `money` IS THE HOME CURRENCY'S (money-core 3.0.0). With none chosen it names no currency, so it is written
@@ -344,12 +360,12 @@ export function format(shape: string | undefined, n: number | null): string {
     case 'pct':
       return `${(n * 100).toLocaleString('en', { maximumFractionDigits: 1 })}%`;
     case 'days':
-      return `${Math.round(n)} days`;
+      return Math.round(n) === 1 ? '1 day' : `${Math.round(n)} days`;
     case 'decimal':
       return n.toLocaleString('en', { maximumFractionDigits: 2 });
     /* A FIGURE THAT IS A DAY, held as whole days since 1970: `11 Sep`. */
     case 'day':
-      return shortDay(new Date(Math.round(n) * DAY_MS).toISOString().slice(0, 10));
+      return daySaid(new Date(Math.round(n) * DAY_MS).toISOString().slice(0, 10), now);
     default:
       return String(n);
   }
@@ -714,6 +730,9 @@ export const targetLine = (decl: MetricDecl, value?: number | null): string => {
   const under = typeof target.lte === 'number';
   const bound = typeof target.lte === 'number' ? target.lte : typeof target.gte === 'number' ? target.gte : null;
   if (bound === null) return '';
+  /* A DAY HAS NO LINE: its bound is a day nobody set (the first of 2100, for the day the money runs out), and "At least
+     1 Jan 2100" under a date is the declaration talking. The tone says which side of it the day is on. */
+  if (decl.format === 'day') return '';
   /* A LIMIT WITH ITS FIGURE BESIDE IT says nothing while the figure keeps to it, since "Limit 5" under a 2 is a rule
      nobody broke, and says how far over once it does not: the tone already says which side it is on. */
   if (under && typeof value === 'number') return value <= bound ? '' : `${format(decl.format, value - bound).replace(/\.0+$/u, '')} over your limit`;

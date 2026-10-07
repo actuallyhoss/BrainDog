@@ -251,10 +251,16 @@ const joined = (where: unknown, clause: string): string => (typeof where === 'st
 /** The row for what no part holds: its label, linked to those rows, and its figure. */
 const unsetRow = (label: string, href: string, shown: string): string => `[${escapeCell(label)}](${href}) | ${escapeCell(shown)} | `;
 
+/** The intent a block names for one value, one of the four, or nothing. */
+const toneWord = (tones: Readonly<Record<string, string>> | undefined, key: string): string => {
+  const tone = tones && Object.hasOwn(tones, key) ? tones[key] : undefined;
+  return tone === 'good' || tone === 'warn' || tone === 'bad' || tone === 'info' ? tone : '';
+};
+
 /** The intent a block names for one part, as the dialect's trailing word, or nothing. */
 const toneOf = (tones: Readonly<Record<string, string>> | undefined, key: string): string => {
-  const tone = tones && Object.hasOwn(tones, key) ? tones[key] : undefined;
-  return tone === 'good' || tone === 'warn' || tone === 'bad' || tone === 'info' ? ` | ${tone}` : '';
+  const tone = toneWord(tones, key);
+  return tone ? ` | ${tone}` : '';
 };
 
 /**
@@ -742,7 +748,20 @@ function cardsRows(block: BlockResult): string[] {
     const href = block.rows[i]?.href;
     const name = named >= 0 ? cells[named] : undefined;
     if (href && name && !/[[\]]/u.test(name)) cells[named] = `[${name}](${href})`;
-    const tone = old ? 'warn' : block.rows[i]?.tone;
+    /* A CARD THE BLOCK GIVES AN INTENT WEARS IT, by the stored value `tones` names ("at_risk": warn), so its ring turns
+       amber at risk and red off track where it drew the accent whatever the project said. The card's title is asked
+       first, then its other columns in the order declared, because how a thing is going is seldom its name. Only a
+       word is matched, and only the four intents. */
+    const declared = block.tones
+      ? [...(named >= 0 ? [named] : []), ...columns.map((_, j) => j).filter((j) => j !== named)]
+          .map((j) => {
+            const field = columns[j]?.field;
+            const v = field ? block.entries[i]?.fields[field] : undefined;
+            return typeof v === 'string' ? toneWord(block.tones, v) : '';
+          })
+          .find(Boolean)
+      : undefined;
+    const tone = old ? 'warn' : (declared ?? block.rows[i]?.tone);
     return `${cells.join(' | ')}${tone ? ` | ${tone}` : ''}`;
   });
   return [head, ...rows];

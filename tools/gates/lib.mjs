@@ -395,7 +395,9 @@ export function readiness(gate, timeoutMs, root) {
       if (state === null || (state === 'refused' && live)) {
         const again = await page.reload().then(once, () => null);
         if (again !== null && again !== 'refused') retried++;
-        if (again !== null) state = again;
+        /* THE SECOND LOOK IS THE ANSWER, even when it is none: the page was reloaded, so the first look describes a
+           document that is gone, and auditing on its word measured a blank shell (`/nowhere` on a loaded runner). */
+        state = again;
       }
       if (state === 'ready') anyReady = true;
       return state;

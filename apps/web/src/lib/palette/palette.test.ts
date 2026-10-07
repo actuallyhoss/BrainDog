@@ -226,6 +226,8 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
        far over, and a floor says its line, but for a floor of zero on a count, which nothing can be under. */
     if (typeof target.lte === 'number' && read.tone === 'good') continue;
     if (target.gte === 0 && decl.format === 'int') continue;
+    /* AND A DAY HAS NO LINE: its bound is a day nobody set, and the tone says which side of it the day is on. */
+    if (decl.format === 'day') continue;
     assert.ok(read.note.trim().length > 0, `${id} prints a bare figure, which is a number you look at`);
   }
   /* AND THE ONES IT DROPS REALLY ARE UNREADABLE, so the filter is not throwing away rows that work. */

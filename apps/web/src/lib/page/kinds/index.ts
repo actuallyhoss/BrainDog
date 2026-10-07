@@ -31,6 +31,7 @@ import { calendar } from './calendar.ts';
 import { link } from './link.ts';
 import { gallery } from './gallery.ts';
 import { embed } from './embed.ts';
+import { lanes } from './lanes.ts';
 
 /** What `draw` hands a kind besides its answer. */
 export type DrawOptions = {
@@ -62,6 +63,7 @@ export const BLOCK_KIND_DRAWERS: Record<string, KindDrawer> = {
   link,
   gallery,
   embed,
+  lanes,
 };
 
 /** The drawer for `kind`, or `undefined` for a kind `blocks.ts` draws itself. */

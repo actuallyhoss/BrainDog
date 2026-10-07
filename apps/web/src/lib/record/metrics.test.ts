@@ -248,3 +248,19 @@ test('A NOTE THAT ONLY SAYS NOUGHT IS NOT SAID: a clause whose figures are all 0
   assert.equal(noteOf('to check, or blocked', said), 'to check, or blocked');
   assert.equal(noteOf('{{agents}} of them by an agent', said), '');
 });
+
+test('a figure that is a day is said as one, with its year only when that is not the year it is', () => {
+  const now = Date.UTC(2026, 9, 7, 12);
+  const days = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / 86_400_000;
+  assert.equal(format('day', days('2026-10-30'), now), '30 Oct');
+  assert.equal(format('day', days('2027-01-04'), now), '4 Jan 2027');
+  assert.equal(format('day', days('2025-12-31'), now), '31 Dec 2025');
+  /* THE SAME DAY WHICHEVER WAY IT ARRIVES: the day itself, or an instant on it. */
+  assert.equal(format('day', '2026-10-30', now), '30 Oct');
+  assert.equal(format('day', '2027-01-04T00:00:00.000Z', now), '4 Jan 2027');
+  assert.equal(format('day', String(days('2026-10-30')), now), '30 Oct', 'whole days written as text are still whole days');
+  assert.equal(format('day', null, now), '—');
+  assert.equal(format('day', 'soon', now), 'soon', 'text that is no day is said as it came, never as a date made up for it');
+  /* A number that arrives as text is the number, under every other format. */
+  assert.equal(format('int', '1234', now), '1,234');
+});

@@ -349,3 +349,59 @@ test('AND A MISSPELT COLUMN IS NOT A SECOND CURRENCY, which is the same guess in
   assert.equal(shown.title, bar.title, 'the heading is a guess about the refusal again');
   assert.notDeepEqual(shown.lines, bar.lines);
 });
+
+/* ── a card's intent, from what the block declares ───────────────────────── */
+
+const project = (seq: number, name: string, health: string | null) => ({
+  id: `01JTHING${String(seq).padStart(18, '0')}`,
+  register: 'things',
+  seq,
+  fields: { name, progress: 60, ...(health ? { health } : {}) },
+  version: 1,
+  created_at: '2026-10-01T09:00:00.000Z',
+  updated_at: '2026-10-01T09:00:00.000Z',
+  deleted_at: null,
+});
+
+const projectCards = (rows: unknown[], more: Record<string, unknown> = {}) =>
+  liveBlockOf(
+    {
+      kind: 'cards',
+      source: 'register.things',
+      heading: 'In play',
+      columns: [
+        { field: 'name', as: 'title' },
+        { field: 'progress', label: '', as: 'ring' },
+        { field: 'health', label: '', as: 'fact' },
+      ],
+      rows: rows as never,
+      matched: rows.length,
+      refusals: [],
+      ...more,
+    } as never,
+    new Map(),
+    Date.UTC(2026, 9, 7, 12),
+  );
+
+test('A CARD WEARS THE INTENT ITS BLOCK DECLARES FOR THE VALUE IT HOLDS, so a ring at risk is not drawn like one on track', () => {
+  const tones = { on_track: 'good', at_risk: 'warn', off_track: 'bad', parked: 'loud' };
+  const rows = [project(1, 'Kiln', 'at_risk'), project(2, 'Tallow', 'off_track'), project(3, 'Ledger Post', 'on_track'), project(4, 'Quire', null), project(5, 'Vellum', 'parked')];
+  const drawn = drawnRows(projectCards(rows, { tones })).slice(1);
+  assert.deepEqual(
+    drawn.map((r) => r.tone),
+    ['warn', 'bad', 'good', undefined, undefined],
+    'a project nobody has said about, and a word that is not one of the four intents, stay neutral',
+  );
+  assert.deepEqual(
+    drawnRows(projectCards(rows)).slice(1).map((r) => r.tone),
+    [undefined, undefined, undefined, undefined, undefined],
+    'and a block that declares none draws every card as it did',
+  );
+});
+
+test('THE CARD’S TITLE IS ASKED BEFORE ITS OTHER COLUMNS, and what it is called is never read for a word it only looks like', () => {
+  const byTitle = drawnRows(projectCards([project(1, 'at_risk', 'off_track')], { tones: { at_risk: 'warn', off_track: 'bad' } })).slice(1);
+  assert.equal(byTitle[0]?.tone, 'warn');
+  const said = drawnRows(projectCards([project(1, 'At risk', null)], { tones: { at_risk: 'warn' } })).slice(1);
+  assert.equal(said[0]?.tone, undefined, 'the stored value is matched, not the words it is said in');
+});
