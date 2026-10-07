@@ -37,6 +37,7 @@
   import { navPrefs } from '../nav-prefs.svelte.ts';
   import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
+  import AgentMark from './AgentMark.svelte';
   import Icon, { type IconName } from './Icon.svelte';
   import { hueFor } from './face.ts';
   import { agentsHref } from '../nav/rail.ts';
@@ -227,6 +228,8 @@
 
   /* WHERE "2 WORKING" GOES: the Agents place, among the seven or under More (`agentsHref`). */
   const agentsAt = $derived(agentsHref([...places, ...more]));
+  /** The makers of the agents at work, each once, three at most: the marks the working tile wears. */
+  const crew = $derived([...new Set(working.map((w) => w.kind))].slice(0, 3));
 
   /**
    * THE WORDS COME BACK AS THE RAIL WIDENS. The rail takes its new width in one frame (the shell slides the work beside
@@ -360,16 +363,6 @@
       {/each}
     </ul>
 
-    <!-- WHO IS WORKING, AS ONE ROW: how many, a dot that pulses while they are at it, and the door to Agents. Nothing
-         while nobody is. -->
-    {#if working.length > 0}
-      <div class="part">
-        <a class="item working tap" href={at(agentsAt)} data-label={words.working(working.length)} title={words.workingOpen}>
-          <span class="rail-glyph" aria-hidden="true"><span class="pulse"></span></span><span class="item-name">{words.working(working.length)}</span>
-        </a>
-      </div>
-    {/if}
-
     <!-- EACH SECTION'S OWN THINGS UNDER ITS NAME, a project per row under Projects, each in its own colour. The fold's
          text is the section's name, so it is announced "Projects, collapsed, button". -->
     {#each things as [section, list] (section)}
@@ -389,9 +382,9 @@
             <li>
               <a class="item tap" href={at(entry.href)} data-nav data-label={entry.title} aria-current={under(entry.href) ? 'page' : undefined}>
                 <span class="rail-glyph">
-                  <!-- ALWAYS ITS DOT, never a glyph: the hue the record sent, else the one its name is drawn in, so a
-                       project does not change face between one load and the next. -->
-                  <span class="hue" style="--hue:{entry.hue ?? hueFor(entry.title)}" aria-hidden="true"></span>
+                  <!-- ALWAYS ITS OWN BADGE, never a glyph: its initial on the hue the record sent, else the one its name
+                       is drawn in, so a project does not change face between one load and the next. -->
+                  <span class="hue" style="--hue:{entry.hue ?? hueFor(entry.title)}" aria-hidden="true">{entry.title.trim().slice(0, 1)}</span>
                 </span>
                 <span class="item-name">{entry.title}</span>
               </a>
@@ -486,6 +479,21 @@
       </ul>
     </section>
   </div>
+
+  <!-- WHO IS WORKING, AS ONE TILE AT THE FOOT: their makers' marks, how many, what the first is doing, and a dot that
+       breathes while they are at it. It opens Agents. Nothing while nobody is. -->
+  {#if working.length > 0}
+    <a class="crew tap" href={at(agentsAt)} data-label={words.working(working.length)} title={words.workingOpen}>
+      <span class="crew-marks" aria-hidden="true">
+        {#each crew as kind (kind)}<span class="crew-mark"><AgentMark {kind} size="s" /></span>{/each}
+      </span>
+      <span class="crew-words">
+        <span class="crew-count">{words.working(working.length)}</span>
+        {#if working[0]?.doing}<span class="crew-doing" dir="auto">{working[0].doing}</span>{/if}
+      </span>
+      <span class="pulse" aria-hidden="true"></span>
+    </a>
+  {/if}
 
   {#if pen.length}
     <!-- A holding pen: an update that adds a page lands hidden and nothing moves until somebody keeps it. Outside the
@@ -839,9 +847,9 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    min-block-size: 34px;
-    padding: 0 10px 0 6px;
-    border-radius: var(--r-ctl);
+    min-block-size: 38px;
+    padding: 0 10px 0 5px;
+    border-radius: var(--r-md);
     color: var(--ink2);
     font-size: calc(var(--t-sm) + 1px);
     font-weight: 500;
@@ -851,28 +859,45 @@
       color var(--d-state) var(--ease-out);
   }
 
-  /* THE GLYPH: 18 in a 24 slot, so every name starts on one line whatever its glyph's own width. */
+  /* THE GLYPH IN ITS WELL: a small tile of its own on the board, as a tile's heading wears one, so the rail reads as
+     the board's index and not a list of grey words. 16 in a 28 well, and every name starts on one line. */
   .rail-glyph {
     display: grid;
     place-items: center;
     flex: none;
-    inline-size: 24px;
-    block-size: 24px;
-    color: var(--dim);
-    transition: color var(--d-state) var(--ease-out);
+    inline-size: 28px;
+    block-size: 28px;
+    background: var(--tile);
+    border-radius: var(--r-ctl);
+    color: var(--ink2);
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
   .rail-glyph :global(.icon) {
-    inline-size: 18px;
-    block-size: 18px;
+    inline-size: 16px;
+    block-size: 16px;
   }
 
-  /* A THING'S OWN COLOUR, a small dot where a place's glyph would be: a project is told from its neighbours by it. */
+  /* A THING'S OWN BADGE where a place's well would be: its initial on its own colour, so a project is told from its
+     neighbours at a glance and by more than a dot. */
+  .rail-glyph:has(> .hue) {
+    background: none;
+  }
+
   .hue {
-    inline-size: 8px;
-    block-size: 8px;
-    border-radius: var(--r-round);
+    display: grid;
+    place-items: center;
+    inline-size: 22px;
+    block-size: 22px;
+    border-radius: var(--r-sm);
     background: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    color: var(--on-action);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    line-height: 1;
+    text-transform: uppercase;
   }
 
   /* "HERE" IS A TILE: the tile's own fill under the name and the glyph in ink. Never a pill, never the red. */
@@ -881,9 +906,10 @@
     color: var(--ink);
   }
 
-  /* AND ITS GLYPH IN THE ACCENT, the working colour's one use on the rail. */
-  .item[aria-current='page'] .rail-glyph {
-    color: var(--action);
+  /* AND ITS WELL FILLED WITH THE ACCENT, the working colour's one use on the rail. A project keeps its own colour. */
+  .item[aria-current='page'] .rail-glyph:not(:has(> .hue)) {
+    background: var(--action);
+    color: var(--on-action);
   }
 
   .item-name {
@@ -896,7 +922,7 @@
 
   /* Indented to where a glyph would end, so a saved view reads as belonging to the list above it. */
   .item.view {
-    padding-inline-start: calc(6px + 24px + 10px);
+    padding-inline-start: calc(5px + 28px + 10px);
     font-size: var(--t-sm);
     font-weight: 400;
   }
@@ -909,10 +935,16 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* THE ONE RED ON THE RAIL: Decide's count, because it is what needs him. Text, not a filled badge. */
+  /* THE ONE RED ON THE RAIL: Decide's count, because it is what needs him, as a count's own small badge. */
   .tally[data-waiting] {
+    min-inline-size: 20px;
+    padding: 2px 6px;
+    border-radius: var(--r-round);
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
     color: var(--danger-text);
+    font-size: var(--t-xs);
     font-weight: 600;
+    text-align: center;
   }
 
   .pen-action {
@@ -928,9 +960,72 @@
 
   /* ── Who is working ─────────────────────────────────────────────────── */
 
-  /* A 6px DOT IN THE WORKING COLOUR, where a place's glyph would be, breathing while the agents are at it. Its opacity
-     moves and nothing else: no ring, no glow, no change of size that would nudge the name beside it. */
+  /* THE WORKING TILE: the one surface on the rail besides the place you are on. */
+  .crew {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-block-size: 48px;
+    margin-block-start: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--tile);
+    border-radius: var(--r-md);
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .crew-marks {
+    display: flex;
+    flex: none;
+  }
+
+  /* Each maker's mark on a round of the board's own colour, the next one tucked a little under the last. */
+  .crew-mark {
+    display: grid;
+    place-items: center;
+    inline-size: 26px;
+    block-size: 26px;
+    background: var(--bg);
+    border-radius: var(--r-round);
+    box-shadow: 0 0 0 2px var(--tile);
+  }
+
+  .crew-mark + .crew-mark {
+    margin-inline-start: -6px;
+  }
+
+  .crew-words {
+    display: grid;
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .crew-count {
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+
+  .crew-doing {
+    overflow: hidden;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rail[data-icons] .crew {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .rail[data-icons] :is(.crew-marks, .crew-words) {
+    display: none;
+  }
+
+  /* A 6px DOT IN THE WORKING COLOUR, breathing while the agents are at it. Its opacity moves and nothing else: no ring,
+     no glow, no change of size that would nudge the name beside it. */
   .pulse {
+    flex: none;
     inline-size: 6px;
     block-size: 6px;
     border-radius: var(--r-round);
@@ -1041,7 +1136,7 @@
       color: var(--ink);
     }
 
-    .item:hover .rail-glyph {
+    .item:hover:not([aria-current='page']) .rail-glyph {
       color: var(--ink);
     }
   }
