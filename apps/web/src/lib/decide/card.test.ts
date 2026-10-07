@@ -290,7 +290,7 @@ test('COMPACT, OUTSIDE DECIDE: the question and its buttons only, and at most th
   const card = src('./DecisionCard.svelte');
   assert.match(card, /const inline = \$derived\(inlineOf\(card, compact\)\);/u);
   assert.match(card, /\{#if !compact\}\n\s+<!-- WHO ASKED/u, 'a compact card still says who asked');
-  assert.match(card, /\{#if link \|\| compact\}<a class="dc-open" href=\{at\(card\.href\)\}>/u, 'a compact question is not the door to its page');
+  assert.match(card, /\{#if link \|\| compact\}<a class="dc-open tap" href=\{at\(card\.href\)\}>/u, 'a compact question is not the door to its page');
   assert.match(card, /!link && !compact && onpress === undefined/u, 'a compact card offers Not now');
   const host = src('../page/QueueAnswer.svelte');
   assert.match(host, /compact = false,/u, 'QueueAnswer takes no compact prop');

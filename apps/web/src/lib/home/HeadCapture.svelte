@@ -82,6 +82,12 @@
     color: var(--dim);
   }
 
+  @media (pointer: coarse) {
+    .head-capture :global(.capture-input) {
+      min-block-size: var(--tap);
+    }
+  }
+
   @media (width < 900px) {
     .head-capture {
       inline-size: 100%;

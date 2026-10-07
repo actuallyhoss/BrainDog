@@ -483,7 +483,7 @@
       <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band
            is kept on it, unseen, for the keys and the ranking. -->
       <h3 class="queue-question" dir="auto">
-        {#if link || compact}<a class="dc-open" href={at(card.href)}>{card.question}</a>{:else}{card.question}{/if}{#if card.joined}{' '}<span
+        {#if link || compact}<a class="dc-open tap" href={at(card.href)}>{card.question}</a>{:else}{card.question}{/if}{#if card.joined}{' '}<span
             class="qa-joined num">{queueWords.joined(card.joined)}</span
           >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
       </h3>
@@ -588,7 +588,7 @@
            left empty, with who asked, why it is asked and what it changes, each under a quiet heading. On a narrow one
            who asked leads the card, why follows the question, and what it changes comes under the buttons. -->
       <div class="dc-side">
-        <section class="dc-part dc-part-by" aria-labelledby="{uid}-by">
+        <div class="dc-part dc-part-by" role="group" aria-labelledby="{uid}-by">
           <h4 class="dc-h" id="{uid}-by">{cardWords.askedBy}</h4>
           <p class="queue-by">
             <Face name={card.by.name} kind={card.by.kind} size="s" /><span class="queue-who">{card.by.name}</span>
@@ -596,18 +596,18 @@
             <span class="queue-when">{card.when}</span>
             {#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
           </p>
-        </section>
+        </div>
         <!-- WHY: under the question on a narrow card, beside it on a wide one, before what it moves. -->
         {#if card.why}
-          <section class="dc-part dc-part-why" aria-labelledby="{uid}-why-h">
+          <div class="dc-part dc-part-why" role="group" aria-labelledby="{uid}-why-h">
             <h4 class="dc-h" id="{uid}-why-h">{cardWords.why}</h4>
             <p class="queue-why" dir="auto">{card.why}</p>
-          </section>
+          </div>
         {/if}
         <!-- WHAT IT CHANGES: what accepting the lead does, the money it writes, what changes from what to what, and the
              whole change one link away. -->
         {#if changesAny}
-          <section class="dc-part dc-part-changes" aria-labelledby="{uid}-changes">
+          <div class="dc-part dc-part-changes" role="group" aria-labelledby="{uid}-changes">
             <h4 class="dc-h" id="{uid}-changes">{cardWords.changes}</h4>
             {#if card.does}<p class="dc-does" dir="auto">{card.does}</p>{/if}
             {#if card.money || card.shifts.length > 0}
@@ -622,7 +622,7 @@
               </ul>
             {/if}
             {#if seeWhole}<a class="qa-see tap" href={at(card.href)}>{queueWords.seeWhole}</a>{/if}
-          </section>
+          </div>
         {/if}
       </div>
     {/if}

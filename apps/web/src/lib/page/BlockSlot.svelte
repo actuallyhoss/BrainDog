@@ -353,8 +353,8 @@
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
          rather than its braces. -->
     {#if glyph && isGlyph(glyph)}<IconWell name={glyph} {tone} />{/if}
-    <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-name" id="{ids}h-{i + 1}"
-      ><Text nodes={inline(block.heading, { icon })} opts={{ icon }} />{#if count !== null}<span class="block-count num">{count}</span>{/if}</svelte:element
+    <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-name"
+      ><span id="{ids}h-{i + 1}"><Text nodes={inline(block.heading, { icon })} opts={{ icon }} /></span>{#if count !== null}<span class="block-count num">{count}</span>{/if}</svelte:element
     >
     {#if source}
       <!-- THE LIST'S NAME, not its id, and A DOOR THAT WAITS FOR THE POINTER (DIRECTION §35: secondary controls appear on

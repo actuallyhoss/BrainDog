@@ -1235,6 +1235,12 @@
     border-radius: var(--r-ctl, 8px);
   }
 
+  @media (pointer: coarse) {
+    .block-slot > :global(.block[data-kind='section'] .sec-toggle) {
+      min-block-size: var(--tap);
+    }
+  }
+
   /* The figure's own bottom margin is the LIST's spacing, and the grid already provides it. */
   .block-slot :global(.block) {
     margin-block-end: 0;

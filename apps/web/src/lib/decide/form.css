@@ -213,7 +213,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   cursor: pointer;
 }
 
-.dc-choice-hit::after {
+.dc-choice-hit::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -395,7 +395,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   }
 
   .dc-btn {
-    min-block-size: 40px;
+    min-block-size: var(--tap);
     font-size: var(--fs-body);
   }
 

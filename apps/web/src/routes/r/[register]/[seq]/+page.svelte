@@ -1335,8 +1335,20 @@
 
   /* A FACT THAT OPENS ANOTHER ROW reads as the value it is, in ink, and shows it is a way there under a pointer. */
   .ref-link {
+    position: relative;
     color: inherit;
     text-decoration: none;
+  }
+
+  /* A THUMB'S TARGET round the one line of words, which stays the height of its text. */
+  @media (pointer: coarse) {
+    .ref-link::before {
+      content: '';
+      position: absolute;
+      inset-block: calc((1lh - var(--tap)) / 2);
+      inset-inline: 0;
+      min-inline-size: var(--tap);
+    }
   }
 
   @media (hover: hover) and (pointer: fine) {

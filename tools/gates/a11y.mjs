@@ -282,7 +282,10 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
     { name: 'grid: peek drawer', route: '/r/obligations', keys: ['p'], expect: 'dialog[open]' },
     /* Desktop only, and that is the product being right rather than the gate being lax: below 900px
        the register draws declared CARDS instead of a grid, so there are no cells to select. */
-    { name: 'grid: selection', route: '/r/obligations', keys: ['x', 'j', 'x'], expect: '[aria-selected="true"]', desktop: true },
+    /* DOWN FIRST, THEN UP, so two rows are selected wherever the cursor starts. The focusing click below lands on a
+       column's sort since the tables were redrawn, and on the last row of that order `x j x` picked one row and then
+       unpicked it, because `j` had nowhere to go. */
+    { name: 'grid: selection', route: '/r/obligations', keys: ['j', 'x', 'k', 'x'], expect: '[aria-selected="true"]', desktop: true },
     { name: 'grid: row menu', route: '/r/obligations', keys: ['Shift+F10'], expect: '[role="menu"]' },
     { name: 'keymap sheet', route: '/r/obligations', keys: ['?'], expect: 'dialog[open]' },
     { name: 'palette', route: '/', keys: ['/'], expect: '[role="listbox"], [role="dialog"]' },

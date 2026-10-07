@@ -74,7 +74,7 @@
 </script>
 
 {#snippet name(line: HomeLine)}
-  {#if line.href}<a class="hl-title" href={at(line.href)}>{line.title}</a>{:else}<span class="hl-title">{line.title}</span>{/if}
+  {#if line.href}<a class="hl-title tap" href={at(line.href)}>{line.title}</a>{:else}<span class="hl-title">{line.title}</span>{/if}
 {/snippet}
 
 {#snippet amount(line: HomeLine)}
