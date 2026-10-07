@@ -344,7 +344,7 @@ export { RAIL_PAGES, REDUCES, ROW_TEXT_MOST, SEED_ACTOR, byOf, fill, railRoom, r
 /* WHAT A READ ANSWERS ON A BLOCK, which the record takes off a block it holds from a reader (`packages/record` `DRAWN`). */
 export { ANSWER_KEYS, BLOCK_KEY, blockKeyOf, defaultBlockKey, keyedBlocks } from './block-keys.ts';
 /* THE LOOK OVERLAY (DIRECTION §38, `compose.ts`): what Slash and the owner write over a page, and the rules' own look. */
-export { applyLook, composeLook, drewNothing, lookOf, mergeLook, LOOK_BY, RANK, type ComposeInput, type LookBody, type LookBy, type LookNext } from './compose.ts';
+export { applyLook, composeLook, drewNothing, lookOf, mergeLook, questionsLead, queuesKept, LOOK_BY, RANK, type ComposeInput, type LookBody, type LookBy, type LookNext } from './compose.ts';
 export { lookFault } from './declare.ts';
 export {
   CHANNELS,

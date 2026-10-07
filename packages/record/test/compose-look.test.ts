@@ -21,15 +21,17 @@ import {
   lookBasis,
   lookHeld,
   lookInputOf,
+  lookKept,
   lookUndoKey,
   nextFault,
   orderFault,
+  questionsKept,
   undoLook,
   writeLook,
   type LookBody,
 } from '../src/compose-look.ts';
 import { lineOf, type HeadlinePage } from '../src/headlines.ts';
-import { validateDeclaration } from '../../kernel/src/index.ts';
+import { applyLook, validateDeclaration } from '../../kernel/src/index.ts';
 
 type Row = { id: string; version: number; kind: string; pack_id: string | null; body: string; checksum: string };
 
@@ -295,4 +297,81 @@ test("a page read sends Slash's next step only while its basis holds and the row
   const owner = store([{ id: 'look.work', version: 1, kind: 'look', pack_id: null, body: JSON.stringify({ basis: 'x', by: 'owner', headline: 'Mine.' }), checksum: 'c' }]);
   assert.deepEqual(lookHeld(owner.kernel, 'work', 'b1', facts('f1'), drawn), { ownerHeadline: true, next: null });
   assert.deepEqual(lookHeld(store().kernel, 'work', 'b1', facts('f1'), drawn), { ownerHeadline: false, next: null });
+});
+
+/* A page about money that also draws the questions, as its read answers it and as the ask is handed it. */
+const MONEY_READ = [
+  { key: 'lead', kind: 'note', lead: true, rows: [], matched: 0, refusals: [] },
+  { key: 'ahead', kind: 'forecast', heading: 'Cash ahead', rows: [], matched: 0, refusals: [] },
+  { key: 'asked', kind: 'queue', source: 'governance.open', heading: 'Waiting on you', rows: [], matched: 1, refusals: [] },
+  { key: 'accounts', kind: 'split', heading: 'Accounts', rows: [], matched: 0, refusals: [] },
+  { key: 'bills', kind: 'table', source: 'register.bills', heading: 'Bills', rows: [], matched: 0, refusals: [] },
+];
+const MONEY: HeadlinePage = {
+  ...PAGE,
+  page: 'money',
+  title: 'Money',
+  blocks: MONEY_READ.map((b) => ({ key: b.key, kind: b.kind, ...(b.heading ? { heading: b.heading } : {}), ...(b.lead ? { lead: true as const } : {}) })),
+};
+
+test('THE QUESTIONS KEEP THEIR PLACE ON A PAGE ABOUT SOMETHING ELSE: a look names none of them there, and any of them on Today or Decide', () => {
+  assert.deepEqual([...questionsKept(MONEY, MONEY_READ)], ['asked']);
+  /* WITHOUT THE READ, the blocks the ask was handed say which is a queue by its kind. */
+  assert.deepEqual([...questionsKept(MONEY)], ['asked']);
+  for (const page of ['home', 'home-business', 'decide']) assert.deepEqual([...questionsKept({ ...MONEY, page }, MONEY_READ)], [], page);
+  /* AND A PAGE OF NOTHING BUT QUESTIONS is Decide whatever it is called. */
+  assert.deepEqual([...questionsKept({ ...MONEY, page: 'asks' }, [MONEY_READ[0], MONEY_READ[2]])], []);
+
+  /* BUT NOT ONE THAT ONLY LOOKS IT TONIGHT: a list the rules' look hid for being empty is drawn again under Slash's look,
+     which hides nothing, so the page is still about that list and the kernel would not move its questions. */
+  const before = [MONEY_READ[4]!, MONEY_READ[2]!, { ...MONEY_READ[2]!, key: 'later', heading: 'Asked last week' }];
+  const quiet = [{ ...before[0]!, drawn: false }, before[1]!, before[2]!];
+  assert.deepEqual([...questionsKept({ ...MONEY, page: 'clients' }, quiet)], ['asked', 'later']);
+  const swapped = lookKept({ look: 'clients', basis: 'b', by: 'slash', order: ['later', 'asked'] }, questionsKept({ ...MONEY, page: 'clients' }, quiet), ['asked', 'later']);
+  assert.equal(swapped.order, undefined);
+  assert.deepEqual(applyLook(before as never, swapped as never).look.order, swapped.order);
+
+  const kept = questionsKept(MONEY, MONEY_READ);
+  const now = MONEY.blocks!.map((b) => b.key);
+  const look = (more: Partial<LookBody>): LookBody => ({ look: 'money', basis: 'b', by: 'slash', ...more });
+  assert.deepEqual(lookKept(look({ lead: 'asked', order: ['asked', 'bills', 'ahead'] }), kept, now), look({ order: ['bills', 'ahead'] }));
+  /* WHAT IS LEFT MUST STILL MOVE SOMETHING: one key, or the order the page already has, is no order. */
+  assert.deepEqual(lookKept(look({ order: ['asked', 'ahead'] }), kept, now), look({}));
+  assert.deepEqual(lookKept(look({ order: ['ahead', 'asked', 'accounts'] }), kept, now), look({}));
+  /* AND A LOOK THAT NEVER TOUCHED THEM is the same look. */
+  const untouched = look({ lead: 'bills', order: ['bills', 'ahead'] });
+  assert.equal(lookKept(untouched, kept, now), untouched);
+});
+
+test("the look step stores Slash's order without the questions on a page about something else, so the stored look is the one a read draws", async () => {
+  const s = store();
+  const lines = {
+    money: { headline: '4 open, 1 waiting.', order: ['asked', 'bills', 'ahead'], next: { row: 'tasks#4', text: 'Send the Kiln quote' } },
+    'home-business': { headline: '4 open, 1 waiting.', order: ['asked', 'bills', 'ahead'] },
+    work: { headline: '4 open, 1 waiting.', order: ['asked', 'ahead'] },
+  };
+  const got = await composeLooks(
+    s.kernel,
+    [
+      { page: MONEY, basis: 'b1', read: MONEY_READ },
+      { page: { ...MONEY, page: 'home-business', title: 'Today' }, basis: 'b2', read: MONEY_READ },
+      { page: { ...MONEY, page: 'work', title: 'Work' }, basis: 'b3', read: MONEY_READ },
+    ],
+    lines,
+  );
+  assert.deepEqual(got.said, ['money', 'home-business']);
+  const stored = liveLook(s.kernel, 'money')!.body;
+  assert.deepEqual(stored, { look: 'money', basis: 'b1', by: 'slash', order: ['bills', 'ahead'], next: { row: 'tasks#4', text: 'Send the Kiln quote' } });
+  /* THE KERNEL LAYS IT AS IT IS STORED: nothing it names is dropped on the way to the page. */
+  const laid = applyLook(MONEY_READ as never, stored as never);
+  assert.deepEqual(laid.look.order, stored.order);
+  assert.deepEqual(laid.blocks.map((b) => b.key), ['lead', 'bills', 'asked', 'accounts', 'ahead']);
+  /* TODAY MAY LEAD WITH THEM, so its order is stored as the model answered it. */
+  assert.deepEqual(liveLook(s.kernel, 'home-business')!.body.order, ['asked', 'bills', 'ahead']);
+  /* AND AN ORDER THAT ONLY MOVED THE QUESTIONS writes no look at all. */
+  assert.equal(liveLook(s.kernel, 'work'), null);
+  assert.deepEqual(got.dropped, [
+    'The order for Money moved the questions waiting on you, which keep their place on that page. The rest of the order is kept.',
+    'The order for Work moved the questions waiting on you, which keep their place on that page. The page keeps its order.',
+  ]);
 });

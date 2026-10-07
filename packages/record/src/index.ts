@@ -3674,7 +3674,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const asked = askedOn(prefs[HEADLINES_ASKED], today);
     if (asked.asks >= HEADLINE_ASKS_DAY) return { said: [], dropped: [] };
     const pressing = pressingRead(today);
-    const due: { page: HeadlinePage; basis: string; facts?: string }[] = [];
+    const due: { page: HeadlinePage; basis: string; facts?: string; read?: readonly unknown[] }[] = [];
     /* A PAGE IS DUE when what it would be written from is not what its line was, and it was not asked at that today. */
     const owed = (slug: string, basis: string, facts: string | undefined): boolean => {
       const stored = storedHeadline(prefs[headlineKey(slug)]);
@@ -3735,6 +3735,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         },
         basis,
         ...(facts === undefined ? {} : { facts }),
+        /* THE BLOCKS AS READ, kept beside the ask and never sent in it: where the questions are, for the look step. */
+        read: read.value.blocks,
       });
     }
     if (due.length === 0) return { said: [], dropped: [] };
@@ -6209,6 +6211,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return { currency: kernel.homeCurrency() ?? (money.length === 1 ? money[0]! : null), money };
   };
 
+  /**
+   * THE HUE A PAGE'S ROW WEARS, read off the field its list names as `identity.accent`, a whole degree or nothing as
+   * `markOf` reads it for a row's chip. Only a list that names an accent is read, one row per page made from it, and
+   * only a page the caller may open is asked about, so it says nothing of a row she could not read. Made per read, so a
+   * list that named its accent since is read as it stands. `boot` and `pages` both send it, the same way.
+   */
+  const pageHues = () => {
+    const accents = new Map<string, string | null>();
+    const accentOf = (list: string): string | null => {
+      if (!accents.has(list)) {
+        const said = (kernel.register(list) as { identity?: { accent?: unknown } } | undefined)?.identity?.accent;
+        accents.set(list, typeof said === 'string' && said !== '' ? said : null);
+      }
+      return accents.get(list)!;
+    };
+    const hueOf = (about: { register: string; seq: number | null }): number | null => {
+      const field = accentOf(about.register);
+      if (field === null || about.seq === null) return null;
+      const row = kernel.get({ register: about.register, seq: about.seq });
+      const hue = row && Object.hasOwn(row.fields, field) ? row.fields[field] : undefined;
+      return typeof hue === 'number' && Number.isInteger(hue) && hue >= 0 && hue <= 359 ? hue : null;
+    };
+    return { accentOf, hueOf };
+  };
+
   const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
@@ -6228,24 +6255,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const speaker = speakingNow(kernel);
     const voiced = speaker === null ? null : `home-${speaker.replace(/^usecase-/u, '')}`;
     const home = voiced !== null && opens.some((page) => page.slug === voiced) ? voiced : opens.some((page) => page.slug === 'home') ? 'home' : null;
-    /* THE HUE A PAGE'S ROW WEARS, read off the field its list names as `identity.accent`, a whole degree or nothing as
-       `markOf` reads it for a row's chip. Only a list that names an accent is read, one row per page made from it, and
-       only a page this caller may open is asked about, so it says nothing of a row she could not read. */
-    const accents = new Map<string, string | null>();
-    const accentOf = (list: string): string | null => {
-      if (!accents.has(list)) {
-        const said = (kernel.register(list) as { identity?: { accent?: unknown } } | undefined)?.identity?.accent;
-        accents.set(list, typeof said === 'string' && said !== '' ? said : null);
-      }
-      return accents.get(list)!;
-    };
-    const hueOf = (about: { register: string; seq: number | null }): number | null => {
-      const field = accentOf(about.register);
-      if (field === null || about.seq === null) return null;
-      const row = kernel.get({ register: about.register, seq: about.seq });
-      const hue = row && Object.hasOwn(row.fields, field) ? row.fields[field] : undefined;
-      return typeof hue === 'number' && Number.isInteger(hue) && hue >= 0 && hue <= 359 ? hue : null;
-    };
+    const { accentOf, hueOf } = pageHues();
     return {
       record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawn } : null,
       ...drawn,
@@ -7396,6 +7406,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          the blocks a caller cannot reach and draws the rest, so a page they can see three fifths of
          is a page they can use. A page bound to no register at all is prose, and prose is for
          anybody who may read. */
+      const { accentOf, hueOf } = pageHues();
       return ok(
         kernel
           .pages()
@@ -7411,7 +7422,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           /* WHICH ROW A PAGE GREW OUT OF DOES, as `boot` sends it, so Settings > Pages can fold the pages made for each
              person or project under one line rather than list them as pages somebody wrote. It names no row the caller
              cannot read: `seesPage` above already dropped a page about one. */
-          .map((p) => ({ slug: p.slug, title: p.title, about: p.about ? { register: p.about.register, seq: p.about.seq } : null })),
+          /* AND THE HUE ITS ROW WEARS, exactly as `boot` says it: a whole degree or `null` on a page whose list names an
+             accent, and no key at all on one whose list names none. */
+          .map((p) => ({
+            slug: p.slug,
+            title: p.title,
+            about: p.about ? { register: p.about.register, seq: p.about.seq, ...(accentOf(p.about.register) === null ? {} : { hue: hueOf(p.about) }) } : null,
+          })),
       );
     },
 

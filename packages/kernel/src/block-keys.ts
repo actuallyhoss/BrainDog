@@ -66,7 +66,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   toward: ['progress'],
   range: ['progress'],
   unset: ['bar', 'split'],
-  tones: ['bar', 'split'],
+  tones: ['bar', 'split', 'cards', 'lanes'],
   document: ['note'],
   fold: ['section', 'cards'],
   group: ['cards'],
@@ -138,7 +138,7 @@ export const ANSWER_KEYS: readonly string[] = [
   'scope_marks', 'feed', 'seen', 'history', 'values', 'said', 'bars', 'measures', 'latest', 'past', 'changes', 'working_now',
   'quiet', 'lateness', 'late_name', 'sells', 'fx',
   'fills', 'rings', 'queue', 'nexts', 'trends', 'done_now', 'next', 'open', 'types', 'home',
-  'short_now', 'window', 'files',
+  'short_now', 'window', 'files', 'lanes',
 ];
 
 /**

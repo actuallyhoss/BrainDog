@@ -51,8 +51,19 @@ import {
 /** The source a figure over the walk ahead names, in place of a list. */
 export const WALK_SOURCE = 'forecast.runway';
 
-/** What a figure over the walk adds up: money arriving, money leaving, the two netted, or the days until it goes under. */
-export const WALKS = ['in', 'out', 'net', 'days_to_zero'] as const;
+/**
+ * What a figure over the walk adds up: money arriving, money leaving, the two netted, the days until it goes under, or
+ * the day it does.
+ */
+export const WALKS = ['in', 'out', 'net', 'days_to_zero', 'zero_on'] as const;
+
+/**
+ * Whether a walk is read off the balance going under, and so walks from an `opening` and looks a year ahead unasked.
+ *
+ * `days_to_zero` AND `zero_on` ARE ONE CROSSING SAID TWO WAYS, a count of days and the day itself, so every rule about
+ * one (the opening, the default span, no value across two currencies) is asked here and holds for both.
+ */
+export const walksToZero = (walk: unknown): boolean => walk === 'days_to_zero' || walk === 'zero_on';
 
 /**
  * The most account rows one rolled figure reads. Past it the figure refuses rather than adding up a subset.
@@ -65,7 +76,7 @@ export const ROLLED_ACCOUNTS_MOST = 500;
 /** The most lists a rolled figure may restart an account from. money-core restarts from `balances` and `transactions`. */
 export const ROLLED_CHECKS_MOST = 4;
 
-/** How far ahead a `days_to_zero` figure looks when it names no `within`: the Money page's own default horizon. */
+/** How far ahead a `days_to_zero` or `zero_on` figure looks when it names no `within`: the Money page's own default horizon. */
 const WALK_DAYS_DEFAULT = 365;
 
 const DAY = 86_400_000;
@@ -381,14 +392,14 @@ function rowOf(sql: Sql, id: string): Entry | null {
 
 /** A figure's own `within`, as whole days ahead, or the sentence saying why it is not one. */
 function daysAhead(walked: Walked): number | string {
-  if (walked.within === undefined) return walked.walk === 'days_to_zero' ? WALK_DAYS_DEFAULT : 'a walk figure says how far ahead it adds up: within: 30d';
+  if (walked.within === undefined) return walksToZero(walked.walk) ? WALK_DAYS_DEFAULT : 'a walk figure says how far ahead it adds up: within: 30d';
   const ms = typeof walked.within === 'string' ? windowMs(walked.within) : null;
   return ms === null ? `${String(walked.within)} is not a span ahead: write 30d, 4w or 3m` : Math.round(ms / DAY);
 }
 
 /**
- * A figure over the cash walk ahead (`modules.md` C4): money arriving, money leaving, the two netted, or the days
- * until the balance goes under.
+ * A figure over the cash walk ahead (`modules.md` C4): money arriving, money leaving, the two netted, the days until
+ * the balance goes under, or the day it does.
  *
  * THE SAME WALK THE FORECAST BLOCK DRAWS, over the legs the figure declares, so a tile, the bridge beside it and the
  * table of what is coming add up the same movements. An overdue movement is in it, clamped to today, as it is in the
@@ -397,6 +408,11 @@ function daysAhead(walked: Walked): number | string {
  * `out` IS A MAGNITUDE, the money leaving as a positive amount, because a tile reading "Going out" says the direction
  * in its words. `net` is signed. `days_to_zero` walks from the figure `opening` names, and has no value when the
  * balance stays above zero inside the span.
+ *
+ * `zero_on` IS THE SAME CROSSING AS A DAY, for a tile that says "Runs out 30 Oct" where a count of days goes stale by
+ * morning. It walks from the same `opening` and has no value in the same cases. A reading's value is a number, so the
+ * day is held as the whole days since 1970 that name it, which is what `format: day` already means for the earliest or
+ * latest of a day field (`metrics.ts`), and the reader writes it as a date.
  *
  * MONEY MISSING FROM THE WALK IS A REFUSAL HERE, where the forecast block draws the walk and lists what it left out. A
  * figure is one number with no room for the list, and one computed from most of the money is the answer wearing the
@@ -427,10 +443,11 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
 
   let opening = 0;
   let openingUnit: string | null = null;
-  if (walked.walk === 'days_to_zero') {
+  const toZero = walksToZero(walked.walk);
+  if (toZero) {
     const from = decl.opening?.metric;
     if (typeof from !== 'string' || from === '')
-      return no<Reading>('REQUIRED_MISSING', `${decl.metric}: the days until the money runs out are walked from a figure of what is held now: opening: { metric: cash-now }.`, { at: 'opening' });
+      return no<Reading>('REQUIRED_MISSING', `${decl.metric}: ${walked.walk === 'zero_on' ? 'the day the money runs out is' : 'the days until the money runs out are'} walked from a figure of what is held now: opening: { metric: cash-now }.`, { at: 'opening' });
     const row = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${from}`);
     if (!row) return no<Reading>('METRIC_UNKNOWN', `${decl.metric}: there is no metric called ${from} to walk from.`, { at: 'opening' });
     const figure = JSON.parse(row.body) as MetricDecl;
@@ -450,10 +467,10 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
 
   /* SEVERAL CURRENCIES WITH NO WAY TO ADD THEM ARE ONE AMOUNT EACH, the walk run once per currency with its own
      movements unconverted (`only`). The days until zero are a date, and a date across two currencies is a day on which
-     nothing happens, so that figure has no value then. */
+     nothing happens, so that figure and the day itself have no value then. */
   const apart = walk.value.currency === null && walk.value.mixed.length > 0;
   if (apart) {
-    if (walked.walk === 'days_to_zero') return ok(empty(decl, 'the walk is in several currencies with no rate to add them', home.rates, today));
+    if (toZero) return ok(empty(decl, 'the walk is in several currencies with no rate to add them', home.rates, today));
     const parts: Part[] = [];
     let steps = 0;
     for (const currency of walk.value.mixed) {
@@ -475,8 +492,8 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
   const bad = walk.value.refusals[0];
   if (bad) return { ok: false, refusal: bad };
 
-  const unit = walked.walk === 'days_to_zero' ? null : walk.value.currency;
-  if (walked.walk === 'days_to_zero' && openingUnit !== null && walk.value.currency !== null && openingUnit !== walk.value.currency)
+  const unit = toZero ? null : walk.value.currency;
+  if (toZero && openingUnit !== null && walk.value.currency !== null && openingUnit !== walk.value.currency)
     return no<Reading>('MIXED_CURRENCY', `${decl.metric}: the walk is in ${walk.value.currency} and the figure it opens from is in ${openingUnit}, and a balance is never walked across two currencies.`, {
       at: 'opening',
       allowed: [walk.value.currency],
@@ -506,6 +523,8 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
 /** What a walk adds up to, as the figure asks for it. */
 function totalOf(walk: Runway, kind: Walked['walk']): number | null {
   if (kind === 'days_to_zero') return walk.days;
+  /* THE DAY ITSELF, as whole days since 1970: the walk's own day for the step that went under, never today plus a count. */
+  if (kind === 'zero_on') return walk.crossed ? Math.round(Date.parse(`${walk.crossed.day}T00:00:00Z`) / DAY) : null;
   let total = 0;
   for (const step of walk.steps) {
     if (kind === 'in' && step.delta > 0) total += step.delta;

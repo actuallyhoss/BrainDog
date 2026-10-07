@@ -22,10 +22,15 @@
  * CACHED ON WHAT IT WAS WRITTEN FROM. A look carries `basis`, the page's `headlineBasis` and its `factsBasis` together
  * (`lookBasis`), so its headline and next are sent only while the figures and the named things still hold
  * (`lookHeld`), and a page whose basis did not move is not asked about again (`slashHeadlines`'s `owed`).
+ *
+ * AND WHAT IS STORED IS WHAT A READ DRAWS. The kernel never lets the engine lead a page with the questions, nor move
+ * them, unless the page is Today, Decide or nothing but questions (`questionsLead`, `applyLook`). An order naming them
+ * anywhere else is stored without them (`lookKept`), so Undo, the history and the next night's "did anything change"
+ * all read the arrangement the person was shown.
  */
 
-import type { Json, Kernel } from '@braindog/kernel';
-import { SLASH } from '@braindog/kernel';
+import type { BlockResult, Json, Kernel } from '@braindog/kernel';
+import { SLASH, queuesKept } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 
@@ -250,6 +255,40 @@ export function lookAnswerOf(answer: unknown, page: HeadlinePage): LookAnswer {
   return out;
 }
 
+/**
+ * The questions the engine leaves where they are on a page, by key (the kernel's `queuesKept`): every queue, unless the
+ * page is Today, Decide or made of nothing but questions. `read` is the page's blocks as its read answered them. Without
+ * it the blocks the ask was handed stand in, which say each block's kind and no more.
+ *
+ * A BLOCK THE READ HID STILL COUNTS AS PART OF THE PAGE. The read comes back under the look it was drawn with, and the
+ * rules' look hides a list that drew nothing, where Slash's look hides nothing and is laid over the page before any
+ * look: so an empty Bills table hidden tonight is drawn again under the look written from it, and the page is about
+ * bills, not questions. Read as hidden, the questions were stored moved on a page the kernel then would not move them on.
+ */
+export function questionsKept(page: HeadlinePage, read?: readonly unknown[]): Set<string> {
+  const blocks = read ?? (page.blocks ?? []).map((b) => ({ key: b.key, kind: b.kind, rows: [], matched: 0, refusals: [] }));
+  const whole = blocks.filter((b) => b !== null && typeof b === 'object').map((b) => {
+    const { drawn: _hidden, ...block } = b as BlockResult;
+    return block as BlockResult;
+  });
+  return queuesKept(page.page, whole);
+}
+
+/**
+ * A look as Slash may store it over a page whose questions keep their place: no lead that is one of them, and an order
+ * that names none of them. What is left of the order is kept only while it still moves something, read against `now`,
+ * the page's keys in the order it draws them. The same look comes back when nothing in it touched the questions.
+ */
+export function lookKept(body: LookBody, kept: ReadonlySet<string>, now: readonly string[]): LookBody {
+  const leads = body.lead !== undefined && kept.has(body.lead);
+  if (!leads && !(body.order ?? []).some((k) => kept.has(k))) return body;
+  const { lead, order, ...rest } = body;
+  const left = (order ?? []).filter((k) => !kept.has(k));
+  const stands = now.filter((k) => left.includes(k));
+  const moves = left.length > 1 && !(stands.length === left.length && stands.every((k, i) => k === left[i]));
+  return { ...rest, ...(lead !== undefined && !leads ? { lead } : {}), ...(moves ? { order: left } : {}) };
+}
+
 /** A stored look's body over `page`, or `null` for one these rules cannot read. */
 export function lookBodyOf(raw: unknown, page: string): LookBody | null {
   let body = raw;
@@ -382,11 +421,14 @@ export function keptBy(kernel: Pick<Kernel, 'declarations' | 'prefsOf'>, page: s
  * more than a line gets Slash's look, with the order and next that passed, written from the basis it was asked at. A
  * page whose answer was a bare line arranges nothing, and a page set by its owner is left alone with a line in the log.
  *
+ * `read` IS THE PAGE'S BLOCKS AS ITS READ ANSWERED THEM, which say where the questions are and whether the page is
+ * anything else (`questionsKept`).
+ *
  * `next` NAMES ONE OF THE PERSON'S THINGS, so it goes out only through `lookHeld`, for the reader the row is drawn for.
  */
 export async function composeLooks(
   kernel: Kept,
-  due: readonly { page: HeadlinePage; basis: string; facts?: string }[],
+  due: readonly { page: HeadlinePage; basis: string; facts?: string; read?: readonly unknown[] }[],
   lines: Readonly<Record<string, unknown>>,
 ): Promise<{ said: string[]; dropped: string[] }> {
   const said: string[] = [];
@@ -397,6 +439,13 @@ export async function composeLooks(
     if (answer === null || typeof answer !== 'object' || Array.isArray(answer)) continue;
     const got = lookAnswerOf(answer, d.page);
     dropped.push(...got.faults);
+    /* THE QUESTIONS KEEP THEIR PLACE on a page that is about something else, as the kernel lays any look of Slash's. */
+    const held = lookKept({ look: d.page.page, basis: '', by: 'slash', ...(got.order === undefined ? {} : { order: got.order }) }, questionsKept(d.page, d.read), d.page.blocks.map((b) => b.key));
+    if (got.order !== undefined && held.order !== got.order) {
+      dropped.push(`The order for ${d.page.title} moved the questions waiting on you, which keep their place on that page. ${held.order === undefined ? 'The page keeps its order.' : 'The rest of the order is kept.'}`);
+      if (held.order === undefined) delete got.order;
+      else got.order = held.order;
+    }
     if (got.order === undefined && got.next === undefined) continue;
     /* NO `headline` IN SLASH'S LOOK: its line goes out through `headline.<page>` and `headlineFor`, which sends one naming
        things only to somebody who reads all of every list the page does. A declaration is laid over every reader's page. */

@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { blockKeyOf, defaultBlockKey, keyedBlocks } from '../src/block-keys.ts';
-import { applyLook, composeLook, drewNothing, lookOf, mergeLook, type ComposeInput, type LookBody } from '../src/compose.ts';
+import { applyLook, composeLook, drewNothing, lookOf, mergeLook, questionsLead, queuesKept, type ComposeInput, type LookBody } from '../src/compose.ts';
 import type { BlockResult, ListShape, PageRow } from '../src/pages.ts';
 
 const TODAY = '2026-10-06';
@@ -428,4 +428,29 @@ test('TODAY AND DECIDE MAY LEAD WITH THE QUESTIONS, and so may a page drawn of n
     block({ kind: 'queue', source: 'governance.open', heading: 'Agents', matched: 1, queue: [{ id: 'SG1', question: 'Merge the two Sams?', options: [] } as never] }),
   );
   assert.equal(composeLook(input(asks, { page: 'asks' })).lead, keysOf(asks)[2]);
+});
+
+test('A HOME IS KNOWN BY ITS NAME AND NOTHING LOOSER: home takes a use case after it, today and decide take nothing', () => {
+  const blocks = moneyPage();
+  for (const page of ['home', 'home-business', 'today', 'decide']) assert.equal(questionsLead(page, blocks), true, page);
+  /* NOTHING NAMES A PAGE `today-` OR `decide-` SOMETHING, so a page somebody called that is a page about its own thing. */
+  for (const page of ['today-plan', 'decide-later', 'homework', 'money', 'my-home']) assert.equal(questionsLead(page, blocks), false, page);
+  const waiting = keysOf(blocks)[2];
+  assert.equal(composeLook(input(blocks, { page: 'decide-later' })).lead, undefined);
+  assert.equal(applyLook(blocks, { look: 'today-plan', basis: 'x', by: 'slash', lead: waiting! }).look.lead, undefined);
+});
+
+test('THE QUEUES THE ENGINE LEAVES IN PLACE ARE ONE ANSWER: every queue on a page about something else, none where the questions lead', () => {
+  const blocks = moneyPage();
+  const waiting = keysOf(blocks)[2]!;
+  assert.deepEqual([...queuesKept('money', blocks)], [waiting]);
+  assert.deepEqual([...queuesKept('home-business', blocks)], []);
+  /* A QUEUE BY ITS SOURCE, whatever kind draws it, is one too. */
+  const listed = keyed(block({ kind: 'stat', heading: 'Cash' }), block({ kind: 'list', source: 'governance.open', heading: 'Asked' }));
+  assert.deepEqual([...queuesKept('money', listed)], [keysOf(listed)[1]]);
+  /* AND WHAT IT ANSWERS IS WHAT A LOOK IS HELD TO: an order of Slash's loses exactly those keys. */
+  const [, ahead, , accounts] = keysOf(blocks);
+  const laid = applyLook(blocks, { look: 'money', basis: 'x', by: 'slash', order: [accounts!, waiting, ahead!] });
+  assert.deepEqual(laid.look.order, [accounts, ahead]);
+  assert.equal(laid.look.order!.some((k) => queuesKept('money', blocks).has(k)), false);
 });

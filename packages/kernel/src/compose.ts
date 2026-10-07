@@ -84,8 +84,14 @@ const DAY_MS = 86_400_000;
 /**
  * THE PAGES THAT MAY LEAD WITH THE QUESTIONS: Today, which is a record's Home (`home`, or `home-<use case>` as
  * `homePageOf` in `@braindog/seed` names it), and Decide. Every page is read by the same rule whichever record it is on.
+ *
+ * BY NAME, BECAUSE A PAGE'S DECLARATION SAYS NOTHING ELSE ABOUT IT. Its body carries `page`, `title`, `nav`, `icon`,
+ * `requires`, `blocks`, `for`, `layout`, `tone`, `filters` and where it came from (`PAGE_KEYS`), and none of them says
+ * "this is the Home": a use case's Home is known as one only by being named `home-<use case>`, which is how the record
+ * picks the page Home draws too. So a page somebody named `home-repairs` reads as a Home here, as it would there. What
+ * the name does settle is held to: only `home` takes a use case after it, since nothing names a `today-` or a `decide-`.
  */
-const ASKS_FIRST = /^(?:home|today|decide)(?:-[a-z0-9-]+)?$/u;
+const ASKS_FIRST = /^(?:home(?:-[a-z0-9-]+)?|today|decide)$/u;
 
 /** Whether a block is the questions waiting on the reader, which every pack draws as a queue over `governance.open`. */
 const isQueue = (b: BlockResult): boolean => b.kind === 'queue' || b.source === 'governance.open';
@@ -106,6 +112,26 @@ export function questionsLead(page: string, blocks: readonly BlockResult[]): boo
 type Area = 'main' | 'rail';
 const areaOf = (b: { area?: unknown }): Area => (b.area === 'rail' ? 'rail' : 'main');
 const keyOf = (b: BlockResult): string => b.key ?? blockKeyOf(b);
+
+/**
+ * THE QUEUES THE ENGINE LEAVES WHERE THEY ARE ON THIS PAGE, by key: every one, on a page where `questionsLead` says no,
+ * and none where it says yes. One answer for the three that are held to it: the rules above, a stored look as it is
+ * laid (`applyLook`), and Slash's overnight writer (`packages/record` `compose-look.ts`), so the look it stores is the
+ * one a read draws. Two blocks of one key are the first of them, as a look names them.
+ */
+export function queuesKept(page: string, blocks: readonly BlockResult[]): Set<string> {
+  const kept = new Set<string>();
+  if (questionsLead(page, blocks)) return kept;
+  const met = new Set<string>();
+  for (const b of blocks) {
+    const key = keyOf(b);
+    if (met.has(key)) continue;
+    met.add(key);
+    if (isQueue(b)) kept.add(key);
+  }
+  return kept;
+}
+
 const isLeadNote = (b: BlockResult): boolean => b.kind === 'note' && b.lead === true;
 const unique = (keys: readonly string[]): string[] => [...new Set(keys)];
 
@@ -428,7 +454,8 @@ export function applyLook(blocks: readonly BlockResult[], look: LookBody): { blo
   const pins = new Set(pinned);
   /* THE ENGINE'S LOOK NEVER LEADS WITH A QUEUE, NOR MOVES ONE, on a page that is about something else (`questionsLead`):
      a look Slash wrote is held to it here, as the rules hold themselves. The person's own look is his. */
-  const kept = (k: string): boolean => look.by !== 'owner' && isQueue(blocks[at.get(k)!]!) && !questionsLead(look.look, blocks);
+  const queues = look.by === 'owner' ? new Set<string>() : queuesKept(look.look, blocks);
+  const kept = (k: string): boolean => queues.has(k);
   const asked = look.lead !== undefined && at.has(look.lead) && !kept(look.lead) ? look.lead : undefined;
 
   /* ORDER, A GROUP AT A TIME: the blocks between two headings in one column, as the rules order them. Named across two

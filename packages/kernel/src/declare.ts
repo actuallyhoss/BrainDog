@@ -62,7 +62,7 @@ import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import type { FlowDecl } from './rules.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
 import { clockOf, isMoneyFormat, windowMs, type EvalContext } from './metrics.ts';
-import { WALKS, WALK_SOURCE, isRolled, rolledFault, type Rolled } from './money-figures.ts';
+import { WALKS, WALK_SOURCE, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
 import { INDEX_CEILING } from './observe.ts';
 
 /**
@@ -314,7 +314,8 @@ function digestBody(decl: Declaration): Refusal | null {
 }
 
 /** `08 §2`'s table, closed. A `format` outside these is a figure nothing knows how to draw. */
-/* `day` is a figure that IS a day, the earliest or latest of a day field, held as whole days since 1970. */
+/* `day` is a figure that IS a day, the earliest or latest of a day field or the day a walk goes under (`zero_on`),
+   held as whole days since 1970. */
 const FORMATS = ['int', 'decimal', 'pct', 'days', 'duration', 'day'] as const;
 
 /** `08 §2`: `previous` · `year_ago` · `none`, and the default is `previous`. */
@@ -510,7 +511,7 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
     const v = body.value as { walk?: unknown; within?: unknown };
     if (!(WALKS as readonly unknown[]).includes(v.walk))
       return bad('DECLARATION_INVALID', `${id} is a figure over the walk, and its value is walk: ${WALKS.join(', ')}.`, 'value', [...WALKS]);
-    if (v.within === undefined ? v.walk !== 'days_to_zero' : typeof v.within !== 'string' || !windowMs(v.within))
+    if (v.within === undefined ? !walksToZero(v.walk) : typeof v.within !== 'string' || !windowMs(v.within))
       return bad('DECLARATION_INVALID', `${id} says how far ahead it adds up as within: 30d, 4w or 3m.`, 'value');
     for (const key of ['where', 'group_by', 'bucket'] as const)
       if (body[key] !== undefined) return bad('DECLARATION_INVALID', `${id} walks its legs, and each leg says which rows it reads; a figure over the walk has no ${key}.`, key);
@@ -523,11 +524,22 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
         return bad('DECLARATION_INVALID', `${id}'s leg ${i + 1} names the list it walks, the day each row moves on and its amount: register, on and amount.`, `legs[${i}]`);
     }
     const opening = body.opening as { metric?: unknown } | undefined;
-    if (v.walk === 'days_to_zero' ? typeof opening?.metric !== 'string' || !METRIC_ID.test(opening.metric) : opening !== undefined)
+    if (walksToZero(v.walk) ? typeof opening?.metric !== 'string' || !METRIC_ID.test(opening.metric) : opening !== undefined)
       return bad(
         'DECLARATION_INVALID',
-        v.walk === 'days_to_zero' ? `${id} counts the days until the money runs out from what is held now: opening: { metric: <id> }.` : `${id} adds up movements, and only the days until zero walk from an opening.`,
+        walksToZero(v.walk)
+          ? `${id} ${v.walk === 'zero_on' ? 'names the day the money runs out' : 'counts the days until the money runs out'} from what is held now: opening: { metric: <id> }.`
+          : `${id} adds up movements, and only the days until zero and the day of it walk from an opening.`,
         'opening',
+      );
+    /* THE DAY IS HELD AS A NUMBER OF DAYS SINCE 1970, so drawn as anything but a day it is a count near twenty thousand
+       beside a heading about money, and a count or an amount drawn as a day is a date in 1970. */
+    if ((v.walk === 'zero_on') !== (body.format === 'day'))
+      return bad(
+        'DECLARATION_INVALID',
+        v.walk === 'zero_on' ? `${id} names a day, so its format is day.` : `${id} adds up money or counts days, and only the day the money runs out (walk: zero_on) has format: day.`,
+        'format',
+        v.walk === 'zero_on' ? ['day'] : undefined,
       );
   }
 

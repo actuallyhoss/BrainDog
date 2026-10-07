@@ -184,8 +184,11 @@ export type PageBlock = {
   headline?: 'under';
   /** A `bar` or `split`'s: the label of the row that holds what no part does, drawn last and linked to those rows. */
   unset?: string;
-  /** A `bar` or `split`'s: the intent a part is drawn in, by the value it groups, such as `{ off_track: bad }`. A part not named is neutral. */
+  /** A `bar` or `split`'s: the intent a part is drawn in, by the value it groups, such as `{ off_track: bad }`. A part not named is neutral.
+      A `cards` block tones a card by its title's value, and a `lanes` block a lane by its fourth column's. */
   tones?: Record<string, 'good' | 'warn' | 'bad' | 'info'>;
+  /** A `lanes` block's: how many hours back from now it shows, 24 when it says nothing, at most 168. */
+  hours?: number;
   /** A `note`'s: its body is a whole document, drawn with the blocks written in it, such as a project's `{{note}}`. */
   document?: boolean;
   /** A `cards` block's: a row whose day in `field` is older than `after` is drawn as out of date. */
@@ -317,7 +320,9 @@ export type BlockResult = PageBlock & {
    * A `calendar`'s: the months it shows, from the first day of the first to the last day of the last, and today, each a
    * day in the record's own zone. Every row it answers falls between `from` and `to` (`kinds/calendar.ts`).
    */
-  window?: { from: string; to: string; today: string };
+  window?: { from: string; to: string; today: string } | { from: string; to: string; now: string };
+  /** A `lanes` block's: each row that overlaps the window, as a title between two instants (`kinds/lanes.ts`). */
+  lanes?: { title: string; start: string; end: string | null; tone?: 'good' | 'warn' | 'bad' | 'info'; href?: string }[];
   /**
    * A `gallery`'s: each file it draws as the record stores it, aligned with the rows it draws (the list's, or the ones
    * written out), `null` where the record holds none (`kinds/gallery.ts`).
