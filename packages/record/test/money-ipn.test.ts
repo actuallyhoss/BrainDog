@@ -35,7 +35,7 @@ import type { Sql } from '@braindog/ports';
 import { createRecordApi } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, day, installSeed } from '../../seed/src/index.ts';
-import { CARD_INGESTS, HSBC_EG_INGESTS, bankDeclarations, cardAlertDeclarations } from '../../seed/test/pack-files.ts';
+import { CARD_INGESTS, HSBC_EG_INGESTS, bankDeclarations, bankHsbcEgFile, cardAlertDeclarations } from '../../seed/test/pack-files.ts';
 
 /** The seeded record, and two EGP accounts whose digits the invented wordings name. */
 async function record(): Promise<{ k: Kernel; sql: Sql; card: string; current: string; company: string }> {
@@ -44,6 +44,13 @@ async function record(): Promise<{ k: Kernel; sql: Sql; card: string; current: s
   const k = api.kernel;
   const seeded = await installSeed(k);
   assert.ok(seeded.ok, JSON.stringify(seeded));
+  /* WHAT THE BANK FILE LAYS SINCE 1.7.0, its extends, which a record opened over installSeed takes no pack to lay: the
+     InstaPay reference its transfers write and key their near rule on. */
+  const ledger = k.declarations().find((d) => d.id === 'register.transactions')!;
+  const own = (typeof ledger.body === 'string' ? JSON.parse(ledger.body) : ledger.body) as { fields: unknown[] };
+  const laid = (bankHsbcEgFile().extends as Record<string, { fields: unknown[] }>)['register.transactions']!.fields;
+  const ledgered = await k.install([{ id: 'register.transactions', kind: 'register', body: { ...own, fields: [...own.fields, ...laid] } as never }]);
+  assert.ok(ledgered.ok, JSON.stringify(ledgered));
   const bank = await k.install(bankDeclarations());
   assert.ok(bank.ok, JSON.stringify(bank));
   /* THE CARD WORDINGS ARE THE CARD ALERTS PACK'S SINCE MONEY-CORE 3.0.0, so the seeded record no longer carries them. */
@@ -106,7 +113,7 @@ const WORDINGS: Want[] = [
   },
   {
     ingest: 'bank-ipn-out',
-    body: 'Your HSBC Account ***846 was debited with IPN outward transfer for EGP 3,250.00 on 07-08-2026 16:42 to MARLOW JOINERY with reference 9c4e1f7a2b',
+    body: 'Your HSBC Account ***846 was debited with IPN outward transfer for EGP 3,250.00 on 07-08-2026 16:42 to MARLOW JOINERY with reference 9c4e1f7a2b. For further details, please contact HSBC',
     direction: 'out', amount: 325_000, currency: 'EGP', what: 'MARLOW JOINERY', on: '2026-08-07', account: 'current',
   },
   /* THE PURCHASE NAMES ITS PAYEE AFTER `from`, and this fixture said `to`, which is the transfer's word. Measured on
@@ -114,12 +121,12 @@ const WORDINGS: Want[] = [
      person. Measured red here before the anchor moved: `review`, `bank-ipn-out could not read what out of this one.` */
   {
     ingest: 'bank-ipn-out',
-    body: 'Your HSBC Account ***846 was debited with IPN purchase for EGP 615.75 on 19-08-2026 21:10 from GRANARY MARKET with reference 0f7d2c91e4',
+    body: 'Your HSBC Account ***846 was debited with IPN purchase for EGP 615.75 on 19-08-2026 21:10 from GRANARY MARKET with reference 0f7d2c91e4. For further details, please contact HSBC',
     direction: 'out', amount: 61_575, currency: 'EGP', what: 'GRANARY MARKET', on: '2026-08-19', account: 'current',
   },
   {
     ingest: 'bank-ipn-in',
-    body: 'Your HSBC Account ***846 was credited with IPN inward transfer for EGP 12,400.00 on 11-08-2026 08:05 from quill.harbour@instapay with reference 5d0b33e8aa',
+    body: 'Your HSBC Account ***846 was credited with IPN inward transfer for EGP 12,400.00 on 11-08-2026 08:05 from quill.harbour@instapay with reference 5d0b33e8aa. For further details, please contact HSBC',
     direction: 'in', amount: 1_240_000, currency: 'EGP', what: 'quill.harbour@instapay', on: '2026-08-11', account: 'current',
   },
   {
@@ -261,7 +268,7 @@ test('A `last4` OF FOUR DIGITS IS THE ACCOUNT A LINE PRINTING ITS LAST THREE BEH
   assert.equal(row.fields.account, four.value.id, 'the three printed digits did not land on the one account ending in them');
 
   /* THE SAME `last4` STILL READS THE INSTAPAY FAMILY, which prints all four digits behind its stars. */
-  const ipn = forward(r.k, 'Your HSBC Account ********6518 was debited with IPN outward transfer for EGP 75.00 on 05-08-2026 10:15 to ORCHARD PRINTS with reference 3a9e0c55d1', 'money-ipn-suffix-four');
+  const ipn = forward(r.k, 'Your HSBC Account ********6518 was debited with IPN outward transfer for EGP 75.00 on 05-08-2026 10:15 to ORCHARD PRINTS with reference 3a9e0c55d1. For further details, please contact HSBC', 'money-ipn-suffix-four');
   assert.equal(ipn.state, 'matched', ipn.reason ?? '');
   assert.equal(r.k.get(ipn.wrote[0]!)!.fields.account, four.value.id, 'the four printed digits did not land on the account holding them');
 

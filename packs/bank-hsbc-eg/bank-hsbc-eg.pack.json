@@ -1,9 +1,9 @@
 {
   "pack": "bank-hsbc-eg",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "title": "HSBC Egypt alerts",
   "summary": "Reads HSBC Egypt alert mails and text messages into Money as transactions, each with the balance it prints, and a message that only prints a balance as a balance check.",
-  "changes": "A card charge and an InstaPay transfer keep the shop or the person as the bank wrote it, in a new Paid to or from field, so the same payee is recognised however it is spelled.",
+  "changes": "Each amount a message prints without a currency is read in its account's own currency, never in pounds sterling. Two like movements a day apart stay two when each prints its own balance or its own InstaPay reference, and the mail and the text of one movement stay one. A question about digits no account holds now says whether it is a card or an account.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -11,6 +11,17 @@
     "primitives": 1,
     "packs": {
       "money-core": ">=3.10.0 <4.0.0"
+    }
+  },
+  "extends": {
+    "register.transactions": {
+      "fields": [
+        {
+          "id": "hsbc_reference",
+          "label": "HSBC reference",
+          "type": "text"
+        }
+      ]
     }
   },
   "declarations": [
@@ -116,13 +127,19 @@
         "amount": {
           "money": {
             "after": "used for ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         },
         "account": {
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "card",
+            "where": "kind is card",
+            "split": true,
             "between": [
               "*** ",
               " has been"
@@ -132,7 +149,10 @@
         "available": {
           "money": {
             "after": "available limit is ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         }
       },
@@ -278,16 +298,29 @@
         "amount": {
           "money": {
             "after": " for ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         },
         "account": {
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "Account ***",
               " was "
+            ]
+          }
+        },
+        "hsbc_reference": {
+          "text": {
+            "between": [
+              "with reference ",
+              "."
             ]
           }
         }
@@ -300,7 +333,8 @@
         "near": {
           "on": [
             "amount",
-            "account"
+            "account",
+            "hsbc_reference"
           ],
           "day": "on",
           "prefix": {
@@ -409,16 +443,29 @@
         "amount": {
           "money": {
             "after": " for ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         },
         "account": {
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "Account ***",
               " was "
+            ]
+          }
+        },
+        "hsbc_reference": {
+          "text": {
+            "between": [
+              "with reference ",
+              "."
             ]
           }
         }
@@ -431,7 +478,8 @@
         "near": {
           "on": [
             "amount",
-            "account"
+            "account",
+            "hsbc_reference"
           ],
           "day": "on",
           "prefix": {
@@ -615,7 +663,10 @@
                   "***-",
                   "- Your available balance"
                 ],
-                "currency": "GBP"
+                "currency": {
+                  "of": "account",
+                  "field": "balance"
+                }
               }
             }
           }
@@ -624,6 +675,8 @@
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "***-",
               " "
@@ -633,7 +686,10 @@
         "balance_after": {
           "money": {
             "after": "available balance is ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         }
       },
@@ -645,7 +701,8 @@
         "near": {
           "on": [
             "amount",
-            "account"
+            "account",
+            "balance_after"
           ],
           "day": "on",
           "prefix": {
@@ -822,7 +879,10 @@
                   "***-",
                   "+ Your available balance"
                 ],
-                "currency": "GBP"
+                "currency": {
+                  "of": "account",
+                  "field": "balance"
+                }
               }
             }
           }
@@ -831,6 +891,8 @@
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "***-",
               " "
@@ -840,7 +902,10 @@
         "balance_after": {
           "money": {
             "after": "available balance is ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         }
       },
@@ -852,7 +917,8 @@
         "near": {
           "on": [
             "amount",
-            "account"
+            "account",
+            "balance_after"
           ],
           "day": "on",
           "prefix": {
@@ -1037,7 +1103,10 @@
                   "***-",
                   "Your available balance"
                 ],
-                "currency": "GBP"
+                "currency": {
+                  "of": "account",
+                  "field": "balance"
+                }
               }
             }
           }
@@ -1046,6 +1115,8 @@
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "***-",
               " "
@@ -1055,7 +1126,10 @@
         "balance_after": {
           "money": {
             "after": "available balance is ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         }
       },
@@ -1067,7 +1141,8 @@
         "near": {
           "on": [
             "amount",
-            "account"
+            "account",
+            "balance_after"
           ],
           "day": "on",
           "prefix": {
@@ -1180,13 +1255,19 @@
         "amount": {
           "money": {
             "after": "used for ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         },
         "account": {
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "card",
+            "where": "kind is card",
+            "split": true,
             "between": [
               "*** ",
               " has been"
@@ -1196,7 +1277,10 @@
         "available": {
           "money": {
             "after": "available limit is ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         }
       },
@@ -1346,16 +1430,29 @@
         "amount": {
           "money": {
             "after": " for ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         },
         "account": {
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "Account ***",
               " was "
+            ]
+          }
+        },
+        "hsbc_reference": {
+          "text": {
+            "between": [
+              "with reference ",
+              "."
             ]
           }
         }
@@ -1368,7 +1465,8 @@
         "near": {
           "on": [
             "amount",
-            "account"
+            "account",
+            "hsbc_reference"
           ],
           "day": "on",
           "prefix": {
@@ -1481,16 +1579,29 @@
         "amount": {
           "money": {
             "after": " for ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         },
         "account": {
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "Account ***",
               " was "
+            ]
+          }
+        },
+        "hsbc_reference": {
+          "text": {
+            "between": [
+              "with reference ",
+              "."
             ]
           }
         }
@@ -1503,7 +1614,8 @@
         "near": {
           "on": [
             "amount",
-            "account"
+            "account",
+            "hsbc_reference"
           ],
           "day": "on",
           "prefix": {
@@ -1691,7 +1803,10 @@
                   "***-",
                   "- Your available balance"
                 ],
-                "currency": "GBP"
+                "currency": {
+                  "of": "account",
+                  "field": "balance"
+                }
               }
             }
           }
@@ -1700,6 +1815,8 @@
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "***-",
               " "
@@ -1709,7 +1826,10 @@
         "balance_after": {
           "money": {
             "after": "available balance is ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         }
       },
@@ -1721,7 +1841,8 @@
         "near": {
           "on": [
             "amount",
-            "account"
+            "account",
+            "balance_after"
           ],
           "day": "on",
           "prefix": {
@@ -1901,7 +2022,10 @@
                   "***-",
                   "+ Your available balance"
                 ],
-                "currency": "GBP"
+                "currency": {
+                  "of": "account",
+                  "field": "balance"
+                }
               }
             }
           }
@@ -1910,6 +2034,8 @@
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "***-",
               " "
@@ -1919,7 +2045,10 @@
         "balance_after": {
           "money": {
             "after": "available balance is ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         }
       },
@@ -1931,7 +2060,8 @@
         "near": {
           "on": [
             "amount",
-            "account"
+            "account",
+            "balance_after"
           ],
           "day": "on",
           "prefix": {
@@ -2120,7 +2250,10 @@
                   "***-",
                   "Your available balance"
                 ],
-                "currency": "GBP"
+                "currency": {
+                  "of": "account",
+                  "field": "balance"
+                }
               }
             }
           }
@@ -2129,6 +2262,8 @@
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "***-",
               " "
@@ -2138,7 +2273,10 @@
         "balance_after": {
           "money": {
             "after": "available balance is ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         }
       },
@@ -2150,7 +2288,8 @@
         "near": {
           "on": [
             "amount",
-            "account"
+            "account",
+            "balance_after"
           ],
           "day": "on",
           "prefix": {
@@ -2210,6 +2349,8 @@
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "***-",
               " "
@@ -2219,7 +2360,10 @@
         "balance": {
           "money": {
             "after": "available balance is ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         },
         "as_of": {
@@ -2297,6 +2441,8 @@
           "lookup": {
             "register": "accounts",
             "by": "last4",
+            "says": "account",
+            "split": true,
             "between": [
               "***-",
               " "
@@ -2306,7 +2452,10 @@
         "balance": {
           "money": {
             "after": "available balance is ",
-            "currency": "GBP"
+            "currency": {
+              "of": "account",
+              "field": "balance"
+            }
           }
         },
         "as_of": {

@@ -9,16 +9,17 @@
  * case the shell may not carry. They are this file now, and a record takes them by installing it.
  *
  * THE SAME READINGS, WITH ONE THING TAKEN OUT: THE CURRENCY FALLBACK. money-core's patterns fell back on `GBP` when a
- * message printed no code, which is a currency nobody chose written into every record. On
- * a record the readers are wired into, `scanMoney` takes the code the bank prints beside the figure, so a message that
- * prints one reads as before, and one that prints none goes to a person instead of being filed in a currency guessed
- * for it.
+ * message printed no code, which is a currency nobody chose written into every record. On a record the readers are
+ * wired into, `scanMoney` takes the code the alert prints beside the figure, and since 1.3.0 a figure printed with none
+ * is in the currency of the card the digits found, which somebody did choose: the card's own.
  *
  * ON money-core 3.0.0 OR LATER, AND NOT BEFORE, because a money-core before 3.0.0 declares these four ids itself and
  * the two would collide on the record.
  *
- * EVERY LINE BELOW IS INVENTED: the card digits, the merchants, the amounts and the days are made up, save two public
- * shop names, Chillout and Talabat, whose spellings 1.2.0's test holds. The person named is invented.
+ * EVERY LINE BELOW IS BUILT FOR THE TEST, AND SAYS SO HERE BECAUSE THE BANK'S OWN PACK HOLDS ONLY ITS OWN WORDING. These
+ * two sentences are no bank's: `loop/research-bank-real.md` found none of a hundred real texts written this way, so there
+ * is no real line to scrub. The card digits, the merchants, the amounts and the days are made up, save two public shop
+ * names, Chillout and Talabat, whose spellings 1.2.0's test holds. The person named is invented.
  */
 
 import { test } from 'node:test';
@@ -100,10 +101,12 @@ const moneysPayee = (): unknown =>
    3.10.0 declares on its ledger, so the floor moves to 3.10.0 and the pack lays nothing. Laid by the pack, even in
    Money's own shape, the ledger was staged as the record's own list, and a record that took the pack on an older Money
    was refused money-core 3.10.0 itself ("register.transactions was written in this record"), so the field is Money's
-   alone. */
-test('THE FILE IS card-alerts 1.2.0, on money-core 3.10.0 or later, with the two wordings and their twins', async () => {
+   alone.
+   1.3.0 IS A MINOR STEP ON THE SAME FLOOR: a figure with no code is in the card's own currency, and each lookup says it
+   finds a card, finds only a card, and reads a card's digits as one or more values, for a card the bank replaced. */
+test('THE FILE IS card-alerts 1.3.0, on money-core 3.10.0 or later, with the two wordings and their twins', async () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version], ['card-alerts', '1.2.0']);
+  assert.deepEqual([doc.pack, doc.version], ['card-alerts', '1.3.0']);
   assert.equal(doc.extends, undefined, 'the payee field is Money\'s, and a pack laying it blocks Money\'s own update');
   assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=3.10.0 <4.0.0' });
   assert.deepEqual(doc.declarations.map((d) => `ingest.${String(d.ingest)}`).sort(), FOUR);
@@ -116,12 +119,15 @@ test('THE FILE IS card-alerts 1.2.0, on money-core 3.10.0 or later, with the two
     const { ingest: _m, channel: _n, ...same } = mailed;
     assert.deepEqual(rest, same, `${String(twin.ingest)} reads differently from its mail pattern`);
   }
-  /* NO CURRENCY IS WRITTEN IN, so an alert is read in the code it prints or not read at all. */
+  /* NO CURRENCY IS WRITTEN IN: an alert is read in the code it prints, or else in its card's. */
   for (const d of doc.declarations) {
-    const amount = (d.extract as { amount?: { money?: Body } }).amount?.money;
-    assert.ok(amount, `${String(d.ingest)} reads no amount`);
-    assert.equal(amount.currency, undefined, `${String(d.ingest)} falls back on a currency nobody chose`);
+    const extract = d.extract as { amount?: { money?: Body }; account?: { lookup?: Body } };
+    assert.ok(extract.amount?.money, `${String(d.ingest)} reads no amount`);
+    assert.deepEqual(extract.amount.money.currency, { of: 'account', field: 'balance' }, `${String(d.ingest)} falls back on a currency nobody chose`);
+    const lookup = extract.account?.lookup;
+    assert.deepEqual([lookup?.says, lookup?.where, lookup?.split], ['card', 'kind is card', true], `${String(d.ingest)} does not say it finds only a card`);
   }
+  assert.ok(!JSON.stringify(doc).includes('"GBP"'), 'a currency nobody chose is written into the file');
   const opened = said<{ pack: { manifest: { pack: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
   assert.equal(opened.pack.manifest.pack, 'card-alerts');
 });
@@ -144,7 +150,7 @@ test('INSTALLED FROM THE FILE: four patterns, nothing refused, and the text door
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), FOUR);
   await put(api, file());
-  assert.equal(api.kernel.packs().find((p) => p.id === 'card-alerts')?.version, '1.2.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'card-alerts')?.version, '1.3.0');
   /* A TWIN WITH NO TOKEN MINTED IS A DOOR THAT MATCHES NOTHING YET, which is `none` and not `null`. */
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-card-out-sms' }), { kind: 'none' });
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-card-in-sms' }), { kind: 'none' });
@@ -176,18 +182,67 @@ test('A CHARGE AND A CREDIT BECOME ROWS at exact, each in its own direction, on 
   sql.close();
 });
 
-test('THE CODE THE ALERT PRINTS IS THE ONE READ, and an alert that prints none goes to a person', async () => {
-  const { api, sql } = await withReaders();
+/**
+ * THE CODE THE ALERT PRINTS FIRST, AND THE CARD'S OWN WHEN IT PRINTS NONE. Until 1.3.0 an alert with no code waited for
+ * a person; now it is in the currency the card is kept in, so an Egyptian card's alert files in Egyptian pounds and a
+ * sterling card's in sterling, and neither is a currency the pack picked.
+ */
+test('THE CODE THE ALERT PRINTS IS THE ONE READ, and an alert that prints none is in its card\'s currency', async () => {
+  const { api, sql, card } = await withReaders();
   const k = api.kernel;
-  const before = k.count('transactions');
   const euro = mail(k, `Your card ending ${DIGITS} was debited EUR 12.50 at CEDAR LANE BAKERY on 17/09/26.`, 'euro');
   assert.deepEqual([euro.state, euro.ingest], ['matched', 'bank-card-out'], euro.reason);
   assert.deepEqual(k.get(euro.wrote[0]!)!.fields.amount, { amount: 1_250, currency: 'EUR' });
 
-  const bare = mail(k, `Your card ending ${DIGITS} was debited 12.50 at CEDAR LANE BAKERY on 16/09/26.`, 'no-code');
-  assert.equal(bare.ingest, 'bank-card-out');
-  assert.equal(bare.state, 'review', `an amount with no currency was ${bare.state}: ${bare.reason}`);
-  assert.equal(k.count('transactions'), before + 1, 'an amount with no currency was written in one somebody guessed');
+  const sterling = mail(k, `Your card ending ${DIGITS} was debited 12.50 at CEDAR LANE BAKERY on 16/09/26.`, 'no-code');
+  assert.deepEqual([sterling.state, sterling.ingest], ['matched', 'bank-card-out'], sterling.reason);
+  assert.deepEqual([k.get(sterling.wrote[0]!)!.fields.account, k.get(sterling.wrote[0]!)!.fields.amount], [card, { amount: 1_250, currency: 'GBP' }]);
+
+  const pounds = said<{ id: string }>(
+    k.create('accounts', { name: 'Cairo card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: TODAY, liquid: false, last4: '7702' } as never, { actor: 'p_1' }),
+  ).id;
+  const egp = mail(k, 'Your card ending 7702 was debited 979.99 at TALABAT on 15/09/26.', 'no-code-egp');
+  assert.deepEqual([egp.state, egp.ingest], ['matched', 'bank-card-out'], egp.reason);
+  assert.deepEqual([k.get(egp.wrote[0]!)!.fields.account, k.get(egp.wrote[0]!)!.fields.amount], [pounds, { amount: 97_999, currency: 'EGP' }]);
+  sql.close();
+});
+
+/**
+ * A CARD ALERT IS NEVER FILED ON AN ACCOUNT, however its digits end (`where: kind is card`). A current account ending
+ * 4471 beside the card made two candidates and the alert waited; with only the account, the charge was filed on it.
+ */
+test('A CARD ALERT FILES ONLY ON A CARD: an account ending in the same digits is never its account', async () => {
+  const { api, sql, card } = await withReaders();
+  const k = api.kernel;
+  const current = said<{ id: string }>(
+    k.create('accounts', { name: 'Current account', kind: 'bank', balance: { amount: 0, currency: 'GBP' }, as_of: TODAY, liquid: true, last4: DIGITS } as never, { actor: 'p_1' }),
+  ).id;
+  const out = mail(k, CHARGE, 'charge-beside-account');
+  assert.deepEqual([out.state, out.ingest], ['matched', 'bank-card-out'], out.reason);
+  assert.equal(k.get(out.wrote[0]!)!.fields.account, card);
+
+  said(k.update('accounts', card, { last4: '0000' } as never, { actor: 'p_1', version: k.get(card)!.version }));
+  const next = mail(k, CREDIT, 'credit-no-card');
+  assert.notEqual(next.state, 'matched', `a card alert was filed on an account: ${next.reason}`);
+  const on = (account: string) => said<{ rows: { fields: Body }[] }>(k.list({ register: 'transactions', limit: 200 })).rows.filter((r) => r.fields.account === account).length;
+  assert.deepEqual([on(card), on(current)], [1, 0]);
+  sql.close();
+});
+
+/**
+ * THE MAIL AND THE TEXT OF ONE ALERT ARE ONE ROW: the same amount, card, day and shop, through two doors. These
+ * sentences print no balance or limit, so two equal charges at one shop within a day of each other still read as one
+ * alert said twice, and the second is skipped with its reason; the bank's own pack, whose alerts print a limit, keeps
+ * both (`packs/bank-hsbc-eg`).
+ */
+test('THE MAIL AND THE TEXT OF ONE ALERT ARE ONE ROW', async () => {
+  const { api, sql, card } = await withReaders();
+  const k = api.kernel;
+  assert.equal(mail(k, CHARGE, 'charge-mail').state, 'matched');
+  const texted = text(k, 'bank-card-out-sms', CHARGE, 'charge-text-too');
+  assert.deepEqual([texted.ingest, texted.state], ['bank-card-out-sms', 'skipped'], texted.reason);
+  const rows = said<{ rows: { fields: Body }[] }>(k.list({ register: 'transactions', limit: 200 })).rows.filter((r) => r.fields.account === card);
+  assert.equal(rows.length, 1);
   sql.close();
 });
 
@@ -262,7 +317,9 @@ test('EACH ALERT KEEPS THE PAYEE AS PRINTED: five spellings of one cafe, Talabat
 test('BESIDE ANOTHER BANK DOOR: the payee field is Money\'s once and both packs install', async () => {
   const { api, sql } = await withReaders();
   const hsbc = JSON.parse(readFileSync(new URL('../bank-hsbc-eg/bank-hsbc-eg.pack.json', import.meta.url), 'utf8')) as Body;
-  assert.deepEqual([hsbc.extends, file().extends], [undefined, undefined], 'a bank door lays the payee field again');
+  /* THE BANK'S PACK LAYS ITS OWN REFERENCE SINCE 1.7.0, under its own id, and still not the payee. */
+  const laid = ((hsbc.extends as Record<string, { fields: Body[] }> | undefined)?.['register.transactions']?.fields ?? []).map((f) => f.id);
+  assert.deepEqual([laid, file().extends], [['hsbc_reference'], undefined], 'a bank door lays the payee field again');
   await put(api, hsbc);
   const ledger = api.kernel.declarations().find((d) => d.id === 'register.transactions');
   /* THE BODY IS STORED AS ITS JSON TEXT. */

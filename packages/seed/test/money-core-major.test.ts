@@ -133,7 +133,7 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
   /* AND IN BATCH 17 EACH KEEPS THE PAYEE AS ITS SOURCE WROTE IT, bank-hsbc-eg 1.6.0 and mercury 1.1.0, minor steps. Both
      floors move to money-core 3.10.0, which declares `counterparty_text` on the ledger that each now writes: laid by
      each pack it was `PROVIDES_CONFLICT` against money-core and between any two of them. */
-  assert.equal(bankHsbcEgFile().version, '1.6.0');
+  assert.equal(bankHsbcEgFile().version, '1.7.0');
   assert.equal(mercuryFile().version, '1.1.0');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
@@ -158,7 +158,7 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
  */
 test('THE HOLE IN THE RANGE CHECK IS CLOSED: a record holding a pack on ^1.8.0 is refused money-core 2.0.0, naming that pack', async () => {
   const { k, sql } = await onMoney(asMoneyCore180);
-  const old = { ...bankHsbcEgFile(), version: '1.0.0', requires: { format: 1, primitives: 1, packs: { 'money-core': '^1.8.0' } } };
+  const old = { ...bankHsbcEgFile13(), version: '1.0.0', requires: { format: 1, primitives: 1, packs: { 'money-core': '^1.8.0' } } };
   await put(k, old);
   const { diff, out } = await attempt(k, asMoneyCore200(firstPartyDocument('money-core')));
   assert.deepEqual(diff.dependents, [{ id: 'bank-hsbc-eg', version: '1.0.0', range: '^1.8.0', ok: false, was: true }], 'the plan does not name the dependent it strands');

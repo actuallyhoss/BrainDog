@@ -143,7 +143,8 @@ test('THE PACK DECLARES THE TWELVE AND THE BALANCE READING, needs money-core 3.1
   const doc = bankHsbcEgFile() as unknown as Doc;
   assert.equal(doc.pack, 'bank-hsbc-eg');
   /* 1.6.0 IN BATCH 17, a minor step: a card charge and an InstaPay transfer keep the payee as the bank wrote it. */
-  assert.equal(doc.version, '1.6.0');
+  /* 1.7.0 IN BATCH 34, a minor step on the same floor: each money form takes its account's currency, each lookup says what it finds, and the near rules read the printed balance and the InstaPay reference. */
+  assert.equal(doc.version, '1.7.0');
   assert.deepEqual(ingestsOf(doc), [...HSBC, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort());
   /* `<3.0.0` SINCE 1.0.1, because the caret it had at 1.0.0 admits no 2.0.0. THE FLOOR MOVES TO 3.0.0 AT 1.4.0, because
      `bank-balance` and its webhook twin read `register.accounts`' `balance_after` and money-core's own balances,
