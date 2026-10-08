@@ -10,8 +10,27 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.6.0",
+      "latest": "1.7.0",
       "versions": [
+        {
+          "version": "1.7.0",
+          "checksum": "409fd18398cfac90aac4f7166e58ea1580c9a1ebc9ec9e84db7d1c3dbaee34f8",
+          "bytes": 60957,
+          "published_at": "2026-10-08T20:07:22.931Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Each amount a message prints without a currency is read in its account's own currency, never in pounds sterling. Two like movements a day apart stay two when each prints its own balance or its own InstaPay reference, and the mail and the text of one movement stay one. A question about digits no account holds now says whether it is a card or an account."
+        },
         {
           "version": "1.6.0",
           "checksum": "c26200dd5536c44814d6e1792b4d3a437e40e5cb52ce77b9f0f0b867de483c4d",
@@ -123,8 +142,27 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.3.0",
       "versions": [
+        {
+          "version": "1.3.0",
+          "checksum": "becd616bac85b9c9b9d79084a699a2e499fd90fd1c49119dab15f0a7b4f8db3b",
+          "bytes": 10779,
+          "published_at": "2026-10-08T20:07:22.931Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "An alert that prints no currency is read in its card's own currency. A card alert is only ever matched to a card, never to an account whose digits end alike, and a question about digits no card holds says it is a card."
+        },
         {
           "version": "1.2.0",
           "checksum": "3bb2181f38a96bf556a72c30620e99514e8970ae0405713543faa6c46c637878",
