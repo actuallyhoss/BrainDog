@@ -232,7 +232,10 @@ async function roundTrip(fx: Fixture, mcp: Mcp, rows: Answered[], deleted: Set<s
             wrong.push(`${at}: ${JSON.stringify(said)}, and a new ref to a deleted row is refused at its field, saying so`);
           continue;
         }
-        if (!said.ok) {
+        /* A ROWSET THAT CHANGES NOTHING IS NOT FILED (`ALREADY_KNOWN`): the row already holds exactly what was sent, which
+           is the round trip this file asks for, so its refs are read as they are and must still be as they were. */
+        const same = s.place === 'in place' && !said.ok && said.refusal?.code === 'ALREADY_KNOWN';
+        if (!said.ok && !same) {
           wrong.push(`${at}: ${JSON.stringify(said.refusal)}`);
           continue;
         }

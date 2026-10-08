@@ -194,7 +194,7 @@ test('THE FIVE SIGNS NAME NO LIST, and on a record with no door, no feed and no 
 });
 
 test('WITH A DOOR, WHAT WAITS IS COUNTED, how old the oldest is and how long since anything came, and one door alone', async () => {
-  const { CARD, CASH, record, text, used } = await import('./ingest-tail-kit.test.ts');
+  const { CARD, CASH, record, text, used } = await import('./ingest-tail-kit.ts');
   const r = await record(CARD(), CASH);
   const SENT = r.clock.now();
   /* A DOOR AND NOTHING WAITING IS A TRUE ZERO; NOTHING EVER CAME IS STILL NO VALUE. */

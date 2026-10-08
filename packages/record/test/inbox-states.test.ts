@@ -116,7 +116,7 @@ test('A STATE THE INBOX DOES NOT SHOW IS REFUSED BY NAME, and so is a key it doe
   const stray = refusal(await api.inbox({ status: 'skipped' } as never, owner));
   assert.equal(stray.code, 'FIELD_UNKNOWN');
   assert.equal(stray.at, 'status');
-  assert.deepEqual(stray.allowed, ['state', 'cursor', 'limit']);
+  assert.deepEqual(stray.allowed, ['state', 'cursor', 'limit', 'repeats']);
   sql.close();
 });
 

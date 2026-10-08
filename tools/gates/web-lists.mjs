@@ -104,10 +104,6 @@ const HELD = {
     ids: ['credentials'],
     why: "`KEYS_REGISTER`, the Agents pack's credentials list, which the Keys index and a new action's key picker read by its id.",
   },
-  'apps/web/src/lib/record/action-draft.ts': {
-    ids: ['fx'],
-    why: "the exchange-rate preset of a new action writes a day's rate into Money's rates list by its id.",
-  },
   'apps/web/src/routes/r/[register]/[seq]/+page.svelte': {
     ids: ['credentials', 'tools'],
     why: "a key's or a tool's row lists the runs that used it, and knows it is one by the Agents pack's list ids.",

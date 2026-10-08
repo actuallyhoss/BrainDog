@@ -14,7 +14,8 @@ import assert from 'node:assert/strict';
 import { createDirectory, type Directory } from '@braindog/record/directory';
 import type { Refusal, Result, Who } from '@braindog/ports';
 
-import { FREE_PLAN, HOSTED_PLANS, billingDoors, type BillingEnv } from '../src/billing.ts';
+import { PLAN_TABLE } from '@braindog/record/plans';
+import { FREE_PLAN, HOSTED_PLANS, billingDoors, planName, planPrice, type BillingEnv } from '../src/billing.ts';
 import type { Form, Stripe, StripeAnswer } from '../src/stripe.ts';
 import { openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 
@@ -135,9 +136,15 @@ test('NO DOOR THAT CHARGES NAMES FREE: the list sells only the paid plans, and n
   assert.ok(!('free' in HOSTED_PLANS));
   const w = world();
   const made = value<{ record: string }>(await w.doors.checkout(w.who, { slug: 'ada', plan: 'free' }));
-  const list = value<{ records: { record: string; state: string; plan: string; price: string }[]; plans: { id: string }[] }>(await w.doors.billing(w.who));
-  assert.deepEqual(list.records.map((r) => [r.record, r.state, r.plan, r.price]), [[made.record, 'unbilled', 'free', FREE_PLAN.price]]);
-  assert.deepEqual(list.plans.map((p) => p.id), ['cloud', 'plus']);
+  const list = value<{ records: { record: string; state: string; plan: string; price: string }[]; plans: { id: string; name: string; price: string }[] }>(await w.doors.billing(w.who));
+  assert.deepEqual(list.records.map((r) => [r.record, r.state, r.plan, r.price]), [[made.record, 'unbilled', 'free', '$0']]);
+  /* THE NAMES AND PRICES ARE THE ONE TABLE'S (`PLAN_TABLE`), which `HOSTED_PLANS` no longer says again. */
+  assert.deepEqual(list.plans.map((p) => [p.id, p.name, p.price]), [['cloud', 'Cloud', '$12 a month'], ['plus', 'Cloud Plus', '$29 a month']]);
+  for (const id of ['free', 'cloud', 'plus'] as const) {
+    const figures = PLAN_TABLE[id === 'free' ? FREE_PLAN.directory : HOSTED_PLANS[id].directory];
+    assert.equal(planName(id), figures.name, id);
+    assert.ok(planPrice(id).startsWith(figures.price.month), `${id} reads ${planPrice(id)} and the table says ${figures.price.month}`);
+  }
   w.sql.close();
 });
 
@@ -223,7 +230,7 @@ test('A PAID PLAN CANCELLED GOES BACK TO FREE when one person is on the record: 
   assert.deepEqual(w.d.billing({ op: 'due', now: NOW + 100 * 86_400_000 }), [], 'a record back on Free is on the delete ladder');
 
   const list = value<{ records: { record: string; state: string; plan: string; price: string; delete_on?: number }[] }>(await w.doors.billing(w.who));
-  assert.deepEqual(list.records.map((r) => [r.record, r.state, r.plan, r.price, r.delete_on]), [[record, 'unbilled', 'free', FREE_PLAN.price, undefined]]);
+  assert.deepEqual(list.records.map((r) => [r.record, r.state, r.plan, r.price, r.delete_on]), [[record, 'unbilled', 'free', '$0', undefined]]);
 
   /* IT IS THE FREE RECORD NOW, so a second free one is refused, and it is upgraded by paying for it as the same customer. */
   assert.equal(refusal(await w.doors.checkout(w.who, { slug: 'ada-two', plan: 'free' })).at, 'plan');

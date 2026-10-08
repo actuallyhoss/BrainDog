@@ -51,6 +51,7 @@ import { initFrom } from './restore.ts';
 import { openSqlite, signedWebhooks, start } from './server.ts';
 import { rewrapAtStart } from './rewrap.ts';
 import { webhookPost } from './actions.ts';
+import { outboundOf } from './script.ts';
 import { authMail, mailedNotices, smtpLine, smtpOf, smtpSender } from './smtp.ts';
 
 /**
@@ -583,6 +584,11 @@ async function serve(): Promise<void> {
   const notices = send ? mailedNotices(send) : undefined;
   const webhooks = signedWebhooks(webhookPost());
 
+  /* THE OPERATOR'S SWITCH (`49 §5.24`): an add-on's requests to other servers leave only when `BRAINDOG_OUTBOUND=on`.
+     A value that is neither stops the server, rather than a guess that sends when the operator meant it not to. */
+  const outbound = outboundOf(env.BRAINDOG_OUTBOUND);
+  if (outbound === null) return refuse('BRAINDOG_OUTBOUND takes on or off. Set it to on to let add-ons send requests to other servers, or unset it to keep them held.');
+
   const running = await start({
     file,
     port,
@@ -597,8 +603,10 @@ async function serve(): Promise<void> {
     sessionKey,
     shareKey: store.shareKey,
     trustProxy: env.BRAINDOG_TRUST_PROXY === '1',
-    /* THE SCHEDULED ACTIONS RUN ON THIS PROCESS'S TIMER, sending only to the origins their declarations name. */
-    actions: {},
+    /* THE SCHEDULED ACTIONS RUN ON THIS PROCESS'S TIMER, sending only to the origins their declarations name, AND ONLY
+       WHEN THE OPERATOR SAID SO. This passed `{}` for every operator once, which made the server's "off unless asked"
+       on for everybody (HD.306). Absent, `start` holds each action with the sentence `script.ts` keeps. */
+    ...(outbound === 'on' ? { actions: {} } : {}),
     /* SLASH LOOKS ONCE A DAY on its own unless the owner turned that off; asking hourly is how a day is noticed. */
     slashTickMs: 3_600_000,
     /* A SIGNED WEBHOOK LEAVES THROUGH THE PINNED POST. Nothing was passed here once, so a `notify.webhook` an automation
@@ -641,6 +649,13 @@ async function serve(): Promise<void> {
   say(bootLine(running.signIn));
   /* AND WHERE MAIL GOES, by host and port and never with what password. */
   if (smtp) say(`  ${smtpLine(smtp)}`);
+  /* AND WHETHER ADD-ONS MAY CALL OUT, with the registry's own switch named apart, because an operator who turns one off
+     should not believe the other went with it. */
+  say(
+    outbound === 'on'
+      ? '  add-ons send requests to other servers (BRAINDOG_OUTBOUND=on). The public add-on registry is read either way; BRAINDOG_KENNEL=off stops that.'
+      : '  add-ons send no requests to other servers, and their scheduled actions are held. Set BRAINDOG_OUTBOUND=on to let them. The public add-on registry is read either way; BRAINDOG_KENNEL=off stops that.',
+  );
 
   /* AND WHAT IS WRONG WITH THE ORIGIN, WHENEVER SOMETHING IS, rather than only when sign-in is off.
      MEASURED: at `BRAINDOG_ORIGIN=https://192.168.1.50:8443` a second boot reports

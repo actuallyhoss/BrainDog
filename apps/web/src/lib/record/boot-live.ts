@@ -23,7 +23,7 @@ import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 import { asPartOf, useCaseName } from '@braindog/seed/usecases/names';
 
 import { hueOf, iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
-import { homeOf, learnHome } from './api.ts';
+import { homeOf, learnHome, learnMoney } from './api.ts';
 import { currencyOf } from './money.ts';
 import { learnPages, REGISTERS } from './held.ts';
 import { copy } from '../copy.ts';
@@ -788,6 +788,9 @@ export const hueSent = (about: object): number | undefined => {
 export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b)): Shell {
   const record = b.record ?? null;
   const drawn = drawnOf(b);
+  /* EVERY CURRENCY THE RECORD'S MONEY IS IN, kept beside the home one (`learnHome` below), so the rates preset quotes
+     them all; a shell over a refusal holds none, so the last record's are forgotten. */
+  learnMoney(drawn ? (drawn.money ?? implied?.held ?? []) : []);
   const waits = waitsOf(b);
   const person = b.me?.person ?? null;
   const level = b.me?.level ?? 'read';

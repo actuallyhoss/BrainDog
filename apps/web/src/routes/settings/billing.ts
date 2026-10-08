@@ -3,9 +3,9 @@
  *
  * ON THE CLOUD IT SAID "This record runs on your own machine.", read
  * off a record provisioned and claimed on the Worker run the way production runs
- * it. The branch was `DEPLOYMENT.kind`, the sample's host (now `lib/record/fixtures/sample.ts`), which followed a
- * build flag that every shipped bundle set to nothing: it read `self-host` on the Cloud build, so every production
- * record was told it was on his laptop.
+ * it. The branch was a host baked into the build, which followed a build flag that every shipped bundle set to
+ * nothing: it read `self-host` on the Cloud build, so every production record was told it was on his laptop. It
+ * reads the host the record's own `boot` names now.
  * `inbound-door.ts` records the same trap for the mail door.
  *
  * `billingCloud` WAS NOT THE ANSWER EITHER. It says "Payment is up to date", and nothing on the

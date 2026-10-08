@@ -1,0 +1,6 @@
+{
+  "note": "The bar each suite passes at, a share of its answered cases from 0 to 100. Set from the first full run less five points (run.mjs --set-baseline), raised by hand, never lowered to make a night green. null is no bar yet.",
+  "set": null,
+  "slash": { "full": null, "small": null },
+  "record": { "full": null, "small": null }
+}

@@ -1,0 +1,117 @@
+name: model-checks
+
+# CHECKS THAT ASK A REAL MODEL, RUN BY THEMSELVES (ENG-A03). The included model, through Workers
+# AI's own address with a token: every routed name asked once (`--routes`), and Slash's questions
+# and the record's descriptions scored against the bars in `tools/model-checks/baseline.json`.
+#
+# THE ROUTES AND EIGHT CASES EVERY NIGHT, EVERYTHING ON SUNDAY, AND BY HAND. Minute 43, off the
+# hour, where GitHub's scheduler is least late. A night is about 3 cents; the ceiling is 20,000
+# neurons (22 cents) on a night and 100,000 ($1.10) on a full run, and the runner stops asking
+# before it would pass it.
+#
+# THREE OUTCOMES. `measured-pass` is green. `measured-below` is red, and the only red. `not-measured`
+# is yellow: one warning line and exit 0, when the provider gave no answer after three tries or
+# when there is no token. NO TOKEN IS THE DEFAULT (DIRECTION 42) until the owner sets the secret
+# `MODEL_CHECK_TOKEN` and the variable `MODEL_CHECK_ACCOUNT`; the run then says so in one line.
+#
+# THE ALARM. Each report carries the nights before it, read from the last scheduled run's report.
+# Two nights below the bar running, or three nights a provider that was asked gave no answer, turn
+# the run red, which GitHub mails, and post the `model` kind to the Worker's operator mail when
+# `MODEL_ALERT_KEY` is set. A night with no token is never counted: it is the owner's hands.
+#
+# THE TOKEN TRAVELS IN THE ENVIRONMENT AND NOWHERE ELSE. The runner never prints it, cuts it and the
+# account out of every message it keeps, and `model-checks.json` holds neither.
+#
+# A FORCED RED: run it by hand on a branch whose `MODELS` in `apps/worker/src/inference.ts` names
+# an id Workers AI does not serve. The route reads `measured-below` and the run is red.
+
+on:
+  schedule:
+    - cron: '43 2 * * 1-6'
+    - cron: '43 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      size:
+        description: 'small: the routes and eight cases. full: every case. routes: the routes alone.'
+        required: false
+        default: small
+        type: choice
+        options: [small, full, routes]
+      set-baseline:
+        description: 'Write each suite bar from this run, less five points, where none is set. The changed baseline.json is in the report to commit by hand.'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: model-checks
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # THE INSTALL IS FOR THE HARNESSES: they run the shipped engine, which imports the workspace.
+      - uses: ./.github/actions/setup
+      - name: The runner's own tests
+        run: node --test tools/model-checks/test/outcomes.test.mjs
+      - name: The nights before
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow model-checks.yml --event schedule --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -n "$id" ]; then gh run download "$id" --repo "$GITHUB_REPOSITORY" --name model-checks --dir previous || echo "No report from the run before, so the nights start again."; fi
+      - name: Ask the model
+        id: check
+        env:
+          MODEL_CHECK_TOKEN: ${{ secrets.MODEL_CHECK_TOKEN }}
+          MODEL_CHECK_ACCOUNT: ${{ vars.MODEL_CHECK_ACCOUNT }}
+          EVENT: ${{ github.event_name }}
+          CRON: ${{ github.event.schedule }}
+          SIZE: ${{ inputs.size }}
+          SET_BASELINE: ${{ inputs.set-baseline }}
+        run: |
+          set +e
+          args=()
+          if [ "$EVENT" = schedule ]; then
+            args+=(--scheduled)
+            if [ "$CRON" = '43 2 * * 0' ]; then args+=(--routes --suite slash --suite record); else args+=(--small); fi
+          elif [ "$SIZE" = full ]; then args+=(--routes --suite slash --suite record)
+          elif [ "$SIZE" = routes ]; then args+=(--routes)
+          else args+=(--small); fi
+          if [ "$SET_BASELINE" = true ]; then args+=(--set-baseline); fi
+          node tools/model-checks/run.mjs "${args[@]}" --history previous/model-checks.json --out model-checks.json
+          code=$?
+          alarm=$(node -e "const r=JSON.parse(require('fs').readFileSync('model-checks.json','utf8'));process.stdout.write(r.alarm?(r.alarm.why==='below'?r.alarm.nights+' nights below the bar':r.alarm.nights+' nights not measured'):'')" 2>/dev/null)
+          echo "alarm=$alarm" >> "$GITHUB_OUTPUT"
+          exit $code
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-checks
+          path: |
+            model-checks.json
+            tools/model-checks/baseline.json
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Mail the operator
+        if: always() && steps.check.outputs.alarm != ''
+        env:
+          ALARM: ${{ steps.check.outputs.alarm }}
+          ALERT_KEY: ${{ secrets.MODEL_ALERT_KEY }}
+        run: |
+          echo "::error title=model checks::$ALARM running; read model-checks.json in this run's artifacts"
+          if [ -n "$ALERT_KEY" ]; then
+            body=$(node -e "process.stdout.write(JSON.stringify({op:'model',model:'model checks',why:process.env.ALARM}))")
+            curl -fsS -X POST https://brain.dog/account/ops/alert -H "authorization: Bearer $ALERT_KEY" -H 'content-type: application/json' --data "$body" >/dev/null || echo "::warning title=model checks::the operator mail was not sent"
+          fi
+          exit 1

@@ -18,10 +18,6 @@
   EVERY KEYSTROKE GOES INTO THE DRAFT, AND NOTHING LEAVES IT. The sheet has no Save of its own: the draft is sent whole
   from the editor's footer, once, so closing this is never a question of whether something was lost.
 
-  `check` IS THE PAGE'S, AND IT IS ONLY HANDED IN ON THE SAMPLE. It runs `where.ts` over the trigger's condition, and
-  `where.ts` compiles against the sample record's own lists; on a real record it would refuse a field the sample does
-  not have, which is a wrong sentence rather than no sentence. The record checks the condition again when it is filed.
-
   PICKED, NEVER TYPED, WHERE THE RECORD ALREADY HOLDS THE ANSWER. "In the
   list" was a box with `obligations` as its placeholder, "The declared call" a box hinting `gold_rate`, and a channel or
   a day was printed as its stored value; a stranger does not know any of those names, and a guess faulted on Send.
@@ -32,9 +28,10 @@
   `openActions` as the page does for its call lines, and the doors through `listDoors` as Settings does. A read that
   does not answer leaves the box as it was, so a record that cannot say is no worse off than before.
 
-  THE FIELDS WERE THE SAMPLE'S ONLY. The page hands in `fieldsOf`, which answers for the sample and `[]` on a real
-  record, so on anybody's own record the chips offered nothing from the row and "the invoice's amount" could only be
-  typed as braces. The record's own declaration is asked first now, and `fieldsOf` is the sample's path.
+  THE FIELDS ARE THE LIST'S OWN DECLARATION. Once the page handed in the fields and they reached no real record, so the
+  chips offered nothing from the row and "the invoice's amount" could only be typed as braces. The sheet asks the
+  record for the list's declaration itself, and a record that cannot say offers no fields rather than wrong ones. The
+  record checks a condition when the automation is sent.
 
   EVERY TRIGGER AND STEP THE RECORD RUNS HAS ITS FIELDS HERE. A figure crossing a line and a decision taken on
   Decide are offered beside the four that were (`flow.ts` `TRIGGER_KINDS`, read from the kernel's capability table); a
@@ -50,7 +47,6 @@
   import { tick } from 'svelte';
   import Panel from '$lib/ui/Panel.svelte';
   import Button from '$lib/ui/Button.svelte';
-  import Icon from '$lib/ui/Icon.svelte';
   import { open as openRecord } from '$lib/data/record.ts';
   import type { FieldDecl } from '$lib/record/schema.ts';
   import { readNames } from '$lib/record/history-live.ts';
@@ -101,17 +97,7 @@
   import Tokens from './Tokens.svelte';
   import type { FlowDraft } from './flow.svelte.ts';
 
-  let {
-    flow,
-    fieldsOf = () => [],
-    check,
-  }: {
-    flow: FlowDraft;
-    /** The fields of a list, for `trigger.row.<field>` chips, where the page knows them. */
-    fieldsOf?: (register: string) => string[];
-    /** What is wrong with a condition over a list, where the page can say. */
-    check?: ((register: string, when: string) => string[]) | undefined;
-  } = $props();
+  let { flow }: { flow: FlowDraft } = $props();
 
   const open = $derived(flow.selected !== null);
   const isTrigger = $derived(flow.selected === 'trigger');
@@ -177,9 +163,8 @@
       .catch(() => undefined);
   });
   const typedFields = $derived<readonly FieldDecl[]>(register === '' ? [] : (declaredFields[register] ?? []));
-  const rowFields = $derived(register === '' ? [] : typedFields.length > 0 ? typedFields.map((f) => f.id) : fieldsOf(register));
-  /* THE SAMPLE'S FIELDS COME AS IDS ALONE, and a field of unknown type is offered as text, which every test reads. */
-  const condFields = $derived<readonly CondField[]>(typedFields.length > 0 ? typedFields : rowFields.map((id) => ({ id, type: 'text' })));
+  const rowFields = $derived(typedFields.map((f) => f.id));
+  const condFields = $derived<readonly CondField[]>(typedFields);
 
   /* ── the pickers each trigger and step reads, each asked once per sheet, each keeping its box when refused ── */
 
@@ -251,7 +236,7 @@
   });
   const callOptions = $derived((calls ?? []).map((a) => ({ id: a.ingest, name: idWords(a.ingest) })));
 
-  /* THE DOORS, WHICH ARE AN OWNER'S READ. Anybody else is refused, and keeps the box. The sample has no doors to list.
+  /* THE DOORS, WHICH ARE AN OWNER'S READ. Anybody else is refused, and keeps the box.
      They are webhooks only, so the picker waits for the arrival to say it comes by webhook (`chips.ts` `doorsPickable`). */
   let doors = $state<Door[] | null>(null);
   $effect(() => {
@@ -290,8 +275,6 @@
     const taken = new Set(own.map((f) => f.id));
     return [...own, ...answerFields(flow.draft.steps, found.node.key).filter((f) => !taken.has(f.id))];
   });
-
-  const whenFaults = $derived(check && register && flow.draft.when ? check(register, flow.draft.when) : []);
 
   /* ── one argument ─────────────────────────────────────────────────────── */
 
@@ -356,12 +339,11 @@
     if (found && s !== shape) flow.setStep(found.node.key, withSlashShape(found.node.step, s));
   }
 
-  /* THE FIELDS OFFERED ARE THE LIST'S OWN, less what never leaves the record; the sample's come as ids alone, so all of
-     them are offered and the lint refuses a sealed one on Decide. A field already sent that the list no longer offers
-     stays, so it can be taken out rather than kept unseen. */
+  /* THE FIELDS OFFERED ARE THE LIST'S OWN, less what never leaves the record. A field already sent that the list no
+     longer offers stays, so it can be taken out rather than kept unseen. */
   const about = $derived(found ? slashAbout(found.node.step) : []);
   const aboutOptions = $derived.by(() => {
-    const offered = typedFields.length > 0 ? slashSendable(typedFields) : rowFields;
+    const offered = slashSendable(typedFields);
     return [...offered, ...about.filter((f) => !offered.includes(f))];
   });
   const fieldWord = (id: string) => typedFields.find((f) => f.id === id)?.label ?? idWords(id);
@@ -518,7 +500,6 @@
             hint={CONDITION_HINT}
             onchange={setWhenOf}
           />
-          {#each whenFaults as f (f)}<p class="fault"><span class="fault-glyph"><Icon name="alert" /></span>{f}</p>{/each}
         {:else if 'arrival' in t}
           <label class="label" for="flow-ingest">At the door</label>
           {#if doors && doors.length > 0 && doorsPickable(t.arrival.channel)}
@@ -831,23 +812,6 @@
     margin-block-start: var(--sp-3);
     padding-block-start: var(--sp-3);
     border-block-start: 1px solid var(--line);
-  }
-
-  /* AN ERROR IS RED WORDS AFTER THE GLYPH, NEVER A WASH. */
-  .fault {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-2);
-    margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  .fault-glyph {
-    display: inline-flex;
-    flex: none;
-    color: var(--danger-text);
   }
 
   /* A SELECT AND A BOX OF LINES ARE FIELDS: 40 tall and 44 under a thumb, the `--s1` fill with no border,

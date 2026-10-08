@@ -149,8 +149,8 @@ const GUARDS = [
   {
     id: 'sign-arrivals-waiting',
     file: 'packages/kernel/src/signs.ts',
-    anchor: 'export const ARRIVALS_WAITING_MOST = 3;',
-    mutant: 'export const ARRIVALS_WAITING_MOST = 4;',
+    anchor: 'export const ARRIVALS_WAITING_MOST = 1;',
+    mutant: 'export const ARRIVALS_WAITING_MOST = 2;',
     tests: ['packages/kernel/test/signs-read.test.ts'],
   },
   {
@@ -250,6 +250,13 @@ const GUARDS = [
     anchor: 'export const RUNS_ABANDONED_ONE_IN = 4;',
     mutant: 'export const RUNS_ABANDONED_ONE_IN = 3;',
     tests: ['packages/kernel/test/signs-read.test.ts'],
+  },
+  {
+    id: 'sign-filed-stands',
+    file: 'packages/kernel/src/signs.ts',
+    anchor: 'export const FILED_STANDS_MS = DAY;',
+    mutant: 'export const FILED_STANDS_MS = 2 * DAY;',
+    tests: ['packages/kernel/test/signs-truth.test.ts'],
   },
   {
     id: 'sign-kept-days',

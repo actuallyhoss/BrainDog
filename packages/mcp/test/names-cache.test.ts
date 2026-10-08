@@ -60,7 +60,8 @@ async function counted() {
       const value = Reflect.get(target, key, receiver) as unknown;
       if (typeof value !== 'function' || typeof key !== 'string') return value;
       return (...args: unknown[]) => {
-        asked.push(key);
+        /* The door's `heard` mark is a call nobody waits on, never a read, so it is not counted against the budget. */
+        if (key !== 'heard') asked.push(key);
         return Reflect.apply(value, target, args) as unknown;
       };
     },

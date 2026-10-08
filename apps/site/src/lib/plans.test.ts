@@ -27,9 +27,11 @@ type Meters = { runs: number; requests: number; bytes: number; ms: number };
 const { ALLOWANCE } = (await import(new URL('packages/record/src/directory.ts', REPO).href)) as {
   ALLOWANCE: { [plan: string]: Meters | null };
 };
-const { HOSTED_PLANS, FREE_PLAN } = (await import(new URL('apps/worker/src/billing.ts', REPO).href)) as {
-  HOSTED_PLANS: { [plan: string]: { name: string; price: string; directory: string } };
-  FREE_PLAN: { name: string; price: string; directory: string };
+const { HOSTED_PLANS, FREE_PLAN, planName, planPrice } = (await import(new URL('apps/worker/src/billing.ts', REPO).href)) as {
+  HOSTED_PLANS: { [plan: string]: { id: string; directory: string } };
+  FREE_PLAN: { id: string; directory: string };
+  planName: (plan: string) => string;
+  planPrice: (plan: string) => string;
 };
 const { ASK_CAP_DEFAULT, ASK_CAP_FREE } = (await import(new URL('packages/slash/src/types.ts', REPO).href)) as {
   ASK_CAP_DEFAULT: number;
@@ -45,8 +47,8 @@ const meteredAs = (id: string): string => (id === 'free' ? FREE_PLAN.directory :
 test('Free is the first plan, and the site sells nothing for it', () => {
   assert.equal(PLANS[0]?.id, 'free', 'plans.ts draws a paid plan before Free, and Free leads (DIRECTION §35)');
   const free = PLANS[0]!;
-  assert.equal(free.name, FREE_PLAN.name, `plans.ts calls Free "${free.name}" and billing.ts "${FREE_PLAN.name}"`);
-  assert.equal(free.price, FREE_PLAN.price, `plans.ts says Free is ${free.price} and billing.ts "${FREE_PLAN.price}"`);
+  assert.equal(free.name, planName('free'), `plans.ts calls Free "${free.name}" and billing.ts "${planName('free')}"`);
+  assert.equal(free.price, planPrice('free'), `plans.ts says Free is ${free.price} and billing.ts "${planPrice('free')}"`);
   assert.ok(!('free' in HOSTED_PLANS), 'billing.ts sells Free at checkout');
 });
 
@@ -59,10 +61,10 @@ test('the site prices exactly the plans the checkout sells, by the same name and
   for (const plan of PAID) {
     const sold = HOSTED_PLANS[plan.id];
     assert.ok(sold, `billing.ts sells no ${plan.id}`);
-    assert.equal(plan.name, sold.name, `plans.ts calls ${plan.id} "${plan.name}" and billing.ts "${sold.name}"`);
+    assert.equal(plan.name, planName(plan.id), `plans.ts calls ${plan.id} "${plan.name}" and billing.ts "${planName(plan.id)}"`);
     /* THE CARD READS "$12" OVER "a month, per record"; the checkout's words are "$12 a month". */
     assert.ok(plan.unit.startsWith('a month'), `${plan.name}'s card says "${plan.unit}", and billing.ts charges by the month`);
-    assert.equal(`${plan.price} a month`, sold.price, `plans.ts says ${plan.name} is ${plan.price} and billing.ts "${sold.price}"`);
+    assert.equal(`${plan.price} a month`, planPrice(plan.id), `plans.ts says ${plan.name} is ${plan.price} and billing.ts "${planPrice(plan.id)}"`);
   }
 });
 

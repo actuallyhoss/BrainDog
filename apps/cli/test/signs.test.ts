@@ -84,6 +84,19 @@ test('THE SIGNS ARE SAID BY NAME, each state with a word and never a colour alon
   assert.deepEqual(signLines([]), ['Your record has no signs to read yet.']);
 });
 
+test('A SIGN NOT READ YET IS NEVER COUNTED AS FINE: none read says so, and some unread are counted apart from the fine', () => {
+  /* An empty record reads every sign `none`, and the line said "All 16 signs are fine, or not read yet.", read as fine. */
+  const unread = (n: number) => Array.from({ length: n }, (_, i) => ({ sign: `unread-${String(i)}`, state: 'none', said: 'Nothing has been filed for this sign yet.' }));
+  assert.equal(signLines(readSigns(unread(16)))[0], 'No sign has been read yet.');
+  assert.equal(signLines(readSigns(unread(1)))[0], 'The one sign has not been read yet.');
+  assert.equal(signLines(readSigns([SIGNS[3], ...unread(14), { ...SIGNS[3], sign: 'runs-true' }]))[0], '2 signs are fine. 14 have not been read yet.');
+  assert.equal(signLines(readSigns([SIGNS[3], SIGNS[4]]))[0], '1 sign is fine. 1 has not been read yet.');
+  assert.equal(signLines(readSigns([SIGNS[3], { ...SIGNS[3], sign: 'runs-true' }]))[0], 'All 2 signs are fine.');
+  /* A red sign leads, whatever else is unread. */
+  assert.equal(signLines(readSigns([SIGNS[0], ...unread(3)]))[0], '1 of 4 signs need a look.');
+  for (const n of [1, 2, 16]) for (const line of signLines(readSigns(unread(n)))) assert.doesNotMatch(line, /\bfine\b/u, `${line} calls an unread sign fine`);
+});
+
 /** A host whose `signs` answers `value`, or refuses with `refusal`, keeping every request it was sent. */
 async function host(t: { after: (fn: () => Promise<void>) => void }, answer: { value?: unknown; refusal?: { code: string; fix: string }; status?: number }) {
   const seen: { method: string; verb: string | undefined; query: string; headers: IncomingHttpHeaders }[] = [];
@@ -143,6 +156,30 @@ test('BRAINDOG SIGNS IS ONE READ: a GET of signs and nothing else, naming no run
   assert.equal(await signsCommand(['--apply'], two), 1);
   assert.match(two.said[0]!, /^braindog signs takes/u);
   assert.equal(h.seen.length, 1);
+});
+
+test('A RED SIGN EXITS 0 ON PURPOSE, and --strict exits 2 on any red and says why, for a script', async (t) => {
+  const reds = await host(t, { value: { signs: SIGNS } });
+  const plain = io(reds.base);
+  assert.equal(await signsCommand([], plain), 0, 'a red sign is the answer, not a failed read');
+  assert.deepEqual(plain.said, []);
+  const strict = io(reds.base);
+  assert.equal(await signsCommand(['--strict'], strict), 2);
+  assert.equal(strict.lines[0], '3 of 5 signs need a look.', 'the signs are still printed');
+  assert.deepEqual(strict.said, ['3 signs need a look, so this ends with exit 2 as --strict asks.']);
+  for (const line of strict.said) assert.doesNotMatch(line, /—/u);
+
+  /* No red, or nothing read yet, is not a failure even under --strict. */
+  const calm = await host(t, { value: { signs: [SIGNS[3], SIGNS[4]] } });
+  const quiet = io(calm.base);
+  assert.equal(await signsCommand(['--strict'], quiet), 0);
+  assert.deepEqual(quiet.said, []);
+  assert.equal(quiet.lines[0], '1 sign is fine. 1 has not been read yet.');
+
+  /* A refusal and an unreachable host keep their own codes under --strict. */
+  const narrow = await host(t, { refusal: { code: 'FORBIDDEN', fix: 'The signs are about the whole record, and this caller is held to part of it.' } });
+  assert.equal(await signsCommand(['--strict'], io(narrow.base)), 1);
+  assert.equal(await signsCommand(['--strict'], io('http://127.0.0.1:9')), 3);
 });
 
 test('BRAINDOG SIGNS SAYS PLAINLY why the record would not read them: a record older than the command, or the record’s own reason', async (t) => {

@@ -105,6 +105,15 @@ export function homeOf(said: unknown, setting: unknown = null, held: Iterable<st
 export const learnHome = (currency: string | null, setting: unknown = null, held: Iterable<string> = []): string | null =>
   (home = homeOf(currency, setting, held));
 
+/**
+ * Every currency the record's money is in, as its `boot` said them (`money`, else the implied `held`), kept by
+ * `layoutOf` beside the home currency so a preset that quotes them (`presetOf`'s rates feed) names them all, sorted.
+ */
+let moneyHeld: string[] = [];
+export const moneyCurrencies = (): string[] => moneyHeld;
+export const learnMoney = (codes: Iterable<string>): string[] =>
+  (moneyHeld = [...new Set([...codes].filter((c) => CODE.test(c)))].sort());
+
 /* ── values ──────────────────────────────────────────────────────────────── */
 
 /** WHAT A REGISTER SAYS A FIELD IS. Exported because the live path has to ask the same question
@@ -680,8 +689,7 @@ export function unansweredBy(register: string, held: Fields): { id: string; labe
 /* ── filters and order ────────────────────────────────────────────────────── */
 
 /* `Filter` LIVES IN `schema.ts` NOW, and is re-exported here so every existing caller is unchanged.
-   It is a SHAPE rather than a reader, and `fixtures/sample.ts` needs it to declare a saved view — which it
-   cannot import from this file, because this file imports it. */
+   It is a SHAPE rather than a reader, so it sits beside the declarations it filters. */
 export type { Filter };
 
 /**

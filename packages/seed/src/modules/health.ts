@@ -1,0 +1,111 @@
+/**
+ * Health: the record's vital signs, as one page every record can open (PRF-A05 job 5, DIRECTION §40 "says so in the app
+ * when one fails").
+ *
+ * DRAWN FROM THREE NAMES THE KERNEL ANSWERS AND NOTHING ELSE: the built-in page source `signs` (each vital sign with its
+ * name, its state and its sentence, `packages/kernel/src/pages.ts`) and the built-in figures `signs-red` and `green-days`
+ * (`packages/kernel/src/built-in-figures.ts`). No list, no figure of its own, so the page leans on no register and every
+ * record that holds it can draw it, whatever else it installs. Nothing here knows whose record it is (DIRECTION §27).
+ *
+ * IN PEOPLE, BECAUSE PEOPLE IS THE ADD-ON NEARLY EVERY RECORD HOLDS: onboarding installs it for the person's own row even
+ * where the use case names no module (`usecases/student.ts`). Which add-on every record holds is still an open question
+ * of the scope (`loop/scope/area-proof-a.md`, its unknowns), and moving the page is one `pack:` and a version.
+ *
+ * ONLY BLOCK KINDS THAT EXIST, AND NO LOOK OF ITS OWN (the unit's critic, rule 7): a lead sentence and three groups of
+ * cards. The strip of the last seven days, and anything drawn only for Health, wait for a board he has said yes to.
+ *
+ * NOT ON THE RAIL. The rail is the seven places (DIRECTION §39); Health is reached from the health sentence in Settings,
+ * whose red signs link here (`apps/web/src/routes/settings/[area]/health.ts`), and from the page resource agents read.
+ *
+ * NOT TODAY'S LINE EITHER. One line on Today while a sign is red, gated on `signs-red` above 0, is the other half of the
+ * job, held back until the experience area's board for Today carries it (`area-proof-a.md`, PRF-A05).
+ */
+
+import type { SeedPage } from './base.ts';
+
+/** The one source and the two figures the page reads, by the names the kernel answers them under. */
+export const HEALTH_SOURCE = 'signs';
+export const HEALTH_FIGURES = ['signs-red', 'green-days'] as const;
+
+/**
+ * A group of signs in one state: the state's word as the heading, and under it each sign by its name with its sentence.
+ *
+ * THE STATE IS A WORD, AND RED A WORD AND A MARK (DIRECTION §42). The source hands a sign's state as `green`, `red` or
+ * `none`, which is the machine's word and not a person's, so each state is its own block with a heading that says it
+ * ("Needs a look", "Alive", "Not read yet") and a glyph beside the heading. A red sign is never told by colour alone.
+ *
+ * `none` IS NEVER GREEN. A sign with nothing to judge by yet is under Not read yet, with its dashed circle, and never
+ * under Alive: a record nobody has read is not well, it is unread.
+ *
+ * NO `order:` AND NO `limit:`. The signs come in the kernel's own order, the same signs in the same places on every
+ * record, and every one in the group is drawn. A group holding no sign is not drawn, so a record with nothing red shows
+ * no empty Needs a look.
+ */
+const group = (state: 'red' | 'green' | 'none', heading: string, icon: string): Record<string, unknown> => ({
+  kind: 'cards',
+  heading,
+  icon,
+  span: 12,
+  source: HEALTH_SOURCE,
+  where: `state is ${state}`,
+  columns: [
+    { field: 'name', as: 'title' },
+    /* THE SIGN'S OWN SENTENCE, under its name in the quieter voice, since it says what was read and when. */
+    { field: 'said', as: 'reply' },
+  ],
+});
+
+export const HEALTH_PAGES: Record<string, SeedPage> = {
+  health: {
+    page: 'health',
+    title: 'Health',
+    icon: 'heart-pulse',
+    pack: 'people',
+    blocks: [
+      /* THE PAGE'S ONE LINE, from `signs-red`. Three notes on the one figure, so exactly one of them draws, and the count
+         reads as a person says it: "One thing ... needs", "3 things ... need". `signs-red` reads nothing at all while no
+         sign has anything to judge by, so a record nobody has read yet opens on no line rather than on "alive". */
+      {
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'signs-red', is: 0 },
+        body: 'Everything on this record is alive.',
+      },
+      {
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'signs-red', is: 1 },
+        body: 'One thing on this record needs a look.',
+      },
+      {
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'signs-red', gt: 1 },
+        body: '{{signs-red}} things on this record need a look.',
+      },
+      /* RED FIRST, since that is what the page is opened for, then what is alive, then what has not been read. */
+      group('red', 'Needs a look', 'octagon-alert'),
+      group('green', 'Alive', 'circle-check'),
+      group('none', 'Not read yet', 'circle-dashed'),
+      /* HOW LONG IT HAS HELD, from `green-days`: days running, to yesterday, with a sign green and none red. Drawn only
+         while there is a run to speak of. Said up to yesterday, because today is not over and a sign red this morning
+         does not undo the days before it. TWO NOTES AND NOT `day(s)`: only a lead note has its `(s)` settled
+         (`apps/web/src/lib/record/page-live.ts`, `leadOf`), so a plain note would print "4 day(s)" as written. */
+      {
+        kind: 'note',
+        span: 12,
+        when: { metric: 'green-days', is: 1 },
+        body: 'Nothing was red yesterday.',
+      },
+      {
+        kind: 'note',
+        span: 12,
+        when: { metric: 'green-days', gt: 1 },
+        body: 'Nothing has been red for {{green-days}} days, up to yesterday.',
+      },
+    ],
+  },
+};

@@ -13,13 +13,22 @@
 <script lang="ts">
   import { inline, MISSING, type Block, type RenderOptions } from '../../src/index.ts';
   import { rowsCell } from '../../src/timeline.ts';
+  import { drawnRows, emptied } from '../../src/html.ts';
   import Text from '../Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
+
+  /* A ROW WITH NO VALUE IS NOT DRAWN (`drawnRows`), as `toHTML` leaves it out: "Keeping it alive: tamsin.me" over a dash
+     said a name and nothing. What is left with none says the host's `empty:` line, or nothing (`emptied`). */
+  const rows = $derived(drawnRows(block, opts).map(({ row }) => row));
+  const left = $derived(emptied(block, opts));
 </script>
 
+{#if typeof left === 'string'}
+  <p class="block-empty">{left}</p>
+{:else if left === undefined}
 <div class="rows">
-  {#each block.rows as row}
+  {#each rows as row}
     <!-- A day this year drops its year and money moving by nothing is not said (`rowsCell`), as `html.ts` draws it: an
          empty value is `MISSING`, a value said as nothing is a known nothing and draws no mark. -->
     {@const value = row.cells[1] ? rowsCell(row.cells[1], opts.now) : undefined}
@@ -32,3 +41,4 @@
     </div>
   {/each}
 </div>
+{/if}

@@ -20,8 +20,9 @@
  * `packages/record/src/directory.ts` holds a record at its allowance until the month turns. So the site says only that
  * they are coming later, and `PACKS` is empty until the checkout sells one.
  *
- * HELD TO THE CODE THAT CHARGES AND METERS, by `plans.test.ts`: each paid plan's name and price to `HOSTED_PLANS` in
- * `apps/worker/src/billing.ts`, what the checkout sells, and Free's to `FREE_PLAN` there, which it sells nothing as;
+ * HELD TO THE CODE THAT CHARGES AND METERS, by `plans.test.ts`: each plan's name and price to `PLAN_TABLE` in
+ * `packages/record/src/plans.ts` (`@braindog/record/plans`), read through `planName`/`planPrice` in
+ * `apps/worker/src/billing.ts`, whose `HOSTED_PLANS` are what the checkout sells and `FREE_PLAN` what it sells nothing as;
  * every plan's runs, requests, gigabytes and hours to the Directory's `ALLOWANCE` in
  * `packages/record/src/directory.ts`, what the Worker holds a record to; Cloud's credits to `ASK_CAP_DEFAULT` and
  * Free's to `ASK_CAP_FREE` in `packages/slash/src/types.ts`. A figure changed here and not there turns that test red,

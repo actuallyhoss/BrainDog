@@ -1272,6 +1272,14 @@
     border-block-start: 1px solid var(--rule);
   }
 
+  /* A BLOCK LEFT WITH NOTHING SAYS ITS `empty:` LINE in place of its parts (`emptied` in packages/render/src/html.ts,
+     drawn the same by both drawers), set as `.inputs-empty` is: one quiet line at the measure. */
+  .block-empty {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
   /* A ROW THAT ARRIVED WHILE THE READER LOOKED: an agent's task, a colleague's row, a line captured on another tab.
 
      A TINT UNDER THE ROW THAT FADES, AND NOTHING THAT MOVES. The rows already on screen stay exactly where they were

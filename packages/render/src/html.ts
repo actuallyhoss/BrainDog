@@ -26,11 +26,11 @@ import { kindSpec } from './kind-spec.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, counted, type AgentMark, initialOf, isDimmed, isQuiet, markOf, ringDash, ringOf, runFaceOf, runMarkOf, trendOf, type RunCell, type RunFace } from './cards.ts';
+import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, trendOf, type RunCell, type RunFace } from './cards.ts';
 import { FEED_EARLIER, feedBurst, feedCasedNodes, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
 import { QUEUE_DOES, QUEUE_REASONS, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueReasoned, queueSuggested, queueWays, type QueueShows } from './queue.ts';
-import { PATH_DONE, PATH_NEXT, pathMore, pathPlan } from './path.ts';
+import { PATH_DONE, PATH_NEXT, pathMore, pathPlan, unvalued } from './path.ts';
 import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
@@ -140,7 +140,24 @@ export type RenderOptions = InlineOptions & {
    * line's actor draws the mark in place of a letter. Absent, or answering `null`, a person keeps their initial.
    */
   agentMark?: (name: string) => AgentMark | null;
+  /**
+   * What a block left with nothing says, as the host's page answers it: the block's `empty:` line where the block is
+   * the page's lead, `keep` (`EMPTY_KEEP`) where its author wrote `empty: keep`, or `null` for nothing at all. A READ.
+   *
+   * A CHIP, A `spec` ROW, A FIGURE CELL OR A STONE WHOSE VALUE IS MISSING IS NOT DRAWN (`unvalued`), in both drawers,
+   * for every reader: his project pages drew chips that were a name and a dash, and a row "Keeping it alive: tamsin.me"
+   * over a dash (DIRECTION §35, "An empty or unused part is not drawn"). A block that has nothing left says this line
+   * where there is one and is not drawn where there is none. Absent, which is a write-up, an export and the mirror,
+   * there is never a line: the page's lead is the page's to name, never the renderer's.
+   *
+   * `keep` is the way back for an author who wants the nought: a ledger wants its blanks, and every part is drawn as it
+   * was, a dash where the value is missing.
+   */
+  empty?: (b: Block) => string | null;
 };
+
+/** The `empty:` answer that keeps every part, the missing ones as a dash (`RenderOptions.empty`). */
+export const EMPTY_KEEP = 'keep';
 
 /** An address as the host serves it (`RenderOptions.href`). */
 export const hrefFor = (o: { href?: RenderOptions['href'] | undefined }, path: string): string => (o.href ? o.href(path) : path);
@@ -373,6 +390,53 @@ function numbersFold(kind: string, heads: readonly string[], rows: readonly (rea
     .join('')}</tbody></table></div>`;
 }
 
+/* ── parts with no value ──────────────────────────────────────────────────── */
+
+/** Whether the host asked this block to keep the parts with no value, each as a dash (`empty: keep`). */
+export const keepsNought = (b: Block, o: RenderOptions): boolean => o.empty?.(b) === EMPTY_KEEP;
+
+/** The grid kinds with a drawer of their own, which this rule does not read: a card, a day and a picture are not figures. */
+const OWN_GRID = new Set(['cards', 'heat', 'gallery', 'board']);
+
+/**
+ * The rows a chip run, a `spec` and a figure grid draw, each with its place in the block, which `cellHref` is keyed by.
+ *
+ * A CHIP NEEDS ITS FIGURE AND ITS WORD, a `spec` row and a figure cell their value (`unvalued`): the one that has none
+ * is not drawn. Where the block keeps its noughts every row is drawn as it was, and a chip still needs both cells
+ * written, since a chip with no word is a rebus whatever the author asked (05 §7.4). Every other block draws every row.
+ */
+export function drawnRows(b: Block, o: RenderOptions): { row: Row; at: number }[] {
+  const all = b.rows.map((row, at) => ({ row, at }));
+  const keep = keepsNought(b, o);
+  const primitive = kindSpec(b.kind, o.kinds)?.primitive;
+  if (primitive === 'inline')
+    return all.filter(({ row: r }) => (keep ? (r.cells[1] ?? '') !== '' && (r.cells[2] ?? '') !== '' : !unvalued(r.cells[1]) && !unvalued(r.cells[2])));
+  if (keep) return all;
+  if ((primitive === 'grid' && !OWN_GRID.has(b.kind)) || (primitive === 'rows' && b.kind !== 'inputs')) return all.filter(({ row: r }) => !unvalued(r.cells[1]));
+  return all;
+}
+
+/**
+ * What a chip run, a `spec`, a figure grid or a path says once its parts with no value are gone: `undefined` while a
+ * part is left (or it keeps its noughts, or it is a block this rule does not read), the host's `empty:` line where the
+ * block is the page's lead (`RenderOptions.empty`), and `null` where nothing is drawn, not even the block's frame.
+ */
+export function emptied(b: Block, o: RenderOptions): string | null | undefined {
+  const primitive = kindSpec(b.kind, o.kinds)?.primitive;
+  const path = b.kind === 'steps' && b.form === 'path';
+  const ruled = path || primitive === 'inline' || (primitive === 'grid' && !OWN_GRID.has(b.kind)) || (primitive === 'rows' && b.kind !== 'inputs');
+  if (!ruled || keepsNought(b, o)) return undefined;
+  if (path) {
+    const plan = pathPlan(b.rows);
+    if (plan.stones.length > 0 || plan.more > 0) return undefined;
+  } else if (drawnRows(b, o).length > 0) return undefined;
+  const line = o.empty?.(b)?.trim();
+  return line ? line : null;
+}
+
+/** A block's `empty:` line, drawn in place of its parts. `svelte/p/*` and `svelte/Path.svelte` draw the same. */
+const emptyLine = (line: string): string => `<p class="block-empty">${escape(line)}</p>`;
+
 function grid(b: Block, o: RenderOptions): string {
   if (b.kind === 'cards') return cards(b, o);
   if (b.kind === 'heat') return heat(b, o);
@@ -395,7 +459,10 @@ function grid(b: Block, o: RenderOptions): string {
   // A layout primitive must be TOLD how many things it contains. It must never infer the count from
   // the space available — three tiles once drew seven auto-fit tracks and a 550px slab of border
   // colour, and every selector was correct (05 §4).
-  const body = b.rows
+  /* A FIGURE WITH NO VALUE IS NOT DRAWN (`drawnRows`), and the tiles are counted after: "Costs a year" over a dash
+     was a tile that said nothing, and a fourth track held its place. */
+  const shown = drawnRows(b, o).map(({ row }) => row);
+  const body = shown
     .map(
       (r) =>
         `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num"${fitAttrs(r.cells[1] && headlineFigure(r.cells[1]))}>${
@@ -406,15 +473,17 @@ function grid(b: Block, o: RenderOptions): string {
         }</span>${trendSvg('cell-trend', r.cells[0] ?? '', r.cells[3] ?? '', o)}${cell('cell-note', r.cells[2] && symbolText(r.cells[2], true), o)}${toneGlyph(r.tone)}</div>`,
     )
     .join('');
-  return `<div class="grid" style="--cells:${b.rows.length}">${body}</div>`;
+  return `<div class="grid" style="--cells:${shown.length}">${body}</div>`;
 }
 
 function rows(b: Block, o: RenderOptions): string {
   if (b.kind === 'inputs') return inputs(b, o);
   /* A DAY THIS YEAR DROPS ITS YEAR, AND MONEY MOVING BY NOTHING IS NOT SAID (`rowsCell`). An empty value is still
      `MISSING`; a value said as nothing is a known nothing, and draws no mark at all. */
-  const body = b.rows
-    .map((r) => {
+  /* A ROW WITH NO VALUE IS NOT DRAWN (`drawnRows`): "Keeping it alive: tamsin.me" over a dash said a name and nothing.
+     Where the block keeps its noughts, a blank value is `MISSING` again. */
+  const body = drawnRows(b, o)
+    .map(({ row: r }) => {
       const value = r.cells[1] ? rowsCell(r.cells[1], o.now) : undefined;
       return `<div class="row">${cell('row-label', r.cells[0], o)}<span class="row-value num">${
         value === undefined ? MISSING : value ? renderInline(inline(value, o), o) : ''
@@ -506,10 +575,11 @@ function proportional(b: Block, o: RenderOptions): string {
 function inlinePrimitive(b: Block, o: RenderOptions): string {
   // A chips row needs a number AND a word, or it is dropped: an icon alone is a rebus, and a colour
   // alone is unreadable to a tenth of readers. The columns do not move (05 §7.4).
-  const body = b.rows
-    .filter((r) => (r.cells[1] ?? '') !== '' && (r.cells[2] ?? '') !== '')
+  // A chip whose figure is the dash a reader prints for null is dropped as well (`drawnRows`): his notes drew chips
+  // that were a name and a dash.
+  const body = drawnRows(b, o)
     .map(
-      (r) =>
+      ({ row: r }) =>
         `<span class="pill"${toneAttrs(r.tone)}><span class="pill-glyph" data-glyph="${escape(r.cells[0] ?? '')}" aria-hidden="true">${slotArt(r.cells[0] ?? '', o)}</span><span class="pill-figure num">${escape(r.cells[1] ?? '')}</span><span class="pill-word">${escape(valueWord(r.cells[2] ?? ''))}</span>${toneGlyph(r.tone)}</span>`,
     )
     .join('');
@@ -568,7 +638,8 @@ function list(b: Block, o: RenderOptions): string {
  * host drawing every stone can still show which ones the view holds.
  */
 function path(b: Block, o: RenderOptions): string {
-  const plan = pathPlan(b.rows);
+  /* A STONE WITH NO STEP IS NOT DRAWN, unless the block keeps its noughts (`pathPlan`). */
+  const plan = pathPlan(b.rows, keepsNought(b, o));
   const short = pathShort(plan);
   const stones = short ? plan.stones.filter((s) => s.short) : plan.stones;
   const body = stones
@@ -881,12 +952,17 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
 
   const body = rows
     .map((r, n) => {
-      const mark = L.mark >= 0 ? markOf(said(r, L.mark)) : null;
+      /* A MARK THAT NAMES A PICTURE IS THE PICTURE, and one that names none is the title's letter, never the first letter
+         of the picture's name ("C Crumb.gg"); `Cards.svelte` draws the same slot (`markOf`, `markGlyphOf`). */
+      const mark = L.mark >= 0 ? markOf(said(r, L.mark), said(r, L.name)) : null;
+      const markGlyph = markGlyphOf(mark);
       const run = L.name >= 0 || L.who >= 0 ? runFaceOf(said(r, L.nameIsWho ? L.name : L.who), o.runs?.[n], isQuiet(L, r.cells)) : null;
       const face = L.nameIsWho ? initialOf(said(r, L.name)) : null;
       const nameMark = L.nameIsWho ? markFor(o, said(r, L.name)) : null;
       const lead = mark
-        ? `<span class="cards-mark" aria-hidden="true">${escape(mark)}</span>`
+        ? `<span class="cards-mark"${markGlyph ? ` data-glyph="${escape(markGlyph)}"` : ''} aria-hidden="true">${
+            markGlyph ? ((d) => (d ? glyphSvg(d, ' width="100%" height="100%"') : ''))(glyphPath(markGlyph, o)) : escape(mark)
+          }</span>`
         : L.nameIsWho && run
           ? runFaceHtml(run, o)
           : nameMark
@@ -1737,7 +1813,13 @@ function block(b: Block, o: RenderOptions): string {
     ? `<figcaption class="block-head"${toneAttrs(b.tone)}>${toneGlyph(b.tone)}${renderInline(inline(b.heading ?? '', o), o)}</figcaption>`
     : '';
   const form = b.form ? ` data-form="${escape(b.form)}"` : '';
-  return `<figure class="block block-${spec.primitive}" data-kind="${b.kind}"${form} data-primitive="${spec.primitive}"${toneAttrs(b.tone)}>${cap}${draw(b as never, o)}</figure>`;
+  /* A BLOCK LEFT WITH NOTHING ONCE ITS PARTS WITH NO VALUE ARE GONE says the host's `empty:` line in place of them, or
+     is not drawn at all, frame and caption with it (`emptied`). */
+  const left = emptied(b, o);
+  if (left === null) return '';
+  return `<figure class="block block-${spec.primitive}" data-kind="${b.kind}"${form} data-primitive="${spec.primitive}"${toneAttrs(b.tone)}>${cap}${
+    left === undefined ? draw(b as never, o) : emptyLine(left)
+  }</figure>`;
 }
 
 /**
@@ -1812,9 +1894,10 @@ export function toHTML(segments: Segment[], opts: RenderOptions = {}): string {
   }
 }
 
-/** The accessible name of a drawn figure reads as a sentence, not as three floating numbers (13 §7). */
+/** The accessible name of a drawn figure reads as a sentence, not as three floating numbers (13 §7). A part that is
+    not drawn for having no value (`drawnRows`) is not said either. */
 export const describe = (b: Block, o: RenderOptions = {}): string =>
-  [b.heading, ...b.rows.map((r) => r.cells.filter(Boolean).map((c) => plain(inline(c, o))).join(', '))]
+  [b.heading, ...drawnRows(b, o).map(({ row: r }) => r.cells.filter(Boolean).map((c) => plain(inline(c, o))).join(', '))]
     .filter(Boolean)
     .join('. ');
 

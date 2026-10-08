@@ -121,9 +121,16 @@ const CASES = [
      fixture is here to end. */
   { gate: 'nul-bytes-backspace', run: 'nul-bytes', expect: /a raw BACKSPACE at offset/, findings: 1 },
 
-  /* A TEST FILE NOTHING RUNS, AND A SKIP THAT GIVES NO REASON: `orphan-tests`' two findings, one fixture each. */
-  { gate: 'orphan-tests', expect: /is run by nothing/, findings: 1 },
+  /* A TEST FILE NOTHING RUNS, AND A SKIP THAT GIVES NO REASON: `orphan-tests`' two findings, one fixture each.
+     AND AUDIT 35'S FOUR BLIND SPOTS, each a seed of its own that the gate passed before. `orphan-tests` seeds three
+     names, a test beside its source, a `.spec.ts` and a `-test.mjs`, and keeps a program called `pack-test.ts` as its
+     decoy. `-empty` seeds a helper named as a test that registers none. `-if` seeds a step and a job under `if: false`
+     and a workspace whose script no workflow runs, beside a `--filter`, the root's `pnpm test` and a condition that may
+     be true. Each count is of lines naming `seeded`, so losing any one rule turns its fixture's count wrong. */
+  { gate: 'orphan-tests', expect: /is run by nothing/, findings: 3 },
   { gate: 'orphan-tests-skip', run: 'orphan-tests', expect: /which gives no reason/, findings: 1 },
+  { gate: 'orphan-tests-empty', run: 'orphan-tests', expect: /registers no test/, findings: 1 },
+  { gate: 'orphan-tests-if', run: 'orphan-tests', expect: /no workflow runs that script|under `if: false`/, findings: 3 },
 
   /* THE FOUR HALVES OF `graph`, ONE FIXTURE EACH. A gate with three checks and one fixture is a
      gate with one check under test and two that have never been asked to fire, and this one's
@@ -366,6 +373,13 @@ const CASES = [
   { gate: 'em-dash-empty', run: 'em-dash', skip: true, expect: /no prose was read/, findings: 1 },
   { gate: 'secret-grep-empty', run: 'secret-grep', skip: true, expect: /no file was read/, findings: 1 },
   { gate: 'graph-empty', run: 'graph', skip: true, expect: /nothing was checked/, findings: 1 },
+
+  /* THIS BATCH'S THREE NEW GATES, one seed each and nothing else red beside it. `one-clock`: a reader working out a
+     run's state from `last_seen` and the clock. `no-sample`: the test fixture's words in the built app. `public-clean`:
+     a changelog at the root, which is the site's. */
+  { gate: 'one-clock', expect: /compares a run's last_seen with the clock/, findings: 1, total: 1 },
+  { gate: 'no-sample', expect: /a string of the test fixture/, findings: 1, total: 1 },
+  { gate: 'public-clean', expect: /the changelog is the site's/, findings: 1, total: 1 },
 ];
 
 /** How many lines of a gate's output name the seeded file. One per seeded violation. */

@@ -15,7 +15,10 @@
  * up here. A preset is a draft with some boxes filled; it installs nothing on its own.
  */
 
+import { fillRates, RATES_CURRENCIES_MOST, ratesSpecFor } from '../../../../../packs/rates-poll/fill.ts';
+import RATES_FILE from '../../../../../packs/rates-poll/rates-poll.pack.json' with { type: 'json' };
 import type { Call } from '../ui/webhook-doors.ts';
+import { homeCurrency } from './api.ts';
 import { forget } from './boot-live.ts';
 import { REGISTERS } from './held.ts';
 import { listName } from './names.ts';
@@ -63,7 +66,18 @@ export type ActionDraft = {
   /** On a pull, where the rows are in each page of the answer. */
   rows: string;
   map: MapLine[];
+  /**
+   * What an add-on's own filler already made, filed in place of `map` while the draft is still the poll it made.
+   *
+   * THE RATES FEED IS ONE POLL WITH A ROW A CURRENCY, and `map` is one row, so the sheet cannot say it line by line.
+   * `fillRates` (`packs/rates-poll/fill.ts`) is the only maker of a rates feed, so what it made is carried here whole and
+   * the boxes keep the rest: the address, how often and the key are still the person's to change.
+   */
+  filled?: Filled;
 };
+
+/** A declaration an add-on's filler made: its ingest name, its maps, the list they write and what it does, in words. */
+export type Filled = { ingest: string; register: string; maps: Record<string, unknown>[]; said: string };
 
 /** The words of both sheets, beside the calls they describe, as `fieldWords` is in `field-write.ts`. */
 export const actionWords = {
@@ -125,6 +139,11 @@ export const actionWords = {
   saved: (name: string) => `${name} is saved. It runs on its clock from now on.`,
   doorMade: (name: string) => `${name} is ready. Give the address below to whatever posts to it.`,
   changed: 'Something changed while this was open. Try again.',
+  ratesName: 'Exchange rates',
+  /* THE PROPOSAL NAMES THE HOST AND HOW OFTEN, because a call to another server is the owner's to approve and the plan
+     line he approves names nothing else (`packs/rates-poll/fill.ts`). */
+  ratesSaid: (host: string, base: string, quoted: readonly string[]) =>
+    `Asks ${host} once a day what one ${base} is worth in ${quoted.length < 2 ? quoted.join('') : `${quoted.slice(0, -1).join(', ')} and ${quoted.at(-1)}`}, and writes ${quoted.length < 2 ? 'it' : 'each'} to Exchange rates.`,
 } as const;
 
 /** An empty draft of either kind. */
@@ -148,15 +167,8 @@ export const blankDraft = (kind: ActionKind): ActionDraft => ({
  * `numbers` AND `watch` ARE THE FOUNDER HOME'S TWO BUTTONS, both writing to `datapoints`, which is the list its
  * numbers blocks read; `name` and `value` are that list's fields.
  *
- * `rates` IS "SET UP EXCHANGE RATES" ON MONEY'S PAGE, which was a form written for one pack. It reads one
- * currency a day into `fx`, whose fields say that one `currency` is worth `rate` of `base`: here one US dollar in the
- * currency the person names twice, once as the base and once at the end of `rates.`. ONE CURRENCY AN ACTION, so a
- * record gains a currency by opening the preset again, which the old form could not do once its pack was installed.
- * THE NAME IS LEFT FOR THE PERSON because an action is filed under the name it is given, and a second currency filed
- * under the first one's name would replace it rather than join it.
- * THE ADDRESS IS FRANKFURTER'S because its answer says its day as `2026-09-16`, which a day field reads as written;
- * open.er-api quotes more currencies, but says its day in a form the sheet cannot yet map. It is an address the person
- * can change, and needs no key.
+ * `rates` IS "SET UP EXCHANGE RATES" ON MONEY'S PAGE, and is not in this table: it is made from the record each time
+ * the sheet opens (`ratesPreset`), because what it fetches is the record's own currencies.
  */
 export const PRESETS: Record<string, ActionDraft> = {
   numbers: {
@@ -178,29 +190,59 @@ export const PRESETS: Record<string, ActionDraft> = {
       { field: 'value', from: 'answer', text: '' },
     ],
   },
-  rates: {
-    ...blankDraft('action'),
-    channel: 'poll',
-    url: 'https://api.frankfurter.app/latest?from=USD',
-    every: '1d',
-    register: 'fx',
-    map: [
-      { field: 'currency', from: 'fixed', text: 'USD' },
-      { field: 'base', from: 'fixed', text: '' },
-      { field: 'rate', from: 'answer', text: 'rates.' },
-      { field: 'as_of', from: 'answer', text: 'date' },
-      { field: 'source', from: 'fixed', text: 'api.frankfurter.app' },
-    ],
-  },
 };
+
+/** What the record holds that a preset is made from: the currencies its money is written in, and its home one. */
+export type Held = { currencies: Iterable<string>; home: string | null };
+
+/**
+ * The exchange rates action for what a record holds, or `null` when it would fetch for nobody.
+ *
+ * MADE BY `fillRates(template, ratesSpecFor(...))` AND BY NOTHING ELSE. It was a draft of its own here: one action a
+ * currency, at an address whose own documents say it quotes no Egyptian pound (`docs/08` 2.5), with the currency typed
+ * twice by the person. Now the add-on file is filled as Browse would fill it, from the record's currencies with the
+ * home one as the base, and its one poll becomes the draft: one action for every currency, under the file's own ingest
+ * name, so opening it again after a currency is added replaces the poll instead of joining it.
+ *
+ * NOTHING CALLS OUT UNTIL THE OWNER SAYS YES. This is a draft; the sheet files it and the record asks for the accept,
+ * which only the owner can give for a call to another server. Until then figures keep the rate they have.
+ */
+export function ratesPreset(held: Held): ActionDraft | null {
+  const spec = ratesSpecFor(held.currencies, held.home);
+  if (spec === null) return null;
+  /* MORE CURRENCIES THAN ONE POLL FILLS (`RATES_CURRENCIES_MOST`) IS REFUSED BY THE FILLER, and a throw here would take
+     the sheet down as it opens; the sheet opens blank instead, and the person drafts the feed by hand. */
+  if (spec.rates.length > RATES_CURRENCIES_MOST) return null;
+  const doc = fillRates(RATES_FILE as Record<string, unknown>, spec);
+  const poll = (doc.declarations as Record<string, unknown>[])[0]!;
+  const register = String((poll.writes as { register?: unknown } | undefined)?.register ?? '');
+  return {
+    ...blankDraft('action'),
+    name: actionWords.ratesName,
+    channel: 'poll',
+    url: String(poll.url),
+    every: EVERY.find((e) => e === poll.every) ?? '1d',
+    register,
+    filled: {
+      ingest: String(poll.ingest),
+      register,
+      maps: structuredClone(poll.map as Record<string, unknown>[]),
+      said: actionWords.ratesSaid(new URL(spec.url).host, spec.base, spec.rates.map((r) => r.currency)),
+    },
+  };
+}
 
 /**
  * The draft a sheet opens with: the preset's, when the id names one of this kind, and a blank one otherwise.
  *
  * `Object.hasOwn`, because the id comes from an address anybody can type, and `?preset=constructor` is not a preset.
  * A COPY, so a sheet typing into its draft never writes into `PRESETS`.
+ *
+ * `held` IS WHAT THE RATES PRESET IS MADE FROM. A caller that knows the record's currencies hands them in; without them
+ * the home currency alone is one currency, which makes no feed, and the sheet opens blank rather than at a guess.
  */
-export function presetOf(kind: ActionKind, id: string | null | undefined): ActionDraft {
+export function presetOf(kind: ActionKind, id: string | null | undefined, held: Held = { currencies: [], home: homeCurrency() }): ActionDraft {
+  if (id === 'rates') return (kind === 'action' && ratesPreset(held)) || blankDraft(kind);
   const found = id && Object.hasOwn(PRESETS, id) ? PRESETS[id] : undefined;
   if (!found || found.kind !== kind) return blankDraft(kind);
   return { ...found, map: found.map.map((l) => ({ ...l })) };
@@ -272,14 +314,21 @@ function mapOf(draft: ActionDraft): Record<string, unknown> | null {
  *
  * `taken` IS EVERY INGEST ID THE RECORD ALREADY DECLARES, bare (as `doors()` and `actions()` answer it, never
  * prefixed `ingest.`), so a name that collides is refused here instead of silently replacing what it names.
+ *
+ * A FILLED DRAFT (`filled`, the rates feed) IS FILED UNDER ITS FILLER'S NAME WITH ITS FILLER'S MAPS, for as long as it
+ * is still the poll writing the list it was made for; a person who turns it into something else gets an ordinary draft.
+ * It replaces the poll already under that name, which is the point: the record's currencies changed, so its feed does.
  */
 export function declarationOf(draft: ActionDraft, taken?: ReadonlySet<string>): Built {
   const said = draft.name.trim();
-  const name = nameOf(said);
+  const made = draft.kind === 'action' && draft.channel === 'poll' && draft.filled && draft.register === draft.filled.register ? draft.filled : undefined;
+  const name = made ? made.ingest : nameOf(said);
   if (said === '' || name === null) return { ok: false, fix: actionWords.noName, at: 'name' };
-  if (taken?.has(name)) return { ok: false, fix: actionWords.nameTaken, at: 'name' };
+  if (!made && taken?.has(name)) return { ok: false, fix: actionWords.nameTaken, at: 'name' };
   const body: Record<string, unknown> = { ingest: name, description: said };
-  const map = mapOf(draft);
+  /* A COPY BY JSON AND NOT BY `structuredClone`: the sheet's draft is a `$state` proxy, which `structuredClone` refuses
+     to copy, so the save press threw before anything was filed. The maps are plain JSON either way. */
+  const map = made ? (JSON.parse(JSON.stringify(made.maps)) as Record<string, unknown>[]) : mapOf(draft);
   const writes = draft.register === '' ? null : { register: draft.register };
 
   if (draft.kind === 'door') {

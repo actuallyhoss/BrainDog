@@ -16,9 +16,9 @@
  * A DECLARED FIGURE OF THE SAME ID WINS. The record asks its declarations first and these second, so a pack that
  * declares its own `questions-open` is read as it declared it, and nothing here can take a name from a pack.
  *
- * NOTHING HERE IMPORTS THE REST OF THE KERNEL BUT TYPES AND `pull.ts`'s INTERVAL, because `metrics.ts` reads these and
- * `govern.ts`, which holds the queue, imports `metrics.ts`; `pull.ts` imports neither. The count is `govern.ts`'s
- * `countOpenQuestions` predicate written once more, and `test/built-in-figures.test.ts` holds the two to one answer.
+ * NOTHING HERE IMPORTS `govern.ts`, because `metrics.ts` reads these and `govern.ts`, which holds the queue, imports
+ * `metrics.ts`. The count is `govern.ts`'s `countOpenQuestions` predicate written once more, and
+ * `test/built-in-figures.test.ts` holds the two to one answer.
  *
  * AND FIVE SIGNS OF A LIVING RECORD (REC-A01), each of which names no list: how many messages wait on a person, how long
  * the oldest has waited, how long since anything came in, how many feeds are behind, and how many rules ran this week.
@@ -27,6 +27,16 @@
  * AND `runs-working`, HOW MANY AGENTS ARE AT WORK NOW (AGT-C02): the runs working with no working parent, by the one
  * clock in `presence.ts`, so a lead note that says "{{runs-working}} agents working" and the cards under it count the
  * same runs. One agent with four helpers is one.
+ *
+ * AND THE RECORD'S HEALTH IN TWO NUMBERS (PRF-A05): `signs-red`, how many vital signs (`signs.ts`) read red now, and
+ * `green-days`, how many days in a row, in the record's zone, the kept readings held none red. A Health page and a Today
+ * line read these by name. AND `rates-age-days` (REC-B02): how old the newest exchange rate is, so a page can say the
+ * rates stopped before a converted figure quietly goes stale. All three say nothing, never nought, with nothing to read.
+ *
+ * `signs.ts` IS NOT IMPORTED, only its types. It reaches `flow.ts` and `digest.ts`, which import `metrics.ts`, which
+ * imports this, and the loop that made broke the kernel's own load (`flow.ts` read a pattern before it was set). So the
+ * signs now come in through the reader, `EvalContext.signs`, as the rates come in through `fx`; the kept readings are
+ * read here from `sign_reading`, which only `signs.ts` writes, and only its closed list.
  */
 
 import type { Result, Sql } from '@braindog/ports';
@@ -106,6 +116,57 @@ const sign = (id: Sign, name: string, target: { lte: number } | { gte: number },
   ...more,
 });
 
+/* ── the record's health, over the vital signs (PRF-A05) and the rates (REC-B02) ── */
+
+/** The source the two figures over the vital signs read: the signs now, and the readings kept a row a day. */
+export const RECORD_VITALS = 'record.vitals';
+
+/** Which of the two a figure is: how many signs read red now, or how many days in a row held none red. */
+export type VitalsDecl = MetricDecl & { vitals: 'red-now' | 'green-days' };
+
+const SIGNS_RED: VitalsDecl = {
+  metric: 'signs-red',
+  name: 'Vital signs that read red',
+  source: RECORD_VITALS,
+  value: { count: 'id' },
+  target: { lte: 0 },
+  window: '1d',
+  compare: 'none',
+  format: 'int',
+  vitals: 'red-now',
+};
+
+const GREEN_DAYS: VitalsDecl = {
+  metric: 'green-days',
+  name: 'Days in a row with no sign red',
+  source: RECORD_VITALS,
+  value: { count: 'id' },
+  target: { gte: 1 },
+  window: '1d',
+  compare: 'none',
+  format: 'days',
+  vitals: 'green-days',
+};
+
+/** The source the rates' age reads: the rows of the list that declares `rates:`, through the reader's `fx`. */
+export const RECORD_RATES = 'record.rates';
+
+/**
+ * Old past a week, the age `fx.ts` marks a converted figure stale at (`RATE_STALE_DAYS`). WRITTEN AND NOT IMPORTED: this
+ * object is built as the file loads, and `fx.ts` reaches back here through `ingest.ts`, so importing it made loading
+ * `fx.ts` or `forecast.ts` first throw. `test/built-in-rates-age.test.ts` holds the two to one number.
+ */
+const RATES_AGE_DAYS: MetricDecl = {
+  metric: 'rates-age-days',
+  name: 'Days since the newest exchange rate',
+  source: RECORD_RATES,
+  value: { count: 'id' },
+  target: { lte: 7 },
+  window: '7d',
+  compare: 'none',
+  format: 'days',
+};
+
 /** The figures the record answers by id when no declaration holds that id. */
 export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'questions-open': QUESTIONS_OPEN,
@@ -115,6 +176,9 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'arrivals-newest-hours': sign('arrivals-newest-hours', 'Hours since the last message came in', { lte: 72 }, 'int'),
   'feeds-behind': sign('feeds-behind', 'Feeds that are behind', { lte: 0 }, 'int'),
   'rules-fired-7d': sign('rules-fired-7d', 'Rules that ran this week', { gte: 1 }, 'int'),
+  'signs-red': SIGNS_RED,
+  'green-days': GREEN_DAYS,
+  'rates-age-days': RATES_AGE_DAYS,
 };
 
 /** The built-in figure called `id`, or `null`; never one `Object.prototype` lends. */
@@ -214,6 +278,88 @@ export function readSign(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'>, d
     default:
       return reading(null, 'not a sign this record reads');
   }
+}
+
+/** A reading of a count with no comparison, judged against the figure's own target, or no verdict with no value. */
+function judged(decl: MetricDecl, value: number | null, why: string): Result<Reading> {
+  const t = decl.target;
+  const met = value === null || t === undefined ? null : 'lte' in t ? value <= t.lte : value >= t.gte;
+  return ok({ value, unit: null, rows: value ?? 0, held: value ?? 0, delta: null, why, met, refusals: [] });
+}
+
+/**
+ * The day a read is about, `YYYY-MM-DD`: the record's own today, or on a read of a past day that day. A past day comes
+ * as noon UTC of its local date (`snapshot`, `clockOf`), so its UTC date is the day meant in every zone.
+ */
+function dayOfRead(ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz'>): string {
+  if (ctx.asOfMs !== undefined) return new Date(ctx.asOfMs).toISOString().slice(0, 10);
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz ?? 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ctx.nowMs));
+  } catch {
+    return new Date(ctx.nowMs).toISOString().slice(0, 10);
+  }
+}
+
+/** The calendar day before `day`, both `YYYY-MM-DD`, as `signs.ts` counts its days. */
+const dayBefore = (day: string): string => new Date(Date.parse(`${day}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * `signs-red` and `green-days`.
+ *
+ * SIGNS RED NOW is the signs read as Health reads them (`readSigns`, handed in as `ctx.signs`), and a sign that reads
+ * `none` is not counted either way. A reader with no signs handed in says nothing rather than guess. On a read of a past day it is that day's kept readings, since what a sign read on a day is not read again
+ * later. NOTHING, NEVER NOUGHT, when no sign has anything to judge by: an empty record has no red sign and is not well.
+ *
+ * GREEN DAYS counts back from yesterday, the last day the night has kept, one day at a time: a day counts when at least
+ * one sign read green and none read red. A day with no reading, or with every sign `none`, ends the run, so a night
+ * that stopped reads nought and not the run before it. Today is never counted, since it is not over. NOTHING, NEVER
+ * NOUGHT, when no kept day ever held a sign green or red. One query, however long the run.
+ */
+export function readVitals(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz' | 'signs'>, decl: MetricDecl): Result<Reading> {
+  const today = dayOfRead(ctx);
+  if ((decl as VitalsDecl).vitals === 'green-days') {
+    const days = sql.all<{ day: string; red: number; green: number }>(
+      `SELECT day, SUM(state = 'red') AS red, SUM(state = 'green') AS green FROM sign_reading
+        WHERE day < ? GROUP BY day ORDER BY day DESC`,
+      today,
+    );
+    if (!days.some((d) => Number(d.red) > 0 || Number(d.green) > 0)) return judged(decl, null, 'no kept day has a sign that read green or red yet');
+    let run = 0;
+    let want = dayBefore(today);
+    for (const d of days) {
+      if (d.day !== want || Number(d.red) > 0 || Number(d.green) === 0) break;
+      run++;
+      want = dayBefore(want);
+    }
+    return judged(decl, run, 'days in a row, to yesterday, with a sign green and none red');
+  }
+  if (ctx.asOfMs !== undefined) {
+    const kept = sql.one<{ red: number | null; judged: number | null }>(
+      `SELECT SUM(state = 'red') AS red, SUM(state <> 'none') AS judged FROM sign_reading WHERE day = ?`,
+      today,
+    );
+    if (!Number(kept?.judged ?? 0)) return judged(decl, null, 'no sign had anything to judge by that day');
+    return judged(decl, Number(kept?.red ?? 0), 'signs kept red that day');
+  }
+  if (ctx.signs === undefined) return judged(decl, null, 'the vital signs are not read here yet');
+  const signs = ctx.signs().filter((s) => s.state !== 'none');
+  if (signs.length === 0) return judged(decl, null, 'no sign has anything to judge by yet');
+  return judged(decl, signs.filter((s) => s.state === 'red').length, 'signs that read red now');
+}
+
+/**
+ * `rates-age-days`: how many days old the newest exchange rate is, by the rows of the list that declares `rates:`, read
+ * through the same `fx` every converted figure reads. NOTHING, NEVER NOUGHT, with no rate: nought would say the rates
+ * are fresh on a record that has none. On a read of a past day, a rate dated after it does not count. A rate dated
+ * ahead of today is nought days old.
+ */
+export function readRatesAge(ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz' | 'fx'>, decl: MetricDecl): Result<Reading> {
+  const today = dayOfRead(ctx);
+  const rates = ctx.fx?.().rates ?? [];
+  const newest = rates.reduce<string | null>((n, r) => (ctx.asOfMs !== undefined && r.as_of > today ? n : n === null || r.as_of > n ? r.as_of : n), null);
+  if (newest === null) return judged(decl, null, 'no exchange rate on this record');
+  const days = Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${newest}T00:00:00Z`)) / 86_400_000));
+  return judged(decl, days, 'days since the newest exchange rate');
 }
 
 /** `ingest.ts`'s `UNVERIFIED`, the one reason an arrival nothing vouched for carries, written once more for the import rule above. */

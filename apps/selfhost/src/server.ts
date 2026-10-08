@@ -40,6 +40,8 @@ import {
   type MailNotice,
 } from '@braindog/host/auth';
 import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
+/* The oldest command this door still works with (AGT-A02), one day for both hosts, answered at the build address. */
+import { MIN_CLI } from '@braindog/mcp/build';
 import { OPERATION_METHOD, type Execute, type OutboxKind, type OutboxRow, type PagedRun, type ScriptRunner, type Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { cutOffReadable } from '@braindog/kernel';
@@ -80,7 +82,7 @@ import { backgroundMeter, serveModelJobs } from '@braindog/host/model-jobs';
 import { grantNamed, holdingScript } from '@braindog/host/script';
 import { askerOf, scriptTrial, trialSandbox } from '@braindog/host/script-try';
 import { runInQuickJs } from '@braindog/script/quickjs';
-import { scriptSandbox } from './script.ts';
+import { outboundHeld, scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
 import { slashAnswersFor, slashDoor, slashEngineFor, slashFromEnv, slashModelFor, slashModelJobs, type SlashConfig } from './slash.ts';
 import { unwrap, type KeyStore } from './keys.ts';
@@ -389,6 +391,12 @@ function presented(request: Request): string | undefined {
   return raw ? raw : undefined;
 }
 
+/** The command's build as it sent it (`x-braindog-cli`), or `undefined`. The kernel decides whether it is one. */
+function cliOf(request: Request): string | undefined {
+  const said = request.headers.get('x-braindog-cli')?.trim();
+  return said ? said : undefined;
+}
+
 /* ONCE PER PROCESS. An unreadable cut-off refuses every bearer, so every request would otherwise print the same line. */
 let cutOffTold = false;
 
@@ -414,7 +422,7 @@ function validFrom(): string | undefined {
  * the same person at the same level through either, and `surface` is only what the token's listing shows as
  * where it was last used.
  */
-async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?: string): Promise<Known> {
+async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?: string, cli?: string): Promise<Known> {
   const { api, token } = site;
   /* THE SERVER KEY IS COMPARED IN CONSTANT TIME, `49 §5.4` step 1. `!==` stops at the first byte that
      differs, so how long a wrong guess took said how much of it was right. */
@@ -430,7 +438,10 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
   if (!sent.includes('.')) return { refused: UNKNOWN };
   /* A TOKEN MADE BEFORE THE OPERATOR'S CUT-OFF IS NOT ONE THIS RECORD KNOWS, in the same sentence, and at an operation
      door it falls to `operationFor`, which holds a grant to the same instant. */
-  const seen = await api.kernel.verifyToken(sent, surface, validFrom());
+  /* `cli` IS THE COMMAND'S BUILD (`x-braindog-cli`, AGT-A02), kept on the token row in the same write as its last use, so
+     the record can say which build each key runs. The kernel drops anything that is not a build, so the header is
+     handed on as sent. */
+  const seen = await api.kernel.verifyToken(sent, surface, validFrom(), cli);
   if (!seen.ok) {
     if (door !== undefined && OPERATION_DOORS.has(door)) return operationFor(sent, api);
     /* AND A BEARER NO TOKEN ROW KNOWS MAY BE A RUNNER'S, AT THE THREE DOORS A RUNNER CALLS AND NOWHERE ELSE,
@@ -504,7 +515,7 @@ async function vaultToken(request: Request, site: Site | null): Promise<Result<C
   };
   const sent = presented(request);
   if (site === null || sent === undefined) return refused;
-  const known = await bearerFor(sent, site, 'api');
+  const known = await bearerFor(sent, site, 'api', undefined, cliOf(request));
   if (!('ctx' in known) || known.ctx.principal.kind !== 'token') return refused;
   const over = await overLimit(site, { door: 'bearer', ctx: known.ctx }, '', 'write');
   if (over !== null) {
@@ -559,7 +570,7 @@ async function contextFor(request: Request, host: string, site: Site, door?: str
   /* ONE · A BEARER, which is an agent, the server key or an operation, and never a browser, so the origin checks below
      do not apply to it: nothing ambient sends an `Authorization` header. `door` is the method the path names, the one
      thing an operation bearer is checked against. */
-  if (sent !== undefined) return bearerFor(sent, site, 'api', door);
+  if (sent !== undefined) return bearerFor(sent, site, 'api', door, cliOf(request));
 
   /* TWO · THE SESSION COOKIE. A BAD ONE IS A 401 AND IS CLEARED, AND NEVER FALLS THROUGH TO OPEN MODE: a
      cookie that names no session is somebody who thinks they are signed in, and answering them as the
@@ -1106,11 +1117,15 @@ export async function start(options: {
    */
   limits?: Limiter | null | undefined;
   /**
-   * Run the scheduled actions, `pull`, `call` and `poll`, on this process's timer.
+   * Send the scheduled actions' requests, `pull`, `call` and `poll`, on this process's timer.
    *
    * OFF UNLESS ASKED, because an action sends a request to somebody else's server, and a test that installs a
-   * pack should not. `main.ts` turns it on. `send` and `openKey` are for tests: the defaults are `fetch` and
-   * the key store above, and `./actions.ts` says what either may send.
+   * pack should not. `main.ts` turns it on when the operator says `BRAINDOG_OUTBOUND=on`. `send` and `openKey` are for
+   * tests: the defaults are `fetch` and the key store above, and `./actions.ts` says what either may send.
+   *
+   * ABSENT, THE PASS STILL RUNS AND HOLDS EACH ACTION with `OUTBOUND_OFF` (`./script.ts`), before anything is resolved,
+   * opened or sent, so Scheduled says why it waits rather than showing an action that is due and never runs. A script
+   * that needs no other server runs as it would.
    *
    * A SCRIPT RUNS HERE TOO, in `./script.ts`'s sandbox, and its `ctx.fetch` leaves through the same `send`, `resolve`
    * and `openKey`. `resolve` is for tests, as `send` is: the default is the system's name service.
@@ -1369,7 +1384,7 @@ export async function start(options: {
   /* THE UTC DAY THIS PROCESS LAST REPLAYED THE RECORD'S RUNS INTO THE LEDGER, so it does so once a day and at start. */
   let replayedOn: string | null = null;
   const act = async (): Promise<void> => {
-    if (!options.actions || acting || !ledger) return;
+    if (acting || !ledger) return;
     const record = api.kernel.identity()?.id;
     if (!record) return;
     acting = true;
@@ -1378,21 +1393,26 @@ export async function start(options: {
          again until the Directory knows the record: `init` provisions on that plan, and this covers a record made
          before plans existed. */
       if (planned !== record && ledger.setPlan(record, 'selfhost').ok) planned = record;
-      const openKey = options.actions.openKey ?? keyOpener(api, options.keys);
+      /* THE OPERATOR'S SWITCH (`49 §5.24`). Off, `outboundHeld` answers "held" for every action and connector before
+         the executor is reached, and the sandbox tells a script's `ctx.fetch` the same sentence; both write it on the
+         run's event, which is what Scheduled shows. Nothing is resolved, opened or sent. */
+      const on = options.actions;
+      const mayRun = on ? ledger.mayRun : outboundHeld(clock.now);
+      const openKey = on?.openKey ?? keyOpener(api, options.keys);
       execute ??= actionExecutor(api, {
         openKey,
-        send: options.actions.send,
-        resolve: options.actions.resolve,
-        rehearseOnThisMachine: options.actions.rehearseOnThisMachine,
+        send: on?.send,
+        resolve: on?.resolve,
+        rehearseOnThisMachine: on?.rehearseOnThisMachine,
       });
-      script ??= scriptSandbox(api, { openKey, send: options.actions.send, resolve: options.actions.resolve, now: clock.now });
+      script ??= scriptSandbox(api, { openKey, send: on?.send, resolve: on?.resolve, now: clock.now, outbound: on ? 'on' : 'off' });
       /* A CONNECTOR PAGES AND THE EXECUTOR ABOVE CANNOT. Without this the kernel finishes the row
          and meters it `dropped`, which is honest but means no self-host ever runs a connector. */
       paged ??= pagedRunner(api, {
         /* ITS OWN SOCKET AND NOT `shared`'s. `shared` is how a use-case FILE is read from an
            address; borrowing its name service here would mean a test that stubs one silently
            stubs the other. A connector's `send` comes from `actions`, beside the executor's. */
-        http: httpFor({ send: options.actions.send }),
+        http: httpFor({ send: on?.send }),
         clock: { now: () => Date.now() },
         keys: options.keys,
       });
@@ -1401,8 +1421,8 @@ export async function start(options: {
       const admissions = pass(IN_FLIGHT);
       let out;
       try {
-        out = await api.kernel.runActions(holding(execute, record, ledger.mayRun, admissions), {
-          page: holdingPaged(paged, record, ledger.mayRun, admissions),
+        out = await api.kernel.runActions(holding(execute, record, mayRun, admissions), {
+          page: holdingPaged(paged, record, mayRun, admissions),
           script: holdingScript(script, record, ledger.mayRun, admissions),
         });
         /* EACH WRITE IS TRIED AGAIN AND NONE STOPS THE REST; what the ledger still would not take is said here and
@@ -1471,8 +1491,8 @@ export async function start(options: {
     /* NOTHING IS LEASED OR SENT FROM A RECORD THIS BUILD REFUSES, for the reason the doors above refuse it. */
     if (api.kernel.refused()) return;
     await act();
-    /* THE QUESTIONS TO SLASH, HERE AND NOT IN `act()`, which returns on its first line when `options.actions` is absent,
-       as it is for every embedder and every test that does not pass it; a pass there left a record admitting the step and
+    /* THE QUESTIONS TO SLASH, HERE AND NOT IN `act()`, which once returned on its first line when `options.actions` was
+       absent, as it is for every embedder and every test that does not pass it; a pass there left a record admitting the step and
        a host that never asked it. And before the line below, because production's
        `start()` passes no `deliver` (`main.ts`). `serveAsks` catches what `answer` throws; this `try` is for the lease. */
     if (answers && !gone) {
@@ -1493,6 +1513,8 @@ export async function start(options: {
           now: () => clock.now(),
           scheduler,
           store: slashSql,
+          /* WHETHER SLASH'S MODEL ANSWERS: while it does not, the jobs wait with their attempts kept (`model-jobs.ts`). */
+          health: engineHealth,
           log: (line) => console.error('slash jobs:', line),
         });
       } catch (e) {
@@ -1651,7 +1673,7 @@ export async function start(options: {
        from a checkout has none, and the record then says `app: null` rather than inventing one.
        `slash` is whether a model is behind Slash here: an endpoint, and a key to call it with or none needed.
        `host` is for `boot`, so Billing reads that this is a self-host rather than inferring it from the mail door's 404. */
-    build: { app: buildApp, slash: slashModel !== undefined, host: 'self-host' },
+    build: { app: buildApp, slash: slashModel !== undefined, host: 'self-host', min_cli: MIN_CLI },
   });
   /* AN ERASURE REACHES SLASH'S LEDGER TOO, in `slash.sqlite` beside the record's file (`slashErasing`),
      which the kernel's erase cascade never reaches. */
@@ -1767,10 +1789,11 @@ export async function start(options: {
   const answering: RequestListener = (req, res) => {
     /* `/.well-known/braindog-build`, AS THE WORKER ANSWERS IT: which build this process is, before any door and with
        no credential, `null` when it was never told. A deployment is not a record, so a deleted record does not change
-       the answer, and a gate comparing hosts reads the same shape from both. */
+       the answer, and a gate comparing hosts reads the same shape from both. `min_cli` IS THE OLDEST COMMAND THIS
+       BUILD SERVES WELL (`MIN_CLI`, one day for both hosts), so a command can say it is behind before it calls. */
     if (/^\/+\.well-known\/+braindog-build\/*$/.test(new URL(req.url ?? '/', 'http://localhost').pathname)) {
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-      res.end(JSON.stringify({ app: buildApp || null }));
+      res.end(JSON.stringify({ app: buildApp || null, min_cli: MIN_CLI }));
       return;
     }
     /* `/healthz` (`53 §13 #9`): `{ ok, app, format, kernel, primitives }` and a 200, or `{ ok, code }` and a
@@ -2470,7 +2493,7 @@ async function agent(req: IncomingMessage, url: string, method: string, headers:
   const early = gate(head);
   if (early) return early;
   const sent = presented(head);
-  const seen = sent === undefined ? null : await bearerFor(sent, site, 'mcp');
+  const seen = sent === undefined ? null : await bearerFor(sent, site, 'mcp', undefined, cliOf(head));
   /* THE 401 NAMES WHERE TO SIGN IN, as the Worker's does, so an MCP client holding no token starts OAuth from it
      (RFC 9728): at the name this process was reached by, and not at all while OAuth is off. */
   const metadata = site.oauth.metadata(req.headers.host ?? '');

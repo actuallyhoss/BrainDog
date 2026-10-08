@@ -337,7 +337,9 @@ test('A PAGE MADE OF FIGURES NAMES THE REGISTERS BEHIND THEM, and it used to nam
     }
   }
 
-  /* AND THE OWNER STILL SEES IT, so the filter is about the caller rather than about the page. */
+  /* AND THE OWNER STILL SEES IT, so the filter is about the caller rather than about the page. One row first: a figure
+     over an empty list holds nothing, and the page leaves an idle figure out for everybody (`drawn.ts`'s `told`). */
+  value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41' } }, owner));
   const mine = value<{ slug: string }[]>(await api.pages(owner));
   assert.ok(mine.some((p2) => p2.slug === 'figures'), 'the owner lost a page of their own record');
   const read = value<{ blocks: { readings?: { reading: unknown }[] }[] }>(await api.page({ slug: 'figures' }, owner));

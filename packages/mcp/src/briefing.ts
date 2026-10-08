@@ -428,6 +428,10 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     const choices = rest > 0 ? `${named.join(', ')} or one of ${grouped(rest)} more` : named.length === 1 ? named[0]! : `${named.slice(0, -1).join(', ')} or ${named.at(-1)!}`;
     lines.push(`Which project is this folder, ${choices}? Until one is set you work in no project.`);
   }
+  /* THE RED SIGNS, each by name with its own sentence, so an agent starting work sees what the record says is wrong with
+     itself (C07-f). The record has already held back what this key may not read (`quietSign`). */
+  const signs = (Array.isArray(c.signs) ? c.signs : []).filter(isObject).filter((s) => typeof s.name === 'string' && typeof s.said === 'string');
+  for (const s of signs.slice(0, 3)) lines.push(`Red on this record: ${String(s.name)}. ${String(s.said)}`);
   for (const g of groups) {
     if (g.kind !== 'work') continue;
     const rows = [...g.rows, ...g.inherited];
@@ -449,6 +453,7 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     ...(session ? { session: { spoken: session.spoken, ...(text(session.state) ? { state: session.state } : {}), ...(runner ? { as: runner } : {}) } } : {}),
     ...(project ? { project: { spoken: project.spoken, name: project.name, ...(text(project.how) ? { how: project.how } : {}) } } : {}),
     ...(ambiguous.length > 0 ? { ambiguous } : {}),
+    ...(signs.length > 0 ? { signs: signs.map((s) => ({ name: s.name, said: s.said })) } : {}),
     ...(handoff
       ? {
           handoff: {

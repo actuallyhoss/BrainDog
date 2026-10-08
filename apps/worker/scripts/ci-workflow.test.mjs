@@ -302,6 +302,14 @@ test('the build job runs the look\'s own tests by their glob', () => {
   assert.equal(all[look].if, null);
 });
 
+/* AND THE WATCH'S (LCH-C01): `tools/watch` is no workspace either, so the test of what launch watches ran nowhere. */
+test('the build job runs the watch\'s own tests by their glob, beside the look\'s', () => {
+  const all = steps(job(ci, 'build'));
+  const watch = at(all, /node --test tools\/watch\/\*\.test\.mjs/, 'runs tools/watch');
+  assert.equal(all[watch].run, 'node --test tools/watch/*.test.mjs');
+  assert.equal(all[watch].if, null);
+});
+
 /* A REAL CLIENT'S HANDSHAKE, WITH THE BUNDLE THAT SHIPS (PRF-A06). After the command is built, so it greets what an agent
    app starts; before the diff check, so a file it wrote would be seen; and with `BRAINDOG_CLI_BUILT=1`, without which a
    missing bundle quietly falls back to the source the `apps` leg already ran. */

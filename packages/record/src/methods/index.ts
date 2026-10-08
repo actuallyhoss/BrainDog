@@ -104,6 +104,10 @@ export type RecordDeps = {
   host?: 'cloud' | 'self-host';
   /** Whether Slash's model answers (host `engine-health.ts`). Absent, `engineHealth` answers `null`. */
   engineHealth?: (() => Promise<import('./engine.ts').EngineHealthRead>) | undefined;
+  /** The host's own build and MIN_CLI (AGT-A02), which doorHealth answers and reads behind against. Absent, both are null. */
+  doorBuild?: import('./door.ts').DoorBuild | (() => import('./door.ts').DoorBuild);
+  /** The operator's cut-off (`TOKENS_VALID_FROM`, `53 §5.11`), so doorHealth counts no key or runner it ended. */
+  validFrom?: (() => string | undefined) | undefined;
 };
 
 export function methods(deps: RecordDeps) {

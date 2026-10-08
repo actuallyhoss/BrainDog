@@ -32,6 +32,9 @@ import {
   type Send,
 } from '../src/actions.ts';
 import { start } from '../src/server.ts';
+import { OUTBOUND_HELD_MS, OUTBOUND_OFF, outboundHeld, outboundOf, scriptSandbox } from '../src/script.ts';
+import { kennelAnswer, kennelBase } from '../src/kennel.ts';
+import { KENNEL_BASE } from '@braindog/declare/kennel';
 
 const ORIGIN = 'https://api.example.test';
 const PUBLIC = '203.0.113.10';
@@ -414,4 +417,153 @@ test('A CALL CARRIES ITS KEY THROUGH THE SOCKET, and one that never answers says
   /* AND A POLL THAT NEVER ANSWERS DOES NOT SAY IT, because a GET has nothing to have landed. */
   const poll = await actionExecutor(declaring(ORIGIN), { openKey, send: hang, resolve: publicNames().resolve })(request({ timeoutMs: 20 }));
   assert.doesNotMatch(fixOf(poll), /idempotency key/);
+});
+
+/* ── the operator's switch, `BRAINDOG_OUTBOUND` (`49 §5.24`) ──────────────── */
+
+const NOON = Date.UTC(2026, 8, 15, 12);
+
+test('THE SWITCH IS OFF UNLESS THE OPERATOR SAYS ON, and a value that is neither is no guess', () => {
+  assert.equal(outboundOf(undefined), 'off');
+  assert.equal(outboundOf(''), 'off');
+  assert.equal(outboundOf(' OFF '), 'off');
+  assert.equal(outboundOf('on'), 'on');
+  assert.equal(outboundOf('On'), 'on');
+  for (const wrong of ['yes', '1', 'true', 'enabled']) assert.equal(outboundOf(wrong), null, wrong);
+});
+
+test('THE HELD SENTENCE NAMES THE SWITCH AND NOTHING A PERSON SHOULD NOT READ: no key, address, file or dash', () => {
+  assert.equal(OUTBOUND_OFF, 'This server does not send requests. Its operator can switch that on.');
+  assert.doesNotMatch(OUTBOUND_OFF, /BRAINDOG_|https?:|\/|\d+\.\d+|[\u2013\u2014]/);
+});
+
+test('OFF, AN ADD-ON ACTION THAT CALLS OUT STILL INSTALLS AND IS HELD WITH THE SENTENCE: no name resolved, no key opened, nothing sent', async () => {
+  /* INSTALLED HERE, by the same `install` an add-on's diff goes through: the switch changes nothing about installing. */
+  const { sql, api } = await pollingRecord();
+  const net = wire(new Response('balance 9'));
+  const dns = publicNames();
+  let opened = 0;
+  const inner = actionExecutor(api, { openKey: async () => (opened++, 'sk-example-123'), send: net.send, resolve: dns.resolve });
+  const run = await api.kernel.runActions(holding(inner, REC, outboundHeld(() => NOON)));
+
+  assert.equal(run.held, 1);
+  assert.equal(net.calls.length, 0);
+  assert.equal(opened, 0);
+  assert.deepEqual(dns.asked, []);
+  assert.equal(sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'pull' ORDER BY ts DESC, id DESC LIMIT 1")?.note, OUTBOUND_OFF);
+  /* HELD, NOT PAUSED AND NOT DROPPED: it is offered again a day on, and nothing about the action is lost. */
+  const row = sql.one<{ state: string; due_at: string }>("SELECT state, due_at FROM schedule WHERE kind = 'poll' AND key = 'balance'");
+  assert.equal(row?.state, 'pending');
+  assert.equal(row?.due_at, new Date(NOON + OUTBOUND_HELD_MS).toISOString());
+});
+
+/** A record with a register and `scripts` installed, each due now: the same path an add-on's script takes. */
+async function scriptedRecord(scripts: { name: string; source: string; egress: string[] }[]) {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOON) });
+  const installed = await api.kernel.install([
+    { id: 'register.notes', kind: 'register', body: { id: 'notes', name: 'Notes', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } as never },
+    ...scripts.map((s) => ({
+      id: `script.${s.name}`,
+      kind: 'script' as const,
+      body: { script: s.name, runs: { every: '1h' }, egress: s.egress, keys: [], reads: [], writes: ['notes'], source: s.source } as never,
+    })),
+  ]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  /* DUE NOW RATHER THAN AT ITS JITTER (`firstDueMs`). */
+  sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script'", new Date(NOON - 1_000).toISOString());
+  const outcome = (name: string) => {
+    const event = sql.one<{ note: string; to_v: string }>('SELECT note, to_v FROM event WHERE target = ? AND to_v IS NOT NULL ORDER BY rowid DESC LIMIT 1', `declaration:script.${name}`);
+    return { note: event?.note, outcome: (JSON.parse(event?.to_v ?? '{}') as { outcome?: string }).outcome, said: event?.to_v ?? '' };
+  };
+  const notes = () => sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'notes'").map((r) => (JSON.parse(r.fields) as { what: string }).what);
+  return { sql, api, outcome, notes };
+}
+
+const fetching = (origin: string) => `export default async function run(ctx) {
+  const r = await ctx.fetch(${JSON.stringify(origin)} + '/v1/balance');
+  ctx.write('notes', { what: 'fetched ' + (await r.text()) });
+}`;
+const local = `export default async function run(ctx) { ctx.write('notes', { what: 'counted at home' }); }`;
+
+test('OFF, A SCRIPT THAT FETCHES IS HELD WITH THE SENTENCE AND WRITES NOTHING, and one that only writes runs as before', async () => {
+  const r = await scriptedRecord([
+    { name: 'balance', source: fetching(ORIGIN), egress: [ORIGIN] },
+    { name: 'tally', source: local, egress: [] },
+  ]);
+  const net = wire(new Response('balance 9'));
+  const dns = publicNames();
+  const script = scriptSandbox(r.api, { openKey, send: net.send, resolve: dns.resolve, now: () => NOON, outbound: 'off' });
+  await r.api.kernel.runActions(holding(actionExecutor(r.api, { openKey, send: net.send, resolve: dns.resolve }), REC, outboundHeld(() => NOON)), { script });
+
+  assert.deepEqual([r.outcome('balance').note, r.outcome('balance').outcome], [OUTBOUND_OFF, 'held']);
+  assert.equal(net.calls.length, 0);
+  assert.deepEqual(dns.asked, []);
+  assert.equal(r.outcome('tally').outcome, 'ok', r.outcome('tally').note);
+  assert.deepEqual(r.notes(), ['counted at home']);
+  assert.equal(
+    r.sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'script' AND key = 'balance'")?.due_at,
+    new Date(NOON + OUTBOUND_HELD_MS).toISOString(),
+  );
+});
+
+test('ON, A SCRIPT RUNS AND SENDS, and one aimed at a name that resolves to 127.0.0.1 is refused before anything is sent', async () => {
+  const INSIDE = 'https://inside.example.test';
+  const r = await scriptedRecord([
+    { name: 'balance', source: fetching(ORIGIN), egress: [ORIGIN] },
+    { name: 'sneak', source: fetching(INSIDE), egress: [INSIDE] },
+  ]);
+  const net = wire(new Response('balance 9'));
+  const dns = names({ 'api.example.test': [PUBLIC], 'inside.example.test': ['127.0.0.1'] });
+  const script = scriptSandbox(r.api, { openKey, send: net.send, resolve: dns.resolve, now: () => NOON, outbound: 'on' });
+  await r.api.kernel.runActions(actionExecutor(r.api, { openKey, send: net.send, resolve: dns.resolve }), { script });
+
+  /* THE ONE THAT RAN WENT TO THE ADDRESS THAT WAS CHECKED, and only it was sent. */
+  assert.deepEqual(net.calls.map((c) => [c.url, c.pinned.address]), [[`${ORIGIN}/v1/balance`, PUBLIC]]);
+  assert.equal(r.outcome('balance').outcome, 'ok', r.outcome('balance').note);
+  assert.deepEqual(r.notes(), ['fetched balance 9']);
+  /* THE FENCE IS THE SAME WITH THE SWITCH ON: asked, refused, never sent, and never the held sentence. */
+  assert.ok(dns.asked.includes('inside.example.test'));
+  const sneak = r.outcome('sneak');
+  assert.notEqual(sneak.outcome, 'held');
+  assert.notEqual(sneak.outcome, 'ok');
+  assert.notEqual(sneak.note, OUTBOUND_OFF);
+  /* THE RUN'S LOG CARRIES THE FENCE'S OWN SENTENCE, the one a `call` gets. */
+  assert.match(sneak.said, /resolves to 127\.0\.0\.1, which is a loopback address, so nothing was sent/);
+});
+
+test('ON, AN ADD-ON ACTION AIMED AT A NAME THAT RESOLVES TO 127.0.0.1 IS REFUSED, and the switch makes no exception to the fence', async () => {
+  const { sql, api } = await pollingRecord();
+  const net = wire(new Response('never'));
+  let opened = 0;
+  const execute = actionExecutor(api, { openKey: async () => (opened++, 'sk-example-123'), send: net.send, resolve: names({ 'api.example.test': ['127.0.0.1'] }).resolve });
+  const run = await api.kernel.runActions(execute);
+
+  assert.equal(run.refused, 1);
+  assert.equal(run.held, 0);
+  assert.equal(net.calls.length, 0);
+  assert.equal(opened, 0);
+  const note = sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'pull' ORDER BY ts DESC, id DESC LIMIT 1")?.note ?? '';
+  assert.match(note, /resolves to 127\.0\.0\.1, which is a loopback address, so nothing was sent/);
+  assert.notEqual(note, OUTBOUND_OFF);
+});
+
+test('THE PUBLIC ADD-ON REGISTRY IS READ WITH THE SWITCH OFF: it answers to BRAINDOG_KENNEL alone', async () => {
+  const was = process.env.BRAINDOG_OUTBOUND;
+  process.env.BRAINDOG_OUTBOUND = 'off';
+  try {
+    const asked: string[] = [];
+    const fetch = async (url: string) => (asked.push(url), new Response('{"id":"check"}', { status: 200 }));
+    const answer = await kennelAnswer('GET', `${KENNEL_BASE}packs/check/1.0.0.pack.json`, undefined, { kennel: undefined, fetch, now: () => NOON });
+    assert.equal(answer.status, 200);
+    assert.deepEqual(asked, ['https://brain.dog/api/kennel/v1/packs/check/1.0.0.pack.json']);
+    /* AND ITS OWN SWITCH IS THE ONE THAT STOPS IT, whatever outbound says. */
+    assert.equal(kennelBase('off'), null);
+    process.env.BRAINDOG_OUTBOUND = 'on';
+    assert.equal((await kennelAnswer('GET', `${KENNEL_BASE}packs/check/1.0.0.pack.json`, undefined, { kennel: 'off', fetch, now: () => NOON })).status, 404);
+    assert.equal(asked.length, 1);
+  } finally {
+    if (was === undefined) delete process.env.BRAINDOG_OUTBOUND;
+    else process.env.BRAINDOG_OUTBOUND = was;
+  }
 });

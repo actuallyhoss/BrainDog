@@ -16,7 +16,7 @@ import { randomUUID } from 'node:crypto';
 import { matchLiterals } from '../../extract/src/extractors.ts';
 import { openRecord, type Arrived, type Declaration, type Kernel } from '../src/index.ts';
 import { confirmedTail } from '../src/ingest.ts';
-import { ACCOUNTS, CARD, LEDGER, NOW, OWNER, answer, bodyOf, openQuestions, record, text, used, type Rec } from './ingest-tail-kit.test.ts';
+import { ACCOUNTS, CARD, LEDGER, NOW, OWNER, answer, bodyOf, openQuestions, record, text, used, type Rec } from './ingest-tail-kit.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 /** The bank's mail, at a door of its own, reading the same card by the same digits as the texts. */

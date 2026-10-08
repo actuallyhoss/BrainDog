@@ -51,7 +51,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { follow, live } from '$lib/data/live.svelte.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
-     paint, and the palette reads the whole sample record to rank what it lists, so importing them
+     paint, and the palette carries its commands, its search and Slash's drawing, so importing them
      here put all of that in front of the first screen and in the entry's preload list. They are
      asked for as the shell mounts: a `⌘K` pressed before the palette lands sets `palette.open`,
      and the palette opens on that when it does. */
@@ -530,8 +530,8 @@
      saying there was no write and no poll yet, so the `polling` and `offline` rules below could never match.
      `follow` starts one poll of `/api/version` per tab (`lib/data/live.ts`),
      on a record that answered only. NOT OVER A REFUSAL, though its shell says `live`: `version` is `READ+`, so on the
-     signed-out sign-in screen every tick was a 401 and the hairline went to `offline`, which the sample's shell had
-     hidden by saying `live: false` until the sample left the app. `page.url` and not `location`, so a move from one
+     signed-out sign-in screen every tick was a 401 and the hairline went to `offline`. A refused shell polls
+     nothing. `page.url` and not `location`, so a move from one
      record to another follows the address being opened. */
   $effect(() => follow(data.live === true ? (data.refused ? null : apiBase(page.url)) : null));
 

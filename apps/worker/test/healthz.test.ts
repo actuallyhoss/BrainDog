@@ -158,22 +158,31 @@ for (const [key, value, sentence] of STOPPED)
     assert.ok(!out.launch.why.some((w) => w.startsWith('The bot check is not keyed')), 'a closed door needs no limit sentence');
   });
 
-test("HEALTH CARRIES LAST NIGHT, from one Directory call: its counts, and `ran` only when it is fresh and whole", async () => {
+test("HEALTH CARRIES LAST NIGHT, from one Directory call: what failed, and `ran` only when it is fresh and whole", async () => {
   const at = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
-  kept = { at, records: 12, backups: 12, backups_failed: 0, directory: 'ok' };
+  const whole = { at, records: 12, backups: 12, backups_failed: 0, directory: 'ok', expiry_failed: 0, stragglers: 0, erase_open: 0, counts_written: true };
+  kept = whole;
   touched.length = 0;
   asked = 0;
-  const whole = (await (await ask('/healthz')).json()) as { night: Record<string, unknown> };
-  assert.deepEqual(whole.night, { at, records: 12, backups: 12, backups_failed: 0, directory: 'ok', ran: true });
+  const said = (await (await ask('/healthz')).json()) as { night: Record<string, unknown> };
+  /* NO COUNT OF RECORDS OR COPIES: on a whole night either is how many people have a record here. `reached` says the walk
+     found some, and the number stays in the Directory. */
+  assert.deepEqual(said.night, { at, reached: true, backups_failed: 0, expiry_failed: 0, stragglers: 0, erase_open: 0, counts_written: true, directory: 'ok', ran: true });
   assert.equal(asked, 1, 'one Directory call a probe');
   assert.deepEqual(touched, []);
 
-  /* A FAILED COPY, A DIRECTORY NOT COPIED, OR A NIGHT OLDER THAN 26 HOURS IS A NIGHT THAT DID NOT RUN WHOLE. */
-  kept = { at, records: 12, backups: 11, backups_failed: 1, directory: 'ok' };
-  assert.equal(((await (await ask('/healthz')).json()) as { night: { ran: boolean } }).night.ran, false);
-  kept = { at, records: 12, backups: 12, backups_failed: 0, directory: 'failed' };
-  assert.equal(((await (await ask('/healthz')).json()) as { night: { ran: boolean } }).night.ran, false);
-  kept = { at: new Date(Date.now() - 27 * 60 * 60 * 1000).toISOString(), records: 12, backups: 12, backups_failed: 0, directory: 'ok' };
+  /* A FAILED COPY, A DIRECTORY NOT COPIED, OR A NIGHT OLDER THAN 26 HOURS IS A NIGHT THAT DID NOT RUN WHOLE; the rest of
+     the cases are `night-ran.test.ts`'s. */
+  const ran = async () => ((await (await ask('/healthz')).json()) as { night: { ran: boolean } }).night.ran;
+  kept = { ...whole, backups: 11, backups_failed: 1 };
+  assert.equal(await ran(), false);
+  kept = { ...whole, directory: 'failed' };
+  assert.equal(await ran(), false);
+  kept = { ...whole, records: 0, backups: 0 };
+  assert.equal(await ran(), false, 'a walk that reached nobody did not copy everybody');
+  kept = { ...whole, expiry_failed: 1 };
+  assert.equal(await ran(), false);
+  kept = { ...whole, at: new Date(Date.now() - 27 * 60 * 60 * 1000).toISOString() };
   const late = await ask('/healthz');
   assert.equal(late.status, 200, 'a late night is a fact beside the liveness, never a failed probe');
   const lateSaid = (await late.json()) as { ok: boolean; night: { ran: boolean } };
@@ -214,17 +223,23 @@ test('THE CRON KEEPS ITS NIGHT FOR /healthz, and a night that cannot run mails "
     }
   };
   await quietly(() => scheduled({}, c.env, { waitUntil: () => {} }).catch(() => {}));
-  const night = kv.get('ops-night') as { records: number; backups: number; directory: string } | undefined;
+  const night = kv.get('ops-night') as Record<string, unknown> | undefined;
   assert.ok(night, 'the walk kept no night');
-  assert.equal(night.records, 1);
-  assert.deepEqual([night.backups, night.directory, sent.length], [1, 'ok', 0], 'a whole night mails nobody');
-  const said = (await (await c.ask('/healthz')).json()) as { night: { records: number; ran: boolean } };
-  assert.equal(said.night.records, 1);
-  assert.equal(said.night.ran, true);
+  /* THE DIRECTORY KEEPS THE COUNT, AND EVERY OTHER JOB OF THE NIGHT BY ITS FAILURES. */
+  assert.equal(night['records'], 1);
+  assert.deepEqual([night['backups'], night['directory'], sent.length], [1, 'ok', 0], 'a whole night mails nobody');
+  assert.deepEqual([night['expiry_failed'], night['stragglers'], night['erase_open']], [0, 0, 0], JSON.stringify(night));
+  const said = (await (await c.ask('/healthz')).json()) as { night: Record<string, unknown> };
+  assert.equal(said.night['reached'], true);
+  assert.equal('records' in said.night || 'backups' in said.night, false, 'a stranger read how many records there are');
+  assert.equal(said.night['ran'], true, JSON.stringify(said.night));
 
   /* NO BUCKET IS A NIGHT THAT CANNOT RUN: mailed, then thrown. */
   const bare = await cloud({ ...mail, BLOBS: undefined });
-  Object.assign(bare.dirStorage, { get: async () => undefined, put: async () => {} });
+  const bareKv = new Map<string, unknown>();
+  Object.assign(bare.dirStorage, { get: async (k: string) => bareKv.get(k), put: async (k: string, v: unknown) => void bareKv.set(k, v) });
   await quietly(() => assert.rejects(scheduled({}, bare.env, { waitUntil: () => {} }), /no BLOBS binding/u));
   assert.ok(sent.some((m) => m['subject'] === 'BrainDog night'), 'no night mail went');
+  /* AND IT IS KEPT AS A NIGHT THAT STOPPED, so the night before it does not go on saying it ran. */
+  assert.equal((bareKv.get('ops-night') as { stopped?: boolean } | undefined)?.stopped, true);
 });

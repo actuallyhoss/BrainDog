@@ -191,7 +191,7 @@ test('A STAT CELL WITH A PARAMETER NARROWS WHAT IT HOLDS, and the tile could not
   }, pageOf({ kind: 'stat', cells: [{ metric: 'open-what:Nowhere' }, { metric: 'open-what:Small' }] })).then(({ k, sql }) => {
     const got = blocks(k.page('invoicing'))[0] as { readings?: { metric: string; reading: { rows: number; held: number } | null }[] };
     const held = Object.fromEntries((got.readings ?? []).map((r) => [r.metric, [r.reading?.rows, r.reading?.held]]));
-    assert.deepEqual(held['open-what:Nowhere'], [0, 0], 'a name with no row of its own holds nothing');
+    assert.equal(held['open-what:Nowhere'], undefined, 'a name with no row of its own holds nothing, so the page leaves that figure out (drawn.ts told)');
     assert.deepEqual(held['open-what:Small'], [1, 1], 'the one row of that name is both matched and held');
     sql.close();
   });

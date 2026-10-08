@@ -55,7 +55,7 @@ async function record() {
   assert.ok(put.ok, JSON.stringify(put));
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
   value(await api.create({ register: 'projects', fields: { name: 'Kiln', hue: 210 } }, owner));
-  value(await api.create({ register: 'projects', fields: { name: 'Portage' } }, owner));
+  value(await api.create({ register: 'projects', fields: { name: 'Portage', hue: null } }, owner));
   value(await api.create({ register: 'clients', fields: { name: 'Marrow & Co' } }, owner));
   value(await api.create({ register: 'notes', fields: { body: 'Ring the printer' } }, owner));
   return { sql, api };

@@ -95,6 +95,7 @@ import {
   SCOPES,
   createToken,
   listTokens,
+  noteTool,
   revokeToken,
   verifyToken,
   type CreateTokenArgs,
@@ -356,6 +357,7 @@ export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provis
 export { GRANT_KINDS, spanMs } from './vault.ts';
 import { GROUP_CAP } from './buckets.ts';
 import { ratesFrom } from './fx.ts';
+import { MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, isControlMark } from './marks.ts';
 import { laidOf } from './pack-laid.ts';
 export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
 export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measureLines, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
@@ -377,6 +379,8 @@ export type { Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.t
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
 export { RAIL_PAGES, REDUCES, ROW_TEXT_MOST, SEED_ACTOR, byOf, fill, railRoom, readBlock, readPage, resolvePages, slugify } from './pages.ts';
+/* WHAT EVERY READER DRAWS (`drawn.ts`), one rule for the record, the web and an agent's read of a page. */
+export { KEEP, WHY, arranged, bare, emptyHidden, gone, holdsNothing, keeps, leadOf, markDrawn, says, unsaid, type Drawable, type Why } from './drawn.ts';
 /* WHAT A READ ANSWERS ON A BLOCK, which the record takes off a block it holds from a reader (`packages/record` `DRAWN`). */
 export { ANSWER_KEYS, BLOCK_KEY, blockKeyOf, defaultBlockKey, keyedBlocks } from './block-keys.ts';
 /* THE LOOK OVERLAY (DIRECTION §38, `compose.ts`): what Slash and the owner write over a page, and the rules' own look. */
@@ -427,7 +431,7 @@ export { KEY_KINDS, PUBLIC_MAIL, githubOfAddress, isMachineIdentity, isOrganisat
 export type { IdentitySaid, KeyInput, KeyKind } from './identity-keys.ts';
 export { nameKey, noteMention } from './entities.ts';
 export { CEILING, CLIENT_KINDS, SCOPES, ceilingOf, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
-export { cutOffReadable, endedByCutOff } from './token.ts';
+export { cutOffReadable, endedByCutOff, isBuild } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
 export type { Member } from './members.ts';
@@ -878,6 +882,12 @@ export type InboxLine = {
    * arrival that waits, and on one a rule moved: that one has no settlement to take back, so nothing offers Put back.
    */
   settled?: ArrivalSettlement;
+  /**
+   * The id of the row a skipped arrival repeats, read from the `repeats` mark ingest wrote on its newest `match` line
+   * (audit-35 #3). Absent on any arrival the dedupe did not set aside, a rule's skip among them, so a screen offers
+   * "It is a second one" by this mark and never by the reason's words.
+   */
+  repeats?: string;
 };
 
 /**
@@ -3587,6 +3597,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             `${key} says where a key is sealed, and only the vault writes it. Deposit the key, and the record points this field at it.`,
             { at: key },
           );
+        /* A MARK IS A PICTURE, NEVER A CONTROL (PGS-A06): a project drawn as the close cross reads as a button. */
+        if ((decl as { identity?: { mark?: unknown } }).identity?.mark === key && isControlMark(value))
+          return no<Entry>(MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, { at: key });
         touched.push(key);
         if (value === null) {
           if (field.immutable && current && current.fields[key] !== undefined)
@@ -4496,10 +4509,23 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (w.principal?.kind !== 'token')
       return no('FORBIDDEN', 'A run belongs to an agent token, and a person is never one.', { at: 'principal' });
     const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
+    const { token } = w.principal;
     return transaction((): Result<Ended> => {
       const at = locateRun(w);
       if (at.found?.foreign) return notYours<Ended>(`${prefix}${String(at.found.seq)}`);
-      const run = at.found ? byId(at.found.id) : null;
+      /* A NAMED RUN IS ENDED, NEVER A GUESS (audit-35 #2). The ladder drops a name whose run is finished, and with no
+         client id rung 4 then adopts the caller's newest live run: a retried `end S1` ended S2, which was still working.
+         With nothing live to adopt, the same retry was refused as a session that never wrote. A caller that named its
+         run is answered for that run. A client id never reaches here, since rung 3 answers it. */
+      const said = w.session?.spoken?.trim() ?? '';
+      const guessed = at.found === null || at.found.by === 'adopted';
+      const named = guessed && isRunName(said) ? bySeq(SESSION, Number(said.slice(prefix.length))) : undefined;
+      if (named === null)
+        return no<Ended>('ROW_UNKNOWN', `${said} is no run on this record, so there is nothing to end. Leave the name out to end this session's own run.`, {
+          at: 'session',
+        });
+      if (named && owned(named.fields.token_id, token ?? null)) return notYours<Ended>(said);
+      const run = named ?? (at.found ? byId(at.found.id) : null);
       if (!run)
         return no<Ended>('ROW_UNKNOWN', 'This session wrote nothing to the record, so it has no run to end. Ending is for a session that wrote.', {
           at: 'session',
@@ -5503,6 +5529,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           : [],
       };
     },
+    /* THE VITAL SIGNS NOW, for the built-in `signs-red`, handed in because `metrics.ts` cannot import `signs.ts` without breaking the kernel's load. */
+    signs: () => readSigns(sql, clock.now(), recordTz()),
   });
 
   /** What the page layer reads through. It runs queries it did not write, so it takes callbacks. */
@@ -5560,6 +5588,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * is read off the body here, in the person's own names (`does.ts`), and a queue keeps it on its
    * lead question alone.
    */
+  /**
+   * How many open questions share the cause of the suggestion `s`, itself included: a column for the query that reads a
+   * page's questions, so a family is counted in SQL. A question put off is still open and counts. The unique index of
+   * migration 31 keeps one open question a cause, so on a sound record this reads 1: more is the index gone missing.
+   */
+  const ALIKE_SQL = "(SELECT COUNT(*) FROM suggestion o WHERE o.status = 'open' AND o.cause = s.cause)";
+
   const questionFrom = (r: Record<string, unknown>): QueueQuestion => {
     const body = parsedBody(r.body);
     const kind = String(r.body_kind ?? '');
@@ -5599,6 +5634,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       ...(does ? { does } : {}),
       ...(candidates.length > 0 ? { candidates } : {}),
       ...(Array.isArray(body.rows) ? { held: body.rows.length } : {}),
+      /* WHAT IT IS ABOUT, AS ONE KEY, and how many open questions share it (AGT-C07 d), read in the page's own query
+         (`ALIKE_SQL`) and never once per question. Absent from a question the record has no cause for. */
+      ...(typeof r.cause === 'string' && r.cause !== '' ? { cause: r.cause, alike: Math.max(1, Number(r.alike ?? 1)) } : {}),
       ...facts,
     };
   };
@@ -5725,6 +5763,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const row = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'look' AND superseded_at IS NULL AND retired = 0", `look.${page}`);
       return row ? (JSON.parse(row.body) as unknown) : null;
     },
+    /* THE RECORD'S VITAL SIGNS, as the record's `signs` reads them (`signs.ts`), so a page block with `source: signs`
+       draws them (PRF-A05). Without this line the block refuses as not in this build. */
+    signs: () => readSigns(sql, clock.now(), recordTz()),
     /* `into` GOES THROUGH, so a walk opened from one book walks in the book's own currency. Dropped here, the page asked
        for the book's currency and this host walked the home one, drawn once per currency instead. */
     runway: (opening, legs, horizon, only, into) => {
@@ -5897,7 +5938,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             ? []
             : sql
                 .all<Record<string, unknown>>(
-                  `SELECT id, body_kind, body, opened_by, opened_at, drafted_by, kind FROM suggestion WHERE id IN (${ids.map(() => '?').join(', ')})`,
+                  `SELECT id, body_kind, body, opened_by, opened_at, drafted_by, kind, cause, ${ALIKE_SQL} AS alike FROM suggestion s WHERE id IN (${ids.map(() => '?').join(', ')})`,
                   ...ids,
                 )
                 .map((r) => [String(r.id), r]),
@@ -5955,7 +5996,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     laterQuestions: (limit) => {
       const now = instant(clock.now());
       const rows = sql.all<Record<string, unknown>>(
-        "SELECT id, body_kind, body, status, opened_by, opened_at, defer_until, defer_why, drafted_by, kind FROM suggestion WHERE status = 'open' AND defer_until > ? ORDER BY defer_until ASC, rowid ASC LIMIT ?",
+        `SELECT id, body_kind, body, status, opened_by, opened_at, defer_until, defer_why, drafted_by, kind, cause, ${ALIKE_SQL} AS alike FROM suggestion s
+         WHERE status = 'open' AND defer_until > ? ORDER BY defer_until ASC, rowid ASC LIMIT ?`,
         now,
         Math.min(Math.max(1, Math.floor(limit)), 200),
       );
@@ -8001,12 +8043,34 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * THE STATES ARE BOUND, NEVER SPLICED. Each is checked against `INBOX_STATES` by the caller and again here, since a
      * word from the wire reaches this list, and only the count of placeholders is written into the text.
      */
-    inboxBefore: (before: number | null, limit: number, states: readonly InboxState[] = INBOX_WAITING): InboxLine[] => {
+    inboxBefore: (
+      before: number | null,
+      limit: number,
+      states: readonly InboxState[] = INBOX_WAITING,
+      only: { repeats?: boolean } = {},
+    ): InboxLine[] => {
       const asked = states.filter((s) => (INBOX_STATES as readonly string[]).includes(s));
       if (asked.length === 0) return [];
+      /* THE REPEATS MARK IS READ IN THE PAGE'S OWN QUERY, never once per arrival: the newest `match` line of a skipped
+         arrival, kept only when ingest marked it `repeats`. `repeats: true` pages through those alone, so a page full of
+         balance alerts set aside by a rule can no longer push a real second charge out of sight (audit-35 #3). */
+      const mark = `CASE WHEN r.state = 'skipped' THEN (SELECT CASE WHEN e.field = 'repeats' THEN e.from_v END FROM event e
+          WHERE e.target = 'inbox_raw:' || r.id AND e.kind = 'match' ORDER BY e.rowid DESC LIMIT 1) END`;
       return sql
-        .all<{ rowid: number; id: string; ts: string; channel: string; headers: string | null; body: string | null; state: string; reason: string | null }>(
-          `SELECT rowid, id, ts, channel, headers, body, state, reason FROM inbox_raw WHERE state IN (${asked.map(() => '?').join(', ')}) AND rowid < ? ORDER BY rowid DESC LIMIT ?`,
+        .all<{
+          rowid: number;
+          id: string;
+          ts: string;
+          channel: string;
+          headers: string | null;
+          body: string | null;
+          state: string;
+          reason: string | null;
+          repeats: string | null;
+        }>(
+          `SELECT * FROM (SELECT r.rowid AS rowid, r.id, r.ts, r.channel, r.headers, r.body, r.state, r.reason, ${mark} AS repeats
+             FROM inbox_raw r WHERE r.state IN (${asked.map(() => '?').join(', ')}) AND r.rowid < ?)
+           ${only.repeats === true ? 'WHERE repeats IS NOT NULL ' : ''}ORDER BY rowid DESC LIMIT ?`,
           ...asked,
           before ?? Number.MAX_SAFE_INTEGER,
           limit,
@@ -8036,6 +8100,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             state: r.state as InboxState,
             reason: r.reason,
             ...settlementOf(r.id, r.state),
+            ...(typeof r.repeats === 'string' && r.repeats !== '' ? { repeats: r.repeats } : {}),
           };
         });
     },
@@ -8298,9 +8363,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /** Revoke one, idempotently. */
     revokeToken: (person: string, id: string): Result<TokenRow> => transaction(() => revokeToken(tokenDeps(), person, id)),
 
-    /** A bearer, checked. The one way a token is recognised, and there is no other. */
-    verifyToken: (bearer: string, surface?: string, validFrom?: string): Promise<Result<Verified>> =>
-      verifyToken({ ...tokenDeps(), validFrom }, bearer, surface),
+    /**
+     * A bearer, checked. The one way a token is recognised, and there is no other. `build` is what the command behind it
+     * said it was (`x-braindog-cli`), kept on the key in the same statement as its use (AGT-A02); a value that is not a
+     * build is dropped there.
+     */
+    verifyToken: (bearer: string, surface?: string, validFrom?: string, build?: string): Promise<Result<Verified>> =>
+      verifyToken({ ...tokenDeps(), validFrom }, bearer, surface, build),
+
+    /** A session on this key called a tool: its `last_tool_at` moves to now, with no event (AGT-A02). */
+    noteTool: (tokenId: string): void => noteTool(sql, tokenId, instant(clock.now())),
 
     /* ── invitations, 12 §3 ───────────────────────────────── */
 

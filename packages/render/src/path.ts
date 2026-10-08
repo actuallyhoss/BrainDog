@@ -46,6 +46,19 @@ export const PATH_STEP = 'Step';
 
 const cell = (cells: readonly string[], i: number): string => (cells[i] ?? '').trim();
 
+/**
+ * Whether a part's value is missing: no cell, a blank one, or the dash a reader prints for null (`format.ts` `MISSING`).
+ * Zero is a value. Both drawers ask this of a chip, a `spec` row, a figure cell and a stone, and a part it answers yes
+ * for is not drawn (DIRECTION §35: "An empty or unused part is not drawn").
+ *
+ * HERE, BECAUSE THIS MODULE IMPORTS NOTHING: `html.ts` and the four Svelte drawers all reach it without a cycle. The
+ * dash is spelled out rather than imported for the same reason, and a test holds it equal to `MISSING`.
+ */
+export const unvalued = (value: string | null | undefined): boolean => {
+  const v = (value ?? '').trim();
+  return v === '' || v === '\u2014';
+};
+
 /** Whether a row is the count of the rest: `more | N`, exactly two cells. */
 const isCount = (cells: readonly string[]): boolean => cells.length === 2 && cell(cells, 0) === 'more';
 
@@ -108,6 +121,7 @@ export function pathFault(rows: readonly (readonly string[])[]): string | null {
  */
 export function pathPlan<R extends { cells: readonly string[] }>(
   rows: readonly R[],
+  keep = false,
 ): { stones: { row: R; mark: PathMark; short: boolean }[]; more: number; name: string | null } {
   const stones: { row: R; mark: PathMark; short: boolean }[] = [];
   let more = 0;
@@ -122,6 +136,9 @@ export function pathPlan<R extends { cells: readonly string[] }>(
       more = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
       continue;
     }
+    /* A STONE WITH NO STEP IS NOT DRAWN (`unvalued`), unless the block keeps its noughts (`empty: keep`): a bound title
+       nobody filled in drew a numbered dash between two real steps. */
+    if (!keep && unvalued(row.cells[0])) continue;
     const read = markOf(cell(row.cells, 2)) ?? { mark: 'later' as const, short: false };
     stones.push({ row, mark: read.mark, short: read.short });
   }

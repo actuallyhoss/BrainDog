@@ -14,12 +14,14 @@ import { createServer, type IncomingHttpHeaders } from 'node:http';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
+import { PassThrough, Writable } from 'node:stream';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { TOOLS, tools, type McpSurface } from '@braindog/mcp';
 import { INSTRUCTIONS, VERSIONS } from '@braindog/mcp/rpc';
 import { UNREACHABLE_FIX } from '../src/surface.ts';
+import { serveStdio } from '../src/stdio.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
@@ -166,6 +168,13 @@ function launch(extra: Record<string, string>, options: { args?: string[]; confi
       child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, ...(params === undefined ? {} : { params }) })}\n`);
       return reply;
     },
+    /** Several requests in ONE write, as a client that pipelines sends them, and their replies in the same order. */
+    together(calls: [method: string, params?: Record<string, unknown>][]): Promise<Rpc>[] {
+      const sent = calls.map(([method, params]) => ({ id: ++n, method, params }));
+      const replies = sent.map(({ id, method }) => expect(id, `${method} (id ${id}, sent together)`));
+      child.stdin.write(sent.map(({ id, method, params }) => `${JSON.stringify({ jsonrpc: '2.0', id, method, ...(params === undefined ? {} : { params }) })}\n`).join(''));
+      return replies;
+    },
     /** A raw line, and the reply that carries a null id. */
     raw(line: string): Promise<Rpc> {
       const reply = expect(null, `the reply to a raw line (${line})`);
@@ -235,6 +244,59 @@ test('AN OLDER CLIENT GETS A BARE PING AND NO resultType, as its own revision dr
     assert.equal((await s.ask('tools/list')).result.resultType, undefined, `tools/list answered a ${older} client with resultType`);
     assert.equal((await s.end()).code, 0);
   }
+});
+
+test('A REQUEST SENT IN THE SAME WRITE AS initialize IS ANSWERED UNDER THE REVISION IT AGREES', async (t) => {
+  /* The loop read both lines before the hello was answered, so the list went out under the newest revision, with a
+     `resultType` an older client may refuse. The hello is now answered before the next line is read. */
+  const host = await stubHost(t);
+  for (const older of ['2025-06-18', '2025-11-25']) {
+    const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+    const [init, listed, ping] = s.together([
+      ['initialize', { protocolVersion: older, capabilities: {}, clientInfo: { name: 'pipelined', version: '1' } }],
+      ['tools/list'],
+      ['ping'],
+    ]);
+    assert.equal((await init!).result.protocolVersion, older);
+    const list = await listed!;
+    assert.equal(list.result.resultType, undefined, `tools/list sent with the hello answered a ${older} client with resultType`);
+    assert.equal((list.result.tools as unknown[]).length, TOOLS.length);
+    assert.deepEqual((await ping!).result, {}, `ping sent with the hello answered a ${older} client with more than {}`);
+    assert.equal((await s.end()).code, 0);
+  }
+});
+
+test('A SLOW HELLO DROPS AND REORDERS NOTHING: the lines behind it wait, then each is answered once, after it', async () => {
+  /* The hello's reply is held 80ms in the pipe, and the input ends while it is held: the two lines read behind it are
+     answered after it, under the revision it agreed, and none is lost to the end of the input. */
+  const input = new PassThrough();
+  const out: Rpc[] = [];
+  let first = true;
+  const output = new Writable({
+    write(chunk: Buffer, _enc, done) {
+      for (const line of chunk.toString().split('\n').filter(Boolean)) out.push(JSON.parse(line) as Rpc);
+      if (first) setTimeout(done, 80);
+      else done();
+      first = false;
+    },
+  });
+  const served = serveStdio({} as McpSurface<null>, () => null, input, output);
+  input.end(
+    [
+      { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'slow', version: '1' } } },
+      { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+      { jsonrpc: '2.0', id: 3, method: 'ping' },
+    ]
+      .map((m) => `${JSON.stringify(m)}\n`)
+      .join(''),
+  );
+  await served;
+  assert.deepEqual(out.map((r) => r.id).sort(), [1, 2, 3], 'every line is answered once');
+  assert.equal(out[0]!.id, 1, 'the hello is answered first');
+  assert.equal(out[0]!.result.protocolVersion, '2025-06-18');
+  const list = out.find((r) => r.id === 2)!;
+  assert.equal(list.result.resultType, undefined, 'the list behind a slow hello was answered under the newest revision');
+  assert.deepEqual(out.find((r) => r.id === 3)!.result, {});
 });
 
 test('initialize and tools/list answer without touching the host, and the list is what the server serves', async (t) => {

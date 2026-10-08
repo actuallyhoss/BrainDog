@@ -1,5 +1,5 @@
 /**
- * `braindog signs [--json]`: the record's vital signs, read now (PRF-A01, DIRECTION §40 "a daily check watches all of
+ * `braindog signs [--json] [--strict]`: the record's vital signs, read now (PRF-A01, DIRECTION §40 "a daily check watches all of
  * that"). Whether bank messages are being filed, whether project numbers still arrive, whether questions pile up on one
  * cause, how old the oldest open question is, and whether runs end true, each as the record says it.
  *
@@ -21,7 +21,7 @@ import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { refuse } from './json.ts';
 import { isObject, type AgentIo } from './skills.ts';
 
-const USAGE = 'braindog signs takes [--json] and [--host <host>], as in braindog signs --json.';
+const USAGE = 'braindog signs takes [--json], [--strict] and [--host <host>], as in braindog signs --strict.';
 
 /** A sign's state as the kernel stores it (`sign_reading.state`): green, red, or none when nothing could be read. */
 export type SignState = 'green' | 'red' | 'none';
@@ -89,17 +89,26 @@ export function readSigns(value: unknown): SignRead[] {
 const closed = (s: string): string => (/[.!?]$/.test(s) ? s : `${s}.`);
 
 /**
+ * The one line for the whole. A sign not read yet is never counted as fine: a record where nothing could be read said
+ * "All 16 signs are fine, or not read yet.", which a person reads as fine.
+ */
+function headline(signs: readonly SignRead[]): string {
+  const red = signs.filter((s) => s.state === 'red').length;
+  const none = signs.filter((s) => s.state === 'none').length;
+  if (red > 0) return `${String(red)} of ${String(signs.length)} signs need a look.`;
+  if (none === signs.length) return signs.length === 1 ? 'The one sign has not been read yet.' : 'No sign has been read yet.';
+  const fine = signs.length - none;
+  if (none === 0) return signs.length === 1 ? 'The one sign is fine.' : `All ${String(signs.length)} signs are fine.`;
+  return `${fine === 1 ? '1 sign is' : `${String(fine)} signs are`} fine. ${none === 1 ? '1 has' : `${String(none)} have`} not been read yet.`;
+}
+
+/**
  * What the signs say, a person's way: one line for the whole, then each sign with its word, its sentence, a few of its
  * facts, and how many of its last days it read red.
  */
 export function signLines(signs: readonly SignRead[]): string[] {
   if (signs.length === 0) return ['Your record has no signs to read yet.'];
-  const red = signs.filter((s) => s.state === 'red').length;
-  const out = [
-    red === 0
-      ? `${signs.length === 1 ? 'The one sign is' : `All ${String(signs.length)} signs are`} fine${signs.some((s) => s.state === 'none') ? ', or not read yet' : ''}.`
-      : `${String(red)} of ${String(signs.length)} signs need a look.`,
-  ];
+  const out = [headline(signs)];
   for (const s of signs) {
     out.push('', `${s.name}: ${WORDS[s.state]}`);
     if (s.said !== '') out.push(`  ${closed(s.said)}`);
@@ -119,11 +128,17 @@ function refusalLine(r: Result<unknown>, to: Target): string {
   return printable(fixOf(r));
 }
 
-/** `braindog signs [--json] [--host <host>]`, and the exit code: 0 read, 1 refused, 3 unreachable. */
+/**
+ * `braindog signs [--json] [--strict] [--host <host>]`, and the exit code: 0 read, 1 refused, 3 unreachable.
+ *
+ * A RED SIGN STILL EXITS 0, ON PURPOSE. The command read the signs, and a sign that needs a look is the answer, not a
+ * failure of the command: a person, a hook or the loop quoting it should not be told the read failed. A script that
+ * wants to stop on a red asks for `--strict`, which exits 2 when any sign reads red and says so on stderr.
+ */
 export async function signsCommand(args: string[], io: AgentIo): Promise<number> {
-  let values: { host?: string | undefined };
+  let values: { host?: string | undefined; strict?: boolean | undefined };
   try {
-    ({ values } = parseArgs({ args, strict: true, allowPositionals: false, options: { host: { type: 'string' } } }));
+    ({ values } = parseArgs({ args, strict: true, allowPositionals: false, options: { host: { type: 'string' }, strict: { type: 'boolean' } } }));
   } catch {
     io.say(USAGE);
     return 1;
@@ -140,6 +155,10 @@ export async function signsCommand(args: string[], io: AgentIo): Promise<number>
   const answer: Result<unknown> = await client.call('signs');
   if (!answer.ok) return refuse(io, answer, refusalLine(answer, to));
   io.answer?.({ value: answer.value });
-  for (const line of signLines(printable(readSigns(answer.value)))) io.out(line);
-  return 0;
+  const signs = printable(readSigns(answer.value));
+  for (const line of signLines(signs)) io.out(line);
+  const red = signs.filter((s) => s.state === 'red').length;
+  if (values.strict !== true || red === 0) return 0;
+  io.say(`${red === 1 ? '1 sign needs' : `${String(red)} signs need`} a look, so this ends with exit 2 as --strict asks.`);
+  return 2;
 }

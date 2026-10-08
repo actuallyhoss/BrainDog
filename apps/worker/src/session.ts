@@ -129,8 +129,12 @@ export function withCookie(response: Response, cookie: string | undefined): Resp
 /** The three calls the bearer path makes: the Directory's `knows`, and the record's `verify` and `access`. */
 export type BearerDeps = {
   knows: (record: string) => Promise<boolean>;
-  /** `reach` is what the token's own row says it opens beyond its scope (`verifyToken`), absent from an older record. */
-  verify: (record: string, bearer: string, surface: 'api' | 'mcp') => Promise<{ id: string; person_id: string; scope: string; reach?: readonly TokenReach[] } | null>;
+  /**
+   * `reach` is what the token's own row says it opens beyond its scope (`verifyToken`), absent from an older record.
+   * `build` is the command's own build as its `x-braindog-cli` header says it (AGT-A02), for the record to keep on the key
+   * as its `last_build`, and absent when the caller sent none. The record drops a value that is not a build.
+   */
+  verify: (record: string, bearer: string, surface: 'api' | 'mcp', build?: string) => Promise<{ id: string; person_id: string; scope: string; reach?: readonly TokenReach[] } | null>;
   access: (record: string, person: string) => Promise<Held | null>;
   /** The record a live name means, the Directory's `resolve`. Asked only for a bearer that came under `/app/<slug>`. */
   named?: (slug: string) => Promise<string | null>;
@@ -183,6 +187,11 @@ function underLapse(method: string, ctx: CallContext): { ctx: CallContext } | { 
   return { ctx: method === OPERATION_METHOD.export ? ctx : capped(ctx) };
 }
 
+/** The header the `braindog` command says its build in (`apps/cli/src/position.ts`, `sessionHeaders`). */
+export const CLI_HEADER = 'x-braindog-cli';
+/** The longest build passed on: a day, a plus and a forty-character hash, with room to spare. */
+const CLI_BUILD_MOST = 64;
+
 /**
  * An agent's bearer, for `/api` and `/mcp` alike, so a token reaches the same person at the same level
  * through either. `surface` is all that differs, and it is only the token's `last_surface`: where a listing
@@ -209,7 +218,11 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
   const record = recordOf(authorization);
   if (!record || !(await deps.knows(record))) return { status: 401 };
   const bearer = /^Bearer\s+(.+)$/i.exec(authorization ?? '')?.[1];
-  const seen = bearer ? await deps.verify(record, bearer, surface) : null;
+  /* THE COMMAND SAYS ITS BUILD ON EVERY CALL (AGT-A02), and it goes down with the bearer so the record can say which
+     machine is behind. Only a short one goes: a build is `YYYY.MM.DD+<hash>`, and the record drops anything else anyway. */
+  const said = request.headers.get(CLI_HEADER)?.trim();
+  const build = said !== undefined && said !== '' && said.length <= CLI_BUILD_MOST ? said : undefined;
+  const seen = bearer ? await deps.verify(record, bearer, surface, build) : null;
   if (!seen) {
     const asked = surface === 'api' && bearer && deps.operation ? operationAsked(request) : null;
     /* THE PATH'S NAME IS ASKED BEFORE THE GRANT IS READ, BECAUSE READING IT SPENDS IT. `heldBy` below asks it too, but

@@ -131,6 +131,29 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
     const per = byHand(k, { ...decl, value: pair.per } as SeedMetric);
     return { value: of.value === null || per.value === null ? null : of.value - per.value, unit: of.unit ?? per.unit };
   }
+  /* A RATIO IS ITS TWO HALVES READ OVER THE SAME ROWS, one over the other, and nothing over a half of nought. */
+  if ('ratio' in v) {
+    const pair = v.ratio as { of: unknown; per: unknown };
+    const of = byHand(k, { ...decl, value: pair.of } as SeedMetric);
+    const per = byHand(k, { ...decl, value: pair.per } as SeedMetric);
+    return { value: of.value === null || per.value === null || per.value === 0 ? null : of.value / per.value, unit: null };
+  }
+  /* THE THREE SIGNS WORDS (money-core 3.16.0): rows with the field empty, the currencies a money field is in, and the
+     whole days from the newest day in the field to today. */
+  if ('empty' in v) {
+    const field = v.empty as string;
+    return { value: rows.filter((e) => e.fields[field] === undefined || e.fields[field] === null || e.fields[field] === '').length, unit: null };
+  }
+  if ('currencies' in v) {
+    const field = v.currencies as string;
+    return { value: new Set(rows.flatMap((e) => { const m = e.fields[field] as { currency?: string } | null | undefined; return m?.currency ? [m.currency] : []; })).size, unit: null };
+  }
+  if ('age' in v) {
+    const days = rows.map((e) => e.fields[v.age as string]).filter((d): d is string => typeof d === 'string').map((d) => d.slice(0, 10)).sort();
+    const newest = days.at(-1);
+    const today = new Date(NOW).toISOString().slice(0, 10);
+    return { value: newest === undefined ? null : Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${newest}T00:00:00Z`)) / 86_400_000)), unit: null };
+  }
   if ('count' in v) {
     const field = v.count as string;
     return { value: field === 'id' ? rows.length : rows.filter((e) => e.fields[field] !== undefined).length, unit: null };
@@ -238,6 +261,9 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
        reading of it. It is held to the forecast it walks with in `money.test.ts` (the tiles and the bridge add up the same
        movements) and `kernel/test/money-figures.test.ts` (a figure over the walk adds up the same movements). */
     if (decl.source === 'forecast.runway') continue;
+    /* NOR OF A FIGURE OVER A KEPT LINE (`series.<figure>`, money-core 3.16.0's `nights-missed-30d`): it counts the days its
+       line has no point, which `kernel/test/metrics-series-gaps.test.ts` holds. */
+    if (decl.source.startsWith('series.')) continue;
     /* A FIGURE READ ONCE PER BOOK has no book to be read about: the sample keeps none (money-core 3.1.0's `books`). */
     if (JSON.stringify(decl).includes('book is {{it}}')) continue;
     const params = JSON.stringify(decl).includes('{{it}}') ? THINGS.map((t) => String(t.name)) : [null];

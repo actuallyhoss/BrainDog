@@ -12,8 +12,9 @@
  * everybody has forgotten it is there, and it would be calling one we chose before the owner had read the host.
  * Arming it installs a schedule row (`packages/kernel/src/index.ts`, `arm(body.channel as 'call' | 'poll', ...)`)
  * that calls out daily from the owner's record. What was wrong was never that approval is required; it was that
- * nobody filed the proposal, so the approval never came up. The proposal a record would file for itself is `ratesProposalFor` in
- * `apps/web/src/lib/record/rates-form.ts`, built from the currencies it already holds, and approving it stays a tap.
+ * nobody filed the proposal, so the approval never came up. The proposal a record files for itself is the `rates` preset
+ * in `apps/web/src/lib/record/action-draft.ts`, filled here from `ratesSpecFor` and the currencies it already holds, and
+ * approving it stays a tap. (This once named a `rates-form.ts` that was never written.)
  *
  * THE FILL CHECKS THE SPEC BECAUSE THE PLAN CANNOT SHOW IT. The approval line is `CALLS OUT open.er-api.com · every
  * 1d · grant "none"` and says nothing about the map. Measured against a real record while this was still a builder in
@@ -28,7 +29,7 @@
  * answered on its last day as values.
  *
  * `apps/web` READS THIS FILE AND THE PACK FILE, AND NOTHING ELSE HERE, which is why nothing here may reach for Node:
- * the rates form runs in the browser and imports `fillRates` beside `rates-poll.pack.json` as JSON.
+ * the `rates` preset runs in the browser and imports `fillRates` and `ratesSpecFor` beside `rates-poll.pack.json`.
  */
 
 /**
@@ -111,8 +112,8 @@ export function fillRates(template: Record<string, unknown>, spec: RatesSpec): R
  * THE SHAPE LIVES HERE AND NOT IN THE FILE, SINCE 1.1.0. The file shipped two maps, dollars in Egyptian pounds and in
  * sterling, and the fill copied the first for every currency, so the shape came with a pair of currencies that were one
  * record's own. A record installing the file as it stood was sent those two whatever it held.
- * The file now ships no map, the form fills one a currency from what the record already holds
- * (`ratesProposalFor`), and the key order is the one the file's maps always had.
+ * The file now ships no map, the preset fills one a currency from what the record already holds
+ * (`ratesSpecFor`), and the key order is the one the file's maps always had.
  */
 function entryOf(base: string, r: { currency: string; path: string }, host: string): Entry {
   return {
@@ -121,5 +122,41 @@ function entryOf(base: string, r: { currency: string; path: string }, host: stri
     rate: { path: r.path, type: 'decimal' },
     as_of: { arrived: true },
     source: { value: host },
+  };
+}
+
+/**
+ * The address the file names, less the currency at its end. open.er-api answers `/v6/latest/<base>` with what one of
+ * the base is worth in every other currency, so the base is the last part of the address and nothing else changes.
+ *
+ * A HAND COPY OF `rates-poll.pack.json`'s `url`, held to it by `rates-poll.test.ts`, because this file may not read the
+ * pack file itself (the browser imports both, and a test reads the file from disk).
+ */
+export const RATES_ADDRESS = 'https://open.er-api.com/v6/latest/';
+
+/**
+ * The spec a record fills the file with, from the currencies its money is written in and its home currency, or `null`
+ * when there is nothing to fetch.
+ *
+ * THE HOME CURRENCY IS THE BASE, AND EVERY OTHER CURRENCY IS QUOTED against it, so one poll a day writes one row of `fx`
+ * a currency, each saying what one of the home currency is worth in it, which is the pair a figure in the home currency
+ * converts by. One address, one action, however many currencies: a record that gains one fills this again and the poll
+ * filed under the same id is replaced rather than joined by a second.
+ *
+ * NO HOME, OR NOTHING BUT THE HOME, IS NO FEED. Without a home there is no base to quote against, and a record whose
+ * money is all in one currency never adds two together, so a daily call would fetch for nobody. `fillRates` would refuse
+ * the second anyway; answering `null` lets the caller offer nothing instead of catching a sentence.
+ */
+export function ratesSpecFor(currencies: Iterable<string>, home: string | null | undefined): RatesSpec | null {
+  const base = (home ?? '').trim().toUpperCase();
+  if (!CODE.test(base)) return null;
+  const others = [...new Set([...currencies].map((c) => c.trim().toUpperCase()))].filter((c) => CODE.test(c) && c !== base).sort();
+  if (others.length === 0) return null;
+  return {
+    id: 'open-er-api-com',
+    url: `${RATES_ADDRESS}${base}`,
+    every: '1d',
+    base,
+    rates: others.map((currency) => ({ currency, path: `rates.${currency}` })),
   };
 }

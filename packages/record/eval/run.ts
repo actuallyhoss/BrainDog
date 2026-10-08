@@ -17,6 +17,7 @@
  *
  *   --only 1,2,3   only those descriptions, by number (`cases.ts`); the headlines are asked whatever is chosen
  *   --dry          the stub model in `stub.ts`, no key and no network: proves the scorer runs, and scores nothing real
+ *   --json         the lines below go to stderr, and stdout is one JSON line, the score object (`Score`), for a runner
  *
  * WHAT IT MEASURES AND WHY IT IS NOT A TEST. The suite in `test/` drives `describe` and the headlines over canned answers,
  * which says what the record does with an answer and nothing about whether a model gives a good one. This asks the model
@@ -30,7 +31,10 @@
  *   - SYSTEM WORDS: row, list, entity, field and the rest in what a person reads (headings, titles, sentences, the question),
  *     leaving out a word the owner used himself, so "a reading list" may be called one.
  *
- * It costs money and differs run to run, so it is not named `*.test.ts`, no package script runs it and CI never does.
+ * It costs money and differs run to run, so it is not named `*.test.ts` and no package script runs it. CI does, by itself
+ * and on its own schedule: `tools/model-checks/run.mjs --suite record` runs it with `--json` from
+ * `.github/workflows/model-checks.yml`, a few chosen descriptions a night and all twelve a week, asks a failed case twice
+ * more, and holds the share passed to the bar in `tools/model-checks/baseline.json`.
  *
  * THE ENGINE IS THE SHIPPED ONE. `createRecordApi` from `src/`, over a real SQLite from the kernel's test helper, drafting
  * through `slashDraft` (`describe` with its repairs and `previewChange`) and writing headlines through `slashTick`. The model
@@ -57,6 +61,9 @@ if (!dry && ((provider !== 'openai' && provider !== 'anthropic') || modelName ==
   console.error('Usage: DRAFT_EVAL_MODEL=<model> DRAFT_EVAL_KEY=<key> [DRAFT_EVAL_PROVIDER=openai|anthropic] [DRAFT_EVAL_URL=<base>] node packages/record/eval/run.ts [--only 1,2,3] [--dry]');
   process.exit(2);
 }
+/** `--json`: the human lines move to stderr so stdout carries the score object alone. */
+const json = process.argv.includes('--json');
+const say = (line: string): void => (json ? console.error(line) : console.log(line));
 const timeoutSaid = Number(process.env['DRAFT_EVAL_TIMEOUT_MS']);
 const timeoutMs = Number.isFinite(timeoutSaid) && timeoutSaid > 0 ? timeoutSaid : SLASH_TIMEOUT_MS;
 
@@ -156,7 +163,7 @@ type Seen = { ok: boolean; value?: { pages: Page[] }; refusal?: { code: string; 
 type Tried = { ok: boolean; value?: { steps?: { state?: string }[] }; refusal?: { at?: string } };
 type Drafted = { by: string; drafts: { question: string; change: { to: unknown } }[]; dropped: string[] };
 
-type Scored = { c: Case; pass: boolean; first: boolean; kept: number; asks: number; pages: number; calm: number; refused: number; dropped: number; words: string[]; ms: number; why: string };
+type Scored = { c: Case; pass: boolean; first: boolean; kept: number; asks: number; pages: number; calm: number; refused: number; dropped: number; words: string[]; ms: number; why: string; fault: string | null };
 
 /** A record whose `previewChange` and `tryAutomation` are counted, as `slashDraft` reads them off `this` (`previewerOf`). */
 const watched = (api: Record<string, unknown>, ask: () => number, seen: { ask: number; got: Seen }[], tried: Tried[]) => ({
@@ -201,7 +208,7 @@ async function described(c: Case): Promise<Scored> {
 
   if (!out.ok || out.value === undefined) {
     const why = out.refusal ? `${out.refusal.code}: ${out.refusal.fix}` : 'the record refused the description';
-    return { c, pass: false, first: false, kept: 0, asks: tally.asks.length, pages: pages.length, calm, refused, dropped: 0, words: [], ms, why: quiet(why) };
+    return { c, pass: false, first: false, kept: 0, asks: tally.asks.length, pages: pages.length, calm, refused, dropped: 0, words: [], ms, why: quiet(why), fault: tally.fault };
   }
   const { drafts, dropped } = out.value;
   const words: string[] = [];
@@ -213,14 +220,14 @@ async function described(c: Case): Promise<Scored> {
   const kept = drafts.length;
   const first = kept > 0 && tally.asks.length === 1 && firstClean;
   const why = kept === 0 ? (tally.fault ?? dropped[0] ?? 'nothing was kept') : words.length > 0 ? `says ${[...new Set(words)].join(', ')}` : '';
-  return { c, pass: kept > 0 && words.length === 0, first, kept, asks: tally.asks.length, pages: pages.length, calm, refused, dropped: dropped.length, words, ms, why: quiet(why) };
+  return { c, pass: kept > 0 && words.length === 0, first, kept, asks: tally.asks.length, pages: pages.length, calm, refused, dropped: dropped.length, words, ms, why: quiet(why), fault: tally.fault };
 }
 
 /* ── the night ─────────────────────────────────────────────────────── */
 
 type Line = { page: string; pass: boolean; text: string; why: string };
 
-async function headlines(): Promise<{ lines: Line[]; why: string; ms: number }> {
+async function headlines(): Promise<{ lines: Line[]; why: string; ms: number; fault: string | null }> {
   tally = fresh();
   night = true;
   const { api, sql } = await seeded(counted);
@@ -233,7 +240,7 @@ async function headlines(): Promise<{ lines: Line[]; why: string; ms: number }> 
   const heard = tally.heard;
   if (heard === null) {
     const said = ran.ran ? ran.dropped.find((d) => /headline/iu.test(d)) : `the look did not run (${ran.why})`;
-    return { lines: [], why: quiet(tally.fault ?? said ?? 'no page was handed to the model'), ms };
+    return { lines: [], why: quiet(tally.fault ?? said ?? 'no page was handed to the model'), ms, fault: tally.fault };
   }
   const lines = heard.pages.map((p): Line => {
     const text = typeof tally.lines?.[p.page] === 'string' ? (tally.lines[p.page] as string).trim() : '';
@@ -242,7 +249,7 @@ async function headlines(): Promise<{ lines: Line[]; why: string; ms: number }> 
     const why = kept ? (words.length > 0 ? `says ${[...new Set(words)].join(', ')}` : '') : (tally.fault ?? headlineFault(text, p) ?? 'not kept');
     return { page: p.page, pass: kept && words.length === 0, text, why: quiet(why) };
   });
-  return { lines, why: '', ms };
+  return { lines, why: '', ms, fault: tally.fault };
 }
 
 /* ── the run ───────────────────────────────────────────────────────── */
@@ -255,12 +262,12 @@ if (asked.length === 0) {
   process.exit(2);
 }
 
-console.log(dry ? `Draft evaluation, dry: ${asked.length} description${asked.length === 1 ? '' : 's'} and the night's headlines, on the stub model` : `Draft evaluation: ${asked.length} description${asked.length === 1 ? '' : 's'} and the night's headlines, ${provider} ${modelName}`);
+say(dry ? `Draft evaluation, dry: ${asked.length} description${asked.length === 1 ? '' : 's'} and the night's headlines, on the stub model` : `Draft evaluation: ${asked.length} description${asked.length === 1 ? '' : 's'} and the night's headlines, ${provider} ${modelName}`);
 const scored: Scored[] = [];
 for (const c of asked) {
   const s = await described(c);
   scored.push(s);
-  console.log(
+  say(
     `${String(c.n).padStart(2)} ${s.pass ? 'pass' : 'FAIL'}  ${c.name.padEnd(16)} ${String(s.ms).padStart(6)} ms  asks ${s.asks}  kept ${s.kept}  ` +
       `first try ${s.first ? 'yes' : 'no '}  calm ${s.pages === 0 ? '-' : (s.calm / s.pages).toFixed(1)}/page  refused ${s.refused}  dropped ${s.dropped}` +
       `${s.why === '' ? '' : `  (${s.why.slice(0, 160)})`}`,
@@ -268,9 +275,9 @@ for (const c of asked) {
 }
 
 const nightly = await headlines();
-if (nightly.lines.length === 0) console.log(`   FAIL  headlines          ${String(nightly.ms).padStart(6)} ms  (${nightly.why.slice(0, 160)})`);
+if (nightly.lines.length === 0) say(`   FAIL  headlines          ${String(nightly.ms).padStart(6)} ms  (${nightly.why.slice(0, 160)})`);
 for (const l of nightly.lines)
-  console.log(`   ${l.pass ? 'pass' : 'FAIL'}  headline ${l.page.padEnd(9)} ${String(nightly.ms).padStart(6)} ms  "${l.text.slice(0, 140)}"${l.why === '' ? '' : `  (${l.why.slice(0, 160)})`}`);
+  say(`   ${l.pass ? 'pass' : 'FAIL'}  headline ${l.page.padEnd(9)} ${String(nightly.ms).padStart(6)} ms  "${l.text.slice(0, 140)}"${l.why === '' ? '' : `  (${l.why.slice(0, 160)})`}`);
 
 const n = scored.length;
 const pct = (a: number, b: number): string => (b === 0 ? '-' : `${Math.round((100 * a) / b)}%`);
@@ -285,15 +292,52 @@ const words = [...scored.flatMap((s) => s.words), ...nightly.lines.flatMap((l) =
 const passed = scored.filter((s) => s.pass).length + nightly.lines.filter((l) => l.pass).length;
 const cases = n + Math.max(1, nightly.lines.length);
 
-console.log('');
-console.log(`first try     ${first} of ${n} drew clean from the first ask, with no repair (${pct(first, n)})`);
-console.log(`calm          ${pages === 0 ? '-' : (calm / pages).toFixed(2)} faults a page, ${calm} over the ${pages} pages the first ask drew`);
-console.log(`refused       ${refused} by the record at a draw or a try, ${dropped} said as dropped, ${outright} of ${n} kept nothing`);
-console.log(`headlines     ${keptLines} of ${nightly.lines.length} kept (${pct(keptLines, nightly.lines.length)})`);
-console.log(`system words  ${words.length}${words.length === 0 ? '' : `: ${[...new Set(words)].join(', ')}`}`);
-console.log(
+say('');
+say(`first try     ${first} of ${n} drew clean from the first ask, with no repair (${pct(first, n)})`);
+say(`calm          ${pages === 0 ? '-' : (calm / pages).toFixed(2)} faults a page, ${calm} over the ${pages} pages the first ask drew`);
+say(`refused       ${refused} by the record at a draw or a try, ${dropped} said as dropped, ${outright} of ${n} kept nothing`);
+say(`headlines     ${keptLines} of ${nightly.lines.length} kept (${pct(keptLines, nightly.lines.length)})`);
+say(`system words  ${words.length}${words.length === 0 ? '' : `: ${[...new Set(words)].join(', ')}`}`);
+say(
   `score         first try ${pct(first, n)}, calm ${pages === 0 ? '-' : (calm / pages).toFixed(2)}/page, refused ${refused}, headlines ${pct(keptLines, nightly.lines.length)}, ` +
     `system words ${words.length}, ${passed} of ${cases} passed`,
 );
+
+/**
+ * What `--json` prints, the one shape `tools/model-checks` reads from both harnesses. `score` is the share of cases that
+ * passed, 0 to 100, the headlines counted as one case each (or one case when none came back), which is what the bar in
+ * `baseline.json` is held to. A case is named by `id`: a description's number, or `headline <page>`, whose `n` is null
+ * because `--only` names descriptions and the headlines are asked on every run. A case's
+ * `fault` is the provider's own words, already quiet, so the runner can tell no answer from a wrong one.
+ */
+type Score = {
+  suite: 'record';
+  model: string;
+  passed: number;
+  total: number;
+  score: number;
+  firstTry: number;
+  headlines: { kept: number; of: number };
+  systemWords: number;
+  cases: { id: string; n: number | null; pass: boolean; ms: number; code: string | null; fault: string | null }[];
+};
+if (json) {
+  const night =
+    nightly.lines.length === 0
+      ? [{ id: 'headlines', n: null, pass: false, ms: nightly.ms, code: nightly.why || null, fault: nightly.fault }]
+      : nightly.lines.map((l) => ({ id: `headline ${l.page}`, n: null, pass: l.pass, ms: nightly.ms, code: l.pass ? null : l.why || null, fault: l.pass ? null : nightly.fault }));
+  const score: Score = {
+    suite: 'record',
+    model: dry ? 'stub' : modelName,
+    passed,
+    total: cases,
+    score: Math.round((100 * passed) / cases),
+    firstTry: n === 0 ? 0 : Math.round((100 * first) / n),
+    headlines: { kept: keptLines, of: nightly.lines.length },
+    systemWords: words.length,
+    cases: [...scored.map((s) => ({ id: String(s.c.n), n: s.c.n, pass: s.pass, ms: s.ms, code: s.pass ? null : s.why || null, fault: s.fault })), ...night],
+  };
+  console.log(JSON.stringify(score));
+}
 
 process.exit(passed === cases ? 0 : 1);

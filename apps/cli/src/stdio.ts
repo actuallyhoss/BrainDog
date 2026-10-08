@@ -2,7 +2,8 @@
  * Newline-delimited JSON-RPC on standard input and output: the transport Claude Code launches.
  *
  * ONE MESSAGE PER LINE, ANSWERED AS IT FINISHES. Calls run side by side, so a slow read does not hold
- * a ping behind it; the id pairs a reply with its request, never the order.
+ * a ping behind it; the id pairs a reply with its request, never the order. The one exception is `initialize`,
+ * answered before the next line is read, because what it agrees is how every later request is answered.
  *
  * STDOUT CARRIES THE PROTOCOL AND NOTHING ELSE. A stray line there is a parse error in the client and a
  * server that looks dead, so anything a person should read goes to stderr.
@@ -73,12 +74,15 @@ export async function serveStdio<C>(
     const said = helloOf(message);
     if (said !== null) hello?.(said);
     /* `handle` never throws, so a failed call is a reply and the loop goes on. */
-    track(
-      handle(message, surface, ctxOf(), origin, version).then((reply) => {
-        version = agreed(reply) ?? version;
-        return reply ? send(reply) : undefined;
-      }),
-    );
+    const job = handle(message, surface, ctxOf(), origin, version).then((reply) => {
+      version = agreed(reply) ?? version;
+      return reply ? send(reply) : undefined;
+    });
+    /* THE HELLO IS ANSWERED BEFORE THE NEXT LINE IS READ. A client may send `initialize` and its first request in one
+       write; the version is known only once the hello is answered, so a request read before then was answered under
+       the newest revision, `resultType` and all, to a client of an older one. Every other call runs side by side. */
+    if (isObject(message) && message.method === 'initialize') await job;
+    else track(job);
   }
 
   while (inFlight.size > 0) await Promise.all(inFlight);

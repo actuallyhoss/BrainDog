@@ -6,7 +6,7 @@
  * an invented record is for the gates and for nothing else (DIRECTION 40).
  */
 
-import { forward, forwards, startRecord } from '../../gates/record.mjs';
+import { forward, forwards, recordsAnswer, startRecord } from '../../gates/record.mjs';
 
 export async function open() {
   const record = await startRecord(0);
@@ -18,6 +18,13 @@ export async function open() {
     prefix: '',
     cannot: [],
     async handle(req, res, at) {
+      /* THE SWITCHER'S QUESTION, which the shell asks on every screen: the seed's one record, as a host lists it.
+         Left to the 404 below, every seed picture carried one failed request and two console errors. */
+      if (req.method === 'GET' && /^\/+account\/records\/?$/u.test(at.pathname)) {
+        for await (const _ of req);
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        return res.end(JSON.stringify(recordsAnswer()));
+      }
       if (!forwards(at.pathname)) {
         for await (const _ of req);
         res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });

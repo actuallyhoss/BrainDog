@@ -10,6 +10,7 @@
 <script lang="ts">
   import { TONES, captioned, inline, type Block, type RenderOptions, type Row } from '../src/index.ts';
   import { kindSpec } from '../src/kind-spec.ts';
+  import { emptied } from '../src/html.ts';
   import Text from './Text.svelte';
   import Panel from './p/Panel.svelte';
   import Grid from './p/Grid.svelte';
@@ -141,7 +142,7 @@
 {#if !spec}
   <!-- A kind nobody installed, `toHTML`'s same one line: a label and what to do, never an empty figure. -->
   <figure class="block" data-kind={block.kind}><p class="needs-client">Block “{block.kind}” needs a newer client.</p></figure>
-{:else}
+{:else if emptied(block, opts) !== null}
 <figure
   class="block block-{spec.primitive}"
   data-kind={block.kind}

@@ -20,6 +20,7 @@
   import * as clipboard from '$lib/clipboard.ts';
   import { callerAt, listDoors, mintDoor, type Said } from '$lib/ui/webhook-doors.ts';
   import { openActions } from '$lib/record/actions.ts';
+  import { homeCurrency, moneyCurrencies } from '$lib/record/api.ts';
   import {
     AUTH_KINDS,
     CHANNELS,
@@ -83,7 +84,9 @@
   $effect(() => {
     if (!open) return;
     untrack(() => {
-      draft = presetOf(kind, preset);
+      /* THE RECORD'S OWN CURRENCIES, as its `boot` said them, or the rates preset knows only the home one and quotes
+         nothing. */
+      draft = presetOf(kind, preset, { currencies: moneyCurrencies(), home: homeCurrency() });
       problem = null;
       filed = null;
       said = null;
@@ -242,7 +245,11 @@
         </label>
       {/if}
 
-      {#if draft.register !== ''}
+      {#if draft.register !== '' && draft.filled && draft.channel === 'poll' && draft.register === draft.filled.register}
+        <!-- A FILLED DRAFT IS FILED WITH ITS FILLER'S MAPS (`declarationOf`), so its map lines would be empty and ignored:
+             the sheet says what the filler made instead. -->
+        <p class="help">{draft.filled.said}</p>
+      {:else if draft.register !== ''}
         <fieldset class="part lines">
           <legend class="label">{w.map}</legend>
           <span class="help">{w.mapHelp}</span>

@@ -10,7 +10,7 @@
  *
  * NOTHING MOVED BUT THE FILE, AND THAT WAS PROVED RATHER THAN CLAIMED. While the builder was in the tree, every spec
  * below was filled from the file and built by the builder, and the two were held equal byte for byte. The builder
- * went once `apps/web/src/lib/record/rates-form.ts` filled this file instead. What each spec
+ * went once this file was filled in its place (`fill.ts`; the `rates-form.ts` once named here was never written). What each spec
  * changes was printed from the builder on its last day, before it was deleted, and is written out below as values, so the
  * comparison outlived the thing it compared against.
  *
@@ -30,7 +30,7 @@ import { createRecordApi, type CallContext } from '../../packages/record/src/ind
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
 import { firstPartyDocument } from '../../packages/seed/src/index.ts';
 
-import { fillRates, RATES_CURRENCIES_MOST, type RatesSpec } from './fill.ts';
+import { fillRates, RATES_ADDRESS, RATES_CURRENCIES_MOST, ratesSpecFor, type RatesSpec } from './fill.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 
@@ -322,4 +322,56 @@ test('EXCHANGE RATES ARE POLLED LIKE ANY ADDRESS: approved once, one row of fx a
   const cash = said<{ value: number | null; unit: string | null; fx?: { asOf: string | null } }>(await api.metric({ metric: 'cash-now' }, owner));
   assert.deepEqual([cash.value, cash.unit, cash.fx?.asOf], [5_200_000 + 340_000 * 50 + convertMinor(74_000, 'GBP', 'EGP', 50 / 0.74), 'EGP', '2026-09-24']);
   sql.close();
+});
+
+/* ── the spec a record fills the file with, from what it holds (REC-B02) ──────────────────────── */
+
+test('THE ADDRESS A SPEC IS FILLED WITH IS THE FILE’S, with the base at its end', () => {
+  /* `RATES_ADDRESS` IS A HAND COPY, because `fill.ts` may not read the pack file. Measured red: with the copy set to
+     another host this test and the EGP one below failed, so the preset cannot poll an address the file never named
+     without saying so. */
+  assert.equal(`${RATES_ADDRESS}USD`, (template().declarations as { url: string }[])[0]!.url);
+});
+
+test('EGP HOME WITH DOLLARS AND STERLING: the home is the base, the other two are quoted, once a day, at the file’s address', () => {
+  const spec = ratesSpecFor(['USD', 'EGP', 'gbp', 'USD'], 'EGP');
+  assert.deepEqual(spec, {
+    id: 'open-er-api-com',
+    url: 'https://open.er-api.com/v6/latest/EGP',
+    every: '1d',
+    base: 'EGP',
+    rates: [
+      { currency: 'GBP', path: 'rates.GBP' },
+      { currency: 'USD', path: 'rates.USD' },
+    ],
+  });
+  /* AND FILLED, IT IS ONE POLL WITH ONE ROW A CURRENCY, each saying what one Egyptian pound is worth in it, under the
+     file's own name, so a record that gains a currency replaces this poll rather than adding a second. */
+  const doc = fillRates(template(), spec!);
+  const poll = (doc.declarations as { ingest: string; url: string; every: string }[])[0]!;
+  assert.deepEqual([doc.pack, poll.ingest, poll.url, poll.every], ['rates-open-er-api-com', 'rates_open_er_api_com', 'https://open.er-api.com/v6/latest/EGP', '1d']);
+  assert.deepEqual(
+    mapOf(doc).map((m) => [m.currency?.value, m.base?.value, m.rate?.path, m.source?.value]),
+    [
+      ['EGP', 'GBP', 'rates.GBP', 'open.er-api.com'],
+      ['EGP', 'USD', 'rates.USD', 'open.er-api.com'],
+    ],
+  );
+  assert.equal(doc.summary, 'Polls open.er-api.com every 1d for what one EGP is worth in GBP, USD.');
+  /* THE FILE IS STILL A TEMPLATE AFTERWARDS: filling reads it and changes nothing in it. */
+  assert.deepEqual(mapOf(template()), []);
+});
+
+test('ONE CURRENCY ONLY MAKES NO FEED, and neither does a record with no home currency', () => {
+  /* A RECORD WHOSE MONEY IS ALL IN ITS HOME CURRENCY NEVER ADDS TWO TOGETHER, so a daily call out would fetch for
+     nobody; with no home there is no base to quote against. `null`, so the caller offers nothing rather than catching
+     the sentence `fillRates` throws for an empty map. */
+  assert.equal(ratesSpecFor(['EGP'], 'EGP'), null);
+  assert.equal(ratesSpecFor(['egp', ' EGP '], 'egp'), null);
+  assert.equal(ratesSpecFor([], 'EGP'), null);
+  assert.equal(ratesSpecFor(['USD', 'EGP'], null), null);
+  assert.equal(ratesSpecFor(['USD', 'EGP'], 'pounds'), null);
+  assert.equal(ratesSpecFor(['EGP', 'nope'], 'EGP'), null, 'a code that is not one was quoted');
+  /* BUT A HOME WITH NO MONEY IN IT YET AND ONE ACCOUNT IN DOLLARS IS TWO CURRENCIES, and the dollar is quoted. */
+  assert.deepEqual(ratesSpecFor(['USD'], 'EGP')?.rates, [{ currency: 'USD', path: 'rates.USD' }]);
 });

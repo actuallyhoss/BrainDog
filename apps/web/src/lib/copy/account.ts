@@ -443,9 +443,8 @@ export const account = {
 
   /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */
   theSignature: 'How anybody checks a copy is yours',
-  /* AND ON A RECORD THERE IS NO KEY TO SHOW YET. The value under this heading is the sample's, kept
-     in `fixtures/sample.ts` with the rest of the synthetic record, and it was drawn on every record: an
-     invented key presented as that record's own, which no reader could tell by looking. `boot` does
+  /* AND ON A RECORD THERE IS NO KEY TO SHOW YET. An invented key was once drawn here as every record's
+     own, which no reader could tell by looking, so none is drawn now. `boot` does
      not carry the real one and `03 §4`'s well-known URL is served by none of the three apps, so a
      record gets the fact that its files are signed and the absence said plainly. */
   /* THE CHECK, RUN IN THIS BROWSER over a file somebody picks: the same `checkBrainl` an import runs before it writes

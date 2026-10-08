@@ -995,7 +995,10 @@ test("A SPLIT IS DRAWN ONLY WHILE IT HAS A PART TO CUT, on Money's Accounts and 
 
   /* THE BOOK'S MONTH, held to the split's own clauses: last month's payment is not this month's. */
   const month = "Where this month's money went";
-  const paid = (on: string) => made('transactions', { what: 'Studio rent', on, direction: 'out', amount: { amount: 40_000, currency: 'GBP' }, account: current, state: 'cleared', book: studio });
+  /* A CATEGORY ON THE PAYMENT: a split whose every row falls under its `unset:` label reads unsaid (`drawn.ts`), and the
+     month is what is under test here, not the uncategorised case. */
+  const rent = made('categories', { name: 'Studio rent', direction: 'out', state: 'live' });
+  const paid = (on: string) => made('transactions', { what: 'Studio rent', on, direction: 'out', amount: { amount: 40_000, currency: 'GBP' }, account: current, state: 'cleared', book: studio, category: rent });
   /* READ A BOOK AT A TIME, as `book-cash` is: the page fills `{{it}}` with the book's name, and so does this. */
   const spent = (): number | null => {
     const decl = METRICS['book-spent-month'] as { where: string };

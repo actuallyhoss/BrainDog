@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { patternReport } from '../src/ingest.ts';
-import { CARD, CASH, NOW, record, text, used } from './ingest-tail-kit.test.ts';
+import { CARD, CASH, NOW, record, text, used } from './ingest-tail-kit.ts';
 
 test('EACH PATTERN BY ITS NAME, WITH ITS THREE COUNTS, and the door’s texts no pattern read', async () => {
   const r = await record(

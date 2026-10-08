@@ -373,7 +373,8 @@ const SHARED_LEVELS = ['co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'com.au', 'net.au',
  * A PASSKEY IS BOUND TO ITS NAME, and every site under a shared name can ask a browser for it. A BrainDog at
  * `studio.pages.dev` whose passkeys were made for `pages.dev`, or for `studio.pages.dev` itself, holds them on a name
  * the platform hands out again; the operator owns neither. So the Directory refuses to start with one, by the name,
- * and says what to do instead; the self-host's start prints the sentence.
+ * and says what to do instead; the self-host's start prints the sentence. It stays strict: no setting lets a shared name
+ * through, and the sentence says so, so nobody goes looking for one.
  */
 export function sharedSuffix(id: string): string | null {
   const name = id.trim().toLowerCase().replace(/\.$/, '');
@@ -381,7 +382,7 @@ export function sharedSuffix(id: string): string | null {
   const level = SHARED_LEVELS.find((s) => name === s);
   const shared = host ?? level;
   if (shared === undefined) return null;
-  return `Passkeys cannot use ${shared}: it is a name many sites share, so any of them could ask for your passkeys. Serve BrainDog at a domain you own and sign in there.`;
+  return `Passkeys cannot use ${shared}: it is a name many sites share, so any of them could ask for your passkeys. Serve BrainDog at a domain you own and sign in there. This is on purpose, and there is no setting that allows it.`;
 }
 
 /**

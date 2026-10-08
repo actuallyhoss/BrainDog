@@ -120,7 +120,7 @@ test('EVERY BLOCK A READ ANSWERS CARRIES ITS KEY, the same on every read, and a 
   assert.equal(page.look, undefined, 'no look reader, no look');
   assert.deepEqual(headings(page.blocks), [
     ['note', true],
-    ['Notes', true],
+    ['Notes', false],
     ['Coming up', true],
     ['Now', true],
   ]);

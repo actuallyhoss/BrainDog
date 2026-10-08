@@ -101,6 +101,14 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.16.0',
+      notes: 'Money says three more things about how it is kept: how old the newest Ledger row is, how many currencies the accounts are in, and how much money out has no category.',
+    },
+    {
+      version: '3.15.0',
+      notes: 'Money says how alive it is, starting with how much was kept on the Ledger in the last seven days.',
+    },
+    {
       version: '3.14.0',
       notes: 'An account asks for the digits the bank prints, where it asked for the last four digits.',
     },

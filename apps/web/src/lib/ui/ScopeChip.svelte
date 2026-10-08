@@ -14,7 +14,9 @@
   "Marl…" in a narrow cell would name a different project to anybody who has two starting the same way.
 -->
 <script lang="ts">
+  import { markOf } from 'braindog-render';
   import Icon from './Icon.svelte';
+  import { isGlyph } from './icons.ts';
   import { words, type Scope } from '../record/scope-move.ts';
 
   let {
@@ -36,14 +38,15 @@
 </script>
 
 {#snippet body()}
-  <!-- THE MARK IS DRAWN, NOT TYPESET, by `rows.css`'s `.thing-glyph`, so a chip's mark and a list's row mark are one
-       shape; its hue is the project's own, set here and read by the rule below. -->
-  {#if scope === null}<Icon name="globe" size="s" />{:else if scope.mark !== null}<span
-      class="scope-mark thing-glyph"
-      data-shape={scope.mark}
-      style={scope.hue === null ? undefined : `--hue:${scope.hue}`}
-      aria-hidden="true"
-    ></span>{/if}<span class="scope-name" data-long={long ? '' : undefined}>{name}</span>
+  <!-- THE PROJECT'S OWN MARK (`markOf`, as a card draws it): its picture, or the letter of its name where the mark names
+       no picture or names a control, never the word itself. Its hue is the project's own, read by the rule below. -->
+  {#if scope === null}<Icon name="globe" size="s" />{:else if scope.mark !== null}{@const m = markOf(scope.mark, scope.name)}{#if m}<span
+        class="scope-mark"
+        data-shape={scope.mark}
+        style={scope.hue === null ? undefined : `--hue:${scope.hue}`}
+        aria-hidden="true"
+        >{#if m.length > 1 && isGlyph(m)}<Icon name={m} size="s" />{:else}{m}{/if}</span
+      >{/if}{/if}<span class="scope-name" data-long={long ? '' : undefined}>{name}</span>
 {/snippet}
 
 {#if onmove}

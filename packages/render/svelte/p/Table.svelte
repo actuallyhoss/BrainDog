@@ -26,7 +26,9 @@
 <script lang="ts">
   import { rowsAsCards } from '../rows-as-cards.svelte.ts';
   import type { Snippet } from 'svelte';
-  import { TONES, hrefFor, type RenderOptions } from '../../src/index.ts';
+  import { TONES, hrefFor, markOf, type RenderOptions } from '../../src/index.ts';
+  import { markGlyphOf } from '../../src/cards.ts';
+  import { glyphPath } from '../../src/inline.ts';
   import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type CardCell, type Cell, type Column, type TableRow } from '../types.ts';
   import { glyphColumn, intrinsicRows, tableCellBody, TABLE_CHUNK, TABLE_ROWS_LABEL } from '../../src/table.ts';
   import { MISSING } from '../../src/format.ts';
@@ -55,6 +57,7 @@
     cellSnippet,
     href,
     scope,
+    icon,
   }: {
     columns: readonly Column[];
     rows: readonly TableRow[];
@@ -88,7 +91,12 @@
      * beside the name, or the globe beside "Everywhere". Absent, every cell is its words, as it always was.
      */
     scope?: ScopeCells | undefined;
+    /** The host's drawing for a picture's name (`RenderOptions.icon`), so a scope chip's mark is its picture, as a card's is. */
+    icon?: RenderOptions['icon'];
   } = $props();
+
+  /** A mark's picture as the host draws it, or `null`, and the chip's slot stays empty, as `Cards.svelte` leaves it. */
+  const markArt = (glyph: string): string | null => glyphPath(glyph, icon ? { icon } : {});
 
   /* THE FIELDS WHOSE CELLS ARE CHIPS, by field and not by index, because the cell body is handed its column and not
      where the column sits. */
@@ -232,7 +240,7 @@
   mark is the project's character, drawn as `Cards.svelte` draws a card's, and hidden from a screen reader, which reads
   the name. The same markup as `Cards.svelte`'s chip, so a scope reads alike in a table and on a card.
 -->
-{#snippet scopeChip(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<span class="scope-chip" data-everywhere={everywhere ? '' : undefined}>{#if everywhere && cells.glyph}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={cells.glyph} /></svg>{:else if m?.mark}<span class="scope-mark" style={m.hue === null ? undefined : `--hue:${m.hue}`} aria-hidden="true">{m.mark}</span>{/if}<span class="scope-name">{said}</span></span>{/snippet}
+{#snippet scopeChip(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<span class="scope-chip" data-everywhere={everywhere ? '' : undefined}>{#if everywhere && cells.glyph}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={cells.glyph} /></svg>{:else if m?.mark}{@const sm = markOf(m.mark, said)}{@const sg = markGlyphOf(sm)}{#if sm}<span class="scope-mark" data-glyph={sg ?? undefined} style={m.hue === null ? undefined : `--hue:${m.hue}`} aria-hidden="true">{#if sg}{@const d = markArt(sg)}{#if d}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path {d} /></svg>{/if}{:else}{sm}{/if}</span>{/if}{/if}<span class="scope-name">{said}</span></span>{/snippet}
 
 <!--
   ONE CELL BODY, DRAWN BY BOTH ARMS.

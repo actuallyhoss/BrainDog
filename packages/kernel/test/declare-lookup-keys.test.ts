@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { openRecord, type Declaration } from '../src/index.ts';
-import { ACCOUNTS, CARD, LEDGER, NOW } from './ingest-tail-kit.test.ts';
+import { ACCOUNTS, CARD, LEDGER, NOW } from './ingest-tail-kit.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 async function install(...decls: Declaration[]): Promise<{ ok: boolean; code?: string; at?: string; fix?: string }> {

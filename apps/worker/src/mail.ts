@@ -764,7 +764,7 @@ const RUNBOOK: Record<OpsKind, string> = {
     'find the ref the person was shown, read where and error in Workers Logs; if it started with a deploy, DEPLOYMENT.md "Rolling back"; more than one door, 53 §5.11',
   refuse: '53 §5.3 (docs/53-SPEC-OPERATIONS.md)',
   model:
-    'read raw on the op: model line in Workers Logs; a message that names the model means the route table (MODELS in apps/worker/src/inference.ts), one that names the account or the gateway means the provider\'s console',
+    'read raw on the op: model line in Workers Logs; a message that names the model means the route table (MODELS in apps/worker/src/inference.ts), one that names the account or the gateway means the provider\'s console; from the model-checks workflow, read model-checks.json in that run\'s artifacts',
   night: '53 §5.4 (docs/53-SPEC-OPERATIONS.md): read the op: walk lines with ok false from the same night in Workers Logs',
 };
 

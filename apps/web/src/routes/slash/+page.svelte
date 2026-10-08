@@ -23,6 +23,10 @@
   THE ASK TILE: the field, and under it the answer with its sources, what it read drawn by code, then Slash's sentence
   beside its face with the model named.
 
+  A MODEL THAT DOES NOT ANSWER IS SAID ABOVE THE ASK TILE (ENG-A02): the record's `engineHealth` sentence, "Slash's
+  model has not answered since 6 October. That is ours to fix. Until it is back, BrainDog works from its rules." Its
+  first sentence in the deeper red, in words. Answering, or a build without the read, says nothing here.
+
   THE RECORD IS ASKED WHATEVER THE SHELL SAYS. This screen used to look at `page.data.live` first and, on a shell that was
   not live, say "This is the sample" without asking anything. With no sample a shell that is not live is a
   record that refused or could not be reached, and `readSlash` hands back that refusal in the record's own words, which
@@ -32,7 +36,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { createClient } from '@braindog/client';
+  import { createClient, type EngineHealth } from '@braindog/client';
   import { copy } from '$lib/copy.ts';
   import { drawProposal, drawReading, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from '$lib/palette/slash.ts';
   import { askedLately, askWords, ASKS_FETCHED, type AskedLine } from '$lib/palette/slash-ask.ts';
@@ -138,6 +142,28 @@
   let answer = $state<Answered | null>(null);
   let lately = $state<AskedLine[] | null>(null);
   let answerAt = $state<HTMLElement | null>(null);
+  let engine = $state<EngineHealth | null>(null);
+
+  /** The not-answering sentence cut into what is wrong (marked) and the rest, or `null` while the model answers. */
+  const engineDown = $derived.by(() => {
+    if (engine === null || (engine.health.state !== 'not_answering' && engine.health.state !== 'key_closed')) return null;
+    const text = engine.said.text.trim();
+    if (text === '') return null;
+    const cut = text.indexOf('. ');
+    return cut < 0 ? { lead: text, rest: '' } : { lead: text.slice(0, cut + 1), rest: text.slice(cut + 1) };
+  });
+
+  /** Whether the engine answers, from its own ledger. A refusal or a build without the read is nothing said. */
+  async function loadEngine() {
+    if (!door || !modelHere) return;
+    try {
+      const out = await door.engineHealth();
+      const v = out.ok ? (out.value as EngineHealth | null) : null;
+      engine = v !== null && typeof v === 'object' && 'health' in v ? v : null;
+    } catch {
+      /* Nothing to say. */
+    }
+  }
 
   /** The fold's line: what it holds, named, or `null` and no fold with nothing in it. */
   const folded = $derived(
@@ -224,6 +250,7 @@
     client = door as unknown as SlashClient;
     void read(load);
     void loadAsks();
+    void loadEngine();
   });
 
   $effect(() => {
@@ -247,6 +274,9 @@
         beside its face, drawn through `Cited` so a figure opens its rows; the model is named under it (`23 §8`); and what
         Slash read folds away at the foot. No chart here: the tile holds no figure of its own, the answer carries its own.
       -->
+      {#if engineDown}
+        <p class="slash-engine" role="status"><span data-needs>{engineDown.lead}</span>{engineDown.rest}</p>
+      {/if}
       <Tile icon="slash" title={askWords.title} lead data-part="ask">
         <form
           class="slash-ask"
@@ -550,6 +580,20 @@
     gap: var(--sp-6);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: 60rem;
+  }
+
+  /* THE MODEL NOT ANSWERING, ABOVE THE ASK TILE: a sentence at the body size, its fault in the deeper red and in words. */
+  .slash-engine {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  .slash-engine [data-needs] {
+    color: var(--danger-text);
+    font-weight: var(--fw-medium);
   }
 
   /* TWO TILES SIDE BY SIDE AT A DESK, 12 apart, one over the other where two will not fit. */

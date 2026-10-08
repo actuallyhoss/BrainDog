@@ -50,7 +50,7 @@
   import PageBody from './PageBody.svelte';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { areaOf, headCaptureAt, layoutOf } from './layout.ts';
-  import { emptyHidden } from './home.ts';
+  import { arranged, emptyHidden } from './home.ts';
   import { leadIndex } from './lead.ts';
   import SourceView from './SourceView.svelte';
   import { heldNone, pageWrites, type Held } from './page-writes.ts';
@@ -328,9 +328,12 @@
   const look = $derived(live?.page.page.look ?? null);
   const answered = $derived(lookPage(live?.page.page.page ?? slug, look));
 
-  /** The page's blocks by key, in the order they are drawn now: what Pin this keeps. */
+  /**
+   * The page's blocks by key, in the order they are drawn now: what Pin this keeps. A block the record left out for
+   * holding nothing is still placed (`arranged`), so a list empty today keeps its place for the day it holds something.
+   */
   function drawnKeys(): string[] {
-    const blocks = live?.page.blocks ?? [];
+    const blocks = arranged(live?.page.blocks ?? []);
     const keyed = blockKeys(blocks);
     return lookOrder(
       blocks.map((b, i) => placedOf(b, keyed[i]!)),

@@ -1027,7 +1027,8 @@ test('EACH REFUSAL SAYS WHAT TO SEND INSTEAD, at the key that was wrong', async 
   assert.equal(at('pack', { enable: 'work', doc: {} }).at, 'body.doc');
 
   assert.equal(at('settings', { pack: 'usecase-student' }).at, 'body.values');
-  assert.equal(at('settings', { pack: 'usecase-student', values: { voice_home: ['a'] } }).at, 'body.values.voice_home');
+  /* A LIST OF TEXT IS A VALUE (REC-A06), and a list of anything else is not. */
+  assert.equal(at('settings', { pack: 'usecase-student', values: { voice_home: [1] } }).at, 'body.values.voice_home');
 
   assert.equal(at('arrange', { packs: { install: ['work'] } }).at, 'body.why');
   assert.equal(at('arrange', { why: ['x'] }).at, 'body');

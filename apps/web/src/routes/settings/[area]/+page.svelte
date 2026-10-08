@@ -37,7 +37,20 @@
   import PageView from '$lib/page/PageView.svelte';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../billing.ts';
-  import { daysLeft, healthSaid, lastCopy, nearest, type CopyState, type UsageState } from './health.ts';
+  import { createClient } from '@braindog/client';
+  import Tile from '$lib/ui/Tile.svelte';
+  import {
+    daysLeft,
+    healthSaid,
+    lastCopy,
+    leadFault,
+    nearest,
+    type CopyState,
+    type Engine,
+    type Fault,
+    type Sign,
+    type UsageState,
+  } from './health.ts';
   import { AREAS, DEFAULT_GROUPS, SETTINGS_INDEX, SETTINGS_PAGE, groupsOf, labelIn, type AreaGroup } from './place.ts';
   import { openSettings } from './settings-state.svelte.ts';
   import SettingsIndex from './SettingsIndex.svelte';
@@ -223,29 +236,60 @@
   $effect(() => drew('ready'));
 
   /**
-   * THE SENTENCE UNDER THE TITLE: last night's copy and the month's allowance, said on
-   * the index and on the two areas whose data it is, Billing and Backups. The phrase that needs him is red, and only
-   * when something does. `health.ts` says what the answers mean.
+   * THE SENTENCE UNDER THE TITLE: what is broken, whether Slash's model answers, how many vital signs need a look, last
+   * night's copy and the month's allowance, said on the index and on the two areas whose data the last two are, Billing
+   * and Backups. The phrase that needs him is red and is words, and only when something does. `health.ts` says what the
+   * answers mean, and what is broken leads.
    *
-   * ONLY WHERE THE CLOUD HOLDS THIS RECORD, which is where both answers exist: a self-host has no ledger, and says
-   * nothing here rather than half a sentence. Asked once for this visit to Settings, when the first of the three is
-   * opened, and never waited on: the screen is drawn without it and the sentence arrives when the record answers.
+   * THE COPY AND THE MONTH ONLY WHERE THE CLOUD HOLDS THIS RECORD, which is where both answers exist: a self-host has no
+   * ledger, and says nothing of them rather than half a sentence. The faults, the engine and the signs are the record's
+   * own on every host. Asked once for this visit to Settings, when the first of the three is opened, and never waited
+   * on: the screen is drawn without it and the sentence arrives when the record answers.
    *
-   * A READ THAT FAILS SAYS NOTHING AND REFUSES NOTHING. The sentence is a summary of two areas that each say their own
-   * refusal in full, so its reads close as fine and never mark the screen refused.
+   * A READ THAT FAILS SAYS NOTHING AND REFUSES NOTHING. A build without `faults`, `engineHealth` or `signs`, a refusal,
+   * or a host that hands none is `null`, which `health.ts` says as nothing and never as healthy. Its reads close as fine
+   * and never mark the screen refused.
    */
   const SAID_ON = new Set([undefined, 'billing', 'backups']);
   let copyLast = $state<CopyState>(null);
   let month = $state<UsageState>(null);
+  let faults = $state<Fault[] | null>(null);
+  let engine = $state<Engine | null>(null);
+  let signs = $state<Sign[] | null>(null);
   let asked = false;
+
+  /* ONLY THE OWNER READS FAULTS (`faults` refuses anyone else), so nobody else is asked for them or offered Details. */
+  const owns = $derived(!shell.refused && may(shell, 'owner'));
+
+  /** One read through the client's route table, its value or `null`: a refusal, a dropped call, a method not here. */
+  async function valueOf<T>(read: () => Promise<{ ok: true; value: T } | { ok: false }>): Promise<T | null> {
+    try {
+      const out = await read();
+      return out.ok ? out.value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const recordClient = () => createClient({ base: apiBase() });
+
+  async function readFaults(): Promise<void> {
+    const out = await valueOf(() => recordClient().call<{ faults: Fault[] }>('faults'));
+    faults = Array.isArray(out?.faults) ? out.faults : null;
+  }
 
   async function readHealth(): Promise<void> {
     asked = true;
     const at = opened();
     const now = Date.now();
-    const [copies, usage] = await Promise.all([
-      readSnapshots(apiBase()).catch(() => null),
-      readUsage((url, init) => fetch(url, init), now, '', apiBase(page.url)).catch(() => null),
+    const hosted = hostedHere(shell);
+    const client = recordClient();
+    const [copies, usage, eng, vital] = await Promise.all([
+      hosted ? readSnapshots(apiBase()).catch(() => null) : null,
+      hosted ? readUsage((url, init) => fetch(url, init), now, '', apiBase(page.url)).catch(() => null) : null,
+      valueOf(() => client.engineHealth()),
+      valueOf(() => client.call<{ signs: Sign[] }>('signs')),
+      owns ? readFaults() : null,
     ]);
     closed(true, at);
     if (copies?.from === 'live') copyLast = lastCopy(copies.snapshots.map((c) => c.at), now);
@@ -254,17 +298,104 @@
       const mine = records.find((r) => r.name === shell.index.slug) ?? (records.length === 1 ? records[0] : undefined);
       if (mine && mine.meters.length > 0) month = { resets: mine.resets, near: nearest(mine.meters), daysLeft: daysLeft(now) };
     }
+    engine = eng && typeof eng === 'object' && 'health' in eng ? (eng as Engine) : null;
+    signs = Array.isArray(vital?.signs) ? vital.signs : null;
   }
 
   $effect(() => {
-    if (!SAID_ON.has(area) || !hostedHere(shell) || asked) return;
+    if (!SAID_ON.has(area) || shell.refused || asked) return;
     untrack(() => void readHealth());
   });
 
-  const health = $derived(SAID_ON.has(area) ? healthSaid(copyLast, month) : null);
+  /**
+   * WHERE THE SIGNS ARE SHOWN, so the count is a link to them: the record's Health page where it holds one, and until
+   * it does (the Health page is its own unit) the Settings index, where this sentence stands whole. On the index itself
+   * the count is words, since a link to the page it is on goes nowhere.
+   */
+  const signsAt = $derived(shell.pages.includes('health') ? '/p/health' : area === undefined ? null : '/settings');
+
+  const health = $derived(SAID_ON.has(area) ? healthSaid(copyLast, month, { faults, engine, signs, signsAt }) : null);
+
+  /**
+   * TRY AGAIN AND DETAILS, under the sentence while a fault is open (AGT-C06). Try again queues the job behind the fault
+   * the sentence names, now rather than at tonight's retry (`retryFault`, the owner's); a refusal shows the record's own
+   * sentence under it. Details lists every open fault: its sentence, how often and since when, and the raw error where
+   * the record hands it (the owner of a self-hosted record).
+   */
+  const fault = $derived(SAID_ON.has(area) ? leadFault(faults) : null);
+  let retrying = $state<string | null>(null);
+  let retryFix = $state('');
+  let details = $state(false);
+
+  const faultWords = {
+    retry: 'Try again',
+    details: 'Details',
+    hide: 'Hide details',
+    retried: 'Trying it again now.',
+    failed: (n: number, since: string) => `${n === 1 ? 'Failed once' : `Failed ${n} times`} since ${since}.`,
+  } as const;
+
+  const dayOf = (iso: string): string => {
+    const ms = Date.parse(iso);
+    return Number.isFinite(ms) ? new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) : iso;
+  };
+
+  async function retry(cause: string): Promise<void> {
+    if (retrying !== null) return;
+    retrying = cause;
+    retryFix = '';
+    try {
+      const out = await recordClient().call<{ cause: string; queued: number }>('retryFault', { cause });
+      if (!out.ok) {
+        retryFix = 'refusal' in out ? out.refusal.fix : copy.recordNotReached;
+        return;
+      }
+      toasts.push(faultWords.retried);
+      await readFaults();
+    } catch {
+      retryFix = copy.recordNotReached;
+    } finally {
+      retrying = null;
+    }
+  }
+
 </script>
 
-{#snippet healthLine()}{#each health ?? [] as part}{#if part.needs}<span data-needs>{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
+{#snippet healthLine()}{#each health ?? [] as part}{#if part.href}<a href={at(part.href)} data-needs={part.needs ? '' : undefined}>{part.text}</a>{:else if part.needs}<span data-needs>{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
+
+<!-- WHAT CAN BE DONE ABOUT AN OPEN FAULT, under the sentence: Try again on the one it names, and for the owner the whole
+     list. A rectangle each; the list is in a tile, and a refusal is the record's own sentence. -->
+{#snippet faultTools()}
+  {#if fault}
+    <div class="fault-tools">
+      <Button size="sm" disabled={retrying !== null} aria-busy={retrying === fault.cause} onclick={() => void retry(fault.cause)}>{faultWords.retry}</Button>
+      {#if owns}
+        <Button size="sm" weight="bare" aria-expanded={details} aria-controls="fault-details" onclick={() => (details = !details)}
+          >{details ? faultWords.hide : faultWords.details}</Button
+        >
+      {/if}
+    </div>
+    <p class="fault-fix" role="status">{retryFix}</p>
+    {#if owns && details}
+      <div id="fault-details" class="fault-details">
+        <Tile title={faultWords.details} count={faults?.length ?? 0}>
+          <ul class="faults">
+            {#each faults ?? [] as f (f.cause)}
+              <li>
+                <p class="fault-said">{f.said}</p>
+                <p class="fault-when">{faultWords.failed(f.count, dayOf(f.since))}</p>
+                {#if f.error}<p class="fault-error">{f.error}</p>{/if}
+                {#if f.cause !== fault.cause}
+                  <Button size="sm" disabled={retrying !== null} aria-busy={retrying === f.cause} onclick={() => void retry(f.cause)}>{faultWords.retry}</Button>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        </Tile>
+      </div>
+    {/if}
+  {/if}
+{/snippet}
 
 <svelte:head><title>{titleOf(label, copy.settings)}</title></svelte:head>
 
@@ -289,7 +420,7 @@
   </Button>
 {/snippet}
 {#if known}
-  <PageHead icon="settings" kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : undefined} />
+  <PageHead icon="settings" kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : undefined} below={fault ? faultTools : undefined} />
 {:else}
   <!-- THE INDEX OPENS ON A LEAD TILE, as a declared page does: its name and Arrange ride over the top of the tile and the
        line under them is the headline. Arrange waits for the pointer or the keyboard to reach the tile. `display:
@@ -299,6 +430,7 @@
       icon="settings"
       title={copy.settings}
       sentence={health ? healthLine : words.lead(shell.refused ? '' : shell.index.name)}
+      below={fault ? faultTools : undefined}
       actions={mayArrange ? indexTools : undefined}
     />
   </div>
@@ -369,6 +501,67 @@
 {/if}
 
 <style>
+  /* TRY AGAIN AND DETAILS: rectangles in a row under the sentence, wrapping on a phone. */
+  .fault-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  /* Always in the document, so the record's refusal is announced when it arrives. Empty, it takes no room. */
+  .fault-fix {
+    margin: var(--sp-2) 0 0;
+    max-inline-size: var(--measure);
+    color: var(--danger-text);
+    font-size: var(--fs-body);
+  }
+
+  .fault-fix:empty {
+    display: none;
+  }
+
+  .fault-details {
+    margin-block-start: var(--sp-3);
+  }
+
+  .faults {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .faults li {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-1);
+  }
+
+  .faults p {
+    margin: 0;
+    max-inline-size: var(--measure);
+    line-height: var(--lh-body);
+  }
+
+  .fault-said {
+    color: var(--ink);
+  }
+
+  .fault-when {
+    color: var(--dim);
+    font-size: var(--fs-body);
+  }
+
+  /* THE RECORD'S RAW ERROR, the self-hosted owner's alone: it may be one long word, so it breaks anywhere. */
+  .fault-error {
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    overflow-wrap: anywhere;
+  }
+
   .index-head {
     display: contents;
   }

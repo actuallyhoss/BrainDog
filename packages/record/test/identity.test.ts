@@ -17,6 +17,7 @@ import type { AuthResult } from '@braindog/ports';
 
 import { DIRECTORY_VERSION, createDirectory, type AuthConfig, type Directory, type Reason } from '../src/directory.ts';
 import { b64url } from '../src/webauthn.ts';
+import { sharedSuffix } from '../src/identity.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 import { asJSON, assert as authenticate, register, testKeys, type TestKey } from './fixtures/webauthn/authenticator.ts';
 
@@ -877,4 +878,17 @@ test('A DIRECTORY WRITTEN BY VERSION 2 IS BROUGHT FORWARD, and signs its person 
   /* And opening it again runs nothing twice: ADD COLUMN would throw the second time. */
   assert.doesNotThrow(() => createDirectory(sql, fixedClock(NOW), config));
   sql.close();
+});
+
+/* ── a shared address ─────────────────────────────────────────────────── */
+
+test('A SELF-HOST AT A FLY.DEV ADDRESS IS REFUSED, and the sentence says the refusal is on purpose', () => {
+  const sentence =
+    'Passkeys cannot use fly.dev: it is a name many sites share, so any of them could ask for your passkeys. ' +
+    'Serve BrainDog at a domain you own and sign in there. This is on purpose, and there is no setting that allows it.';
+  assert.equal(sharedSuffix('studio.fly.dev'), sentence);
+  assert.throws(
+    () => createDirectory(openSqlite(), fixedClock(NOW), { mac: new Uint8Array(32).fill(9), rp: { id: 'studio.fly.dev', origin: 'https://studio.fly.dev' }, magic: true }),
+    (e: Error) => e.message === sentence,
+  );
 });

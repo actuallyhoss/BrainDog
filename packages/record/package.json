@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./directory": "./src/directory.ts",
+    "./plans": "./src/plans.ts",
     "./webauthn": "./src/webauthn.ts",
     "./catalogue-offers": "./src/catalogue-offers.ts",
     "./automations": "./src/automations.ts",

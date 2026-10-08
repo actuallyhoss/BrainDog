@@ -70,8 +70,8 @@ const DAY = 24 * HOUR;
 
 /** An arrival waits once it is older than this and still unfiled. */
 export const ARRIVAL_WAIT_MS = DAY;
-/** Red when this many arrivals or more wait. */
-export const ARRIVALS_WAITING_MOST = 3;
+/** Red when this many arrivals or more wait: one text unfiled past a day is already one the person must file by hand. */
+export const ARRIVALS_WAITING_MOST = 1;
 /** Red when an arrival is more than this newer than the newest entry of the list its pattern files into. */
 export const ARRIVAL_AHEAD_MS = DAY;
 /** The window arrivals are judged over: with no door, or none arrived in it and none waiting, nothing to judge by. */
@@ -79,7 +79,7 @@ export const ARRIVALS_WINDOW_DAYS = 14;
 
 /** A feed is late when its last good run is older than this many of its periods. */
 export const FEED_LATE_PERIODS = 2;
-/** A series counts once it has held this many numbers. */
+/** A series counts once it has held this many numbers; one younger counts only when a feed declares how often it comes. */
 export const SERIES_POINTS_LEAST = 5;
 /** A series is stale when its newest number is older than this many of its usual gaps... */
 export const SERIES_GAP_TIMES = 3;
@@ -102,8 +102,11 @@ export const RUNS_WINDOW_DAYS = 7;
 export const RUN_SILENT_MS = 12 * HOUR;
 /** The abandoned share is judged once this many runs have ended... */
 export const RUNS_ENDED_LEAST = 8;
-/** ...and red when more than one in this many ended as abandoned (a quarter). */
+/** ...and red when more than one in this many ended as lost (a quarter): abandoned, or handed off by the sweep. */
 export const RUNS_ABANDONED_ONE_IN = 4;
+
+/** A filed reading stands for now this long after it was filed. A layer that files once a night files again before it is up. */
+export const FILED_STANDS_MS = DAY;
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
 
@@ -202,9 +205,8 @@ function readArrivals(sql: Sql, nowMs: number, tz: string): SignReading {
   );
   /* NO PATTERN IS NOT NOTHING TO JUDGE BY WHILE MESSAGES WAIT: a pattern retired or lost leaves them waiting all the same. */
   if (fed.size === 0 && waiting.length === 0) return reading('none', null, 'Nothing on this record takes messages in yet.');
-  const recent = Number(
-    sql.one<{ n: number }>(`SELECT count(*) AS n FROM inbox_raw WHERE state <> 'erased' AND ts >= ? AND ${VOUCHED}`, new Date(nowMs - ARRIVALS_WINDOW_DAYS * DAY).toISOString(), UNVERIFIED)?.n ?? 0,
-  );
+  const since = new Date(nowMs - ARRIVALS_WINDOW_DAYS * DAY).toISOString();
+  const recent = Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM inbox_raw WHERE state <> 'erased' AND ts >= ? AND ${VOUCHED}`, since, UNVERIFIED)?.n ?? 0);
   if (waiting.length === 0 && recent === 0) return reading('none', null, `Nothing has come in for ${ARRIVALS_WINDOW_DAYS} days, so there is nothing to judge by.`);
 
   /* EACH FED LIST AGAINST THE NEWEST MESSAGE AT ITS DOORS THAT WAS NOT SET ASIDE: one filed is in the list, one waiting is not. */
@@ -229,20 +231,47 @@ function readArrivals(sql: Sql, nowMs: number, tz: string): SignReading {
     if (came !== null && (newest === null || Date.parse(came) - Date.parse(newest) > ARRIVAL_AHEAD_MS)) behind.push(has);
   }
 
+  /* A DAY OF ARRIVALS ALL SET ASIDE AS REPEATS IS NOT A DAY FILED. A repeat is the record's own call, and a dedupe that
+     matches every text leaves nothing waiting and nothing filed. A pattern's `skip` rule (a refund, a PIN reminder) is
+     the person's declared call, so a day of only those is a quiet day and is not judged here: it would read red for two
+     weeks on a bank that sends one. The day judged is the one up to the newest arrival no rule skipped, so a quiet day
+     after it does not hide it. A repeat is known by its newest `match` line, marked `repeats` by ingest. */
+  const RULED = `(state = 'skipped' AND coalesce((SELECT e.field FROM event e WHERE e.target = 'inbox_raw:' || inbox_raw.id AND e.kind = 'match'
+     ORDER BY e.rowid DESC LIMIT 1), '') <> 'repeats')`;
+  const at = sql.one<{ at: string | null }>(`SELECT max(ts) AS at FROM inbox_raw WHERE state <> 'erased' AND ts >= ? AND ${VOUCHED} AND NOT ${RULED}`, since, UNVERIFIED)?.at ?? null;
+  const day =
+    at === null
+      ? []
+      : sql.all<{ state: string; reason: string | null }>(
+          `SELECT state, reason FROM inbox_raw WHERE state <> 'erased' AND ts > ? AND ts <= ? AND ${VOUCHED} AND NOT ${RULED}`,
+          new Date(Date.parse(at) - DAY).toISOString(),
+          at,
+          UNVERIFIED,
+        );
+  const aside = day.filter((r) => r.state === 'skipped');
+  const allAside = day.length > 0 && aside.length === day.length;
+  const on = at === null ? '' : dateSaid(at, tz, nowMs);
+  const asideSaid = !allAside ? '' : aside.length === 1 ? `The only message in the day up to ${on} was set aside as a repeat, not filed.` : `All ${aside.length} messages in the day up to ${on} were set aside as repeats. None was filed.`;
+  const why = new Map<string, number>();
+  for (const r of allAside ? aside : []) if (r.reason) why.set(r.reason, (why.get(r.reason) ?? 0) + 1);
+  const top = [...why].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (top !== undefined) facts.push(top.length > 140 ? `${top.slice(0, 139)}…` : top);
+
   const reasons = new Map<string, number>();
   for (const w of waiting) if (w.reason) reasons.set(w.reason, (reasons.get(w.reason) ?? 0) + 1);
   const most = [...reasons].sort((a, b) => b[1] - a[1])[0];
   if (waiting.length > 0) facts.unshift(`The oldest has waited since ${dateSaid(waiting[0]!.ts, tz, nowMs)}.`);
-  const red = waiting.length >= ARRIVALS_WAITING_MOST || behind.length > 0;
+  const red = waiting.length >= ARRIVALS_WAITING_MOST || behind.length > 0 || allAside;
   if (!red)
     return reading('green', waiting.length, waiting.length === 0 ? 'Every message has been filed or set aside within a day.' : `${count(waiting.length, 'message has', 'messages have')} waited more than a day. Every other one is filed.`, facts);
   /* ONE LIST BEHIND IN THE SENTENCE; every list's newest is in the facts. */
   const said = [
-    waiting.length > 0 ? `${count(waiting.length, 'message has', 'messages have')} waited more than a day.` : 'Messages came in that no list holds yet.',
+    waiting.length > 0 ? `${count(waiting.length, 'message has', 'messages have')} waited more than a day.` : allAside ? '' : 'Messages came in that no list holds yet.',
+    asideSaid,
     ...behind.slice(0, 1).map((b) => `${b}.`),
     most && most[1] > 1 ? `Most say: ${most[0].length > 140 ? `${most[0].slice(0, 139)}…` : most[0]}` : '',
   ];
-  return reading('red', waiting.length, said.filter((s) => s !== '').join(' '), facts);
+  return reading('red', waiting.length === 0 && allAside ? aside.length : waiting.length, said.filter((s) => s !== '').join(' '), facts);
 }
 
 /* ── numbers-arrive ────────────────────────────────────────────────────── */
@@ -296,30 +325,45 @@ function readNumbers(sql: Sql, nowMs: number, tz: string): SignReading {
     `${DECLARED} SELECT series, max(at) AS newest FROM metric_point mp WHERE ${ARRIVED} GROUP BY series HAVING count(DISTINCT at) >= ? ORDER BY series`,
     SERIES_POINTS_LEAST,
   );
-  if (feeds.length === 0 && series.length === 0) return reading('none', null, 'No numbers come in on this record yet.');
+  /* AND A SERIES TOO YOUNG FOR A USUAL GAP, WHEN A FEED DECLARES HOW OFTEN IT COMES: its gap is the feed's `every`. A
+     feed that runs well and writes no number is late only here, and a new one is new for exactly the weeks it matters.
+     Its feed is the one that wrote its newest number (`writePoints` stamps `ingest:<key>`). */
+  const young = sql.all<{ series: string; newest: string; every: string | null }>(
+    `${DECLARED}, young AS (SELECT series, max(at) AS newest FROM metric_point mp WHERE ${ARRIVED} GROUP BY series HAVING count(DISTINCT at) < ?)
+     SELECT y.series, y.newest, json_extract(d.body, '$.every') AS every FROM young y
+       JOIN metric_point p ON p.series = y.series AND p.at = y.newest AND p.source LIKE 'ingest:%'
+       JOIN declaration d ON d.id = 'ingest.' || substr(p.source, 8) AND d.superseded_at IS NULL AND d.retired = 0 AND json_valid(d.body)
+     GROUP BY y.series ORDER BY y.series`,
+    SERIES_POINTS_LEAST,
+  ).flatMap((y) => {
+    const every = intervalMs(String(y.every ?? ''));
+    return every === null ? [] : [{ series: y.series, newest: y.newest, every }];
+  });
+  if (feeds.length === 0 && series.length === 0 && young.length === 0) return reading('none', null, 'No numbers come in on this record yet.');
   const stale: { name: string; newestMs: number }[] = [];
-  for (const s of series) {
-    const ats = sql.all<{ at: string }>(`${DECLARED} SELECT DISTINCT at FROM metric_point mp WHERE series = ? AND ${ARRIVED} ORDER BY at DESC LIMIT 30`, s.series).map((r) => Date.parse(r.at));
+  const judged: { series: string; newest: string; every?: number }[] = [...series, ...young];
+  for (const s of judged) {
+    const ats = s.every !== undefined ? [] : sql.all<{ at: string }>(`${DECLARED} SELECT DISTINCT at FROM metric_point mp WHERE series = ? AND ${ARRIVED} ORDER BY at DESC LIMIT 30`, s.series).map((r) => Date.parse(r.at));
     const gaps = ats.slice(1).map((at, i) => ats[i]! - at).sort((a, b) => a - b);
-    const gap = gaps[Math.floor(gaps.length / 2)] ?? DAY;
+    const gap = s.every ?? gaps[Math.floor(gaps.length / 2)] ?? DAY;
     const newestMs = Date.parse(s.newest);
     const age = nowMs - newestMs;
     if (age > SERIES_GAP_TIMES * gap && age > SERIES_STALE_DAYS * DAY) stale.push({ name: seriesName(sql, s.series), newestMs });
   }
-  const newestAll = series.reduce((m, s) => Math.max(m, Date.parse(s.newest)), -Infinity);
+  const newestAll = judged.reduce((m, s) => Math.max(m, Date.parse(s.newest)), -Infinity);
   const facts = [
     ...(Number.isFinite(newestAll) ? [`The newest number is from ${dateSaid(newestAll, tz, nowMs)}.`] : []),
     ...late.map((f) => `${f.name} last ran well on ${dateSaid(f.lastGoodMs, tz, nowMs)}.`),
     ...stale.slice(0, 3).map((s) => `${s.name}: no number since ${dateSaid(s.newestMs, tz, nowMs)}.`),
   ];
-  const red = late.length > 0 || (series.length > 0 && stale.length * SERIES_STALE_ONE_IN >= series.length);
+  const red = late.length > 0 || (judged.length > 0 && stale.length * SERIES_STALE_ONE_IN >= judged.length);
   if (!red) {
-    const said = series.length === 0 ? `${count(feeds.length, 'feed')} ran on time.` : stale.length === 0 ? 'Every series has its numbers on time.' : `${stale.length} of ${series.length} series ${stale.length === 1 ? 'is' : 'are'} behind. The rest are on time.`;
+    const said = judged.length === 0 ? `${count(feeds.length, 'feed')} ran on time.` : stale.length === 0 ? 'Every series has its numbers on time.' : `${stale.length} of ${judged.length} series ${stale.length === 1 ? 'is' : 'are'} behind. The rest are on time.`;
     return reading('green', stale.length + late.length, said, facts);
   }
   const since = stale.reduce((m, s) => Math.max(m, s.newestMs), -Infinity);
   const said = [
-    stale.length > 0 && stale.length * SERIES_STALE_ONE_IN >= series.length
+    stale.length > 0 && stale.length * SERIES_STALE_ONE_IN >= judged.length
       ? `${count(stale.length, 'series has', 'series have')} had no number since ${dateSaid(since, tz, nowMs)}.`
       : '',
     late.length > 0 ? `${late.length === 1 ? late[0]!.name : count(late.length, 'feed')} ${late.length === 1 ? 'has' : 'have'} not run well since ${dateSaid(Math.max(...late.map((f) => f.lastGoodMs)), tz, nowMs)}.` : '',
@@ -413,7 +457,15 @@ function readRuns(sql: Sql, nowMs: number): SignReading {
   const since = new Date(nowMs - RUNS_WINDOW_DAYS * DAY).toISOString();
   const HEARD = "coalesce(json_extract(fields, '$.last_seen'), updated_at)";
   const AGENT = "coalesce(json_extract(fields, '$.client'), json_extract(fields, '$.agent'))";
-  const runs = sql.all<{ state: string | null }>(`SELECT state FROM entry WHERE register = 'session' AND deleted_at IS NULL AND ${HEARD} >= ?`, since);
+  /* A HANDOFF THE SWEEP WROTE IS A RUN THAT WENT SILENT, not one that ended: `sweepSessions` hands off a run that crashed
+     after leaving a step, and its `state` line is by `system`. A run that handed off itself signs its own line. Read in
+     the same query, the newest `state` line of each handoff, so a week of runs is one read and not one a run. */
+  const runs = sql.all<{ state: string | null; swept: number }>(
+    `SELECT state, (state = 'handoff' AND coalesce((SELECT e.actor FROM event e WHERE e.target = 'entry:' || entry.id AND e.kind = 'state'
+       ORDER BY e.ts DESC, e.rowid DESC LIMIT 1), '') = 'system') AS swept
+     FROM entry WHERE register = 'session' AND deleted_at IS NULL AND ${HEARD} >= ?`,
+    since,
+  );
   /* STILL OPEN LONG AFTER IT WAS LAST HEARD FROM: the sweep that writes such a run off did not. AT ANY AGE, not only this
      week's: a run the sweep never wrote off falls out of the window and would read as no run at all. */
   const silent = sql.all<{ heard: string; agent: string | null }>(
@@ -422,25 +474,31 @@ function readRuns(sql: Sql, nowMs: number): SignReading {
   );
   if (runs.length === 0 && silent.length === 0) return reading('none', null, `No agent has run on this record in ${RUNS_WINDOW_DAYS} days.`);
   const ended = runs.filter((r) => r.state === 'done' || r.state === 'abandoned' || r.state === 'handoff');
-  const abandoned = ended.filter((r) => r.state === 'abandoned');
-  const lost = ended.length >= RUNS_ENDED_LEAST && abandoned.length * RUNS_ABANDONED_ONE_IN > ended.length;
-  const facts = [`${count(runs.length, 'run')} this week, ${ended.length} ended, ${abandoned.length} of them abandoned.`];
+  const abandoned = ended.filter((r) => r.state === 'abandoned').length;
+  const swept = ended.filter((r) => Number(r.swept) === 1).length;
+  const gone = abandoned + swept;
+  const lost = ended.length >= RUNS_ENDED_LEAST && gone * RUNS_ABANDONED_ONE_IN > ended.length;
+  const facts = [`${count(runs.length, 'run')} this week, ${ended.length} ended, ${abandoned} of them abandoned.`];
+  if (swept > 0) facts.push(`${count(swept, 'run')} went silent and ${swept === 1 ? 'was' : 'were'} left waiting with ${swept === 1 ? 'its' : 'their'} next step, not ended.`);
   if (silent.length > 0) {
     const ago = nowMs - Date.parse(silent[0]!.heard);
     facts.push(`${silent[0]!.agent ?? 'A run'} was last heard from ${ago < 2 * DAY ? count(Math.floor(ago / HOUR), 'hour') : count(Math.floor(ago / DAY), 'day')} ago and is still open.`);
   }
   if (!lost && silent.length === 0)
-    return reading('green', abandoned.length, ended.length === 0 ? `${count(runs.length, 'run')} this week, none ended yet.` : abandoned.length === 0 ? 'Every run that ended this week ended normally.' : `${ended.length - abandoned.length} of ${ended.length} runs this week ended normally.`, facts);
+    return reading('green', gone, ended.length === 0 ? `${count(runs.length, 'run')} this week, none ended yet.` : gone === 0 ? 'Every run that ended this week ended normally.' : `${ended.length - gone} of ${ended.length} runs this week ended normally.`, facts);
+  const how = swept === 0 ? 'ended as abandoned' : abandoned === 0 ? 'went silent and never ended' : `did not end normally: ${abandoned} ${abandoned === 1 ? 'was' : 'were'} abandoned and ${swept} went silent`;
   const said = [
-    lost ? `${abandoned.length} of ${ended.length} runs this week ended as abandoned. A normal end is being lost.` : '',
+    lost ? `${gone} of ${ended.length} runs this week ${how}. A normal end is being lost.` : '',
     silent.length > 0 ? `${count(silent.length, 'run is', 'runs are')} still open more than ${RUN_SILENT_MS / HOUR} hours after last heard from.` : '',
   ];
-  return reading('red', lost ? abandoned.length : silent.length, said.filter((s) => s !== '').join(' '), facts);
+  return reading('red', lost ? gone : silent.length, said.filter((s) => s !== '').join(' '), facts);
 }
 
 /* ── the closed list ───────────────────────────────────────────────────── */
 
-const kernel = (sign: string, name: string, thresholds: Record<string, number>, read: NonNullable<SignReader['read']>): SignReader => ({ sign, name, hand: 'kernel', version: 1, thresholds, read });
+/* A READER WHOSE RULE CHANGED WITHOUT A THRESHOLD MOVING TAKES THE NEXT VERSION, so its days read under the old rule keep
+   the old `rule`. Version 2 (audit 35): arrivals all set aside, a young series read by its feed, a run the sweep handed off. */
+const kernel = (sign: string, name: string, thresholds: Record<string, number>, read: NonNullable<SignReader['read']>, version = 1): SignReader => ({ sign, name, hand: 'kernel', version, thresholds, read });
 const filed = (sign: string, name: string, hand: 'record' | 'host'): SignReader => ({ sign, name, hand, version: 1, thresholds: {}, read: null });
 
 /**
@@ -448,14 +506,14 @@ const filed = (sign: string, name: string, hand: 'record' | 'host'): SignReader 
  * `signs-flow.ts`) with one spread. The ids are 2.2's; a person reads the names.
  */
 export const VITAL_SIGNS: readonly SignReader[] = [
-  kernel('arrivals-filed', 'Arrivals file by themselves', { ARRIVAL_WAIT_MS, ARRIVALS_WAITING_MOST, ARRIVAL_AHEAD_MS, ARRIVALS_WINDOW_DAYS }, readArrivals),
-  kernel('numbers-arrive', 'Numbers arrive on schedule', { FEED_LATE_PERIODS, SERIES_POINTS_LEAST, SERIES_GAP_TIMES, SERIES_STALE_DAYS, SERIES_STALE_ONE_IN }, readNumbers),
+  kernel('arrivals-filed', 'Arrivals file by themselves', { ARRIVAL_WAIT_MS, ARRIVALS_WAITING_MOST, ARRIVAL_AHEAD_MS, ARRIVALS_WINDOW_DAYS }, readArrivals, 2),
+  kernel('numbers-arrive', 'Numbers arrive on schedule', { FEED_LATE_PERIODS, SERIES_POINTS_LEAST, SERIES_GAP_TIMES, SERIES_STALE_DAYS, SERIES_STALE_ONE_IN }, readNumbers, 2),
   filed('model-answers', 'The model answers', 'host'),
   filed('tools-listed', 'Agents get the tool list', 'host'),
   filed('briefing-true', 'The briefing is true', 'record'),
   kernel('questions-by-cause', 'One question per cause', { CAUSE_QUESTIONS_MOST, UNCAUSED_MOST }, (sql, nowMs) => readCauses(sql, nowMs)),
   kernel('oldest-question', 'No question waits too long', { QUESTION_DAYS_MOST }, readOldest),
-  kernel('runs-true', 'Runs end as they ended', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs) => readRuns(sql, nowMs)),
+  kernel('runs-true', 'Runs end as they ended', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs) => readRuns(sql, nowMs), 2),
   filed('pages-clean', 'Pages print clean', 'host'),
   ...SIGNS_FLOW,
 ];
@@ -463,8 +521,8 @@ export const VITAL_SIGNS: readonly SignReader[] = [
 /** The sign called `id` on the closed list, or `null`. */
 export const signOf = (id: string): SignReader | null => VITAL_SIGNS.find((s) => s.sign === id) ?? null;
 
-/** How many days back a filed reading still stands for now. A layer that files once a day files today or yesterday. */
-const FILED_STANDS_DAYS = 2;
+/** What the night writes for a filed sign on a day nothing was filed: a placeholder, never a filing. */
+const NOT_FILED = 'Nothing was filed for this sign that day.';
 
 /** One sign read now. A reader that throws reads `none` with its own words, never green and never a throw out of here. */
 function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string): SignReading {
@@ -475,12 +533,16 @@ function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string): SignReadin
       return reading('none', null, 'This sign could not be read.', [e instanceof Error ? e.message.slice(0, 200) : String(e).slice(0, 200)]);
     }
   }
-  const row = sql.one<{ state: SignState; value: number | null; said: string; facts: string }>(
-    'SELECT state, value, said, facts FROM sign_reading WHERE sign = ? AND day >= ? ORDER BY day DESC LIMIT 1',
+  /* THE NEWEST FILING, BY WHEN IT WAS FILED AND NOT BY ITS DAY: a reading stands a day after it was filed, so a filer
+     that died reads `none` the next night and says since when, rather than its last word standing a second day. */
+  const row = sql.one<{ state: SignState; value: number | null; said: string; facts: string; read_at: string }>(
+    "SELECT state, value, said, facts, read_at FROM sign_reading WHERE sign = ? AND NOT (state = 'none' AND said = ?) ORDER BY day DESC, read_at DESC LIMIT 1",
     s.sign,
-    dayBefore(dayIn(nowMs, tz), FILED_STANDS_DAYS - 1),
+    NOT_FILED,
   );
   if (row === undefined) return reading('none', null, 'Nothing has been filed for this sign yet.');
+  if (nowMs - Date.parse(row.read_at) > FILED_STANDS_MS)
+    return reading('none', null, `Not read since ${dateSaid(row.read_at, tz, nowMs)}.`, [`It last read ${row.state === 'none' ? 'nothing to judge by' : row.state}: ${row.said}`.slice(0, 200)]);
   const facts = JSON.parse(row.facts) as unknown;
   return reading(row.state, row.value === null ? null : Number(row.value), row.said, Array.isArray(facts) ? facts.map(String) : []);
 }
@@ -563,7 +625,7 @@ export function runSignsNight(sql: Sql, nowMs: number, tz: string): number {
   let wrote = 0;
   sql.transactionSync(() => {
     for (const s of VITAL_SIGNS) {
-      const r = s.read !== null ? readNow(sql, s, nowMs, zone) : reading('none', null, 'Nothing was filed for this sign that day.');
+      const r = s.read !== null ? readNow(sql, s, nowMs, zone) : reading('none', null, NOT_FILED);
       wrote += write(sql, s, ended, r, nowMs, s.read !== null);
     }
     sql.exec('DELETE FROM sign_reading WHERE day < ?', dayBefore(dayIn(nowMs, zone), SIGNS_KEPT_DAYS));

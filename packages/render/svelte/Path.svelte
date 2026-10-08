@@ -20,6 +20,7 @@
   import { TONES, WORKING_GLYPH, WORKING_LABEL, inline, takeWorking, text, type Block, type RenderOptions, type Row } from '../src/index.ts';
   import { PATH_DONE, PATH_EVERYTHING, PATH_NEXT, PATH_STEP, PATH_VIEWS, pathMore, pathPlan, pathRest, pathShort } from '../src/path.ts';
   import { nextTicks, tickState } from '../src/ticks.ts';
+  import { emptied, keepsNought } from '../src/html.ts';
   import Text from './Text.svelte';
 
   let {
@@ -36,7 +37,10 @@
   /* THE PACKAGE'S OWN WORD for a stone pressed and not yet written back, as `List` says it for a box. */
   const UNSAVED = 'Not saved';
 
-  const plan = $derived(pathPlan(block.rows));
+  /* A STONE WITH NO STEP IS NOT DRAWN, unless the block keeps its noughts (`pathPlan`); a path left with none says the
+     host's `empty:` line, or nothing (`emptied`), as `toHTML` draws it. */
+  const plan = $derived(pathPlan(block.rows, keepsNought(block, opts)));
+  const left = $derived(emptied(block, opts));
   const short = $derived(pathShort(plan));
   /** Whether the reader asked for every stone. Local, and starting on the short view, which is the point of one. */
   let everything = $state(false);
@@ -62,6 +66,9 @@
   }
 </script>
 
+{#if typeof left === 'string'}
+  <p class="block-empty">{left}</p>
+{:else if left === undefined}
 {#if short}
   <div class="path-switch" role="group" aria-label={PATH_VIEWS}>
     <button type="button" class="path-view" aria-pressed={!everything} onclick={() => (everything = false)}>{plan.name}</button>
@@ -111,3 +118,4 @@
 </ol>
 {#if short && !everything}<p class="path-rest">{pathRest(plan.stones.length - stones.length)}</p>{/if}
 {#if plan.more > 0}<p class="path-more">{pathMore(plan.more)}</p>{/if}
+{/if}

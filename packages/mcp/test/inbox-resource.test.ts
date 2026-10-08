@@ -117,7 +117,7 @@ test('A SURFACE WITH NO INBOX DOES NOT LIST IT, says so when asked, and the tool
  * one charge filed, the same charge again skipped as a repeat, and one text no pattern read. Every value is invented.
  */
 async function banked() {
-  const { ACCOUNTS, CARD, LEDGER, used } = await import('../../kernel/test/ingest-tail-kit.test.ts');
+  const { ACCOUNTS, CARD, LEDGER, used } = await import('../../kernel/test/ingest-tail-kit.ts');
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const api = await createRecordApi({ sql, clock });

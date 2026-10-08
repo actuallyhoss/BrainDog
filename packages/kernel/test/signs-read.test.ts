@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 
 import { openRecord } from '../src/index.ts';
 import { readSigns, VITAL_SIGNS, type VitalSign } from '../src/signs.ts';
-import { CARD, OWNER, record, text, used } from './ingest-tail-kit.test.ts';
+import { CARD, OWNER, record, text, used } from './ingest-tail-kit.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 8, 12);
@@ -85,12 +85,15 @@ test('ARRIVALS: messages that wait after their pattern is gone are still judged,
   r.sql.close();
 });
 
-test('ARRIVALS: two held is green, under the three', async () => {
-  const r = await held(2);
-  const green = sign(r.sql, 'arrivals-filed', r.sent + DAY + 60_000);
-  assert.equal(green.state, 'green');
-  assert.equal(green.value, 2);
-  assert.equal(green.said, '2 messages have waited more than a day. Every other one is filed.');
+test('ARRIVALS: one held more than a day is red; a minute short of a day, green', async () => {
+  /* ONE TEXT UNFILED PAST A DAY IS ONE THE PERSON MUST FILE BY HAND (audit 35): two once read green under a limit of three. */
+  const r = await held(1);
+  const red = sign(r.sql, 'arrivals-filed', r.sent + DAY + 60_000);
+  assert.equal(red.state, 'red');
+  assert.equal(red.value, 1);
+  assert.match(red.said, /^1 message has waited more than a day\./);
+  /* A MINUTE SHORT OF A DAY IT HAS NOT WAITED YET. */
+  assert.equal(sign(r.sql, 'arrivals-filed', r.sent + DAY - 60_000).state, 'green');
   r.sql.close();
 });
 

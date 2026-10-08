@@ -51,6 +51,7 @@ import runs0028 from './migrations/0028_runs.ts';
 import door0029 from './migrations/0029_door.ts';
 import faults0030 from './migrations/0030_faults.ts';
 import cause0031, { causeSteps } from './migrations/0031_cause.ts';
+import tokenBuild0032 from './migrations/0032_token_build.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -87,6 +88,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 29, slug: 'door', sql: door0029 },
   { version: 30, slug: 'faults', sql: faults0030 },
   { version: 31, slug: 'cause', sql: cause0031 },
+  { version: 32, slug: 'token_build', sql: tokenBuild0032 },
 ];
 
 /**
@@ -132,6 +134,7 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 31 adds one nullable column, `cause`, to `suggestion` and to `decision`, which an older file imports
  * without and reads as NULL, a question nobody gave a cause, with indexes and a trigger no file carries, so the format
  * is still 1.
+ * Migration 32 rebuilds `token` with `last_build` and `last_tool_at`, `local` as every key is, so no file carries it.
  */
 export const FORMAT_VERSION = 1 as const;
 

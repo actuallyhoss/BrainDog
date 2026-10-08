@@ -823,3 +823,111 @@ test("AND A RUN THE HOST HANDS WEARS ITS MAKER'S MARK IN BOTH, undimmed, and a r
   assert.equal(svelte.match(/class="cards-run-agent"/gu)?.length, 1, 'the run with a mark did not wear it, or the other did');
   assert.doesNotMatch(svelte, /data-quiet/u, 'a run the host handed was dimmed');
 });
+
+/* ── a part with no value is not drawn (PGS-A05) ───────────────────────────── */
+
+/**
+ * Each part the rule reads, once with a part whose value is missing beside parts that hold one, as his project pages
+ * hold them: a chip that is a name and a dash, "Keeping it alive: lanternfish.example" over a dash, a figure over a dash beside a
+ * figure of nought, and a stone with no step. Zero is a value, so the nought stays.
+ */
+const PARTS: Record<string, { src: string; gone: string; kept: readonly string[] }> = {
+  chip: { src: '```chips\ndot | — | status\ndot | 3 | open tasks\n```', gone: 'status', kept: ['3', 'open tasks'] },
+  'spec row': { src: '```spec\nKeeping it alive: lanternfish.example | — | \nDomain | lanternfish.example | renews in May\n```', gone: 'Keeping it alive', kept: ['Domain', 'renews in May'] },
+  'stat cell': { src: '```stat\nCosts a year | — | \nEarns a month | 0 | \nUsers | 41 | \n```', gone: 'Costs a year', kept: ['Earns a month', 'Users'] },
+  step: { src: '```steps path\nSample the fit | maker | done\n— | quoted | \nPick a board |  | next\n```', gone: 'quoted', kept: ['Sample the fit', 'Pick a board'] },
+};
+
+/** The host's answer for every block: no `empty:` line, which is a write-up's and a block that is not the page's lead. */
+const NO_LINE = { empty: () => null };
+const Emptied = Block as unknown as Component<{ block: BlockSegment; opts: Record<string, unknown> }>;
+const both = (block: BlockSegment, opts: Record<string, unknown>): [string, string] => [
+  tree(render(Emptied, { props: { block, opts } }).body),
+  tree(toHTML([block], opts)),
+];
+
+for (const [name, { src, gone, kept }] of Object.entries(PARTS)) {
+  test(`A ${name.toUpperCase()} WITH NO VALUE IS NOT DRAWN in either renderer, and the ones that hold a value are`, () => {
+    const [svelte, html] = both(page(src), NO_LINE);
+    assert.equal(svelte, html);
+    assert.ok(!html.includes(gone), `${gone} was drawn: ${html}`);
+    assert.ok(!html.includes('—'), `a dash was drawn: ${html}`);
+    for (const k of kept) assert.ok(html.includes(k), `${k} was not drawn: ${html}`);
+  });
+
+  test(`A ${name.toUpperCase()} WITH A VALUE IS DRAWN AS IT WAS, the same in both renderers, with no host at all`, () => {
+    const present = page(src.replace('—', '12'));
+    const [svelte, html] = both(present, {});
+    assert.equal(svelte, html);
+    assert.ok(html.includes(gone) && html.includes('12'), html);
+  });
+
+  test(`A ${name.toUpperCase()} KEEPS ITS DASH where the block says \`empty: keep\`, in both renderers`, () => {
+    const [svelte, html] = both(page(src), { empty: () => 'keep' });
+    assert.equal(svelte, html);
+    assert.ok(html.includes(gone), html);
+  });
+}
+
+/** Whether `svelte/Block.svelte` leaves out the figure of a block left with nothing, as `toHTML` does. */
+const FRAMED = readFileSync(new URL('../svelte/Block.svelte', import.meta.url), 'utf8').includes('emptied(block, opts)');
+
+/** A block every part of which has no value: each kind the rule reads, over dashes alone. */
+const BARE: Record<string, string> = {
+  chips: '```chips\ndot | — | status\ndot | — | lane\n```',
+  spec: '```spec\nKeeping it alive: lanternfish.example | — | \n```',
+  stat: '```stat\nCosts a year | — | \nEarns a month |  | \n```',
+  path: '```steps path\n— | maker | \n```',
+};
+
+for (const [name, src] of Object.entries(BARE)) {
+  test(`A ${name.toUpperCase()} LEFT WITH NOTHING SAYS ITS EMPTY LINE where it leads the page, one tree in both renderers`, () => {
+    const [svelte, html] = both(page(src), { empty: () => 'Nothing measured yet.' });
+    assert.equal(svelte, html);
+    assert.match(html, /^<figure [^>]*>(<figcaption[^>]*>.*<\/figcaption>)?<p class="block-empty">Nothing measured yet\.<\/p><\/figure>$/u);
+  });
+
+  test(`A ${name.toUpperCase()} LEFT WITH NOTHING IS NOT DRAWN by the mirror where it does not lead, and draws no part in the app`, () => {
+    const block = page(src);
+    assert.equal(toHTML([block], NO_LINE), '');
+    assert.equal(toHTML([block]), '', 'a write-up has no lead, so its bare block is not drawn either');
+    const svelte = tree(render(Emptied, { props: { block, opts: NO_LINE } }).body);
+    assert.doesNotMatch(svelte, /—|class="(?:pill|row|cell|item)"/u, `a part was drawn: ${svelte}`);
+  });
+
+  /* Waits on one line in `svelte/Block.svelte`: the figure is drawn only where `emptied(block, opts)` is not null.
+     Until it is there the app draws the bare frame the mirror leaves out, and this is a to-do; once it is, a failure. */
+  test(`A ${name.toUpperCase()} LEFT WITH NOTHING IS ONE TREE IN BOTH: nothing at all`, { todo: FRAMED ? false : 'svelte/Block.svelte skips the figure when emptied() is null' }, () => {
+    const [svelte, html] = both(page(src), NO_LINE);
+    assert.equal(svelte, html);
+  });
+}
+
+/** Zero is a value: a part reading 0 beside a missing one is drawn, the same in both renderers. */
+const NOUGHTS: Record<string, { src: string; gone: string; kept: string }> = {
+  chip: { src: '```chips\ndot | 0 | open tasks\ndot | — | status\n```', gone: 'status', kept: 'open tasks' },
+  'spec row': { src: '```spec\nUsers | 0 | \nKeeping it alive: lanternfish.example | — | \n```', gone: 'Keeping it alive', kept: 'Users' },
+  'stat cell': { src: '```stat\nCosts a year | 0 | \nEarns a month | — | \n```', gone: 'Earns a month', kept: 'Costs a year' },
+  step: { src: '```steps path\n0 | maker | done\n— | quoted | \n```', gone: 'quoted', kept: '>0<' },
+};
+
+for (const [name, { src, gone, kept }] of Object.entries(NOUGHTS)) {
+  test(`A ${name.toUpperCase()} READING 0 IS DRAWN in both renderers, and the missing one beside it is not`, () => {
+    const [svelte, html] = both(page(src), NO_LINE);
+    assert.equal(svelte, html);
+    assert.ok(html.includes(kept), `${kept} was not drawn: ${html}`);
+    assert.ok(!html.includes(gone) && !html.includes('—'), html);
+  });
+}
+
+/* ── a row's mark is a picture (PGS-A06) ───────────────────────────────────── */
+
+test('A CARD\'S MARK THAT NAMES A PICTURE IS THE PICTURE IN BOTH RENDERERS, and never the first letter of its name', () => {
+  const block = page('```cards\nmark: Icon | title: Project\ncake | Crumb.gg\nKiln | Kiln\nclose | Lanternfish\n```');
+  for (const opts of [{}, { icon: (name: string) => (name === 'gift' ? 'M4 20h16' : null) }]) {
+    const [svelte, html] = both(block, opts);
+    assert.equal(svelte, html);
+    const marks = [...html.matchAll(/<span aria-hidden="true" class="cards-mark"( data-glyph="[^"]*")?>(.*?)<\/span>/gu)].map((m) => [m[1] ?? '', m[2]!.startsWith('<svg') ? 'svg' : m[2]]);
+    assert.deepEqual(marks, [[' data-glyph="gift"', 'icon' in opts ? 'svg' : ''], ['', 'K'], ['', 'L']], html);
+  }
+});

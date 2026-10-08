@@ -236,8 +236,18 @@ export async function serveMcp<C>(
     session?: (ctx: C, said: unknown) => C;
     /** Where this host serves the app, such as `https://brain.dog`. It is handed to `handle`, and the tools read it only to put a `decide` link on a filed question. Left out, that link is left out. */
     origin?: string;
+    /** This host's build, sent on every answer as the header `braindog-build`, so the bridge can see a deploy mid-session (AGT-A02). */
+    build?: string;
+    /** Called after a `tools/call` is answered without a protocol error (AGT-A02; the scope's critic moved this half to AGT-B01's marks). */
+    called?: (ctx: C, name: string) => void | Promise<void>;
   } = {},
 ): Promise<Response> {
+  const res = await answered(request, surface, ctx, options);
+  if (options.build) res.headers.set('braindog-build', options.build);
+  return res;
+}
+
+async function answered<C>(request: Request, surface: McpSurface<C>, ctx: C | null, options: Parameters<typeof serveMcp<C>>[3] & {}): Promise<Response> {
   const early = gate(request);
   if (early) return early;
   if (ctx === null) return unauthorized();
@@ -265,6 +275,23 @@ export async function serveMcp<C>(
      else 2025-03-26, which the specification tells a server to assume of a request that sends no header. `handle`
      reads it only to decide whether a result says `resultType`, which no client older than 2026-07-28 expects. */
   const version = request.headers.get('mcp-protocol-version') ?? versionIn(meta) ?? OLDEST;
-  const reply = await handle(message, surface, who, options.origin, version);
+  const reply = await handle(message, surface, who, options.origin, version, callerOf(request, said));
+  if (options.called && reply !== null && !('error' in reply) && isObject(message) && message.method === 'tools/call') {
+    const name = isObject(message.params) && typeof message.params.name === 'string' ? message.params.name : '';
+    if (name !== '') await options.called(who, name);
+  }
   return reply === null ? bare(202) : json(statusOf(reply), reply);
+}
+
+/**
+ * Who is calling, as a key for the minute between `called` marks (`rpc.ts`): the bearer and what the client says of its
+ * session, folded to eight hex characters so the bearer itself is never kept. They are what the record tells one run
+ * from another by, so two sessions on one key that say different things are two callers, and sessions that say nothing
+ * are one caller as they are one run.
+ */
+function callerOf(request: Request, said: unknown): string {
+  const text = `${request.headers.get('authorization') ?? ''}\n${said === null ? '' : JSON.stringify(said)}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(16).padStart(8, '0');
 }

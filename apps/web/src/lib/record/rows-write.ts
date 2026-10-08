@@ -4,7 +4,7 @@
  * A ROUTE-ONLY MODULE, like `row-live.ts`: the client carries the route table as a value, so only the two register
  * screens that write import it.
  *
- * ONLY A LIVE SCREEN CALLS THIS, and since the sample record went every screen is live.
+ * EVERY SCREEN THAT CALLS THIS IS DRAWN OVER THE RECORD ITSELF.
  *
  * THE VALUES GO OUT IN THE RECORD'S SPELLING AND COME BACK IN THE SCREEN'S. The screen holds a ref as the number a
  * person says and an enum as whichever spelling the address carried; the record stores the target row's ULID and the

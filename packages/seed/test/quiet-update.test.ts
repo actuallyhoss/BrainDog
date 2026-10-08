@@ -337,8 +337,10 @@ const QUIETEST_FIRST: Body[] = [
 /**
  * MONEY-CORE 3.13.0, WORK 1.16.0 AND PEOPLE 3.1.0, THE VERSIONS BEFORE THIS BUILD'S, made from this build's document by
  * undoing the one change each new version makes (money-core 3.14.0, work 1.17.0, people 3.2.0), and held below to the
- * fingerprint released under each.
+ * fingerprint released under each. Money-core 3.15.0's one figure, `ledger-rows-7d`, and 3.16.0's three signs are taken
+ * off as well.
  */
+const SIGNS_ADDED = new Set(['ledger-rows-7d', 'ledger-newest-days', 'currencies-held', 'uncategorised-share-30d']);
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
   'money-core': {
@@ -346,7 +348,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     released: '2e09983b40aba73e',
     undo: (doc) => ({
       ...doc,
-      declarations: (doc.declarations as Body[]).map((d) =>
+      declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric))).map((d) =>
         d.register === 'accounts' && Array.isArray(d.fields)
           ? { ...d, fields: (d.fields as Body[]).map((f) => (f.id === 'last4' ? { ...f, label: 'Last four digits' } : f)) }
           : d,

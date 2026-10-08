@@ -153,7 +153,8 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   await installSeed(api.kernel);
   const mcp = tools(api);
 
-  /* THE OWNER'S SHAPE: forty keys and ten tools that apply everywhere, fifty learnings, and a queue with three alike. */
+  /* THE OWNER'S SHAPE: forty keys and ten tools that apply everywhere, fifty learnings, and a queue with two alike. The
+     same question asked twice by one run is one question (its cause joins them), so three asked read two alike. */
   for (let i = 0; i < 40; i++)
     assert.ok(api.kernel.create('credentials', { label: `Deploy key ${String(i)}`, opens: `Deploys service ${String(i)}`, kind: 'api_token' }, { actor: 'p_seed' }).ok);
   for (let i = 0; i < 10; i++) assert.ok(api.kernel.create('tools', { name: `tool-${String(i)}`, kind: 'cli' }, { actor: 'p_seed' }).ok);
@@ -185,7 +186,7 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   assert.equal(said.split('\n')[0], 'BrainDog · run S6 · project Kiln · Claude Code on MacBook');
   assert.doesNotMatch(text, /Studio-MacBook/u, 'the machine was said by its own name');
   assert.match(slots.get('Next') ?? '', /check before acting\)$/u, "another run's step a fortnight old was not marked to check");
-  assert.match(slots.get('Waiting') ?? '', /: bank-card-used-sms could not read account out of this one\. [^·]*\(3 alike\) · /u);
+  assert.match(slots.get('Waiting') ?? '', /: bank-card-used-sms could not read account out of this one\. [^·]*\(2 alike\) · /u);
   assert.match(slots.get('Learned') ?? '', /^Lesson 49 of the card test\. · Lesson 48 of the card test\.$/u);
 
   /* A KEPT LIST IS A COUNT AND THIS PROJECT'S ROWS: the forty keys that apply everywhere are a number, not forty lines,

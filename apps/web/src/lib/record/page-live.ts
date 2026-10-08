@@ -123,9 +123,8 @@ type Row = RecordRow & { updated_at?: string; group?: unknown };
  * may carry. Each of those is `unknown` here and is narrowed once, by the code that puts it on a
  * block, because the app's own `PageBlock` promises a shape nobody checked.
  *
- * THE SAMPLE CANNOT REACH THIS. Its blocks are typed literals in `fixtures/sample.ts`, written in this repo and
- * checked by the compiler. A live block is JSON from a record, and a pack is a thing a stranger
- * wrote, so this path is the only one where a declaration can be a shape the app did not expect.
+ * A BLOCK IS JSON FROM A RECORD, and a pack is a thing a stranger wrote, so this path is where a
+ * declaration can be a shape the app did not expect.
  */
 type Answered = {
   source?: string;

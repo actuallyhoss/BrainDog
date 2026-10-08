@@ -435,6 +435,10 @@ export function summaryOf(walked: Walked, began: number): string {
  * looking; an invocation marked failed is what makes them look. The line between the two is whether
  * anything at all worked: one record over the 40 MiB ceiling is a record to fix, and a whole fleet
  * that wrote nothing is a binding, a bucket or a recipient, and nobody has a copy of anything.
+ *
+ * A WALK THAT REACHED NO RECORD IS NOT RED HERE, because a deployment before its first sign-up is not broken. It is not a
+ * night that ran either: `/healthz` says `reached: false, ran: false` for it (`nightSaid` in `health.ts`), so a watch
+ * from outside sees a Directory whose page came back empty.
  */
 export function fleetFailure(walked: Walked): string | null {
   if (walked.records === 0 || walked.backups > 0) return null;

@@ -15,7 +15,7 @@
  */
 
 export { parse, splitRow, type Block, type Degraded, type Markdown, type ParseOptions, type Row, type RowRef, type Segment } from './parse.ts';
-export { toHTML, filtersHTML, captioned, describe, escape, holeLabel, hrefFor, verbatimText, type RenderOptions } from './html.ts';
+export { toHTML, filtersHTML, captioned, describe, escape, holeLabel, hrefFor, verbatimText, EMPTY_KEEP, drawnRows, emptied, keepsNought, type RenderOptions } from './html.ts';
 export {
   CARD_ROLES,
   CARDS_NEXT,
@@ -163,7 +163,7 @@ export {
   type RangeBar,
   type RangeInput,
 } from './progress.ts';
-export { PATH_DONE, PATH_EVERYTHING, PATH_NEXT, PATH_STEP, PATH_VIEWS, pathFault, pathMore, pathPlan, pathRest, pathShort, type PathMark } from './path.ts';
+export { PATH_DONE, PATH_EVERYTHING, PATH_NEXT, PATH_STEP, PATH_VIEWS, pathFault, pathMore, pathPlan, pathRest, pathShort, unvalued, type PathMark } from './path.ts';
 export { CALENDAR_MONTHS_MOST, CALENDAR_NONE, WEEKDAYS, calendarDay, calendarMore, calendarPlan, calendarSaid, calendarSkipped, type CalendarCell, type CalendarDay, type CalendarMonth, type CalendarPlan } from './calendar.ts';
 export { LANES_NONE, LANES_NOW, LANES_WINDOW, lanesFault, lanesInstant, lanesOutside, lanesPlan, lanesSentence, lanesSince, lanesSkipped, type Lane, type LanesPlan, type LanesTick } from './lanes.ts';
 export { LINK_ADDRESS, LINKS_NONE, linkFault, linkHost, linkHref, linkPlan, type LinkLine } from './links.ts';

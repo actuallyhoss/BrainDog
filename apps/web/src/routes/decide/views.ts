@@ -246,7 +246,8 @@ export type DecideDrawn = {
  *
  * A QUESTION IS DRAWN ONCE: the rest leave out what the first block drew, and say how many are left past them.
  *
- * AND WHAT HOLDS NOTHING IS NOT DRAWN, the page reader's own rule (`emptyHidden`), so a section over nothing goes too.
+ * AND WHAT HOLDS NOTHING IS NOT DRAWN, the record's rule (`drawn: false` with `why`, the kernel's `drawn.ts`), which
+ * `emptyHidden` reads and judges again only where the record drew a block, so a section over nothing goes too.
  * `who` names whoever asked the first question, or `''` for the reader or nobody, as the classic screen said it.
  */
 /**

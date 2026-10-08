@@ -7,7 +7,8 @@
  * the names travel on their own, here, and the paths stay behind the dynamic import in `index.ts`.
  * Importing `set.ts` for its keys would carry its paths into every chunk that asks a name, which is the
  * `bundle` gate's red, and `core.ts` would carry the core's paths to every host that only reads names:
- * this file imports their TYPES only, and a type import erases.
+ * this file imports their TYPES only, and a type import erases. `aliases.ts` is the one value it imports,
+ * and it carries names and no paths, so `isMark` can answer an alias without the drawings.
  *
  * ONE LIST FOR BOTH SIDES. `apps/web/src/lib/ui/icons.ts` answers `isGlyph` from this set and the
  * renderer answers an inline icon from it, so a name is nameable in text exactly when an `icon:` key
@@ -18,6 +19,7 @@
  * object literal answers from its prototype.
  */
 
+import { canonical } from './aliases.ts';
 import type { CoreGlyph } from './core.ts';
 import type { SetGlyph } from './set.ts';
 
@@ -98,3 +100,37 @@ export const GLYPH_NAMES: ReadonlySet<string> = new Set<string>([
   ...Object.keys(CORE_NAMES),
   ...Object.keys(SET_NAMES),
 ]);
+
+/**
+ * THE NAMES THE FRAME USES AS CONTROLS, which a row may never wear as its mark: a project drawn as a
+ * close cross or a pencil reads as a button nobody can press. Each control is listed by every name it
+ * answers to, the shell's (`close`) beside Lucide's (`x`), so a reader that holds no alias table, the
+ * kernel's copy in `packages/kernel/src/marks.ts`, refuses the same words this file does.
+ *
+ * TWO COPIES OF ONE CLOSED LIST, held equal word for word and in order by `tools/gates/closed-lists.mjs`.
+ * A name added here is added there in the same commit.
+ */
+export const CONTROLS = [
+  'close', 'x', 'circle-x', 'plus', 'circle-plus', 'minus', 'circle-minus', 'check',
+  'chevron', 'chevron-right', 'chevronDown', 'chevron-down', 'chevron-left', 'chevron-up', 'chevrons-up-down',
+  'arrow', 'arrow-right', 'back', 'arrow-left', 'arrowUp', 'arrow-up', 'arrowDown', 'arrow-down', 'arrow-up-down',
+  'external', 'external-link', 'filter', 'funnel', 'list-filter', 'search', 'settings', 'sliders-horizontal',
+  'settings-2', 'copy', 'edit', 'pencil', 'trash', 'trash-2', 'refresh', 'rotate-cw', 'rotate-ccw', 'refresh-cw',
+  'more', 'ellipsis', 'ellipsis-vertical', 'drag', 'grip-vertical', 'move', 'menu', 'panel-left', 'eye', 'eye-off',
+  'download', 'upload', 'maximize-2', 'minimize-2', 'expand', 'shrink', 'undo-2', 'redo-2', 'log-in', 'log-out',
+  'stop', 'square', 'slash', 'play', 'pause', 'save', 'share', 'share-2', 'arrow-up-narrow-wide', 'arrow-down-wide-narrow',
+] as const satisfies readonly (AppGlyph | CoreGlyph | SetGlyph)[];
+
+/** The same list as a `Set`, for the reason `GLYPH_NAMES` is one. */
+export const CONTROL_GLYPHS: ReadonlySet<string> = new Set<string>(CONTROLS);
+
+/**
+ * Whether `name` may be a row's mark: it names a glyph, as written or through an alias, and that glyph
+ * is no control under any of its names. `cake` is a mark (an alias of `gift`); `close`, `x` and `pencil`
+ * are not, and neither is a word the set does not draw.
+ */
+export function isMark(name: string): boolean {
+  const n = name.trim();
+  const known = GLYPH_NAMES.has(n) ? n : GLYPH_NAMES.has(canonical(n)) ? canonical(n) : null;
+  return known !== null && !CONTROL_GLYPHS.has(known) && !CONTROL_GLYPHS.has(canonical(known));
+}

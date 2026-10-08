@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 
 import type { LiveBlock } from '../record/page-live.ts';
 import type { Entry } from '../record/schema.ts';
-import { emptyHidden, foldOf, FOLD_AT, holdsNothing, leadOf, openOf, optionOf, rowKeys, stepRow, unsaid, wholeKey } from './home.ts';
+import { arranged, bare, emptyHidden, foldOf, FOLD_AT, holdsNothing, leadOf, markDrawn, openOf, optionOf, rowKeys, stepRow, unsaid, wholeKey, type Why } from './home.ts';
 
 /** A block as the record answers one, holding nothing unless the case says what. */
 const block = (over: Partial<LiveBlock> & { kind: string }): LiveBlock =>
@@ -206,6 +206,65 @@ test('A PAGE AT ITS OWN ADDRESS SAYS ONE SENTENCE WHERE IT WOULD SAY NOTHING, an
   assert.deepEqual(emptyHidden([cannot, tasks], true).map((b) => b.drawn), [false, true], 'a block this build cannot draw is never the one kept');
 });
 
+/* ── the record's flag ─────────────────────────────────────────────────────── */
+
+/* THE SAME ANSWERS AS THE KERNEL'S `drawn.test.ts`, over the app's shape: this file's rule is that one's copy until
+   `@braindog/kernel` exports it, and the two are held equal by holding each to the same cases. */
+const whyOf = (b: object): Why | undefined => (b as { why?: Why }).why;
+const whys = (blocks: readonly LiveBlock[]): string[] => blocks.map((b) => (b.drawn ? 'drawn' : (whyOf(b) ?? 'no why')));
+const held = (title: string, fields: Record<string, unknown> = {}) => ({ id: title, fields }) as unknown as Entry;
+const full = () => block({ kind: 'table', rows: [row('Rent')], entries: [held('Rent')], shown: 1, total: 1 });
+
+test('EACH WHY: a list of nothing is empty, a chart of a field nobody filled is unsaid, a when that said no is when, and cannot', () => {
+  const chips = block({ kind: 'chips', columns: [{ field: 'health' }] as LiveBlock['columns'], matched: [held('Kiln', { health: null }), held('Bake', { health: '' })], rows: [row('Kiln')] });
+  const out = markDrawn([
+    full(),
+    block({ kind: 'todo', empty: 'Nothing due today.' }),
+    chips,
+    block({ kind: 'note', body: 'Heads up', drawn: false }),
+    block({ kind: 'todo', cannot: 'This part of the page cannot be drawn from the record yet.' }),
+  ]);
+  assert.deepEqual(whys(out), ['drawn', 'empty', 'unsaid', 'when', 'cannot']);
+});
+
+test('THE RECORD LEFT IT OUT, SO IT IS OUT: a block the record marked keeps its mark, and the rest are judged here', () => {
+  const marked = { ...full(), drawn: false, why: 'empty' } as LiveBlock;
+  const out = emptyHidden([marked, block({ kind: 'todo' }), full()]);
+  assert.equal(out[0], marked, 'the record\'s flag is read as it came');
+  assert.deepEqual(whys(out), ['empty', 'empty', 'drawn']);
+});
+
+test('EMPTY: KEEP keeps a block that holds nothing, and its noughts', () => {
+  const nought = { id: 'costs', label: 'Costs a year', nothingHeld: true } as never;
+  const ledger = block({ kind: 'stat', metrics: [nought], empty: 'keep' });
+  assert.equal(bare(ledger), false);
+  const out = emptyHidden([full(), ledger]);
+  assert.equal(out[1]!.drawn, true);
+  assert.equal(out[1]!.metrics?.length, 1, 'its nought is still there');
+  assert.equal(emptyHidden([full(), { ...ledger, empty: 'Nothing costs a year yet.' }])[1]!.drawn, false);
+});
+
+test('A SECTION HEADS ITS OWN COLUMN, and one carrying a host panel stays', () => {
+  const out = emptyHidden([
+    block({ kind: 'section', heading: 'Heads up' }),
+    block({ kind: 'note', body: 'Rail note', area: 'rail' } as Partial<LiveBlock> & { kind: string }),
+    block({ kind: 'todo' }),
+    block({ kind: 'section', heading: 'Actions', panel: 'actions' } as Partial<LiveBlock> & { kind: string }),
+    block({ kind: 'todo' }),
+    full(),
+  ]);
+  assert.deepEqual(whys(out), ['empty', 'drawn', 'empty', 'drawn', 'empty', 'drawn']);
+});
+
+test('ARRANGING STILL DRAWS EVERY BLOCK the record left out, but one whose when said no', () => {
+  const marked = markDrawn([full(), block({ kind: 'todo' }), block({ kind: 'note', drawn: false })]);
+  assert.deepEqual(whys(marked), ['drawn', 'empty', 'when']);
+  const laid = arranged(marked);
+  assert.deepEqual(laid.map((b) => b.drawn), [true, true, false]);
+  assert.equal(whyOf(laid[1]!), undefined);
+  assert.equal(leadOf(laid), 0);
+});
+
 /* ── the fold ──────────────────────────────────────────────────────────────── */
 
 test('A LONG LIST FOLDS IN PLACE AFTER ITS FIRST ROWS, and "N more" counts the rest', () => {
@@ -276,7 +335,7 @@ const CARD = readFileSync(new URL('./QueueAnswer.svelte', import.meta.url), 'utf
 
 test('A HOME DRAWS ITS BLOCKS THROUGH THE EMPTY RULE AND WALKS ROWS, and a page at its own address still walks blocks', () => {
   assert.match(BODY, /const quiet = \$derived\(emptyHidden\(blocks, mode === 'page'\)\);/, 'a page at its own address keeps one sentence where it would say nothing');
-  assert.match(BODY, /const drawable = \$derived\(mode === 'preview' \|\| arranging \? blocks : quiet\);/, 'every page being read hides its empty blocks; authoring draws them all');
+  assert.match(BODY, /const drawable = \$derived\(mode === 'preview' \|\| arranging \? arranged\(blocks\) : quiet\);/, 'every page being read hides its empty blocks; authoring draws them all, the record\'s marks undone');
   assert.match(BODY, /if \(mode === 'home'\) return homeKey\(e\);/);
   for (const key of ["case 'j':", "case 'k':", "case 'x':", "case 'Enter':", "case 'n':", 'optionOf(e.key)'])
     assert.ok(BODY.includes(key), `the home keys lost ${key}`);

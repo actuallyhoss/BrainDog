@@ -13,7 +13,7 @@
  */
 
 import { createClient, type Boot, type Cursor, type EventLine } from '@braindog/client';
-import { QUIET_MS, type QueueQuestion } from '@braindog/kernel';
+import { presenceOf, type Json, type QueueQuestion } from '@braindog/kernel';
 import { money } from 'braindog-render';
 
 import type { Fetch } from './boot-live.ts';
@@ -57,7 +57,7 @@ export type DayRow = {
 
 /**
  * One run an agent had open today, as a span on the day: from when it opened to when it was last heard from, and
- * whether it is working now (open, and heard from inside the last 15 minutes, the record's own `QUIET_MS`, its `WORKING_MS`).
+ * whether it is working now, by the kernel's one clock (`presenceOf`: active, and heard from inside its `WORKING_MS`).
  */
 export type SessionRow = {
   seq: number | null;
@@ -252,9 +252,6 @@ export function comingOf(
 
 /* ── the runs of the day ────────────────────────────────────────────────── */
 
-/** The record's own `QUIET_MS` (`WORKING_MS`): a run not heard from in 15 minutes has gone quiet. */
-export const QUIET_AFTER = QUIET_MS;
-
 /**
  * The runs heard from since `dayStart`, as spans: from when each opened (or midnight, for one opened before it) to
  * when it was last heard from, or to now while it works. A run with no time it can be placed at is left out.
@@ -266,7 +263,9 @@ export function sessionsOf(rows: readonly Row[], dayStart: number, now: number):
     const opened = Date.parse(text(r.created_at));
     if (!Number.isFinite(seen) || seen < dayStart) continue;
     const state = text(r.fields.state) || 'active';
-    const working = state === 'active' && now - seen < QUIET_AFTER;
+    /* THE KERNEL'S ONE CLOCK (`presence.ts`), never a sum of this file's own: the rail and the Agents headline count by
+       it, so a run seen 16 minutes ago is quiet here as it is there. A run never heard from (`before`) is not working. */
+    const working = presenceOf({ state, fields: r.fields as Record<string, Json> }, now) === 'working';
     const began = Number.isFinite(opened) ? Math.min(opened, seen) : seen;
     out.push({
       seq: r.seq,

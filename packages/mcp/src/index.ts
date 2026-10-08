@@ -257,6 +257,18 @@ export type McpSurface<C> = {
    * reason above: both HTTP hosts hand `serveMcp` the whole record, and a surface without it answers `NOT_IN_THIS_BUILD`.
    */
   understandPlan?(args: Record<string, never>, ctx: C): Answer;
+  /**
+   * Take back a question this run asked, while it is still open (the record's `withdraw`, DATA, AGT-C07). It backs
+   * `propose`'s `withdraw`. Optional for the command line's reason above, and a surface without it answers that
+   * `NOT_IN_THIS_BUILD`. Who may is the record's to say, and its refusal is said as it came.
+   */
+  withdraw?(args: { id: string }, ctx: C): Answer;
+  /**
+   * One mark of how a session met this door (the record's `heard`, DATA, AGT-B01): it said hello, was given the tools,
+   * made a call, or was answered INTERNAL. `rpc.ts` calls it and never waits on it, so a mark that fails or is slow
+   * costs the call nothing. A surface without it is left alone.
+   */
+  heard?(args: { kind: 'hello' | 'listed' | 'called' | 'internal'; n?: number; build?: string; client?: string }, ctx: C): Answer;
 };
 
 /**
@@ -362,14 +374,14 @@ export const TOOLS: readonly Tool[] = [
     /* THAT IT IS THE FIRST CALL IS THE INSTRUCTIONS' FIRST RULE, which a client shows in the same payload. What is left
        is what comes back, and since the card it is the card's five slots, in the order the card says them. */
     description:
-      'Your briefing: run, project, next step, what waits, what was learned.',
+      'Run, project, next step, what waits, what was learned.',
     input: obj({ format: FORMAT }),
     writes: false,
   },
   {
     name: 'schema',
     title: 'See the fields',
-    description: 'The fields of one register, their types and what each may take.',
+    description: 'One register\'s fields, their types and what each may take.',
     input: obj({ register: str('A register id from record_index.'), format: FORMAT }, ['register']),
     writes: false,
   },
@@ -384,7 +396,7 @@ export const TOOLS: readonly Tool[] = [
        the list measured 2,528 before and 2,544 after. A figure's id is a bare lowercase name, which no row form is. */
     /* AND "NEVER ADD TWO CURRENCIES" MOVED HERE FROM THE INSTRUCTIONS, beside the one read that answers a figure, when
        the instructions were cut to the three rules every call needs. */
-    description: 'One row or figure, by the id a person says out loud. Two currencies are never added.',
+    description: 'One row or figure, by its spoken id. Two currencies are never added.',
     input: obj(
       { spoken: str('register#number, a prefixed id such as S42, a row id from a ref field, or a figure from record_index.'), format: FORMAT },
       ['spoken'],
@@ -424,7 +436,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'search',
     title: 'Search everything',
-    description: 'Rows whose text matches, across every register you can see. Every word is a prefix.',
+    description: 'Rows whose text matches, in every register you see. Each word is a prefix.',
     /* AND 100, NOT THE 50 THIS SAID, for `list`'s reason one tool up. `ftsSearch` is
        `Math.min(Math.max(1, opts.limit ?? 20), 100)` (`packages/kernel/src/fts.ts:116`). Measured over
        130 rows all matching one word: `limit: 80` answered 80 hits, which an agent reading this was
@@ -436,7 +448,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'history',
     title: 'See how one thing changed',
-    description: 'The writes that made one row, in order, each with who and when.',
+    description: 'Every write to one row, in order, with who and when.',
     input: obj({ spoken: str('As get takes it.'), format: FORMAT }, ['spoken']),
     writes: false,
   },
@@ -444,7 +456,7 @@ export const TOOLS: readonly Tool[] = [
     name: 'activity',
     title: 'See recent changes',
     description:
-      'What changed lately, newest first, and who changed it.',
+      'What changed lately, newest first, and by whom.',
     /* A CURSOR NOW, AND TWENTY BY DEFAULT. It took a limit alone, up to the record's 200 and 50 when asked for none, so
        the default read on the owner's record was 13 KB with 70 row ids in it, and a session that wanted the page below
        had no way to ask. Paged as `list` is, the closing line says what is left and the call that reads it. */
@@ -455,7 +467,7 @@ export const TOOLS: readonly Tool[] = [
     name: 'governance',
     title: 'See questions and decisions',
     description:
-      'Questions waiting on the person, what was decided and why, and predictions.',
+      'Open questions, what was decided and why, and predictions.',
     input: obj({
       register: { enum: ['suggestion', 'decision', 'prediction'] },
       id: str('One by its SG or D number.'),
@@ -472,7 +484,13 @@ export const TOOLS: readonly Tool[] = [
     /* WHEN TO REACH FOR IT IS THE INSTRUCTIONS' SECOND RULE, and was said again here: "an agent never decides, lay out
        options with propose" and "to change something you may not change yourself, propose it" were the two clauses
        this description carried, in the same payload, a line apart. Where the person decides is said once, here. */
-    description: 'Put a question to the person, with what you would do about it. It changes nothing by itself; they decide in BrainDog.',
+    description: 'Ask the person, with what you would do. It changes nothing; they decide in BrainDog.',
+    /* `cause` AND `withdraw` (AGT-C07). A key is asked once: a second proposal with an open question's cause files
+       nothing and is answered "Already waiting as SG90.". `withdraw` takes one back, a branch and not an eighteenth tool
+       for `script_try`'s reason: the list was at its ceiling to the token, and a tool measured 76 where this is 21.
+       `required` went, since a withdrawal sends none of the three, and a proposal missing one is refused by the record
+       in the sentence that names it. The 45 they cost with `cause` was paid by `required`, this description, and nine
+       others that said a thing twice (`update`'s version, which its `version` says, among them): 2,760 after. */
     input: obj(
       {
         question: str('One sentence a person can answer.'),
@@ -490,15 +508,16 @@ export const TOOLS: readonly Tool[] = [
           description:
             'options: {"options":[...]}, two or more, each with id, label and because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change adds fields: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or to is a whole declaration of that id with the from_version you read. Others: braindog:grammar/proposals.',
         },
+        cause: str('A short key for what this is about, so it is asked once.'),
+        withdraw: str('Alone, takes back an SG you asked.'),
       },
-      ['question', 'body_kind', 'body'],
     ),
     writes: true,
   },
   {
     name: 'create',
     title: 'Add something',
-    description: 'Add a row to a register; it comes back with its number.',
+    description: 'Add a row to a register; it answers its number.',
     /* MONEY IS SAID WHERE IT IS WRITTEN. The instructions carried it as their second rule, read on every call; it
        matters on the two calls that write a value, and a brief answer now says every amount as a person reads it. */
     input: obj(
@@ -519,7 +538,7 @@ export const TOOLS: readonly Tool[] = [
        AND DELETING IS SAID, because nothing told an agent how. Other records hand their agents a
        delete tool; here it is `deleted_at` through the same verb and the same permission, and an
        agent had no way to find that out. */
-    description: 'Change a row, sending the version you read. On VERSION_STALE, re-apply your change to current.',
+    description: 'Change a row. On VERSION_STALE, re-apply your change to current.',
     input: obj(
       {
         spoken: str('As get takes it.'),
@@ -1401,6 +1420,55 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     return tried.ok ? { ok: true, value: { script_try: tried.value, proposed: false } } : tried;
   };
 
+  /**
+   * `propose` with `withdraw`: a question this run asked, taken back while it is open (the record's `withdraw`, AGT-C07).
+   *
+   * IT GOES ALONE. A withdrawal beside a question would be two acts in one call, and an agent that meant "replace it"
+   * should read that the old one went before it asks again. WHO MAY IS THE RECORD'S: another run's question is refused
+   * in the record's own sentence ("Only the run that asked can take it back."), and this adds nothing to it.
+   */
+  const withdrawn = async (args: Args, ctx: C): Promise<Done> => {
+    const beside = ['question', 'body_kind', 'body', 'cause'].find((k) => args[k] !== undefined);
+    if (beside !== undefined)
+      return { result: { ok: false, refusal: { code: 'FIELD_UNKNOWN', fix: `withdraw goes alone. Send it without ${beside}, then propose again if you still need to.`, at: beside, allowed: ['withdraw'] } } };
+    const id = typeof args.withdraw === 'string' ? args.withdraw.trim() : '';
+    if (!surface.withdraw) return { result: unbuilt('withdraw', 'The question stays in Decide until the person answers it.') };
+    const out = await surface.withdraw({ id }, ctx);
+    if (!out.ok) return { result: out };
+    /* SAID BY THE QUESTION'S WORDS WITH ITS HANDLE BESIDE THEM, read before the answer says it, as `log` reads one. */
+    const shown = isObject(out.value) && typeof out.value.id === 'string' && out.value.id !== '' ? out.value.id : id;
+    const words = await askedAs(shown, ctx);
+    return {
+      result: { ok: true, value: bare(out.value) },
+      say: (look) => `Taken back: ${words === null ? shown : `${clip(plainOf(words, look), 160)} (${shown})`}. It is gone from Decide.`,
+    };
+  };
+
+  /** The words an open or closed question was asked in, read by its SG handle, or `null` when it cannot be read. */
+  const askedAs = async (sg: string, ctx: C): Promise<string | null> => {
+    if (!/^SG[1-9][0-9]*$/u.test(sg)) return null;
+    const read = await surface.governance({ register: 'suggestion', id: sg } as never, ctx);
+    return read.ok && isObject(read.value) && typeof read.value.question === 'string' && read.value.question.trim() !== '' ? read.value.question : null;
+  };
+
+  /**
+   * What a joined proposal is said as: "Already waiting as SG90.", the question's words, and where the person answers.
+   *
+   * THE WORDS ARE THE QUESTION ALREADY WAITING, read by its handle, since another run may have asked it in other words
+   * and the person will read those; the agent's own words stand in only when it cannot be read. `widened` says how many
+   * more this call added to an open set of changes.
+   */
+  const joinedSaid = (out: Record<string, unknown>, question: string, look: Look): string => {
+    const id = typeof out.id === 'string' && out.id !== '' ? out.id : null;
+    const more = typeof out.widened === 'number' && out.widened > 0 ? ` This added ${String(out.widened)} more to it.` : '';
+    const at = typeof out.decide === 'string' ? ` at ${out.decide}` : '';
+    const decider = look.decider.slice(0, 1).toUpperCase() + look.decider.slice(1);
+    return [
+      `${id === null ? 'Already waiting.' : `Already waiting as ${id}.`} ${clip(plainOf(question, look), 160)}${more}`,
+      `Nothing new was asked. ${decider} decides in BrainDog${at}.`,
+    ].join('\n');
+  };
+
   /** Run `work` over every item, at most `at` at a time, and answer in the order they were given. */
   const pooled = async <T, R>(items: readonly T[], work: (item: T) => Promise<R>, at = 8): Promise<R[]> => {
     const out = new Array<R>(items.length);
@@ -2098,6 +2166,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      * CHANGE THAT SAYS `"try"` IS DRAWN INSTEAD OF FILED by the same branch (`preview` above), answered `page_preview`.
      */
     propose: async (args, ctx, turn) => {
+      if (args.withdraw !== undefined) return withdrawn(args, ctx);
       if (args.body_kind === 'change' && isObject(args.body) && args.body.try !== undefined) {
         const tried = await trial(args.body, ctx);
         /* A TRIAL IS SAID WHOLE, because it is what the agent asked to see and nobody else reads it: the writes a script
@@ -2114,6 +2183,13 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const filed = await decideAt(await surface.propose({ ...args, ...(body === undefined ? {} : { body }) } as never, ctx), ctx, turn);
       const question = typeof args.question === 'string' ? args.question : '';
       if (!filed.ok || !isObject(filed.value)) return { result: filed };
+      /* AN OPEN QUESTION WITH THIS CAUSE WAS JOINED AND NOTHING WAS FILED, so the answer names the one waiting and never
+         says "Asked": the agent asks nobody twice, and passes on the question already there. Nothing new is dry run. */
+      if (filed.value.joined === true) {
+        const joined = bare(filed.value) as Record<string, unknown>;
+        const waiting = typeof joined.id === 'string' ? ((await askedAs(joined.id, ctx)) ?? question) : question;
+        return { result: { ok: true, value: joined }, say: (look) => joinedSaid(joined, waiting, look), names: { people: true } };
+      }
       let value: Record<string, unknown> = filed.value;
       const rule = args.body_kind === 'change' && isObject(body) ? ruleIn(body) : null;
       if (rule !== null && surface.dryRun) {
@@ -2335,7 +2411,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           if (questionWords !== null) turn.titles.set(question, questionWords);
         }
         if (questionWords !== null) await handlesNamed(handlesIn(questionWords), ctx, turn);
-        /* A NAME ALONE IS NOTED ON THE CALLER'S PROJECT, which is said by name: "Noted Ahmed on Encore". */
+        /* A NAME ALONE IS NOTED ON THE CALLER'S PROJECT, which is said by name: "Noted Wren on Lanternfish". */
         if (mention && surface.context) {
           const c = await surface.context({}, ctx);
           on = c.ok && isObject(c.value) && isObject(c.value.project) && typeof c.value.project.name === 'string' ? c.value.project.name : null;

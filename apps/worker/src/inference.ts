@@ -165,6 +165,13 @@ const MODELS: Record<string, Rate> = {
   'glm-5.3-flash': { provider: '@cf/zai-org/glm-5.3-flash', shape: 'chat', inPerM: 13_636, outPerM: 45_455 },
 };
 
+/**
+ * The table above as the model checks read it (ENG-A03): each routed name with the id it is spelled by, its shape and its
+ * rates. `tools/model-checks/run.mjs --routes` asks every row once, so what it measures is the table this Worker ships,
+ * never a copy that could drift from it. Read only; the adapter still reads `MODELS`.
+ */
+export const ROUTED: readonly ({ name: string } & Readonly<Rate>)[] = Object.freeze(Object.entries(MODELS).map(([name, rate]) => Object.freeze({ name, ...rate })));
+
 /** Embeddings are the adapter's own pick, because the port passes no model: multilingual, because the record holds Arabic and English (`11 §3`). */
 export const EMBED_MODEL = '@cf/baai/bge-m3';
 

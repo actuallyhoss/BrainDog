@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { ROUTES } from '@braindog/host';
+import { MIN_CLI } from '@braindog/mcp/build';
 import { start } from '../src/server.ts';
 
 const OBLIGATIONS = {
@@ -580,7 +581,7 @@ test('`/.well-known/braindog-build` ANSWERS AS THE WORKER DOES: the build string
         const res = await fetch(`http://127.0.0.1:${bound(running)}/.well-known/braindog-build`);
         assert.equal(res.status, 200);
         assert.equal(res.headers.get('cache-control'), 'no-store');
-        assert.deepEqual(await res.json(), { app });
+        assert.deepEqual(await res.json(), { app, min_cli: MIN_CLI });
       } finally {
         await running.close();
       }

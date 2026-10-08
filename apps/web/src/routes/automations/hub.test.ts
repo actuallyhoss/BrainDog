@@ -317,3 +317,13 @@ test("an automation's page says what it would act on, and never rows", () => {
   for (const w of Object.values(canvasWords))
     if (typeof w === 'string') assert.doesNotMatch(w, /\b(rows?|lists?|registers?|blocks?)\b/iu, w);
 });
+
+test("A HELD RUN THAT SAYS WHY ITSELF IS NOT BLAMED ON THE MONTH'S LIMIT, and one that says nothing still is", () => {
+  const off = 'This server does not send requests. Its operator can switch that on.';
+  const at = iso(NOW - 120_000);
+  const [said] = runLines([], new Map(), [action('rates', { last: { at, outcome: 'held', status: null, note: off } })], [], NOW);
+  assert.doesNotMatch(said!.said, /month's limit/);
+  assert.match(said!.said, new RegExp(`^Held .+\\. ${off.replace(/\./g, '\\.')}$`));
+  const [quiet] = runLines([], new Map(), [action('rates', { last: { at, outcome: 'held', status: null, note: '' } })], [], NOW);
+  assert.match(quiet!.said, /by this month's limit\.$/);
+});

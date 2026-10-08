@@ -1,7 +1,7 @@
 /**
  * Money's figures, in the order a record has always held them. Each group is its own file, cut out of `money.ts` with no
- * change (REC-B01 job 1), and the order of the spreads here is the order of the document, which the pinned fingerprint
- * holds.
+ * change (REC-B01 job 1), the signs of life added after them (job 3), and the order of the spreads here is the order of
+ * the document, which the pinned fingerprint holds.
  */
 
 import type { SeedMetric } from '../../base.ts';
@@ -11,6 +11,7 @@ import { DUE_FIGURES } from './due.ts';
 import { FLOW_FIGURES } from './flow.ts';
 import { INSTALMENTS_FIGURES } from './instalments.ts';
 import { RUNWAY_FIGURES } from './runway.ts';
+import { SIGNS_FIGURES } from './signs.ts';
 import { SPENDING_FIGURES } from './spending.ts';
 
 const DECLARED_METRICS: Record<string, SeedMetric> = {
@@ -26,6 +27,12 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
      personal use case already name. */
 
   ...INSTALMENTS_FIGURES,
+
+  /* ── signs of life ───────────────────────────────────────────────────────
+     Whether Money is being kept at all, since money-core 3.15.0 (REC-B01 job 3). Last, so every figure above keeps its
+     place in the document. */
+
+  ...SIGNS_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */

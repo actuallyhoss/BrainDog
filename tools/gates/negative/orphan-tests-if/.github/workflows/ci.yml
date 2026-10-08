@@ -1,0 +1,23 @@
+name: ci
+on:
+  push:
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # THE DECOYS: a `--filter` naming one workspace, the root's `pnpm test`, and a condition that may be true.
+      - run: pnpm --filter @seeded/kept run test
+      - run: pnpm test
+      - if: github.event_name == 'push'
+        run: node --test tools/maybe.test.mjs
+      # THE FIRST SEED: a step that can never run, its condition written after its `run:`.
+      - name: Never
+        run: node --test tools/seeded-step.test.mjs
+        if: false
+  # THE SECOND SEED: a whole job that can never run.
+  off:
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: node --test tools/seeded-job.test.mjs

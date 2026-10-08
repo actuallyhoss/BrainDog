@@ -7,7 +7,8 @@
  *
  * `heard` IS DATA AND A WRITE: a POST whose JSON body is the mark, so it takes nothing in a query. It opens no run and
  * changes no row a person reads; it adds to the door's own table. `doorSigns` IS READ+ AND NO WRITE, the whole record's,
- * and takes how many days back.
+ * and takes how many days back. `doorHealth` IS ADMIN, the owner's in a browser: every connection, its app, build and last
+ * tool call, and the door's seven signs (AGT-A02). It takes nothing and changes nothing.
  */
 
 import type { Route } from '../index.ts';
@@ -17,4 +18,6 @@ export const ROUTES: readonly Route[] = [
     takes: {} },
   { name: 'doorSigns', group: 'READ+', writes: false, what: 'How many sessions connected, were given the tools and made a call, over the last 7 days unless days says otherwise. It changes nothing.',
     takes: { days: 'integer' } },
+  { name: 'doorHealth', group: 'ADMIN', writes: false, what: 'Every app, machine and key that can act on the record, the build each runs and when it last used a tool, and whether the agent door is working. A browser session only.',
+    takes: {} },
 ];

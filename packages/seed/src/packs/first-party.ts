@@ -425,11 +425,19 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   three or six, and the field holds whatever the message names. The id stays `last4`, so every bank pattern's lookup
  *   still reads it. A label on a field a record already holds, so a minor step that reaches a record on its own. Money's
  *   module is cut into a folder in the same step (`modules/money/`, REC-B01 job 1), which moves no byte of the document.
+ * - money-core 3.15.0: Money's first sign of life, `ledger-rows-7d`, how many cleared Ledger rows are dated in the last
+ *   seven days, with a target of at least one so a Ledger that stopped reads as missing its mark (REC-B01 job 3,
+ *   `modules/money/figures/signs.ts`). The other three signs the unit names wait for words the kernel does not read yet,
+ *   and come in a later step. One figure added, no list or field, so a minor step that reaches a record on its own.
+ * - money-core 3.16.0: three more signs, once the kernel reads their words (`age`, `currencies`, `empty`):
+ *   `ledger-newest-days`, `currencies-held` and `uncategorised-share-30d` (REC-B01 jobs 2 and 3,
+ *   `modules/money/figures/signs.ts`). Three figures added, no list or field, so a minor step that reaches a record on its
+ *   own. `nights-missed-30d` waits on a series naming its figure's lists.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.15.0',
   people: '3.2.0',
-  'money-core': '3.14.0',
+  'money-core': '3.16.0',
   estate: '2.1.0',
   work: '1.17.0',
 };

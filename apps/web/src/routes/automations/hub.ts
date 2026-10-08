@@ -110,6 +110,8 @@ export const hubWords = {
     waiting: (when: string) => `Started ${when}, waiting on a step.`,
     pending: (when: string) => `Queued ${when}.`,
   } as Record<string, (when: string) => string>,
+  /* A HELD RUN THAT SAID WHY ITSELF (a self-host with its outbound switch off): the month's limit is not the reason. */
+  heldSaid: (when: string) => `Held ${when}.`,
 
   /* ── the groups the lists sit in on the ground ── */
   on: 'On',
@@ -503,6 +505,8 @@ const BAD = new Set(['failed', 'refused']);
 function saidOf(outcome: string, at: string, say: string | null, now: number): string {
   const when = since(at, now);
   const ended = Object.hasOwn(hubWords.ended, outcome) ? hubWords.ended[outcome] : undefined;
+  /* A HELD RUN THAT SAID ITS OWN REASON is not held by the month's limit: the limit's words stay only when it gave none. */
+  if (outcome === 'held' && say) return `${hubWords.heldSaid(when)} ${say}`;
   const line = (ended ?? hubWords.ended.done!)(when);
   return say ? `${line} ${say}` : line;
 }

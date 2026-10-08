@@ -17,27 +17,94 @@
  */
 
 import type { ScriptRunner } from '@braindog/kernel';
+import type { Ledger } from '@braindog/host/actions';
 import { grantNamed, scriptReads, scriptRunner } from '@braindog/host/script';
 import type { RecordApi } from '@braindog/record';
 import { runInQuickJs } from '@braindog/script/quickjs';
 
 import { pinFor, pinnedSend, systemResolve, type OpenKey, type Pinned, type Resolve, type Send } from './actions.ts';
 
+/* ── the operator's switch ─────────────────────────────────────────────── */
+
+/**
+ * `BRAINDOG_OUTBOUND`: whether this server sends requests to other servers on a record's behalf. `off` unless the
+ * operator says `on`, because a self-host that was never asked to call out should not (HD.306).
+ *
+ * WHAT IT GOVERNS: a scheduled action (`pull`, `call`, `poll`, a connector) and a script's `ctx.fetch`, which are the
+ * requests an installed add-on makes. WHAT IT DOES NOT: the read of the public add-on registry, which is
+ * `BRAINDOG_KENNEL`'s (`kennel.ts`, RQ-SHL-308), a webhook or mail the owner set up, and a shared file read at an
+ * address somebody pasted. The two switches are named apart in `49 §5.24` so an operator never reads one as the other.
+ *
+ * `null` IS A VALUE THAT IS NEITHER, and `main.ts` refuses to start on it rather than guess which was meant.
+ */
+export function outboundOf(said: string | undefined): 'on' | 'off' | null {
+  const value = (said ?? '').trim().toLowerCase();
+  if (value === '' || value === 'off') return 'off';
+  if (value === 'on') return 'on';
+  return null;
+}
+
+/** What a held action or script says while the switch is off. It names the switch and no key, address or file. */
+export const OUTBOUND_OFF = 'This server does not send requests. Its operator can switch that on.';
+
+/**
+ * How long a held run waits before it is offered again: a day. A held run moves its schedule to `until` and writes one
+ * event, so an hour would fill the record's history and its usage with a held run every hour for each add-on. The cost
+ * is that an operator who switches it on sees each action run at its next turn, inside the day.
+ */
+export const OUTBOUND_HELD_MS = 86_400_000;
+
+/**
+ * The ledger's question, answered "held" for every action while the switch is off. `holding` and `holdingPaged` ask it
+ * before anything is resolved, opened or sent, so a held run sends nothing and its event carries `OUTBOUND_OFF`.
+ */
+export const outboundHeld =
+  (now: () => number = Date.now): Ledger['mayRun'] =>
+  () => ({ until: now() + OUTBOUND_HELD_MS, say: OUTBOUND_OFF });
+
 /**
  * The runner `runActions` is handed as its `script` option on this host. `send` and `resolve` are for tests; the
  * defaults are the pinned socket and the system's name service, as for the executor.
+ *
+ * `outbound: 'off'` HOLDS A RUN THAT FETCHES, AND ONLY ONE THAT FETCHES. A script that reads the record and writes back
+ * needs no other server and runs as before. One that calls `ctx.fetch` is told `OUTBOUND_OFF` inside the sandbox, so it
+ * stops where it would have sent, and the run comes back `held` with that sentence: nothing it wrote is applied, its
+ * schedule moves on by `OUTBOUND_HELD_MS`, and the event says why. Nothing is resolved and nothing is sent.
  */
 export function scriptSandbox(
   api: Pick<RecordApi, 'kernel' | 'list' | 'get'>,
-  options: { openKey: OpenKey; send?: Send | undefined; resolve?: Resolve | undefined; now?: (() => number) | undefined },
+  options: {
+    openKey: OpenKey;
+    send?: Send | undefined;
+    resolve?: Resolve | undefined;
+    now?: (() => number) | undefined;
+    outbound?: 'on' | 'off' | undefined;
+  },
 ): ScriptRunner {
-  return scriptRunner<Pinned>({
-    run: runInQuickJs,
-    send: options.send ?? pinnedSend,
-    pin: pinFor(options.resolve ?? systemResolve),
-    openKey: options.openKey,
-    grantOf: grantNamed(() => api.kernel.grants()),
-    reads: scriptReads(api),
-    now: options.now,
-  });
+  const runner = (run: typeof runInQuickJs): ScriptRunner =>
+    scriptRunner<Pinned>({
+      run,
+      send: options.send ?? pinnedSend,
+      pin: pinFor(options.resolve ?? systemResolve),
+      openKey: options.openKey,
+      grantOf: grantNamed(() => api.kernel.grants()),
+      reads: scriptReads(api),
+      now: options.now,
+    });
+  if (options.outbound !== 'off') return runner(runInQuickJs);
+  const now = options.now ?? Date.now;
+  return async (s) => {
+    /* ONE FLAG A RUN, so a held fetch in one run never holds the next. */
+    let asked = false;
+    const answer = await runner((decl, host) =>
+      runInQuickJs(decl, {
+        ...host,
+        fetch: async () => {
+          asked = true;
+          throw new Error(OUTBOUND_OFF);
+        },
+      }),
+    )(s);
+    return asked ? { held: { until: now() + OUTBOUND_HELD_MS, say: OUTBOUND_OFF } } : answer;
+  };
 }

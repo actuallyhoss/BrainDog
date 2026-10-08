@@ -13,14 +13,21 @@
 <script lang="ts">
   import { TONES, valueWord, type Block, type RenderOptions } from '../../src/index.ts';
   import { glyphPath } from '../../src/inline.ts';
+  import { drawnRows, emptied } from '../../src/html.ts';
 
   // `opts` is read for one thing, the glyph's drawing: a chip is a glyph, a figure and a word, and
   // none of the three may contain an inline run.
   let { block, opts = {} }: { block: Block; opts?: RenderOptions | undefined } = $props();
 
-  const rows = $derived(block.rows.filter((r) => (r.cells[1] ?? '') !== '' && (r.cells[2] ?? '') !== ''));
+  // A chip whose figure is the dash a reader prints for null is dropped as well (`drawnRows`), as `toHTML` drops it.
+  const rows = $derived(drawnRows(block, opts).map(({ row }) => row));
+  /** The block's `empty:` line where nothing is left to draw and the host names one (`emptied`). */
+  const left = $derived(emptied(block, opts));
 </script>
 
+{#if typeof left === 'string'}
+  <p class="block-empty">{left}</p>
+{:else if left === undefined}
 <div class="inline">
   {#each rows as row}
     {@const d = glyphPath(row.cells[0] ?? '', opts)}
@@ -43,3 +50,4 @@
     </span>
   {/each}
 </div>
+{/if}

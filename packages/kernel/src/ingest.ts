@@ -41,6 +41,7 @@ import { jsonPath, evaluate, parseWhere, INBOX_RAW, type Predicate, type Schema 
 import type { Entry, Json } from './index.ts';
 import { instant } from './migrate.ts';
 import { attempt } from './tx.ts';
+import { canon, sha256 } from './cause.ts';
 import { SESSION_PREFIX } from './session.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
 import { parseAnswer, readRow, type Mapping } from './map.ts';
@@ -1464,11 +1465,13 @@ function openRowset(
     );
     return asked.id;
   }
+  const cause = freeCause(deps.sql, rowsetCause(item.ingest, item.register, item.question.slice(0, 280), context, item.resembles ?? '', joins));
   const id = `SG${deps.allocate('suggestion')}`;
   deps.sql.exec(
-    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'rowset', ?, 'open', ?, ?)",
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, cause) VALUES (?, 'rowset', ?, 'open', ?, ?, ?)",
     id,
     JSON.stringify({
+      cause,
       register: item.register,
       rows: item.rows,
       count: item.rows.length,
@@ -1482,6 +1485,7 @@ function openRowset(
     }),
     `ingest:${item.ingest}`,
     at,
+    cause,
   );
   deps.sql.exec(
     "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'suggest', ?, 'suggestion', ?)",
@@ -1492,6 +1496,29 @@ function openRowset(
     item.question.slice(0, 280),
   );
   return id;
+}
+
+/**
+ * The cause of a question an arrival opens (AGT-C07): what `openRowset` joins on, the pattern, the list, the words, the
+ * context, what it resembles and the payee it is about, hashed. Not its rows, which grow as arrivals join it, so the
+ * cause stays put while the question does.
+ */
+function rowsetCause(ingest: string, register: string, question: string, context: string, resembles: string, joins: string): string {
+  return `ingest#${sha256(new TextEncoder().encode(canon([ingest, register, question, context, resembles, joins]))).slice(0, 24)}`;
+}
+
+/**
+ * `cause`, or when an open question already holds it, the first of `cause#2`, `cause#3`... none does. One holds it only
+ * when it is full (`ROWS_ASKED_MOST`), since `openRowset` joins any other, and the one asked beside it must not be
+ * refused by the index that keeps one open question a cause (migration 31).
+ */
+function freeCause(sql: Sql, cause: string): string {
+  const held = new Set(
+    sql.all<{ cause: string }>("SELECT cause FROM suggestion WHERE status = 'open' AND (cause = ? OR cause LIKE ?)", cause, `${cause}#%`).map((r) => r.cause),
+  );
+  let n = 1;
+  while (held.has(n === 1 ? cause : `${cause}#${n}`)) n++;
+  return n === 1 ? cause : `${cause}#${n}`;
 }
 
 /** The most rows one question an arrival opens holds, as many as `govern.ts` lets one `rowset` carry. */
@@ -3028,6 +3055,11 @@ export function fileAsSecond(deps: IngestDeps, raw: string): Result<Arrived> {
   );
   if (row === undefined || row.state !== 'skipped')
     return no<Arrived>('OUT_OF_BOUNDS', 'Only a message skipped as a repeat can be filed as a second one.', { at: 'raw' });
+  /* A REPEAT BY ITS MARK, NOT BY ITS STATE: a rule's skip is `skipped` too, and filed from here it skipped again and
+     answered ok, or, with the rule edited since, filed past the repeat check (audit-35, finding 4). Only a newest
+     `match` line carrying `field: 'repeats'` is a repeat. */
+  const mark = deps.sql.one<{ field: string | null }>("SELECT field FROM event WHERE kind = 'match' AND target = ? ORDER BY rowid DESC LIMIT 1", `inbox_raw:${raw}`);
+  if (mark?.field !== 'repeats') return no<Arrived>('OUT_OF_BOUNDS', 'This message was set aside by a rule, not as a repeat.', { at: 'raw' });
   const pattern = matchedBy(deps, raw);
   if (pattern === null) return no<Arrived>('OUT_OF_BOUNDS', 'The pattern that read this message is gone, so it cannot be filed again from here.', { at: 'raw' });
   const once: IngestDeps = {

@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CARD, CASH, answer, bodyOf, cash, depsOf, openQuestions, record, text, used } from './ingest-tail-kit.test.ts';
+import { CARD, CASH, answer, bodyOf, cash, depsOf, openQuestions, record, text, used } from './ingest-tail-kit.ts';
 import { answerAsked } from '../src/ingest.ts';
 
 const SHOPS = ['CORNER SHOP', 'NILE BOOKS', 'HALDEN COFFEE', 'CEDAR LANE BAKERY', 'ORCHARD PRINTS'];

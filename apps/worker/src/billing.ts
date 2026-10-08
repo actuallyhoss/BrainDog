@@ -32,6 +32,7 @@
 import { personName, type AccountDoor, type Provisioned } from '@braindog/host/auth';
 import { httpStatus } from '@braindog/host';
 import { verifyStripe } from '@braindog/host/stripe-sign';
+import { PLAN_TABLE } from '@braindog/record/plans';
 import { badSlug, type AccountUsage, type BillingAnswers, type BillingCall, type BillingRow, type BillingSet, type BillingState } from '@braindog/record/directory';
 import { no, ok, refused, type Refusal, type Result, type Who } from '@braindog/ports';
 
@@ -58,28 +59,26 @@ import {
 /* ── the plans ───────────────────────────────────────────────────────────── */
 
 /**
- * The plans this Worker sells, each with the words a person reads and the setting that holds its Stripe price.
+ * The plans this Worker sells, each with the Directory's plan it meters a record under and the setting that holds its
+ * Stripe price. Nothing else: the name and the price a person reads are the one table's (`PLAN_TABLE` in
+ * `packages/record/src/plans.ts`, LCH-A08), read by `planName` and `planPrice` below. What a person is charged is the
+ * Stripe price the setting names, so a change of price is made in Stripe and in that table, together.
  *
- * THE WORDS ARE THE SITE'S, SAID AGAIN HERE BECAUSE AN APP CANNOT IMPORT ANOTHER: `apps/site/src/lib/plans.ts` is where
- * every price is chosen ("$12" and "$29", "a month, per record"), and `apps/site/src/lib/plans.test.ts` holds these
- * names and prices to it. What a person is charged is the
- * Stripe price the setting names, so a change of price is made in Stripe, in that file, and here, together.
- *
- * `directory` IS THE PLAN THE DIRECTORY METERS THE RECORD UNDER (`PLANS` and `ALLOWANCE` in
- * `packages/record/src/directory.ts`): Cloud is the Directory's `hosted`, the plan every hosted record was already on.
+ * `directory` IS THE PLAN THE DIRECTORY METERS THE RECORD UNDER: Cloud is the Directory's `hosted`, the plan every
+ * hosted record was already on.
  */
 export const HOSTED_PLANS = {
-  cloud: { name: 'Cloud', price: '$12 a month', directory: 'hosted', setting: 'STRIPE_PRICE_HOSTED' },
-  plus: { name: 'Cloud Plus', price: '$29 a month', directory: 'plus', setting: 'STRIPE_PRICE_PLUS' },
+  cloud: { id: 'cloud', directory: 'hosted', setting: 'STRIPE_PRICE_HOSTED' },
+  plus: { id: 'plus', directory: 'plus', setting: 'STRIPE_PRICE_PLUS' },
 } as const;
 
 /**
- * The free plan: the words a person reads and the Directory's plan, and no Stripe price, because nothing is sold.
+ * The free plan: its id and the Directory's plan, and no Stripe price, because nothing is sold.
  *
  * NOT IN `HOSTED_PLANS`, so no door that charges can name it: `planAsked` answers only a plan with a price, and the
- * list's `plans` are what a checkout sells. `plans.test.ts` holds the name and the price to `apps/site/src/lib/plans.ts`.
+ * list's `plans` are what a checkout sells.
  */
-export const FREE_PLAN = { name: 'Free', price: '$0', directory: 'free' } as const;
+export const FREE_PLAN = { id: 'free', directory: 'free' } as const;
 
 export type HostedPlan = keyof typeof HOSTED_PLANS;
 
@@ -90,6 +89,18 @@ export type ListedPlan = HostedPlan | 'free';
 export type MeteredPlan = (typeof HOSTED_PLANS)[HostedPlan]['directory'] | typeof FREE_PLAN.directory;
 
 const PLAN_IDS: readonly HostedPlan[] = ['cloud', 'plus'];
+
+/** The Directory's plan a listed plan is metered under. */
+const meteredAs = (plan: ListedPlan): MeteredPlan => (plan === 'free' ? FREE_PLAN.directory : HOSTED_PLANS[plan].directory);
+
+/** A plan's name as a person reads it ("Cloud Plus"), from the one table of plans. */
+export const planName = (plan: ListedPlan): string => PLAN_TABLE[meteredAs(plan)].name;
+
+/** What a plan costs as the list and the checkout say it: "$12 a month", and Free's "$0", from the one table of plans. */
+export const planPrice = (plan: ListedPlan): string => {
+  const { price, cents } = PLAN_TABLE[meteredAs(plan)];
+  return cents.month === 0 ? price.month : `${price.month} a month`;
+};
 
 /**
  * How many days after its lapse began a record is deleted: the ladder's last step, which the nightly walk takes.
@@ -370,12 +381,12 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
           slug: r.slug,
           state: row ? row.state : 'unbilled',
           plan,
-          price: plan === 'free' ? FREE_PLAN.price : HOSTED_PLANS[plan].price,
+          price: planPrice(plan),
           ...(row && row.period_end !== null ? { period_end: row.period_end } : {}),
           ...(lapsedAt !== null ? { lapsed_at: lapsedAt, delete_on: lapsedAt + LAPSE_DELETES_DAYS * DAY_MS } : {}),
         };
       });
-    const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: HOSTED_PLANS[p].name, price: HOSTED_PLANS[p].price }));
+    const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: planName(p), price: planPrice(p) }));
     const open = key.ok && originOf(env).ok && priceOf(env, 'cloud') !== null;
     const canMake = signupMode(env) !== 'closed' && !records.some((r) => r.plan === 'free');
     return ok({ records, open, plans: open ? sold : [], canMake });
@@ -409,7 +420,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     if (!plan.ok) return plan;
     const price = priceOf(env, plan.value);
     if (price === null)
-      return no('NOT_IN_THIS_BUILD', `${HOSTED_PLANS[plan.value].setting} is not set, so ${HOSTED_PLANS[plan.value].name} is not sold on this host.`, { at: 'plan' });
+      return no('NOT_IN_THIS_BUILD', `${HOSTED_PLANS[plan.value].setting} is not set, so ${planName(plan.value)} is not sold on this host.`, { at: 'plan' });
     const stripe = deps.stripe(key.value);
 
     let customer: string | null;
@@ -504,10 +515,10 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
       if (!plan.ok) return plan;
       const price = priceOf(env, plan.value);
       if (price === null)
-        return no('NOT_IN_THIS_BUILD', `${HOSTED_PLANS[plan.value].setting} is not set, so ${HOSTED_PLANS[plan.value].name} is not sold on this host.`, { at: 'plan' });
+        return no('NOT_IN_THIS_BUILD', `${HOSTED_PLANS[plan.value].setting} is not set, so ${planName(plan.value)} is not sold on this host.`, { at: 'plan' });
       if (row.state === 'lapsed') return no('FORBIDDEN', 'Billing for this record has lapsed. Pay again, on the plan you choose, and it is switched as it is paid for.', { at: 'record' });
       if (backOnFree(row)) return no('FORBIDDEN', 'This record is on Free. Pay for it on the plan you choose, and it moves as it is paid for.', { at: 'record' });
-      if (row.price === price) return no('ALREADY_KNOWN', `This record is on ${HOSTED_PLANS[plan.value].name} already.`, { at: 'plan' });
+      if (row.price === price) return no('ALREADY_KNOWN', `This record is on ${planName(plan.value)} already.`, { at: 'plan' });
       const sub = row.subscription === null ? null : await subscriptionOf(stripe, row.subscription, planPrices(env));
       if (sub === null || sub.item === null) {
         op({ op: 'billing', door: 'portal', ok: false, why: 'subscription', rec: row.record }, 'error');

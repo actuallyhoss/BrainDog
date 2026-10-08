@@ -1,0 +1,289 @@
+/**
+ * Every Money figure, on a record that holds pounds and dollars, answers one amount, a converted amount, or one amount a
+ * currency, and never the bare sum of two currencies' minor units (REC-B01 build 4, `loop/scope/area-record-b.md`).
+ *
+ * WHY A GUARD AND NOT A HOPE. His record holds Egyptian pounds and dollars (one rate, typed on 28 September), and an
+ * amount is integer minor units with a currency beside it. A figure that adds 50,000 cents to 100,000 pence answers
+ * 150,000 of something, and a page prints it as GBP 1,500.00 with nothing on it to say it is wrong. The kernel keeps
+ * currencies apart today (`fx.ts`, `across`); this file is what says so for every figure Money declares, including the
+ * ones added after it was written, since it reads the installed pack rather than a list of ids.
+ *
+ * HOW "NEVER THE BARE SUM" IS KNOWN. The same rows are written on four records: both currencies, pounds alone, dollars
+ * alone, and both with every dollar relabelled as pounds, which is what a bare sum would read. A part must be what that
+ * currency alone reads; one amount must be what its currency alone reads, with nothing in the other; a converted amount
+ * must be the pounds plus the dollars at the rate, within a minor unit a row, and must not be the relabelled record's.
+ *
+ * FOUR WAYS A RECORD STANDS: no home currency; a home currency and the rate; a home currency and no rate; and a home
+ * currency with one of its two rates missing. The last checks that a figure does not convert the half it can and print
+ * the result as the whole. Built through the record's public methods only: `create` and `setPackConfig`.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
+import { fill, openRecord, type Kernel } from '@braindog/kernel';
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+
+import { NOW, day, firstPartyDocument } from '../src/index.ts';
+
+const OWNER = { actor: 'p_1' };
+
+const value = <T>(r: unknown): T => {
+  const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code} at ${x.refusal?.at}: ${x.refusal?.fix}`);
+  return x.value;
+};
+
+const hostFor = (k: Kernel): Host => ({
+  count: (register) => k.count(register),
+  stage: (batch) => k.stageInstall(batch as never),
+  transaction: (fn) => k.transaction(fn),
+  reload: () => k.reload(),
+  retire: (ids) => k.retire(ids),
+  seed: (register, fields) => k.create(register, { ...fields, tags: ['example'] }, { actor: 'p_seed', cascade: false }) as never,
+  remember: (row) => k.rememberPack(row),
+  forget: (id) => k.forgetPack(id),
+  claimed: (pack) => k.packClaims(pack),
+});
+
+/**
+ * One currency's rows: the currency they are written in, the word their names carry, how much bigger they are than the
+ * pounds, and what a savings account in it holds.
+ */
+type Side = { currency: string; word: string; times: number; savings: number };
+
+const POUNDS: Side = { currency: 'GBP', word: 'pounds', times: 1, savings: 0 };
+/* DOLLARS ARE THREE TIMES THE POUNDS, so a part that came from the wrong currency, or a bare sum, is never the right number
+   by chance. AND ONLY THE DOLLARS SAVE: rows in the same shape in both currencies run out on the same day however they are
+   added, so the runway of a bare sum could not be told from a converted one without money that is in one currency only.
+   Measured: with 700,000 saved the bare sum runs out in 248 days and the converted amount in 218. Most savings below it
+   give both the same day, since the walk steps a month at a time. */
+const DOLLARS: Side = { currency: 'USD', word: 'dollars', times: 3, savings: 700_000 };
+/** What a bare sum reads: the dollars' rows, written as pounds. */
+const DOLLARS_AS_POUNDS: Side = { ...DOLLARS, currency: 'GBP' };
+
+/** The name a figure about one book or one project is asked with: a book and a project are both called this. */
+const KILN = 'Kiln';
+
+/** A way the record stands: its home currency, and the rates it holds, each as what one unit is worth in the base. */
+type Stands = { say: string; home: string | null; rates: { currency: string; base: string; rate: number }[] };
+
+const STANDS: Stands[] = [
+  { say: 'with no home currency', home: null, rates: [] },
+  { say: 'with pounds at home and the rate for dollars', home: 'GBP', rates: [{ currency: 'USD', base: 'GBP', rate: 0.8 }] },
+  { say: 'with pounds at home and no rate', home: 'GBP', rates: [] },
+  { say: 'with euros at home and the rate for dollars missing', home: 'EUR', rates: [{ currency: 'GBP', base: 'EUR', rate: 1.15 }] },
+];
+
+/** A record holding money-core and what it points at, with no example rows. */
+async function moneyCore(): Promise<Kernel> {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  for (const id of ['portfolio', 'people', 'money-core']) {
+    const pack = value<Pack>(await normalise(firstPartyDocument(id, { seeds: [] }), { kind: 'local' }));
+    const state: Installed = { format: 1, primitives: 1, record_version: k.version(), packs: k.packs(), declarations: k.declarations() as Installed['declarations'], rows: k.census() };
+    const diff = await plan(pack, state);
+    value(await install(pack, diff, hostFor(k), diff.planHash));
+  }
+  return k;
+}
+
+/**
+ * One currency's share of everything Money reads: an account that counts as cash and one that arrives later, money in
+ * and out of the ledger, bills and invoices due soon and late, a paid invoice, repeating money each way and an
+ * instalment. Each is in the book and the project called Kiln, so the figures of one book and one project read them too.
+ */
+function write(k: Kernel, side: Side, kiln: { book: string; thing: string; category: string }): void {
+  const at = (n: number) => ({ amount: n * side.times, currency: side.currency });
+  const make = (register: string, fields: Record<string, unknown>) => value(k.create(register, { book: kiln.book, ...fields }, OWNER));
+  const cash = value<{ id: string }>(k.create('accounts', { name: `Current in ${side.word}`, kind: 'bank', balance: at(100_000), as_of: day(-1), book: kiln.book }, OWNER));
+  if (side.savings > 0) make('accounts', { name: `Savings in ${side.word}`, kind: 'bank', balance: { amount: side.savings, currency: side.currency }, as_of: day(-1) });
+  make('accounts', { name: `Deposit in ${side.word}`, kind: 'bank', balance: at(5_000), as_of: day(-1), liquid: false, arrives: day(10) });
+  make('transactions', { what: `Paid in ${side.word}`, on: day(-2), direction: 'out', amount: at(1_000), account: cash.id, state: 'cleared', thing: kiln.thing });
+  make('transactions', { what: `Software in ${side.word}`, on: day(-1), direction: 'out', amount: at(700), account: cash.id, state: 'cleared', category: kiln.category });
+  make('transactions', { what: `Received in ${side.word}`, on: day(-1), direction: 'in', amount: at(2_500), account: cash.id, state: 'cleared', thing: kiln.thing });
+  make('obligations', { what: `Bill in ${side.word}`, direction: 'owed_by_me', amount: at(2_000), due: day(5), state: 'open' });
+  make('obligations', { what: `Late bill in ${side.word}`, direction: 'owed_by_me', amount: at(3_000), due: day(-5), state: 'open' });
+  make('obligations', { what: `Invoice in ${side.word}`, direction: 'owed_to_me', amount: at(4_000), due: day(7), state: 'open', thing: kiln.thing });
+  make('obligations', { what: `Late invoice in ${side.word}`, direction: 'owed_to_me', amount: at(1_500), due: day(-4), state: 'open', chased: day(-1), thing: kiln.thing });
+  make('obligations', { what: `Paid invoice in ${side.word}`, direction: 'owed_to_me', amount: at(900), due: day(-40), settled: day(-30), state: 'paid' });
+  make('recurring', { what: `Rent in ${side.word}`, direction: 'out', amount: at(40_000), every: 'monthly', next_due: day(6), state: 'live', category: kiln.category });
+  make('recurring', { what: `Retainer in ${side.word}`, direction: 'in', amount: at(7_000), every: 'monthly', next_due: day(12), state: 'live' });
+  make('installments', { what: `Laptop in ${side.word}`, plan: `Laptop in ${side.word}`, direction: 'out', amount: at(1_200), due: day(8), state: 'open' });
+}
+
+/** A record holding the rows of each side, standing as `stands` says. */
+async function recordOf(sides: Side[], stands: Stands): Promise<Kernel> {
+  const k = await moneyCore();
+  const book = value<{ id: string }>(k.create('books', { name: KILN }, OWNER)).id;
+  const thing = value<{ id: string }>(k.create('things', { name: KILN, lane: 'earning' }, OWNER)).id;
+  const category = value<{ id: string }>(k.create('categories', { name: 'Software', direction: 'out', state: 'live' }, OWNER)).id;
+  for (const side of sides) write(k, side, { book, thing, category });
+  if (stands.home !== null) value(k.setPackConfig('money-core', { home_currency: stands.home }, OWNER));
+  for (const r of stands.rates) value(k.create('fx', { ...r, as_of: day(-1) }, OWNER));
+  return k;
+}
+
+/* ── what each figure answers ─────────────────────────────────────────── */
+
+/** One answer, of a figure or of one part of a grouped figure: the fields this guard asks. */
+type Answer = { value: number | null; unit: string | null; rows: number; parts?: { currency: string; amount: number }[]; fx?: { into: string | null; missing: string[] } };
+type Read = Answer & { groups?: (Answer & { key: string; label?: string })[] };
+type Figure = { metric: string; format?: string; source?: string; value?: unknown; where?: unknown };
+
+/** Every figure money-core installed on this record, a figure of one book or one project asked about Kiln. */
+const figuresOf = (k: Kernel): Figure[] =>
+  (k.declarations() as { kind: string; pack_id: string; body: string }[])
+    .filter((d) => d.kind === 'metric' && d.pack_id === 'money-core')
+    .map((d) => {
+      const body = JSON.parse(d.body) as Figure;
+      return (JSON.stringify(body).includes('{{it}}') ? fill(body, null, KILN) : body) as Figure;
+    });
+
+/** What every figure answers, by id. A refusal is a fault of its own: a figure the record cannot read answers nothing. */
+function readAll(k: Kernel): Map<string, Read> {
+  const out = new Map<string, Read>();
+  for (const f of figuresOf(k)) out.set(f.metric, value<Read>(k.metric(f as never)));
+  return out;
+}
+
+const isMoney = (f: Figure): boolean => f.format === 'money' || (f.format ?? '').startsWith('money.');
+
+/** A figure that reads money and answers something else: how many days it lasts, or the day it runs out. */
+const readsMoney = (f: Figure): boolean => /"(walk|rolled)"/.test(JSON.stringify(f.value ?? null));
+
+/* ── what a right answer is ───────────────────────────────────────────── */
+
+/** What one unit of `code` is worth at home on this record, or `null` when it holds no rate for it. */
+const worth = (stands: Stands, code: string): number | null =>
+  code === stands.home ? 1 : (stands.rates.find((r) => r.currency === code && r.base === stands.home)?.rate ?? null);
+
+/**
+ * Why one money answer is wrong, or nothing. `raw` is what each currency's rows alone answer on a record with no home
+ * currency, in that currency; `bare` is what the same rows answer with the dollars written as pounds.
+ */
+function moneyFaults(said: Answer, raw: Record<string, number>, bare: Answer | undefined, stands: Stands): string[] {
+  const out: string[] = [];
+  const held = Object.keys(raw).filter((c) => raw[c] !== 0);
+  /* A MINOR UNIT A ROW, since each amount is converted and rounded on its own before they are added. */
+  const near = (a: number, b: number): boolean => Math.abs(a - b) <= Math.max(1, said.rows);
+  const atHome = (codes: string[]): number => codes.reduce((sum, c) => sum + raw[c]! * (worth(stands, c) ?? Number.NaN), 0);
+  const isBare = held.length > 1 && typeof bare?.value === 'number' && said.value === bare.value;
+  if (said.parts !== undefined) {
+    if (said.value !== null) out.push(`answers ${said.value} and parts at once`);
+    const codes = said.parts.map((p) => p.currency);
+    if (new Set(codes).size !== codes.length) out.push(`names one currency twice: ${codes.join(', ')}`);
+    /* A HELD CURRENCY WITH NO PART OF ITS OWN WAS CONVERTED, and only into the home part. */
+    const converted = held.filter((c) => !codes.includes(c) || c === stands.home);
+    for (const p of said.parts) {
+      const want = p.currency === stands.home ? atHome(converted) : (raw[p.currency] ?? Number.NaN);
+      if (!near(p.amount, want)) out.push(`says ${p.currency} ${p.amount} where its rows hold ${want}`);
+    }
+    for (const c of converted) if (c !== stands.home && (worth(stands, c) === null || !codes.includes(stands.home ?? ''))) out.push(`leaves out the ${c} its rows hold`);
+    return out;
+  }
+  if (said.value === null) return held.length > 0 ? [`answers nothing where ${held.map((c) => `${c} ${raw[c]}`).join(' and ')} is held`] : [];
+  if (said.unit === null) return said.value === 0 && held.length === 0 ? [] : [`answers ${said.value} in no currency`];
+  if (held.every((c) => c === said.unit)) return near(said.value, raw[said.unit] ?? 0) ? [] : [`answers ${said.unit} ${said.value} where its rows hold ${raw[said.unit] ?? 0}`];
+  /* MORE THAN ONE CURRENCY AS ONE AMOUNT IS A CONVERTED AMOUNT, at home, with every rate it needed. */
+  if (said.unit !== stands.home) out.push(`adds ${held.join(' and ')} up in ${said.unit}, which is not the home currency`);
+  else if (held.some((c) => worth(stands, c) === null)) out.push(`adds ${held.join(' and ')} up without the rate for ${held.filter((c) => worth(stands, c) === null).join(', ')}`);
+  else if (!near(said.value, atHome(held))) out.push(`answers ${said.unit} ${said.value} where the rows converted hold ${atHome(held)}`);
+  if (isBare) out.push(`answers ${said.value}, the bare sum of ${held.join(' and ')}`);
+  return out;
+}
+
+/** What each currency's rows alone answer, by figure: the record that holds only them, with no home currency. */
+type Alone = Record<string, Map<string, Read>>;
+
+/** A group's answer on another record, found by what a person calls it, since a book's key is a row id that differs. */
+const groupOf = (r: Read | undefined, name: string): Answer | undefined => r?.groups?.find((g) => (g.label ?? g.key) === name);
+
+/** Why one figure's answer on the record holding both currencies is wrong, each reason as a sentence, or nothing. */
+function figureFaults(f: Figure, said: Read, alone: Alone, bare: Read | undefined, stands: Stands): string[] {
+  const rawOf = (pick: (r: Read | undefined) => Answer | undefined): Record<string, number> =>
+    Object.fromEntries(Object.entries(alone).map(([code, reads]) => [code, pick(reads.get(f.metric))?.value ?? 0]));
+  if (!isMoney(f)) {
+    const out: string[] = [];
+    if (said.parts !== undefined || (said.unit !== null && /^[A-Z]{3}$/.test(said.unit))) out.push(`${f.metric} is not money and answers in ${said.unit ?? 'parts'}`);
+    /* A RUNWAY ADDS THE CURRENCIES UP BEFORE IT COUNTS DAYS, so it may only answer once every one of them can be. */
+    if (readsMoney(f)) {
+      const all = Object.keys(alone).every((c) => stands.home !== null && worth(stands, c) !== null);
+      if (!all && said.value !== null) out.push(`${f.metric} answers ${said.value} with no rate to add ${Object.keys(alone).join(' and ')} up by`);
+      if (all && said.value !== null && said.value === bare?.value) out.push(`${f.metric} answers ${said.value}, what the bare sum of ${Object.keys(alone).join(' and ')} answers`);
+    }
+    return out;
+  }
+  const out = moneyFaults(said, rawOf((r) => r), bare, stands).map((why) => `${f.metric} ${why}`);
+  /* A FIGURE THAT CANNOT ADD UP NAMES THE RATE IT LACKS, since that is what a person can do about it. */
+  if (said.parts !== undefined && stands.home !== null)
+    for (const code of Object.keys(alone).filter((c) => worth(stands, c) === null && rawOf((r) => r)[c] !== 0))
+      if (!said.fx?.missing.includes(`${code} to ${stands.home}`)) out.push(`${f.metric} does not say it lacks the rate from ${code} to ${stands.home}`);
+  for (const g of said.groups ?? []) {
+    const name = g.label ?? g.key;
+    out.push(...moneyFaults({ ...g, unit: said.unit }, rawOf((r) => groupOf(r, name)), groupOf(bare, name), stands).map((why) => `${f.metric}, ${name}, ${why}`));
+  }
+  return out;
+}
+
+/* ── the guard ────────────────────────────────────────────────────────── */
+
+const NO_HOME = STANDS[0]!;
+let aloneOnce: Promise<Alone> | null = null;
+const aloneReads = (): Promise<Alone> =>
+  (aloneOnce ??= (async () => ({ GBP: readAll(await recordOf([POUNDS], NO_HOME)), USD: readAll(await recordOf([DOLLARS], NO_HOME)) }))());
+
+/** Every reason any Money figure answers wrongly on a record holding both currencies, standing as `stands` says. */
+async function faultsWhere(stands: Stands, answer: (k: Kernel) => Map<string, Read> = readAll): Promise<string[]> {
+  const alone = await aloneReads();
+  const k = await recordOf([POUNDS, DOLLARS], stands);
+  const both = answer(k);
+  const bare = readAll(await recordOf([POUNDS, DOLLARS_AS_POUNDS], stands));
+  return figuresOf(k).flatMap((f) => figureFaults(f, both.get(f.metric)!, alone, bare.get(f.metric), stands));
+}
+
+for (const stands of STANDS)
+  test(`EVERY MONEY FIGURE ANSWERS ONE AMOUNT, A CONVERTED ONE, OR ONE A CURRENCY, ${stands.say.toUpperCase()}`, async () => {
+    assert.deepEqual(await faultsWhere(stands), []);
+  });
+
+test('EVERY MONEY FIGURE IN AN AMOUNT HAS ROWS IN BOTH CURRENCIES HERE, so none passes for holding nothing', async () => {
+  const alone = await aloneReads();
+  const k = await recordOf([POUNDS, DOLLARS], NO_HOME);
+  const figures = figuresOf(k).filter(isMoney);
+  assert.ok(figures.length >= 30, `only ${figures.length} money figures were found, so the pack was not read`);
+  const idle = figures.filter((f) => Object.values(alone).some((reads) => (reads.get(f.metric)?.value ?? 0) === 0)).map((f) => f.metric);
+  assert.deepEqual(idle, [], 'these figures read nothing in one currency: give `write` a row each reads');
+});
+
+/* ── the guard bites ──────────────────────────────────────────────────── */
+
+test('A FIGURE THAT ADDS POUNDS AND DOLLARS AS THEY ARE IS CAUGHT, as one amount, as a part, and as a runway', async () => {
+  const rated = STANDS[1]!;
+  /* THE PLANT, TWICE: every answer in parts replaced by the bare sum of its parts' minor units, as one amount in pounds
+     and then as one part in pounds. */
+  const summed = (k: Kernel): Map<string, Read> => {
+    const reads = readAll(k);
+    for (const [id, r] of reads) {
+      const total = (r.parts ?? []).reduce((sum, p) => sum + p.amount, 0);
+      if (r.parts === undefined) continue;
+      const { parts: _parts, ...rest } = r;
+      reads.set(id, { ...rest, value: total, unit: 'GBP' });
+    }
+    return reads;
+  };
+  const onePart = (k: Kernel): Map<string, Read> => {
+    const reads = readAll(k);
+    for (const [id, r] of reads) if (r.parts !== undefined) reads.set(id, { ...r, parts: [{ currency: 'GBP', amount: r.parts.reduce((sum, p) => sum + p.amount, 0) }] });
+    return reads;
+  };
+  assert.ok((await faultsWhere(NO_HOME, summed)).some((why) => why.startsWith('cash-now adds GBP and USD up in GBP')));
+  assert.ok((await faultsWhere(NO_HOME, onePart)).some((why) => /^cash-now says GBP \d+ where its rows hold 100000$/.test(why)));
+  /* WITH THE RATE: the bare sum dressed as a converted amount, in the home currency. That is what the record holding the
+     dollars written as pounds answers, so its answers are planted in place of the real ones. */
+  const relabelled = readAll(await recordOf([POUNDS, DOLLARS_AS_POUNDS], rated));
+  const dressed = await faultsWhere(rated, () => relabelled);
+  assert.ok(dressed.some((why) => /^cash-now answers GBP \d+ where the rows converted hold \d+$/.test(why)), dressed.join('\n'));
+  assert.ok(dressed.some((why) => why.startsWith('cash-now answers') && why.endsWith('the bare sum of GBP and USD')), dressed.join('\n'));
+  assert.ok(dressed.some((why) => why.startsWith('runway-days answers') && why.endsWith('what the bare sum of GBP and USD answers')), dressed.join('\n'));
+});

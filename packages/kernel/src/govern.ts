@@ -34,6 +34,7 @@ import { SLASH, slashMayWrite } from './slash.ts';
 import { causeFault, causeOf, canon, noop } from './cause.ts';
 import { costOf } from './weigh.ts';
 import { askOf, retypedBody, retypeShapeFault } from './api/retype.ts';
+import { configValue, readPackConfig } from './declare.ts';
 
 /** The three tables that are read like registers and are not registers. */
 export const GOVERNANCE = ['suggestion', 'decision', 'prediction'] as const;
@@ -1522,10 +1523,29 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
         fix: 'A settings change names at least one setting and its new value; null puts one back to its default.',
         at: `${at}.values`,
       };
-    for (const [key, v] of Object.entries(values))
-      if (v !== null && typeof v !== 'string' && typeof v !== 'number' && typeof v !== 'boolean')
-        return { code: 'VALUE_MALFORMED', fix: `The setting ${key} takes text, a number, true or false, or null for its default.`, at: `${at}.values.${key}` };
+    for (const [key, v] of Object.entries(values)) {
+      const bad = settingValue(s.pack as string, key, v, `${at}.values.${key}`);
+      if (bad) return bad;
+    }
     return null;
+  };
+
+  /* A VALUE AS ITS SETTING'S TYPE SAYS (REC-A06 step 3), where the pack is installed and declares the setting: a `list`
+     is lines of text, and any other type is coerced as its field would be (`configValue`), so what the gate would refuse
+     on apply is refused here, at the key. A pack the same arrangement installs, or a setting it does not declare, is
+     the record's to check from its catalogue, and only the shape is held: text, a number, true or false, a list of
+     text, or null for the default. */
+  const settingValue = (pack: string, key: string, v: unknown, at: string): Refusal | null => {
+    if (v === null) return null;
+    const read = readPackConfig(deps.sql, pack);
+    const decl = read.ok && Object.hasOwn(read.value.config, key) ? read.value.config[key] : undefined;
+    if (decl !== undefined) {
+      const out = configValue(key, decl, v, at);
+      return out.ok ? null : 'refusal' in out ? out.refusal : { code: 'VALUE_MALFORMED', fix: `The setting ${key} does not take this value.`, at };
+    }
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return null;
+    if (Array.isArray(v) && v.length > 0 && v.every((line) => typeof line === 'string' && line.trim() !== '')) return null;
+    return { code: 'VALUE_MALFORMED', fix: `The setting ${key} takes text, a number, true or false, a list of text, or null for its default.`, at };
   };
 
   if (kind === 'pack') {

@@ -33,7 +33,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
   import { areaOf, boardRail, boxesOf, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, slotOf, snapped, splitAreas, sticks, widened, type Run } from './layout.ts';
-  import { emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
+  import { arranged, emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
   import type { RowHost } from './row-host.svelte.ts';
@@ -119,17 +119,18 @@
 
   /**
    * THE BLOCKS AS THIS MODE DRAWS THEM. On every page being read, a home or any other, a block that holds nothing and
-   * says nothing about it, or that this build cannot draw, is not drawn (`home.ts` `emptyHidden`, DIRECTION §35: an
-   * empty or unused part is not drawn), at the index it was declared at, so every id and write on the page still finds
-   * it. AUTHORING DRAWS THEM ALL: while the page is arranged, or as a preview of a change, a block that is empty today is
-   * still a block somebody is placing.
+   * says nothing about it, or that this build cannot draw, is not drawn (DIRECTION §35: an empty or unused part is not
+   * drawn), at the index it was declared at, so every id and write on the page still finds it. THE RECORD SAYS WHICH
+   * (`drawn: false` with `why`, the kernel's `drawn.ts`), and `emptyHidden` keeps what it left out and judges only what
+   * it drew. AUTHORING DRAWS THEM ALL (`arranged`): while the page is arranged, or as a preview of a change, a block that
+   * is empty today is still a block somebody is placing, and only one whose `when:` said no stays out.
    *
    * A PAGE AT ITS OWN ADDRESS IS NEVER EMPTIED BY THIS: one whose every block would go keeps the first, which says its
    * one sentence, and still offers the first row, rather than drawing a title over nothing. It kept every block, so an
    * empty Work was a wall of tiles each saying it held nothing.
    */
   const quiet = $derived(emptyHidden(blocks, mode === 'page'));
-  const drawable = $derived(mode === 'preview' || arranging ? blocks : quiet);
+  const drawable = $derived(mode === 'preview' || arranging ? arranged(blocks) : quiet);
   /* AND THE LINE THE HEADER HOLDS IS NOT A TILE AS WELL (`captured`): not drawn here, and still at its place, so every
      write finds its block. Never while authoring, where it is a block like any other. */
   const tiled = $derived(

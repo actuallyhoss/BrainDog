@@ -8,7 +8,8 @@
  * and `graph` gates require of anything under `packages/`.
  *
  * STATELESS. `initialize` negotiates a version and hands over the instructions, and nothing is
- * remembered: every message stands alone, which is what a Worker that keeps nothing can serve.
+ * remembered: every message stands alone, which is what a Worker that keeps nothing can serve. The one exception is
+ * when a caller's calls were last marked (`calledBy`), which writes fewer marks and changes no reply.
  */
 
 import { refused, type Result } from '@braindog/ports';
@@ -178,6 +179,62 @@ const DECIDES_NOT = {
   },
 } as const satisfies Result<never>;
 
+/** One mark `handle` leaves with the surface's `heard`. */
+type Mark = Parameters<NonNullable<McpSurface<unknown>['heard']>>[0];
+
+/**
+ * Leave a mark, and never wait on it or let it fail the call (AGT-B01, "the agent door lists its tools").
+ *
+ * NOT AWAITED, AND EVERY WAY IT CAN GO WRONG IS SWALLOWED: a surface whose `heard` throws, answers a refusal, rejects or
+ * never settles costs the answer nothing, because a session that was given its tools must be given them whether or not
+ * the record could count it. The record writes a mark before its first `await`, so nothing is lost by not waiting.
+ */
+function hear<C>(surface: McpSurface<C>, ctx: C, mark: Mark): void {
+  if (typeof surface.heard !== 'function') return;
+  try {
+    const p: unknown = surface.heard(mark, ctx);
+    /* ANY THENABLE, not only this realm's Promise, so a rejection from a surface built elsewhere is caught too. */
+    if (p !== null && typeof p === 'object' && typeof (p as { then?: unknown }).then === 'function') Promise.resolve(p).catch(() => undefined);
+  } catch {
+    /* A mark that throws is a mark not kept, and nothing more. */
+  }
+}
+
+/** How often a caller's calls are marked after its first: the count since the last mark rides on the next. */
+const CALLED_EVERY = MINUTE;
+/** The most callers one surface remembers between marks; the oldest goes first. */
+const CALLERS_KEPT = 1_000;
+
+/**
+ * THE ONE THING THIS FILE REMEMBERS, AND ONLY TO WRITE FEWER MARKS. A caller's first call is marked at once, so a session
+ * that called is counted from its first answer; after that, at most one mark a minute carries the calls since the last.
+ * Kept per surface, so a record's host that keeps one surface keeps one count, and a surface built for each request
+ * marks each call, which is more writes and the same count. A reply never depends on it.
+ */
+const calledBy = new WeakMap<object, Map<string, { at: number; n: number }>>();
+
+/** How many calls to mark now for this caller, or `null` to hold this one for the next mark. */
+function called(surface: object, caller: string, now: number): number | null {
+  let seen = calledBy.get(surface);
+  if (seen === undefined) calledBy.set(surface, (seen = new Map()));
+  const was = seen.get(caller);
+  if (was !== undefined && now - was.at < CALLED_EVERY) {
+    was.n += 1;
+    return null;
+  }
+  if (was === undefined && seen.size >= CALLERS_KEPT) seen.delete(seen.keys().next().value as string);
+  seen.set(caller, { at: now, n: 0 });
+  return (was?.n ?? 0) + 1;
+}
+
+/** The client as a mark names it, its name and version, held to the record's 80 characters. */
+function clientOf(params: Record<string, unknown>): string | undefined {
+  const info = params.clientInfo;
+  if (!isObject(info) || typeof info.name !== 'string' || info.name.trim() === '') return undefined;
+  const said = `${info.name.trim()}${typeof info.version === 'string' && info.version.trim() !== '' ? ` ${info.version.trim()}` : ''}`;
+  return said.slice(0, 80);
+}
+
 /**
  * The version an `initialize` is answered with, or `null` for none.
  *
@@ -204,6 +261,12 @@ export function negotiate(asked: unknown): (typeof VERSIONS)[number] | null {
  *
  * `version` IS THE REVISION THE TRANSPORT KNOWS this request speaks (`revisionOf`), and it decides only whether a
  * result carries `resultType`. `initialize` is answered under the revision it negotiates, whatever is passed.
+ *
+ * AND IT MARKS HOW THE SESSION MET THE DOOR, through the surface's optional `heard` (AGT-B01): `hello` for an
+ * `initialize` it answered, with the client and this server's build; `listed` for a tool list it gave, with how many;
+ * `called` on a caller's first tool call and at most once a minute after; `internal` for an answer whose code is
+ * INTERNAL. None is waited on and none can fail the call (`hear`). `caller` is the transport's key for who is calling,
+ * which only the minute between `called` marks reads; a stdio pipe is one caller and passes none.
  */
 export async function handle<C>(
   message: unknown,
@@ -211,6 +274,7 @@ export async function handle<C>(
   ctx: C,
   origin?: string,
   version?: string,
+  caller = '',
 ): Promise<Reply | null> {
   if (Array.isArray(message)) return fail(null, RPC.invalid, 'Send one message at a time; a batch is not accepted.');
   if (!isObject(message)) return fail(null, RPC.invalid, 'A message is a JSON object.');
@@ -229,10 +293,11 @@ export async function handle<C>(
   if (!isObject(params)) return fail(id, RPC.params, 'params is an object.');
 
   try {
-    return await dispatch(id, message.method, params, surface, ctx, origin, revisionOf(params, version));
+    return await dispatch(id, message.method, params, surface, ctx, origin, revisionOf(params, version), caller);
   } catch (e) {
     const ref = crypto.randomUUID();
     console.error('mcp', ref, message.method, e);
+    hear(surface, ctx, { kind: 'internal' });
     return fail(id, RPC.internal, 'internal', { ref });
   }
 }
@@ -245,6 +310,7 @@ async function dispatch<C>(
   ctx: C,
   origin: string | undefined,
   version: string,
+  caller: string,
 ): Promise<Reply> {
   const mcp = tools(surface, origin);
   const said = (result: Record<string, unknown>) => whole(id, result, version);
@@ -264,6 +330,8 @@ async function dispatch<C>(
         return fail(id, RPC.params, 'Unsupported protocol version', { supported: [...VERSIONS], requested: params.protocolVersion });
       /* ANSWERED UNDER THE REVISION IT AGREES, so a client of the stateless one reads `resultType` here as on every other
          result, and an older client's handshake carries nothing it does not know. */
+      const client = clientOf(params);
+      hear(surface, ctx, { kind: 'hello', build: SERVER.version, ...(client === undefined ? {} : { client }) });
       return whole(id, { protocolVersion, capabilities: CAPABILITIES, serverInfo: SERVER, instructions: INSTRUCTIONS }, protocolVersion);
     }
 
@@ -287,19 +355,28 @@ async function dispatch<C>(
     /* THE INSTRUCTIONS ARE NOT SENT AGAIN HERE. They went out in `initialize`, or in `server/discover` for a client of the
        stateless revision, and a session that asked for both carried the whole text twice; Claude Code puts the
        instructions in every session's system prompt on its own. Once a connection is the specification's place for them. */
-    case 'tools/list':
-      return paged(params) ?? said({ tools: TOOLS.map(listedTool), ttlMs: HOUR, cacheScope: 'private' });
+    case 'tools/list': {
+      const wrong = paged(params);
+      if (wrong) return wrong;
+      hear(surface, ctx, { kind: 'listed', n: TOOLS.length });
+      return said({ tools: TOOLS.map(listedTool), ttlMs: HOUR, cacheScope: 'private' });
+    }
 
     case 'tools/call': {
       const args = params.arguments ?? {};
       if (typeof params.name !== 'string')
         return fail(id, RPC.params, 'tools/call needs the name of a tool.', { allowed: TOOLS.map((t) => t.name) });
       if (!isObject(args)) return fail(id, RPC.params, "arguments is an object of the tool's fields.");
+      /* MARKED BEFORE IT RUNS, so a call that throws or is refused was still a call. */
+      const n = called(surface, caller, Date.now());
+      if (n !== null) hear(surface, ctx, { kind: 'called', n });
       /* THE REVISION SENDS `inputResponses` ON A RETRY OF THE ORIGINAL REQUEST, and a client may put it in the request's
          params or among the tool's arguments, so both places are read. */
       if (params.name === 'propose' && (Object.hasOwn(params, 'inputResponses') || Object.hasOwn(args, 'inputResponses')))
         return said(render({ result: DECIDES_NOT, text: refusalBrief(DECIDES_NOT.refusal), structured: DECIDES_NOT.refusal }));
-      return said(render(await mcp.answer(params.name, args, ctx)));
+      const out = await mcp.answer(params.name, args, ctx);
+      if (refused(out.result) && out.result.refusal.code === 'INTERNAL') hear(surface, ctx, { kind: 'internal' });
+      return said(render(out));
     }
 
     /* A minute, not an hour: the list names pages, and a page appears when its row does. */

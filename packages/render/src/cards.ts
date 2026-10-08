@@ -5,6 +5,9 @@
  * and two drawers that each worked it out would be two answers.
  */
 
+import { canonical } from './glyphs/aliases.ts';
+import { CONTROL_GLYPHS, GLYPH_NAMES, isMark } from './glyphs/names.ts';
+
 /**
  * What a column IS on a card. Closed, because each one is drawn differently.
  *
@@ -228,11 +231,52 @@ export function initialOf(name: string): string | null {
   return first ? first.toUpperCase() : null;
 }
 
-/** A thing's mark: its first character, which for a project is the glyph it was given at create. */
-export const markOf = (value: string): string | null => {
-  const first = [...value.trim()][0];
-  return first ? first.toUpperCase() : null;
+/**
+ * A row's mark, the one both drawers and the app's `IdentityMark` draw: the glyph the value names, when it
+ * names one that may be a mark (`isMark`), and otherwise a letter. The answer is the glyph's own name, which
+ * `markGlyphOf` tells from a letter, or one letter, or null for none.
+ *
+ * NEVER A LETTER OF A GLYPH'S NAME. A value written the way icons are named (`cake`, `paw`, `close`) is a
+ * picture's name, drawn or not, and its first letter says nothing about the row: Crumb.gg was drawn "C". Such a
+ * value, and a control the frame uses (`close`, `pencil`), and a bare shape (`●`), all give way to the first
+ * letter of the row's `title`, or to nothing when no title is handed. A value written as a name (`Kiln`) is a
+ * name, and its own first letter is the mark, which is what the one-argument call always answered.
+ */
+export function markOf(value: string, title?: string): string | null {
+  const trimmed = value.trim();
+  /* `Cake` and `Close` are the picture's name with a capital, as the kernel reads them, and never a "C". `Kiln` names no picture. */
+  const v =
+    [trimmed.slice(0, 1).toLowerCase() + trimmed.slice(1), trimmed.toLowerCase()].find(
+      (c) => c !== trimmed && ICON_WORD.test(c) && (GLYPH_NAMES.has(c) || canonical(c) !== c),
+    ) ?? trimmed;
+  const named = (): string | null => (title === undefined ? null : initialOf(title));
+  if (!v || CONTROL_GLYPHS.has(v) || CONTROL_GLYPHS.has(canonical(v))) return named();
+  if (ICON_WORD.test(v)) {
+    const glyph = GLYPH_NAMES.has(v) ? v : GLYPH_NAMES.has(canonical(v)) ? canonical(v) : null;
+    return glyph !== null && isMark(glyph) ? glyph : named();
+  }
+  const first = [...v][0]!;
+  if (/[\p{L}\p{N}]/u.test(first)) return first.toUpperCase();
+  /* A picture somebody typed (an emoji) is a mark of its own; a bare shape (`●`, the four the marks once were) is not. */
+  if (/\p{Extended_Pictographic}/u.test(first)) return firstGrapheme(v);
+  return named() ?? first;
+}
+
+/**
+ * How a mark is written when it is a picture's name: `cake`, `chevronDown`, `trash-2`. A name like `Kiln` is not,
+ * and neither is one letter (`k`), which is a letter somebody chose.
+ */
+const ICON_WORD = /^[a-z][a-zA-Z0-9]+(?:-[a-z0-9]+)*$/u;
+
+/** The first thing a reader sees as one character, so a joined emoji (a person at a laptop) is not cut in two. */
+const firstGrapheme = (v: string): string => {
+  const seg = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter().segment(v)[Symbol.iterator]().next().value : undefined;
+  return seg?.segment ?? [...v][0]!;
 };
+
+/** The glyph a mark from `markOf` draws, or null when the mark is a letter. Every glyph name is longer than one letter. */
+export const markGlyphOf = (mark: string | null): string | null =>
+  mark !== null && mark.length > 1 && GLYPH_NAMES.has(mark) ? mark : null;
 
 /**
  * What a host says about the run a card is for, when the block's rows are runs (`sessions.live`): the run as it signs

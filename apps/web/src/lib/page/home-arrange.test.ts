@@ -242,6 +242,9 @@ test('the kept cash tile installs on a record without Money, waits unseen, and d
     },
   ] as never);
   assert.ok(money.ok, JSON.stringify(money));
+  /* ONE ACCOUNT, because a figure over an empty list holds nothing and the record leaves an idle figure out for everybody
+     (`drawn.ts`): what is under test is the figure arriving, not the empty list. */
+  assert.ok(k.create('accounts', { name: 'Current' }, { actor: 'p_1' }).ok);
   const after = k.page('home');
   assert.ok(after.ok, JSON.stringify(after));
   /* THE RECORD MARKS ONLY A BLOCK IT LEAVES OUT; one it draws carries no `drawn` at all. */

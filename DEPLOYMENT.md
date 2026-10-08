@@ -206,6 +206,7 @@ required but the data directory.
 | `BRAINDOG_TOKEN` | no server key | a private single-user instance's owner bearer |
 | `BRAINDOG_SMTP_URL`, `BRAINDOG_MAIL_FROM` | no mail: no sign-in links, no invitation proof, notification mail waits in the outbox | `smtps://user:pass@host:465`, or `smtp://...:587` with STARTTLS required, and the sender |
 | `BRAINDOG_BACKUP_AT` | `03:20` | the UTC time of day the nightly copy falls due |
+| `BRAINDOG_OUTBOUND` | `off`: add-ons send no requests to other servers, and their scheduled actions are held | `on`: add-ons may send them. The public add-on registry has its own switch, `BRAINDOG_KENNEL` |
 | `BRAINDOG_ORIGIN` | `http://localhost:<port>` | the public origin: sign-in links, the passkeys' relying party, the CSRF check |
 | `BRAINDOG_HOST` | `127.0.0.1` without a token, `0.0.0.0` with one | the interface to listen on |
 | `BRAINDOG_TRUST_PROXY` | the socket's address is the caller's | `1`: the last `X-Forwarded-For` entry is, behind a proxy you run |
@@ -357,7 +358,7 @@ filters, pick the window, and save it under the alert's name. Nine, and each nam
 | Dead outbox row | `op` = `outbox`, `state` = `dead`, `kind` != `erase.r2` | 3 or more records in 24 h (a provider, not a customer) | 53 §5.15 |
 | Connector paused | `op` = `outbox`, `kind` = `pull.fetch`, `http` in 401, 403 | 3 or more records on one `ingest` in 24 h: a provider changed | 53 §5.12 |
 | KEK straggler | `op` = `walk.done`, `stragglers` > 0 | two nights in a row | 53 §5.6 |
-| Model | `op` = `model` | any row in 15 min (mailed as BrainDog model) | read `raw`: one that names the model means the route table (`MODELS` in `apps/worker/src/inference.ts`), one that names the account or gateway means the provider's console |
+| Model | `op` = `model` | any row in 15 min (mailed as BrainDog model) | read `raw`: one that names the model means the route table (`MODELS` in `apps/worker/src/inference.ts`), one that names the account or gateway means the provider's console; from the model-checks workflow, read `model-checks.json` in that run's artifacts |
 | Night | `op` = `walk.done` with `backups_failed` > 0, or `op` = `walk`, `backup` = `failed` (mailed as BrainDog night) | the night's run | 53 §5.4 |
 
 `erase.r2` has its own row rather than riding "Dead outbox row", because 53 §2.3 asked only for a

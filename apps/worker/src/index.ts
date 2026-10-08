@@ -31,6 +31,8 @@ import { GOOGLE_ROUTES, googleOn, serveGoogle } from './google.ts';
 import { CLOSE_RECORDS_MOST, closeDoor } from '@braindog/host/auth';
 import type { AccountClosed } from '@braindog/ports';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
+/* The oldest command this door still works with (AGT-A02), one day for both hosts, answered at the build address. */
+import { MIN_CLI } from '@braindog/mcp/build';
 import { INVITE_GONE, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
@@ -470,8 +472,9 @@ function loggingAcks(api: RecordApi, sql: Sql): void {
  * over them, key by key. The headers' hints are already on `ctx`: `inward` put them there.
  */
 /* `origin` IS WHERE THIS HOST SERVES THE APP, the start of a filed question's `decide` link: the configured `PUBLIC_HOST` and never the request's own URL. Unset, it is left out, and so is the link. */
-const serveMcp = (request: Request, api: RecordApi, ctx: CallContext, origin?: string): Promise<Response> =>
-  answerMcp(request, api, ctx, { session: (c, said) => withSession(c, hintsOf(said)), ...(origin ? { origin } : {}) });
+/* `build` IS THIS DEPLOY'S BUILD (`BRAINDOG_BUILD`), sent on every answer as `braindog-build` so the bridge sees a deploy mid-session (AGT-A02). `called` stays unwired: AGT-B01's marks carry the tool call. */
+const serveMcp = (request: Request, api: RecordApi, ctx: CallContext, origin?: string, build?: string): Promise<Response> =>
+  answerMcp(request, api, ctx, { session: (c, said) => withSession(c, hintsOf(said)), ...(origin ? { origin } : {}), ...(build ? { build } : {}) });
 
 /** Built once a Worker isolate, not once a record: every record on it is offered the same packs and use cases. */
 const CATALOGUE = seedCatalogue();
@@ -784,6 +787,8 @@ export class Record$ extends DurableObject<Env> {
              `/api/inbound/mint` answered 404. This Worker is
              the Cloud and nothing else, so it is a constant and not a binding. */
           host: 'cloud',
+          /* The oldest command this door still works with, which `doorHealth` reads `behind` against (AGT-A02). */
+          min_cli: MIN_CLI,
         },
         slashModel,
         /* AND THE LEDGER ITS PRESS AND FIRST PLAN ARE SPENT FROM, the one a read at the palette and an automation's question
@@ -1045,6 +1050,8 @@ export class Record$ extends DurableObject<Env> {
         /* WHERE WHO IS WHO KEEPS THE VERDICTS IT WAS GIVEN AND THE NOTES IT READ. `infer.resolve` is on no deliverer's
            list, as `infer.draft` and `infer.prose` are not: only this pass leases it. */
         store: this.#jobsStore,
+        /* WHETHER SLASH'S MODEL ANSWERS: while it does not, the jobs wait with their attempts kept (`model-jobs.ts`). */
+        health: this.#engineHealth,
         log: (line) => op({ op: 'slash.jobs', rec, ok: false, error: line }),
       });
     } catch (e) {
@@ -1506,11 +1513,12 @@ export class Record$ extends DurableObject<Env> {
    * THE ANSWER IS THE KERNEL'S `Verified`, `reach` INCLUDED, so the inbox reach `session.ts` puts on the principal is
    * named by the type it crosses the RPC in, not only by the row it came from. And the operator's `TOKENS_VALID_FROM`
    * goes down with the bearer: a token made before it answers `null`, which is the 401 every unknown bearer gets.
+   * `build` is the command's `x-braindog-cli` (`bearerOf`), kept on the key as its `last_build` (AGT-A02).
    */
-  async verify(bearer: string, surface: string): Promise<Verified | null> {
+  async verify(bearer: string, surface: string, build?: string): Promise<Verified | null> {
     if (this.#gone) return null;
     const api = await this.#record();
-    const out = await api.kernel.verifyToken(bearer, surface, validFromOf(this.env));
+    const out = await api.kernel.verifyToken(bearer, surface, validFromOf(this.env), build);
     return out.ok ? out.value : null;
   }
 
@@ -1816,7 +1824,7 @@ export class Record$ extends DurableObject<Env> {
 
     /* `/mcp` READS ITS BODY HERE. The router checked the bearer from the headers alone, so nothing a stranger
        sent is parsed, and the tools reach this record through the same methods `/api` calls. */
-    if (servesMcp(new URL(request.url).pathname)) return serveMcp(request, api, ctx, this.env.PUBLIC_HOST ? `https://${this.env.PUBLIC_HOST}` : undefined);
+    if (servesMcp(new URL(request.url).pathname)) return serveMcp(request, api, ctx, this.env.PUBLIC_HOST ? `https://${this.env.PUBLIC_HOST}` : undefined, this.env.BRAINDOG_BUILD || undefined);
 
     /* A KEPT COPY'S DOOR ANSWERS AS THE LIST DOES, and not `ROUTE_UNKNOWN`. See `copyAsked`. */
     const copy = copyAsked(request.method, new URL(request.url).pathname);
@@ -2481,7 +2489,7 @@ function bearerDeps(env: Env): BearerDeps {
     /* THE DIRECTORY'S ROW AND NOT THE OBJECT'S FLAG, as the session's `lapsed` is, so both doors cap on one fact. A record
        with no billing row answers `false` and is never capped. */
     lapsed: async (id) => ((await directory.billing({ op: 'lapsed', record: id })) as unknown) === true,
-    verify: (id, bearer, surface) => held(env, id, (record) => record.verify(bearer, surface)),
+    verify: (id, bearer, surface, build) => held(env, id, (record) => record.verify(bearer, surface, build)),
     access: (id, person) => held(env, id, (record) => record.access(person)),
     /* ASKED ONLY UNDER `/app/<slug>`, to hold the path to the record the bearer names. */
     named: async (slug) => (await directory.resolve(slug))?.record ?? null,
@@ -2598,7 +2606,7 @@ const json = (body: unknown, status: number, extra: [string, string][] = []): Re
  * build id is a gate measuring an edge rather than the deploy, on the one request where that is the
  * entire question being asked.
  */
-const buildId = (env: Env): Response => json({ app: env.BRAINDOG_BUILD || null }, 200);
+const buildId = (env: Env): Response => json({ app: env.BRAINDOG_BUILD || null, min_cli: MIN_CLI }, 200);
 
 /**
  * The one answer to every way of not being let in.
@@ -2782,6 +2790,7 @@ export default {
 /** The walk, wired to the Directory, the objects and the bucket. Exported from nowhere: the cron is its one caller. */
 async function nightly(env: Env): Promise<void> {
   if (!env.BLOBS) {
+    await keepNight(env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')), stoppedNight());
     await opsAlert(env, { op: 'night', why: 'no BLOBS binding' }, alertClaim(env));
     throw new Error('The nightly copy did not run: this deployment has no BLOBS binding, so there is nowhere to put one.');
   }
@@ -2870,7 +2879,9 @@ async function nightly(env: Env): Promise<void> {
     speak: op,
     now: () => Date.now(),
   }).catch(async (e: unknown) => {
-    /* A WALK THAT THREW IS A NIGHT THAT DID NOT RUN, mailed before the throw makes the invocation red. */
+    /* A WALK THAT THREW IS A NIGHT THAT DID NOT RUN, kept as one so last night's `ran` does not stand for a day more
+       (audit-35, finding 5), and mailed before the throw makes the invocation red. */
+    await keepNight(directory, stoppedNight(directoryFailed));
     await opsAlert(env, { op: 'night', why: 'the walk stopped' }, alertClaim(env));
     throw e;
   });
@@ -2887,14 +2898,33 @@ async function nightly(env: Env): Promise<void> {
     backups: walked.backups,
     backups_failed: walked.failed,
     directory: directoryFailed === null ? 'ok' : 'failed',
+    /* AND EVERY OTHER JOB OF THE NIGHT BY ITS FAILURES, so `ran` is not said over expiries, re-wraps, erasures or counts
+       that did not finish (audit-35, finding 5). */
+    expiry_failed: walked.expiryFailed,
+    stragglers: walked.stragglers,
+    erase_open: walked.eraseOpen,
+    ...(walked.counts === undefined ? {} : { counts_written: walked.counts.written }),
   };
+  await keepNight(directory, night);
+  if (walked.failed > 0 || directoryFailed !== null) await opsAlert(env, { op: 'night', ...night }, alertClaim(env));
+  if (red.length > 0) throw new Error(red.join(' '));
+}
+
+/**
+ * A night that did not run: the walk threw, or it could not start. Nothing reached and nothing copied, so `/healthz` reads
+ * `ran: false` from the moment it is kept, and not 26 hours later when the night before it goes stale.
+ */
+function stoppedNight(directoryFailed: string | null = null): Night {
+  return { at: new Date().toISOString(), records: 0, backups: 0, backups_failed: 0, directory: directoryFailed === null ? 'ok' : 'failed', stopped: true };
+}
+
+/** The night handed to the Directory for `/healthz`. One that could not be kept is a line, and the night still happened. */
+async function keepNight(directory: { nightDone(night: Night): Promise<void> }, night: Night): Promise<void> {
   try {
     await directory.nightDone(night);
   } catch (e) {
     op({ op: 'walk', rec: 'directory', night: 'unkept', why: e instanceof Error ? e.message : String(e) }, 'error');
   }
-  if (walked.failed > 0 || directoryFailed !== null) await opsAlert(env, { op: 'night', ...night }, alertClaim(env));
-  if (red.length > 0) throw new Error(red.join(' '));
 }
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -3546,6 +3576,7 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     if (over !== null) return over;
   }
   if (OPS_INVITE.test(new URL(request.url).pathname)) return opsInvite(request, env);
+  if (OPS_ALERT.test(new URL(request.url).pathname)) return opsAlertDoor(request, env);
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const billing: BillingDeps = {
     clock: () => Date.now(),
@@ -3682,6 +3713,39 @@ async function opsInvite(request: Request, env: Env): Promise<Response> {
   if (!out.ok) return json(out, httpStatus(out));
   const origin = `https://${env.PUBLIC_HOST ?? ''}`;
   return json({ ok: true, value: { links: out.value.codes.map((code) => `${origin}/app/signup#code=${code}`), ends_at: out.value.ends_at } }, 200);
+}
+
+/** The operator's door to the `model` mail, with the slashes every other door here forgives. */
+const OPS_ALERT = /^\/+account\/+ops\/+alert\/*$/;
+
+/**
+ * `/account/ops/alert`: the `model-checks` workflow's way to send the `model` operator mail, so a red night is mailed and
+ * not only a red run on GitHub. `POST { op: 'model', model?, why? }`, each string cut to 200 characters, and nothing but
+ * `model` is taken. Guarded as `/account/ops/invite` is: 404 with no `PROVISION_KEY`, 401 on a wrong key. The mail goes
+ * at most once in its quiet window (`alertClaim`), and `sent` says whether this call sent it.
+ */
+async function opsAlertDoor(request: Request, env: Env): Promise<Response> {
+  const key = (env.PROVISION_KEY ?? '').trim();
+  if (key === '') return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This BrainDog has no operator key, so it has no operator doors.' } }, 404);
+  if (request.method !== 'POST')
+    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/account/ops/alert is written with POST.' } }, 405, [['allow', 'POST']]);
+  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
+  if (bearer === '' || !(await sameKey(bearer, key)))
+    return json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This route takes the operator key.', at: 'authorization' } }, 401);
+  let body: unknown = null;
+  try {
+    body = JSON.parse((await request.text()).slice(0, SIGNUP_BODY_MAX));
+  } catch {
+    body = null;
+  }
+  const said = typeof body === 'object' && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : null;
+  if (said === null || said['op'] !== 'model')
+    return json({ ok: false, refusal: { code: 'BODY_MALFORMED', fix: "/account/ops/alert takes { op: 'model', model?, why? } as JSON.", at: 'op', allowed: ['model'] } }, 400);
+  const cut = (v: unknown): string | undefined => (typeof v === 'string' && v !== '' ? v.slice(0, 200) : undefined);
+  const model = cut(said['model']);
+  const why = cut(said['why']);
+  const sent = await opsAlert(env, { op: 'model', ...(model ? { model } : {}), ...(why ? { why } : {}) }, alertClaim(env));
+  return json({ ok: true, value: { sent } }, 200);
 }
 
 /**

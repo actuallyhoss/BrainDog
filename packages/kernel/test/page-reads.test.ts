@@ -432,8 +432,8 @@ test('A BOX WHOSE EVERY BLOCK IS HIDDEN IS NOT DRAWN, and one holding anything d
   const quiet = value<{ blocks: BlockResult[] }>(k.page('desk')).blocks;
   assert.deepEqual(
     quiet.map((b) => b.drawn),
-    [false, false, undefined, false, undefined, false, undefined, undefined, undefined, false],
-    'a block in the rail is not held by a box in the main column, and a heading with no box is its own when to hide',
+    [false, false, undefined, false, undefined, false, undefined, undefined, false, false],
+    'a block in the rail is not held by a box in the main column, and a heading over nothing goes, boxed or not',
   );
 
   value(k.propose({ question: 'Raise the retainer?', body_kind: 'options', body: OPTIONS }, 'slash'));

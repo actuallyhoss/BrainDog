@@ -1,0 +1,25 @@
+{
+  "app": "claude-code",
+  "package": "@anthropic-ai/claude-code",
+  "pinned": "2.1.248",
+  "why": "The least Claude Code the runner starts a job with (CLAUDE_LEAST in apps/cli/src/runner.ts, docs/26-BYO-INTELLIGENCE.md section 5). A pin moves by hand, and only with a passing night on the new version.",
+  "newest": "Read from the registry at run time and never pinned. Its row warns and does not fail the night.",
+  "install": ["npm", "install", "--prefix", "<home>/claude-<version>", "--no-save", "--no-audit", "--no-fund", "@anthropic-ai/claude-code@<version>"],
+  "start": [
+    "claude",
+    "-p",
+    "Call the context tool of braindog once and print the session it names",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--max-turns",
+    "3",
+    "--allowedTools",
+    "mcp__braindog__context"
+  ],
+  "env": {
+    "HOME": "<home>",
+    "CLAUDE_CONFIG_DIR": "<home>/.claude",
+    "XDG_CONFIG_HOME": "<home>/.config"
+  }
+}

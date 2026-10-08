@@ -11,21 +11,25 @@
  * site, so thirty-seven skips rode a green leg and two tests the history called red could not be
  * shown green by anybody.
  *
- * A TEST FILE IS REACHED BY ONE OF THREE THINGS, and nothing else counts:
+ * A TEST FILE IS A `*.test.(ts|mjs|js)`, or a `*.spec.(ts|mjs|js)` or `*-test.(ts|mjs)` that brings a test
+ * runner in. A TEST FILE IS REACHED BY ONE OF TWO THINGS, and nothing else counts:
  *
- *   * a workspace's `test` script, its `node --test` globs read from where the script runs, and a
- *     bare `node --test` reaching every test file under its folder, which is what Node does with it;
- *   * a `node --test` line in a workflow under `.github/workflows`, read from the repository root;
+ *   * a workflow step under `.github/workflows`: its own `node --test` line, read from the repository
+ *     root, or a workspace's `test` script the step runs (`pnpm -r test`, a `--filter` or `--dir` naming
+ *     the folder, or the root's `pnpm test`), its `node --test` globs read from where the script runs and
+ *     a bare `node --test` reaching every test file under its folder, which is what Node does with it;
  *   * a gate under `tools/gates` that spawns `--test` with a literal path.
  *
- * The root `package.json`'s own test script counts as a workspace's, read from the root. A comment
- * naming `node --test` is prose and reaches nothing, so a workflow's `#` lines are dropped and a gate
- * is read for the argument list it spawns rather than for the words.
+ * A SCRIPT NOBODY RUNS IS NOT A RUN, and a step under `if: false` is not one either: audit 35 found both
+ * read as reached. A comment naming `node --test` is prose and reaches nothing, so a workflow's `#`
+ * lines are dropped and a gate is read for the argument list it spawns rather than for the words.
  *
  * FOUR FINDINGS, EACH NAMING THE FILE:
  *
- *   * a test file nothing above reaches, wherever it is;
- *   * a test file in a workspace with no `test` script, which is the same file one step earlier;
+ *   * a test file nothing above reaches, wherever it is, with what came closest (a script no workflow
+ *     runs, a step under `if: false`, a workspace with no `test` script);
+ *   * a reached test file that calls no `test(` or `it(`: Node prints it as a pass and it checked
+ *     nothing (`HELPERS` holds the few that may, and only shrinks);
  *   * a skip with no reason: `test.skip(`, `it.skip(`, `describe.skip(`, `t.skip()`, `skip: true`, or a
  *     `skip:` that is a bare condition such as `!hasSh`. Node prints `# SKIP` and nothing after it, and
  *     the reader of the run is left to guess why it did not run;
@@ -41,12 +45,18 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { posix, join, relative, sep } from 'node:path';
+import { posix, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { skipDir } from './lib.mjs';
 
 const TEST = /\.test\.(?:ts|mjs|js)$/u;
+/* THE OTHER TWO NAMES A TEST GOES BY, `a.spec.ts` and `a-test.mjs`. Both are names Node's own `--test` looks for and a
+   runner's convention, and this gate walked neither, so a test written under one was a test nothing could name. They
+   are test files only when they bring a runner in: `tools/gates/self-test.mjs` and `apps/cli/src/pack-test.ts` are
+   programs whose names end the same way. */
+const NAMED_LIKE = /(?:\.spec\.(?:ts|mjs|js)|-test\.(?:ts|mjs))$/u;
+const RUNNER = /\bfrom\s+['"](?:node:test|@playwright\/test|vitest)['"]|\brequire\(\s*['"]node:test['"]\s*\)/u;
 const LEFT_OUT = new Set(['tools/gates/negative', 'loop']);
 const slash = (p) => p.split(sep).join('/');
 
@@ -56,9 +66,24 @@ function* walk(root, at = root) {
     if (entry.isDirectory()) {
       if (skipDir(entry.name) || LEFT_OUT.has(slash(relative(root, full)))) continue;
       yield* walk(root, full);
-    } else if (entry.isFile() && TEST.test(entry.name)) yield slash(relative(root, full));
+    } else if (entry.isFile() && (TEST.test(entry.name) || (NAMED_LIKE.test(entry.name) && RUNNER.test(readFileSync(full, 'utf8')))))
+      yield slash(relative(root, full));
   }
 }
+
+/** A call that registers a test: `test(`, `it(`, and their `.only(`, `.todo(` and `.describe(` forms. A method called
+    `test` is not one: `/x/.test(s)` is a regular expression's, and a helper that matches strings registers nothing. */
+const CALLS = /(?<![.\w$])(?:test|it)(?:\.\w+)*\s*\(/u;
+
+/**
+ * THE FILES NAMED AS TESTS THAT REGISTER NONE, ON PURPOSE. A test file that calls no `test(` runs green and checks
+ * nothing, and Node prints it as a pass with no line under it. The way out is a name that is not a test's (`kit.ts`,
+ * not `kit.test.ts`); a file on this list is one that cannot take that way yet, by its path, with the reason.
+ *
+ * IT MAY ONLY SHRINK. An entry whose file is gone or now registers a test is a finding of its own, so a fixed file
+ * takes its line with it, and a line added here is a line a reviewer reads.
+ */
+export const HELPERS = new Map([]);
 
 const readJson = (file) => {
   try {
@@ -165,31 +190,127 @@ function builtBy(line, dirByName) {
   return out;
 }
 
+/** A condition no run can meet, as a workflow writes one: `false` bare, quoted, or as an expression. */
+const NEVER = /^(?:false|'false'|"false"|\$\{\{\s*false\s*\}\})$/u;
+
+/** pnpm flags that take the next word as their value, so that word is not the script. */
+const PNPM_VALUED = new Set(['--workspace-concurrency', '--reporter', '--loglevel', '--test-pattern', '--changed-files-ignore-pattern']);
+
+/** The folders one `--filter` selects: a package's name or `./` and a folder, either with `*`, and `...` or `^` around it read as the package. */
+function filtered(filter, dirs, dirByName) {
+  const f = filter.replace(/^\.\.\.\^?|\^?\.\.\.$/gu, '');
+  if (f.startsWith('!') || f === '') return [];
+  if (f.startsWith('.')) {
+    const re = globRe(posix.normalize(f).replace(/\/$/u, ''));
+    return dirs.filter((d) => re.test(d));
+  }
+  const re = globRe(f);
+  return [...dirByName].filter(([name]) => re.test(name)).map(([, d]) => d);
+}
+
 /**
- * Every `node --test` in a workflow, and every workspace test script a step runs with `--filter`, with the
- * folders its job built in the steps before it. A job is a
- * key two spaces in under `jobs:`, and what it built resets at the next one, because a build in one job
- * is not on the runner of another.
+ * The workspaces whose `test` script each `pnpm` call in a shell text runs, `''` for the root's own.
+ *
+ * `pnpm test` with no `-r`, `--filter` or `--dir` is the root's script. `-r` with no filter is every workspace and not
+ * the root, as pnpm has it. A filter held in a shell variable is every workspace too, because its value is not in the
+ * text: that is `ci.yml`'s legs, and `apps/worker/scripts/ci-workflow.test.mjs` holds those to every workspace once.
  */
-function workflowCalls(root, dirByName, scriptCalls) {
+function scriptRuns(text, dirs, dirByName) {
+  const out = new Set();
+  for (const segment of text.split(/&&|\|\||[;\n|]/u)) {
+    const words = [...segment.matchAll(/'([^']*)'|"([^"]*)"|(\S+)/gu)].map((m) => m[1] ?? m[2] ?? m[3]);
+    const at = words.indexOf('pnpm');
+    if (at === -1) continue;
+    let recursive = false;
+    let hidden = false;
+    let dir = null;
+    let script = null;
+    const filters = [];
+    for (let i = at + 1; i < words.length && script === null; i++) {
+      const w = words[i];
+      if (w === '-r' || w === '--recursive') recursive = true;
+      else if (w === '--filter' || w === '-F' || w.startsWith('--filter=')) {
+        const v = w.startsWith('--filter=') ? w.slice(9) : (words[++i] ?? '');
+        if (v.includes('$')) hidden = true;
+        else filters.push(v);
+      } else if (w === '--dir' || w === '-C' || w.startsWith('--dir=')) dir = w.startsWith('--dir=') ? w.slice(6) : (words[++i] ?? null);
+      else if (PNPM_VALUED.has(w)) i++;
+      else if (w.includes('$')) hidden = true;
+      else if (!w.startsWith('-') && w !== 'run') script = w;
+    }
+    if (script !== 'test') continue;
+    if (filters.length > 0) for (const f of filters) for (const d of filtered(f, dirs, dirByName)) out.add(d);
+    else if (dir !== null) out.add(posix.normalize(dir).replace(/\/$/u, '').replace(/^\.$/u, ''));
+    else if (recursive || hidden) for (const d of dirs) out.add(d);
+    else out.add('');
+  }
+  return [...out];
+}
+
+/**
+ * Every `node --test` in a workflow, and every workspace test script a step runs, with the folders its job built in
+ * the steps before it. A job is a key two spaces in under `jobs:`, and what it built resets at the next one, because a
+ * build in one job is not on the runner of another.
+ *
+ * A WORKSPACE'S `test` SCRIPT REACHES NOTHING BY BEING WRITTEN. It reaches its files when a workflow runs it: `pnpm -r
+ * test`, a `--filter` or `--dir` naming its folder, or the root's `pnpm test`, whose own script is read the same way.
+ * Counting every script as run is how a package whose leg was dropped from CI kept reading as tested.
+ *
+ * A STEP OR JOB UNDER `if: false` RUNS NOTHING, and its `node --test` line reached its files all the same. The
+ * condition is read wherever it sits in its step, before or after the `run:`, so the lines are gathered first and read
+ * second. Any other condition may be true on some run, and counts.
+ */
+function workflowCalls(root, dirs, dirByName, scriptCalls) {
   const dir = join(root, '.github', 'workflows');
   if (!existsSync(dir)) return [];
+  const rootText = scriptText(readJson(join(root, 'package.json'))?.scripts, 'test');
   const out = [];
+  /* THE ROOT'S SCRIPT IS FOLLOWED ONCE: its `node --test` lines from the root and the workspaces its `pnpm` lines run. */
+  const runScripts = (line, built, never, root = true) => {
+    for (const ws of scriptRuns(line, dirs, dirByName)) {
+      if (ws !== '') for (const globs of scriptCalls(ws)) out.push({ base: ws, globs, built: new Set(built), never });
+      else if (root) {
+        for (const globs of testCalls(rootText)) out.push({ base: '', globs, built: new Set(built), never });
+        runScripts(rootText, built, never, false);
+      }
+    }
+  };
   for (const name of readdirSync(dir).filter((n) => /\.ya?ml$/u.test(n)).sort()) {
+    const lines = [];
     let jobs = false;
-    let built = new Set();
+    let job = null;
+    let step = null;
+    let held = '';
     for (const raw of readFileSync(join(dir, name), 'utf8').replace(/\r\n/gu, '\n').split('\n')) {
       if (/^\s*#/u.test(raw)) continue;
-      const line = raw.replace(/\s+#\s.*$/u, '');
-      if (/^\S/u.test(line)) jobs = /^jobs:\s*$/u.test(line);
-      if (jobs && /^ {2}[\w-]+:\s*$/u.test(line)) built = new Set();
-      for (const d of builtBy(line, dirByName)) built.add(d);
-      for (const globs of testCalls(line)) out.push({ base: '', globs, built: new Set(built) });
-      /* A WORKSPACE'S OWN TEST SCRIPT RUN BY NAME, which is how a job runs a package's tests after building it. */
-      for (const m of line.matchAll(/--filter[= ]+(\S+)\s+(?:run\s+)?test\b/gu)) {
-        const base = m[1].startsWith('./') ? m[1].slice(2).replace(/\/$/u, '') : dirByName.get(m[1]);
-        if (base !== undefined) for (const globs of scriptCalls(base)) out.push({ base, globs, built: new Set(built) });
+      const bare = raw.replace(/\s+#\s.*$/u, '');
+      /* A LINE ENDING IN `\` GOES ON ON THE NEXT ONE, as the shell reads it, so `node --test \` keeps its paths. */
+      if (/\\$/u.test(bare)) {
+        held += `${bare.slice(0, -1)} `;
+        continue;
       }
+      const line = held + bare;
+      held = '';
+      if (/^\S/u.test(line)) jobs = /^jobs:\s*$/u.test(line);
+      if (jobs && /^ {2}[\w-]+:\s*$/u.test(line)) [job, step] = [{ off: false }, null];
+      if (/^ {4}steps:\s*$/u.test(line)) step = null;
+      const item = /^(\s*)-\s/u.exec(line);
+      if (item && (step === null || item[1].length <= step.indent)) step = { indent: item[1].length, off: false };
+      const cond = /^(\s*)(-\s+)?if:\s*(.+?)\s*$/u.exec(line);
+      if (cond && job !== null && cond[2] === undefined && cond[1].length === 4) job.off = NEVER.test(cond[3]);
+      else if (cond && step !== null && (cond[2] !== undefined || cond[1].length === step.indent + 2)) step.off = NEVER.test(cond[3]);
+      lines.push({ line, jobs, job, step });
+    }
+    let built = new Set();
+    let at = null;
+    for (const { line, jobs: inJobs, job, step } of lines) {
+      if (job !== at) [built, at] = [new Set(), job];
+      if (!inJobs) continue;
+      /* KEPT, AND MARKED: a line that never runs reaches nothing, and saying it was found there is the fix's address. */
+      const never = job?.off === true || step?.off === true;
+      if (!never) for (const d of builtBy(line, dirByName)) built.add(d);
+      for (const globs of testCalls(line)) out.push({ base: '', globs, built: new Set(built), never });
+      runScripts(line, built, never);
     }
   }
   return out;
@@ -212,7 +333,7 @@ const uncommented = (text) =>
     .replace(/(^|[^:\\'"`])\/\/.*$/gmu, '$1');
 
 const PLATFORM = /process\.platform\s*[!=]==?\s*(['"`])[^'"`]*\1/gu;
-const TYPE = /^(?:string|boolean|unknown|undefined|never)\b/u;
+const TYPE = /^(?:string|boolean|number|unknown|undefined|never|readonly|ReadonlySet|ReadonlyArray|Set|Array)\b/u;
 
 /**
  * The skips a test file writes. `bare` gives no reason; `platform` is a bare condition on
@@ -266,15 +387,16 @@ function buildsWanted(root, file, text, dirByName) {
   return wanted.size > 0 && skipsOf(all).reasoned ? [...wanted].sort() : [];
 }
 
+/** The repository this file sits in. */
+const HOME = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
+
 /**
  * THE CHECK IS A FUNCTION `run.mjs` CALLS, `52 §5.1` step 3, and nothing in this file happens on import.
  * The root is an argument, then `BRAINDOG_GATE_ROOT` (the handle `self-test` aims it at a planted tree
  * with), then the repository this file sits in. It returns 1 on a finding, 3 when it read no test file at
  * all, and falls off the end for a pass.
  */
-export default function orphanTests(
-  root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..'),
-) {
+export default function orphanTests(root = process.env.BRAINDOG_GATE_ROOT ?? HOME) {
   const files = [...walk(root)].sort();
   /* A ROOT WITH NO TEST FILE IS A WRONG ROOT, and green over it would read as a tree where every test
      runs. */
@@ -292,19 +414,22 @@ export default function orphanTests(
   const ownerOf = (f) => dirs.filter((d) => f.startsWith(`${d}/`)).sort((a, b) => b.length - a.length)[0] ?? null;
 
   const scriptCalls = (d) => testCalls(scriptText(readJson(join(root, d, 'package.json'))?.scripts, 'test'));
-  const reachers = [];
+  /* WHAT EACH SCRIPT WOULD REACH, held apart from what reaches: it names the cause when a script no workflow runs. */
+  const written = [];
   const noScript = new Set();
   for (const d of ['', ...dirs]) {
     const calls = scriptCalls(d);
     if (calls.length === 0 && d) noScript.add(d);
-    for (const globs of calls) for (const re of reach(d, globs)) reachers.push({ re, built: null });
+    for (const globs of calls) for (const re of reach(d, globs)) written.push({ re, d });
   }
-  for (const { base, globs, built } of workflowCalls(root, dirByName, scriptCalls))
-    for (const re of reach(base, globs)) reachers.push({ re, built });
+  const reachers = [];
+  const neverRun = [];
+  for (const { base, globs, built, never } of workflowCalls(root, dirs, dirByName, scriptCalls))
+    for (const re of reach(base, globs)) (never ? neverRun : reachers).push({ re, built });
   for (const globs of gateCalls(root)) for (const re of reach('', globs)) reachers.push({ re, built: null });
 
   const findings = [];
-  const counts = { orphan: 0, bare: 0, build: 0 };
+  const counts = { orphan: 0, bare: 0, build: 0, empty: 0 };
   const byPlatform = [];
   let platformSkips = 0;
   for (const f of files) {
@@ -312,15 +437,21 @@ export default function orphanTests(
     const by = reachers.filter((r) => r.re.test(f));
     if (by.length === 0) {
       counts.orphan++;
-      const why =
-        ws === null
-          ? 'it is in no workspace, and no root script, workflow step or gate names it'
-          : noScript.has(ws)
-            ? `${ws} has test files and no test script`
-            : `the test script of ${ws} does not reach it, and no workflow step or gate names it`;
+      const script = written.find((w) => w.re.test(f));
+      let why = `the test script of ${ws} does not reach it, and no workflow step or gate names it`;
+      if (neverRun.some((r) => r.re.test(f))) why = 'the only workflow step that names it sits under `if: false`, which never runs';
+      else if (script !== undefined)
+        why = `${script.d === '' ? 'the root test script' : `the test script of ${script.d}`} reaches it, and no workflow runs that script`;
+      else if (ws === null) why = 'it is in no workspace, and no root script, workflow step or gate names it';
+      else if (noScript.has(ws)) why = `${ws} has test files and no test script`;
       findings.push(`  ${f}  is run by nothing: ${why}.`);
     }
     const text = readFileSync(join(root, f), 'utf8');
+    /* RUN AND REGISTERING NOTHING, which Node prints as a file that passed. One nothing runs is named above already. */
+    if (by.length > 0 && !HELPERS.has(f) && !CALLS.test(uncommented(text))) {
+      counts.empty++;
+      findings.push(`  ${f}  registers no test: it calls no \`test(\` or \`it(\`, so its run passes having checked nothing.`);
+    }
     const skips = skipsOf(text);
     for (const { line, how } of skips.bare) {
       counts.bare++;
@@ -340,12 +471,23 @@ export default function orphanTests(
     }
   }
 
+  /* THE HELPER LIST ONLY SHRINKS: a line whose file now registers a test, or is gone from this repository, is a finding
+     until it is taken off. A planted tree holds none of these files, so a missing one is read only at home. */
+  for (const f of HELPERS.keys()) {
+    const at = join(root, f);
+    const stale = existsSync(at) ? CALLS.test(uncommented(readFileSync(at, 'utf8'))) : resolve(root) === HOME;
+    if (stale) {
+      counts.empty++;
+      findings.push(`  ${f}  is on this gate's helper list and ${existsSync(at) ? 'registers a test now' : 'is gone'}, so its line comes off.`);
+    }
+  }
+
   if (findings.length) console.log(`\n${findings.join('\n')}\n`);
   if (platformSkips > 0)
     console.log(`  ${platformSkips} test(s) skip by platform, in ${byPlatform.length} file(s): ${byPlatform.join(', ')}`);
   console.log(
     `  orphan-tests: ${files.length} test file(s) in ${dirs.length} workspace(s); ${counts.orphan} run by nothing, ` +
-      `${counts.bare} skip(s) with no reason, ${counts.build} wait on a build no step before them makes`,
+      `${counts.bare} skip(s) with no reason, ${counts.build} wait on a build no step before them makes, ${counts.empty} register no test`,
   );
   if (findings.length) return 1;
 }

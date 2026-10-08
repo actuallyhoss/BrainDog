@@ -32,7 +32,8 @@
     type Row,
   } from '../src/index.ts';
   /* From the module and not the root, which does not export it: the word is this drawer's and `html.ts`'s alone. */
-  import { CARDS_NEXT, RUN_OPEN, isDimmed, runFaceOf, runMarkOf, type RunCell, type RunFace } from '../src/cards.ts';
+  import { CARDS_NEXT, RUN_OPEN, isDimmed, markGlyphOf, runFaceOf, runMarkOf, type RunCell, type RunFace } from '../src/cards.ts';
+  import { glyphPath, glyphWaits } from '../src/inline.ts';
   import { hueOf } from '../src/cards.ts';
   import { pictureSrc } from '../src/gallery.ts';
   import { hrefFor } from '../src/html.ts';
@@ -57,6 +58,25 @@
   const label = (i: number): string => L.labels[i] ?? '';
   const said = (r: Row, i: number): string => (i < 0 ? '' : text(inline(r.cells[i] ?? '', opts)));
   const nodes = (r: Row, i: number) => inline(r.cells[i] ?? '', opts);
+  /* A ROW'S MARK IS A PICTURE WHERE IT NAMES ONE (`markOf`), and a picture only the set holds is asked again once the
+     set lands, as `Section` waits on it: `gift` and `store` have no drawing in the host's hand until the set's chunk
+     arrives. Until then, and for a host with no drawing at all, the named slot stays empty, as `toHTML` leaves it. */
+  let landed = $state(0);
+  $effect(() => {
+    const waits = rows.some((r) => {
+      const g = L.mark >= 0 ? markGlyphOf(markOf(said(r, L.mark), said(r, L.name))) : null;
+      return g !== null && glyphWaits(g, opts);
+    }) || [...(opts.scope?.marks ?? new Map()).entries()].some(([name, m]) => {
+      const g = m.mark ? markGlyphOf(markOf(m.mark, name)) : null;
+      return g !== null && glyphWaits(g, opts);
+    });
+    if (waits) void opts.iconSet?.().then(() => landed++, () => {});
+  });
+  const markArt = (glyph: string): string | null => {
+    void landed;
+    return glyphPath(glyph, opts);
+  };
+
   /** The mark the host draws for the name in a cell, or `null`, as `markFor` in `src/html.ts`. */
   const markFor = (name: string): AgentMark | null => (name.trim() && opts.agentMark ? opts.agentMark(name.trim()) : null);
 </script>
@@ -72,8 +92,9 @@
 {#snippet labelled(i: number)}{#if label(i)}<span class="cards-label">{label(i)}</span>{/if}{/snippet}
 
 <!-- A SCOPE CHIP, as `p/Table.svelte` draws one: the globe beside "Everywhere", or the project's mark in its own hue
-     beside its name. The mark is hidden from a screen reader, which reads the name. -->
-{#snippet scopeChip(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<span class="scope-chip" data-everywhere={everywhere ? '' : undefined}>{#if everywhere && cells.glyph}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={cells.glyph} /></svg>{:else if m?.mark}<span class="scope-mark" style={m.hue === null ? undefined : `--hue:${m.hue}`} aria-hidden="true">{m.mark}</span>{/if}<span class="scope-name">{said}</span></span>{/snippet}
+     beside its name, its picture or its letter as `markOf` answers it, so a chip wears what the project's card wears.
+     The mark is hidden from a screen reader, which reads the name. -->
+{#snippet scopeChip(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<span class="scope-chip" data-everywhere={everywhere ? '' : undefined}>{#if everywhere && cells.glyph}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={cells.glyph} /></svg>{:else if m?.mark}{@const sm = markOf(m.mark, said)}{@const sg = markGlyphOf(sm)}{#if sm}<span class="scope-mark" data-glyph={sg ?? undefined} style={m.hue === null ? undefined : `--hue:${m.hue}`} aria-hidden="true">{#if sg}{@const d = markArt(sg)}{#if d}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path {d} /></svg>{/if}{:else}{sm}{/if}</span>{/if}{/if}<span class="scope-name">{said}</span></span>{/snippet}
 
 <!-- A RUN'S FACE, as `apps/web`'s `AgentFace` draws one: the kind's glyph on a disc washed in the run's
      hue, ringed in that hue while the run is open, solid while it works and dashed once it has gone quiet, and a door to
@@ -122,7 +143,8 @@
   <!-- AS MANY COLUMNS AS FIT, AND NEVER MORE THAN THERE ARE CARDS (`cardsCount`), so three cards fill the row. -->
   <ul class="cards-grid" data-cards={cardsCount(rows.length)}>
     {#each rows as r, n}
-      {@const mark = L.mark >= 0 ? markOf(said(r, L.mark)) : null}
+      {@const mark = L.mark >= 0 ? markOf(said(r, L.mark), said(r, L.name)) : null}
+      {@const markGlyph = markGlyphOf(mark)}
       {@const run = L.name >= 0 || L.who >= 0 ? runFaceOf(said(r, L.nameIsWho ? L.name : L.who), opts.runs?.[n], isQuiet(L, r.cells)) : null}
       {@const face = L.nameIsWho ? initialOf(said(r, L.name)) : null}
       {@const nameMark = L.nameIsWho ? markFor(said(r, L.name)) : null}
@@ -148,7 +170,18 @@
       >
         {#if picture}<img class="cards-picture" src={hrefFor(opts, picture)} alt="" loading="lazy" />{/if}
         <div class="cards-head">
-          {#if mark}<span class="cards-mark" aria-hidden="true">{mark}</span>
+          {#if mark}<span class="cards-mark" data-glyph={markGlyph ?? undefined} aria-hidden="true"
+              >{#if markGlyph}{@const d = markArt(markGlyph)}{#if d}<svg
+                    width="100%"
+                    height="100%"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"><path {d}></path></svg
+                  >{/if}{:else}{mark}{/if}</span
+            >
           {:else if L.nameIsWho && run}{@render runFace(run)}
           {:else if nameMark}{@render agentFace(nameMark, 'cards-face')}
           {:else if face}<span class="cards-face" aria-hidden="true">{face}</span>{/if}

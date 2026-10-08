@@ -55,7 +55,7 @@ test('OPTIONS ARE THE QUESTION’S WORDS FOLDED AND THE OPTION IDS, and need the
   assert.equal(causeOf('options', body, 'Which café first?'), causeOf('options', reordered, '  which CAFE first '));
   assert.notEqual(causeOf('options', body, 'Which café first?'), causeOf('options', body, 'Which café last?'));
   assert.equal(causeOf('options', body), null);
-  assert.equal(fold('Ça  va, Sam?'), 'ca va sam');
+  assert.equal(fold('Ça  va, Wren?'), 'ca va wren');
 });
 
 test('THE REST ARE THE WHOLE BODY AS ASKED, and a kind nobody knows derives none', () => {

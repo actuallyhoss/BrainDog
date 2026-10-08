@@ -23,12 +23,12 @@ const refusalOf = (r: { ok: boolean }, what: string) => {
 
 /* The names the audit stored through sign-up, and the two it refused that are a name with a note. */
 const NAMES = [
-  '(Sam) [work]', '(ex-Acme) Sam (work)', 'Sam [admin]', 'Sam (work)', 'Zoë [Z] O’Brien', 'Bo {B} Tanner',
+  '(Wren) [work]', '(ex-Acme) Wren (work)', 'Wren [admin]', 'Wren (work)', 'Zoë [Z] O’Brien', 'Bo {B} Tanner',
   '山田（太郎）', 'Ana María «Anita» López', 'Jean-Luc (JL) Picard', 'Kim (김민준)', '김민준 (Kim)', '(김민준) Kim',
   '李雷', 'Мария Иванова', 'محمد علي', 'שרה כהן', 'Nguyễn Văn An', '„Anita“ Weber',
   /* A WORD IN A NAME IS NOT THE NAME: never a single real word refused for holding a field word. */
-  'Namelia', 'Owner-Smith', 'Todorov', 'Jane Doering', 'Firstbrook', 'Your', 'Doe', 'Jane', 'John', 'Sam',
-  'Sam (owner)', 'Ana (first born)', 'Lee [Firstbrook]', 'First', 'Last', 'Nam',
+  'Namelia', 'Owner-Smith', 'Todorov', 'Jane Doering', 'Firstbrook', 'Your', 'Doe', 'Jane', 'John', 'Wren',
+  'Wren (owner)', 'Ana (first born)', 'Lee [Firstbrook]', 'First', 'Last', 'Nam',
 ];
 
 /* The audit's thirty-one placeholder spellings that were all stored, "Your Name", and the bracketed fields. */
@@ -37,10 +37,10 @@ const PLACEHOLDERS = [
   'Your.Name', 'yourname', '"Name"', '“Name”', "'Name'", '»Name«', '›Name‹', '﹤Name﹥', '˂Name˃', 'ᐸNameᐳ', '＂Name＂',
   'Jane Doe', 'John Doe', 'y o u r n a m e', 'TODO', 'CHANGE ME', 'changeme', '$name', '${name}', '%NAME%', ':name',
   '$env:USERNAME', 'Your Name', 'your name', 'your　name', 'first last', 'JOHN DOE',
-  '[NAME]', '[Sam]', '{Sam}', '(Sam)', '((Name))', '{{ owner }}', '【山田】', '[First] [Last]', '{{first_name}} {{last_name}}',
-  '{first}', 'Sam {firstName}', 'Sam [your name]', 'Sam [Last_Name]', '*|FNAME|*', '%FIRST_NAME%', '${first} Smith',
+  '[NAME]', '[Wren]', '{Wren}', '(Wren)', '((Name))', '{{ owner }}', '【山田】', '[First] [Last]', '{{first_name}} {{last_name}}',
+  '{first}', 'Sam {firstName}', 'Wren [your name]', 'Wren [Last_Name]', '*|FNAME|*', '%FIRST_NAME%', '${first} Smith',
   /* A FIELD'S LABEL RUN TOGETHER IS THE FIELD, in any bracket, and the two labels every form prints. */
-  'Sam [yourname]', 'Sam [lastname]', 'Sam (your name)', '(First Name)', 'First Name', 'last name', 'Firstname',
+  'Wren [yourname]', 'Sam [lastname]', 'Wren (your name)', '(First Name)', 'First Name', 'last name', 'Firstname',
 ];
 
 test('A NAME WITH A NOTE IN BRACKETS IS A NAME, and so is every script the audit typed', () => {
@@ -79,18 +79,18 @@ test('the rest of the rule holds: empty, too long, hidden characters', () => {
   assert.equal(spaced.value, 'Sam Smith');
 });
 
-test('A RENAME TAKES "(Sam) [work]" AND REFUSES "First Last", through the record the person is in', async () => {
+test('A RENAME TAKES "(Wren) [work]" AND REFUSES "First Last", through the record the person is in', async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(Date.UTC(2026, 9, 9, 12)));
   const made = k.createRecord({ id: ID, slug: 'the-studio', name: 'The Studio', tz: 'Africa/Cairo', locale: 'en-GB', owner: { id: 'p_1', email: 'me@example.test', name: 'Sam' } });
   assert.ok(made.ok);
 
-  const kept = k.renamePerson('p_1', '(Sam) [work]');
+  const kept = k.renamePerson('p_1', '(Wren) [work]');
   assert.ok(kept.ok, JSON.stringify(kept));
-  assert.equal(sql.one<{ name: string }>("SELECT name FROM person WHERE id = 'p_1'")?.name, '(Sam) [work]');
+  assert.equal(sql.one<{ name: string }>("SELECT name FROM person WHERE id = 'p_1'")?.name, '(Wren) [work]');
 
   const refused = k.renamePerson('p_1', 'First Last');
   assert.equal(refused.ok, false);
-  assert.equal(sql.one<{ name: string }>("SELECT name FROM person WHERE id = 'p_1'")?.name, '(Sam) [work]', 'a refused rename moved the name');
+  assert.equal(sql.one<{ name: string }>("SELECT name FROM person WHERE id = 'p_1'")?.name, '(Wren) [work]', 'a refused rename moved the name');
   sql.close();
 });

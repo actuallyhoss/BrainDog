@@ -65,22 +65,82 @@ const HEADERS: [string, string][] = [
 
 /**
  * The last nightly walk, as `nightly()` hands it to the Directory (`Directory$.nightDone`): when it closed, how many records
- * it reached, how many copies it wrote and how many failed, and whether the Directory's own copy was written. No record's
- * name: a stranger can read this.
+ * it reached, how many copies it wrote and how many failed, and whether the Directory's own copy was written. Then each
+ * other job of the night by its failures (audit-35, finding 5): the deleted records' copies that would not expire, the
+ * records whose keys are still under an old root key, the erasures still open, and whether the install counts were
+ * written, absent where the walk counted nothing. `stopped` is a walk that threw, or a night that could not start: kept so
+ * the night before it cannot go on saying it ran.
+ *
+ * THE FOUR NEWER FIELDS ARE OPTIONAL BECAUSE A NIGHT KEPT BY AN OLDER BUILD IS STILL IN THE DIRECTORY the morning of a
+ * deploy, and `nightSaid` reads one without them as a night that cannot say it ran whole.
  */
-export type Night = { at: string; records: number; backups: number; backups_failed: number; directory: 'ok' | 'failed' };
+export type Night = {
+  at: string;
+  records: number;
+  backups: number;
+  backups_failed: number;
+  directory: 'ok' | 'failed';
+  expiry_failed?: number;
+  stragglers?: number;
+  erase_open?: number;
+  counts_written?: boolean;
+  stopped?: true;
+};
+
+/**
+ * The night as a stranger reads it. NO COUNT OF RECORDS AND NO COUNT OF COPIES: on a whole night either is how many people
+ * have a record here. `reached` is whether the walk reached any; the number stays in the Directory and in the walk's lines.
+ */
+export type NightSaid = {
+  at: string;
+  reached: boolean;
+  backups_failed: number;
+  expiry_failed: number | null;
+  stragglers: number | null;
+  erase_open: number | null;
+  counts_written?: boolean;
+  directory: 'ok' | 'failed';
+  stopped?: true;
+  ran: boolean;
+};
 
 /** How old a night may be and still be last night's: the cron's day and two hours for a slow walk or a late trigger. */
 export const NIGHT_FRESH_MS = 26 * 60 * 60 * 1000;
 
 /**
- * The night as `/healthz` says it: the Directory's tally and `ran`, whether last night's jobs ran whole (fresh, every copy
- * written, the Directory's too). `null` where no night has been told yet or the Directory could not be asked.
+ * The night as `/healthz` says it, and `ran`: whether last night's jobs ran whole. Fresh; not stopped; at least one record
+ * reached, because a walk that found nobody is a Directory that answered an empty page and not a night that copied
+ * everyone; every copy written, the Directory's too; nothing left to expire, re-wrap or erase; and the counts written
+ * where they were counted. A field the night does not carry is `null` here and is not a 0: unknown is not whole.
+ * `null` where no night has been told yet or the Directory could not be asked.
  */
-export const nightSaid = (night: Night | null, now: number): (Night & { ran: boolean }) | null => {
+export const nightSaid = (night: Night | null, now: number): NightSaid | null => {
   if (night === null) return null;
   const age = now - Date.parse(night.at);
-  return { ...night, ran: Number.isFinite(age) && age < NIGHT_FRESH_MS && night.backups_failed === 0 && night.directory === 'ok' };
+  const said: NightSaid = {
+    at: night.at,
+    reached: night.records > 0,
+    backups_failed: night.backups_failed,
+    expiry_failed: night.expiry_failed ?? null,
+    stragglers: night.stragglers ?? null,
+    erase_open: night.erase_open ?? null,
+    ...(night.counts_written === undefined ? {} : { counts_written: night.counts_written }),
+    directory: night.directory,
+    ...(night.stopped === true ? { stopped: true as const } : {}),
+    ran: false,
+  };
+  said.ran =
+    Number.isFinite(age) &&
+    age < NIGHT_FRESH_MS &&
+    said.stopped !== true &&
+    said.reached &&
+    said.backups_failed === 0 &&
+    said.directory === 'ok' &&
+    said.expiry_failed === 0 &&
+    said.stragglers === 0 &&
+    said.erase_open === 0 &&
+    said.counts_written !== false;
+  return said;
 };
 
 /**

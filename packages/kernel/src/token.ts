@@ -81,6 +81,10 @@ export type TokenRow = {
   created_at: string;
   last_used_at: string | null;
   last_surface: string | null;
+  /** The build of the command behind it, as the command last said it (`2026.10.09+1a2b3c4`), or `null` until it does. */
+  last_build: string | null;
+  /** When a session on it last called a tool (`noteTool`), or `null` for one that never has. */
+  last_tool_at: string | null;
   expires_at: string | null;
   revoked_at: string | null;
   /**
@@ -99,7 +103,8 @@ export type TokenRow = {
   client?: TokenClient;
 };
 
-const VISIBLE = 'id, person_id, scope, reach, label, created_at, last_used_at, last_surface, expires_at, revoked_at, client_id, client_kind, host';
+const VISIBLE =
+  'id, person_id, scope, reach, label, created_at, last_used_at, last_surface, last_build, last_tool_at, expires_at, revoked_at, client_id, client_kind, host';
 
 /**
  * An ISO instant with its zone: `2026-09-25T12:00:00Z`, the seconds and up to three digits of fraction optional.
@@ -190,6 +195,7 @@ const clientOf = (raw: { client_id: string | null; client_kind: string | null; h
 const LISTED =
   'SELECT t.id AS id, t.person_id AS person_id, t.scope AS scope, t.reach AS reach, t.label AS label, ' +
   't.created_at AS created_at, t.last_used_at AS last_used_at, t.last_surface AS last_surface, ' +
+  't.last_build AS last_build, t.last_tool_at AS last_tool_at, ' +
   't.expires_at AS expires_at, t.revoked_at AS revoked_at, t.client_id AS client_id, t.client_kind AS client_kind, ' +
   't.host AS host, COALESCE(p.name, p.email) AS person_name ' +
   'FROM token t LEFT JOIN person p ON p.id = t.person_id';
@@ -412,8 +418,12 @@ export type Verified = {
  * AND THE USE IS RECORDED WITHOUT AN EVENT. `last_used_at` is what makes a listing say "this one has
  * not been used since March", which is how somebody decides what to revoke. An event per call would
  * be a ledger of an agent's polling.
+ *
+ * `build` IS WHAT THE COMMAND SAID IT WAS (`x-braindog-cli`), kept in the same statement, so a call costs no write more.
+ * A value that is not a build (`isBuild`) is dropped and the build already kept stays: a header anybody can send is not
+ * let into a column a person reads.
  */
-export async function verifyToken(deps: TokenDeps, bearer: string, surface?: string): Promise<Result<Verified>> {
+export async function verifyToken(deps: TokenDeps, bearer: string, surface?: string, build?: string): Promise<Result<Verified>> {
   const cut = bearer.indexOf('.');
   const record = cut < 0 ? '' : bearer.slice(0, cut);
   const secret = cut < 0 ? '' : bearer.slice(cut + 1);
@@ -455,11 +465,32 @@ export async function verifyToken(deps: TokenDeps, bearer: string, surface?: str
   if (endedByCutOff(deps.validFrom, row.created_at)) return wrong;
 
   deps.sql.exec(
-    'UPDATE token SET last_used_at = ?, last_surface = ? WHERE id = ?',
+    'UPDATE token SET last_used_at = ?, last_surface = ?, last_build = COALESCE(?, last_build) WHERE id = ?',
     instant(deps.nowMs),
     surface ?? null,
+    build !== undefined && isBuild(build) ? build : null,
     row.id,
   );
   const client = clientOf(row);
   return ok({ id: row.id, person_id: row.person_id, scope: row.scope, reach: reachOf(row.reach), ...(client === undefined ? {} : { client }) });
+}
+
+/**
+ * A command's build: the day it was bundled and its commit, `2026.10.09+1a2b3c4`, as `apps/cli/scripts/bundle.mjs`'s
+ * `TUPLE` holds it, or `dev+` and a commit from a checkout that was never bundled (`dev+0000000`). Seven to forty hex
+ * digits, because `git rev-parse --short=7` answers more when seven are ambiguous.
+ */
+const BUILD = /^(?:\d{4}\.\d{2}\.\d{2}|dev)\+[0-9a-f]{7,40}$/u;
+
+/** Whether a value is a build a key may keep. Nothing else is: no key, no path, no host. */
+export const isBuild = (value: string): boolean => BUILD.test(value);
+
+/**
+ * A session on this key called a tool: `last_tool_at` moves to `at`.
+ *
+ * NO EVENT, for `verifyToken`'s reason: a tool call is not history, and an event per call would be a ledger of an agent's
+ * work that the work's own rows already are. One statement, and a key that is not there changes nothing.
+ */
+export function noteTool(sql: Sql, tokenId: string, at: string): void {
+  sql.exec('UPDATE token SET last_tool_at = ? WHERE id = ?', at, tokenId);
 }

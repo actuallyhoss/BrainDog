@@ -65,6 +65,10 @@ const GATES = [
      one of them passes it, which is the only thing that makes the nine below mean anything. */
   ['self-test', ['node', [join(here, 'self-test.mjs')]]],
   ['clean-room', call(join(here, 'clean-room.mjs'))],
+  /* AND WHAT THE REPOSITORY CARRIES ABOUT ITS OWNER (LCH-C11): no private name, the licence files right, the README
+     with its Licence section and no price or badge, and on the owner's machine his own private list. Beside
+     `clean-room` because both are a read of every tracked file for something that must not be in it. */
+  ['public-clean', call(join(here, 'public-clean.mjs'))],
   /* The banned surface: one kernel, three runtimes, and a source file that imports a driver has
      chosen one of them. Cheap and early, beside the other greps. */
   ['stack', ['node', [join(here, 'stack.mjs')]]],
@@ -148,6 +152,9 @@ const GATES = [
      root, and a shipped file that imports either draws the sample on a real record. Beside `shell-words` because both
      are a grep over what the core ships for something it must not name. */
   ['no-fixtures', call(join(here, 'no-fixtures.mjs'))],
+  /* AND WHAT `no-fixtures` CANNOT SEE OF THE SAMPLE (LCH-A06): the demo's setting outside a test, and a string only the
+     test fixture holds in the built app. It needs the build, so it runs in `--built`. */
+  ['no-sample', call(join(here, 'no-sample.mjs'))],
   /* AND THE WEB NAMES NO FIRST-PARTY LIST OR PACK, AND GUESSES NO CURRENCY.
      Beside `shell-words` and `no-fixtures` because it is the same kind of rule: a grep over what the app ships for
      something it must not name. */
@@ -162,6 +169,9 @@ const GATES = [
      flippant register in anything a stranger reads", against 91 string literals carrying
      one, most of them in refusals, which is the prose somebody meets at the moment they are stuck. */
   ['em-dash', call(join(here, 'em-dash.mjs'))],
+  /* AND THE ONE CLOCK (AGT-C02): a run's `last_seen` compared with the time anywhere outside `presence.ts` is the
+     rail, Today and Agents saying three numbers again. Today's hits are allowed by count, and the list only shrinks. */
+  ['one-clock', call(join(here, 'one-clock.mjs'))],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
   // Needs a build. It exits 3 when there is not one, which is a skip here and not a pass, so
   // `pnpm gates` is useful on a fresh checkout; CI builds first, and then it is a real gate.

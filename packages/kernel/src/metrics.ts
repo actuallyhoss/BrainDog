@@ -28,15 +28,16 @@ import { fixOf, no, ok } from '@braindog/ports';
 import { KERNEL_FIELDS, compile, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
-import { GOVERNANCE_OPEN, RECORD_SIGNS, SESSIONS_WORKING, readOpenQuestions, readRunsWorking, readSign } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, RECORD_RATES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING, readOpenQuestions, readRatesAge, readRunsWorking, readSign, readVitals } from './built-in-figures.ts';
 import { isCurrencyCode } from './coerce.ts';
 import type { Leg } from './forecast.ts';
+import type { VitalSign } from './signs.ts';
 import { across, convertMinor, dayFieldOf, pairParts, rateFor, rateIsStale, type Part, type Rate, type Reduce } from './fx.ts';
 /* THE TWO FIGURES THAT ARE NOT A SUM OVER ONE LIST, read in their own file, which imports this one back (it says why that is safe). */
 import { isRolled, isWalked, readRolled, readWalk } from './money-figures.ts';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
-export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct'] as const;
+export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct', 'age', 'currencies', 'empty'] as const;
 /**
  * A row-level multiplication, before the sum.
  *
@@ -54,7 +55,13 @@ export type Aggregation =
   | { avg: string }
   | { min: string }
   | { max: string }
-  | { distinct: string };
+  | { distinct: string }
+  /** Whole days from the newest day in the field to the reading's own day, on a day or instant field (money-signs B1). */
+  | { age: string }
+  /** How many currencies a money field is kept in (money-signs B2). */
+  | { currencies: string }
+  /** How many rows leave the field empty, any type (money-signs B3). */
+  | { empty: string };
 
 export type Value = Aggregation | { ratio: { of: Aggregation; per: Aggregation } } | { diff: { of: Aggregation; per: Aggregation } };
 
@@ -63,7 +70,8 @@ export type MetricDecl = {
   name: string;
   /**
    * `register.<id>`, or `forecast.runway` for a figure over the cash walk ahead (`money-figures.ts`). A `series.<id>`
-   * source reads `metric_point`, which this build does not.
+   * source reads `metric_point`, the line a figure's nights kept, and this build reads one thing of it: with
+   * `value: { count: 'missing' }`, how many days of the window hold no point (`readSeriesGaps`).
    */
   source: string;
   /**
@@ -293,6 +301,12 @@ export type Reading = {
   current?: string;
   /** How many groups past the cap of fifty were left out, the oldest first. */
   more?: number;
+  /**
+   * NO ROW SAID THE FIELD THIS FIGURE REDUCES: no row matched, rows were held, and the figure's own `where` requires that
+   * field filled (`present`). "Earning £0" over a field nobody filled is not a zero, so `drawn.ts` leaves it out
+   * (`unsaid`), as the web's `overUnsaidField` (`page-live.ts`) does. Absent when false.
+   */
+  unsaid?: true;
   /**
    * MONEY IN MORE THAN ONE CURRENCY THAT COULD NOT BE CONVERTED, one amount per currency, and `value` is `null`. It is
    * not a refusal: the parts are the answer, and `fx.missing` says which rate would add them up.
@@ -732,6 +746,12 @@ export type EvalContext = {
    * home currency and no rates, so such a figure comes back in parts.
    */
   fx?: (() => { home: string | null; rates: readonly Rate[] }) | undefined;
+  /**
+   * The record's vital signs now, as Health reads them (`readSigns` in `signs.ts`), for `signs-red`. HANDED IN AND NOT
+   * IMPORTED: `signs.ts` reaches `flow.ts`, which imports this file, and importing it here broke the kernel's own load.
+   * Absent, `signs-red` says nothing.
+   */
+  signs?: (() => readonly Pick<VitalSign, 'sign' | 'state'>[]) | undefined;
 };
 
 /** What a money sum needs to add across currencies: the currency, the rates, today, and the field that dates a row. */
@@ -990,6 +1010,10 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   if (decl.source === RECORD_SIGNS) return readSign(sql, ctx, decl);
   /* AND HOW MANY AGENTS ARE WORKING NOW, by the one clock (`presence.ts`). */
   if (decl.source === SESSIONS_WORKING) return readRunsWorking(sql, ctx);
+  /* AND THE RECORD'S HEALTH OVER ITS VITAL SIGNS, `signs-red` and `green-days` (PRF-A05), and how old its newest
+     exchange rate is, `rates-age-days` (REC-B02). Each answers no value, never nought, with nothing to read. */
+  if (decl.source === RECORD_VITALS) return readVitals(sql, ctx, decl);
+  if (decl.source === RECORD_RATES) return readRatesAge(ctx, decl);
   const refusals: Refusal[] = [];
   const at = (code: string, fix: string, key?: string): void => {
     refusals.push({ code, fix: `${decl.metric}: ${fix}`, ...(key === undefined ? {} : { at: key }) });
@@ -1010,6 +1034,18 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   if (!decl.window) at('REQUIRED_MISSING', 'a number with no comparison window is a number you cannot act on', 'window');
   const shift = decl.window ? windowMs(decl.window) : null;
   if (decl.window && shift === null) at('VALUE_MALFORMED', `${decl.window} is not a window: write 30d, 4w or 3m`, 'window');
+
+  /* A FIGURE OVER A KEPT LINE (REC-B01): `series.<figure>` reads the points that figure's nights wrote, and the one thing
+     this build asks of them is how many days of the window hold none (`readSeriesGaps`). Anything else over a line is
+     still a source this build does not read, as it was before it read this, and says what it does read. */
+  if (decl.source.startsWith('series.')) {
+    const value = decl.value as { count?: unknown };
+    if (keysOf(decl.value).join() !== 'count' || value.count !== 'missing')
+      at('SOURCE_UNKNOWN', `${decl.source} is read only as { count: missing }, how many days of its window hold no point`, 'source');
+    if (decl.source === 'series.') at('SOURCE_UNKNOWN', 'series. names no figure: write series.<figure>', 'source');
+    if (refusals.length) return { ok: false, refusal: refusals[0]! };
+    return readSeriesGaps(sql, decl, ctx, shift!);
+  }
 
   /* CASH ROLLED FORWARD AND THE WALK AHEAD ARE READ IN THEIR OWN FILE (`money-figures.ts`), after the two keys every
      figure needs and before anything that assumes one aggregation over one list. */
@@ -1258,15 +1294,30 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
      rather than inside a scan because it is a fact about the scope and not about an aggregation:
      the comparison window, the two halves of a ratio and every group are all the same rows under a
      narrower predicate, so each of them reading it would be the same query several times over. */
+  const inScope = heldBy(sql, schema, scope.predicate);
+  const reduced = fields.filter((f) => REDUCING.has(f.kind)).map((f) => f.field).filter((f): f is string => typeof f === 'string');
+  const unsaid = now.value.rows === 0 && inScope > 0 && requiresFilled(said.predicate, reduced);
   return ok({
     ...now.value,
-    held: heldBy(sql, schema, scope.predicate),
+    held: inScope,
+    ...(unsaid ? { unsaid: true as const } : {}),
     delta,
     why,
     met,
     ...(targetIn ? { targetIn } : {}),
     ...(grouped ? grouped.value : {}),
   });
+}
+
+/** The kinds that reduce over a field's values, so a row with the field empty gives them nothing to read. */
+const REDUCING: ReadonlySet<string> = new Set(['sum', 'avg', 'min', 'max']);
+
+/** Whether a `where` requires one of `fields` filled: a `present` leaf (or `empty: false`) on it, at the top or under `all`. */
+function requiresFilled(node: Predicate | undefined, fields: readonly string[]): boolean {
+  if (node === undefined || fields.length === 0) return false;
+  if ('all' in node && Array.isArray(node.all)) return node.all.some((n) => requiresFilled(n as Predicate, fields));
+  if ('field' in node && typeof node.field === 'string') return fields.includes(node.field) && (node.present === true || node.empty === false);
+  return false;
 }
 
 /** The order a grouping by a word draws in: the largest part first, then the key. Exported for the browser's reader. */
@@ -1868,6 +1919,44 @@ function one(
       refusals: [],
     });
 
+  /* THE ROWS THAT LEAVE THE FIELD EMPTY, whatever its type: the half of "the share with no category" a ratio's one
+     `where` could not count beside the whole (money-signs B3). */
+  if (kind === 'empty')
+    return ok({
+      value: Number(
+        sql.one<{ n: number }>(
+          `SELECT count(*) AS n FROM entry WHERE ${where} AND (json_extract(fields, ?) IS NULL OR json_extract(fields, ?) = '')`,
+          ...params,
+          jsonPath(field),
+          jsonPath(field),
+        )?.n ?? 0,
+      ),
+      unit: null,
+      rows,
+      refusals: [],
+    });
+
+  /* HOW MANY CURRENCIES A MONEY FIELD IS KEPT IN, the currency alone: `distinct` counts amount and currency together,
+     so three accounts in pounds with three balances read three (money-signs B2). */
+  if (kind === 'currencies')
+    return ok({
+      value: Number(
+        sql.one<{ n: number }>(`SELECT count(DISTINCT json_extract(fields, ?)) AS n FROM entry WHERE ${where}`, `${jsonPath(field)}.currency`, ...params)?.n ?? 0,
+      ),
+      unit: null,
+      rows,
+      refusals: [],
+    });
+
+  /* THE AGE OF THE NEWEST DAY, in whole days to the reading's own day: `{ max: 'on' }` is a day, not an age, and read
+     as a number it is twenty thousand. No row, or no day to count from, is no value (money-signs B1). */
+  if (kind === 'age') {
+    const v = sql.one<{ v: string | null }>(`SELECT max(json_extract(fields, ?)) AS v FROM entry WHERE ${where}`, jsonPath(field), ...params)?.v ?? null;
+    const today = fx?.today ?? null;
+    const days = v === null || today === null ? null : Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${String(v).slice(0, 10)}T00:00:00Z`)) / 86_400_000);
+    return ok({ value: days === null || Number.isNaN(days) ? null : Math.max(0, days), unit: null, rows, refusals: [] });
+  }
+
   const type = schema.fields[field]?.type ?? 'text';
   const expr = `json_extract(fields, '${jsonPath(field)}${type === 'money' ? '.amount' : type === 'quantity' ? '.value' : ''}')`;
 
@@ -2074,8 +2163,11 @@ const NUMERIC = new Set(['int', 'decimal', 'duration', 'money', 'quantity', 'boo
  * as a blank beside `met: false`. `count` and `distinct` read any field, so they are never refused.
  */
 function unaggregatable(kind: string, field: string, schema: Schema): string | null {
-  if (!['sum', 'avg', 'min', 'max'].includes(kind) || field === 'id') return null;
   const type = Object.hasOwn(schema.fields, field) ? schema.fields[field]?.type : undefined;
+  /* AN AGE IS COUNTED FROM A DAY, and currencies are read off money: on any other field each is a number about nothing. */
+  if (kind === 'age') return type === undefined || type === 'day' || type === 'instant' ? null : `age reads a day, and ${field} is a ${type}. Name a day or instant field.`;
+  if (kind === 'currencies') return type === undefined || type === 'money' ? null : `currencies reads money, and ${field} is a ${type}. Name a money field.`;
+  if (!['sum', 'avg', 'min', 'max'].includes(kind) || field === 'id') return null;
   if (type === undefined || NUMERIC.has(type)) return null;
   /* THE EARLIEST OR THE LATEST DAY IS A DAY, and it is read as whole days since 1970 (`aggregate`). AN
      AVERAGE DAY IS READ THE SAME WAY, so the average of two paid days less the average of their due days is
@@ -2346,6 +2438,46 @@ export const point = (value: number, unit: string | null | undefined): { value: 
   if (Number.isInteger(value)) return { value, unit: null };
   return { value: Math.round(value * BASIS_SCALE), unit: BASIS };
 };
+
+/**
+ * How many days of a figure's window hold no point in its kept line (REC-B01): the nights `snapshot` could not write,
+ * which it counts (`missing`) and keeps nowhere, read back from `metric_point` by the record's own days.
+ *
+ * THE WINDOW ENDS YESTERDAY, the last day a night writes, in the record's zone (`clockOf`); today has no point until
+ * tonight, and counting it would read one night missed every day. On a read of a past day it ends the day before that.
+ *
+ * A LINE IS NOT MISSED BEFORE IT BEGAN. The window starts at the line's first point if that is later, so a figure armed
+ * three days ago is not thirty nights behind. NOTHING, NEVER NOUGHT, for a line with no point at all, or one that began
+ * after the window: there is nothing to have missed yet, and nought would say every night was kept.
+ *
+ * ONE QUERY, however long the window: the line's first day and the days of the window holding a point, together.
+ */
+function readSeriesGaps(sql: Sql, decl: MetricDecl, ctx: EvalContext, shift: number): Result<Reading> {
+  const series = decl.source.slice('series.'.length);
+  const back = (day: string, n: number): string => new Date(Date.parse(`${day}T12:00:00Z`) - n * DAY).toISOString().slice(0, 10);
+  const today = new Date(clockOf(ctx)).toISOString().slice(0, 10);
+  const last = back(today, 1);
+  const first = back(today, Math.max(1, Math.round(shift / DAY)));
+  const row = sql.one<{ began: string | null; held: number }>(
+    `SELECT (SELECT min(at) FROM metric_point WHERE series = ? AND grain = 'day') AS began, COUNT(DISTINCT at) AS held
+       FROM metric_point WHERE series = ? AND grain = 'day' AND at >= ? AND at <= ?`,
+    series,
+    series,
+    first,
+    last,
+  );
+  const began = row?.began ?? null;
+  const t = decl.target as { lte?: unknown; gte?: unknown } | undefined;
+  const said = (value: number | null, days: number, why: string): Result<Reading> => {
+    const met = value === null ? null : typeof t?.lte === 'number' ? value <= t.lte : typeof t?.gte === 'number' ? value >= t.gte : null;
+    return ok({ value, unit: null, rows: value ?? 0, held: days, delta: null, why, met, refusals: [] });
+  };
+  if (began === null) return said(null, 0, `${wordsOf(series)} has kept no point yet`);
+  if (began > last) return said(null, 0, `${wordsOf(series)} began after the window`);
+  const from = began > first ? began : first;
+  const days = Math.round((Date.parse(`${last}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / DAY) + 1;
+  return said(days - Number(row?.held ?? 0), days, `days of the last ${days} with no point in ${wordsOf(series)}`);
+}
 
 export function snapshot(
   sql: Sql,

@@ -243,6 +243,18 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
 export const forwards = (pathname) => /^\/+(?:api|auth|account\/billing)(?:\/|$)/.test(pathname);
 
 /**
+ * `GET /account/records` as the host's envelope (`readRecordsForSwitcher` in `apps/web/src/lib/record/switcher.ts`):
+ * the one record a gate's server holds, its owner's.
+ *
+ * NOT FORWARDED, BECAUSE THE SELF-HOST WOULD SAY NO. The route reads a session cookie and nothing else, and a gate's
+ * record is reached with its server key, so the record behind it answers 401 and the switcher would draw "Sign in
+ * again" over a record the screen is plainly open on. The shell asks this on every screen, so a source that left it to
+ * a 404 put one failed request and two console errors in every picture. A variant is the same record under another
+ * port, so every one answers the same row.
+ */
+export const recordsAnswer = () => ({ ok: true, value: [{ slug: IDENTITY.slug, name: IDENTITY.name, level: 'owner' }] });
+
+/**
  * The server key of a record this module started, for the one gate that has to sign in as a person rather than
  * be handed the record: `passkey` drives the real ceremony, and the key is the door the first person comes
  * through before a passkey exists. It stays inside this process and is never printed, as it was before.

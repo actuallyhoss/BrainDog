@@ -18,9 +18,9 @@ export const home = {
 
   /**
    * THE DECISION, drawn as a scene: an agent proposes, a person decides, and the change lands carrying
-   * the agent's name. Every word is `SG33` in `packages/seed/src/index.ts` or the fixture ledger in
-   * `apps/web/src/lib/record/fixtures/sample.ts`, with one liberty: in the seed the question is opened by
-   * the record's reader of the invoice, and here by Claude, as `propose` over MCP really can.
+   * the agent's name. The proposal's words are `SG33` in `packages/seed/src/index.ts`, the record the gates
+   * install, with one liberty: in the seed the question is opened by the record's reader of the invoice, and
+   * here by Claude, as `propose` over MCP really can. Each history row says below where its words come from.
    *
    * `history` is oldest first, and its last row is the one that lands when the reader accepts.
    */

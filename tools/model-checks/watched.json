@@ -1,0 +1,15 @@
+{
+  "note": "A push that touches one of these asks the model (run.mjs --changed <base>): the prompts, the route table, the schemas the Worker sends, and the checks themselves.",
+  "files": [
+    "apps/worker/src/inference.ts",
+    "apps/worker/src/slash.ts",
+    "packages/slash/src/prompts.ts",
+    "packages/slash/src/answer.ts",
+    "packages/slash/src/propose.ts",
+    "packages/host/src/slash.ts",
+    "packages/record/src/slash.ts",
+    "packages/slash/eval/**",
+    "packages/record/eval/**",
+    "tools/model-checks/**"
+  ]
+}

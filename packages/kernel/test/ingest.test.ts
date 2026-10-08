@@ -722,6 +722,7 @@ test('A REGISTER REFUSING WHAT A PATTERN READ DOWNGRADES IT, and never discards 
   assert.equal(sg.id, out.suggestion);
   assert.equal(sg.opened_by, 'ingest:hsbc-sms');
   assert.deepEqual(JSON.parse(sg.body), {
+    cause: sql.one<{ cause: string }>('SELECT cause FROM suggestion WHERE id = ?', sg.id)!.cause,
     register: 'transactions',
     rows: [{ amount: { amount: 131_624, currency: 'EGP' } }],
     count: 1,

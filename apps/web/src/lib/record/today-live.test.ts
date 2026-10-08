@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { byAgent, comingOf, forecastOf, hostOf, sessionsOf, sinceWho, tasksOf, untitled } from './today-live.ts';
+import { presenceOf } from '@braindog/kernel';
+
 import { REGISTERS } from './held.ts';
 import type { RegisterDecl } from './schema.ts';
 
@@ -88,6 +90,25 @@ test('THE RUNS OF THE DAY: a span from when each opened, from midnight at the ea
   assert.equal(hostOf(['OMEN', 'MINI']), null);
   assert.equal(hostOf(['OMEN', null]), null);
   assert.equal(hostOf([]), null);
+});
+
+test('ONE CLOCK: a run seen 16 minutes ago is not working on Today, as on the rail, and one never heard from is not either', () => {
+  const now = Date.parse('2026-09-29T09:40:00');
+  const ago = (m: number) => new Date(now - m * 60_000).toISOString();
+  const out = sessionsOf(
+    [
+      row(1, { agent: 'claude', state: 'active', last_seen: ago(14) }, { created_at: ago(60) }),
+      row(2, { agent: 'codex', state: 'active', last_seen: ago(16) }, { created_at: ago(60) }),
+      row(3, { agent: 'cursor', state: 'idle', last_seen: ago(1) }, { created_at: ago(60) }),
+      row(4, { agent: 'claude', state: 'active' }, { created_at: ago(30), updated_at: ago(2) }),
+    ],
+    Date.parse('2026-09-29T00:00:00'),
+    now,
+  );
+  assert.deepEqual(out.map((s) => [s.seq, s.working]).sort(), [[1, true], [2, false], [3, false], [4, false]]);
+  /* THE KERNEL'S WORD for the same run, which the rail counts by: the two never disagree. */
+  assert.equal(presenceOf({ state: 'active', fields: { last_seen: ago(16) } }, now), 'quiet');
+  assert.equal(presenceOf({ state: 'active', fields: { last_seen: ago(14) } }, now), 'working');
 });
 
 test('WHO MADE THE CHANGES: a run, an agent token or an agent`s name is an agent, the reader is you, and a heartbeat is neither', () => {

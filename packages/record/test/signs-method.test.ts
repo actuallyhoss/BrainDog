@@ -74,3 +74,87 @@ test('A CALLER HELD TO PART OF THE RECORD, OR WHO MAY ONLY ADD, IS TOLD SO in on
   }
   sql.close();
 });
+
+/* ── the inbox's words ─────────────────────────────────────────────────── */
+
+/** What the bank's texts say when no account holds the card they name: inbox text, which only the inbox's reach reads. */
+const SAYS = 'No account has 1234 in Digits the bank prints.';
+const ASKED = 'Fire the kiln on Friday?';
+
+/** A record with three texts held two days in the inbox for one reason, and two open questions about one thing. */
+async function busy() {
+  const r = await record();
+  for (let i = 0; i < 3; i++)
+    r.sql.exec(
+      "INSERT INTO inbox_raw (id, ts, channel, body, sha256, state, reason) VALUES (?, ?, 'api', ?, ?, 'review', ?)",
+      `raw_${String(i)}`,
+      new Date(NOW - 2 * 24 * 3_600_000).toISOString(),
+      `CARD 1234 SHOP ${String(i)}`,
+      `sha_${String(i)}`,
+      SAYS,
+    );
+  const options = { options: [{ id: 'yes', label: 'Yes', because: 'It is due' }, { id: 'no', label: 'No', because: 'It is not' }], about: 'kiln' };
+  for (const question of [ASKED, 'Fire the kiln on Saturday?']) {
+    const asked = await r.api.propose({ question, body_kind: 'options', body: options } as never, owner);
+    assert.ok(asked.ok, JSON.stringify(asked));
+  }
+  return r;
+}
+
+type Read = { sign: string; state: string; value: number | null; said: string; facts: string[]; days: unknown[] };
+const read = async (api: Awaited<ReturnType<typeof record>>['api'], who: CallContext): Promise<Read[]> => {
+  const out = await api.signs({}, who);
+  assert.ok(out.ok, JSON.stringify(out));
+  return signsOf(out.value) as Read[];
+};
+
+test('THE INBOX’S WORDS GO ONLY TO A CALLER WHO MAY READ THE INBOX: an owner and a token given the inbox reach read them, a whole-record token reads the state and number alone', async () => {
+  const { api, sql } = await busy();
+  const reached: CallContext = { ...agent, principal: { ...agent.principal, reach: ['inbox'] } as CallContext['principal'] };
+  /* A REACH OF THE WRONG SHAPE IS NO REACH: `includes` is a string's too. */
+  const stringy: CallContext = { ...agent, principal: { ...agent.principal, reach: 'no-inbox' } as unknown as CallContext['principal'] };
+
+  for (const who of [owner, reached]) {
+    const signs = await read(api, who);
+    const arrivals = signs.find((s) => s.sign === 'arrivals-filed')!;
+    assert.equal(arrivals.state, 'red');
+    assert.match(arrivals.said, new RegExp(`Most say: ${SAYS.replace(/\./g, '\\.')}`));
+    const causes = signs.find((s) => s.sign === 'questions-by-cause')!;
+    assert.equal(causes.state, 'red');
+    assert.match(causes.said, /Fire the kiln on Friday\?/);
+    assert.ok(signs.find((s) => s.sign === 'oldest-question')!.facts.some((f) => f.includes(ASKED)));
+  }
+
+  const full = await read(api, owner);
+  /* A PERSON BELOW OWNER READS THE WHOLE RECORD AND NOT THE INBOX, as `inbox` refuses her. */
+  const decider: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'decide' } };
+  for (const who of [agent, stringy, decider]) {
+    /* NOWHERE IN THE ANSWER, not only in the sentences and facts. */
+    const answer = await api.signs({}, who);
+    assert.doesNotMatch(JSON.stringify(answer), /1234|Most say|kiln|Digits/u);
+    const signs = await read(api, who);
+    /* EVERY SIGN STILL COMES BACK, with the owner's state, number and days; only the words are held. */
+    assert.deepEqual(signs.map((s) => [s.sign, s.state, s.value, s.days.length]), full.map((s) => [s.sign, s.state, s.value, s.days.length]));
+    for (const s of signs) {
+      assert.deepEqual(s.facts, [], `${s.sign} handed its facts to a caller without the inbox reach`);
+      assert.doesNotMatch(s.said, /1234|Most say|kiln/u, `${s.sign} said ${s.said}`);
+      assert.doesNotMatch(s.said, /—/u);
+      assert.ok(s.said.length > 0, `${s.sign} said nothing`);
+    }
+    assert.equal(signs.find((s) => s.sign === 'arrivals-filed')!.said, 'Messages wait to be filed.');
+    assert.equal(signs.find((s) => s.sign === 'questions-by-cause')!.said, 'Open questions pile up on one cause, or carry none.');
+  }
+  sql.close();
+});
+
+test('A SIGN READ NONE KEEPS ITS OWN SENTENCE for a caller without the inbox reach, which says what is missing and quotes nothing', async () => {
+  const { api, sql } = await record();
+  const full = await read(api, owner);
+  const held = await read(api, agent);
+  for (const id of ['arrivals-filed', 'questions-by-cause']) {
+    const mine = full.find((s) => s.sign === id)!;
+    assert.equal(mine.state, 'none');
+    assert.equal(held.find((s) => s.sign === id)!.said, mine.said, `${id} told a token something other than what is missing`);
+  }
+  sql.close();
+});

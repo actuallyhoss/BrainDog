@@ -85,8 +85,7 @@
   /**
    * WHERE THE QUEUE CAME FROM. `live` is the record's open suggestions, through `governance`; `refused`
    * is a host that answered no, and its own sentence is what is drawn. Nothing is drawn while the first
-   * read is out. There was a third, `sample`, for a host with no record behind it, which drew fixture
-   * questions and let them be answered with nothing sent; it went with the sample record.
+   * read is out. Every question drawn is the record's own, and every answer is sent to it.
    */
   let from = $state<'reading' | 'live' | 'refused'>('reading');
   let live = $state<Queue | null>(null);

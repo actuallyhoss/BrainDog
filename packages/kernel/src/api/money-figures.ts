@@ -41,11 +41,12 @@ export function extension(parts: KernelParts) {
       return homeCurrency(parts.sql);
     },
     /**
-     * The currencies the money on the lists `reads` admits is in, sorted, stopping at the second: a record in two is
-     * answered two and no more, because one currency is the only answer anybody draws with. Every list when `reads` is
-     * absent; a list the caller may not open adds nothing, so its money says nothing about it.
+     * The currencies the money on the lists `reads` admits is in, sorted, stopping at `most` (the second by default): a
+     * record in two is answered two and no more, because one currency is the only answer `boot`'s home draws with. A
+     * caller that quotes them all (the rates preset, up to `RATES_CURRENCIES_MOST`) asks for one more than it can quote.
+     * Every list when `reads` is absent; a list the caller may not open adds nothing, so its money says nothing about it.
      */
-    moneyCurrencies(reads: (register: string) => boolean = () => true): string[] {
+    moneyCurrencies(reads: (register: string) => boolean = () => true, most = 2): string[] {
       const found = new Set<string>();
       for (const d of parts.declarations()) {
         if (d.kind !== 'register' || !d.id.startsWith('register.')) continue;
@@ -55,11 +56,12 @@ export function extension(parts: KernelParts) {
           if (f.type !== 'money') continue;
           const at = `json_extract(fields, '${jsonPath(f.id)}.currency')`;
           const held = parts.sql.all<{ c: unknown }>(
-            `SELECT DISTINCT ${at} AS c FROM entry WHERE register = ? AND deleted_at IS NULL AND ${at} IS NOT NULL LIMIT 2`,
+            `SELECT DISTINCT ${at} AS c FROM entry WHERE register = ? AND deleted_at IS NULL AND ${at} IS NOT NULL LIMIT ?`,
             list.id,
+            most,
           );
           for (const r of held) if (typeof r.c === 'string' && /^[A-Z]{3}$/u.test(r.c)) found.add(r.c);
-          if (found.size > 1) return [...found].sort();
+          if (found.size >= most) return [...found].sort().slice(0, most);
         }
       }
       return [...found].sort();

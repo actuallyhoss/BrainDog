@@ -18,6 +18,7 @@
   import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
   import { TODO_META_JOIN, todoMeta } from '../../src/todo.ts';
   import { valueWord } from '../../src/format.ts';
+  import { drawnRows, emptied } from '../../src/html.ts';
   import Text from '../Text.svelte';
   import Cards from '../Cards.svelte';
   import Heat from './Heat.svelte';
@@ -255,6 +256,10 @@
        drop outside this board arrives as the words the reader was dragging rather than as nothing. */
     e.dataTransfer.setData('text/plain', text(inline(takeWorking(row.cells[1] ?? null).text ?? '', opts)));
   }
+
+  /* The figures that hold a value, and what a grid left with none says (`drawnRows`, `emptied` in `src/html.ts`). */
+  const shown = $derived(drawnRows(block, opts));
+  const left = $derived(emptied(block, opts));
 </script>
 
 {#snippet cardBody(row: Row, unsaved: boolean)}
@@ -417,6 +422,9 @@
       </div>
     {/each}
   </div>
+{:else if left !== undefined}
+  <!-- A FIGURE GRID LEFT WITH NOTHING says the host's `empty:` line, or nothing (`emptied`), as `toHTML` draws it. -->
+  {#if left !== null}<p class="block-empty">{left}</p>{/if}
 {:else}
   <!--
     A FIGURE IS A DOOR WHEN THE HOST KNOWS WHERE ITS ROWS ARE. "Overdue · GBP 2,340.00" is a number
@@ -424,8 +432,10 @@
     the list cannot disagree is worth nothing behind something unclickable. Where there is no
     address it stays a `div`: a link to nowhere is worse than no link.
   -->
-  <div class="grid" style="--cells:{block.rows.length}">
-    {#each block.rows as row, i}
+  <!-- A FIGURE WITH NO VALUE IS NOT DRAWN (`drawnRows`) and the tiles are counted after, as `toHTML` counts them. Each
+       keeps its place in the block, which is what `cellHref` is keyed by. -->
+  <div class="grid" style="--cells:{shown.length}">
+    {#each shown as { row, at: i }}
       {@const to = opts.cellHref?.(i) ?? null}
       {@const href = to === null ? null : hrefFor(opts, to)}
       <!-- THE CURRENCY CODE IS PRESENT AND QUIET. A figure the size of this one read "GBP" as loudly

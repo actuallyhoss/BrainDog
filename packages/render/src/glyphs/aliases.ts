@@ -81,7 +81,44 @@ export const SPELLINGS = {
   unlock: 'lock-open',
 } as const satisfies Record<string, CoreGlyph | SetGlyph>;
 
-export const ALIASES: Readonly<Record<string, CoreGlyph | SetGlyph>> = { ...SHELL, ...SPELLINGS };
+/**
+ * THE WORDS REAL RECORDS GIVE A ROW AS ITS MARK, where the set draws the thing under another name. Read
+ * from the marks records hold (the owner's projects among them: `cake`, `shop`, `cube`, `site`, `chart`),
+ * so a project shows its picture rather than a letter. A word with no fair picture in the set (`paw`,
+ * `koala`, `sword`, `dice`) has no entry: the row shows the first letter of its own name instead, which
+ * says more than a picture of something else.
+ */
+export const MARK_WORDS = {
+  /* A cake is a celebration first; the set has no cake, and the wrapped gift is the nearest picture. */
+  cake: 'gift',
+  shop: 'store',
+  cube: 'box',
+  site: 'globe',
+  website: 'globe',
+  web: 'globe',
+  chart: 'chart-column',
+  graph: 'chart-line',
+  cart: 'shopping-cart',
+  bag: 'shopping-bag',
+  food: 'utensils',
+  idea: 'lightbulb',
+  robot: 'bot',
+  photo: 'image',
+  film: 'video',
+  app: 'smartphone',
+  computer: 'laptop',
+  chat: 'message-circle',
+  email: 'mail',
+  bank: 'landmark',
+  school: 'graduation-cap',
+  health: 'heart-pulse',
+  plant: 'sprout',
+  tree: 'tree-pine',
+  train: 'train-front',
+  office: 'building-2',
+} as const satisfies Record<string, CoreGlyph | SetGlyph>;
+
+export const ALIASES: Readonly<Record<string, CoreGlyph | SetGlyph>> = { ...SHELL, ...SPELLINGS, ...MARK_WORDS };
 
 /**
  * The set's own name for `name`, or `name` unchanged. It does not say whether a glyph exists: an unknown

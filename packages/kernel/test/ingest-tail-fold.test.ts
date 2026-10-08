@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Declaration } from '../src/index.ts';
-import { CARD, bodyOf, openQuestions, record, text, type Rec } from './ingest-tail-kit.test.ts';
+import { CARD, bodyOf, openQuestions, record, text, type Rec } from './ingest-tail-kit.ts';
 
 /** The pattern as an older add-on wrote it: the card's digits printed bare, and the lookup saying nothing of them. */
 const OLD = (says?: string): Declaration =>

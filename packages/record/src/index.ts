@@ -33,7 +33,7 @@ import { isDuplicate, matchLiterals, normalise as normaliseText, parseDate, scan
 import { fixOf, no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
-import { ACCENTS } from '@braindog/theme';
+import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
@@ -192,6 +192,7 @@ import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, 
 import type { Directory } from './directory.ts';
 import { methods } from './methods/index.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
+import { quietSign } from './methods/signs.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, type PenItem } from './emergent.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
@@ -330,6 +331,9 @@ export const PREVIEW_BYTES_MOST = 2_000_000;
 export const PREVIEW_WALK_ROWS_MOST = 5_000;
 /** The currencies one previewed cash walk's legs and opening hold, each of which may be a walk of its own. */
 export const PREVIEW_CURRENCIES_MOST = 8;
+
+/** The most currencies `boot` names in `money`: the rates pack's `RATES_CURRENCIES_MOST` (20) and one more (`drawnIn`). */
+const DRAWN_CURRENCIES_MOST = 21;
 
 /* WHAT `page` ALLOWS, SAID IN A PREVIEW'S REFUSALS so a proposal's author knows the installed page draws the block. Copies
    of the kernel's own, which it does not export: `BLOCK_CEILING` and `LIMIT_MAX` in `packages/kernel/src/declare.ts`,
@@ -958,7 +962,7 @@ export type Boot = {
    * not. WHERE NOBODY CHOSE ONE it is the one currency every amount the caller reads is in, which is what each figure
    * then comes back in too (`drawnIn`), and `null` when the money is in none or in two.
    *
-   * `money` IS WHAT THAT WAS READ FROM, the currencies the money the caller reads is in, sorted and at most two, so a
+   * `money` IS WHAT THAT WAS READ FROM, the currencies the money the caller reads is in, sorted and at most 21, so a
    * host that sent it has already asked what the web otherwise asks before the first screen (`boot-live.ts`).
    */
   record: { slug: string; name: string; locale: string; currency: string | null; money: string[] } | null;
@@ -1282,7 +1286,8 @@ export type MeetSaid = {
  * question for the person, `id` is the question's handle, `question` what she is asked, and `why` the one line that says
  * why this change asks. Nothing was written to the list.
  */
-export type Asked = { asked: { id: string; question: string; why: string } };
+/** `joined` when the same write was already waiting as an open question (its cause), so nothing new was asked. */
+export type Asked = { asked: { id: string; question: string; why: string; joined?: true } };
 
 /**
  * What `meet` answers (`loop/contract-17.md`): the row they turned out to be, by its handle and name, or `null` when a
@@ -1363,6 +1368,12 @@ export type Context = {
   organisations: OrgBrief[];
   /** Rows of a fading register left out because nobody confirmed them in ninety days. */
   faded: number;
+  /**
+   * The record's vital signs that are red now, each by its name with its one sentence (`signs`, SHL-D01), so a session
+   * starts knowing what is broken. Only to a caller who reads the whole record, as `signs` itself answers only them:
+   * anybody narrower is answered `[]`, since a sign counts across every list.
+   */
+  signs: { name: string; said: string }[];
   /** One sentence: what to call next. */
   next: string;
 };
@@ -1414,6 +1425,8 @@ export type Build = {
    * Optional, so a build that does not name its host is a record whose `boot` carries no `host` key at all.
    */
   host?: 'cloud' | 'self-host';
+  /** The oldest command this host's door still works with, `MIN_CLI` from packages/mcp/src/build.ts (AGT-A02). */
+  min_cli?: string;
 };
 
 /**
@@ -4130,7 +4143,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `actions` both held those back from her. The record asks the source itself rather than waiting for `kernel.blockRegisters` to name something for it, so the
    * block is held whether or not the kernel's answer carries a name for the whole record.
    */
-  const ACROSS = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided']);
+  const ACROSS = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs']);
 
   /**
    * The lists one block reads that `kernel.blockRegisters` may not name: each leg of a cash walk, and `session` for a
@@ -5199,6 +5212,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return tried.ok ? null : (tried as Result<never>);
   };
 
+  /**
+   * A new row's identity hue, chosen once at create (`28 §3.2`, PGS-A06): when its list names an `identity.accent` whole
+   * number field and the row brings none, the theme's `nextAccentHue` of the hues the list already holds, so each new
+   * project wears a colour of its own, far from the others for every kind of sight. Written into the fields, so it is
+   * frozen with the row and never worked out again; a hue the caller sent stands, `null` too. Rows made before keep the hue drawn
+   * from their id until somebody gives them one.
+   */
+  const huedOf = (register: string, fields: Patch): Patch => {
+    const decl = kernel.register(register) as (RegisterDecl & { identity?: { accent?: unknown } }) | undefined;
+    const accent = decl?.identity?.accent;
+    if (typeof accent !== 'string' || fields === null || typeof fields !== 'object' || Array.isArray(fields)) return fields;
+    /* A HUE SENT STANDS, AND SO DOES `null`: whoever sent it said this row wears none. Only a row that is silent is given one. */
+    if (Object.hasOwn(fields, accent)) return fields;
+    if (decl!.fields.find((f) => f.id === accent)?.type !== 'int') return fields;
+    const held = sql
+      .all<{ h: unknown }>('SELECT DISTINCT json_extract(fields, ?) AS h FROM entry WHERE register = ? AND deleted_at IS NULL', `$."${accent}"`, register)
+      .flatMap(({ h }) => (typeof h === 'number' && Number.isInteger(h) && h >= 0 && h < 360 ? [h] : []));
+    return { ...(fields as Record<string, unknown>), [accent]: nextAccentHue(held) } as Patch;
+  };
+
   const askInstead = (ctx: CallContext, register: string, row: Record<string, unknown>, self: Entry | null, why: string): Result<Asked> => {
     const question = askedOf(register, row, self);
     /* THE SAME WRITE TRIED AGAIN JOINS THE OPEN QUESTION (AGT-C07): its cause is the list, the row (or `new`) and a hash
@@ -5208,7 +5241,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const cause = `write#${register}#${target}#${sha256(new TextEncoder().encode(canonValue(patch))).slice(0, 24)}`;
     const filed = filedAs(ctx, kernel.propose({ question, body_kind: 'rowset', body: { register, rows: [row] }, ...(CAUSE.test(cause) ? { cause } : {}) }, writerOf(ctx)));
     if (!filed.ok) return filed;
-    return ok({ asked: { id: filed.value.id, question, why } });
+    return ok({ asked: { id: filed.value.id, question, why, ...(filed.value.joined === true ? { joined: true as const } : {}) } });
   };
 
   /** The question a filed write asks, in the list's own words: "Add Fix the retry to Tasks?", "Mark Fix the retry done?". */
@@ -5948,6 +5981,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     out.ok && !readsEveryList(ctx) ? ok({ ...out.value, id: nameOf(ctx, 'suggestion', out.value.id) ?? '' }) : out;
 
   /**
+   * What `propose` answers when an open question already held its cause: `filedAs`'s answer, plus `said`, "Already
+   * waiting as SG90.", by the name this caller is handed, so whoever asked passes on the one question waiting and never
+   * says it asked again. A name it may not be handed leaves the sentence without one.
+   */
+  const joinedAs = <T extends { id: string }>(ctx: CallContext, out: Result<T>): Result<T & { said: string }> => {
+    const named = filedAs(ctx, out);
+    if (!named.ok) return named;
+    /* A HANDLE (`q.<ULID>`) IS NOT A NAME A PERSON SAYS, so a caller handed one is told only that it waits. */
+    return ok({ ...named.value, said: /^SG[1-9][0-9]*$/u.test(named.value.id) ? `Already waiting as ${named.value.id}.` : 'Already waiting.' });
+  };
+
+  /**
    * Whether an agent's `change` is one the additive rule may answer: an `add`, from a key, about a list that key
    * reaches. The gate then decides whether its fields are loose enough (`additiveFault`), so this only says who may be
    * answered by rule at all.
@@ -6521,8 +6566,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * NOR DOES ONE THEIR GRANT NARROWS (`whereFor`): the query reads every row of a list, so a member who sees only some
    * of its rows would be told the currency of rows held back from them.
    */
+  /* AND EVERY CURRENCY THE RATES PRESET CAN QUOTE, AND ONE MORE (REC-B02). Two were read, so a record in EGP, USD and GBP
+     was answered two and the preset quoted one of USD or GBP. 21 is the pack's `RATES_CURRENCIES_MOST` (20,
+     `packs/rates-poll/fill.ts`) and one over it, so a record past it is told so; `currency` still reads only one. */
   const drawnIn = (ctx: CallContext): { currency: string | null; money: string[] } => {
-    const money = kernel.moneyCurrencies((register) => readable(ctx, register) === null && whereFor(ctx.wheres, register) === undefined);
+    const money = kernel.moneyCurrencies((register) => readable(ctx, register) === null && whereFor(ctx.wheres, register) === undefined, DRAWN_CURRENCIES_MOST);
     return { currency: kernel.homeCurrency() ?? (money.length === 1 ? money[0]! : null), money };
   };
 
@@ -6891,8 +6939,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       self: selfOf(ctx),
       organisations: orgs === null ? [] : organisationsOf(orgs, orgLinked, orgNamed),
       faded,
+      signs: redSigns(ctx),
       next,
     };
+  };
+
+  /**
+   * THE RED SIGNS FOR THE BRIEFING, by name and sentence, to the callers `signs` answers and nobody else: the system, or
+   * a person or key at a level that reads, held to no list and no part of one (`methods/signs.ts`, and `readsEveryList`
+   * for a grant narrowed to some rows). A record that cannot read its signs briefs none rather than refusing the
+   * briefing. AND THE INBOX'S WORDS ONLY TO WHO MAY READ THE INBOX (`quietSign`): a read token for the lists is told a
+   * red sign in that file's words, never a message or a question quoted from the inbox.
+   */
+  const redSigns = (ctx: CallContext): Context['signs'] => {
+    const p = ctx.principal;
+    const whole =
+      p.kind === 'system' ||
+      ((p.kind === 'person' || p.kind === 'token') && p.level !== null && p.level !== 'append' && (ctx.registers === undefined || ctx.registers === '*') && readsEveryList(ctx));
+    if (!whole) return [];
+    const read = kernel.signs();
+    if (!read.ok) return [];
+    const inbox = allows(ctx, 'owner') === null || inboxReached(ctx);
+    return read.value.signs.filter((s) => s.state === 'red').map((s) => (inbox ? s : quietSign(s))).map((s) => ({ name: s.name, said: s.said }));
   };
 
   /**
@@ -7557,6 +7625,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (known) return { ok: false, refusal: known };
       /* AN AGENT WRITES AT THE RUNG IT HAS EARNED, AND ASKS BELOW IT (`ladder.ts`): at Ask, on the floor, or after its
          run read text from outside the record, the row is filed on Decide instead, and the answer says so in one line. */
+      args = { ...args, fields: huedOf(args.register, args.fields) };
       const rung = laddered(ctx, args.register, 'create', args.fields, null);
       if (rung && !rung.gate.write) {
         const refused = wouldRefuse((w) => offRegister(args.register, kernel.create(args.register, args.fields, { ...writerOf(ctx), reads: refsSeen(ctx), ...w })));
@@ -9314,7 +9383,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const filed = await arrangement.prepare(args.body_kind, body);
           if (!filed.ok) return filed;
           const opened = kernel.propose({ ...args, body: filed.value }, writerOf(ctx));
-          return tail(filedAs(ctx, opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened));
+          const asked = opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened;
+          return tail(asked.ok && asked.value.joined === true ? joinedAs(ctx, asked) : filedAs(ctx, asked));
         }
       }
       /* A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are. AND IT IS ANSWERED WITH THE CARD'S FACTS
@@ -9322,6 +9392,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          it asked to change as the person will read it. */
       const opened = kernel.propose(args, writerOf(ctx));
       const filed = opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened;
+      /* A JOINED QUESTION IS ANSWERED AS A FILED ONE IS (AGT-C07): its name, its card's facts, and the sentence the agent
+         passes on, since an open question already holds this cause (`cause`, the filer's or derived) and nothing new was
+         asked. Never landed by this caller's rung or by rule: it is waiting on the person for whoever asked it first. */
+      if (filed.ok && filed.value.joined === true) return joinedAs(ctx, filed);
       if (filed.ok && args?.body_kind === 'rowset') {
         /* ROWS ITS RUNG LETS THROUGH ARE ACCEPTED BY THE LADDER AND LAND NOW, with the Undo every decision has. */
         const landed = byLadder(ctx, filed.value.id);
@@ -11196,7 +11270,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     async inbox(
       /* `state` IS A STRING because it arrives from the wire, as an MCP address segment or a JSON body, and is checked below. */
-      args: { state?: string; cursor?: number; limit?: number } | undefined,
+      args: { state?: string; cursor?: number; limit?: number; repeats?: boolean } | undefined,
       ctx: CallContext,
     ): Promise<Result<InboxPage>> {
       const stop = scoped(ctx, 'read');
@@ -11207,8 +11281,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (owner) return { ok: false, refusal: { ...owner, code: 'FORBIDDEN' } };
       if (!wholeRecord(ctx))
         return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });
-      const extra = stray((args ?? {}) as Record<string, unknown>, ['state', 'cursor', 'limit']);
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['state', 'cursor', 'limit', 'repeats']);
       if (extra) return { ok: false, refusal: extra };
+      /* `repeats: true` PAGES THROUGH THE SECOND COPIES ALONE (audit-35 #3): a skipped arrival ingest marked as repeating a
+         row, each carrying that row's id as `repeats`, so "It is a second one" is offered by the mark and a page of rule
+         skips can no longer hide a real second charge. */
+      const repeats: unknown = args?.repeats;
+      if (repeats !== undefined && typeof repeats !== 'boolean') return no('VALUE_MALFORMED', 'repeats is true, for the second copies alone, or left out.', { at: 'repeats' });
       const state: unknown = args?.state;
       const allowed = [...INBOX_STATES, 'all'];
       if (state !== undefined && !(typeof state === 'string' && allowed.includes(state)))
@@ -11216,7 +11295,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           at: 'state',
           allowed,
         });
-      const states: readonly InboxState[] | undefined = state === 'all' ? INBOX_STATES : state === undefined ? undefined : [state as InboxState];
+      /* A REPEAT IS ONLY EVER A SKIPPED ARRIVAL, so `repeats` with no state reads the skipped ones, not what waits. */
+      const states: readonly InboxState[] | undefined =
+        state === 'all' ? INBOX_STATES : state === undefined ? (repeats === true ? ['skipped' as InboxState] : undefined) : [state as InboxState];
       const cursor = args?.cursor;
       if (cursor !== undefined && !(Number.isSafeInteger(cursor) && cursor >= 1))
         return no('VALUE_MALFORMED', 'A cursor is the number of an arrival, a whole number from 1.', { at: 'cursor' });
@@ -11224,7 +11305,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (asked !== undefined && !Number.isSafeInteger(asked))
         return no('VALUE_MALFORMED', 'A limit is a whole number of arrivals.', { at: 'limit' });
       const limit = Math.min(Math.max(1, asked ?? 50), 200);
-      const lines = kernel.inboxBefore(cursor ?? null, limit + 1, states);
+      const lines = kernel.inboxBefore(cursor ?? null, limit + 1, states, repeats === true ? { repeats: true } : {});
       const arrivals = lines.slice(0, limit);
       /* WHAT ARRIVED IS TEXT ANYBODY COULD HAVE WRITTEN, so an agent that reads it asks for the rest of its run (`ladder.ts`). */
       const reader = arrivals.length === 0 ? null : callerOf(ctx);
@@ -11374,7 +11455,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        handed the guards above rather than a copy of them, so a method there is held to the same ladder as every method
        in this file; the `guards` gate reads those files as it reads this one, and refuses a name two files both define,
        since the later one would win here without a word. */
-    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }) }),
+    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom }),
     /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/`: the owner's, in a browser, and a runner's,
        for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin` as every ADMIN method
        here is, and a runner's admit the one principal every guard above refuses. */

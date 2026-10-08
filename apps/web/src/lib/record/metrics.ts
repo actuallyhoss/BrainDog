@@ -27,14 +27,19 @@ import type { Entry } from './schema.ts';
 
 /* ── the document ────────────────────────────────────────────────────────── */
 
-/** The six this build reads. `median`, `last`, `running` and `trend` are §2.3 and series-only. */
+/** The nine this build reads. `median`, `last`, `running` and `trend` are §2.3 and series-only. */
 export type Aggregation =
   | { sum: Operand }
   | { count: string }
   | { avg: Operand }
   | { min: string }
   | { max: string }
-  | { distinct: string };
+  | { distinct: string }
+  /* THE KERNEL'S THREE SIGNS WORDS (`AGGREGATIONS`): the age of the newest day, the currencies a money field is kept
+     in and the rows that leave a field empty. Each is a count or a number of days, never money. */
+  | { age: string }
+  | { currencies: string }
+  | { empty: string };
 
 /**
  * A field, or a row-level product of a field and a named lookup.
@@ -264,6 +269,8 @@ const registerOf = (source: string): string | null =>
  * under a code the declaration chose rather than the rows did.
  */
 function currenciesOf(rows: Entry[], agg: Aggregation): Set<string> {
+  /* AN AGE, A COUNT OF CURRENCIES AND A COUNT OF EMPTY ROWS ADD NO MONEY, so no two currencies meet in them. */
+  if ('age' in agg || 'currencies' in agg || 'empty' in agg) return new Set();
   const field =
     'count' in agg ? agg.count : 'distinct' in agg ? agg.distinct : 'sum' in agg ? agg.sum : 'avg' in agg ? agg.avg : 'min' in agg ? agg.min : agg.max;
   const id = typeof field === 'string' ? field : field.product[0];
@@ -407,8 +414,8 @@ export function hrefFor(decl: MetricDecl): string | null {
    never a template, so only a sentence is searched. */
 export const isTemplate = (decl: MetricDecl): boolean => typeof decl.where === 'string' && decl.where.includes('{{');
 
-/** The six aggregations this build reads. `08` §2.2 publishes eleven; the rest are post-v1. */
-const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct'];
+/** The nine aggregations this build reads. `08` §2.2 publishes eleven; the rest are post-v1. */
+const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct', 'age', 'currencies', 'empty'];
 
 /**
  * Every key a metric document may carry here, so one it may not is named rather than ignored.

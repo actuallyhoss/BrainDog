@@ -67,7 +67,7 @@ async function booted(): Promise<{ boot: Boot; close: () => void }> {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   value(await api.kernel.install([THINGS, NOTES, PROJECT, NOTE, NOTEBOOK]));
-  for (const fields of [{ name: 'Kiln', mark: 'k', hue: 212 }, { name: 'Marlow', mark: 'm' }, { name: 'Odd', hue: 400 }])
+  for (const fields of [{ name: 'Kiln', mark: 'k', hue: 212 }, { name: 'Marlow', mark: 'm', hue: null }, { name: 'Odd', hue: 400 }])
     value(await api.create({ register: 'things', fields }, owner));
   value(await api.create({ register: 'notes', fields: { what: 'Ring the printer' } }, owner));
   return { boot: value<Boot>(await api.boot(owner)), close: () => sql.close() };

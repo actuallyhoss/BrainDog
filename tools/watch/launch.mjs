@@ -208,9 +208,10 @@ export async function questions({ names, github = {}, ask = fetch, now = Date.no
     : !Number.isFinite(age) ? `the night's time, ${night.at}, is not a date`
     : age >= NIGHT_MS ? `the last night closed ${ageWords(age)} ago`
     : night.backups_failed !== 0 ? `${night.backups_failed} of last night's copies failed`
-    : night.ran !== true ? `the night did not run whole, and the Directory's own copy ${night.directory === 'ok' ? 'was taken' : 'failed'}`
+    : night.ran !== true ? (night.stopped ? 'the walk stopped before it finished' : night.reached === false ? 'the walk reached no record' : `the night did not run whole: ${[night.expiry_failed && 'expiry failed', night.stragglers && 'keys left under an old root key', night.erase_open && 'erasures left open', night.counts_written === false && 'counts not written', night.directory !== 'ok' && "the Directory's copy failed"].filter(Boolean).join(', ') || 'a field this build does not carry yet'}`)
     : null,
-    night && Number.isFinite(age) ? `${ageWords(age)} ago, ${night.records} records, ${night.backups} copies` : '',
+    /* NO COUNTS: /healthz stopped carrying night.records and night.backups (they were user counts). */
+    night && Number.isFinite(age) ? `${ageWords(age)} ago${night.reached === false ? ', no record reached' : ''}` : '',
   );
 
   /* NOT OPEN WHILE A WHY SAYS IT CANNOT WORK: a build from before `stops` said `open` beside "every sign-up is refused". */

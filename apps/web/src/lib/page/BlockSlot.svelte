@@ -20,7 +20,7 @@
   import { tick } from 'svelte';
   import { at as inApp } from '../at.ts';
   import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
-  import { inline, text } from 'braindog-render';
+  import { EMPTY_KEEP, inline, text } from 'braindog-render';
   import QueueAnswer from './QueueAnswer.svelte';
   import { compactOf, queueWords } from './queue-answer.ts';
   import { doorOf } from './door.ts';
@@ -181,6 +181,9 @@
     href: inApp,
     icon,
     iconSet: glyphSet,
+    /* A BLOCK LEFT WITH NOTHING IS NOT DRAWN (`emptied`), unless its author wrote `empty: keep`: a ledger wants its
+       noughts. The lead's own `empty:` line stays the page's (`home.ts`), so no other line is handed down here. */
+    empty: () => (block.empty === EMPTY_KEEP ? EMPTY_KEEP : null),
     /* AN AGENT'S MARK, ON A CARD'S OR A FEED ROW'S FACE: the maker's drawing for the name a cell gives (`Claude`,
        `Cursor`), from the same set the app's faces draw, or nothing, and the renderer keeps the initial. */
     agentMark: (name: string) => {
@@ -433,7 +436,7 @@
 {:else if block.kind === 'table' && !block.answer}
   <!-- THE ROWS THAT ARRIVED SINCE IT WAS LAST DRAWN ARE MARKED, as a list's are, where the page can write. -->
   {@const all = writes ? writes.arrivedTable(i, block.rows, block) : block.rows}
-  <Table columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} total={block.total} label={headingText} href={inApp} scope={block.scopeCells} />
+  <Table columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} total={block.total} label={headingText} href={inApp} scope={block.scopeCells} {icon} />
   {#if folded}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, folded?.shown ?? 0)}>{words.more(folded.more)}</button>{/if}
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->

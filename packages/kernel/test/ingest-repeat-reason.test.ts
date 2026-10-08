@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { fileAsSecond } from '../src/ingest.ts';
-import { CARD, depsOf, record, text, used } from './ingest-tail-kit.test.ts';
+import { CARD, depsOf, record, text, used } from './ingest-tail-kit.ts';
 
 test('A REPEAT SAYS WHAT IT REPEATS, by its name, amount and day, and keeps the row', async () => {
   const r = await record(CARD({ dedupe: ['amount', 'account'] }));
@@ -38,6 +38,7 @@ test('A REPEAT SAYS WHAT IT REPEATS, by its name, amount and day, and keeps the 
   /* AND ONLY A SKIPPED ONE. */
   const twice = r.k.transaction(() => fileAsSecond(depsOf(r.k, r.sql), again.raw));
   assert.equal(twice.ok, false);
+  assert.equal(r.k.count('transactions'), 2);
   r.sql.close();
 });
 
@@ -47,5 +48,22 @@ test('A TEXT THE SKIP LIST TURNS AWAY IS WRITTEN AGAINST ITS PATTERN, so what ea
   assert.equal(out.state, 'skipped');
   const line = r.sql.one<{ actor: string; to_v: string }>("SELECT actor, to_v FROM event WHERE kind = 'match' AND target = ?", `inbox_raw:${out.raw}`)!;
   assert.deepEqual({ ...line }, { actor: 'ingest:bank-sms', to_v: 'skipped' });
+  r.sql.close();
+});
+
+test('A TEXT A RULE SET ASIDE IS NOT A REPEAT, so "It is a second one" refuses it and files nothing', async () => {
+  const r = await record(CARD({ dedupe: ['amount', 'account'], skip: [{ when: { field: 'body', contains: 'declined' }, reason: 'A declined charge moved no money.' }] }));
+  assert.ok(r.k.write('accounts', r.card, { last4: '1234' } as never, { actor: 'p_1' }).ok);
+  assert.equal(text(r.k, used('1234', 'Corner Shop', '120.00', '07/10/2026')).state, 'matched');
+  assert.equal(text(r.k, used('1234', 'Corner Shop', '80.00', '07/10/2026')).state, 'matched');
+  const declined = text(r.k, `${used('1234', 'Corner Shop', '5.00', '07/10/2026')} It was declined.`);
+  assert.equal(declined.state, 'skipped');
+  const pressed = r.k.transaction(() => fileAsSecond(depsOf(r.k, r.sql), declined.raw));
+  assert.equal(pressed.ok, false);
+  assert.equal(pressed.ok ? '' : 'refusal' in pressed ? pressed.refusal.fix : '', 'This message was set aside by a rule, not as a repeat.');
+  /* AND PRESSED AGAIN, still nothing: two rows, as before either press. */
+  const again = r.k.transaction(() => fileAsSecond(depsOf(r.k, r.sql), declined.raw));
+  assert.equal(again.ok, false);
+  assert.equal(r.k.count('transactions'), 2);
   r.sql.close();
 });

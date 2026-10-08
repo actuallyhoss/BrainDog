@@ -27,6 +27,7 @@ import type { AccountCall, AccountClosed, AuthCall, AuthResult, Suspended, Who }
 import { no, ok } from '@braindog/ports';
 import { ulids } from '@braindog/kernel';
 
+import { PLANS, PLAN_TABLE, type Allowance, type Plan } from './plans.ts';
 import { codeHash, createAuth, signInForgotten, type AuthConfig } from './identity.ts';
 import type { DirectoryAuth, SessionAsk } from './identity.ts';
 
@@ -412,33 +413,23 @@ export type Directory = ReturnType<typeof createDirectory>;
 /* ── plans and usage ─────────────────────────────────────────────────────── */
 
 /**
- * The plans a record can be on. `free` is Free, one person's record at no charge with a small allowance, which a record
- * made at sign-up without paying starts on (`FREE_PLAN` in `apps/worker/src/billing.ts`); `hosted` is Cloud, the record
- * at $12 a month; `plus` is Cloud Plus, at $29 a month with a larger allowance (`HOSTED_PLANS` there); `selfhost` is
- * counted and never limited.
+ * The plans a record can be on, and each one's allowance, read from the one table of plans (`plans.ts`, LCH-A08), where
+ * every figure is chosen. `free` is Free, one person's record at no charge with a small allowance, which a record made
+ * at sign-up without paying starts on (`FREE_PLAN` in `apps/worker/src/billing.ts`); `hosted` is Cloud and `plus` is
+ * Cloud Plus, the two the checkout sells (`HOSTED_PLANS` there); `selfhost` is counted and never limited.
  *
  * FREE IS NOT THE COLUMN'S DEFAULT, on purpose (DIRECTION §35). Every record already in a Directory is `hosted`
  * and keeps it, and `provision` with no plan still says `hosted`, the plan the operator's own records and the paid
  * path's have always been made under; a record is put on `free` by the door that makes it free.
  */
-export const PLANS = ['free', 'hosted', 'plus', 'selfhost'] as const;
-export type Plan = (typeof PLANS)[number];
+export { PLANS, PLAN_TABLE, PACKS, type Plan, type Allowance } from './plans.ts';
 
-/** One month's allowance: runs, requests, bytes fetched and run time in milliseconds. Failures are never limited. */
-export type Allowance = { runs: number; requests: number; bytes: number; ms: number };
-
-/**
- * What each plan allows a record's scheduled actions in a calendar month, UTC.
- *
- * THE OWNER'S DEFAULTS until he says otherwise: twenty hourly actions are 14,600 runs, so 15,000 is the hosted record's
- * allowance. Free's is the default taken for him on 2 October (`apps/site/src/lib/plans.ts`): one person's record:
- * a fifteenth of Cloud's runs and requests, a tenth of its data and script time. `null` is no limit.
- */
+/** What each plan allows a record's scheduled actions in a calendar month, UTC: the table's `allowance`. `null` is no limit. */
 export const ALLOWANCE: Record<Plan, Allowance | null> = {
-  free: { runs: 1_000, requests: 10_000, bytes: 100_000_000, ms: 5 * 3_600_000 },
-  hosted: { runs: 15_000, requests: 150_000, bytes: 1_000_000_000, ms: 50 * 3_600_000 },
-  plus: { runs: 75_000, requests: 750_000, bytes: 5_000_000_000, ms: 250 * 3_600_000 },
-  selfhost: null,
+  free: PLAN_TABLE.free.allowance,
+  hosted: PLAN_TABLE.hosted.allowance,
+  plus: PLAN_TABLE.plus.allowance,
+  selfhost: PLAN_TABLE.selfhost.allowance,
 };
 
 export type UsageTotals = { runs: number; requests: number; bytes: number; ms: number; failures: number; held: number };
@@ -606,9 +597,14 @@ const planOf = (value: string | undefined): Plan => ((PLANS as readonly string[]
 /**
  * Free's "one person" (DIRECTION §35), as the owner reads it when an invitation is refused, and as the person holding the
  * link reads it. Each says why and offers the way on, which is the owner moving the record to Cloud.
+ *
+ * THE COUNT AND THE NAMES ARE THE TABLE'S (`PLAN_TABLE.free.people`), so the sentence moves with the figure.
  */
-export const FREE_ONE_PERSON = 'Free is for one person, so nobody else can join this record. Move it to Cloud in Settings to invite colleagues.';
-export const FREE_JOIN_REFUSED = 'This record is on Free, which is for one person, so nobody else can join it. Ask its owner to move it to Cloud, then open this link again.';
+const peopleWords = (n: number | null): string => (n === 1 ? 'one person' : n === null ? 'anyone' : `${n} people`);
+const FREE = PLAN_TABLE.free;
+const CLOUD = PLAN_TABLE.hosted.name;
+export const FREE_ONE_PERSON = `${FREE.name} is for ${peopleWords(FREE.people)}, so nobody else can join this record. Move it to ${CLOUD} in Settings to invite colleagues.`;
+export const FREE_JOIN_REFUSED = `This record is on ${FREE.name}, which is for ${peopleWords(FREE.people)}, so nobody else can join it. Ask its owner to move it to ${CLOUD}, then open this link again.`;
 
 /**
  * The Directory's own schema revision. `49 §5.1` step 4.

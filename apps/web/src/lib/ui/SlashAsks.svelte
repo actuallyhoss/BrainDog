@@ -14,12 +14,17 @@
   sentence saying this host has no model would be a claim about a host nobody is on.
 
   A REFUSAL IS SHOWN AS IT CAME (`13 §6`): the status door's under the heading, the settings door's under the field.
+
+  WHETHER THE MODEL ANSWERS, UNDER ITS NAME (ENG-A02). The record's `engineHealth` says it in one sentence from the
+  engine's own ledger: "Slash's model answered 3 hours ago", or "has not answered since 6 October. That is ours to fix."
+  A model named here and silent for days read as fine. A record whose build has no such read says nothing, never that
+  it answers; a model that does not answer is said in the deeper red with its words, never the colour alone.
 -->
 <script lang="ts">
   import { apiBase } from '../at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { createClient, type SlashStatus } from '@braindog/client';
+  import { createClient, type EngineHealth, type SlashStatus } from '@braindog/client';
   import { asksShown, atCap, capOf, capSaid, metered, resetsWords, words } from '$lib/ui/slash-asks.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
@@ -36,6 +41,17 @@
   let typed = $state('');
   let saving = $state(false);
   let capRefusal = $state('');
+  let engine = $state<EngineHealth | null>(null);
+
+  /* NOT ANSWERING, OR HIS OWN KEY WILL NOT OPEN: the sentence's first sentence is what is wrong, and is marked. `off` is
+     `words.noModel` above, so it is not said twice. */
+  const down = $derived(engine !== null && (engine.health.state === 'not_answering' || engine.health.state === 'key_closed'));
+  const engineSaid = $derived.by(() => {
+    if (engine === null || engine.health.state === 'off' || engine.said.text.trim() === '') return null;
+    const text = engine.said.text.trim();
+    const cut = down ? text.indexOf('. ') : -1;
+    return cut < 0 ? { lead: down ? text : '', rest: down ? '' : text } : { lead: text.slice(0, cut + 1), rest: text.slice(cut + 1) };
+  });
 
   const modelHere = $derived(page.data.slash === true);
   const asks = $derived(status ? asksShown(status) : null);
@@ -57,6 +73,14 @@
       status = out.value;
       typed = String(out.value.asks.cap);
     });
+    /* A BUILD WITHOUT THE READ, OR A REFUSAL, IS NOTHING SAID. */
+    void client
+      .engineHealth()
+      .then((out) => {
+        const v = out.ok ? (out.value as EngineHealth | null) : null;
+        engine = v !== null && typeof v === 'object' && 'health' in v ? v : null;
+      })
+      .catch(() => {});
   });
 
   async function save(e: SubmitEvent) {
@@ -97,6 +121,9 @@
           </li>
         {/if}
         <li><span class="fact-key">{words.model}</span><span class="fact-value">{status.model}</span></li>
+        {#if engineSaid}
+          <li><p class="engine-said" data-intent={down ? 'bad' : undefined}>{#if engineSaid.lead}<span data-needs>{engineSaid.lead}</span>{/if}{engineSaid.rest}</p></li>
+        {/if}
         {#if asks}
           <li><span class="fact-key">{words.resets}</span><span class="fact-value num">{resetsWords(status.asks.resets)}</span></li>
         {/if}
@@ -162,6 +189,21 @@
     min-inline-size: 0;
     color: var(--ink2);
     overflow-wrap: anywhere;
+  }
+
+  /* THE ENGINE'S SENTENCE, the whole width under the model's name. Its fault, when it has one, in the deeper red. */
+  .engine-said {
+    grid-column: 1 / -1;
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  .engine-said [data-needs] {
+    color: var(--danger-text);
+    font-weight: var(--fw-medium);
   }
 
   .hint {

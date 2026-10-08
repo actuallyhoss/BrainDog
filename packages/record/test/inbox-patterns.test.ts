@@ -15,7 +15,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { Arrived, PatternReport } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '../src/index.ts';
-import { ACCOUNTS, CARD, LEDGER, NOW, used } from '../../kernel/test/ingest-tail-kit.test.ts';
+import { ACCOUNTS, CARD, LEDGER, NOW, used } from '../../kernel/test/ingest-tail-kit.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };

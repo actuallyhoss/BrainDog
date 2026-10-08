@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { rerunHeld } from '../src/ingest.ts';
-import { CARD, answer, bodyOf, depsOf, openQuestions, record, text, used } from './ingest-tail-kit.test.ts';
+import { CARD, answer, bodyOf, depsOf, openQuestions, record, text, used } from './ingest-tail-kit.ts';
 
 test('MORE THAN TWO HUNDRED WAITING FILE OLDEST FIRST, in one batch that one Undo puts back', async () => {
   const r = await record();

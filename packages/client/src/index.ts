@@ -259,6 +259,11 @@ export type InboxLine = {
     at: string;
     row: { id: string; register: string; seq: number | null; version: number; archived: boolean } | null;
   };
+  /**
+   * The id of the row a skipped arrival repeats, a handle for "It is a second one" and never shown. Absent on every
+   * arrival the dedupe did not set aside, a rule's skip among them. See `InboxLine.repeats` in `@braindog/kernel`.
+   */
+  repeats?: string;
 };
 
 /** The states `inbox` reads arrivals in, as `INBOX_STATES` in `@braindog/kernel` names them. */
@@ -616,6 +621,10 @@ export type TokenRow = {
   ended_by?: 'operator';
   /** Whose it is, by name or address, on `listTokens`'s rows only: a colleague may hold keys of their own. */
   person_name?: string | null;
+  /** The build of the command behind the key, as its last call said it (`x-braindog-cli`, AGT-A02). Absent on an older host. */
+  last_build?: string | null;
+  /** When the key last made a tool call through the door (`noteTool`). Absent on an older host. */
+  last_tool_at?: string | null;
 };
 
 /** `invitations`: one invitation still waiting to be used. Never its link. */
@@ -886,6 +895,46 @@ export type EngineHealth = {
 };
 
 /**
+ * `doorHealth`'s answer (AGT-A02), the owner's: every connection that can act on the record and the agent door's seven
+ * signs. `id` is a handle, never shown alone: a screen names a connection by `app` and `where`. Each sign is a count, 0
+ * green, or `null` where there is nothing yet to judge. See `DoorHealth` in `packages/record/src/methods/door.ts`.
+ */
+export type DoorConnection = {
+  id: string;
+  kind: 'device' | 'cimd' | 'dcr' | 'key' | 'runner';
+  app: string | null;
+  app_version: string | null;
+  where: string | null;
+  verified: boolean | null;
+  scope: string | null;
+  reach: string[];
+  made_at: string;
+  ends_at: string | null;
+  days_left: number | null;
+  last_call_at: string | null;
+  last_door: string | null;
+  last_tool_at: string | null;
+  cli_build: string | null;
+  /** Whole days its build is older than `min_cli`; `null` with no build, a checkout's, or no `min_cli`. */
+  behind: number | null;
+  runs_7d: number;
+};
+export type DoorHealth = {
+  host_build: string | null;
+  min_cli: string | null;
+  connections: DoorConnection[];
+  signs: {
+    delivered: number | null;
+    behind: number | null;
+    ending: number;
+    silent: number;
+    door_used: number | null;
+    runners_listening: number | null;
+    jobs_lost_7d: number;
+  };
+};
+
+/**
  * Call one method.
  *
  * The verb follows the route table rather than the caller's guess, so a write is a POST because the
@@ -1126,9 +1175,10 @@ export function createClient(options: ClientOptions) {
     /**
      * The arrivals in one state, newest first: left out, what waits; `matched` what was filed, `ignored` what was
      * archived, `all` every state. An owner's read, or a token's with the `inbox` reach; `cursor` is the one the page
-     * above answered with.
+     * above answered with. `repeats: true` pages through the arrivals set aside as repeats alone, so a page of skipped
+     * balance alerts cannot push a real second charge out of sight.
      */
-    inbox: (args: { state?: InboxState | 'all'; cursor?: number; limit?: number } = {}) => call<InboxPage>('inbox', args as Record<string, unknown>),
+    inbox: (args: { state?: InboxState | 'all'; cursor?: number; limit?: number; repeats?: boolean } = {}) => call<InboxPage>('inbox', args as Record<string, unknown>),
     /**
      * Settle one arrival: file it on a list with the fields it should carry (`register`), archive it (`ignore`), or put a
      * filed or archived one back in the inbox (`back`, with the filed row's `version`). Exactly one of the three. DATA.
@@ -1459,6 +1509,9 @@ export function createClient(options: ClientOptions) {
     /* WHETHER THE ENGINE'S MODEL ANSWERS (ENG-A02), at read level, so a read token, the command line and the daily
        vital-sign read can ask. `null` from a host that hands the record no engine. */
     engineHealth: () => call<AnswerOr<'engineHealth', EngineHealth | null>>('engineHealth'),
+    /* THE DOOR'S HEALTH (AGT-A02). ADMIN, so a browser session at owner: every connection, its app, build and last tool
+       call, and the seven signs. It takes nothing and changes nothing. */
+    doorHealth: () => call<AnswerOr<'doorHealth', DoorHealth>>('doorHealth'),
     changeEmail: (email: string) => accountDoor<Record<string, never>>('email', { email }),
     confirmEmail: (token: string) => accountDoor<{ email: string; unreached: number }>('email/confirm', { token }),
 

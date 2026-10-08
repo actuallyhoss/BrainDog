@@ -542,6 +542,52 @@ export default function closedLists(
       }
   }
 
+  /**
+   * THE CONTROLS NO ROW MAY WEAR AS ITS MARK (PGS-A06), written twice: `CONTROLS` in the renderer's
+   * `glyphs/names.ts`, which the app and both drawers read, and `CONTROLS` in the kernel's `marks.ts`, which
+   * refuses `MARK_IS_CONTROL` on a write. The kernel imports no renderer, so the copy is the price, and this is
+   * what keeps it honest: a control added to one side only is a picture one side draws and the other refuses,
+   * or a button the record lets a project wear. WORD FOR WORD AND IN ORDER, as the extractors are read.
+   *
+   * A TREE WITH NEITHER FILE IS NOT A FINDING, for the reason the extractors give: a planted tree carries only
+   * what its own case needs. A tree with one and not the other is, because that is the drift itself.
+   */
+  const controlsAt = [
+    ['packages/render/src/glyphs/names.ts', join(root, 'packages', 'render', 'src', 'glyphs', 'names.ts')],
+    ['packages/kernel/src/marks.ts', join(root, 'packages', 'kernel', 'src', 'marks.ts')],
+  ];
+  const haveControls = controlsAt.filter(([, at]) => existsSync(at));
+  if (haveControls.length === 0) {
+    notChecked.push("the controls a mark may not be, for want of render's glyphs/names.ts and the kernel's marks.ts");
+  } else if (haveControls.length === 1) {
+    const [missing] = controlsAt.filter(([, at]) => !existsSync(at));
+    findings.push(`${haveControls[0][0]} lists the controls a mark may not be and ${missing[0]} is not there to agree`);
+  } else {
+    const lists = controlsAt.map(([rel, at]) => {
+      const src = readFileSync(at, 'utf8');
+      const from = src.indexOf('export const CONTROLS = [');
+      if (from < 0) {
+        findings.push(`${rel} has no CONTROLS list this gate can read`);
+        return null;
+      }
+      return [...src.slice(from, src.indexOf(']', from)).matchAll(/'([A-Za-z0-9-]+)'/g)].map((m) => m[1]);
+    });
+    if (lists[0] !== null && lists[1] !== null) {
+      if (lists[0].join(' ') !== lists[1].join(' ')) {
+        const only = (a, b) => a.filter((n) => !b.includes(n));
+        const [render, kernel] = lists;
+        const said = [
+          only(render, kernel).length ? `render alone has ${only(render, kernel).join(', ')}` : '',
+          only(kernel, render).length ? `the kernel alone has ${only(kernel, render).join(', ')}` : '',
+        ].filter(Boolean);
+        findings.push(
+          `the controls a mark may not be differ between glyphs/names.ts and kernel marks.ts (${said.length ? said.join('; ') : 'same names, another order'})`,
+        );
+      }
+      readLists++;
+    }
+  }
+
   if (findings.length === 0) {
     /* `readLists` IS IN THE SENTENCE, not merely in a skip line, because a count that never mentions
        a check cannot report that the check stopped running. Three numbers were printed here and the
@@ -549,7 +595,7 @@ export default function closedLists(
        looked exactly like a passing one. */
     console.log(
       `  closed-lists: ${said.size} CHECKs agree across the document and the DDL, ${counted} counted lists add up, ` +
-        `${spelledOut} spelled-out kind counts agree, and ${readLists} of 3 word-for-word lists match`,
+        `${spelledOut} spelled-out kind counts agree, and ${readLists} of 4 word-for-word lists match`,
     );
     for (const what of notChecked) console.log(`  closed-lists: NOT checked, ${what}`);
   } else {

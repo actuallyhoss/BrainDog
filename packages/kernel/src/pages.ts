@@ -27,6 +27,7 @@ import type { ActionRow } from './actions.ts';
 import { BLOCK_READS, FILTER_TYPES, blockKeyOf, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
 import { applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
 import { builtInFigure } from './built-in-figures.ts';
+import { KEEP, markDrawn, type Why } from './drawn.ts';
 import { kindModule } from './kinds/index.ts';
 import { fileLists } from './kinds/gallery.ts';
 import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
@@ -43,6 +44,7 @@ import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isBucket } from './buckets.ts';
 import { isQuiet, presenceOf, WORKING_MS } from './presence.ts';
 import { SESSION_PREFIX } from './session.ts';
+import type { SignState, VitalSign } from './signs.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost } from './weigh.ts';
 import { MEASURES_MOST, MEASURE_BUCKETS, measureBucket, measureLines, measureSeries, measureWindow, readableZone, type MeasureLatest, type MeasureSeries, type RawReading } from './measures.ts';
@@ -232,10 +234,13 @@ export type PageBlock = {
    */
   short?: { where: string; label: string };
   /**
-   * Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. A boxed section is also
-   * `false` when every block it holds is (`emptyBoxesShut`).
+   * Whether the block is drawn. Absent on a block that draws. `false` where its `when:` said no, where it holds nothing
+   * and does not lead the page, where what it reads no row has said, and on a section over nothing (`markDrawn`, in
+   * `drawn.ts`), so every reader of the answer draws the same blocks the screen does.
    */
   drawn?: boolean;
+  /** Why a block is not drawn, beside `drawn: false`: `empty`, `unsaid`, `when` or `cannot` (`drawn.ts` `Why`). */
+  why?: Why;
 };
 
 export type PageDecl = {
@@ -510,6 +515,13 @@ export type QueueQuestion = {
   changes?: { field: string; label?: string; before: Json | null; after: Json | null }[];
   /** The kinds of change it is (`change-kind.ts`'s keys, `tasks:move:done`), dearest first, as the ladder counts it. */
   kinds?: string[];
+  /**
+   * WHAT IT IS ABOUT, AS ONE KEY (`cause.ts`), so a thing asked twice is asked once: the cause its opener gave or the
+   * record derived. With `alike`, how many open questions share that cause, itself included, so Decide draws one card
+   * for a family and says how many it holds. Both absent from a question the record has no cause for.
+   */
+  cause?: string;
+  alike?: number;
 };
 
 /**
@@ -653,6 +665,11 @@ export type PageDeps = {
   /** Every active scheduled action, as the record's `actions` read lists them, keys by label. */
   actions?: () => ActionRow[];
   /**
+   * The record's vital signs now, in the order of the closed list (`signs.ts` `readSigns`): each its id, its name, its
+   * state, its number and its own sentence. A `signs` block reads them; a sign with nothing to read is `none`.
+   */
+  signs?: () => readonly VitalSign[];
+  /**
    * Who opened a key last and when: the newest `grant.read` event on the grant a key's row points at, or `null` when
    * nobody has. `runs_on` asks it with the grant's id and answers only who and when, never the grant.
    */
@@ -780,7 +797,7 @@ export type ListsBeside = {
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
 const COMPUTED = new Set([
   'forecast.runway', 'activity', 'sessions.live', 'sessions.working', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'runs_on',
-  'deadlines', 'figures.home',
+  'deadlines', 'figures.home', 'signs',
 ]);
 
 /** The name `registersOf` gives a read across the whole record, which no register id can be. */
@@ -795,7 +812,7 @@ export const WHOLE_RECORD = '*';
  * may open every list that holds a deadline may be shown them all, and naming `*` would hold them back from anybody
  * whose access is the lists themselves rather than the whole record.
  */
-const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided']);
+const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs']);
 
 /**
  * The kinds that ADD THEIR ROWS UP, whose `limit:` cuts the GROUPS they draw and never the rows they read.
@@ -1176,7 +1193,7 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
     const area = b !== null && typeof b === 'object' && b.area === 'rail' ? 'rail' : 'main';
     if (b !== null && typeof b === 'object' && b.kind === 'section') hiding.delete(area);
     else if (hiding.has(area) && b !== null && typeof b === 'object') {
-      const folded: BlockResult = { ...shorn(b), rows: [], matched: 0, refusals: [], drawn: false };
+      const folded: BlockResult = { ...shorn(b), rows: [], matched: 0, refusals: [], drawn: false, why: 'when' };
       return added === undefined ? folded : { ...folded, added };
     }
     const read = readBlock(filters ? narrowed(deps, b, filters.clauses) : deps, b);
@@ -1199,7 +1216,10 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
        because the page is in hand here; the word itself was checked with the block (`kinds/words.ts` `panelFault`). */
     /* AND WHAT OTHER PACKS ADD TO IT, laid among its own blocks as it is read and never written into its declaration
        (`page-adds.ts`). A page made from a template fills each addition from its row, as `resolvePages` filled its own. */
-    blocks: headlineHeld(emptyBoxesShut(looked?.blocks ?? shown?.blocks ?? blocks)),
+    /* AND WHAT IS DRAWN IS SAID HERE, for every reader: a block that holds nothing, one over what no row has said, a
+       section over nothing, each `drawn: false` with its `why` (`markDrawn`), so an agent reading the page, a shared
+       page and an export leave out what the screen does. After the look, so a box the look emptied is shut. */
+    blocks: headlineHeld(drawnUnder(looked?.blocks ?? shown?.blocks ?? blocks, looked?.look.pinned)),
     ...(filters ? { filters: filters.answer } : {}),
     ...(looked ? { look: looked.look } : {}),
   });
@@ -1211,8 +1231,8 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
  * The stored look wins as it is, unless it is the owner's: then the rules fill what he left unset, never over what he
  * pinned (`mergeLook`). With none stored, or one Slash wrote from blocks this reader is held from, the rules' look over
  * what she is shown is the page's. Read after the page's own blocks and its adds,
- * so the look can name either, and before the boxes are shut and the headline is held, so a box the look emptied is
- * shut and a hidden lead note says no line.
+ * so the look can name either, and before what is drawn is marked and the headline is held, so a box the look emptied
+ * is shut and a hidden lead note says no line.
  */
 function lookedAt(
   deps: PageDeps,
@@ -1282,6 +1302,25 @@ function rekeyedLook(look: LookBody | null, rekeyed: ReadonlyMap<string, string>
 }
 
 /**
+ * The page's blocks marked as every reader draws them (`markDrawn`), with what the owner pinned kept.
+ *
+ * A PINNED BLOCK IS NEVER HIDDEN (`compose.ts`): he put it there, so it keeps its nought as `empty: keep` keeps it, and the
+ * heading over it stays with it. Kept by handing the rule the block as `keep` and giving it back its own `empty:` after,
+ * so the rule is the one rule and the answer says what the declaration said.
+ */
+function drawnUnder(blocks: readonly BlockResult[], pinned: readonly string[] | undefined): BlockResult[] {
+  const pins = new Set(pinned ?? []);
+  const pinnedAt = (b: BlockResult): boolean => b.key !== undefined && pins.has(b.key);
+  if (!blocks.some(pinnedAt)) return markDrawn(blocks);
+  return markDrawn(blocks.map((b) => (pinnedAt(b) ? { ...b, empty: KEEP } : b))).map((b, i) => {
+    const was = blocks[i]!;
+    if (!pinnedAt(was)) return b;
+    const { empty: _keep, ...rest } = b;
+    return was.empty === undefined ? rest : { ...rest, empty: was.empty };
+  });
+}
+
+/**
  * The page's blocks with a forecast's `headline:` taken off when no lead note on the page is drawn.
  *
  * THE OPENING LINE IS WHAT SAYS WHEN THE MONEY RUNS OUT, and a forecast that leaves its own sentence off for it has to
@@ -1294,30 +1333,6 @@ function headlineHeld(blocks: readonly BlockResult[]): BlockResult[] {
     if (said || b.headline === undefined) return b;
     const { headline: _unsaid, ...rest } = b;
     return rest as BlockResult;
-  });
-}
-
-/**
- * The page's blocks with each boxed section that holds nothing drawn said `drawn: false`.
- *
- * A BOX WHOSE EVERY BLOCK IS HIDDEN IS AN EMPTY TITLED BOX, so it is not drawn either. Measured: Money's 'Heads up' is
- * gated on there being accounts, and its three lines each on something stale or late, so a record with accounts and
- * nothing wrong drew the bell heading over an empty surface, on the most common healthy day. A section holds the blocks
- * after it in its own column up to the next section there, as a `when:` hides them. One that holds no block, or carries
- * a host panel under its heading, is not empty and stays as it is; a section with no box draws only its heading, which
- * is its own `when:`'s to hide.
- */
-function emptyBoxesShut(blocks: readonly BlockResult[]): BlockResult[] {
-  const areaOf = (b: BlockResult): 'main' | 'rail' => (b.area === 'rail' ? 'rail' : 'main');
-  return blocks.map((b, i) => {
-    if (b.kind !== 'section' || b.box !== true || b.drawn === false || typeof b.panel === 'string') return b;
-    const held: BlockResult[] = [];
-    for (const next of blocks.slice(i + 1)) {
-      if (areaOf(next) !== areaOf(b)) continue;
-      if (next.kind === 'section') break;
-      held.push(next);
-    }
-    return held.length > 0 && held.every((x) => x.drawn === false) ? { ...b, drawn: false } : b;
   });
 }
 
@@ -1824,7 +1839,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      result rather than implied by an empty one, because "the condition was false" and "the query
      matched nothing" are different facts and a renderer that cannot tell them apart draws the empty
      state of a block that was never meant to be on the page. */
-  if (!drawnWhen(deps, block)) return { ...base, drawn: false };
+  if (!drawnWhen(deps, block)) return { ...base, drawn: false, why: 'when' };
 
   /* THE PAGE'S LIVE FIGURES ARE THE RECORD'S TO SAY, so the host does not answer them from a copy of
      its own. Only for a block that draws: a figure in a block that is not on the page is not read. */
@@ -2060,6 +2075,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.source === 'sessions.live') return liveBlock(deps, block, base, also);
   if (block.source === 'sessions.working') return workingBlock(deps, block, base, also);
   if (block.source === 'actions') return actionsBlock(deps, block, base, also);
+  if (block.source === 'signs') return signsBlock(deps, block, base, also);
   if (block.source === 'governance.open') return openBlock(deps, block, base, also);
   if (block.source === 'governance.later') return laterBlock(deps, block, base, also);
   if (block.source === 'governance.decided') return decidedBlock(deps, block, base, also);
@@ -3483,7 +3499,7 @@ function openBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (.
   const read = deps.openQuestions(Math.max(limit, QUEUE_CEILING), said.predicate === undefined ? undefined : admits);
   /* AND AGAIN HERE, for a host that takes no filter: what it was handed is filtered as it always was. */
   const kept = read.questions
-    .map((q) => ({ ...q, list: listOf(q.about) }))
+    .map((q) => familyOf({ ...q, list: listOf(q.about) }))
     .filter((q) => admits({ who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null }));
   /* THE RECORD'S OWN COUNT when it answered one, over everything the filter admitted. A host that answers none: with no
      predicate, every open question; with one, what this page could see, and it says so by being smaller. */
@@ -3497,6 +3513,18 @@ function openBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (.
 export function staleAt(at: string, nowMs: number): boolean {
   const ms = Date.parse(at);
   return Number.isFinite(ms) && nowMs - ms > STALE_DAYS * 86_400_000;
+}
+
+/**
+ * A question with its family as the record said it (`cause`, `alike`), or neither.
+ *
+ * A COUNT OF A FAMILY THAT HAS NO NAME SAYS NOTHING, so `alike` without a `cause` is left off, and so is one that is not
+ * a whole number of at least one: the question itself is always one of its own family. A blank cause is no cause.
+ */
+function familyOf<Q extends QueueQuestion>(q: Q): Q {
+  const { cause, alike, ...rest } = q;
+  if (typeof cause !== 'string' || cause.trim() === '') return rest as Q;
+  return { ...rest, cause, ...(typeof alike === 'number' && Number.isInteger(alike) && alike >= 1 ? { alike } : {}) } as Q;
 }
 
 /**
@@ -3528,7 +3556,7 @@ function laterBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (
   const limit = Math.min(QUEUE_CEILING, Math.max(1, Math.floor(block.limit ?? QUEUE_LIMIT)));
   const read = deps.laterQuestions(Math.max(limit, QUEUE_CEILING));
   const kept = read.questions
-    .map((q) => ({ ...q, list: listOf(q.about) }))
+    .map((q) => familyOf({ ...q, list: listOf(q.about) }))
     .filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null, list: q.list }, OPEN));
   const matched = said.predicate === undefined && read.questions.length < read.later ? read.later : kept.length;
   return { ...base, queue: ledBy(block, kept.slice(0, limit)), matched };
@@ -3675,6 +3703,72 @@ function actionsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also:
   const said = predicateOf(block.where, ACTIONS, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
   const kept = deps.actions().map(actionEntry).filter((r) => evaluate(said.predicate, r.fields, ACTIONS));
+  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
+  return { ...base, rows: kept.slice(0, limit), matched: kept.length };
+}
+
+/* ── the record's vital signs ────────────────────────────────────────────── */
+
+/** The states a sign can be in. Anything else a host hands is read as `none`: nothing to read is never green. */
+const SIGN_STATES: readonly SignState[] = ['green', 'red', 'none'];
+
+/**
+ * What a `signs` block's `where` and columns may name: one row a sign. `sign` is its id, a handle and never what a
+ * person reads; `name` is what they read, `value` its number (`null` where it counts nothing) and `said` its own
+ * sentence, never one made here.
+ */
+const SIGNS: Schema = {
+  register: 'signs',
+  fields: {
+    sign: { type: 'text' },
+    name: { type: 'text' },
+    state: { type: 'enum', values: SIGN_STATES },
+    value: { type: 'decimal' },
+    said: { type: 'text' },
+  },
+};
+
+/**
+ * One sign as a row a table or cards block draws, keyed by its id, `seq` `null` because it is no list's row. Read now,
+ * so the row was last changed when the page was read.
+ *
+ * A SIGN WITH NOTHING TO READ IS `none`, NEVER GREEN: a state outside the three, from a host or a reading out of shape,
+ * is `none`, and so is its number, so a page never draws a sign as well that nobody has read.
+ */
+function signEntry(s: VitalSign, at: string): Entry {
+  const state: SignState = SIGN_STATES.includes(s.state) ? s.state : 'none';
+  const value = state !== 'none' && typeof s.value === 'number' && Number.isFinite(s.value) ? s.value : null;
+  return {
+    id: `sign:${s.sign}`,
+    register: SIGNS.register,
+    seq: null,
+    fields: { sign: s.sign, name: s.name, state, value, said: typeof s.said === 'string' ? s.said : '' },
+    state,
+    version: 1,
+    created_at: at,
+    updated_at: at,
+    deleted_at: null,
+  };
+}
+
+/**
+ * The record's vital signs, one row each, in the order of the closed list (`signs.ts` `VITAL_SIGNS`).
+ *
+ * THE SAME READ AS `braindog signs` AND THE RECORD'S `signs`, so Health, the command line and an agent cannot disagree
+ * about what is red. The order is the list's: `order:` is refused rather than ignored, and a page that wants the red
+ * ones first asks for them with `where: state is red`.
+ */
+function signsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (!deps.signs) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its vital signs onto a page yet.', at: 'source' }) };
+  if (block.order?.length)
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'signs come in the order the record lists them, so it takes no order:. Use where: state is red for the red ones.', at: 'order' }) };
+  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(SIGNS.fields, f));
+  if (unknown.length)
+    return { ...base, refusals: also({ code: 'FIELD_UNKNOWN', fix: `A sign has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(SIGNS.fields) }) };
+  const said = predicateOf(block.where, SIGNS, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  const at = new Date(deps.ctx.nowMs).toISOString();
+  const kept = deps.signs().map((s) => signEntry(s, at)).filter((r) => evaluate(said.predicate, r.fields, SIGNS));
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   return { ...base, rows: kept.slice(0, limit), matched: kept.length };
 }

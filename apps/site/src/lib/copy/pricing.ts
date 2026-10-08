@@ -108,8 +108,9 @@ export const pricing = {
   /**
    * THE PRICING PAGE. Free leads (DIRECTION §35): it is the page's headline and its first tile, and Cloud and Cloud
    * Plus follow as the plans for pros. The plans it sells are `HOSTED_PLANS` in `apps/worker/src/billing.ts`, Free is
-   * `FREE_PLAN` there, and the allowance a record is held to is `ALLOWANCE` in `packages/record/src/directory.ts`;
-   * `plans.test.ts` holds `plans.ts` to all three. Credit packs and extra usage are not built, so the page says they
+   * `FREE_PLAN` there, their names and prices come from `PLAN_TABLE` in `packages/record/src/plans.ts`, and the
+   * allowance a record is held to is `ALLOWANCE` in `packages/record/src/directory.ts`; `plans.test.ts` holds `plans.ts`
+   * to all of them. Credit packs and extra usage are not built, so the page says they
    * are coming later in one line and sells neither.
    */
   pricing: {

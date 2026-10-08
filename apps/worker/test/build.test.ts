@@ -33,7 +33,7 @@ test('the Worker answers it before any door is asked, and through the helper tha
      deployment that was never told which build it is. */
   assert.match(
     src,
-    /const buildId = \(env: Env\): Response => json\(\{ app: env\.BRAINDOG_BUILD \|\| null \}, 200\)/u,
-    'the build id is not answered as the tuple-or-null this route promises',
+    /const buildId = \(env: Env\): Response => json\(\{ app: env\.BRAINDOG_BUILD \|\| null, min_cli: MIN_CLI \}, 200\)/u,
+    'the build id is not answered as { app: tuple-or-null, min_cli } as this route promises',
   );
 });

@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { answer, bodyOf, depsOf, openQuestions, record, text, used } from './ingest-tail-kit.test.ts';
+import { answer, bodyOf, depsOf, openQuestions, record, text, used } from './ingest-tail-kit.ts';
 import { offerAgain, reopenedTail } from '../src/ingest.ts';
 
 const held = (r: { sql: { one<T>(q: string): T | undefined } }): number =>

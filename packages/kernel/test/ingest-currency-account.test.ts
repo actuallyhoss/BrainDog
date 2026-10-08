@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { openRecord, type Arrived, type Declaration, type Json, type NumberReaders } from '../src/index.ts';
-import { ACCOUNTS, LEDGER, NOW, OWNER } from './ingest-tail-kit.test.ts';
+import { ACCOUNTS, LEDGER, NOW, OWNER } from './ingest-tail-kit.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const PATTERN = (currency: unknown = { of: 'account', field: 'balance' }, extra: Record<string, unknown> = {}): Declaration => ({

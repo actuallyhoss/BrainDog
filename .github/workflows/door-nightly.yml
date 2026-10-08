@@ -1,0 +1,83 @@
+name: door-nightly
+
+# A REAL CLAUDE CODE THROUGH THE AGENT DOOR, EVERY NIGHT (AGT-A01). Ten thousand tests drove the door
+# with a hand-written client, and a tool list Claude Code refused passed all of them for a week. This
+# installs the command the way a stranger does, runs `braindog setup`, starts Claude Code at its pin
+# and asks it for `context`, and fails the run when the tools are missing, `context` fails or the
+# instructions a session is handed are not the host's. `tools/door-check/run.mjs` runs every
+# `*.check.mjs` beside it, so a later unit adds a check by adding a file there.
+#
+# EVERY NIGHT AT 03:17, AND AFTER EACH DEPLOY. Minute 17, off the hour, where GitHub's scheduler is
+# least late. After a deploy because a bad deploy of the door reaches every agent at once.
+#
+# NO MODEL KEY IS "NOT RUN", NOT GREEN AND NOT RED (DIRECTION 42, over the brief's exit 1): the row
+# prints one warning annotation, `claude-code <version>: not run: no key`, and the run exits 0, so
+# the warning is on the run's page every night until `ANTHROPIC_API_KEY` is set. The same holds with
+# no record (`DOOR_RECORD`, a repository variable) or no key for it (`DOOR_TOKEN`, a secret made for
+# that record), because nobody is here at night to approve six digits. When the proof area's harness
+# makes a fresh record on demand, a step before the check asks it for both.
+#
+# THE KEYS TRAVEL IN THE ENVIRONMENT AND NOWHERE ELSE. The check hands `DOOR_TOKEN` to the command
+# as `BRAINDOG_TOKEN` and writes neither key into any file; `report.json` holds what each app saw.
+#
+# A FORCED FAILURE: run it by hand with `host` set to an https site that serves no door. The command
+# does not install, the row reads FAIL and the run is red. (A `record` the key cannot open is no
+# test: with DOOR_TOKEN the key alone names the record, and the address only names the host.)
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_run:
+    workflows: [deploy]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      host:
+        description: 'The host to check. Empty is production.'
+        required: false
+        default: ''
+        type: string
+      record:
+        description: 'The record to check, by its address or slug. Empty is DOOR_RECORD.'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: door-nightly
+  cancel-in-progress: false
+
+jobs:
+  door:
+    # AFTER A DEPLOY ONLY WHEN IT DEPLOYED: `workflow_run` fires on a failed deploy too.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.13.0
+      - name: The runner's own tests
+        run: node --test tools/door-check/test/run.test.mjs
+      - name: Real agent apps through the door
+        env:
+          DOOR_HOST: ${{ inputs.host || 'https://brain.dog' }}
+          DOOR_RECORD: ${{ inputs.record || vars.DOOR_RECORD }}
+          DOOR_TOKEN: ${{ secrets.DOOR_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node tools/door-check/run.mjs --report report.json
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: door-report
+          path: report.json
+          if-no-files-found: warn
+          retention-days: 30

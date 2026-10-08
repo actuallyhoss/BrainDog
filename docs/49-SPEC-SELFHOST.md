@@ -54,6 +54,8 @@ type Config = {
   sqlite: 'node:sqlite' | 'better-sqlite3';       // BRAINDOG_SQLITE   default 'node:sqlite'
   origin: string;          // BRAINDOG_ORIGIN      default `http://localhost:${port}` — magic-link URLs, rpId, CSRF
   smtp?: { url: URL; from: string };              // BRAINDOG_SMTP_URL smtps://u:p@host:465 | smtp://u:p@host:587 ; BRAINDOG_MAIL_FROM (amended)
+  outbound: 'off' | 'on';  // BRAINDOG_OUTBOUND    default 'off': add-ons' requests to other servers (§5.24)
+  kennel: string | 'off';  // BRAINDOG_KENNEL      default the public registry: its own switch, not outbound's (§5.24)
 };
 
 type HostDeps = { clock: Clock; keys: KeyStore; dispatch: Dispatch; http: Http; blobs: (recId: RecordId) => Blobs;
@@ -748,6 +750,29 @@ applies, or a refusal.
     event is kept and nothing is filed. It asks the Directory's `mayRun` first and is metered on the script's line,
     `channel: 'script'`, under an id minted for it; a sandbox that throws is counted as a failure that costs no run
     and answered as the host's 500.
+
+### 5.24 · The operator's switch: `BRAINDOG_OUTBOUND`
+
+*Release note, said first:* **a self-host stops sending requests to other servers when it is updated, until its
+operator sets `BRAINDOG_OUTBOUND=on` and starts it again.** Scheduled actions and scripts that call out are held, each
+with the sentence below, and run again at their next turn once it is on. The release note opens with this line,
+before anything else it says, because an operator who updates and reads nothing else would otherwise find their
+feeds stopped (SHL-C11, HD.306).
+
+| | |
+|---|---|
+| **The setting** | `BRAINDOG_OUTBOUND`, `off` or `on`, read once at start. Unset is `off`. Any other value stops the server with one sentence naming the two it takes, rather than guessing. |
+| **What it governs** | Every request an installed add-on makes to another server on a record's behalf: a scheduled `pull`, `call` and `poll`, a connector's pages, and a script's `ctx.fetch`. Also a draft script's trial (§5.23 step 11), which is wired only when it is on. |
+| **What it does not** | The read of the public add-on registry, which has its own switch, `BRAINDOG_KENNEL` (`off`, or the registry's address; unset is the public one): a server with outbound off still lists what the registry offers, and one with the registry off may still send. Nor a signed webhook or a notice by mail that the owner set up, nor a shared file read from an address somebody pasted, nor sign-in mail, nor the client document an app connecting over OAuth names (`oauth.ts`, behind the same private-address fence). |
+| **Off** | `main.ts` passes `start` no `actions`. An add-on that calls out still installs: its install diff is the same, and nothing about the record changes. Each of its actions, when it falls due, is held: nothing is resolved, no key is opened, nothing is sent, the run is counted as held, its schedule moves on a day (`OUTBOUND_HELD_MS`), and its event and its line in Scheduled read *"This server does not send requests. Its operator can switch that on."* A script that only reads and writes the record runs as before; one that calls `ctx.fetch` is told the same sentence inside the sandbox, nothing it wrote is applied, and the run is held with it. Nothing is skipped silently. |
+| **On** | `main.ts` passes `actions: {}`, and every rule of `./actions.ts` holds exactly as before: https to a declared origin only, a name refused when any address it resolves to is private (`127.0.0.1` among them) before a key is opened, the socket pinned to the address that was checked. The switch adds no exception to the fence. |
+| **At start** | One line under the sign-in line says which way it is set, and names the registry's switch apart from it. |
+
+The pieces are in `src/script.ts`: `outboundOf` reads the value, `OUTBOUND_OFF` is the sentence, `outboundHeld` is the
+ledger's answer that holds every run, and `scriptSandbox({ outbound: 'off' })` is the sandbox that holds a fetch.
+`server.ts` holds the scheduled pass with them when `actions` is absent. *Until that line lands in `server.ts`*, a
+server with the switch off leaves those actions due and unsent, and Scheduled shows them late without the sentence;
+the rest of this section holds today. Held by `test/actions.test.ts`.
 
 ---
 

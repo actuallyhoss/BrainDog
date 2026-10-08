@@ -13,8 +13,9 @@
  *
  * CALM. A block with nothing in it is not drawn, a row shown in one block is not shown again in the next, and the
  * page's one line is worked out from the blocks drawn (`sentenceOf`), so the line and the page cannot disagree. What
- * holds nothing is the page reader's rule for every home (`$lib/page/home.ts`, `bare` and `emptyHidden`, which PageBody
- * applies in mode=home); Home applies it here too, so what it counts and lays out is what the reader draws.
+ * holds nothing is the record's rule for every page (`drawn: false` with `why`, the kernel's `drawn.ts`, read here
+ * through `$lib/page/home.ts` `bare` and `emptyHidden`, which PageBody applies in mode=home); Home applies it here too,
+ * so what it counts and lays out is what the reader draws.
  *
  * A PLAIN MODULE, so the body and the reshaping below are read by a test without a component.
  */
@@ -469,7 +470,8 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
     const cut = worded(untold(b, told));
     return hollow(cut) ? { ...cut, drawn: false } : cut;
   });
-  /* AND THEN THE READER'S OWN RULE, so a section over nothing goes with its blocks here as it does on the page. */
+  /* AND THEN THE RECORD'S RULE, read as the record marked it and judged again only where it drew a block, so a section
+     over nothing goes with its blocks here as it does on the page. */
   const out = emptyHidden(fed);
   for (const at of lateAt) lateTile(out, at, today, voice);
   /* WHAT COMES UP, A DAY AT A TIME, each day a chip with what falls due on it beside it. */
