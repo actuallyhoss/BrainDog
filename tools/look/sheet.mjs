@@ -24,9 +24,18 @@ const GAP_PX = 12;
 /** Screens a sheet holds, so a sheet of every route stays under the tallest picture a browser will take. */
 const PER_SHEET = 12;
 
+/* THE SHEET'S COLOURS ARE THE THEME'S, read from the stylesheet the theme generates (`packages/skin/house.css`), so the
+   sheet changes when the theme does and `colour-grep` finds no literal here: the light roles from the first block, the
+   dark ones from `html[data-scheme='dark']`. */
+const HOUSE = readFileSync(new URL('../../packages/skin/house.css', import.meta.url), 'utf8');
+const rolesOf = (block) => {
+  const role = (name) => new RegExp(`--${name}:\\s*([^;]+);`, 'u').exec(block)?.[1]?.trim() ?? '';
+  return { board: role('board'), tile: role('tile'), ink: role('ink'), muted: role('dim'), late: role('danger') };
+};
+const darkAt = HOUSE.indexOf("html[data-scheme='dark']");
 const BOARD = {
-  light: { board: '#F3F4F6', tile: '#FFFFFF', ink: '#111318', muted: '#5B616B', late: '#B3322C' },
-  dark: { board: '#0D1014', tile: '#161A20', ink: '#E8EAEE', muted: '#9AA1AC', late: '#F07A73' },
+  light: rolesOf(HOUSE.slice(0, HOUSE.indexOf('@media'))),
+  dark: rolesOf(HOUSE.slice(darkAt, HOUSE.indexOf('}', darkAt))),
 };
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/gu, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);

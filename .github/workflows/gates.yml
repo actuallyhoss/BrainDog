@@ -81,6 +81,11 @@ on:
       - 'tools/gates/layout.mjs'
       - 'tools/gates/a11y.mjs'
       - 'tools/gates/lib.mjs'
+      # The record the gates draw can be built from a real record's shape (`lived.mjs`, PRF-A07), and the self-host the
+      # gates start reads the command line's surface.
+      - 'tools/gates/lived.mjs'
+      - 'fixtures/shapes/**'
+      - 'apps/cli/**'
       - 'tools/gates/record.mjs'
       - 'tools/gates/routes.mjs'
       - 'tools/gates/budgets.json'
