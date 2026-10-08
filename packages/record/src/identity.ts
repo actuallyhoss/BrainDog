@@ -34,7 +34,7 @@ import { FRESH } from './index.ts';
 import { assertion, b64url, clientData, registration, same, unb64url, type Alg, type PublicJwk, type Why } from './webauthn.ts';
 
 type Key = Awaited<ReturnType<typeof crypto.subtle.importKey>>;
-type Flow = AuthCall['flow'] | SignupCall['flow'];
+type Flow = AuthCall['flow'] | SignupCall['flow'] | PasskeyRename['flow'];
 /* Read through `AuthBodies`, which `@braindog/ports` already exports from its root, whose index names neither of these two. */
 type SessionInfo = AuthBodies['sessions']['sessions'][number];
 type InviteProved = AuthBodies['invite.proved'];
@@ -237,7 +237,9 @@ const slugTyped = (x: unknown): string | null => {
 export type SessionAsk = { flow: 'session'; sid: string; slug?: string };
 
 /** `Auth`, and the named `session` beside it. Assignable to `Auth`, so every host that holds one is unchanged. */
-export type DirectoryAuth = <C extends AuthCall | SessionAsk | SignupCall | AccountCall>(call: C) => Promise<AuthResult<AuthBodies[C['flow']]>>;
+export type DirectoryAuth = <C extends AuthCall | SessionAsk | SignupCall | AccountCall | PasskeyRename>(
+  call: C,
+) => Promise<AuthResult<DirectoryBodies[C['flow']]>>;
 
 type Row = { id_hash: string; person: string; record: string | null; rotated_at: number; authed_at: number; email: string; is_current: number };
 type Found = { row: Row; rotated: { sid: string } | null };
@@ -314,6 +316,73 @@ export type SignupStart = Extract<SignupCall, { flow: 'signup.start' }> & { chec
 export type SignupNeeds = { needs: 'code' };
 
 /**
+ * A person giving one of their own passkeys a name of their choosing (LCH-A04): `label` is what they typed.
+ *
+ * The arm `AuthCall` in `@braindog/ports` now carries too, kept here under this name for the hosts and the self-host
+ * start that import it from `@braindog/record/directory`.
+ */
+export type PasskeyRename = { flow: 'passkey.rename'; sid: string; id: string; label: string };
+
+/** What each flow answers on a 200: `AuthBodies`, and the renamed passkey for `passkey.rename`. */
+export type DirectoryBodies = AuthBodies & { 'passkey.rename': PasskeyInfo };
+
+/** The longest name a passkey keeps, in characters. */
+export const PASSKEY_NAME_MOST = 64;
+
+/** Whole characters as a reader sees them: a flag, a family, a skin tone, each one, however many code points it takes. */
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+/**
+ * A passkey's name as it is kept: one line, every run of spaces, tabs and line breaks one space, trimmed, and cut to
+ * `PASSKEY_NAME_MOST` code points. `null` when nothing is left.
+ *
+ * THE CUT FALLS BETWEEN WHOLE CHARACTERS, so a flag or a family emoji at the edge is dropped whole and never halved,
+ * and it counts code points, so a character stacked with marks cannot make a short name long. THE SAME AT
+ * REGISTRATION AND AT A RENAME, so the platform's name a browser sends and a name a person types are kept by one rule,
+ * and a name never pushes the passkey list onto a second line.
+ */
+export function passkeyName(x: unknown): string | null {
+  const line = text(x).replace(/[\s\p{Cc}]+/gu, ' ').trim();
+  let cut = '';
+  let size = 0;
+  for (const { segment } of GRAPHEMES.segment(line)) {
+    size += Array.from(segment).length;
+    if (size > PASSKEY_NAME_MOST) break;
+    cut += segment;
+  }
+  cut = cut.trim();
+  return cut === '' ? null : cut;
+}
+
+/**
+ * Names a host gives to anybody who asks, where a passkey made for the name, or for one under it, would answer at
+ * sites its operator does not own: `workers.dev`, `pages.dev`, `github.io` and the hosts like them.
+ */
+const SHARED_HOSTS = ['workers.dev', 'pages.dev', 'github.io', 'netlify.app', 'vercel.app', 'herokuapp.com', 'fly.dev', 'onrender.com', 'web.app', 'firebaseapp.com', 'appspot.com', 'azurewebsites.net', 'trycloudflare.com', 'ngrok.io', 'ngrok-free.app'];
+
+/**
+ * A country's shared second level, refused only as itself: `example.co.uk` is somebody's own name, `co.uk` is everybody's.
+ */
+const SHARED_LEVELS = ['co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'com.au', 'net.au', 'co.nz', 'co.jp', 'co.za', 'com.br', 'co.in', 'com.cn'];
+
+/**
+ * The sentence that refuses a relying-party id on a shared public suffix, or `null` for a name an operator can own.
+ *
+ * A PASSKEY IS BOUND TO ITS NAME, and every site under a shared name can ask a browser for it. A BrainDog at
+ * `studio.pages.dev` whose passkeys were made for `pages.dev`, or for `studio.pages.dev` itself, holds them on a name
+ * the platform hands out again; the operator owns neither. So the Directory refuses to start with one, by the name,
+ * and says what to do instead; the self-host's start prints the sentence.
+ */
+export function sharedSuffix(id: string): string | null {
+  const name = id.trim().toLowerCase().replace(/\.$/, '');
+  const host = SHARED_HOSTS.find((s) => name === s || name.endsWith(`.${s}`));
+  const level = SHARED_LEVELS.find((s) => name === s);
+  const shared = host ?? level;
+  if (shared === undefined) return null;
+  return `Passkeys cannot use ${shared}: it is a name many sites share, so any of them could ask for your passkeys. Serve BrainDog at a domain you own and sign in there.`;
+}
+
+/**
  * A typed record name as it would be stored: trimmed, and lower-cased only when it is ASCII.
  *
  * ASCII BEFORE IT IS LOWERED, for the reason `slugTyped` gives: `toLowerCase` folds the Kelvin sign to `k`, and a name
@@ -334,6 +403,9 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
   const personId = ulids(() => clock.now());
 
   if (config && config.mac.length < 32) throw new Error('The sign-in MAC key must be at least 32 bytes.');
+  /* A PASSKEY DOMAIN ON A SHARED SUFFIX IS REFUSED AT THE START, as a short key is, and never served (`sharedSuffix`). */
+  const shared = config?.rp ? sharedSuffix(config.rp.id) : null;
+  if (shared !== null) throw new Error(shared);
   const macKey: Promise<Key> | null = config
     ? crypto.subtle.importKey('raw', new Uint8Array(config.mac), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
     : null;
@@ -541,7 +613,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
     return { id, clientDataJSON, authenticatorData, signature, userHandle };
   };
 
-  const auth = async (call: AuthCall | SessionAsk | SignupCall): Promise<AuthResult> => {
+  const auth = async (call: AuthCall | SessionAsk | SignupCall | PasskeyRename): Promise<AuthResult> => {
     const flow = call.flow;
     if (!config) {
       if (flow !== 'methods') return off();
@@ -676,7 +748,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (!v.ok) return rejected(flow, v.why, keep);
         /* The id the browser reported must be the id the authenticator attested, or this is two responses spliced. */
         if (v.value.id !== cred.id) return rejected(flow, 'shape', keep);
-        const label = text(call.label).trim().slice(0, 64) || null;
+        const label = passkeyName(call.label);
         const row = sql.one(
           `INSERT INTO dir_passkey (id, person, jwk, alg, sign_count, label, backed_up, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING RETURNING id`,
@@ -850,6 +922,40 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
             lastUsed: k.last_used === null ? null : Number(k.last_used),
           }));
         return { status: 200, body, ...carry(found) };
+      }
+
+      /**
+       * A new name for one of the person's own passkeys, kept by `passkeyName`'s rule; a name that leaves nothing is
+       * refused with the fix, and the name stands as it was.
+       *
+       * NO FRESH PROOF AND NO LETTER, unlike adding or removing one: a name opens nothing and closes nothing, so a
+       * person who has been signed in all month can tidy their list without signing in again. ANOTHER PERSON'S KEY IS
+       * ANSWERED AS A KEY THAT IS NOT THERE, in one statement keyed on both, so the answer says nothing about whether
+       * the key exists.
+       */
+      case 'passkey.rename': {
+        const found = await current(call.sid, now);
+        if (!found) return rejected(flow, 'session', { session: 'clear' });
+        const keep = carry(found);
+        const label = passkeyName(call.label);
+        if (label === null)
+          return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'A passkey needs a name. Type one, such as the device it lives on.', at: 'label' }, ...keep };
+        const k = sql.one<{ id: string; label: string | null; alg: number; backed_up: number; created_at: number; last_used: number | null }>(
+          'UPDATE dir_passkey SET label = ? WHERE id = ? AND person = ? RETURNING id, label, alg, backed_up, created_at, last_used',
+          label,
+          text(call.id),
+          found.row.person,
+        );
+        if (!k) return { status: 422, refusal: { code: 'OUT_OF_BOUNDS', fix: 'That passkey is not one of yours. Pick one from your passkeys in Settings.', at: 'id' }, ...keep };
+        const body: PasskeyInfo = {
+          id: k.id,
+          label: k.label,
+          alg: k.alg as Alg,
+          backedUp: k.backed_up === 1,
+          createdAt: Number(k.created_at),
+          lastUsed: k.last_used === null ? null : Number(k.last_used),
+        };
+        return { status: 200, body, ...keep };
       }
 
       /**

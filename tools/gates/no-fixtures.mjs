@@ -1,12 +1,17 @@
 /**
- * `no-fixtures`: nothing the app ships imports the sample.
+ * `no-fixtures`: nothing BrainDog ships imports the sample or installs it.
  *
  *   node tools/gates/no-fixtures.mjs [root]
  *
  * The sample record is gone from the product. The app shows a real record or says why it cannot, and the
  * sample's rows, questions, add-ons and readers stay only as test data. They
- * live in `apps/web/src/lib/record/fixtures/`, and this is what keeps them there: any file under `apps/web/src` that is
+ * live in `apps/web/src/lib/record/fixtures/`, and this is what keeps them there: any file in one of `PLACES` that is
  * not a test and not in a `fixtures/` directory, and imports a module through a `fixtures/` path, is a finding.
+ *
+ * A LIST AND NOT ONE FOLDER (PRF-A07, `DIRECTION.md` 40: the invented record is for the gates and for nothing else).
+ * This read `apps/web/src` alone, so the command's scratch record imported its three product parts from the seed's
+ * root and no gate said so (`apps/cli/src/scratch.ts`, until 9 October). Everything that runs a record for somebody
+ * is on the list: the web app, the worker, the self-host, the command, and the host, record and agent-door packages.
  *
  * WHY A GATE AND NOT A TEST BESIDE THE OTHERS. `no-sample-b2.test.ts` already walks the app for one directory, and it
  * ran green while shipped files imported `data.ts`, the fixture before it moved, because the rule it held was about a
@@ -19,6 +24,11 @@
  * `NOW` and `installSeed`, 27 KB brotli, and a route that imports it for one table carries all of it. Its subpaths
  * (`@braindog/seed/usecases/*`, and `@braindog/seed/packs` for the first-party declarations) are product, and are free
  * to import.
+ *
+ * BY ANY PATH, AND ITS INSTALLER BY ANY NAME. A package beside the seed can reach its root as `../../seed/src/index.ts`
+ * or as the package folder `../../seed` and never write `@braindog/seed`, so either path is the root too. And
+ * `installSeed(` is a finding wherever it is called, because a record a person uses that was filled by it holds
+ * invented rows, however the function got there.
  *
  * WITH NO FILE EXCUSED. Three shipped files read the root for product until 25 September (the modules' figures in
  * `declared.ts`, the documents Install sends in `packs.ts`, the Agents pack in Settings) and sat on a named waiting
@@ -37,14 +47,29 @@
  * `.svelte` file, `<!-- -->` are blanked before anything is matched; strings are left, because a specifier is one.
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { skipDir } from './lib.mjs';
 
-/** The app whose shipped files are read, and the kinds of file it ships. */
-const APP = join('apps', 'web', 'src');
+/**
+ * The places whose shipped files are read, each with the name a finding gives it.
+ *
+ * EVERY ONE MUST BE THERE IN THE WORKSPACE. A folder renamed or moved leaves its entry reading nothing, and a list
+ * that quietly reads less is the one-folder gate again. So on a root that is the workspace (it holds
+ * `pnpm-workspace.yaml`) a place with no source is "could not run"; a seeded tree holds only the places it seeds.
+ */
+export const PLACES = [
+  { dir: 'apps/web/src', name: 'the web app' },
+  { dir: 'apps/worker/src', name: 'the worker' },
+  { dir: 'apps/selfhost/src', name: 'the self-host' },
+  { dir: 'apps/cli/src', name: 'the command' },
+  { dir: 'packages/host/src', name: 'the host' },
+  { dir: 'packages/record/src', name: 'the record' },
+  { dir: 'packages/mcp/src', name: 'the agent door' },
+];
+/** The kinds of file they ship. */
 const SOURCE = /\.(ts|js|mjs|svelte)$/u;
 /** A test, which may import any fixture it likes. */
 const TEST = /\.test\.(ts|js|mjs)$/u;
@@ -130,11 +155,26 @@ export function specifiers(code) {
   return found;
 }
 
+/** The seed's root file named by a path, `../../seed/src/index.ts` or the folder that resolves to it. */
+const SEED_ROOT_FILE = /(?:^|\/)seed\/src(?:\/index(?:\.[cm]?[jt]s)?)?\/?$/u;
+/**
+ * The seed's package folder, which a bundler opens at its `exports["."]`, the root. Only a relative path resolved from
+ * the file that wrote it can say it is this folder: `../../seed` from the host is, and `./seed` beside a page is not.
+ */
+const SEED_PACKAGE = 'packages/seed';
+
 /** Why a specifier is not a shipped file's to import, or `null`. */
 export function refused(spec) {
   if (/(?:^|\/)fixtures\//u.test(spec)) return 'imports the test fixtures, which only a test may';
-  if (spec === '@braindog/seed') return "imports the seed's root, which is the sample: import a subpath of it, or read the record";
+  if (spec === '@braindog/seed' || SEED_ROOT_FILE.test(spec))
+    return "imports the seed's root, which is the sample: import a subpath of it, or read the record";
   return null;
+}
+
+/** Each call of the seed's installer, which writes the sample into the record it is handed: as a name or a method. */
+export function installs(code) {
+  const lineOf = (at) => code.slice(0, at).split('\n').length;
+  return [...code.matchAll(/(?<![\w$])installSeed\s*\(/gu)].map((m) => lineOf(m.index));
 }
 
 /**
@@ -147,32 +187,45 @@ export default function noFixtures(
   root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..'),
 ) {
   const ROOT = resolve(root);
-  const files = walk(join(ROOT, APP));
+  const read = PLACES.map((p) => ({ ...p, files: walk(join(ROOT, p.dir)) }));
+  const files = read.flatMap((p) => p.files);
 
   /* A GATE THAT READ NOTHING HAS NOT PASSED, and a mistyped root reads nothing. Exit 3 is "could not run". */
   if (files.length === 0) {
-    console.log(`  no-fixtures: no source under ${join(ROOT, APP)}, so nothing shipped was read`);
+    console.log(`  no-fixtures: no source in any of its ${PLACES.length} places under ${ROOT}, so nothing shipped was read`);
+    return 3;
+  }
+  /* NOR HAS ONE THAT READ PART OF THE WORKSPACE. See `PLACES`. */
+  const gone = existsSync(join(ROOT, 'pnpm-workspace.yaml')) ? read.filter((p) => p.files.length === 0) : [];
+  if (gone.length > 0) {
+    for (const p of gone) console.log(`  no-fixtures: ${p.name} has no source at ${p.dir}, so it was not read`);
+    console.log('  no-fixtures: a place on the list is missing. Point its entry in `PLACES` at where it lives now.');
     return 3;
   }
 
   const findings = [];
   for (const file of files) {
     const rel = relative(ROOT, file).replace(/\\/g, '/');
-    for (const { spec, line } of specifiers(uncommented(readFileSync(file, 'utf8'), file.endsWith('.svelte')))) {
-      const why = refused(spec);
+    const code = uncommented(readFileSync(file, 'utf8'), file.endsWith('.svelte'));
+    for (const { spec, line } of specifiers(code)) {
+      const folder = spec.startsWith('.') && relative(ROOT, resolve(dirname(file), spec)).replace(/\\/g, '/') === SEED_PACKAGE;
+      const why = refused(folder ? '@braindog/seed' : spec);
       if (why !== null) findings.push(`  ${rel}:${line}  ${why} (${spec})`);
     }
+    for (const line of installs(code))
+      findings.push(`  ${rel}:${line}  calls the seed's installer, which writes the sample into a record (installSeed)`);
   }
 
+  const where = `${files.length} shipped file(s) in ${read.filter((p) => p.files.length > 0).length} place(s)`;
   if (findings.length === 0) {
-    console.log(`  no-fixtures: ${files.length} shipped file(s), 0 finding(s)`);
+    console.log(`  no-fixtures: ${where}, 0 finding(s)`);
     return;
   }
   for (const f of findings) console.error(f);
   console.error(
-    `\n  no-fixtures: ${files.length} shipped file(s), ${findings.length} finding(s), each a shipped file reading the sample.\n` +
-      '  The app draws the record it is given or says why it cannot. Read the record, or move the file\n' +
-      '  beside the tests that need it.',
+    `\n  no-fixtures: ${where}, ${findings.length} finding(s), each a shipped file reading the sample.\n` +
+      '  What ships draws the record it is given or says why it cannot. Read the record, import the product\n' +
+      '  through `@braindog/seed/packs`, or move the file beside the tests that need it.',
   );
   return 1;
 }

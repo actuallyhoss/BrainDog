@@ -64,6 +64,7 @@ export type AuthCall =
   | { flow: 'magic.redeem'; claimToken: string; ip: string; sid?: string }
   | { flow: 'passkeys'; sid: string }
   | { flow: 'passkey.remove'; sid: string; id: string }
+  | { flow: 'passkey.rename'; sid: string; id: string; label: string }
   | { flow: 'logout'; sid: string }
   /** Open another record this person is on, in this browser: the session row's record moves, and the cookie does not. */
   | { flow: 'switch'; sid: string; slug: string }
@@ -267,6 +268,7 @@ export type AuthBodies = {
   'magic.redeem': Who;
   passkeys: PasskeyInfo[];
   'passkey.remove': Record<string, never>;
+  'passkey.rename': PasskeyInfo;
   logout: Record<string, never>;
   switch: Who;
   'claim.mint': { expires: number };

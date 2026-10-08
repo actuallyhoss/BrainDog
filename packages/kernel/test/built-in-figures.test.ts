@@ -261,3 +261,35 @@ test('THE SIGNS READ AN UNVERIFIED ARRIVAL BY THE INBOX’S OWN WORDS, written t
 function figureListsOf(id: string): string[] {
   return figureListsSync(BUILT_IN_FIGURES[id]!);
 }
+
+/* ── the agents working now (AGT-C02) ────────────────────────────────────── */
+
+test('RUNS-WORKING COUNTS THE AGENTS AT WORK BY THE ONE CLOCK: 14 minutes is working, 16 is not, and a helper is not one more', async () => {
+  const { workingRuns } = await import('../src/presence.ts');
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const run = (doing: string, state: string, minutesAgo: number, parent?: string) =>
+    value(
+      k.create('session', { doing, agent: 'claude', state }, { actor: 'p_1', stamp: { last_seen: new Date(NOW - minutesAgo * 60_000).toISOString(), ...(parent ? { parent } : {}) } }),
+    );
+
+  const read = () => value<Reading>(k.metric(BUILT_IN_FIGURES['runs-working']!));
+  assert.equal(read().value, 0, 'a record with no run has nobody at work');
+  run('Lead the release', 'active', 2);
+  run('Heard 14 minutes ago', 'active', 14);
+  run('Heard 16 minutes ago', 'active', 16);
+  run('Idle a minute ago', 'idle', 1);
+  run('Check the links', 'active', 3, 'S1');
+
+  const now = read();
+  assert.equal(now.value, 2);
+  assert.equal(now.value, workingRuns(sql, NOW).length, 'the figure and the clock count two different things');
+  /* NO VERDICT: a count of who is at work is neither good nor bad news. */
+  assert.equal(now.met, null);
+  /* A STAT AND A LEAD NOTE READ IT BY NAME, with no figure declared. */
+  assert.equal(k.block({ kind: 'stat', cells: [{ metric: 'runs-working' }] }).readings?.[0]?.reading?.value, 2);
+  const note = k.block({ kind: 'note', body: '{{runs-working}} agents working.', when: { metric: 'runs-working', gt: 0 } } as PageBlock);
+  assert.notEqual(note.drawn, false);
+  assert.equal(note.values?.['runs-working'], 2);
+  sql.close();
+});

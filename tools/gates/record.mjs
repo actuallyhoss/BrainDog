@@ -41,6 +41,10 @@ import { httpStatus } from '../../packages/host/src/index.ts';
 import { NOW, installSeed } from '../../packages/seed/src/index.ts';
 
 import { budget } from './lib.mjs';
+/* THE LIVED RECORD (PRF-A07, `lived.mjs`), the gates' second record, built by living in it rather than seeded. PRF-B06
+   draws it here as a variant; until then it is handed on from this door, so a gate and the look reach both records
+   through one module, and the runner reads `lived.mjs` as the library it is rather than a gate nobody registered. */
+export { buildLived, openLived } from './lived.mjs';
 
 /** Each running record's server key, by its base. Here and nowhere else. */
 const KEYS = new Map();

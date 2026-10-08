@@ -222,6 +222,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    { version: '1.9.0', notes: 'Agents counts an agent as working only when it was heard from in the last 15 minutes.' },
     {
       version: '1.8.0',
       notes:

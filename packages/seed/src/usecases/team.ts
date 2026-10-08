@@ -16,7 +16,6 @@
  */
 
 import { projectTemplate } from '../modules/portfolio.ts';
-import { RUNS_WORKING } from '../packs/agents.ts';
 import { counted } from './counted.ts';
 
 type Body = Record<string, unknown>;
@@ -80,7 +79,7 @@ export const TEAM = {
      2.13.0: a project's page takes portfolio 1.12.0's template: its line is the next step alone, Where it stands is
      headed by how it is going with the agent last, and the tickets handed back are a to-do with no Changed by. 2.12.0
      is live.
-     2.15.0: Agent work's Working now reads the runs active and heard from today (`RUNS_WORKING`, DIRECTION §37). It
+     2.15.0: Agent work's Working now reads the runs active and heard from today (the Agents add-on's clause, §37). It
      read every run the record had not closed, so a run that stopped a minute ago, or one waiting for a pickup, was
      drawn as working, and its empty line no longer tells a team whose agents stopped to connect one. A clause added,
      so a minor step. 2.14.0 is live.
@@ -94,8 +93,12 @@ export const TEAM = {
      step. 2.16.0 is live.
      2.18.0: a project's page takes the template without Done, by week: what was finished this week is the last figure of
      At a glance, after Due soon and In review, asking for its four weeks as a line. A block gone and a cell kept, so a
-     minor step. 2.17.0 is live. */
-  version: '2.18.0',
+     minor step. 2.17.0 is live.
+     2.19.0: Agent work's Working now reads the record's working runs (`sessions.working`, agents 1.9.0), heard from in
+     the last fifteen minutes with a helper folded under its run, where its own clause said today and a run quiet for
+     hours was drawn as working. A source changed under a block that is already there, so a minor step. 2.18.0 is
+     live. */
+  version: '2.19.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -461,15 +464,15 @@ export const TEAM = {
           {
             /* THE RUNS THE RECORD KNOWS ARE GOING (2.6.0), each with the agent's face and what it says it is doing, read
                from `sessions.live` as Home's own runs are. This page listed the `session` list by hand, and drew an
-               empty list on a record whose agents were working. ONLY THE ONES WORKING, SINCE 2.15.0: active and heard
-               from today, the clause the Agents page reads. Its empty line said to connect an agent, which a team whose
-               agents stopped yesterday has done, so it says where agents are connected without saying none is. */
+               empty list on a record whose agents were working. ONLY THE ONES WORKING, SINCE 2.15.0, and since 2.19.0
+               the record's own working runs (`sessions.working`), heard from in the last fifteen minutes, the runs the
+               Agents page and the rail count. Its empty line said to connect an agent, which a team whose agents
+               stopped yesterday has done, so it says where agents are connected without saying none is. */
             kind: 'cards',
             heading: 'Working now',
             icon: 'session',
             span: 12,
-            source: 'sessions.live',
-            where: RUNS_WORKING,
+            source: 'sessions.working',
             columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
             limit: 12,
             empty: 'No agent is working here right now. Agents you connect in Settings show here while they work.',

@@ -417,6 +417,7 @@
       {/if}
 
       {#if note}<p class="status" role="status">{note}</p>{/if}
+      {#if host?.magic === 'down' && !noDoor && (doors || view.name === 'signed-out')}<p class="status" role="status">{copy.mailDown}</p>{/if}
       {#if fromGoogle && doors}<p class="status" role="status">{copy.googleSaid[fromGoogle]}</p>{/if}
 
       <!-- ONE BLOCK FOR EVERY STATE THAT OFFERS A WAY IN, so moving between signed out, asking and

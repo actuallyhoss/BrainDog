@@ -188,6 +188,26 @@ Notion's `Can edit content` is worth naming as the good version of the third row
 *specifically* to separate data from schema, explicitly forbidding *"adding or removing a property,
 or changing a property's type"* and *"creating or changing views."*
 
+### The defaults taken on 8 October, his to reverse with a word
+
+The questions only he could answer were put to him (USE-A02 in `loop/scope/area-usecases-a.md`) and never answered.
+On 8 October he told the loop to take every answer itself (`loop/DIRECTION.md` §42), so each one below is its default,
+taken for him on **8 October 2026** and **his to reverse with a word**. Each is what the code already does, except the
+last, so writing them down changes nothing in the product; each names the line that holds it, and reversing one is
+the job named beside it.
+
+| Question | Taken | Held by | If he reverses it |
+|---|---|---|---|
+| A project's lanes: four or five | **Four**: Building, Earning, Parked, Finished (stored `building`, `earning`, `parked`, `retired`) | `packages/seed/src/modules/portfolio.ts:170-178`, the `lane` field; the projects in play are filtered on two of them at `packages/seed/src/usecases/personal.ts:590`; held by `packages/seed/test/portfolio-lanes.test.ts` | Five (Earning, Shipping, Exploring, Maintain, Retired): the lane field gains `exploring` and `maintain`, shows `building` as Shipping and `retired` as Retired, keeps the stored values, and needs his word on where `parked` goes, since the five do not name it; Portfolio's version moves |
+| Share links in production | **Off.** Opening sign-up to strangers (§42) does not switch them on | The four routes of `packages/host/src/routes/shares.ts:17-22` are in no table (`packages/host/src/routes/index.ts:16-31`), so no host serves them | On: USE-A06 adds the one import line and the one spread line |
+| Who accepts a suggested change | **Any member who may decide accepts a change to a list or a page. Only an owner accepts an add-on, a setting, an arrangement, or anything that runs unattended** | `packages/record/src/index.ts:9349-9369`, the accept path of `decide`: `pack`, `settings` and `arrange` are held to the owner, then `runsUnattended`; held by `packages/record/test/accept-unattended.test.ts` and `accept-rule-level.test.ts` | Owner only: `change` joins the kinds held to the owner, and `accept-unattended.test.ts` gains the case |
+| The levels an invitation offers on one list | **Reads, Adds only and Edits. Never Decides or Owner** | `LIST_LEVELS` at `apps/web/src/lib/record/may.ts:38`; the record does not honour either on one list (above, *A level on one list*) | Offering Decides on one list is a new requirement, since the record would have to honour it first |
+| A colleague who cannot read People | **Reads "Someone on this record"** for every other member | `namesFor` at `packages/record/src/index.ts:6388-6394`: the owner, and a member who may read People while the People module is on, are told names; nobody else is | Names for everyone: `namesFor` admits every member |
+| Services on a founder's record | **Installed only when his words point at it** (domains, hosting, renewals), **otherwise offered at its first renewal**, because "not overwhelming" is his own word | Not yet: a founder's use case installs Estate, and with it Services, on day 0 today (`modules` at `packages/seed/src/usecases/founder.ts:275`). USE-B08 builds the default | Every founder on day 0: USE-B08 keeps Services among what a founder's use case cannot stand without |
+
+What he gets, everyone gets (`loop/DIRECTION.md` §27): none of these is read from his record, and each is the
+default on every record until he says otherwise.
+
 ---
 
 ## 2 · The tiers

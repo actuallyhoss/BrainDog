@@ -556,12 +556,29 @@ const DONE_BY_WEEK: Body = {
  * with no line asked for (`trend`).
  */
 const projectBefore = (doc: Body, id: string): Body =>
-  withPage(doc, 'project', (now) =>
+  withPage(workingBefore(doc, id), 'project', (now) =>
     now.flatMap((b) => {
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
       if (b.heading !== 'At a glance') return [b];
       const cells = (b.cells as Body[]).flatMap((c) => (c.metric !== 'project-done-7d:{{name}}' ? [c] : id === 'founder' ? [] : [(({ trend: _trend, ...cell }) => cell)(c)]));
       return [{ ...b, cells }];
+    }),
+  );
+
+/** The clause the Agents add-on wrote for a run at work until agents 1.9.0: active and heard from today. */
+const RUNS_TODAY = 'state is active, last_seen is today';
+
+/**
+ * AND THE WORKING NOW BLOCK AS IT WAS BEFORE FOUNDER 2.4.0 AND TEAM 2.19.0: the add-on's clause of today over
+ * `sessions.live` where it reads `sessions.working`, drawn whatever the count, and Founder with no line saying how many
+ * agents work now. Undone with the project page's change, so the version before is still the one released.
+ */
+const workingBefore = (doc: Body, id: string): Body =>
+  withPage(doc, id === 'founder' ? 'home-founder' : 'agent-work', (now) =>
+    now.flatMap((b) => {
+      if (b.kind === 'note' && typeof b.body === 'string' && b.body.includes('{{runs-working}}')) return [];
+      if (b.source !== 'sessions.working') return [b];
+      return [Object.fromEntries(Object.entries(b).flatMap(([k, v]): [string, unknown][] => (k === 'when' ? [] : k === 'source' ? [['source', 'sessions.live'], ['where', RUNS_TODAY]] : [[k, v]])))];
     }),
   );
 

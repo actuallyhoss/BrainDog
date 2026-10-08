@@ -76,7 +76,7 @@ const STAYS: ReadonlySet<string> = new Set(['note', 'capture', 'inputs', 'sectio
 
 /** The computed sources whose rows are a list the reader could be shown, so none read is a block with nothing in it. */
 const LISTED: ReadonlySet<string> = new Set([
-  'deadlines', 'activity', 'governance.open', 'governance.later', 'governance.decided', 'sessions.live', 'actions', 'runs_on',
+  'deadlines', 'activity', 'governance.open', 'governance.later', 'governance.decided', 'sessions.live', 'sessions.working', 'actions', 'runs_on',
 ]);
 
 const DAY_MS = 86_400_000;

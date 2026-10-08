@@ -227,6 +227,7 @@ import { answeredOnly, askOwnRows, fileVerdicts, joinOrganisation, meet as meetP
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { builtInFigure } from './built-in-figures.ts';
+import { workingRuns } from './presence.ts';
 import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, type UndoApplied, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
 import { understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
@@ -358,6 +359,8 @@ export { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 export { COSTS, MANY_ROWS, costOf, costRank, worseCost, type Cost } from './weigh.ts';
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
 export { clockOf, isMoneyFormat, verdictOf } from './metrics.ts';
+export { readDeclaredSigns, vitalOf } from './metrics.ts';
+export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 export { ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
 export type { Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
@@ -482,7 +485,7 @@ export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } fro
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
-export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, Value } from './metrics.ts';
+export type { Aggregation, DeclaredSign, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
@@ -1767,9 +1770,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         } else if (at !== null) arm('rule', key, { every: bare, clock: said }, at);
       }
 
-      /* A METRIC WITH `snapshot:` REMEMBERS ITS OWN READINGS. Five past midnight, so the day it is
+      /* A METRIC WITH `snapshot:`, OR A DECLARED SIGN (`vital: true`), REMEMBERS ITS OWN READINGS. Five past midnight, so the day it is
          about is finished and nothing else is competing for the alarm. */
-      if (decl.kind === 'metric' && body.snapshot) {
+      if (decl.kind === 'metric' && (body.snapshot || body.vital === true)) {
         const at = nextOccurrence({ at: '00:05' }, clock.now(), tz);
         if (at !== null) arm('snapshot', bare, { metric: typeof body.metric === 'string' ? body.metric : bare }, at);
       }
@@ -4487,7 +4490,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (at.found?.foreign) return notYours<Ended>(`${prefix}${String(at.found.seq)}`);
       const run = at.found ? byId(at.found.id) : null;
       if (!run)
-        return no<Ended>('NOT_FOUND', 'This session wrote nothing to the record, so it has no run to end. Ending is for a session that wrote.', {
+        return no<Ended>('ROW_UNKNOWN', 'This session wrote nothing to the record, so it has no run to end. Ending is for a session that wrote.', {
           at: 'session',
         });
       const spoken = `${prefix}${String(run.seq)}`;
@@ -5838,6 +5841,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         )
         .map((r) => byId(r.id))
         .filter((e): e is Entry => e !== null),
+    /* THE RUNS WORKING NOW, by the one clock (`presence.ts`), each read whole with its helpers counted under it. */
+    sessionsWorking: () =>
+      workingRuns(sql, clock.now()).flatMap((r) => {
+        const run = byId(r.id);
+        return run ? [{ run, helpers: r.helpers }] : [];
+      }),
     /* THE RECORD'S SCHEDULED ACTIONS, as the `actions` read lists them: keys by label, nothing sealed read. */
     actions: () => listActions(sql, clock.now()),
     /* WHO OPENED A KEY LAST, by the grant its row's secret field names: the newest `grant.read` event, as `keyState`

@@ -307,7 +307,7 @@ function scopeCellsOf(columns: readonly { as?: unknown }[], rows: readonly { cel
 
 /** The register a block's rows belong to, when it has one this build can draw. */
 function registerOf(b: Answered): string | null {
-  if (b.source === 'sessions.live') return 'session';
+  if (b.source === 'sessions.live' || b.source === 'sessions.working') return 'session';
   /* AN `inputs` BLOCK NAMES ITS LIST AS `register:`, as a capture does, and has no `source:`. Without this the page read
      never asked for a pack's list before drawing one, and every such block came back as the line saying it cannot be
      drawn, on the first record that had not already opened that list somewhere else. */
@@ -1215,7 +1215,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     spentBy = { metric: figure, unit: typeof reading.unit === 'string' ? reading.unit : null, groups, ...(spent === undefined ? { toward: true } : {}) };
   }
 
-  const live = b.source === 'sessions.live';
+  /* THE RUNS, ALL OF THEM OR THE ONES WORKING NOW (`sessions.working`, which the record already narrows by the one clock). */
+  const live = b.source === 'sessions.live' || b.source === 'sessions.working';
   const entries = got.map((r) => entryOf(register, r, refs));
   /* HOW FAR ALONG A CARD IS FROM ITS STEPS, worked out by the record where the ring's own field is empty. Drawn through the
      field, so the ring reads as a typed one does; the row itself is not changed. */

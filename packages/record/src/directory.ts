@@ -30,8 +30,8 @@ import { ulids } from '@braindog/kernel';
 import { codeHash, createAuth, signInForgotten, type AuthConfig } from './identity.ts';
 import type { DirectoryAuth, SessionAsk } from './identity.ts';
 
-export type { AuthConfig, DirectoryAuth, Reason, Rule, SessionAsk, SignupNeeds, SignupStart } from './identity.ts';
-export { SIGNUP_UNCHECKED } from './identity.ts';
+export type { AuthConfig, DirectoryAuth, DirectoryBodies, PasskeyRename, Reason, Rule, SessionAsk, SignupNeeds, SignupStart } from './identity.ts';
+export { PASSKEY_NAME_MOST, SIGNUP_UNCHECKED, passkeyName, sharedSuffix } from './identity.ts';
 
 /** The five a person can hold on a record. The record's own ladder, mirrored where membership lives. */
 export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;

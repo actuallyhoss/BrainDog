@@ -104,7 +104,7 @@ function walk(body: unknown, kind: Kind, resolve: Resolve, self?: string): Touch
       /* A PAGE SOURCE THAT IS NO LIST READS THE RUNS OR THE RECORD AS A WHOLE, as `pages.ts` names it. The record's
          copy lacked this line, and handed a member held to `append` on Session the change declaring a page over
          `sessions.live` while `page` answered her `PAGE_UNKNOWN` for the same page. */
-      else if (page && key === 'source' && !PAGE_SOURCES.has(node)) lists.add(node === 'sessions.live' ? 'session' : ACROSS);
+      else if (page && key === 'source' && !PAGE_SOURCES.has(node)) lists.add(node === 'sessions.live' || node === 'sessions.working' ? 'session' : ACROSS);
       for (const m of node.matchAll(/\{\{\s*(?:[a-z]+:)?\s*([a-z][a-z0-9_]*)(?:#\d+)?\.[A-Za-z]/g))
         if (!(kind === 'rule' && RUN_SCOPE.has(m[1]!))) lists.add(m[1]!);
       /* A RULE'S `{{metric.cash-now}}` IS THE FIGURE, read by the run through `figureText`, so it touches the list the

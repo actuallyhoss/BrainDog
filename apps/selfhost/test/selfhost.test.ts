@@ -284,6 +284,9 @@ test('A WRITE THAT MAKES A REMINDER ARMS THE ALARM, without being asked to', asy
     /* NOTHING TO DO IS NO ALARM. The weekly analysis is `createRecord`'s row and this server was
        started against a bare file, so a declaration is all this record has. */
     assert.ok((await running.api.kernel.install([REMINDING])).ok);
+    /* EVERY RECORD READS ITS VITAL SIGNS AT 00:05 (`signs.ts`), so its nightly row is taken out here and this
+       measures the reminder alone. */
+    running.sql.exec("DELETE FROM schedule WHERE kind = 'snapshot' AND key = 'signs'");
     await running.api.kernel.tail(running.scheduler);
     assert.equal(await running.scheduler.get(), null, 'a record with nothing to do armed an alarm');
 
@@ -332,8 +335,12 @@ test('AND A RECORD REOPENED AFTER THE TIME CAME FIRES IT, rather than waiting fo
     await again.drain();
     const notes = again.api.kernel.history(again.api.kernel.get('renewals#1')!.id).filter((e) => e.kind === 'note');
     assert.equal(notes.length, 1, 'the due reminder did not fire on reopen');
-    /* AND THE ALARM IS CLEARED rather than left in the past. */
-    assert.equal(await again.scheduler.get(), null, 'the drained schedule left an alarm behind');
+    /* AND THE ALARM IS CLEARED rather than left in the past: what is left is the record's own night of signs (`signs.ts`),
+       which every record keeps at 00:05, or nothing. */
+    const left = await again.scheduler.get();
+    const night = again.sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'snapshot' AND key = 'signs' AND state = 'pending'");
+    assert.equal(left, night ? Date.parse(night.due_at) : null, 'the drained schedule left an alarm behind');
+    assert.ok(left === null || left > Date.now(), 'the drained schedule left an alarm in the past');
   } finally {
     await again.close();
     rmSync(dir, { recursive: true, force: true });

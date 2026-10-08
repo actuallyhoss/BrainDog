@@ -1,0 +1,22 @@
+{
+  "profile": "default",
+  "says": "A record a month after a move from another tool, shaped like an owner's who stopped tending it: the import left residue, the card's digits were never given so every bank text waits, the numbers stopped coming ten days before the end, and the questions the old tool asked one per message still wait. Every value is invented.",
+  "record": { "name": "Harbour Works", "tz": "Africa/Cairo", "locale": "en-GB", "currency": "EGP" },
+  "weeks": 5,
+  "usecase": "founder",
+  "packs": ["bank-hsbc-eg", "card-alerts"],
+  "import": {
+    "accounts": { "count": 12, "digits": false },
+    "ledger": 200,
+    "people": { "count": 30, "twice": 4 },
+    "numbers": { "series": 24, "points": 2500 },
+    "questions": { "open": 25, "alike": 17 }
+  },
+  "days": {
+    "arrivals": { "count": 30, "lastDaysQuiet": 2 },
+    "balances": { "everyDays": 0 },
+    "numbers": { "stopDaysBeforeEnd": 10 },
+    "runs": { "count": 750, "ends": { "done": 5, "handoff": 1, "abandoned": 4 } },
+    "answers": { "imported": 0 }
+  }
+}

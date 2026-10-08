@@ -53,6 +53,7 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
       'POST /auth/magic/redeem both',
       'GET /auth/passkeys both',
       'POST /auth/passkey/remove both',
+      'POST /auth/passkey/rename both',
       'POST /auth/logout both',
       'GET /auth/sessions both',
       'POST /auth/logout/all both',
@@ -395,6 +396,30 @@ test('an open self-host offers nothing and says so; an insecure origin and an un
   assert.deepEqual(said.body.value, { passkey: false, magic: false, key: false, open: false, why: 'not-configured', me: null });
   assert.deepEqual(said.headers.getSetCookie(), [clearCookie('secure')], 'a cookie this host cannot have issued was kept');
   assert.equal((await bare.call('/auth/session', { headers: { cookie: `__Host-bd_s=${SID}` } })).status, 404);
+});
+
+test("MAIL THAT IS NOT GOING OUT IS SAID: `magic: 'down'`, and never for a host that offers no links", async () => {
+  const magicOf = async (o: Parameters<typeof setup>[0]) => (await setup(o).call('/auth/methods')).body.value?.magic;
+  const linksOff: AuthConfig = { mac: new Uint8Array(32).fill(7), rp: { id: 'studio.example', origin: ORIGIN }, magic: false };
+
+  /* THE WORKER WITH NO SENDER SET: it always means to mail, so it is down whatever its Directory was told. */
+  assert.equal(await magicOf({ auth: linksOff, door: { on: 'worker', mail: undefined } }), 'down');
+  /* A DIRECTORY THAT OFFERS LINKS ON A HOST THAT GAVE NO SENDER: a link would be promised and never sent. */
+  assert.equal(await magicOf({ door: { mail: undefined } }), 'down');
+  /* A SELF-HOST WITH NO MAIL AND LINKS OFF OFFERS NONE, which is not a fault. */
+  assert.equal(await magicOf({ auth: linksOff, door: { mail: undefined } }), false);
+  assert.equal(await magicOf({ auth: linksOff, door: { mailDown: () => true } }), false);
+
+  /* THE COUNT OF THE LAST SENDS, as the Worker's Directory keeps it: down when it says so, and only then. */
+  assert.equal(await magicOf({ door: { mailDown: () => Promise.resolve(true) } }), 'down');
+  assert.equal(await magicOf({ door: { mailDown: () => false } }), true);
+  /* A COUNT THAT CANNOT BE READ, OR NEVER ANSWERS, NEVER HIDES A WAY IN THAT WORKS. */
+  assert.equal(await magicOf({ door: { mailDown: () => { throw new Error('the Directory is away'); } } }), true);
+  assert.equal(await magicOf({ door: { mailDown: () => new Promise<boolean>(() => {}) } }), true);
+
+  /* DOWN TAKES NOTHING ELSE AWAY: the passkey is still offered beside it. */
+  const down = (await setup({ door: { on: 'worker', mail: undefined } }).call('/auth/methods')).body.value;
+  assert.equal(down?.passkey, true);
 });
 
 test('THE OPERATOR: no key is no route, a wrong key is 401, and the claim link comes back and is never mailed', async () => {

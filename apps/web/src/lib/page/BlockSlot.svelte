@@ -194,7 +194,7 @@
     ...(block.scopeCells ? { scope: block.scopeCells } : {}),
     /* A RUN'S FACE, ON A CARD OF RUNS: the run and whether it is working, gone quiet or stopped, so
        `Cards.svelte` draws the run's glyph in the `who` cell instead of a plain initial. */
-    ...(block.source === 'sessions.live' && block.entries
+    ...((block.source === 'sessions.live' || block.source === 'sessions.working') && block.entries
       ? { runs: block.entries.map((e, n) => ({ run: `S${e.seq}`, agent: typeof e.fields.agent === 'string' ? e.fields.agent : null, live: liveOf(e.fields.state, block.quiet?.[n] === true) })) }
       : {}),
     /* A PICTURE IS SERVED BY THE RECORD THE PAGE IS ON: a gallery tile's or a card's file, found in what the

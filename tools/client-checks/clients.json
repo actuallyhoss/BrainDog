@@ -1,0 +1,52 @@
+{
+  "read": "2026-10-09",
+  "why": "Each client is the official MCP SDK a real agent app ships, pinned to an exact version at least two weeks old. The check greets the agent door with each one, over each transport, at each revision named here.",
+  "clients": [
+    {
+      "name": "Claude Code's client",
+      "package": "@modelcontextprotocol/client",
+      "version": "2.1.0",
+      "published": "2026-09-23",
+      "ships_in": "Claude Code 2.1.295 speaks the 2026-07-28 revision through server/discover and falls back to 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05 and 2024-10-07, read from its own binary on 9 October. It names no SDK version, so this is the newest 2.x at least two weeks old.",
+      "transports": [
+        "stdio",
+        "http"
+      ],
+      "revisions": [
+        {
+          "revision": "2026-07-28",
+          "negotiation": "auto"
+        },
+        {
+          "revision": "2025-11-25",
+          "negotiation": "legacy"
+        },
+        {
+          "revision": "2025-06-18",
+          "negotiation": "legacy"
+        },
+        {
+          "revision": "2025-03-26",
+          "negotiation": "legacy"
+        }
+      ]
+    },
+    {
+      "name": "The 1.x SDK",
+      "package": "@modelcontextprotocol/sdk",
+      "version": "1.30.1",
+      "published": "2026-09-23",
+      "ships_in": "Agent apps still on the 1.x line. It always offers its newest revision, 2025-11-25, and has no option to offer an older one, so the older ones are offered by Claude Code's client.",
+      "transports": [
+        "stdio",
+        "http"
+      ],
+      "revisions": [
+        {
+          "revision": "2025-11-25",
+          "negotiation": "legacy"
+        }
+      ]
+    }
+  ]
+}

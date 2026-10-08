@@ -58,9 +58,10 @@ export const packs = {
       back: 'All packs',
       install: 'Install in BrainDog',
       /* The app shows its plan before a write: `apps/web/src/lib/market/PlanSheet.svelte`. */
-      installNote: 'Opens BrainDog, which shows what this adds and asks before anything changes.',
-      /* Until `LAUNCH.signup`, only a record that already exists can take one: `apps/site/src/lib/launch.ts`. */
-      installNoteSoon: 'Opens BrainDog for a record you already have. Anyone can start a record at launch.',
+      installNote: 'Opens BrainDog, which shows what this adds and asks before anything changes. No record yet? You can start one there.',
+      /* SIGN-UP IS OPEN (DIRECTION §42), so `installNote` says a stranger can start a record. This twin is shown only
+         while `LAUNCH.signup` is off, when only a record that already exists can take a pack, and it says just that. */
+      installNoteSoon: 'Opens BrainDog for a record you already have.',
       preview: 'How it looks',
       /* A preview is made in a scratch record by `tools/catalogue/previews.mjs`, never by the author. */
       previewNote: 'Drawn by BrainDog in a fresh record with only this pack on, holding just the examples it brings.',

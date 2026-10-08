@@ -1705,6 +1705,22 @@ export async function start(options: {
     } catch (e) {
       console.error('slash:', e instanceof Error ? e.message : String(e));
     }
+    await lint();
+  };
+  /* AND THE RECORD LINTS ITS OWN PAGES ONCE A DAY on the same ticker (PRF-A04), not on every hour's ask: a round draws
+     every page, so the day is held here as well as in the record and the hours between ask nothing of it. */
+  let lintedOn = '';
+  const lint = async (): Promise<void> => {
+    const today = new Date(clock.now()).toISOString().slice(0, 10);
+    if (gone || lintedOn === today) return;
+    lintedOn = today;
+    try {
+      /* A RECORD NOT YET OPENED (a fresh install at boot) is asked again next hour, not tomorrow. */
+      const ran = await api.lintTick();
+      if (!ran.ran && ran.why === 'unopened') lintedOn = '';
+    } catch (e) {
+      console.error('lint:', e instanceof Error ? e.message : String(e));
+    }
   };
   const slashTicker = options.slashTickMs ? setInterval(() => void slash(), options.slashTickMs) : null;
   slashTicker?.unref?.();

@@ -29,6 +29,7 @@ import { nextOccurrence } from './digest.ts';
 import { dayIn } from './finished.ts';
 import { UNVERIFIED } from './ingest.ts';
 import { intervalMs } from './pull.ts';
+import { SIGNS_FLOW } from './signs-flow.ts';
 
 export type SignState = 'green' | 'red' | 'none';
 
@@ -178,6 +179,8 @@ const VOUCHED = "(state <> 'untriaged' OR reason IS NULL OR reason <> ?)";
 function readArrivals(sql: Sql, nowMs: number, tz: string): SignReading {
   /* THE DOORS AND THE LISTS EACH FEEDS: an installed pattern that takes messages in, and where it files. */
   const fed = new Map<string, Set<string>>();
+  /* AND THE PATTERNS THAT FILE INTO EACH LIST: a message another list's pattern filed says nothing of this one. */
+  const by = new Map<string, Set<string>>();
   for (const r of sql.all<{ body: string }>(
     `SELECT body FROM declaration WHERE kind = 'ingest' AND superseded_at IS NULL AND retired = 0 AND json_valid(body)
        AND json_extract(body, '$.channel') IN ('email', 'webhook', 'api', 'paste')`,
@@ -186,7 +189,11 @@ function readArrivals(sql: Sql, nowMs: number, tz: string): SignReading {
     const channel = String(body?.channel);
     const target = (body?.writes as { register?: unknown } | undefined)?.register;
     const lists = typeof target === 'string' ? [target] : Array.isArray((target as { to?: unknown })?.to) ? ((target as { to: { register?: unknown }[] }).to.map((t) => t.register)) : [];
-    for (const list of lists) if (typeof list === 'string') fed.set(list, (fed.get(list) ?? new Set()).add(channel));
+    for (const list of lists)
+      if (typeof list === 'string') {
+        fed.set(list, (fed.get(list) ?? new Set()).add(channel));
+        if (typeof body?.ingest === 'string') by.set(list, (by.get(list) ?? new Set()).add(body.ingest));
+      }
   }
   const waiting = sql.all<{ ts: string; reason: string | null }>(
     `SELECT ts, reason FROM inbox_raw WHERE state IN ('untriaged', 'review', 'proposed') AND ts <= ? AND ${VOUCHED} ORDER BY ts`,
@@ -206,9 +213,14 @@ function readArrivals(sql: Sql, nowMs: number, tz: string): SignReading {
   for (const [list, channels] of fed) {
     const { name, one } = listWords(sql, list);
     const newest = sql.one<{ at: string | null }>('SELECT max(created_at) AS at FROM entry WHERE register = ? AND deleted_at IS NULL', list)?.at ?? null;
+    /* A MESSAGE FILED COUNTS FOR THE LIST ITS PATTERN WROTE INTO; one still waiting holds every list at its door behind. */
     const marks = [...channels].map(() => '?').join(', ');
+    const names = [...(by.get(list) ?? [])];
+    const filedBy = names.length === 0 ? '0' : `EXISTS (SELECT 1 FROM ingest_receipt x WHERE x.raw_id = r.id AND x.ingest_id IN (${names.map(() => '?').join(', ')}))`;
     const came = sql.one<{ at: string | null }>(
-      `SELECT max(ts) AS at FROM inbox_raw WHERE channel IN (${marks}) AND state IN ('matched', 'untriaged', 'review', 'proposed') AND ${VOUCHED}`,
+      `SELECT max(r.ts) AS at FROM inbox_raw r
+       WHERE ((r.state = 'matched' AND ${filedBy}) OR (r.state IN ('untriaged', 'review', 'proposed') AND r.channel IN (${marks}))) AND ${VOUCHED}`,
+      ...names,
       ...channels,
       UNVERIFIED,
     )?.at ?? null;
@@ -268,9 +280,12 @@ function seriesName(sql: Sql, series: string): string {
 
 /* A NUMBER THAT ARRIVED, NOT ONE THE RECORD WROTE OF ITSELF. A figure's nightly reading (`metrics.ts`, under the figure's
    own id and source) is written every night over whatever its list holds, stale or not, so it is never late: counted
-   here it would be a series that cannot go red, and enough of them would hide a quarter gone quiet. */
-const ARRIVED = `NOT EXISTS (SELECT 1 FROM declaration d WHERE d.kind = 'metric' AND d.superseded_at IS NULL AND json_valid(d.body)
-  AND json_extract(d.body, '$.metric') = mp.series AND json_extract(d.body, '$.source') = mp.source)`;
+   here it would be a series that cannot go red, and enough of them would hide a quarter gone quiet.
+   The figures' (series, source) pairs are read once per query, not once per point: parsing every declaration for
+   every point was most of a night's signs read on a record with a few thousand points. */
+const DECLARED = `WITH declared AS MATERIALIZED (SELECT json_extract(body, '$.metric') AS m, json_extract(body, '$.source') AS s
+  FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND json_valid(body))`;
+const ARRIVED = 'NOT EXISTS (SELECT 1 FROM declared d WHERE d.m = mp.series AND d.s = mp.source)';
 
 function readNumbers(sql: Sql, nowMs: number, tz: string): SignReading {
   const feeds = feedsOn(sql);
@@ -278,13 +293,13 @@ function readNumbers(sql: Sql, nowMs: number, tz: string): SignReading {
 
   /* EVERY SERIES THAT EVER HELD ENOUGH NUMBERS TO HAVE A USUAL GAP, the median of its last thirty. */
   const series = sql.all<{ series: string; newest: string }>(
-    `SELECT series, max(at) AS newest FROM metric_point mp WHERE ${ARRIVED} GROUP BY series HAVING count(DISTINCT at) >= ? ORDER BY series`,
+    `${DECLARED} SELECT series, max(at) AS newest FROM metric_point mp WHERE ${ARRIVED} GROUP BY series HAVING count(DISTINCT at) >= ? ORDER BY series`,
     SERIES_POINTS_LEAST,
   );
   if (feeds.length === 0 && series.length === 0) return reading('none', null, 'No numbers come in on this record yet.');
   const stale: { name: string; newestMs: number }[] = [];
   for (const s of series) {
-    const ats = sql.all<{ at: string }>(`SELECT DISTINCT at FROM metric_point mp WHERE series = ? AND ${ARRIVED} ORDER BY at DESC LIMIT 30`, s.series).map((r) => Date.parse(r.at));
+    const ats = sql.all<{ at: string }>(`${DECLARED} SELECT DISTINCT at FROM metric_point mp WHERE series = ? AND ${ARRIVED} ORDER BY at DESC LIMIT 30`, s.series).map((r) => Date.parse(r.at));
     const gaps = ats.slice(1).map((at, i) => ats[i]! - at).sort((a, b) => a - b);
     const gap = gaps[Math.floor(gaps.length / 2)] ?? DAY;
     const newestMs = Date.parse(s.newest);
@@ -429,8 +444,8 @@ const kernel = (sign: string, name: string, thresholds: Record<string, number>, 
 const filed = (sign: string, name: string, hand: 'record' | 'host'): SignReader => ({ sign, name, hand, version: 1, thresholds: {}, read: null });
 
 /**
- * THE KERNEL'S FIVE AND THE FOUR FILED, in the order 2.2 sets them. One array, so the automation signs (SHL-D01) join
- * with one import and one spread here. The ids are 2.2's; a person reads the names.
+ * THE KERNEL'S FIVE AND THE FOUR FILED, in the order 2.2 sets them, then the seven automation signs (SHL-D01,
+ * `signs-flow.ts`) with one spread. The ids are 2.2's; a person reads the names.
  */
 export const VITAL_SIGNS: readonly SignReader[] = [
   kernel('arrivals-filed', 'Arrivals file by themselves', { ARRIVAL_WAIT_MS, ARRIVALS_WAITING_MOST, ARRIVAL_AHEAD_MS, ARRIVALS_WINDOW_DAYS }, readArrivals),
@@ -442,6 +457,7 @@ export const VITAL_SIGNS: readonly SignReader[] = [
   kernel('oldest-question', 'No question waits too long', { QUESTION_DAYS_MOST }, readOldest),
   kernel('runs-true', 'Runs end as they ended', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs) => readRuns(sql, nowMs)),
   filed('pages-clean', 'Pages print clean', 'host'),
+  ...SIGNS_FLOW,
 ];
 
 /** The sign called `id` on the closed list, or `null`. */

@@ -107,10 +107,11 @@ jobs:
           - leg: web
             dirs: 'apps/web packages/render packages/theme packages/skin'
             browser: true
-          # The hosts, the CLI and the site. The docs' tests ride here because `docs/` is not a
+          # The hosts, the CLI and the site, and the real MCP clients that greet the CLI's source
+          # (`tools/client-checks`). The docs' tests ride here because `docs/` is not a
           # workspace, so no filter reaches them.
           - leg: apps
-            dirs: 'apps/worker apps/selfhost apps/cli apps/site'
+            dirs: 'apps/worker apps/selfhost apps/cli apps/site tools/client-checks'
             links: true
     steps:
       - uses: actions/checkout@v4
@@ -223,6 +224,16 @@ jobs:
       # builds it before anything goes live.
       - run: pnpm --filter braindog-cli build
       - run: node apps/cli/dist/braindog.mjs --version
+      # A REAL CLIENT'S HANDSHAKE WITH THE COMMAND JUST BUNDLED (PRF-A06). The official MCP client SDKs, at the
+      # versions agent apps ship (`tools/client-checks/clients.json`), greet `braindog mcp` over stdio and a self-host's
+      # `/mcp` over HTTP at every revision the server claims: they list the tools, list the resources, ping and call
+      # one. The tools did not list in a real client for a week while every hand-written test was green, and a red
+      # step here holds the deploy. `BRAINDOG_CLI_BUILT=1` runs the bundle rather than the source, and makes a missing
+      # bundle a failure; the `apps` leg runs the same file against the source.
+      - name: Greet the agent door with real MCP clients
+        env:
+          BRAINDOG_CLI_BUILT: '1'
+        run: node --test tools/client-checks/sdk.test.mjs
 
       # AND THE BUILD MUST NOT HAVE CHANGED A TRACKED FILE.
       #
@@ -286,8 +297,8 @@ jobs:
       # because some of them read what the build wrote. By glob, so a new one needs no line here.
       - run: node --test tools/gates/test/*.test.mjs
       # AND THE LOOK'S OWN TESTS, FOR THE SAME REASON: `tools/look` is no workspace either, so no leg
-      # reaches `tools/look/test`. They build nothing and need no build; by glob, as above.
-      - run: node --test tools/look/test/*.test.mjs
+      # reaches `tools/look/test`, nor the tests beside its files. They build nothing and need no build; by glob, as above.
+      - run: node --test tools/look/test/*.test.mjs tools/look/*.test.mjs
 
   windows:
     # THE KERNEL, THE SELF-HOST AND THE CLI ON WINDOWS, which is the owner's own machine and which

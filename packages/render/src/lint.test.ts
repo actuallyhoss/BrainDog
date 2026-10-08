@@ -1,0 +1,166 @@
+/**
+ * The page lint's rules, each with a page that breaks it and one that does not, and one whole page
+ * drawn by `toHTML` that has nothing to find. The red cases are the faults his own pages printed on
+ * 7 October (`evidence-own-record.md` 2.1, `research-direction-audit.md`): a chips figure in braces, a
+ * stat figure with no answer, a run's handle and an ISO instant in the side, and "cake" for an icon.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { LINT_RULES, lintHtml, lintPage, lintText, parse, toHTML, type LintFinding, type LintRule } from './index.ts';
+
+const rules = (fs: readonly LintFinding[]): LintRule[] => fs.map((f) => f.rule);
+const draw = (src: string, values: Record<string, string> = {}): string => toHTML(parse(src), { resolve: (p) => values[p] ?? null });
+/** Red: the rule finds it, in a sentence with no raw form of what it found. Green: nothing at all. */
+const red = (fs: readonly LintFinding[], rule: LintRule): LintFinding => {
+  const f = fs.find((x) => x.rule === rule);
+  assert.ok(f, `expected ${rule}, found ${JSON.stringify(fs)}`);
+  assert.doesNotMatch(f.said, /—|\{\{|#\d|\bS\d{2,}\b|\d{4}-\d{2}-\d{2}T/, 'a finding says what it found without printing it raw');
+  return f;
+};
+
+test('THE RULE LIST IS CLOSED AND SAYS ITSELF: ten rules, each named once, with a sentence and no em dash', () => {
+  assert.deepEqual(
+    LINT_RULES.map((r) => r.rule),
+    ['placeholder', 'braces', 'raw-key', 'raw-id', 'raw-instant', 'icon-word', 'only-a-dash', 'cut-money', 'em-dash', 'plain-words'],
+  );
+  for (const r of LINT_RULES) assert.match(r.says, /^[A-Z].*\.$/), assert.doesNotMatch(r.says, /—/);
+  assert.deepEqual(LINT_RULES.filter((r) => r.copy).map((r) => r.rule), ['em-dash', 'plain-words']);
+});
+
+test('placeholder: a figure with no answer is the hole, named by its last word', () => {
+  const f = red(lintHtml(draw('```stat\nMonthly | {{revenue.mrr}}\nChurn | {{metrics.churn30d}}\n```'), { name: 'Crumb.gg' }), 'placeholder');
+  assert.deepEqual(f, { rule: 'placeholder', part: 'Crumb.gg', said: 'Prints 2 placeholders where values go: mrr, churn30d.' });
+  assert.deepEqual(lintHtml(draw('```stat\nMonthly | {{revenue.mrr}}\n```', { 'revenue.mrr': '£4,200' })), []);
+});
+
+test('placeholder: a bar\'s hole bucket prints its amount and is not one, even drawn as a control', () => {
+  for (const kind of ['bar', 'split'])
+    for (const opts of [{ hole: true as const }, {}])
+      assert.deepEqual(lintHtml(toHTML(parse(`\`\`\`${kind} | Spend\nRent | 1200\nUncategorised | 400 | | hole\n\`\`\``), { ...opts, resolve: () => null })), []);
+  const f = red(lintHtml(toHTML(parse('```bar | Spend\nRent | 1200\nUncategorised | {{spend.loose}} | | hole\n```'), { hole: true, resolve: () => null })), 'placeholder');
+  assert.equal(f.said, 'Prints a placeholder where a value goes: loose.');
+});
+
+test('braces: a chips figure printed as written, braces and all', () => {
+  const html = draw('```chips\nmoney | {{revenue.monthly}} | monthly, trailing\nclock | {{effortDays}}d | to build as sized\n```');
+  assert.equal(red(lintHtml(html), 'braces').said, 'Prints 2 figures in braces instead of their values: monthly, effort days.');
+  assert.deepEqual(lintHtml(draw('```chips\nmoney | £4,200 | monthly, trailing\n```')), []);
+});
+
+test('raw-key: a key in a figure slot, or joined words in the product copy; not in his own prose', () => {
+  assert.equal(red(lintHtml('<span class="pill-figure num">revenue.monthly</span>'), 'raw-key').said, 'Prints a key where a value goes: monthly.');
+  red(lintText('Earned this month: dailyRunRate'), 'raw-key');
+  red(lintText('Waiting on blockers_count'), 'raw-key');
+  assert.deepEqual(lintText('Earned £4,200 this month on brain.dog, the iPhone app and macOS'), []);
+  assert.deepEqual(lintText('The user_id column moved to dailyRunRate', { name: 'Note', theirs: true }), []);
+  assert.deepEqual(lintText('From first_last@gmail.com, with invoice_2026.pdf attached'), []);
+});
+
+test('raw-id: a row number, a run handle, a ULID, a UUID or a random id where a name goes', () => {
+  for (const id of ['tools#8', 'S731', '01J9ZQ4X8M2K7V3N6P5R1T0W9Y', '3f2b8c1e-9a4d-4e6f-8b2a-1c5d7e9f0a3b', 'a3f9c2e81b7d4f60', 'V1StGXR8Z5jdHi6BmyT0aq'])
+    assert.equal(red(lintText(`Started by ${id} this morning`), 'raw-id').said, 'Prints an id where a name goes.');
+  assert.deepEqual(lintText('Started by Sam this morning, the 3rd of 12'), []);
+});
+
+test('raw-id: a part that prints handles on purpose declares it, and his own notes keep their hashes', () => {
+  assert.deepEqual(lintText('Ledger sync, S731\nBank texts, S732', { name: 'Runs', ids: true }), []);
+  assert.deepEqual(lintText('Fixed in a3f9c2e81b7d4f60', { name: 'Note', theirs: true }), []);
+  red(lintText('Filed as tools#8', { name: 'Note', theirs: true }), 'raw-id');
+  assert.deepEqual(lintHtml('<li><span class="name">Claude Code</span> <span class="handle">S731</span></li>', { name: 'Runs', ids: true }), []);
+  for (const id of ['01J9ZQ4X8M2K7V3N6P5R1T0W9Y', 'tools#8']) red(lintText(`Ledger sync, S731, ${id}`, { name: 'Runs', ids: true }), 'raw-id');
+  assert.equal(red(lintText('Shows {{tools#8}}'), 'braces').said, 'Prints a figure in braces instead of its value.');
+});
+
+test('raw-instant: an ISO instant or seconds since 1970 in what is read', () => {
+  for (const at of ['2026-10-06T19:07:01.610Z', '2026-10-06 19:07:01', '1759777621', '1759777621610'])
+    red(lintText(`Last read ${at}`), 'raw-instant');
+  assert.deepEqual(lintText('Last read 6 Oct at 19:07, on 2026-10-06, call +201012345678'), []);
+  assert.deepEqual(lintText('Order 1759777621 shipped', { name: 'Note', theirs: true }), [], 'ten digits in his words are his own number');
+  red(lintHtml('<span class="figure num">1759777621</span>', { name: 'Note', theirs: true }), 'raw-instant');
+});
+
+test('icon-word: a glyph slot holding a word, or an icon the set does not have', () => {
+  assert.equal(red(lintHtml('<span class="sec-glyph" data-glyph="cake" aria-hidden="true">cake</span>'), 'icon-word').said, "Prints an icon's name where the icon goes: cake.");
+  red(lintHtml(draw('Shipped {{icon:not-a-glyph}} today')), 'icon-word');
+  assert.deepEqual(lintHtml(draw('Shipped {{icon:rocket}} today')), []);
+});
+
+test('only-a-dash: a dash alone is a finding only where the data holds a value', () => {
+  /* The two marks the drawers print for no value: a figure slot of only a dash, and the table's `missing` cell. */
+  const html = '<span class="cell-label">Paid</span><span class="cell-figure num">\u2014</span><span class="td"><span class="missing">\u2014</span></span>';
+  red(lintHtml(html, { name: 'Bills', hasValue: true }), 'only-a-dash');
+  assert.deepEqual(lintHtml(html, { name: 'Bills' }), []);
+});
+
+test('cut-money: an amount cut off part way through its number', () => {
+  red(lintText('Owed £33,8…'), 'cut-money');
+  red(lintText('Owed EGP 1,23'), 'cut-money');
+  assert.equal(red(lintHtml('<p>Owed £33,8&hellip;</p>'), 'cut-money').said, 'Cuts an amount off part way through its number.');
+  assert.deepEqual(lintText('Owed £33,850.00, EGP 1,230 and €1,50'), []);
+});
+
+test('em-dash: in the product copy, never in his own note, and never the drawn mark for no value', () => {
+  assert.equal(red(lintText('Rent — due Friday'), 'em-dash').said, 'Uses an em dash in its words.');
+  red(lintHtml('<p>Rent &mdash; due Friday</p>'), 'em-dash');
+  assert.deepEqual(lintText('Rent — due Friday', { name: 'Note', theirs: true }), []);
+  assert.deepEqual(lintText('Rent, due Friday\n—'), []);
+});
+
+test('plain-words: row, list item and entity in the product copy', () => {
+  assert.equal(red(lintText('Open this row to edit the entity'), 'plain-words').said, 'Says a word for the machinery where it should name the thing: "row", "entity".');
+  assert.deepEqual(lintText('Open this bill to change it. Arrow keys move between bills.'), []);
+  assert.deepEqual(lintText('Three wins in a row', { name: 'Note', theirs: true }), []);
+});
+
+test('A WHOLE DECLARED PAGE, DRAWN BY toHTML, HAS NOTHING TO FIND, and a code sample is never read', () => {
+  const src = [
+    '# Crumb.gg',
+    '',
+    'Earning **{{revenue.monthly}}** a month, and {{blockers.count}} things in the way.',
+    '',
+    '```stat',
+    'Monthly | {{revenue.monthly}}',
+    'Paying | {{metrics.payers}}',
+    '```',
+    '',
+    '```chips',
+    'money | £4,200 | monthly, trailing',
+    'block | 2 | in the way',
+    '```',
+    '',
+    '```comparison | Bills',
+    'Name | Amount | Due',
+    'Hosting | £120.00 | Friday',
+    'Domain | £12.00 | 3 Nov',
+    '```',
+    '',
+    '```bar | Spend',
+    'Hosting | 120',
+    'Domain | 12',
+    'Design | 40',
+    '```',
+    '',
+    '- Ship the trial page',
+    '- Ask Tima about the pricing',
+    '',
+    '```code',
+    'run S731 at 2026-10-06T19:07:01.610Z on tools#8 {{revenue.monthly}}',
+    '```',
+  ].join('\n');
+  const html = draw(src, { 'revenue.monthly': '£4,200', 'blockers.count': '2', 'metrics.payers': '31' });
+  assert.match(html, /S731/, 'the code sample is drawn, and the lint does not read it');
+  assert.deepEqual(lintPage({ name: 'Crumb.gg', html, parts: [{ name: 'Who is paying', text: '31 people pay, newest on 6 Oct' }] }), []);
+  assert.deepEqual(lintPage(html), []);
+});
+
+test('A PAGE NAMES EACH PART IN ITS FINDINGS, its own HTML under its own name', () => {
+  const fs = lintPage({
+    name: 'Crumb.gg',
+    html: draw('```stat\nMonthly | {{revenue.mrr}}\n```'),
+    parts: [{ name: 'Activity', text: 'Run S731 read the bank at 2026-10-06T19:07:01.610Z' }],
+  });
+  assert.deepEqual(fs.map((f) => [f.part, f.rule]), [['Crumb.gg', 'placeholder'], ['Activity', 'raw-id'], ['Activity', 'raw-instant']]);
+  assert.deepEqual(rules(lintPage({ name: 'Empty' })), []);
+});

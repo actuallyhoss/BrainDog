@@ -255,3 +255,5 @@ export {
   barFigure,
   zeroFigure,
 } from './format.ts';
+/* The page lint (PRF-A04): what a drawn page prints that a person should never read. The host draws its pages and runs it. */
+export { LINT_RULES, lintHtml, lintPage, lintPart, lintText, type LintFinding, type LintPage, type LintPart, type LintRule } from './lint.ts';

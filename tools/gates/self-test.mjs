@@ -308,6 +308,8 @@ const CASES = [
      that sixth line into a failure rather than a pass that happened to count five. */
   { gate: 'shell-words', expect: /a use case named in the core/, findings: 10, total: 10 },
   { gate: 'no-fixtures', expect: /imports the test fixtures/, findings: 1, total: 1 },
+  { gate: 'no-fixtures-places', run: 'no-fixtures', expect: /imports the seed's root/, findings: 1, total: 1 },
+  { gate: 'no-fixtures-installer', run: 'no-fixtures', expect: /calls the seed's installer/, findings: 3, total: 3 },
   /* THREE, ONE OF EACH SHAPE: a list id as a string, a link into a list written as a template with a hole, and a currency
      code after `??`. Beside them sit a test, a `fixtures/` file, a currency table, markup classes, comments, a regular
      expression and a time zone after `||`, each spelled like one of the three, and `total` says none of them was read. */

@@ -17,6 +17,7 @@
 
 import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
+import { lintRound, pagesCleanReading } from './page-lint.ts';
 import {
   handedOf,
   install,
@@ -122,6 +123,7 @@ import {
   touches,
   whereFor,
   type Wheres,
+  REVIVED as KERNEL_REVIVED,
 } from '@braindog/kernel';
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
@@ -206,6 +208,7 @@ export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, typ
 export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
 export { LATE_DAYS, isWorking, lateAt, nothingWaits, presenceOf, waiting, type Presence, type WaitingNow, type WaitingQuestion, type WaitingReader, type WaitingRun } from './waiting.ts';
 export { headlineAgrees, type Disagrees } from './headlines.ts';
+export { lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_MS, TEMPLATE_ALL, type AnswerRule, type PageFinding, type PageLintRound, type PagesCleanReading } from './page-lint.ts';
 export {
   HEADLINE_ASKS_DAY,
   HEADLINE_MOST,
@@ -580,7 +583,9 @@ export const HANDOFF_ACTIVE = 'A run is active when it writes. Leave state out.'
  * The states a run leaves for `active` when it writes again, as the kernel's ladder moves them
  * (`41 §5.4`). `handoff` is not one: it is a request waiting for the next run.
  */
-const REVIVED: readonly string[] = ['idle', 'done', 'abandoned'];
+/* THE KERNEL'S OWN LIST (handoff included since AGT-C04), so a run resumed through `handoff` or `attach` revives as the
+   ladder revives it. */
+const REVIVED: readonly string[] = KERNEL_REVIVED;
 /** Where a run is and what it is doing. Re-attaching refreshes these, and never `next`, `tried` or `notes`. */
 const POSITION = ['agent', 'host', 'repo', 'remote', 'cwd', 'branch', 'head', 'doing'] as const;
 /** Why `attach` was called: the hook that fired, or the command line. */
@@ -4078,6 +4083,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const SLASH_DAILY = 'slash.daily';
   const SLASH_LAST = 'slash.last';
+  /** The day `lintTick` last ran a round (PRF-A04), kept as the record's own pref beside its updates. */
+  const LINT_HOLDER = 'braindog:signs';
+  const LINT_LAST = 'pages-clean.last';
   const slashDailyState = () => {
     const prefs = kernel.prefsOf(SLASH);
     return { on: prefs[SLASH_DAILY] !== false, last: typeof prefs[SLASH_LAST] === 'string' ? (prefs[SLASH_LAST] as string) : null };
@@ -4125,7 +4133,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ...(Array.isArray(b.from)
       ? (b.from as unknown[]).flatMap((leg) => (leg !== null && typeof leg === 'object' && typeof (leg as { register?: unknown }).register === 'string' ? [(leg as { register: string }).register] : []))
       : []),
-    ...(b.source === 'sessions.live' || b.working === true ? [SESSION] : []),
+    ...(b.source === 'sessions.live' || b.source === 'sessions.working' || b.working === true ? [SESSION] : []),
     ...besideReads(b),
   ];
 
@@ -4146,7 +4154,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const besideReads = (b: { kind?: unknown; source?: unknown; inherit?: unknown; columns?: unknown }): string[] => {
     const declared = [...kernel.registers().values()];
-    if (b.source === 'sessions.live') return declared.filter((r) => r.scopes !== undefined).map((r) => r.id);
+    if (b.source === 'sessions.live' || b.source === 'sessions.working') return declared.filter((r) => r.scopes !== undefined).map((r) => r.id);
     const source = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
     if (source === null) return [];
     const roles = (Array.isArray(b.columns) ? (b.columns as unknown[]) : []).map((c) => (c !== null && typeof c === 'object' ? (c as { as?: unknown }).as : undefined));
@@ -4348,8 +4356,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        refuses her; a figure's said `source: metric.diary-count`. The web
        reads neither off a refused block: `blockOf` draws the shell, headed from `refusals`, the moment one is
        there. A source that names a view and no list stays, since it says nothing she could not guess: the `log`
-       ones, and the two below, which are the kernel's computed sources that `ACROSS` does not hold. */
-    if (!log && typeof b.source === 'string' && b.source !== 'forecast.runway' && b.source !== 'sessions.live') {
+       ones, and the three below, which are the kernel's computed sources that `ACROSS` does not hold. */
+    if (!log && typeof b.source === 'string' && b.source !== 'forecast.runway' && b.source !== 'sessions.live' && b.source !== 'sessions.working') {
       delete kept.source;
       delete kept.columns;
     }
@@ -7924,6 +7932,34 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       out.dropped.push(...(await slashHeadlines(today)).dropped);
       if (out.filed.length > 0 && scheduler) await kernel.tail(scheduler);
       return { ran: true, ...out };
+    },
+
+    /**
+     * THE RECORD LINTS ITS OWN PAGES (PRF-A04), for a host's tick and never routed: one round over the pages it can draw,
+     * on its own data, and the sign `pages-clean` filed through the kernel with the findings as its facts. Once a UTC day
+     * at most, and the day is kept before the round, as `slashTick` keeps its own, so a round that throws is not retried
+     * until tomorrow. Nothing is observed: a page read by the lint is not a page somebody opened.
+     */
+    async lintTick(): Promise<{ ran: false; why: 'today' | 'unopened' } | { ran: true; state: 'green' | 'red' | 'none'; findings: number; pages: number }> {
+      if (kernel.refused()) return { ran: false, why: 'unopened' };
+      const today = new Date(clock.now()).toISOString().slice(0, 10);
+      if (kernel.prefsOf(LINT_HOLDER)[LINT_LAST] === today) return { ran: false, why: 'today' };
+      kernel.setPref(LINT_HOLDER, LINT_LAST, today);
+      const round = lintRound({
+        pages: () => kernel.pages(),
+        page: (slug) => kernel.page(slug),
+        questionsOpen: () => {
+          const decl = kernel.metricDecl('questions-open');
+          const read = decl ? kernel.metric(decl) : null;
+          return read?.ok ? read.value.value : null;
+        },
+        now: () => Date.now(),
+      });
+      const reading = pagesCleanReading(round);
+      /* A READING THE KERNEL REFUSES IS SAID, never dropped: the host logs the throw, and the sign keeps yesterday's. */
+      const filed = kernel.signRead('pages-clean', reading);
+      if (!filed.ok) throw new Error(`pages-clean was not filed: ${'refusal' in filed ? filed.refusal.fix : 'the record changed under it'}`);
+      return { ran: true, state: reading.state, findings: round.findings.length, pages: round.pages };
     },
 
     /**

@@ -5,6 +5,10 @@ packages:
   # the record's primitives rather than code in the shell. Without this line a pack's test is a file nothing runs,
   # and the first time anybody learns that a kernel change broke a pack is when it refuses to install.
   - packs/*
+  # THE OFFICIAL MCP CLIENTS, AS A REAL AGENT APP SHIPS THEM, so the SDKs are installed and pinned like any other
+  # dependency and `pnpm test` greets the agent door with them. The tools did not list in a real client for a week
+  # while every hand-written test was green.
+  - tools/client-checks
 minimumReleaseAge: 1440
 linkWorkspacePackages: false
 # WHICH DEPENDENCIES MAY RUN A BUILD SCRIPT, DECIDED RATHER THAN APPROVED.

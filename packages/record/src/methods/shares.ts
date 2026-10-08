@@ -87,7 +87,7 @@ const FIGURES = [
 const HEADING_ONLY: ReadonlySet<string> = new Set(['capture', 'inputs', 'link', 'feed', 'queue', 'agents', 'diff']);
 
 /** And the computed sources that read across the whole record, whatever kind draws them, as `index.ts`'s `ACROSS` holds. */
-const ACROSS: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'sessions.live']);
+const ACROSS: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'sessions.live', 'sessions.working']);
 
 /**
  * The field types whose values a shared row keeps. Absent are `ref` (another row's id), `file` (a stored file the

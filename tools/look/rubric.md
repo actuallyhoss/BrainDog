@@ -50,4 +50,4 @@ because the picture is unclear is `cannot-tell`, with the reason, and it does no
   where a person sees it), or `polish`.
 - The look passes only when every screen passes every check, nothing is in `notDrawn`, and `look.seen` is true. On the
   seed or the lived record it can be clean and still not count as seen.
-- Name things by what the person calls them (Money, Crumb.gg), never by a key or an id.
+- Name things by what the person calls them (Money, a project by its own name), never by a key or an id.

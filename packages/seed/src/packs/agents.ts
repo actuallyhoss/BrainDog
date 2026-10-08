@@ -183,22 +183,20 @@ const WEEKLY = { value: { count: 'id' }, group_by: 'created_at', bucket: 'week',
 const COUNT = { value: { count: 'id' }, format: 'int', target: { gte: 0 }, window: '30d', compare: 'none' } as const;
 
 /**
- * THE RUNS WORKING NOW, SINCE 1.5.0: active, and heard from today. `state is active` alone kept every run the end hook
- * never closed, so a record's Working now read four runs that had gone quiet the day before, each under its opening
- * placeholder ("Claude run, 1 Oct"), beside the one typing now. A run goes quiet well inside the hour after it was last
- * heard from (`packages/kernel/src/session.ts`), and the sentence grammar counts in days, so today is the nearest clause
- * there is; the host still draws a run quiet since this morning dimmed.
- *
- * ONE CLAUSE FOR EVERY PAGE THAT DRAWS THEM, the figure the line counts included: Agents, a founder's and a business's
- * Home and a team's Agent work read it from here, so no two of them can disagree about who is working.
+ * THE RUNS WORKING NOW ARE THE KERNEL'S, SINCE 1.9.0: active and heard from inside fifteen minutes, its working runs
+ * with no working parent (`sessions.working`, counted as the built-in `runs-working`, both over `workingRuns` in
+ * `packages/kernel/src/presence.ts`). Until 1.9.0 this pack held its own clause, active and heard from today, and the
+ * owner's record said four agents worked while two of the four were last heard from two and four hours before. The
+ * sentence grammar counts in days, so no clause could say fifteen minutes; and eight readers worked "working" out eight
+ * ways. One clock now, so the rail, Today and this page cannot disagree about who is working.
  */
-export const RUNS_WORKING = 'state is active, last_seen is today';
 
 /**
- * THE RUNS THAT STOPPED TODAY, SINCE 1.6.0: idle or handed off, and last heard from today. With `RUNS_WORKING` and
- * `RUNS_EARLIER` it cuts the live runs (`sessions.live`, every run not done or abandoned) so each sits under exactly one
- * heading: a run still active and heard from today is working, one that stopped today is Today, and anything last heard
- * from before today is Earlier, the run the end hook never closed among them.
+ * THE RUNS THAT STOPPED TODAY, SINCE 1.6.0: idle or handed off, and last heard from today. With the kernel's working runs
+ * and `RUNS_EARLIER` it cuts the live runs (`sessions.live`, every run not done or abandoned) so each sits under one
+ * heading: a run active and heard from inside fifteen minutes is working, one that stopped today is Today, and anything
+ * last heard from before today is Earlier, the run the end hook never closed among them. An active run quiet since
+ * earlier today is under none of the three, and Today's lanes still draw it.
  */
 export const RUNS_TODAY = 'state is idle or handoff, last_seen is today';
 
@@ -266,8 +264,8 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
   },
   /* WHAT THE AGENTS PAGE IS DRAWN ON, SINCE 1.4.0, each over its tile's own clauses, so a tile is not drawn over
      nothing and the line at the top can say the runs as a number. A run is a row of the kernel's own `session` list,
-     which every record holds. Working now counts the cards' own clause since 1.5.0 (`RUNS_WORKING`). */
-  'agents-working': { metric: 'agents-working', name: 'Agents working now', source: 'register.session', where: RUNS_WORKING, ...COUNT },
+     which every record holds. HOW MANY WORK NOW IS NOT DECLARED HERE SINCE 1.9.0: `agents-working` counted this pack's
+     own clause, and the line reads the record's built-in `runs-working`, the runs the Working cards draw. */
   'runs-left-next': { metric: 'runs-left-next', name: 'Runs that left a next step', source: 'register.session', where: 'state is idle or handoff, next is set', ...COUNT },
   /* THE TWO GROUPS OF STOPPED RUNS, SINCE 1.6.0, each over its cards' own clause, so a heading is drawn only over runs.
      Earlier counts only the runs still open, as `sessions.live` lists them, so a figure and its cards agree. */
@@ -321,14 +319,14 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'agents-working', gt: 0 },
-        body: '{{agents-working}} agent(s) working now, {{runs-left-next}} run(s) left a next step',
+        when: { metric: 'runs-working', gt: 0 },
+        body: '{{runs-working}} agent(s) working now, {{runs-left-next}} run(s) left a next step',
       },
       {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'agents-working', is: 0 },
+        when: { metric: 'runs-working', is: 0 },
         body: 'No agent is working right now, and {{runs-left-next}} run(s) left a next step',
       },
       /* THE DAY AS A PICTURE, SINCE 1.8.0 (DIRECTION §39, the picture first): the last 24 hours, one lane a run, from when
@@ -361,18 +359,17 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         limit: 3,
         when: { metric: 'questions-open', gt: 0 },
       },
-      /* ONLY THE RUNS STILL WORKING (`RUNS_WORKING`). The end hook leaves a run idle and a handoff waits for a pickup,
-         and both were listed here as working, the run that closed a minute ago beside the one typing now. A run still
-         active and heard from today stays, and the host draws it dimmed once it has gone quiet, because it may yet come
-         back. The project is a scope chip, read off the run's placed project (`projectsOf` in
-         `packages/kernel/src/pages.ts`). WORKING AND NOT "Working now" SINCE 1.6.0, one word among the group headings. */
+      /* ONLY THE RUNS WORKING NOW, THE KERNEL'S SINCE 1.9.0 (`sessions.working`): active and heard from inside fifteen
+         minutes, a helper folded under the run that started it. The end hook leaves a run idle and a handoff waits for
+         a pickup, and neither is working. The source takes no `where:` and no `order:`, so no page can count working its
+         own way again. The project is a scope chip, read off the run's placed project. WORKING AND NOT "Working now"
+         SINCE 1.6.0, one word among the group headings. */
       {
         kind: 'cards',
         heading: 'Working',
         icon: 'session',
         span: 12,
-        source: 'sessions.live',
-        where: RUNS_WORKING,
+        source: 'sessions.working',
         columns: [
           { field: 'doing', as: 'title' },
           { field: 'agent', as: 'who' },
@@ -381,7 +378,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
           { field: 'last_seen', as: 'when' },
         ],
         limit: 12,
-        when: { metric: 'agents-working', gt: 0 },
+        when: { metric: 'runs-working', gt: 0 },
       },
       /* THE RUNS THAT STOPPED TODAY, SINCE 1.6.0, and with them where each left off: what the next session starts from. */
       {
@@ -514,8 +511,8 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      folded under What the brain holds; the Faded tile went into the line; the skill page leads with its trigger and
      draws the lessons that bear on it over the new `skill-learnings`.
      1.5.0 TAKES BLOCKS AWAY AND NARROWS A CLAUSE, SO IT IS MINOR TOO: the agents home is the runs (DIRECTION §37).
-     Working now and the `agents-working` figure under its line read runs active and heard from today
-     (`RUNS_WORKING`), where every active run was counted; Waiting on you goes, since it drew Decide's own cards; What
+     Working now and the `agents-working` figure under its line read runs active and heard from today, where every
+     active run was counted; Waiting on you goes, since it drew Decide's own cards; What
      the brain holds goes with Growth, Learnings and Skills under it, each a list with its own page; the line says
      the runs alone; and no block on the home or the lessons of a skill's page says it is empty, since a block with
      nothing in it is not drawn. Every figure stays declared, for a page that draws one and for an agent that reads
@@ -527,8 +524,12 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      1.7.0 ONLY ADDS, SO IT IS MINOR: `page.run`, a page per run, whose one section draws what the run did and Undo this
      run under `panel: run`.
      1.8.0 ONLY ADDS, SO IT IS MINOR: Today's lanes at the top of the agents home, over the kernel's `started` on a run
-     (its migration 26), and the `runs-heard-today` figure they are drawn on. 1.7.0 is live. */
-  manifest: { id: 'agents', version: '1.8.0', requires: ['register.things'] },
+     (its migration 26), and the `runs-heard-today` figure they are drawn on. 1.7.0 is live.
+     1.9.0 NARROWS WHO IS WORKING TO THE KERNEL'S CLOCK, SO IT IS MINOR: Working draws `sessions.working` and the line
+     reads the built-in `runs-working`, an agent heard from in the last fifteen minutes, where both read this pack's own
+     clause of active and heard from today. `agents-working` goes, the one figure taken away, because the record answers
+     the same question once for every page; no list or field goes. 1.8.0 is live. */
+  manifest: { id: 'agents', version: '1.9.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

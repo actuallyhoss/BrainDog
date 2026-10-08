@@ -24,7 +24,7 @@ import { install, normalise, plan, unresolvedFault, type Applied, type Host, typ
 import { MANIFEST_KEYS, PREVIEW_FORMAT, type CatalogueFile, type Preview } from '@braindog/declare/catalogue';
 import { FORMAT_VERSION, openRecord, type Json, type Kernel, type PageResult } from '@braindog/kernel';
 import type { Param, Refusal, Result, Row, Sql } from '@braindog/ports';
-import { FIRST_PARTY, agentsPackDocument, firstPartyDocument } from '@braindog/seed';
+import { FIRST_PARTY, agentsPackDocument, firstPartyDocument } from '@braindog/seed/packs';
 import { PRIMITIVES_VERSION } from 'braindog-render';
 
 import { oneLine } from './clip.ts';

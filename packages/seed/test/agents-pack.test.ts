@@ -12,7 +12,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 import { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, NOW, ROWS, RUNS, agentsPackDocument, declarations, installAgentsPack, installSeed } from '../src/index.ts';
-import { RUNS_WORKING } from '../src/packs/agents.ts';
+import * as AGENTS_MODULE from '../src/packs/agents.ts';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -45,15 +45,14 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.8.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.9.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.8.0');
+  assert.equal(pack.manifest.version, '1.9.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
 const PROVIDES = [
-  'metric.agents-working',
   'metric.keys-by-week',
   'metric.learnings-active',
   'metric.learnings-by-week',
@@ -77,7 +76,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.8.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.9.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -321,26 +320,40 @@ test("TODAY'S LANES ARE NOT DRAWN ON A DAY NO RUN WAS HEARD FROM", async () => {
 });
 
 /**
- * A RUN THAT HAS GONE QUIET SINCE YESTERDAY IS NOT WORKING NOW, SINCE 1.5.0. `state is active` alone kept every run the
- * end hook never closed: the owner's record read four of them under Working now, each named for the day before. The
- * line counts the same runs the cards draw, so the two cannot disagree.
+ * WORKING IS THE KERNEL'S, SINCE 1.9.0: active and heard from inside fifteen minutes (`sessions.working`), counted by the
+ * built-in `runs-working`. The pack's own clause said today, so the owner's record read four agents working while two of
+ * the four were last heard from hours before. A run quiet for twenty minutes is not working, nor one left since
+ * yesterday, and the line counts the runs the cards draw.
  */
-test('WORKING NOW IS THE RUNS ACTIVE AND HEARD FROM TODAY, and the line counts the same runs', async () => {
+test('WORKING NOW IS THE RUNS HEARD FROM IN THE LAST FIFTEEN MINUTES, and the line counts the same runs', async () => {
   const { k, sql } = await seeded();
-  /* PLANTED AS THE SEED PLANTS A RUN, with the field only the record writes stamped (`openRun` in `src/index.ts`): an
-     active run last heard from a day and two hours ago. */
-  const yesterday = new Date(NOW - 26 * 3_600_000).toISOString();
-  value(k.create('session', { doing: 'Left open since yesterday', agent: 'claude', state: 'active' } as never, { actor: 'p_seed', stamp: { last_seen: yesterday } }));
+  /* PLANTED AS THE SEED PLANTS A RUN, with the field only the record writes stamped (`openRun` in `src/index.ts`). */
+  const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+  value(k.create('session', { doing: 'Quiet for twenty minutes', agent: 'codex', state: 'active' } as never, { actor: 'p_seed', stamp: { last_seen: ago(20) } }));
+  value(k.create('session', { doing: 'Left open since yesterday', agent: 'claude', state: 'active' } as never, { actor: 'p_seed', stamp: { last_seen: ago(26 * 60) } }));
 
   const doing = headed(opened(k, 'agents'), 'Working').rows.map((r) => String(r.fields.doing));
-  assert.ok(!doing.includes('Left open since yesterday'), `a run quiet since yesterday is working now: ${doing.join(', ')}`);
-  assert.deepEqual([...doing].sort(), RUNS.filter((r) => r.state === 'active').map((r) => String(r.doing)).sort(), 'a run heard from today is not working now');
-  const read = k.metric(k.metricDecl('agents-working')!);
+  for (const quiet of ['Quiet for twenty minutes', 'Left open since yesterday']) assert.ok(!doing.includes(quiet), `${quiet} is working now: ${doing.join(', ')}`);
+  /* THE SEED'S TWO ACTIVE RUNS WERE HEARD FROM THREE AND TWELVE MINUTES AGO. */
+  assert.deepEqual([...doing].sort(), RUNS.filter((r) => r.state === 'active').map((r) => String(r.doing)).sort(), 'a run heard from inside fifteen minutes is not working now');
+  const read = k.metric(k.metricDecl('runs-working')!);
   assert.ok(read.ok, JSON.stringify(read));
   assert.equal(read.value.value, doing.length, 'the line counts a run the cards do not draw');
-  /* ONE CLAUSE FOR EVERY PAGE THAT DRAWS WORKING RUNS, the figure included. */
-  assert.equal((AGENTS_PAGES.agents!.blocks as { heading?: string; where?: string }[]).find((b) => b.heading === 'Working')?.where, RUNS_WORKING);
   sql.close();
+});
+
+test('THE ADD-ON HOLDS NO CLOCK OF ITS OWN: the cards read `sessions.working` and the line `runs-working`', () => {
+  assert.deepEqual(Object.keys(AGENTS_MODULE).filter((name) => /WORKING/u.test(name)), [], 'the pack still exports its own clause for working');
+  assert.equal(JSON.stringify(agentsPackDocument()).includes('agents-working'), false, 'the pack still declares or reads its own working figure');
+  const blocks = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; source?: string; where?: unknown; when?: { metric?: string }; lead?: boolean; body?: string }[];
+  const working = blocks.find((b) => b.heading === 'Working');
+  assert.equal(working?.source, 'sessions.working');
+  assert.equal(working?.where, undefined, 'the working source takes no clause');
+  assert.equal(working?.when?.metric, 'runs-working');
+  const lines = blocks.filter((b) => b.kind === 'note' && b.lead === true);
+  assert.equal(lines.length, 2);
+  for (const line of lines) assert.equal(line.when?.metric, 'runs-working', `${line.body} is not held to the record's count`);
+  assert.match(lines[0]!.body!, /^\{\{runs-working\}\} agent\(s\) working now/u);
 });
 
 test('A SKILL IN USE HAS A PAGE: its trigger, then its versions; a retired one has none', async () => {

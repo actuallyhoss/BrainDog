@@ -160,3 +160,32 @@ test("a screen the live source cannot draw is known by its name, and raw text is
   assert.deepEqual(Object.keys(raw).sort(), ['handles', 'ids', 'instants', 'placeholders', 'stuck']);
   assert.deepEqual(rawIn('Cash is £33,850 across 2 accounts, 6 days late.'), {});
 });
+
+test('a script opens at its bare id and a run is the newest, and a refused read is said as refused', async () => {
+  const base = stub(recordB).ask;
+  const answers = {
+    scripts: [{ id: 'script.chase_invoices', script: 'chase_invoices', title: 'Chase invoices' }],
+    listJobs: { jobs: [{ id: 'j_8KQ2' }, { id: 'j_1AAA' }], cursor: null },
+  };
+  const filled = await screensOf('all', await pick(async (m, b) => (Object.hasOwn(answers, m) ? answers[m] : base(m, b))));
+  const paths = filled.screens.map((s) => s.path);
+  assert.ok(paths.includes('/scripts/chase_invoices'), 'the app links a script by its bare id');
+  assert.ok(paths.includes('/jobs/j_8KQ2'), 'the newest run, not a typed id');
+  assert.ok(!paths.some((p) => /j_none/u.test(p)));
+
+  /* The live source refuses the JOBS group, so the run screen is said as a read refused, not as a record with none. */
+  const refused = await screensOf('all', await pick(async (m, b) => (m === 'listJobs' ? null : base(m, b))));
+  const run = refused.missing.find((m) => m.name === 'A run');
+  assert.match(run?.missing ?? '', /did not answer/u);
+  assert.ok(!refused.screens.some((s) => s.path.startsWith('/jobs/')), 'no run address is made up');
+});
+
+test("the sheet says each fault once, with the widths it was seen at", async () => {
+  const { flags } = await import('./sheet.mjs');
+  const shot = (width, extra) => ({ width, settled: 'ready', consoleErrors: ['x'], raw: {}, ...extra });
+  assert.deepEqual(flags([shot(390, { raw: { instants: { count: 3 } } }), shot(1512), shot(1728, { settled: 'refused' })]), [
+    '1 console error at 390, 1512 and 1728',
+    '3 raw times at 390',
+    'Refused at 1728',
+  ]);
+});

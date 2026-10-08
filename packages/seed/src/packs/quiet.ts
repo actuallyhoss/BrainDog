@@ -100,7 +100,9 @@ const spelled = (id: string): string => {
  */
 export function losses(diff: Diff, nameOf: (id: string) => string = spelled, tookOff: ReadonlySet<string> = new Set()): string[] {
   const out: string[] = [];
-  const gone = diff.retires.filter((r) => r.to === undefined);
+  /* A PACK'S OWN FIGURE RETIRED IS NO LOSS by itself: a page the person changed that reads it is still asked about, as
+     a conflict through `c.reads`, and one the pack draws goes with it (agents 1.9.0's working count, DIRECTION 42). */
+  const gone = diff.retires.filter((r) => r.to === undefined && !r.id.startsWith('metric.'));
   if (gone.length > 0) out.push(`take away ${namesSaid(gone.map((r) => nameOf(r.id)))}`);
   const back = diff.adds.filter((a) => a.handed !== true && tookOff.has(a.id));
   if (back.length > 0) out.push(`bring back ${namesSaid(back.map((a) => nameOf(a.id)))}, which you took off`);

@@ -1,0 +1,22 @@
+{
+  "profile": "lived-well",
+  "says": "The same five weeks on a record its owner tends: the card's digits came with the import so every bank text files, the bank sends the day's balance each evening, the numbers come in every day to the end, runs end as they ended, and the questions the import carried are answered in the first week. Every value is invented.",
+  "record": { "name": "Harbour Works", "tz": "Africa/Cairo", "locale": "en-GB", "currency": "EGP" },
+  "weeks": 5,
+  "usecase": "founder",
+  "packs": ["bank-hsbc-eg", "card-alerts"],
+  "import": {
+    "accounts": { "count": 12, "digits": true },
+    "ledger": 200,
+    "people": { "count": 30, "twice": 4 },
+    "numbers": { "series": 24, "points": 2500 },
+    "questions": { "open": 25, "alike": 17 }
+  },
+  "days": {
+    "arrivals": { "count": 30, "lastDaysQuiet": 2 },
+    "balances": { "everyDays": 1 },
+    "numbers": { "stopDaysBeforeEnd": 0 },
+    "runs": { "count": 750, "ends": { "done": 8, "handoff": 2, "abandoned": 0 } },
+    "answers": { "imported": 25 }
+  }
+}

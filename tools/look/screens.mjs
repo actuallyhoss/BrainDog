@@ -8,9 +8,10 @@
  *
  * EVERY SAMPLE IS PICKED FROM THE RECORD'S OWN ANSWERS, never from an id somebody typed: the oldest open question,
  * the project most rows point at, the list with the most rows and its newest row, the first saved view, pack, script
- * and thread. The gates' samples (`tools/gates/routes.mjs`) name rows that exist only in the seed, so on a real
- * record they draw "not found" and photograph as a tidy page. A place opens where the app's own rail opens it: the
- * lead page of the section of that name (`apps/web/src/lib/nav.ts` `leadOf`, `lib/nav/rail.ts` `PLACES`).
+ * and automation, and the newest run and thread. The gates' samples (`tools/gates/routes.mjs`) name rows that exist
+ * only in the seed, so on a real record they draw "not found" and photograph as a tidy page. A place opens where the
+ * app's own rail opens it: the lead page of the section of that name (`apps/web/src/lib/nav.ts` `leadOf`,
+ * `lib/nav/rail.ts` `PLACES`).
  *
  * A SCREEN THAT CANNOT BE PICKED IS SAID, NOT DROPPED. A record with no project has no project screen, and `missing`
  * carries it with the reason, so `said.json` counts it as not seen rather than as a screen that went well.
@@ -127,18 +128,29 @@ export async function pick(ask) {
   const first = out.list ? list((await ask('list', { register: out.list.register, limit: 1 }))?.rows)[0] : undefined;
   out.row = first && Number.isInteger(first.seq) ? { register: biggest.id, seq: first.seq, name: rowName(first, biggest), why: `the first in ${biggest.name}, as the list draws it` } : null;
 
-  const view = list(await ask('views', {}))[0];
+  /* A READ THE RECORD REFUSED is not a record with nothing in it: the screen is said as not picked, for that reason. */
+  const refused = new Set();
+  const read = async (from, method, body) => {
+    const got = await ask(method, body);
+    if (got === null) refused.add(from);
+    return got;
+  };
+  const view = list(await read('view', 'views', {}))[0];
   out.view = view?.register && view?.id ? { key: `${view.register}.${view.id}`, name: view.name ?? null, why: 'the first saved view' } : null;
-  const pack = list(await ask('packs', {}))[0];
+  const pack = list(await read('pack', 'packs', {}))[0];
   out.pack = typeof pack?.id === 'string' ? { id: pack.id, why: 'the first pack this record has' } : null;
-  const script = list(await ask('scripts', {}))[0];
-  out.script = typeof script?.id === 'string' ? { id: script.id, name: script.title ?? null, why: 'the first installed script' } : null;
-  const automations = await ask('automations', {});
+  /* A script's page is at its bare id (`script`), as the app links it; `id` is the declaration's `script.<id>`. */
+  const script = list(await read('script', 'scripts', {}))[0];
+  out.script = typeof script?.script === 'string' ? { id: script.script, name: script.title ?? null, why: 'the first installed script' } : null;
+  const automations = await read('automation', 'automations', {});
   const automation = list(Array.isArray(automations) ? automations : automations?.automations)[0];
   out.automation = typeof automation?.id === 'string' ? { id: automation.id, name: automation.name ?? automation.title ?? null, why: 'the first automation' } : null;
+  const job = list((await read('job', 'listJobs', { limit: 1 }))?.jobs)[0];
+  out.job = typeof job?.id === 'string' ? { id: job.id, why: 'the newest run' } : null;
   const tracks = registers.find((r) => r.id === 'tracks' && r.count > 0);
   const track = tracks ? list((await ask('list', { register: 'tracks', limit: 1 }))?.rows)[0] : undefined;
   out.track = Number.isInteger(track?.seq) ? { seq: track.seq, name: rowName(track, tracks), why: 'the newest thread' } : null;
+  out.refused = [...refused];
   return out;
 }
 
@@ -202,6 +214,7 @@ const PICKED = {
   '/packs/browse/[id]': { name: 'A pack in the catalogue', from: 'pack', path: (p) => `/packs/browse/${encodeURIComponent(p.id)}` },
   '/scripts/[id]': { name: 'A script', from: 'script', path: (s) => `/scripts/${encodeURIComponent(s.id)}` },
   '/automations/[id]': { name: 'An automation', from: 'automation', path: (a) => `/automations/${encodeURIComponent(a.id)}` },
+  '/jobs/[id]': { name: 'A run', from: 'job', path: (j) => `/jobs/${encodeURIComponent(j.id)}` },
   '/t/[track]': { name: 'A thread', from: 'track', path: (t) => `/t/${t.seq}` },
 };
 
@@ -255,6 +268,7 @@ async function everyRoute(picked, appRoot) {
       const key = keyOf(pattern.replace(/[[\]]/gu, ''));
       const held = picked[from];
       if (held) screens.push({ key, name: held.name ?? held.title ?? name, path: path(held), why: held.why });
+      else if (picked.refused?.includes(from)) missing.push({ key, name, missing: `The record did not answer the read that picks ${name.toLowerCase()}, so none was drawn.` });
       else missing.push({ key, name, missing: `This record holds nothing for ${name.toLowerCase()} to show.` });
       continue;
     }

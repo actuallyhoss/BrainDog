@@ -60,6 +60,15 @@
     ],
     "port": 5186
   },
+  "look": {
+    "//": "`tools/look/capture.mjs`, the real screens of a record (`loop/scope/area-proof-a.md` 2.4, PRF-A02). Its height is `layout.viewportHeightPx` and its wait `ready.settleTimeoutMs`, so a look and a gate agree on what drawn means.",
+    "//widths": "Named once: 390 the phone, 1512 the laptop and 1728 the owner's MacBook window, the widths DIRECTION 37 and 39 judge every batch at, each light and dark. 1440 is retired from looks and stays only in `layout.dockedAtPx`. The brief's \"390 and 1440\" is read as 390 and 1512, after section 39.",
+    "widths": [
+      390,
+      1512,
+      1728
+    ]
+  },
   "record": {
     "//": "`record.mjs` on the command line: the port the seed is served on for `vite dev` and `vite preview` to proxy `/api` to. 8787 because `wrangler dev` listens there, so the app finds a record at the same address whichever host is running. The gates never use it: each starts its own record on port 0.",
     "port": 8787

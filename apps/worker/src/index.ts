@@ -933,6 +933,8 @@ export class Record$ extends DurableObject<Env> {
     const asked = await this.#ask(api);
     const modelled = await this.#model(api);
     await slashLook(api);
+    /* AND THE RECORD LINTS ITS OWN PAGES (PRF-A04), at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
+    await api.lintTick().catch((e: unknown) => console.error('lint:', e instanceof Error ? e.message : String(e)));
     /* WORK LEFT FOR THE NEXT INVOCATION SETS THE ALARM FOR NOW, AND IT IS SET LAST. `kernel.tail` sets the alarm from the
        `schedule` table alone, and both the ask pass and the daily look tail it, so a `set(now)` made inside `#act`
        before either of them could be moved out to the next schedule row, or cleared, by a pass that answered one
@@ -2290,19 +2292,28 @@ export class Directory$ extends DurableObject<Env> {
   async letterSent(went: boolean): Promise<void> {
     const kept = (await this.ctx.storage.get<boolean[]>(LETTERS_KEY)) ?? [];
     await this.ctx.storage.put(LETTERS_KEY, [...kept, went].slice(-LETTERS_KEPT));
+    await this.ctx.storage.put(LETTERS_AT_KEY, Date.now());
   }
 
-  /** Whether sign-in mail is down: the last `LETTERS_DOWN_AFTER` sends all failed. What `/auth/methods` says as `magic: 'down'`. */
+  /**
+   * Whether sign-in mail is down: the last `LETTERS_DOWN_AFTER` sends all failed, the newest inside `LETTERS_FRESH_MS`.
+   * What `/auth/methods` says as `magic: 'down'`. FRESH, OR IT NEVER COMES BACK UP: the page offers no link while mail is
+   * down, so no send would ever succeed to clear it: a quarter hour after the last send, the link is offered again.
+   */
   async lettersDown(): Promise<boolean> {
     const kept = (await this.ctx.storage.get<boolean[]>(LETTERS_KEY)) ?? [];
+    const at = (await this.ctx.storage.get<number>(LETTERS_AT_KEY)) ?? 0;
     const last = kept.slice(-LETTERS_DOWN_AFTER);
-    return last.length === LETTERS_DOWN_AFTER && last.every((went) => !went);
+    return last.length === LETTERS_DOWN_AFTER && last.every((went) => !went) && Date.now() - at < LETTERS_FRESH_MS;
   }
 }
 
 /** Where the Directory keeps the last night (`nightDone`), and the last sign-in sends (`letterSent`). */
 const NIGHT_KEY = 'ops-night';
 const LETTERS_KEY = 'ops-letters';
+/** When the last sign-in letter was sent, so a run of failures stops saying mail is down once it is old. */
+const LETTERS_AT_KEY = 'ops-letters-at';
+const LETTERS_FRESH_MS = 15 * 60_000;
 const LETTERS_KEPT = 20;
 const LETTERS_DOWN_AFTER = 5;
 
@@ -3682,6 +3693,9 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
     on: 'worker',
     origin,
     google,
+    /* WHETHER SIGN-IN MAIL IS DOWN: the last five letters all failed, the newest inside the quarter hour
+       (`Directory$.lettersDown`), so `/auth/methods` answers `magic: 'down'` and the page says so (LCH-A04). */
+    mailDown: () => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).lettersDown(),
     auth: ((call: AuthCall) => directory.auth(call)) as unknown as Auth,
     ip: request.headers.get('cf-connecting-ip') ?? '',
     /* MAIL ONLY WHEN BOTH ARE SET, so a host that cannot send says so by offering no `mail` at all. THE ANSWER NEVER

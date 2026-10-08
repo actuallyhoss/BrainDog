@@ -23,7 +23,7 @@ import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, parseWhere, type Predi
 
 import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, looksLikeCredential, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
-import { SESSION_BODY } from './migrations/0026_session_started.ts';
+import { SESSION_BODY } from './migrations/0028_runs.ts';
 import { checkInterval, intervalMs, type PullDecl } from './pull.ts';
 /* A SCHEDULED ACTION'S KEY AND CLOCK, read by the runner from the same lists this file checks against. */
 import { ACTION_AUTH_KINDS, reservedKeyHeader } from './actions.ts';
@@ -372,6 +372,7 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
     opening?: unknown;
     home?: unknown;
     sellable?: unknown;
+    vital?: unknown;
   };
   const id = decl.id;
 
@@ -540,6 +541,19 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
         v.walk === 'zero_on' ? `${id} names a day, so its format is day.` : `${id} adds up money or counts days, and only the day the money runs out (walk: zero_on) has format: day.`,
         'format',
         v.walk === 'zero_on' ? ['day'] : undefined,
+      );
+  }
+
+  /* A VITAL SIGN IS RED WHEN ITS READING MISSES ITS TARGET, so a figure with no bound to miss would read none forever
+     while saying it watches something. Checked before the general rule, so the refusal says why a sign needs one. */
+  if (body.vital !== undefined) {
+    if (body.vital !== true) return bad('DECLARATION_INVALID', `${id}'s vital is true, or left out.`, 'vital', ['true']);
+    const bound = body.target !== null && typeof body.target === 'object' && (Object.hasOwn(body.target, 'lte') || Object.hasOwn(body.target, 'gte'));
+    if (!bound)
+      return bad(
+        'METRIC_NEEDS_TARGET_OR_WINDOW',
+        `${id} is a vital sign, and a sign turns red when its reading misses its target. Give it one, target: { lte: <n> } or target: { gte: <n> }, or take vital out.`,
+        'target',
       );
   }
 
@@ -852,10 +866,11 @@ const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
 /* A SOURCE MUST BE HERE AND IN `pages.ts`'s `COMPUTED`, or a block reading it is refused at install while the reader
    stands ready. `runs_on` is a project's keys, tools, skills and actions; `deadlines` is every row due soon and
    `figures.home` the figures that ask a place on Home. `governance.later` is what was put off, soonest back first, and
-   `governance.decided` what was answered, latest first. */
+   `governance.decided` what was answered, latest first. `sessions.working` is the runs working now, helpers folded under
+   the run that started them, by the one clock in `presence.ts`. */
 const COMPUTED_SOURCES = [
-  'forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'governance.later', 'governance.decided',
-  'runs_on', 'deadlines', 'figures.home',
+  'forecast.runway', 'activity', 'sessions.live', 'sessions.working', 'actions', 'governance.open', 'governance.later',
+  'governance.decided', 'runs_on', 'deadlines', 'figures.home',
 ] as const;
 
 /** A metric id as a page says it: `project-owed:Kiln` is one document read about one project. */
@@ -1547,6 +1562,16 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
          `DEPENDENCY_UNRESOLVED` that needs no record at all. A block reading a register the page does
          not require is a page that survives the uninstall of the pack holding its rows — it stays in
          the nav and draws an empty table under a heading that promises one. */
+      /* THE RUNS WORKING NOW ARE THE CLOCK'S TO CHOOSE AND TO ORDER, so a page cannot count another "working" under the
+         same name. Refused here as `pages.ts` refuses it when read, so the page never installs to draw a refusal. */
+      if (source === 'sessions.working' && (block.where !== undefined || (Array.isArray(block.order) && block.order.length > 0)))
+        return bad(
+          'DECLARATION_INVALID',
+          block.where !== undefined
+            ? `${id}.${at} reads sessions.working, which is every run working now, so it takes no where. Read sessions.live to choose among runs.`
+            : `${id}.${at} reads sessions.working, which comes the most recently heard from first, so it takes no order.`,
+          `${at}.${block.where !== undefined ? 'where' : 'order'}`,
+        );
       if (declared.size > 0 && source.startsWith('register.') && !declared.has(source))
         return bad(
           'DEPENDENCY_UNRESOLVED',

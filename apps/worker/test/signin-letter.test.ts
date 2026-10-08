@@ -43,7 +43,8 @@ async function deployment() {
     assert.ok(out.status < 500, `${out.status} ${await out.clone().text()}`);
     for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
   };
-  return { sent, kv, directory, ask, failWith: (code: string | null) => void (fault = code) };
+  const methods = () => c.ask('/auth/methods', { method: 'GET' });
+  return { sent, kv, directory, ask, methods, failWith: (code: string | null) => void (fault = code) };
 }
 
 /** Run `fn` with the Worker's lines kept out of the test's output. */
@@ -80,6 +81,19 @@ test('FIVE HOST FAULTS IN A ROW IS MAIL DOWN, and one letter that goes is mail b
   d.failWith(null);
   await quiet(() => d.ask());
   assert.equal(await d.directory.lettersDown(), false);
+});
+
+test("MAIL DOWN REACHES /auth/methods AS magic: 'down', AND GOES STALE: a quarter hour after the last send it is not down", async () => {
+  const d = await deployment();
+  d.failWith('E_INTERNAL_SERVER_ERROR');
+  await quiet(async () => {
+    for (let i = 0; i < 5; i++) await d.ask();
+  });
+  assert.equal(await d.directory.lettersDown(), true);
+  const methods = (await (await d.methods()).json()) as { value?: { magic?: unknown } };
+  assert.equal(methods.value?.magic, 'down');
+  d.kv.set('ops-letters-at', Date.now() - 16 * 60_000);
+  assert.equal(await d.directory.lettersDown(), false, 'five old failures still read as down, and nothing would ever send to clear them');
 });
 
 test("AN ADDRESS'S OWN FAULT IS NEVER COUNTED: a suppressed mailbox says nothing about the host or the person", async () => {

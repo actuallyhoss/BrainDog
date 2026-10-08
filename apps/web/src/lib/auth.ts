@@ -18,7 +18,11 @@ export type Who = { person: string; email: string; record: string | null; proved
 /** `GET /auth/methods`: what the Directory offers, plus what only the host knows. */
 export type Methods = {
   passkey: boolean;
-  magic: boolean;
+  /**
+   * Whether an emailed link signs in here. `'down'` is a host that offers links whose mail is not going out now (no
+   * sender, or its last sends failed): the page offers no link then and says so (LCH-A04).
+   */
+  magic: boolean | 'down';
   /** The self-host's server key is accepted here. */
   key: boolean;
   /** The host lets anyone in without a session: a self-host started without a key. */
@@ -177,7 +181,7 @@ function whoOf(v: unknown): Who | null {
 }
 
 function methodsOf(v: unknown): Methods | null {
-  if (!isObj(v) || typeof v.passkey !== 'boolean' || typeof v.magic !== 'boolean' || typeof v.key !== 'boolean') return null;
+  if (!isObj(v) || typeof v.passkey !== 'boolean' || (typeof v.magic !== 'boolean' && v.magic !== 'down') || typeof v.key !== 'boolean') return null;
   return {
     passkey: v.passkey,
     magic: v.magic,

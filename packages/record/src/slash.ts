@@ -286,7 +286,7 @@ export function pageShowsAgents(body: unknown): boolean {
   if (!Array.isArray(blocks)) return false;
   return blocks.some((b) => {
     const x = b as { kind?: unknown; source?: unknown };
-    return x?.kind === 'agents' || x?.source === 'activity' || x?.source === 'sessions.live';
+    return x?.kind === 'agents' || x?.source === 'activity' || x?.source === 'sessions.live' || x?.source === 'sessions.working';
   });
 }
 

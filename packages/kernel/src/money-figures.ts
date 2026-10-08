@@ -25,7 +25,7 @@ import { no, ok } from '@braindog/ports';
 import { compile, jsonPath, type Schema } from '@braindog/where';
 
 import { GROUP_CAP } from './buckets.ts';
-import { GOVERNANCE_OPEN, RECORD_SIGNS } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, RECORD_SIGNS, SESSIONS_WORKING } from './built-in-figures.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { across, type Amount, type Part } from './fx.ts';
 import type { Entry } from './index.ts';
@@ -565,6 +565,8 @@ export function figureLists(
   /* THE RECORD'S SIGNS TOO: what waits in the inbox and what runs on a clock belongs to no list, and to every reader of
      every list. */
   if (decl.source === RECORD_SIGNS) return ['*'];
+  /* THE COUNT OF RUNS WORKING NOW READS THE RUNS, so it is named by Session, as a page over `sessions.working` is. */
+  if (decl.source === SESSIONS_WORKING) return ['session'];
   const out = new Set<string>();
   const add = (d: Pick<MetricDecl, 'source' | 'value' | 'legs'>) => {
     if (d.source.startsWith('register.')) out.add(d.source.slice('register.'.length));

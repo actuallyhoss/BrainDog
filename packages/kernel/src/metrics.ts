@@ -28,7 +28,7 @@ import { fixOf, no, ok } from '@braindog/ports';
 import { KERNEL_FIELDS, compile, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
-import { GOVERNANCE_OPEN, RECORD_SIGNS, readOpenQuestions, readSign } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, RECORD_SIGNS, SESSIONS_WORKING, readOpenQuestions, readRunsWorking, readSign } from './built-in-figures.ts';
 import { isCurrencyCode } from './coerce.ts';
 import type { Leg } from './forecast.ts';
 import { across, convertMinor, dayFieldOf, pairParts, rateFor, rateIsStale, type Part, type Rate, type Reduce } from './fx.ts';
@@ -113,6 +113,12 @@ export type MetricDecl = {
   home?: number | undefined;
   /** `true` offers the figure to a forecast's sell control as something that could be sold for cash. */
   sellable?: true | undefined;
+  /**
+   * `true` makes the figure one of the record's vital signs (PRF-A01): red on the day its reading misses its target,
+   * green when it meets it. Only on a figure with a target, which `declare.ts` holds. A declared sign is shown with the
+   * record's own; it never joins the signs the hold is counted on, so a pack cannot move the clock (`vitalOf`).
+   */
+  vital?: true | undefined;
   /**
    * The factor tables this figure's `product` reads, by name: `{ per_year: { monthly: 12, yearly: 1 } }`.
    *
@@ -982,6 +988,8 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   /* AND THE RECORD'S OWN SIGNS (REC-A01), which read what arrives and what runs, and answer no value, never nought, where
      there is nothing to measure. */
   if (decl.source === RECORD_SIGNS) return readSign(sql, ctx, decl);
+  /* AND HOW MANY AGENTS ARE WORKING NOW, by the one clock (`presence.ts`). */
+  if (decl.source === SESSIONS_WORKING) return readRunsWorking(sql, ctx);
   const refusals: Refusal[] = [];
   const at = (code: string, fix: string, key?: string): void => {
     refusals.push({ code, fix: `${decl.metric}: ${fix}`, ...(key === undefined ? {} : { at: key }) });
@@ -1533,6 +1541,39 @@ export const bucketState = (key: string, rows: number, current: string, first: b
 /** Does the figure clear its target? A target is a bound, and `met` is a fact about one number. */
 export const meets = (value: number, target: { lte: number } | { gte: number }): boolean =>
   'lte' in target ? value <= target.lte : value >= target.gte;
+
+/** A declared figure read as a sign: its id and name, green, red or none, the number read and one sentence. */
+export type DeclaredSign = { sign: string; name: string; state: 'green' | 'red' | 'none'; value: number | null; said: string; hold: false };
+
+/**
+ * A figure declared `vital: true`, read as a sign, or `null` for a figure that is not one.
+ *
+ * RED WHEN THE READING MISSES ITS TARGET, and only then: a reading that could not be judged (no value, a currency with
+ * no rate, a refusal) is `none`, never green, so a sum over nothing does not pass for want of a number. A count of none is
+ * a number and is judged.
+ * `hold` is always false: the hold's clock watches the record's own closed list (`signs.ts`), and a sign a pack declares
+ * is shown beside them, not counted with them.
+ */
+export function vitalOf(decl: Pick<MetricDecl, 'metric' | 'name' | 'vital' | 'target'>, reading: Pick<Reading, 'value' | 'met' | 'refusals'> | null): DeclaredSign | null {
+  if (decl.vital !== true || decl.target === undefined) return null;
+  const judged = reading !== null && reading.refusals.length === 0 && reading.value !== null ? reading.met : null;
+  const state = judged === false ? 'red' : judged === true ? 'green' : 'none';
+  const said = state === 'red' ? `${decl.name} misses its target.` : state === 'green' ? `${decl.name} meets its target.` : `${decl.name} has nothing to judge by yet.`;
+  return { sign: decl.metric, name: decl.name, state, value: reading?.value ?? null, said, hold: false };
+}
+
+/**
+ * Every figure of `decls` declared `vital: true`, read now as a sign, in the order given. The caller hands the figures
+ * with their targets already read live (`liveTarget` in `declare.ts`), so a limit a person changed is the one judged.
+ */
+export function readDeclaredSigns(sql: Sql, decls: readonly MetricDecl[], ctx: EvalContext): DeclaredSign[] {
+  return decls.flatMap((decl) => {
+    if (decl.vital !== true || decl.target === undefined) return [];
+    const read = evaluateMetric(sql, decl, ctx);
+    const sign = vitalOf(decl, read.ok ? read.value : null);
+    return sign === null ? [] : [sign];
+  });
+}
 
 /* ── the scan ────────────────────────────────────────────────────────────── */
 

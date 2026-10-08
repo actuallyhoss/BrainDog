@@ -16,7 +16,7 @@ __*
 !apps/*/static/_headers
 .DS_Store
 
-# Screenshots a person looks at, regenerated on demand and never asserted on: see the two
+# Screenshots a person looks at, regenerated on demand and never asserted on: see the site's
 # `scripts/shot.mjs`. Anchored per app rather than a bare `shots/`, because the marketing site
 # SERVES product shots from `apps/site/static/shots/` and a bare pattern silently excluded them.
 apps/*/shots/

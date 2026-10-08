@@ -15,7 +15,7 @@ export const trust = {
     licence: {
       title: 'Licence',
       body: [
-        'BrainDog is open source. The software is licensed under the Apache License 2.0, and the renderer in packages/render is licensed under the MIT License.',
+        'The software is licensed under the Apache License 2.0, and its renderer under the MIT License.',
         'It is provided as is, without warranty of any kind, express or implied. The licence texts set out the full terms.',
       ],
       links: [
@@ -29,7 +29,7 @@ export const trust = {
       /* NOT WRITTEN HERE. The legal texts are drafted in `apps/site/legal/` and the owner's to
          approve; a marketing redesign does not invent a legal term. Before `LAUNCH.legal` the index
          says so in one sentence; after it, it lists the three pages below. */
-      body: 'The Terms of Service, the Privacy Policy and the Data Processing Addendum are published on this page before sign-up opens, and each says when it last changed.',
+      body: 'The Terms of Service, the Privacy Policy and the Data Processing Addendum will be published on this page, and each will say when it last changed.',
       live: 'The terms you agree to when you make a hosted record, how your data is handled, and who handles it for us.',
     },
     /* One entry per text in `apps/site/legal/`, by its file name, which is also its address under
@@ -41,7 +41,7 @@ export const trust = {
     },
     /* The one sentence an unpublished text's page says. The page exists so a strict prerender passes
        and carries `noindex`, and nothing links to it. */
-    pending: 'This text is published here before sign-up opens.',
+    pending: 'This text will be published here.',
   },
 
   support: {
@@ -55,7 +55,7 @@ export const trust = {
       title: 'Write to us',
       body: 'Send a question, a fault or a request about your record to the support address.',
       /* The empty-address twin. Nothing reads mail at an address until the owner routes it. */
-      pending: 'The support address is published here before sign-up opens.',
+      pending: 'The support address will be listed here.',
     },
     /* Shown only when `LAUNCH.repo`: while the repository is private these addresses answer 404. */
     github: {
@@ -162,7 +162,7 @@ export const trust = {
       title: 'Report a vulnerability',
       body: 'Write to the support address with the steps that show the weakness. Test only against a record that is yours.',
       /* The empty-address twin, as on /support. */
-      pending: 'The address for reporting a weakness is published here before sign-up opens.',
+      pending: 'The address for reporting a weakness will be listed here.',
       /* THE REPOSITORY'S OWN PROMISE, `SECURITY.md` at the root, its table of what happens after a report, word for word
          in its figures. It is drawn only beside the address, because it is a promise about mail somebody reads. */
       after: 'What happens after you write',

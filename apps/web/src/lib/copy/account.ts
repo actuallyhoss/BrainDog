@@ -555,6 +555,8 @@ export const account = {
   withGoogle: 'Continue with Google',
   /* WHAT CAME BACK FROM GOOGLE WITHOUT A SESSION, one sentence each. `unknown` can say so plainly, because Google has
      just shown the address belongs to whoever is reading it. */
+  /* MAIL THAT IS NOT GOING OUT (`magic: 'down'`): no link is offered, and this line says why and what to do instead. */
+  mailDown: 'Mail is not going out right now. Use a passkey, or try in a few minutes.',
   googleSaid: {
     cancelled: 'Google sign-in was cancelled. Nothing changed.',
     unknown: 'Nobody here signs in with that Google address. Use another way in, or start a record of your own.',

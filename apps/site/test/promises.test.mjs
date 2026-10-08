@@ -173,6 +173,19 @@ const NOT_YET = [
   /\bsign-up is not open\b/i,
   /\bnothing is for sale\b/i,
   /\bthe repository is private\b/i,
+  /* SIGN-UP OPENED ON 8 OCTOBER (DIRECTION §42), so a sentence that waits for launch or for sign-up to open is false
+     the day it is read, and so is one that puts off a part with a vague "soon". `packs.ts` said "Anyone can start a
+     record at launch." beside an open door until the copy audit of 9 October. */
+  /\b(at|after|until|before) launch\b/i,
+  /\bwhen the product launches\b/i,
+  /\bsign[- ]?ups? opens\b/i,
+  /\bcoming soon\b/i,
+  /\bnot yet\b/i,
+  /* THE AUDIT'S NOT-YET CLAIMS (`src/lib/claims.ts`, marked `not-yet`). The repository stays private on his word, so
+     no sentence says the code can be read or that the product is open source; the licence may still be named. */
+  /\bthe code is open\b/i,
+  /\bopen[- ]source\b/i,
+  /\bread (the|our) code\b/i,
 ];
 
 test('no sentence says the product is not open yet', () => {

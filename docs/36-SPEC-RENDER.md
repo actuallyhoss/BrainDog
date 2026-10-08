@@ -443,7 +443,7 @@ it saying what to do. The fence is the feedback channel.
 | `DIALECT_KIND_UNKNOWN` | the info string names no kind, or does not match the info regex | `info` | the token · `one of the twenty kinds` | `` `widget` is not a block kind. Write `code \| widget` for verbatim text, or one of the twenty kinds. `` |
 | `DIALECT_KIND_UNKNOWN` | the kind is `table` in a write-up (§13-9), or `cards` outside `{ page: true }` | `info` | the kind · `a page block` | `` `table` draws a register on a page. In a write-up, use `comparison`. `` |
 | `DIALECT_KIND_UNKNOWN` | the kind is `section` outside `{ page: true }` | `info` | `section` · `a page block` | `` `section` is a heading on a page, so it has no place in a fence. Write a `##` heading. `` |
-| `DIALECT_KIND_UNKNOWN` | the kind is `feed` outside `{ page: true }` (§13-22) | `info` | `feed` · `a page block` | `` `feed` draws what happened in the record, on a page, so it has no rows in a fence. Use `timeline`. `` |
+| `DIALECT_KIND_UNKNOWN` | the kind is `feed` outside `{ page: true }` (§13-22) | `info` | `feed` · `a page block` | `` `feed` draws what happened in the record, on a page, so it takes nothing written in a fence. Use `timeline`. `` |
 | `DIALECT_ARITY` | row n has more cells than the kind takes | `rows[n]` | the count · the kind's cells joined with ` \| ` | `` `stat` row 2 has 5 cells. A `stat` row is label \| figure \| note, then a tone. `` |
 | `DIALECT_ARITY` | a `comparison` row is wider than its header | `rows[n]` | the count · the header count | `` `comparison` row 3 has 4 cells. The header has 3. `` |
 | `DIALECT_ARITY` | rows over the cap — `stat` 6, `quote` 1, `gauge` 1, `section` 1 (§13-9) | `rows` | the count · the cap | `` `stat` has 7 rows. Six at most — a seventh tile is a `spec`. `` |

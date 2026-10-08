@@ -81,6 +81,14 @@ test('methods reads the host and keeps only the fields the screen uses', async (
   assert.ok(odd.ok && !('why' in odd.value));
 });
 
+/* MAIL DOWN IS AN ANSWER, NOT A BROKEN HOST: `magic: 'down'` is read, and any other word still loses the answer. */
+test("methods reads magic: 'down' and refuses any other word there", async () => {
+  const down = await methods(host({ '/auth/methods': () => ok({ ...METHODS, magic: 'down' }) }).io);
+  assert.ok(down.ok && down.value.magic === 'down', JSON.stringify(down));
+  const odd = await methods(host({ '/auth/methods': () => ok({ ...METHODS, magic: 'up' }) }).io);
+  assert.deepEqual(odd, { ok: false, kind: 'no-host' });
+});
+
 /* THERE IS NO DEMO TO OPEN, so a host older than the change that still says `demo` is read past rather
    than carried into a screen that has nothing left to draw with it. */
 test('methods drops `demo`, even from a host that still sends it as true', async () => {

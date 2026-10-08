@@ -165,7 +165,7 @@ async function main() {
       write({ closed: new Date().toISOString() });
       return;
     }
-    console.log(`  look: ${source.record} at ${served.app}, set ${asked.set}. Capture arrives in batch 36; stop with Ctrl+C.`);
+    console.log(`  look: ${source.record} at ${served.app}, set ${asked.set}. capture.mjs is missing; stop with Ctrl+C.`);
     if (source.cannot.length > 0) for (const c of source.cannot) console.log(`  cannot draw ${c.screens.join(', ')}: ${c.why}`);
     await new Promise((r) => process.once('SIGINT', r));
     write({ closed: new Date().toISOString() });

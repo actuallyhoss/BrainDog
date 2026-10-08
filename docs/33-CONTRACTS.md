@@ -444,7 +444,7 @@ is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout st
 
 | Route | Method | Host | Does |
 |---|---|---|---|
-| `/auth/methods` | GET | both | which ways in this host offers, and who the cookie belongs to: `{ passkey, magic, key, open, why?, me, firstRun?, google? }` |
+| `/auth/methods` | GET | both | which ways in this host offers, and who the cookie belongs to: `{ passkey, magic, key, open, why?, me, firstRun?, google? }`; `magic` is `'down'` on a host that offers links while its mail is not going out (no sender, or the last five sign-in letters failed within the quarter hour), and the sign-in page then offers no link and says so |
 | `/auth/session` | GET | both | who the cookie belongs to, or 401 and the cookie cleared |
 | `/auth/token` | POST | self-host | `{ serverKey }`: `BRAINDOG_TOKEN` for a session, where the Directory holds one person |
 | `/auth/passkey/register/options` · `/auth/passkey/register` | POST | both | the registration ceremony, behind a session |
@@ -452,6 +452,7 @@ is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout st
 | `/auth/magic/start` | POST | both | `{ email }`: a link, mailed as `<origin>/app/signin#magic=<token>` (`linkOf` in `packages/host/src/auth.ts`; a claim link is `#claim=` on the same page); an unknown address gets the same 200 and no mail. A link mailed before push A as `<origin>/signin#magic=` still works, because that page load is a `308` to `/app/signin` and a browser keeps the fragment |
 | `/auth/magic/redeem` | POST | both | `{ linkToken }` or `{ claimToken }`: spent once, by a press, never by a GET |
 | `/auth/passkeys` · `/auth/passkey/remove` | GET · POST | both | a person's own passkeys, and removing one, the last included; adding or removing needs a proof within 15 minutes (401 `NEEDS_BROWSER_SESSION`, reason `stale`), removing ends the person's other sessions, and both are mailed to the person |
+| `/auth/passkey/rename` | POST | both | `{ id, label }` → the renamed passkey, behind a session; renames only your own, to one line of at most 64 characters; an empty name is 422 `VALUE_MALFORMED`, and a key that is not yours 422 `OUT_OF_BOUNDS`, as one that does not exist is |
 | `/auth/logout` | POST | both | ends the session and clears the cookie |
 | `/auth/sessions` · `/auth/logout/all` | GET · POST | both | a person's own live sessions, `{ sessions: [{ ref, current, authedAt, activeAt, record }] }`, this one marked, each by a short reference and never by its id; and ending the others, `{ keep: "this" }`, or every one, `{ keep: "none" }`, answering `{ ended }` |
 | `/auth/signup/start` · `/auth/signup/verify` · `/auth/signup/name` | POST · POST · GET | Cloud | declared for sign-up: a mailed link proves the address, spending it once makes the person and signs them in, and `?slug=` asks whether a name is free; until the `AuthCall` union names the three flows each answers as a way in this host does not offer |

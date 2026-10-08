@@ -23,12 +23,17 @@
  * AND FIVE SIGNS OF A LIVING RECORD (REC-A01), each of which names no list: how many messages wait on a person, how long
  * the oldest has waited, how long since anything came in, how many feeds are behind, and how many rules ran this week.
  * His record stood still for nine days after the move and no check saw it, because nothing could say so.
+ *
+ * AND `runs-working`, HOW MANY AGENTS ARE AT WORK NOW (AGT-C02): the runs working with no working parent, by the one
+ * clock in `presence.ts`, so a lead note that says "{{runs-working}} agents working" and the cards under it count the
+ * same runs. One agent with four helpers is one.
  */
 
 import type { Result, Sql } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 
 import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
+import { workingRuns } from './presence.ts';
 import { intervalMs } from './pull.ts';
 
 /** The source a built-in figure over the open questions reads, the same word a `queue` block's source is. */
@@ -54,6 +59,23 @@ const QUESTIONS_OPEN: OpenQuestionsDecl = {
   compare: 'none',
   format: 'int',
   about: PARAM,
+};
+
+/** The source the working-runs figure reads, the same word the page source over the same runs is. */
+export const SESSIONS_WORKING = 'sessions.working';
+
+/**
+ * How many agents are working now. NO TARGET: a count of who is at work is neither good nor bad, so it is never met and
+ * never missed, and a tile draws it with no verdict.
+ */
+const RUNS_WORKING: MetricDecl = {
+  metric: 'runs-working',
+  name: 'Agents working now',
+  source: SESSIONS_WORKING,
+  value: { count: 'id' },
+  window: '1d',
+  compare: 'none',
+  format: 'int',
 };
 
 /* ── the signs of a living record (REC-A01) ────────────────────────────── */
@@ -87,6 +109,7 @@ const sign = (id: Sign, name: string, target: { lte: number } | { gte: number },
 /** The figures the record answers by id when no declaration holds that id. */
 export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'questions-open': QUESTIONS_OPEN,
+  'runs-working': RUNS_WORKING,
   'arrivals-waiting': sign('arrivals-waiting', 'Messages waiting on you', { lte: 0 }, 'int', { door: PARAM }),
   'arrivals-oldest-days': sign('arrivals-oldest-days', 'Days the oldest waiting message has waited', { lte: 1 }, 'days'),
   'arrivals-newest-hours': sign('arrivals-newest-hours', 'Hours since the last message came in', { lte: 72 }, 'int'),
@@ -116,6 +139,15 @@ export function readOpenQuestions(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'as
       : sql.one<{ n: number }>(`${open} AND (CASE WHEN json_valid(body) THEN json_extract(body, '$.about') END) = ?`, at, about);
   const n = Number(row?.n ?? 0);
   return ok({ value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: n <= 0, refusals: [] });
+}
+
+/**
+ * How many agents are working now, read off `workingRuns`, which every other reader of "working" reads too. Always now,
+ * even on a read of a past day: which runs were working at some earlier moment is not kept anywhere to be read back.
+ */
+export function readRunsWorking(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>): Result<Reading> {
+  const n = workingRuns(sql, ctx.nowMs).length;
+  return ok({ value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: null, refusals: [] });
 }
 
 /**

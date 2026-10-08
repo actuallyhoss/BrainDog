@@ -353,7 +353,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
           kind === 'section'
             ? `"section" is a heading on a page, so it has no place in a fence. Write a "##" heading. The block is shown as you wrote it.`
             : kind === 'feed' || kind === 'agents'
-              ? `"${kind}" draws what happened in the record, on a page, so it has no rows in a fence. Use "timeline". The block is shown as you wrote it.`
+              ? `"${kind}" draws what happened in the record, on a page, so it takes nothing written in a fence. Use "timeline". The block is shown as you wrote it.`
               : kind === 'capture'
                 ? /* A WRITE-UP HAS NO HOST TO ADD WITH, and "use comparison" would send the author to draw a table of a line nobody can type into. */
                   `"capture" adds a row to a list from a page, so a write-up cannot carry one. Link to the list instead. The block is shown as you wrote it.`
@@ -362,7 +362,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
                     `"inputs" edits a row of a list from a page, so a write-up cannot carry one. Use "spec" for the values. The block is shown as you wrote it.`
                   : kind === 'embed'
                     ? `"embed" frames a video, a design or a map on a page, so a write-up cannot carry one. Link to it instead. The block is shown as you wrote it.`
-                  : `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
+                  : `"${kind}" draws a register on a page, so it takes nothing written in a fence. Use "comparison". The block is shown as you wrote it.`,
         raw,
         info,
         start,

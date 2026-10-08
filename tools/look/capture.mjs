@@ -77,10 +77,19 @@ export const asker = (origin) => async (method, body = {}) => {
   }
 };
 
-/** A tally's change across one picture, so writes blocked are counted against the screen that sent them. */
-const since = (before, after) => {
+/**
+ * A tally's change across one picture, so writes blocked are counted against the screen that sent them. A nested
+ * tally (the live source's `blocked`, by route) is followed, so the line names the route that was refused.
+ */
+export const since = (before, after) => {
   const out = {};
-  for (const [k, v] of Object.entries(after ?? {})) if (typeof v === 'number' && v - (before?.[k] ?? 0) > 0) out[k] = v - (before?.[k] ?? 0);
+  for (const [k, v] of Object.entries(after ?? {})) {
+    if (typeof v === 'number' && v - (before?.[k] ?? 0) > 0) out[k] = v - (before?.[k] ?? 0);
+    else if (v !== null && typeof v === 'object') {
+      const inner = since(before?.[k], v);
+      if (Object.keys(inner).length > 0) out[k] = inner;
+    }
+  }
   return out;
 };
 
@@ -107,8 +116,14 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
     if (was !== null && was !== t) d.setAttribute('data-scheme', t);
     return was;
   }, theme);
-  /* An off-screen group of a long list is not laid out until it nears the window, so a full page would show it empty. */
-  await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' }).catch(() => {});
+  /* An off-screen group of a long list is not laid out until it nears the window, so a full page would show it empty.
+     Set through each element's style and not a <style> tag: the app's policy refuses an inline sheet, which printed a
+     console error on every picture and left the groups unpainted. */
+  await page
+    .evaluate(() => {
+      for (const el of document.querySelectorAll('.rowgroup')) el.style.setProperty('content-visibility', 'visible', 'important');
+    })
+    .catch(() => {});
   await page.waitForTimeout(settleMs);
   const facts = await page
     .evaluate(() => ({
@@ -123,7 +138,8 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
   const base = `${screen.key}-${width}-${theme}`;
   await page.screenshot({ path: join(out, `${base}.png`) });
   await page.screenshot({ path: join(out, `${base}-full.png`), fullPage: true });
-  const blocked = since(before, source.counts());
+  /* What went on is not what was refused: `forwarded` is the reads handed to the record, kept apart. */
+  const { forwarded = 0, ...blocked } = since(before, source.counts());
   return {
     screen: screen.key,
     name: screen.name,
@@ -139,6 +155,7 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
     ...(kept !== null && kept !== theme ? { schemeKept: kept } : {}),
     consoleErrors: [...new Set(heard.errors)].slice(0, 12),
     failedRequests: [...new Set(heard.failed)].slice(0, 12),
+    readsForwarded: forwarded,
     writesBlocked: blocked.writes ?? 0,
     refused: blocked,
     overflowPx: Math.max(0, facts.overflow),

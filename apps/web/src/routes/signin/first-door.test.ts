@@ -138,3 +138,12 @@ test('the screen draws no way into a demo, since there is none to open', () => {
   assert.doesNotMatch(PAGE, /copy\.openTheDemo|copy\.demoNeedsNothing/);
   assert.doesNotMatch(PAGE, /class="demo"/);
 });
+
+/* MAIL THAT IS NOT GOING OUT (LCH-A04): the host answers `magic: 'down'`, the screen reads it rather than losing the whole
+   answer, offers no link, and says why in one line. */
+test("a host whose mail is down offers no link and the screen says so", () => {
+  const down: Methods = { ...LIVE, firstRun: false, magic: 'down' };
+  assert.equal(stateOf(seen(down)).name, 'signed-out');
+  assert.deepEqual(waysFor(down), { passkey: true, magic: false, key: false, lead: 'passkey', keyOpen: false });
+  assert.match(PAGE, /host\?\.magic === 'down'[^}]*\}<p class="status" role="status">\{copy\.mailDown\}/);
+});

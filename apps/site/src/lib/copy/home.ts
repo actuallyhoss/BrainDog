@@ -169,10 +169,10 @@ export const home = {
       body: [
         'Each record is its own database. Export all of it as one file whenever you like.',
         'Every change is saved with who made it, and any change can be undone.',
-        'The code is open, so you can read exactly how all of this works.',
+        'Nothing is locked away: your agents, your scripts and the command line all reach the same record you do.',
       ],
       source: 'See the code on GitHub',
-      /* A glyph for each paragraph of `body`, in order: its own database, every change named, open source. */
+      /* A glyph for each paragraph of `body`, in order: its own database, every change named, everything reaches the same record. */
       glyphs: ['server', 'undo', 'code'],
     },
 

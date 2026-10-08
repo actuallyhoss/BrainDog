@@ -13,7 +13,7 @@
     "release": "node tools/release.mjs",
     "dev": "pnpm --filter @braindog/web dev",
     "build": "pnpm -r --workspace-concurrency=1 run build",
-    "shots": "pnpm --filter @braindog/web exec node scripts/shot.mjs",
+    "shots": "node tools/look/run.mjs",
     "theme": "pnpm --filter @braindog/skin theme",
     "proof": "pnpm --filter @braindog/theme run proof",
     "dev:site": "pnpm --filter @braindog/site dev",

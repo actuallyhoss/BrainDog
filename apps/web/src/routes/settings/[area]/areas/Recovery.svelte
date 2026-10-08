@@ -90,7 +90,7 @@
     {#if liveKeys === null}
       <p class="hint">{copy.passkeysUnread}</p>
     {:else if liveKeys.length === 0}
-      <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy(livePasskeys.magic)} />
+      <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy(livePasskeys.magic !== false)} />
     {:else}
       <ul class="ledger ledger-lead">
         {#each liveKeys as k (k.id)}
@@ -145,7 +145,7 @@
   <Empty
     kind="no-data-yet"
     title={copy.noPasskeys}
-    body={copy.noPasskeysWhy(hostAuth.magic)}
+    body={copy.noPasskeysWhy(hostAuth.magic !== false)}
     actions={hostAuth.passkey && !hostAuth.me ? signInToAdd : undefined}
   />
 </Section>
@@ -162,7 +162,7 @@
        mailed link can still clear a key they lost. The sentence names that way when this host sends mail, and the
        person who runs the host as the last resort either way, because there is no recovery code to offer. -->
   {#if livePasskeys}
-    <StateRow icon="key" title={copy.passkeyLost} line={copy.passkeyLostHow(livePasskeys.magic)} />
+    <StateRow icon="key" title={copy.passkeyLost} line={copy.passkeyLostHow(livePasskeys.magic !== false)} />
   {/if}
   <!-- AND THE ONE THAT IS OFFERED ONLY WHERE IT EXISTS. `49 §5.6`: on a self-host with no SMTP
        `GET /auth/methods` answers `magic: false` "so the screen never offers it". A recovery

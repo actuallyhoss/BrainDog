@@ -10,7 +10,7 @@
  *   In       JSON. A POST needs `content-type: application/json` and `sameOrigin`, except the two
  *            operator routes, which take `Authorization: Bearer <PROVISION_KEY>` instead. The fields are
  *            the `AuthCall`'s: `{ serverKey }`, `{ credential, label? }`, `{ credential }`, `{ email }`,
- *            `{ linkToken }` or `{ claimToken }`, `{ id }`, `{ keep }`; provision takes `{ slug, email, name? }`.
+ *            `{ linkToken }` or `{ claimToken }`, `{ id }`, `{ id, label }`, `{ keep }`; provision takes `{ slug, email, name? }`.
  *   200      `{ ok: true, value }`, the value being `AuthBodies[flow]`; `/auth/methods` answers `MethodsBody`.
  *   202      `/auth/invite` alone: `{ ok: true, value: { proving: true, to } }`, a new address mailed its proof.
  *            A host that sends no mail answers that path 501 `NOT_IN_THIS_BUILD` instead (`invite.ts`).
@@ -410,6 +410,7 @@ export type GoogleFlow = 'google.start' | 'google.callback';
 
 const GOOGLE: ReadonlySet<string> = new Set<GoogleFlow>(['google.start', 'google.callback']);
 
+
 /** One sign-in route: where it is, who serves it, and what it needs. */
 export type AuthRoute = {
   path: string;
@@ -449,6 +450,7 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/magic/redeem', method: 'POST', flow: 'magic.redeem', on: 'both', needs: 'nothing', what: 'Spend a sign-in or claim link, once.' },
   { path: '/auth/passkeys', method: 'GET', flow: 'passkeys', on: 'both', needs: 'session', what: 'Your passkeys, never their keys.' },
   { path: '/auth/passkey/remove', method: 'POST', flow: 'passkey.remove', on: 'both', needs: 'session', what: 'Remove one of your passkeys, the last one included.' },
+  { path: '/auth/passkey/rename', method: 'POST', flow: 'passkey.rename', on: 'both', needs: 'session', what: 'Give one of your passkeys a name of your choosing. `{ id, label }`.' },
   { path: '/auth/logout', method: 'POST', flow: 'logout', on: 'both', needs: 'nothing', what: 'End this session and clear the cookie.' },
   { path: '/auth/sessions', method: 'GET', flow: 'sessions', on: 'both', needs: 'session', what: 'Every live session you have, this one marked, each by a short reference and never by its id.' },
   { path: '/auth/logout/all', method: 'POST', flow: 'logout.all', on: 'both', needs: 'session', what: 'End your other sessions, `{ keep: "this" }`, or every one of them, `{ keep: "none" }`.' },
@@ -477,10 +479,15 @@ export type Why = 'not-configured' | 'insecure';
  * NO `demo`. A Worker with a pinned public record said so here, and the app offered a way into it; the public demo is
  * gone, so there is nothing to offer and the key is not sent. The web reads an absent
  * key as `false`, so an app older than this host draws the same screen.
+ *
+ * `magic: 'down'` IS A HOST THAT MEANS TO MAIL AND CANNOT (LCH-A04): the Worker with no sender set, a Directory that
+ * offers links on a host that gave `serveAuth` no `mail`, or `mailDown` saying the last sign-in letters all failed.
+ * The screen then says mail is not going out, rather than that a link is on its way. It is the host's fault and never
+ * an address's, so it says nothing about who has an account.
  */
 export type MethodsBody = {
   passkey: boolean;
-  magic: boolean;
+  magic: boolean | 'down';
   key: boolean;
   open: boolean;
   why?: Why;
@@ -730,6 +737,12 @@ export type AuthDoor = {
   invite?: InviteDoor | undefined;
   /** This host signs people in with Google, which `/auth/methods` says so the screen draws the button. */
   google?: boolean | undefined;
+  /**
+   * Whether this host's sign-in letters are not going out: on the Worker, the Directory's count of the last sends
+   * (`lettersDown`, the last five all failed for a fault of the host's). Asked only by `/auth/methods`; a throw or a
+   * slow answer is read as not down, so a count that cannot be read never hides a way in that works.
+   */
+  mailDown?: (() => boolean | Promise<boolean>) | undefined;
 };
 
 type Header = readonly [string, string];
@@ -847,6 +860,10 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
       return { flow, sid: sid ?? '', id: text(body.id) };
     case 'switch':
       return { flow, sid: sid ?? '', slug: text(body.slug) };
+    /* A PERSON NAMING ONE OF THEIR OWN PASSKEYS (LCH-A04): the Directory keeps the name to one line of 64 characters,
+       refuses an empty one and renames only the person's own key (`passkey.rename` in `record/src/identity.ts`). */
+    case 'passkey.rename':
+      return { flow, sid: sid ?? '', id: text(body.id), label: text(body.label) };
     /* THE FIVE THAT ARE HANDLED ELSEWHERE AND NOT HERE. `methods` is answered above, `claim.mint`
        and `suspend` go through `operated`, which checks the operator key first, and the two halves of an
        invitation's proof are called by `serveInvite` alone, after it has looked the invitation up.
@@ -988,8 +1005,35 @@ async function methods(door: AuthDoor, mode: CookieMode | null, sid: string | un
   const m = out.body as Methods;
   if (!m.configured) return reply(200, { ok: true, value: { ...nothing, why: 'not-configured' } satisfies MethodsBody }, clear);
   /* GOOGLE NEEDS THE LINK FLOWS, because a sign-in through it is a link minted and spent on the spot. */
-  const body: MethodsBody = { passkey: m.passkey, magic: m.magic, key: m.key, open: false, me: m.me, firstRun: m.firstRun, ...(door.google === true && m.magic ? { google: true as const } : {}) };
+  const magic = (await mailIsDown(door, m.magic)) ? ('down' as const) : m.magic;
+  const body: MethodsBody = { passkey: m.passkey, magic, key: m.key, open: false, me: m.me, firstRun: m.firstRun, ...(door.google === true && m.magic ? { google: true as const } : {}) };
   return answered({ ...out, body }, mode);
+}
+
+/** How long `/auth/methods` waits on `mailDown` before reading it as not down. */
+const MAIL_DOWN_WAIT_MS = 1_000;
+
+/**
+ * Whether sign-in mail is down on this host: `magic: 'down'` on `/auth/methods`.
+ *
+ * NO SENDER WHERE ONE IS MEANT. The Worker always means to mail, so a Worker with no `mail` is down whatever the
+ * Directory was told; a host whose Directory offers links (`offered`) and gave `serveAuth` no `mail` is down too. A
+ * self-host with links off offers none, which is `false` and never `'down'`, whatever a count says. Then the count,
+ * `mailDown`, raced against `MAIL_DOWN_WAIT_MS`.
+ */
+async function mailIsDown(door: AuthDoor, offered: boolean): Promise<boolean> {
+  if (!offered && door.on !== 'worker') return false;
+  if (!door.mail) return true;
+  if (!door.mailDown) return false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const late = new Promise<boolean>((done) => (timer = setTimeout(() => done(false), MAIL_DOWN_WAIT_MS)));
+    return (await Promise.race([Promise.resolve(door.mailDown()), late])) === true;
+  } catch {
+    return false;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
 /** Ten wrong operator keys from one address are compared; the eleventh is refused, as every other lockout is. */

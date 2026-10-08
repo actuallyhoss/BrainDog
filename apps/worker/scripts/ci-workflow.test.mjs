@@ -167,7 +167,7 @@ test('the legs are the four the workflow was drawn with', () => {
     kernel: ['ports', 'where', 'kernel', 'declare', 'extract', 'dog'].map((p) => `packages/${p}`),
     record: [...['record', 'host', 'mcp', 'client', 'slash', 'seed', 'script', 'connect'].map((p) => `packages/${p}`), ...packs],
     web: ['apps/web', ...['render', 'theme', 'skin'].map((p) => `packages/${p}`)],
-    apps: ['worker', 'selfhost', 'cli', 'site'].map((a) => `apps/${a}`),
+    apps: [...['worker', 'selfhost', 'cli', 'site'].map((a) => `apps/${a}`), 'tools/client-checks'],
   };
   const found = legs();
   assert.deepEqual(found.map((leg) => leg.leg), Object.keys(drawn));
@@ -298,8 +298,23 @@ test('the build job runs the gate runner\'s own tests by their glob, after the b
 test('the build job runs the look\'s own tests by their glob', () => {
   const all = steps(job(ci, 'build'));
   const look = at(all, /node --test tools\/look\/test\/\*\.test\.mjs/, 'runs tools/look/test');
-  assert.equal(all[look].run, 'node --test tools/look/test/*.test.mjs');
+  assert.equal(all[look].run, 'node --test tools/look/test/*.test.mjs tools/look/*.test.mjs');
   assert.equal(all[look].if, null);
+});
+
+/* A REAL CLIENT'S HANDSHAKE, WITH THE BUNDLE THAT SHIPS (PRF-A06). After the command is built, so it greets what an agent
+   app starts; before the diff check, so a file it wrote would be seen; and with `BRAINDOG_CLI_BUILT=1`, without which a
+   missing bundle quietly falls back to the source the `apps` leg already ran. */
+test('the build job greets the bundled command with real MCP clients, after building it', () => {
+  const all = steps(job(ci, 'build'));
+  const build = at(all, /pnpm --filter braindog-cli build/, 'bundles the command');
+  const greet = at(all, /node --test tools\/client-checks\/sdk\.test\.mjs/, 'greets the agent door with real MCP clients');
+  const diff = at(all, /git diff --exit-code/, 'checks the build changed no tracked file');
+  assert.ok(build < greet, 'the clients greet the command before it is bundled');
+  assert.ok(greet < diff, 'the clients greet the command after the diff check, so a file they write is never seen');
+  assert.equal(all[greet].if, null, 'the handshake check is conditional');
+  assert.equal(all[greet].run, 'node --test tools/client-checks/sdk.test.mjs');
+  assert.match(all[greet].body, /^ {8}env:\n {10}BRAINDOG_CLI_BUILT: '1'$/m, 'the handshake runs without BRAINDOG_CLI_BUILT=1, so it greets the source and not the bundle');
 });
 
 /* THE SELF-HOST'S APP-PATH TEST SKIPS WITHOUT `apps/web/build`, so it runs only after the job builds the app (batch 35). */

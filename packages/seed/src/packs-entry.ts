@@ -2,9 +2,11 @@
  * `@braindog/seed/packs`: the first-party declarations the app ships, without the sample's names.
  *
  * THE ROOT IS THE SAMPLE. `@braindog/seed` exports `REGISTERS`, `ROWS`, `NOW` and `installSeed` beside the product's own
- * declarations, and `tools/gates/no-fixtures.mjs` refuses a shipped file that imports it. Three shipped files read it for
- * product and nothing else: `declared.ts` for the modules' figures, `packs.ts` for the documents Install sends, and
- * Settings for the Agents pack. This is their door, and `test/packs-entry.test.ts` holds it to exactly what they read.
+ * declarations, and `tools/gates/no-fixtures.mjs` refuses a shipped file that imports it. Four shipped files read it for
+ * product and nothing else: `declared.ts` for the modules' figures, `packs.ts` for the documents Install sends,
+ * Settings for the Agents pack, and the command's scratch record (`apps/cli/src/scratch.ts`, since 9 October, once the
+ * gate read the command too), which installs `FIRST_PARTY` and the Agents pack from the same documents a real record
+ * installs, and no sample. This is their door, and `test/packs-entry.test.ts` holds it to exactly what they read.
  *
  * WHAT IT DOES NOT YET DO IS KEEP THE SAMPLE'S ROWS OUT OF THE BUNDLE. `packs/first-party.ts` slices every document out
  * of `packDocument()` in `index.ts`, whose example seeds are the first row of each of the sample's lists, so loading

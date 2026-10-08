@@ -229,7 +229,7 @@ export const DEFAULT_HOME = todayHome({ tasks: true, adds: true, money: true });
 
 /* ── what Home does to the page it draws ───────────────────────────────── */
 
-const isRuns = (b: LiveBlock): boolean => b.source === 'sessions.live';
+const isRuns = (b: LiveBlock): boolean => b.source === 'sessions.live' || b.source === 'sessions.working';
 /** How many days of a line hold a number. */
 const known = (line: readonly (number | null)[] | undefined): number => (line ?? []).filter((v) => v !== null).length;
 

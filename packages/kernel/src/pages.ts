@@ -41,7 +41,8 @@ import { figureLists, type PointsAt } from './money-figures.ts';
 import { withAdds, type PageAddition } from './page-adds.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isBucket } from './buckets.ts';
-import { isQuiet, QUIET_MS, SESSION_PREFIX } from './session.ts';
+import { isQuiet, presenceOf, WORKING_MS } from './presence.ts';
+import { SESSION_PREFIX } from './session.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost } from './weigh.ts';
 import { MEASURES_MOST, MEASURE_BUCKETS, measureBucket, measureLines, measureSeries, measureWindow, readableZone, type MeasureLatest, type MeasureSeries, type RawReading } from './measures.ts';
@@ -280,7 +281,7 @@ export type BlockResult = PageBlock & {
   inherited?: number;
   /**
    * Where each row applies, aligned with `rows`: its project's title, or `null` for everywhere. On
-   * `sessions.live`, the name of the project each run was placed in.
+   * `sessions.live` and `sessions.working`, the name of the project each run was placed in.
    */
   scopes?: (string | null)[];
   /**
@@ -379,11 +380,16 @@ export type BlockResult = PageBlock & {
   /** Aligned with `rows`, when the block set `working: true`: whether an agent is on each row right now. */
   working_now?: boolean[];
   /**
-   * On `sessions.live`, aligned with `rows`: whether each run has gone quiet, open and not heard from in thirty minutes
-   * (`isQuiet` in `session.ts`). Open is not working, so a declared page draws a quiet run as gone quiet and not as at
-   * work, from the record's clock rather than one of its own.
+   * On `sessions.live`, aligned with `rows`: whether each run has gone quiet, open and not working (`presenceOf` in
+   * `presence.ts`). Open is not working, so a declared page draws a quiet run as gone quiet and not as at work, from the
+   * record's clock rather than one of its own.
    */
   quiet?: boolean[];
+  /**
+   * On `sessions.working`, aligned with `rows`: how many helpers each run has working under it. A helper is folded into
+   * the run that started it and is not a row of its own, so one agent with four subagents is one card that says four.
+   */
+  helpers?: number[];
   /** A forecast's `late:` figure, read: how many days late money has come in on average, or `null` when nothing was paid. */
   lateness?: number | null;
   /** That figure's name as the record declares it, which the late knob is called by, so a use case's words reach it. */
@@ -639,6 +645,11 @@ export type PageDeps = {
   activity?: (limit: number) => { events: ActivityEvent[]; seen: string | null };
   /** Every run of the kernel's `session` register not in one of its `done` states, the most recently seen first. */
   sessionsLive?: () => Entry[];
+  /**
+   * The runs working now that no working run started, each with how many of its helpers are working too: `workingRuns`
+   * in `presence.ts`, the one clock the rail, Today and the Agents page count by. The most recently heard from first.
+   */
+  sessionsWorking?: () => { run: Entry; helpers: number }[];
   /** Every active scheduled action, as the record's `actions` read lists them, keys by label. */
   actions?: () => ActionRow[];
   /**
@@ -768,8 +779,8 @@ export type ListsBeside = {
 
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
 const COMPUTED = new Set([
-  'forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'runs_on', 'deadlines',
-  'figures.home',
+  'forecast.runway', 'activity', 'sessions.live', 'sessions.working', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'runs_on',
+  'deadlines', 'figures.home',
 ]);
 
 /** The name `registersOf` gives a read across the whole record, which no register id can be. */
@@ -842,7 +853,7 @@ export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'heat
 export const REDUCES: ReadonlySet<string> = new Set([...SUMS, 'section']);
 const READ_WHOLE = 200;
 
-/** The register `sessions.live` reads, whose fields its `where` and columns name. */
+/** The register `sessions.live` and `sessions.working` read, whose fields their columns name. */
 const SESSION = 'session';
 
 /** How many events a feed reads. Bursts are counted from events, so a feed of 20 rows reads more than 20. */
@@ -2047,6 +2058,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   /* A FEED READS THE RECORD'S EVENTS, not a register's rows. */
   if (block.source === 'activity') return activityBlock(deps, block, base, also);
   if (block.source === 'sessions.live') return liveBlock(deps, block, base, also);
+  if (block.source === 'sessions.working') return workingBlock(deps, block, base, also);
   if (block.source === 'actions') return actionsBlock(deps, block, base, also);
   if (block.source === 'governance.open') return openBlock(deps, block, base, also);
   if (block.source === 'governance.later') return laterBlock(deps, block, base, also);
@@ -3032,10 +3044,10 @@ function changesOf(deps: PageDeps, register: string, rows: readonly Entry[], eve
  * the reason this is not read off `changes`. Only an agent has a run to be at, so a row last touched
  * by a person or a rule answers `false` before the runs are read at all.
  *
- * THEN TWO CLOCKS AND NOT ONE. The touch itself has to sit inside `QUIET_MS`, because an agent that
+ * THEN TWO CLOCKS AND NOT ONE. The touch itself has to sit inside `WORKING_MS`, because an agent that
  * is still running does not mean it is still on the row it wrote three hours ago; and the run the
- * write was signed by has to have been heard from inside the same window, which is the same fact
- * `sessions.live` shows for a run, asked here of a row instead.
+ * write was signed by has to be working, which `presenceOf` says and nothing here works out again.
+ * A helper counts: it is folded under its parent on `sessions.working`, but the row is still its own.
  *
  * THE JOIN IS THE RUN'S NAME AND NOT THE AGENT'S. `30 §3`: an agent's write is signed by its run,
  * `event.actor = 'S42'`, because three agents under one token are three runs and the question worth
@@ -3046,10 +3058,9 @@ function workingOf(deps: PageDeps, register: string, rows: readonly Entry[]): bo
   const now = deps.ctx.nowMs;
   const live = new Set(
     (deps.sessionsLive?.() ?? [])
-      /* ACTIVE AND HEARD FROM, which is narrower than `sessions.live`'s own "not finished": an idle
-         run is a run that has stopped, and a run nobody has heard from in 30 minutes has gone quiet:
-         its machine went to sleep mid-task. Neither is somebody working on a row now. */
-      .filter((run) => run.fields.state === 'active' && !isQuiet(run, now) && run.seq !== null)
+      /* WORKING, which is narrower than `sessions.live`'s own "not finished": an idle run has stopped, and an active
+         one nobody has heard from inside the window has gone quiet. Neither is somebody working on a row now. */
+      .filter((run) => presenceOf(run, now) === 'working' && run.seq !== null)
       .map((run) => `${SESSION_PREFIX}${String(run.seq)}`),
   );
   if (live.size === 0) return rows.map(() => false);
@@ -3057,7 +3068,7 @@ function workingOf(deps: PageDeps, register: string, rows: readonly Entry[]): bo
     const events = r.seq === null ? undefined : deps.history?.(register, `${register}#${r.seq}`);
     const last = events?.ok ? events.value.at(-1) : undefined;
     if (!last || byOf(last.actor) !== 'agent') return false;
-    return now - Date.parse(last.ts) < QUIET_MS && live.has(last.actor);
+    return now - Date.parse(last.ts) < WORKING_MS && live.has(last.actor);
   });
 }
 
@@ -3695,8 +3706,44 @@ function liveBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (.
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   const rows = kept.slice(0, limit);
   /* AND WHICH OF THEM HAVE GONE QUIET, read here so a page and the rail agree on the one clock: open is not working, and
-     four runs reading "Working now" that nobody had heard from in hours was the board the owner saw. */
+     four runs reading "Working now" that nobody had heard from in hours was the board the owner saw. Open and not working
+     (`isQuiet` over `presenceOf`): a run that left a step is never quiet, even one carried in with no `last_seen`. */
   return { ...base, rows, matched: kept.length, ...projectsOf(deps, rows), quiet: rows.map((r) => isQuiet(r, deps.ctx.nowMs)) };
+}
+
+/**
+ * The runs working now, as rows of `session`, each with its helpers folded under it, the most recently heard from first.
+ *
+ * ONE NUMBER FOR EVERY READER. The rail's foot, Today's headline and tile and the Agents headline each counted runs
+ * their own way, and on the owner's record they said four while two of the four were last heard from hours before.
+ * They all read this now, and this reads `workingRuns` in `presence.ts`, so the count is the clock's and nobody's own.
+ *
+ * NO `where` AND NO `order`. Which runs are working is the clock's to say and the order is the clock's too; a `where`
+ * would let a page count a different "working" under the same name, which is the fault this source closes.
+ */
+function workingBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (!deps.sessionsWorking)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its working runs onto a page yet.', at: 'source' }) };
+  const schema = deps.schemaOf(SESSION);
+  if (!schema) return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: 'This record keeps no runs.', at: 'source' }) };
+  if (block.where !== undefined)
+    return {
+      ...base,
+      refusals: also({ code: 'DECLARATION_INVALID', fix: 'sessions.working is every run working now, so it takes no where:. Use sessions.live to choose among runs.', at: 'where' }),
+    };
+  if (block.order?.length)
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'sessions.working comes the most recently heard from first, so it takes no order:.', at: 'order' }) };
+  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => f !== 'seq' && !Object.hasOwn(schema.fields, f));
+  if (unknown.length)
+    return {
+      ...base,
+      refusals: also({ code: 'FIELD_UNKNOWN', fix: `${SESSION} has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) }),
+    };
+  const working = deps.sessionsWorking();
+  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
+  const kept = working.slice(0, limit);
+  const rows = kept.map((w) => w.run);
+  return { ...base, rows, matched: working.length, ...projectsOf(deps, rows), helpers: kept.map((w) => w.helpers) };
 }
 
 /** A spoken id as the ladder writes a run's project: `things#1`. */
@@ -4193,9 +4240,10 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     /* THE RUNS ARE ROWS OF `session`, whether a block lists the live ones or marks which of its own rows has an
        agent on it. `sessionsLive` refuses somebody without `read` on `session`, and the block on the same page
        handed that person each run's repo, what it was doing and its token id. */
-    if (block.source === 'sessions.live' || block.working === true) named.add(SESSION);
+    const runs = block.source === 'sessions.live' || block.source === 'sessions.working';
+    if (runs || block.working === true) named.add(SESSION);
     /* A LIVE RUN IS NAMED BY ITS PROJECT'S TITLE (`projectsOf`), a row of the list that declares `scopes:`. */
-    const projects = block.source === 'sessions.live' ? beside?.projects?.() : null;
+    const projects = runs ? beside?.projects?.() : null;
     if (projects) named.add(projects);
     /* A CARD'S NEXT STEP AND ITS RING READ EVERY LIST OF STEPS UNDER THE CARDS, all of them, because `ringsOf` tallies
        each and `stepsHolding` refuses a field none of them has with every one's name and fields in `allowed`. */

@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "look": "node run.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs *.test.mjs"
   }
 }

@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { CLAIMS } from './claims.ts';
 import { site } from './copy.ts';
 import { LAUNCH } from './launch.ts';
 import { SUPPORT_EMAIL } from './links.ts';
@@ -164,4 +165,47 @@ test('no sentence says there is no model while an environment includes one', () 
   if (modelled.length > 0) {
     assert.deepEqual(said, [], `a model is included in ${modelled.join(' and ')}, and the site says there is none: ${said.join(' | ')}`);
   }
+});
+
+/**
+ * THE LEDGER OF CLAIMS (`claims.ts`) HELD TO THE COPY AND TO THE FLAGS. A claim is found by the path it names and its
+ * own words, so a sentence reworded without its claim fails here; a claim on a flag names a flag `launch.ts` has; a
+ * claim marked true on a flag fails the day the flag goes off, and one marked `flag` fails the day it goes on, so the
+ * ledger never says a stale thing for long. A `not-yet` claim is checked across every string the site holds.
+ */
+
+/** The value at a dotted path into `site`, an array index as a number. */
+const at = (path: string): unknown =>
+  path.split('.').reduce<unknown>((v, key) => (v && typeof v === 'object' ? (v as { [k: string]: unknown })[key] : undefined), site);
+
+test('every claim in the ledger is said where it says, in its own words', () => {
+  const ids = new Set<string>();
+  for (const claim of CLAIMS) {
+    assert.ok(!ids.has(claim.id), `two claims are called ${claim.id}`);
+    ids.add(claim.id);
+    if (claim.state === 'not-yet') continue;
+    const value = at(claim.where);
+    assert.equal(typeof value, 'string', `${claim.id}: site.${claim.where} is not a sentence`);
+    assert.ok((value as string).includes(claim.said), `${claim.id}: site.${claim.where} no longer says "${claim.said}"; it says "${value}"`);
+  }
+});
+
+test('every claim on a flag names a flag launch.ts has, and agrees with it', () => {
+  for (const claim of CLAIMS) {
+    if (claim.state === 'flag') assert.ok(claim.flag !== undefined, `${claim.id} is marked flag and names none`);
+    if (claim.flag === undefined) continue;
+    assert.ok(Object.hasOwn(LAUNCH, claim.flag), `${claim.id} names the flag "${claim.flag}", and launch.ts has no such flag`);
+    const on = LAUNCH[claim.flag];
+    if (claim.state === 'true') assert.ok(on, `${claim.id} is marked true on ${claim.flag}, and LAUNCH.${claim.flag} is off`);
+    if (claim.state === 'flag') assert.ok(!on, `${claim.id} waits on ${claim.flag}, and LAUNCH.${claim.flag} is on, so mark it true`);
+    if (claim.state === 'not-yet') assert.ok(!on, `${claim.id} is not yet, and LAUNCH.${claim.flag} is on: check it and mark it again`);
+  }
+});
+
+test('no sentence in the copy says a claim the ledger marks not yet', () => {
+  const said = strings(site);
+  const found = CLAIMS.filter((c) => c.state === 'not-yet').flatMap((c) =>
+    said.filter((s) => s.toLowerCase().includes(c.said.toLowerCase())).map((s) => `${c.id}: "${s}"`),
+  );
+  assert.deepEqual(found, [], `${found.length} sentence(s) say what is not true yet:\n${found.join('\n')}`);
 });

@@ -31,19 +31,28 @@ const BOARD = {
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/gu, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-/** What a screen's pictures say against it, as short lines: never settled, refused, raw text, sideways overflow. */
+const plural = (n, one) => `${n} ${n === 1 ? one : `${one}s`}`;
+const listOf = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
+/** What each kind of raw text is called on the sheet. */
+const RAW_WORDS = { placeholders: 'placeholder', instants: 'raw time', ids: 'raw id', handles: 'raw handle', stuck: 'stuck value' };
+
+/**
+ * What a screen's pictures say against it, one line a fault with the widths it was seen at: never settled, refused,
+ * still busy, sideways overflow, writes blocked, console errors, raw text.
+ */
 export function flags(shots) {
-  const out = new Set();
+  const at = new Map();
+  const add = (said, width) => at.set(said, [...(at.get(said) ?? []), width]);
   for (const s of shots) {
-    if (s.settled === null) out.add(`never settled at ${s.width}`);
-    else if (s.settled === 'refused') out.add(`refused at ${s.width}`);
-    if (s.waited?.busy === 'still busy') out.add(`still busy at ${s.width}`);
-    if (s.overflowPx > 1) out.add(`${s.overflowPx}px sideways at ${s.width}`);
-    if (s.writesBlocked > 0) out.add(`${s.writesBlocked} writes blocked`);
-    if (s.consoleErrors?.length > 0) out.add(`${s.consoleErrors.length} console errors at ${s.width}`);
-    for (const [kind, { count }] of Object.entries(s.raw ?? {})) out.add(`${count} raw ${kind}`);
+    if (s.settled === null) add('Never settled', s.width);
+    else if (s.settled === 'refused') add('Refused', s.width);
+    if (s.waited?.busy === 'still busy') add('Still busy', s.width);
+    if (s.overflowPx > 1) add(`${s.overflowPx}px sideways`, s.width);
+    if (s.writesBlocked > 0) add(`${plural(s.writesBlocked, 'write')} blocked`, s.width);
+    if (s.consoleErrors?.length > 0) add(plural(s.consoleErrors.length, 'console error'), s.width);
+    for (const [kind, { count }] of Object.entries(s.raw ?? {})) add(plural(count, RAW_WORDS[kind] ?? `raw ${kind}`), s.width);
   }
-  return [...out];
+  return [...at].map(([said, ws]) => `${said} at ${listOf([...new Set(ws)])}`);
 }
 
 /** The sheet of one theme, as a page. Images are read from `out` and put inline, so the page needs no server. */

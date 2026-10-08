@@ -24,7 +24,6 @@
  */
 import { DUE_THIS_WEEK } from '../modules/money.ts';
 import { projectTemplate } from '../modules/portfolio.ts';
-import { RUNS_WORKING } from '../packs/agents.ts';
 import { counted } from './counted.ts';
 
 /** The lists a founder's record holds once its five modules and this pack are in, services among them. */
@@ -258,8 +257,13 @@ export const FOUNDER = {
      2.3.0: `page.project` takes the template without Done, by week, a chart the whole of the main column for bars of 1
      and 2 (the second design review's fix 5): what was finished this week is the last figure of At a glance, asking
      for its four weeks as a line. A block gone from a page that is already there and a cell added to another, so a
-     minor step. 2.2.0 is live. */
-  version: '2.3.0',
+     minor step. 2.2.0 is live.
+
+     2.4.0: `page.home-founder` says how many agents work now in a line, from the record's `runs-working`, and its
+     Working now table reads the record's working runs (`sessions.working`, agents 1.9.0), heard from in the last
+     fifteen minutes, where its own clause said today and a run quiet for hours was listed as at work. A block added
+     and a source changed, so a minor step. 2.3.0 is live. */
+  version: '2.4.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -401,14 +405,24 @@ export const FOUNDER = {
             limit: 6,
           },
           {
-            /* THE RUNS STILL WORKING, active and heard from today since 1.16.0 (`RUNS_WORKING`), which hides this block
-               when none is. */
+            /* HOW MANY AGENTS WORK NOW, SAID IN WORDS, SINCE 2.4.0, from the record's own count (`runs-working`): the runs
+               heard from in the last fifteen minutes, the number the rail and the Agents page say. The plural and the
+               verb agree with it ("1 agent is working now"). Drawn only while one is, so a quiet record says nothing. */
+            kind: 'note',
+            lead: true,
+            span: 12,
+            when: { metric: 'runs-working', gt: 0 },
+            body: '{{runs-working}} agent(s) are working now.',
+          },
+          {
+            /* AND WHICH, the record's working runs since 2.4.0 (`sessions.working`), a helper folded under its run. It
+               read its own clause of active and heard from today, and a run quiet for four hours was listed as at work. */
             kind: 'table',
             heading: 'Working now',
             icon: 'session',
             span: 12,
-            source: 'sessions.live',
-            where: RUNS_WORKING,
+            source: 'sessions.working',
+            when: { metric: 'runs-working', gt: 0 },
             columns: [
               { field: 'agent', label: 'Agent' },
               { field: 'doing', label: 'Doing' },

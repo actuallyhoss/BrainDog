@@ -392,12 +392,15 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     stopped.length === 0
       ? ''
       : ` Its writes started no ${stopped[0]}${stopped.length > 1 ? ` or ${stopped.length - 1} more` : ''}: ${stopped.length > 1 ? 'those runs' : 'that run'} would be at depth ${SCRIPT_CHAIN_CEILING + 1} of one chain of rules and scripts, and a chain stops at depth ${SCRIPT_CHAIN_CEILING} so that it cannot run for ever. A person's own write starts it again.`;
-  return keepLog(
+  const metered = keepLog(
     deps,
     meter(deps, { ...base, ...spent, outcome: 'ok', failures: 0 }, `${script} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one row' : `${n} rows`}.${stop}`),
     answer.log,
     decl,
   );
+  /* AND THE STOP AS A NUMBER ON THE RUN, so the stopped-chains sign (`signs-flow.ts`) does not hang on the line's words. */
+  if (stopped.length > 0) deps.sql.exec("UPDATE event SET to_v = json_set(to_v, '$.stopped', ?) WHERE id = ?", stopped.length, metered.event);
+  return metered;
 }
 
 /**

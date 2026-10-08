@@ -77,12 +77,14 @@ export type State =
     };
 
 function waysOf(it: Methods, webauthn: boolean): Ways | null {
-  if (!it.passkey && !it.magic && !it.key) return null;
+  /* MAIL THAT IS NOT GOING OUT OFFERS NO LINK (`'down'`); the page says why in one line beside the other ways. */
+  const magic = it.magic === true;
+  if (!it.passkey && !magic && !it.key) return null;
   const first = it.firstRun === true;
   /* No passkey exists yet on first run, so a passkey button could not sign anybody in. */
   const passkey = it.passkey && webauthn && !first;
-  const lead = passkey ? 'passkey' : it.key && first ? 'key' : it.magic ? 'magic' : it.key ? 'key' : null;
-  return { passkey, magic: it.magic, key: it.key, lead, keyOpen: it.key && (first || lead === 'key'), ...(it.google ? { google: true as const } : {}) };
+  const lead = passkey ? 'passkey' : it.key && first ? 'key' : magic ? 'magic' : it.key ? 'key' : null;
+  return { passkey, magic, key: it.key, lead, keyOpen: it.key && (first || lead === 'key'), ...(it.google ? { google: true as const } : {}) };
 }
 
 function signedIn(who: Who, it: Methods, s: Seen): State {
