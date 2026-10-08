@@ -2,12 +2,15 @@
  * What is true on launch day and not before, one flag per fact.
  *
  * Every sentence that differs before and after launch reads one of these, so nothing else on the site
- * knows the date and the owner's word flips one line. They stay `false` until he gives it. The
- * production vars that mirror `signup` and `billing`, and
- * a test holds each pair equal.
+ * knows the date and the owner's word flips one line. Each stays `false` until he gives it. Two mirror
+ * production's Worker vars (`apps/worker/wrangler.jsonc`), and `claims.test.ts` holds each pair equal:
+ * `signup` is `SIGNUP` being `open`, and `billing` is `BILLING` being `live`.
+ *
+ * SIGN-UP OPENED ON HIS WORD ON 8 OCTOBER (DIRECTION §42, "open to strangers now"). Billing did not: charging
+ * money is a separate word, so it stays off or in test mode and `billing` stays `false`.
  */
 export const LAUNCH = {
-  signup: false, // a stranger can make a hosted record at SIGNUP
+  signup: true, // a stranger can make a hosted record at SIGNUP
   billing: false, // the Hosted price is charged
   repo: false, // the GitHub repository is public (the owner)
   cli: false, // the CLI is on npm under the name the docs print

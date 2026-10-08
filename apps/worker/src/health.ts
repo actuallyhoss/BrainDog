@@ -30,6 +30,8 @@
 
 import { FORMAT_VERSION, KERNEL_MIGRATION } from '@braindog/kernel';
 
+import type { LaunchState } from './launch.ts';
+
 /**
  * `PRIMITIVES_VERSION` (`31 §6`, `packages/render/src/kinds.ts`), WRITTEN HERE BECAUSE THE WORKER CANNOT IMPORT IT.
  *
@@ -60,15 +62,19 @@ const HEADERS: [string, string][] = [
  * The answer. `build` is `BRAINDOG_BUILD`, and an unset one is `null` and never `""`, as `/.well-known/braindog-build`
  * says it, so a monitor that sees a restart can also see which version came back.
  *
+ * `launch` IS WHO MAY SIGN UP, WHETHER THE BOT CHECK RUNS AND BILLING'S MODE, with a sentence for each thing not yet as it
+ * will be (`launchState` in `launch.ts`). Settings of this build, read with no object woken and no secret's value read
+ * (only whether one is set), so a person checking the launch from a machine with no session can read it here.
+ *
  * HEAD ANSWERS THE SAME STATUS AND HEADERS WITH NO BODY, and any other method is 405 with `Allow`, because a POST here is
  * a caller who has the wrong address.
  */
-export function healthz(request: Request, build: string | undefined): Response {
+export function healthz(request: Request, build: string | undefined, launch?: LaunchState): Response {
   if (request.method !== 'GET' && request.method !== 'HEAD')
     return new Response(JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/healthz is read with GET or HEAD.' } }), {
       status: 405,
       headers: [...HEADERS, ['allow', 'GET, HEAD']],
     });
-  const body = JSON.stringify({ ok: true, app: build || null, format: FORMAT_VERSION, kernel: KERNEL_MIGRATION, primitives: PRIMITIVES });
+  const body = JSON.stringify({ ok: true, app: build || null, format: FORMAT_VERSION, kernel: KERNEL_MIGRATION, primitives: PRIMITIVES, ...(launch ? { launch } : {}) });
   return new Response(request.method === 'HEAD' ? null : body, { status: 200, headers: HEADERS });
 }

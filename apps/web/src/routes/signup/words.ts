@@ -66,4 +66,7 @@ export const words = {
   /** Sign-up refused, in this screen's words where the host sent none. */
   sendFailed: 'That did not go through. Check the address, then send it again.',
   haveOne: 'Already have a BrainDog? Sign in',
+  /** Sign-up by invitation, reached with no code: the closed page's own line, and the way to sign in under it. */
+  inviteTitle: 'Sign-up is by invitation',
+  inviteWhy: 'Open the link you were sent to start your BrainDog here. If you already have one, sign in.',
 } as const;

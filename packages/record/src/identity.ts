@@ -108,11 +108,21 @@ const PENDING_LIFE = DAY;
 const SESSIONS_READ = 100;
 
 /** How many strikes a lockout key takes, and over how long; the lock lasts the same length again. */
-type Rule = { most: number; window: number };
+export type Rule = { most: number; window: number };
 /** A way in, or sending a link: ten in fifteen minutes (`49 §5.5`, amended below). */
 const SIGN_IN: Rule = { most: 10, window: WINDOW };
 /** Minting a passkey challenge: thirty a minute from one address, `chal:<ip>`. */
 const CHALLENGES: Rule = { most: 30, window: MINUTE };
+/**
+ * Sign-up's two strikes, `signup:<ip>` and `signup-email:<address>`, while no bot check stands in front of `start`:
+ * three an hour each, and the fourth locks the key for an hour.
+ *
+ * TIGHTER THAN `SIGN_IN` UNTIL THE CHECK IS KEYED (DIRECTION §42). Sign-up is open to strangers before Turnstile has
+ * its keys, and with nothing in front of `start` these strikes are the whole brake: `SIGN_IN`'s ten in fifteen minutes
+ * is forty letters an hour from one address to whoever a script types. The host says on every `start` whether its
+ * check ran (`checked`), and a `start` that says nothing is read as unchecked, so a host that forgot gets the tight one.
+ */
+export const SIGNUP_UNCHECKED: Rule = { most: 3, window: 60 * MINUTE };
 
 /** Every value this file mints is 32 random bytes in base64url, which is 43 characters and nothing else. */
 const MINTED = /^[A-Za-z0-9_-]{43}$/;
@@ -258,8 +268,11 @@ const pendingInvite = (payload: string): { invite: string; name: string | null }
   return { invite: x.invite, name: typeof x.name === 'string' && x.name !== '' ? x.name : null };
 };
 
-/** The record name, person's name and zone a sign-up proof was minted with, or `null` for a payload this code did not write. */
-const pendingSignup = (payload: string): { slug: string; name: string | null; tz: string | null } | null => {
+/**
+ * The record name, person's name and zone a sign-up proof was minted with, and the hash of the sign-up code it holds,
+ * or `null` for a payload this code did not write. A proof minted with no code, or before codes existed, holds none.
+ */
+const pendingSignup = (payload: string): { slug: string; name: string | null; tz: string | null; code: string | null } | null => {
   let x: unknown = null;
   try {
     x = JSON.parse(payload);
@@ -271,8 +284,34 @@ const pendingSignup = (payload: string): { slug: string; name: string | null; tz
     slug: x.slug,
     name: typeof x.name === 'string' && x.name !== '' ? x.name : null,
     tz: typeof x.tz === 'string' && x.tz !== '' ? x.tz : null,
+    code: typeof x.code === 'string' && /^[0-9a-f]{64}$/.test(x.code) ? x.code : null,
   };
 };
+
+/**
+ * A sign-up code as `dir_invite` keeps it: SHA-256, in hex.
+ *
+ * UNKEYED, UNLIKE EVERY OTHER HASH HERE, because a code is 32 random bytes and a hash of one cannot be walked back, and
+ * because `invite.mint` must hash what it mints on a Directory with sign-in off as readily as with it on.
+ */
+export async function codeHash(code: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code)));
+  let out = '';
+  for (const b of digest) out += b.toString(16).padStart(2, '0');
+  return out;
+}
+
+/**
+ * `signup.start` as the Worker sends it: `checked`, whether a bot check ran in front of it (`SIGNUP_UNCHECKED` applies
+ * when it did not), and, while sign-up is by invitation, `invite` with the `code` the page carried.
+ *
+ * HERE AND NOT IN `@braindog/ports`, as `SessionAsk` is, because only this file and the Worker read the three fields;
+ * the port's arm is where they belong the day that file is next opened. Assignable to `SignupCall`, so `auth` takes it.
+ */
+export type SignupStart = Extract<SignupCall, { flow: 'signup.start' }> & { checked?: boolean; invite?: boolean; code?: string };
+
+/** What `signup.start` answers while sign-up is by invitation and no code could be held: the Worker turns it into a 403. */
+export type SignupNeeds = { needs: 'code' };
 
 /**
  * A typed record name as it would be stored: trimmed, and lower-cased only when it is ASCII.
@@ -1064,7 +1103,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
       /**
        * A stranger asks for a record: an address, a name for the record, and optionally their own name and zone.
        *
-       * THE SAME `200 {}` FOR EVERY ADDRESS, so this door tells nobody who has an account. A new address is sent a proof
+       * THE SAME ANSWER FOR EVERY ADDRESS, so this door tells nobody who has an account. A new address is sent a proof
        * (`dir_pending`, purpose `signup`, a day); an address that can already sign in is sent a sign-in link instead,
        * `signup.known`, so the person who forgot they had one is let in from their mailbox and nobody watching the page
        * learns anything. Both mint one MAC and write one row, so neither answers faster.
@@ -1072,14 +1111,24 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
        * A LOCKOUT ON EACH OF ITS KEYS: `signup:<ip>` for the asking address, then `signup-email:<address>` for the
        * address typed, which is struck for known and unknown alike so a lock says nothing about which it is; and
        * `email:<address>`, the count of mails sent, is reserved only when a mail is about to go. A full mail count
-       * sends nothing and answers exactly as a sent one does.
+       * sends nothing and answers exactly as a sent one does. THE FIRST TWO TAKE `SIGNUP_UNCHECKED` unless the host
+       * says its bot check ran (`checked`), so an open door with no check in front of it is a narrow one.
+       *
+       * BY INVITATION (`invite`), A NEW ADDRESS NEEDS A CODE: one in `dir_invite`, not spent, not ended and not held by
+       * another proof. It is HELD by the proof written here, for the proof's day, so the same code typed twice is refused
+       * the second time; and SPENT when `signup.verify` makes the person. A missing or unusable code answers `needs:
+       * 'code'`, which the Worker says as a 403, and writes nothing. A KNOWN ADDRESS NEEDS NONE: it is sent its sign-in
+       * link whatever the code, and its answer is the one a new address without a code gets, so the refusal says nothing
+       * about who is here. A wrong code costs the `signup:<ip>` strike every `start` pays.
        *
        * THE NAME IS CHECKED HERE AS WELL AS LIVE, because nothing about a name is secret: `signup.name` answers the same
        * question to anybody. It is checked again at checkout and once more when the record is made, where it is claimed.
        */
       case 'signup.start': {
         if (!config.magic) return off();
-        const stop = reserve(flow, `signup:${text(call.ip)}`, now);
+        const asked = call as SignupStart;
+        const rule = asked.checked === true ? SIGN_IN : SIGNUP_UNCHECKED;
+        const stop = reserve(flow, `signup:${text(call.ip)}`, now, rule);
         if (stop) return stop;
         const email = text(call.email).trim().toLowerCase();
         if (!ADDRESS.test(email)) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'That is not an email address.', at: 'email' } };
@@ -1098,9 +1147,24 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'That is not a time zone, such as Europe/London.', at: 'tz' } };
 
         const token = fresh();
-        const [linkHash, proofHash] = await Promise.all([hmac('l:', token), hmac('p:', token)]);
-        const asked = reserve(flow, `signup-email:${email}`, now);
-        if (asked) return asked;
+        const [linkHash, proofHash, code] = await Promise.all([
+          hmac('l:', token),
+          hmac('p:', token),
+          asked.invite === true && typeof asked.code === 'string' && MINTED.test(asked.code) ? codeHash(asked.code) : null,
+        ]);
+        const struck = reserve(flow, `signup-email:${email}`, now, rule);
+        if (struck) return struck;
+        /* THE ONE ANSWER EVERY ADDRESS GETS: `{}`, or by invitation with no code that could be held, `needs: 'code'`. */
+        const usable = (): boolean =>
+          code !== null &&
+          sql.one(
+            'SELECT 1 AS n FROM dir_invite WHERE code_hash = ? AND spent_at IS NULL AND (ends_at IS NULL OR ends_at > ?) AND (held_until IS NULL OR held_until <= ?)',
+            code,
+            now,
+            now,
+          ) !== undefined;
+        const needs = asked.invite === true && !usable();
+        const same = (): AuthResult => ({ status: 200, body: needs ? ({ needs: 'code' } satisfies SignupNeeds) : {} });
         const person = sql.one<Person & { suspended: number }>(
           'SELECT id, email, suspended_at IS NOT NULL AS suspended FROM dir_person WHERE lower(email) = lower(?)',
           email,
@@ -1109,29 +1173,39 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
            row per address. The answer is the one every address gets. */
         if (person && Number(person.suspended) !== 0) {
           say(flow, 'suspended');
-          return { status: 200, body: {} };
+          return same();
         }
+        /* NOTHING IS MINTED FOR A NEW ADDRESS WITHOUT A CODE, and its mail count is not touched, since nothing is sent. */
+        if (!person && needs) return same();
         /* `reserve` has told the log why; either way nothing is sent, and the answer is the one a sent mail gets. */
-        if (reserve(flow, mailKey(email), now)) return { status: 200, body: {} };
+        if (reserve(flow, mailKey(email), now)) return same();
         if (person) {
           sql.transactionSync(() => {
             sql.exec('DELETE FROM dir_link WHERE expires <= ?', now);
             sql.exec('INSERT INTO dir_link (hash, person, purpose, expires) VALUES (?, ?, ?, ?)', linkHash, person.id, 'magic', now + MAGIC_LIFE);
           });
-          return { status: 200, body: {}, mail: { kind: 'signup.known', to: person.email, link: token } };
+          return { ...same(), mail: { kind: 'signup.known', to: person.email, link: token } } as AuthResult;
         }
-        sql.transactionSync(() => {
+        /* THE CODE IS HELD IN THE SAME TRANSACTION AS THE PROOF, and asked again inside it, so two starts with one code
+           cannot both find it free. */
+        const held = sql.transactionSync((): boolean => {
+          if (code !== null) {
+            if (!usable()) return false;
+            sql.exec('UPDATE dir_invite SET held_until = ? WHERE code_hash = ?', now + PENDING_LIFE, code);
+          }
           sql.exec('DELETE FROM dir_pending WHERE expires <= ?', now);
           sql.exec(
             'INSERT INTO dir_pending (hash, purpose, email, payload, expires, created_at) VALUES (?, ?, ?, ?, ?, ?)',
             proofHash,
             'signup',
             email,
-            JSON.stringify({ slug, name, tz }),
+            JSON.stringify({ slug, name, tz, ...(code !== null ? { code } : {}) }),
             now + PENDING_LIFE,
             now,
           );
+          return true;
         });
+        if (!held) return { status: 200, body: { needs: 'code' } satisfies SignupNeeds };
         return { status: 200, body: {}, mail: { kind: 'signup.verify', to: email, link: token } };
       }
 
@@ -1144,6 +1218,10 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
        * AN ADDRESS THAT BECAME A PERSON IN THE MEANTIME, by an invitation or a second sign-up, is that person: the
        * proof shows the same mailbox either way, and `dir_person` holds one row per address. No record is made here.
        * The session opens on none, and the record is made when its payment is in (`/account/billing/checkout`).
+       *
+       * THE SIGN-UP CODE THE PROOF HOLDS IS SPENT HERE, in the transaction that makes the person, and names them. A code
+       * ended after the proof was sent is still spent: the proof was minted while it stood. A proof with no code (open
+       * sign-up, or one mailed before codes) spends nothing.
        */
       case 'signup.verify': {
         const token = call.token;
@@ -1157,7 +1235,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (stop) return stop;
         if (hash === null) return rejected(flow, 'shape');
         const made = new Date(now).toISOString();
-        const outcome = sql.transactionSync((): { who: Who; held: { slug: string; name: string | null; tz: string | null } } | Reason => {
+        const outcome = sql.transactionSync((): { who: Who; held: { slug: string; name: string | null; tz: string | null; code: string | null } } | Reason => {
           const row = sql.one<{ email: string; payload: string }>(
             "DELETE FROM dir_pending WHERE hash = ? AND purpose = 'signup' AND expires > ? RETURNING email, payload",
             hash,
@@ -1178,10 +1256,13 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
             person = { id: `p_${personId()}`, email: row.email };
             sql.exec('INSERT INTO dir_person (id, email, name, created_at) VALUES (?, ?, ?, ?)', person.id, person.email, held.name, made);
           }
+          if (held.code !== null)
+            sql.exec('UPDATE dir_invite SET spent_at = ?, person = ?, held_until = NULL WHERE code_hash = ? AND spent_at IS NULL', now, person.id, held.code);
           return { who: open(person, presented, next, now, strike), held };
         });
         if (typeof outcome === 'string') return rejected(flow, outcome);
-        const body: SignupVerified = { person: outcome.who.person, email: outcome.who.email, ...outcome.held };
+        const { slug, name, tz } = outcome.held;
+        const body: SignupVerified = { person: outcome.who.person, email: outcome.who.email, slug, name, tz };
         return { status: 200, body, session: { sid: next.sid } };
       }
 

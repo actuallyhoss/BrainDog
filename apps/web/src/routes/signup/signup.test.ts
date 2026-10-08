@@ -9,7 +9,27 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { allWritten, chooseName, keepSaid, namesHeard, recordNames, SAID_KEY, SAID_MOST, saidKept, type Asked, type NameSeen } from '../../lib/signup.ts';
+import {
+  allWritten,
+  arrivalOf,
+  billing,
+  checkName,
+  chooseName,
+  CODE_KEY,
+  codeKept,
+  keepCode,
+  keepSaid,
+  namesHeard,
+  recordNames,
+  SAID_KEY,
+  SAID_MOST,
+  saidKept,
+  startSignup,
+  type Asked,
+  type Io,
+  type NameSeen,
+} from '../../lib/signup.ts';
+import { words } from './words.ts';
 import { propose } from '../../lib/start/propose.ts';
 
 const CTX = { zone: 'Europe/London', locale: 'en-GB' };
@@ -19,7 +39,7 @@ const directory =
   (taken: readonly string[], asked: string[] = []) =>
   async (slug: string): Promise<Asked<NameSeen>> => {
     asked.push(slug);
-    return { ok: true, value: { slug, free: !taken.includes(slug), why: null, open: true, turnstile: null } };
+    return { ok: true, value: { slug, free: !taken.includes(slug), why: null, mode: 'open', open: true, turnstile: null } };
   };
 
 /** A storage that keeps what it is given, as a tab's would. */
@@ -138,4 +158,80 @@ test('THE SENTENCE IS FORGOTTEN ONLY WHEN THE BUILD IS ALL IN, so a dropped line
   assert.equal(allWritten({ failed: [] }), true);
   assert.equal(allWritten({ failed: [{ said: 'Money was not added.', why: '' }] }), false);
   assert.equal(allWritten(null), false, 'nothing answered');
+});
+
+/** A host that answers one envelope, and remembers what it was sent. */
+function host(answer: unknown, status = 200) {
+  const sent: { url: string; body: Record<string, unknown> | null }[] = [];
+  const io: Io = {
+    fetch: async (url, init) => {
+      sent.push({ url, body: typeof init.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : null });
+      return new Response(JSON.stringify(answer), { status, headers: { 'content-type': 'application/json' } });
+    },
+  };
+  return { io, sent };
+}
+
+const CODE = 'c'.repeat(20) + '_-' + 'D'.repeat(21);
+
+test('WHO MAY SIGN UP IS THE HOST\'S mode, and a host a release older that says only open is read the old way', async () => {
+  for (const mode of ['open', 'invite', 'closed'] as const) {
+    const out = await checkName('', host({ ok: true, value: { slug: '', free: false, mode, open: mode !== 'closed' } }).io);
+    assert.ok(out.ok);
+    assert.equal(out.ok && out.value.mode, mode);
+    assert.equal(out.ok && out.value.open, mode !== 'closed');
+  }
+  const old = await checkName('', host({ ok: true, value: { slug: '', free: false, open: true } }).io);
+  assert.equal(old.ok && old.value.mode, 'open');
+  const shut = await checkName('', host({ ok: true, value: { slug: '', free: false } }).io);
+  assert.equal(shut.ok && shut.value.mode, 'closed', 'a host that says nothing is closed');
+});
+
+test('AN INVITATION\'S CODE IS READ OFF THE ADDRESS AND WIPED, as a mailed link is, and kept for this tab only', () => {
+  let wiped = 0;
+  assert.deepEqual(arrivalOf(`#code=${CODE}`, () => (wiped += 1)), { kind: 'code', code: CODE });
+  assert.equal(wiped, 1);
+  /* A FRAGMENT THAT IS NOT A CODE IS NOT TAKEN, and the address is left as it was. */
+  assert.equal(arrivalOf('#code=short', () => (wiped += 1)), null);
+  assert.equal(wiped, 1);
+  const tab = storage();
+  keepCode(tab, CODE);
+  assert.equal(tab.map.get(CODE_KEY), CODE);
+  assert.ok(CODE_KEY.startsWith('braindog.signup'));
+  assert.equal(codeKept(tab), CODE);
+  keepCode(tab, 'not a code');
+  assert.equal(codeKept(tab), null, 'anything but a code is not kept');
+  keepCode(tab, CODE);
+  keepCode(tab, null);
+  assert.equal(tab.map.has(CODE_KEY), false);
+  const blocked = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem: () => { throw new Error('blocked'); } };
+  assert.doesNotThrow(() => keepCode(blocked, CODE));
+  assert.equal(codeKept(blocked), null);
+});
+
+test('THE CODE RIDES WITH THE START, and a refusal at code is the host\'s own sentence', async () => {
+  const yes = host({ ok: true, value: {} });
+  assert.deepEqual(await startSignup({ email: ' sami@example.com ', slug: 'kiln', code: CODE }, yes.io), { ok: true, value: null });
+  assert.equal(yes.sent[0]?.url, '/auth/signup/start');
+  assert.equal(yes.sent[0]?.body?.['code'], CODE);
+  const none = host({ ok: true, value: {} });
+  await startSignup({ email: 'sami@example.com', slug: 'kiln' }, none.io);
+  assert.equal('code' in (none.sent[0]?.body ?? {}), false, 'no code is sent when there is none');
+  const fix = 'Sign-up here is by invitation, so open the link you were sent to sign up.';
+  const no = await startSignup({ email: 'sami@example.com', slug: 'kiln' }, host({ ok: false, refusal: { code: 'FORBIDDEN', fix, at: 'code' } }, 403).io);
+  assert.deepEqual(no, { ok: false, kind: 'refused', fix, at: 'code' });
+});
+
+test('"MAKE IT AGAIN" WAITS ON THE ACCOUNT\'S OWN YES: canMake true only when the host says so', async () => {
+  const said = await billing(host({ ok: true, value: { records: [], open: false, plans: [], canMake: true } }).io);
+  assert.equal(said.ok && said.value.canMake, true);
+  const silent = await billing(host({ ok: true, value: { records: [], open: false, plans: [] } }).io);
+  assert.equal(silent.ok && silent.value.canMake, false, 'a host that did not say is a no');
+});
+
+test('THE INVITATION PAGE IS ONE PLAIN LINE, with no dash and no code to type', () => {
+  for (const line of [words.inviteTitle, words.inviteWhy]) {
+    assert.doesNotMatch(line, /[\u2013\u2014]/);
+    assert.doesNotMatch(line, /\bcode\b/i, 'nobody types a code, so the page does not ask for one');
+  }
 });

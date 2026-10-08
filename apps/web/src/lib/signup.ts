@@ -19,6 +19,10 @@
  *
  * THE PROOF IN THE LINK IS READ OFF THE FRAGMENT AND THEN WIPED FROM THE ADDRESS (`arrivalOf` and its `clear`), as a
  * sign-in link is, so it never reaches a server log, a `Referer` or the tab's history.
+ *
+ * WHO MAY SIGN UP IS THE HOST'S ONE SWITCH (`mode` on the name answer: `open`, `invite` or `closed`). By invitation the
+ * code arrives the same way, `#code=`, is wiped the same way, and waits in this tab's storage (`keepCode`) until `start`
+ * carries it. Nobody types a code.
  */
 
 import { playedBy } from './start/parts.ts';
@@ -36,8 +40,14 @@ export type Asked<T> =
   | { ok: false; kind: 'locked'; retryAfter: number }
   | { ok: false; kind: 'unreachable' };
 
-/** What the name check answers, and whether sign-up is open at all, and the Turnstile site key when the host asks for one. */
-export type NameSeen = { slug: string; free: boolean; why: string | null; open: boolean; turnstile: string | null };
+/** Who may sign up on this host: anybody, a new address with a code, or nobody yet. */
+export type SignupMode = 'open' | 'invite' | 'closed';
+
+/**
+ * What the name check answers, who may sign up (`mode`, and `open` when it is not `closed`), and the Turnstile site key
+ * when the host asks for one.
+ */
+export type NameSeen = { slug: string; free: boolean; why: string | null; mode: SignupMode; open: boolean; turnstile: string | null };
 
 /** What spending the mailed proof answers: who was made, and what was typed at the start. */
 export type Verified = { person: string; email: string; slug: string; name: string | null; tz: string | null };
@@ -49,10 +59,13 @@ export type Owned = { record: string; slug: string; state: string };
  * What `/account/billing` answers that this page reads: the records, whether billing is open, the price of a record on
  * the first plan sold, and each sold plan's price by its id, so a page paying for Cloud Plus names Cloud Plus's.
  */
-export type Billing = { records: Owned[]; open: boolean; price: string | null; prices: Partial<Record<Plan, string>> };
+export type Billing = { records: Owned[]; open: boolean; price: string | null; prices: Partial<Record<Plan, string>>; canMake: boolean };
 
-/** Where somebody arrived from: their mail with a proof, Stripe with a payment, Stripe without one, or nowhere. */
-export type Arrival = { kind: 'verify'; token: string } | { kind: 'paid' } | { kind: 'cancelled' } | null;
+/**
+ * Where somebody arrived from: their mail with a proof, an invitation with a sign-up code, Stripe with a payment, Stripe
+ * without one, or nowhere.
+ */
+export type Arrival = { kind: 'verify'; token: string } | { kind: 'code'; code: string } | { kind: 'paid' } | { kind: 'cancelled' } | null;
 
 /** The plans a new record can start on: Free, which nothing sells, or one paid for on Stripe's page. */
 export type Plan = 'free' | 'cloud' | 'plus';
@@ -73,6 +86,37 @@ export const HELD_KEY = 'braindog.signup';
  * would come back to a tab that never heard of it and be made a free record. The plan alone, nothing they typed.
  */
 export const PLAN_KEY = 'braindog.signup.plan';
+
+/**
+ * The key a sign-up code waits under in this tab, in `sessionStorage`, between arriving by `#code=` and `start`.
+ *
+ * THE TAB'S AND NOT THE DEVICE'S: the code is spent on the start this tab sends, and the mailed link that follows needs
+ * none, so nothing about it should outlive the tab. Beside `HELD_KEY`, under the same `braindog.signup` name.
+ */
+export const CODE_KEY = 'braindog.signup.code';
+
+/** A sign-up code as the host mints one: 43 characters of base64url. Anything else is not kept. */
+const CODE = /^[A-Za-z0-9_-]{43}$/;
+
+/** Keep the code for this tab's start, or forget it (`null`). Storage may be off, and then the page asks for a link again. */
+export function keepCode(storage: Pick<Storage, 'setItem' | 'removeItem'> | null | undefined, code: string | null): void {
+  try {
+    if (code === null || !CODE.test(code)) storage?.removeItem(CODE_KEY);
+    else storage?.setItem(CODE_KEY, code);
+  } catch {
+    /* Storage off: the start goes without a code, and the host says one is needed. */
+  }
+}
+
+/** The code this tab kept, or `null`. */
+export function codeKept(storage: Pick<Storage, 'getItem'> | null | undefined): string | null {
+  try {
+    const code = storage?.getItem(CODE_KEY) ?? null;
+    return code !== null && CODE.test(code) ? code : null;
+  } catch {
+    return null;
+  }
+}
 
 const PLANS: readonly Plan[] = ['free', 'cloud', 'plus'];
 const planIn = (v: unknown): Plan | null => (PLANS.includes(v as Plan) ? (v as Plan) : null);
@@ -313,21 +357,27 @@ export async function checkName(slug: string, io: Io = live()): Promise<Asked<Na
   const out = await call(io, `/auth/signup/name?slug=${encodeURIComponent(slug)}`);
   if (!out.ok) return out;
   const v = isObj(out.value) ? out.value : {};
+  /* `mode` FIRST; A HOST A RELEASE OLDER SAYS ONLY `open`, which was open to anybody or to nobody. */
+  const mode: SignupMode = v.mode === 'open' || v.mode === 'invite' || v.mode === 'closed' ? v.mode : v.open === true ? 'open' : 'closed';
   return {
     ok: true,
     value: {
       slug: typeof v.slug === 'string' ? v.slug : slug,
       free: v.free === true,
       why: str(v.why),
-      open: v.open === true,
+      mode,
+      open: mode !== 'closed',
       turnstile: str(v.turnstile),
     },
   };
 }
 
-/** Ask for a record: the host always answers the same for an address, and the mail says the rest. */
+/**
+ * Ask for a record: the host always answers the same for an address, and the mail says the rest. By invitation, the
+ * code this tab kept rides along, and a start without a usable one is refused `at: 'code'`.
+ */
 export async function startSignup(
-  ask: { email: string; slug: string; name?: string; tz?: string | null; turnstile?: string | null },
+  ask: { email: string; slug: string; name?: string; tz?: string | null; turnstile?: string | null; code?: string | null },
   io: Io = live(),
 ): Promise<Asked<null>> {
   const out = await call(io, '/auth/signup/start', {
@@ -336,6 +386,7 @@ export async function startSignup(
     ...(ask.name && ask.name.trim() !== '' ? { name: ask.name.trim() } : {}),
     ...(ask.tz ? { tz: ask.tz } : {}),
     ...(ask.turnstile ? { turnstile: ask.turnstile } : {}),
+    ...(ask.code ? { code: ask.code } : {}),
   });
   return out.ok ? { ok: true, value: null } : out;
 }
@@ -349,7 +400,10 @@ export async function verifySignup(token: string, io: Io = live()): Promise<Aske
   return { ok: true, value: { person: v.person, email: v.email, slug: v.slug, name: str(v.name), tz: str(v.tz) } };
 }
 
-/** The records this person owns and whether billing is open, with the price a new record is sold at. */
+/**
+ * The records this person owns and whether billing is open, with the price a new record is sold at, and whether a free
+ * record can be made now (`canMake`): only the host's own word says yes, so a host that did not say is a no.
+ */
 export async function billing(io: Io = live()): Promise<Asked<Billing>> {
   const out = await call(io, '/account/billing');
   if (!out.ok) return out;
@@ -365,7 +419,7 @@ export async function billing(io: Io = live()): Promise<Asked<Billing>> {
     const price = str(p.price);
     if (id !== null && price !== null) prices[id] = price;
   }
-  return { ok: true, value: { records, open: v.open === true, price: str(plans[0]?.price), prices } };
+  return { ok: true, value: { records, open: v.open === true, price: str(plans[0]?.price), prices, canMake: v.canMake === true } };
 }
 
 /**
@@ -406,7 +460,8 @@ export function madeFor(records: readonly Owned[], slug: string): Owned | null {
 }
 
 /**
- * What the address's fragment says, and a way to wipe it: `#verify=` from the mail, `#paid=` or `#cancelled` from Stripe.
+ * What the address's fragment says, and a way to wipe it: `#verify=` from the mail, `#code=` from an invitation,
+ * `#paid=` or `#cancelled` from Stripe.
  *
  * `clear` RUNS ONLY WHEN THERE WAS SOMETHING TO TAKE, so a plain visit leaves the address alone.
  */
@@ -418,6 +473,10 @@ export function arrivalOf(hash: string, clear: () => void): Arrival {
   if (word === 'verify' && /^[A-Za-z0-9_-]{43}$/.test(value)) {
     clear();
     return { kind: 'verify', token: value };
+  }
+  if (word === 'code' && CODE.test(value)) {
+    clear();
+    return { kind: 'code', code: value };
   }
   if (word === 'paid') {
     clear();

@@ -23,7 +23,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 /* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
-import { clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameOrigin, sessionCookie } from '@braindog/host/auth';
+import { clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
 import type { AccountCall, SignupCall } from '@braindog/ports';
 /* GOOGLE: its two routes are answered in `signIn()` before `serveAuth`, as sign-up's are. */
 import { GOOGLE_ROUTES, googleOn, serveGoogle } from './google.ts';
@@ -37,6 +37,7 @@ import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
 import { FREE_JOIN_REFUSED, FREE_ONE_PERSON, createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
+import type { InviteAnswers, InviteCall, SignupNeeds, SignupStart } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
 import type { Plan } from '@braindog/record/directory';
@@ -77,6 +78,7 @@ import { shareKeyOf } from './share.ts';
 import { consume, pump } from './pump.ts';
 import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
 import { HEALTHZ, healthz } from './health.ts';
+import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } from './launch.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { LAPSED_FIX, lapseDrops } from './lapse.ts';
@@ -303,8 +305,14 @@ type Env = {
   /** The version poll's own budget, 240 a minute (`POLL_PER_MINUTE`). Unbound, the poll spends `RL_READ`. */
   RL_POLL?: RateLimitBinding;
   /**
+   * Who may make an account here (`launch.ts`): `open`, `invite` (a new address needs a code from `/account/ops/invite`),
+   * and anything else, unset included, is closed. A var in each environment, beside `BILLING`.
+   */
+  SIGNUP?: string;
+  /**
    * Cloudflare Turnstile on the sign-up page: the site key a var the page is handed, the
-   * secret a secret `signIn()` checks each answer with. Either unset, and sign-up runs on the Directory's lockouts alone.
+   * secret a secret `signIn()` checks each answer with. Either unset, and sign-up runs on the Directory's lockouts alone,
+   * which are tightened while the secret is unset (`SIGNUP_UNCHECKED`).
    */
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET?: string;
@@ -1875,6 +1883,11 @@ export class Directory$ extends DurableObject<Env> {
     return this.#directory().auth(call);
   }
 
+  /** The sign-up codes, minted, listed and ended: the operator's door only (`/account/ops/invite`). */
+  invites<C extends InviteCall>(call: C): Promise<InviteAnswers[C['flow']]> {
+    return this.#directory().invites(call);
+  }
+
   /** The live name of a record, or `null` for one with none: where `GET /app` sends a session back to. */
   slugOf(record: string): string | null {
     return this.#directory().slugOf(record);
@@ -2732,7 +2745,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     /* LIVENESS BEFORE EVERYTHING, THE OLD HOST'S REDIRECT INCLUDED. Measured at afb3b1b2 `/healthz` was the router's 404
        on `PUBLIC_HOST` and a 308 to `/app/healthz` on a legacy host for a caller sending `accept: text/html`, so a monitor
        either read the Worker as down or followed the redirect to the app shell and read somebody else's 200. */
-    if (HEALTHZ.test(url.pathname)) return healthz(request, env.BRAINDOG_BUILD);
+    if (HEALTHZ.test(url.pathname)) return healthz(request, env.BRAINDOG_BUILD, launchState(env));
     /* THE OLD HOST FIRST, AND ONLY FOR A PAGE LOAD. `legacyRedirect` answers
        `null` for every path this Worker serves itself, the build id and sign-in included, so an agent, a webhook
        sender and a stale tab on `app.brain.dog` are served where they stand. Unset `LEGACY_HOSTS` is no host at all. */
@@ -3375,6 +3388,7 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     const over = await overLimit(env, null, request, 'write');
     if (over !== null) return over;
   }
+  if (OPS_INVITE.test(new URL(request.url).pathname)) return opsInvite(request, env);
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const billing: BillingDeps = {
     clock: () => Date.now(),
@@ -3451,6 +3465,66 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
       : {}),
     ...billingDoors(env, billing),
   });
+}
+
+/** The operator's door to the sign-up codes, with the slashes every other door here forgives. */
+const OPS_INVITE = /^\/+account\/+ops\/+invite\/*$/;
+
+/**
+ * `/account/ops/invite`: the sign-up codes, behind the provision key, beside `/auth/provision`.
+ *
+ * `POST { note?, days?, count? }` MINTS, at most fifty a call (`INVITE_MINT_MOST`), and answers each as the link a person
+ * opens, `https://<host>/app/signup#code=<code>`: the fragment never reaches a server, and the page wipes it as it reads
+ * it. No `days` is a code that never ends, which is the lane's. `POST { end }` ends one by the `ref` the list shows or
+ * by the code, and `GET` lists them, newest first, never with the code. A code is answered once, at minting.
+ *
+ * ANSWERED WHATEVER `SIGNUP` SAYS, so the codes can be made before the host is switched to `invite`. WITHOUT
+ * `PROVISION_KEY` IT IS 404, as the two operator routes under `/auth` are, and a wrong key is a 401 that says which
+ * header. POSTs are already counted by address in `account()`; a GET is counted here.
+ */
+async function opsInvite(request: Request, env: Env): Promise<Response> {
+  const key = (env.PROVISION_KEY ?? '').trim();
+  if (key === '') return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This BrainDog has no operator key, so it has no operator doors.' } }, 404);
+  if (request.method !== 'GET' && request.method !== 'POST')
+    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/account/ops/invite is read with GET and written with POST.' } }, 405, [['allow', 'GET, POST']]);
+  if (request.method === 'GET') {
+    const over = await overLimit(env, null, request, 'read');
+    if (over !== null) return over;
+  }
+  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
+  if (bearer === '' || !(await sameKey(bearer, key)))
+    return json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This route takes the operator key.', at: 'authorization' } }, 401);
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const ask = <C extends InviteCall>(call: C) => directory.invites(call) as unknown as Promise<InviteAnswers[C['flow']]>;
+  if (request.method === 'GET') return json({ ok: true, value: { codes: await ask({ flow: 'invite.list' }) } }, 200);
+
+  if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json'))
+    return json({ ok: false, refusal: { code: 'BODY_MALFORMED', fix: '/account/ops/invite takes a JSON object, sent as application/json.' } }, 400);
+  let body: unknown = null;
+  try {
+    body = JSON.parse((await request.text()).slice(0, SIGNUP_BODY_MAX));
+  } catch {
+    body = null;
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body))
+    return json({ ok: false, refusal: { code: 'BODY_MALFORMED', fix: '/account/ops/invite takes a JSON object, sent as application/json.' } }, 400);
+  const said = body as Record<string, unknown>;
+  if (said['end'] !== undefined) {
+    const ended = await ask({ flow: 'invite.end', ref: typeof said['end'] === 'string' ? said['end'] : '' });
+    return ended.ok ? json({ ok: true, value: ended.value }, 200) : json(ended, httpStatus(ended));
+  }
+  const days = said['days'];
+  const count = said['count'];
+  const note = said['note'];
+  const out = await ask({
+    flow: 'invite.mint',
+    ...(typeof note === 'string' ? { note } : note === undefined ? {} : { note: note as string }),
+    ...(days === undefined || days === null ? {} : { days: days as number }),
+    ...(count === undefined ? {} : { count: count as number }),
+  });
+  if (!out.ok) return json(out, httpStatus(out));
+  const origin = `https://${env.PUBLIC_HOST ?? ''}`;
+  return json({ ok: true, value: { links: out.value.codes.map((code) => `${origin}/app/signup#code=${code}`), ends_at: out.value.ends_at } }, 200);
 }
 
 /**
@@ -3542,15 +3616,21 @@ const signupRefused = (status: number, refusal: Refusal, extra: readonly (readon
  * elsewhere gets a 403 and the Directory never hears of it; and only then the Directory. The answers are the `/auth`
  * envelope, so the page reads them as it reads every sign-in answer.
  *
- * `/auth/signup/name` ALSO SAYS WHETHER SIGN-UP IS OPEN, and the Turnstile site key when it is, because the page is a
- * stranger's and has no other door that answers without a session. It is open wherever `PUBLIC_HOST` is set, billing
- * on or off, because the record a stranger makes first is a free one. Unset, sign-up is shut: the name answer says
- * `open: false`, the page asks nothing, and `start` refuses with the sentence. A proof already in a mailbox is still
- * spent by `verify`, which makes a person and no record.
+ * `/auth/signup/name` ALSO SAYS WHO MAY SIGN UP, as `mode` (`launch.ts`), and the Turnstile site key when anybody may,
+ * because the page is a stranger's and has no other door that answers without a session. `SIGNUP` alone decides it,
+ * billing on or off, because the record a stranger makes first is a free one. `open` beside `mode` is `mode` is not
+ * `closed`, KEPT FOR ONE RELEASE so a tab loaded before this one still reads it. Closed, the page asks nothing and
+ * `start` refuses with the sentence. A proof already in a mailbox is still spent by `verify`, which makes a person and
+ * no record.
  *
- * TURNSTILE IS CHECKED ON `start` WHEN `TURNSTILE_SECRET` IS SET, against the address Cloudflare wrote
- * (`cf-connecting-ip`, as `remoteip`), and a failed or missing answer is a 403 with a sentence. Unset, the Directory's
- * lockouts (`signup:<ip>`, `signup-email:<address>`, `email:<address>`) are the whole of the brake.
+ * BY INVITATION, `start` CARRIES THE PAGE'S `code` TO THE DIRECTORY, which holds it for the proof it mails or answers
+ * `needs: 'code'`, said here as a 403 at `code`. A known address is mailed its sign-in link either way, and gets the
+ * same 403, so the refusal tells nobody who is here.
+ *
+ * TURNSTILE IS CHECKED ON `start` WHEN `TURNSTILE_SECRET` IS SET, in `invite` as in `open`, against the address
+ * Cloudflare wrote (`cf-connecting-ip`, as `remoteip`), and a failed or missing answer is a 403 with a sentence. Unset,
+ * the Directory's lockouts (`signup:<ip>`, `signup-email:<address>`, `email:<address>`) are the whole of the brake, and
+ * the Directory is told so (`checked`), which tightens the first two to `SIGNUP_UNCHECKED` (DIRECTION §42).
  *
  * THE MAIL GOES OUT WITHOUT BEING WAITED FOR, through `sendMail` inside `waitUntil`, as every `/auth` letter does, so an
  * address that already has an account answers in the time a new one does. A known address is sent a sign-in link
@@ -3569,16 +3649,17 @@ async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: k
   /* THE RPC STUB'S TYPE IS A CAST, as `serveAuth`'s door is: the Directory answers `AuthResult` over the wire. */
   const ask = ((call: SignupCall) => directory.auth(call)) as unknown as (call: SignupCall) => Promise<AuthResult>;
   const ip = request.headers.get('cf-connecting-ip') ?? '';
-  /* OPEN WHEREVER THIS HOST HAS AN ADDRESS, since Free needs no payment (DIRECTION §35): a record is made at no charge
-     (`plan: 'free'` at `/account/billing/checkout`), and the paid plans are offered where billing is on. */
-  const open = (env.PUBLIC_HOST ?? '').trim() !== '';
+  /* ONE SWITCH, `SIGNUP` (`launch.ts`, DIRECTION §42). Free needs no payment (DIRECTION §35), so a record is made at no
+     charge wherever sign-up is not closed, and the paid plans are offered where billing is on. */
+  const allowed = signupMode(env);
+  const open = allowed !== 'closed';
 
   if (method === 'GET') {
     const slug = new URL(request.url).searchParams.get('slug') ?? '';
     const out = await ask({ flow: 'signup.name', slug: slug.slice(0, 256) });
     if (out.status !== 200) return signupAnswer(out, mode);
     const siteKey = (env.TURNSTILE_SITE_KEY ?? '').trim();
-    return signupReply(200, { ok: true, value: { ...(out.body as object), open, ...(open && siteKey !== '' ? { turnstile: siteKey } : {}) } });
+    return signupReply(200, { ok: true, value: { ...(out.body as object), mode: allowed, open, ...(open && siteKey !== '' ? { turnstile: siteKey } : {}) } });
   }
 
   if (!sameOrigin(request, origin))
@@ -3601,14 +3682,24 @@ async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: k
   const body = parsed as Record<string, unknown>;
   const said = (k: string): string => (typeof body[k] === 'string' ? (body[k] as string) : '');
 
-  let call: SignupCall;
+  let call: SignupCall | SignupStart;
   if (path === '/auth/signup/start') {
-    if (!open) return signupRefused(403, { code: 'NOT_IN_THIS_BUILD', fix: 'Sign-up is not open on this BrainDog yet.' });
+    if (!open) return signupRefused(403, { code: 'NOT_IN_THIS_BUILD', fix: SIGNUP_CLOSED });
     if (!(await turnstilePassed(env, body['turnstile'], ip)))
       return signupRefused(403, { code: 'FORBIDDEN', fix: 'The check that you are a person did not pass. Try it again, then send the form.', at: 'turnstile' });
     const name = said('name').trim();
     const tz = said('tz').trim();
-    call = { flow: 'signup.start', email: said('email'), slug: said('slug'), ip, ...(name !== '' ? { name } : {}), ...(tz !== '' ? { tz } : {}) };
+    const code = said('code').trim();
+    call = {
+      flow: 'signup.start',
+      email: said('email'),
+      slug: said('slug'),
+      ip,
+      checked: botCheckKeyed(env),
+      ...(allowed === 'invite' ? { invite: true, ...(code !== '' ? { code } : {}) } : {}),
+      ...(name !== '' ? { name } : {}),
+      ...(tz !== '' ? { tz } : {}),
+    };
   } else {
     const presented = readSid(request, mode);
     call = { flow: 'signup.verify', token: said('token'), ip, ...(presented === undefined ? {} : { sid: presented }) };
@@ -3620,6 +3711,9 @@ async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: k
     const link = mail.kind === 'signup.known' ? `${origin}/app/signin#magic=${mail.link}` : `${origin}/app/signup#verify=${mail.link}`;
     ctx.waitUntil(sendMail(env, mail.kind, mail.to, { link }));
   }
+  /* AFTER THE MAIL, so a known address is still sent its sign-in link, and the 403 is the one every address gets. */
+  if (out.status === 200 && (out.body as Partial<SignupNeeds> | undefined)?.needs === 'code')
+    return signupRefused(403, { code: 'FORBIDDEN', fix: CODE_NEEDED, at: 'code' });
   return signupAnswer(out, mode);
 }
 

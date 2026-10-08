@@ -35,6 +35,7 @@ import { verifyStripe } from '@braindog/host/stripe-sign';
 import { badSlug, type AccountUsage, type BillingAnswers, type BillingCall, type BillingRow, type BillingSet, type BillingState } from '@braindog/record/directory';
 import { no, ok, refused, type Refusal, type Result, type Who } from '@braindog/ports';
 
+import { SIGNUP_CLOSED, signupMode } from './launch.ts';
 import { sendMail, type MailEnv } from './mail.ts';
 import { op } from './oplog.ts';
 import {
@@ -136,6 +137,8 @@ export type BillingEnv = MailEnv & {
   STRIPE_PRICE_HOSTED?: string | undefined;
   STRIPE_PRICE_PLUS?: string | undefined;
   PUBLIC_HOST?: string | undefined;
+  /** Who may make an account (`launch.ts`): while it is `closed`, nobody makes a free record either. */
+  SIGNUP?: string | undefined;
 };
 
 /** A plan's Stripe price, or `null` while its setting is empty: that plan is not sold on this host. */
@@ -309,6 +312,9 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
    * there is a line, not a stop: the record exists and its name is taken, and refusing now would strand both.
    */
   const makeFree = async (who: Who, body: Record<string, unknown>): Promise<Result<unknown>> => {
+    /* SIGN-UP CLOSED IS NO NEW RECORD FOR ANYBODY, so a person already here (invited to somebody's record) cannot make one
+       through this door while the front door is shut. By invitation it is open: the code was spent making the person. */
+    if (signupMode(env) === 'closed') return no('NOT_IN_THIS_BUILD', SIGNUP_CLOSED, { at: 'signup' });
     const origin = originOf(env);
     if (!origin.ok) return origin;
     if (body['record'] !== undefined) return no('VALUE_MALFORMED', 'Free is for a new record. A record already made keeps its plan.', { at: 'plan' });
@@ -339,6 +345,8 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
    * OWNED, NOT REACHED, as the Directory's `usage` and `for` both are: billing is the owner's, so a member of somebody
    * else's record sees nothing of it here. A record with no row is `unbilled`, which is every record the operator made.
    * ANSWERED WHILE BILLING IS OFF, with `open: false`, because a row written while it was on still says what was paid.
+   * `canMake` SAYS WHETHER THIS PERSON CAN MAKE A FREE RECORD NOW: sign-up is not closed and they own no free record.
+   * Every "make another" control reads it, so none is drawn that checkout would refuse.
    * REFUSED WHILE IT IS WRONG, as every billing door is: `BILLING` set with no key, or with a key of the other mode,
    * is a host set up by mistake, and a list that looked closed would hide that.
    */
@@ -369,7 +377,8 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
       });
     const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: HOSTED_PLANS[p].name, price: HOSTED_PLANS[p].price }));
     const open = key.ok && originOf(env).ok && priceOf(env, 'cloud') !== null;
-    return ok({ records, open, plans: open ? sold : [] });
+    const canMake = signupMode(env) !== 'closed' && !records.some((r) => r.plan === 'free');
+    return ok({ records, open, plans: open ? sold : [], canMake });
   };
 
   /* ── POST /account/billing/checkout ───────────────────────────────────── */

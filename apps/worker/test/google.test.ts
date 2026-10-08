@@ -149,3 +149,21 @@ test('A HOSTED DOMAIN IS TAKEN, and `next` never leaves the app', async () => {
   const landed = await back(door({ claims: { nonce: outside.nonce } }).d, `code=abc&state=${outside.state}`, outside.cookie);
   assert.equal(landed.headers.get('location'), `${ORIGIN}/app/`);
 });
+
+test('A NEW ADDRESS THROUGH GOOGLE MAKES NOBODY, against a real Directory: sign-up is the only door that makes a person', async () => {
+  /* WHATEVER `SIGNUP` SAYS: Google is answered by `signIn()`, which never reads it, so closed and by invitation are this
+     case too. Sign-up's switch, its code and its strikes are on `/auth/signup/start` alone. */
+  const { createDirectory } = await import('@braindog/record/directory');
+  const { openSqlite } = await import('../../../packages/kernel/test/sqlite.ts');
+  const sql = openSqlite();
+  const directory = createDirectory(sql, { now: () => NOW }, { mac: new Uint8Array(32).fill(5), magic: true });
+  const people = () => sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM dir_person')?.n;
+  const first = door();
+  const s = await started(first.d);
+  const { d } = door({ claims: { nonce: s.nonce, email: 'stranger@gmail.com' } });
+  const real: GoogleDoor = { ...d, ask: (call) => directory.auth(call) as Promise<AuthResult> };
+  const res = await back(real, `code=abc&state=${s.state}`, s.cookie);
+  assert.equal(new URL(res.headers.get('location') ?? '').searchParams.get('google'), 'unknown');
+  assert.ok(!res.headers.getSetCookie().some((c) => c.startsWith('__Host-bd_s=')), 'a session was set');
+  assert.equal(people(), 0, 'Google made a person');
+});

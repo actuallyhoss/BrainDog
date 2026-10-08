@@ -76,17 +76,21 @@ test('every place nav.ts names is a route the site has', () => {
 });
 
 /**
- * THE SITE'S LAUNCH FLAGS MIRROR THE WORKER'S VARS. There is no sign-up var: production's `BILLING` is both switches, so
- * `LAUNCH.signup` is on exactly when it is set, and `LAUNCH.billing` exactly when it is `live`. The support
- * address is the Worker's `SUPPORT_ADDRESS`, and `/support` shows `SUPPORT_EMAIL`, so the two are one address
- * or both empty. Each is read off the parsed config of production, because that is the environment the site
- * deployed to brain.dog describes.
+ * THE SITE'S LAUNCH FLAGS MIRROR THE WORKER'S VARS. Production's `SIGNUP` is sign-up's switch (`apps/worker/src/launch.ts`),
+ * so `LAUNCH.signup` is on exactly when it is `open`; `BILLING` is billing's, so `LAUNCH.billing` is on exactly when it
+ * is `live`. Before 8 October there was no `SIGNUP` and `LAUNCH.signup` read `BILLING`, so a host open to anybody and a
+ * site that said it was closed passed together. A production config with no `SIGNUP` fails here, because then nothing
+ * says who may sign up. The support address is the Worker's `SUPPORT_ADDRESS`, and `/support` shows `SUPPORT_EMAIL`, so
+ * the two are one address or both empty. Each is read off the parsed config of production, because that is the
+ * environment the site deployed to brain.dog describes.
  */
 test("the launch flags and the support address match production's Worker vars", () => {
   const vars: { [key: string]: string } = wranglerConfig(fileURLToPath(REPO)).env?.['production']?.vars ?? {};
+  const signup = vars['SIGNUP'];
+  assert.ok(signup !== undefined, 'no SIGNUP in the production environment of apps/worker/wrangler.jsonc, so nothing says who may sign up');
+  assert.equal(LAUNCH.signup, signup === 'open', `production's SIGNUP is "${signup}", and LAUNCH.signup in src/lib/launch.ts is ${LAUNCH.signup}`);
   const billing = vars['BILLING'];
-  assert.ok(billing !== undefined, 'no BILLING in the production environment of apps/worker/wrangler.jsonc, so nothing says whether sign-up is open');
-  assert.equal(LAUNCH.signup, billing !== '', `production's BILLING is "${billing}", and LAUNCH.signup in src/lib/launch.ts is ${LAUNCH.signup}`);
+  assert.ok(billing !== undefined, 'no BILLING in the production environment of apps/worker/wrangler.jsonc, so nothing says whether cards are charged');
   assert.equal(LAUNCH.billing, billing === 'live', `production's BILLING is "${billing}", and LAUNCH.billing in src/lib/launch.ts is ${LAUNCH.billing}`);
   /* Absent reads as empty: the var is added the day the address routes to a person. */
   const support = vars['SUPPORT_ADDRESS'] ?? '';

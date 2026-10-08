@@ -22,6 +22,7 @@ import assert from 'node:assert/strict';
 import { FORMAT_VERSION, KERNEL_MIGRATION } from '@braindog/kernel';
 
 import { PRIMITIVES_VERSION } from '../../../packages/render/src/kinds.ts';
+import { launchState } from '../src/launch.ts';
 import { bundled } from './bundled-worker.ts';
 
 /* `53 §13 #9`'s TUPLE, EACH FROM THE MODULE THAT OWNS IT, so a build that moved one and not this door goes red here. */
@@ -31,11 +32,17 @@ const touched: string[] = [];
 const trap = (name: string) =>
   new Proxy({}, { get: (_, key) => { touched.push(`${name}.${String(key)}`); throw new Error(`${name} was reached for /healthz`); } });
 
-async function ask(path: string, init: RequestInit & { host?: string; build?: string } = {}) {
+/* PRODUCTION'S SHAPE ON 8 OCTOBER: open, no bot check keyed, billing off (DIRECTION §42). */
+const LAUNCH_ENV = { SIGNUP: 'open', BILLING: '' };
+const LAUNCH = launchState(LAUNCH_ENV);
+
+async function ask(path: string, init: RequestInit & { host?: string; build?: string; vars?: Record<string, string> } = {}) {
   const { default: worker } = await bundled();
   const env = {
     PUBLIC_HOST: 'brain.example.test',
     LEGACY_HOSTS: 'app.brain.example.test',
+    ...LAUNCH_ENV,
+    ...init.vars,
     BRAINDOG_BUILD: init.build ?? '2026.09.23+abc1234',
     RECORD: trap('RECORD'),
     DIRECTORY: trap('DIRECTORY'),
@@ -49,14 +56,14 @@ test('GET /healthz IS 200 WITH THE TUPLE OF 53 §13 #9, `ok` BESIDE IT, with no-
   touched.length = 0;
   const out = await ask('/healthz');
   assert.equal(out.status, 200, await out.clone().text());
-  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234', ...TUPLE });
+  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234', ...TUPLE, launch: LAUNCH });
   assert.equal(out.headers.get('cache-control'), 'no-store');
   assert.match(out.headers.get('content-type') ?? '', /^application\/json/);
   assert.deepEqual(touched, [], 'a binding was reached for a liveness probe');
 });
 
 test('AN UNSET BUILD IS null, as `/.well-known/braindog-build` says it', async () => {
-  assert.deepEqual(await (await ask('/healthz', { build: '' })).json(), { ok: true, app: null, ...TUPLE });
+  assert.deepEqual(await (await ask('/healthz', { build: '' })).json(), { ok: true, app: null, ...TUPLE, launch: LAUNCH });
 });
 
 test('HEAD ANSWERS HEAD: the same status and headers, and no body', async () => {
@@ -82,5 +89,21 @@ test('A BROWSER ON THE OLD HOST IS ANSWERED WHERE IT STANDS, not sent to /app/he
      `accept: text/html` would follow a 308 to the app shell and read a 200 from the wrong thing. */
   const out = await ask('/healthz', { host: 'app.brain.example.test', headers: { accept: 'text/html' } });
   assert.equal(out.status, 200);
-  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234', ...TUPLE });
+  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234', ...TUPLE, launch: LAUNCH });
+});
+
+test('HEALTH CARRIES THE LAUNCH: open, no bot check, and the sentence that says sign-ups from one address are limited', async () => {
+  const out = (await (await ask('/healthz')).json()) as { launch: { signup: string; botCheck: boolean; billing: string; why: string[] } };
+  assert.equal(out.launch.signup, 'open');
+  assert.equal(out.launch.botCheck, false);
+  assert.equal(out.launch.billing, 'off');
+  assert.ok(
+    out.launch.why.includes('The bot check is not keyed, so sign-ups from one address are limited to 3 an hour until it is.'),
+    out.launch.why.join(' | '),
+  );
+  /* ONLY WHETHER THE SECRET IS SET IS READ: its value never reaches the answer. */
+  const keyed = await ask('/healthz', { vars: { TURNSTILE_SECRET: '0x-a-secret-value', TURNSTILE_SITE_KEY: '0x-site' } });
+  const text = await keyed.text();
+  assert.ok(!text.includes('0x-a-secret-value'), 'the secret was answered');
+  assert.equal((JSON.parse(text) as { launch: { botCheck: boolean } }).launch.botCheck, true);
 });

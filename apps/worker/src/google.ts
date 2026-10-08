@@ -21,6 +21,11 @@
  * verifier, the nonce and where to go afterwards, and the callback reads it, clears it and compares. `SameSite=Lax`,
  * because the callback is a top-level navigation from Google and a `Strict` cookie would not come with it.
  *
+ * AND IT NEVER MAKES ANYBODY, WHATEVER `SIGNUP` SAYS (`launch.ts`). `magic.start` mints nothing for an address nobody
+ * has, so a first sign-in with Google is sent back with `unknown` and the person signs up through `/app/signup`, where
+ * the switch, the code in `invite` and the strikes all apply. A Google door that made people would need a sign-up code
+ * riding in `state`, and would be a second front door to keep in step with the first; there is none.
+ *
  * A GET THAT SIGNS SOMEBODY IN, WHICH NO OTHER ROUTE HERE IS. A redirect back from Google can be nothing else. What
  * stands in for the origin check a POST has is the state: a callback is answered only for the browser that holds the
  * cookie the start wrote, with a code Google issued against the verifier inside it.

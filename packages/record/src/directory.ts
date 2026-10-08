@@ -27,10 +27,11 @@ import type { AccountCall, AccountClosed, AuthCall, AuthResult, Suspended, Who }
 import { no, ok } from '@braindog/ports';
 import { ulids } from '@braindog/kernel';
 
-import { createAuth, signInForgotten, type AuthConfig } from './identity.ts';
+import { codeHash, createAuth, signInForgotten, type AuthConfig } from './identity.ts';
 import type { DirectoryAuth, SessionAsk } from './identity.ts';
 
-export type { AuthConfig, DirectoryAuth, Reason, SessionAsk } from './identity.ts';
+export type { AuthConfig, DirectoryAuth, Reason, Rule, SessionAsk, SignupNeeds, SignupStart } from './identity.ts';
+export { SIGNUP_UNCHECKED } from './identity.ts';
 
 /** The five a person can hold on a record. The record's own ladder, mirrored where membership lives. */
 export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;
@@ -317,6 +318,20 @@ CREATE TABLE IF NOT EXISTS dir_pending (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS dir_pending_expires ON dir_pending(expires);
+
+-- A sign-up code: while sign-up is by invitation, a new address needs one (identity.ts, signup.start). Minted by the
+-- operator (invite.mint), held by the proof a start sends for that proof's day, spent when the proof makes the person.
+-- Only the hash is kept, so the table opens nothing. Left out of every copy with dir_pending, because a restore that
+-- revived a spent code would let it make a second person.
+CREATE TABLE IF NOT EXISTS dir_invite (
+  code_hash  TEXT PRIMARY KEY,              -- SHA-256 of the 43-character code, in hex
+  note       TEXT NOT NULL DEFAULT '',      -- who or what it was made for, the operator's words
+  made_at    INTEGER NOT NULL,              -- epoch ms
+  ends_at    INTEGER,                       -- epoch ms, or null for a code that never ends
+  spent_at   INTEGER,                       -- epoch ms, set when the proof it held made a person
+  person     TEXT,                          -- p_..., who it made
+  held_until INTEGER                        -- epoch ms, while a proof sent with it is still live
+);
 
 -- One row per record somebody pays for. A record with no row is not billed and never lapses: every record the
 -- operator provisioned has none, and a row is written only when a Stripe checkout for that record completes.
@@ -677,15 +692,15 @@ export const CARRIED = [
 ] as const;
 
 /**
- * The tables a copy leaves out: sessions, sign-in links, WebAuthn challenges, the lockout's strikes and the mailboxes
- * not yet proved.
+ * The tables a copy leaves out: sessions, sign-in links, WebAuthn challenges, the lockout's strikes, the mailboxes
+ * not yet proved, and the sign-up codes.
  *
  * CREDENTIALS THAT EXPIRE IN MINUTES TO DAYS. A restore that revived them would sign back in people who had signed out,
  * and a copy kept thirty nights would hold a session for longer than the session itself lives. Named, and not merely
  * absent from `CARRIED`, so a table added to `SCHEMA` later has to be put in one list or the other: the test reads
  * `sqlite_master` and fails for a table in neither.
  */
-export const LEFT_OUT = ['dir_session', 'dir_link', 'dir_challenge', 'dir_fail', 'dir_pending'] as const;
+export const LEFT_OUT = ['dir_session', 'dir_link', 'dir_challenge', 'dir_fail', 'dir_pending', 'dir_invite'] as const;
 
 type Carried = (typeof CARRIED)[number];
 
@@ -858,6 +873,64 @@ function mintedToken(): string {
   for (const b of crypto.getRandomValues(new Uint8Array(32))) out += String.fromCharCode(b);
   return btoa(out).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+
+/* ── sign-up codes ───────────────────────────────────────────────────────────── */
+
+/** The most codes one `invite.mint` makes: the operator's door asks for at most this many a call. */
+export const INVITE_MINT_MOST = 50;
+
+/** The longest a code may be given to live, in days; a code given no days never ends. */
+export const INVITE_DAYS_MOST = 365;
+
+/** The longest note a code keeps, in characters. */
+const INVITE_NOTE_MOST = 200;
+
+/** The codes `invite.list` answers at most, newest first. */
+const INVITE_LIST_MOST = 500;
+
+/**
+ * The sign-up codes' three flows, the operator's alone: the Worker answers them only behind the provision key.
+ *
+ * `invite.end` NAMES A CODE BY ITS `ref`, the first twelve characters of its hash as the list shows it, or by the code
+ * itself, because only the hash is kept and the list can never show the code.
+ */
+export type InviteCall =
+  | { flow: 'invite.mint'; note?: string; days?: number | null; count?: number }
+  | { flow: 'invite.list' }
+  | { flow: 'invite.end'; ref: string };
+
+/**
+ * A code as the list shows it. `state` is `open` (can be used), `held` (a proof sent with it is still live), `spent`
+ * (it made somebody, named in `made` by their address) or `ended`.
+ */
+export type InviteRow = {
+  ref: string;
+  note: string;
+  made_at: number;
+  ends_at: number | null;
+  state: 'open' | 'held' | 'spent' | 'ended';
+  made: string | null;
+};
+
+export type InviteAnswers = {
+  'invite.mint': Result<{ codes: string[]; ends_at: number | null }>;
+  'invite.list': InviteRow[];
+  'invite.end': Result<InviteRow>;
+};
+
+type InviteStored = { code_hash: string; note: string; made_at: number; ends_at: number | null; spent_at: number | null; held_until: number | null; made: string | null };
+
+const INVITE_COLUMNS = `i.code_hash AS code_hash, i.note AS note, i.made_at AS made_at, i.ends_at AS ends_at, i.spent_at AS spent_at,
+  i.held_until AS held_until, (SELECT p.email FROM dir_person p WHERE p.id = i.person) AS made`;
+
+/** A stored code as the list shows it, at `now`. Spent wins over ended, because a code that made somebody did its work. */
+const inviteRow = (row: InviteStored, now: number): InviteRow => {
+  const ends = numberOrNull(row.ends_at);
+  const held = numberOrNull(row.held_until);
+  const state: InviteRow['state'] =
+    row.spent_at !== null && row.spent_at !== undefined ? 'spent' : ends !== null && ends <= now ? 'ended' : held !== null && held > now ? 'held' : 'open';
+  return { ref: row.code_hash.slice(0, 12), note: row.note, made_at: Number(row.made_at), ends_at: ends, state, made: row.made ?? null };
+};
 
 /**
  * The token as it is stored: an HMAC under the Directory's key, with its own prefix, so a pending row never holds the
@@ -2202,5 +2275,55 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
      * writes a row, so none of its records is ever billed or lapsed.
      */
     billing: <C extends BillingCall>(call: C): BillingAnswers[C['op']] => billingAnswer(call) as BillingAnswers[C['op']],
+
+    /**
+     * The sign-up codes: minted, listed and ended (`InviteCall`). Asked by the Worker's operator door only.
+     *
+     * A CODE IS 43 CHARACTERS, AS EVERY VALUE SIGN-IN MINTS, and is answered once, at minting: only its hash is kept
+     * (`codeHash`), so a lost link is a new code, never a recovered one. `signup.start` holds a code and `signup.verify`
+     * spends it (`identity.ts`); nothing here does either.
+     *
+     * ENDING IS FOR ONE NOT YET SPENT, and a proof already sent with it still makes its person: it was minted while the
+     * code stood, as `signup.verify` says.
+     */
+    invites: async <C extends InviteCall>(call: C): Promise<InviteAnswers[C['flow']]> => {
+      const now = clock.now();
+      if (call.flow === 'invite.list') {
+        const rows = sql.all<InviteStored>(`SELECT ${INVITE_COLUMNS} FROM dir_invite i ORDER BY i.made_at DESC, i.code_hash LIMIT ?`, INVITE_LIST_MOST);
+        return rows.map((r) => inviteRow(r, now)) as InviteAnswers[C['flow']];
+      }
+      if (call.flow === 'invite.end') {
+        const ref = typeof call.ref === 'string' ? call.ref.trim() : '';
+        const hash = EMAIL_TOKEN.test(ref) ? await codeHash(ref) : /^[0-9a-f]{12}$/.test(ref) ? ref : null;
+        const found =
+          hash === null ? [] : sql.all<InviteStored>(`SELECT ${INVITE_COLUMNS} FROM dir_invite i WHERE i.code_hash = ?1 OR substr(i.code_hash, 1, 12) = ?1`, hash);
+        if (found.length !== 1 || found[0] === undefined)
+          return no<InviteRow>('OUT_OF_BOUNDS', 'No sign-up code goes by that. Name one by the ref the list shows, or by the code itself.', { at: 'ref' }) as InviteAnswers[C['flow']];
+        const row = found[0];
+        if (row.spent_at === null || row.spent_at === undefined) {
+          const ends = numberOrNull(row.ends_at);
+          if (ends === null || ends > now) sql.exec('UPDATE dir_invite SET ends_at = ? WHERE code_hash = ?', now, row.code_hash);
+        }
+        const after = sql.one<InviteStored>(`SELECT ${INVITE_COLUMNS} FROM dir_invite i WHERE i.code_hash = ?`, row.code_hash) ?? row;
+        return ok(inviteRow(after, now)) as InviteAnswers[C['flow']];
+      }
+      const count = call.count ?? 1;
+      if (!Number.isSafeInteger(count) || count < 1 || count > INVITE_MINT_MOST)
+        return no('VALUE_MALFORMED', `count is a whole number from 1 to ${INVITE_MINT_MOST}.`, { at: 'count' }) as InviteAnswers[C['flow']];
+      const days = call.days ?? null;
+      if (days !== null && (!Number.isSafeInteger(days) || days < 1 || days > INVITE_DAYS_MOST))
+        return no('VALUE_MALFORMED', `days is a whole number from 1 to ${INVITE_DAYS_MOST}, or left out for a code that never ends.`, { at: 'days' }) as InviteAnswers[C['flow']];
+      if (call.note !== undefined && typeof call.note !== 'string') return no('VALUE_MALFORMED', 'note is text.', { at: 'note' }) as InviteAnswers[C['flow']];
+      const note = (call.note ?? '').trim();
+      if (note.length > INVITE_NOTE_MOST)
+        return no('VALUE_MALFORMED', `A note is at most ${INVITE_NOTE_MOST} characters.`, { at: 'note' }) as InviteAnswers[C['flow']];
+      const ends_at = days === null ? null : now + days * DAY_MS;
+      const codes = Array.from({ length: count }, mintedToken);
+      const hashes = await Promise.all(codes.map(codeHash));
+      sql.transactionSync(() => {
+        for (const hash of hashes) sql.exec('INSERT INTO dir_invite (code_hash, note, made_at, ends_at) VALUES (?, ?, ?, ?)', hash, note, now, ends_at);
+      });
+      return ok({ codes, ends_at }) as InviteAnswers[C['flow']];
+    },
   };
 }

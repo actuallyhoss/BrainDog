@@ -404,8 +404,13 @@
            `apps/site/src/lib/plans.ts`. What a card is charged is whatever the Stripe price says. */
         "STRIPE_PRICE_HOSTED": "price_1UKiDwPop5yzbTmmSBwLkuFa",
         "STRIPE_PRICE_PLUS": "price_1UKiEhPop5yzbTmmOMMwOGJP",
-        /* THE SIGN-UP PAGE'S TURNSTILE WIDGET. Empty, and sign-up runs on the Directory's lockouts alone; the
-           secret half is `TURNSTILE_SECRET`, named at the end of this file. */
+        /* WHO MAY MAKE AN ACCOUNT, AND THIS IS ITS ONE SWITCH (`src/launch.ts`). `open` is anybody, `invite` is a new
+           address with a code from `/account/ops/invite`, and anything else, empty included, is closed. Open here as in
+           production (DIRECTION §42), so the walk kit signs up with no code, as a stranger does. */
+        "SIGNUP": "open",
+        /* THE SIGN-UP PAGE'S TURNSTILE WIDGET. Empty, and sign-up runs on the Directory's lockouts alone, tightened to
+           three an hour from one address until the secret half, `TURNSTILE_SECRET` (named at the end of this file),
+           is set; `/healthz` says so in its `launch` sentence. */
         "TURNSTILE_SITE_KEY": "",
         /* THE OPERATOR'S CANARY RECORD, a `rec_...` id. Empty, and the nightly walk writes its summary nowhere. */
         "OPS_RECORD": ""
@@ -610,6 +615,10 @@
         /* THE STRIPE PRICES OF CLOUD AND CLOUD PLUS, as alpha's comment says, from the live mode of his Stripe account. */
         "STRIPE_PRICE_HOSTED": "price_1UKmaqPop5yzbTmmSOx5842B",
         "STRIPE_PRICE_PLUS": "",
+        /* WHO MAY MAKE AN ACCOUNT, as alpha's comment says. OPEN TO STRANGERS ON HIS WORD (DIRECTION §42, 8 October):
+           with no bot check keyed, the strikes are tightened until it is. The site's `LAUNCH.signup` mirrors this value,
+           and a site test holds them equal and fails when this line is missing. */
+        "SIGNUP": "open",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET, as alpha's comment says. */
         "TURNSTILE_SITE_KEY": "",
         /* THE OPERATOR'S CANARY RECORD, as alpha's comment says. */

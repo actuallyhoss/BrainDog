@@ -80,10 +80,11 @@ test('A LINK TO A RECORD NOW ON FREE IS REFUSED WHEN IT IS OPENED, before a proo
   assert.equal(dir.joinRecord(REC, bo.value.id).refusal?.fix, FREE_JOIN_REFUSED);
 });
 
-test('SIGN-UP IS OPEN WHEREVER THIS HOST HAS AN ADDRESS, with billing off', async () => {
-  const c = await cloud();
+test('SIGN-UP IS OPEN WHERE SIGNUP SAYS open, with billing off', async () => {
+  const c = await cloud({ SIGNUP: 'open' });
   const res = await c.ask('/auth/signup/name?slug=bakery');
   const out = (await res.json()) as Out;
   assert.equal(res.status, 200, JSON.stringify(out));
   assert.equal(out.value?.['open'], true);
+  assert.equal(out.value?.['mode'], 'open');
 });

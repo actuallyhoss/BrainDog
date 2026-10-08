@@ -20,9 +20,14 @@
   ON `?plan=cloud` OR `?plan=plus` the link leads to Stripe's page on that plan instead (`NoRecord`), and the build is
   written once the payment has made the record (`#paid`). `#cancelled` is the payment step again. Free leads (§35).
 
-  WHILE SIGN-UP IS CLOSED THE PAGE ASKS NOTHING. `/auth/signup/name` says whether it is open, because it is the one door
-  a stranger can ask; closed, the page says so and points at sign-in. The answer to the email is the same for every
-  address: the host sends a sign-in link to one that already has an account and a proof to a new one.
+  WHILE SIGN-UP IS CLOSED THE PAGE ASKS NOTHING. `/auth/signup/name` says who may sign up (`mode`), because it is the
+  one door a stranger can ask; closed, the page says so and points at sign-in. BY INVITATION the code comes in the
+  address (`#code=`), is wiped from it as a mailed link is, waits in this tab and rides with the email; with no code the
+  page is the closed one with its own line. Nobody types a code. The answer to the email is the same for every address:
+  the host sends a sign-in link to one that already has an account and a proof to a new one.
+
+  "MAKE IT AGAIN" IS DRAWN ONLY WHEN THE ACCOUNT SAYS A RECORD CAN BE MADE (`canMake` on `/account/billing`), so no
+  control offers what checkout would refuse.
 
   THE WHOLE WINDOW (`../start/Frame.svelte`): the words on the left and the build on the right from 900px, the words
   first and the build under them on a phone.
@@ -46,9 +51,11 @@
     checkout,
     checkName,
     chooseName,
+    codeKept,
     HELD_KEY,
     heldOf,
     hold,
+    keepCode,
     keepPlan,
     keepSaid,
     madeFor,
@@ -85,6 +92,7 @@
     | 'loading'
     | 'unreachable'
     | 'closed'
+    | 'invite-only'
     | 'describe'
     | 'keep'
     | 'sent'
@@ -113,11 +121,24 @@
   let said = $state<string | null>(null);
   /* A FREE RECORD REFUSED FOR ITS PLAN, not its name: the person has theirs, so the name is not offered again. */
   let paidOnly = $state(false);
+  /* WHETHER THE ACCOUNT SAYS A RECORD CAN BE MADE NOW, asked when making one was refused: no means no "make it again". */
+  let canMake = $state(false);
+  /* WHETHER PRESSING AGAIN COULD GO DIFFERENTLY: a lock lifts and a host comes back, but a refusal says the same twice. */
+  let retry = $state(false);
   let sentTo = $state('');
 
   /* WHERE AND HOW THE SENTENCE WAS TYPED, for a date such as "on the 1st" and the currencies worth offering. */
   const locale = typeof navigator === 'undefined' ? 'en' : navigator.language;
   const here = zone();
+
+  /** `sessionStorage`, or `null` where reading it throws (storage blocked). */
+  function tabStore(): Storage | null {
+    try {
+      return globalThis.sessionStorage ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   /** `localStorage`, or `null` where reading it throws (storage blocked). */
   function localStore(): Storage | null {
@@ -374,6 +395,8 @@
     }
     /* THIS TAB'S PLAN FIRST, then the one kept across the mail; a link opened anywhere else is Free. */
     const lasting = kept?.plan ?? planKept(localStore());
+    /* AN INVITATION: the code waits in this tab for the start, and the page opens as a plain visit does (the last branch). */
+    if (arrived?.kind === 'code') keepCode(tabStore(), arrived.code);
     if (arrived?.kind === 'verify') {
       plan = lasting ?? 'free';
       void verify(arrived.token);
@@ -400,9 +423,15 @@
       return;
     }
     signedIn = who.ok ? who.value.me : null;
-    /* A PERSON SIGNED IN NEEDS NO OPEN DOOR: their account is made, and a record of their own is checkout's to say. */
-    if (!out.value.open && signedIn === null) {
+    /* CLOSED IS NO NEW RECORD FOR ANYBODY, signed in or not: checkout refuses a free one while it is. */
+    if (out.value.mode === 'closed') {
       step = 'closed';
+      return;
+    }
+    /* BY INVITATION, A STRANGER WITH NO CODE IS SHOWN THE CLOSED PAGE WITH ITS OWN LINE. A person signed in needs none:
+       their account is made, and a record of their own is checkout's to say. */
+    if (out.value.mode === 'invite' && signedIn === null && codeKept(tabStore()) === null) {
+      step = 'invite-only';
       return;
     }
     siteKey = out.value.turnstile;
@@ -434,10 +463,12 @@
     }
     busy = true;
     said = null;
-    const out = await startSignup({ email, slug, name: person, tz: zone(), turnstile: human });
+    const out = await startSignup({ email, slug, name: person, tz: zone(), turnstile: human, code: codeKept(tabStore()) });
     busy = false;
     if (out.ok) {
       sentTo = email.trim();
+      /* THE CODE IS HELD BY THE PROOF JUST MAILED, so this tab has no more use for it. */
+      keepCode(tabStore(), null);
       /* KEPT ONLY ONCE THE HOST SAID YES, so a refused address leaves nobody's words on this device. */
       keepSaid(localStore(), draftNow());
       /* KEPT NOW AS WELL AS IN THE PROOF, so a proof opened in this tab still finds the name if the mail was slow. */
@@ -520,6 +551,10 @@
       await build(asked.slug, out.value);
       return;
     }
+    /* ONLY THE ACCOUNT'S OWN YES DRAWS "MAKE IT AGAIN": a host that did not answer is a no. */
+    const account = await billing();
+    canMake = account.ok && account.value.canMake;
+    retry = out.kind !== 'refused';
     busy = false;
     slug = asked.slug;
     paidOnly = out.kind === 'refused' && out.at === 'plan';
@@ -684,9 +719,9 @@
         <Empty kind="error" title={copy.unreachableTitle} body={copy.unreachableWhy}>
           {#snippet actions()}<Button onclick={() => void ask()}>{copy.askAgain}</Button>{/snippet}
         </Empty>
-      {:else if step === 'closed'}
-        <h1 class="title">{copy.signupClosedTitle}</h1>
-        <p class="lede">{copy.signupClosedWhy}</p>
+      {:else if step === 'closed' || step === 'invite-only'}
+        <h1 class="title">{step === 'closed' ? copy.signupClosedTitle : words.inviteTitle}</h1>
+        <p class="lede">{step === 'closed' ? copy.signupClosedWhy : words.inviteWhy}</p>
         <div class="go"><Button weight="primary" href="/signin">{copy.signIn}</Button></div>
       {:else if step === 'describe'}
         <h1 class="title" id="who-h">{firstRun.whoQuestion}</h1>
@@ -812,7 +847,7 @@
         {#if said}<p class="lede" role="alert">{said}</p>{/if}
         {#if paidOnly}
           <div class="go"><Button weight="primary" onclick={payInstead}>{words.payInstead}</Button></div>
-        {:else}
+        {:else if canMake}
           <form class="form" onsubmit={makeAgain}>
             <NameField bind:value={slug} bind:free id="make-name" />
             <div class="go sticky">
@@ -822,6 +857,11 @@
             </div>
           </form>
           <p class="aside"><button class="link plain" type="button" onclick={payInstead}>{words.payInstead}</button></p>
+        {:else if retry}
+          <!-- THE ACCOUNT DID NOT SAY A RECORD CAN BE MADE (or did not answer): no name to change, only the same press
+               again, and only after a lock or a host that did not answer. A refusal, sign-up closed among them, is its
+               sentence alone, since pressing again would be refused the same way. -->
+          <div class="go"><Button weight="primary" disabled={busy || held === null} onclick={() => held && void makeFree(held)}>{words.tryAgain}</Button></div>
         {/if}
       {:else if step === 'pay'}
         <NoRecord title={held ? copy.signupPayFor(held.slug) : copy.noRecordTitle} {held} note={cancelled ? copy.signupCancelled : null} />

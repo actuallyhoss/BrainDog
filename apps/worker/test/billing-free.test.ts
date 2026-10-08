@@ -28,6 +28,7 @@ const ENV: BillingEnv = {
   STRIPE_PRICE_HOSTED: 'price_cloud',
   STRIPE_PRICE_PLUS: 'price_plus',
   PUBLIC_HOST: 'brain.dog',
+  SIGNUP: 'open',
 };
 
 type Asked = { verb: 'create' | 'read' | 'remove'; path: string; form?: Form };
@@ -102,10 +103,32 @@ test('ONE FREE RECORD A PERSON, and a taken name or a free plan for a made recor
 });
 
 test('FREE NEEDS NO BILLING SETTING: a host with billing off still makes one', async () => {
-  const w = world({ PUBLIC_HOST: 'brain.dog' });
+  const w = world({ PUBLIC_HOST: 'brain.dog', SIGNUP: 'open' });
   const made = value<{ record: string }>(await w.doors.checkout(w.who, { slug: 'ada', plan: 'free' }));
   assert.equal(w.planOf(made.record), 'free');
   w.sql.close();
+});
+
+test('canMake SAYS WHETHER A RECORD CAN BE MADE NOW: sign-up not closed and no free record held', async () => {
+  const w = world();
+  assert.equal(value<{ canMake: boolean }>(await w.doors.billing(w.who)).canMake, true, 'open, and no record yet');
+  value(await w.doors.checkout(w.who, { slug: 'ada', plan: 'free' }));
+  assert.equal(value<{ canMake: boolean }>(await w.doors.billing(w.who)).canMake, false, 'a free record is held');
+  w.sql.close();
+  const invite = world({ ...ENV, SIGNUP: 'invite' });
+  assert.equal(value<{ canMake: boolean }>(await invite.doors.billing(invite.who)).canMake, true, 'by invitation, the code was spent making the person');
+  invite.sql.close();
+});
+
+test('SIGN-UP CLOSED IS NO NEW RECORD FOR ANYBODY: canMake is false and a free checkout is refused', async () => {
+  for (const env of [{ ...ENV, SIGNUP: '' }, { ...ENV, SIGNUP: undefined }]) {
+    const w = world(env);
+    assert.equal(value<{ canMake: boolean }>(await w.doors.billing(w.who)).canMake, false);
+    const out = refusal(await w.doors.checkout(w.who, { slug: 'ada', plan: 'free' }));
+    assert.deepEqual([out.code, out.at, out.fix], ['NOT_IN_THIS_BUILD', 'signup', 'Sign-up is not open on this BrainDog yet.']);
+    assert.equal(w.sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM dir_record')?.n, 0);
+    w.sql.close();
+  }
 });
 
 test('NO DOOR THAT CHARGES NAMES FREE: the list sells only the paid plans, and names a free record Free', async () => {
