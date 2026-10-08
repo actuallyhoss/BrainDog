@@ -47,6 +47,12 @@ export const CASH_LEGS: Leg[] = [
     },
     /* THE ROW'S OWN END, SO THE WALK STOPS WHERE THE LINE DOES: the kernel stops on `ends` only when the leg names it. */
     ends: 'ends',
+    /* THE ROW'S OWN DAYS AND ITS RULE FOR A REST DAY, SINCE money-core 3.16.0 (REC-B13). Set, `day_of_month` puts a line
+       on its days of every month its cycle lands in, and the table above is what an empty one falls back to; `weekend`
+       moves a day off Money's `rest_days`, which the walk reads by that setting's name (`restDaysOf`), so the leg does
+       not name it. Empty is a line as imported: its days as `every` says, kept where they fall. */
+    days: 'day_of_month',
+    weekend: 'weekend',
   },
   {
     register: 'installments',

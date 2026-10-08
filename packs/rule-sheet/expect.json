@@ -1,0 +1,414 @@
+{
+  "pages": {
+    "Counts on Rule sheet": "/p/rule-sheet"
+  },
+  "rules": [
+    {
+      "rule": "Values: a figure named in text is read from the record",
+      "page": "Values",
+      "selector": "[data-path=\"open-tasks\"]",
+      "count": 0
+    },
+    {
+      "rule": "Values: a count of a list is read, never its contents",
+      "page": "Values",
+      "selector": "[data-path=\"tasks.count\"]",
+      "count": 0
+    },
+    {
+      "rule": "Values: a count of the open ones is read",
+      "page": "Values",
+      "selector": "[data-path=\"tasks.open\"]",
+      "count": 0
+    },
+    {
+      "rule": "Values: a field of another task is read by its spoken name",
+      "page": "Values",
+      "selector": "[data-path=\"tasks#1.what\"]",
+      "count": 0
+    },
+    {
+      "rule": "Values: a long field is never pulled into text",
+      "page": "Values",
+      "selector": ".hole[data-path=\"tasks#1.note\"]",
+      "count": 1
+    },
+    {
+      "rule": "Values: a name that points at nothing is shown as written, marked",
+      "page": "Values",
+      "selector": ".hole[data-path=\"no-such-figure\"]",
+      "count": 1
+    },
+    {
+      "rule": "Values: a value in backticks is left as typed",
+      "page": "Values",
+      "selector": "code",
+      "text": "{{open-tasks}}"
+    },
+    {
+      "rule": "Values: a day ahead is drawn as the day and how far off it is",
+      "page": "Values",
+      "selector": ".typed[data-form=\"date\"]",
+      "text": "24 Dec 2030 · in "
+    },
+    {
+      "rule": "Values: no day is a link, since no page of the app is a calendar",
+      "page": "Values",
+      "selector": "a .typed:is([data-form=\"date\"], [data-form=\"day\"])",
+      "count": 0
+    },
+    {
+      "rule": "Values: a day behind is drawn as the day",
+      "page": "Values",
+      "selector": ".typed[data-form=\"day\"]",
+      "text": "10 Apr 2020"
+    },
+    {
+      "rule": "Values: until is the time left to a day",
+      "page": "Values",
+      "selector": ".typed[data-form=\"until\"]",
+      "text": "in "
+    },
+    {
+      "rule": "Values: until takes a path as well as a literal",
+      "page": "Values",
+      "selector": ".typed[data-form=\"until\"]",
+      "count": 2
+    },
+    {
+      "rule": "Values: ago is the time since a day",
+      "page": "Values",
+      "selector": ".typed[data-form=\"ago\"]",
+      "text": "ago"
+    },
+    {
+      "rule": "Values: money is minor units with its currency",
+      "page": "Values",
+      "selector": ".typed[data-form=\"money\"]",
+      "text": "EGP 1,299.00"
+    },
+    {
+      "rule": "Values: money below nought takes the one minus sign",
+      "page": "Values",
+      "selector": ".typed[data-form=\"money\"]",
+      "text": "GBP −42.00"
+    },
+    {
+      "rule": "Values: CLF has four decimals",
+      "page": "Values",
+      "selector": ".typed[data-form=\"money\"]",
+      "text": "CLF 100.0000"
+    },
+    {
+      "rule": "Values: UYW has four decimals",
+      "page": "Values",
+      "selector": ".typed[data-form=\"money\"]",
+      "text": "UYW 12.3456"
+    },
+    {
+      "rule": "Values: a quantity is a number with its unit",
+      "page": "Values",
+      "selector": ".typed[data-form=\"quantity\"]",
+      "text": "1.4 m"
+    },
+    {
+      "rule": "Values: a quantity below nought takes the one minus sign",
+      "page": "Values",
+      "selector": ".typed[data-form=\"quantity\"]",
+      "text": "−2.5 kg"
+    },
+    {
+      "rule": "Values: a whole number below nought takes the one minus sign",
+      "page": "Values",
+      "selector": ".typed[data-form=\"quantity\"]",
+      "text": "−1,299"
+    },
+    {
+      "rule": "Values: a percentage is drawn as one",
+      "page": "Values",
+      "selector": ".typed[data-form=\"pct\"]",
+      "text": "−46.3%"
+    },
+    {
+      "rule": "Values: a task named by reference is drawn",
+      "page": "Values",
+      "selector": ".typed[data-form=\"ref\"]",
+      "count": 1
+    },
+    {
+      "rule": "Values: a percentage written loosely stays as typed, marked",
+      "page": "Values",
+      "selector": ".unresolved",
+      "text": "12 %"
+    },
+    {
+      "rule": "Values: a typed value that does not parse stays as typed, marked",
+      "page": "Values",
+      "selector": ".unresolved",
+      "count": 3,
+      "text": "12.50 GBP"
+    },
+    {
+      "rule": "Values: an icon is set inside a sentence",
+      "page": "Values",
+      "selector": ".glyph-inline",
+      "count": 1,
+      "attr": "aria-label",
+      "is": "rocket"
+    },
+    {
+      "rule": "Values: verified is drawn with and without a source",
+      "page": "Values",
+      "selector": ".evidence[data-evidence=\"verified\"]",
+      "count": 2,
+      "text": "verified: the bank statement"
+    },
+    {
+      "rule": "Values: inferred is drawn with and without a source",
+      "page": "Values",
+      "selector": ".evidence[data-evidence=\"inferred\"]",
+      "count": 2,
+      "text": "inferred: two invoices"
+    },
+    {
+      "rule": "Values: estimate is drawn with and without a source",
+      "page": "Values",
+      "selector": ".evidence[data-evidence=\"estimate\"]",
+      "count": 2,
+      "text": "estimate: last quarter's pace"
+    },
+    {
+      "rule": "Values: unknown is something to press, not a weak claim",
+      "page": "Values",
+      "selector": ".hole:not([data-path])",
+      "count": 2,
+      "text": "unknown"
+    },
+    {
+      "rule": "Blocks: a stat of six figures draws six tiles",
+      "page": "Blocks",
+      "selector": ".block[data-kind=\"stat\"] .cell",
+      "count": 6
+    },
+    {
+      "rule": "Blocks: a stat of seven figures is a fence that says a stat takes six",
+      "page": "Blocks",
+      "selector": ".block-degraded[data-code=\"DIALECT_ARITY\"] .degraded-fix",
+      "text": "stat takes 6"
+    },
+    {
+      "rule": "Blocks: a block written wrongly shows what was typed, and the page goes on",
+      "page": "Blocks",
+      "selector": ".block-degraded .degraded-source",
+      "text": "```stat | Seven figures"
+    },
+    {
+      "rule": "Blocks: a chip with no number or no word is not drawn, and the rest keep their places",
+      "page": "Blocks",
+      "selector": ".block[data-kind=\"chips\"] .pill:not([data-intent])",
+      "count": 2,
+      "text": "4 launched"
+    },
+    {
+      "rule": "Blocks: a bar line that is words keeps its words",
+      "page": "Blocks",
+      "selector": ".block[data-kind=\"bar\"] .prop-row",
+      "count": 3,
+      "text": "not measured yet"
+    },
+    {
+      "rule": "Blocks: a bar line that is words draws no bar",
+      "page": "Blocks",
+      "selector": ".block[data-kind=\"bar\"] .prop-track",
+      "count": 2
+    },
+    {
+      "rule": "Blocks: earn is read as good",
+      "page": "Blocks",
+      "selector": ".pill[data-intent=\"good\"]",
+      "count": 1,
+      "text": "written earn"
+    },
+    {
+      "rule": "Blocks: danger is read as bad",
+      "page": "Blocks",
+      "selector": ".pill[data-intent=\"bad\"]",
+      "count": 1,
+      "text": "written danger"
+    },
+    {
+      "rule": "Blocks: accent is read as info",
+      "page": "Blocks",
+      "selector": ".pill[data-intent=\"info\"]",
+      "count": 1,
+      "text": "written accent"
+    },
+    {
+      "rule": "Blocks: risk is read as warn",
+      "page": "Blocks",
+      "selector": ".pill[data-intent=\"warn\"]",
+      "count": 1,
+      "text": "written risk"
+    },
+    {
+      "rule": "Blocks: a block inside a note ends the note, so its opening line is the note's text",
+      "page": "Blocks",
+      "selector": ".block[data-kind=\"note\"]",
+      "text": "stat | Inside the note"
+    },
+    {
+      "rule": "Blocks: the block inside the note is not drawn as a block of its own",
+      "page": "Blocks",
+      "selector": ".block[data-kind=\"stat\"]",
+      "count": 1
+    },
+    {
+      "rule": "Blocks: a ring of five parts is drawn, and one of six is a fence that says a ring takes five",
+      "page": "Blocks",
+      "selector": ".block[data-kind=\"ring\"]",
+      "count": 1
+    },
+    {
+      "rule": "Blocks: a ring of six parts says why",
+      "page": "Blocks",
+      "selector": ".block-degraded .degraded-fix",
+      "text": "ring takes 5"
+    },
+    {
+      "rule": "Blocks: a filter that cannot be read matches nothing and says so",
+      "page": "Blocks",
+      "selector": ".empty",
+      "text": "nothing-here"
+    },
+    {
+      "rule": "Blocks: a quote mark written twice is read, and its tasks are drawn",
+      "page": "Blocks",
+      "selector": ":is(.table-region, .table-cards)",
+      "count": 1
+    },
+    {
+      "rule": "Counts: a ring is labelled by its title, never its sentence",
+      "page": "Counts",
+      "selector": ".ring-label",
+      "text": "Tasks done"
+    },
+    {
+      "rule": "Counts: a ring with of: is set against the whole it names",
+      "page": "Counts",
+      "selector": ".ring-label",
+      "text": "Done of the dated"
+    },
+    {
+      "rule": "Counts: both rings are drawn",
+      "page": "Counts",
+      "selector": ".block[data-kind=\"ring\"]",
+      "count": 2
+    },
+    {
+      "rule": "Counts: a heat is drawn over the days tasks were finished",
+      "page": "Counts",
+      "selector": ".block[data-kind=\"heat\"] .heat",
+      "count": 1
+    },
+    {
+      "rule": "Counts: on a project's page the same ring inherits the project",
+      "page": "Counts on Rule sheet",
+      "selector": ".ring-label",
+      "text": "Tasks done here"
+    },
+    {
+      "rule": "Layout: a side rail whose only block is held back is not drawn",
+      "page": "Layout",
+      "selector": ".area[data-area=\"rail\"]",
+      "count": 0
+    },
+    {
+      "rule": "Layout: with no side rail, main is 12 wide",
+      "page": "Layout",
+      "selector": ".area[data-area=\"main\"]",
+      "style": "--area-span",
+      "is": "12"
+    },
+    {
+      "rule": "Layout: a block 3 wide says its width in twelfths",
+      "page": "Layout",
+      "selector": ".block-slot:is([style*=\"--span:3\"], [style*=\"--span: 3\"])",
+      "text": "Three wide"
+    },
+    {
+      "rule": "Layout: a block 4 wide says its width in twelfths",
+      "page": "Layout",
+      "selector": ".block-slot:is([style*=\"--span:4\"], [style*=\"--span: 4\"])",
+      "text": "Four wide"
+    },
+    {
+      "rule": "Layout: a block 6 wide says its width in twelfths",
+      "page": "Layout",
+      "selector": ".block-slot:is([style*=\"--span:6\"], [style*=\"--span: 6\"])",
+      "text": "Six wide"
+    },
+    {
+      "rule": "Layout: a block 8 wide says its width in twelfths",
+      "page": "Layout",
+      "selector": ".block-slot:is([style*=\"--span:8\"], [style*=\"--span: 8\"])",
+      "text": "Eight wide"
+    },
+    {
+      "rule": "Layout: a block 12 wide says its width in twelfths",
+      "page": "Layout",
+      "selector": ".block-slot:is([style*=\"--span:12\"], [style*=\"--span: 12\"])",
+      "text": "Twelve wide"
+    },
+    {
+      "rule": "Layout: cards inside a tile are part of the tile, not tiles of their own",
+      "page": "Layout",
+      "selector": ".box .block[data-kind=\"cards\"]",
+      "count": 1
+    },
+    {
+      "rule": "Layout: a block inside a tile draws no tile of its own",
+      "page": "Layout",
+      "selector": ".box > .block-slot",
+      "style": "padding-top",
+      "is": "0px"
+    },
+    {
+      "rule": "Layout: a stat tile carries its note as one line",
+      "page": "Layout",
+      "selector": ".cell .cell-note",
+      "text": "Every task in play"
+    },
+    {
+      "rule": "Tabs: twelve tabs",
+      "page": "Tab 5",
+      "selector": ".page-tabs .tab-row .tab",
+      "count": 12
+    },
+    {
+      "rule": "Tabs: and More 2",
+      "page": "Tab 5",
+      "selector": ".tab-more .tally",
+      "text": "2"
+    },
+    {
+      "rule": "Tabs: the tab of the page open is marked",
+      "page": "Tab 5",
+      "selector": ".page-tabs a.tab[aria-current=\"page\"]",
+      "count": 1,
+      "text": "Tab 5"
+    },
+    {
+      "rule": "Tabs: each tab is a page with an address of its own",
+      "page": "Tab 5",
+      "selector": ".page-tabs a.tab[href$=\"/p/rule-sheet-values\"]",
+      "count": 1,
+      "text": "Values"
+    },
+    {
+      "rule": "Tabs: a page in no section draws no tab strip",
+      "page": "Counts on Rule sheet",
+      "selector": ".page-tabs",
+      "count": 0
+    }
+  ]
+}

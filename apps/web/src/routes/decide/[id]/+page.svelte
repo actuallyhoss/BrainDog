@@ -40,7 +40,7 @@
   import Arranged from './Arranged.svelte';
   import Applied from './Applied.svelte';
   import { heard } from '$lib/voice.svelte.ts';
-  import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './arranged.ts';
+  import { appliedLines, arrangedOf, heldOf, isArranging, KEYS_CONTEXT, partialOf, type KeysContext, type Partial } from './arranged.ts';
   import { proposedOf } from './proposed.ts';
   import { updatesOf, words as changeWords } from './changes.ts';
   import { joinedCount, pickableOf, rowsToSend, words as pickWords } from './picked.ts';
@@ -63,7 +63,7 @@
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import { pressedOnly } from '@braindog/kernel';
-  import { tick, untrack } from 'svelte';
+  import { setContext, tick, untrack } from 'svelte';
   import { page } from '$app/state';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -102,6 +102,20 @@
     refusal = out.from === 'refused' ? out.fix : '';
     from = out.from;
     closed(out.from !== 'refused', at);
+    keysHeld = undefined;
+    if (live?.about && isArranging(live.about.kind)) void readHeld();
+  }
+
+  /**
+   * WHICH KEYS THE RECORD HOLDS, by label, for an arrangement's sitting: read from `listGrants`, which carries a label and
+   * how it is sealed and never a value. Read again after a key is put in, so the tick is the record's and not this
+   * screen's guess. A refused read leaves it unknown, and the page then says nothing about holding either way.
+   */
+  let keysHeld = $state<ReadonlyMap<string, 'connector' | 'person'> | undefined>(undefined);
+  async function readHeld() {
+    if (!client) return;
+    const out = await client.listGrants();
+    keysHeld = out.ok ? heldOf(out.value) : undefined;
   }
 
   $effect(() => {
@@ -174,8 +188,19 @@
     new Map<string, string>(((page.data.lists ?? page.data.index?.registers ?? []) as { id: string; name: string }[]).map((l) => [l.id, l.name])),
   );
   const story = $derived(
-    about ? arrangedOf(about.kind, about.body, { lists, labels: heard(), pagesNow: live?.pagesNow }) : null,
+    about ? arrangedOf(about.kind, about.body, { lists, labels: heard(), pagesNow: live?.pagesNow, held: keysHeld }) : null,
   );
+  /* A KEY'S FIELD ONLY FOR A READER WHO MAY ANSWER: the record refuses anybody else's key, and a field that can only be
+     refused is a control that cannot change anything. */
+  const keyClient = $derived(from === 'live' && answerable ? client : null);
+  /* HANDED DOWN BY CONTEXT, so the story keeps its one spelling on this page and on the queue, and only this page, the
+     question's own, gives a key a field. */
+  setContext(KEYS_CONTEXT, {
+    get client() {
+      return keyClient ?? undefined;
+    },
+    onheld: readHeld,
+  } satisfies KeysContext);
 
   /** What an accepted arrangement did, and how far one got when the record stopped part way. */
   let applied = $state<string[]>([]);

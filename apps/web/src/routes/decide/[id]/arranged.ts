@@ -2,11 +2,13 @@
  * WHAT A `pack`, `settings` OR `arrange` PROPOSAL WOULD DO TO THIS BRAINDOG, AND WHAT IT DID, read from the body the
  * record filed (`packages/record/src/arrange.ts`, `prepare` and `apply`).
  *
- * THE STORY, IN THE ORDER A PERSON ASKS IT. Why, first, because a proposal to rearrange somebody's record is judged by
- * its reasons; then what it calls out, because that is the one part that reaches outside the record and costs egress;
- * then the packs it installs or turns off; then what will appear, page by page and list by list; then the words that
- * change ("Home will be called “Today”"); then any other setting. `arrange` is all of these as one question, so it is
- * drawn as one story and not as several proposals stacked.
+ * THE STORY, IN THE ORDER A PERSON ASKS IT (the sitting of REC-A07). Why, first, because a proposal to rearrange
+ * somebody's record is judged by its reasons; then what it needs from them, the keys, because those are the one thing
+ * the record cannot do for itself; then what it changes, before and after; then what it adds; then what it starts, each
+ * feed by host and how often, because that reaches outside the record and costs egress; then the choices it leaves to
+ * them; then any other call out, the packs it installs or turns off, what will appear, the words that change ("Home will
+ * be called “Today”") and any other setting. `arrange` is all of these as one question, so it is drawn as one story and
+ * not as several proposals stacked.
  *
  * THE RECORD'S READING, NEVER THE PROPOSER'S. Everything drawn here is a key `prepare` worked out: the plan, the
  * calls out, the settings as they stood. Nothing a proposer typed about consequences reaches the screen but `why`.
@@ -14,6 +16,7 @@
  * NOTHING HERE ASSUMES A KIND OF RECORD. A pack is named by its id when the body gives no title, a list by the record's
  * own name for it when the screen has one, and every sentence is `copy.ts`'s.
  */
+import type { createClient } from '@braindog/client';
 import { moduleName, ruleName } from '@braindog/seed/usecases/names';
 
 import { copy } from '../../../lib/copy.ts';
@@ -25,11 +28,33 @@ type Row = Record<string, unknown>;
 export const ARRANGING = ['pack', 'settings', 'arrange'] as const;
 export const isArranging = (kind: string | undefined): boolean => (ARRANGING as readonly string[]).includes(kind ?? '');
 
-/** One call out a press approves: the host it reaches, and how often and with what, in plain words. */
-export type Call = { host: string; detail: string };
+/**
+ * One call out a press approves: the host it reaches, and how often and what it sends, in plain words. `every` is the
+ * cadence alone, empty for a call only a rule makes; `keys` the labels of the keys it opens, said under what the sitting
+ * needs and never in the call's own line; `to` the one host a key is sent to, where the line names one (a script's
+ * `key "<a>" to <host>`), since a script's own host may be several.
+ */
+export type Call = { host: string; detail: string; every: string; keys: string[]; to: Record<string, string> };
+
+/**
+ * A key the arrangement needs: its label, what it opens, whether a run with nobody signed in uses it, and whether the
+ * record holds it. `held` is `null` when the screen could not read the keys, so nothing is said either way; `person` is a
+ * key of that name a scheduled run cannot open (`kernel` `actions.ts`, a key deposited for a person is refused).
+ */
+export type Need = { label: string; opens: string; scheduled: boolean; held: 'connector' | 'person' | 'none' | null };
+
+/** One existing entry an arrangement changes, field by field: what it says now (`null` when the record sent no before) and after. */
+export type Change = { title: string; fields: { field: string; before: string | null; after: string }[] };
+
+/** A part of the arrangement that is a choice between options, each with its name and one line of what it does. */
+export type Choice = { question: string; options: { name: string; line: string; suggested: boolean }[] };
 
 export type Part =
   | { part: 'why'; lines: { text: string; at?: string }[] }
+  | { part: 'needs'; keys: Need[] }
+  | { part: 'changes'; lists: { name: string; changes: Change[] }[]; count: number }
+  | { part: 'starts'; feeds: Call[] }
+  | { part: 'choices'; choices: Choice[] }
   | { part: 'calls'; calls: Call[] }
   | { part: 'packs'; lines: string[] }
   | { part: 'appears'; appears: Appears[]; examples: number }
@@ -48,7 +73,29 @@ export type Context = {
   labels?: Readonly<Record<string, string>> | undefined;
   pagesNow?: Readonly<Record<string, Row>> | undefined;
   names?: Readonly<Record<string, string>> | undefined;
+  /** The keys the record holds, by label, from `listGrants` (`heldOf`). Left out, the screen says nothing about holding. */
+  held?: ReadonlyMap<string, 'connector' | 'person'> | undefined;
 };
+
+/** What the question's own page hands `Arranged.svelte` by context so a needed key gets a field: the client, and a re-read. */
+export type KeysContext = { readonly client: Pick<ReturnType<typeof createClient>, 'putKey'> | undefined; onheld: () => unknown };
+export const KEYS_CONTEXT = Symbol('arranged-keys');
+
+/**
+ * The keys the record holds by label, from `listGrants`: a live grant sealed for a connector, or one only a person opens.
+ * A label held both ways is held for a connector, since that is the one a scheduled run opens. Never a value: a grant
+ * row carries none.
+ */
+export function heldOf(grants: unknown): Map<string, 'connector' | 'person'> {
+  const out = new Map<string, 'connector' | 'person'>();
+  for (const g of Array.isArray(grants) ? grants.filter(isRow) : []) {
+    const label = text(g.label);
+    if (label === '' || (g.revoked_at !== null && g.revoked_at !== undefined)) continue;
+    if (g.sealed_under === 'connector') out.set(label, 'connector');
+    else if (!out.has(label)) out.set(label, 'person');
+  }
+  return out;
+}
 
 /** The names the record filed for a proposal's lists and pages, as the rail will say them once it is accepted. */
 const namesOf = (body: Row): Record<string, string> =>
@@ -88,22 +135,47 @@ const listName = (id: string, ctx: Context): string => {
 };
 
 /**
- * `CALLS OUT api.example · every 1h · grant "Label" · sends a, b` as a host and the rest in words. A line that is not
- * one of those (a key's own line) is kept whole, because it is already a sentence.
+ * `CALLS OUT api.example · every 1h · grant "Label" · sends a, b` as a host, its cadence and the rest in words, and the
+ * keys it opens apart. A line that is not one of those (a key's own line) is kept whole, because it is already a sentence.
+ *
+ * THE KEY IS NOT SAID IN THE LINE. The sitting says each key once, under what it needs from you, with a field to put it
+ * in; said again in every call it read "with the key “Stripe”" three times above a page that never let you add it.
+ * The three spellings the kernel prints are read: `grant "<label>"` (an action, a digest), `key "<a>" to <host>, ...`
+ * and `no key` (a script).
  */
 export function callOf(line: string): Call {
-  const m = /^CALLS OUT (\S+) · (.*)$/u.exec(line);
-  if (!m) return { host: '', detail: line };
-  const rest = m[2]!.split(' · ').map((part) => {
+  /* THE HOST MAY BE SEVERAL WORDS: "no host declared", or a script's "a.example and b.example". */
+  const m = /^CALLS OUT (.+?) · (.*)$/u.exec(line);
+  if (!m) return { host: '', detail: line, every: '', keys: [], to: {} };
+  const keys: string[] = [];
+  const to: Record<string, string> = {};
+  let every = '';
+  const rest = m[2]!.split(' · ').flatMap((part): string[] => {
     const grant = /^grant "(.*)"$/u.exec(part);
-    if (grant) return grant[1] === 'none' ? copy.arrangeCallNoKey : copy.arrangeCallKey(grant[1]!);
-    if (part.startsWith('sends ')) return copy.arrangeCallSends(part.slice('sends '.length));
-    /* A CADENCE IS SAID IN WORDS, "every hour" and never the record's `every 1h`. */
-    const every = /^every (\d+)([mhdw])$/u.exec(part);
-    if (every) return copy.arrangeCallEvery(Number.parseInt(every[1]!, 10), every[2] as 'm' | 'h' | 'd' | 'w');
-    return part;
+    if (grant) {
+      if (grant[1] !== 'none' && grant[1] !== '') keys.push(grant[1]!);
+      return [];
+    }
+    if (part === 'no key') return [];
+    if (part.startsWith('key "')) {
+      /* A HOST IS A NAME WITH A DOT; "the host its vault entry opens" and "no host it calls" are not one. */
+      for (const k of part.matchAll(/"([^"]+)" to (\S+)/gu)) {
+        keys.push(k[1]!);
+        const host = k[2]!.replace(/,$/u, '');
+        if (/^[\w-]+(\.[\w-]+)+(:\d+)?$/u.test(host)) to[k[1]!] ??= host;
+      }
+      return [];
+    }
+    if (part.startsWith('sends ')) return [copy.arrangeCallSends(part.slice('sends '.length))];
+    /* A CADENCE IS SAID IN WORDS, "every hour" and never the record's `every 1h`. A call with one is a feed: it runs by
+       itself, with nobody signed in. One only a rule makes ("when a rule runs it") is not. */
+    if (/^(every \d+[mhdw]|daily|weekly)\b/u.test(part)) {
+      every = part.replace(/^every (\d+)([mhdw])\b/u, (_, n: string, unit: string) => copy.arrangeCallEvery(Number.parseInt(n, 10), unit as 'm' | 'h' | 'd' | 'w'));
+      return [every];
+    }
+    return [part];
   });
-  return { host: m[1] === 'no' ? copy.arrangeCallNoHost : m[1]!, detail: rest.join(', ') };
+  return { host: m[1] === 'no host declared' ? copy.arrangeCallNoHost : m[1]!, detail: rest.join(', '), every, keys: [...new Set(keys)], to };
 }
 
 /** The first key of a pack document's declaration is its kind: `{ "page": "work", ... }`. */
@@ -322,6 +394,101 @@ function settingsLines(s: Row, installing: readonly string[], ctx: Context, body
 }
 
 /**
+ * THE KEYS IT NEEDS, from `needs` when the record worked them out (REC-A06), else from each call out's own keys, one line
+ * a label. A key the record lists is used by a scheduled run unless it says otherwise; a call's key always is, since a
+ * call runs with nobody signed in.
+ */
+function needsOf(body: Row, calls: readonly Call[], ctx: Context): Need[] {
+  const out = new Map<string, Need>();
+  const held = (label: string): Need['held'] => (ctx.held === undefined ? null : (ctx.held.get(label) ?? 'none'));
+  if (Array.isArray(body.needs)) {
+    for (const n of body.needs) {
+      const label = isRow(n) ? text(n.label) || text(n.key) : text(n);
+      if (label === '' || out.has(label)) continue;
+      out.set(label, { label, opens: isRow(n) ? text(n.opens) : '', scheduled: !isRow(n) || n.scheduled !== false, held: held(label) });
+    }
+    return [...out.values()];
+  }
+  for (const c of calls)
+    for (const label of c.keys) {
+      /* WHAT IT OPENS IS ONE HOST OR NOTHING: a script's "a.example and b.example" is not what the key opens, and the
+         field then asks for it (`KeyNeeded.svelte`) rather than guessing one the run would refuse. */
+      const opens = c.to[label] ?? (c.host === copy.arrangeCallNoHost || /\s/u.test(c.host) ? '' : c.host);
+      if (!out.has(label)) out.set(label, { label, opens, scheduled: true, held: held(label) });
+    }
+  return [...out.values()];
+}
+
+/** A row patch (`at`, `version`, `patch`), as REC-A06 files one, apart from a row the plan adds. */
+const isPatch = (r: Row): boolean => text(r.at) !== '' || isRow(r.patch);
+
+/** The title among a row's own fields, and nothing else: a patch of `last4` has no title, and "7731" is not one. */
+const titleIn = (fields: unknown): string => {
+  if (!isRow(fields)) return '';
+  for (const key of ['what', 'question', 'name', 'title']) if (text(fields[key])) return text(fields[key]);
+  return '';
+};
+
+/**
+ * WHAT IT CHANGES, list by list: each entry by its title, and each field as it is now and as it will be. A field the
+ * patch leaves as it was is not said. Before is `null` when the record sent no `before`, and the screen then says only
+ * what it will be. An entry is never named by its address.
+ */
+function changesOf(raw: unknown, ctx: Context): Extract<Part, { part: 'changes' }> | null {
+  const patches = (Array.isArray(raw) ? raw.filter(isRow) : []).filter(isPatch);
+  if (patches.length === 0) return null;
+  const lists: { register: string; name: string; changes: Change[] }[] = [];
+  for (const r of patches) {
+    /* THE LIST FROM AN ADDRESS ONLY WHEN IT IS ONE (`accounts#2`): a bare row id is not a list, and never reaches the page. */
+    const register = (text(r.register) || (text(r.at).includes('#') ? text(r.at).split('#')[0]! : '')).replace(/^register\./u, '');
+    const name = listName(register, ctx);
+    const patch = isRow(r.patch) ? r.patch : isRow(r.fields) ? r.fields : {};
+    const before = isRow(r.before) ? r.before : isRow(r.was) ? r.was : null;
+    const said = (field: string, v: unknown): string => {
+      if (v === null || v === undefined || v === '') return copy.arrangeEmpty;
+      if (typeof v === 'boolean') return v ? copy.arrangeYes : copy.arrangeNo;
+      if (Array.isArray(v)) return v.map((x) => said(field, x)).join(', ');
+      if (typeof v === 'string') return ctx.labels?.[`${register}.${field}.${v}`] ?? v;
+      return typeof v === 'number' ? v.toLocaleString('en') : copy.arrangeNewValue;
+    };
+    const fields = Object.entries(patch)
+      .filter(([field, v]) => before === null || JSON.stringify(before[field] ?? null) !== JSON.stringify(v ?? null))
+      .map(([field, v]) => ({
+        field: ctx.labels?.[`${register}.${field}`] ?? copy.valueWord(field),
+        before: before === null ? null : said(field, before[field]),
+        after: said(field, v),
+      }));
+    if (fields.length === 0) continue;
+    const title = titleIn(before) || text(r.title) || titleIn(patch) || (name ? copy.arrangeChangeOne(name) : copy.arrangeChangeAny);
+    const list = lists.find((l) => l.register === register) ?? (lists.push({ register, name, changes: [] }), lists[lists.length - 1]!);
+    list.changes.push({ title, fields });
+  }
+  const count = lists.reduce((n, l) => n + l.changes.length, 0);
+  return count === 0 ? null : { part: 'changes', lists: lists.map(({ name, changes }) => ({ name, changes })), count };
+}
+
+/**
+ * THE CHOICES IT LEAVES TO YOU: a part (`parts`, or `choices`) with two options or more. Each option by its name and one
+ * line of what it does, the suggested one marked. An option with no name is not drawn, since its id is not one.
+ */
+function choicesOf(body: Row): Choice[] {
+  const raw = [...(Array.isArray(body.parts) ? body.parts : []), ...(Array.isArray(body.choices) ? body.choices : [])].filter(isRow);
+  const out: Choice[] = [];
+  for (const p of raw) {
+    const options = (Array.isArray(p.options) ? p.options : [])
+      .map((o) =>
+        isRow(o)
+          ? { name: text(o.label) || text(o.title) || text(o.name), line: text(o.does) || text(o.line) || text(o.description), suggested: o.suggested === true || (text(o.id) !== '' && text(o.id) === text(p.suggested)) }
+          : { name: text(o), line: '', suggested: text(o) !== '' && text(o) === text(p.suggested) },
+      )
+      .filter((o) => o.name !== '');
+    const question = text(p.question) || text(p.title) || text(p.label);
+    if (question !== '' && options.length >= 2) out.push({ question, options });
+  }
+  return out;
+}
+
+/**
  * A `pack`, `settings` or `arrange` body as the story Decide draws, or `null` for every other kind.
  */
 export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arranged | null {
@@ -339,7 +506,20 @@ export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arran
     .filter((w) => w.text !== '');
   if (why.length) parts.push({ part: 'why', lines: why });
 
-  const calls = strings(body.approve).map(callOf);
+  /* THE SITTING, IN THE BRIEF'S ORDER after why: what it needs from you, what it changes and adds, what it starts, your
+     choices. Then any call out that is not a feed, and the rest of the story as it always read. */
+  const allCalls = strings(body.approve).map(callOf);
+  const needs = needsOf(body, allCalls, ctx);
+  if (needs.length) parts.push({ part: 'needs', keys: needs });
+  const changes = kind === 'arrange' ? changesOf(body.rows, ctx) : null;
+  if (changes) parts.push(changes);
+  const rows = kind === 'arrange' ? rowsOf(body.rows, ctx) : null;
+  if (rows) parts.push(rows);
+  const feeds = allCalls.filter((c) => c.every !== '');
+  if (feeds.length) parts.push({ part: 'starts', feeds });
+  const choices = choicesOf(body);
+  if (choices.length) parts.push({ part: 'choices', choices });
+  const calls = allCalls.filter((c) => c.every === '');
   if (calls.length) parts.push({ part: 'calls', calls });
 
   const packLines: string[] = [];
@@ -374,9 +554,6 @@ export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arran
   if (wordLines.length) parts.push({ part: 'words', lines: wordLines });
   if (otherLines.length) parts.push({ part: 'settings', lines: otherLines });
 
-  const rows = kind === 'arrange' ? rowsOf(body.rows, ctx) : null;
-  if (rows) parts.push(rows);
-
   const useCase = text(body.usecase) || (kind === 'pack' && body.kind === 'usecase' ? text(body.title) : '');
   const lead =
     kind === 'settings'
@@ -395,16 +572,20 @@ export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arran
           ? copy.arrangeLeadUseCase(useCaseWords(useCase))
           : copy.arrangeLeadArrange;
 
-  /* ONE LINE FOR THE QUEUE: what appears and what is renamed, counted. The calls are never folded into it. */
+  /* ONE LINE FOR THE QUEUE, in the sitting's order: the keys, the updates and the feeds, then what is added, what appears
+     and what is renamed, counted. A call out that is not a feed is never folded into it. */
   const newPages = plan.pages + pages.filter((p) => p.kind === newKind('page')).length;
   const more = plan.more + pages.length - pages.filter((p) => p.kind === newKind('page')).length;
   const bits = [
+    needs.length ? copy.arrangeCountKeys(needs.length) : '',
+    changes ? copy.arrangeCountUpdates(changes.count) : '',
+    feeds.length ? copy.arrangeCountFeeds(feeds.length) : '',
+    rows ? copy.arrangeCountRows(rows.count) : '',
     newPages ? copy.arrangeCountPages(newPages) : '',
     plan.lists ? copy.arrangeCountLists(plan.lists) : '',
     more ? copy.arrangeCountOther(more) : '',
     wordLines.length ? copy.arrangeCountWords(wordLines.length) : '',
     otherLines.length ? copy.arrangeCountSettings(otherLines.length) : '',
-    rows ? copy.arrangeCountRows(rows.count) : '',
   ].filter((b) => b !== '');
   return { lead, parts, summary: bits.join(', ') };
 }
@@ -420,10 +601,13 @@ const rowTitle = (fields: Row): string => {
  * of the earlier row it points at. `null` when the body carries none.
  */
 function rowsOf(raw: unknown, ctx: Context): Extract<Part, { part: 'rows' }> | null {
+  /* A PATCH IS SAID UNDER WHAT IT CHANGES (`changesOf`), so only a row the plan adds is said here. A link is the index
+     into the whole plan, patches and all, so the plan is read whole and the patches skipped. */
   const rows = Array.isArray(raw) ? raw.filter(isRow) : [];
-  if (rows.length === 0) return null;
+  if (rows.every(isPatch)) return null;
   const lists: { register: string; name: string; lines: string[] }[] = [];
   for (const r of rows) {
+    if (isPatch(r)) continue;
     const register = text(r.register);
     const fields = isRow(r.fields) ? r.fields : {};
     const under = Object.values(isRow(r.links) ? r.links : {})
@@ -433,7 +617,7 @@ function rowsOf(raw: unknown, ctx: Context): Extract<Part, { part: 'rows' }> | n
     const list = lists.find((l) => l.register === register) ?? (lists.push({ register, name: listName(register, ctx), lines: [] }), lists[lists.length - 1]!);
     list.lines.push(line);
   }
-  return { part: 'rows', lists: lists.map(({ name, lines }) => ({ name, lines })), count: rows.length };
+  return { part: 'rows', lists: lists.map(({ name, lines }) => ({ name, lines })), count: rows.filter((r) => !isPatch(r)).length };
 }
 
 /** A page an arrangement puts in place, by the title its body gives, or its id in words. */

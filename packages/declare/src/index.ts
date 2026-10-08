@@ -525,10 +525,11 @@ export type Diff = {
    * Each setting the pack declares and the value this install writes into its declarations.
    *
    * `kept` is a value somebody set on the installed version that is still legal for this one,
-   * `default` is this version's default, and `none` is a setting with neither, which no declaration
-   * reads, because `normalise` refuses a placeholder whose setting has no default.
+   * `given` is a value handed to this plan with the install (`PlanOptions.settings`), `default` is this version's
+   * default, and `none` is a setting with neither, which no declaration reads, because `normalise` refuses a
+   * placeholder whose setting has no default. `kept` and `given` are both chosen, and the install keeps both.
    */
-  config: { key: string; type: string; value: Json; from: 'kept' | 'default' | 'none' }[];
+  config: { key: string; type: string; value: Json; from: 'kept' | 'given' | 'default' | 'none' }[];
   /**
    * The lists this pack points at that the record does not hold and the pack does not declare.
    * Reported here, refused by `install` and by the record's `planPack` as `REGISTER_UNRESOLVED`.
@@ -1425,12 +1426,22 @@ const newer = (a: string, b: string): number => order(parts(a), parts(b));
  * IT REFUSES NOTHING. A plan of a pack that cannot be installed is the most useful thing here: it
  * names the conflict, the missing dependency and the rows that would be orphaned in one screen,
  * instead of failing on the first and making somebody find the rest one round trip at a time.
+ *
+ * `options.settings` ARE VALUES SENT WITH THE INSTALL, which fill it. An arrangement that installed an add-on and set
+ * its book planned the add-on with its defaults and wrote the book afterwards, and a setting is read only when a pack is
+ * planned and installed, so every declaration reading the book said the default until a later update. A value the
+ * setting will not take, or a key the pack does not declare, is a warning, and the setting keeps what it would have had.
+ * THE SAME DOOR PLANS A LATER CHANGE: the pack planned again at its own version with the new value names, as `changes`,
+ * exactly the declarations that read it.
  */
-export async function plan(given: Pack, installed: Installed): Promise<Diff> {
+export type PlanOptions = { settings?: Readonly<Record<string, unknown>> | undefined };
+
+export async function plan(given: Pack, installed: Installed, options: PlanOptions = {}): Promise<Diff> {
   /* THE BODIES ARE COMPARED AS THEY WOULD BE STORED, with every setting filled in. The installed body
      is the filled one, so comparing it with the file's text would report a change on every plan of
      a pack that reads a setting, and would miss the one a changed setting really makes. */
-  const config = settingsFor(given, installed);
+  const sent = settingsSent(given, options.settings);
+  const config = settingsFor(given, installed, sent.values);
   const pack = filledWith(given, config);
   const live = new Map(installed.declarations.map((d) => [d.id, d]));
   const mine = pack.manifest.pack;
@@ -1800,7 +1811,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     newly_required: newlyRequired,
     misreads,
     renames,
-    warnings: warningsOf(pack),
+    warnings: [...warningsOf(pack), ...sent.warnings],
     config,
     unresolved,
     base,
@@ -1832,17 +1843,48 @@ function seedsFor(pack: Pack, adds: readonly { id: string; handed?: true }[]): S
  * The value each of a pack's settings takes in this install: the one somebody chose, when the new
  * version still accepts it, or else this version's default.
  */
-function settingsFor(pack: Pack, installed: Installed): Diff['config'] {
+function settingsFor(pack: Pack, installed: Installed, sent: ReadonlyMap<string, Json | null> = new Map()): Diff['config'] {
   const declared = pack.manifest.config ?? {};
   const chosen = installed.config?.[pack.manifest.pack] ?? {};
   return Object.entries(declared).map(([key, setting]) => {
-    if (Object.hasOwn(chosen, key)) {
+    const given = sent.get(key);
+    if (given !== undefined && given !== null) return { key, type: setting.type, value: given, from: 'given' as const };
+    /* `null` SENT PUTS THE SETTING BACK TO ITS DEFAULT, as `setPackConfig` reads it, so a value chosen before is not kept. */
+    if (Object.hasOwn(chosen, key) && !sent.has(key)) {
       const still = configValue(key, setting, chosen[key]);
       if (still.ok) return { key, type: setting.type, value: still.value, from: 'kept' as const };
     }
     if (setting.default !== undefined) return { key, type: setting.type, value: setting.default, from: 'default' as const };
     return { key, type: setting.type, value: null, from: 'none' as const };
   });
+}
+
+/**
+ * The values sent with an install that its settings take, each checked as a setting is set (`configValue`). `null` puts
+ * the setting back to its default, as `setPackConfig` does. What does not fit is said as a warning, by the setting's name.
+ */
+function settingsSent(pack: Pack, settings: PlanOptions['settings']): { values: Map<string, Json | null>; warnings: { at: string; say: string }[] } {
+  const values = new Map<string, Json | null>();
+  const warnings: { at: string; say: string }[] = [];
+  const declared = pack.manifest.config ?? {};
+  for (const [key, raw] of Object.entries(settings ?? {})) {
+    if (raw === undefined) continue;
+    /* OWN KEYS ONLY: `toString` is not a setting because every object answers to it. */
+    const setting = Object.hasOwn(declared, key) ? declared[key] : undefined;
+    if (raw === null) {
+      if (setting) values.set(key, null);
+      continue;
+    }
+    const named = typeof setting?.label === 'string' && setting.label !== '' ? setting.label : key;
+    if (!setting) {
+      warnings.push({ at: `config.${key}`, say: `This add-on has no setting called ${key}, so the value sent for it was not used.` });
+      continue;
+    }
+    const fits = configValue(key, setting, raw, `config.${key}`);
+    if (fits.ok) values.set(key, fits.value);
+    else warnings.push({ at: `config.${key}`, say: `The value sent for ${named} does not fit it, so it keeps its own.` });
+  }
+  return { values, warnings };
 }
 
 /**
@@ -3097,7 +3139,7 @@ export function plannedState(installed: Installed, pack: Pack, diff: Diff): Inst
      value on that list, as a record that cannot count does. */
   const counts = installed.holding;
   const holding = counts === undefined || seeded.size === 0 ? counts : (list: string, fields: readonly string[]) => (seeded.has(list) ? null : counts(list, fields));
-  const chosen = diff.config.filter((c) => c.from === 'kept');
+  const chosen = diff.config.filter((c) => c.from === 'kept' || c.from === 'given');
   const { [mine]: _was, ...config } = installed.config ?? {};
   return {
     ...installed,
@@ -3284,7 +3326,8 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
      identical document then reported an upgrade with an empty diff, which is the most confident
      wrong answer this module can give. */
   const { provides: _provides, ...manifest } = pack.manifest;
-  const kept = diff.config.filter((c) => c.from === 'kept').map((c) => [c.key, c.value] as const);
+  /* A VALUE SENT WITH THE INSTALL IS KEPT AS ONE CHOSEN ON THE APP, so the next plan reads it as `kept`. */
+  const kept = diff.config.filter((c) => c.from === 'kept' || c.from === 'given').map((c) => [c.key, c.value] as const);
   /* A LIST THAT ALREADY HOLDS ROWS HAS HAD ITS EXAMPLES. An uninstall keeps the rows, so installing the pack again used
      to plant the examples a second time beside the first ones; counted before anything is written. */
   /* PLANTED FROM THE FILLED PACK, because `plan` counted its seeds off the filled one too: planting

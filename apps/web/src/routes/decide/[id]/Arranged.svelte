@@ -1,20 +1,29 @@
 <!--
-  A proposal that arranges this BrainDog (`arranged.ts`), drawn as one story: why, what it calls out, the packs,
-  what will appear, the words that change, and any other setting.
+  A proposal that arranges this BrainDog (`arranged.ts`), drawn as one story and one sitting: why, what it needs from
+  you (each key, with a field to put it in), what it changes and adds, what it starts, your choices, then any other
+  call out, the packs, what will appear, the words that change, and any other setting.
 
-  THE CALLS OUT ARE NEVER FOLDED. They are the one part of an arrangement that reaches outside the record and
-  costs egress, and accepting approves them, so the queue draws them as whole as the gate does, with a glyph in
-  the warning ink and the host in ink. Everything else folds to one counted line on the queue (`compact`).
+  THE CALLS OUT AND THE FEEDS ARE NEVER FOLDED. They are the parts of an arrangement that reach outside the record and
+  cost egress, and accepting approves them, so the queue draws them as whole as the gate does, with a glyph in the
+  warning ink and the host in ink. Everything else folds to one counted line on the queue (`compact`).
+
+  A KEY'S FIELD IS DRAWN ONLY WITH A `client`, which the question's own page hands down by context (`KEYS_CONTEXT`) for
+  a reader who may answer.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Proposed from './Proposed.svelte';
-  import type { Arranged } from './arranged.ts';
+  import KeyNeeded from './KeyNeeded.svelte';
+  import { getContext } from 'svelte';
+  import { KEYS_CONTEXT, type Arranged, type KeysContext } from './arranged.ts';
 
   let { arranged, compact = false }: { arranged: Arranged; compact?: boolean } = $props();
 
-  const folded = new Set(['appears', 'words', 'settings', 'rows']);
+  /* THE QUESTION'S OWN PAGE HANDS A CLIENT DOWN (`+page.svelte`); the queue does not, and there a key is only said. */
+  const keys = getContext<KeysContext | undefined>(KEYS_CONTEXT);
+
+  const folded = new Set(['needs', 'changes', 'choices', 'appears', 'words', 'settings', 'rows']);
 </script>
 
 <div class="arr" data-compact={compact ? '' : undefined}>
@@ -33,6 +42,19 @@
             <li>{line.text}{#if line.at}<span class="arr-at">{line.at}</span>{/if}</li>
           {/each}
         </ul>
+      </section>
+    {:else if p.part === 'starts'}
+      <section class="arr-part arr-calls" aria-label={copy.arrangeStarts}>
+        <h3 class="arr-h arr-calls-h"><Icon name="globe" size="s" />{copy.arrangeStarts}</h3>
+        <ul class="arr-lines">
+          {#each p.feeds as feed, i (i)}
+            <li class="arr-call">
+              {#if feed.host}<span class="arr-host">{feed.host}</span>{/if}
+              <span class="arr-detail">{feed.detail}</span>
+            </li>
+          {/each}
+        </ul>
+        <p class="arr-note">{copy.arrangeStartsNote}</p>
       </section>
     {:else if p.part === 'calls'}
       <section class="arr-part arr-calls" aria-label={copy.arrangeCalls}>
@@ -55,7 +77,53 @@
         </ul>
       </section>
     {:else if !(compact && folded.has(p.part))}
-      {#if p.part === 'appears'}
+      {#if p.part === 'needs'}
+        <section class="arr-part" aria-label={copy.arrangeNeeds}>
+          <h3 class="arr-h arr-calls-h"><Icon name="key" size="s" />{copy.arrangeNeeds}</h3>
+          <ul class="arr-lines arr-needs">
+            {#each p.keys as need, i (need.label)}<KeyNeeded {need} at={i} client={compact ? undefined : keys?.client} onheld={keys?.onheld} />{/each}
+          </ul>
+          {#if p.keys.some((k) => k.held !== 'connector')}<p class="arr-note">{copy.arrangeNeedsNote}</p>{/if}
+        </section>
+      {:else if p.part === 'changes'}
+        <section class="arr-part" aria-label={copy.arrangeChangesH}>
+          <h3 class="arr-h">{copy.arrangeChangesH}</h3>
+          {#each p.lists as l (l.name)}
+            {#if l.name}<h4 class="arr-h">{l.name}</h4>{/if}
+            <ul class="arr-lines arr-changes">
+              {#each l.changes as change, i (i)}
+                <li>
+                  <span class="arr-title">{change.title}</span>
+                  <dl class="arr-fields">
+                    {#each change.fields as f, j (j)}
+                      <dt>{f.field}</dt>
+                      <dd>
+                        {#if f.before !== null}<span class="arr-was"><span class="arr-tag">{copy.arrangeBefore}</span>{f.before}</span>{/if}
+                        <span class="arr-will"><span class="arr-tag">{copy.arrangeAfter}</span>{f.after}</span>
+                      </dd>
+                    {/each}
+                  </dl>
+                </li>
+              {/each}
+            </ul>
+          {/each}
+        </section>
+      {:else if p.part === 'choices'}
+        <section class="arr-part" aria-label={copy.arrangeChoices}>
+          <h3 class="arr-h">{copy.arrangeChoices}</h3>
+          {#each p.choices as c, i (i)}
+            <p class="arr-question">{c.question}</p>
+            <ul class="arr-lines arr-options">
+              {#each c.options as o, j (j)}
+                <li>
+                  <span class="arr-title">{o.name}{#if o.suggested}<span class="arr-suggested">{copy.arrangeSuggested}</span>{/if}</span>
+                  {#if o.line}<span class="arr-detail">{o.line}</span>{/if}
+                </li>
+              {/each}
+            </ul>
+          {/each}
+        </section>
+      {:else if p.part === 'appears'}
         <section class="arr-part" aria-label={copy.proposalWillAppear}>
           <h3 class="arr-h">{copy.proposalWillAppear}</h3>
           <Proposed proposed={{ appears: p.appears, samples: null }} />
@@ -177,6 +245,87 @@
 
   .arr-detail {
     color: var(--ink2);
+  }
+
+  /* WHAT IT CHANGES: each entry's title, then its fields as a definition list, now beside what it will be. */
+  .arr-changes,
+  .arr-options {
+    gap: var(--sp-3);
+  }
+
+  .arr-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--sp-2);
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .arr-fields {
+    display: grid;
+    grid-template-columns: minmax(6rem, max-content) minmax(0, 1fr);
+    gap: var(--sp-1) var(--sp-3);
+    margin: var(--sp-1) 0 0;
+  }
+
+  .arr-fields dt {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 1.6;
+  }
+
+  .arr-fields dd {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--sp-3);
+    margin: 0;
+    min-inline-size: 0;
+  }
+
+  .arr-was {
+    color: var(--dim);
+  }
+
+  .arr-will {
+    color: var(--ink);
+  }
+
+  .arr-tag {
+    margin-inline-end: var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .arr-question {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-ui);
+    font-weight: 600;
+  }
+
+  .arr-options li {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+  }
+
+  /* THE SUGGESTED ONE IS SAID IN THE ACCENT'S TEXT, a word and not a colour alone. */
+  .arr-suggested {
+    color: var(--action-text);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  @media (max-width: 480px) {
+    .arr-fields {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+
+    .arr-fields dd {
+      margin-block-end: var(--sp-2);
+    }
   }
 
   .arr-note,

@@ -34,8 +34,9 @@ export const MEASURES_MOST = 12;
 /**
  * One reading as a list holds it. `of` is the project's name, which is drawn; `project` is the project itself, by its id,
  * which only keeps two projects apart and is never drawn, so two projects with no name (or one name) are two measures.
+ * `amount` is the reading as money, minor units and a currency, and when it is money it is read in place of `value`.
  */
-export type RawReading = { at: unknown; value: unknown; name?: unknown; unit?: unknown; of?: unknown; project?: unknown };
+export type RawReading = { at: unknown; value: unknown; amount?: unknown; name?: unknown; unit?: unknown; of?: unknown; project?: unknown };
 
 export type MeasureSeries = {
   name: string;
@@ -117,9 +118,11 @@ export function measureWindow(nowMs: number, back: unknown, bucket: MeasureBucke
   return { before: all.slice(0, n), keys: all.slice(n), since: new Date(first).toISOString().slice(0, 10) };
 }
 
-/** A reading's number and unit: a number, a numeric text, or money, which carries its own currency. */
-function readingOf(v: unknown, unit: unknown): { value: number; unit: string } | null {
-  const said = typeof unit === 'string' ? unit.trim() : '';
+/**
+ * Money, `{ amount, currency }` with the amount in minor units, as a number in major units by the currency's decimals,
+ * its unit the code. The store may hand it back as JSON text. Anything else is not money and answers `null`.
+ */
+function moneyOf(v: unknown): { value: number; unit: string } | null {
   let x = v;
   if (typeof x === 'string' && x.startsWith('{')) {
     try {
@@ -128,13 +131,22 @@ function readingOf(v: unknown, unit: unknown): { value: number; unit: string } |
       return null;
     }
   }
-  if (typeof x === 'number' && Number.isFinite(x)) return { value: x, unit: said };
-  if (typeof x === 'string' && x.trim() !== '' && Number.isFinite(Number(x))) return { value: Number(x), unit: said };
-  if (x !== null && typeof x === 'object') {
-    const { amount, currency } = x as { amount?: unknown; currency?: unknown };
-    if (typeof amount === 'number' && typeof currency === 'string') return { value: amount / 10 ** exponentOf(currency), unit: currency };
-  }
-  return null;
+  if (x === null || typeof x !== 'object') return null;
+  const { amount, currency } = x as { amount?: unknown; currency?: unknown };
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || typeof currency !== 'string' || currency.trim() === '') return null;
+  const code = currency.trim().toUpperCase();
+  return { value: amount / 10 ** exponentOf(code), unit: code };
+}
+
+/** A unit's currency code, upper case, or `null` when it is not three letters and cannot be one. */
+const currencyCode = (unit: string): string | null => (/^[A-Za-z]{3}$/.test(unit) ? unit.toUpperCase() : null);
+
+/** A reading's number and unit: a number, a numeric text, or money, which carries its own currency. */
+function readingOf(v: unknown, unit: unknown): { value: number; unit: string } | null {
+  const said = typeof unit === 'string' ? unit.trim() : '';
+  if (typeof v === 'number' && Number.isFinite(v)) return { value: v, unit: said };
+  if (typeof v === 'string' && !v.startsWith('{') && v.trim() !== '' && Number.isFinite(Number(v))) return { value: Number(v), unit: said };
+  return moneyOf(v);
 }
 
 /** A measure with fewer than two points in the period, which draws no line: its newest reading, said once. */
@@ -238,12 +250,22 @@ function seriesOf(readings: Iterable<RawReading>, opts: MeasureOpts): (MeasureSe
     const dated = r.at.length === 10;
     const ms = Date.parse(dated ? `${r.at}T00:00:00Z` : r.at);
     if (!Number.isFinite(ms)) continue;
-    const reading = readingOf(r.value, r.unit);
+    /* AN AMOUNT THAT IS MONEY IS THE READING, and a row without one is read from `value` as before, so a measure's older
+       decimal rows and its newer money rows, grouped by name and project below, are one line. */
+    const reading = moneyOf(r.amount) ?? readingOf(r.value, r.unit);
     if (reading === null) continue;
     const said = typeof r.name === 'string' && r.name.trim() !== '' ? r.name.trim() : opts.fallback;
     const of = typeof r.of === 'string' && r.of.trim() !== '' ? r.of.trim() : null;
-    const id = JSON.stringify([said, of, typeof r.project === 'string' ? r.project : null]);
+    const project = typeof r.project === 'string' ? r.project : null;
+    let id = JSON.stringify([said, of, project]);
     let group = groups.get(id);
+    /* TWO CURRENCIES ARE NEVER ONE LINE. A measure that turns from EUR to JPY under one name drew its yen as euros, under
+       the first reading's code; the reading in the other currency is a line of its own, of the same name. */
+    const code = currencyCode(reading.unit);
+    if (group && code !== null && currencyCode(group.unit) !== null && currencyCode(group.unit) !== code) {
+      id = JSON.stringify([said, of, project, code]);
+      group = groups.get(id);
+    }
     if (!group) groups.set(id, (group = { name: said, of, unit: reading.unit, last: new Map(), latest: null }));
     if (!group.unit && reading.unit) group.unit = reading.unit;
     const day = dated ? r.at : dayOf(ms);

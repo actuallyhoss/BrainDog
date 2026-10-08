@@ -35,7 +35,7 @@ import { refused, type Result } from '@braindog/ports';
 import { installFromCatalogue, loadSource, reachLines, sdkVerb } from './catalogue.ts';
 import { oneLine, printable } from './clip.ts';
 import { refuse } from './json.ts';
-import { connect, fixOf, type AgentIo, type Connected } from './skills.ts';
+import { causeOf, connect, fixOf, joinedSaid, type AgentIo, type Connected } from './skills.ts';
 
 const USAGE =
   'braindog usecase takes new <id>, check <file>, diff <a> <b>, publish <file> --to <folder> [--sign <key file>], key <file> --author <name>, search [words] --from <catalogue>, preview <file> [--port <n>], list [--host <host>], export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], or install <id|file|url> [--from <catalogue>] [--version <x.y.z>] [--host <host>].';
@@ -284,15 +284,17 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
  * A `pack` proposal carrying a file already read through `readShared`, and the Decide link it prints. The record reads the
  * file through the same door again and plans it; nothing is installed until the owner accepts it.
  */
-export async function proposeFile(text: string, file: { title: string; version: string }, host: string | undefined, io: AgentIo, question?: string): Promise<number> {
+export async function proposeFile(text: string, file: { usecase: string; title: string; version: string }, host: string | undefined, io: AgentIo, question?: string): Promise<number> {
   /* The question and the line are built from a scrubbed copy; `text`, the file itself, is sent byte for byte. */
   const u = printable({ title: file.title, version: file.version });
   const at = await connect(host, io);
   if (typeof at === 'number') return at;
-  const answer = await at.client.call<{ id: string }>('propose', {
+  /* ASKED ONCE (AGT-C07), keyed as its pack is (`usecase-<id>`), so the file and the use case on offer by its id join. */
+  const answer = await at.client.call<{ id: string; joined?: true; said?: string }>('propose', {
     question: question ?? `Install ${u.title} ${u.version}?`,
     body_kind: 'pack',
     body: { file: text },
+    ...causeOf(`install#${USE_CASE}${file.usecase}`),
   });
   if (!answer.ok) {
     return refuse(io, answer, saidWithCode(answer));
@@ -303,7 +305,8 @@ export async function proposeFile(text: string, file: { title: string; version: 
     return 1;
   }
   const link = new URL(`/decide/${encodeURIComponent(id)}`, at.to.base).href;
-  io.out(`${question === undefined ? `Asked the owner to install ${u.title} ${u.version}.` : `Asked the owner: ${oneLine(question)}`} Nothing is installed until they accept it: ${link}`);
+  const joined = joinedSaid(answer.value);
+  io.out(`${joined !== null ? joined : question === undefined ? `Asked the owner to install ${u.title} ${u.version}.` : `Asked the owner: ${oneLine(question)}`} Nothing is installed until they accept it: ${link}`);
   return 0;
 }
 
@@ -392,7 +395,12 @@ async function installOffered(given: string, host: string | undefined, io: Agent
     return 1;
   }
   const title = oneLine(offered?.usecase ?? idWords(id));
-  const answer = await at.client.call<{ id: string }>('propose', { question: update ? `Update ${title} from ${update.from} to ${update.to}?` : `Set this BrainDog up for ${title}?`, body_kind: 'pack', body: { install: id } });
+  const answer = await at.client.call<{ id: string; joined?: true; said?: string }>('propose', {
+    question: update ? `Update ${title} from ${update.from} to ${update.to}?` : `Set this BrainDog up for ${title}?`,
+    body_kind: 'pack',
+    body: { install: id },
+    ...causeOf(`install#${id}`),
+  });
   if (!answer.ok) {
     return refuse(io, answer, saidWithCode(answer));
   }
@@ -403,6 +411,7 @@ async function installOffered(given: string, host: string | undefined, io: Agent
   }
   const link = new URL(`/decide/${encodeURIComponent(filed)}`, at.to.base).href;
   const asked = update ? `update ${title} from ${update.from} to ${update.to}` : `set this BrainDog up for ${title}`;
-  io.out(`Asked the owner to ${asked}. Nothing is installed until they accept it: ${link}`);
+  const joined = joinedSaid(answer.value);
+  io.out(`${joined ?? `Asked the owner to ${asked}.`} Nothing is installed until they accept it: ${link}`);
   return 0;
 }

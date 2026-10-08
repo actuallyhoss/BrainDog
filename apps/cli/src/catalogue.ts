@@ -968,10 +968,11 @@ export async function installFromCatalogue(
 }
 
 async function proposePack(id: string, doc: Record<string, unknown>, question: string, host: string | undefined, io: AgentIo): Promise<number> {
-  const { connect } = await import('./skills.ts');
+  const { causeOf, connect, joinedSaid } = await import('./skills.ts');
   const at = await connect(host, io);
   if (typeof at === 'number') return at;
-  const answer = await at.client.call<{ id: string }>('propose', { question, body_kind: 'pack', body: { install: id, doc } });
+  /* ASKED ONCE (AGT-C07): the same pack asked for again, from here or another machine, joins the open question. */
+  const answer = await at.client.call<{ id: string; joined?: true; said?: string }>('propose', { question, body_kind: 'pack', body: { install: id, doc }, ...causeOf(`install#${id}`) });
   if (!answer.ok) {
     return refuse(io, answer, saidWithCode(answer));
   }
@@ -980,7 +981,9 @@ async function proposePack(id: string, doc: Record<string, unknown>, question: s
     io.say('The record took the question and did not say which one it is. Open Decide in the app.');
     return 1;
   }
-  io.out(`Asked the owner: ${question} Nothing is installed until they accept it: ${new URL(`/decide/${encodeURIComponent(filed)}`, at.to.base).href}`);
+  const link = new URL(`/decide/${encodeURIComponent(filed)}`, at.to.base).href;
+  const joined = joinedSaid(answer.value);
+  io.out(joined !== null ? `${joined} Nothing is installed until they accept it: ${link}` : `Asked the owner: ${question} Nothing is installed until they accept it: ${link}`);
   return 0;
 }
 

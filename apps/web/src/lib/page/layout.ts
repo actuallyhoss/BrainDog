@@ -379,3 +379,25 @@ export function leadChartAt(blocks: readonly Opening[]): number {
   if (!first || !LEAD_CHARTS.has(first.kind) || first.box === true || first.joins === true) return -1;
   return blocks.slice(at + 1).find((b) => b.drawn)?.joins === true ? -1 : at;
 }
+
+/** What `railDrawn` reads off a block: the area it sits in and whether its `when:` let it be drawn. */
+export type Drawn = { readonly area?: unknown; readonly drawn: boolean };
+
+/**
+ * THE TWO COLUMNS AS THEY ARE DRAWN: how many twelfths the main column takes and how many the side rail takes, where
+ * `0` is a column that is not drawn at all.
+ *
+ * A COLUMN WHOSE EVERY BLOCK SAID NO TO `when:` IS NOT DRAWN, as an empty one is not, and the other takes the whole
+ * board. A side rail whose only block is hidden is no rail: the main column is twelve wide, not eight beside a third of
+ * nothing. This was the page's own arithmetic (`PageBody.svelte`) with no test at all; here it is pure, so the rule
+ * sheet's Layout page and `layout.test.ts` hold it. Both drawn, the board's own two thirds and a third (`boardRail`).
+ * A page with no layout is one column, whatever its blocks say.
+ */
+export function railDrawn(layout: Layout | null, blocks: readonly Drawn[]): { main: number; rail: number } {
+  if (!layout) return { main: blocks.some((b) => b.drawn) ? COLUMNS : 0, rail: 0 };
+  const shown = (area: Area): boolean => blocks.some((b) => b.drawn && areaIn(b.area, layout) === area);
+  const main = shown('main');
+  const rail = shown('rail');
+  if (main && rail) return boardRail(layout);
+  return { main: main ? COLUMNS : 0, rail: rail ? COLUMNS : 0 };
+}

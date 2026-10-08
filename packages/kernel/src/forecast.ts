@@ -24,7 +24,7 @@ import { compile, resolveDay, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
 import { convertMinor, homeFrom, rateFor, rateIsStale } from './fx.ts';
-import { predicateOf, type EvalContext } from './metrics.ts';
+import { clockOf, predicateOf, type EvalContext } from './metrics.ts';
 
 export type Leg = {
   register: string;
@@ -78,6 +78,22 @@ export type Leg = {
    * putting every such row into one plan called nothing.
    */
   group?: string;
+  /**
+   * The field holding the days of the month a row's money moves on: a day from 1 to 31, `last`, or two of them,
+   * `15, last` (`daysOf`). Set, the walk steps to those days of every month its cycle lands in; empty, it steps as the
+   * cycle alone says, and twice a month falls back to the leg's table (the 1st and the 15th).
+   *
+   * A SALARY PAID TWICE A MONTH HAS DAYS, and they were one table for every row of every record: a line paid on the 15th
+   * and the last day walked on the 1st and the 15th. And a line on the 30th typed in September read as "the end of the
+   * month" and walked to 31 October. `last` is each month's own last day; `30` is the 30th, or the end of a shorter
+   * month. The row's own first day still moves first, because that is the day somebody wrote on it.
+   */
+  days?: string;
+  /**
+   * The field holding what happens to a day that falls on one of the record's rest days (`ForecastDeps.restDays`):
+   * `leave` it, the working day `before`, or the working day `after`. Empty is `leave`, which is a line as imported.
+   */
+  weekend?: string;
 };
 
 export type Runway = {
@@ -126,6 +142,11 @@ export type ForecastDeps = {
   titleOf: (register: string) => string | null;
   hydrate: (id: string) => Entry | null;
   ctx: EvalContext;
+  /**
+   * The record's rest days, as weekday numbers (0 Sunday to 6 Saturday), which a row's `weekend` rule moves a day off.
+   * Absent, the walk reads the record's `rest_days` setting (`restDaysOf`), and Saturday and Sunday when none is set.
+   */
+  restDays?: readonly number[];
 };
 
 const DAY_MS = 86_400_000;
@@ -212,10 +233,30 @@ type Held = {
   label: string;
   spoken: string;
   of: string | null;
+  /** The days of the month from the leg's `days` field, or `null` when it is empty: the cycle alone steps. */
+  named: readonly Named[] | null;
+  /** Where a day on a rest day moves, from the leg's `weekend` field. */
+  shift: Shift;
 };
 
+/** A day of the month a row names: a number from 1 to 31, or `'last'` for each month's own last day. */
+type Named = number | 'last';
+type Shift = 'leave' | 'before' | 'after';
+
 /** What one leg read: the sentence that stopped it, or its rows and a count of each thing it could not read. */
-type LegRead = { leg: Leg; stopped: Refusal | null; rows: Held[]; unreadable: number; unreadableEnd: number; notMoney: number };
+type LegRead = {
+  leg: Leg;
+  stopped: Refusal | null;
+  rows: Held[];
+  unreadable: number;
+  unreadableEnd: number;
+  notMoney: number;
+  /** Rows whose days this walk could not read, walked by their cycle alone. */
+  unreadableDays: number;
+  /** Rows whose days do not fit how often they repeat (one day on twice a month, two on a cycle of months), walked by
+   *  their cycle alone. */
+  daysOff: number;
+};
 
 /**
  * Walk the legs.
@@ -253,7 +294,10 @@ export function runway(
   const asked = into === undefined ? null : homeFrom(into);
   if (into !== undefined && asked === null)
     return no<Runway>('VALUE_MALFORMED', `A currency to walk in is a three-letter code, and this one is ${JSON.stringify(into)}.`, { at: 'into' });
-  const today = iso(deps.ctx.nowMs);
+  /* TODAY IS THE RECORD'S LOCAL DAY, as every `today` a predicate names is (`clockOf`). The UTC date of `nowMs` made a
+     bill due yesterday in `Africa/Cairo` read as due today until 03:00 local time, and a walk drawn beside a list that
+     already called it late. */
+  const today = iso(clockOf(deps.ctx));
   const refusals: Refusal[] = [];
   const movements: { at: number; currency: string; step: Omit<Step, 'balance'> }[] = [];
   const seen = new Set<string>();
@@ -263,7 +307,7 @@ export function runway(
      leg's own order below, as they did when reading and walking were one loop. */
   const reads: LegRead[] = [];
   for (const leg of legs) {
-    const read: LegRead = { leg, stopped: null, rows: [], unreadable: 0, unreadableEnd: 0, notMoney: 0 };
+    const read: LegRead = { leg, stopped: null, rows: [], unreadable: 0, unreadableEnd: 0, notMoney: 0, unreadableDays: 0, daysOff: 0 };
     reads.push(read);
     const schema = deps.schemaOf(leg.register);
     if (!schema) {
@@ -335,16 +379,29 @@ export function runway(
       }
       const part = leg.group ? entry.fields[leg.group] : undefined;
       const cycle = leg.every ? String(entry.fields[leg.every.field] ?? '') : '';
+      /* DAYS THIS WALK CANNOT READ ARE COUNTED AND SAID, and the row walks by its cycle as an empty field would. Left
+         out, a salary typed "15th and last" would be money missing; walked on a guess, it would be days nobody wrote. */
+      const given = leg.days ? daysOf(entry.fields[leg.days]) : null;
+      if (given === undefined) read.unreadableDays++;
+      const how = cadenceOf(leg.every, cycle);
+      /* DAYS THAT DO NOT FIT THE CYCLE ARE SAID TOO, and the row walks by its cycle. Two days on a line paid every month
+         walked it twice a month, double the money every figure that counts it by how often reads; one day on twice a
+         month is half a pair. A week has no day of the month and a one-off has its own day, so those keep their days. */
+      const off = given && how.cadence && how.cadence.kind !== 'weeks' && given.length !== (how.cadence.kind === 'twice' ? 2 : 1);
+      if (off) read.daysOff++;
+      const named = off ? null : given;
       read.rows.push({
         first: dayOf(first),
         last: last ? dayOf(last) : null,
-        ...cadenceOf(leg.every, cycle),
+        ...how,
         amount: money.amount,
         currency: money.currency,
         incoming: leg.incoming ? entry.fields[leg.incoming.field] === leg.incoming.is : false,
         label: String(entry.fields[title] ?? entry.id),
         spoken: entry.seq === null ? entry.id : `${leg.register}#${entry.seq}`,
         of: typeof part === 'string' && part.trim() !== '' ? part.trim() : null,
+        named: named ?? null,
+        shift: leg.weekend ? shiftOf(entry.fields[leg.weekend]) : 'leave',
       });
     }
   }
@@ -358,7 +415,11 @@ export function runway(
         : Math.min(ceilingOf(horizonDays), Math.max(horizonDays.last, lastOf(reads, deps.ctx.nowMs, today, horizonDays.last)));
   const until = deps.ctx.nowMs + horizon * DAY_MS;
 
-  for (const { leg, stopped, rows, unreadable, unreadableEnd, notMoney } of reads) {
+  /* THE RECORD'S REST DAYS ARE READ ONCE, and only when a row has a rule that moves a day: a walk with none reads no
+     setting, which is every walk of a record whose lines are as imported. */
+  const rest = reads.some((r) => r.rows.some((row) => row.shift !== 'leave')) ? new Set(deps.restDays ?? restDaysOf(deps.sql)) : new Set<number>();
+
+  for (const { leg, stopped, rows, unreadable, unreadableEnd, notMoney, unreadableDays, daysOff } of reads) {
     if (stopped) {
       refusals.push(stopped);
       continue;
@@ -370,7 +431,7 @@ export function runway(
        these rows are walked once, and this is what lets the walk say that the rest is missing. */
     const unread = new Map<string, number>();
     for (const row of rows) {
-      const recurs = occurrences(row, until, today);
+      const recurs = occurrences(row, until, today, rest);
       if (recurs.capped) truncated++;
       /* ONLY A ROW WITH A STEP INSIDE THE WINDOW: one whose first day is past the horizon is missing
          nothing from this walk, whatever its cycle. */
@@ -410,6 +471,18 @@ export function runway(
         code: 'VALUE_MALFORMED',
         fix: `${unreadableEnd} ${unreadableEnd === 1 ? 'row' : 'rows'} of ${leg.register} ${unreadableEnd === 1 ? 'has an end in' : 'have ends in'} ${leg.ends} that this walk could not read, and ${unreadableEnd === 1 ? 'its' : 'their'} money is not in it.`,
         at: 'ends',
+      });
+    if (unreadableDays)
+      refusals.push({
+        code: 'VALUE_MALFORMED',
+        fix: `${unreadableDays} ${unreadableDays === 1 ? 'line' : 'lines'} of ${leg.register} ${unreadableDays === 1 ? 'has days' : 'have days'} in ${leg.days} that this walk could not read, and ${unreadableDays === 1 ? 'it walks' : 'they walk'} by how often alone. Write a day from 1 to 31, last, or two of them: 15, last.`,
+        at: 'days',
+      });
+    if (daysOff)
+      refusals.push({
+        code: 'VALUE_MALFORMED',
+        fix: `${daysOff} ${daysOff === 1 ? 'line' : 'lines'} of ${leg.register} ${daysOff === 1 ? 'names days' : 'name days'} in ${leg.days} that do not fit how often ${daysOff === 1 ? 'it repeats, and it walks' : 'they repeat, and they walk'} by how often alone. Twice a month takes two days, and every other cycle one.`,
+        at: 'days',
       });
     if (notMoney)
       refusals.push({
@@ -571,7 +644,12 @@ export function runway(
  *
  * A WEEK IS SEVEN DAYS AND TWICE A MONTH IS TWO NAMED DAYS, each stepped by `stepsOf` below.
  */
-function occurrences(row: Held, until: number, today: string): { of: { day: string; at: number }[]; capped: boolean } {
+function occurrences(
+  row: Held,
+  until: number,
+  today: string,
+  rest: ReadonlySet<number> = new Set(),
+): { of: { day: string; at: number }[]; capped: boolean } {
   const { first, last, cadence } = row;
   const start = noon(first);
   if (!Number.isFinite(start)) return { of: [], capped: false };
@@ -579,25 +657,46 @@ function occurrences(row: Held, until: number, today: string): { of: { day: stri
      due 1 October for a line that ends on 28 September when the next payday is past the end, and that row is no cheque.
      */
   if (last !== null && first > last) return { of: [], capped: false };
-  if (cadence === null) return { of: start <= until ? [{ day: first, at: start }] : [], capped: false };
+  /* A DAY ON A REST DAY MOVES BY THE ROW'S RULE, and the row's own first day too: a rule says the money moves on a
+     working day, and a "Next" already moved is a working day, so moving it again changes nothing. A day moved before
+     today whose own day is still ahead moves today, not into the past it would be skipped or called late in. */
+  const moved = (day: string): string => {
+    const to = shifted(day, row.shift, rest);
+    return to < today && day >= today ? today : to;
+  };
+  if (cadence === null) {
+    const day = moved(first);
+    return { of: noon(day) <= until ? [{ day, at: noon(day) }] : [], capped: false };
+  }
 
   /* A CYCLE BEFORE TODAY HAS ALREADY BEEN CHARGED. `renews` is an anchor nobody moves on, and the
      walk started at it and clamped every past cycle to today as overdue: a monthly service anchored
      three months back charged four times on day one, and one anchored in 2020 hit the cap on a
      30-day horizon. The reminder engine skips past occurrences for the same reason (`expandRepeat`'s
      `skipPast`). Skipped cycles are not counted against `EVERY_CAP`, only against `SKIP_CAP`. */
-  const days = stepsOf(first, start, cadence);
+  const days = stepsOf(first, start, cadence, row.named);
   const out: { day: string; at: number }[] = [];
+  /* THE LAST DAY A STEP MOVED TO, so a step moved onto or behind the one before it is the same payment and is dropped:
+     a "Next" typed as Thursday 29 October for a payday on the 30th, a Friday, is October's, and the 30th moved back a
+     day is that payday again. */
+  let prev = '';
   let n = 0;
   for (; out.length < EVERY_CAP && n < SKIP_CAP; n++) {
     const next = days.next();
-    const day = next.done ? null : next.value;
-    if (!day) break;
-    const at = noon(day);
+    const named = next.done ? null : next.value;
+    if (!named) break;
     /* PAST THE ROW'S LAST DAY IS THE SAME STOP AS PAST THE HORIZON, and it is a stop and not the cap, so `capped` below
-       stays false for a line that simply ended. */
-    if (at > until || (last !== null && day > last)) break;
-    if (day < today) continue;
+       stays false for a line that simply ended. The end bounds the day the row names, before any rest day moves it. */
+    if (noon(named) > until || (last !== null && named > last)) break;
+    const to = shifted(named, row.shift, rest);
+    const repeat = to <= prev;
+    prev = to > prev ? to : prev;
+    /* A DAY GONE BY IS SKIPPED ONLY WHEN ITS MOVE IS GONE BY TOO: a payday on Saturday 31 October paid the working day
+       after is still Monday's money on the Sunday between. */
+    if ((named < today && to < today) || repeat) continue;
+    const day = moved(named);
+    const at = noon(day);
+    if (at > until) break;
     out.push({ day, at });
   }
   /* AND THE CAP IS REPORTED RATHER THAN TAKEN. Running out of occurrences while the horizon still
@@ -610,8 +709,18 @@ function occurrences(row: Held, until: number, today: string): { of: { day: stri
  * Every day a repeating row's money moves on, from its first day on, in order and without end: `occurrences` stops
  * reading at the horizon, the row's end or a cap, so nothing here has to. `null` is a day the calendar could not step to.
  */
-function* stepsOf(first: string, start: number, cadence: NonNullable<Cadence>): Generator<string | null, void, undefined> {
+function* stepsOf(
+  first: string,
+  start: number,
+  cadence: NonNullable<Cadence>,
+  named: readonly Named[] | null = null,
+): Generator<string | null, void, undefined> {
   yield first;
+  /* THE DAYS A ROW NAMES ARE ITS OWN, and they replace the twice-a-month table and the month end reading below. Twice a
+     month has two of them and a cycle of months one (`runway` says a row whose days do not fit and hands none here). A
+     week has no day of the month, so a weekly row walks by its seven days whatever it names. */
+  if (named && cadence.kind === 'months') return yield* namedSteps(first, cadence.months, named);
+  if (named && cadence.kind === 'twice') return yield* namedSteps(first, 1, named);
   if (cadence.kind === 'weeks') {
     /* SEVEN DAYS AT A TIME FROM NOON ON THE FIRST DAY, so a month end or a leap day is simply a day the count passes
        through: a weekly row from 22 February 2028 lands on the 29th and then on 7 March. */
@@ -653,6 +762,49 @@ function* stepsOf(first: string, start: number, cadence: NonNullable<Cadence>): 
       const stepped = resolveDay(`+${Math.round(cadence.months * n)}m`, start);
       yield stepped && monthEnd ? endOfMonth(stepped) : stepped;
     }
+  }
+}
+
+/**
+ * The days a row's own `days` name, every `every` months, after the one its first day stands for.
+ *
+ * THE FIRST DAY IS ONE OF THE NAMED DAYS, MOVED OR MISTYPED, AND THE NEAREST ONE IS THE PAYMENT IT IS. A "Next" of
+ * Thursday 29 October on a line paid on the 30th is October's pay moved to a working day, and one of Monday 2 November
+ * on a line paid on the last day is October's moved the other way; walking every named day after the first would pay
+ * the first of those twice and skip November's in the second. So the named day nearest the first day is that payment,
+ * the earlier on a tie (which drops no money), and the walk goes on from the named day after it. A "Next" far from
+ * every named day steps once on it and then on the named days: that is the sign the two disagree, and the form says
+ * which wins ("Next" for the next payment, the days after it).
+ *
+ * `last` IS EACH MONTH'S OWN LAST DAY AND A NUMBER IS THAT DAY, or the last day of a month too short for it: `15, last`
+ * walks 15 and 31 October and 15 and 30 November, and `30` walks 30 October, never the 31st.
+ */
+function* namedSteps(first: string, every: number, named: readonly Named[]): Generator<string, void, undefined> {
+  const year = Number(first.slice(0, 4));
+  const month = Number(first.slice(5, 7)) - 1;
+  /* FROM ONE CYCLE BEFORE THE FIRST DAY'S MONTH, so there is always a named day on or before it to weigh. */
+  function* all(): Generator<string, void, undefined> {
+    for (let k = -1; ; k++) {
+      const length = new Date(Date.UTC(year, month + k * every + 1, 0)).getUTCDate();
+      const days = [...new Set(named.map((d) => (d === 'last' ? length : Math.min(d, length))))].sort((a, b) => a - b);
+      for (const d of days) yield iso(Date.UTC(year, month + k * every, d, 12));
+    }
+  }
+  const at = noon(first);
+  let before = '';
+  let stood = false;
+  for (const day of all()) {
+    if (day <= first) {
+      before = day;
+      continue;
+    }
+    /* THE FIRST NAMED DAY AFTER THE ROW'S OWN: the payment the row's day stands for when it is nearer than the one
+       before, and so not walked again. */
+    if (!stood) {
+      stood = true;
+      if (before === '' || noon(day) - at < at - noon(before)) continue;
+    }
+    yield day;
   }
 }
 
@@ -796,3 +948,113 @@ const isMoney = (v: unknown): v is { amount: number; currency: string } =>
   typeof (v as { amount: unknown }).amount === 'number' &&
   Number.isFinite((v as { amount: number }).amount) &&
   typeof (v as { currency: unknown }).currency === 'string';
+
+/**
+ * The days of the month a row's `days` field names: `null` when it is empty, `undefined` when this walk cannot read it.
+ *
+ * A DAY FROM 1 TO 31 OR `last`, ONE OR TWO OF THEM, apart by a comma, `and` or a space: `15, last`, `15 and last`,
+ * `last`. A number field holding a whole day reads as that day. Anything else is said (`unreadableDays`), never guessed.
+ */
+function daysOf(value: unknown): Named[] | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return Number.isInteger(value) && value >= 1 && value <= 31 ? [value] : undefined;
+  if (typeof value !== 'string') return undefined;
+  const parts = value
+    .toLowerCase()
+    .split(/,|\band\b|\s+/)
+    .map((p) => p.trim())
+    .filter((p) => p !== '');
+  if (parts.length === 0) return null;
+  if (parts.length > 2) return undefined;
+  const out: Named[] = [];
+  for (const p of parts) {
+    if (p === 'last') out.push('last');
+    else if (/^\d{1,2}$/.test(p) && Number(p) >= 1 && Number(p) <= 31) out.push(Number(p));
+    else return undefined;
+  }
+  /* THE SAME DAY TWICE IS ONE DAY, and on a line paid twice a month it would walk half its money. */
+  return out.length === 2 && out[0] === out[1] ? undefined : out;
+}
+
+/** A row's weekend rule: `before` or `after` (the reminder engine's `previous` and `next` too), else `leave`. */
+function shiftOf(value: unknown): Shift {
+  const said = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (said === 'before' || said === 'previous') return 'before';
+  if (said === 'after' || said === 'next') return 'after';
+  return 'leave';
+}
+
+/**
+ * A day moved off the record's rest days by a row's rule: back to the working day before, or on to the one after.
+ *
+ * THE SAME RULE THE REMINDERS KEEP (`shiftWorkday` in `schedule.ts`), with the rest days the record's own and not
+ * Saturday and Sunday for everyone: in Cairo the weekend is Friday and Saturday, and a payday on Friday 30 October paid
+ * "the working day before" is Thursday 29. A week of nothing but rest days has no working day, and the day stays.
+ */
+function shifted(day: string, how: Shift, rest: ReadonlySet<number>): string {
+  if (how === 'leave' || rest.size === 0 || rest.size >= 7) return day;
+  let at = noon(day);
+  while (rest.has(new Date(at).getUTCDay())) at += how === 'before' ? -DAY_MS : DAY_MS;
+  return iso(at);
+}
+
+/** Saturday and Sunday, the rest days a record has until somebody says otherwise. */
+const REST_DEFAULT: readonly number[] = [6, 0];
+/** The setting a record's rest days are held in, on whichever enabled pack declares it (Money, `rest_days`). */
+export const REST_DAYS_SETTING = 'rest_days';
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+/**
+ * The record's rest days: the `rest_days` setting of the first enabled pack, by id, that declares one, as a person set
+ * it or as the pack's default; Saturday and Sunday when no pack declares it or it is empty.
+ *
+ * READ AS `homeCurrency` IN `declare.ts` READS THE HOME CURRENCY, from the pack rows themselves, and each time a walk
+ * needs it, so a change on Money's settings holds at once. Read here and not through `declare.ts`, which imports this
+ * module's callers.
+ *
+ * A LIST OR A SENTENCE, because the setting is a person's: weekday numbers (0 or 7 Sunday, 1 Monday to 6 Saturday) or
+ * names, `Friday, Saturday` or `fri sat`. `none` is a record with no rest days. A value nothing here can read is the
+ * default rather than no rest days, since moving no payday is the reading that hides the setting was ever made.
+ */
+export function restDaysOf(sql: Sql): number[] {
+  let rows: { manifest: string }[];
+  try {
+    rows = sql.all<{ manifest: string }>('SELECT manifest FROM pack WHERE disabled_at IS NULL ORDER BY id');
+  } catch {
+    return [...REST_DEFAULT];
+  }
+  for (const { manifest } of rows) {
+    let m: { config?: Record<string, { default?: unknown }>; config_values?: Record<string, unknown> };
+    try {
+      m = JSON.parse(manifest) as typeof m;
+    } catch {
+      continue;
+    }
+    const decl = m?.config?.[REST_DAYS_SETTING];
+    if (!decl || typeof decl !== 'object') continue;
+    const set = m.config_values?.[REST_DAYS_SETTING];
+    const read = weekdaysOf(set !== null && set !== undefined ? set : decl.default);
+    if (read) return read;
+  }
+  return [...REST_DEFAULT];
+}
+
+/** Weekday numbers from a list or a sentence of numbers or names, `[]` for `none`, or `null` when nothing is readable. */
+function weekdaysOf(value: unknown): number[] | null {
+  const parts = Array.isArray(value)
+    ? value.map((v) => String(v).trim().toLowerCase())
+    : typeof value === 'string'
+      ? value.toLowerCase().split(/[,\s]+|\band\b/).map((p) => p.trim())
+      : typeof value === 'number'
+        ? [String(value)]
+        : [];
+  const said = parts.filter((p) => p !== '');
+  if (said.length === 1 && said[0] === 'none') return [];
+  const out = new Set<number>();
+  for (const p of said) {
+    const n = /^[0-7]$/.test(p) ? Number(p) % 7 : p.length >= 3 ? WEEKDAYS.findIndex((w) => w.startsWith(p)) : -1;
+    if (n < 0 || n > 6) return null;
+    out.add(n);
+  }
+  return out.size ? [...out].sort((a, b) => a - b) : null;
+}

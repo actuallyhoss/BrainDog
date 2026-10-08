@@ -87,8 +87,21 @@ export type RolledCheck = { register: string; by: string; balance: string; on: s
 /** The list whose rows move money in and out of an account, and which of its rows count. */
 export type RolledMoves = { register: string; by: string; on: string; amount: string; direction: string; out: string; where?: string };
 
-/** `value: { rolled }` (`modules.md` C3): each account's own balance and day, the lists that restart it, and its moves. */
-export type Rolled = { balance: string; as_of: string; checks?: RolledCheck[]; moves: RolledMoves };
+/**
+ * What a rolled figure answers in place of the money: the oldest day an account was last confirmed, that day's age in
+ * whole days, or how many accounts were last confirmed longer ago than `after` (or never).
+ */
+export const ROLLED_READS = ['as_of', 'age', 'stale'] as const;
+
+/**
+ * `value: { rolled }` (`modules.md` C3): each account's own balance and day, the lists that restart it, and its moves.
+ *
+ * `read` TURNS THE SAME ROLL INTO A FIGURE ABOUT ITS AGE. A balance is only as new as the last thing that said it, the
+ * account's own day or a check's (a bank message's balance after a movement, a typed balance check), so the age is read
+ * from the same statements the roll restarts from and never from the account's typed day alone. `after` is the window
+ * a `stale` figure counts past: `after: 7d`.
+ */
+export type Rolled = { balance: string; as_of: string; checks?: RolledCheck[]; moves: RolledMoves; read?: (typeof ROLLED_READS)[number]; after?: string };
 
 /** `value: { walk, within }` over `source: forecast.runway` (`modules.md` C4). */
 export type Walked = { walk: (typeof WALKS)[number]; within?: string };
@@ -113,6 +126,11 @@ export function rolledFault(rolled: unknown): string | null {
       if (c === null || typeof c !== 'object' || !['register', 'by', 'balance', 'on'].every((k) => named((c as Record<string, unknown>)[k])))
         return 'each of rolled.checks names its list, its account field, the balance it states and its day';
   }
+  if (r.read !== undefined && !(ROLLED_READS as readonly unknown[]).includes(r.read))
+    return `rolled.read is ${ROLLED_READS.join(', ')}, or left out for the money itself`;
+  if (r.after !== undefined && (typeof r.after !== 'string' || windowMs(r.after) === null)) return 'rolled.after is a span of days, such as 7d';
+  if (r.read === 'stale' && r.after === undefined) return 'a stale count says how old a balance may be before it counts: after: 7d';
+  if (r.after !== undefined && r.read !== 'stale') return 'rolled.after is the window a stale count reads, so it goes with read: stale';
   return null;
 }
 
@@ -171,6 +189,10 @@ function compared(decl: MetricDecl, now: Summed, before: (clockMs: number) => Su
  * are taken back off it, which is the same arithmetic run the other way.
  *
  * THE READING'S `as_of` IS THE OLDEST STATEMENT USED, so the tile can say how old the figure's weakest part is.
+ *
+ * WITH `read` SET THE VALUE IS THAT AGE AND NOT THE MONEY: the oldest day an account was last confirmed, its age in
+ * days, or how many accounts are older than `after`, for the whole figure and for each group. The verdict and the
+ * comparison read that number as they read any other.
  */
 export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading> {
   const fault = rolledFault((decl.value as unknown as { rolled: unknown }).rolled);
@@ -284,8 +306,11 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
       )
       .map((r) => ({ currency: String(r.c), amount: Number(r.v ?? 0), first: r.first }));
 
-  /* ONE ACCOUNT ON ONE DAY: its amounts per currency, and the day its statement is from. */
-  const accountOn = (a: { id: string; fields: Record<string, unknown> }, on: string): { amounts: Amount[]; since: string | null } => {
+  /* ONE ACCOUNT ON ONE DAY: its amounts per currency, the day its statement is from, and the day it was last confirmed.
+     `confirmed` IS A STATEMENT THAT SAYS BOTH A BALANCE AND A DAY, the account's own or a check's. An account with
+     neither, or with a balance and no day, was never confirmed, and its `since` (the first move it rolls from) is not
+     a confirmation: a balance nobody has stated is not a balance anybody checked. */
+  const accountOn = (a: { id: string; fields: Record<string, unknown> }, on: string): { amounts: Amount[]; since: string | null; confirmed: string | null } => {
     const own = { day: dayIn(a.fields[rolled.as_of]), money: moneyOf(a.fields[rolled.balance]) };
     /* THE ACCOUNT'S OWN STATEMENT WITH NO DAY STANDS BEFORE EVERY MOVE (`''` sorts first), and one with no balance starts
        from nothing. A check always restarts it, since any check is newer than before everything. */
@@ -298,9 +323,11 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
       const since = movesBetween(a.id, start.day, on);
       const amounts: Amount[] = [...(start.money ? [{ ...start.money, day: null }] : []), ...since.map((s) => ({ currency: s.currency, amount: s.amount, day: null }))];
       const first = since.map((s) => s.first).filter((d): d is string => typeof d === 'string').sort()[0] ?? null;
-      return { amounts, since: start.day !== '' ? start.day : first };
+      return { amounts, since: start.day !== '' ? start.day : first, confirmed: start.day !== '' && start.money ? start.day : null };
     }
-    /* EVERY STATEMENT IS AFTER THE DAY: the earliest of them, less what moved between the day and it. */
+    /* EVERY STATEMENT IS AFTER THE DAY: the earliest of them, less what moved between the day and it. Rolled back so,
+       the balance was not yet confirmed on the day, as a rate dated later is not known on it (`readRatesAge`): a day
+       the night's snapshot reads from before an account's first statement counts it never confirmed, not fresh. */
     let later: { day: string; money: { amount: number; currency: string } | null } = own;
     for (const c of checks) {
       const stated = statedIn(c, a.id, on, true);
@@ -310,7 +337,23 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
     return {
       amounts: [...(later.money ? [{ ...later.money, day: null }] : []), ...between.map((s) => ({ currency: s.currency, amount: -s.amount, day: null }))],
       since: later.day,
+      confirmed: null,
     };
+  };
+
+  /* WHAT `read` ANSWERS FOR A SET OF ACCOUNTS' LAST CONFIRMED DAYS ON ONE DAY. A day is held as the whole days since 1970
+     that name it, as `zero_on` holds one, and an age is counted in whole days (never below nought, though a confirmed
+     day is never after the day asked about). The oldest day and its age leave out an account never confirmed, which
+     has no day to say; the stale count counts it, so it is never quietly fresh. */
+  const reads = rolled.read;
+  const afterDays = rolled.after === undefined ? 0 : Math.round((windowMs(rolled.after) ?? 0) / DAY);
+  const epochDay = (d: string): number => Math.round(Date.parse(`${d}T00:00:00Z`) / DAY);
+  const agesSay = (days: readonly (string | null)[], on: string): number | null => {
+    const today = epochDay(on);
+    if (reads === 'stale') return days.filter((d) => d === null || today - epochDay(d) > afterDays).length;
+    const oldest = days.filter((d): d is string => d !== null).sort()[0];
+    if (oldest === undefined) return null;
+    return reads === 'as_of' ? epochDay(oldest) : Math.max(0, today - epochDay(oldest));
   };
 
   /* THE WHOLE FIGURE AND ITS GROUPS AS OF ONE CLOCK. A rate is taken as of the day asked about, because a balance held
@@ -318,19 +361,33 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
   const rollAt = (clockMs: number, grouped: boolean): { whole: Summed; since: string | null; groups: Group[] | null; more: number } => {
     const on = new Date(clockMs).toISOString().slice(0, 10);
     const all: Amount[] = [];
-    const byKey = new Map<string, { amounts: Amount[]; rows: number }>();
+    const byKey = new Map<string, { amounts: Amount[]; rows: number; days: (string | null)[] }>();
+    const days: (string | null)[] = [];
     let since: string | null = null;
     for (const a of accountsRead) {
       const read = accountOn(a, on);
       all.push(...read.amounts);
+      days.push(read.confirmed);
       if (read.since !== null && read.amounts.length > 0 && (since === null || read.since < since)) since = read.since;
       if (!grouped || decl.group_by === undefined) continue;
       const key = a.fields[decl.group_by];
       if (key === null || key === undefined || key === '') continue;
-      const slot = byKey.get(String(key)) ?? { amounts: [], rows: 0 };
+      const slot = byKey.get(String(key)) ?? { amounts: [], rows: 0, days: [] };
       slot.amounts.push(...read.amounts);
       slot.rows += 1;
+      slot.days.push(read.confirmed);
       byKey.set(String(key), slot);
+    }
+    /* A FIGURE ABOUT AGE IS A PLAIN NUMBER, never money, so it has no currency and nothing to convert. Each group says
+       its own accounts' answer, which is what lets a line name each old account. Oldest first when the answer is a
+       day, with a group never confirmed before every dated one; otherwise the largest age or count first. */
+    if (reads !== undefined) {
+      const whole: Summed = { value: agesSay(days, on), unit: null };
+      if (!grouped || decl.group_by === undefined) return { whole, since, groups: null, more: 0 };
+      const aged = [...byKey].map(([key, slot]): Group => ({ key, value: agesSay(slot.days, on), rows: slot.rows, state: 'full' }));
+      aged.sort(reads === 'as_of' ? (a, b) => (a.value ?? -Infinity) - (b.value ?? -Infinity) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0) : largestFirst);
+      const kept = aged.slice(0, GROUP_CAP);
+      return { whole, since, groups: names ? withLabels(kept, names) : kept, more: Math.max(0, aged.length - GROUP_CAP) };
     }
     const whole = summed(all, into ?? home.home, home.home, home.rates, on);
     if (!grouped || decl.group_by === undefined) return { whole, since, groups: null, more: 0 };

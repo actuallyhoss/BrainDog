@@ -19,7 +19,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 
 import { blockOf } from '../record/page-live.ts';
-import { boardRail, boxesOf, headCaptureAt, leadChartAt, paired, layoutOf, mainSpan, snapped, splitAreas, sticks, TILE_SPANS, widened, type Layout } from './layout.ts';
+import { boardRail, boxesOf, headCaptureAt, leadChartAt, paired, layoutOf, mainSpan, railDrawn, snapped, splitAreas, sticks, TILE_SPANS, widened, type Layout } from './layout.ts';
 
 const RAIL: Layout = { rail: 4, sticky: false };
 
@@ -367,4 +367,32 @@ test('A ROW THAT WAS NOT WHOLE STAYS WITHIN THE ROW, and a hidden block keeps it
 
 test('THE RAIL IS A THIRD OF THE BOARD AND THE MAIN COLUMN TWO, whatever rail the page declares', () => {
   for (const rail of [3, 4, 5]) assert.deepEqual(boardRail({ rail, sticky: false }), { main: 8, rail: 4 }, `rail ${rail}`);
+});
+
+/* THE RAIL RULE, which had no test at all (`PageBody.svelte` drew it from its own arithmetic). The rule sheet's Layout
+   page declares this very page: a side rail whose only block says `when:` false. */
+test('A SIDE RAIL WHOSE ONLY BLOCK IS HIDDEN DRAWS NO SIDE COLUMN, and the main column is twelve wide', () => {
+  const hidden = [
+    { kind: 'table', drawn: true },
+    { kind: 'note', area: 'rail', drawn: false },
+  ];
+  assert.deepEqual(railDrawn(RAIL, hidden), { main: 12, rail: 0 });
+});
+
+test('both columns drawn are the board\'s two thirds and a third, and either alone takes the whole board', () => {
+  assert.deepEqual(railDrawn(RAIL, [{ drawn: true }, { area: 'rail', drawn: true }]), { main: 8, rail: 4 });
+  assert.deepEqual(railDrawn({ rail: 5, sticky: true }, [{ drawn: true }, { area: 'rail', drawn: true }]), { main: 8, rail: 4 });
+  assert.deepEqual(railDrawn(RAIL, [{ drawn: false }, { area: 'rail', drawn: true }]), { main: 0, rail: 12 }, 'a main column of hidden blocks');
+  assert.deepEqual(railDrawn(RAIL, [{ area: 'rail', drawn: true }]), { main: 0, rail: 12 }, 'no main block at all');
+  assert.deepEqual(railDrawn(RAIL, []), { main: 0, rail: 0 }, 'a page of nothing draws neither');
+});
+
+test('A PAGE WITH NO LAYOUT IS ONE COLUMN, though a block says `area: rail`', () => {
+  assert.deepEqual(railDrawn(null, [{ drawn: true }, { area: 'rail', drawn: true }]), { main: 12, rail: 0 });
+  assert.deepEqual(railDrawn(null, [{ area: 'rail', drawn: true }]), { main: 12, rail: 0 });
+  assert.deepEqual(railDrawn(null, [{ drawn: false }]), { main: 0, rail: 0 });
+});
+
+test('the rule is the one `splitAreas` splits by: an area that is not `rail` is main', () => {
+  assert.deepEqual(railDrawn(RAIL, [{ area: 'side', drawn: true }, { area: 'rail', drawn: false }]), { main: 12, rail: 0 });
 });

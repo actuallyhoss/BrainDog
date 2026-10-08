@@ -35,6 +35,10 @@
  * AND ITS SHA-256 BESIDE IT, as `<hex>  braindog.mjs`, the line `sha256sum -c` reads. The install scripts hold every
  * download to it. It is served from the same place as the file, so it catches a download cut short or altered on the
  * way; it does not defend against someone able to change what the site serves, who could change both.
+ *
+ * AND ITS BUILD BESIDE IT, as `braindog.mjs.build`: one line, the tuple, and nothing else. `braindog update` reads it
+ * first from the address the install script downloads from, so a command that is already the served build says so
+ * without fetching the bundle, and one that is behind names the build it is about to become.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -49,6 +53,7 @@ const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SRC = fileURLToPath(new URL('../src/', import.meta.url));
 const OUT = fileURLToPath(new URL('../dist/braindog.mjs', import.meta.url));
 const SUM = `${OUT}.sha256`;
+const STAMP = `${OUT}.build`;
 const SKILL = fileURLToPath(new URL('../../../skills/braindog/SKILL.md', import.meta.url));
 const HASHBANG = '#!/usr/bin/env node\n';
 
@@ -109,9 +114,10 @@ try {
   fail(`The Agent Skill is not at ${SKILL}, and the CLI carries it, so there is nothing to bundle.`);
 }
 
-/* THE OLD PAIR GOES FIRST, so a build that fails leaves no file beside a checksum that was written for another. */
+/* THE OLD THREE GO FIRST, so a build that fails leaves no file beside a checksum or a build written for another. */
 rmSync(OUT, { force: true });
 rmSync(SUM, { force: true });
+rmSync(STAMP, { force: true });
 
 try {
   await build({
@@ -149,5 +155,6 @@ chmodSync(OUT, 0o755);
 const bytes = readFileSync(OUT);
 const hex = createHash('sha256').update(bytes).digest('hex');
 writeFileSync(SUM, `${hex}  braindog.mjs\n`);
+writeFileSync(STAMP, `${tuple}\n`);
 
 process.stdout.write(`dist/braindog.mjs, build ${tuple}, ${bytes.length} bytes, sha256 ${hex}\n`);

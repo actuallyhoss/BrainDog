@@ -6,7 +6,10 @@
 # WHAT IT WRITES, AND NOTHING ELSE. The command is one JavaScript file, built by apps/cli/scripts/bundle.mjs and
 # published beside this script by the deploy. It goes to ~/.braindog/bin/braindog.mjs, with a two-line shim called
 # braindog beside it, and ~/.braindog/bin goes on the PATH through one line in the shell's startup file when it is
-# not there already. No sudo, no system folder, and running it again is how an install is updated.
+# not there already. No sudo, no system folder. Once installed, `braindog update` keeps it current: it reads the build
+# published beside this script, downloads the same file to the same sum, keeps the old one as braindog.mjs.prev, and
+# places the Agent Skill and hooks again. Running this script again still works, and is how a command older than the
+# update verb catches up the first time.
 #
 # THE FILE IS HELD TO ITS SHA-256 BEFORE IT REPLACES ANYTHING. The sum is published from the same place, so it catches
 # a download cut short or altered on the way; it does not defend against someone able to change what the site

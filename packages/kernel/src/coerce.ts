@@ -71,6 +71,14 @@ export type FieldDecl = {
    * `FIELD_UNKNOWN` until the schema handed the grammar the same word the screen shows.
    */
   label?: string;
+  /**
+   * `money` only: `'<link>.<money field>'`, a ref of this list and a money field of the list it points at. An amount
+   * written with no code takes the code that field holds on the linked row (`Lookups.currencyOf`), so a bare amount
+   * filed against an account is in the account's currency rather than refused or guessed.
+   */
+  currency_from?: string;
+  /** `money` only: once a row holds a code here, a write that would change it is `CURRENCY_FIXED` (`currencyFixed`). */
+  currency_fixed?: boolean;
 };
 
 export type Coerced = { ok: true; value: Json } | { ok: false; refusal: Refusal };
@@ -490,7 +498,41 @@ export type Lookups = {
   deleted?: (register: string, seq: number) => boolean;
   /** Does a grant with this id exist? */
   grantExists?: (id: string) => boolean;
+  /**
+   * A `currency_from` field's code: the one the linked row's money field holds, or `null` when the row names no
+   * account or the account holds no value. The caller owns it, because which row the link names is in the patch and
+   * the stored row together, and reading that row is SQL.
+   */
+  currencyOf?: () => string | null;
 };
+
+/** The sentence an amount gets when it has no code and nothing it is filed against has one to give. */
+export const NO_CURRENCY_TO_GIVE = 'This amount has no currency, and its account has none to give.';
+
+/** The sentence a later write gets when it would change a `currency_fixed` field's code. */
+export const CURRENCY_FIXED_SENTENCE =
+  "A row's currency does not change. Delete this row and add it again in the other currency.";
+
+/**
+ * `CURRENCY_FIXED` when a write would change the code a `currency_fixed` field already holds, or `null`.
+ *
+ * THE CODE IS LOCKED AND THE NUMBER IS NOT. `immutable` locks a whole field, and the Ledger's amount is corrected often
+ * and never moves between currencies: a transaction's currency is one of the things he listed as never changing
+ * (P.205), and a row whose code changed in place would carry a history in which one amount was two kinds of money.
+ * `next` is the coerced value, so `egp` and `EGP` are one code. Clearing the field is not a change of code.
+ */
+export function currencyFixed(field: FieldDecl, stored: unknown, next: unknown, at = field.id): Refusal | null {
+  if (field.type !== 'money' || field.currency_fixed !== true) return null;
+  const was = codeOf(stored);
+  const now = codeOf(next);
+  if (was === null || now === null || was === now) return null;
+  return { code: 'CURRENCY_FIXED', fix: CURRENCY_FIXED_SENTENCE, at, allowed: [was], detail: `The row holds ${was}, and the write sent ${now}.` };
+}
+
+const codeOf = (v: unknown): string | null =>
+  v !== null && typeof v === 'object' && !Array.isArray(v) && typeof (v as { currency?: unknown }).currency === 'string'
+    ? ((v as { currency: string }).currency).toUpperCase()
+    : null;
 
 export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at = field.id): Coerced {
   const malformed = (fix: string, extra?: Omit<Refusal, 'code' | 'fix' | 'at'>) =>
@@ -572,7 +614,13 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
         return malformed(`${at}.amount is ${amount}; money is an integer in minor units, so 48.00 is 4800.`);
       if (Math.abs(amount) > MAX_SAFE)
         return bad('INT_OUT_OF_RANGE', `${at}.amount is past 2^53 − 1.`, at);
-      const currency = raw.currency;
+      /* AN AMOUNT WITH NO CODE, ON A FIELD THAT SAYS WHERE ITS CODE COMES FROM, takes the account's. Only absent:
+         a code that was sent is kept as written, and a wrong one is still refused below. Nothing to give is refused
+         rather than guessed, because a guessed currency is the sterling a bank in Egypt was filed in 22 times. */
+      const unsaid = raw.currency === undefined || raw.currency === null || raw.currency === '';
+      const given = unsaid && typeof field.currency_from === 'string' ? (look.currencyOf?.() ?? null) : undefined;
+      if (given === null) return malformed(NO_CURRENCY_TO_GIVE);
+      const currency = given ?? raw.currency;
       if (typeof currency !== 'string' || !CURRENCY.test(currency))
         return malformed(`${at}.currency takes a three-letter code, and every money value carries its own.`);
       /* THE MEMBERSHIP TEST RUNS ON THE UPPER-CASED CODE, and the order is the whole subtlety: a

@@ -151,8 +151,6 @@ export const decide = {
   arrangeWhy: 'Why',
   arrangeCalls: 'Calls out once you accept',
   arrangeCallsNote: 'Accepting approves these. Each one reaches a service outside this record, and counts toward what it calls out.',
-  arrangeCallKey: (label: string) => `with the key “${label}”`,
-  arrangeCallNoKey: 'with no key',
   arrangeCallNoHost: 'A service it does not name',
   arrangeCallSends: (fields: string) => `sends ${fields}`,
   /** A pack's cadence (`every 1h`) in words: "every hour", "every 3 hours". */
@@ -160,6 +158,40 @@ export const decide = {
     const word = { m: 'minute', h: 'hour', d: 'day', w: 'week' }[unit];
     return n === 1 ? `every ${word}` : `every ${n.toLocaleString('en')} ${word}s`;
   },
+  /* THE SITTING (REC-A07): what an arrangement needs from you, what it changes, what it starts and your choices, each
+     under its own heading, in that order after Why. */
+  arrangeNeeds: 'What it needs from you',
+  arrangeNeedOpens: (opens: string) => `Opens ${opens}`,
+  arrangeNeedScheduled: 'A scheduled run uses it, with nobody signed in.',
+  arrangeNeedHeld: 'Held, ready for scheduled runs',
+  /* NEEDS YOU IS A WORD AS WELL AS THE DEEPER RED, never the colour alone. */
+  arrangeNeedMissing: 'Needed',
+  arrangeNeedPerson: (label: string) =>
+    `A key called “${label}” is held, but only for you. A scheduled run cannot open it, so put it in again here.`,
+  arrangeNeedField: 'Paste the key',
+  arrangeNeedHint: 'Sent once and sealed. It is never shown again.',
+  arrangeNeedSave: 'Keep this key',
+  arrangeNeedSaving: 'Keeping it',
+  arrangeNeedKept: (label: string) => `Kept “${label}” for scheduled runs`,
+  /* TRUE OF THE RECORD TODAY: `govern.ts` refuses an approval whose key is missing, and `actions.ts` one held only for a
+     person. When an accept can take some parts and leave the rest (REC-A06), this says that instead. */
+  arrangeNeedsNote: 'Add each key here before you accept. The record will not start anything whose key it does not hold.',
+  arrangeChangesH: 'What it changes',
+  arrangeChangeOne: (list: string) => `One in ${list}`,
+  arrangeChangeAny: 'One of your entries',
+  arrangeBefore: 'Now',
+  arrangeAfter: 'Will be',
+  arrangeEmpty: 'empty',
+  arrangeYes: 'yes',
+  arrangeNo: 'no',
+  arrangeNewValue: 'a new value',
+  arrangeStarts: 'What it starts',
+  arrangeStartsNote: 'Accepting starts these. Each one reaches a service outside this record on its own schedule.',
+  arrangeChoices: 'Your choices',
+  arrangeSuggested: 'Suggested',
+  arrangeCountKeys: (n: number) => `${n} ${n === 1 ? 'key' : 'keys'}`,
+  arrangeCountUpdates: (n: number) => `${n} ${n === 1 ? 'update' : 'updates'}`,
+  arrangeCountFeeds: (n: number) => `${n} ${n === 1 ? 'feed' : 'feeds'}`,
   arrangePacks: 'Add-ons',
   arrangeInstalls: (names: readonly string[]) => `Installs ${names.join(', then ')}`,
   /** The same line inside the Packs section, which is why `arranged.ts` guards against printing both. */
@@ -227,8 +259,8 @@ export const decide = {
   arrangeRows: 'Adds these',
   arrangeRowUnder: (row: string, under: string) => `${row}, for “${under}”`,
   arrangeRowsNote: 'Nothing is added until you accept. Each one can be changed or deleted afterwards like any other.',
-  arrangeCountRows: (n: number) => `${n} new ${n === 1 ? 'item' : 'items'}`,
-  arrangeDidRows: (n: number) => `Added ${n} ${n === 1 ? 'item' : 'items'}`,
+  arrangeCountRows: (n: number) => `${n} ${n === 1 ? 'addition' : 'additions'}`,
+  arrangeDidRows: (n: number) => `Added ${n} to your lists`,
   arrangeWords: 'Words',
   arrangeCalled: (now: string, next: string) => `${now} will be called “${next}”`,
   arrangeReads: (now: string, next: string) => `“${now}” will read “${next}”`,

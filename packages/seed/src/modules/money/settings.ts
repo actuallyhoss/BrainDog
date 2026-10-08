@@ -1,5 +1,5 @@
 /**
- * Money's settings: the home currency, and the targets a person changes later. Cut out of `money.ts` with no change
+ * Money's settings: the home currency, the rest days, and the targets a person changes later. Cut out of `money.ts` with no change
  * (REC-B01 job 1).
  */
 
@@ -17,6 +17,19 @@
  */
 export const MONEY_HOME_SETTING = {
   home_currency: { type: 'text', label: 'Home currency', note: 'The currency money in other currencies is added up in, when there is a rate for it. Held to this as soon as it is saved.' },
+  /* THE DAYS NO MONEY MOVES ON, SINCE money-core 3.16.0 (REC-B13). A repeating line set to move off them goes to the
+     working day before or after (`recurring.weekend`); a line left to keep its day keeps it, which is every line until
+     a person says otherwise. SATURDAY AND SUNDAY TO START, AND A RECORD'S OWN AFTER THAT: in Cairo the weekend is Friday
+     and Saturday. Day names, one a line, because that is what a person types on the settings screen; the walk reads
+     names or weekday numbers by this setting's name (`restDaysOf` in `packages/kernel/src/forecast.ts`), so no leg
+     has to name it. */
+  rest_days: {
+    type: 'list',
+    max: 7,
+    default: ['Saturday', 'Sunday'],
+    label: 'Rest days',
+    note: 'The days no money moves on, one a line, such as Friday. A repeating payment set to move goes to the working day before or after.',
+  },
 } as const;
 
 /**

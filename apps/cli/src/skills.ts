@@ -140,6 +140,23 @@ export function valueOf<T>(r: Result<T>): T | null {
 /** The fix sentence of a refusal, or a fixed one. Never an exception's message, which could quote anything. */
 export const fixOf = (r: Result<unknown>): string => (refused(r) ? r.refusal.fix : 'The record did not take it.');
 
+/**
+ * A COPY OF `packages/kernel/src/cause.ts`'s `CAUSE`, because the command line is bundled without the kernel: a letter or
+ * digit, then at most 199 of letters, digits and `# @ . _ : / -`. A key outside it is left off, so the record derives one
+ * rather than refusing the whole question for its key.
+ */
+const CAUSE = /^[\p{L}\p{N}][\p{L}\p{N}#@._:/-]{0,199}$/u;
+
+/** `{ cause }` for a `propose` (AGT-C07), so a question the command line asks is asked once; nothing for a key out of shape. */
+export const causeOf = (key: string): { cause?: string } => (CAUSE.test(key) ? { cause: key } : {});
+
+/**
+ * The record's own sentence when a `propose` joined a question already open ("Already waiting as SG90."), or `null`
+ * when it filed a new one. An older record that answers no `said` is told in the same words without the name.
+ */
+export const joinedSaid = (value: unknown): string | null =>
+  isObject(value) && value.joined === true ? (typeof value.said === 'string' && value.said.trim() !== '' ? value.said.trim() : 'Already waiting.') : null;
+
 /** The spoken id a created row is read back by. */
 export const spokenOf = (value: unknown): string | null =>
   isObject(value) && typeof value.register === 'string' && typeof value.seq === 'number' ? `${value.register}#${String(value.seq)}` : null;
@@ -320,14 +337,21 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
 
   /* THE QUESTION NAMES THE SKILL AND "THIS MAC", AND THE DETAILS SAY WHERE. It read "Take the edit to kiln-release made
      on Maras-MacBook-Pro.local as version 2?"; the file and the machine's own name are kept in the body's details. */
-  const propose = async (row: Brief, name: string, rev: number, text: string, path: string): Promise<string> => {
-    const out = await s.client.call<{ id: string }>('propose', {
+  /* ASKED ONCE (AGT-C07): the cause is the skill, where it lives, its row and a hash of the edit, so the same edit synced
+     on a second machine joins the question already open instead of opening another, and the line says the record's own
+     sentence, not a new id. THE ROW AND THE HASH KEEP IT EXACT: two projects each hold a `review-pr` at `project`, and a
+     second machine's different edit is its own question, never "Already waiting" for text it did not send. No machine
+     name and no path: those are in the body's details. */
+  const propose = async (row: Brief, name: string, rev: number, text: string, path: string): Promise<{ filed: boolean; said: string; joined: string | null }> => {
+    const out = await s.client.call<{ id: string; joined?: true; said?: string }>('propose', {
       question: asking(`Take ${thisMachine()}'s edit to `, name, ` as version ${String(rev + 1)}?`),
       body_kind: 'rowset',
       body: { register: 'skills', rows: [{ at: row.spoken, version: row.version, patch: { body: text, rev: rev + 1 } }], details: { file: path, machine } },
+      ...causeOf(`skills#${name}@${row.scope}#${row.spoken.slice(row.spoken.indexOf('#') + 1)}#${sha256(text).slice(0, 24)}`),
     });
     const made = valueOf(out);
-    return made !== null && typeof made.id === 'string' ? made.id : `refused: ${fixOf(out)}`;
+    if (made === null || typeof made.id !== 'string') return { filed: false, said: `refused: ${fixOf(out)}`, joined: null };
+    return { filed: true, said: made.id, joined: joinedSaid(made) };
   };
 
   /**
@@ -407,11 +431,15 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
           continue;
         }
         const asked = await propose(row, name, rev, text, path);
-        if (!asked.startsWith('refused')) lock[path] = { ...entry, proposed_sha: now };
+        if (asked.filed) lock[path] = { ...entry, proposed_sha: now };
         lines.push(
-          both
-            ? `Skill ${name} changed here and in the record; kept yours and asked (${asked}).`
-            : `Skill ${name} was edited in ${where(path)}; kept it and proposed it as version ${String(rev + 1)} (${asked}).`,
+          asked.joined !== null
+            ? both
+              ? `Skill ${name} changed here and in the record; kept yours. ${asked.joined}`
+              : `Skill ${name} was edited in ${where(path)}; kept it. ${asked.joined}`
+            : both
+              ? `Skill ${name} changed here and in the record; kept yours and asked (${asked.said}).`
+              : `Skill ${name} was edited in ${where(path)}; kept it and proposed it as version ${String(rev + 1)} (${asked.said}).`,
         );
         continue;
       }
@@ -442,8 +470,12 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         continue;
       }
       const asked = await propose(row, name, rev, text, path);
-      lock[path] = { spoken: row.spoken, version: rev, sha256: sha256(got.text), ...(asked.startsWith('refused') ? {} : { proposed_sha: now }) };
-      lines.push(`Skill ${name} in ${where(path)} differs from the record; kept it and proposed it as version ${String(rev + 1)} (${asked}).`);
+      lock[path] = { spoken: row.spoken, version: rev, sha256: sha256(got.text), ...(asked.filed ? { proposed_sha: now } : {}) };
+      lines.push(
+        asked.joined !== null
+          ? `Skill ${name} in ${where(path)} differs from the record; kept it. ${asked.joined}`
+          : `Skill ${name} in ${where(path)} differs from the record; kept it and proposed it as version ${String(rev + 1)} (${asked.said}).`,
+      );
     }
 
     /* Retired: an unchanged file is deleted, an edited one left. */

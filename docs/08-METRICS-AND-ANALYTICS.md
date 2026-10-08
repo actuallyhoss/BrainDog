@@ -250,6 +250,18 @@ The rate table is a dated register, as §3 of [02-DATA-MODEL](02-DATA-MODEL.md) 
 already have, with one new key, `as_of`. *(An earlier draft spelled it `asof` and looked rows up by a
 `pair` the register does not have.)*
 
+**A row's currency comes from its account, and stays (2026-10-09, REC-B04).** Every figure above starts from a code
+each amount carries, so the code has to be right when the row is filed. A money field may declare two keys, each on a
+`money` field only. `currency_from: account.balance` names a link of the same list and a money field of the list it
+points at: an amount written with no code takes the code that field holds on the linked row, so a bare `{ amount:
+97999 }` against an account kept in EGP is stored as EGP 979.99, and an amount whose account names none is refused,
+*"This amount has no currency, and its account has none to give."* A code that was sent is kept as written: a dollar
+payment from that account stays in dollars and is converted by the rules above. `currency_fixed: true` locks the code
+and leaves the number free: a later write that would change it is `CURRENCY_FIXED`, *"A row's currency does not
+change. Delete this row and add it again in the other currency."* Install refuses either key on a field that is not
+money, a `currency_from` whose link is not a ref of the list, and one whose target is not a money field. Nothing ever
+converts a row into a currency nobody chose; a total converts at read time, and the row keeps what was filed.
+
 ### What this build reads: dated rates and a home currency (as built, 2026-09-17)
 
 The dated `fx` register is built, shipped by `money-core` (`currency`, `base`, `rate`, `as_of`, `source`; one

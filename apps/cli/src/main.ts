@@ -53,6 +53,7 @@ import { runner } from './runner.ts';
 import { setup } from './setup.ts';
 import { tools } from './tools.ts';
 import { tokenCommand } from './token.ts';
+import { update } from './update.ts';
 import { verify } from './verify.ts';
 
 /* Synchronous, so the line is out before `exit`: a write to a pipe on Windows is asynchronous, and
@@ -255,6 +256,8 @@ const usage = () =>
     'braindog init <slug> --owner <email>',
     'braindog serve [<record file>]',
     '  Create or serve a record on this machine, through the self-host.',
+    'braindog update [--check]',
+    '  Replace this command with the build that is out, held to its checksum, keeping the old one as braindog.mjs.prev, and place the Agent Skill and hooks again. --check only says whether it is behind.',
     'braindog --version',
     '  The build, the file format it writes, the kernel it expects, and the primitives it renders.',
     '',
@@ -680,6 +683,9 @@ try {
   else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'kennel' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify' || command === 'people' || command === 'understand' || command === 'signs') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);
+  /* THE FILE IT REPLACES IS THIS ONE: in the bundle every module is the one file, and from a checkout `build()` says
+     `dev+0000000` and `update` refuses before it touches anything. */
+  else if (command === 'update') process.exitCode = await update(rest, { file: fileURLToPath(import.meta.url), build: build(), env: process.env, out: (line) => process.stdout.write(`${line}\n`), err: say });
   else if (command === 'init' || command === 'serve') selfhost(command, rest);
   else if (command === 'help' || command === '--help' || command === '-h') {
     /* `help` IS NOT ONE OF THE SIX §4.5 EXCLUDES, so it answers the flag rather than ignoring it.

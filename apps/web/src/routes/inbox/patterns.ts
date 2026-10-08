@@ -14,7 +14,7 @@
 
 import { createClient } from '@braindog/client';
 
-import { INBOX_PAGE, itemOf } from '../../lib/record/inbox-live.ts';
+import { itemOf } from '../../lib/record/inbox-live.ts';
 import type { InboxItem } from '../../lib/record/schema.ts';
 
 /** The record's report, as `PatternReport` in `@braindog/kernel` shapes it. */
@@ -32,10 +32,24 @@ export type PatternPanel = { sentence: string; doors: DoorSaid[] };
 /** How many days back the panel reads: the scope's fortnight. */
 export const PATTERN_DAYS = 14;
 
-/** How a repeat's reason starts, in the kernel's words (`repeatSaid`). Only such a message offers "It is a second one". */
+/**
+ * How a repeat's reason reads, in the kernel's words (`repeatSaid`), and how it read before batch 35: "transactions#4
+ * already says this.". The report counts reasons, not the record's `repeats` mark, so its tile knows a repeat by these
+ * words alone. Which messages offer "It is a second one" is the mark's to say (`readRepeats`), never these words.
+ */
 export const REPEAT = 'Looks like a repeat';
+const REPEAT_BEFORE = /\salready says this\.?$/u;
 
-export const isRepeat = (reason: string | null | undefined): boolean => typeof reason === 'string' && reason.startsWith(REPEAT);
+export const isRepeat = (reason: string | null | undefined): boolean => typeof reason === 'string' && (reason.startsWith(REPEAT) || REPEAT_BEFORE.test(reason));
+
+/** A list's handle and number (`transactions#4`) or a row's id: words a person never reads. */
+const HANDLE = /[\p{L}\p{N}_-]+#\d+|\b[0-9A-HJKMNP-TV-Z]{26}\b/u;
+
+/** A repeat's reason as a person reads it: the record's sentence, or, where it names the row by a handle, plain words. */
+function repeatReason(reason: string | null | undefined): string {
+  const said = sentence(reason ?? '');
+  return said === '' || HANDLE.test(said) ? 'Looks like a repeat of one already filed.' : said;
+}
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
 
@@ -55,7 +69,7 @@ export function heldSaid(skipped: readonly { reason: string; n: number }[]): str
   const repeats = skipped.filter((s) => isRepeat(s.reason));
   const repeated = repeats.reduce((sum, s) => sum + s.n, 0);
   const out: string[] = [];
-  if (repeated === 1) out.push(sentence(repeats[0]!.reason));
+  if (repeated === 1) out.push(repeatReason(repeats[0]!.reason));
   else if (repeated > 1) out.push(`${plural(repeated, 'message', 'messages')} looked like repeats of ones already filed.`);
   for (const s of skipped) {
     if (isRepeat(s.reason) || s.n < 1) continue;
@@ -162,17 +176,21 @@ export async function readReport(base: string, io: Fetch = fetched): Promise<Pat
 export const REPEATS_MOST = 5;
 
 /**
- * The newest messages skipped as a repeat, each with the record's reason, at most `REPEATS_MOST`. One page of the
- * record's skipped messages is read, and only the repeats are kept: a skip for any other reason is not a second one.
+ * The newest messages skipped as a repeat, each with the record's reason, at most `REPEATS_MOST`. The record is asked
+ * for its repeats alone (`repeats: true`, by the mark ingest wrote), so a page of other skips never pushes one off and a
+ * marked repeat offers "It is a second one" whatever its words. A rule's skip carries no mark and never shows, and nor
+ * does a repeat skipped before batch 35, which ingest kept no mark for. A record that does not answer `repeats` refuses
+ * the read, and the tile draws no repeats rather than guess. The host must declare `repeats` on `inbox` as structured
+ * (`ROUTES` in `@braindog/host`), or the query string's "true" reaches the record as text and is refused.
  */
 export async function readRepeats(base: string, io?: Fetch): Promise<(InboxItem & { reason: string })[]> {
   try {
-    const out = await createClient({ base, ...(io ? { fetch: io as typeof globalThis.fetch } : {}) }).inbox({ state: 'skipped', limit: INBOX_PAGE });
+    const out = await createClient({ base, ...(io ? { fetch: io as typeof globalThis.fetch } : {}) }).inbox({ state: 'skipped', repeats: true, limit: REPEATS_MOST });
     if (!out.ok) return [];
     return out.value.arrivals
-      .filter((a) => isRepeat(a.reason))
+      .filter((a) => typeof a.repeats === 'string' && a.repeats !== '')
       .slice(0, REPEATS_MOST)
-      .map((a) => ({ ...itemOf(a), reason: sentence(a.reason ?? '') }));
+      .map((a) => ({ ...itemOf(a), reason: repeatReason(a.reason) }));
   } catch {
     return [];
   }

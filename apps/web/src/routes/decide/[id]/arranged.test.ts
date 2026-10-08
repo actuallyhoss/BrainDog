@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { appliedLines, arrangedOf, callOf, partialOf } from './arranged.ts';
+import { appliedLines, arrangedOf, callOf, heldOf, partialOf } from './arranged.ts';
 import { labelSetting } from '../../../lib/voice.ts';
 
 const STUDENT = {
@@ -26,10 +26,12 @@ test('an arrangement reads as one story, in the order a person asks it', () => {
   const out = arrangedOf('arrange', STUDENT, { pagesNow: { 'page.home-student': { title: 'Home', blocks: [{ kind: 'stat', heading: 'Right now' }] } } });
   assert.ok(out);
   assert.equal(out.lead, 'Sets this BrainDog up for Student');
-  assert.deepEqual(out.parts.map((p) => p.part), ['why', 'calls', 'packs', 'appears', 'words']);
-  const [why, calls, packs, appears, words] = out.parts;
+  /* The key the feed opens is said once, under what it needs; the hourly call is a feed, under what it starts. */
+  assert.deepEqual(out.parts.map((p) => p.part), ['why', 'needs', 'starts', 'packs', 'appears', 'words']);
+  const [why, needs, starts, packs, appears, words] = out.parts;
   assert.deepEqual(why?.part === 'why' && why.lines[1], { text: 'Two courses start on Monday.', at: 'courses#2' });
-  assert.deepEqual(calls?.part === 'calls' && calls.calls, [{ host: 'calendar.example', detail: 'every hour, with the key “Timetable feed”' }]);
+  assert.deepEqual(needs?.part === 'needs' && needs.keys, [{ label: 'Timetable feed', opens: 'calendar.example', scheduled: true, held: null }]);
+  assert.deepEqual(starts?.part === 'starts' && starts.feeds, [{ host: 'calendar.example', detail: 'every hour', every: 'every hour', keys: ['Timetable feed'], to: {} }]);
   assert.deepEqual(packs?.part === 'packs' && packs.lines, ['Installs Portfolio, then Student', 'Turns off Money']);
   assert.ok(appears?.part === 'appears');
   assert.equal(appears.examples, 6);
@@ -50,7 +52,7 @@ test('an arrangement reads as one story, in the order a person asks it', () => {
   ]);
   /* A pack this same proposal installs is not on yet, so the sentence starts from the house word. */
   assert.deepEqual(words?.part === 'words' && words.lines, ['Home will be called “Today”', 'In Things, “Earning” will be called “Handed in”']);
-  assert.equal(out.summary, '2 new pages, 3 new lists, 2 more changes, 2 words change');
+  assert.equal(out.summary, '1 key, 1 feed, 2 new pages, 3 new lists, 2 more changes, 2 words change');
 });
 
 test('a settings change says each word before and after, from what the record holds now', () => {
@@ -101,10 +103,14 @@ test('every other kind is not this drawing’s', () => {
 });
 
 test('a line that is not a CALLS OUT line is kept whole', () => {
-  assert.deepEqual(callOf('pull-x runs for the project kiln and sends the key "K".'), { host: '', detail: 'pull-x runs for the project kiln and sends the key "K".' });
+  assert.deepEqual(callOf('pull-x runs for the project kiln and sends the key "K".'), { host: '', detail: 'pull-x runs for the project kiln and sends the key "K".', every: '', keys: [], to: {} });
+  /* A CALL ONLY A RULE MAKES is not a feed: it has no cadence, and it stays under what it calls out. */
   assert.deepEqual(callOf('CALLS OUT api.example · when a rule runs it, at most 100 a day · grant "none" · sends amount, due'), {
     host: 'api.example',
-    detail: 'when a rule runs it, at most 100 a day, with no key, sends amount, due',
+    detail: 'when a rule runs it, at most 100 a day, sends amount, due',
+    every: '',
+    keys: [],
+    to: {},
   });
 });
 
@@ -314,8 +320,8 @@ test('A PLAN OF ROWS reads list by list, each row with the row it belongs with, 
     { name: 'Steps', lines: ['Write one sentence, for “Say what the show is about”'] },
     { name: 'Choices', lines: ['Alone or with a co-host?'] },
   ]);
-  assert.equal(out.summary, '4 new items');
-  assert.deepEqual(appliedLines({ rows: ['milestones#1', 'milestones#2', 'steps#1', 'choices#1'] }, body), ['Added 4 items']);
+  assert.equal(out.summary, '4 additions');
+  assert.deepEqual(appliedLines({ rows: ['milestones#1', 'milestones#2', 'steps#1', 'choices#1'] }, body), ['Added 4 to your lists']);
 });
 
 /*
@@ -350,4 +356,134 @@ test('A DECLARATION HANDED TO ANOTHER PACK GETS ITS OWN LINE, naming the pack, a
   assert.ok(away, lines.join('\n'));
   assert.doesNotMatch(away, /ipn in sms/iu, 'the handed door was said as taken away');
   assert.match(away, /card/iu);
+});
+
+/* ── the sitting (REC-A07): what it needs, what it changes, what it starts, your choices ── */
+
+const SITTING = {
+  why: ['Your money has stood still since the move.'],
+  packs: { install: ['stripe'] },
+  approve: [
+    'CALLS OUT api.stripe.com · every 1d · grant "Stripe"',
+    'CALLS OUT api.mercury.com · every 6h · grant "Mercury"',
+    'CALLS OUT hooks.example · when a rule runs it, at most 100 a day · grant "Stripe" · sends amount',
+    'CALLS OUT rates.example and fx.example · every 1d · key "Rates" to rates.example, "Stripe" to the host its vault entry opens',
+  ],
+  rows: [
+    { register: 'accounts', at: 'accounts#2', version: 3, patch: { last4: '7731', kind: 'card' }, before: { name: 'Credit Card', last4: '', kind: 'card' } },
+    { at: 'accounts#3', version: 1, patch: { last4: '1100' } },
+    { register: 'accounts', at: 'accounts#4', version: 2, patch: { name: 'Savings', open: true }, before: { name: 'HSBC', open: false } },
+    { register: 'books', fields: { name: 'Quartz' } },
+  ],
+  parts: [
+    { id: 'p1', question: 'How often should rates arrive?', suggested: 'daily', options: [{ id: 'daily', label: 'Every day', does: 'One call a day' }, { id: 'hourly', label: 'Every hour' }] },
+    { id: 'p2', title: 'Install Stripe' },
+  ],
+};
+
+test('THE SITTING reads in the brief’s order after why, and the queue counts keys, updates and feeds first', () => {
+  const ctx = { lists: new Map([['accounts', 'Accounts'], ['books', 'Books']]), labels: { 'accounts.last4': 'Last four digits', 'accounts.kind.card': 'Card' } };
+  const out = arrangedOf('arrange', SITTING, ctx);
+  assert.ok(out);
+  assert.deepEqual(out.parts.map((p) => p.part), ['why', 'needs', 'changes', 'rows', 'starts', 'choices', 'calls', 'packs']);
+  const needs = out.parts.find((p) => p.part === 'needs');
+  assert.deepEqual(needs?.part === 'needs' && needs.keys.map((k) => [k.label, k.opens]), [
+    ['Stripe', 'api.stripe.com'],
+    ['Mercury', 'api.mercury.com'],
+    /* A script's key is said with the one host it is sent to, never the script's "a and b". */
+    ['Rates', 'rates.example'],
+  ]);
+  const starts = out.parts.find((p) => p.part === 'starts');
+  assert.deepEqual(starts?.part === 'starts' && starts.feeds.map((f) => `${f.host}: ${f.detail}`), [
+    'api.stripe.com: every day',
+    'api.mercury.com: every 6 hours',
+    'rates.example and fx.example: every day',
+  ]);
+  /* The rule's call stays a call, and no call line names its key. */
+  const calls = out.parts.find((p) => p.part === 'calls');
+  assert.deepEqual(calls?.part === 'calls' && calls.calls.map((c) => c.detail), ['when a rule runs it, at most 100 a day, sends amount']);
+  assert.equal(JSON.stringify([starts, calls]).includes('with the key'), false);
+  const choices = out.parts.find((p) => p.part === 'choices');
+  assert.deepEqual(choices?.part === 'choices' && choices.choices, [
+    { question: 'How often should rates arrive?', options: [{ name: 'Every day', line: 'One call a day', suggested: true }, { name: 'Every hour', line: '', suggested: false }] },
+  ]);
+  const rows = out.parts.find((p) => p.part === 'rows');
+  assert.deepEqual(rows?.part === 'rows' && rows.lists, [{ name: 'Books', lines: ['Quartz'] }]);
+  assert.equal(out.summary, '3 keys, 3 updates, 3 feeds, 1 addition');
+});
+
+test('WHAT IT CHANGES says each field before and after, by the list’s words, and never an address', () => {
+  const ctx = { lists: new Map([['accounts', 'Accounts']]), labels: { 'accounts.last4': 'Last four digits', 'accounts.kind.card': 'Card' } };
+  const changes = arrangedOf('arrange', SITTING, ctx)?.parts.find((p) => p.part === 'changes');
+  assert.ok(changes?.part === 'changes');
+  assert.equal(changes.count, 3);
+  assert.deepEqual(changes.lists, [
+    {
+      name: 'Accounts',
+      changes: [
+        /* `kind` is the same before and after, so it is not said. */
+        { title: 'Credit Card', fields: [{ field: 'Last four digits', before: 'empty', after: '7731' }] },
+        /* No before was sent and the patch has no title: said by its list, never as accounts#3. */
+        { title: 'One in Accounts', fields: [{ field: 'Last four digits', before: null, after: '1100' }] },
+        { title: 'HSBC', fields: [{ field: 'Name', before: 'HSBC', after: 'Savings' }, { field: 'Open', before: 'no', after: 'yes' }] },
+      ],
+    },
+  ]);
+  assert.equal(/#\d/u.test(JSON.stringify(changes)), false, 'an address reached the page');
+});
+
+test('THE KEYS IT NEEDS come from the record’s `needs` when it sends them, each said held or not from the grants', () => {
+  const held = heldOf([
+    { id: 'g1', label: 'Stripe', sealed_under: 'connector', revoked_at: null },
+    { id: 'g2', label: 'Mercury', sealed_under: 'record', revoked_at: null },
+    { id: 'g3', label: 'Rates', sealed_under: 'connector', revoked_at: '2026-10-01T00:00:00Z' },
+    { id: 'g4', label: 'Mercury', sealed_under: 'record', revoked_at: null },
+  ]);
+  assert.deepEqual([...held], [['Stripe', 'connector'], ['Mercury', 'person']]);
+  const out = arrangedOf('arrange', { ...SITTING, needs: [{ label: 'Stripe', opens: 'api.stripe.com', scheduled: true }, { label: 'Mercury', opens: 'api.mercury.com' }, 'Rates', { label: 'Mine', scheduled: false }] }, { held });
+  const needs = out?.parts.find((p) => p.part === 'needs');
+  assert.deepEqual(needs?.part === 'needs' && needs.keys, [
+    { label: 'Stripe', opens: 'api.stripe.com', scheduled: true, held: 'connector' },
+    { label: 'Mercury', opens: 'api.mercury.com', scheduled: true, held: 'person' },
+    { label: 'Rates', opens: '', scheduled: true, held: 'none' },
+    { label: 'Mine', opens: '', scheduled: false, held: 'none' },
+  ]);
+  assert.equal(out?.summary.startsWith('4 keys, '), true);
+  assert.deepEqual(heldOf(null), new Map());
+});
+
+test('a call that names no host is said as one, and a script with no key needs none', () => {
+  assert.deepEqual(callOf('CALLS OUT no host declared · every 1h · grant "K"'), { host: 'A service it does not name', detail: 'every hour', every: 'every hour', keys: ['K'], to: {} });
+  assert.deepEqual(callOf('CALLS OUT a.example · daily at 08:00 Europe/London · no key'), { host: 'a.example', detail: 'daily at 08:00 Europe/London', every: 'daily at 08:00 Europe/London', keys: [], to: {} });
+  const out = arrangedOf('arrange', { approve: ['CALLS OUT no host declared · every 1h · grant "K"'] });
+  const needs = out?.parts.find((p) => p.part === 'needs');
+  assert.deepEqual(needs?.part === 'needs' && needs.keys, [{ label: 'K', opens: '', scheduled: true, held: null }]);
+});
+
+test('A SCRIPT’S KEY OPENS THE ONE HOST ITS LINE SENDS IT TO, and one sent to no host it names opens nothing the page guesses', () => {
+  const line = 'CALLS OUT rates.example and fx.example · every 1d · key "Rates" to rates.example, "Fx" to the host its vault entry opens and "Old" to no host it calls (its vault entry opens "x.example"), so every fetch with it is refused';
+  const call = callOf(line);
+  assert.deepEqual(call.keys, ['Rates', 'Fx', 'Old']);
+  assert.deepEqual(call.to, { Rates: 'rates.example' });
+  const needs = arrangedOf('arrange', { approve: [line] })?.parts.find((p) => p.part === 'needs');
+  /* An empty `opens` is what makes the key's field ask what it opens, since the record refuses a new key without one. */
+  assert.deepEqual(needs?.part === 'needs' && needs.keys.map((k) => [k.label, k.opens]), [['Rates', 'rates.example'], ['Fx', ''], ['Old', '']]);
+});
+
+test('AN ARRANGEMENT WITH NO KEY draws no section for keys, and the queue counts none', () => {
+  for (const body of [
+    { why: ['Tidy the home page.'], words: { home: 'Today' } },
+    { approve: ['CALLS OUT a.example · when a rule runs it, at most 100 a day · grant "none"', 'CALLS OUT b.example · every 1h · no key'] },
+    { needs: [], approve: [] },
+  ]) {
+    const out = arrangedOf('arrange', body, { held: new Map() });
+    assert.equal(out?.parts.some((p) => p.part === 'needs'), false, JSON.stringify(body));
+    assert.doesNotMatch(out?.summary ?? '', /\bkeys?\b/u);
+  }
+});
+
+test('A CHANGE ADDRESSED BY A BARE ROW ID is said by no list and no id', () => {
+  const out = arrangedOf('arrange', { rows: [{ at: '01JABCDEFGHJKMNPQRSTVWXYZ0', version: 1, patch: { last4: '1100' } }] });
+  const changes = out?.parts.find((p) => p.part === 'changes');
+  assert.deepEqual(changes?.part === 'changes' && changes.lists, [{ name: '', changes: [{ title: 'One of your entries', fields: [{ field: 'Last4', before: null, after: '1100' }] }] }]);
 });

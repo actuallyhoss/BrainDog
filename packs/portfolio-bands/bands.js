@@ -44,8 +44,9 @@ const REGISTER = 'revenue_bands';
 const PAGE = 50;
 const named = (measures) => ({ any: measures.flatMap((m) => [{ field: 'name', is: m }, { field: 'name', starts: `${m}, ` }]) });
 
-/* ISO 4217'S MINOR DIGITS, where they are not two. A reading is a decimal in whole units and a band is money in minor
-   units, and the sandbox has no `Intl` to ask. */
+/* ISO 4217'S MINOR DIGITS, where they are not two. An older reading is a decimal in whole units and a band is money in
+   minor units, and the sandbox has no `Intl` to ask. A reading whose `amount` is money is in minor units already and
+   never goes through this table. */
 const DIGITS = { BIF: 0, CLP: 0, DJF: 0, GNF: 0, ISK: 0, JPY: 0, KMF: 0, KRW: 0, PYG: 0, RWF: 0, UGX: 0, UYI: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0, BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3, CLF: 4, UYW: 4 };
 const minor = (value, currency) => Math.round(value * 10 ** (DIGITS[currency] ?? 2));
 
@@ -81,11 +82,24 @@ export function measuresOf(config) {
   return { now, base };
 }
 
-/** The reading's currency, or `null` when its unit is not three letters and it cannot be money. */
+/** The reading's `amount` when it is money: a whole number of minor units and a currency of three letters. */
+const amountOf = (r) => {
+  const a = r.fields.amount;
+  if (a === null || typeof a !== 'object' || !Number.isInteger(a.amount) || typeof a.currency !== 'string') return null;
+  const currency = a.currency.trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(currency) ? { amount: a.amount, currency } : null;
+};
+
+/** The reading's currency, its amount's when it has one, or `null` when its unit is not three letters and it cannot be money. */
 const currencyOf = (r) => {
+  const money = amountOf(r);
+  if (money !== null) return money.currency;
   const unit = String(r.fields.unit ?? '').trim().toUpperCase();
   return /^[A-Z]{3}$/.test(unit) ? unit : null;
 };
+
+/* THE READING IN MINOR UNITS: its amount as it stands, or its decimal value turned by the digits table. */
+const minorOf = (r, currency) => amountOf(r)?.amount ?? minor(r.fields.value, currency);
 
 /** The later of two readings: by when it was true, then by when it was written. */
 const later = (a, b) => {
@@ -104,7 +118,7 @@ export function bandsOf(things, readings, { now: NOW, base: BASE }) {
   const latest = new Map();
   for (const r of readings) {
     /* THE SEED'S EXAMPLE ROWS ARE LEFT OUT, as every dashboard over datapoints leaves them out. */
-    if (r.fields.source === 'example' || typeof r.fields.value !== 'number') continue;
+    if (r.fields.source === 'example' || (amountOf(r) === null && typeof r.fields.value !== 'number')) continue;
     const name = String(r.fields.name ?? '');
     const kind = measureOf(name, NOW) ? 'now' : measureOf(name, BASE) ? 'base' : null;
     if (kind === null) continue;
@@ -125,7 +139,7 @@ export function bandsOf(things, readings, { now: NOW, base: BASE }) {
     const nowIn = now === undefined ? null : currencyOf(now);
     const baseIn = base === undefined ? null : currencyOf(base);
     if (now !== undefined && nowIn === null) said.push(`${name}'s monthly revenue is in ${JSON.stringify(now.fields.unit ?? '')}, which is not a currency, so it is not counted.`);
-    if (nowIn !== null) add(nowIn, 'now', minor(now.fields.value, nowIn));
+    if (nowIn !== null) add(nowIn, 'now', minorOf(now, nowIn));
 
     const band = LANES[t.fields.lane];
     if (band === undefined || base === undefined) continue;
@@ -137,8 +151,8 @@ export function bandsOf(things, readings, { now: NOW, base: BASE }) {
       said.push(`${name} takes ${nowIn} today and is forecast in ${baseIn}, and two currencies are not subtracted, so it adds no headroom.`);
       continue;
     }
-    const taking = nowIn === null ? 0 : minor(now.fields.value, nowIn);
-    add(baseIn, band, Math.max(0, minor(base.fields.value, baseIn) - taking));
+    const taking = nowIn === null ? 0 : minorOf(now, nowIn);
+    add(baseIn, band, Math.max(0, minorOf(base, baseIn) - taking));
   }
   return { bands, said };
 }

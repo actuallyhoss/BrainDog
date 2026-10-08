@@ -9,8 +9,29 @@
  * does not verify is never offered. A catalogue with no index, or an index that does not read, offers nothing.
  */
 
-import { CATALOGUE_INDEX, catalogueUpdates, readCatalogue, rotatedFrom, verifiedStatements, verifySignature } from '@braindog/declare/catalogue';
+import {
+  CATALOGUE_INDEX,
+  catalogueFile,
+  catalogueUpdates,
+  heldToEntry,
+  installedIdOf,
+  keysSignedBefore,
+  listedEntries,
+  offeredVersion,
+  readCatalogue,
+  readCatalogueFile,
+  revokedNotice,
+  rotatedFrom,
+  strippedNotice,
+  verifiedStatements,
+  verifySignature,
+  verifyVersion,
+  type CatalogueEntry as IndexEntry,
+  type CatalogueIndex,
+} from '@braindog/declare/catalogue';
+import type { Refusal, Result } from '@braindog/ports';
 
+import type { CatalogueShelf, ShelfEntry, ShelfFetched } from './arrange.ts';
 import type { CatalogueOffer } from './slash.ts';
 
 export type CatalogueReader = (path: string) => string | null | Promise<string | null>;
@@ -50,5 +71,85 @@ export function offersFromCatalogue(read: CatalogueReader): (held: readonly { id
       });
     }
     return offers;
+  };
+}
+
+/* ── the whole catalogue, for the arranger ───────────────────────────────── */
+
+const indexOf = async (read: CatalogueReader): Promise<CatalogueIndex | null> => {
+  try {
+    const text = await read(CATALOGUE_INDEX);
+    if (text === null) return null;
+    const index = readCatalogue(JSON.parse(text));
+    return index.ok ? index.value : null;
+  } catch {
+    return null;
+  }
+};
+
+/** An entry by the pack id a record holds it under, or a use case by its own short id: `usecase-student` or `student`. */
+const entryNamed = (index: CatalogueIndex, id: string): IndexEntry | undefined =>
+  index.entries.find((e) => installedIdOf(e) === id) ?? index.entries.find((e) => e.kind === 'usecase' && e.id === id);
+
+const shelfEntry = (e: IndexEntry, version: string, modules: readonly string[]): ShelfEntry => ({
+  id: installedIdOf(e),
+  kind: e.kind,
+  title: e.title,
+  summary: e.summary,
+  version,
+  modules,
+});
+
+/**
+ * THE HOST'S WHOLE CATALOGUE, AS THE ARRANGER READS IT (`ArrangeDeps.shelf`). The arranger found an add-on only in the
+ * host's short list and refused every other one the catalogue held, so an agent asked to install Stripe was told it was
+ * not on offer while the catalogue listed it. Now any current entry is found by its id.
+ *
+ * HELD AS AN UPDATE IS HELD (`catalogueUpdates`): the newest version not yanked, its file fetched and held to the
+ * checksum the index gives, its signature verified, a revoked or stripped one refused, read through its door and held to
+ * the entry it is listed under. What does not hold is a refusal saying why, never an install. An unlisted entry installs
+ * by its id and is left out of `listed`, as the catalogue says.
+ */
+export function shelfFromCatalogue(read: CatalogueReader): CatalogueShelf {
+  const no = (code: Refusal['code'], fix: string): Result<ShelfFetched> => ({ ok: false, refusal: { code, fix, at: 'file' } });
+  return {
+    listed: async () => {
+      const index = await indexOf(read);
+      if (index === null) return [];
+      return listedEntries(index).flatMap((e) => {
+        const latest = offeredVersion(e);
+        return latest === null ? [] : [shelfEntry(e, latest.version, latest.reach?.modules ?? [])];
+      });
+    },
+    fetch: async (id) => {
+      const index = await indexOf(read);
+      const entry = index === null ? undefined : entryNamed(index, id);
+      const latest = entry === undefined ? null : offeredVersion(entry);
+      if (index === null || entry === undefined || latest === null) return null;
+      const not = (fix: string): string => `${entry.title} is in this host's catalogue and was not offered. ${fix}`;
+      const text = await read(catalogueFile(entry.id, latest.version, entry.kind));
+      if (text === null) return no('DECLARATION_UNKNOWN', not(`Its file for ${latest.version} is missing.`));
+      const verified = await verifyVersion(entry, latest, text);
+      if (!verified.ok) {
+        const r = (verified as { refusal: Refusal }).refusal;
+        return no(r.code, not(r.fix));
+      }
+      const statements = await verifiedStatements(index.keys);
+      const revoked = revokedNotice(statements, entry.title, latest.version, verified.value);
+      if (revoked !== null) return no('SIGNATURE_INVALID', not(revoked));
+      if (verified.value === null) {
+        const before = await keysSignedBefore(entry, latest.version);
+        if (before.length > 0) return no('SIGNATURE_INVALID', not(strippedNotice(entry.title, latest.version, before)));
+      }
+      const file = await readCatalogueFile(text, { kind: 'url' });
+      if (!file.ok) return no('PACK_MALFORMED', not((file as { refusal: Refusal }).refusal.fix));
+      const held = heldToEntry(entry, latest.version, file.value);
+      if (!held.ok) return no('PACK_MALFORMED', not((held as { refusal: Refusal }).refusal.fix));
+      const f = file.value;
+      const doc = f.kind === 'usecase' ? f.shared.doc : f.file.doc;
+      if (doc === null) return no('PACK_MALFORMED', not('It carries no lists or pages of its own, only the modules it names.'));
+      const modules = f.kind === 'usecase' ? f.shared.usecase.modules : Object.keys(f.file.pack.manifest.requires.packs);
+      return { ok: true, value: { ...shelfEntry(entry, latest.version, modules), doc } };
+    },
   };
 }

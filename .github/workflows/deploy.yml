@@ -107,11 +107,12 @@ jobs:
         run: pnpm --filter ./apps/web build
 
       # THE CLI, BUILT FROM THIS COMMIT AND SERVED BY THE SITE.
-      # `apps/cli/scripts/bundle.mjs` makes `apps/cli/dist/braindog.mjs` and its `.sha256`, stamped
-      # with the `BRAINDOG_BUILD` above so `braindog --version` names the same build as the Worker,
-      # and both are copied into the site's `static/cli/` beside `install.ps1` and `install.sh`. The
-      # site builds below carry them all to `/cli/`: production's to `brain.dog/cli/`, and alpha's,
-      # when it deploys, to the same path on alpha's own name.
+      # `apps/cli/scripts/bundle.mjs` makes `apps/cli/dist/braindog.mjs`, its `.sha256` and its
+      # `.build` (the one line `braindog update` reads first), stamped with the `BRAINDOG_BUILD`
+      # above so `braindog --version` names the same build as the Worker, and all three are copied
+      # into the site's `static/cli/` beside `install.ps1` and `install.sh`. The site builds below
+      # carry them all to `/cli/`: production's to `brain.dog/cli/`, and alpha's, when it deploys, to
+      # the same path on alpha's own name.
       #
       # BEFORE ANYTHING DEPLOYS, because a CLI that does not build should stop the run with nothing
       # live changed, rather than after the Worker, where it would leave a new app beside an old site.
@@ -120,7 +121,7 @@ jobs:
         run: |
           pnpm --filter braindog-cli build
           mkdir -p apps/site/static/cli
-          cp apps/cli/dist/braindog.mjs apps/cli/dist/braindog.mjs.sha256 apps/site/static/cli/
+          cp apps/cli/dist/braindog.mjs apps/cli/dist/braindog.mjs.sha256 apps/cli/dist/braindog.mjs.build apps/site/static/cli/
 
       # WHAT IS LIVE, WRITTEN DOWN BEFORE IT STOPS BEING LIVE. A rollback needs the version ids of the
       # app and the site that served before this deploy, and the sha that app was built from, and

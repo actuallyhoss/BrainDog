@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { heldSaid, isRepeat, panelOf, readReport, reportOf, type PatternLine, type PatternReport } from './patterns.ts';
+import { heldSaid, isRepeat, panelOf, readRepeats, readReport, reportOf, REPEATS_MOST, type PatternLine, type PatternReport } from './patterns.ts';
 
 const line = (over: Partial<PatternLine>): PatternLine => ({ ingest: 'hsbc_card', said: 'Card purchases', filed: 0, skipped: [], waiting: 0, ...over });
 
@@ -59,6 +59,7 @@ test('many repeats are one counted line, since each names the one it repeats', (
   ]);
   assert.deepEqual(held, ['3 messages looked like repeats of ones already filed.']);
   assert.equal(isRepeat('Looks like a repeat of Uber.'), true);
+  assert.equal(isRepeat('transactions#4 already says this.'), true);
   assert.equal(isRepeat('Not a message from the bank.'), false);
   assert.equal(isRepeat(null), false);
 });
@@ -100,4 +101,82 @@ test("the report is read from the record's answer, and anything else is no repor
     }),
     null,
   );
+});
+
+/* ── the repeats the tile offers "It is a second one" on ─────────────────── */
+
+type Skip = { id: string; reason: string; repeats?: string };
+
+/**
+ * A record that answers `inbox` as the record does: newest first, at most 200 to a page, and with `repeats: true` only
+ * the arrivals ingest marked as repeating a row. Every ask is kept, so a test can say what was asked.
+ */
+function record(skips: readonly Skip[]): { io: (url: string) => Promise<Response>; asked: URLSearchParams[] } {
+  const asked: URLSearchParams[] = [];
+  const io = async (url: string) => {
+    const q = new URL(url).searchParams;
+    asked.push(q);
+    const limit = Math.min(Number(q.get('limit') ?? 50), 200);
+    const arrivals = skips
+      .map((s, i) => ({ rowid: skips.length - i, id: s.id, ts: new Date(Date.UTC(2026, 9, 9, 12) - i * 60_000).toISOString(), channel: 'sms', from: 'HSBC', to: '', subject: '', body: `Text ${s.id}`, state: 'skipped', reason: s.reason, ...(s.repeats ? { repeats: s.repeats } : {}) }))
+      .filter((a) => q.get('repeats') !== 'true' || 'repeats' in a)
+      .slice(0, limit);
+    return new Response(JSON.stringify({ ok: true, value: { arrivals, cursor: null } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  return { io, asked };
+}
+
+const balance = (n: number): Skip[] => Array.from({ length: n }, (_, i) => ({ id: `bal_${i}`, reason: 'A balance alert is a position, not a movement.' }));
+
+/* A MARKED REPEAT IN THE OLD WORDS: what a pre-35 repeat reads like once the kernel marks it. On a real record a repeat
+   skipped before batch 35 has no `match` line and no mark yet, so the record does not answer it here at all. */
+test('a marked repeat in the words before batch 35 offers the press, and never says the list it repeats by its handle', async () => {
+  const { io, asked } = record([{ id: 'raw_old', reason: 'transactions#4 already says this.', repeats: '01J9ZQ4M8X3V6T2R5N7K1P0WQY' }]);
+  const held = await readRepeats('http://record.test', io);
+  assert.deepEqual(held.map((r) => [r.id, r.reason]), [['raw_old', 'Looks like a repeat of one already filed.']]);
+  for (const r of held) assert.doesNotMatch(`${r.reason} ${r.subject}`, /#\d|01J9|\u2014/u);
+  /* THE RECORD IS ASKED FOR ITS REPEATS ALONE, by the mark, and only as many as the tile offers. */
+  assert.equal(asked[0]!.get('repeats'), 'true');
+  assert.equal(asked[0]!.get('state'), 'skipped');
+  assert.equal(asked[0]!.get('limit'), String(REPEATS_MOST));
+});
+
+test('a page full of balance alerts set aside does not push a real second charge off', async () => {
+  /* MORE THAN A WHOLE PAGE of other skips, all newer than the repeat: one page of skipped texts never reached it. */
+  const skips = [...balance(250), { id: 'raw_twice', reason: 'Looks like a repeat of Corner Shop, EGP 120.00, 7 Oct.', repeats: '01J9ZQ4M8X3V6T2R5N7K1P0WQY' }];
+  const held = await readRepeats('http://record.test', record(skips).io);
+  assert.deepEqual(held.map((r) => [r.id, r.reason]), [['raw_twice', 'Looks like a repeat of Corner Shop, EGP 120.00, 7 Oct.']]);
+
+  /* AND THIRTY OF THEM beside one repeat still show the repeat alone. */
+  const few = await readRepeats('http://record.test', record([...balance(30), skips.at(-1)!]).io);
+  assert.deepEqual(few.map((r) => r.id), ['raw_twice']);
+});
+
+test("a rule's skip never offers the press, even from a record that answers it among the repeats", async () => {
+  /* A RECORD THAT DOES NOT KNOW `repeats` answers every skip; only the marked one shows. */
+  const careless = async () =>
+    new Response(
+      JSON.stringify({
+        ok: true,
+        value: {
+          arrivals: [
+            { rowid: 2, id: 'raw_rule', ts: '2026-10-09T12:00:00.000Z', channel: 'sms', from: 'HSBC', to: '', subject: '', body: 'Balance', state: 'skipped', reason: 'Looks like a repeat, by the rule that sets aside balance alerts.' },
+            { rowid: 1, id: 'raw_twice', ts: '2026-10-09T11:00:00.000Z', channel: 'sms', from: 'HSBC', to: '', subject: '', body: 'Corner Shop', state: 'skipped', reason: 'Looks like a repeat of Corner Shop.', repeats: '01J9ZQ4M8X3V6T2R5N7K1P0WQY' },
+          ],
+          cursor: null,
+        },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  assert.deepEqual((await readRepeats('http://record.test', careless)).map((r) => r.id), ['raw_twice']);
+  assert.deepEqual(await readRepeats('http://record.test', record(balance(3)).io), []);
+
+  /* A RECORD THAT REFUSES THE ASK, or is not there, offers no repeats rather than a guess. */
+  const refused = async () => new Response(JSON.stringify({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'No.' } }), { status: 422, headers: { 'content-type': 'application/json' } });
+  assert.deepEqual(await readRepeats('http://record.test', refused), []);
+  assert.deepEqual(await readRepeats('http://record.test', async () => { throw new TypeError('fetch failed'); }), []);
+});
+
+test("the report's tile never says a repeat by the old handle either", () => {
+  assert.deepEqual(heldSaid([{ reason: 'transactions#4 already says this.', n: 1 }]), ['Looks like a repeat of one already filed.']);
 });

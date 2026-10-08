@@ -141,12 +141,33 @@ export async function carryUpdate(catalogue: readonly CatalogueEntry[], kernel: 
 
 type Body = Record<string, unknown>;
 
+/** One current entry of the host's whole catalogue: `id` is the pack id a record holds it under, `modules` what goes in first. */
+export type ShelfEntry = { id: string; kind: 'pack' | 'usecase'; title: string; summary: string; version: string; modules: readonly string[] };
+
+/** A shelf entry with its document, fetched and held to its checksum and signature. */
+export type ShelfFetched = ShelfEntry & { doc: Record<string, unknown> };
+
+/**
+ * THE HOST'S WHOLE CATALOGUE, beside the short list `catalogue` is (`catalogue-offers.ts` `shelfFromCatalogue`). `fetch`
+ * answers `null` for an id it does not hold, and a refusal for one it holds that does not verify.
+ */
+export type CatalogueShelf = {
+  listed: () => Promise<readonly ShelfEntry[]>;
+  fetch: (id: string) => Promise<Result<ShelfFetched> | null>;
+};
+
 export type ArrangeDeps = {
   kernel: Kernel;
   catalogue: readonly CatalogueEntry[];
   installed: () => Installed;
   host: (actor: string) => Host;
+  /** The host's whole catalogue. Absent, only the short list is offered. */
+  shelf?: CatalogueShelf | undefined;
 };
+
+/** What a proposal found in the host's whole catalogue: each document by pack id, the modules under it, and its entry. */
+type Shelving = { docs: Map<string, Body>; sent: Map<string, readonly string[]>; found: Map<string, ShelfEntry> };
+const shelving = (): Shelving => ({ docs: new Map(), sent: new Map(), found: new Map() });
 
 /** A use case's pack starts with this, by `declare`'s own convention. */
 const USE_CASE = packIdOf('');
@@ -180,6 +201,12 @@ const refuse = <T>(code: Refusal['code'], fix: string, at?: string, allowed?: re
   refusal: { code, fix, ...(at === undefined ? {} : { at }), ...(allowed === undefined ? {} : { allowed }) },
 });
 const listed = (items: readonly string[]): string => (items.length === 0 ? 'none' : items.slice(0, 20).join(', '));
+/* WHAT IS ON OFFER, BY NAME, AND THEN THE IDS a proposal sends, in the same order. */
+const offered = (items: readonly { id: string; title: string }[]): string => {
+  const shown = items.slice(0, 20);
+  const more = items.length > shown.length ? `, and ${items.length - shown.length} more` : '';
+  return `${shown.map((e) => e.title || e.id).join(', ')}${more} (by id: ${shown.map((e) => e.id).join(', ')})`;
+};
 
 export function arranger(d: ArrangeDeps) {
   const { kernel, catalogue } = d;
@@ -230,14 +257,60 @@ export function arranger(d: ArrangeDeps) {
     return open.ok ? open.value.filter((r) => r.body_kind === 'arrange').map((r) => String(r.id)) : [];
   };
 
-  const notOffered = (id: string, at: string): Result<never> =>
-    refuse(
+  /* ONE SENTENCE THAT NAMES WHAT IS OFFERED, the short list and the whole catalogue together. */
+  const notOffered = (id: string, at: string, shelf: readonly ShelfEntry[] = []): Result<never> => {
+    const all = [...catalogue.map((e) => ({ id: e.id, title: e.title })), ...shelf.filter((x) => !catalogue.some((e) => e.id === x.id))];
+    return refuse(
       'DECLARATION_UNKNOWN',
-      catalogue.length === 0
-        ? `This host offers no catalogue, so ${id} cannot be found by name. Send the pack document as doc.`
-        : `There is no pack called ${id} on offer here. Read arrangement for what is offered: ${listed(catalogue.map((e) => e.id))}.`,
+      all.length === 0
+        ? `This host offers no catalogue, so ${id} cannot be found by its id. Send the pack document as doc.`
+        : `There is no add-on called ${id} on offer here, and what is on offer is ${offered(all)}.`,
       at,
     );
+  };
+
+  /* THE NAME A PACK FROM THE WHOLE CATALOGUE WAS FETCHED UNDER, for a sentence about it once it is planned. */
+  const shelfTitles = new Map<string, string>();
+  const titleOf = (id: string): string => entryOf(id)?.title ?? shelfTitles.get(id) ?? id;
+
+  /**
+   * THE IDS ASKED, FOUND: in the short list, in a document sent, or else in the host's whole catalogue, fetched and held to
+   * its checksum as an update is. The modules under one found there are found the same way. Answers each id as the record
+   * installs it (`student` is `usecase-student`), or the refusal for the first not offered or not verified.
+   */
+  async function shelved(ids: readonly string[], at: string, into: Shelving, sent: ReadonlyMap<string, Body> = new Map()): Promise<Result<string[]>> {
+    const out: string[] = [];
+    for (const [i, asked] of ids.entries()) {
+      const queue = [asked];
+      while (queue.length > 0) {
+        const id = queue.shift()!;
+        const entry = entryOf(id);
+        if (entry || sent.has(id) || into.docs.has(id) || into.found.has(id) || !d.shelf) {
+          if (id === asked) out.push(entry?.id ?? id);
+          continue;
+        }
+        const fetched = await d.shelf.fetch(id);
+        if (fetched === null) {
+          /* A MODULE NOTHING OFFERS IS LEFT FOR `expand` TO SAY, as it says one under a short-list entry, and so is a pack
+             this record holds that the catalogue does not: "already installed" is the true answer, not "not on offer". */
+          if (id !== asked || stateOf(id)) {
+            if (id === asked) out.push(id);
+            continue;
+          }
+          return notOffered(asked, `${at}[${i}]`, await d.shelf.listed());
+        }
+        if (!fetched.ok) return { ok: false, refusal: { ...(fetched as { refusal: Refusal }).refusal, at: `${at}[${i}]` } };
+        const { doc, ...found } = fetched.value;
+        into.docs.set(found.id, doc);
+        into.sent.set(found.id, found.modules);
+        into.found.set(found.id, found);
+        shelfTitles.set(found.id, found.title);
+        if (id === asked) out.push(found.id);
+        queue.push(...found.modules);
+      }
+    }
+    return ok(out);
+  }
 
   /* ── reading ─────────────────────────────────────────────────────────── */
 
@@ -290,6 +363,9 @@ export function arranger(d: ArrangeDeps) {
     /* A HANDED PACK IS LISTED AS ONE, so an agent reading this says "holds a door money-core handed it, not installed" and
        offers the install or turning it off, rather than naming it among the packs the owner chose. */
     const handed = [...handedPacks()].sort().map((id) => ({ id, handed: true }));
+    /* AND EVERY CURRENT ENTRY OF THE HOST'S WHOLE CATALOGUE, said as the short list says one: a proposal installs it by its
+       id, and the record fetches it and holds it to its checksum then. */
+    const shelf = d.shelf ? (await d.shelf.listed()).filter((e) => !held.has(e.id) && !catalogue.some((c) => c.id === e.id)) : [];
     return {
       packs: [...packs.map((p) => ({ id: p.id, ...(p.version === null ? {} : { version: p.version }), ...(p.disabled_at === null ? {} : { off: true }) })), ...handed],
       offer: catalogue
@@ -300,7 +376,15 @@ export function arranger(d: ArrangeDeps) {
           ...(e.kind === 'usecase' ? { usecase: e.title } : {}),
           summary: e.summary,
           ...(e.modules.length === 0 ? {} : { modules: e.modules }),
-        })),
+        }))
+        .concat(
+          shelf.map((e) => ({
+            id: e.id,
+            ...(e.kind === 'usecase' ? { usecase: e.title } : {}),
+            summary: e.summary,
+            ...(e.modules.length === 0 ? {} : { modules: [...e.modules] }),
+          })),
+        ),
       ...(updates.length === 0 ? {} : { updates }),
       /* THE KEYS ARE IN braindog:grammar/proposals, read once; here is only what this record says. */
       voice: { pack: voicePack, said },
@@ -387,7 +471,7 @@ export function arranger(d: ArrangeDeps) {
   };
 
   /** Each pack planned in order, each against the record as the ones before it would leave it. Nothing is written. */
-  async function planAll(asked: readonly string[], docs: ReadonlyMap<string, Body>): Promise<Result<Planned>> {
+  async function planAll(asked: readonly string[], docs: ReadonlyMap<string, Body>, given: ReadonlyMap<string, Body> = new Map()): Promise<Result<Planned>> {
     const base = d.installed();
     /* IN THE ORDER THAT INSTALLS, and not the order asked. The owner can only accept an arrangement, and `base` 2.0.0
        named before the `leaf` 1.1.0 that takes it was filed and refused `PACK_REQUIRED` at the accept, telling him to
@@ -405,13 +489,14 @@ export function arranger(d: ArrangeDeps) {
       const read = await packOf(id, docs, heldBy(state), useCaseFor(ids, id));
       if (!read.ok) return read;
       const pack = read.value;
-      const diff = await plan(pack, state);
+      /* THE SETTINGS SENT FOR IT FILL THE INSTALL, so what reads them is planned, approved and written with them. */
+      const diff = await plan(pack, state, { settings: given.get(id) });
       const unheld = unresolvedFault(diff);
       if (unheld) return { ok: false, refusal: unheld };
       const clash = diff.conflicts[0];
       /* AN EDIT THE UPDATE WOULD BREAK IS SAID AS ONE, by the names the owner reads: "retire page.money first" told them
          to throw away their own Money page. */
-      const edited = conflictFault(diff, (x) => (x === id ? (entryOf(id)?.title ?? id) : spokenOf(x)));
+      const edited = conflictFault(diff, (x) => (x === id ? titleOf(id) : spokenOf(x)));
       if (edited) return { ok: false, refusal: { ...edited, at: 'body.packs' } };
       if (clash)
         return refuse('PROVIDES_CONFLICT', `${id} would take over ${clash.id}, which ${clash.pack} holds. Leave ${id} out, or retire ${clash.id} first.`, 'body.packs');
@@ -454,7 +539,7 @@ export function arranger(d: ArrangeDeps) {
           ? {}
           : {
               retires: diff.retires.map((x) => {
-                const to = x.to === undefined ? undefined : entryOf(x.to)?.title;
+                const to = x.to === undefined ? undefined : (entryOf(x.to)?.title ?? shelfTitles.get(x.to));
                 return { id: x.id, rows: x.rows, ...(x.to === undefined ? {} : { to: x.to }), ...(to === undefined ? {} : { to_name: to }) };
               }),
             }),
@@ -669,8 +754,24 @@ export function arranger(d: ArrangeDeps) {
           `${target} is on offer here, so it is installed from this host's own document. Propose {"install":"${asked}"} without doc.`,
           'body.doc',
         );
+      /* AND THE SAME FOR ONE THE HOST'S WHOLE CATALOGUE HOLDS, which the arrangement reading lists as on offer. */
+      const shelfHolds = fromFile === null && isMap(body.doc) && d.shelf ? await d.shelf.fetch(asked) : null;
+      if (shelfHolds !== null)
+        return refuse(
+          'VALUE_MALFORMED',
+          `${shelfHolds.ok ? shelfHolds.value.title : target} is in this host's catalogue, so it is installed from the host's own document. Propose {"install":"${asked}"} without doc.`,
+          'body.doc',
+        );
       const docs = new Map<string, Body>(isMap(body.doc) ? [[target, body.doc]] : []);
       const sent = new Map<string, readonly string[]>(fromFile === null ? [] : [[target, fromFile.modules]]);
+      /* NOT IN THE SHORT LIST AND NO DOCUMENT SENT: the host's whole catalogue, held to its checksum. */
+      const sh = shelving();
+      const found = await shelved([asked], 'body.install', sh, docs);
+      if (!found.ok) return found;
+      for (const [id, doc] of sh.docs) docs.set(id, doc);
+      for (const [id, modules] of sh.sent) sent.set(id, modules);
+      const fromShelf = sh.found.get(found.value[0] ?? target);
+      if (fromShelf && fromShelf.id !== target) return prepare('pack', { ...body, install: fromShelf.id });
       /* AN UPDATE OF A MODULE UNDER IT is an update too: Personal at its version with Money behind is planned for Money. */
       if (on(target) && ![...(entryOf(asked)?.modules ?? sent.get(target) ?? []), target].some((id) => on(id) && updateOf(id, docs)))
         return refuse(
@@ -690,7 +791,13 @@ export function arranger(d: ArrangeDeps) {
       return ok({
         install: target,
         /* A FILE IS SAID BY ITS OWN TITLE, even over a catalogue use case with the same id: it is what the owner was asked about. */
-        ...(fromFile ? { kind: 'usecase', title: fromFile.title, summary: fromFile.summary } : entry ? { kind: entry.kind, title: entry.title, summary: entry.summary } : {}),
+        ...(fromFile
+          ? { kind: 'usecase', title: fromFile.title, summary: fromFile.summary }
+          : entry
+            ? { kind: entry.kind, title: entry.title, summary: entry.summary }
+            : fromShelf
+              ? { kind: fromShelf.kind, title: fromShelf.title, summary: fromShelf.summary }
+              : {}),
         ...(keeps === null ? {} : { keeps }),
         packs: { install: planned.value.order, ...(order.value.enable.length === 0 ? {} : { enable: order.value.enable }) },
         plan: planned.value.plan,
@@ -702,6 +809,7 @@ export function arranger(d: ArrangeDeps) {
 
     /* AN ARRANGEMENT: packs, then pages, then settings, each checked against what the ones before would leave. */
     const packs = isMap(body.packs) ? body.packs : {};
+    const sh = shelving();
     const lead = typeof body.usecase === 'string' ? packIdOf(body.usecase.replace(new RegExp(`^${USE_CASE}`), '')) : null;
     /* A USE CASE BESIDE THE ONE SPEAKING, by the voice rule every other door keeps (`declare` `voiceWhenAdding`): it
        installs after the lead and never changes who speaks, whichever way its id sorts, because accepting writes the
@@ -714,13 +822,17 @@ export function arranger(d: ArrangeDeps) {
         return refuse('REQUIRED_MISSING', 'A use case goes beside the one this BrainDog speaks in, and none is on. Name one as usecase, and the others beside it.', 'body.alongside');
       for (const [i, raw] of (body.alongside as string[]).entries()) {
         const id = packIdOf(raw.replace(new RegExp(`^${USE_CASE}`), ''));
-        const entry = entryOf(id);
-        if (!entry || entry.kind !== 'usecase') return notOffered(raw, `body.alongside[${i}]`);
+        const found = await shelved([id], 'body.alongside', sh);
+        if (!found.ok) return { ok: false, refusal: { ...(found as { refusal: Refusal }).refusal, at: `body.alongside[${i}]` } };
+        if ((entryOf(id) ?? sh.found.get(id))?.kind !== 'usecase') return notOffered(raw, `body.alongside[${i}]`, d.shelf ? await d.shelf.listed() : []);
         beside.push(id);
       }
     }
     const asked = [...(lead === null ? [] : [lead]), ...beside, ...(Array.isArray(packs.install) ? packs.install.map(String) : [])];
-    const order = expand([...new Set(asked)], 'body.packs.install', new Map());
+    /* ANY CURRENT ADD-ON OF THE HOST'S WHOLE CATALOGUE, found by its id and held to its checksum, beside the short list. */
+    const found = await shelved([...new Set(asked)], 'body.packs.install', sh);
+    if (!found.ok) return found;
+    const order = expand([...new Set(found.value)], 'body.packs.install', sh.docs, sh.sent);
     if (!order.ok) return order;
     const enable = [...order.value.enable];
     for (const [i, id] of (Array.isArray(packs.enable) ? packs.enable.map(String) : []).entries()) {
@@ -733,7 +845,17 @@ export function arranger(d: ArrangeDeps) {
       if (running(id)?.disabled_at !== null) return refuse('TRANSITION_ILLEGAL', `${id} is not on, so there is nothing to turn off.`, `body.packs.disable[${i}]`);
       disable.push(id);
     }
-    const planned = await planAll(order.value.install, new Map());
+    /* THE SETTINGS SENT FOR AN ADD-ON IT INSTALLS FILL THAT INSTALL (`declare` `plan`), checked below as any setting is. */
+    const given = new Map<string, Body>();
+    for (const raw of Array.isArray(body.settings) ? body.settings : [])
+      if (isMap(raw) && typeof raw.pack === 'string' && isMap(raw.values) && order.value.install.includes(raw.pack))
+        given.set(raw.pack, { ...(given.get(raw.pack) ?? {}), ...raw.values });
+    /* THE VOICE TOO, when it is the voice of a use case this installs: `apply` fills the install with every setting filed for
+       it, and the voice is filed as one, so the plan the owner is shown is the plan that runs. Checked below as any setting. */
+    const voiced = body.voice === undefined ? null : voiceOf(body.voice, 'body.voice', order.value.install);
+    if (voiced?.ok && typeof voiced.value.pack === 'string' && isMap(voiced.value.values) && order.value.install.includes(voiced.value.pack))
+      given.set(voiced.value.pack, { ...(given.get(voiced.value.pack) ?? {}), ...voiced.value.values });
+    const planned = await planAll(order.value.install, sh.docs, given);
     if (!planned.ok) return planned;
 
     const pages: Body[] = [];
@@ -867,6 +989,27 @@ export function arranger(d: ArrangeDeps) {
     const docs = new Map<string, Body>(kind === 'pack' && typeof body.install === 'string' && isMap(body.doc) ? [[body.install, body.doc]] : []);
 
     const steps = Array.isArray(body.plan) ? (body.plan as Body[]) : [];
+    /* WHAT IS INSTALLED FROM THE HOST'S WHOLE CATALOGUE IS FETCHED AGAIN, held to its checksum again, and must be the version
+       the owner was shown: a catalogue that moved since the question was filed is said, and nothing is installed. */
+    for (const id of packs.install ?? []) {
+      if (docs.has(id) || entryOf(id) || !d.shelf) continue;
+      const fetched = await d.shelf.fetch(id);
+      if (fetched === null) return stopped(notOffered(id, 'body.packs', await d.shelf.listed()));
+      if (!fetched.ok) return stopped(fetched);
+      const planned = steps.find((x) => x.pack === id)?.version;
+      if (typeof planned === 'string' && planned !== fetched.value.version)
+        return stopped(
+          refuse('PLAN_STALE', `${fetched.value.title} is at ${fetched.value.version} in this host's catalogue now, and this proposal showed ${planned}. Propose it again.`, 'body.packs'),
+        );
+      docs.set(id, fetched.value.doc);
+      shelfTitles.set(id, fetched.value.title);
+    }
+    /* THE SETTINGS SENT FOR AN ADD-ON THIS PRESS INSTALLS GO IN WITH IT, as `prepare` planned them. */
+    const given = new Map<string, Body>();
+    if (kind === 'arrange')
+      for (const s of settings)
+        if (typeof s.pack === 'string' && isMap(s.values) && (packs.install ?? []).includes(s.pack)) given.set(s.pack, { ...(given.get(s.pack) ?? {}), ...s.values });
+    const filled = new Set<string>();
     const spokeBefore = speakerNow();
     for (const id of packs.install ?? []) {
       /* AN UPDATE THE OWNER ACCEPTED goes in over the pack that is on, unless that pack is already at the planned version. */
@@ -886,7 +1029,7 @@ export function arranger(d: ArrangeDeps) {
       const state = d.installed();
       const pack = await packOf(id, docs, heldBy(state), useCaseFor(packs.install ?? [], id));
       if (!pack.ok) return stopped(pack);
-      const diff = await plan(pack.value, state);
+      const diff = await plan(pack.value, state, { settings: given.get(id) });
       const unshown = diff.approve.filter((line) => !approved.includes(line));
       if (unshown.length > 0)
         return stopped(refuse('PLAN_STALE', `${id} now calls out something this proposal did not show: ${unshown.join('; ')}. Propose it again.`, 'body.approve'));
@@ -894,6 +1037,7 @@ export function arranger(d: ArrangeDeps) {
       const put = await install(pack.value, diff, d.host(actor), diff.planHash, diff.approve);
       if (!put.ok) return stopped(put);
       done.installed.push(id);
+      if (given.has(id)) filled.add(id);
       await carryUpdate(d.catalogue, kernel, id, from, actor);
       await afterInstall(id, actor);
     }
@@ -928,6 +1072,11 @@ export function arranger(d: ArrangeDeps) {
       done.pages.push(String(page.id));
     }
     for (const s of settings) {
+      /* ALREADY WRITTEN BY ITS INSTALL, which kept the values as chosen. */
+      if (filled.has(String(s.pack))) {
+        if (!done.settings.includes(String(s.pack))) done.settings.push(String(s.pack));
+        continue;
+      }
       const set = kernel.setPackConfig(String(s.pack), s.values, { actor });
       if (!set.ok) return stopped(set);
       done.settings.push(String(s.pack));

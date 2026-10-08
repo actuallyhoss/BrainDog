@@ -4067,11 +4067,13 @@ function prefixHolder(self: string, prefix: string, installed?: Known): { who: s
  *   `min` · `max`  bounds, in UTF-8 bytes on text and documents and by value on numbers.
  *   `required_when`  `{ field, is }`: required while another field of the row holds that value.
  *   `by`        `decide`: once the row is made, only an accepted proposal changes the field.
+ *   `currency_from` · `currency_fixed`  a money field's code: taken from the account a link names when an amount
+ *               comes without one, and never changed once a row holds it (`currencyKeysFault`).
  */
 const FIELD_KEYS = [
   'id', 'type', 'of', 'values', 'required', 'index', 'unique', 'immutable', 'default', 'retired',
   'redact', 'transitions', 'remind', 'repeat', 'scope', 'min', 'max', 'required_when', 'by',
-  'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived', 'labels',
+  'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived', 'labels', 'currency_from', 'currency_fixed',
 ] as const;
 
 /**
@@ -4154,6 +4156,53 @@ const WHEN_TYPES = ['text', 'enum', 'bool', 'int'];
 
 /** Who changes a field or makes a move. `decide` is an accepted proposal, and the one word read. */
 const BY = ['decide'];
+
+/**
+ * `currency_from` and `currency_fixed`, each on a money field only, and `currency_from` naming a link of this list and a
+ * money field of the list that link points at. The target is checked where the batch or the record holds that list, as
+ * `currencyOfFault` checks a pattern's; a list pointing at itself is checked against its own fields.
+ *
+ * ONE SENTENCE FOR EACH WAY TO BE WRONG, because each sends the author somewhere else: the field's type, the link, or
+ * the field on the other list. Installed wrong, an amount sent with no code is refused on every write and nobody is
+ * told the declaration is why.
+ */
+function currencyKeysFault(id: string, fields: readonly Record<string, unknown>[], installed?: Known): Refusal | null {
+  const a = (type: unknown): string => `${/^[aeiou]/u.test(String(type)) ? 'an' : 'a'} ${String(type)}`;
+  for (const f of fields) {
+    const said = `${id}.${String(f.id)}`;
+    const from = f.currency_from;
+    const fixed = f.currency_fixed;
+    if (from === undefined && fixed === undefined) continue;
+    const key = from !== undefined ? 'currency_from' : 'currency_fixed';
+    if (f.type !== 'money')
+      return bad('DECLARATION_INVALID', `${said} is ${a(f.type)}, and ${key} is for a money field.`, `${String(f.id)}.${key}`);
+    if (fixed !== undefined && fixed !== true)
+      return bad('DECLARATION_INVALID', `${said}: currency_fixed is true or left out.`, `${String(f.id)}.currency_fixed`);
+    if (from === undefined) continue;
+    const at = `${String(f.id)}.currency_from`;
+    const parts = typeof from === 'string' ? from.split('.') : [];
+    if (parts.length !== 2 || !parts.every((p) => IDENT.test(p)))
+      return bad('DECLARATION_INVALID', `${said}: currency_from names a link of ${id} and a money field of the list it points at, like account.balance.`, at);
+    const [linkId, targetId] = parts as [string, string];
+    const link = fields.find((g) => g.id === linkId);
+    if (link === undefined || link.type !== 'ref' || typeof link.to !== 'string')
+      return bad(
+        'DECLARATION_INVALID',
+        `${said} takes its currency from ${linkId}, and ${link === undefined ? `${id} has no field called ${linkId}` : `${linkId} is ${a(link.type)}, not a link to one row`}.`,
+        at,
+      );
+    const theirs = link.to === id ? fields : listFields(installed, link.to);
+    if (theirs === null) continue;
+    const target = theirs.find((g) => g.id === targetId);
+    if (target === undefined || target.type !== 'money')
+      return bad(
+        'DECLARATION_INVALID',
+        `${said} takes its currency from ${targetId} of ${link.to}, and ${target === undefined ? `${link.to} has no such field` : `${targetId} is ${a(target.type)}, which holds no currency`}.`,
+        at,
+      );
+  }
+  return null;
+}
 
 /**
  * The rules on each field that the write path keeps, checked once every field is known, because a
@@ -5205,6 +5254,8 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
 
   const ruled = fieldRules(id, fields as unknown as Record<string, unknown>[], title);
   if (ruled) return ruled;
+  const coded = currencyKeysFault(id, fields as unknown as Record<string, unknown>[], installed);
+  if (coded) return coded;
 
   /* A SPOKEN PREFIX NAMES ONE REGISTER, or `LN7` names two rows (`02 §2`). `#` is the default every
      register shares, which is why it never resolves bare and is not checked here. */

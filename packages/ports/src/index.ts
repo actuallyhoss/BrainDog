@@ -172,8 +172,8 @@ export type Conflict = {
  * refuses and never about the boundary a request arrives through, so both hosts and the client each
  * minted their own word for a route that does not exist.
  *
- * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and twenty-eight, counted, in nine
- * families — 54 pack and declaration · 14 grammar · 20 write path · 8 auth and vault · 8 format and
+ * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and twenty-nine, counted, in nine
+ * families — 54 pack and declaration · 14 grammar · 21 write path · 8 auth and vault · 8 format and
  * lifecycle · 2 dialect · 6 slash · 12 connector · 4 host and client."* A sentence that counts is a
  * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
  * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
@@ -232,7 +232,7 @@ const GRAMMAR = [
   'REF_UNKNOWN',
 ] as const;
 
-/** Write path — 20. */
+/** Write path — 21. */
 const WRITE = [
   'REGISTER_UNKNOWN', 'ROW_UNKNOWN', 'FIELD_UNKNOWN', 'ROW_LOCKED', 'HUMAN_ONLY', 'TEXT_JSON_QUOTED',
   'TEXT_ESCAPED_NEWLINE', 'INT_OUT_OF_RANGE', 'VALUE_MALFORMED', 'REQUIRED_MISSING', 'ENUM_VALUE_UNKNOWN',
@@ -244,6 +244,10 @@ const WRITE = [
   'CURRENCY_UNKNOWN',
   'OUT_OF_BOUNDS', 'IMMUTABLE_FIELD', 'UNIQUE_VIOLATION', 'ALREADY_KNOWN', 'REF_REGISTER_MISMATCH',
   'DELETE_WHILE_REFERENCED', 'VERSION_STALE', 'LEVEL_REQUIRED',
+  /* A ROW'S CURRENCY DOES NOT CHANGE, 2026-10-09 (REC-B04): a money field declaring `currency_fixed` keeps the code it
+     was filed in, and its number stays free. Not `IMMUTABLE_FIELD`, which says the whole field is set once and would
+     send a caller correcting an amount away from a write that is allowed; the repair here is delete and add again. */
+  'CURRENCY_FIXED',
 ] as const;
 
 /** Auth and vault — 8. */
@@ -305,7 +309,7 @@ const CONNECTOR = [
 const HOST = [
   'ROUTE_UNKNOWN', 'BODY_MALFORMED', 'RECORD_UNAVAILABLE', 'UNREACHABLE',
 ] as const;
-/** The hundred and twenty-eight, in `30 §6`'s order. */
+/** The hundred and twenty-nine, in `30 §6`'s order. */
 export const REFUSAL_CODES = [
   ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SLASH, ...CONNECTOR, ...HOST,
 ] as const;
@@ -318,7 +322,7 @@ export const isRefusalCode = (code: string): code is RefusalCode =>
 
 export type Refusal = {
   /**
-   * One of the hundred and twenty-eight. `30-BLUEPRINT` §6, and the list is above.
+   * One of the hundred and twenty-nine. `30-BLUEPRINT` §6, and the list is above.
    *
    * STILL `string`, AND THE GATE IS WHY — but the reason is now four codes rather than twenty-four.
    * `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and the rest were the concepts `30 §6` was
