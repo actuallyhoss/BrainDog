@@ -238,6 +238,12 @@ export type AimRole =
  * #4A505B fell just under its 6.5 floor), ink-3 #5C626D at 4.91:1, red words #BD181E at 5.08:1, and green #067342
  * at 4.79:1, where the floor alone would have set green at exactly 4.5.
  *
+ * 2026-10-08, LIGHT RED IS THE DEEPER RED, AS A MARK AND AS WORDS (DIRECTION §42). BrainDog red, #CF413A, is the working
+ * accent now, so late and "needs you" step a shade deeper to #B3322C, the pressed red, and are one value in both jobs
+ * the way dark's red already was. It is not apart from the working red by colour alone and is never asked to be: a late
+ * thing carries its word or its mark, and a late bar its hatch (`separation.test.ts`). The mark keeps the logo's red;
+ * a badge stopped being the logo on the day the buttons went red.
+ *
  * 2026-10-07, THE BOARD AND THE TILE, AT DIRECTION §39'S OWN VALUES: light board #F3F4F6 under a white tile, dark board
  * #0D1014 under #161A20. Each carries its own hue, read off the hex, so the value that ships is the value named. They
  * have no floor to be moved by: both sit inside the band the five rungs already span, so every ink solved on the
@@ -252,8 +258,8 @@ const SYSTEM_AIM: Record<Scheme, Partial<Record<AimRole, Aim>>> = {
     dim: { L: 0.495, C: 0.019 }, //      #5C626D
     faint: { L: 0.495, C: 0.019 },
     line: { L: 0.9259, C: 0.0085 }, //  #E3E7EC
-    danger: { L: 0.575, C: 0.215, H: 27 }, //       #DB2527, the mark
-    'danger-text': { L: 0.512, C: 0.1963, H: 26.7 }, // #BD181E
+    danger: { L: 0.5137, C: 0.1667, H: 27.4 }, //    #B3322C, the deeper red (DIRECTION §42)
+    'danger-text': { L: 0.5137, C: 0.1667, H: 27.4 }, // #B3322C
     earn: { L: 0.49, C: 0.1182, H: 155.4 }, //     #067342
     warn: { L: 0.5198, C: 0.133, H: 52.4 }, //     #A24E00
     live: { L: 0.5131, C: 0.204, H: 276.5 }, //    #4F4FD8
@@ -442,14 +448,19 @@ export type Seed = {
    *
    * Omitted, `action` is solved from `accent`, which is what a record's own colour asks for: the person picks a
    * green and the buttons, the links, the selection and the charts go green. The house is the one seed whose working
-   * colour is not its accent (the accent is the mark's red, the working colour a blue), so it names both here.
+   * colour is not solved from its accent (the accent is the mark's red, the working colour BrainDog red, #CF413A, a
+   * named pair with its pressed step since DIRECTION §42), so it names both here.
    *
    * KEYED BY `accent` BECAUSE A SEED IS SPREAD. `{ ...HOUSE_SEED, accent }` is how a look, an environment or a record
-   * starts from the house, and a pin that travelled with the spread would keep the house blue under every colour
+   * starts from the house, and a pin that travelled with the spread would keep the house red under every colour
    * anybody chose: the control would report success and paint the same buttons. A pin whose `accent` is not the seed's
    * is ignored, and the action is solved from the colour that is there.
+   *
+   * `pressed` PINS THE FILL UNDER THE POINTER, per scheme, and only beside the same accent. 2026-10-08 (DIRECTION §42):
+   * the house's light hover is its pressed red, #B3322C, a named colour rather than a step the generator would pick. A
+   * scheme it does not name keeps the solved step, which walks away from the label.
    */
-  action?: { accent: string; light: string; dark: string } | undefined;
+  action?: { accent: string; light: string; dark: string; pressed?: Partial<Record<Scheme, string>> } | undefined;
 };
 
 /** Hue anchors, 28 §3 step 5. `danger` sits at 27 — which is where the BrainDog red already is. */
@@ -933,27 +944,34 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
 
   /* 9 · THE WORKING ACCENT. Pinned beside the accent it was chosen with (`Seed.action`), or solved from the accent: in
      light the accent itself, which check R has already held to 3:1 on every ground, so the colour a person picked is
-     the colour their buttons are; in dark a lighter step of it, as light as the design's own blue (L 0.72) and no
-     more saturated, because a mid-tone fill on a near-black tile reads as a hole and its words as mud. */
-  const pin = seed.action && toHex(rgb(seed.action.accent)) === toHex(rgb(seed.accent)) ? seed.action[scheme] : null;
+     the colour their buttons are; in dark a lighter step of it, as light as the design's old blue was (L 0.72) and no
+     more saturated, because a mid-tone fill on a near-black tile reads as a hole and its words as mud.
+
+     2026-10-08 (DIRECTION §42), THE HOUSE PIN IS RED. BrainDog red, #CF413A, in light, with #B3322C under the pointer;
+     in dark the nearest red of that hue whose label and whose hover both clear their floors (`HOUSE_SEED`, ELEVEN). */
+  const pinned = seed.action && toHex(rgb(seed.action.accent)) === toHex(rgb(seed.accent)) ? seed.action : null;
+  const pin = pinned ? pinned[scheme] : null;
   const action = pin
     ? toHex(rgb(pin))
     : hex(scheme === 'light' ? gamutMap(acc) : gamutMap({ L: Math.max(acc.L, 0.72), C: Math.min(acc.C, 0.15), H: acc.H }));
   const actionLch = rgbToLch(rgb(action));
 
   /* The label on it: the tile or the ink, whichever stands further off it, and black or white only where neither
-     clears AA. White on the light blue, the dark tile on the dark one. */
+     clears AA. White on the light red, the dark tile on the dark one. */
   const onAction = (() => {
     const by = (c: string) => contrast(rgb(c), rgb(action));
     const best = [tile, ink].reduce((a, b) => (by(b) > by(a) ? b : a));
     return by(best) >= 4.5 ? best : by('#FFFFFF') >= by('#000000') ? '#FFFFFF' : '#000000';
   })();
-  /* Hover steps away from the label, as `accent-hover` does, and only as far as the label still reads. */
+  /* Hover steps away from the label, as `accent-hover` does, and only as far as the label still reads. A pinned
+     pressed colour is taken as named: check S holds its label to AA like any other. */
   const labelIsLight = rgbToLch(rgb(onAction)).L > 0.5;
-  const actionHover =
-    [0.05, 0.07, 0.09]
-      .map((d) => hex(gamutMap({ ...actionLch, L: Math.min(0.98, Math.max(0.02, actionLch.L + (labelIsLight ? -d : d))) })))
-      .find((c) => contrast(rgb(c), rgb(onAction)) >= 4.5) ?? action;
+  const pressed = pinned?.pressed?.[scheme];
+  const actionHover = pressed
+    ? toHex(rgb(pressed))
+    : ([0.05, 0.07, 0.09]
+        .map((d) => hex(gamutMap({ ...actionLch, L: Math.min(0.98, Math.max(0.02, actionLch.L + (labelIsLight ? -d : d))) })))
+        .find((c) => contrast(rgb(c), rgb(onAction)) >= 4.5) ?? action);
 
   /* THE TWO TINTS, the accent laid over the tile as `color-mix(in srgb, …)` would, and as strong as the words on them
      allow. A chosen row is `tint-1`, so its meta line (`dim`) sits on it, and the text inside a selection or a chosen
@@ -979,8 +997,9 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
   const tint2 = tint(scheme === 'light' ? 0.2 : 0.22, [ink, ink2]);
 
   /* THE ACCENT AS WORDS: the fill itself where it clears the intent floor on every ground and on both tints, and
-     otherwise the least move along lightness, away from the ground, in its own hue, that does. In light the blue fill
-     is 4.0:1 on its own second tint, so its words are a step deeper; in dark they are the fill. */
+     otherwise the least move along lightness, away from the ground, in its own hue, that does. The red fill is under
+     4.5:1 on the light board and on the dark field, so in both schemes its words are a step off the fill: deeper in
+     light, lighter in dark (ELEVEN in `index.ts` has the figures). */
   const textGrounds = [...SURFACES.map((s) => g[s]), ...boardGrounds, tint1, tint2].map(rgb);
   const worstText = textGrounds.reduce((a, b) => ((relLuminance(b) < relLuminance(a)) === (scheme === 'light') ? b : a));
   const actionText =

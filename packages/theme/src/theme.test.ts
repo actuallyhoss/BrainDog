@@ -343,7 +343,7 @@ test('and the checks would SAY so — a floor nothing measures is not a floor', 
 
 /* ── the shape of the result, and not only its refusals ─────────────────── */
 
-test('EVERY CHECK REPORTS, PASS OR FAIL: 204 rows per scheme, counted here and nowhere quoted', () => {
+test('EVERY CHECK REPORTS, PASS OR FAIL: 206 rows per scheme, counted here and nowhere quoted', () => {
   /**
    * 39 §6.1 SPECIFIED 90 RESULTS PER SCHEME AND THE CODE RETURNED 6 IN DARK AND 4 IN LIGHT.
    *
@@ -366,6 +366,10 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 204 rows per scheme, counted here and n
    * 119 UNTIL 2026-10-07, when the board arrived (DIRECTION §39): every pair measured on the five rungs is measured on
    * the board, the tile and the field too (`GROUNDS`), eight grounds where there were five, and check S holds the
    * working accent's twenty-five pairs.
+   *
+   * 204 UNTIL 2026-10-08, when the working accent went red (DIRECTION §42): its words are a link too, so check K measures
+   * `action-text` against body ink and red words as it does `accent-text`. Two rows; the second is the one pair K
+   * reports and does not refuse (`K_EXEMPT`).
    */
   const PER_CHECK: Record<string, number> = {
     A: 24, // three inks that are not `faint`, each on eight grounds
@@ -377,7 +381,7 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 204 rows per scheme, counted here and n
     G: 40, // the four intents as words (red's are `danger-text`) and `live`, each on eight grounds
     H: 4, //  four rungs of the five-surface ladder
     J: 1, //  one row for the palette: the most chroma any role gave up to the gamut
-    K: 2, //  a link against body ink, and against red words, `danger-text`
+    K: 4, //  each link (`accent-text`, `action-text`) against body ink, and against red words, `danger-text`
     M: 1, //  `line` against `edge`
     N: 4, //  the APCA advisory, one row per ink
     O: 1, //  one row for the palette: every value is shaped like a colour
@@ -388,7 +392,7 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 204 rows per scheme, counted here and n
     //        and two tints, three inks and five state words on the first tint, and two inks on the second
   };
   const PER_SCHEME = Object.values(PER_CHECK).reduce((a, b) => a + b, 0);
-  assert.equal(PER_SCHEME, 204, 'the per-letter table no longer sums to the number the checks report');
+  assert.equal(PER_SCHEME, 206, 'the per-letter table no longer sums to the number the checks report');
 
   for (const built of [HOUSE, HIGH_CONTRAST])
     for (const scheme of ['dark', 'light'] as const) {
@@ -762,7 +766,10 @@ test('THE DESIGN SYSTEM LANDS EXACTLY WHEREVER THE FLOORS ALLOW IT', () => {
      under the design system's ceiling (`HOUSE_PROFILE.ladder`), and are pinned here as that.
 
      2026-10-06: light's ladder widened too, under the white tile, and its ground came down for room. Ink-2, ink-3, red
-     words and green each aim a step darker to keep the room they had on the old ground (`SYSTEM_AIM`). */
+     words and green each aim a step darker to keep the room they had on the old ground (`SYSTEM_AIM`).
+
+     2026-10-08 (DIRECTION §42): light red, as a mark and as words, is the deeper red #B3322C, a step under the working
+     accent #CF413A, and it lands exactly. */
   const exact: Record<'light' | 'dark', Partial<Record<keyof Palette, string>>> = {
     light: {
       sunk: '#E4E6EB',
@@ -775,8 +782,8 @@ test('THE DESIGN SYSTEM LANDS EXACTLY WHEREVER THE FLOORS ALLOW IT', () => {
       dim: '#5C626D',
       line: '#E3E7EC',
       earn: '#067342',
-      'danger-text': '#BD181E',
-      danger: '#DB2527',
+      'danger-text': '#B3322C',
+      danger: '#B3322C',
       live: '#4F4FD8',
     },
     dark: {
@@ -800,13 +807,15 @@ test('THE DESIGN SYSTEM LANDS EXACTLY WHEREVER THE FLOORS ALLOW IT', () => {
 });
 
 test('AND WHERE IT CANNOT, THE ROLE SITS ON ITS FLOOR RATHER THAN UNDER IT', () => {
-  /* High contrast starts from the same colours under higher floors, so its light ink-3 and its red mark are each
-     darkened to their own floor on the ground, 9.5 and 4.5, and no further. */
+  /* High contrast starts from the same colours under higher floors, so its light ink-3 is darkened to its own floor on
+     the ground, 9.5, and no further.
+
+     2026-10-08: ITS RED MARK USED TO BE THE SECOND, darkened from the logo's #DB2527 to 4.5:1. The mark is the deeper red
+     now (DIRECTION §42), which clears high contrast's 4.5 on its ground as it is, so it lands on its aim instead. */
   const sunk = fromHex(HIGH_CONTRAST.schemes.light.sunk);
-  for (const [role, floor] of [
-    ['dim', HIGH_CONTRAST_PROFILE.ink[2]],
-    ['danger', HIGH_CONTRAST_PROFILE.intentFill],
-  ] as const) {
+  assert.equal(HIGH_CONTRAST.schemes.light.danger, '#B3322C', 'high-contrast light red moved off an aim that clears its floor');
+  assert.ok(contrast(fromHex(HIGH_CONTRAST.schemes.light.danger), sunk) >= HIGH_CONTRAST_PROFILE.intentFill);
+  for (const [role, floor] of [['dim', HIGH_CONTRAST_PROFILE.ink[2]]] as const) {
     const c = contrast(fromHex(HIGH_CONTRAST.schemes.light[role]), sunk);
     assert.ok(c >= floor && c < floor + 0.1, `high-contrast light ${role} is ${c.toFixed(2)}:1 on the ground, not on its floor of ${floor}`);
   }
@@ -824,10 +833,25 @@ test('RED HAS TWO JOBS, AND EACH IS ONE VALUE', () => {
      count on Decide, a badge) it owes 3:1 and is `danger`. Checks G and D hold the floors. What is held here is the
      identity: in light the words sit 5:1 on the ground, a step deeper than the mark, and the mark IS the logo, which
      `theme.mjs` paints from the light accent, where a badge and the logo used to be two reds a hair apart. In dark
-     the words already clear AA in the mark's own red, so the two jobs share it. */
+     the words already clear AA in the mark's own red, so the two jobs share it.
+
+     2026-10-08 (DIRECTION §42), THE BADGE LEAVES THE LOGO. BrainDog red is the working accent now, so late and "needs
+     you" take the deeper red, #B3322C, as a mark and as words, one value in light as in dark. The logo keeps the mark's
+     red, and a badge is no longer it: beside red buttons, a badge in the logo's red would be a third red a hair off the
+     other two.
+
+     AND ITS 5:1 IS MEASURED ON THE BOARD AND THE TILE NOW, where words sit since DIRECTION §39: 5.60:1 and 6.16:1. On
+     the old ground, `sunk`, the deeper red is 4.93:1, which is short of the 5 this line used to ask there by less than
+     a code value would buy, and a second red two code values deeper for words alone would be the hair-apart pair this
+     test was written to end. The ground still owes AA, which check G holds, and a slip toward its edge fails here. */
   const light = HOUSE.schemes.light;
-  assert.ok(contrast(fromHex(light['danger-text']), fromHex(light.sunk)) >= 5, 'light red words are back at the edge of AA');
-  assert.equal(light.danger, light.accent, 'a badge is not the logo’s red');
+  for (const ground of ['board', 'tile'] as const)
+    assert.ok(contrast(fromHex(light['danger-text']), fromHex(light[ground])) >= 5, `light red words are back at the edge of AA on the ${ground}`);
+  assert.ok(contrast(fromHex(light['danger-text']), fromHex(light.sunk)) >= 4.9, 'light red words are back at the edge of AA on the ground');
+  assert.equal(light.danger, '#B3322C', 'a late mark is not the deeper red');
+  assert.equal(light.danger, light['danger-text'], 'light red has two values for one red');
+  assert.notEqual(light.danger, light.accent, 'a badge is the logo’s red again, beside red buttons');
+  assert.equal(light.accent, '#DB2527', 'the mark left its red');
   assert.equal(HOUSE.schemes.dark.danger, HOUSE.schemes.dark['danger-text'], 'dark red has two values for one red');
 });
 
@@ -870,14 +894,31 @@ test('TEXT ON THE WASHES CLEARS THE SAME FLOORS AS TEXT ON A SURFACE', () => {
 });
 
 test('THE BOARD (DIRECTION §39): exact colours, no glass, no light, a flat tile', () => {
+  /* 2026-10-08 (DIRECTION §42): the working accent is BrainDog red, #CF413A in light with #B3322C under the pointer, and
+     in dark #E05148, the nearest red of that hue whose label and hover both clear (ELEVEN in `index.ts`). */
   assert.deepEqual(
-    (['board', 'tile', 'action'] as const).map((r) => HOUSE.schemes.light[r]),
-    ['#F3F4F6', '#FFFFFF', '#2563EB'],
+    (['board', 'tile', 'action', 'action-hover'] as const).map((r) => HOUSE.schemes.light[r]),
+    ['#F3F4F6', '#FFFFFF', '#CF413A', '#B3322C'],
   );
   assert.deepEqual(
     (['board', 'tile', 'action'] as const).map((r) => HOUSE.schemes.dark[r]),
-    ['#0D1014', '#161A20', '#6EA8FE'],
+    ['#0D1014', '#161A20', '#E05148'],
   );
+  /* The same pair in high contrast: the pin is the seed's, and its floors are proven there by check S. */
+  assert.equal(HIGH_CONTRAST.schemes.light.action, '#CF413A');
+  assert.equal(HIGH_CONTRAST.schemes.dark.action, '#E05148');
+  /* AND THE BUTTON UNDER THE POINTER IS STILL A BUTTON. Check S holds the label on the hover; this holds the hover fill
+     itself to 3:1 on the three grounds a button stands on, which is what chose dark's red (ELEVEN in `index.ts`): a
+     white-labelled #CF413A could only press darker, and that step, #BD2F2B, is 2.55:1 on the dark field. */
+  for (const built of [HOUSE, HIGH_CONTRAST])
+    for (const scheme of ['light', 'dark'] as const) {
+      const p = built.schemes[scheme];
+      for (const ground of ['board', 'tile', 'field'] as const)
+        for (const fill of ['action', 'action-hover'] as const) {
+          const got = contrast(fromHex(p[fill]), fromHex(p[ground]));
+          assert.ok(got >= 3, `${built.id} ${scheme}: ${fill} is ${got.toFixed(2)}:1 on the ${ground}`);
+        }
+    }
   /* The brand stays red: the working accent is beside the mark, never instead of it. */
   assert.equal(HOUSE.schemes.light.accent, '#DB2527');
   assert.equal(HOUSE.chrome.light['hover-wash'], 'rgb(16 19 24 / 0.05)');
@@ -902,15 +943,16 @@ test('A RECORD’S COLOUR DRIVES THE WORKING ACCENT, and the house pin holds onl
     const p = got.value.built.schemes;
     /* In light the buttons are the colour the person picked, exactly. */
     assert.equal(p.light.action, hex.toUpperCase(), `${name}'s buttons are not ${name}`);
-    /* In dark a lighter step of the same hue, never the house blue. */
+    /* In dark a lighter step of the same hue, never the house red. */
     const dh = rgbToLch(fromHex(p.dark.action)).H;
     const ph = rgbToLch(fromHex(hex)).H;
     assert.ok(Math.min(Math.abs(dh - ph), 360 - Math.abs(dh - ph)) < 8, `${name}'s dark buttons left its hue`);
     assert.notEqual(p.dark.action, HOUSE.schemes.dark.action);
   }
-  /* A seed spread from the house with another accent does not keep the house blue. */
+  /* A seed spread from the house with another accent does not keep the house red, nor its pressed step. */
   const spread = build({ ...HOUSE_SEED, accent: '#2B7F8A' }, HOUSE_PROFILE, 'spread');
   assert.equal(spread.schemes.light.action, '#2B7F8A');
+  assert.notEqual(spread.schemes.light['action-hover'], '#B3322C');
 });
 
 test('THE DARK LADDER: TILES, WELLS AND CHROME STAND APART FROM THE GROUND', () => {

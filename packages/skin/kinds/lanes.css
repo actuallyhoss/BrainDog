@@ -167,7 +167,7 @@
   }
 
   .lanes-item[data-intent='bad'] .lanes-bar {
-    background: var(--danger);
+    background: var(--chart-late-hatch);
   }
 
   /* A LANE CUT AT AN EDGE OF THE WINDOW IS SQUARE THERE, so a bar that began before the hours shown does not look as

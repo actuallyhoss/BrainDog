@@ -103,8 +103,8 @@
     --tone-fill: var(--status-late);
   }
   [data-intent='info'] {
-    --tone: var(--action-text);
-    --tone-fill: var(--status-working);
+    --tone: var(--info);
+    --tone-fill: var(--info-fill);
   }
 
   /* AN INTENT ON A ROW OR A FIGURE IS A DOT, NOT A SYMBOL. The renderer still emits

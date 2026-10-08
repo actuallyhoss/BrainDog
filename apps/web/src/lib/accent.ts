@@ -27,8 +27,13 @@
  * 2026-10-07, THE COLOUR IS THE WORKING ACCENT, NOT ONLY THE BRAND'S. The product paints its buttons, links, selection
  * and charts in `--action` (DIRECTION §39) and kept `--accent` for the mark's red, so a picker that re-solved only
  * `--accent` changed two swatches and nothing a person uses. `recordTheme` solves `--action` and its tints, label and
- * words from the chosen colour (`Seed.action` in `@braindog/theme`: the house's blue is pinned only beside the house
- * red), so picking Moss turns the buttons Moss, in light exactly the swatch and in dark a lighter step of it.
+ * words from the chosen colour (`Seed.action` in `@braindog/theme`: the house's working red is pinned only beside the
+ * house mark), so picking Moss turns the buttons Moss, in light exactly the swatch and in dark a lighter step of it.
+ *
+ * 2026-10-08, HOUSE IS RED NOW (DIRECTION §42). The house's working accent is BrainDog red, #CF413A in light with #B3322C
+ * under the pointer and #E05148 in dark, where it was a blue. So `apply(null)` puts the red buttons back, and a person
+ * who picks a swatch moves them off red; late stays the house's deeper red whatever they pick, because `danger` is
+ * solved at its own anchor and not from this colour.
  */
 
 import { ACCENTS, recordTheme } from '@braindog/theme';

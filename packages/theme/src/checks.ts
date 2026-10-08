@@ -122,6 +122,13 @@ function pairsAgainstSurfaces(
   return out;
 }
 
+/**
+ * The one pair check K measures and does not refuse: the working accent's words beside red words (DIRECTION §42).
+ * BrainDog red is the working accent and late is a deeper red of the same hue, held apart by a word, a mark or a hatch
+ * rather than by colour; the reason is at K below, and `separation.test.ts` holds what carries the difference.
+ */
+export const K_EXEMPT = ['action-text', 'danger-text'] as const satisfies readonly [Role, Role];
+
 export function checkScheme(built: Built, scheme: Scheme): Finding[] {
   const p = built.schemes[scheme];
   const out: Finding[] = [];
@@ -470,28 +477,39 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
 
   /* K · hue-only encoding. A link must differ in LIGHTNESS from the two things it is most likely to
      be confused with: body ink, and red words (`danger-text`) — which in a theme whose accent is a
-     red mark are the same hue as the link by construction. */
-  for (const [what, against] of [
-    ['body text', p.ink],
-    ['an overdue figure', p['danger-text']],
-  ] as const) {
-    const dL = Math.abs(rgbToCielab(rgb(p['accent-text'])).L - rgbToCielab(rgb(against)).L);
-    if (dL < 8)
-      out.push({
-        check: 'K',
-        scheme,
-        level: 'refuse',
-        code: 'CONTRAST_FLOOR',
-        measured: r2(dL),
-        /* THE LINK, because the link is what moves. `ink` and `danger-text` are what a link is measured
-           against and neither is free to shift to make room for it (39 §6.3). */
-        at: at('accent-text'),
-        fix: `theme: a link and ${what} are ${r2(dL)} L* apart in ${scheme}. Colour alone cannot carry the difference; they need 8.`,
-      });
-    /* ONE ROW PER THING A LINK CAN BE CONFUSED WITH, passing or not, so the output says which two
-       comparisons K made. It is a closed list of two and a reader should be able to see both. */
-    else out.push({ check: 'K', scheme, level: 'pass', measured: r2(dL) });
-  }
+     red mark are the same hue as the link by construction.
+
+     2026-10-08, TWO LINKS, AND ONE PAIR LET THROUGH (DIRECTION §42). A link is `action-text` now, the working accent's
+     words, as well as `accent-text`, the mark's, and both are held apart from body text. The one pair not held is the
+     working accent's words against red words (`K_EXEMPT`): BrainDog red is the working accent, late and "needs you" are
+     a deeper red of the same hue, and the owner's word is that the two stand apart "with a mark or a word, never the
+     colour alone". In light no link can be 8 L* off the late red and still clear AA on the board, so the rule could
+     only be met by a link the product does not want. The pair is measured and reported as a pass, so the distance stays
+     on the record; what carries the difference is the late thing's word, its dot and its hatch
+     (`separation.test.ts`). Every other pair still refuses. */
+  for (const link of ['accent-text', 'action-text'] as const)
+    for (const [what, role] of [
+      ['body text', 'ink'],
+      ['an overdue figure', 'danger-text'],
+    ] as const) {
+      const dL = Math.abs(rgbToCielab(rgb(p[link])).L - rgbToCielab(rgb(p[role])).L);
+      const exempt = link === K_EXEMPT[0] && role === K_EXEMPT[1];
+      if (dL < 8 && !exempt)
+        out.push({
+          check: 'K',
+          scheme,
+          level: 'refuse',
+          code: 'CONTRAST_FLOOR',
+          measured: r2(dL),
+          /* THE LINK, because the link is what moves. `ink` and `danger-text` are what a link is measured
+             against and neither is free to shift to make room for it (39 §6.3). */
+          at: at(link),
+          fix: `theme: a link and ${what} are ${r2(dL)} L* apart in ${scheme}. Colour alone cannot carry the difference; they need 8.`,
+        });
+      /* ONE ROW PER THING A LINK CAN BE CONFUSED WITH, passing or not, so the output says which comparisons K made.
+         It is a closed list of four and a reader should be able to see all of them. */
+      else out.push({ check: 'K', scheme, level: 'pass', measured: r2(dL) });
+    }
 
   /* M · line and edge not confusable — a judgement call, so it warns */
   const dLine = Math.abs(rgbToLch(rgb(p.line)).L - rgbToLch(rgb(p.edge)).L);

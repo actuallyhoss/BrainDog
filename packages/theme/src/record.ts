@@ -41,7 +41,7 @@ export type RecordTheme = {
  * as warmth, which is what the house seed's own note records paying to learn. So a record's
  * surfaces stay the house's slate that everything else is built against, and what changes
  * is the accent, the marks, and the working accent (buttons, links, selection and charts: `action`, solved from
- * this colour since the house pins its blue only beside its own red) — which is where colour means anything.
+ * this colour since the house pins its working red only beside its own mark) — which is where colour means anything.
  */
 /**
  * WHY IT WAS REFUSED, AND NOT ONLY THE AUTHOR'S SENTENCE FOR IT.

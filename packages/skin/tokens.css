@@ -102,17 +102,19 @@
      THE COLOURS ARE THE THEME'S ROLES, AND NEVER A LITERAL. `packages/theme` generates every colour the product has and
      `colour-grep` holds everything else to naming them. `--board`, `--tile`, `--field`, `--action`, `--action-hover`,
      the two `--action-tint`s, `--action-text` and `--on-action` are generated roles (`house.css`), at the design's own
-     values (light board #F3F4F6 and tile #FFFFFF, dark #0D1014 and #161A20; the accent #2563EB in light and #6EA8FE in
-     dark) and proven by the theme's check S: a label on the fill, the fill on the board, the accent's words on every
-     ground and both tints, and every word a chosen row carries on its tint, at AA. So they are not written here, where
+     values (light board #F3F4F6 and tile #FFFFFF, dark #0D1014 and #161A20; the accent BrainDog red, #CF413A in light
+     with #B3322C under the pointer, and #E05148 in dark, DIRECTION §42) and proven by the theme's check S: a label on
+     the fill, the fill on the board, the accent's words on every ground and both tints, and every word a chosen row carries on its tint, at AA. So they are not written here, where
      the theme layer would only paint over them. A record's own colour (`apps/web/src/lib/accent.ts`) re-solves all of
      them, so the colour a person picks is the colour of their buttons, links, selection and charts.
 
      What is left here is mixed from those roles, the same in both schemes: a field under the pointer, the status dots
      and the chart steps.
 
-     RED STAYS THE BRAND AND THE "LATE" COLOUR (`--accent`, `--danger`), AND NOTHING ELSE. Blue is the working colour, so
-     a red on screen again means one thing. */
+     RED IS THE WORKING COLOUR, AND LATE IS A DEEPER RED THAT ALWAYS SAYS SO (DIRECTION §42, which replaced §39's blue).
+     `--action` is BrainDog red; `--danger` (late, "needs you") is the deeper #B3322C in light, and is never told from the
+     working red by colour alone: a late thing carries its word or its dot, and a late bar its hatch
+     (`--chart-late-hatch`). `--accent` stays the mark's red, for the logo. */
   :root {
     --field-hover: color-mix(in srgb, var(--ink) 6%, var(--field));
 
@@ -134,8 +136,9 @@
     --lh-head: 1.4;
     --lh-figure: 1.15;
 
-    /* A STATUS IS A SMALL DOT AND ITS WORD, never the fill of a whole row. Working is the accent, late is the red,
-       done and idle are greys, so the eye finds the two that ask for something. */
+    /* A STATUS IS A SMALL DOT AND ITS WORD, never the fill of a whole row. Working is the accent, late is the deeper red,
+       done and idle are greys, so the eye finds the two that ask for something. Working and late are both red now, so the
+       word beside the dot is what tells them apart, and is never left out. */
     --status-working: var(--action);
     --status-late: var(--danger);
     --status-ok: var(--earn-fill);
@@ -143,12 +146,21 @@
     --status-done: color-mix(in srgb, var(--ink) 35%, var(--tile));
     --status-idle: color-mix(in srgb, var(--ink) 20%, var(--tile));
 
-    /* A CHART IS THE ACCENT AND ITS TINTS, the red only for late or over, grey only for "other". */
+    /* A CHART IS THE ACCENT AND ITS TINTS, the deeper red, striped, only for late or over, grey only for "other". */
     --chart-1: var(--action);
     --chart-2: color-mix(in srgb, var(--action) 55%, var(--tile));
     --chart-3: color-mix(in srgb, var(--action) 28%, var(--tile));
     --chart-other: color-mix(in srgb, var(--ink) 18%, var(--tile));
     --chart-late: var(--danger);
+    /* A LATE SERIES IS STRIPED AS WELL AS RED (DIRECTION §42). The working accent is BrainDog red and late is a deeper red
+       of the same hue, so a late bar beside a working one differs by its stripes and never by its colour alone: the
+       late red, and the late red at 30% on the tile between. Opaque, so the bar still reads as one shape on its track.
+       Every late mark in `blocks-charts.css` paints this (`separation.test.ts` in `packages/theme` holds it). */
+    --chart-late-hatch: repeating-linear-gradient(
+      135deg,
+      var(--chart-late) 0 3px,
+      color-mix(in srgb, var(--chart-late) 30%, var(--tile)) 3px 6px
+    );
     /* AT RISK IS AMBER: not late yet, and not going to plan. The status dot's own colour, so a plan bar and its dot agree. */
     --chart-risk: var(--status-waiting);
     --chart-track: var(--field);
@@ -456,8 +468,9 @@
      * They sit on `:root` for the reason `--hover-wash` does: every one resolves its `var()`s against
      * the palette on `html`, which is the element `:root` is.
      */
-    /* ON AND A LINK ARE THE WORKING ACCENT NOW (DIRECTION §39): the blue says "chosen" and "go", and the red is free
-       to say "late" again. `--on-ink` stays the ground, for a mark on an ink fill. */
+    /* ON AND A LINK ARE THE WORKING ACCENT NOW (DIRECTION §39, red since §42): BrainDog red says "chosen" and "go", and
+       "late" is the deeper red with its word or its mark beside it. `--on-ink` stays the ground, for a mark on an ink
+       fill. */
     --on: var(--action);
     --on-ink: var(--bg);
     --link: var(--action-text);

@@ -14,7 +14,9 @@
  *
  * THE MARKS ARE THE WORKING ACCENT AND ITS TINTS (DIRECTION §39). The first series, the one that matters, is the accent;
  * the next two are its tints, lighter in turn; grey is only for "other" and for what is done. A colour is a meaning and
- * only one: the red is for what is late or over and nothing else, `--warn` for a crossing below a line the owner set
+ * only one: the deeper red is for what is late or over and nothing else, and it is always striped (`--chart-late-hatch`,
+ * DIRECTION §42: the working accent is BrainDog red too, so a late mark differs by its stripes and never by colour
+ * alone), `--warn` for a crossing below a line the owner set
  * (with its glyph, so never by colour alone), and an intent through the map. The palette is the theme's `--chart-*`
  * (`tokens.css`): `--chart-1` to `--chart-3`, `--chart-other`, `--chart-late` and `--chart-track`, so a kind names a
  * role and never a hue.
@@ -160,6 +162,13 @@
   .split-dot,
   .ring-dot {
     background: var(--part);
+  }
+
+  /* A LATE PART'S KEY IS STRIPED like every late mark (DIRECTION §42). Its arc or segment is an SVG shape, which a CSS
+     stripe cannot reach; the renderer's own pattern is what that needs. */
+  .split-item[data-intent='bad'] > .split-dot,
+  .ring-item[data-intent='bad'] > .ring-dot {
+    background: var(--chart-late-hatch);
   }
 
   /* A row with no part keeps its place in the legend, and its dot is an empty ring. */
@@ -860,6 +869,11 @@
     inline-size: calc(var(--fill) * 100%);
     border-radius: inherit;
     background: var(--tone-fill, var(--chart-1));
+  }
+
+  /* A LATE ROW'S BAR IS STRIPED, so it is not the working red's bar with a darker shade (DIRECTION §42). */
+  .progress-row[data-intent='bad'] .progress-fill {
+    background: var(--chart-late-hatch);
   }
 
   .progress-over {
@@ -2218,8 +2232,9 @@
     background: var(--chart-1);
   }
 
+  /* LATE IS STRIPED, beside working bars of the same red family (DIRECTION §42). */
   .roadmap-item[data-intent='bad'] .roadmap-bar {
-    background: var(--chart-late);
+    background: var(--chart-late-hatch);
   }
 
   /* AT RISK IS AMBER, between working and late, so a plan says which bars to watch before any of them is red. */
@@ -2301,7 +2316,7 @@
     inset-block-start: 50%;
     inset-inline-start: var(--sp-2);
     translate: 0 -50%;
-    background: var(--chart-late);
+    background: var(--chart-late-hatch);
   }
 
   /* THE KEY UNDER THE ROWS: a dot in each colour a bar is drawn in and its word, on one quiet line the width of the
@@ -2337,7 +2352,7 @@
   }
 
   .roadmap-key[data-key='bad']::before {
-    background: var(--chart-late);
+    background: var(--chart-late-hatch);
   }
 
   .roadmap-key[data-key='warn']::before {

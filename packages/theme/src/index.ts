@@ -12,7 +12,7 @@ export * from './checks.ts';
 export * from './css.ts';
 export * from './record.ts';
 
-import { build, HIGH_CONTRAST_PROFILE, HOUSE_NEUTRAL_HUE, HOUSE_PROFILE, type Seed } from './build.ts';
+import { BRAND_RED, build, HIGH_CONTRAST_PROFILE, HOUSE_NEUTRAL_HUE, HOUSE_PROFILE, type Seed } from './build.ts';
 
 /**
  * The house seed. Three decisions, and the first two are reversals.
@@ -108,9 +108,37 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_NEUTRAL_HUE, HOUSE_PROFILE, type Se
  *
  * TEN · 2026-10-07, ONE WORKING ACCENT BESIDE THE MARK (DIRECTION §39: "keep BrainDog red as the brand and the late
  * colour; add one working accent for selection, primary buttons, links and charts"). The accent stays the mark's red,
- * and the house pins its working colour beside it: #2563EB in light and #6EA8FE in dark, the design's own blues. The pin
- * holds only beside this accent (`Seed.action`), so a record, a look or an environment that brings its own colour has
- * its working accent solved from that colour instead.
+ * and the house pins its working colour beside it. It was the design's own blue, in light and in dark, until ELEVEN.
+ * The pin holds only beside this accent (`Seed.action`), so a record, a look or an environment that brings its own
+ * colour has its working accent solved from that colour instead.
+ *
+ * ELEVEN · 2026-10-08, THE WORKING ACCENT IS RED (DIRECTION §42: "stick with red as the working accent color"). §39's
+ * "one blue working accent" is "one red working accent" now. BrainDog red (`BRAND_RED`, #CF413A) is the fill in light,
+ * and the pressed red, #B3322C, is its hover. The mark keeps its own red (#DB2527) for the logo and nothing else.
+ *
+ * DARK IS #E05148, THE NEAREST RED OF THAT HUE THAT PASSES, found by walking #CF413A up its lightness at its own hue and
+ * chroma. #CF413A itself clears 3:1 on every dark ground with a white label at 4.70:1, but a white-labelled fill can only
+ * press darker, and darker sinks into the dark board: the generator's first step, #BD2F2B, is 2.55:1 on the field, and
+ * the light scheme's pressed red, #B3322C, 2.83:1 on the tile. From L 0.627 the dark tile clears 4.5:1 as its label,
+ * so the hover steps lighter, away from the label, and every state clears every floor. The steps between are reds
+ * neither white nor the tile can label at AA.
+ *
+ * LATE AND "NEEDS YOU" TAKE THE DEEPER RED, #B3322C in light as a mark and as words (`SYSTEM_AIM`); dark's late red stays
+ * #FF5A55, lighter and more saturated than the working one. The working and the late red are close by design and are
+ * never told apart by colour alone: a late thing carries its word or its dot, a late bar its hatch
+ * (`--chart-late-hatch`), and check K measures the working accent's words beside red words without refusing them
+ * (`K_EXEMPT`, `separation.test.ts`).
+ *
+ * MEASURED, normal and high contrast, light then dark. Label on the fill and on the hover: 4.70 and 6.16 in light in both
+ * profiles; 4.52 and 5.51 in dark in both. The fill on the board, the tile and the field: light 4.27, 4.70, 4.01 (high
+ * contrast 4.27, 4.70, 4.38); dark 4.94, 4.52, 3.84 (high contrast 4.94, 4.52, 4.23); the hover clears more on each. The
+ * accent as words (`action-text`) on the board and the tile: light #BB2C29 at 5.44 and 5.99 (high contrast #B22321 at
+ * 6.05 and 6.66); dark #F6665B at 6.33 and 5.80 (high contrast #FF6F63 at 7.00 and 6.41), and at 4.51 or more on its
+ * own stronger tint. Selection: the first tint stands 6.98 ΔE off the light tile and 10.72 off the dark one, with body
+ * text on it at 16.18 and 13.89 and quiet text at 5.34 and 4.99. Focus: the ring's inner tone is the ink, 15.71 or more
+ * on the board and the tile in every profile and scheme (the dark tile is the least), and 3.96 (light) and 3.47 (dark)
+ * against the red fill itself. Late as words: 5.60 on the light board, 6.16 on the light tile; 6.22 and 5.69 in dark.
+ * Dark's label at 4.52 is the tightest number here, and check S holds it.
  */
 const HOUSE_ACCENT = 'oklch(0.575 0.215 27)';
 
@@ -120,7 +148,7 @@ export const HOUSE_SEED: Seed = {
   space: 4,
   radius: { sm: 6, md: 12, lg: 22 },
   density: 'comfortable',
-  action: { accent: HOUSE_ACCENT, light: '#2563EB', dark: '#6EA8FE' },
+  action: { accent: HOUSE_ACCENT, light: BRAND_RED, dark: '#E05148', pressed: { light: '#B3322C' } },
 };
 
 export const HOUSE = build(HOUSE_SEED, HOUSE_PROFILE, 'house');

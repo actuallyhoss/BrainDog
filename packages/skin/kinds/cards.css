@@ -269,8 +269,10 @@
     stroke: var(--status-waiting);
   }
 
+  /* LATE IS TOLD APART FROM THE WORKING RED BY A MARK, NOT ONLY ITS SHADE (DIRECTION 42): the ring breaks. */
   .cards-item[data-intent='bad'] .cards-ring-fill {
     stroke: var(--status-late);
+    stroke-dasharray: 3 2;
   }
 
   .cards-facts {
