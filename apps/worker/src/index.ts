@@ -20,7 +20,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
+import { engineHealthRead, handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 /* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
 import { clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
@@ -31,7 +31,7 @@ import { GOOGLE_ROUTES, googleOn, serveGoogle } from './google.ts';
 import { CLOSE_RECORDS_MOST, closeDoor } from '@braindog/host/auth';
 import type { AccountClosed } from '@braindog/ports';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
-import { INVITE_GONE, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
+import { INVITE_GONE, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
@@ -55,6 +55,7 @@ import { serveAsks, type ModelJobInference, type SlashAnswer } from '@braindog/h
 import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/host/model-jobs';
 
 import { alarmScheduler } from './alarm.ts';
+import { fileModelSign } from '@braindog/host/sign-model';
 import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
 import { slashErasing, slashPlanMoved } from './slash.ts';
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
@@ -589,6 +590,13 @@ export class Record$ extends DurableObject<Env> {
   #jobsMeter: ModelJobMeter | undefined;
   /** This object's Slash storage, where who is who keeps the verdicts it was given and the notes it read (`understand.ts`). */
   #jobsStore: Sql | undefined;
+  /**
+   * Whether Slash's model answers, read from this object's Slash ledger (ENG-A02): the record's `engineHealth` and the
+   * door's `GET /api/slash/health` both answer it. Set in `#open` beside `#answers`, from the same `slashModel`.
+   */
+  #engineHealth: (() => Promise<EngineHealthRead>) | undefined;
+  /** The provider's words from the last model call that failed, for the `model-answers` sign to quote. */
+  #lastModelFail: { raw: string; at: number } | null = null;
 
   /** The scripts running from this object's alarm, and the rules each is held to (`script.ts`). */
   #scripts = new ScriptRuns();
@@ -722,6 +730,17 @@ export class Record$ extends DurableObject<Env> {
     this.#jobs = workerModelJobs(this.env, () => api, { sql, clock: { now: () => Date.now() }, onFail });
     this.#jobsMeter = backgroundMeter(sql);
     this.#jobsStore = sql;
+    /* THE ENGINE'S HEALTH, FROM ITS OWN LEDGER AND NOT FROM THE SETTINGS (ENG-A02): `/api/version`'s `slash` below says a
+       model is configured, and this says whether it answers. The same storage the asks, the answers and the jobs settle
+       in, so every model call is in what it reads; the package is loaded only where there is a model. */
+    const engineHealth = engineHealthRead({
+      sql,
+      clock: { now: () => Date.now() },
+      model: slashModel !== undefined,
+      load: () => import('@braindog/slash'),
+      grants: () => api.kernel.grants(),
+    });
+    this.#engineHealth = engineHealth;
     /* THE RECORD'S COPIES, IN THE BUCKET THE NIGHT WRITES TO (`copies.ts`). Taken, listed and gone back to from inside
        this object, because `onNextSessionRestoreBookmark` is this storage's and nothing outside the object can call it.
        No `BLOBS` and there is no port, so the record answers `NOT_IN_THIS_BUILD` as it always did. */
@@ -771,6 +790,8 @@ export class Record$ extends DurableObject<Env> {
            are, under the owner's `ask_cap` and the operator's ceiling alike (`slash-meter.ts`). Without it the record asks
            `slashModel` unmetered: 5 presses and the daily look were 6 binding calls under a ceiling of three, and no row. */
         slashMeter: workerSlashMeter(this.env, () => api, { sql, clock: { now: () => Date.now() } }),
+        /* AND WHETHER THAT MODEL ANSWERS, for a read token, the command line and the daily vital sign (`engineHealth`). */
+        engineHealth,
         /* WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, so the doorbell rings for work somebody can
            do. A kind with no deliverer sits `pending` for ever — which is honest — and without
            this every write afterwards rang the queue about it. `notify.push` is among them only where both VAPID halves
@@ -935,6 +956,13 @@ export class Record$ extends DurableObject<Env> {
     await slashLook(api);
     /* AND THE RECORD LINTS ITS OWN PAGES (PRF-A04), at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
     await api.lintTick().catch((e: unknown) => console.error('lint:', e instanceof Error ? e.message : String(e)));
+    /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from this object's Slash ledger. A later filing the same day
+       replaces the earlier one, so each alarm may file it; the provider's last words ride along from `#modelFailed`. */
+    try {
+      fileModelSign(api.kernel, guardedSql(this.ctx.storage), Date.now(), { lastFail: this.#lastModelFail });
+    } catch (e) {
+      console.error('signs:', e instanceof Error ? e.message : String(e));
+    }
     /* WORK LEFT FOR THE NEXT INVOCATION SETS THE ALARM FOR NOW, AND IT IS SET LAST. `kernel.tail` sets the alarm from the
        `schedule` table alone, and both the ask pass and the daily look tail it, so a `set(now)` made inside `#act`
        before either of them could be moved out to the next schedule row, or cleared, by a pass that answered one
@@ -989,6 +1017,7 @@ export class Record$ extends DurableObject<Env> {
       },
       'error',
     );
+    if (fail.raw) this.#lastModelFail = { raw: fail.raw, at: Date.now() };
     if (fail.whose === 'owner' || (fail.why === 'schema' && fail.streak < SCHEMA_STREAK)) return;
     this.ctx.waitUntil(opsAlert(this.env, { op: 'model', rec, model: fail.model, why: fail.why }, alertClaim(this.env)));
   }
@@ -1822,7 +1851,9 @@ export class Record$ extends DurableObject<Env> {
         { sql: guardedSql(this.ctx.storage), clock: { now: () => Date.now() }, plan: () => this.#planOf(api), onFail: (fail) => this.#modelFailed(api, fail) },
         new Set([`https://${this.env.PUBLIC_HOST ?? ''}`]),
       );
-      return serveSlash(request, this.#slash, ctx);
+      /* `GET /api/slash/health` READS THE SAME LEDGER THE RECORD'S `engineHealth` DOES, so Settings and a read token are
+         told one thing. Handed per request, since `#open` sets it and the door is built before it may be read. */
+      return serveSlash(request, { ...this.#slash, health: this.#engineHealth }, ctx);
     }
 
     /* SLASH'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day.
@@ -4143,12 +4174,12 @@ function mergeField(name: string): boolean {
 function provisionable(args: { name?: string; tz?: unknown }): Result<string> {
   const tz = zoneOf(args.tz);
   if (tz === null) return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: zoneFix(args.tz), at: 'tz' } };
-  if (args.name !== undefined && placeholderName(args.name))
+  if (args.name !== undefined && (placeholderName(args.name) || recordPlaceholder(args.name)))
     return {
       ok: false,
       refusal: {
         code: 'VALUE_MALFORMED',
-        fix: 'name is the owner’s name as the passkey will show it, and this one reads as a placeholder: a word in brackets, a < or a >, a template field, or the words your name. Type the name itself.',
+        fix: 'name is the owner’s name as the passkey will show it, and this one reads as a placeholder: a word in brackets, a < or a >, a template field, or the words your name. Type the name itself. If it really is your name, write to support@brain.dog.',
         at: 'name',
       },
     };

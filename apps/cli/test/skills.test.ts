@@ -446,7 +446,7 @@ test('THE START HOOK SYNCS SKILLS on startup, says so as one count on the card, 
   assert.equal(h.seen[1]?.authorization, `Bearer ${TOKEN}`);
 
   await hook('compact');
-  assert.deepEqual(h.seen.map((s) => s.method), ['attach', 'get', 'attach'], 'a compaction is the same session, so it does not sync');
+  assert.deepEqual(h.seen.map((s) => s.method).filter((m) => m !== 'heard'), ['attach', 'get', 'attach'], 'a compaction is the same session, so it does not sync');
   assert.ok(!(written[1] ?? '').includes('Skill kiln-release'));
   printed.push(...written);
 });

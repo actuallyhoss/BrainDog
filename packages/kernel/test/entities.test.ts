@@ -160,7 +160,8 @@ test('A RUN IS NAMED BY THE TITLE ITS AGENT GIVES A QUESTION, never by the quest
   value(k.propose({ ...options, question: 'Merge Sara into Sarah?' }, as('cc-1')));
   const run = () => sql.one<{ doing: string | null }>("SELECT json_extract(fields, '$.doing') AS doing FROM entry WHERE register = 'session' ORDER BY seq LIMIT 1")?.doing;
   assert.doesNotMatch(run() ?? '', /Sara/, 'the question named the run');
-  value(k.propose({ ...options, question: 'Merge Sara into Sarah?', title: 'Tidying the contacts' }, as('cc-1')));
+  /* ANOTHER QUESTION, since the same one asked again joins the first and names nothing (AGT-C07). */
+  value(k.propose({ ...options, question: 'Merge Sam into Samuel?', title: 'Tidying the contacts' }, as('cc-1')));
   assert.equal(run(), 'Tidying the contacts');
   sql.close();
 });

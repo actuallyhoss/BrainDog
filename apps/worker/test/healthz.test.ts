@@ -36,8 +36,16 @@ const touched: string[] = [];
 const trap = (name: string) =>
   new Proxy({}, { get: (_, key) => { touched.push(`${name}.${String(key)}`); throw new Error(`${name} was reached for /healthz`); } });
 
-/* PRODUCTION'S SHAPE ON 8 OCTOBER: open, no bot check keyed, billing off (DIRECTION §42). */
-const LAUNCH_ENV = { SIGNUP: 'open', BILLING: '' };
+/* PRODUCTION'S SHAPE ON 8 OCTOBER: open, no bot check keyed, billing off (DIRECTION §42), and what `signUp()` needs
+   before the switch is asked: a 32-character session key, the public address, a sending address and the mail binding. */
+const LAUNCH_ENV = {
+  SIGNUP: 'open',
+  BILLING: '',
+  SESSION_SECRET: 'fake-session-secret-for-tests-only-0123456789',
+  PUBLIC_HOST: 'brain.example.test',
+  AUTH_MAIL_FROM: 'hello@brain.example.test',
+  EMAIL: { send: async () => {} },
+};
 const LAUNCH = launchState(LAUNCH_ENV);
 
 /* THE DIRECTORY'S ONE METHOD THIS DOOR MAY CALL, answering whatever the test last told it, and every other key a trap. */
@@ -59,10 +67,9 @@ const directory = {
     ),
 };
 
-async function ask(path: string, init: RequestInit & { host?: string; build?: string; vars?: Record<string, string> } = {}) {
+async function ask(path: string, init: RequestInit & { host?: string; build?: string; vars?: Record<string, unknown> } = {}) {
   const { default: worker } = await bundled();
   const env = {
-    PUBLIC_HOST: 'brain.example.test',
     LEGACY_HOSTS: 'app.brain.example.test',
     ...LAUNCH_ENV,
     ...init.vars,
@@ -132,6 +139,24 @@ test('HEALTH CARRIES THE LAUNCH: open, no bot check, and the sentence that says 
   assert.ok(!text.includes('0x-a-secret-value'), 'the secret was answered');
   assert.equal((JSON.parse(text) as { launch: { botCheck: boolean } }).launch.botCheck, true);
 });
+
+/* AUDIT 34, FINDING 2: the answer said `open` while `signUp()` refused everybody or sent no letter. Each thing it needs,
+   taken away alone through the bundle's own env, is `closed` here with its sentence, and the switch still says open. */
+const STOPPED: [string, unknown, RegExp][] = [
+  ['SESSION_SECRET', 'only-thirty-one-characters-long', /session key is missing or shorter than 32 characters/],
+  ['PUBLIC_HOST', '', /no public address set/],
+  ['AUTH_MAIL_FROM', '', /No address to send mail from/],
+  ['EMAIL', undefined, /Mail is not connected/],
+];
+
+for (const [key, value, sentence] of STOPPED)
+  test(`WITHOUT ${key}, /healthz SAYS SIGN-UP IS closed, AND WHY`, async () => {
+    const out = (await (await ask('/healthz', { vars: { [key]: value } })).json()) as { ok: boolean; launch: { signup: string; why: string[] } };
+    assert.equal(out.ok, true, 'a sign-up that cannot work is a fact beside the liveness, never a failed probe');
+    assert.equal(out.launch.signup, 'closed', out.launch.why.join(' | '));
+    assert.equal(out.launch.why.filter((w) => sentence.test(w)).length, 1, out.launch.why.join(' | '));
+    assert.ok(!out.launch.why.some((w) => w.startsWith('The bot check is not keyed')), 'a closed door needs no limit sentence');
+  });
 
 test("HEALTH CARRIES LAST NIGHT, from one Directory call: its counts, and `ran` only when it is fresh and whole", async () => {
   const at = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();

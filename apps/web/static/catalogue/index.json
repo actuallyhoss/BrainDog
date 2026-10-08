@@ -10,8 +10,27 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.7.0",
+      "latest": "1.7.1",
       "versions": [
+        {
+          "version": "1.7.1",
+          "checksum": "58eda914d2219b913d05f0b6014f93c16f73c4c439f156ad8ce475401419e12c",
+          "bytes": 61049,
+          "published_at": "2026-10-08T22:22:38.812Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing it reads or writes changed. Two like movements a day apart stay two when each prints its own balance or its own InstaPay reference, and the mail and the text of one movement stay one. A balance can come back to a figure it printed before, as when one sum is withdrawn, paid back in and withdrawn again on the same day: the second withdrawal is then held as a repeat that names the one it looks like, and “It is a second one” files it."
+        },
         {
           "version": "1.7.0",
           "checksum": "409fd18398cfac90aac4f7166e58ea1580c9a1ebc9ec9e84db7d1c3dbaee34f8",

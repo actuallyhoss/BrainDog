@@ -322,7 +322,7 @@ test('READY prints the provision command for both shells, and the operator key i
 
   const at = (marker) => host.lines.findIndex((line) => line.toLowerCase().includes(marker));
   const ps = at('windows powershell');
-  const sh = at('git bash');
+  const sh = at('in bash.');
   assert.ok(ps > 0 && sh > ps, `READY does not print the command for both shells:\n${out}`);
   /* THE HEADING NAMES curl ON PURPOSE, to say why it is absent, so the commands start on the line after it. */
   const powershell = host.lines.slice(ps + 1, sh).join('\n');

@@ -1022,7 +1022,14 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
     for (const q of asked) {
       if (!whole && q.as === 'undone') continue;
       if (whole) {
-        sql.exec("UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL WHERE id = ?", q.id);
+        /* A NEWER OPEN QUESTION MAY HOLD ITS CAUSE NOW, and one open question holds a cause at a time (migration 31): this one
+           reopens without it, as govern.ts's `reopen` does. */
+        sql.exec(
+          `UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL,
+             cause = CASE WHEN EXISTS (SELECT 1 FROM suggestion o WHERE o.status = 'open' AND o.cause = suggestion.cause AND o.id <> suggestion.id) THEN NULL ELSE cause END
+           WHERE id = ?`,
+          q.id,
+        );
         readAgain(sql, q.id, every);
         /* A REOPENED "which account" QUESTION HOLDS ITS TEXTS AGAIN at once, not at the next text (REC-A02). */
         reopenedTail(sql, q.id);

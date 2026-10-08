@@ -1,0 +1,54 @@
+{
+  "measured": {
+    "client": "Claude Code",
+    "version": "2.1.295",
+    "on": "2026-10-09",
+    "machine": "macOS 27, the loop's Mac",
+    "profile": "a scratch CLAUDE_CONFIG_DIR, not signed in; each hook copied its stdin to a file"
+  },
+  "how": "/resume typed in a window and a past conversation picked: the open session ends, the picked one starts in the same process",
+  "of": "fb9c53e2-c20f-4459-a12f-833365d95253",
+  "hooks": [
+    {
+      "event": "SessionEnd",
+      "stdin": {
+        "session_id": "92568c1c-d321-4f5e-932f-95d22a96f26a",
+        "transcript_path": "/private/tmp/hook-capture/config/projects/-private-tmp-hook-capture-work/92568c1c-d321-4f5e-932f-95d22a96f26a.jsonl",
+        "cwd": "/private/tmp/hook-capture/work",
+        "prompt_id": "10dc5532-fb43-40ed-8253-081219ae83f5",
+        "hook_event_name": "SessionEnd",
+        "reason": "resume"
+      },
+      "env": {
+        "CLAUDECODE": "1",
+        "CLAUDE_CODE_SESSION_ID": "92568c1c-d321-4f5e-932f-95d22a96f26a",
+        "CLAUDE_PID": "62607",
+        "CLAUDE_CODE_CHILD_SESSION": "1",
+        "CLAUDE_CODE_ENTRYPOINT": "cli",
+        "CLAUDE_PROJECT_DIR": "/private/tmp/hook-capture/work",
+        "CLAUDE_CODE_SESSION_ATTENDED": "1"
+      }
+    },
+    {
+      "event": "SessionStart",
+      "stdin": {
+        "session_id": "fb9c53e2-c20f-4459-a12f-833365d95253",
+        "transcript_path": "/private/tmp/hook-capture/config/projects/-private-tmp-hook-capture-work/fb9c53e2-c20f-4459-a12f-833365d95253.jsonl",
+        "cwd": "/private/tmp/hook-capture/work",
+        "prompt_id": "10dc5532-fb43-40ed-8253-081219ae83f5",
+        "hook_event_name": "SessionStart",
+        "source": "resume",
+        "model": "claude-haiku-5-5"
+      },
+      "env": {
+        "CLAUDECODE": "1",
+        "CLAUDE_CODE_SESSION_ID": "fb9c53e2-c20f-4459-a12f-833365d95253",
+        "CLAUDE_PID": "62607",
+        "CLAUDE_CODE_CHILD_SESSION": "1",
+        "CLAUDE_CODE_ENTRYPOINT": "cli",
+        "CLAUDE_PROJECT_DIR": "/private/tmp/hook-capture/work",
+        "CLAUDE_CODE_SESSION_ATTENDED": "1"
+      }
+    }
+  ]
+}

@@ -24,6 +24,7 @@ import { no, ok } from '@braindog/ports';
 
 import { actionJitterMs, keyNamed } from './actions.ts';
 import { writeEmbeddings } from './embed.ts';
+import { clearFault, raiseFault } from './fault.ts';
 import { finishPull, pullFinishOf, type PullFinished } from './pull.ts';
 
 /**
@@ -305,9 +306,9 @@ export type AckDeps = {
  * Finish a leased job.
  *
  * `done` closes it. `failed` walks the ladder: `attempts + 1`, and a `retry` row that will put the
- * job back to `pending`. At the eighth failure the job is `dead` and a suggestion opens — because a
- * notification that silently gave up is worse than one that never existed, and the person it was
- * about is the only one who can decide whether to retry it or change what produces it.
+ * job back to `pending`. At the eighth failure the job is `dead` and a fault is raised — because a
+ * notification that silently gave up is worse than one that never existed. A fault and not a question,
+ * because retrying it or changing what produces it is an operator's work, never the owner's (AGT-C06).
  */
 export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
   const row = sql.one<{ kind: string; payload: string; attempts: number; leased_until: string | null }>(
@@ -376,6 +377,9 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
 
   if (args.state === 'done') {
     sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL WHERE id = ?", args.id);
+    /* A JOB OF A KIND THAT COMPLETES CLEARS THAT KIND'S FAULT: the thing that was not working works again. Before the
+       branches below, because each of them returns. */
+    clearFault(sql, `outbox#${row.kind}`, deps.nowMs);
 
     /* AN ANSWER TO AN AUTOMATION GOES BACK TO ITS RUN, in this transaction, which is the `infer.draft` branch's shape
        below with a run where that has the gate. A reply with no text is still a reply: the run is told there was no
@@ -612,20 +616,22 @@ function finishUnawaited(sql: Sql, id: string, tried: 0 | 1): void {
 }
 
 /**
- * The visible item at the end of the ladder.
+ * The end of the ladder: a fault, never a question (AGT-C06).
  *
- * The question is the whole point of it: "retry it, or change what produces it" is a decision only a
- * person can make, and a dead job with no question attached is a row in a table nobody opens.
+ * "Retry it, or change what produces it" was asked of the owner in Decide, and it was never his to answer: a model with
+ * no key, a mail server that refuses, a bucket that is gone are an operator's to fix, and the job comes back the next
+ * night whatever he says (D40.53). So the eighth failure raises `outbox#<kind>` (`fault.ts`), one line however many jobs
+ * of the kind die, read in Settings as a plain sentence, and cleared when a job of the kind next completes.
  */
 function deadLetter(
   sql: Sql,
   deps: AckDeps,
   job: { id: string; kind: string; payload: string; attempts: number; error: string },
 ): void {
-  /* A QUESTION AN AUTOMATION ASKED ENDS ITS RUN INSTEAD. "Retry it, or change what produces it" has nothing to retry:
-     the run it would answer has stopped waiting by the time a person reads it, so the run fails here with the error as
-     its sentence, and the run is the item the owner sees. Both ends of the ladder come through here, an eighth failed
-     ack and an eighth abandoned lease. A call a `call` step made ends its run the same way. */
+  /* A QUESTION AN AUTOMATION ASKED ENDS ITS RUN INSTEAD. Nothing is left to retry: the run it would answer has stopped
+     waiting by the time anybody reads it, so the run fails here with the error as its sentence, and the run is the item
+     the owner sees. Both ends of the ladder come through here, an eighth failed ack and an eighth abandoned lease. A
+     call a `call` step made ends its run the same way. */
   const asked = job.kind === 'infer.ask' || job.kind === 'pull.fetch' ? runOf(job.payload) : null;
   if (asked !== null && deps.answerRun) {
     const who = job.kind === 'infer.ask' ? 'Slash' : 'The call';
@@ -636,40 +642,24 @@ function deadLetter(
     });
     return;
   }
-  openChangeSuggestion(sql, deps, {
-    declarationId: 'kernel.outbox',
-    from: { kind: job.kind, error: job.error, attempts: job.attempts, payload: summary(job.payload) },
-    question: `${job.kind} could not be delivered after ${job.attempts} attempts: ${job.error}. Retry it, or change what produces it.`,
-  });
+  raiseFault(sql, `outbox#${job.kind}`, job.kind, job.error, deps.nowMs);
 }
 
 /**
- * A `change` suggestion by `system`, and the `suggest` event that makes it visible.
- *
- * Shared by the two ladders, because they end the same way and a second copy of this would be the
- * one that forgot the event — leaving a suggestion nothing in the app knows arrived.
+ * Queue the newest dead job of a kind again, for `retryFault`: `pending`, its count of attempts back to nought and no
+ * lease, so the next pass takes it as a new job and it gets the whole ladder. The newest and only it, because a dead job
+ * of most kinds is one message or one night's batch, and a retry that woke every dead notification of a month would
+ * send them all at once. Its fault stays open until it completes. The number of jobs queued, 0 or 1.
  */
-export function openChangeSuggestion(
-  sql: Sql,
-  deps: AckDeps,
-  item: { declarationId: string; from: Record<string, unknown>; question: string },
-): string {
-  const id = `SG${deps.allocate('suggestion')}`;
-  const body = { declaration_id: item.declarationId, from: item.from, to: 'retry', question: item.question };
-  sql.exec(
-    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'change', ?, 'open', 'system', ?)",
-    id,
-    JSON.stringify(body),
-    iso(deps.nowMs),
+export function retryDead(sql: Sql, kind: string, nowMs: number): number {
+  const row = sql.one<{ id: string }>(
+    "SELECT id FROM outbox WHERE kind = ? AND state = 'dead' ORDER BY created DESC, id DESC LIMIT 1",
+    kind,
   );
-  sql.exec(
-    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, 'system', 'suggest', ?, 'suggestion', ?)",
-    deps.mint(),
-    iso(deps.nowMs),
-    `suggestion:${id}`,
-    item.question.slice(0, 280),
-  );
-  return id;
+  if (row === undefined) return 0;
+  sql.exec("UPDATE outbox SET state = 'pending', attempts = 0, leased_until = NULL WHERE id = ?", row.id);
+  sql.exec("DELETE FROM schedule WHERE kind = 'retry' AND key = ? AND due_at > ?", `outbox:${row.id}`, iso(nowMs));
+  return 1;
 }
 
 /**

@@ -11,6 +11,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { createClient, type Client } from '@braindog/client';
+import { cliBuild } from './position.ts';
 import type { Result } from '@braindog/ports';
 
 type Env = Record<string, string | undefined>;
@@ -190,6 +191,8 @@ export function clientFor(to: Target, headers: () => Promise<Record<string, stri
     token: to.token,
     fetch: async (input, init) => {
       const sent = new Headers(init?.headers);
+      /* EVERY CALL SAYS THE COMMAND'S BUILD (AGT-B01), the ones that send no session headers too. */
+      sent.set('x-braindog-cli', cliBuild());
       for (const [name, value] of Object.entries(await headers())) sent.set(name, value);
       return fetch(input, { ...init, headers: sent, signal, redirect: 'error' });
     },

@@ -1,0 +1,32 @@
+{
+  "measured": {
+    "client": "Claude Code",
+    "version": "2.1.295",
+    "on": "2026-10-09",
+    "machine": "macOS 27, the loop's Mac",
+    "profile": "a scratch CLAUDE_CONFIG_DIR, not signed in; each hook copied its stdin to a file"
+  },
+  "how": "claude, started in a folder, then /exit",
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "stdin": {
+        "session_id": "e24a8e6b-1340-422d-94cf-4fa1eb6ed2d4",
+        "transcript_path": "/private/tmp/hook-capture/config/projects/-private-tmp-hook-capture-work/e24a8e6b-1340-422d-94cf-4fa1eb6ed2d4.jsonl",
+        "cwd": "/private/tmp/hook-capture/work",
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "model": "claude-haiku-5-5"
+      },
+      "env": {
+        "CLAUDECODE": "1",
+        "CLAUDE_CODE_SESSION_ID": "e24a8e6b-1340-422d-94cf-4fa1eb6ed2d4",
+        "CLAUDE_PID": "61996",
+        "CLAUDE_CODE_CHILD_SESSION": "1",
+        "CLAUDE_CODE_ENTRYPOINT": "cli",
+        "CLAUDE_PROJECT_DIR": "/private/tmp/hook-capture/work",
+        "CLAUDE_CODE_SESSION_ATTENDED": "1"
+      }
+    }
+  ]
+}

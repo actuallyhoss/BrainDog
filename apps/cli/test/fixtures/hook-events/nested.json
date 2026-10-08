@@ -1,0 +1,55 @@
+{
+  "measured": {
+    "client": "Claude Code",
+    "version": "2.1.295",
+    "on": "2026-10-09",
+    "machine": "macOS 27, the loop's Mac",
+    "profile": "a scratch CLAUDE_CONFIG_DIR, not signed in; each hook copied its stdin to a file"
+  },
+  "how": "claude -p started from the shell of another Claude Code session, with that session's CLAUDECODE, CLAUDE_CODE_SESSION_ID, CLAUDE_PID and CLAUDE_CODE_CHILD_SESSION in its environment",
+  "parent": {
+    "CLAUDE_CODE_SESSION_ID": "edf4ce11-c81f-4c42-9f33-e4ef90336b5b",
+    "CLAUDE_PID": "6710"
+  },
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "stdin": {
+        "session_id": "229f27f9-ad13-46e7-878d-e14ecb7db7a5",
+        "transcript_path": "/private/tmp/hook-capture/config/projects/-private-tmp-hook-capture-work/229f27f9-ad13-46e7-878d-e14ecb7db7a5.jsonl",
+        "cwd": "/private/tmp/hook-capture/work",
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      },
+      "env": {
+        "CLAUDECODE": "1",
+        "CLAUDE_CODE_SESSION_ID": "229f27f9-ad13-46e7-878d-e14ecb7db7a5",
+        "CLAUDE_PID": "64956",
+        "CLAUDE_CODE_CHILD_SESSION": "1",
+        "CLAUDE_CODE_ENTRYPOINT": "sdk-cli",
+        "CLAUDE_PROJECT_DIR": "/private/tmp/hook-capture/work",
+        "CLAUDE_CODE_SESSION_ATTENDED": "0"
+      }
+    },
+    {
+      "event": "SessionEnd",
+      "stdin": {
+        "session_id": "229f27f9-ad13-46e7-878d-e14ecb7db7a5",
+        "transcript_path": "/private/tmp/hook-capture/config/projects/-private-tmp-hook-capture-work/229f27f9-ad13-46e7-878d-e14ecb7db7a5.jsonl",
+        "cwd": "/private/tmp/hook-capture/work",
+        "prompt_id": "5db1fd5d-1900-47e0-a067-a8efbe4ec6db",
+        "hook_event_name": "SessionEnd",
+        "reason": "other"
+      },
+      "env": {
+        "CLAUDECODE": "1",
+        "CLAUDE_CODE_SESSION_ID": "229f27f9-ad13-46e7-878d-e14ecb7db7a5",
+        "CLAUDE_PID": "64956",
+        "CLAUDE_CODE_CHILD_SESSION": "1",
+        "CLAUDE_CODE_ENTRYPOINT": "sdk-cli",
+        "CLAUDE_PROJECT_DIR": "/private/tmp/hook-capture/work",
+        "CLAUDE_CODE_SESSION_ATTENDED": "0"
+      }
+    }
+  ]
+}

@@ -55,12 +55,15 @@ import {
 import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
 import { runsDataSteps } from './migrations/0028_runs.ts';
 import { SIGNS_KEY, fileSignReading, nextSignsDue, readSigns, runSignsNight, type SignReading, type VitalSign } from './signs.ts';
+import { DOOR_KINDS, DOOR_WINDOW_DAYS, doorMarks as readDoorMarks, markDoor, sweepDoorMarks, type DoorMark, type DoorSigns } from './door.ts';
+import { openFaults, type Fault } from './fault.ts';
 import { checkBrainl, exportBrainl, importBrainl, signBrainl, tables as fileTables, type ImportReport, type Section, type Signer } from './brainl.ts';
 import {
   drainSchedule,
   due,
   pendingWork,
   reschedule,
+  retryFailed,
   retryHandler,
   sweepSessions,
   type Drained,
@@ -68,7 +71,7 @@ import {
   type Remindable,
   type ScheduleKind,
 } from './schedule.ts';
-import { ack, enqueue, lease, unlease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
+import { ack, enqueue, lease, retryDead, unlease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import { embedJob } from './embed.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { leasedPushTarget, ownersPushSubs, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
@@ -109,10 +112,12 @@ import {
   countOpenQuestions,
   propose as openSuggestion,
   reopen,
+  withdraw as withdrawSuggestion,
   keepApplied,
   questionOf,
   showsOf,
   type Decided,
+  type Filed,
   type GovernDeps,
   type GovernRegister,
   type Proposal,
@@ -228,7 +233,7 @@ import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from 
 import { foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { builtInFigure } from './built-in-figures.ts';
 import { workingRuns } from './presence.ts';
-import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn } from './change-kind.ts';
+import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, type UndoApplied, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
 import { understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
 import {
@@ -290,6 +295,12 @@ export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
 export { KERNEL_WRITTEN, REVIVED, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
 /* THE RECORD'S VITAL SIGNS (`signs.ts`): the closed list, and what a sign and a reading are. */
 export { VITAL_SIGNS, type SignReading, type VitalSign } from './signs.ts';
+export { DOOR_KINDS, type DoorMark, type DoorSigns } from './door.ts';
+export { SAID, clearFault, openFaults, raiseFault, type Fault } from './fault.ts';
+/* `canon` IS ALSO MIGRATE'S NAME (a script written one way), so a value written one way is `canonValue` out here. */
+export { CAUSE, canon as canonValue, causeFault, causeOf, noop, sha256 } from './cause.ts';
+/* THE RECORD'S OWN NAME RULE (`api/person-name.ts`), so the Worker refuses at provision what a rename would refuse. */
+export { PERSON_NAME_SUPPORT, personNameOf, placeholderName } from './api/person-name.ts';
 /* THE ONE CLOCK (`presence.ts`): every reader that asks whether a run is working, quiet or gone asks here. */
 export {
   ABANDON_MS,
@@ -335,12 +346,12 @@ export type { Remindable, Repeat, Reminder } from './schedule.ts';
 export type { ImportReport, Section, TableShape } from './brainl.ts';
 export { EVENT_KINDS, isEventKind } from './events.ts';
 export type { EventKind } from './events.ts';
-export { OUTBOX_KINDS, backoffMs, summary } from './outbox.ts';
+export { OUTBOX_KINDS, backoffMs, retryDead, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { ERASED } from './erase.ts';
 export type { EraseReport, EraseRequest } from './erase.ts';
 export type { PushJob, PushSettled, PushTarget } from './push.ts';
-export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
+export { SCHEDULE_KINDS, drainSchedule, retryFailed, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
 import { GROUP_CAP } from './buckets.ts';
@@ -441,7 +452,7 @@ export type {
   PostJobEventArgs,
   Posted,
 } from './jobs.ts';
-export type { Arranging, Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
+export type { Arranging, Decision, Decided, Filed, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 /* `exponentOf` IS EXPORTED SO THE RECORD'S CURRENCY TABLE IS NOT A SECOND EXPONENT READER. It is
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, fileAsSecond, patternReport, resolve as extractOutcome, senderOf, shapeOf, tailCause } from './ingest.ts';
@@ -6720,6 +6731,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     transaction(() => deviceSweep(tokenDeps()));
     /* A JOB NOBODY TOOK IN A DAY, OR ONE WHOSE MACHINE STOPPED ANSWERING, is let go in the same hour (`jobs.ts`). */
     transaction(() => sweepJobs(tokenDeps()));
+    /* AND THE DOOR'S MARKS once thirty days old, which no sign reads any more (`door.ts`). */
+    transaction(() => sweepDoorMarks(sql, clock.now()));
     rulesAboutTime();
     figuresWatched();
     /* A FINISHED AUTOMATION RUN IS KEPT NINETY DAYS, and its metered event after that: one line per run, as §4.5 asks.
@@ -6808,7 +6821,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     const night = dayBefore(dayIn(nowMs, tz));
     /* ALREADY TAKEN. `on` is unique, so the write below would be refused anyway — but a refusal out
-       of a schedule handler walks the retry ladder and opens a suggestion, and a redelivered alarm
+       of a schedule handler walks the retry ladder and raises a fault, and a redelivered alarm
        is not a defect worth telling anybody about.
 
        AND A DELETED NIGHT COUNTS AS TAKEN, which the unique index would not say: it is partial on
@@ -8372,15 +8385,19 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * body has passed, so a refused proposal opens none. A bare name signs as itself. `drafted` is who drafted it,
      * Slash's rules or a model, kept on `suggestion.drafted_by`. A run's first question names the run while the
      * record's own name still stands (`nameRunBy`).
+     *
+     * `cause` RIDES THROUGH IN THE BODY TO govern (AGT-C07), which derives one when none is given: a question whose cause
+     * is already open answers its id with `joined` and files nothing, so asked twice is asked once.
      */
-    propose: (p: Proposal & { title?: string }, w: WriteContext | string, drafted?: string): Result<{ id: string }> =>
+    propose: (p: Proposal & { title?: string }, w: WriteContext | string, drafted?: string): Result<Filed> =>
       transaction(() => {
         const theirs = typeof w === 'string' ? null : foreignRun<{ id: string }>(w);
         if (theirs) return theirs;
         /* THE TITLE IS THE RUN'S, NOT THE QUESTION'S: taken off before the body is checked, and kept nowhere else. */
         const { title, ...asked } = p;
         const out = openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), asked, drafted);
-        if (out.ok) nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w, typeof title === 'string' ? title : undefined);
+        /* A JOINING RUN IS NOT TITLED after somebody else's question. */
+        if (out.ok && !out.value.joined) nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w, typeof title === 'string' ? title : undefined);
         return out;
       }),
 
@@ -8573,7 +8590,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     leaseOutbox: (kinds: readonly OutboxKind[], n = 10) => transaction(() => lease(sql, ackDeps(), kinds, n)),
 
     /**
-     * Finish one. `failed` walks the ladder; the eighth failure is `dead` and opens an item.
+     * Finish one. `failed` walks the ladder; the eighth failure is `dead` and raises a fault for its kind, never a
+     * question (AGT-C06), and a `done` clears that kind's fault.
      *
      * AND A PUSH'S ANSWER GOES BACK TO ITS SUBSCRIPTION, IN THE SAME TRANSACTION. `51 §5`: a 404 or 410 means the browser
      * threw the subscription away, and the deliverer acks that as `done` with `{ gone: true }`, so the row is deleted and
@@ -9584,6 +9602,84 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const barred = schemaRefusal(state);
       if (barred) return barred;
       return transaction(() => fileSignReading(sql, id, reading, clock.now(), recordTz()));
+    },
+    /**
+     * One mark of how a session met the agent door (AGT-B01): it said hello, was given the tools, made calls, waited on a
+     * hook. Kept against the caller's run, `S42`, or `token:` and its token when it has none.
+     *
+     * IT NEVER OPENS A RUN. A mark that opened one would make the very session it counts, and a client that only said
+     * hello would read as a session that worked. A run another key opened is not the caller's, so it marks its token.
+     * A person or the record's own path marks as itself. A kind off the list is refused, so the surface hears why.
+     */
+    heard: (w: WriteContext, mark: DoorMark): Result<{ marked: true }> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      if (!(DOOR_KINDS as readonly string[]).includes(mark?.kind as string))
+        return no('ENUM_VALUE_UNKNOWN', `A mark is one of ${DOOR_KINDS.join(', ')}.`, { at: 'kind', allowed: [...DOOR_KINDS] });
+      return transaction(() => {
+        const token = w.principal?.kind === 'token' ? (w.principal.token ?? null) : null;
+        const run = token === null ? null : findRun(w.session ?? {}, token);
+        const who = run ? `${registers.get(SESSION)?.seq_prefix ?? 'S'}${String(run.seq)}` : token !== null ? `token:${token}` : w.actor;
+        markDoor(sql, who, mark, clock.now());
+        return ok({ marked: true as const });
+      });
+    },
+    /**
+     * What the door's marks since `sinceMs` add up to, the last seven days when it names none (`door.ts`). `current` is
+     * the build the reader runs, so a session on another counts as behind. Reads only.
+     */
+    doorMarks: (sinceMs?: number, current?: string): Result<DoorSigns> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      const now = clock.now();
+      return ok(readDoorMarks(sql, sinceMs ?? now - DOOR_WINDOW_DAYS * 86_400_000, now, current));
+    },
+    /**
+     * What is not working that an operator must fix, open ones only, newest first (AGT-C06): each with its plain
+     * sentence, how many times and since when. Reads only. The raw error rides along, and the record decides who reads it.
+     */
+    faults: (): Result<{ faults: Fault[] }> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      return ok({ faults: openFaults(sql) });
+    },
+    /**
+     * Queue the job a fault is about once more: `outbox#<kind>`'s dead letters go back on the outbox with their attempts
+     * reset (`retryDead`), and `schedule#<kind>`'s newest failed row goes back on the schedule, due now (`retryFailed`).
+     * THE FAULT STAYS OPEN until a job of that kind completes, which clears it, so "Try again" that fails again says so.
+     */
+    retryFault: (_w: WriteContext, args: { cause: string }): Result<{ cause: string; queued: number }> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      const cause = typeof args?.cause === 'string' ? args.cause.trim() : '';
+      if (cause === '') return no('REQUIRED_MISSING', 'Say which fault to try again, by its cause.', { at: 'cause' });
+      return transaction(() => {
+        if (!openFaults(sql).some((f) => f.cause === cause))
+          return no<{ cause: string; queued: number }>('ROW_UNKNOWN', 'Nothing is failing for that cause now, so there is nothing to try again.', { at: 'cause' });
+        if (cause.startsWith('outbox#')) return ok({ cause, queued: retryDead(sql, cause.slice('outbox#'.length), clock.now()) });
+        if (cause.startsWith('schedule#')) return ok({ cause, queued: retryFailed(sql, cause.slice('schedule#'.length), clock.now()) });
+        return no<{ cause: string; queued: number }>('VALUE_MALFORMED', 'This one tries again by itself at its next time.', { at: 'cause' });
+      });
+    },
+    /**
+     * Take back an open question (AGT-C07). Only the run that opened it, or a later run of the same key, may; govern
+     * says who and closes it as `withdrawn`. Signed as `propose` signs, so the opener is the one asking.
+     */
+    withdraw: (w: WriteContext, args: { id: string }): Result<{ id: string; state: 'withdrawn' }> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      const id = typeof args?.id === 'string' ? args.id.trim() : '';
+      if (id === '') return no('REQUIRED_MISSING', 'Say which question to take back.', { at: 'id' });
+      return transaction(() => {
+        const theirs = foreignRun<{ id: string; state: 'withdrawn' }>(w);
+        if (theirs) return theirs;
+        /* ANOTHER KEY IS REFUSED BEFORE IT IS SIGNED, since signing opens a run for a token that has none and a refused
+           call must leave nothing behind. Govern refuses `token:` as no run, in its own sentence. */
+        const token = w.principal?.kind === 'token' ? (w.principal.token ?? null) : null;
+        const opener = sql.one<{ opened_by: string }>('SELECT opened_by FROM suggestion WHERE id = ?', id)?.opened_by;
+        const mine = token === null || (opener !== undefined && tokenOfRun(sql, opener) === token);
+        return withdrawSuggestion(sql, governDeps(), id, mine ? signedBy(w) : `token:${token}`, clock.now());
+      });
     },
     findRun,
     /** Whether a line of the log is the record's own bookkeeping, which a feed leaves out and the log keeps. Reads only. */

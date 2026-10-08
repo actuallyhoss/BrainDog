@@ -269,9 +269,15 @@
     stroke: var(--status-waiting);
   }
 
-  /* LATE IS TOLD APART FROM THE WORKING RED BY A MARK, NOT ONLY ITS SHADE (DIRECTION 42): the ring breaks. */
+  /* LATE IS TOLD APART FROM THE WORKING RED BY A MARK, NOT ONLY ITS SHADE (DIRECTION 42): the TRACK breaks, the part
+     of the ring still to go, and the arc stays whole. The arc's share is its `stroke-dasharray` ATTRIBUTE, and a rule
+     here would beat it: a dash on the fill drew every late card as a full broken circle, whatever its share
+     (`ring-late.test.ts` holds that no rule here ever dashes the fill). */
   .cards-item[data-intent='bad'] .cards-ring-fill {
     stroke: var(--status-late);
+  }
+
+  .cards-item[data-intent='bad'] .cards-ring-track {
     stroke-dasharray: 3 2;
   }
 

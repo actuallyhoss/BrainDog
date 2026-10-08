@@ -1,0 +1,60 @@
+name: watch
+
+# THE WATCH FROM OUTSIDE (LCH-C01): brain.dog asked once an hour from GitHub's machines, which are
+# outside Cloudflare, so a day with the app down at Cloudflare's edge or a night with no copy turns
+# a run red and GitHub mails him. The only watchdog before this ran inside Cloudflare, in the site's
+# Worker, and could not see Cloudflare itself down.
+#
+# SEVEN QUESTIONS, ONE LINE EACH, EVERY MISS PRINTED (`tools/watch/launch.mjs` says them): http to
+# https, `/healthz` ok, the live build is the last green deploy, `security.txt` not expiring,
+# each old name answers, last night's copies all taken, and sign-up as the config switches it.
+#
+# HOURLY FROM GITHUB AND NO STATUS PAGE are the defaults (DIRECTION 42), until he picks an outside
+# monitor with a one-minute beat. Minute 7, off the hour, because GitHub's own scheduler is
+# busiest on it and runs late there. A run GitHub skips is not the product down: the next run
+# prints how long ago the one before it started.
+#
+# NODE ONLY, NO INSTALL. The script reads `apps/worker/wrangler.jsonc` and asks with `fetch`, so a
+# run is a checkout and one command, and a broken lock file cannot turn the watch red.
+#
+# `actions: read` IS FOR THE LAST GREEN DEPLOY, read with the workflow's own token, and for when
+# this workflow last ran. Nothing here writes.
+#
+# A FORCED MISS: run it by hand with `host` set to a name that answers 503, and the run is red.
+# The input reaches the script through the environment, never pasted into the command.
+
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+    inputs:
+      host:
+        description: 'A name to ask in place of production, for a forced miss. Empty asks production.'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.13.0
+      - name: Ask production from outside
+        env:
+          WATCH_HOST: ${{ inputs.host }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/watch/launch.mjs

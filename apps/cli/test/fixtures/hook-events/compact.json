@@ -1,0 +1,33 @@
+{
+  "measured": {
+    "client": "Claude Code",
+    "version": "2.1.295",
+    "on": "2026-10-09",
+    "machine": "macOS 27, the loop's Mac",
+    "profile": "a scratch CLAUDE_CONFIG_DIR, not signed in; each hook copied its stdin to a file"
+  },
+  "how": "/compact asked of claude -p --resume <id>: PreCompact ran, the compaction failed for want of a sign-in, so no SessionStart came",
+  "hooks": [
+    {
+      "event": "PreCompact",
+      "stdin": {
+        "session_id": "fd2f8c26-f11e-49f9-9f58-83e054d487f8",
+        "transcript_path": "/private/tmp/hook-capture/config/projects/-private-tmp-hook-capture-work/fd2f8c26-f11e-49f9-9f58-83e054d487f8.jsonl",
+        "cwd": "/private/tmp/hook-capture/work",
+        "prompt_id": "1cf6ae08-d99c-4d58-8282-d2ce5d00f4ca",
+        "hook_event_name": "PreCompact",
+        "trigger": "manual",
+        "custom_instructions": null
+      },
+      "env": {
+        "CLAUDECODE": "1",
+        "CLAUDE_CODE_SESSION_ID": "fd2f8c26-f11e-49f9-9f58-83e054d487f8",
+        "CLAUDE_PID": "58572",
+        "CLAUDE_CODE_CHILD_SESSION": "1",
+        "CLAUDE_CODE_ENTRYPOINT": "sdk-cli",
+        "CLAUDE_PROJECT_DIR": "/private/tmp/hook-capture/work",
+        "CLAUDE_CODE_SESSION_ATTENDED": "0"
+      }
+    }
+  ]
+}

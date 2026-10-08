@@ -69,7 +69,7 @@ export function createRecord(
   if (!args.name.trim()) return no<Provisioned>('REQUIRED_MISSING', 'A record has a name a person would say.', { at: 'name' });
   /* THE TIMEZONE IS CHECKED AGAINST THE RUNTIME'S OWN DATA, never against a list shipped here: a
      table of zones is a table that is wrong the next time a government moves one. */
-  if (!isZone(args.tz)) return no<Provisioned>('VALUE_MALFORMED', `${args.tz} is not an IANA timezone.`, { at: 'tz' });
+  if (!isZone(args.tz)) return no<Provisioned>('VALUE_MALFORMED', zoneRefused(args.tz), { at: 'tz' });
 
   const existing = sql.one<{ id: string; slug: string }>('SELECT id, slug FROM record WHERE singleton = 1');
   /* AN OBJECT IS ADDRESSED, NOT CREATED, so a second create is the ordinary case — a retried signup,
@@ -223,13 +223,42 @@ export const recordIdentity = (sql: Sql) =>
     'SELECT id, slug, name, tz, locale, created_at FROM record WHERE singleton = 1',
   ) ?? null;
 
+/** The three spellings of UTC a zone may be that are not a place: UTC is not an offset from anywhere. */
+const UTC_NAMES: ReadonlySet<string> = new Set(['UTC', 'Etc/UTC', 'Etc/GMT']);
+
+/** The runtime's own list of zones, read once: `Intl.supportedValuesOf('timeZone')`, every one a place. */
+let ZONES: ReadonlySet<string> | null = null;
+const zones = (): ReadonlySet<string> => (ZONES ??= new Set(Intl.supportedValuesOf('timeZone')));
+
+/**
+ * Whether `tz` is a zone a record may keep: a place in the runtime's own list, a place's other name that the runtime
+ * files under one in that list, or one of `UTC_NAMES`.
+ *
+ * WHATEVER `Intl` ACCEPTS WAS TOO MUCH. `EST` is answered as `America/Panama`, which has no summer time, so a record
+ * typed `EST` from New York is an hour out from March to November; `Etc/GMT+5` is a fixed offset under a zone's name,
+ * and `SystemV/EST5` is a name the tz database dropped. None of them is in the list, because the list holds places.
+ *
+ * AN OTHER NAME IS STILL A PLACE. The list is canonical, and on Node 24 (ICU 77.1) it holds `Asia/Calcutta` and
+ * `Europe/Kiev` but not `Asia/Kolkata` or `Europe/Kyiv`, which a newer browser reports as its own zone. Sign-up sends
+ * the browser's zone, so refusing those would refuse everybody in India. A name shaped `Area/Place`, outside `Etc/` and
+ * `SystemV/`, that the runtime resolves to a zone in the list is kept as typed; `EST`, `GB` and `PRC` have no `/`.
+ */
 function isZone(tz: string): boolean {
+  if (UTC_NAMES.has(tz) || zones().has(tz)) return true;
+  if (!/^[A-Z][A-Za-z_-]*(\/[A-Za-z0-9_+-]+)+$/.test(tz) || /^(Etc|SystemV)\//.test(tz)) return false;
   try {
-    new Intl.DateTimeFormat('en', { timeZone: tz });
-    return true;
+    return zones().has(new Intl.DateTimeFormat('en', { timeZone: tz }).resolvedOptions().timeZone);
   } catch {
     return false;
   }
+}
+
+/**
+ * The one sentence a refused zone gets. It names what was typed and offers the browser's own zone, which is always a
+ * place, because a zone is typed only by the operator's command and the person typing it has a browser to ask.
+ */
+function zoneRefused(tz: string): string {
+  return `${tz} is not a place's time zone, so use the one your browser reports, a place such as Africa/Cairo or America/New_York, or UTC.`;
 }
 
 /* ── the sweep ───────────────────────────────────────────────────────────── */

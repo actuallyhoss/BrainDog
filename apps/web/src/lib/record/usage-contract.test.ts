@@ -116,7 +116,7 @@ test("THE READER DRAWS THE DIRECTORY'S OWN ANSWER: the plan line and the Slash l
   assert.equal(studio?.name, 'the-studio');
   assert.equal(studio?.plan, 'Cloud');
   assert.equal(studio?.planLine, 'On Cloud: 15,000 runs, 150,000 requests, 1.00 GB fetched and 50 hours of run time a month.');
-  assert.equal(studio?.slash, 'Slash was asked 41 times this month, and the model spent 12,300 neurons answering.');
+  assert.equal(studio?.slash, 'Slash was asked 41 times this month, and the model did 12,300 units of work answering.');
   assert.deepEqual(studio?.asks, { asks: 41, neurons: 12_300, cap: null });
   assert.equal(studio?.meters[0]?.line, 'Runs 3 of 15,000');
   assert.equal(view.totals.runs, 3);

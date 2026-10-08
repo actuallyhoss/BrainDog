@@ -29,6 +29,7 @@ import type {
 import { ulids } from '@braindog/kernel';
 
 import { badSlug } from './directory.ts';
+import { ipBucket, mailCanon } from './signup-keys.ts';
 
 import { FRESH } from './index.ts';
 import { assertion, b64url, clientData, registration, same, unb64url, type Alg, type PublicJwk, type Why } from './webauthn.ts';
@@ -114,7 +115,8 @@ const SIGN_IN: Rule = { most: 10, window: WINDOW };
 /** Minting a passkey challenge: thirty a minute from one address, `chal:<ip>`. */
 const CHALLENGES: Rule = { most: 30, window: MINUTE };
 /**
- * Sign-up's two strikes, `signup:<ip>` and `signup-email:<address>`, while no bot check stands in front of `start`:
+ * Sign-up's two strikes, `signup:<ip, an IPv6 address as its /64>` and `signup-email:<address>`, while no bot check
+ * stands in front of `start`:
  * three an hour each, and the fourth locks the key for an hour.
  *
  * TIGHTER THAN `SIGN_IN` UNTIL THE CHECK IS KEYED (DIRECTION §42). Sign-up is open to strangers before Turnstile has
@@ -173,7 +175,7 @@ ON CONFLICT (key) DO UPDATE SET
 RETURNING n, until`;
 
 /** The `dir_fail` key that counts the mails sent to one address, however it was typed. */
-const mailKey = (address: string): string => `email:${address.trim().toLowerCase()}`;
+const mailKey = (address: string): string => `email:${mailCanon(address)}`;
 
 /**
  * A live session: by its id, or by the id it had until a rotation less than a minute ago, only for a person who is
@@ -1214,8 +1216,9 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
        * `signup.known`, so the person who forgot they had one is let in from their mailbox and nobody watching the page
        * learns anything. Both mint one MAC and write one row, so neither answers faster.
        *
-       * A LOCKOUT ON EACH OF ITS KEYS: `signup:<ip>` for the asking address, then `signup-email:<address>` for the
-       * address typed, which is struck for known and unknown alike so a lock says nothing about which it is; and
+       * A LOCKOUT ON EACH OF ITS KEYS: `signup:<ip, an IPv6 address as its /64>` for the asking address, then
+       * `signup-email:<address>` for the address typed, which is struck for known and unknown alike so a lock says
+       * nothing about which it is; and
        * `email:<address>`, the count of mails sent, is reserved only when a mail is about to go. A full mail count
        * sends nothing and answers exactly as a sent one does. THE FIRST TWO TAKE `SIGNUP_UNCHECKED` unless the host
        * says its bot check ran (`checked`), so an open door with no check in front of it is a narrow one.
@@ -1225,7 +1228,8 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
        * the second time; and SPENT when `signup.verify` makes the person. A missing or unusable code answers `needs:
        * 'code'`, which the Worker says as a 403, and writes nothing. A KNOWN ADDRESS NEEDS NONE: it is sent its sign-in
        * link whatever the code, and its answer is the one a new address without a code gets, so the refusal says nothing
-       * about who is here. A wrong code costs the `signup:<ip>` strike every `start` pays.
+       * about who is here. A wrong code costs the `signup:<ip>` strike every `start` pays; a mistyped address costs
+       * no strike, because the address is checked first.
        *
        * THE NAME IS CHECKED HERE AS WELL AS LIVE, because nothing about a name is secret: `signup.name` answers the same
        * question to anybody. It is checked again at checkout and once more when the record is made, where it is claimed.
@@ -1234,10 +1238,10 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (!config.magic) return off();
         const asked = call as SignupStart;
         const rule = asked.checked === true ? SIGN_IN : SIGNUP_UNCHECKED;
-        const stop = reserve(flow, `signup:${text(call.ip)}`, now, rule);
-        if (stop) return stop;
         const email = text(call.email).trim().toLowerCase();
         if (!ADDRESS.test(email)) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'That is not an email address.', at: 'email' } };
+        const stop = reserve(flow, `signup:${ipBucket(text(call.ip))}`, now, rule);
+        if (stop) return stop;
         const slug = signupSlug(call.slug);
         if (slug.length > 64) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'A name is at most thirty-two characters.', at: 'slug' } };
         const wrong = badSlug(slug);
@@ -1258,7 +1262,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           hmac('p:', token),
           asked.invite === true && typeof asked.code === 'string' && MINTED.test(asked.code) ? codeHash(asked.code) : null,
         ]);
-        const struck = reserve(flow, `signup-email:${email}`, now, rule);
+        const struck = reserve(flow, `signup-email:${mailCanon(email)}`, now, rule);
         if (struck) return struck;
         /* THE ONE ANSWER EVERY ADDRESS GETS: `{}`, or by invitation with no code that could be held, `needs: 'code'`. */
         const usable = (): boolean =>

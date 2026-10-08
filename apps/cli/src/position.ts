@@ -87,6 +87,19 @@ const printable = (max: number) => new RegExp(`^[\\x20-\\x7e]{1,${max}}$`);
 
 const CLIENT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
+/** A build as `scripts/bundle.mjs` stamps one, `<yyyy.mm.dd>+<sha>` with seven to forty hex digits, or a checkout's `dev+0000000`. */
+export const BUILD = /^(?:[0-9]{4}\.[0-9]{2}\.[0-9]{2}|dev)\+[0-9a-f]{7,40}$/;
+
+/* The bundler defines it, in this module as in `main.ts`; run from a checkout there is no bundle and it is undefined. */
+declare const __BUILD__: string;
+
+/**
+ * This command's build, the one `braindog version` prints. SENT WITH EVERY CALL as `x-braindog-cli` (AGT-B01), so the
+ * record can say a machine runs a command older than itself: his Mac ran the build of 1 October for a week, and
+ * nothing in the record could tell.
+ */
+export const cliBuild = (): string => (typeof __BUILD__ === 'string' ? __BUILD__ : 'dev+0000000');
+
 /* The grammar of the plan's §3.4. `Session` and `Client` come from the session file the start hook
    writes, or the host's own session id, so a process with neither sends neither. */
 const GRAMMAR: Record<string, RegExp> = {
@@ -100,6 +113,7 @@ const GRAMMAR: Record<string, RegExp> = {
   'x-braindog-agent': new RegExp(`^(?:${AGENTS.join('|')})$`),
   'x-braindog-client-name': printable(128),
   'x-braindog-client-version': printable(64),
+  'x-braindog-cli': BUILD,
 };
 
 type Env = Record<string, string | undefined>;
@@ -122,9 +136,9 @@ export type Parent = { spoken: string; cwd: string | null; repo: string | null; 
 
 /**
  * What else a call says about who makes it: the process's environment, the client's own name and version, and the run
- * it works for when it is a subagent.
+ * it works for when it is a subagent. `build` is the command's own (`cliBuild`) unless a caller says another, as a test does.
  */
-export type Said = { env?: Env | undefined; client?: ClientInfo | undefined; parent?: Parent | null | undefined };
+export type Said = { env?: Env | undefined; client?: ClientInfo | undefined; parent?: Parent | null | undefined; build?: string | undefined };
 
 /**
  * The headers a position becomes. A value outside its grammar is dropped, as the host would drop it,
@@ -155,6 +169,7 @@ export function sessionHeaders(p: Position, agent?: Agent, run?: { spoken?: stri
     'x-braindog-agent': agent ?? (env.CLAUDECODE ? 'claude' : undefined),
     'x-braindog-client-name': said.client?.name?.trim(),
     'x-braindog-client-version': said.client?.version?.trim(),
+    'x-braindog-cli': said.build ?? cliBuild(),
   };
   const out: Record<string, string> = {};
   for (const [name, value] of Object.entries(values)) if (value && GRAMMAR[name]!.test(value)) out[name] = value;

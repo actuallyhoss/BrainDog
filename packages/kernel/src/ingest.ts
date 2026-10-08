@@ -1111,11 +1111,12 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
     const pending = tails.filter((t) => !confirmedTail(deps.sql, t));
 
     /**
-     * ONE QUESTION PER DOOR, LIST AND DIGITS, WHERE THE ACCOUNT IS THE ONLY THING NOT READ (REC-A02).
+     * ONE QUESTION PER LIST AND DIGITS, AT EVERY DOOR, WHERE THE ACCOUNT IS THE ONLY THING NOT READ (REC-A02).
      *
      * Digits printed for an account nobody holds them on, and nothing else missing: the arrival waits under the one
-     * question "Which account is the card ending 1234?", which every later text printing those digits at that door
-     * joins. It was a question per text, each asking to add a row with its account empty, which the list refuses.
+     * question "Which account is the card ending 1234?", which every later text printing those digits joins, at this
+     * door or any other that reads them. It was a question per text, each asking to add a row with its account empty,
+     * which the list refuses.
      *
      * AND DIGITS AN AGENT WROTE ON AN ACCOUNT ARE CONFIRMED ONCE (DIRECTION §42). They read, and the row they name is an
      * agent's word about money, so the first text that reads them waits under the same one question with that account
@@ -1581,13 +1582,27 @@ function firstRun(masked: string): { digits: string; starred: boolean } | null {
   return /^\d{3,}$/.test(token) ? { digits: token, starred: false } : null;
 }
 
-/** The reverse tail: printed digits longer than a stored value of three digits or more that they end in (`printedTail`). */
+/**
+ * The reverse tail: printed digits longer than a stored value of three digits or more that they end in (`printedTail`).
+ *
+ * A BARE RUN IS KEPT BY ITS LAST FOUR, or by the stored value where that is longer (audit-34 finding 9). A bare run of
+ * `BARE_NUMBER` digits or more is a whole card or account number, and what is answered here is what a confirmation, a
+ * tail question and an account's field keep: a text that printed a card's sixteen digits must never put them there.
+ */
 function reverseTail(masked: string, whole: string): string | null {
   if (!/^\d{3,}$/.test(whole)) return null;
   const run = firstRun(masked);
   if (run === null || (!run.starred && run.digits.length < BARE_NUMBER)) return null;
-  return run.digits.length > whole.length && run.digits.endsWith(whole) ? run.digits : null;
+  if (run.digits.length <= whole.length || !run.digits.endsWith(whole)) return null;
+  return run.starred ? run.digits : run.digits.slice(-Math.max(LAST_FOUR, whole.length));
 }
+
+/** How many of a whole number's digits are kept as its tail: a card's last four. */
+const LAST_FOUR = 4;
+
+/** Whether a run a message printed is these kept digits: the same, or a whole bare number that ends in them. */
+const printsDigits = (run: { digits: string; starred: boolean } | null, digits: string): boolean =>
+  run !== null && (run.digits === digits || (!run.starred && run.digits.length >= BARE_NUMBER && run.digits.endsWith(digits)));
 
 /** The first `lookup` a form holds, however deep under `first`, `nth` or `default`, or `null`. */
 function lookupOf(form: Extractor, depth = 1): LookupForm | null {
@@ -1857,7 +1872,7 @@ function readFields(deps: IngestDeps, matched: IngestDecl, body: string, text: s
   return read;
 }
 
-/* ── one question per door, list and digits (REC-A02) ───────────────────── */
+/* ── one question per list and digits, whatever door (REC-A02) ───────────── */
 
 /** The answer that says none of the accounts offered is the one. */
 export const NONE = 'none';
@@ -1871,8 +1886,24 @@ const REPLAY_BATCH = 200;
 /** How long after an answer digits moved to another account still ask to move what they filed. */
 const MOVE_DAYS = 30;
 
-/** The cause of a tail question: the door, the list the lookup reads and the digits. */
-export const tailCause = (door: string, register: string, digits: string): string => `tail:${door}:${register}:${digits}`;
+/**
+ * The cause of a tail question: the list the lookup reads, the field and the digits.
+ *
+ * NOT THE DOOR (audit-34 finding 5). The owner's card ending 7731 is printed by the bank's mail and by its texts, two
+ * doors, and with the door in the cause it was asked about twice and one answer closed one of the two.
+ */
+export const tailCause = (register: string, by: string, digits: string): string => `tail:${register}:${by}:${digits}`;
+
+/** What makes two tail questions one: the list, the field and the digits. */
+type TailKey = { register: string; by: string; digits: string };
+
+/**
+ * The tail questions about one list, field and digits, by what they asked and not by their cause string, so a question
+ * opened when the cause still named its door is found too.
+ */
+const SAME_TAIL =
+  "body_kind = 'options' AND json_valid(body) AND json_extract(body, '$.cause') LIKE 'tail:%' AND json_extract(body, '$.tail.register') = ? AND json_extract(body, '$.tail.by') = ? AND json_extract(body, '$.tail.digits') = ?";
+const keyOf = (t: TailKey): [string, string, string] => [t.register, t.by, t.digits];
 
 /**
  * What a tail question keeps about what it asks, so an answer can be carried out without the pattern that asked: the
@@ -1940,7 +1971,7 @@ type Holding = {
 };
 
 /**
- * Hold an arrival under the one question for its door, list and digits, opening it or joining it.
+ * Hold an arrival under the one question for its list and digits, opening it or joining it, whichever door it came by.
  *
  * THE REASON IS IN HIS WORDS, from the list's declaration: "No account has 1234 in Digits the bank prints. It waits for
  * you to say which account it is." No pattern id and no list id. Digits an agent wrote say so, and that it waits for one
@@ -1961,11 +1992,11 @@ function holdTail(deps: IngestDeps, h: Holding): Arrived {
     field: h.tail.field,
   };
   const { one, label } = tailWords(deps.sql, asked);
-  const cause = tailCause(h.door, asked.register, asked.digits);
+  const cause = tailCause(asked.register, asked.by, asked.digits);
   const named = h.suggested === null ? null : rowTitle(deps.sql, asked.register, h.suggested);
   const held = { raw: h.raw, ingest: h.matched.ingest, state: 'review' as const, wrote: [], confidence: 'needs-review' as const };
 
-  const declined = declinedTail(deps.sql, cause, asked.register);
+  const declined = declinedTail(deps.sql, asked);
   if (declined !== null) {
     const reason = `No ${one} has ${asked.digits} in ${label}. You said it is none of the ones offered, so it waits until a new ${one} is added.`;
     h.store('review', reason);
@@ -1994,33 +2025,32 @@ function askTail(
   at: string,
   q: { cause: string; asked: TailAsked; raw: string; register: string; extracted: Record<string, unknown>; text: string; suggested: string | null },
 ): string {
-  const open = deps.sql.one<{ id: string; body: string }>(
-    "SELECT id, body FROM suggestion WHERE body_kind = 'options' AND status = 'open' AND json_valid(body) AND json_extract(body, '$.cause') = ? ORDER BY rowid LIMIT 1",
-    q.cause,
-  );
+  const open = deps.sql.one<{ id: string; body: string }>(`SELECT id, body FROM suggestion WHERE status = 'open' AND ${SAME_TAIL} ORDER BY rowid LIMIT 1`, ...keyOf(q.asked));
   const was = open === undefined ? null : parsed(open.body);
   const raws = Array.isArray(was?.raws) ? (was.raws as unknown[]).filter((r): r is string => typeof r === 'string') : [];
-  /* A QUESTION ASKED AGAIN AFTER "NONE OF THESE" CARRIES WHAT WAITED UNDER THE ANSWERED ONE, which is still held. */
-  if (open === undefined) raws.push(...declinedRaws(deps.sql, q.cause).filter((r) => r !== q.raw));
-  const fresh = !raws.includes(q.raw);
   const totals: Record<string, number> = { ...((was?.totals as Record<string, number> | undefined) ?? {}) };
+  const add = (amount: Minor | null): void => {
+    if (amount !== null) totals[amount.currency] = (totals[amount.currency] ?? 0) + amount.amount;
+  };
+  /* A QUESTION ASKED AGAIN AFTER "NONE OF THESE" CARRIES WHAT WAITED UNDER THE ANSWERED ONE, which is still held, and
+     what they come to: the count and the sum are of the same messages (audit-34 finding 8). */
+  if (open === undefined)
+    for (const d of declinedRaws(deps, q.asked)) {
+      if (d.raw === q.raw || raws.includes(d.raw)) continue;
+      raws.push(d.raw);
+      add(d.amount);
+    }
+  const fresh = !raws.includes(q.raw);
   if (fresh) {
-    /* THE FIRST MONEY FIELD THE LIST DECLARES, as it would be filed: one sum per currency, and two currencies never added. */
-    const money = Object.entries(deps.schemaOf(q.register)?.fields ?? {}).find(([, f]) => f.type === 'money')?.[0];
-    const amount = money === undefined ? undefined : (q.extracted[money] as { amount?: unknown; currency?: unknown } | undefined);
-    if (amount !== undefined && Number.isInteger(amount.amount) && typeof amount.currency === 'string')
-      totals[amount.currency] = (totals[amount.currency] ?? 0) + (amount.amount as number);
+    add(moneyOf(deps, q.register, q.extracted));
     raws.push(q.raw);
   }
   const suggested = q.suggested ?? (typeof was?.suggested === 'string' ? was.suggested : null);
   const options = tailOptions(deps, q.asked, suggested);
   const { one } = tailWords(deps.sql, q.asked);
-  const sums = Object.entries(totals)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([currency, minor]) => moneyText(minor, currency));
   const agent = suggested === null ? '' : `An agent put ${q.asked.digits} on ${rowTitle(deps.sql, q.asked.register, suggested) ?? `one ${one}`}. `;
   const nobody = options.length === 1 ? `No ${one} could be it yet; add it, and it is offered here. ` : '';
-  const waiting = `${raws.length} ${raws.length === 1 ? 'message waits' : 'messages wait'} for this${sums.length ? `, ${listedAnd(sums)} in all` : ''}.`;
+  const waiting = waitingSaid(raws.length, totals);
   const body = {
     ...(was ?? {}),
     cause: q.cause,
@@ -2048,13 +2078,17 @@ function askTail(
       );
     return open.id;
   }
+  /* ONE OPEN QUESTION HOLDS A CAUSE AT A TIME (migration 31's unique index), so one already open on it is this one. */
+  const holding = deps.sql.one<{ id: string }>("SELECT id FROM suggestion WHERE status = 'open' AND cause = ?", q.cause);
+  if (holding !== undefined) return holding.id;
   const id = `SG${deps.allocate('suggestion')}`;
   deps.sql.exec(
-    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'options', ?, 'open', ?, ?)",
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, cause) VALUES (?, 'options', ?, 'open', ?, ?, ?)",
     id,
     JSON.stringify(body),
     `ingest:${q.asked.door}`,
     at,
+    q.cause,
   );
   deps.sql.exec(
     "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'suggest', ?, 'suggestion', ?)",
@@ -2066,6 +2100,17 @@ function askTail(
   );
   return id;
 }
+
+/** How many messages wait under a tail question and what they come to, one sum per currency: its context's last sentence. */
+function waitingSaid(n: number, totals: Record<string, number>): string {
+  const sums = Object.entries(totals)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([currency, minor]) => moneyText(minor, currency));
+  return `${n} ${n === 1 ? 'message waits' : 'messages wait'} for this${sums.length ? `, ${listedAnd(sums)} in all` : ''}.`;
+}
+
+/** The sentence `waitingSaid` ends a context with, to be said again when the count changes. */
+const WAITING_SAID = /\d+ messages? waits? for this[^]*$/u;
 
 /**
  * The open tail questions over `register` offered again from the rows it holds now. Their options are read when a text
@@ -2097,10 +2142,11 @@ export function offerAgain(deps: Pick<IngestDeps, 'sql' | 'schemaOf' | 'nowMs'>,
  * The tail question for `cause` answered "None of these", while it stands: no row was added to the list since. Its id,
  * or `null` when there is none or an account has been added (which opens the question again).
  */
-function declinedTail(sql: Sql, cause: string, register: string): string | null {
+function declinedTail(sql: Sql, key: TailKey): string | null {
+  const register = key.register;
   const last = sql.one<{ id: string; status: string; resolved_as: string | null }>(
-    "SELECT id, status, resolved_as FROM suggestion WHERE body_kind = 'options' AND json_valid(body) AND json_extract(body, '$.cause') = ? ORDER BY rowid DESC LIMIT 1",
-    cause,
+    `SELECT id, status, resolved_as FROM suggestion WHERE ${SAME_TAIL} ORDER BY rowid DESC LIMIT 1`,
+    ...keyOf(key),
   );
   if (last === undefined || last.status !== 'resolved' || last.resolved_as !== 'addressed' || settledAnswer(sql, last.id) !== NONE) return null;
   /* AFTER IT BY THE LOG'S OWN ORDER, not by the clock: two writes in one instant are still one before the other. */
@@ -2114,19 +2160,55 @@ function declinedTail(sql: Sql, cause: string, register: string): string | null 
   return added > 0 ? null : last.id;
 }
 
-/** The arrivals still held under the questions for `cause` answered "None of these", oldest question first. */
-function declinedRaws(sql: Sql, cause: string): string[] {
-  const out: string[] = [];
-  for (const q of sql.all<{ id: string; body: string }>(
-    "SELECT id, body FROM suggestion WHERE body_kind = 'options' AND status = 'resolved' AND json_valid(body) AND json_extract(body, '$.cause') = ? AND json_extract(body, '$.applied.none') = 1 ORDER BY rowid",
-    cause,
+/** An amount in minor units and its currency, as a money field is filed. */
+type Minor = { amount: number; currency: string };
+
+/** THE FIRST MONEY FIELD THE LIST DECLARES, as it would be filed, or `null`: one sum per currency, two never added. */
+function moneyOf(deps: Pick<IngestDeps, 'schemaOf'>, register: string, extracted: Record<string, unknown>): Minor | null {
+  const money = Object.entries(deps.schemaOf(register)?.fields ?? {}).find(([, f]) => f.type === 'money')?.[0];
+  const amount = money === undefined ? undefined : (extracted[money] as { amount?: unknown; currency?: unknown } | undefined);
+  return amount !== undefined && amount !== null && Number.isInteger(amount.amount) && typeof amount.currency === 'string'
+    ? { amount: amount.amount as number, currency: amount.currency }
+    : null;
+}
+
+/**
+ * The arrivals still held under the questions for these digits answered "None of these", oldest question first, each
+ * with what it would file: its bytes read again by the pattern that last matched it, since a question keeps one sum
+ * and not one amount per message. An arrival whose pattern is gone still counts, with no amount.
+ */
+function declinedRaws(deps: IngestDeps, key: TailKey): { raw: string; amount: Minor | null }[] {
+  const out: { raw: string; amount: Minor | null }[] = [];
+  for (const q of deps.sql.all<{ id: string; body: string }>(
+    `SELECT id, body FROM suggestion WHERE status = 'resolved' AND ${SAME_TAIL} AND json_extract(body, '$.applied.none') = 1 ORDER BY rowid`,
+    ...keyOf(key),
   )) {
     const raws = parsed(q.body)?.raws;
     if (!Array.isArray(raws)) continue;
-    const held = sql.all<{ id: string }>("SELECT id FROM inbox_raw WHERE id IN (SELECT value FROM json_each(?)) AND state IN ('review', 'proposed')", JSON.stringify(raws));
-    for (const r of held) if (!out.includes(r.id)) out.push(r.id);
+    for (const r of heldAmounts(deps, raws)) if (!out.some((o) => o.raw === r.raw)) out.push(r);
   }
   return out;
+}
+
+/**
+ * The held arrivals among `raws`, oldest first, each with the amount it would file, read again from its bytes by the
+ * pattern that last matched it, into the list that pattern routes it to.
+ */
+function heldAmounts(deps: IngestDeps, raws: readonly unknown[]): { raw: string; amount: Minor | null }[] {
+  const patterns = new Map(deps.ingests().map((p) => [`ingest:${p.ingest}`, p]));
+  const held = deps.sql.all<{ id: string; ts: string; body: string | null; actor: string | null }>(
+    `SELECT i.id, i.ts, i.body, (SELECT e.actor FROM event e WHERE e.kind = 'match' AND e.target = 'inbox_raw:' || i.id ORDER BY e.rowid DESC LIMIT 1) AS actor
+       FROM inbox_raw i WHERE i.id IN (SELECT value FROM json_each(?)) AND i.state IN ('review', 'proposed') ORDER BY i.rowid`,
+    JSON.stringify(raws),
+  );
+  return held.map((r) => {
+    const pattern = r.actor === null ? undefined : patterns.get(r.actor);
+    if (pattern === undefined) return { raw: r.id, amount: null };
+    const body = r.body ?? '';
+    const read = readFields(deps, pattern, body, deps.normalise === undefined ? body : deps.normalise(body), r.ts);
+    const routed = routeTo(pattern.writes.register, read.extracted);
+    return { raw: r.id, amount: 'to' in routed ? moneyOf(deps, routed.to, read.extracted) : null };
+  });
 }
 
 /** Add one arrival to a question's `raws`, once, without asking it again. */
@@ -2220,9 +2302,21 @@ function answerTail(deps: IngestDeps, a: Answered, asked: Record<string, unknown
     return v === null || v === undefined || typeof v === 'object' ? '' : String(v).trim();
   };
   const holds = (r: LiveRow): boolean => (tail.split ? partsOf(valueOf(r)) : [valueOf(r)]).includes(tail.digits);
+  /* DIGITS ARE NEVER MOVED IN SILENCE (audit-34 finding 6). Digits a person put on an account, or confirmed there, are
+     his word: an answer that would take them off another account, or write over them on this one, is refused in one
+     sentence that names the account, and nothing is written. Digits an agent put and nobody confirmed are a guess, and
+     the answer is the correction: they are taken or written over, and the closing line says so. */
+  const mine = (r: LiveRow, digits: string): boolean => !writtenByAgent(deps.sql, r.id, tail.by) || confirmedTail(deps.sql, { digits, row: r.id });
+  const { label } = tailWords(deps.sql, tail);
+  const held = rows.find((r) => r.id !== chosen.id && holds(r) && mine(r, tail.digits));
+  if (held !== undefined)
+    return no('UNIQUE_VIOLATION', `${rowSaid(deps.sql, tail.register, held)} already holds ${tail.digits}. Take it off that account first, or pick it.`, { at: 'option' });
+  const before = valueOf(chosen);
+  const over = !tail.split && before !== '' && before !== tail.digits;
+  if (over && mine(chosen, before))
+    return no('UNIQUE_VIOLATION', `${rowSaid(deps.sql, tail.register, chosen)} already holds ${before} in ${label}. Change it on the account first, or pick another.`, { at: 'option' });
   if (!holds(chosen)) {
-    const now = valueOf(chosen);
-    const wrote = deps.write(tail.register, chosen.id, { [tail.by]: tail.split && now !== '' ? `${now}, ${tail.digits}` : tail.digits }, a.actor);
+    const wrote = deps.write(tail.register, chosen.id, { [tail.by]: tail.split && before !== '' ? `${before}, ${tail.digits}` : tail.digits }, a.actor);
     if (!wrote.ok) return wrote as Result<never>;
   }
   /* AND OFF EVERY OTHER ACCOUNT THAT HELD THEM, so the next text names one account and not two. What a wrong answer
@@ -2241,7 +2335,11 @@ function answerTail(deps: IngestDeps, a: Answered, asked: Record<string, unknown
   /* WHAT AN UNDONE ANSWER FILED IS FILED AGAIN: a text whose rows the Undo took back waits under this question again. */
   const ran = replayHeld(deps, raws.map((raw) => ({ raw })), true);
   const name = rowSaid(deps.sql, tail.register, chosen);
-  const line = filedSaid(ran, name);
+  const moved = [
+    over ? `${name} held ${before} in ${label}, put there by an agent; it holds ${tail.digits} now.` : '',
+    ...off.map((other) => `${tail.digits} was taken off ${rowSaid(deps.sql, tail.register, other)}, where an agent put it.`),
+  ];
+  const line = [filedSaid(ran, name), ...moved].filter((part) => part !== '').join(' ');
   keep({ applied: { row: chosen.id, at, resolve, wrote: ran.wrote }, said: line });
   deps.sql.exec(
     "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'note', ?, 'suggestion', ?)",
@@ -2252,10 +2350,13 @@ function answerTail(deps: IngestDeps, a: Answered, asked: Record<string, unknown
     line.slice(0, 280),
   );
   for (const other of off) askMove(deps, at, { tail, from: other.id, to: chosen.id, since: deps.nowMs - MOVE_DAYS * 86_400_000 });
-  /* WHAT ELSE WAITED AT THE DOOR FOR THESE DIGITS is read again now, not at the next text: a question per message filed
-     before this one existed is folded or filed (`sweepDoor`). */
-  const swept = sweepDoor(deps, tail.door);
-  if (!swept.ok) return swept as Result<never>;
+  /* WHAT ELSE WAITED FOR THESE DIGITS is read again now, not at the next text, AT EVERY DOOR THAT READS THEM (audit-34
+     finding 5): the bank's mail and its texts print one card, and a question the other door asked before the cause
+     stopped naming a door closes with this answer, as filed (`sweepDoor`). */
+  for (const door of doorsReading(deps, tail)) {
+    const swept = sweepDoor(deps, door);
+    if (!swept.ok) return swept as Result<never>;
+  }
   inBatch(deps.sql, mark, a.batch, rows.map((r) => r.id));
   return ok(line);
 }
@@ -2458,6 +2559,91 @@ const amountOnly = (value: unknown): unknown =>
 /** The most held arrivals one sweep reads. Past it the rest wait for the next arrival at the door. */
 const SWEEP_MOST = 200;
 
+/** Every lookup a pattern's fields read by. */
+const lookupsOf = (p: IngestDecl): LookupForm[] =>
+  Object.values(p.extract ?? {}).flatMap((declared) => {
+    const l = lookupOf(stripOf(declared).form);
+    return l !== null && typeof l.register === 'string' && typeof l.by === 'string' ? [l] : [];
+  });
+
+/**
+ * Every door whose patterns look up the list and field a tail question asks about, its own door first: the doors one
+ * answer is swept at. A door is what `sweepDoor` is called with, a pattern's `door` or, where it names none, the pattern.
+ */
+function doorsReading(deps: IngestDeps, tail: TailAsked): string[] {
+  const doors = [tail.door];
+  for (const p of deps.ingests()) {
+    const door = p.door ?? p.ingest;
+    if (!doors.includes(door) && lookupsOf(p).some((l) => l.register === tail.register && l.by === tail.by)) doors.push(door);
+  }
+  return doors;
+}
+
+/**
+ * An answer the door's sweep could not carry out, put in the log on its question in its own sentence, once per answer:
+ * a sweep runs at every text, and the same failure is not written at each.
+ */
+function failedAnswer(deps: IngestDeps, suggestion: string, door: string, failed: Result<unknown>): void {
+  const why = failed.ok ? '' : 'refusal' in failed ? failed.refusal.fix : 'Somebody changed the account at the same time.';
+  const note = `This answer could not be carried out, so its messages still wait: ${why}`.slice(0, 280);
+  const last = deps.sql.one<{ note: string | null }>("SELECT note FROM event WHERE kind = 'note' AND target = ? ORDER BY rowid DESC LIMIT 1", `suggestion:${suggestion}`);
+  if (last?.note === note) return;
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'note', ?, 'suggestion', ?)",
+    deps.mint(),
+    instant(deps.nowMs),
+    `ingest:${door}`,
+    `suggestion:${suggestion}`,
+    note,
+  );
+}
+
+/** A tail question as the door's sweep holds it. */
+type Swept = { id: string; status: string; parsed: Record<string, unknown>; tail: TailAsked };
+
+/**
+ * Open tail questions about one list, field and digits folded into the oldest: its messages, each once, and their sums
+ * per currency, and the others closed as asked again. Only questions a door asked when the cause named it can be twins.
+ */
+function foldTwins(deps: IngestDeps, questions: Swept[]): void {
+  const first = new Map<string, Swept>();
+  for (const q of questions) {
+    if (q.status !== 'open') continue;
+    const key = keyOf(q.tail).join('\u0000');
+    const keep = first.get(key);
+    if (keep === undefined) {
+      first.set(key, q);
+      continue;
+    }
+    const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((r): r is string => typeof r === 'string') : []);
+    const raws = strings(keep.parsed.raws);
+    const twice = strings(q.parsed.raws).some((raw) => raws.includes(raw));
+    for (const raw of strings(q.parsed.raws)) if (!raws.includes(raw)) raws.push(raw);
+    const totals: Record<string, number> = twice ? {} : { ...((keep.parsed.totals as Record<string, number> | undefined) ?? {}) };
+    const add = (currency: string, minor: number): void => {
+      if (Number.isInteger(minor)) totals[currency] = (totals[currency] ?? 0) + minor;
+    };
+    /* A MESSAGE BOTH HELD IS SUMMED ONCE: the sums are then read again from the messages themselves. */
+    const amounts = twice
+      ? heldAmounts(deps, raws).flatMap((h): [string, number][] => (h.amount === null ? [] : [[h.amount.currency, h.amount.amount]]))
+      : Object.entries((q.parsed.totals as Record<string, number> | undefined) ?? {});
+    for (const [currency, minor] of amounts) add(currency, minor);
+    const context = typeof keep.parsed.context === 'string' ? keep.parsed.context.replace(WAITING_SAID, '') : '';
+    keep.parsed = { ...keep.parsed, raws, count: raws.length, totals, context: cutTo(`${context}${waitingSaid(raws.length, totals)}`, 280) };
+    deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify(keep.parsed), keep.id);
+    deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'asked-again' WHERE id = ? AND status = 'open'", q.id);
+    deps.sql.exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'resolve', ?, 'suggestion', 'asked-again', ?)",
+      deps.mint(),
+      instant(deps.nowMs),
+      `ingest:${q.tail.door}`,
+      `suggestion:${q.id}`,
+      `Asked again as one question with the other messages for ${q.tail.digits}.`,
+    );
+    q.status = 'resolved';
+  }
+}
+
 /**
  * Before an arrival at `door` is filed, what waits there is looked at again (DIRECTION §42):
  *
@@ -2477,18 +2663,24 @@ function sweepDoor(deps: IngestDeps, door: string): Result<null> {
   const patterns = deps.ingests().filter((i) => i.ingest === door || i.door === door);
   if (patterns.length === 0) return ok(null);
   const at = instant(deps.nowMs);
+  /* THE TAIL QUESTIONS ABOUT WHAT THIS DOOR'S PATTERNS LOOK UP, whichever door asked them, and those its door asked
+     before the cause stopped naming one. */
+  const reads = new Set(patterns.flatMap(lookupsOf).map((l) => `${l.register}\u0000${l.by}`));
   const questions = deps.sql
     .all<{ id: string; body: string; status: string; resolved_as: string | null; opened_at: string }>(
       `SELECT id, body, status, resolved_as, opened_at FROM suggestion
-        WHERE body_kind = 'options' AND json_valid(body) AND json_extract(body, '$.cause') LIKE ? ESCAPE '\\' ORDER BY rowid`,
-      `tail:${door.replace(/[\\%_]/g, (c) => `\\${c}`)}:%`,
+        WHERE body_kind = 'options' AND json_valid(body) AND json_extract(body, '$.cause') LIKE 'tail:%'
+          AND (json_extract(body, '$.tail.door') = ? OR json_extract(body, '$.tail.register') IN (SELECT value FROM json_each(?))) ORDER BY rowid`,
+      door,
+      JSON.stringify([...new Set(patterns.flatMap(lookupsOf).map((l) => l.register))]),
     )
     .flatMap((q) => {
       const body = parsed(q.body);
       const tail = body === null ? null : tailAsked(body);
-      return body === null || tail === null ? [] : [{ ...q, parsed: body, tail }];
+      return body === null || tail === null || (tail.door !== door && !reads.has(`${tail.register}\u0000${tail.by}`)) ? [] : [{ ...q, parsed: body, tail }];
     });
 
+  let carried = false;
   for (const q of questions) {
     if (q.status !== 'resolved' || q.resolved_as !== 'addressed' || carriedOut(deps.sql, q.id, q.parsed)) continue;
     const answer = settledAnswer(deps.sql, q.id);
@@ -2496,9 +2688,36 @@ function sweepDoor(deps: IngestDeps, door: string): Result<null> {
       "SELECT e.actor AS actor, e.batch AS batch FROM event r JOIN event e ON e.rowid = r.rowid - 1 AND e.kind = 'decide' WHERE r.kind = 'resolve' AND r.target = ? ORDER BY r.rowid DESC LIMIT 1",
       `suggestion:${q.id}`,
     );
-    const done = answerTail(deps, { id: q.id, option: answer, actor: made?.actor ?? 'system', batch: made?.batch ?? null }, q.parsed);
-    if (!done.ok) return done as Result<never>;
+    /* ONE ANSWER THAT CANNOT BE CARRIED OUT NEVER STOPS THE DOOR (audit-34 finding 7). It runs in a savepoint of its own,
+       so what it wrote before it failed is taken back; the failure is put in the log once per answer, on the question,
+       and the sweep goes on, so the text that came is filed. The answer is tried again at the next text, since a write
+       that failed may not fail twice. Only `decide`, which hands an answer here itself, refuses with the error. */
+    const done = attempt(deps.sql, (fn) => fn(), () => answerTail(deps, { id: q.id, option: answer, actor: made?.actor ?? 'system', batch: made?.batch ?? null }, q.parsed));
+    if (!done.ok) failedAnswer(deps, q.id, door, done);
+    carried = true;
   }
+  /* READ AGAIN AFTER AN ANSWER WAS CARRIED OUT: it swept the doors itself, and a question it folded or filed there is
+     not folded or filed a second time here from what was read before. */
+  if (carried) {
+    const now = new Map(
+      deps.sql
+        .all<{ id: string; body: string; status: string; resolved_as: string | null }>(
+          'SELECT id, body, status, resolved_as FROM suggestion WHERE id IN (SELECT value FROM json_each(?))',
+          JSON.stringify(questions.map((q) => q.id)),
+        )
+        .map((q) => [q.id, q]),
+    );
+    for (const q of questions) {
+      const fresh = now.get(q.id);
+      const body = fresh === undefined ? null : parsed(fresh.body);
+      if (fresh === undefined || body === null) continue;
+      Object.assign(q, { status: fresh.status, resolved_as: fresh.resolved_as, parsed: body });
+    }
+  }
+
+  /* TWO QUESTIONS OPEN ABOUT ONE ACCOUNT'S DIGITS, asked by two doors when the cause still named its door, are one: the
+     newer one's messages join the older and it closes as asked again, so Decide counts one. */
+  foldTwins(deps, questions);
 
   for (const q of questions) {
     if (q.status !== 'open') continue;
@@ -2638,9 +2857,10 @@ function askMove(deps: IngestDeps, at: string, m: { tail: TailAsked; from: strin
   const list = declaredList(deps.sql, moved.register);
   const n = moved.rows.length;
   const things = n === 1 ? (typeof list.one === 'string' && list.one.trim() !== '' ? list.one.trim() : 'one') : listName(deps.sql, moved.register).toLowerCase();
+  if (deps.sql.one("SELECT 1 AS n FROM suggestion WHERE status = 'open' AND cause = ?", cause) !== undefined) return;
   const id = `SG${deps.allocate('suggestion')}`;
   deps.sql.exec(
-    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'options', ?, 'open', ?, ?)",
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, cause) VALUES (?, 'options', ?, 'open', ?, ?, ?)",
     id,
     JSON.stringify({
       cause,
@@ -2654,6 +2874,7 @@ function askMove(deps: IngestDeps, at: string, m: { tail: TailAsked; from: strin
     }),
     `ingest:${m.tail.door}`,
     at,
+    cause,
   );
   deps.sql.exec(
     "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'suggest', ?, 'suggestion', ?)",
@@ -2684,7 +2905,7 @@ function filedBy(deps: IngestDeps, digits: string, account: string, since: strin
       const lookup = lookupOf(stripOf(declared).form);
       if (lookup === null) return [];
       const mask = maskAtEnd(lookup.between?.[0] ?? lookup.after ?? '');
-      return slices({ lookup } as Record<string, unknown>, text).some((s) => firstRun(mask + s)?.digits === digits) ? [field] : [];
+      return slices({ lookup } as Record<string, unknown>, text).some((s) => printsDigits(firstRun(mask + s), digits)) ? [field] : [];
     });
     if (printing.length === 0) continue;
     let ids: unknown;

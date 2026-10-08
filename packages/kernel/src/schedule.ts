@@ -19,7 +19,8 @@
 import type { Sql } from '@braindog/ports';
 
 import type { Json } from './coerce.ts';
-import { backoffMs, openChangeSuggestion, summary, type AckDeps } from './outbox.ts';
+import { clearFault, raiseFault } from './fault.ts';
+import { backoffMs, type AckDeps } from './outbox.ts';
 import { ABANDON_MS } from './presence.ts';
 import { SESSION, isHelper, leftFreshStep } from './session.ts';
 import { resolveDay } from '@braindog/where';
@@ -407,8 +408,8 @@ const CEILING = 8;
  * inside a CPU budget instead of discovering the ceiling in production.
  *
  * BACKOFF, CAPPED, AND THEN VISIBLE. Doubling minutes to six hours, and at the eighth attempt the row
- * is `failed` and a suggestion opens. A reminder that silently gave up is worse than one that never
- * existed — the person it was about has no way to know the difference, and acts as though it fired.
+ * is `failed` and a fault is raised (`fault.ts`). A reminder that silently gave up is worse than one that
+ * never existed — the person it was about has no way to know the difference, and acts as though it fired.
  */
 export function drainSchedule(
   sql: Sql,
@@ -438,7 +439,7 @@ export function drainSchedule(
     if (!handler) {
       /* A KIND WITH NO HANDLER DOES NOT WALK THE LADDER. Retrying code that does not exist eight
          times is not a retry — it is eight hours of pretending. The row fails once, and the
-         suggestion says which kind nothing answers to. */
+         fault keeps which kind nothing answers to. */
       fail(sql, deps, row, `Nothing in this record handles a ${row.kind} row.`, CEILING);
       out.dead++;
       continue;
@@ -472,6 +473,8 @@ export function drainSchedule(
         new Date(next).toISOString(),
         row.id,
       );
+    /* A ROW OF A KIND THAT RUNS CLEARS THAT KIND'S FAULT, as a completed outbox job clears its own. */
+    clearFault(sql, `schedule#${row.kind}`, deps.nowMs);
     out.done++;
   }
 
@@ -489,12 +492,25 @@ function fail(sql: Sql, deps: AckDeps, row: Claimed, error: string, attempts: nu
     );
     return;
   }
+  /* THE END OF IT IS A FAULT, NEVER A QUESTION (AGT-C06), the outbox's reason: a scheduled thing that cannot run is an
+     operator's to fix, and asking the owner to retry it or change what produces it asked him for something he cannot
+     do. One `schedule#<kind>` however many rows of the kind fail, cleared when one of the kind next runs. */
   sql.exec("UPDATE schedule SET state = 'failed', attempts = ? WHERE id = ?", attempts, row.id);
-  openChangeSuggestion(sql, deps, {
-    declarationId: `kernel.schedule.${row.kind}`,
-    from: { kind: row.kind, key: row.key, error, attempts, payload: summary(row.payload) },
-    question: `A ${row.kind} due ${row.due_at.slice(0, 10)} could not run after ${attempts} attempts: ${error}. Retry it, or change what produces it.`,
-  });
+  raiseFault(sql, `schedule#${row.kind}`, row.kind, error, deps.nowMs);
+}
+
+/**
+ * Put the newest failed row of a kind back on the schedule, for `retryFault`: `pending`, due now, its attempts back to
+ * nought. The newest only, for `retryDead`'s reason in `outbox.ts`. The number of rows queued, 0 or 1.
+ */
+export function retryFailed(sql: Sql, kind: string, nowMs: number): number {
+  const row = sql.one<{ id: string }>(
+    "SELECT id FROM schedule WHERE kind = ? AND state = 'failed' ORDER BY due_at DESC, id DESC LIMIT 1",
+    kind,
+  );
+  if (row === undefined) return 0;
+  sql.exec("UPDATE schedule SET state = 'pending', attempts = 0, due_at = ? WHERE id = ?", new Date(nowMs).toISOString(), row.id);
+  return 1;
 }
 
 /** A run not heard from in twelve hours is written off by the hourly sweep: kept in `presence.ts`, with the clock. */

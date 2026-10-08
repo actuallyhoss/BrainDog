@@ -13,6 +13,7 @@
     "./oauth": "./src/oauth.ts",
     "./script": "./src/script.ts",
     "./script-try": "./src/script-try.ts",
+    "./sign-model": "./src/sign-model.ts",
     "./slash": "./src/slash.ts",
     "./slash-answers": "./src/slash-answers.ts",
     "./stripe-sign": "./src/stripe-sign.ts",

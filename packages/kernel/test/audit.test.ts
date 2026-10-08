@@ -110,11 +110,12 @@ test('AN ABANDONED LEASE IS AN ATTEMPT, and the eighth one is dead rather than a
   assert.equal(row.state, 'dead');
   assert.equal(row.attempts, 8);
 
-  // And the ladder ends where every other one does: one visible item, naming what could not be sent.
-  const items = sql.all<{ body: string; opened_by: string }>('SELECT body, opened_by FROM suggestion');
-  assert.equal(items.length, 1, `${items.length} items for one job`);
-  assert.equal(items[0]?.opened_by, 'system');
-  assert.match(items[0]?.body ?? '', /lease expired without an ack/);
+  // And the ladder ends where every other one does: one fault, naming what could not be sent, and no question (AGT-C06).
+  assert.equal(sql.all('SELECT id FROM suggestion').length, 0, 'a fault was asked as a question');
+  const faults = sql.all<{ cause: string; error: string }>('SELECT cause, error FROM fault WHERE cleared_at IS NULL');
+  assert.equal(faults.length, 1, `${faults.length} faults for one job`);
+  assert.equal(faults[0]?.cause, 'outbox#notify.email');
+  assert.match(faults[0]?.error ?? '', /lease expired without an ack/);
   sql.close();
 });
 

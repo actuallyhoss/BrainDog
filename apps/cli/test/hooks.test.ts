@@ -16,7 +16,7 @@ import { hostname, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { HOOK_MS, heldFor, hookBudget, notSignedIn, readSession, REMEMBER_MS, sessionPath, windowPath, writeSession, type SessionFile } from '../src/hooks.ts';
+import { eventOf, HOOK_MS, heldFor, hookBudget, notSignedIn, readSession, REMEMBER_MS, sessionPath, windowPath, writeSession, type SessionFile } from '../src/hooks.ts';
 import { replaceByHand, hookCommand, installInto, serversFileOf } from '../src/install.ts';
 import { sessionHeaders } from '../src/position.ts';
 import { REPLACE, REPLACE_FILE } from './replace.ts';
@@ -99,6 +99,7 @@ async function stubHost(
       }
       if (method === 'end') return answer({ ok: true, value: { run: 'S7', state: 'done', changed: true } });
       if (method === 'context') return answer({ ok: true, value: CONTEXT });
+      if (method === 'heard') return answer({ ok: true, value: { marked: true } });
       /* With `projects`, a Projects list declaring `scopes:` and a People list declaring `meets:` with its self part. */
       const registers = o.projects === undefined ? [] : [{ id: 'things', name: 'Projects', count: o.projects.length }, { id: 'people', name: 'People', count: 1 }];
       if (method === 'boot') return answer({ ok: true, value: { registers, now: '2026-10-02T09:00:00Z', me: { kind: 'token', person: 'p_owner', name: 'Sam', level: 'owner' } } });
@@ -217,7 +218,9 @@ test('THE START HOOK ATTACHES, KEEPS THE SESSION FILE, AND PRINTS THE CARD, then
   assert.notEqual(file, sessionPath(env, cwd));
   for (const kept of [file, sessionPath(env, cwd)]) {
     const held = readSession(kept);
-    assert.deepEqual({ ...held, at: undefined }, { host: host.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: undefined, cwd });
+    assert.deepEqual({ ...held, at: undefined, hook_ms: undefined }, { host: host.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: undefined, cwd, hook_ms: undefined });
+    /* How long this hook took, kept for the next hook of the session to send (`owedMark`). */
+    assert.ok(Number.isInteger(held?.hook_ms) && held!.hook_ms! > 0 && held!.hook_ms! < 30_000, String(held?.hook_ms));
     assert.ok(!readFileSync(kept, 'utf8').includes('stub-bearer'), 'the session file holds the token');
   }
 });
@@ -277,6 +280,50 @@ test('THE RECORD’S OWN CARD IS PRINTED AS IT CAME, and a compaction prints onl
   assert.equal((await run(['hook', 'start'], env, event(cwd, { session_id: 'claude-run-9', source: 'compact' }))).stdout, 'Next     Kern the lowercase pairs. (S6, Claude Code, 10m ago)\n');
 });
 
+test('THE START HOOK’S OWN TIME RIDES THE NEXT CALL of the same session, as a hook mark against its run, and is sent once', async (t) => {
+  const host = await stubHost(t);
+  const cwd = folder('kiln');
+  const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+  const own = sessionPath(env, cwd, 'claude-run-1');
+  const methods = () => host.seen.map((s) => s.method).sort();
+
+  /* A start times itself and keeps the time; it sends nothing more than it always did. */
+  assert.equal((await run(['hook', 'start'], env, event(cwd, { session_id: 'claude-run-1', source: 'startup' }))).code, 0);
+  assert.deepEqual(methods(), ['attach', 'boot']);
+  /* Every call says the command's build, the checkout's here. */
+  for (const s of host.seen) assert.equal(s.headers['x-braindog-cli'], 'dev+0000000', s.method);
+  const first = readSession(own)?.hook_ms;
+  assert.ok(first !== undefined && first > 0, 'the start hook kept no time');
+  host.seen.splice(0);
+
+  /* The compaction's attach carries it along: one mark beside the call it makes anyway, against the run that hook attached. */
+  assert.equal((await run(['hook', 'start'], env, event(cwd, { session_id: 'claude-run-1', source: 'compact' }))).code, 0);
+  assert.deepEqual(methods(), ['attach', 'heard']);
+  const mark = host.seen.find((s) => s.method === 'heard')!;
+  assert.deepEqual(mark.body, { kind: 'hook', ms: first, build: 'dev+0000000' });
+  assert.deepEqual([mark.headers['x-braindog-session'], mark.headers['x-braindog-client'], mark.headers['x-braindog-cli']], ['S7', 'claude-run-1', 'dev+0000000']);
+  const second = readSession(own)?.hook_ms;
+  assert.ok(second !== undefined, 'the compaction kept no time of its own');
+  host.seen.splice(0);
+
+  /* A clear is another session: the time the folder's file holds is not its to send. */
+  assert.equal((await run(['hook', 'start'], env, event(cwd, { session_id: 'claude-run-2', source: 'clear' }))).code, 0);
+  assert.deepEqual(methods(), ['attach', 'boot']);
+  host.seen.splice(0);
+
+  /* The end sends what the session still owes beside its end, and the file stops owing it. */
+  const end = JSON.stringify({ session_id: 'claude-run-1', cwd, hook_event_name: 'SessionEnd', reason: 'prompt_input_exit' });
+  assert.equal((await run(['hook', 'end'], env, end)).code, 0);
+  assert.deepEqual(methods(), ['end', 'heard']);
+  assert.deepEqual(host.seen.find((s) => s.method === 'heard')!.body, { kind: 'hook', ms: second, build: 'dev+0000000' });
+  assert.equal(readSession(own)?.hook_ms, undefined);
+  host.seen.splice(0);
+
+  /* A second end owes nothing, so it sends the end alone. */
+  assert.equal((await run(['hook', 'end'], env, end)).code, 0);
+  assert.deepEqual(methods(), ['end']);
+});
+
 test('AN UNREACHABLE HOST IS ONE LINE AND EXIT 0: a host that never answers, and a port nobody listens on', async (t) => {
   assert.equal(HOOK_MS, 8_000);
   assert.equal(hookBudget({}), 8_000);
@@ -314,6 +361,57 @@ test('NOT SIGNED IN is one line saying how to get a token, exit 0, and nothing i
 
   /* An empty stdin, as a person running it by hand sends, is the same startup. */
   assert.equal((await run(['hook', 'start'], envFor(config, {}), '')).code, 0);
+});
+
+/* ── what a real Claude Code sends ─────────────────────────────────────── */
+
+type Fixture = { measured: { version: string }; of?: string; hooks: { event: string; stdin: Record<string, string>; env: Record<string, string> }[] };
+const FIXTURES = join(APP, 'test', 'fixtures', 'hook-events');
+const fixture = (name: string) => JSON.parse(readFileSync(join(FIXTURES, `${name}.json`), 'utf8')) as Fixture;
+
+test('WHAT CLAUDE CODE SENDS, AS MEASURED: a resume keeps its id, a clear and a fork do not, and each start reads as the hook expects', () => {
+  const names = readdirSync(FIXTURES).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
+  assert.deepEqual(names, ['clear', 'compact', 'continue', 'exit', 'fork', 'nested', 'resume', 'resume-picked', 'startup', 'startup-print']);
+  const starts: Record<string, string> = {};
+  for (const name of names) {
+    const f = fixture(name);
+    assert.match(f.measured.version, /^2\.\d+\.\d+$/, name);
+    for (const h of f.hooks) {
+      /* The environment names the same session the event does, in every hook measured. */
+      assert.equal(h.env.CLAUDE_CODE_SESSION_ID, h.stdin.session_id, `${name} ${h.event}`);
+      if (h.event !== 'SessionStart') continue;
+      const read = eventOf(JSON.stringify(h.stdin), '/elsewhere');
+      assert.deepEqual(read, { cwd: h.stdin.cwd, source: read.source, client_id: h.stdin.session_id }, name);
+      starts[name] = `${h.stdin.source} as ${read.source}`;
+    }
+  }
+  /* A fork is a source the hook does not name, so it starts a run of its own. */
+  assert.deepEqual(starts, {
+    clear: 'clear as clear',
+    continue: 'resume as resume',
+    fork: 'fork as startup',
+    nested: 'startup as startup',
+    resume: 'resume as resume',
+    'resume-picked': 'resume as resume',
+    startup: 'startup as startup',
+    'startup-print': 'startup as startup',
+  });
+  /* `--resume`, `--continue` and a picked resume come back under the conversation's own id; a fork under a new one. */
+  for (const name of ['resume', 'continue', 'resume-picked']) assert.equal(fixture(name).hooks.at(-1)!.stdin.session_id, fixture(name).of, name);
+  assert.notEqual(fixture('fork').hooks[0]!.stdin.session_id, fixture('fork').of);
+  /* A clear and a picked resume end the open session and start another in the same process. */
+  for (const [name, reason] of [['clear', 'clear'], ['resume-picked', 'resume']] as const) {
+    const [end, start] = fixture(name).hooks;
+    assert.deepEqual([end!.event, end!.stdin.reason, start!.event], ['SessionEnd', reason, 'SessionStart'], name);
+    assert.notEqual(end!.stdin.session_id, start!.stdin.session_id, name);
+    assert.equal(end!.env.CLAUDE_PID, start!.env.CLAUDE_PID, name);
+  }
+  /* A claude started from another session's shell names nothing of that session. */
+  const nested = fixture('nested') as Fixture & { parent: Record<string, string> };
+  assert.notEqual(nested.hooks[0]!.env.CLAUDE_PID, nested.parent.CLAUDE_PID);
+  assert.notEqual(nested.hooks[0]!.stdin.session_id, nested.parent.CLAUDE_CODE_SESSION_ID);
+  /* Measured on 2.1.295: the child flag is set in every hook, a window a person opened included (see the spec). */
+  assert.equal(fixture('startup').hooks[0]!.env.CLAUDE_CODE_CHILD_SESSION, '1');
 });
 
 /* ── the end hook ──────────────────────────────────────────────────────── */
@@ -467,6 +565,7 @@ test('the MCP server sends the run and client from the session file, and a hook 
     'x-braindog-repo': 'kiln',
     'x-braindog-cwd': 'C:\\Repos\\kiln',
     'x-braindog-agent': 'claude',
+    'x-braindog-cli': 'dev+0000000',
   });
   assert.equal(sessionHeaders(at, 'claude', { spoken: 'not-a-run' })['x-braindog-session'], undefined);
 

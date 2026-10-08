@@ -16,6 +16,7 @@ import { mapDriverMessage, ok } from '@braindog/ports';
 
 import { seedLadder } from './change-kind.ts';
 import { rebuildKeys } from './entities.ts';
+import { ulids } from './ids.ts';
 import { rebuild } from './fts.ts';
 import type { RegisterDecl } from './index.ts';
 
@@ -47,6 +48,9 @@ import trust0025 from './migrations/0025_trust.ts';
 import sessionStarted0026 from './migrations/0026_session_started.ts';
 import signs0027 from './migrations/0027_signs.ts';
 import runs0028 from './migrations/0028_runs.ts';
+import door0029 from './migrations/0029_door.ts';
+import faults0030 from './migrations/0030_faults.ts';
+import cause0031, { causeSteps } from './migrations/0031_cause.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -80,6 +84,9 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 26, slug: 'session_started', sql: sessionStarted0026 },
   { version: 27, slug: 'signs', sql: signs0027 },
   { version: 28, slug: 'runs', sql: runs0028 },
+  { version: 29, slug: 'door', sql: door0029 },
+  { version: 30, slug: 'faults', sql: faults0030 },
+  { version: 31, slug: 'cause', sql: cause0031 },
 ];
 
 /**
@@ -120,6 +127,11 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 27 adds `sign_reading`, `local`, so no file carries it, and the format is still 1.
  * Migration 28 adds a row, the next version of `register.session` with nine fields an older file's runs import without,
  * and no table, column or index, so the format is still 1.
+ * Migration 29 adds `door_mark`, how each run met the agent door, `local`, so no file carries it.
+ * Migration 30 adds `fault`, what an operator must fix, `local` as the identity keys are, so no file carries it.
+ * Migration 31 adds one nullable column, `cause`, to `suggestion` and to `decision`, which an older file imports
+ * without and reads as NULL, a question nobody gave a cause, with indexes and a trigger no file carries, so the format
+ * is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 
@@ -372,6 +384,10 @@ export async function applyMigrations(
     /* AND THE RUNGS EXISTING WRITE TOKENS KEEP, once, in the run that made the ladder: the kinds each used in the last
        thirty days and that are not on the floor stay at Do and tell (`seedLadder`). A kind is worked out by code too. */
     if (m.slug === 'trust') sql.transactionSync(() => seedLadder(sql, clock.now()));
+    /* AND THE DECISION'S TRIGGER AND EACH OPEN QUESTION'S CAUSE, once, in the run that made the column: a derived cause
+       is a hash code works out, a merge writes a line whose id is minted, and a trigger's body holds a `;` the script
+       runner would cut (`causeSteps`). */
+    if (m.slug === 'cause') sql.transactionSync(() => causeSteps(sql, ulids(() => clock.now()), instant(clock.now())));
   }
 
   /* HALF TWO: a read of `entry_fts` that returns nothing, once the schema is whole. A file whose migrations were

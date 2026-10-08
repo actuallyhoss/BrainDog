@@ -32,12 +32,76 @@ export const PERSON_NAME_MOST = 80;
  */
 const HIDDEN = /[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}\p{Cs}]/u;
 
+/** Where a person whose real name reads as a placeholder writes, said in the refusal so they are not stuck. */
+export const PERSON_NAME_SUPPORT = 'support@brain.dog';
+
 /**
- * A placeholder nobody filled in: a braced field (`{{first_name}}`, `{first}`, `${first}`), a bracketed one
- * (`[First] [Last]`), a mail merge's `*|FNAME|*` or `%FIRST_NAME%`. A form filled from a template stored these as a
- * person's name, and every place the name was drawn said it for good.
+ * A template's field anywhere in a name: a doubled bracket (`{{first_name}}`, `[[Name]]`), `${first}`, a mail merge's
+ * `*|FNAME|*` or `%FIRST_NAME%`. No name is spelled with these, so they are refused wherever they stand.
  */
-const PLACEHOLDER = /\{[^{}]*\}|\[[^[\]]*\]|\*\|[^|]*\|\*|%[\p{L}_]+%/u;
+const MERGE = /\{\{[^{}]*\}\}|\[\[[^[\]]*\]\]|\$\{[^}]*\}|\*\|[^|]*\|\*|%[\p{L}_]+%/u;
+
+/**
+ * The whole name inside one bracketed span, however many brackets deep: a run of opening brackets, no closing bracket,
+ * a run of closing ones (`[Sam]`, `{{ owner }}`, `【山田】`). The Worker's provisioning rule, so a name sign-up takes is
+ * a name a rename takes. THE RUNS KEEP `((Name))` REFUSED and the one span keeps `(Sam) [work]`, two notes, a name.
+ */
+const WHOLE = /^\p{Ps}+[^\p{Pe}]*\p{Pe}+$/u;
+
+/** A bracketed part: square, braced, or round. A round one is a note (`Sam (work)`), so its words are not read. */
+const PART = /\[([^[\]]*)\]|\{([^{}]*)\}|\(([^()]*)\)/gu;
+
+/** A form's field word, which a square bracket or a brace around it makes a field nobody filled: `[First] [Last]`. */
+const FIELD_WORD = /^(first|last|name|your)$/u;
+
+/** A field's label run together, as `spellingOf` writes it, in any bracket: `[yourname]`, `[lastname]`, `(your name)`. */
+const FIELD_LABEL = /^((first|last|full|your)?name|firstlast)$/u;
+
+/** The words of a bracketed part: split at `_`, spaces, hyphens and dots, and where a lower-case letter meets a capital. */
+const wordsOf = (part: string): string[] =>
+  part
+    .replace(/(\p{Ll})(\p{Lu})/gu, '$1 $2')
+    .toLowerCase()
+    .split(/[\s_.-]+/u)
+    .filter(Boolean);
+
+/**
+ * The spellings a form left in place of a name, compared as `spellingOf` writes them, so `Your.Name`, `y o u r n a m e`
+ * and `“Name”` are each one entry. The audit's thirty-one, which were all stored (`loop/research-batch-fifty-audit.md`
+ * section 3), "Your Name", "First Name" and "Last Name". A WHOLE NAME, NEVER A WORD IN ONE: `Name` alone is refused
+ * and `Namelia` is a name.
+ */
+const SPELLINGS: ReadonlySet<string> = new Set([
+  'name', 'fullname', 'firstname', 'lastname', 'firstlast', 'firstnamelastname', 'yourname', 'owner', 'janedoe', 'johndoe',
+  'todo', 'changeme', '$name', '${name}', '%name%', ':name', '$env:username',
+]);
+
+/** A name as `SPELLINGS` holds it: one compatibility form, lower case, and only its letters, digits and `$ : % { }`. */
+const spellingOf = (name: string): string =>
+  name
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[ᐸᐳ]|[^\p{L}\p{N}$:%{}]/gu, '');
+
+/**
+ * Whether a name is a placeholder nobody filled in rather than a name. Exported so the Worker's provisioning and a
+ * screen can ask the same question the record asks.
+ *
+ * A BRACKET IS NOT A PLACEHOLDER BY ITSELF. Any `[...]` part was refused, so `(Sam) [work]` and `Zoë [Z] O’Brien`
+ * were refused at rename while sign-up stored them. A bracketed or braced part is refused only when it is the whole
+ * name or holds a field word; the spellings are a short list compared whole, because a list of spellings has no end
+ * and the person it wrongly refuses is told how to reach a person.
+ */
+export function placeholderName(name: string): boolean {
+  const trimmed = name.trim();
+  if (MERGE.test(trimmed) || WHOLE.test(trimmed)) return true;
+  for (const m of trimmed.matchAll(PART)) {
+    const part = m[1] ?? m[2] ?? m[3] ?? '';
+    if (FIELD_LABEL.test(spellingOf(part))) return true;
+    if (m[3] === undefined && wordsOf(part).some((w) => FIELD_WORD.test(w))) return true;
+  }
+  return SPELLINGS.has(spellingOf(trimmed));
+}
 
 /**
  * The name a person typed, trimmed and with runs of spaces made one, or the one sentence that says why it is not a
@@ -49,7 +113,12 @@ export function personNameOf(typed: unknown): Result<string> {
   if (name === '') return no('REQUIRED_MISSING', 'Type the name you want to be called.', { at: 'name' });
   if ([...name].length > PERSON_NAME_MOST) return no('VALUE_MALFORMED', `A name is at most ${PERSON_NAME_MOST} characters.`, { at: 'name' });
   if (HIDDEN.test(name)) return no('VALUE_MALFORMED', 'That name has a hidden character in it, such as a line break or a direction mark. Type it again without it.', { at: 'name' });
-  if (PLACEHOLDER.test(name)) return no('VALUE_MALFORMED', 'That name is a template field nobody filled in, such as {{first_name}}. Type the name itself.', { at: 'name' });
+  if (placeholderName(name))
+    return no(
+      'VALUE_MALFORMED',
+      `That reads as a form's placeholder, such as Your Name or {{first_name}}, so type the name you want to be called. If it really is your name, write to ${PERSON_NAME_SUPPORT} and we will set it for you.`,
+      { at: 'name' },
+    );
   return ok(name);
 }
 

@@ -1,5 +1,5 @@
 /**
- * One question per door, list and digits (REC-A02): "Which account is the card ending 1234?"
+ * One question per list and digits, whatever door printed them (REC-A02): "Which account is the card ending 1234?"
  *
  * MEASURED ON THE OWNER'S RECORD: about seventeen of his twenty-five questions were one bank text each, every one
  * "bank-card-used-sms could not read account out of this one", none asking which account, and Accept refused because the
@@ -40,7 +40,8 @@ test('TWENTY TEXTS FOR ONE CARD AT FIVE SHOPS ARE ONE QUESTION, which asks which
     context: string;
     options: { id: string; label: string; because: string; recommended?: boolean }[];
   };
-  assert.equal(body.cause, 'tail:bank-sms:accounts:1234', 'the cause is kept on the question, as no column holds it yet');
+  /* THE LIST, THE FIELD AND THE DIGITS, AND NOT THE DOOR: the bank's mail and its texts print one card (audit-34 finding 5). */
+  assert.equal(body.cause, 'tail:accounts:last4:1234', 'the cause is kept on the question, as no column holds it yet');
   assert.equal(body.count, 20);
   /* ONE SUM PER CURRENCY, in minor units: 10.00 to 29.00 is 390.00. */
   assert.deepEqual(body.totals, { EGP: 39_000 });
@@ -64,7 +65,7 @@ test('TWENTY TEXTS FOR ONE CARD AT FIVE SHOPS ARE ONE QUESTION, which asks which
   r.sql.close();
 });
 
-test('ONE QUESTION PER DOOR, LIST AND DIGITS: two cards are two questions, and two patterns at one door share one', async () => {
+test('ONE QUESTION PER LIST AND DIGITS: two cards are two questions, and two patterns at one door share one', async () => {
   const r = await record(CARD(), CASH);
   text(r.k, used('1234', 'CORNER SHOP', '12.00'));
   text(r.k, used('9876', 'CORNER SHOP', '12.00'));

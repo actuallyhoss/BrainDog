@@ -12,7 +12,7 @@
  * bare Node process against an object literal.
  *
  * A FAILURE THROWS AND IS NEVER SWALLOWED. The retry ladder is the record's: `ackOutbox` walks it,
- * counts the attempt, and opens a suggestion at the ceiling. A deliverer that caught its own errors
+ * counts the attempt, and raises a fault at the ceiling. A deliverer that caught its own errors
  * and decided when to try again would be the second ladder `09-ALARMS` spends a paragraph
  * forbidding, and the two would disagree on the day it mattered.
  *
@@ -429,7 +429,7 @@ export function makeDeliver(transports: Transports): Deliver {
 
     /* NOTHING HERE DELIVERS THIS KIND, said out loud. Silently acking it would make the outbox
        claim the work was done; retrying it eight times would be eight hours of pretending. The
-       ladder's ceiling opens a suggestion, and the sentence names the kind. */
+       ladder's ceiling raises a fault, and the sentence names the kind. */
     throw new Error(`nothing in this deployment delivers a ${job.kind}`);
   };
 }

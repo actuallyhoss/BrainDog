@@ -221,7 +221,7 @@
   {:else}
     <!-- A THROW WHILE DRAWING THE BOARD IS THIS SCREEN'S FAULT, said as one with the reason under Details, and never the
          offline sentence: by this point the record has answered. -->
-    <svelte:boundary>
+    <svelte:boundary onerror={(e) => console.error(e)}>
       <div class="tiles">
         <!-- THE ALLOWANCE LEADS, one tile a record the person owns: the four meters as rings, each with its own line under
              it, and the binding meter's sentence as the line that reads them. A plan with no limit has no rings; its tile
@@ -356,8 +356,9 @@
       {#if view.current && view.owner}
         <SlashUsage month={view.month} />
       {/if}
-      {#snippet failed(error, reset)}
-        <ReadState state="fault" screen={words.usage} refusal={error instanceof Error ? error.message : String(error)} onretry={reset} />
+      {#snippet failed(_error, reset)}
+        <!-- A SENTENCE UNDER DETAILS, NEVER THE EXCEPTION: the thrown message reaches the console through `onerror`. -->
+        <ReadState state="fault" screen={words.usage} refusal={words.usageThrew} onretry={reset} />
       {/snippet}
     </svelte:boundary>
   {/if}

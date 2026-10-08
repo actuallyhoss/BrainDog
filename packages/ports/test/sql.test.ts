@@ -227,6 +227,11 @@ test('A SCRIPT REFUSES A TRANSACTION KEYWORD AFTER ANY SEMICOLON, AND RUNS NOTHI
   assert.equal(codeOf(() => sql.exec('CREATE TABLE t2 (x); BEGIN; INSERT INTO t2 VALUES (1); COMMIT;')), 'TXN_STATEMENT_FORBIDDEN');
   assert.deepEqual(plain(sql.all("SELECT count(*) AS n FROM sqlite_master WHERE name = 't2'")), [{ n: 0 }]);
   assert.equal(codeOf(() => guardScript(padded(100_001))), 'STATEMENT_TOO_LONG');
+  /* A TRIGGER'S BODY IS NOT A TRANSACTION (migration 31's `decision_kept`), and a transaction after one still is. */
+  const trigger = "CREATE TRIGGER kept BEFORE UPDATE ON t BEGIN SELECT RAISE(ABORT, 'kept'); END";
+  sql.exec(trigger);
+  assert.deepEqual(plain(sql.all("SELECT count(*) AS n FROM sqlite_master WHERE type = 'trigger' AND name = 'kept'")), [{ n: 1 }]);
+  assert.equal(codeOf(() => guardScript(`${trigger}; BEGIN; COMMIT;`)), 'TXN_STATEMENT_FORBIDDEN');
   raw.close();
 });
 

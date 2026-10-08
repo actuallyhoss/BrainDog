@@ -138,10 +138,15 @@ export type SlashAskDoor<C> = {
   byok?: ((ctx: C) => Promise<unknown>) | undefined;
   vault?: ((ctx: C) => Promise<Refusal | null>) | undefined;
   samples?: ((ids: readonly string[], ctx: C) => Promise<Result<unknown[]>>) | undefined;
+  /**
+   * Whether Slash's model answers, read from its own ledger (`engine-health.ts` `engineHealthRead`). Asked even where the
+   * host wired no engine, since `off` is an answer too; absent, the door answers `NOT_IN_THIS_BUILD`.
+   */
+  health?: (() => Promise<unknown>) | undefined;
 };
 
 /** What a host hands `slashAskDoor` beside the builder: the vault's gate and the inbox's reader (`SlashAskDoor`). */
-export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'vault' | 'samples'>;
+export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'vault' | 'samples' | 'health'>;
 
 /**
  * A door over a builder that is asked once, which is what each host's `slash.ts` hands this file.
@@ -180,14 +185,15 @@ export function slashAskDoor<C>(
     ...(byok === undefined ? {} : { byok }),
     ...(reads.vault === undefined ? {} : { vault: reads.vault }),
     ...(reads.samples === undefined ? {} : { samples: reads.samples }),
+    ...(reads.health === undefined ? {} : { health: reads.health }),
   };
 }
 
 /** A Slash door this file answers. */
-export type SlashRoute = 'read' | 'status' | 'settings' | 'propose' | 'asks' | 'pattern' | 'setup' | 'mapping';
+export type SlashRoute = 'read' | 'status' | 'settings' | 'propose' | 'asks' | 'pattern' | 'setup' | 'mapping' | 'health';
 
-/** The two doors that are a GET: they read and change nothing, so a browser sends them with no `Origin`. */
-const GETS: ReadonlySet<SlashRoute> = new Set(['status', 'asks']);
+/** The three doors that are a GET: they read and change nothing, so a browser sends them with no `Origin`. */
+const GETS: ReadonlySet<SlashRoute> = new Set(['status', 'asks', 'health']);
 
 /**
  * Which Slash door a path is, or `null`.
@@ -198,7 +204,7 @@ const GETS: ReadonlySet<SlashRoute> = new Set(['status', 'asks']);
  * the router on `!== null`. `packages/host/test/slash-ask.test.ts` reads both hosts' wiring as text for it.
  */
 export function servesSlash(pathname: string): SlashRoute | null {
-  const hit = /^\/+api\/+slash\/+(read|status|settings|propose|asks|pattern|setup|mapping)\/*$/.exec(pathname);
+  const hit = /^\/+api\/+slash\/+(read|status|settings|propose|asks|pattern|setup|mapping|health)\/*$/.exec(pathname);
   return hit ? (hit[1] as SlashRoute) : null;
 }
 
@@ -262,6 +268,12 @@ const NO_MODEL: Refusal = {
   fix: 'No model is configured behind Slash on this host, so it cannot read the record for you.',
 };
 
+/** The sentence a host that hands no health read answers at `/api/slash/health`. */
+const NO_HEALTH: Refusal = {
+  code: 'NOT_IN_THIS_BUILD',
+  fix: "This host does not read Slash's health yet.",
+};
+
 /**
  * Answer the ask, for the session this host has already resolved.
  *
@@ -279,7 +291,7 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   if (route === null)
     return refusal(404, {
       code: 'ROUTE_UNKNOWN',
-      fix: "Slash's doors are /api/slash/read, /api/slash/status, /api/slash/settings, /api/slash/propose, /api/slash/asks, /api/slash/pattern, /api/slash/setup and /api/slash/mapping.",
+      fix: "Slash's doors are /api/slash/read, /api/slash/status, /api/slash/settings, /api/slash/propose, /api/slash/asks, /api/slash/pattern, /api/slash/setup, /api/slash/mapping and /api/slash/health.",
     });
   const path = `/api/slash/${route}`;
   const verb = GETS.has(route) ? 'GET' : 'POST';
@@ -297,7 +309,7 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
      The GET is held to `apps/selfhost/src/server.ts` `forged` instead: a NAMED origin this host does not
      answer for, or a `Sec-Fetch-Site` that names another site, is a page somewhere else. Status reads no
      row and calls no model, so what a request with neither header can learn is a tier, a model name and
-     a count. `asks` is the other GET and is held the same way; it answers only the owner's own session
+     a count. `health` reads no row either, a state and a sentence. `asks` is the third GET and is held the same way; it answers only the owner's own session
      (`history` in the package), so a page elsewhere learns nothing through a cookie it cannot read. */
   const origin = request.headers.get('origin');
   const site = request.headers.get('sec-fetch-site');
@@ -305,6 +317,14 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
     ? (origin !== null && !door.origins.has(origin)) || (site !== null && site !== 'same-origin' && site !== 'none')
     : origin === null || !door.origins.has(origin);
   if (foreign) return refusal(403, { code: 'FORBIDDEN', fix: 'Slash is asked from this app, in a browser, on this address.', at: 'origin' });
+
+  /* THE ENGINE'S HEALTH, BEFORE THE ENGINE IS ASKED FOR, because a host with no model answers it too (`off`), and reading it
+     builds nothing: it reads Slash's ledger and calls no model. Any signed-in person, since it holds no row and no words. */
+  if (route === 'health') {
+    const health = door.health;
+    if (health === undefined) return refusal(501, NO_HEALTH);
+    return answer(async () => ({ ok: true, value: await health() }));
+  }
 
   if (!door.engine) return refusal(501, NO_MODEL);
 

@@ -149,11 +149,15 @@ test('A NAME IS A PATH SEGMENT UNDER /app, SO EVERY WORD THE APP ROUTES AND EVER
     .map((e) => e.name)
     .filter((name) => /^[a-z][a-z0-9-]*$/.test(name));
   assert.ok(words.includes('settings') && words.includes('catalogue'), `the app's folders were not read: ${words.join(' ')}`);
+  /* TODAY'S FOLDERS, after sections 36 to 39 moved the app under `/app` and added sign-up and the decide page: if
+     the read found none of them it read the wrong tree, and every assertion under it would pass on nothing. */
+  for (const route of ['signup', 'signin', 'start', 'decide', 'slash', 'usage', 'vault', 'fonts'])
+    assert.ok(words.includes(route), `/app/${route} is a folder the read should have found: ${words.join(' ')}`);
   for (const slug of words) assert.ok(d.bad(slug) !== null, `/app/${slug} is an app route and ${slug} is a legal record name`);
 
   /* A SPOKEN ID IS `/app/d41`, the same shape the app opens (`apps/web/src/routes/[id]/+page.svelte`), so a record
      named `d41` would be a name the app can never be asked for. One to three letters and then only digits. */
-  for (const slug of ['d41', 'sg31', 'abc123', 'q2'])
+  for (const slug of ['d41', 'sg31', 't7', 'abc123', 'q2'])
     assert.match(refusal(d.provision({ slug, email: 'ada@example.com' })).fix, /spoken id/, `${slug} was allowed`);
   /* And the names beside that shape are still names. */
   for (const slug of ['abcd1', 'd41x', 'd-41', 'studio2026']) assert.equal(d.bad(slug), null, `${slug} was refused`);
@@ -161,7 +165,7 @@ test('A NAME IS A PATH SEGMENT UNDER /app, SO EVERY WORD THE APP ROUTES AND EVER
 
   /* AND RENAMING INTO ONE IS THE SAME REFUSAL, because a rename is a claim too. */
   value(d.provision({ slug: 'the-studio', email: 'ada@example.com' }));
-  for (const to of ['settings', 'd41']) assert.equal(refusal(d.rename('the-studio', to)).at, 'slug', `renamed into ${to}`);
+  for (const to of ['settings', 'signup', 'd41', 'sg31', 't7']) assert.equal(refusal(d.rename('the-studio', to)).at, 'slug', `renamed into ${to}`);
   sql.close();
 });
 

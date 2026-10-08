@@ -24,13 +24,14 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 
 import { approvalLines, egressOf, keyNamed, runnerCannotOpen, type Egress } from './actions.ts';
-import { agentOf, kindsOfProposal, recordReader, rungOf, shapeIn, stampOf } from './change-kind.ts';
+import { agentOf, kindsOfProposal, recordReader, rungOf, shapeIn, stampOf, tokenOfRun } from './change-kind.ts';
 import { instant } from './migrate.ts';
 import { point } from './metrics.ts';
 import { pairsReads, type PairsDecl } from './pairs.ts';
 import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
 import { egressChanged } from './script.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
+import { causeFault, causeOf, canon, noop } from './cause.ts';
 import { costOf } from './weigh.ts';
 import { askOf, retypedBody, retypeShapeFault } from './api/retype.ts';
 
@@ -79,6 +80,8 @@ export type Suggestion = {
   resolved_as: string | null;
   defer_until: string | null;
   defer_why: string | null;
+  /** The key for what it is about, so it is asked once (`cause.ts`), or `null` for a question nobody gave one. */
+  cause: string | null;
 };
 
 export type Decision = {
@@ -89,6 +92,8 @@ export type Decision = {
   decided_by: string;
   ts: string;
   supersedes: string | null;
+  /** The cause of the question it answered, so the same ask is found with its answer. */
+  cause: string | null;
 };
 
 export type GovernDeps = {
@@ -179,8 +184,8 @@ const APPLIED =
   "(SELECT a.to_v FROM event a WHERE a.kind = 'note' AND a.target = 'decision:' || decision.id AND a.target_kind = 'decision' AND a.to_v IS NOT NULL ORDER BY a.rowid DESC LIMIT 1) AS applied";
 
 const COLUMNS: Record<GovernRegister, string> = {
-  suggestion: `id, body_kind, body, status, opened_by, opened_at, resolved_as, defer_until, defer_why, ${SETTLED_BY}`,
-  decision: `id, question, answer, reason, decided_by, ts, supersedes, ${SETTLED}, ${APPLIED}`,
+  suggestion: `id, body_kind, body, status, opened_by, opened_at, resolved_as, defer_until, defer_why, cause, ${SETTLED_BY}`,
+  decision: `id, question, answer, reason, decided_by, ts, supersedes, cause, ${SETTLED}, ${APPLIED}`,
   prediction:
     'id, for_decl, claim, measure, baseline, unit, target, window, score_at, scored_at, observed, met, on_miss',
 };
@@ -288,7 +293,19 @@ function hydrate(register: GovernRegister, row: Record<string, unknown>): Record
 
 /* ── opening one ─────────────────────────────────────────────────────────── */
 
-export type Proposal = { question: string; body_kind: BodyKind; body: Record<string, unknown> };
+/**
+ * `cause` IS THE FILER'S KEY FOR WHAT IT ASKS, so it is asked once (`cause.ts`): left out, an agent's run derives one.
+ */
+export type Proposal = { question: string; body_kind: BodyKind; body: Record<string, unknown>; cause?: string };
+
+/**
+ * What filing answers: the question's id, and `joined` when an open question already asked it and nothing was filed.
+ * `widened` when the open one was a rowset and this one's further rows were added to it.
+ */
+export type Filed = { id: string; joined?: true; widened?: number };
+
+/** The one sentence a rowset that would change nothing is refused with. */
+export const NOTHING_TO_DECIDE = 'Every row already holds this. Nothing to decide.';
 
 /** At most this many rows in one `rowset`. Past it, it is an import and wants a different verb. */
 const MAX_ROWS = 200;
@@ -307,7 +324,7 @@ const MAX_ROWS = 200;
  * (`suggestion.drafted_by`, migration 21). A parameter and not a field of `Proposal`, so a caller's own proposal
  * cannot claim to be one.
  */
-export function propose(deps: GovernDeps, actor: string | (() => string), p: Proposal, drafted?: string): Result<{ id: string }> {
+export function propose(deps: GovernDeps, actor: string | (() => string), p: Proposal, drafted?: string): Result<Filed> {
   if (!p?.question?.trim())
     return no<{ id: string }>('REQUIRED_MISSING', 'A proposal is a question somebody can answer.', { at: 'question' });
   if (!(BODY_KINDS as readonly string[]).includes(p.body_kind))
@@ -316,8 +333,18 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
       allowed: BODY_KINDS,
     });
 
+  if (p.cause !== undefined) {
+    const bad = causeFault(p.cause);
+    if (bad !== null) return no<Filed>('VALUE_MALFORMED', bad, { at: 'cause' });
+  }
+
   const wrong = checkBody(deps, p.body_kind, p.body ?? {});
   if (wrong) return { ok: false, refusal: wrong };
+
+  /* A ROWSET THAT CHANGES NOTHING IS NOT A QUESTION. SG69 on the owner's record proposed values its rows already held,
+     and answering it would have written nothing; the proposer is told so instead of the owner being asked. */
+  if (p.body_kind === 'rowset' && noop(p.body, (register, at) => heldFields(deps, register, at)))
+    return no<Filed>('ALREADY_KNOWN', NOTHING_TO_DECIDE, { at: 'body.rows' });
 
   /* WHAT IT SENDS OUT IS WORKED OUT HERE, NEVER TAKEN FROM THE PROPOSER. An agent that wrote its own `egress` could
      print a friendlier host than the one it declares, so whatever it wrote is dropped and the record's own reading
@@ -399,7 +426,14 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
     if (egress.length > 0) body = { ...body, egress, approve: approvalLines(egress) };
   }
 
+  /* ASKED ONCE. The filer's cause, or for an agent's run the one the body derives, and an open question holding it is
+     the answer: nothing is filed and the proposer is told which. A rule's, Slash's or a person's question derives none,
+     for migration 31's reason: an automation's run waits on its own question, and two runs asking alike are two asks. */
   const by = typeof actor === 'function' ? actor() : actor;
+  const cause = p.cause ?? (RUN_ID.test(by) ? causeOf(p.body_kind, body, p.question) : null);
+  const asked = askedAlready(deps, by, p, body, cause);
+  if (asked !== null) return ok(asked);
+
   const id = `SG${deps.allocate('suggestion')}`;
   const at = instant(deps.nowMs);
   /* THE KIND OF CHANGE IT IS, STAMPED HERE AND NEVER TAKEN FROM THE PROPOSER, for `costOf`'s reason: a proposer that
@@ -407,7 +441,7 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
      record's own egress lines replaced any it sent, so what it sends out is on the floor (`change-kind.ts`). */
   const kind = stampOf(kindsOfProposal(p.body_kind, body, recordReader(deps.sql, by)));
   deps.sql.exec(
-    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, drafted_by, kind) VALUES (?, ?, ?, 'open', ?, ?, ?, ?)",
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, drafted_by, kind, cause) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?)",
     id,
     p.body_kind,
     JSON.stringify(body),
@@ -415,6 +449,7 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
     at,
     drafted ?? null,
     kind,
+    cause,
   );
   /* THE QUESTION GOES IN `to_v`, WHICH IS WHERE 45 §5.4 PUTS IT — and `note` is capped at 280 by
      the rule that a note is one sentence a human reads in six weeks. A question is not a note: it is
@@ -424,6 +459,105 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
      the original nowhere. */
   event(deps, at, by, 'suggest', `suggestion:${id}`, 'suggestion', p.question);
   return ok({ id });
+}
+
+/** A row's fields as they stand, by its list and its spoken id or row id, or `null` for a row that is not there or is gone. */
+function heldFields(deps: GovernDeps, register: string, at: string): Record<string, unknown> | null {
+  const row = deps.row(register, at);
+  if (!row || row.deleted) return null;
+  const fields = deps.sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', row.id)?.fields;
+  return typeof fields === 'string' ? parse(fields) : null;
+}
+
+/**
+ * The open question this proposal already is, or `null` when it is new (AGT-C07).
+ *
+ * THE SAME CAUSE IS THE SAME QUESTION, whoever asks: an open one holding it is answered with `joined` and nothing is
+ * filed, so two agents proposing one change make one card. A deferred question is still open, and is joined.
+ *
+ * A ROWSET THAT NAMES ROWS THE OPEN ONE LACKS ADDS THEM TO IT, when both causes are derived, they are about one list,
+ * share at least one row asked for word for word, and ask nothing different of any row both name. A cause its filer
+ * set is never widened or widened into: the filer said what the question is about, and this would be guessing.
+ */
+function askedAlready(deps: GovernDeps, by: string, p: Proposal, body: Record<string, unknown>, cause: string | null): Filed | null {
+  if (cause !== null) {
+    const held = deps.sql.one<{ id: string }>("SELECT id FROM suggestion WHERE status = 'open' AND cause = ?", cause);
+    if (held) return { id: held.id, joined: true };
+  }
+  if (p.body_kind !== 'rowset' || p.cause !== undefined || cause === null) return null;
+
+  const register = String(body.register);
+  const rows = body.rows as Record<string, unknown>[];
+  const prefix = `rowset#${register}#`;
+  const open = deps.sql.all<{ id: string; body: string; cause: string; opened_by: string }>(
+    "SELECT id, body, cause, opened_by FROM suggestion WHERE status = 'open' AND body_kind = 'rowset' AND substr(cause, 1, ?) = ? ORDER BY opened_at, rowid",
+    prefix.length,
+    prefix,
+  );
+  for (const q of open) {
+    const theirs = parse(q.body);
+    if (!theirs || !Array.isArray(theirs.rows) || causeOf('rowset', theirs) !== q.cause) continue;
+    const asks = new Map((theirs.rows as Record<string, unknown>[]).map((r) => [rowKey(r), rowAsk(r)]));
+    const both = rows.filter((r) => asks.has(rowKey(r)));
+    if (both.length === 0 || both.some((r) => asks.get(rowKey(r)) !== rowAsk(r))) continue;
+    const lacking = rows.filter((r) => !asks.has(rowKey(r)));
+    if (lacking.length === 0 || asks.size + lacking.length > MAX_ROWS) continue;
+
+    const wider = { ...theirs, rows: [...(theirs.rows as unknown[]), ...lacking] };
+    const widerCause = causeOf('rowset', wider);
+    if (widerCause !== null && deps.sql.one('SELECT 1 AS y FROM suggestion WHERE status = ? AND cause = ? AND id <> ?', 'open', widerCause, q.id)) continue;
+    const kind = stampOf(kindsOfProposal('rowset', wider, recordReader(deps.sql, q.opened_by)));
+    deps.sql.exec('UPDATE suggestion SET body = ?, cause = ?, kind = ? WHERE id = ?', JSON.stringify(wider), widerCause, kind, q.id);
+    const more = lacking.length === 1 ? 'One more row was' : `${lacking.length} more rows were`;
+    event(deps, instant(deps.nowMs), by, 'note', `suggestion:${q.id}`, 'suggestion', String(lacking.length), `${more} asked about the same way, and added to this question.`);
+    return { id: q.id, joined: true, widened: lacking.length };
+  }
+  return null;
+}
+
+/** Which row a rowset row is about: an update by its target, a new row by everything it says. */
+const rowKey = (r: Record<string, unknown>): string => (typeof r.at === 'string' ? `at:${r.at}` : `new:${canon(r)}`);
+
+/** What a rowset row asks of the row it is about. A new row is all key and asks nothing besides. */
+const rowAsk = (r: Record<string, unknown>): string => (typeof r.at === 'string' ? canon(r.patch ?? null) : '');
+
+/** The spoken id of a run, `S12`, and its number. A run is the one opener that has a key and a later run of it. */
+const RUN_ID = /^S([1-9]\d*)$/u;
+
+/**
+ * Take back a question its opener no longer asks (AGT-C07).
+ *
+ * ONLY THE OPENER'S, AND ONLY WHILE IT IS OPEN. The run that filed it may, and so may a later run of the same key: a
+ * session that ends and starts again is the same agent asking, and the question it left is still its own. Another
+ * agent's run, a person, or an earlier run of the key may not, because taking back somebody else's question is
+ * answering it, and answering is the owner's. A question already answered or merged is not withdrawn;
+ * one put off is still open, and is.
+ *
+ * IT CLOSES AS `withdrawn`, which is neither a yes nor a no: no decision is written, the ladder does not count it
+ * against the agent as it counts `incorrect`, and the line in history says who took it back.
+ */
+export function withdraw(sql: Sql, deps: Pick<GovernDeps, 'mint'>, id: string, by: string, nowMs: number): Result<{ id: string; state: 'withdrawn' }> {
+  type Out = { id: string; state: 'withdrawn' };
+  const row = sql.one<{ status: string; resolved_as: string | null; opened_by: string }>('SELECT status, resolved_as, opened_by FROM suggestion WHERE id = ?', id);
+  if (!row) return no<Out>('OUT_OF_BOUNDS', `There is no question ${id}.`, { at: 'id' });
+  if (row.status !== 'open')
+    return no<Out>('TRANSITION_ILLEGAL', `${id} is already closed as ${row.resolved_as ?? row.status}, so there is nothing to take back.`, { at: 'id' });
+  if (!mayWithdraw(sql, row.opened_by, by))
+    return no<Out>('FORBIDDEN', `${id} was asked by another agent, so only that agent can take it back. Otherwise it waits for the owner's answer.`, { at: 'id' });
+  const at = instant(nowMs);
+  sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'withdrawn' WHERE id = ? AND status = 'open'", id);
+  event({ sql, mint: deps.mint }, at, by, 'resolve', `suggestion:${id}`, 'suggestion', 'withdrawn', 'Taken back by the agent that asked it.');
+  return ok({ id, state: 'withdrawn' });
+}
+
+/** Whether `by` is the run that opened a question, or a later run of the same key. */
+function mayWithdraw(sql: Sql, opener: string, by: string): boolean {
+  if (by === opener) return true;
+  const a = RUN_ID.exec(opener)?.[1];
+  const b = RUN_ID.exec(by)?.[1];
+  if (a === undefined || b === undefined || Number(b) < Number(a)) return false;
+  const key = tokenOfRun(sql, opener);
+  return key !== null && tokenOfRun(sql, by) === key;
 }
 
 /**
@@ -2027,13 +2161,15 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   const question = questionOf(deps.sql, id) ?? id;
   const decision = `D${deps.allocate('decision')}`;
   deps.sql.exec(
-    'INSERT INTO decision (id, question, answer, reason, decided_by, ts, supersedes) VALUES (?, ?, ?, ?, ?, ?, NULL)',
+    /* AND THE QUESTION'S CAUSE, so the same ask filed again finds the answer it was given (`decision_cause`, AGT-C08). */
+    "INSERT INTO decision (id, question, answer, reason, decided_by, ts, supersedes, cause) VALUES (?, ?, ?, ?, ?, ?, NULL, (SELECT cause FROM suggestion WHERE id = ?))",
     decision,
     question,
     option,
     reason,
     actor,
     at,
+    id,
   );
   deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'addressed' WHERE id = ?", id);
   /* AND THE LINES THAT PRESS APPROVED, word for word, so "what did I agree to send" has an answer that does not depend
@@ -2189,7 +2325,14 @@ export function reopen(deps: GovernDeps, id: string, why = 'What was accepted wo
 
   /* AND THE DEFERRAL GOES WITH IT. A reopened suggestion carrying a `defer_until` from last year
      comes back invisible, which is the same as not coming back. */
-  deps.sql.exec("UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL WHERE id = ?", id);
+  /* ITS CAUSE COMES BACK WITH IT unless an open question asked the same since, which the unique index keeps the only
+     one open with it: the two then stand side by side, and this one is the older. */
+  deps.sql.exec(
+    `UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL,
+       cause = CASE WHEN EXISTS (SELECT 1 FROM suggestion o WHERE o.status = 'open' AND o.cause = suggestion.cause AND o.id <> suggestion.id) THEN NULL ELSE cause END
+     WHERE id = ?`,
+    id,
+  );
 
   /* AND IT SAYS SO, because the first law of this file is that a decision is a row and not a side
      effect. Without this a resolved row went back to open with nothing between the `resolve` event
@@ -2229,7 +2372,7 @@ export function questionOf(sql: Sql, id: string): string | null {
 }
 
 function event(
-  deps: GovernDeps,
+  deps: Pick<GovernDeps, 'sql' | 'mint'>,
   at: string,
   actor: string,
   kind: string,

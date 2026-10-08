@@ -38,6 +38,10 @@ import { methods as undo } from './undo.ts';
 import { methods as understand } from './understand.ts';
 import { methods as signs } from './signs.ts';
 import { methods as inboxPatterns } from './inbox-patterns.ts';
+import { methods as faults } from './faults.ts';
+import { methods as withdraw } from './withdraw.ts';
+import { methods as door } from './door.ts';
+import { methods as engine } from './engine.ts';
 /* END METHODS */
 
 /**
@@ -93,6 +97,13 @@ export type RecordDeps = {
    * before it answers in the names of every list. Absent, nobody is answered.
    */
   readsEveryList?: (ctx: CallContext) => boolean;
+  /**
+   * Which host keeps this record, as `Build.host` in `index.ts` says it, which `faults` asks before it shows the raw error
+   * of a fault: only a self-host's owner reads it, because there the owner is the operator. Absent is the Cloud's answer.
+   */
+  host?: 'cloud' | 'self-host';
+  /** Whether Slash's model answers (host `engine-health.ts`). Absent, `engineHealth` answers `null`. */
+  engineHealth?: (() => Promise<import('./engine.ts').EngineHealthRead>) | undefined;
 };
 
 export function methods(deps: RecordDeps) {
@@ -114,6 +125,10 @@ export function methods(deps: RecordDeps) {
     ...understand(deps),
     ...signs(deps),
     ...inboxPatterns(deps),
+    ...faults(deps),
+    ...withdraw(deps),
+    ...door(deps),
+    ...engine(deps),
     /* END METHODS */
   };
 }

@@ -61,7 +61,7 @@ of four codes (§4.4).
 | `page push <file>` | `--host <host>` | reads the file with `parseDog`, then `POST /api/setDeclaration { body }` with the body exactly as read. ADMIN, and the record's `admin()` refuses every token before it reads the arguments (ADR-060), so from this command it answers `Open this from the app; a token cannot change what this record is.` A file the parser refuses is never sent | `<page> pushed to <host>.`; the value is `{ page, host }`. A parse failure prints `<file>, line <n>: <sentence>` | 0 · 1 · 3 |
 | `page check <file>` | none | nothing on the network. Reads the file with `parseDog`, then the kernel's `validateDeclaration` on `page.<page>` with no installed state, so a `requires` naming a list nobody installed is not asked about | `<page> reads as a page. Nothing was sent.`; the value is `{ page, blocks }`. A parse failure prints `<file>, line <n>: <sentence>`; a declaration the kernel refuses prints the kernel's sentence | 0 · 1 |
 | `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
-| `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file, then on `startup` or `resume` runs `skills sync` and `tools scan` in what is left of the 8 seconds. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/handoff { state: 'idle', branch, head }`, all as the run the session file names | `start`: the card: Next, Waiting, Learned and More, each left out when empty, plus an Also line only when another run is working in the repository; three items a slot, 1,500 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
+| `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source` or `reason`; what each event sends is the measured table under "The session hooks") | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file, then on `startup` or `resume` runs `skills sync` and `tools scan` in what is left of the 8 seconds, and last writes how long it took into the session file. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/end { branch, head }` (`POST /api/handoff { state: 'idle', branch, head }` only where the host has no `end`), all as the run the session file names. The start hook's time is sent as `POST /api/heard { kind: 'hook', ms, build }` by the next hook of the same session, sent beside the call it makes anyway, the next `attach` or the `end`: a small request of its own in parallel with that call, never waited for before it, and never one the start hook makes | `start`: the card: Next, Waiting, Learned and More, each left out when empty, plus an Also line only when another run is working in the repository; three items a slot, 1,500 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
 | `install` | `--apply` · `--config-dir <folder>` (repeatable) | nothing on the network; reads `<profile>/settings.json`, where the profile is each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude` | each entry it would add, as `+ hooks.<Event>: <json>`, then the `claude mcp add-json` line that registers `mcp`. With `--apply` it writes them, after copying the file to `settings.json.bak`, or the first free `.bak<n>` | 0 · 1 when a settings file is not JSON or not the settings shape, and then nothing is written |
 | `init <slug>` | self-host only | spawns the self-host entry: `init <slug>` (§5.14) | the child's output | the child's |
 | `serve [<file>]` | self-host only | spawns the self-host entry: `serve [<file>]` (§5.14) | the child's output | the child's |
@@ -143,8 +143,9 @@ the entries are:
 ```
 
 - **Start.** It attaches to the run, writes the session file, and prints the card, which Claude Code adds
-  to the model's context. `compact` and `clear` send the same `session_id`, so they re-attach to the same run.
-  `startup` and `clear` print the whole card; `compact` prints only its Next line, the one thing the model just
+  to the model's context. A `resume` sends the resumed conversation's own `session_id`, so it re-attaches to the
+  same run; a `clear` sends a new one, so it is a new run; a forked resume sends `fork` and a new id, and is read
+  as a `startup` (measured, below). `startup` and `clear` print the whole card; `compact` prints only its Next line, the one thing the model just
   lost; a `resume` of the same session within an hour of a hook last hearing from it prints nothing. With no token it prints one line naming `BRAINDOG_TOKEN` and
   the hosts file, and `braindog login <host>`. A host that does not answer within 8 seconds is one line
   too.
@@ -159,6 +160,13 @@ the entries are:
   off, done or abandoned has no declared move to `idle`, so the record refuses the call and the run stays as it
   was. When another session in the same folder has rewritten the session file since, its client id differs,
   and the hook leaves that run alone.
+- **The hook's own time.** The start hook counts from its process's start to the card printed, and keeps the
+  milliseconds in the session file as `hook_ms`. The next hook of the same session (by `session_id`) sends it as the
+  agent door's `hook` mark, against the run that start attached and with the command's build, beside the call it
+  makes anyway: a compaction's or resume's `attach`, or the `end`. HTTP takes one method a request, so the mark is a
+  request of its own sent in parallel with that call, until the host reads it off a header. The end takes it out of the file as it sends it,
+  so a time is sent once. A clear is another session and never sends its predecessor's time. A host without `heard`
+  refuses the mark and the hook carries on.
 - **The card**, five slots in this order, each left out when it is empty, at most three items a slot and 1,500
   characters in all, clipped at a word: who the run is and where (`BrainDog · run S731 · project BrainDog ·
   Claude Code on MacBook`, the device named as a person names it, never a hostname); Next, the last handoff's
@@ -173,6 +181,43 @@ the entries are:
   vault grant is said once per host rather than in every briefing, and said again only after a grant has been kept
   and there is none again. A `compact` or a `clear` runs neither, and a
   record with neither register costs no request and no file read.
+
+#### What Claude Code hands each hook, measured
+
+Measured on Claude Code 2.1.295 on 9 October 2026, on macOS, in a scratch profile (`CLAUDE_CONFIG_DIR`) whose hooks
+copied their stdin and their Claude variables to a file. The profile was not signed in, so every event that needs a
+model's answer is marked not measured rather than guessed. Each captured event is a fixture in
+`apps/cli/test/fixtures/hook-events/`, and `apps/cli/test/hooks.test.ts` reads each one through `eventOf`.
+
+| What happened | Hooks, in order | `session_id` | `source` or `reason` | Fixture |
+| --- | --- | --- | --- | --- |
+| `claude` opened in a folder | SessionStart | a new one | `startup`, with `model` | `startup.json` |
+| `claude -p` | SessionStart, SessionEnd | a new one | `startup` (no `model`), then `other` | `startup-print.json` |
+| `/clear` typed in a window | SessionEnd, then SessionStart, in the same process | the end: the open session's; the start: a new one | `clear`, then `clear` | `clear.json` |
+| `claude --resume <id>` | SessionStart | the resumed conversation's own | `resume` | `resume.json` |
+| `/resume` picked inside a window | SessionEnd, then SessionStart, in the same process | the end: the open session's; the start: the picked conversation's | `resume`, then `resume` | `resume-picked.json` |
+| `claude --continue` | SessionStart | the folder's newest conversation's | `resume` | `continue.json` |
+| `claude --resume <id> --fork-session` | SessionStart | a new one | `fork` | `fork.json` |
+| `/exit` | SessionEnd | the session's | `prompt_input_exit` | `exit.json` |
+| Ctrl-C twice, or a `claude -p` that ends | SessionEnd | the session's | `other` | `exit.json` |
+| `claude -p` started from another session's shell | SessionStart, SessionEnd | a new one | `startup`, then `other` | `nested.json` |
+| `/compact` | PreCompact (`trigger: manual`); the SessionStart after it not measured | the session's | not measured | `compact.json` |
+| An automatic compaction | not measured | not measured | not measured | none |
+| A helper (a subagent the Agent tool starts) | not measured | not measured | not measured | none |
+
+What follows from it, and what the hooks do about it:
+
+- **A resume keeps its id, a clear and a fork do not.** `attach` finds a resumed run by its `session_id`. A clear is a
+  new run. A fork arrives as `fork`, a source the hook does not name, and is read as `startup`: a new run with the
+  whole card. That a compaction keeps its id, as this section said before it was measured, is still unmeasured.
+- **The variables follow the session.** In every hook `CLAUDE_CODE_SESSION_ID` equals the stdin's `session_id`, after
+  a clear and a picked resume too, and `CLAUDE_PID` is the Claude Code process, the same across a clear and a picked
+  resume in one window. A `claude` started from another session's shell has its own `CLAUDE_PID` and session id, and
+  nothing in its hooks' environment names the session it was started from.
+- **`CLAUDE_CODE_CHILD_SESSION` is `1` in every hook**, a window opened by a person included, so on this version it
+  cannot tell a subagent from a session of its own. `isChild` in `hooks.ts` reads it, so the start hook takes every
+  session for a subagent: it never writes the window's file (`windowPath`), and a run's parent is looked for in every
+  session. Not changed here, because the helper's own hook was not measured; it is listed for the run rules' units.
 
 ### The config file
 

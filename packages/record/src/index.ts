@@ -18,6 +18,7 @@
 import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
 import { lintRound, pagesCleanReading } from './page-lint.ts';
+import { fileRecordSigns } from './signs.ts';
 import {
   handedOf,
   install,
@@ -41,6 +42,9 @@ import type { MetricDecl } from '@braindog/kernel';
 import type { PageFilter } from '@braindog/kernel';
 import {
   ANSWER_KEYS,
+  CAUSE,
+  canonValue,
+  sha256,
   fill,
   GRANT_KINDS,
   agentOf as kindOf,
@@ -187,6 +191,7 @@ import { dropPushSub, readPushSub, savePushSub } from './push.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 import type { Directory } from './directory.ts';
 import { methods } from './methods/index.ts';
+import type { EngineHealthRead } from './methods/engine.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, type PenItem } from './emergent.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
@@ -208,6 +213,7 @@ export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, typ
 export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
 export { LATE_DAYS, isWorking, lateAt, nothingWaits, presenceOf, waiting, type Presence, type WaitingNow, type WaitingQuestion, type WaitingReader, type WaitingRun } from './waiting.ts';
 export { headlineAgrees, type Disagrees } from './headlines.ts';
+export { fileRecordSigns, readBriefingSign, readToolsSign, type RecordSignsDeps } from './signs.ts';
 export { lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_MS, TEMPLATE_ALL, type AnswerRule, type PageFinding, type PageLintRound, type PagesCleanReading } from './page-lint.ts';
 export {
   HEADLINE_ASKS_DAY,
@@ -1555,6 +1561,11 @@ export type RecordDeps = {
    */
   slashMeter?: SlashMeter | undefined;
   /**
+   * Whether Slash's model answers, read from Slash's own ledger by the host (`packages/host/src/engine-health.ts`), which
+   * `engineHealth` answers. Absent, `engineHealth` answers `null`.
+   */
+  engineHealth?: (() => Promise<EngineHealthRead>) | undefined;
+  /**
    * Newer versions of what this record holds, found in the host's catalogue, verified and read there (`slash.ts`
    * `catalogueDrafts`). Slash asks about each on Decide through the same `prepare`; absent, it asks about none.
    */
@@ -1764,7 +1775,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'catalogueOffers' | 'tryScript' | 'answersSlash' | 'directory' | 'validFrom'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'catalogueOffers' | 'tryScript' | 'answersSlash' | 'directory' | 'validFrom'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /* THE LADDER OF TRUST, the record's half (`ladder.ts`): what an agent's write does at the rung it stands on. */
   const trust = ladder({ sql, kernel, now: () => clock.now() });
@@ -5190,7 +5201,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   const askInstead = (ctx: CallContext, register: string, row: Record<string, unknown>, self: Entry | null, why: string): Result<Asked> => {
     const question = askedOf(register, row, self);
-    const filed = filedAs(ctx, kernel.propose({ question, body_kind: 'rowset', body: { register, rows: [row] } }, writerOf(ctx)));
+    /* THE SAME WRITE TRIED AGAIN JOINS THE OPEN QUESTION (AGT-C07): its cause is the list, the row (or `new`) and a hash
+       of what it would write, so another patch to the same row is another question. */
+    const target = typeof row.at === 'string' ? row.at : 'new';
+    const patch = row.patch ?? row;
+    const cause = `write#${register}#${target}#${sha256(new TextEncoder().encode(canonValue(patch))).slice(0, 24)}`;
+    const filed = filedAs(ctx, kernel.propose({ question, body_kind: 'rowset', body: { register, rows: [row] }, ...(CAUSE.test(cause) ? { cause } : {}) }, writerOf(ctx)));
     if (!filed.ok) return filed;
     return ok({ asked: { id: filed.value.id, question, why } });
   };
@@ -7959,6 +7975,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A READING THE KERNEL REFUSES IS SAID, never dropped: the host logs the throw, and the sign keeps yesterday's. */
       const filed = kernel.signRead('pages-clean', reading);
       if (!filed.ok) throw new Error(`pages-clean was not filed: ${'refusal' in filed ? filed.refusal.fix : 'the record changed under it'}`);
+      /* AND THE RECORD'S TWO SIGNS (`signs.ts`): whether a new session's briefing is true, and whether agents were given
+         the tool list. A system principal reads the whole briefing, as a session in that repository would be handed it. */
+      const signs = await fileRecordSigns(kernel, { sql, briefing: (repo) => briefing({ principal: { kind: 'system', id: 'signs' }, session: { repo } }) }, clock.now());
+      if (signs.refused.length > 0) throw new Error(`signs were not filed: ${signs.refused.join('; ')}`);
       return { ran: true, state: reading.state, findings: round.findings.length, pages: round.pages };
     },
 
@@ -11354,7 +11374,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        handed the guards above rather than a copy of them, so a method there is held to the same ladder as every method
        in this file; the `guards` gate reads those files as it reads this one, and refuses a name two files both define,
        since the later one would win here without a word. */
-    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList }),
+    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }) }),
     /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/`: the owner's, in a browser, and a runner's,
        for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin` as every ADMIN method
        here is, and a runner's admit the one principal every guard above refuses. */

@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SCHEDULE_KINDS, backoffMs, drainSchedule, openRecord, summary, type Declaration, type Kernel, type OutboxKind } from '../src/index.ts';
-import { unlease } from '../src/outbox.ts';
+import { retryDead, unlease } from '../src/outbox.ts';
 import { fixedClock, openSqlite, recordingScheduler, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -254,27 +254,60 @@ test('THE EIGHTH FAILURE IS VISIBLE, because a notification that silently gave u
   assert.equal(row(sql, id).attempts, 8);
   assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'retry' AND state = 'pending'").length, 0, 'a ninth retry');
 
-  const item = sql.one<{ id: string; body_kind: string; opened_by: string; body: string; status: string }>(
-    'SELECT id, body_kind, opened_by, body, status FROM suggestion',
+  /* A FAULT, NEVER A QUESTION (AGT-C06). The eighth failure files nothing in Decide: retrying a mail server that refuses
+     is an operator's work, and the owner was being asked to do it. It raises one fault for the kind instead. */
+  assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0, 'a dead letter filed a question');
+  assert.equal(sql.all("SELECT 1 FROM event WHERE kind = 'suggest'").length, 0, 'a dead letter announced a question');
+  const fault = sql.one<{ cause: string; kind: string; count: number; error: string; said: string; cleared_at: string | null }>(
+    'SELECT cause, kind, count, error, said, cleared_at FROM fault',
   )!;
-  assert.equal(item.body_kind, 'change');
-  assert.equal(item.opened_by, 'system');
-  assert.equal(item.status, 'open');
-  assert.match(item.id, /^SG\d+$/);
-  const body = JSON.parse(item.body) as { question: string; from: { kind: string; error: string; payload: Record<string, string> } };
-  assert.match(body.question, /notify\.email could not be delivered after 8 attempts: smtp said 550/);
-  assert.equal(body.from.kind, 'notify.email');
+  assert.equal(fault.cause, 'outbox#notify.email');
+  assert.equal(fault.kind, 'notify.email');
+  assert.equal(fault.count, 1);
+  assert.equal(fault.error, 'smtp said 550');
+  assert.equal(fault.cleared_at, null);
 
-  // The item is READ by whoever the record belongs to, so the payload in it is a summary.
-  assert.equal(body.from.payload.text, '--withheld--', 'the failure report quoted the message body');
-  assert.equal(body.from.payload.to, 'p_1');
+  /* The sentence is READ by whoever the record belongs to, so it names no job, no attempt count and nothing the job was
+     carrying. */
+  assert.doesNotMatch(fault.said, /notify|smtp|550|8|Invoice|the whole body/);
+  assert.match(fault.said, /^BrainDog could not send a notification\./);
+  sql.close();
+});
 
-  // And the event, or the suggestion arrived and nothing in the app knows.
-  const event = sql.one<{ kind: string; actor: string; target: string }>(
-    "SELECT kind, actor, target FROM event WHERE kind = 'suggest'",
-  )!;
-  assert.equal(event.actor, 'system');
-  assert.equal(event.target, `suggestion:${item.id}`);
+test('A JOB OF THE KIND THAT COMPLETES CLEARS ITS FAULT, and the next death counts on the same line', async () => {
+  const { k, sql, clock } = await record();
+  const dead = k.outbox('infer.resolve', { pairs: [] });
+  sql.exec("UPDATE outbox SET attempts = 7 WHERE id = ?", dead);
+  k.leaseOutbox(['infer.resolve'], 10);
+  value(k.ackOutbox({ id: dead, state: 'failed', error: 'No model answered' }));
+  assert.equal(row(sql, dead).state, 'dead');
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM fault WHERE cause = 'outbox#infer.resolve' AND cleared_at IS NULL")!.n, 1);
+  assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0);
+
+  // A job of another kind completing leaves it open.
+  const mail = k.outbox('notify.email', { to: 'p_1' });
+  k.leaseOutbox(['notify.email'], 10);
+  value(k.ackOutbox({ id: mail, state: 'done' }));
+  assert.equal(sql.one<{ c: string | null }>("SELECT cleared_at AS c FROM fault")!.c, null);
+
+  // The dead job queued again and completing clears it.
+  assert.equal(retryDead(sql, 'infer.resolve', NOW), 1);
+  assert.deepEqual({ ...row(sql, dead) }, { state: 'pending', attempts: 0, leased_until: null });
+  assert.equal(retryDead(sql, 'infer.resolve', NOW), 0, 'a second retry found the same job');
+  clock.set(NOW + MINUTE);
+  k.leaseOutbox(['infer.resolve'], 10);
+  value(k.ackOutbox({ id: dead, state: 'done', result: { verdicts: [] } }));
+  assert.equal(sql.one<{ c: string | null }>("SELECT cleared_at AS c FROM fault")!.c, new Date(NOW + MINUTE).toISOString());
+
+  // It dies again the next night: the same line, counted twice, open again.
+  const again = k.outbox('infer.resolve', { pairs: [] });
+  sql.exec("UPDATE outbox SET attempts = 7 WHERE id = ?", again);
+  clock.set(NOW + DAY);
+  k.leaseOutbox(['infer.resolve'], 10);
+  value(k.ackOutbox({ id: again, state: 'failed', error: 'No model answered' }));
+  const f = sql.one<{ count: number; cleared_at: string | null; first_at: string; last_at: string }>('SELECT count, cleared_at, first_at, last_at FROM fault')!;
+  assert.deepEqual({ ...f }, { count: 2, cleared_at: null, first_at: new Date(NOW).toISOString(), last_at: new Date(NOW + DAY).toISOString() });
+  assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0);
   sql.close();
 });
 
@@ -384,8 +417,9 @@ test('EVERY ONE OF THE TEN KINDS IS HANDLED NOW, and a kind that were not would 
   assert.equal(drained.dead, 1);
   assert.equal(sql.one<{ state: string }>("SELECT state FROM schedule WHERE id = 's_1'")?.state, 'failed');
 
-  const item = JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion')!.body) as { question: string };
-  assert.match(item.question, /pull/);
+  // A fault for the kind, and no question (AGT-C06).
+  assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0);
+  assert.equal(sql.one<{ cause: string }>('SELECT cause FROM fault')?.cause, 'schedule#pull');
   void k;
   sql.close();
 });

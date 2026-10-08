@@ -863,6 +863,29 @@ export type SlashProposal = {
 };
 
 /**
+ * One mark the agent door leaves about a session (AGT-B01): `hello`, `listed` (with `n`, the tools sent), `called`
+ * (with `n`, the calls since the last mark), `hook` (with `ms`, how long the start hook took), `resource` (with `ms`),
+ * `card` (with `n`, its words), or `internal`. `build` is the caller's own build, `client` the app's name and version.
+ * The record keeps one row for each run and kind and adds to `n`; it refuses any other key.
+ */
+export type HeardKind = 'hello' | 'listed' | 'called' | 'hook' | 'resource' | 'card' | 'internal';
+export type Heard = { kind: HeardKind; n?: number | undefined; ms?: number | undefined; build?: string | undefined; client?: string | undefined };
+
+/**
+ * `engineHealth`'s answer (ENG-A02), `packages/slash/src/health.ts` read through the record: whether the engine's model
+ * answers, from its own ledger, and the one sentence a person reads about it.
+ *
+ * `last_ok` is when a model last answered, `since` when the failing began, both instants or `null`. `said.whose` is
+ * whose the fault is to fix: `ours` (the operator's), `yours` (the owner's own key), or `null` when nothing is wrong.
+ * WRITTEN HERE UNTIL THE RECORD NAMES IT, as `AnswerOr` reads it: the record's own declaration wins once it exists.
+ */
+export type EngineState = 'answering' | 'not_answering' | 'never_asked' | 'off' | 'key_closed';
+export type EngineHealth = {
+  health: { state: EngineState; last_ok: string | null; since: string | null };
+  said: { text: string; whose: 'ours' | 'yours' | null };
+};
+
+/**
  * Call one method.
  *
  * The verb follows the route table rather than the caller's guess, so a write is a POST because the
@@ -1424,6 +1447,18 @@ export function createClient(options: ClientOptions) {
     /* A PERSON'S OWN NAME AND SIGN-IN ADDRESS. The name is a record method, DATA, a person only; the address is
        the account's: a link mailed to the new one, then pressed from a sign-in in the last fifteen minutes. */
     renamePerson: (name: string) => call<Answer<'renamePerson'>>('renamePerson', { name }),
+
+    /* THE AGENT DOOR'S OWN SIGNS (AGT-B01). DATA, from a token or a session: the mark lands against the caller's run, or
+       the token when there is none, and never opens a run. Only the keys a mark has are sent, because the record
+       refuses any other, and an absent one is absent rather than `null`. */
+    heard: (mark: Heard) =>
+      call<AnswerOr<'heard', { marked: true }>>(
+        'heard',
+        Object.fromEntries(Object.entries(mark).filter(([key, value]) => value !== undefined && ['kind', 'n', 'ms', 'build', 'client'].includes(key))),
+      ),
+    /* WHETHER THE ENGINE'S MODEL ANSWERS (ENG-A02), at read level, so a read token, the command line and the daily
+       vital-sign read can ask. `null` from a host that hands the record no engine. */
+    engineHealth: () => call<AnswerOr<'engineHealth', EngineHealth | null>>('engineHealth'),
     changeEmail: (email: string) => accountDoor<Record<string, never>>('email', { email }),
     confirmEmail: (token: string) => accountDoor<{ email: string; unreached: number }>('email/confirm', { token }),
 

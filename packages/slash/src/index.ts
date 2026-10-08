@@ -64,6 +64,8 @@ import {
 } from './types.ts';
 
 export { eraseSlash } from './erase.ts';
+export { health as engineHealth, said as engineSaid, FAILS_DOWN, HEALTH_DAYS } from './health.ts';
+export type { EngineFacts, EngineHealth, EngineSaid } from './health.ts';
 export { STORE_VERSION } from './call.ts';
 export { cite, citable, shapeOf, tokens } from './project.ts';
 export { answerSchema } from './answer.ts';

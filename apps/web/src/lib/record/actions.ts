@@ -209,6 +209,10 @@ export const words = {
   waitingFallback: 'Waiting for next month. This record has used its allowance for this month.',
   /* The usage page. */
   usage: 'Usage',
+  /* WHAT A DRAW FAULT'S DETAILS SAY, in words and never the thrown message, which named a field or a line of code to a
+     person who can do nothing with either (audit 34). The first is an answer missing a part, the second the page itself. */
+  usageShape: "This month's answer was missing a part this page needs, so the page stopped before drawing it.",
+  usageThrew: "A part of this page stopped while drawing the month. The fault is in BrainDog, not in the record.",
   byProject: 'By project',
   byAction: 'By action',
   overTime: 'Runs by week',
@@ -239,13 +243,14 @@ export const words = {
     `On ${plan}: ${runs} runs, ${requests} requests, ${bytes} fetched and ${hours} of run time a month.`,
   /* SLASH IN THE LEDGER'S OWN TERMS: asks and the neurons the model spent on them, and an allowance only when the answer
      carries one. It said "credits left" out of `included` and `packs`, two keys the Directory never sent. `when` is
-     "this month" or "in September". */
+     "this month" or "in September". A NEURON IS THE HOST'S UNIT AND NOBODY'S WORD, so it is said as the units of work the
+     model did (audit 34). */
   slashLine: (asks: number, neurons: number, cap: number | null, when: string) =>
     asks === 0
       ? `Slash was not asked anything ${when}${cap !== null ? `, of the ${cap.toLocaleString('en-GB')} asks a month allows` : ''}.`
       : `Slash was asked ${asks === 1 ? 'once' : `${asks.toLocaleString('en-GB')} times`} ${when}` +
         (cap !== null ? `, of the ${cap.toLocaleString('en-GB')} asks a month allows` : '') +
-        (neurons > 0 ? `, and the model spent ${neurons.toLocaleString('en-GB')} ${neurons === 1 ? 'neuron' : 'neurons'} answering.` : '.'),
+        (neurons > 0 ? `, and the model did ${neurons.toLocaleString('en-GB')} ${neurons === 1 ? 'unit' : 'units'} of work answering.` : '.'),
   thisMonth: 'this month',
   inMonth: (month: string) => `in ${month}`,
   extraLine: (units: number, cost: string, cap: string) =>
@@ -722,7 +727,8 @@ export const monthWords = (month: string): string => MONTHS[Number(month.slice(5
 /**
  * What `/usage`'s read came to. `fault` is a read that answered and a month that could not be drawn from it, never a
  * refusal of the record's, because the record was reached and said what it said. It carries a refusal's shape
- * (`INTERNAL`, the code the host's crash answer carries, and the thrown reason as `fix`, which a screen folds under Details) so a caller that treats every
+ * (`INTERNAL`, the code the host's crash answer carries, and a plain sentence as `fix`, which a screen folds under Details; the
+ * thrown message goes to the console, never to the page) so a caller that treats every
  * answer short of a month alike, as Settings' bill does, reads it with no case of its own.
  */
 export type UsageRead = { ok: true; view: UsageView } | { ok: false; refusal: Refusal } | { ok: 'none' } | { ok: 'fault'; refusal: Refusal };
@@ -738,7 +744,8 @@ function drawn(build: () => UsageView): UsageRead {
   try {
     return { ok: true, view: build() };
   } catch (e) {
-    return { ok: 'fault', refusal: { code: 'INTERNAL', fix: e instanceof Error ? e.message : String(e) } };
+    console.error(e);
+    return { ok: 'fault', refusal: { code: 'INTERNAL', fix: words.usageShape } };
   }
 }
 

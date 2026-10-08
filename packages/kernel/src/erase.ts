@@ -197,6 +197,13 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   };
   tomb('decision', 'id', ['question', 'answer', 'reason']);
   tomb('suggestion', 'id', ['body']);
+  /* A CAUSE A FILER TYPED CAN CARRY A NAME (`call-mara-quill`), read with its separators as spaces. A decision's goes
+     to the tombstone like its words (migration 31's trigger lets it); a question's is let go, since two open questions
+     both tombstoned to one cause would break the index that holds one open question to a cause. */
+  const causeNames = (cause: string | null): boolean => cause !== null && (names(cause, subjects) || names(cause.replace(/[-_.#:/@]+/gu, ' '), subjects));
+  for (const [table, to] of [['decision', ERASED], ['suggestion', null]] as const)
+    for (const r of sql.all<{ id: string; cause: string | null }>(`SELECT id, cause FROM ${table} WHERE cause IS NOT NULL AND cause <> ?`, ERASED))
+      if (causeNames(r.cause)) sql.exec(`UPDATE ${table} SET cause = ? WHERE id = ?`, to, r.id);
   tomb('prediction', 'id', ['claim']);
   tomb('grant', 'id', ['label', 'hint']);
   tomb('device_grant', 'id', ['label', 'ua']);

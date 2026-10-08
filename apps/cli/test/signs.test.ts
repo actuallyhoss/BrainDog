@@ -132,7 +132,8 @@ test('BRAINDOG SIGNS IS ONE READ: a GET of signs and nothing else, naming no run
   assert.equal(await signsCommand([], one), 0, one.said.join('\n'));
   assert.deepEqual(h.seen.map((s) => [s.method, s.verb, s.query]), [['signs', 'GET', '']]);
   assert.equal(h.seen[0]!.headers.authorization, 'Bearer rec_01TESTTESTTESTTESTTESTTEST.signs');
-  for (const name of Object.keys(h.seen[0]!.headers)) assert.doesNotMatch(name, /^x-braindog-/u, `${name} names a run`);
+  /* THE COMMAND'S BUILD RIDES EVERY CALL (AGT-B01) and names no run, so it is the one `x-braindog-` header a read carries. */
+  for (const name of Object.keys(h.seen[0]!.headers)) assert.doesNotMatch(name, /^x-braindog-(?!cli$)/u, `${name} names a run`);
   assert.deepEqual(one.answered, [{ value: { signs: SIGNS } }]);
   assert.equal(one.lines[0], '3 of 5 signs need a look.');
   assert.ok(one.lines.includes('Questions by cause: Needs a look'));

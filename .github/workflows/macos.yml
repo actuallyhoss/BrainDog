@@ -1,0 +1,84 @@
+name: macos
+
+# THE PROVISION COMMAND'S BASH FORM, RUN ON A MAC.
+#
+# `apps/worker/scripts/provision-ask.test.mjs` pipes answers into the bash form `provision-check.mjs` prints, has it post
+# to a server on 127.0.0.1, and compares the body that arrives with what was typed. It was written and measured on
+# Windows (Git for Windows' bash and curl), and the owner works on a Mac now, where `bash` is the 3.2 Apple ships at
+# `/bin/bash` and `curl` is Apple's. So this runs that one test file there, with the name it types holding a double
+# quote, an apostrophe and `ë` (`Zoë "Z" O'Brien`), which is the name that breaks a body built by pasting into JSON.
+#
+# ONE FILE, NOT THE SUITE. `ci.yml` runs every workspace on `vars.CI_RUNNER`; this asks one question of one shell, so
+# it needs Node and nothing from the lockfile (`provision-check.mjs` imports only `node:` modules), and it stays off
+# `ci.yml` so a red Mac never holds a deploy: `deploy.yml` follows a `ci` run, and a run of this workflow deploys nothing.
+#
+# WHEN IT RUNS: when the command, its test or this file changes, on master or in a pull request; weekly, because a
+# macOS image moves `curl` under an unchanged tree; and by hand.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - apps/worker/scripts/provision-check.mjs
+      - apps/worker/scripts/provision-ask.test.mjs
+      - .github/workflows/macos.yml
+  pull_request:
+    paths:
+      - apps/worker/scripts/provision-check.mjs
+      - apps/worker/scripts/provision-ask.test.mjs
+      - .github/workflows/macos.yml
+  schedule:
+    # Monday, 06:30 UTC: half an hour after `windows.yml`'s weekly run.
+    - cron: '30 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  provision-ask:
+    name: provision command on macOS
+    # `macos-latest` BY DEFAULT, with a lever, as `windows.yml` has: set the repository variable MACOS_RUNNER to the
+    # label of a Mac registered as a runner to use that one instead.
+    runs-on: ${{ vars.MACOS_RUNNER || 'macos-latest' }}
+    # A ceiling for a hang, not a budget. The file runs in under a second on a Mac.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # NODE ALONE, AT THE PATCH `.github/actions/setup` PINS, so this is the same Node every other job runs.
+      # `macos-workflow.test.mjs` holds the two pins together. No pnpm and no install: nothing here reads a package.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.13.0
+
+      # THE BASH A MAC SHIPS, FIRST ON THE PATH. A runner image may put a newer bash from Homebrew ahead of
+      # `/bin/bash`, and the owner's Terminal runs Apple's. The test calls `bash` by name, so a folder holding only a
+      # link to `/bin/bash` goes first, and the step says which shells it ran.
+      - name: Put Apple's bash first
+        run: |
+          mkdir -p "$RUNNER_TEMP/apple-bash"
+          ln -sf /bin/bash "$RUNNER_TEMP/apple-bash/bash"
+          echo "$RUNNER_TEMP/apple-bash" >> "$GITHUB_PATH"
+
+      - name: Say which shell and curl
+        run: |
+          sw_vers
+          command -v bash
+          bash --version | head -n 1
+          curl --version | head -n 1
+
+      # RUN, AND NOT SKIPPED. The test skips its one run of the bash form when there is no bash with curl and node, and a
+      # skipped test is a green run that tested nothing. So the TAP summary is kept and read: no failure and no skip.
+      - name: Run the bash form with a quoted, accented name
+        run: |
+          node --test \
+            --test-reporter=spec --test-reporter-destination=stdout \
+            --test-reporter=tap --test-reporter-destination="$RUNNER_TEMP/provision-ask.tap" \
+            apps/worker/scripts/provision-ask.test.mjs
+          grep -qx '# fail 0' "$RUNNER_TEMP/provision-ask.tap"
+          grep -qx '# skipped 0' "$RUNNER_TEMP/provision-ask.tap" || { echo 'The bash form was skipped, so nothing ran on this Mac.'; exit 1; }

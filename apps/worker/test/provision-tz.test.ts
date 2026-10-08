@@ -253,12 +253,20 @@ test('but a name with a bracket inside it is a name: the bracket has to open it 
      would take that from him. So the rule is a name that is all one bracketed span, and each of these is stored as
      typed. */
   const { provision, made } = await host();
-  const names = ['Sam (work)', 'Zoë [Z] O’Brien', '(Ada) Lovelace', 'Bo {B} Tanner', 'Yourname'];
+  const names = ['Sam (work)', 'Zoë [Z] O’Brien', '(Ada) Lovelace', 'Bo {B} Tanner'];
   for (const [i, name] of names.entries()) {
     const out = await provision({ slug: `name-${i}`, email: `name-${i}@example.test`, name, tz: 'Europe/London' });
     assert.equal(out.status, 200, `${JSON.stringify(name)} was refused: ${out.text}`);
   }
   assert.deepEqual(made.map((m) => m.owner?.name), names);
+  /* AND THE RECORD'S OWN RULE ASKS TOO (`api/person-name.ts`), so a form's label run together is refused here as a rename
+     refuses it, with the address of a person to write to if it really is somebody's name. */
+  for (const [i, name] of ['Yourname', 'First Last', 'John Doe'].entries()) {
+    const out = await provision({ slug: `label-${i}`, email: `label-${i}@example.test`, name, tz: 'Europe/London' });
+    assert.equal(out.status, 422, `${JSON.stringify(name)} was taken as a name`);
+    assert.match(out.text, /support@brain\.dog/u);
+  }
+  assert.equal(made.length, names.length);
 });
 
 test('A NAME IS REFUSED FOR ITS BRACKETS ONLY WHEN IT IS ONE BRACKETED SPAN, however many brackets deep', async () => {

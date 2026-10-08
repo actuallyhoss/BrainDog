@@ -230,21 +230,25 @@ const ledger = (held: number): AccountUsage => {
   };
 };
 
-test("SLASH'S LINE IS ASKS AND NEURONS, and an allowance only when the answer carries one", () => {
+test("SLASH'S LINE IS ASKS AND THE MODEL'S WORK, never neurons, and an allowance only when the answer carries one", () => {
   /* IT READ `included`, `used` AND `packs`, which the Directory never sent, and `toLocaleString` on nothing threw the
      whole of `/usage` into "BrainDog could not reach this record". */
   const [studio] = usageFromLedger(ledger(0), '2026-09', '2026-09-15').records;
-  assert.equal(studio?.slash, 'Slash was asked 41 times this month, and the model spent 12,300 neurons answering.');
+  assert.equal(studio?.slash, "Slash was asked 41 times this month, and the model did 12,300 units of work answering.");
+  /* A NEURON IS THE HOST'S BILLING UNIT, and a person reading their usage was never told what one is (audit 34). */
+  assert.doesNotMatch(studio?.slash ?? '', /neuron/iu, "the host's unit reached the page");
   assert.deepEqual(studio?.asks, { asks: 41, neurons: 12_300, cap: null });
   assert.doesNotMatch(studio?.slash ?? '', /credit|of the|allows/u, 'an allowance was said that the answer never carried');
 
   const past = usageFromLedger(ledger(0), '2026-08', undefined, undefined, false).records[0];
-  assert.equal(past?.slash, 'Slash was asked 41 times in August, and the model spent 12,300 neurons answering.');
+  assert.equal(past?.slash, "Slash was asked 41 times in August, and the model did 12,300 units of work answering.");
 
   const one = ledger(0);
   const r = one.records[0]!;
   r.slash = { asks: 0, neurons: 0, days: [] };
   assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, 'Slash was not asked anything this month.');
+  r.slash = { asks: 1, neurons: 1, days: [], cap: 600 };
+  assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, "Slash was asked once this month, of the 600 asks a month allows, and the model did 1 unit of work answering.");
   r.slash = { asks: 1, neurons: 0, days: [], cap: 600 };
   assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, 'Slash was asked once this month, of the 600 asks a month allows.');
   delete r.slash;
@@ -253,12 +257,15 @@ test("SLASH'S LINE IS ASKS AND NEURONS, and an allowance only when the answer ca
 
 test('A MONTH THAT CANNOT BE DRAWN FROM AN ANSWER THAT CAME IS A DRAW FAULT, never the record out of reach', async () => {
   /* AN ANSWER THIS READER CANNOT READ: a record with no month. The read reached the host and the host answered, so the
-     screen says it could not be drawn and keeps the reason for Details; "could not reach this record" is a failed read's. */
+     screen says it could not be drawn and keeps a plain sentence for Details; "could not reach this record" is a failed
+     read's. THE DETAILS ARE WORDS, NEVER THE EXCEPTION: they printed "Cannot read properties of undefined (reading ...)". */
   const broken = ledger(0) as unknown as { records: Record<string, unknown>[] };
   delete broken.records[0]!.month;
   const read = await readUsage(host({ '/account/usage': () => json(200, { ok: true, value: broken }) }).io, NOW_MS);
   assert.equal(read.ok, 'fault');
-  assert.ok(read.ok === 'fault' && read.refusal.code === 'INTERNAL' && /allowance|month/u.test(read.refusal.fix), JSON.stringify(read));
+  assert.ok(read.ok === 'fault' && read.refusal.code === 'INTERNAL', JSON.stringify(read));
+  assert.equal(read.refusal.fix, words.usageShape);
+  for (const said of [words.usageShape, words.usageThrew]) assert.doesNotMatch(said, /undefined|reading|Error|\(|\.ts\b|\u2014/u, said);
   assert.notEqual(read.ok === 'fault' ? read.refusal.fix : '', copy.recordNotReached);
   assert.equal(copy.readFault, 'This screen could not be drawn');
   assert.match(copy.readFaultOn(words.usage), /\bUsage\b/u);

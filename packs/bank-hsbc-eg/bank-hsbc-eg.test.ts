@@ -196,10 +196,12 @@ const moneysPayee = (): unknown =>
    card or an account, a card's finds only a card, and every lookup reads an account's digits as one or more values;
    the account line keys its near rule on the balance it prints, and InstaPay on its reference, which the pack lays as
    `hsbc_reference`. ITS OWN FIELD AND NOT A SHARED ONE, the way Mercury lays `mercury_id`: a field of a common id laid by
-   a bank door is the 1.6.0 lesson above, refused the day Money or a second bank declares it too. */
-test('THE FILE IS bank-hsbc-eg 1.7.0, on money-core 3.10.0 or later before 4.0.0, with the fifteen', () => {
+   a bank door is the 1.6.0 lesson above, refused the day Money or a second bank declares it too.
+   1.7.1 IS A PATCH: the twin test below said two movements never leave one balance, which a withdrawal, a deposit and
+   a withdrawal of one sum on one day disprove. The pack's note now says so, and nothing a record reads moved. */
+test('THE FILE IS bank-hsbc-eg 1.7.1, on money-core 3.10.0 or later before 4.0.0, with the fifteen', () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.7.0']);
+  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.7.1']);
   assert.deepEqual(doc.extends, { 'register.transactions': { fields: [{ id: 'hsbc_reference', label: 'HSBC reference', type: 'text' }] } }, 'the pack lays more than its reference, or lays the payee Money declares');
   assert.equal((moneysPayee() as { type?: string } | undefined)?.type, 'text', 'Money declares no payee field to write');
   const frozen = JSON.parse(readFileSync(new URL('./bank-hsbc-eg-1.3.1.json', import.meta.url), 'utf8')) as { version: string; requires: { packs: unknown } };
@@ -268,7 +270,7 @@ test('INSTALLED FROM THE FILE: fifteen patterns, nothing refused, and the same f
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), FIFTEEN);
   await put(api, file());
-  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.7.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.7.1');
   const opened = said<{ pack: { manifest: { pack: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
   assert.equal(opened.pack.manifest.pack, 'bank-hsbc-eg');
   sql.close();
@@ -365,8 +367,9 @@ test('AN ACQUIRER\'S PREFIX COMES OFF THE MERCHANT (1.4.0): a card charge at FAW
  * TWO EQUAL WITHDRAWALS ARE TWO ROWS WHEN EACH PRINTS ITS OWN BALANCE. The account line's near rule read the amount,
  * the account, a day either side and the start of the description, and two cash withdrawals of one amount on one day
  * share all four, so the second was skipped as already said. The balance each prints is what the account held after it,
- * and two movements never leave one balance, so the rule reads it too (H.792). A day apart is checked as well, because
- * it is the case the near rule's day window was written for.
+ * so the rule reads it too (H.792). A day apart is checked as well, because it is the case the near rule's day window
+ * was written for. A balance CAN come back to a figure it printed before, so this tells most twins apart and not all:
+ * the known skip below is the one it misses.
  */
 test('TWO EQUAL WITHDRAWALS FROM ONE ACCOUNT, EACH PRINTING ITS OWN BALANCE, ARE TWO ROWS, on one day and a day apart', async () => {
   const { api, sql, current } = await withReaders();
@@ -391,6 +394,42 @@ test('TWO EQUAL WITHDRAWALS FROM ONE ACCOUNT, EACH PRINTING ITS OWN BALANCE, ARE
   const again = mail(api.kernel, `Fwd: ${withdrew('16AUG26', '28,540.25')}`, 'atm-2-fwd');
   assert.equal(again.state, 'skipped', `a resend was ${again.state}: ${again.reason}`);
   assert.equal(rowsOn(api.kernel, current).length, 3);
+  sql.close();
+});
+
+/**
+ * A KNOWN SKIP, KEPT VISIBLE: A BALANCE THAT COMES BACK. Withdraw 2,500, pay 2,500 back in and withdraw 2,500 again on
+ * one day, and the second withdrawal prints the amount, the account, the description and the balance the first printed,
+ * so the near rule holds it as a repeat. It is never lost silently: the skip names the row it looks like, and "It is a
+ * second one" files it beside that row. A DAY LATER IT IS NOT A SKIP, because the description the account line keeps
+ * starts with the bank's day ("17AUG26 ATM Cash Withdrawal"), so the twelve characters the rule compares differ; the
+ * last arrival below holds that. When the account line reads something that tells the same-day pair apart, this test
+ * goes red and the pack's note changes with it.
+ */
+test('A WITHDRAWAL, A DEPOSIT AND THE SAME WITHDRAWAL AGAIN SHARE A BALANCE: the second is held as a repeat, and "It is a second one" files it', async () => {
+  const { api, sql, current } = await withReaders();
+  const first = mail(api.kernel, withdrew('16AUG26', '31,040.25'), 'back-1');
+  const paid = mail(api.kernel, `From HSBC: 16AUG26 Cash Deposit ${ACCOUNT_LINE} EGP 2500.00+ Your available balance is EGP 33,540.25`, 'back-2');
+  for (const out of [first, paid]) assert.equal(out.state, 'matched', out.reason);
+  const again = mail(api.kernel, withdrew('16AUG26', '31,040.25'), 'back-3');
+  assert.equal(again.state, 'skipped', `the known skip no longer happens (${again.state}): make this two rows and say so in the pack`);
+  assert.match(again.reason ?? '', /^Looks like a repeat of /u, 'the skip names the row it looks like');
+  assert.equal(rowsOn(api.kernel, current).length, 2);
+  const filed = said<Arrived>(api.kernel.fileAsSecond(again.raw));
+  assert.deepEqual([filed.state, filed.ingest], ['matched', 'bank-from-out'], filed.reason);
+  const egp = (amount: number) => ({ amount, currency: 'EGP' });
+  assert.deepEqual(
+    rowsOn(api.kernel, current).map((r) => JSON.stringify([r.on, r.direction, r.amount, r.balance_after])).sort(),
+    [
+      ['2026-08-16', 'out', egp(250_000), egp(3_104_025)],
+      ['2026-08-16', 'in', egp(250_000), egp(3_354_025)],
+      ['2026-08-16', 'out', egp(250_000), egp(3_104_025)],
+    ].map((r) => JSON.stringify(r)).sort(),
+  );
+  /* THE SAME BALANCE A DAY LATER IS FILED AT ONCE: the description starts with the day, so its start is not the same. */
+  const later = mail(api.kernel, withdrew('17AUG26', '31,040.25'), 'back-4');
+  assert.equal(later.state, 'matched', later.reason);
+  assert.equal(rowsOn(api.kernel, current).length, 4);
   sql.close();
 });
 

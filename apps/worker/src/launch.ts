@@ -15,18 +15,30 @@
  * this is read by `/healthz`, by sign-up, by the billing list and by a test.
  */
 
+import { cookieMode } from '@braindog/host/auth';
 import { SIGNUP_UNCHECKED } from '@braindog/record/directory';
 
 export type SignupMode = 'closed' | 'invite' | 'open';
 
 export type BillingMode = 'off' | 'test' | 'live';
 
-/** The settings this file reads. Each is optional (Rule 2); only whether a secret is set is read, never its value. */
+/**
+ * The settings this file reads. Each is optional (Rule 2); only whether a secret is set is read, never its value.
+ *
+ * THE LAST FOUR ARE WHAT `signUp()` NEEDS BEFORE THE SWITCH IS ASKED (audit 34, finding 2). Without a session key of 32
+ * characters and a `PUBLIC_HOST` that gives a cookie, `signUp()` answers 404 to everybody; without a sending address and
+ * the mail binding, the Directory offers no letter and a stranger gets a 200 and nothing in the inbox. `/healthz` said
+ * `open` through all four. `EMAIL` is the binding, read only for whether it is there.
+ */
 export type LaunchEnv = {
   SIGNUP?: string | undefined;
   TURNSTILE_SECRET?: string | undefined;
   TURNSTILE_SITE_KEY?: string | undefined;
   BILLING?: string | undefined;
+  SESSION_SECRET?: string | undefined;
+  PUBLIC_HOST?: string | undefined;
+  AUTH_MAIL_FROM?: string | undefined;
+  EMAIL?: unknown;
 };
 
 /** What `/healthz` and the signs read about the launch: who may sign up, whether the bot check runs, billing's mode, and why. */
@@ -65,20 +77,42 @@ export const CODE_NEEDED =
 export const SIGNUP_CLOSED = 'Sign-up is not open on this BrainDog yet.';
 
 /**
+ * What stops a switched-on sign-up from working, one sentence each, in the order `signUp()` meets them. Each test is the
+ * one the door itself makes (`index.ts` `signUp`, the Directory's `magic`), so this and the door cannot disagree.
+ */
+function stops(env: LaunchEnv): string[] {
+  const out: string[] = [];
+  if ((env.SESSION_SECRET ?? '').length < 32)
+    out.push('The session key is missing or shorter than 32 characters, so every sign-up is refused.');
+  if (cookieMode(`https://${env.PUBLIC_HOST ?? ''}`) === null)
+    out.push('This host has no public address set, so it cannot give a new person a session and every sign-up is refused.');
+  if (!env.AUTH_MAIL_FROM) out.push('No address to send mail from is set, so nobody gets the letter that finishes a sign-up.');
+  if (!env.EMAIL) out.push('Mail is not connected, so nobody gets the letter that finishes a sign-up.');
+  if (botCheckKeyed(env) && (env.TURNSTILE_SITE_KEY ?? '').trim() === '')
+    out.push('The bot check has its secret and no site key, so the sign-up page cannot pass it and every sign-up is refused.');
+  return out;
+}
+
+/**
  * The launch as one answer, with a plain sentence for each thing that is not yet as it will be. An empty `why` is a host
  * that is fully open: sign-up open, the bot check keyed, billing live.
+ *
+ * `signup` IS WHAT A STRANGER MEETS, NOT ONLY WHAT `SIGNUP` SAYS. A switch that is on while anything in `stops` holds is
+ * `closed`, with the stopping sentences as its why, so `open` here always means a stranger can finish signing up and
+ * the outside watch (`tools/watch/launch.mjs`) can hold production to it.
  */
 export function launchState(env: LaunchEnv): LaunchState {
-  const signup = signupMode(env);
+  const switched = signupMode(env);
+  const stopped = switched === 'closed' ? [] : stops(env);
+  const signup: SignupMode = stopped.length > 0 ? 'closed' : switched;
   const botCheck = botCheckKeyed(env);
   const billing = billingMode(env);
   const why: string[] = [];
-  if (signup === 'closed') why.push('Sign-up is closed, so nobody new can make an account.');
+  if (switched === 'closed') why.push('Sign-up is closed, so nobody new can make an account.');
+  why.push(...stopped);
   if (signup === 'invite') why.push('Sign-up is by invitation, so a new address needs a code.');
   if (signup !== 'closed' && !botCheck)
     why.push(`The bot check is not keyed, so sign-ups from one address are limited to ${limitWords()} until it is.`);
-  if (botCheck && (env.TURNSTILE_SITE_KEY ?? '').trim() === '')
-    why.push('The bot check has its secret and no site key, so the sign-up page cannot pass it and every sign-up is refused.');
   if (billing === 'off') why.push('Billing is off, so every new record is on Free.');
   if (billing === 'test') why.push('Billing is in test mode, so no card is charged.');
   return { signup, botCheck, billing, why };

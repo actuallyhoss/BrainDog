@@ -226,7 +226,8 @@ test('A HEADER OUTSIDE ITS GRAMMAR IS DROPPED rather than sent broken', () => {
     'x-braindog-remote': 'github.com/Acme/braindog',
     'x-braindog-cwd': 'C:\\Repos\\braindog',
     'x-braindog-agent': 'claude',
+    'x-braindog-cli': 'dev+0000000',
   });
   /* A folder in another script would make fetch throw on every call; a repo is a name, never a path. */
-  assert.deepEqual(sessionHeaders({ ...p, cwd: 'C:\\Users\\Zoë', repo: 'a..b', host: 'my laptop', remote: null }), {});
+  assert.deepEqual(sessionHeaders({ ...p, cwd: 'C:\\Users\\Zoë', repo: 'a..b', host: 'my laptop', remote: null }), { 'x-braindog-cli': 'dev+0000000' });
 });

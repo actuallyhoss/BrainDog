@@ -9,11 +9,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { hostSessionOf, sessionHeaders, type Position } from '../src/position.ts';
+import { BUILD, cliBuild, hostSessionOf, sessionHeaders, type Position } from '../src/position.ts';
 import { helloOf } from '../src/stdio.ts';
 
 const AT: Position = { cwd: '/Users/ada/kiln', repo: 'kiln', remote: 'github.com/ada/kiln', host: 'box', branch: 'main', head: 'abc1234' };
-const WHERE = { 'x-braindog-host': 'box', 'x-braindog-repo': 'kiln', 'x-braindog-remote': 'github.com/ada/kiln', 'x-braindog-cwd': '/Users/ada/kiln' };
+/* Run from a checkout, so the command's build is the one with no bundle, and every call says it. */
+const WHERE = { 'x-braindog-host': 'box', 'x-braindog-repo': 'kiln', 'x-braindog-remote': 'github.com/ada/kiln', 'x-braindog-cwd': '/Users/ada/kiln', 'x-braindog-cli': 'dev+0000000' };
 
 test('THE HOST SESSION IS THE ONE ITS ENVIRONMENT NAMES, CLAUDE_SESSION_ID first, and nothing that is not an id', () => {
   assert.equal(hostSessionOf({}), null);
@@ -50,6 +51,18 @@ test('THE CLIENT’S OWN NAME AND VERSION travel as headers, trimmed, and one ou
   assert.equal(said['x-braindog-client-name'], undefined);
   assert.equal(said['x-braindog-client-version'], undefined);
   assert.deepEqual(sessionHeaders(AT, undefined, undefined, { client: {} }), WHERE);
+});
+
+test('EVERY CALL SAYS THE COMMAND’S BUILD as x-braindog-cli, and a build outside the bundler’s grammar is not sent', () => {
+  assert.equal(cliBuild(), 'dev+0000000');
+  assert.equal(sessionHeaders(AT)['x-braindog-cli'], 'dev+0000000');
+  assert.equal(sessionHeaders(AT, 'claude', undefined, { build: '2026.10.09+1a2b3c4' })['x-braindog-cli'], '2026.10.09+1a2b3c4');
+  for (const build of ['2026.10.09+1a2b3c4', '2026.10.09+' + 'a'.repeat(40), 'dev+0000000']) assert.ok(BUILD.test(build), build);
+  /* A version a person typed, a branch name and a header break are never a build, so none leaves the machine. */
+  for (const build of ['1.2.3', '2026.10.09', '2026.10.09+main', '2026.10.09+1A2B3C4', 'dev+0000000\r\nx: y', '2026.10.09+' + 'a'.repeat(41)]) {
+    assert.ok(!BUILD.test(build), build);
+    assert.equal(sessionHeaders(AT, undefined, undefined, { build })['x-braindog-cli'], undefined, build);
+  }
 });
 
 test('A HELLO IS initialize WITH clientInfo, read for its strings and nothing else', () => {

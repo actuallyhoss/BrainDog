@@ -560,7 +560,7 @@ export function printedForms(commands) {
     '  IN WINDOWS POWERSHELL 5.1, where curl is Invoke-WebRequest and curl.exe with quoted JSON answers BODY_MALFORMED.',
     '  Copy through the empty line under the closing brace: without PSReadLine, that line is what runs it.',
     ...commands.powershell.map(indent),
-    '  IN GIT BASH, OR ANY BASH:',
+    '  IN BASH. On a Mac, type bash and press Enter first: zsh, the Mac\'s own shell, reads read -p as a coprocess and asks nothing.',
     ...commands.bash.map(indent),
   ];
 }

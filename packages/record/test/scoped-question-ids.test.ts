@@ -58,10 +58,11 @@ const value = <T>(r: unknown): T => {
   return x.value as T;
 };
 
-const rows = (register: string) => (register === 'diary' ? [{ body: 'Dinner with the auditor' }] : [{ what: 'Invoice 41', state: 'open' }]);
+/* EACH QUESTION ITS OWN ROW, since the same row proposed again joins the open question (AGT-C07). */
+const rows = (register: string, question: string) => (register === 'diary' ? [{ body: `Dinner with the auditor: ${question}` }] : [{ what: `Invoice: ${question}`, state: 'open' }]);
 
 async function ask(api: Awaited<ReturnType<typeof createRecordApi>>, register: string, question: string, ctx: CallContext = agent): Promise<string> {
-  return value<{ id: string }>(await api.propose({ question, body_kind: 'rowset', body: { register, rows: rows(register) } } as never, ctx)).id;
+  return value<{ id: string }>(await api.propose({ question, body_kind: 'rowset', body: { register, rows: rows(register, question) } } as never, ctx)).id;
 }
 
 async function settle(api: Awaited<ReturnType<typeof createRecordApi>>, id: string): Promise<string> {

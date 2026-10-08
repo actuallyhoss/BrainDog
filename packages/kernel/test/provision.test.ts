@@ -144,6 +144,35 @@ test('the things that are not a name, a slug or a timezone are refused with the 
   sql.close();
 });
 
+test('A ZONE IS A PLACE: an abbreviation or an offset under a zone name is refused, with the sentence that offers the browser', async () => {
+  const { k, sql } = await record();
+  /* WHATEVER `Intl` ACCEPTED USED TO PASS: `EST` is filed under America/Panama, which has no summer time, and
+     `Etc/GMT+5` is five hours behind for good. Neither is in the runtime's list of places. */
+  for (const tz of ['EST', 'MST', 'HST', 'Etc/GMT+5', 'Etc/GMT-3', 'SystemV/EST5', 'GB', 'PRC', '+01:00', 'europe/london']) {
+    const said = refusal(k.createRecord({ ...MADE, tz }));
+    assert.equal(said.at, 'tz', `${tz} was taken as a zone`);
+    assert.equal(said.code, 'VALUE_MALFORMED');
+    assert.ok(said.fix.startsWith(`${tz} is not a place's time zone`), said.fix);
+    assert.match(said.fix, /your browser reports/);
+    assert.doesNotMatch(said.fix, /\u2014/, 'no em dash in a sentence a person reads');
+  }
+  assert.equal(sql.all('SELECT 1 FROM record').length, 0, 'a refused zone left a record behind');
+  sql.close();
+});
+
+test('AND EVERY PLACE PASSES: the list, its other names a newer browser reports, and the three spellings of UTC', async () => {
+  for (const tz of ['Africa/Cairo', 'UTC', 'Etc/UTC', 'Etc/GMT', 'America/Argentina/Buenos_Aires', 'Asia/Kolkata', 'Europe/Kyiv', 'America/Port-au-Prince']) {
+    const { k, sql } = await record();
+    value(k.createRecord({ ...MADE, tz }));
+    assert.equal(sql.one<{ tz: string }>('SELECT tz FROM record')?.tz, tz, 'a zone is kept as it was sent');
+    sql.close();
+  }
+  /* AND THE WHOLE LIST, so a runtime whose list holds a name the shape test refuses fails here rather than at sign-up. */
+  const { k, sql } = await record();
+  for (const tz of Intl.supportedValuesOf('timeZone')) value(k.createRecord({ ...MADE, tz }));
+  sql.close();
+});
+
 test('a refused create writes nothing at all', async () => {
   const { k, sql } = await record();
   refusal(k.createRecord({ ...MADE, tz: 'Europe/Camelot' }));

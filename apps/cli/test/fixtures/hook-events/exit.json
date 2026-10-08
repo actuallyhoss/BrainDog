@@ -1,0 +1,51 @@
+{
+  "measured": {
+    "client": "Claude Code",
+    "version": "2.1.295",
+    "on": "2026-10-09",
+    "machine": "macOS 27, the loop's Mac",
+    "profile": "a scratch CLAUDE_CONFIG_DIR, not signed in; each hook copied its stdin to a file"
+  },
+  "how": "/exit typed in a window; Ctrl-C twice and the end of a claude -p session say other",
+  "hooks": [
+    {
+      "event": "SessionEnd",
+      "stdin": {
+        "session_id": "fb9c53e2-c20f-4459-a12f-833365d95253",
+        "transcript_path": "/private/tmp/hook-capture/config/projects/-private-tmp-hook-capture-work/fb9c53e2-c20f-4459-a12f-833365d95253.jsonl",
+        "cwd": "/private/tmp/hook-capture/work",
+        "prompt_id": "8a73f626-8167-4bcc-b603-d22a8ebacaa2",
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      },
+      "env": {
+        "CLAUDECODE": "1",
+        "CLAUDE_CODE_SESSION_ID": "fb9c53e2-c20f-4459-a12f-833365d95253",
+        "CLAUDE_PID": "61996",
+        "CLAUDE_CODE_CHILD_SESSION": "1",
+        "CLAUDE_CODE_ENTRYPOINT": "cli",
+        "CLAUDE_PROJECT_DIR": "/private/tmp/hook-capture/work",
+        "CLAUDE_CODE_SESSION_ATTENDED": "1"
+      }
+    },
+    {
+      "event": "SessionEnd",
+      "stdin": {
+        "session_id": "be6221b5-2222-4015-9cfc-ca255d12e95f",
+        "transcript_path": "/private/tmp/hook-capture/config/projects/-private-tmp-hook-capture-work/be6221b5-2222-4015-9cfc-ca255d12e95f.jsonl",
+        "cwd": "/private/tmp/hook-capture/work",
+        "hook_event_name": "SessionEnd",
+        "reason": "other"
+      },
+      "env": {
+        "CLAUDECODE": "1",
+        "CLAUDE_CODE_SESSION_ID": "be6221b5-2222-4015-9cfc-ca255d12e95f",
+        "CLAUDE_PID": "60195",
+        "CLAUDE_CODE_CHILD_SESSION": "1",
+        "CLAUDE_CODE_ENTRYPOINT": "cli",
+        "CLAUDE_PROJECT_DIR": "/private/tmp/hook-capture/work",
+        "CLAUDE_CODE_SESSION_ATTENDED": "1"
+      }
+    }
+  ]
+}

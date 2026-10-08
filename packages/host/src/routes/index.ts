@@ -28,6 +28,10 @@ import { ROUTES as retype } from './retype.ts';
 import { ROUTES as understand } from './understand.ts';
 import { ROUTES as signs } from './signs.ts';
 import { ROUTES as inboxPatterns } from './inbox-patterns.ts';
+import { ROUTES as faults } from './faults.ts';
+import { ROUTES as withdraw } from './withdraw.ts';
+import { ROUTES as door } from './door.ts';
+import { ROUTES as engine } from './engine.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -47,5 +51,9 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...understand,
   ...signs,
   ...inboxPatterns,
+  ...faults,
+  ...withdraw,
+  ...door,
+  ...engine,
   /* END ROUTES */
 ];

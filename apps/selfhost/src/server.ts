@@ -19,7 +19,7 @@ import { env } from 'node:process';
 
 import {
   grantAad, grantKey, openSealed,
-  handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveVault, servesKeys, servesSlash, servesVault, sessionOf, slashRecordMeter, withSession,
+  engineHealthRead, handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveVault, servesKeys, servesSlash, servesVault, sessionOf, slashRecordMeter, withSession,
   type Handler, type IngestDoor, type KeysDoor, type SlashAskDoor, type VaultDoor,
 } from '@braindog/host';
 import {
@@ -101,6 +101,7 @@ import { refusedFor as linkRefused, windowLimiter as linkLimiter } from '@braind
 /* THE FRONT DOORS: a crash answered by reference, the limiter, and the guard in front of
    every statement. */
 import { crashed } from '@braindog/host';
+import { fileModelSign } from '@braindog/host/sign-model';
 import { classOf, limitKey, refusedFor, windowLimiter, type LimitClass, type LimitDoor, type Limiter } from '@braindog/host/limits';
 import { guarded } from '@braindog/ports';
 
@@ -1164,8 +1165,8 @@ export async function start(options: {
          * THE TWO TRAVEL TOGETHER BECAUSE THE LIST IS A PROPERTY OF THE DELIVERER. This leased all
          * nine kinds and handed each row to whatever function it was given — so a self-host with no
          * model leased its `infer.embed` rows, threw "nothing in this deployment delivers a
-         * infer.embed" at each of them eight times, and dead-lettered them with a suggestion asking
-         * somebody to decide about work they never asked for. 49 §5.12 note 1 says the opposite in
+         * infer.embed" at each of them eight times, and dead-lettered them into a fault about work
+         * they never asked for. 49 §5.12 note 1 says the opposite in
          * as many words: "a kind not in `kinds` is never leased, so it waits in `pending` until the
          * host can serve it — a self-host with no model never dead-letters an `infer.embed` row",
          * and §9 has the test.
@@ -1309,6 +1310,15 @@ export async function start(options: {
      `UNDERSTAND_ASK`. `undefined` with no model, and then the jobs wait `pending`, as they always have here. */
   const modelJobs = slashModelJobs(slashConfig, () => api, options.keys, { sql: slashSql, clock }, slashMeter);
   const jobsMeter = backgroundMeter(slashSql);
+  /* WHETHER SLASH'S MODEL ANSWERS, read from the same Slash SQLite every model call settles in (ENG-A02): the record's
+     `engineHealth` and `GET /api/slash/health` both ask this one read, as the Worker's do. */
+  const engineHealth = engineHealthRead({
+    sql: slashSql,
+    clock,
+    model: slashModel !== undefined,
+    load: () => import('@braindog/slash'),
+    grants: () => api.kernel.grants(),
+  });
 
   /**
    * Drain everything due, then re-arm.
@@ -1631,6 +1641,7 @@ export async function start(options: {
     /* SLASH'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
     slashModel,
     slashMeter,
+    engineHealth,
     /* NEWER VERSIONS IN THIS HOST'S CATALOGUE, for Slash to ask about on Decide. */
     ...(catalogueDir === undefined ? {} : { catalogueOffers: catalogueOffersFrom(catalogueDir) }),
     snapshots: kept,
@@ -1718,6 +1729,8 @@ export async function start(options: {
       /* A RECORD NOT YET OPENED (a fresh install at boot) is asked again next hour, not tomorrow. */
       const ran = await api.lintTick();
       if (!ran.ran && ran.why === 'unopened') lintedOn = '';
+      /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from Slash's own SQLite, where its ledger lives here. */
+      else fileModelSign(api.kernel, slashSql, clock.now());
     } catch (e) {
       console.error('lint:', e instanceof Error ? e.message : String(e));
     }
@@ -1929,7 +1942,7 @@ export async function start(options: {
        bearer is (`vaultToken`); the record refuses anything but a token's context there. */
     vault: vaultDoor(api, options.keys, (asked) => vaultToken(asked, site)),
     keys: keysDoor(api, options.keys, origins),
-    slash: slashDoor(slashConfig, () => api, options.keys, { sql: slashSql, clock }, origins),
+    slash: { ...slashDoor(slashConfig, () => api, options.keys, { sql: slashSql, clock }, origins), health: engineHealth },
     /* ONE BUDGET PER PROCESS, built here so it outlives a request and is shared by every ingest. */
     arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundMail, keyOpener(api, options.keys), blobsFolder(options.file)),
     /* A LINK TO ONE PAGE, built here once so its read budget outlives a request, as the arrivals' does. */

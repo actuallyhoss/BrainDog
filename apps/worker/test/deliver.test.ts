@@ -104,8 +104,8 @@ test('AND A WEBHOOK THAT ANSWERED 500 IS NOT DELIVERED', async () => {
 /* ── and refuses to pretend ──────────────────────────────────────────────── */
 
 test('A KIND NOTHING HERE DELIVERS IS SAID OUT LOUD, and never acked as done', async () => {
-  /* Silently acking would make the outbox claim the work happened. The ladder's ceiling opens a
-     suggestion, and the sentence in it names the kind. */
+  /* Silently acking would make the outbox claim the work happened. The ladder's ceiling raises a
+     fault, and the sentence in it names the kind. */
   const deliver = makeDeliver({ email: async () => {}, post: async () => ({ ok: true, status: 200 }) });
   assert.match(await threw(() => deliver(job('infer.prose', {}))), /nothing in this deployment delivers a infer.prose/);
   assert.match(await threw(() => deliver(job('pull.fetch', { ingest: 'x' }))), /delivers a pull.fetch/);

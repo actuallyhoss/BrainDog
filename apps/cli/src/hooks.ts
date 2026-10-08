@@ -21,7 +21,7 @@ import { refused } from '@braindog/ports';
 import { briefing, cardOf, nextLine, words, type Moved, type Where } from './brief.ts';
 import { budgetOf, clientFor, hostsPath, readHosts, sameHost, target, type Target } from './http.ts';
 import { authoredIn, childHeads, commitsBy, joinedAt, listedBy, localRepo, LOG_FORMAT, meeter, meetingOf, MIN_COMMITS, ownerOf, readLayout, type Layout, type MeetCall, type Meeting, type Owner, type Reader } from './people.ts';
-import { git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
+import { cliBuild, git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
 import { syncSkills, type AgentIo } from './skills.ts';
 import { depositor, scanTools } from './tools.ts';
 
@@ -29,9 +29,10 @@ type Env = Record<string, string | undefined>;
 
 /**
  * What a hook needs from its process, passed in so a test can hold all of it. `device` is the name this machine goes
- * by, when a test gives one; otherwise it is worked out (`deviceName`).
+ * by, when a test gives one; otherwise it is worked out (`deviceName`). `began` is when the hook began, in epoch
+ * milliseconds, for a caller that is not its own process; without it the start hook counts from its process's start.
  */
-export type Io = { env: Env; stdin: string; cwd: string; write: (text: string) => void; home?: string; device?: string };
+export type Io = { env: Env; stdin: string; cwd: string; write: (text: string) => void; home?: string; device?: string; began?: number };
 
 /** The start hook's whole budget: git, then `attach`, well inside the twenty seconds Claude Code gives it. */
 export const HOOK_MS = 8_000;
@@ -63,7 +64,8 @@ export const unreachable = (ms: number): string =>
  * from the same session, so a resume knows how long the session was away. `pid` is the Claude Code process the start
  * hook ran under (`CLAUDE_PID`). `cwd`, `repo` and `remote` are where the session started, for a subagent working in a
  * scratch folder (`parentOf`), and `heads` the HEAD of each repository under a folder that is not one, so the end hook
- * reads the commits of every one that moved.
+ * reads the commits of every one that moved. `hook_ms` is how long the start hook that wrote it took, until a later hook
+ * of the same session sends it as the door's `hook` mark (`owedMark`).
  */
 export type SessionFile = {
   host: string;
@@ -77,6 +79,7 @@ export type SessionFile = {
   repo?: string;
   remote?: string;
   heads?: Record<string, string>;
+  hook_ms?: number;
 };
 
 const SPOKEN = /^S[1-9][0-9]*$/;
@@ -128,8 +131,12 @@ export function readSession(file: string): SessionFile | null {
     ...(typeof x.repo === 'string' && PRINTABLE.test(x.repo) ? { repo: x.repo } : {}),
     ...(typeof x.remote === 'string' && PRINTABLE.test(x.remote) ? { remote: x.remote } : {}),
     ...(isObject(x.heads) ? { heads: headsOf(x.heads) } : {}),
+    ...(typeof x.hook_ms === 'number' && Number.isInteger(x.hook_ms) && x.hook_ms >= 0 && x.hook_ms <= HOOK_MARK_MAX_MS ? { hook_ms: x.hook_ms } : {}),
   };
 }
+
+/* A start hook is stopped at its budget, so a time past a minute is a clock that jumped, not a hook, and is not sent. */
+const HOOK_MARK_MAX_MS = 60_000;
 
 /* A place as a header may carry it, and a folder's HEADs as git writes them under a relative path that stays inside. */
 const PRINTABLE = /^[\x20-\x7e]{1,512}$/;
@@ -360,7 +367,10 @@ export const asksWaiting = (c: Context | undefined): boolean => c !== undefined 
 type Event = { client_id?: string; cwd: string; source: 'startup' | 'resume' | 'clear' | 'compact' };
 const SOURCES = ['startup', 'resume', 'clear', 'compact'] as const;
 
-/** Claude Code's JSON on stdin, read loosely: an empty or broken event is a startup in the process's folder. */
+/**
+ * Claude Code's JSON on stdin, read loosely: an empty or broken event is a startup in the process's folder, and so is a
+ * `source` this hook does not name, as `fork` (a forked resume, a new conversation under a new id) is.
+ */
 export function eventOf(stdin: string, cwd: string): Event {
   let x: unknown;
   try {
@@ -413,12 +423,21 @@ export async function movedSince(cwd: string, from: string | null, head: string 
  *   - `resume` within the hour of the same session last being heard from: nothing, because its card is still in the
  *     conversation. A resume after longer gets the whole card.
  *
- * `compact` AND `resume` COME BACK HERE with the same `session_id`, and `attach` finds the run by it, so each
- * re-attaches rather than opening a second run, and even a quiet resume brings the run back to active. `clear` comes
- * with a new one, as a new transcript, so it is a run of its own, and the file says so to the MCP server the window
- * keeps (`heldFor`).
+ * WHAT EACH ONE SENDS, MEASURED on Claude Code 2.1.295 (9 October 2026; `test/fixtures/hook-events/`, and the table
+ * under "The session hooks" in `docs/48-SPEC-CLI.md`). `resume` comes back here with the resumed conversation's own
+ * `session_id`, whether by `--resume <id>`, `--continue`, or `/resume` picked inside a window (which first ends the
+ * open session with reason `resume`), so `attach` finds the run by it and re-attaches rather than opening a second run,
+ * and even a quiet resume brings the run back to active. `clear` ends the old session (reason `clear`) and comes with a
+ * new `session_id` in the same process, as a new transcript, so it is a run of its own, and the file says so to the MCP
+ * server the window keeps (`heldFor`). A forked resume (`--fork-session`) comes as `source: "fork"` with a new
+ * `session_id`, which this hook reads as a `startup`: a new run, and its card. `compact` WAS NOT MEASURED: the capture
+ * profile was not signed in, so no compaction ran and no SessionStart followed its PreCompact. That it keeps the
+ * `session_id` is still the assumption.
  */
 export async function hookStart(io: Io): Promise<void> {
+  /* WHEN THIS PROCESS STARTED, so the hook's time counts Node's own start and the module load, which a person waits
+     through as much as the attach. */
+  const started = io.began ?? performance.timeOrigin;
   const event = eventOf(io.stdin, io.cwd);
   const id = event.client_id ?? null;
   const before = rememberedIn(io.env, event.cwd, id);
@@ -440,6 +459,11 @@ export async function hookStart(io: Io): Promise<void> {
   /* NO RUN NAMED, AND THE SESSION'S OWN ID: attaching finds the run by it, so an old run named in a file is never sent. */
   const mine = event.client_id === undefined ? undefined : { client_id: event.client_id };
   const client = clientFor(to, async () => sessionHeaders(at, 'claude', mine, { env: io.env, parent }), signal);
+  /* THE LAST START HOOK'S TIME RIDES BESIDE THIS ATTACH, when it was this same session's (a compaction, a resume). NOT
+     WAITED FOR HERE, so a slow mark never holds the card or eats the sync's budget: it is waited for last, once the card
+     is written, and a path that returns early leaves it to the process, which stays open while it is in flight. */
+  const owed = before !== null && event.client_id !== undefined && before.client_id === event.client_id ? before : null;
+  const marking = owedMark(to, owed, at, io.env, signal);
   const out = await client.attach({
     source: event.source,
     ...(event.client_id === undefined ? {} : { client_id: event.client_id }),
@@ -478,25 +502,38 @@ export async function hookStart(io: Io): Promise<void> {
     } catch {
       /* A folder that cannot be written costs the MCP server its attribution, not the session its card. */
     }
-  /* QUIET ONLY WHEN THE RECORD AGREES it is the run the file remembered, so a resume the record placed elsewhere is told. */
-  if (soon && before.host === to.key && before.spoken === run.spoken) return;
+  try {
+    /* QUIET ONLY WHEN THE RECORD AGREES it is the run the file remembered, so a resume the record placed elsewhere is told. */
+    if (soon && before.host === to.key && before.spoken === run.spoken) return;
 
-  const moved = await movedSince(event.cwd, run.context?.handoff?.head ?? null, at.head);
-  if (event.source === 'compact') {
-    const line = nextLine(run, moved);
-    if (line !== null) io.write(line);
-    return;
+    const moved = await movedSince(event.cwd, run.context?.handoff?.head ?? null, at.head);
+    if (event.source === 'compact') {
+      const line = nextLine(run, moved);
+      if (line !== null) io.write(line);
+      return;
+    }
+    const named = { spoken: run.spoken, ...mine };
+    /* Only a session that begins syncs: a compaction or a clear is the same session going on (plan §4.3 step 6). */
+    const [more, decides] = await Promise.all([
+      run.context !== undefined && (event.source === 'startup' || event.source === 'resume') ? startWork(io, to, at, run.context, named, began + ms) : [],
+      asksWaiting(run.context)
+        ? whoDecides(clientFor(to, async () => sessionHeaders(at, 'claude', named, { env: io.env }), AbortSignal.timeout(Math.max(1, Math.min(NAME_MS, began + ms - Date.now())))))
+        : null,
+    ]);
+    const where: Where = { repo: at.repo, host: at.host, device, agent: 'Claude Code' };
+    io.write(briefing(run, where, moved, { more, ...decides }));
+  } finally {
+    /* THE HOOK'S OWN TIME, from the process's start to the card printed, kept for the next hook of this session to send
+       beside the call it makes anyway (`owedMark`). Written last, so it counts the sync, the scan and the card. */
+    const hook_ms = Math.max(0, Math.round(Date.now() - started));
+    for (const file of files)
+      try {
+        writeSession(file, { ...held, hook_ms });
+      } catch {
+        /* The same folder as above: the sign loses one time, and nothing else. */
+      }
+    await marking;
   }
-  const named = { spoken: run.spoken, ...mine };
-  /* Only a session that begins syncs: a compaction or a clear is the same session going on (plan §4.3 step 6). */
-  const [more, decides] = await Promise.all([
-    run.context !== undefined && (event.source === 'startup' || event.source === 'resume') ? startWork(io, to, at, run.context, named, began + ms) : [],
-    asksWaiting(run.context)
-      ? whoDecides(clientFor(to, async () => sessionHeaders(at, 'claude', named, { env: io.env }), AbortSignal.timeout(Math.max(1, Math.min(NAME_MS, began + ms - Date.now())))))
-      : null,
-  ]);
-  const where: Where = { repo: at.repo, host: at.host, device, agent: 'Claude Code' };
-  io.write(briefing(run, where, moved, { more, ...decides }));
 }
 
 /** Each of the sync and the scan gets at most this long, inside what is left of the hook's budget. */
@@ -690,11 +727,16 @@ export async function hookEnd(io: Io): Promise<void> {
      before anything is sent, so a host that is slow to answer cannot cost it. The folder's file too, while it still
      names this run, for a shell in the folder. */
   const seen = new Date().toISOString();
+  /* THE START HOOK'S TIME GOES WITH THIS END, so it leaves both files as it is sent and is never sent twice. */
+  const { hook_ms: _owed, ...kept } = held;
   try {
-    writeSession(file, { ...held, seen });
+    writeSession(file, { ...kept, seen });
     const folder = sessionPath(io.env, event.cwd);
     const there = folder === file ? null : readSession(folder);
-    if (there !== null && there.spoken === held.spoken && there.host === held.host) writeSession(folder, { ...there, seen });
+    if (there !== null && there.spoken === held.spoken && there.host === held.host) {
+      const { hook_ms: _same, ...rest } = there;
+      writeSession(folder, { ...rest, seen });
+    }
   } catch {
     /* A folder that cannot be written costs the next resume its quiet, and nothing else. */
   }
@@ -710,10 +752,32 @@ export async function hookEnd(io: Io): Promise<void> {
      handoff back to active, so people met after the end would undo it; and the end, which is what this
      hook is for, keeps time to land. */
   const until = Date.now() + budget / 2;
+  /* Beside the harvest and the end, on the same deadline, so the mark adds no wait to the hook. */
+  const marked = owedMark(to, held, at, io.env, AbortSignal.timeout(budget));
   if (moved.length > 0) await harvest(moved, client, (args) => client.call('meet', args), until);
   const where = { ...(at.branch === null ? {} : { branch: at.branch }), ...(at.head === null ? {} : { head: at.head }) };
   const ended = await client.call('end', where);
   if (refused(ended) && OLDER_HOST.has(ended.refusal.code)) await client.handoff({ state: 'idle', ...where });
+  await marked;
+}
+
+/**
+ * The `hook` mark a session file still owes the agent door (AGT-B01): how long the start hook that wrote it took. The
+ * next hook of the same session sends it beside the call it makes anyway, the next start's `attach` or the end's `end`,
+ * so timing the start hook costs the start hook no request and no wait of its own.
+ *
+ * AGAINST THE RUN THAT HOOK ATTACHED, by its spoken id and client id, so a clear's new run is never handed the time of
+ * the one before it. With the command's build, which the record compares with its own. Never refuses the hook: a host
+ * without `heard` answers that it has no such method, and a sign that is not kept costs nothing else.
+ */
+export async function owedMark(to: Target, held: SessionFile | null, at: Position, env: Env, signal: AbortSignal): Promise<void> {
+  if (held === null || held.host !== to.key || held.hook_ms === undefined) return;
+  const run = { spoken: held.spoken, ...(held.client_id === undefined ? {} : { client_id: held.client_id }) };
+  try {
+    await clientFor(to, async () => sessionHeaders(at, 'claude', run, { env }), signal).heard({ kind: 'hook', ms: held.hook_ms, build: cliBuild() });
+  } catch {
+    /* The client answers a refusal rather than throwing, and this holds if that ever changes: a lost sign, never a lost hook. */
+  }
 }
 
 /** What a host with no `end` answers: no such method at all, or a route whose record is older than it. */

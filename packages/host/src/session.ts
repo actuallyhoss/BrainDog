@@ -24,6 +24,8 @@ export type SessionHints = {
   client_version?: string | undefined;
   /** The run a subagent works for, by its spoken id, `S5`, as the command line sends it for a run started inside another. */
   parent?: string | undefined;
+  /** The command line's own build, `2026.10.09+abc1234`, as every call it makes says it (AGT-B01). */
+  cli?: string | undefined;
 };
 
 type Key = keyof SessionHints;
@@ -51,6 +53,8 @@ export const HINTS: Readonly<Record<Key, { header: string; grammar: RegExp }>> =
   /* A RUN'S NAME, held to `spoken`'s grammar: the run this one was started from, so the record can say whose subagent
      it is. Only a run, never a question or a row. */
   parent: { header: 'x-braindog-parent', grammar: /^S[1-9][0-9]*$/ },
+  /* THE COMMAND'S BUILD, a date or `dev` and a commit, so the record can say which sessions run a command that is behind. */
+  cli: { header: 'x-braindog-cli', grammar: /^(?:[0-9]{4}\.[0-9]{2}\.[0-9]{2}|dev)\+[0-9a-f]{7,40}$/ },
 };
 
 const KEYS = Object.keys(HINTS) as Key[];

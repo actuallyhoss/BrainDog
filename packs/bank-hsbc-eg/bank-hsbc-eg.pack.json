@@ -1,9 +1,9 @@
 {
   "pack": "bank-hsbc-eg",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "title": "HSBC Egypt alerts",
   "summary": "Reads HSBC Egypt alert mails and text messages into Money as transactions, each with the balance it prints, and a message that only prints a balance as a balance check.",
-  "changes": "Each amount a message prints without a currency is read in its account's own currency, never in pounds sterling. Two like movements a day apart stay two when each prints its own balance or its own InstaPay reference, and the mail and the text of one movement stay one. A question about digits no account holds now says whether it is a card or an account.",
+  "changes": "Nothing it reads or writes changed. Two like movements a day apart stay two when each prints its own balance or its own InstaPay reference, and the mail and the text of one movement stay one. A balance can come back to a figure it printed before, as when one sum is withdrawn, paid back in and withdrawn again on the same day: the second withdrawal is then held as a repeat that names the one it looks like, and “It is a second one” files it.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {

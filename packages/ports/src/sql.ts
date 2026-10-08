@@ -142,6 +142,8 @@ const utf8Bytes = (s: string): number => {
  */
 const TXN_AT_START = /^\s*(BEGIN|COMMIT|END|ROLLBACK|SAVEPOINT|RELEASE)\b/i;
 const TXN_IN_SCRIPT = /(?:^|;)\s*(BEGIN|COMMIT|END|ROLLBACK|SAVEPOINT|RELEASE)\b/i;
+/** A trigger's own `BEGIN ... END`, which is its body and no transaction: up to the first `; END` after its `BEGIN`. */
+const TRIGGER_BODY = /\bCREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\b[\s\S]*?\bBEGIN\b[\s\S]*?;\s*END\b/gi;
 /**
  * A placeholder, and whether it follows `LIKE` or `GLOB`.
  *
@@ -257,11 +259,12 @@ export function guard(query: string, params: readonly unknown[]): void {
  * The two checks a script can fail (`37 §5.4`): a transaction keyword opening any statement, and the byte ceiling,
  * which SQLite applies to the whole text handed to it.
  *
- * ponytail: a script refuses by a `(^|;)` keyword regex, so a trigger body's `BEGIN ... END;` would be refused. No
- * migration declares a trigger (`01 §2`); walk the script statement by statement when one does (`37 §10` #6).
+ * A TRIGGER'S BODY IS TAKEN OUT FIRST, because its `BEGIN ... END` is the trigger's and not a transaction: migration 31
+ * declares `decision_kept`, and without this both hosts refused it and no record opened past migration 30. What
+ * follows the body is still read, so `CREATE TRIGGER ... END; BEGIN;` is refused as before.
  */
 export function guardScript(sql: string): void {
-  const txn = TXN_IN_SCRIPT.exec(sql);
+  const txn = TXN_IN_SCRIPT.exec(sql.replace(TRIGGER_BODY, 'CREATE TRIGGER'));
   if (txn) throw new SqlError('TXN_STATEMENT_FORBIDDEN', `a statement in this script begins with ${txn[1]!.toUpperCase()}; use transactionSync.`);
   tooLong(sql);
 }

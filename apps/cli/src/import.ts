@@ -48,6 +48,7 @@ import { knownKeys } from './catalogue.ts';
 import { keysOfRow, meeter, metOf, sameName, type Meeting } from './people.ts';
 import type { AgentIo } from './skills.ts';
 import { readSource } from './usecase.ts';
+import { cliBuild } from './position.ts';
 
 import { createClient } from '@braindog/client';
 
@@ -2254,6 +2255,8 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     ...(folder['x-braindog-host'] === undefined ? {} : { 'x-braindog-host': folder['x-braindog-host'] }),
     'x-braindog-client': `braindog-import-${crypto.randomUUID()}`,
     'x-braindog-agent': 'other',
+    /* THE COMMAND'S BUILD, which every call says (AGT-B01). */
+    'x-braindog-cli': cliBuild(),
   };
   const ms = budgetOf(io.env);
   /* ONE DEADLINE A REQUEST, not one for the run: an import is hundreds of requests, and each is as quick as any other. */

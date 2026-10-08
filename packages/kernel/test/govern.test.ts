@@ -1040,12 +1040,13 @@ test('EACH REFUSAL SAYS WHAT TO SEND INSTEAD, at the key that was wrong', async 
 test('AT MOST THREE ARRANGEMENTS WAIT AT ONCE, and the fourth names the three', async () => {
   const { k, sql } = await record();
   const arrange = { question: 'Arrange it?', body_kind: 'arrange' as const, body: { why: ['x'], packs: { enable: ['work'] } } };
-  const ids = [1, 2, 3].map(() => value<{ id: string }>(k.propose(arrange, 'S1')).id);
-  const fourth = refusal(k.propose(arrange, 'S1'));
+  /* EACH ITS OWN CAUSE, since the same arrangement asked again by one run joins the first (AGT-C07). */
+  const ids = [1, 2, 3].map((n) => value<{ id: string }>(k.propose({ ...arrange, cause: `arrange-${n}` }, 'S1')).id);
+  const fourth = refusal(k.propose({ ...arrange, cause: 'arrange-4' }, 'S1'));
   assert.equal(fourth.code, 'OUT_OF_BOUNDS');
   for (const id of ids) assert.ok(fourth.fix.split(/[ ,]+/).includes(id), id);
   value(k.decide(ids[0]!, { resolved_as: 'wont-fix', reason: 'not now' }, 'p_owner'));
-  value(k.propose(arrange, 'S1'));
+  value(k.propose({ ...arrange, cause: 'arrange-5' }, 'S1'));
   sql.close();
 });
 
