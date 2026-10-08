@@ -154,7 +154,7 @@ test('A LATE SERIES ALWAYS CARRIES ITS HATCH (blocks-charts.css)', () => {
   assert.deepEqual(unstriped(read('../../skin/blocks-charts.css'), allowed), [], 'a late mark is red by colour alone');
 
   /* The hatch is the late red, striped, and nothing else. */
-  const hatch = /--chart-late-hatch:\s*([^;]+);/u.exec(read('../../skin/tokens.css'))?.[1] ?? '';
+  const hatch = /--chart-late-hatch:\s*([^;]+);/u.exec(read('../../skin/blocks-charts.css'))?.[1] ?? '';
   assert.match(hatch, /^repeating-linear-gradient\(/u, 'the late hatch is not a stripe');
   assert.match(hatch, /var\(--chart-late\) 0 3px/u, 'the late hatch is not the late red');
 

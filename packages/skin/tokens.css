@@ -152,15 +152,8 @@
     --chart-3: color-mix(in srgb, var(--action) 28%, var(--tile));
     --chart-other: color-mix(in srgb, var(--ink) 18%, var(--tile));
     --chart-late: var(--danger);
-    /* A LATE SERIES IS STRIPED AS WELL AS RED (DIRECTION §42). The working accent is BrainDog red and late is a deeper red
-       of the same hue, so a late bar beside a working one differs by its stripes and never by its colour alone: the
-       late red, and the late red at 30% on the tile between. Opaque, so the bar still reads as one shape on its track.
-       Every late mark in `blocks-charts.css` paints this (`separation.test.ts` in `packages/theme` holds it). */
-    --chart-late-hatch: repeating-linear-gradient(
-      135deg,
-      var(--chart-late) 0 3px,
-      color-mix(in srgb, var(--chart-late) 30%, var(--tile)) 3px 6px
-    );
+    /* A LATE SERIES IS STRIPED AS WELL AS RED: `--chart-late-hatch` lives in `blocks-charts.css`, which every page that
+       draws a chart or a lane loads, so the stripe costs the entry stylesheet nothing. */
     /* AT RISK IS AMBER: not late yet, and not going to plan. The status dot's own colour, so a plan bar and its dot agree. */
     --chart-risk: var(--status-waiting);
     --chart-track: var(--field);

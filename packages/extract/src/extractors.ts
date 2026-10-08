@@ -316,7 +316,9 @@ function matchMaskedTail(folded: string, entries: readonly (readonly [string, Js
     if (at - from < 3 || isWordChar(folded[at])) continue;
     runs.push({ digits: folded.slice(from, at), starred: true });
   }
-  const bare = folded.slice(first, firstEnd).replace(/[.,;:)]+$/u, '');
+  let bareEnd = firstEnd;
+  while (bareEnd > first && '.,;:)'.includes(folded[bareEnd - 1]!)) bareEnd -= 1;
+  const bare = folded.slice(first, bareEnd);
   if (runs.length === 0 && bare.length >= BARE_NUMBER && [...bare].every((ch) => ch >= '0' && ch <= '9')) runs.push({ digits: bare, starred: false });
 
   for (const { digits, starred } of runs) {

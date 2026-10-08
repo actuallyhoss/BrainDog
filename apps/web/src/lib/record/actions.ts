@@ -722,7 +722,7 @@ export const monthWords = (month: string): string => MONTHS[Number(month.slice(5
 /**
  * What `/usage`'s read came to. `fault` is a read that answered and a month that could not be drawn from it, never a
  * refusal of the record's, because the record was reached and said what it said. It carries a refusal's shape
- * (`DRAW_FAULT`, and the thrown reason as `fix`, which a screen folds under Details) so a caller that treats every
+ * (`INTERNAL`, the code the host's crash answer carries, and the thrown reason as `fix`, which a screen folds under Details) so a caller that treats every
  * answer short of a month alike, as Settings' bill does, reads it with no case of its own.
  */
 export type UsageRead = { ok: true; view: UsageView } | { ok: false; refusal: Refusal } | { ok: 'none' } | { ok: 'fault'; refusal: Refusal };
@@ -738,7 +738,7 @@ function drawn(build: () => UsageView): UsageRead {
   try {
     return { ok: true, view: build() };
   } catch (e) {
-    return { ok: 'fault', refusal: { code: 'DRAW_FAULT', fix: e instanceof Error ? e.message : String(e) } };
+    return { ok: 'fault', refusal: { code: 'INTERNAL', fix: e instanceof Error ? e.message : String(e) } };
   }
 }
 

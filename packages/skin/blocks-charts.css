@@ -33,6 +33,20 @@
  */
 
 @layer components {
+  /* A LATE SERIES IS STRIPED AS WELL AS RED (DIRECTION §42). The working accent is BrainDog red and late is a deeper red
+     of the same hue, so a late bar beside a working one differs by its stripes and never by its colour alone: the late
+     red, and the late red at 30% on the tile between. Opaque, so the bar still reads as one shape on its track. Every
+     late mark here and in `kinds/lanes.css` (loaded beside this file by the page view) paints it, and
+     `separation.test.ts` in `packages/theme` holds that. Here and not in `tokens.css`, so only a page that draws a chart
+     pays for it. */
+  :root {
+    --chart-late-hatch: repeating-linear-gradient(
+      135deg,
+      var(--chart-late) 0 3px,
+      color-mix(in srgb, var(--chart-late) 30%, var(--tile)) 3px 6px
+    );
+  }
+
   /* ── sparkline: a label, a small line, the figure it ends at ─────────────
      The line is 120 by 32 in a fixed column, so the lines of several rows share a left edge and a
      row with fewer than two points keeps its figure in the figure's column. */

@@ -258,7 +258,7 @@ test('A MONTH THAT CANNOT BE DRAWN FROM AN ANSWER THAT CAME IS A DRAW FAULT, nev
   delete broken.records[0]!.month;
   const read = await readUsage(host({ '/account/usage': () => json(200, { ok: true, value: broken }) }).io, NOW_MS);
   assert.equal(read.ok, 'fault');
-  assert.ok(read.ok === 'fault' && read.refusal.code === 'DRAW_FAULT' && /allowance|month/u.test(read.refusal.fix), JSON.stringify(read));
+  assert.ok(read.ok === 'fault' && read.refusal.code === 'INTERNAL' && /allowance|month/u.test(read.refusal.fix), JSON.stringify(read));
   assert.notEqual(read.ok === 'fault' ? read.refusal.fix : '', copy.recordNotReached);
   assert.equal(copy.readFault, 'This screen could not be drawn');
   assert.match(copy.readFaultOn(words.usage), /\bUsage\b/u);
