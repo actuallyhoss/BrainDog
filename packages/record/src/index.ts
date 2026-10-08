@@ -127,6 +127,7 @@ import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
+import { LATE_DAYS, isWorking, presenceOf, waiting as waitingOf, type Presence, type WaitingNow } from './waiting.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
 import { grammarOf } from './grammar.ts';
@@ -203,6 +204,8 @@ export { PREVIEW_DECLARATIONS_MOST, PREVIEW_SAMPLE_ROWS_A_LIST, PREVIEW_SAMPLE_R
 export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
 export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, type SkillDraftInput } from './slash.ts';
 export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
+export { LATE_DAYS, isWorking, lateAt, nothingWaits, presenceOf, waiting, type Presence, type WaitingNow, type WaitingQuestion, type WaitingReader, type WaitingRun } from './waiting.ts';
+export { headlineAgrees, type Disagrees } from './headlines.ts';
 export {
   HEADLINE_ASKS_DAY,
   HEADLINE_MOST,
@@ -561,6 +564,18 @@ const SESSION = RUN.id;
 const PREFIX = RUN.seq_prefix;
 /** The states a run is live in: every declared one but the finished. */
 const LIVE = (RUN.fields.find((f) => f.id === RUN.state)?.values ?? []).filter((v) => !RUN.done.includes(v));
+/**
+ * THE STATES `handoff` WRITES, AND NO OTHER: resting (`idle`), leaving a step for the next run (`handoff`) and finished
+ * (`done`). One constant, which the agent door's tool reads for its own words, so the two never list different states.
+ *
+ * `active` IS NOT ONE. A run is active because it writes; asked for by name it opened a run only to be refused, or
+ * revived a finished one with no work in it. `abandoned` is the sweep's word for a run that went silent, never a run's own.
+ */
+export const HANDOFF_STATES = ['idle', 'handoff', 'done'] as const;
+
+/** What `handoff` says when it is asked to set `active`. */
+export const HANDOFF_ACTIVE = 'A run is active when it writes. Leave state out.';
+
 /**
  * The states a run leaves for `active` when it writes again, as the kernel's ladder moves them
  * (`41 §5.4`). `handoff` is not one: it is a request waiting for the next run.
@@ -1043,7 +1058,65 @@ export type Boot = {
    * from one place.
    */
   theme: { light: Record<string, string>; dark: Record<string, string> } | null;
+  /**
+   * WHICH SHAPE THIS ANSWER IS, a whole number (`BOOT_SHAPE`) that grows whenever a field joins or one is taken away, so
+   * a client tells a host that sends `waits` from one older than it by asking once rather than by guessing from keys.
+   */
+  shape: number;
+  /**
+   * WHAT WAITS ON THE CALLER, COUNTED ONCE (`waiting()` in `waiting.ts`): questions open for them, how many of those are
+   * late and how many hard to undo, arrivals in the inbox (`null` where they are not told), and agents working now. The
+   * rail's badge, Today's header and Decide's sentence all say these, so no two of them can disagree.
+   *
+   * `waiting` (the list of questions) KEEPS ITS NAME FOR ONE RELEASE, so these counts travel as `waits`.
+   */
+  waits: WaitingNow;
+  /** How many days a question waits before it is late (`LATE_DAYS`), which `waits.late` counts and a screen colours by. */
+  lateDays: number;
+  /**
+   * THE AGENTS WORKING NOW, by the one clock (`isWorking`): active and not `isQuiet`. Most recently heard from first, at
+   * most `WORKING_MOST`, each by its spoken handle beside its agent's name and what it says it is doing, and the project
+   * it is placed in by name when the caller may read that project. Empty for a caller who may not read the runs.
+   */
+  working: WorkingRun[];
+  /**
+   * THE VOICE THE RECORD SPEAKS IN, worked out while answering (`speakingNow`): the use case that speaks, its settings'
+   * values, and each setting's label where it names one, which is everything the app read with two or more calls of its
+   * own before the first screen. `pack` is `null` for the house voice, and for a caller the record's settings are not
+   * read to.
+   */
+  voice: BootVoice;
+  /** Whether a model is behind Slash on this host, as `version` says it (`Build.slash`), so the app need not ask. */
+  slash: boolean;
 };
+
+/** The shape `boot` answers in: 2 since `waits`, `lateDays`, `working`, `voice` and `slash` joined it. */
+export const BOOT_SHAPE = 2;
+
+/** The most working runs `boot` sends. The rail says how many, so past this it says the ceiling. */
+export const WORKING_MOST = 50;
+
+/** One agent at work, as `boot` sends it: its handle beside its name, what it is doing, where, and for how long. */
+export type WorkingRun = {
+  /** The run's handle (`S42`), never shown alone: a screen says the agent and what it does. */
+  spoken: string;
+  seq: number | null;
+  /** The kind of agent the run says it is (`claude`, `codex`), or `null` when it said none. */
+  agent: string | null;
+  /** What the run says it is doing, or `null`. */
+  doing: string | null;
+  /** The project it is placed in, by name, when the caller may read that project; else `null`. */
+  project: string | null;
+  /** When the run began, ISO 8601. */
+  since: string;
+  /** When it was last heard from, ISO 8601. */
+  last_seen: string;
+  /** Seconds it has been going (`runAge`). */
+  ran_s: number;
+};
+
+/** The voice `boot` sends: the use case that speaks, its settings' values, and the label each setting names. */
+export type BootVoice = { pack: string | null; values: Record<string, JsonValue>; labels: Record<string, string> };
 
 /** One line of the log as a caller sees it: the event, and what it is about when they may read that. */
 export type EventLine = Omit<LogLine, 'rowid'> & {
@@ -1110,6 +1183,8 @@ export type LiveRun = Entry & {
   ran_s: number;
   /** Its repository is the one the caller said it is in: two runs in one working tree overwrite each other. */
   same_repo: boolean;
+  /** Where the run stands for a person (`presenceOf`): working, quiet, or left a step for the next run. */
+  presence: Presence;
 };
 
 /**
@@ -3594,6 +3669,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     questions: { list: string | null; question: string }[];
     open: number;
     working: number;
+    inbox: number;
   };
 
   /**
@@ -3618,8 +3694,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     });
     const asked = drawn({ kind: 'queue', source: 'governance.open', limit: 50 });
     const questions = (asked?.queue ?? []).map((q) => ({ list: q.list ?? null, question: q.question.trim().slice(0, 200) })).filter((q) => q.question !== '');
-    const working = drawn({ kind: 'table', source: 'sessions.live', where: 'state is active', limit: 0 })?.matched ?? 0;
-    return { due, questions, open: asked?.matched ?? 0, working };
+    /* HOW MANY WAIT AND WHO IS WORKING ARE `waiting()`'S, the counts `boot` sends the rail, so Home's line says the badge's
+       number: `state is active` counted a run silent for hours as working, and the queue's own count was a second one. */
+    const waits = waitsFor(null);
+    return { due, questions, open: waits.questions, working: waits.working, inbox: waits.inbox ?? 0 };
   };
 
   /** What a page's ask names: the late or due things on its lists, most pressing first, and the first question about them. */
@@ -3642,16 +3720,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const late: HeadlineItem[] = [];
     for (const d of read.due) if (d.when === 'late' && !late.some((i) => i.title === d.title)) late.push({ title: d.title, when: 'late' });
     const needs = read.open + late.length;
-    if (needs === 0 && read.working === 0) return null;
+    if (needs === 0 && read.working === 0 && read.inbox === 0) return null;
     const question = read.questions[0]?.question;
     return {
       page: HOME_PAGE,
       title: 'Today',
-      rules: homeRulesLine(needs, late.length, read.working),
+      rules: homeRulesLine(needs, late.length, read.working, read.inbox),
+      /* AND WHAT WAITS IN THE INBOX WHEN ANYTHING DOES, so the model may say it and a line naming it is held to it
+         (`headlineAgrees` in `headlineFault`, which reads the questions as `needs-you` less `late`). */
       figures: [
         { id: 'needs-you', value: String(needs) },
         { id: 'late', value: String(late.length) },
         { id: 'working', value: String(read.working) },
+        ...(read.inbox > 0 ? [{ id: 'inbox', value: String(read.inbox) }] : []),
       ],
       ...(late.length > 0 ? { items: late.slice(0, HEADLINE_ITEMS_MOST) } : {}),
       ...(question === undefined ? {} : { question }),
@@ -5187,6 +5268,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * writes are all like that. Aged from `updated_at`, which is the import's own write, each one read `stale: false` for
    * the 45 minutes after an import, beside the agents actually working. `isStale` keeps its fallback on purpose, for
    * the rows that reach it by another road; this list does not ask it about rows nobody heard from.
+   *
+   * AND A STALE RUN IS NOT LIVE. On the owner's record an agent's start card printed a line for each of six other
+   * sessions, four of them dead for hours, and the rail counted them as working. So a run nobody has heard from in
+   * `STALE_MS` is left out here, which is `context`'s `same_repo`, the resource and `boot`'s `sessions` at once, and each
+   * run that stays carries where it stands (`presence`). The rows themselves are not touched: a `list` of runs still
+   * answers every run as it is.
    */
   const live = (ctx: CallContext): LiveRun[] => {
     const rows = kernel.list({
@@ -5198,15 +5285,100 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (!rows.ok) return [];
     const now = clock.now();
     const repo = ctx.session?.repo;
-    return rows.value.rows.map((row) => ({
-      ...row,
-      spoken: `${PREFIX}${String(row.seq)}`,
-      stale: isStale(row, now),
-      quiet: isQuiet(row, now),
-      age_s: ageOf(row),
-      ran_s: runAge(row, now),
-      same_repo: repo !== undefined && row.fields.repo === repo,
-    }));
+    return rows.value.rows
+      .filter((row) => !isStale(row, now))
+      .map((row) => ({
+        ...row,
+        spoken: `${PREFIX}${String(row.seq)}`,
+        stale: false,
+        quiet: isQuiet(row, now),
+        age_s: ageOf(row),
+        ran_s: runAge(row, now),
+        same_repo: repo !== undefined && row.fields.repo === repo,
+        presence: presenceOf(row, now),
+      }));
+  };
+
+  /**
+   * The runs that may be working: active and heard from, most recently heard from first. `isWorking` then keeps the ones
+   * inside the kernel's quiet mark, so the clock is compared in one place (`waiting.ts`).
+   */
+  const activeRuns = (): Entry[] => {
+    const rows = kernel.list({
+      register: SESSION,
+      where: { all: [{ field: RUN.state, is: 'active' }, { field: 'last_seen', present: true }] } as Predicate,
+      order: [{ field: 'last_seen', dir: 'desc' }],
+      limit: 200,
+    });
+    return rows.ok ? rows.value.rows : [];
+  };
+
+  /**
+   * WHAT WAITS ON A READER, COUNTED ONCE (`waiting()`): `boot`, Home's line and the queue's counts all read this.
+   *
+   * HELD TO THE READER AS EACH COUNT ALREADY WAS: the questions `holds` leaves them, the inbox only to an owner and a
+   * token an owner gave the `inbox` reach (`counts.inbox`'s rule), and runs only to a reader who may read them. `null`
+   * is the record itself (Slash's nightly look), which reads everything.
+   */
+  const waitsFor = (ctx: CallContext | null): WaitingNow => {
+    const open = kernel.openSuggestions();
+    const rows = open.ok ? open.value.filter((row) => ctx === null || !holds(ctx, row)) : [];
+    const told = ctx === null || allows(ctx, 'owner') === null || (inboxReached(ctx) && wholeRecord(ctx));
+    return waitingOf({
+      nowMs: clock.now(),
+      questions: rows.map((row) => ({ opened_at: String(row.opened_at ?? ''), body_kind: String(row.body_kind ?? ''), body: row.body })),
+      inbox: told ? kernel.inboxWaiting() : null,
+      runs: ctx !== null && readable(ctx, SESSION) ? [] : activeRuns(),
+    });
+  };
+
+  /**
+   * THE AGENTS WORKING NOW, as `boot` sends them (`WorkingRun`), by the clock `waitsFor` counts with, so the rail's
+   * count is `waits.working` and its list is the same runs. A project is said by name, and only to a reader who reads it.
+   */
+  const workingFor = (ctx: CallContext): WorkingRun[] => {
+    if (readable(ctx, SESSION)) return [];
+    const now = clock.now();
+    const said = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v : null);
+    const projectOf = (ref: unknown): string | null => {
+      if (typeof ref !== 'string' || ref === '') return null;
+      const row = kernel.get(ref);
+      if (!row || readable(ctx, row.register) || !rowAdmitted(ctx, row.register, row.seq)) return null;
+      const title = kernel.titleOfRow(row.id);
+      return title === null ? null : (scrubbed(title) ?? null);
+    };
+    return activeRuns()
+      .filter((row) => isWorking(row, now))
+      .slice(0, WORKING_MOST)
+      .map((row) => ({
+        spoken: `${PREFIX}${String(row.seq)}`,
+        seq: row.seq,
+        agent: said(row.fields.agent),
+        doing: said(row.fields.doing),
+        project: projectOf(row.fields.project),
+        since: row.created_at,
+        last_seen: String(row.fields.last_seen),
+        ran_s: runAge(row, now),
+      }));
+  };
+
+  /**
+   * THE VOICE THE RECORD SPEAKS IN, as `boot` sends it: the use case `speakingNow` names, its settings' values, and the
+   * label each setting names. Held as `packConfig` is: a caller the record's settings are not read to hears the house.
+   */
+  const voiceFor = (ctx: CallContext): BootVoice => {
+    const house: BootVoice = { pack: null, values: {}, labels: {} };
+    if (guard(ctx, 'read')) return house;
+    const pack = speakingNow(kernel);
+    if (pack === null) return house;
+    const read = kernel.packConfig(pack);
+    if (!read.ok) return house;
+    const labels: Record<string, string> = {};
+    for (const [setting, decl] of Object.entries(read.value.config)) {
+      const label = (decl as { label?: unknown }).label;
+      if (typeof label === 'string' && label !== '') labels[setting] = label;
+    }
+    return { pack, values: { ...read.value.values }, labels };
   };
 
   /**
@@ -7159,6 +7331,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const icon = (decl as { icon?: unknown }).icon;
           out.push({ id, name: decl.name, count: kernel.count(id, whereFor(ctx.wheres, id)), icon: typeof icon === 'string' && icon !== '' ? icon : null });
         }
+        const shell = shellFor(ctx);
+        const waits = waitsFor(ctx);
         const answered: Omit<Boot, 'theme'> = {
           registers: out,
           now: new Date(clock.now()).toISOString(),
@@ -7166,7 +7340,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
              held to what the caller may read, as the registers above are. */
           sessions: readable(ctx, SESSION) ? [] : live(ctx),
           waiting: waitingFor(ctx),
-          ...shellFor(ctx),
+          ...shell,
+          /* THE RAIL'S TWO COUNTS ARE `waits`' OWN, read in the same moment, so the badge is the number Today and Decide say. */
+          counts: { ...shell.counts, decide: waits.questions, inbox: waits.inbox },
+          shape: BOOT_SHAPE,
+          waits,
+          lateDays: LATE_DAYS,
+          working: workingFor(ctx),
+          voice: voiceFor(ctx),
+          slash: build?.slash ?? false,
           signIn: invitations !== undefined && invitations() === null,
           /* ONLY WHEN THE BUILD NAMES ONE: a key set to `undefined` still reads as `'host' in boot`, which is a host
              that said something. */
@@ -8779,7 +8961,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           { at: 'next' },
         );
       if (said.state !== undefined && typeof said.state !== 'string')
-        return no('VALUE_MALFORMED', `state is one of the run's states: ${LIVE.join(', ')} or ${RUN.done.join(', ')}.`, { at: 'state' });
+        return no('VALUE_MALFORMED', `state is one of ${HANDOFF_STATES.join(', ')}, or left out.`, { at: 'state', allowed: HANDOFF_STATES });
+      /* ONLY THE THREE STATES A RUN HANDS ITSELF INTO, refused before any run is found or opened. `active` is told why, with
+         the same call without it, which is the call that does what it meant. */
+      if (said.state === 'active') {
+        const { state: _state, ...rest } = said;
+        const kept = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
+        return no('VALUE_MALFORMED', HANDOFF_ACTIVE, {
+          at: 'state',
+          allowed: HANDOFF_STATES,
+          ...(Object.keys(kept).length === 0 ? {} : { try: `handoff ${JSON.stringify(kept)}` }),
+        });
+      }
+      if (typeof said.state === 'string' && !(HANDOFF_STATES as readonly string[]).includes(said.state))
+        return no('ENUM_VALUE_UNKNOWN', `state is one of ${HANDOFF_STATES.join(', ')}, or left out.`, { at: 'state', allowed: HANDOFF_STATES });
       if (Object.keys(lines).length === 0 && said.state === undefined)
         return no('REQUIRED_MISSING', 'A handoff carries at least one of next, tried, note, doing, state, branch or head.', { at: 'next' });
 

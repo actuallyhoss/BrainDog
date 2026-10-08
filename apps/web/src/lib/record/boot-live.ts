@@ -15,7 +15,7 @@
  */
 
 import { createClient, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
-import { isQuiet, railRoom, runAge } from '@braindog/kernel';
+import { railRoom } from '@braindog/kernel';
 /* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
    carried the same six and the sample's two made-up add-ons, until the sample left the app, then a hand copy in `modules.ts` until each module's
    own manifest said it. */
@@ -27,7 +27,7 @@ import { homeOf, learnHome } from './api.ts';
 import { currencyOf } from './money.ts';
 import { learnPages, REGISTERS } from './held.ts';
 import { copy } from '../copy.ts';
-import type { SwitcherRow } from './switcher.ts';
+import type { Answer, SwitcherRow } from './switcher.ts';
 import { declaredOf, noteOf } from './history-live.ts';
 import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
 import type { Level } from './schema.ts';
@@ -189,6 +189,15 @@ export type Shell = ShellBase & {
    * Absent on a shell no record answered; the root layout then reads `open` and `inbox`.
    */
   counts?: NonNullable<Boot['counts']>;
+  /**
+   * WHAT WAITS ON THE READER, AS `boot` SAID IT (`waitsOf`): the rail's badge, Today's header and Decide's sentence read
+   * these and nothing of their own. `null` from a host older than the field, and on a shell no record answered.
+   */
+  waits: Waits | null;
+  /** How many days a question waits before it is late, as the record says it; `null` where it did not say. */
+  lateDays: number | null;
+  /** The agents working now, as `boot` said it (`workingOf`). Empty on a shell no record answered. */
+  working: Working[];
   now: number;
   live: boolean;
   /* A ROWID FOR THE OWNER AND `e.<id>` FOR A MEMBER HELD TO NAMED LISTS: handed back to `markRead` as it came. */
@@ -211,11 +220,29 @@ let keptFor = '';
  */
 let refusal: { code: string; fix: string } | null = null;
 
+/**
+ * THE `boot` THE PAGE ASKED FOR BEFORE THE APP ARRIVED (`app.html`), taken once and only for the address it was asked
+ * at, or `null`. The shell's first request goes out beside the first chunks rather than after three of them have loaded;
+ * a guess at the record that turns out wrong is left unread, and this asks as it always did.
+ */
+function earlyBoot(url: string): Promise<Response> | null {
+  const held = (globalThis as { __bdBoot?: { url?: unknown; at?: unknown } }).__bdBoot;
+  if (!held || held.url !== url || !(held.at instanceof Promise)) return null;
+  (globalThis as { __bdBoot?: unknown }).__bdBoot = undefined;
+  return held.at as Promise<Response>;
+}
+
 export function readBoot(base: string, io?: Fetch): Promise<Booted> {
   if (keptFor !== base) kept = null;
   keptFor = base;
   kept ??= (async (): Promise<Booted> => {
-    const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+    /* THE EARLY ANSWER, WHEN IT WAS ASKED AT THIS ADDRESS, is the one `boot` read; anything else goes to the network. */
+    const early = io ? null : earlyBoot(`${base}/api/boot`);
+    const first: Fetch | undefined = early
+      ? (((input: string | URL | Request, init?: RequestInit) =>
+          String(input) === `${base}/api/boot` && (init?.method ?? 'GET') === 'GET' ? early : globalThis.fetch(input, init)) as Fetch)
+      : io;
+    const client = createClient({ base, ...(first ? { fetch: first } : {}) });
     const out = await client.boot();
     refusal = null;
     if (out.ok) {
@@ -329,81 +356,105 @@ export type Working = {
   agent: string;
   kind: AgentKind;
   project: string | null;
-  doing: string;
+  doing: string | null;
   since: string | null;
   quiet: boolean;
   ran_s?: number;
 };
 
 /**
- * The most runs the rail counts. It draws none of them, only how many ("2 working"), so this is a ceiling on a count
- * and not a list's length: past it the rail says the ceiling.
+ * What waits on the reader, as `boot` says it (`waits`, the record's `waiting()`): open questions, how many of them are
+ * late and how many hard to undo, arrivals in the inbox (`null` where the reader is not told), and agents working now.
+ * The rail's badge, Today's header and Decide's sentence all say these numbers, so no two of them disagree.
  */
-export const WORKING_SHOWN = 50;
+export type Waits = { questions: number; late: number; hard: number; inbox: number | null; working: number };
 
 /**
- * WHO IS WORKING, BY THE AGENTS PAGE'S OWN CLAUSE: active, and heard from today. It is `RUNS_WORKING` in
- * `packages/seed/src/packs/agents.ts`, written out because the seed does not export that file (`boot-live.test.ts`
- * holds the two equal). With `state is active` alone the rail counted a run the end hook never closed yesterday, so
- * it said three working beside an Agents page that said two.
- */
-export const RUNS_WORKING = 'state is active, last_seen is today';
-
-/**
- * THE AGENTS AT WORK, READ THE WAY THE AGENTS PAGE READS THEM: the record draws `sessions.live` as a page it holds
- * nowhere, over the same clause as Agents' Working group, so the rail's count and that group are the same runs. Most
- * recently heard from first, as the record orders them.
+ * WHO IS WORKING, AS `boot` SAYS IT (`working`): the runs active and not quiet, by the record's one clock, so the rail's
+ * count, Today's tile and the Agents header are the same runs. It was a page of its own the rail asked the record to
+ * draw (`previewPage` over `sessions.live`) on every screen and every version; `boot` answers it in the same request.
  *
- * A REFUSAL IS NOBODY WORKING, never a failure of the shell: a colleague who may not read the runs sees no group, and
- * the screen beside the rail is not told anything went wrong. `now` is the clock "gone quiet" is judged against.
+ * A HOST OLDER THAN THE FIELD sent its live runs on `sessions`, each saying whether it had gone quiet, so the working ones
+ * are read from there: active and not quiet, as that host judged it. A caller who may not read runs is sent none.
  */
-export async function readWorking(base: string, io?: Fetch, now = Date.now()): Promise<Working[]> {
-  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const body = {
-    page: 'working',
-    title: 'Working now',
-    blocks: [
-      {
-        kind: 'table',
-        heading: 'Working now',
-        source: 'sessions.live',
-        where: RUNS_WORKING,
-        columns: [{ field: 'agent' }, { field: 'doing' }, { field: 'last_seen' }],
-        limit: WORKING_SHOWN,
-      },
-    ],
-  };
-  const out = await client.call<{ blocks?: unknown }>('previewPage', { body });
-  if (!out.ok) return [];
-  const table = (Array.isArray(out.value.blocks) ? out.value.blocks : [])[0] as { rows?: unknown; scopes?: unknown } | undefined;
-  const scopes = Array.isArray(table?.scopes) ? (table.scopes as unknown[]) : [];
-  const rows = Array.isArray(table?.rows) ? (table.rows as unknown[]) : [];
+export function workingOf(b: Boot): Working[] {
   const said = (v: unknown): string => (typeof v === 'string' ? v : '');
-  return rows.flatMap((r, i): Working[] => {
-    if (typeof r !== 'object' || r === null) return [];
-    const row = r as { seq?: unknown; fields?: unknown; created_at?: unknown; updated_at?: unknown };
-    const fields = (typeof row.fields === 'object' && row.fields !== null ? row.fields : {}) as Record<string, unknown>;
-    const scope = scopes[i];
-    const kind = agentKindOf(said(fields.agent));
-    const run = { fields: fields as Parameters<typeof runAge>[0]['fields'], created_at: said(row.created_at), updated_at: said(row.updated_at) };
-    return [
-      {
-        seq: typeof row.seq === 'number' ? row.seq : null,
-        agent: said(fields.agent) || 'other',
-        /* The kind of agent (`face.ts`), worked out here so the rail's chunk does not carry the names behind it; the rail
-           draws its maker's mark from it (`AgentMark`). */
-        kind,
-        project: (typeof scope === 'string' && scope !== '' ? scope : null) ?? (said(fields.project) || null),
-        doing: said(fields.doing),
-        since: said(row.created_at) || null,
-        /* GONE QUIET AS THE RECORD SAYS IT (`isQuiet`): open, and not heard from in 30 minutes. */
-        quiet: isQuiet(run, now),
-        /* AND HOW LONG IT HAS GONE AS THE RECORD COUNTS IT (`runAge`), so a quiet run's age stops where it went quiet. */
-        ran_s: runAge(run, now),
-      },
-    ];
-  });
+  if (Array.isArray(b.working))
+    return b.working.map((w) => ({
+      seq: w.seq,
+      agent: w.agent || 'other',
+      /* The kind of agent (`face.ts`), worked out here so the rail's chunk does not carry the names behind it. */
+      kind: agentKindOf(w.agent ?? ''),
+      project: w.project,
+      doing: w.doing,
+      since: w.since || null,
+      quiet: false,
+      ran_s: w.ran_s,
+    }));
+  return (b.sessions ?? [])
+    .filter((r) => r.state === 'active' && !r.quiet && !r.stale)
+    .map((r) => ({
+      seq: r.seq,
+      agent: said(r.fields.agent) || 'other',
+      kind: agentKindOf(said(r.fields.agent)),
+      project: null,
+      doing: said(r.fields.doing) || null,
+      since: null,
+      quiet: false,
+      ran_s: r.ran_s,
+    }));
 }
+
+/**
+ * WHAT WAITS, AS `boot` SAYS IT, or `null` from a host older than `waits`: a screen then says what it said before, from
+ * `counts` and its own reads, rather than a count this tab made up.
+ */
+export function waitsOf(b: Boot): Waits | null {
+  const w = b.waits;
+  if (w === null || typeof w !== 'object') return null;
+  const whole = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+  if (!whole(w.questions) || !whole(w.late) || !whole(w.hard) || !whole(w.working)) return null;
+  return { questions: w.questions, late: w.late, hard: w.hard, inbox: whole(w.inbox) ? w.inbox : null, working: w.working };
+}
+
+/**
+ * THE POLL'S RE-READ OF `boot`, when the record's version moves: one request, and the answer kept for the tab, so the
+ * rail's count, its badge and the next screen's shell are all the record as it is now. A refusal keeps nothing, as
+ * `readBoot` keeps none, and the shell already drawn stays.
+ */
+export function rereadBoot(base: string, io?: Fetch): Promise<Booted> {
+  if (keptFor === base) kept = null;
+  return readBoot(base, io);
+}
+
+/*
+ * THE ACCOUNT'S RECORDS, AS THE SWITCHER READS THEM, kept for the tab for the reason `readBoot` is kept: the root load
+ * runs on every navigation and the list is the same answer every time. A refusal is dropped rather than kept, because
+ * it is about this moment and not about which records exist.
+ */
+let reach: Promise<Answer<SwitcherRow[]>> | null = null;
+let reached: Answer<SwitcherRow[]> | null = null;
+
+/**
+ * Ask for the account's records once for the tab, and the answer. NEVER WAITED ON BEFORE THE FIRST PAINT (EXP-D03): the
+ * rail reads it once it lands, and only a screen that lists the records waits for it.
+ */
+export function recordsReach(io: Fetch, origin: string): Promise<Answer<SwitcherRow[]>> {
+  reach ??= import('./switcher.ts')
+    .then((m) => m.readRecordsForSwitcher(io, origin))
+    .then((listed) => {
+      if (listed.ok) reached = listed;
+      else reach = null;
+      return listed;
+    });
+  return reach;
+}
+
+/** The account's records once they have answered for this tab, or `null` before then and after a refusal. */
+export const recordsReached = (): Answer<SwitcherRow[]> | null => reached;
+
+/** The ask for the account's records when the root load made one, which the rail reads once it lands; else `null`. */
+export const recordsAsked = (): Promise<Answer<SwitcherRow[]>> | null => reach;
 
 /** Drop the kept answer, and the refusal beside it, so the next screen asks the record again. */
 export function forget(): void {
@@ -737,6 +788,7 @@ export const hueSent = (about: object): number | undefined => {
 export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b)): Shell {
   const record = b.record ?? null;
   const drawn = drawnOf(b);
+  const waits = waitsOf(b);
   const person = b.me?.person ?? null;
   const level = b.me?.level ?? 'read';
   /* A PERSON WITH NO RECORD LEVEL WHOM THE RECORD STILL ANSWERED holds exactly the lists `boot` sent. A token
@@ -859,9 +911,13 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
        lists is sent a cursor and no number, and 0 is what "names no event" already means. */
     version: typeof b.whatsNew?.upTo === 'number' ? b.whatsNew.upTo : 0,
     assistant: false,
-    inbox: b.counts?.inbox ?? 0,
-    open: b.counts?.decide ?? (b.waiting ?? []).length,
+    inbox: waits?.inbox ?? b.counts?.inbox ?? 0,
+    /* THE BADGE IS `waits`' COUNT, the number Today's header and Decide's sentence say; `counts` from an older host. */
+    open: waits?.questions ?? b.counts?.decide ?? (b.waiting ?? []).length,
     ...(b.counts ? { counts: b.counts } : {}),
+    waits,
+    lateDays: typeof b.lateDays === 'number' && Number.isSafeInteger(b.lateDays) && b.lateDays > 0 ? b.lateDays : null,
+    working: workingOf(b),
     now: Number.isFinite(Date.parse(b.now)) ? Date.parse(b.now) : Date.now(),
     live: true,
     upTo: b.whatsNew?.upTo ?? null,

@@ -17,8 +17,14 @@ import type { Question } from '../../lib/record/schema.ts';
 /** The most questions the queue aims to hold at once; the classic screen's figure says it as "Limit 3". The line never does. */
 export const AIM = 3;
 
-/** Past this many days a question has waited too long, and its bar and its age are drawn in the red that means late. */
-export const STALE_DAYS = 14;
+/*
+ * WHEN A QUESTION IS LATE IS THE RECORD'S TO SAY, NOT THIS FILE'S (EXP-E07). It was fourteen days here, and again in the
+ * kernel, so the rail, Today and Decide could each count late their own way. `boot` sends it (`lateDays`, the shell's)
+ * and each function below takes it; a host older than the field sends none, and then nothing is drawn late here.
+ */
+
+/** An age is said in days up to two weeks, then in weeks (`waitedWords`). A way of speaking, not a mark of late. */
+const DAYS_SAID = 14;
 
 /** The most bars the waiting chart draws; the reading line says when there are more. */
 export const WAITED_MOST = 8;
@@ -49,6 +55,10 @@ export const numberWord = (n: number): string => NUMBERS[n] ?? n.toLocaleString(
 
 const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** How long a question waits before it is late, in words: "two weeks" for 14, "ten days" for 10. */
+export const lateSaid = (days: number): string =>
+  days % 7 === 0 ? `${numberWord(days / 7)} ${days === 7 ? 'week' : 'weeks'}` : `${numberWord(days)} ${days === 1 ? 'day' : 'days'}`;
+
 /** Whole and part days since `iso`, never below zero; zero for a time this build cannot read. */
 export function ageDays(iso: string, now: number): number {
   const t = Date.parse(iso);
@@ -62,7 +72,7 @@ export function ageDays(iso: string, now: number): number {
 export function waitedWords(days: number): string {
   const d = Math.floor(days);
   if (d < 1) return 'today';
-  if (d < STALE_DAYS) return d === 1 ? '1 day' : `${d} days`;
+  if (d < DAYS_SAID) return d === 1 ? '1 day' : `${d} days`;
   if (d < 60) return `${Math.round(d / 7)} weeks`;
   if (d < 365) {
     const m = Math.max(2, Math.round(d / 30.44));
@@ -95,7 +105,7 @@ export const suggestedOf = (q: Pick<Question, 'options'> | undefined): string | 
  *
  * "Eight questions wait on you. The first one is hard to undo." How many wait, and then the one thing worth knowing
  * before reading them: which are hard to undo, or else what the first suggests, with who asked it when that is known.
- * RED IS ONLY FOR WHAT IS LATE, a question that has waited past two weeks ("two of them for over two weeks"); a count is
+ * RED IS ONLY FOR WHAT IS LATE, a question that has waited past the record's `lateDays` ("two of them for over two weeks"); a count is
  * never the trouble, and the queue keeps no quota to be over. Questions come dearest first, so the hard ones lead.
  * NOTHING WAITING IS NOT A SENTENCE: the screen's cleared state already says it, with when the last one was decided.
  */
@@ -104,10 +114,11 @@ export function sentenceOf(
   first: Pick<Question, 'options'> | undefined,
   who = '',
   now = Date.now(),
+  lateDays: number | null = null,
 ): { text: string; needs: string } | null {
   const hard = waiting.filter((q) => q.band === 'undo').length;
-  const late = waiting.filter((q) => typeof q.opened === 'string' && ageDays(q.opened, now) > STALE_DAYS).length;
-  return countSentence(waiting.length, hard, suggestedOf(first), who, late);
+  const late = lateDays === null ? 0 : waiting.filter((q) => typeof q.opened === 'string' && ageDays(q.opened, now) > lateDays).length;
+  return countSentence(waiting.length, hard, suggestedOf(first), who, late, lateDays);
 }
 
 /**
@@ -116,12 +127,21 @@ export function sentenceOf(
  * how many have waited past two weeks. `sentenceOf` is this over the questions the classic screen holds whole, so the
  * two screens say one sentence.
  */
-export function countSentence(n: number, undo: number | boolean, option: string | undefined, who = '', late = 0): { text: string; needs: string } | null {
+export function countSentence(
+  n: number,
+  undo: number | boolean,
+  option: string | undefined,
+  who = '',
+  late = 0,
+  lateDays: number | null = null,
+): { text: string; needs: string } | null {
   if (n <= 0) return null;
+  /* HOW LONG IS THE RECORD'S (`lateDays`); a host that did not say it is not quoted a number it never gave. */
+  const past = lateDays === null ? 'for too long' : `for over ${lateSaid(lateDays)}`;
   const count = n === 1 ? 'One question waits on you' : `${capital(numberWord(n))} questions wait on you`;
   const stale = Math.min(Math.max(0, late), n);
   const overdue =
-    stale === 0 ? '' : stale === n ? (n === 1 ? 'for over two weeks' : 'all of them for over two weeks') : `${numberWord(stale)} of them for over two weeks`;
+    stale === 0 ? '' : stale === n ? (n === 1 ? past : `all of them ${past}`) : `${numberWord(stale)} of them ${past}`;
   const hard = Math.min(Number(undo), n);
   const which = n > 1 ? ' for the first' : '';
   const then =
@@ -154,20 +174,24 @@ export function waitedOf(
   waiting: readonly Pick<Question, 'id' | 'title' | 'opened'>[],
   openId: string | undefined,
   now: number,
+  lateDays: number | null = null,
 ): { items: WaitedBar[]; reading: string } {
+  const isLate = (days: number): boolean => lateDays !== null && days > lateDays;
   const shown = waiting.slice(0, WAITED_MOST);
   const items = shown.map((q): WaitedBar => {
     const value = ageDays(q.opened, now);
-    const tone = value > STALE_DAYS ? 'danger' : q.id === openId ? 'ink' : 'g2';
+    const tone = isLate(value) ? 'danger' : q.id === openId ? 'ink' : 'g2';
     return { label: shortTitle(q.title), value, tone };
   });
   const ages = waiting.map((q) => ageDays(q.opened, now));
   const oldest = Math.max(0, ...ages);
-  const stale = ages.filter((d) => d > STALE_DAYS).length;
+  const stale = ages.filter(isLate).length;
   const lead =
-    stale === 0
-      ? `None has waited two weeks; the oldest has waited ${waitedWords(oldest)}.`
-      : `${capital(numberWord(stale))} ${stale === 1 ? 'has' : 'have'} waited over two weeks, the longest ${waitedWords(oldest)}.`;
+    lateDays === null
+      ? `The oldest has waited ${waitedWords(oldest)}.`
+      : stale === 0
+        ? `None has waited ${lateSaid(lateDays)}; the oldest has waited ${waitedWords(oldest)}.`
+        : `${capital(numberWord(stale))} ${stale === 1 ? 'has' : 'have'} waited over ${lateSaid(lateDays)}, the longest ${waitedWords(oldest)}.`;
   const more = waiting.length > shown.length ? ` The first ${numberWord(shown.length)} of ${waiting.length.toLocaleString('en-GB')} are drawn.` : '';
   return { items, reading: `${lead}${more}` };
 }

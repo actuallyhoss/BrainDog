@@ -95,9 +95,17 @@ export function lateBy(due: string, today: string): string {
  * "Eight things are late. Twelve more need you." It is never fewer than the days drawn, and with no day drawn nothing
  * is said to be late, since the oldest could not be named. `agents` is the runs working now.
  */
-export function sentenceOf(needing: number, late: readonly string[], agents: number, today: string, lateCount = late.length): Sentence {
+/*
+ * "NOTHING NEEDS YOU" ONLY WHEN NOTHING DOES (EXP-E07): no question, and nothing in the inbox. `inbox` is what waits
+ * there, as `boot` says it; with something in it and nothing else, the line says so in place of the calm one.
+ */
+export function sentenceOf(needing: number, late: readonly string[], agents: number, today: string, lateCount = late.length, inbox = 0): Sentence {
   const working = agents === 0 ? 'no agent is working' : agents === 1 ? 'one agent is working' : `${counted(agents)} agents are working`;
   const lates = late.length === 0 ? 0 : Math.max(lateCount, late.length);
+  if (needing === 0 && lates === 0 && inbox > 0) {
+    const head = `${opening(inbox)} ${plural(inbox, 'thing waits', 'things wait')} in your inbox`;
+    return { text: `${head}, and ${working}.`, needs: '' };
+  }
   if (needing === 0 && lates === 0) return { text: `Nothing needs you, and ${working}.`, needs: '' };
   if (lates > 0) {
     const how = lateBy(late[0]!, today);

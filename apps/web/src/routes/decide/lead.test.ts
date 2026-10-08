@@ -11,6 +11,8 @@ import { test } from 'node:test';
 import { ageDays, countSentence, evidenceOf, sentenceOf, shortTitle, waitedOf, waitedWords, waitingSaid } from './lead.ts';
 
 const NOW = Date.parse('2026-09-29T09:40:00Z');
+/** When a question is late, as the record says it (`boot`'s `lateDays`): the web keeps no number of its own. */
+const LATE = 14;
 const daysAgo = (d: number) => new Date(NOW - d * 86_400_000).toISOString();
 const opt = (title: string, recommended = false) => ({ key: title.toLowerCase(), title, body: '', recommended });
 
@@ -25,10 +27,15 @@ test('the count is said in words, then what is hard to undo or what the first su
   const eight = sentenceOf([{ band: 'undo' }, {}, {}, {}, {}, {}, {}, {}], { options: [opt('Yes'), opt('No')] }, '', NOW);
   assert.deepEqual(eight, { text: 'Eight questions wait on you. The first one is hard to undo.', needs: '' });
 
-  const stale = sentenceOf([{ opened: daysAgo(20) }, { opened: daysAgo(16) }, { opened: daysAgo(1) }], { options: [opt('Yes', true)] }, '', NOW);
+  const stale = sentenceOf([{ opened: daysAgo(20) }, { opened: daysAgo(16) }, { opened: daysAgo(1) }], { options: [opt('Yes', true)] }, '', NOW, LATE);
   assert.deepEqual(stale, { text: 'Three questions wait on you, two of them for over two weeks. “Yes” is suggested for the first.', needs: 'two of them for over two weeks' });
   /* THE RED PHRASE IS INSIDE THE SENTENCE, so PageHead can cut round it. */
   assert.ok(stale && stale.text.includes(stale.needs));
+  /* A HOST THAT DID NOT SAY WHEN A QUESTION IS LATE: nothing is called late, rather than a number of the web's own. */
+  const unsaid = sentenceOf([{ opened: daysAgo(20) }, { opened: daysAgo(1) }], { options: [opt('Yes', true)] }, '', NOW);
+  assert.deepEqual(unsaid, { text: 'Two questions wait on you. “Yes” is suggested for the first.', needs: '' });
+  /* AND ITS WORDS ARE THE RECORD'S NUMBER: ten days is said as ten days. */
+  assert.equal(sentenceOf([{ opened: daysAgo(12) }], undefined, '', NOW, 10)?.needs, 'for over ten days');
 });
 
 test('nothing waiting is not a sentence, because the cleared state says it', () => {
@@ -61,17 +68,19 @@ test('how long each has waited: the open one in ink, anything past two weeks red
     { id: 'b', title: 'GA4 consent gate', opened: daysAgo(36) },
     { id: 'c', title: 'Supplier price', opened: daysAgo(5) },
   ];
-  const w = waitedOf(qs, 'a', NOW);
+  const w = waitedOf(qs, 'a', NOW, LATE);
   assert.deepEqual(
     w.items.map((i) => i.tone),
     ['ink', 'danger', 'g2'],
   );
   assert.equal(Math.round(w.items[1]!.value), 36);
   assert.equal(w.reading, 'One has waited over two weeks, the longest 5 weeks.');
-  assert.equal(waitedOf(qs.slice(0, 1), 'a', NOW).reading, 'None has waited two weeks; the oldest has waited 2 days.');
+  assert.equal(waitedOf(qs.slice(0, 1), 'a', NOW, LATE).reading, 'None has waited two weeks; the oldest has waited 2 days.');
 
   const many = Array.from({ length: 11 }, (_, i) => ({ id: String(i), title: `Q${i}`, opened: daysAgo(i) }));
-  const drawn = waitedOf(many, '0', NOW);
+  const drawn = waitedOf(many, '0', NOW, LATE);
+  assert.equal(waitedOf(qs, 'a', NOW).reading, 'The oldest has waited 5 weeks.', 'no late mark from the record, none here');
+  assert.deepEqual(waitedOf(qs, 'a', NOW).items.map((i) => i.tone), ['ink', 'g2', 'g2']);
   assert.equal(drawn.items.length, 8);
   assert.match(drawn.reading, /The first eight of 11 are drawn\.$/u);
 });
@@ -118,7 +127,8 @@ test('the declared page says the same sentence from a count, how many are hard t
   assert.deepEqual(countSentence(1, 1, undefined), { text: 'One question waits on you. It is hard to undo.', needs: '' });
   assert.deepEqual(countSentence(5, 2, 'Yes'), { text: 'Five questions wait on you. The first two are hard to undo.', needs: '' });
   assert.equal(countSentence(2, 2, 'Yes')?.text, 'Two questions wait on you. Both are hard to undo.');
-  assert.deepEqual(countSentence(1, 0, undefined, '', 1), { text: 'One question waits on you, for over two weeks.', needs: 'for over two weeks' });
+  assert.deepEqual(countSentence(1, 0, undefined, '', 1, LATE), { text: 'One question waits on you, for over two weeks.', needs: 'for over two weeks' });
+  assert.equal(countSentence(1, 0, undefined, '', 1)?.needs, 'for too long', 'a late count from a host that named no days');
   /* AND THE CLASSIC SCREEN'S SENTENCE IS THIS ONE, over the questions it holds whole. */
   const waiting = [{ band: 'call' }, { band: 'undo' }] as never[];
   assert.deepEqual(sentenceOf(waiting, { options: [{ key: 'a', title: 'Per seat', body: '', recommended: true }] } as never, '', NOW), countSentence(2, 1, 'Per seat'));

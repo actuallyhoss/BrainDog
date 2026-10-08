@@ -54,6 +54,7 @@
   import { Sparkline, Stacked, Swimlanes, WeekStrip } from '$lib/viz/index.ts';
   import { rampAt } from '$lib/viz/shared.ts';
   import Question from './Question.svelte';
+  import { waitsNow } from './waits.svelte.ts';
   import type { DayRow, DueRow, TaskRow, TodayRead } from '$lib/record/today-live.ts';
   import { drew } from '../ui/screen.svelte.ts';
   import { run } from '$lib/data/optimistic.svelte.ts';
@@ -306,7 +307,10 @@
       ...tasks.filter((x) => x.why === 'urgent').map(taskNeed),
     ];
   });
-  const moreQuestions = $derived(t ? Math.max(0, t.open - t.questions.length) : 0);
+  /* HOW MANY QUESTIONS WAIT AND HOW MANY AGENTS WORK ARE `boot`'S (`waits`, EXP-E07), the rail's badge and its working
+     row; this screen's own read stands only for a host older than the field. */
+  const waits = $derived(waitsNow());
+  const moreQuestions = $derived(t ? Math.max(0, (waits?.questions ?? t.open) - t.questions.length) : 0);
   const needing = $derived(needs.length + moreQuestions);
 
   /* A LONG MORNING IS FOLDED, never cut: the first eight, and the rest one press away. */
@@ -317,7 +321,7 @@
   const lateDays = $derived(
     [...tasks.filter((x) => x.why === 'late' && x.due).map((x) => x.due!), ...bills.filter((b) => b.late && b.due).map((b) => b.due!)].sort(),
   );
-  const said = $derived(t ? sentenceOf(needing, lateDays, t.runs.length, day) : null);
+  const said = $derived(t ? sentenceOf(needing, lateDays, waits?.working ?? t.runs.length, day, lateDays.length, waits?.inbox ?? 0) : null);
 
   /* ── the next two weeks ────────────────────────────────────────────────────── */
 

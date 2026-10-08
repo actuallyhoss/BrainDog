@@ -36,7 +36,9 @@
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
   import { holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
-  import { drawsAny, homeDrawn, railed, slashLineOf, todayHome, type Holds, type HomeVoice } from '$lib/home/default-home.ts';
+  import { drawsAny, homeDrawn, railed, slashLineOf, todayHome, type Holds, type HomeVoice, type HomeWaits } from '$lib/home/default-home.ts';
+  import { sentenceOf } from '$lib/home/today-tiles.ts';
+  import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { words } from '$lib/home/words.ts';
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
   import { untrack } from 'svelte';
@@ -155,13 +157,29 @@
   listen(reread, () => reading || typing() || document.querySelector('main [aria-busy="true"]') !== null);
 
   const live = $derived(got?.from === 'live' ? got : null);
-  /* THE PAGE AS HOME DRAWS IT: its line lifted into the head, each row once, and nothing drawn that holds nothing. */
-  const shaped = $derived(live ? homeDrawn(live.page.blocks, live.now, voice, one) : null);
 
-  /* THE ONE LINE, worked out from the blocks drawn, else the page's own line, else the calm one once the page is read. */
+  /* WHAT WAITS AND WHO IS WORKING, AS `boot` SAYS IT (EXP-E07): the rail's badge and this header say one number, and the
+     working tile lists the runs `boot` says are working. `null` from a host older than the field. */
+  const waits = $derived.by((): HomeWaits | null => {
+    const w = waitsNow();
+    return w === null ? null : { questions: w.questions, inbox: w.inbox, working: w.working, seqs: workingNow().map((r) => r.seq) };
+  });
+
+  /* THE PAGE AS HOME DRAWS IT: its line lifted into the head, each row once, and nothing drawn that holds nothing. */
+  const shaped = $derived(live ? homeDrawn(live.page.blocks, live.now, voice, one, waits) : null);
+
+  /* THE LINE `boot`'S COUNTS SAY BY THEMSELVES, for a page that draws nothing it can be counted from; `null` while nothing
+     waits, which is the only time the calm line may be said. */
+  const waitsLine = $derived(
+    waits && (waits.questions > 0 || (waits.inbox ?? 0) > 0) ? sentenceOf(waits.questions, [], waits.working, '', 0, waits.inbox ?? 0) : null,
+  );
+
+  /* THE ONE LINE, worked out from the blocks drawn, else what `boot` says waits, else the page's own line, else the calm
+     one once the page is read. */
   const lead = $derived.by(() => {
     if (!shaped) return null;
     if (shaped.sentence) return shaped.sentence;
+    if (waitsLine) return waitsLine;
     return { text: shaped.lead ?? nothing, needs: '' };
   });
 
@@ -303,7 +321,7 @@
       </Empty>
     {:else if settled && got === null}
       <!-- A HOST THAT CANNOT DRAW THE PAGE: the calm line, and what fills it, rather than a blank. -->
-      <Empty kind="cleared" title={nothing} body={said('fills_with')} />
+      <Empty kind="cleared" title={waitsLine?.text ?? nothing} body={said('fills_with')} />
     {/if}
 
     <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->

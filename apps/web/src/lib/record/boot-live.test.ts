@@ -7,8 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import './fixtures/fill.ts';
-import { forget, layoutOf, newsOf, readBoot, readWorking, refusedShell, RUNS_WORKING, signsIn, type Fetch } from './boot-live.ts';
-import { AGENTS_METRICS } from '@braindog/seed';
+import { forget, layoutOf, newsOf, readBoot, refusedShell, rereadBoot, signsIn, waitsOf, workingOf, type Fetch } from './boot-live.ts';
 import { hueFor } from '../ui/face.ts';
 import { tabsOf } from '../page/tabs.ts';
 
@@ -601,31 +600,69 @@ test('A ONE-LIST COLLEAGUE KEEPS THEIR LIST IN THE RAIL AT ZERO ROWS, and the sh
 });
 
 /**
- * A RUN'S AGE IS THE RECORD'S (`runAge`), carried beside whether it has gone quiet, so the rail's Working now says how
- * long a quiet run went and not how long ago it started: counted to the clock, a run that stopped at ten read at noon as
- * three and a half hours of work.
+ * WHO IS WORKING IS `boot`'S (EXP-D03): the runs it sends as `working`, by the record's one clock, each with the age the
+ * record counts (`ran_s`). The rail no longer asks the record to draw a page of its own to count them.
  */
-test('A QUIET RUN IS AS OLD AS IT WAS WHEN LAST HEARD FROM, and a run still at work counts to now', async () => {
-  const NOW = Date.parse('2026-10-02T12:00:00.000Z');
-  const run = (seq: number, began: string, seen: string) => ({
-    seq,
-    fields: { agent: 'claude-code', doing: 'Filing the receipts', state: 'active', last_seen: seen },
-    created_at: began,
-    updated_at: seen,
-  });
-  const { io } = host(() =>
-    json(200, {
-      ok: true,
-      value: {
-        blocks: [{ rows: [run(1, '2026-10-02T11:00:00.000Z', '2026-10-02T11:55:00.000Z'), run(2, '2026-10-02T08:30:00.000Z', '2026-10-02T10:00:00.000Z')], scopes: ['Kiln', null] }],
-      },
-    }),
+test('the working runs are the ones boot sends, with their age, their project by name and the kind of agent', () => {
+  const shell = layoutOf({
+    ...BOOT,
+    shape: 2,
+    working: [
+      { spoken: 'S41', seq: 41, agent: 'claude', doing: 'Filing the receipts', project: 'Kiln', since: '2026-09-15T11:00:00.000Z', last_seen: '2026-09-15T11:58:00.000Z', ran_s: 3600 },
+    ],
+  } as never);
+  assert.deepEqual(
+    shell.working.map((w) => [w.seq, w.agent, w.doing, w.project, w.quiet, w.ran_s]),
+    [[41, 'claude', 'Filing the receipts', 'Kiln', false, 3600]],
   );
-  const [busy, quiet] = await readWorking(BASE, io, NOW);
-  assert.equal(busy?.quiet, false);
-  assert.equal(busy?.ran_s, 60 * 60, 'a run still at work stopped counting');
-  assert.equal(quiet?.quiet, true, 'a run not heard from in two hours is not quiet');
-  assert.equal(quiet?.ran_s, 90 * 60, 'a quiet run went on ageing after it was last heard from');
+  assert.equal(shell.working[0]?.kind, workingOf({ ...BOOT, working: [{ agent: 'claude' }] } as never)[0]?.kind);
+});
+
+/**
+ * AN OLDER HOST'S `boot` HAS NO `working`, `waits` OR `voice`. Its live runs are read for the working ones (active, not
+ * quiet, not stale, as that host judged them), what waits is `null` so each screen says what it said before, and the
+ * badge is the record's own count.
+ */
+test("an older host's boot: working from its live runs, no waits, and the badge from its counts", () => {
+  const older = {
+    ...BOOT,
+    counts: { decide: 7, inbox: 3 },
+    sessions: [
+      { id: 'r1', seq: 1, spoken: 'S1', state: 'active', version: 1, fields: { agent: 'codex', doing: 'Reading' }, stale: false, quiet: false, age_s: 60, ran_s: 600, same_repo: false },
+      { id: 'r2', seq: 2, spoken: 'S2', state: 'active', version: 1, fields: { agent: 'claude' }, stale: false, quiet: true, age_s: 2400, ran_s: 900, same_repo: false },
+      { id: 'r3', seq: 3, spoken: 'S3', state: 'idle', version: 1, fields: { agent: 'claude' }, stale: false, quiet: false, age_s: 60, ran_s: 60, same_repo: false },
+    ],
+  };
+  const shell = layoutOf(older as never);
+  assert.deepEqual(shell.working.map((w) => w.seq), [1]);
+  assert.equal(shell.waits, null);
+  assert.equal(shell.lateDays, null);
+  assert.deepEqual([shell.open, shell.inbox], [7, 3]);
+});
+
+/** WHAT WAITS IS `boot`'S, AND THE BADGE IS ITS COUNT, so the rail, Today and Decide say one number. */
+test('what waits is read off boot whole, and the badge and the inbox count are its numbers', () => {
+  const waits = { questions: 25, late: 10, hard: 22, inbox: 32, working: 1 };
+  const shell = layoutOf({ ...BOOT, shape: 2, counts: { decide: 99, inbox: 99 }, waits, lateDays: 14, working: [] } as never);
+  assert.deepEqual(shell.waits, waits);
+  assert.deepEqual([shell.open, shell.inbox, shell.lateDays], [25, 32, 14]);
+  /* A COUNT THAT IS NOT A WHOLE NUMBER IS NO ANSWER, and an inbox the reader is not told about stays `null`. */
+  assert.equal(waitsOf({ ...BOOT, waits: { ...waits, late: -1 } } as never), null);
+  assert.equal(waitsOf({ ...BOOT, waits: { ...waits, inbox: null } } as never)?.inbox, null);
+});
+
+/** THE POLL'S RE-READ IS ONE `boot`, AND IT IS KEPT: the next screen's shell is the record as it is now. */
+test("the poll's re-read asks boot again once and keeps that answer for the next screen", async () => {
+  forget();
+  let n = 0;
+  const { io, sent } = host(() => json(200, { ok: true, value: { ...BOOT, waits: { questions: ++n, late: 0, hard: 0, inbox: 0, working: 0 } } }));
+  const first = await readBoot(BASE, io);
+  const again = await rereadBoot(BASE, io);
+  const kept = await readBoot(BASE, io);
+  assert.equal(sent.length, 2, 'the re-read asked more than once, or the next read asked again');
+  assert.ok(first.from === 'live' && again.from === 'live' && kept.from === 'live');
+  assert.deepEqual([waitsOf(first.boot)?.questions, waitsOf(again.boot)?.questions, waitsOf(kept.boot)?.questions], [1, 2, 2]);
+  forget();
 });
 
 /**
@@ -663,14 +700,3 @@ test("a page about a row carries the hue boot sends, else its name's", () => {
   assert.equal(hues.odd, hueFor('Odd'), 'a hue that is not a turn was drawn');
 });
 
-/** THE RAIL COUNTS WHO IS WORKING BY THE AGENTS PAGE'S OWN CLAUSE, so "2 working" and Agents' Working are the same runs. */
-test("the rail asks for the runs Agents' Working group draws, and no others", async () => {
-  assert.equal(RUNS_WORKING, AGENTS_METRICS['agents-working']?.where, "the rail's clause drifted from the Agents page's");
-  const bodies: unknown[] = [];
-  const io = (async (_url: string | URL | Request, init?: RequestInit) => {
-    bodies.push(JSON.parse(String(init?.body ?? '{}')));
-    return json(200, { ok: true, value: { blocks: [{ rows: [] }] } });
-  }) as Fetch;
-  assert.deepEqual(await readWorking(BASE, io), []);
-  assert.match(JSON.stringify(bodies), new RegExp(RUNS_WORKING), 'the rail asked for runs under another clause');
-});

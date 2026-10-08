@@ -273,10 +273,10 @@
 
   /* THE SENTENCE UNDER THE TITLE, about what still waits and what the first of it suggests (`lead.ts`). */
   const firstWaiting = $derived(order.find((q) => !settledHere.has(q.id)));
-  const sentence = $derived(from === 'live' ? sentenceOf(waiting, firstWaiting, firstWaiting ? askerOf(firstWaiting) : '', now) : null);
+  const sentence = $derived(from === 'live' ? sentenceOf(waiting, firstWaiting, firstWaiting ? askerOf(firstWaiting) : '', now, shell.lateDays ?? null) : null);
 
   /* HOW LONG EACH HAS WAITED, in the queue's order, the open one in ink and anything past two weeks in red. */
-  const waited = $derived(waitedOf(waiting, lead?.id, now));
+  const waited = $derived(waitedOf(waiting, lead?.id, now, shell.lateDays ?? null));
 
   /**
    * THE SUGGESTION ON THE OPEN QUESTION, AND WHY: the suggested option's reason as it was filed, braces and all, so its

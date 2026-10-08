@@ -479,3 +479,16 @@ test('FEWER THAN THREE DAYS KEPT IS A NUMBER, NOT A CHART, and a tile with no li
   const none = cashTile();
   assert.equal(homeDrawn([none], NOW).blocks[0], none);
 });
+
+test('WITH boot’S waits HOME SAYS THE BADGE’S NUMBER: every open question and agent at work, and the calm line only when nothing waits', () => {
+  const queue = block({ kind: 'queue', source: 'governance.open', queue: [] });
+  const waits = { questions: 25, inbox: 32, working: 0, seqs: [] };
+  /* 25 QUESTIONS, NOT THE NONE THE QUEUE DREW: the line says what the rail's badge says. */
+  assert.equal(homeDrawn([queue], NOW, undefined, undefined, waits).sentence?.text, '25 things need you.');
+  /* NO QUESTION BUT 32 ARRIVALS: never "Nothing needs you". */
+  assert.equal(homeDrawn([queue], NOW, undefined, undefined, { ...waits, questions: 0 }).sentence?.text, '32 things wait in your inbox, and no agent is working.');
+  /* NOTHING WAITING: a page's own line stands, as before. */
+  const calm = homeDrawn([block({ kind: 'note', lead: true, body: 'Calm.' })], NOW, undefined, undefined, { questions: 0, inbox: 0, working: 0, seqs: [] });
+  assert.equal(calm.sentence, null);
+  assert.equal(calm.lead, 'Calm.');
+});

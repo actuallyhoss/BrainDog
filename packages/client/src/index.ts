@@ -157,7 +157,45 @@ export type Boot = {
   whatsNew?: WhatsNew;
   /** The record's installed look, as the record's Boot.theme: each scheme's custom properties without the `--`; null for the house look; absent from an older host. */
   theme?: { light: Record<string, string>; dark: Record<string, string> } | null;
+  /*
+   * THE SHELL'S ONE ROUND TRIP (EXP-D03), each absent from a host older than shape 2, which a reader then asks the way it
+   * asked before: `waits` from `counts`, `working` from `sessions`, the voice from the add-ons, and Slash from `version`.
+   */
+  /** Which shape the answer is: 2 since the five fields below joined it. Absent from an older host. */
+  shape?: number;
+  /**
+   * What waits on the caller, counted once by the record (`waiting()`): open questions, how many are late and how many
+   * hard to undo, arrivals in the inbox (`null` where the caller is not told), and agents working now. The rail's badge,
+   * Today's header and Decide's sentence say these.
+   */
+  waits?: BootWaits;
+  /** How many days a question waits before it is late, which `waits.late` counts. */
+  lateDays?: number;
+  /** The agents working now (active and not quiet), most recently heard from first. Empty for a caller who may not read runs. */
+  working?: BootWorking[];
+  /** The voice the record speaks in: the use case that speaks (`null` for the house voice), its settings and their labels. */
+  voice?: BootVoice;
+  /** Whether a model is behind Slash on this host, as `version` says it. */
+  slash?: boolean;
 };
+
+/** What waits on a person, as `boot` says it (`waits`). */
+export type BootWaits = { questions: number; late: number; hard: number; inbox: number | null; working: number };
+
+/** One agent at work, as `boot` sends it: its handle beside its agent, what it does, its project by name, and how long. */
+export type BootWorking = {
+  spoken: string;
+  seq: number | null;
+  agent: string | null;
+  doing: string | null;
+  project: string | null;
+  since: string;
+  last_seen: string;
+  ran_s: number;
+};
+
+/** The voice `boot` sends: the use case that speaks, its settings' values, and the label each setting names. */
+export type BootVoice = { pack: string | null; values: Record<string, unknown>; labels: Record<string, string> };
 
 /** One line of the log, as `whatsNew` and `recentHistory` send it. See `EventLine` in `@braindog/record`. */
 export type EventLine = {
@@ -299,6 +337,8 @@ export type LiveRun = {
   ran_s: number;
   /** Its repository is the one the caller said it is in. */
   same_repo: boolean;
+  /** Where the run stands for a person: working, quiet, or left a step. Absent from a host older than the field. */
+  presence?: 'working' | 'quiet' | 'left' | 'ended' | 'stopped' | 'before';
 };
 
 /** `attach`: the run this agent is, and whether it was already there. */

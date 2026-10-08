@@ -29,7 +29,7 @@ import { blockOf, type Fetch, type LiveBlock, type Opened } from '../../lib/reco
 import type { PageBlock } from '../../lib/record/schema.ts';
 import { emptyHidden, says } from '../../lib/page/home.ts';
 import { copy } from '../../lib/copy.ts';
-import { ageDays, countSentence, STALE_DAYS, WORDS as LEAD } from './lead.ts';
+import { ageDays, countSentence, WORDS as LEAD } from './lead.ts';
 import { words } from './words.ts';
 
 type Row = Record<string, unknown>;
@@ -249,7 +249,20 @@ export type DecideDrawn = {
  * AND WHAT HOLDS NOTHING IS NOT DRAWN, the page reader's own rule (`emptyHidden`), so a section over nothing goes too.
  * `who` names whoever asked the first question, or `''` for the reader or nobody, as the classic screen said it.
  */
-export function decideDrawn(blocks: readonly LiveBlock[], now: number, who: (q: QueueQuestion) => string = () => ''): DecideDrawn {
+/**
+ * WHAT WAITS, AS `boot` SAYS IT (`waits`, the record's `waiting()`), and when a question is late (`lateDays`). With it the
+ * sentence's counts are the record's, the number the rail's badge and Today's header say; without it (an older host)
+ * they are the queue's own, as before. Late is never counted here by a number of days of this file's.
+ */
+export type DecideWaits = { questions: number; late: number; hard: number; inbox: number | null };
+
+export function decideDrawn(
+  blocks: readonly LiveBlock[],
+  now: number,
+  who: (q: QueueQuestion) => string = () => '',
+  waits: DecideWaits | null = null,
+  lateDays: number | null = null,
+): DecideDrawn {
   let calm: string | null = null;
   const drawn = new Set<string>();
   let first: QueueQuestion | undefined;
@@ -281,7 +294,7 @@ export function decideDrawn(blocks: readonly LiveBlock[], now: number, who: (q: 
     if (said) counted = { hardToUndo: Math.max(counted?.hardToUndo ?? 0, said.hardToUndo), stale: Math.max(counted?.stale ?? 0, said.stale) };
     for (const q of b.queue) {
       if (q.cost === 'undo') hard.add(q.id);
-      if (ageDays(q.at, now) > STALE_DAYS) late.add(q.id);
+      if (lateDays !== null && ageDays(q.at, now) > lateDays) late.add(q.id);
     }
     const fresh = b.queue.filter((q) => !drawn.has(q.id));
     for (const q of fresh) drawn.add(q.id);
@@ -296,8 +309,18 @@ export function decideDrawn(blocks: readonly LiveBlock[], now: number, who: (q: 
   first ??= shaped.find((b) => isOpen(b) && b.drawn && b.queue?.length)?.queue?.[0];
   const option = first?.options.find((o) => o.recommended)?.label;
   const tally = counted as { hardToUndo: number; stale: number } | null;
-  const waiting = countSentence(open, tally?.hardToUndo ?? hard.size, option, first ? who(first) : '', tally?.stale ?? late.size);
-  const quiet = decided ? words.lastDecided(since(decided, now)) : (calm ?? words.nothingWaiting);
+  const asker = first ? who(first) : '';
+  const waiting = waits
+    ? countSentence(waits.questions, waits.hard, option, asker, waits.late, lateDays)
+    : countSentence(open, tally?.hardToUndo ?? hard.size, option, asker, tally?.stale ?? late.size, lateDays);
+  if (waits) open = waits.questions;
+  /* "NOTHING WAITS ON YOU" ONLY WHEN NOTHING DOES: an arrival in the inbox is something, so the line says no question does. */
+  const arrived = (waits?.inbox ?? 0) > 0;
+  const quiet = decided
+    ? (arrived ? words.noQuestionDecided : words.lastDecided)(since(decided, now))
+    : arrived
+      ? words.noQuestion
+      : (calm ?? words.nothingWaiting);
   const out = emptyHidden(shaped);
   return { blocks: out, sentence: waiting ?? { text: quiet, needs: '' }, open, drawsAny: out.some((b) => b.drawn) };
 }

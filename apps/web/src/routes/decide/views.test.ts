@@ -17,6 +17,8 @@ import { callsRead, DECIDE_HOME, decideBlockOf, decideDrawn, decideHome, readDec
 import { words } from './words.ts';
 
 const CLOCK = Date.UTC(2026, 9, 2, 12);
+/** When a question is late, as the record says it (`boot`'s `lateDays`). */
+const LATE = 14;
 const DAY = 86_400_000;
 const BASE = 'http://record.test';
 const reply = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -179,7 +181,7 @@ test('the head says the record’s count with no quota in red, and red only for 
   assert.equal(shaped.sentence.text, 'Five questions wait on you. Claude suggests “Yes” for the first.');
   assert.equal(shaped.sentence.needs, '');
   const old = qs.map((q, n) => (n < 2 ? { ...q, at: new Date(CLOCK - 20 * DAY).toISOString() } : q));
-  const waited = decideDrawn([noteBlock(), queueBlock(old.slice(0, 1), 5, true), queueBlock(old, 5)], CLOCK, () => 'Claude');
+  const waited = decideDrawn([noteBlock(), queueBlock(old.slice(0, 1), 5, true), queueBlock(old, 5)], CLOCK, () => 'Claude', null, LATE);
   assert.equal(waited.sentence.text, 'Five questions wait on you, two of them for over two weeks. Claude suggests “Yes” for the first.');
   assert.equal(waited.sentence.needs, 'two of them for over two weeks');
   assert.deepEqual(shaped.blocks[2]?.queue?.map((q) => q.id), ['q2', 'q3', 'q4', 'q5']);
@@ -202,12 +204,12 @@ test('the head counts what is hard to undo and what has waited from the record, 
   /* THE RECORD SAYS 12 OPEN, 4 OF THEM HARD TO UNDO AND 3 PAST TWO WEEKS, though the three drawn are none of those. */
   const lead = withCounts(queueBlock(qs.slice(0, 1), 12, true), { stale: 3, hardToUndo: 4 });
   const rest = withCounts(queueBlock(qs, 12), { stale: 3, hardToUndo: 4 });
-  const shaped = decideDrawn([noteBlock(), lead, rest], CLOCK);
+  const shaped = decideDrawn([noteBlock(), lead, rest], CLOCK, undefined, null, LATE);
   assert.equal(shaped.sentence.text, '12 questions wait on you, three of them for over two weeks. The first four are hard to undo.');
   assert.equal(shaped.sentence.needs, 'three of them for over two weeks');
 
   /* THE MOST EITHER QUEUE SAID, since both count every open question. */
-  const most = decideDrawn([noteBlock(), withCounts(queueBlock(qs.slice(0, 1), 12, true), { stale: 0, hardToUndo: 1 }), rest], CLOCK);
+  const most = decideDrawn([noteBlock(), withCounts(queueBlock(qs.slice(0, 1), 12, true), { stale: 0, hardToUndo: 1 }), rest], CLOCK, undefined, null, LATE);
   assert.equal(most.sentence.text, shaped.sentence.text);
 
   /* NOUGHT FROM THE RECORD IS NOUGHT, even where the questions drawn would say otherwise. */
@@ -216,8 +218,22 @@ test('the head counts what is hard to undo and what has waited from the record, 
   assert.equal(none.sentence.text, 'Three questions wait on you.');
 
   /* A RECORD OLDER THAN THE COUNTS, or one that sent them in a shape this cannot read, is counted from what was drawn. */
-  const counted = decideDrawn([noteBlock(), queueBlock(old.slice(0, 1), 3, true), withCounts(queueBlock(old, 3), { stale: 'three' })], CLOCK);
+  const counted = decideDrawn([noteBlock(), queueBlock(old.slice(0, 1), 3, true), withCounts(queueBlock(old, 3), { stale: 'three' })], CLOCK, undefined, null, LATE);
   assert.equal(counted.sentence.text, 'Three questions wait on you, all of them for over two weeks. All of them are hard to undo.');
+});
+
+test('with boot\'s waits the head says the record\'s one count, and the calm line only when nothing waits in the inbox either', () => {
+  const qs = ['q1', 'q2', 'q3'].map((id) => question(id));
+  /* THE BADGE'S NUMBER (`waits`), not the three the queue drew, and its late and hard counts. */
+  const waits = { questions: 25, late: 10, hard: 2, inbox: 32 };
+  const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 3, true), queueBlock(qs, 3)], CLOCK, () => '', waits, LATE);
+  assert.equal(shaped.sentence.text, '25 questions wait on you, ten of them for over two weeks. The first two are hard to undo.');
+  assert.equal(shaped.open, 25);
+  /* NO QUESTION BUT 32 ARRIVALS: "Nothing waits on you" would be false. */
+  const inbox = decideDrawn([noteBlock(), queueBlock([], 0, true), queueBlock([], 0)], CLOCK, undefined, { questions: 0, late: 0, hard: 0, inbox: 32 }, LATE);
+  assert.deepEqual(inbox.sentence, { text: words.noQuestion, needs: '' });
+  const calm = decideDrawn([noteBlock(), queueBlock([], 0, true), queueBlock([], 0)], CLOCK, undefined, { questions: 0, late: 0, hard: 0, inbox: 0 }, LATE);
+  assert.deepEqual(calm.sentence, { text: words.nothingWaiting, needs: '' });
 });
 
 test('nothing waiting says the calm line, with when the last one was decided, and draws nothing that holds nothing', () => {

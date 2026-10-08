@@ -59,6 +59,7 @@
   import { mayAnswer, whyNotAnswering } from './answering.ts';
   import { callsRead, dayWord, decideDrawn, readCalls, readDecide, WORDS, type Call, type DecideBody } from './views.ts';
   import { words } from './words.ts';
+  import { waitsNow } from '$lib/home/waits.svelte.ts';
 
   let { data } = $props();
 
@@ -248,7 +249,9 @@
   /* ── the page as Decide draws it ─────────────────────────────────────────── */
 
   const live = $derived(got?.from === 'live' ? got : null);
-  const shaped = $derived(live ? decideDrawn(live.page.blocks, live.now, askerOf) : null);
+  /* THE SENTENCE'S COUNTS ARE `boot`'S (`waits`, EXP-E07), the number the rail's badge and Today's header say, and late is
+     the record's own mark (`lateDays`). An older host sends neither and the queue's counts stand. */
+  const shaped = $derived(live ? decideDrawn(live.page.blocks, live.now, askerOf, waitsNow(), shell.lateDays ?? null) : null);
   const drawn = $derived<Opened | null>(got && got.from === 'live' && shaped ? { ...got, page: { page: got.page.page, blocks: shaped.blocks } } : got);
   /* NOTHING TO DRAW AT ALL: the head says so, and the other queue is offered when something waits in it. */
   const cleared = $derived(shaped !== null && !shaped.drawsAny);

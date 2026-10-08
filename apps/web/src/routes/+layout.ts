@@ -6,26 +6,25 @@
  * carries the client's route table, and in the entry chunk it pushes it over its budget, which the
  * bundle gate would be right to report.
  *
- * ONE REQUEST EACH, AND BOTH ARE KEPT. The three imports are fetched together; the record's `boot`
- * and the account's list of records are the only calls the shell waits on, and each is kept for the
- * tab once it has answered, so a navigation costs nothing here.
+ * ONE REQUEST BEFORE THE FIRST PAINT, AND IT IS `boot` (EXP-D03). It carries the voice, who is working, what waits and
+ * whether a model is behind Slash, which were four more calls in turn, and `app.html` asked for it before this ran. The
+ * account's list of records and an older host's model check start here and are never waited on, but by the screens that
+ * list the records (Settings and the connect screen), and each is kept for the tab once it has answered.
  */
 import { redirect, type LoadEvent } from '@sveltejs/kit';
 
 import { apiBase, at, here, signInFirst } from '$lib/at.ts';
 import type { Shell } from '$lib/record/boot-live.ts';
-import type { Answer, SwitcherRow } from '$lib/record/switcher.ts';
 
 export const ssr = false;
 export const prerender = false;
 
-/* Kept for the tab for the reason `readBoot` is kept: this load runs on every navigation and the
-   switcher is the same answer every time it does. A refusal is dropped rather than kept, because it
-   is about this moment and not about which records exist. */
-let reach: Promise<Answer<SwitcherRow[]>> | null = null;
+/** The screens that list the records, which wait for the list: Settings (Identity, Billing) and an app's consent. */
+const LISTS_RECORDS = /^\/(?:settings(?:\/|$)|connect$)/u;
 
 /**
- * WHETHER A MODEL IS BEHIND SLASH ON THIS HOST, asked of `/api/version` once for the tab.
+ * WHETHER A MODEL IS BEHIND SLASH ON THIS HOST, as `boot` says it (`slash`), and asked of `/api/version` once for the tab
+ * only where the host is older than that field.
  *
  * THE PALETTE'S ROW FOR Slash HANGS ON THIS AND ON NOTHING ELSE (`50 §5.5` step 5). The only place the app read the flag was
  * `/start`, asked at the moment of making a record, so a person on a host with a model had no way to ask it a question: the
@@ -36,6 +35,8 @@ let reach: Promise<Answer<SwitcherRow[]>> | null = null;
  * pulls it into its own chunk, and a static import would put it back in the entry.
  */
 let modelHere: Promise<boolean> | null = null;
+/** What it answered, once it has. */
+let modelSaid: boolean | null = null;
 
 const askModel = (origin: string, fetch: typeof globalThis.fetch): Promise<boolean> =>
   import('@braindog/client')
@@ -43,17 +44,14 @@ const askModel = (origin: string, fetch: typeof globalThis.fetch): Promise<boole
     .then(
       (v) => {
         if (!v.ok) modelHere = null;
-        return v.ok && v.value.slash === true;
+        modelSaid = v.ok && v.value.slash === true;
+        return modelSaid;
       },
       () => ((modelHere = null), false),
     );
 
 export async function load({ url, fetch }: Pick<LoadEvent, 'url' | 'fetch'>): Promise<Shell & { slash: boolean }> {
-  const [live, { readRecordsForSwitcher }, voice] = await Promise.all([
-    import('$lib/record/boot-live.ts'),
-    import('$lib/record/switcher.ts'),
-    import('$lib/voice.svelte.ts'),
-  ]);
+  const [live, voice] = await Promise.all([import('$lib/record/boot-live.ts'), import('$lib/voice.svelte.ts')]);
   /* THE RECORD THE ADDRESS NAMES. `url` and not `location`: a load runs for the address being opened, and `location`
      is the page being left until the navigation lands, so a move from acme to kiln would read acme's `boot`. */
   const api = apiBase(url);
@@ -70,9 +68,11 @@ export async function load({ url, fetch }: Pick<LoadEvent, 'url' | 'fetch'>): Pr
   const signIn = booted.from === 'refused' ? signInFirst(booted.code, url) : null;
   if (signIn) redirect(307, signIn);
 
-  /* THE VOICE THE RECORD SPEAKS IN, from its use-case pack's settings. Asked once per
-     `boot` answer and never awaited past a refusal: a record that cannot say speaks in the house voice. */
-  await voice.listen(booted.from === 'live' ? booted.boot : null, api).catch(() => undefined);
+  /* THE VOICE THE RECORD SPEAKS IN, as `boot` says it (`voice`): heard at once, since nothing is asked to hear it. A host
+     older than the field is asked the old way, and that is not waited on: the screens catch up when it lands. Never
+     past a refusal: a record that cannot say speaks in the house voice. */
+  const heard = voice.listen(booted.from === 'live' ? booted.boot : null, api).catch(() => undefined);
+  if (booted.from !== 'live' || Object.hasOwn(booted.boot, 'voice')) await heard;
   if (typeof document !== 'undefined') void import('$lib/theme/draw.ts').then((look) => look.draw(booted.from === 'live' ? booted.boot : null));
 
   /* ANY OTHER REFUSAL IS THE RECORD'S ANSWER, a host nobody reached among them (a static host's fallback page, a
@@ -125,25 +125,26 @@ export async function load({ url, fetch }: Pick<LoadEvent, 'url' | 'fetch'>): Pr
      the rest are absent, in the host's own words. Saying nothing leaves a menu one row long, which
      reads as a product that holds one business.
 
-     AN EMPTY LIST IS NOT AN ANSWER ABOUT THIS RECORD EITHER. Somebody is inside one, so a switcher
-     with no rows in it would be the rail contradicting the screen beside it.
-
      AND NOT WHERE NOBODY SIGNS IN. A self-host started without a key answers this 401 on every load,
      and the switcher then said "Sign in again" on a host with no sign-in. `boot` says which host this is.
 
-     AT THE ROOT, UNDER NO SLUG: the list is the person's, not the record's in the address. */
+     NOT WAITED ON BEFORE THE FIRST PAINT. The rail's switcher reads it when it lands (`+layout.svelte`), and this load
+     carries it once it has; only the screens that list the records wait for it. AT THE ROOT, UNDER NO SLUG: the list is
+     the person's, not the record's in the address. */
   if (booted.from === 'live' && live.signsIn(booted.boot)) {
-    reach ??= readRecordsForSwitcher(fetch, url.origin);
-    const listed = await reach;
-    if (!listed.ok) {
-      reach = null;
-      shell.recordsRefused = listed.refusal.fix;
-    } else if (listed.value.length > 0) shell.me = { ...shell.me, records: listed.value };
+    const asked = live.recordsReach(fetch, url.origin);
+    const listed = live.recordsReached() ?? (LISTS_RECORDS.test(inner) ? await asked : null);
+    if (listed !== null) {
+      if (!listed.ok) shell.recordsRefused = listed.refusal.fix;
+      else if (listed.value.length > 0) shell.me = { ...shell.me, records: listed.value };
+    }
   }
 
-  /* A REFUSED RECORD IS NEVER `true`: there is nobody signed in to it to ask Slash anything, so a palette over a refusal
-     never offers it, whatever the host serving the shell has configured. */
-  const slash = booted.from === 'live' ? await (modelHere ??= askModel(api, fetch)) : false;
+  /* WHETHER A MODEL IS BEHIND SLASH, as `boot` says it. A host older than the field is asked `version` once for the tab,
+     not waited on: this load says no until it has answered. A REFUSED RECORD IS NEVER `true`: there is nobody signed in
+     to it to ask Slash anything. */
+  const sent = booted.from === 'live' ? booted.boot.slash : false;
+  const slash = typeof sent === 'boolean' ? sent : ((modelHere ??= askModel(api, fetch)), modelSaid === true);
 
   return { ...shell, slash };
 }

@@ -21,7 +21,8 @@
   WHO IS WORKING IS ONE ROW, "2 working", with a pulsing dot, and it opens Agents. It was a group of its own, one line a
   run with how long each had gone ("11 h 52"), which repeated the Agents page and disagreed with it on the time ("3 min
   ago" there, for the same run). The runs and their times are Agents' to draw; the rail only says that some are at it,
-  counted by the same clause (`RUNS_WORKING`). Absent while nobody works.
+  counted from what `boot` sends (`working`, the record's one clock), so it says the number Today and Agents say. It
+  counts what it is given and nothing of its own. Absent while nobody works.
 
   THE PAGE BESIDE IT MUST NOT JUMP, SO THE RAIL SAYS ITS WIDTH ON THE ROOT. `--rail-w` is the rail's width at whichever
   width it is drawn, and `--rail-d` and `--rail-ease` the time and curve the shell slides the work on when it changes.
@@ -87,7 +88,7 @@
     /** The spine as `spineOf` reads it: whether Inbox has been used, which puts its row under More. */
     spine?: readonly SpineKey[] | undefined;
     inbox?: number | undefined;
-    /** The agents at work now (`readWorking`); the rail says how many, and nothing while this is empty. */
+    /** The agents at work now, as `boot` sends them (`working`); the rail says how many, and nothing while this is empty. */
     working?: readonly Working[] | undefined;
     /** The narrow rail: glyphs, with the names on hover and on focus. Per device, `pref.sidebar`. */
     icons?: boolean | undefined;

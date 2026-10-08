@@ -394,7 +394,15 @@ export function slashLineOf(drawn: HomeDrawn, today: boolean): unknown {
  * task ticked) must not move the blocks after it into its place. The lifted line stays at its place, and what falls
  * due is always two blocks, Late and the rest, either of them not drawn when it holds nothing.
  */
-export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: HomeVoice = HOUSE, one?: string): HomeDrawn {
+/**
+ * WHAT WAITS AND WHO IS WORKING, AS `boot` SAYS IT (`waits.svelte.ts`), which Home's line and its working tile read in
+ * place of what the page happened to draw (EXP-E07, AGT-C02): the line counts every open question and every agent at
+ * work by the record's one count, and the tile lists only the runs `boot` says are working. Absent from an older host,
+ * and Home then counts what it drew, as before.
+ */
+export type HomeWaits = { questions: number; inbox: number | null; working: number; seqs: readonly (number | null)[] };
+
+export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: HomeVoice = HOUSE, one?: string, waits?: HomeWaits | null): HomeDrawn {
   const today = dayOf(now);
   let lead: string | null = null;
   let capture: LiveBlock | null = null;
@@ -445,6 +453,12 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
       shaped.push(gone === 0 && late.length === 0 ? b : pick(b, rest, undefined, rest.length === 0 ? 0 : b.total - gone - late.length));
       continue;
     }
+    /* WHO IS WORKING IS `boot`'S: a run the page drew that has gone quiet is not drawn as working. */
+    if (waits && isRuns(b) && aligned(b)) {
+      const at = where(b, (_, seq) => waits.seqs.includes(seq));
+      shaped.push(at.length === b.entries.length ? b : pick(b, at, undefined, at.length));
+      continue;
+    }
     shaped.push(linesKept(newOnly(b)));
   }
   const kept = shaped.map((b) => (b.drawn && hollow(b) ? { ...b, drawn: false } : b));
@@ -462,7 +476,7 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
   for (const [n, b] of out.entries())
     if (b.drawn && !says(b) && isDue(b) && b.kind === 'timeline' && aligned(b) && !(b as WithRows).homeRows)
       out[n] = { ...b, homeRows: { kind: 'days', days: dayGroups(b, today) } } as WithRows;
-  return { blocks: out, lead, capture, sentence: sentenceFrom(shaped, today), slash };
+  return { blocks: out, lead, capture, sentence: sentenceFrom(shaped, today, waits ?? null), slash };
 }
 
 /** Each house line Today's body writes that a voice may say its own way, by its key. */
@@ -669,9 +683,12 @@ function lateBeyond(b: LiveBlock, today: string): number {
  * twelve are what a later block over the same list draws when it draws a late one (Urgent's oldest, a deadline that is
  * a task): such a row is one of the twelve, and is not counted again, late or as needing the reader.
  */
-function sentenceFrom(blocks: readonly LiveBlock[], today: string): Sentence | null {
-  let counts = false;
-  let needing = 0;
+/* WITH `boot`'S `waits` the questions and the agents are its counts, every open question and every run at work, never
+   the few a queue or a table drew; and what waits in the inbox is said when nothing else is (`sentenceOf`). */
+function sentenceFrom(blocks: readonly LiveBlock[], today: string, waits: HomeWaits | null = null): Sentence | null {
+  /* SOMETHING WAITING IS ALWAYS SAID; with nothing waiting a page's own line (a use case's) may stand, as before. */
+  let counts = waits !== null && (waits.questions > 0 || (waits.inbox ?? 0) > 0);
+  let needing = waits?.questions ?? 0;
   let agents = 0;
   let lateCount = 0;
   const late: string[] = [];
@@ -691,7 +708,7 @@ function sentenceFrom(blocks: readonly LiveBlock[], today: string): Sentence | n
     if (says(b) || !b.drawn) continue;
     if (isQueue(b)) {
       counts = true;
-      needing += asked(b);
+      if (waits === null) needing += asked(b);
     } else if (isTodo(b)) {
       counts = true;
       const list = listOf(b);
@@ -721,7 +738,8 @@ function sentenceFrom(blocks: readonly LiveBlock[], today: string): Sentence | n
       agents += b.entries.length;
     }
   }
-  return counts ? sentenceOf(Math.max(0, needing), late.sort(), agents, today, lateCount) : null;
+  if (waits !== null) agents = waits.working;
+  return counts ? sentenceOf(Math.max(0, needing), late.sort(), agents, today, lateCount, waits?.inbox ?? 0) : null;
 }
 
 /**

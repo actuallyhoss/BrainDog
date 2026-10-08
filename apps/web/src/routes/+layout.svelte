@@ -64,7 +64,8 @@
   import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
   import { railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
-  import type { Working } from '$lib/record/boot-live.ts';
+  import { heardWaits, waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { spineOf } from '$lib/spine.ts';
   import { said } from '$lib/voice.svelte.ts';
@@ -165,9 +166,14 @@
     const placed = new Set(data.index.registers.flatMap((r) => (r.views ?? []).map((v) => v.href)));
     return navPrefs.relabel(data.nav.filter((n) => !n.cut && !placed.has(n.href)));
   });
+  /* WHAT WAITS, AS THE NEWEST `boot` SAID IT (`waits.svelte.ts`): the shell's, and then the poll's re-read of `boot`, so
+     the badge moves with the record and says the number Today's header and Decide's sentence say. */
+  $effect.pre(() => heardWaits({ waits: data.waits ?? null, working: data.working ?? [] }));
+  const open = $derived(waitsNow()?.questions ?? data.open);
+  const inbox = $derived(waitsNow()?.inbox ?? data.inbox);
   /* THE SPINE'S RULE FOR INBOX (`spine.ts`): it is a row under More once anything has arrived. A shell no record answered
      has no `counts`, and is read from the two numbers it does carry. */
-  const spine = $derived(spineOf(data.counts ?? { decide: data.open, inbox: data.inbox }));
+  const spine = $derived(spineOf(data.counts ? { ...data.counts, decide: open, inbox } : { decide: open, inbox }));
   /* THE TOOLS UNDER MORE, IN THE ORDER A PHONE READS THEM, with the rail's glyphs and the rail's words (`Sidebar.svelte`).
      Slash's page is Suggestions there, and Inbox joins once anything has arrived (`spineOf`). USAGE IS HERE: its
      word is written out rather than read from `record/actions.ts`, which would carry the usage reader into the entry
@@ -211,7 +217,7 @@
      task brings Work back, and until then the palette and Today's capture line both add one. */
   const holdsTasks = $derived(data.index.registers.some((r) => r.id === TASKS && r.count > 0));
   const flat = $derived(
-    flatNav(grouped, data.open, { today: copy.today, activity: copy.audit, decide: said('decide') }, { work: holdsTasks ? WORK : null }),
+    flatNav(grouped, open, { today: copy.today, activity: copy.audit, decide: said('decide') }, { work: holdsTasks ? WORK : null }),
   );
   /**
    * THE RAIL'S SECTIONS (DIRECTION §39, `railOf`): the seven places, each section's own things under its name, and the
@@ -530,36 +536,58 @@
   $effect(() => follow(data.live === true ? (data.refused ? null : apiBase(page.url)) : null));
 
   /**
-   * WHO IS WORKING NOW, FOR THE RAIL, asked as Today asks it (`readWorking` in `record/boot-live.ts`) and
-   * again whenever the poll hears the record move, so a run that starts or stops shows up without a reload.
+   * WHO IS WORKING AND WHAT WAITS, READ AGAIN WITH `boot` WHENEVER THE POLL HEARS THE RECORD MOVE (EXP-D03), so a run that
+   * starts or stops and a question answered elsewhere show up without a reload. One request, the shell's own, in place
+   * of the page the rail asked the record to draw on every screen and every version; the answer is kept for the tab, so
+   * the next screen's shell is the record as it is now.
    *
-   * NOT THROUGH `read()`, WHICH IS A SCREEN'S. `read` brackets every call in the screen's readiness count, and a rail
-   * read refused for a colleague who may not see the runs would mark the screen beside it refused. Keyed on the
-   * record's address rather than on `page.url`, so moving between screens asks nothing; a refusal is an empty group.
-   * Asked only while the rail is drawn, since no other shape has the group.
+   * NOT THROUGH `read()`, WHICH IS A SCREEN'S. `read` brackets every call in the screen's readiness count. Keyed on the
+   * record's address rather than on `page.url`, so moving between screens asks nothing; a refusal keeps what was heard.
+   * The version the shell was read at is not asked again.
    */
-  let working = $state.raw<Working[]>([]);
-  const workingAt = $derived(!bare && shape === 'rail' && data.live === true && !data.refused ? apiBase(page.url) : null);
+  const pollAt = $derived(!bare && data.live === true && !data.refused ? apiBase(page.url) : null);
+  let heardAt: { base: string | null; version: unknown } = { base: null, version: undefined };
   $effect(() => {
-    const base = workingAt;
-    void live.version;
-    if (base === null) {
-      working = [];
-      return;
-    }
+    const base = pollAt;
+    const version = live.version;
+    const first = heardAt.base !== base;
+    heardAt = { base, version };
+    if (base === null || first) return;
     let gone = false;
     void import('$lib/record/boot-live.ts')
-      .then((m) => m.readWorking(base))
-      .then(
-        (w) => {
-          if (!gone) working = w;
-        },
-        () => undefined,
-      );
+      .then(async (m) => {
+        const got = await m.rereadBoot(base);
+        if (!gone && got.from === 'live') heardWaits({ waits: m.waitsOf(got.boot), working: m.workingOf(got.boot) });
+      })
+      .catch(() => undefined);
     return () => {
       gone = true;
     };
   });
+
+  /**
+   * THE RECORDS THIS PERSON CAN REACH, read after the shell has drawn (EXP-D03): the root load asks and does not wait, so
+   * the switcher starts with the record in the address and fills in once the account answers. A load after that carries
+   * the list itself.
+   */
+  let reachable = $state.raw<{ records: Shell['me']['records']; refused: string | undefined } | null>(null);
+  $effect(() => {
+    void data;
+    reachable = null;
+    let gone = false;
+    void import('$lib/record/boot-live.ts').then((m) =>
+      m.recordsAsked()?.then((listed) => {
+        if (gone) return;
+        if (!listed.ok) reachable = { records: data.me.records, refused: listed.refusal.fix };
+        else if (listed.value.length > 0) reachable = { records: listed.value, refused: undefined };
+      }),
+    );
+    return () => {
+      gone = true;
+    };
+  });
+  const records = $derived(reachable?.records ?? data.me.records);
+  const recordsRefused = $derived(reachable ? reachable.refused : data.recordsRefused);
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
   /* `g s` IS HERE NOW. It was removed on the grounds that "search is not a place you go, it is the
@@ -688,12 +716,12 @@
           hidden={hiddenCount}
           pen={data.pen}
           record={data.index.name}
-          records={data.me.records}
-          refused={data.recordsRefused}
+          {records}
+          refused={recordsRefused}
           registers={data.index.registers}
           {spine}
-          inbox={data.inbox}
-          {working}
+          {inbox}
+          working={workingNow()}
         />
       </div>
     {:else}
@@ -827,7 +855,7 @@
       </button>
       {#if switching}
         <ul class="more-list more-records">
-          {#each data.me.records as r}
+          {#each records as r}
             {@const word = levelWord(r)}
             {#if r.name !== data.index.name}
               <li>
@@ -840,7 +868,7 @@
             {/if}
           {/each}
           <!-- The host's own sentence when the records could not be listed, as the rail's switcher says it. -->
-          {#if data.recordsRefused}<li class="more-note">{data.recordsRefused}</li>{/if}
+          {#if recordsRefused}<li class="more-note">{recordsRefused}</li>{/if}
           <li>
             <a class="more-row" href={at('/settings/identity')}><Icon name="settings" size="m" /><span class="more-name">{copy.recordSettings}</span></a>
           </li>

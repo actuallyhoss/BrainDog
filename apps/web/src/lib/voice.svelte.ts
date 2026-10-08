@@ -40,7 +40,25 @@ async function hear(labels: Labels): Promise<void> {
   relabelAll(REGISTERS, labels);
 }
 
-/** Ask the record for its voice, once per `boot` answer. `null` for the sample or a refused boot. */
+/** The voice as a `boot` of shape 2 sends it (`voice`), or `null` from a host older than the field. */
+function sentVoice(boot: object): { pack: string | null; values: Record<string, unknown>; labels: Record<string, string> } | null {
+  const v = (boot as { voice?: unknown }).voice;
+  if (v === null || typeof v !== 'object') return null;
+  const { pack, values, labels } = v as { pack?: unknown; values?: unknown; labels?: unknown };
+  if (pack !== null && typeof pack !== 'string') return null;
+  const isMap = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
+  if (!isMap(values)) return null;
+  const said = isMap(labels) ? Object.fromEntries(Object.entries(labels).filter((e): e is [string, string] => typeof e[1] === 'string')) : {};
+  return { pack, values, labels: said };
+}
+
+/**
+ * Ask the record for its voice, once per `boot` answer. `null` for the sample or a refused boot.
+ *
+ * `boot` SAYS IT NOW (`voice`, EXP-D03): the use case that speaks, its settings and their labels, worked out by the record
+ * while it answered. It was the add-ons list and one or more add-on settings reads, one after another, before the first
+ * screen. A host older than the field is asked the old way, which is what the fallback below still does.
+ */
 export async function listen(boot: object | null, base: string): Promise<void> {
   if (boot === heardFor) return;
   heardFor = boot;
@@ -48,6 +66,14 @@ export async function listen(boot: object | null, base: string): Promise<void> {
     state.voice = {};
     state.pack = null;
     await hear({});
+    return;
+  }
+  const sent = sentVoice(boot);
+  if (sent !== null) {
+    state.voice = sent.pack === null ? {} : voiceOf(sent.values);
+    state.pack = sent.pack;
+    const config = Object.fromEntries(Object.entries(sent.labels).map(([setting, label]) => [setting, { label }]));
+    await hear(sent.pack === null ? {} : labelsOf(sent.values, config));
     return;
   }
   /* LOADED HERE AND NOT AT THE TOP: the rail imports this module, and the client does not belong in the entry chunk. */

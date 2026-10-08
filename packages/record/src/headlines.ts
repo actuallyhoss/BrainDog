@@ -30,6 +30,8 @@
 import type { Json } from '@braindog/kernel';
 import { exponentOf } from '@braindog/kernel';
 
+import { nothingWaits, type WaitingNow } from './waiting.ts';
+
 /** A headline is a line, not a paragraph: what fits beside a page's title on a phone. */
 export const HEADLINE_MOST = 140;
 
@@ -265,6 +267,11 @@ export function headlineFault(text: unknown, page: HeadlinePage): string | null 
   const handed = numbersOf(page);
   const made = numbersIn(line).find((n) => !handed.has(n));
   if (made !== undefined) return `The line for ${page.title} said ${made}, which none of its figures holds.`;
+  /* AND HOME'S LINE AGREES WITH WHAT WAITS (`headlineAgrees`): a number it was handed for one count is never said of
+     another, and "nothing needs you" is never said beside a question or an arrival. */
+  const waits = page.page === HOME_PAGE ? waitsHanded(page) : null;
+  const off = waits === null ? [] : headlineAgrees(line, waits);
+  if (off.length > 0) return `The line for ${page.title} said "${off[0]!.said}", which is not what waits.`;
   return null;
 }
 
@@ -290,10 +297,15 @@ export function askedOn(raw: unknown, today: string): HeadlinesAsked {
 
 /**
  * Home's line as the rules would say it, from the reading Home's ask is handed: how many things need the person, how
- * many of them are late, and how many runs are working. In digits, as the figures the model may repeat are.
+ * many of them are late, how many runs are working, and how many arrivals wait in the inbox. In digits, as the figures
+ * the model may repeat are.
+ *
+ * "NOTHING NEEDS YOU" ONLY WHEN NOTHING DOES: no question (they are in `needs`) and nothing in the inbox
+ * (`nothingWaits`). With the inbox holding something it says so in place of the calm line.
  */
-export function homeRulesLine(needs: number, late: number, working: number): string {
+export function homeRulesLine(needs: number, late: number, working: number, inbox = 0): string {
   const runs = working === 0 ? 'no agent is working' : working === 1 ? '1 agent is working' : `${working} agents are working`;
+  if (needs === 0 && inbox > 0) return `${inbox} ${inbox === 1 ? 'thing waits' : 'things wait'} in your inbox, and ${runs}.`;
   if (needs === 0) return `Nothing needs you, and ${runs}.`;
   const head = `${needs} ${needs === 1 ? 'thing needs' : 'things need'} you`;
   if (late === 0) return `${head}, and ${runs}.`;
@@ -315,3 +327,74 @@ export function lineOf(answer: unknown): unknown {
   if (answer === null || typeof answer !== 'object' || Array.isArray(answer)) return answer;
   return (answer as { headline?: unknown }).headline;
 }
+
+/** What a header said that disagrees with `waiting()`: the words, which count they name, the number said, and the count. */
+export type Disagrees = { said: string; names: 'questions' | 'inbox' | 'agents' | 'nothing'; wrote: number; is: number };
+
+/** A count as a header may write it: in digits, in words ("twenty-five" too), or "no". */
+const TENS = 'twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety';
+const UNITS = 'one|two|three|four|five|six|seven|eight|nine';
+const COUNT = `(\\d[\\d,]*|no|(?:${TENS})-(?:${UNITS})|${Object.keys(WORD_NUMBERS).join('|')})`;
+
+/** "25 questions", "two open questions", "4 agents", "1 arrival": a count and, at most two words on, what it counts. */
+const NAMED = new RegExp(`(?<![\\p{L}\\p{N}-])${COUNT}\\s+(?:[\\p{L}]+\\s+){0,2}?(questions?|arrivals?|agents?)(?![\\p{L}])`, 'giu');
+
+/** "3 things wait in your inbox": a count of what waits in the inbox, said without the word arrival. */
+const IN_INBOX = new RegExp(`(?<![\\p{L}\\p{N}-])${COUNT}\\s+(?:[\\p{L}]+\\s+){0,3}?in\\s+(?:your|the)\\s+inbox`, 'giu');
+
+/** The calm line in each of the house's and the use cases' words: "Nothing needs you", "nothing waits on you", "Nothing needs your call". */
+const NOTHING = /\bnothing\s+(?:needs|waits\s+on|is\s+waiting\s+on)\s+you(?:r\b)?/iu;
+
+/** A count as a number: digits, a word to twenty and the tens, or `no` as nought. */
+const countOf = (word: string): number => {
+  const w = word.toLowerCase();
+  if (w === 'no') return 0;
+  if (w.includes('-')) return w.split('-').reduce((n, part) => n + (WORD_NUMBERS[part] ?? NaN), 0);
+  if (Object.hasOwn(WORD_NUMBERS, w)) return WORD_NUMBERS[w]!;
+  return Number(w.replace(/,/gu, ''));
+};
+
+/**
+ * `headline-agrees`: WHETHER A HEADER AGREES WITH WHAT WAITS (`waiting()`), and where it does not.
+ *
+ * A number in a header that names questions equals `questions`; one that names arrivals, or what waits in the inbox,
+ * equals `inbox`; one that names agents equals `working`. And a header may say nothing needs the reader only when no
+ * question and nothing in the inbox waits (`nothingWaits`). An inbox the reader is not told about is not checked.
+ *
+ * A FUNCTION FIRST, and the page lint's rule later (PRF-A04): the record holds Home's model line to it before it keeps
+ * one (`headlineFault`), and the lint will hold every header to it, whoever wrote the header.
+ */
+export function headlineAgrees(header: string, w: WaitingNow): Disagrees[] {
+  const out: Disagrees[] = [];
+  for (const m of header.matchAll(NAMED)) {
+    const wrote = countOf(m[1]!);
+    const noun = m[2]!.toLowerCase();
+    const names = noun.startsWith('question') ? 'questions' : noun.startsWith('arrival') ? 'inbox' : 'agents';
+    const is = names === 'questions' ? w.questions : names === 'inbox' ? w.inbox : w.working;
+    if (is !== null && Number.isFinite(wrote) && wrote !== is) out.push({ said: m[0], names, wrote, is });
+  }
+  if (w.inbox !== null)
+    for (const m of header.matchAll(IN_INBOX)) {
+      const wrote = countOf(m[1]!);
+      if (Number.isFinite(wrote) && wrote !== w.inbox) out.push({ said: m[0], names: 'inbox', wrote, is: w.inbox });
+    }
+  const calm = NOTHING.exec(header);
+  if (calm && !nothingWaits(w)) out.push({ said: calm[0], names: 'nothing', wrote: 0, is: w.questions + (w.inbox ?? 0) });
+  return out;
+}
+
+/**
+ * Home's figures as `waiting()` says them, read back off the reading Home's ask was handed (`homeReading`), or `null`
+ * without them: the questions are what needs the person less what is late, and the inbox is nought when it is not named.
+ */
+const waitsHanded = (page: HeadlinePage): WaitingNow | null => {
+  const said = (id: string): number | null => {
+    const f = page.figures.find((x) => x.id === id);
+    const n = f === undefined ? NaN : Number(f.value);
+    return Number.isFinite(n) ? n : null;
+  };
+  const needs = said('needs-you');
+  const working = said('working');
+  if (needs === null || working === null) return null;
+  return { questions: Math.max(0, needs - (said('late') ?? 0)), late: 0, hard: 0, inbox: said('inbox') ?? 0, working };
+};
