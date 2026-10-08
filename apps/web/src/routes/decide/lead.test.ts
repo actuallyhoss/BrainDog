@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { ageDays, countSentence, evidenceOf, sentenceOf, shortTitle, waitedOf, waitedWords, waitingSaid } from './lead.ts';
+import { ageDays, countSentence, evidenceIn, sentenceOf, shortTitle, waitedOf, waitedWords, waitingSaid } from './lead.ts';
 
 const NOW = Date.parse('2026-09-29T09:40:00Z');
 /** When a question is late, as the record says it (`boot`'s `lateDays`): the web keeps no number of its own. */
@@ -85,20 +85,26 @@ test('how long each has waited: the open one in ink, anything past two weeks red
   assert.match(drawn.reading, /The first eight of 11 are drawn\.$/u);
 });
 
-test('a share is read out of the proposer’s own reason, and nothing else is drawn as one', () => {
-  const said =
-    "41 of September's 58 HSBC lines were typed in by hand from those texts, and your rules would have filed 37 of the 41 correctly. Accepting takes the typing away.";
-  const e = evidenceOf(said);
-  assert.deepEqual(e && { value: e.value, max: e.max }, { value: 41, max: 58 });
-  assert.equal(e?.said, "41 of September's 58 HSBC lines were typed in by hand from those texts, and your rules would have filed 37 of the 41 correctly.");
+test('a share is the pair the question’s body gives as data, and a sentence never makes one', () => {
+  const said = "41 of September's 58 HSBC lines were typed in by hand from those texts.";
+  assert.deepEqual(evidenceIn({ evidence: { value: 41, of: 58, said } }), { value: 41, max: 58, said });
+  /* THE SENTENCE MAY CITE THE BODY'S FIGURES, and is read through them; with none, the reading is the pair itself. */
+  const figures = { 'ref:people#2': { kind: 'row', register: 'people', seq: 2, title: 'Ana Reyes' } };
+  const cited = evidenceIn({ evidence: { value: 3, of: 12, said: '3 of the 12 went to {{ref:people#2}}.' }, figures });
+  assert.equal(cited?.said, '3 of the 12 went to Ana Reyes.');
+  assert.deepEqual(evidenceIn({ evidence: { value: 3, of: 1200 } }), { value: 3, max: 1200, said: '3 of 1,200' });
 
-  assert.equal(evidenceOf('3 of the 1,200 rows moved.')?.max, 1200);
-  /* NOT A SHARE: a count against something else, a larger part than its whole, a whole too small to draw, no pair. */
-  assert.equal(evidenceOf('1 of them paid 2 days later.'), null);
-  assert.equal(evidenceOf('9 of 4 were filed.'), null);
-  assert.equal(evidenceOf('1 of 2 is fine.'), null);
-  assert.equal(evidenceOf('Nothing is paid or moved.'), null);
-  assert.equal(evidenceOf('Q3 of 12 went well.'), null);
+  /* NOT A SHARE: a part larger than its whole, a whole too small to draw, a part that is no whole number, no field. */
+  assert.equal(evidenceIn({ evidence: { value: 9, of: 4 } }), null);
+  assert.equal(evidenceIn({ evidence: { value: 1, of: 2 } }), null);
+  assert.equal(evidenceIn({ evidence: { value: 1.5, of: 4 } }), null);
+  assert.equal(evidenceIn({ evidence: { value: '41', of: '58' } }), null);
+  assert.equal(evidenceIn({ evidence: [41, 58] }), null);
+  assert.equal(evidenceIn(undefined), null);
+
+  /* THE WORDS OF AN AGENT ARE NEVER EVIDENCE (audit 31-32, finding 5): "2 of 5 steps" in a reason drew a waffle. A body
+     that holds the pair only in an option's reason draws nothing. */
+  assert.equal(evidenceIn({ options: [{ id: 'accept', because: '2 of 5 steps are done.' }] }), null);
 });
 
 /**
@@ -110,7 +116,9 @@ test('the queue draws its sentence, its lead and its chart from this module, and
   assert.match(page, /from '\.\/lead\.ts'/u);
   assert.match(page, /sentenceOf\(/u);
   assert.match(page, /waitedOf\(/u);
-  assert.match(page, /evidenceOf\(/u);
+  /* THE OPEN QUESTION'S SHARE IS READ FROM ITS BODY, never out of its reason's words. */
+  assert.match(page, /evidenceIn\(body/u);
+  assert.doesNotMatch(page, /evidenceOf\(/u);
   /* THE LEAD IS ITS OWN `ol.queue`, and the rows under it start after it, so no question is drawn twice. */
   assert.match(page, /<ol class="queue"/u);
   assert.match(page, /class="q"/u);

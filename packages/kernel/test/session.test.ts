@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SESSION_BODY } from '../src/migrations/0026_session_started.ts';
+import { SESSION_BODY } from '../src/migrations/0028_runs.ts';
 import {
   KERNEL_WRITTEN,
   isStale,
@@ -167,15 +167,16 @@ test('A CLIENT ID RE-ATTACHES in any state, and a finished run comes back to act
   );
   assert.equal(events(sql, task.id)[0]?.actor, 'S1');
 
-  /* A run waiting on a handoff keeps waiting: its own write is a heartbeat and nothing more. */
+  /* A RUN THAT LEFT A STEP AND IS WORKED IN AGAIN IS WORKING (AGT-C04, `REVIVED`): resumed and writing, it comes back
+     to active and a new stretch begins, so the step it was handed is no longer the one it leaves (`leftFreshStep`). */
   value(k.update('session', 'S1', { state: 'handoff', next: 'Pick up the sweep' }, { actor: 'p_owner' }));
-  const waiting = k.get('S1')!;
   clock.advance(MIN);
   value(k.create('tasks', { what: 'Still here' }, agent({ client_id: 'cc-1' })));
-  const still = k.get('S1')!;
-  assert.equal(still.state, 'handoff');
-  assert.equal(still.version, waiting.version);
-  assert.equal(still.fields.last_seen, iso(NOW + 3 * HOUR + MIN));
+  const back = k.get('S1')!;
+  assert.equal(back.state, 'active');
+  assert.equal(back.fields.last_seen, iso(NOW + 3 * HOUR + MIN));
+  assert.equal(back.fields.stretch_at, iso(NOW + 3 * HOUR + MIN), 'coming back began no new stretch');
+  assert.equal(back.fields.next, 'Pick up the sweep', 'the step was taken off the run');
   sql.close();
 });
 
@@ -285,11 +286,16 @@ test('UNIQUE NAMES THE ROW: a second run with the same client id is ALREADY_KNOW
 
 test('THE KERNEL-WRITTEN FIELDS are refused from a person and from a run alike', async () => {
   const { k, sql } = await record();
-  assert.deepEqual([...KERNEL_WRITTEN], ['last_seen', 'project', 'token_id', 'started']);
+  assert.deepEqual(
+    [...KERNEL_WRITTEN],
+    ['last_seen', 'project', 'token_id', 'started', 'stretch_at', 'next_at', 'closed_as', 'closed_at', 'taken_by', 'took', 'parent', 'wrote', 'seen_before'],
+  );
   value(k.create('session', { doing: 'Mine' }, { actor: 'p_owner' }));
 
+  /* EACH WITH A VALUE ITS TYPE TAKES, so the refusal is about who writes it and not about the value. */
+  const INSTANTS = ['last_seen', 'started', 'stretch_at', 'next_at', 'closed_at', 'seen_before'];
   for (const key of KERNEL_WRITTEN) {
-    const said = key === 'last_seen' || key === 'started' ? iso(NOW) : 'x';
+    const said = INSTANTS.includes(key) ? iso(NOW) : key === 'wrote' ? 1 : key === 'closed_as' ? 'taken' : 'x';
     for (const out of [
       k.create('session', { doing: 'Another', [key]: said }, { actor: 'p_owner' }),
       k.update('session', 'S1', { [key]: said }, { actor: 'p_owner' }),
@@ -330,7 +336,8 @@ test('THE TWELVE-HOUR SWEEP abandons quiet runs, leaves a handoff waiting, and n
     "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('01J00000000000000000000001', ?, 'purge', 'sweep', '{}', 'pending', 0)",
     iso(clock.now()),
   );
-  assert.equal((await k.drain()).done, 1);
+  /* The sweep, and the signs' night beside it, armed as the record opened (`armSigns`). */
+  assert.ok((await k.drain()).done >= 1);
 
   assert.deepEqual(['S1', 'S2', 'S3', 'S4'].map((s) => k.get(s)?.state), ['abandoned', 'abandoned', 'handoff', 'active']);
   assert.deepEqual(events(sql, k.get('S1')!.id).at(-1), {

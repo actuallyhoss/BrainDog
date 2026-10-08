@@ -561,13 +561,18 @@ export const ROADMAP_TODAY = 'Today';
 
 /**
  * What a bar's colour says, for the key under the drawing: the row's tone as the host's stylesheet paints it, the
- * accent while the work is in hand, amber at risk, red late and grey done. `tone` is absent on the accent's.
+ * accent while the work is in hand, amber due soon, red late and grey done. `tone` is absent on the accent's.
+ *
+ * WARN IS "DUE SOON", NOT "AT RISK". The record sets it from the due date alone (`toneOf` in the web app: under 14
+ * days), so "At risk" was a claim about the work that nothing made. "Done" stays on purpose: a plan an author writes
+ * can draw a finished bar, and the key names only the colours on screen, so a plan of open work (a project's) never
+ * shows it.
  */
 export type RoadmapKey = { tone?: 'warn' | 'bad' | 'good'; label: string };
 
 /** The key's name for a screen reader, and its four words, in the order a plan is read: what is in hand first. */
 export const ROADMAP_LEGEND = 'What the colours mean';
-const ROADMAP_KEYS: readonly RoadmapKey[] = [{ label: 'Under way' }, { tone: 'warn', label: 'At risk' }, { tone: 'bad', label: 'Late' }, { tone: 'good', label: 'Done' }];
+const ROADMAP_KEYS: readonly RoadmapKey[] = [{ label: 'Under way' }, { tone: 'warn', label: 'Due soon' }, { tone: 'bad', label: 'Late' }, { tone: 'good', label: 'Done' }];
 
 /**
  * The key under the drawing: each colour the rows drawn are in, named, and nothing where they are all one colour.

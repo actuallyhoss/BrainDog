@@ -16,7 +16,7 @@ import { createInterface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 
 import type { McpSurface } from '@braindog/mcp';
-import { handle, type Reply } from '@braindog/mcp/rpc';
+import { agreed, handle, type Reply } from '@braindog/mcp/rpc';
 
 import type { ClientInfo } from './position.ts';
 
@@ -48,6 +48,8 @@ export async function serveStdio<C>(
   hello?: (client: ClientInfo) => void,
 ): Promise<void> {
   const inFlight = new Set<Promise<void>>();
+  /* THE REVISION THE HANDSHAKE AGREED. A pipe sends no header, so a later request is answered under it. */
+  let version: string | undefined;
   /* Settled by the write's own callback, which is what makes "flushed" true on a Windows pipe, where
      a write is asynchronous. */
   const send = (reply: Reply) => new Promise<void>((done) => output.write(`${JSON.stringify(reply)}\n`, () => done()));
@@ -71,7 +73,12 @@ export async function serveStdio<C>(
     const said = helloOf(message);
     if (said !== null) hello?.(said);
     /* `handle` never throws, so a failed call is a reply and the loop goes on. */
-    track(handle(message, surface, ctxOf(), origin).then((reply) => (reply ? send(reply) : undefined)));
+    track(
+      handle(message, surface, ctxOf(), origin, version).then((reply) => {
+        version = agreed(reply) ?? version;
+        return reply ? send(reply) : undefined;
+      }),
+    );
   }
 
   while (inFlight.size > 0) await Promise.all(inFlight);

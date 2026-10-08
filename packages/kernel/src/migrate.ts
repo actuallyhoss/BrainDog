@@ -45,6 +45,8 @@ import entityKey0023 from './migrations/0023_entity_key.ts';
 import look0024 from './migrations/0024_look.ts';
 import trust0025 from './migrations/0025_trust.ts';
 import sessionStarted0026 from './migrations/0026_session_started.ts';
+import signs0027 from './migrations/0027_signs.ts';
+import runs0028 from './migrations/0028_runs.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -76,6 +78,8 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 24, slug: 'look', sql: look0024 },
   { version: 25, slug: 'trust', sql: trust0025 },
   { version: 26, slug: 'session_started', sql: sessionStarted0026 },
+  { version: 27, slug: 'signs', sql: signs0027 },
+  { version: 28, slug: 'runs', sql: runs0028 },
 ];
 
 /**
@@ -112,6 +116,10 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 24 rebuilds `declaration` with one more kind, `look`, for the same reason, so the format is still 1.
  * Migration 25 rebuilds `suggestion` with one nullable column last, which an older file imports without and reads as NULL,
  * and `token` with three, adds two indexes and `ladder` and `undone`, both `local`, so the format is still 1.
+ * Migration 26 adds a row, the next version of `register.session`, and gives runs a field, so the format is still 1.
+ * Migration 27 adds `sign_reading`, `local`, so no file carries it, and the format is still 1.
+ * Migration 28 adds a row, the next version of `register.session` with nine fields an older file's runs import without,
+ * and no table, column or index, so the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 

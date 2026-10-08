@@ -366,6 +366,7 @@ const DATED_POLL: Declaration = {
   kind: 'ingest',
   body: {
     ingest: 'invoices',
+    description: 'Billing updates',
     channel: 'poll',
     url: 'https://billing.example.test/v1/latest.json',
     every: '1h',
@@ -407,11 +408,11 @@ test('and a record that wired the grammar reads the date, so only the genuinely 
   assert.doesNotMatch(raw?.reason ?? '', /when/, 'the date was read, so nothing should name it');
 });
 
-test('an arrival with nothing but absent fields reads exactly as it read before', async () => {
-  /* THE CLAUSE FOR AN ABSENT FIELD IS UNCHANGED, WORD FOR WORD, which is what keeps every receipt
-     already sitting in a record meaning what it meant when it was written. */
+test('an arrival with nothing but absent fields names them in one clause, and the pattern by its name', async () => {
+  /* THE CLAUSE FOR AN ABSENT FIELD KEEPS ITS WORDS, and since REC-A03 says the pattern by its name and the fields as a
+     sentence lists them, where it said `invoices could not read ref, when out of this one.` */
   const raw = await polled({ day: wiredDay }, JSON.stringify({ data: {} }));
-  assert.equal(raw?.reason, 'invoices could not read ref, when out of this one.');
+  assert.equal(raw?.reason, 'Billing updates could not read ref and when out of this one.');
 });
 
 /* ------------------------------------------------------------------------------------------------ */

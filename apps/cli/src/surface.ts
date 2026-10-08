@@ -56,6 +56,9 @@ const reachable = <T>(r: Result<T>): Result<T> =>
  * `understandPlan` JOINED WITH ITS TOOL (`understand`), for the same lesson: an agent working for the owner from the
  * command line sees what the record would link before it meets anyone, as it does over `POST /mcp`. Who may read it is
  * the record's to say.
+ *
+ * `inboxPatterns` JOINED WITH ITS ADDRESS (`braindog:inbox/patterns`), for `triage`'s lesson: a stdio agent with the
+ * `inbox` reach reads what each pattern did with what came in, as an agent over HTTP can.
  */
 const LATER = [
   'context',
@@ -69,6 +72,7 @@ const LATER = [
   'scriptTry',
   'previewPage',
   'inbox',
+  'inboxPatterns',
   'triage',
   'previewChange',
   'tryAutomation',

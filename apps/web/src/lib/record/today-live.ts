@@ -57,7 +57,7 @@ export type DayRow = {
 
 /**
  * One run an agent had open today, as a span on the day: from when it opened to when it was last heard from, and
- * whether it is working now (open, and heard from inside the last 30 minutes, the record's own `QUIET_MS`).
+ * whether it is working now (open, and heard from inside the last 15 minutes, the record's own `QUIET_MS`, its `WORKING_MS`).
  */
 export type SessionRow = {
   seq: number | null;
@@ -252,7 +252,7 @@ export function comingOf(
 
 /* ── the runs of the day ────────────────────────────────────────────────── */
 
-/** The record's own `QUIET_MS`: a run not heard from in 30 minutes has gone quiet. */
+/** The record's own `QUIET_MS` (`WORKING_MS`): a run not heard from in 15 minutes has gone quiet. */
 export const QUIET_AFTER = QUIET_MS;
 
 /**
@@ -638,7 +638,7 @@ export async function readToday(base: string, io?: Fetch, at?: number): Promise<
   const capped = b.whatsNew?.sinceCapped ?? false;
   const who = sinceWho(events, b.me?.person ?? null);
   /* THE MACHINE THE RUNS ARE ON: the live runs `boot` sent say it, and failing those, the day's runs that still work. A
-     run gone quiet (`quiet`, the record's 30 minutes) is not one of them, as a stale one is not. */
+     run gone quiet (`quiet`, the record's 15 minutes) is not one of them, as a stale one is not. */
   const live = b.sessions ?? [];
   const host =
     live.length > 0

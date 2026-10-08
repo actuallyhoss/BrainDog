@@ -18,6 +18,10 @@
   const plan = $derived(splitPlan(rows.map((r) => signedOf(text(inline(r.cells[1] ?? '', opts))))));
   const said = (r: Row | undefined) => text(inline(r?.cells[0] ?? '', opts));
   const name = $derived(splitSentence(plan.parts.map((p) => ({ label: said(rows[p.at]), share: p.share }))));
+  /* A late part is striped as well as red (DIRECTION §42), by a pattern of its own: `$props.id()` keeps two charts on
+     one page from painting from one another's (`lateId` in the mirror). */
+  const uid = $props.id();
+  const late = $derived(plan.parts.some((p) => rows[p.at]?.tone === 'bad') ? `${uid}-late` : '');
 
   /** Ask the host to close the hole. Only ever called from the branch that proved it can. */
   const fill = () => {
@@ -39,8 +43,21 @@
     <p class="split-empty">{SPLIT_ZERO}</p>
   {:else}
     <svg class="split-track" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={name}>
+      {#if late}
+        <defs
+          ><pattern class="late-hatch" id={late} patternUnits="userSpaceOnUse" width="10" height="60"
+            ><rect class="late-ground" width="10" height="60" fill="currentColor" fill-opacity="0.3"></rect><path
+              class="late-stripe"
+              d="M0 0H5L0 30ZM10 0V30L5 60H0Z"
+              fill="currentColor"
+            ></path></pattern
+          ></defs
+        >
+      {/if}
       {#each plan.parts as p}
-        <rect class="split-seg" data-step={p.step} data-intent={rows[p.at]?.tone} x={p.x} y="0" width={p.width} height="100"></rect>
+        {@const tone = rows[p.at]?.tone}
+        <rect class="split-seg" data-step={p.step} data-intent={tone} style={tone === 'bad' ? `fill:url(#${late})` : undefined} x={p.x} y="0" width={p.width} height="100"
+        ></rect>
       {/each}
       {#if plan.cuts}<path class="split-cut" d={plan.cuts} vector-effect="non-scaling-stroke"></path>{/if}
     </svg>

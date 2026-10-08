@@ -66,3 +66,26 @@ test('A SPLIT PUTS ITS NUMBERS IN A FOLD: each part, its figure and its share, a
   assert.match(fold, /<tr><th scope="row">Tools<\/th><td class="num">pending<\/td><td class="num">—<\/td><\/tr>/u);
   assert.match(fold, /<tr><th scope="row">Uncategorised<\/th><td class="num">50<\/td><td class="num">—<\/td><\/tr><\/tbody>/u, 'the hole comes last and is not a part');
 });
+
+test('A LATE PART IS STRIPED AS WELL AS RED (DIRECTION §42): it is filled with a pattern of its own, and the rest are not', () => {
+  const html = toHTML(parse('```split | Owed\nPaid | 600\nOverdue | 300 | 3 invoices | bad\nDue soon | 100 |  | warn\n```'));
+  const id = /<pattern class="late-hatch" id="([^"]+)" patternUnits="userSpaceOnUse" width="10" height="60">/u.exec(html)?.[1];
+  assert.ok(id, 'a late part drew no pattern');
+  assert.match(html, new RegExp(`<rect class="split-seg" data-step="1" data-intent="bad" style="fill:url\\(#${id}\\)" x="600"`, 'u'));
+  assert.match(html, /<path class="late-stripe" d="M0 0H5L0 30ZM10 0V30L5 60H0Z" fill="currentColor">/u, 'the pattern is a stripe, not a wash');
+  assert.equal(html.match(/url\(#/gu)?.length, 1, 'only the late part is striped');
+  assert.ok(html.indexOf('<pattern') < html.indexOf('<rect class="split-seg"'), 'the pattern is drawn before the part that paints from it');
+  /* Nothing late, no pattern: the track is as it was. */
+  assert.doesNotMatch(toHTML(parse(SPLIT)), /<pattern|url\(#/u);
+});
+
+test('TWO LATE SPLITS ON ONE PAGE PAINT FROM TWO PATTERNS, even when they say the same thing', () => {
+  const src = '```split\nPaid | 600\nOverdue | 300 | | bad\n```';
+  const html = toHTML([...parse(src), ...parse(src), ...parse('```split\nRent | 1\nLate rent | 2 | | bad\n```')]);
+  const ids = [...html.matchAll(/<pattern [^>]*id="([^"]+)"/gu)].map((m) => m[1]);
+  const refs = [...html.matchAll(/url\(#([^)]+)\)/gu)].map((m) => m[1]);
+  assert.equal(ids.length, 3);
+  assert.equal(new Set(ids).size, 3, `one id painted two tracks: ${ids.join(', ')}`);
+  assert.deepEqual(refs, ids, 'each part paints from its own track\'s pattern');
+  assert.equal(toHTML(parse(src)), toHTML(parse(src)), 'the same input draws the same page');
+});

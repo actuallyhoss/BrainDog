@@ -39,6 +39,9 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql; clock: Clockish }> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const k = await openRecord(sql, clock);
+  /* THE SIGNS' NIGHT IS ARMED AS EVERY RECORD OPENS (`armSigns`), and this file counts only the outbox's own claims and
+     alarms, so the row is taken out before anything is counted. */
+  sql.exec("DELETE FROM schedule WHERE kind = 'snapshot' AND key = 'signs'");
   assert.ok((await k.install([OBLIGATIONS])).ok);
   return { k, sql, clock };
 }

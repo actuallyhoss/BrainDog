@@ -75,18 +75,18 @@ import { ACCENTS } from '../../packages/theme/src/record.ts';
 import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
 import { answers, bootWith, forward, forwards, RECORD_PREFS, recordPrefsOf, startRecord } from './record.mjs';
 
-/* AND WHY THIS GATE DECLARES NO `needs`, although it drives a browser like the four that do.
-   `52 §5.1` step 2 lets the runner refuse a gate whose prerequisite is unmet, and a refusal means
-   the gate is never run. Half of this one reads `pref.ts` as text and is RED when the covered
-   list and the type have drifted, which is a finding with nothing to do with whether anybody has
-   run a build; the check below is deliberately placed after it for exactly that reason, and returns
-   1 rather than 3 when the drift is there. Declaring `web-build` would throw that half away on
-   every run at a desk, which is where the drift is found.
+/* AND WHY THIS GATE NEEDS `builds` AND NOT `web-build`, although it drives a browser like the four
+   that declare `web-build`. `52 §5.1` step 2 lets the runner refuse a gate whose prerequisite is
+   unmet, and a refusal means the gate is never run. Half of this one reads `pref.ts` as text and is
+   RED when the covered list and the type have drifted, which is a finding with nothing to do with
+   whether anybody has run a build; the check below is deliberately placed after it for exactly that
+   reason, and returns 1 rather than 3 when the drift is there. Declaring `web-build` would throw that
+   half away on every run at a desk, which is where the drift is found.
 
-   STEP 3 DOES NOT CHANGE THAT, and it is worth saying because the absence is the declaration here.
-   `run.mjs` reads `mod.needs` off this module, finds nothing, and runs the gate, which is the same
-   answer it reached by finding no `export const needs` in the text. An absent prerequisite means the
-   gate decides for itself what it can measure, which for this one is the whole argument above. */
+   `builds` NEVER REFUSES (`NEEDS` in `run.mjs`), so the `pref.ts` text half still runs at a desk, and
+   the gate still decides for itself what it can measure. The line only places it in `--built`, the
+   job that builds, rather than in `--unbuilt`, where it would exit 3 for want of a build. */
+export const needs = ['builds'];
 
 /**
  * EVERY PREFERENCE, SET AND MEASURED, AS A FUNCTION THE RUNNER CALLS. `52 §5.1` step 3.

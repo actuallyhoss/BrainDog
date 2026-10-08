@@ -76,6 +76,10 @@ const GATES = [
      binary, so it silently stops diffing and stops merging. This is a scan of bytes rather than of
      syntax, because the defect is in the byte and not in the shape of the code around it. */
   ['nul-bytes', call(join(here, 'nul-bytes.mjs'))],
+  /* EVERY TEST FILE RUNS, AND NONE SKIPS ITS WAY TO GREEN (PRF-B01). A test no script, workflow step or
+     gate reaches is a promise nobody checks, and twelve of the runner's own sat there. A text walk, cheap
+     and early, beside the other scans of the whole tree. */
+  ['orphan-tests', call(join(here, 'orphan-tests.mjs'))],
   /* THE OTHER HALF OF `31 §3`. `stack` is layer 4: the runtime surface a package may not name.
      This is layers 3 and 5: the seventeen-row order, acyclicity, and the relative import that
      climbs out of its own package, which pnpm resolves happily and which nothing else can see. */
@@ -240,11 +244,153 @@ if (unregistered.length > 0) {
 }
 
 /**
+ * WHAT A GATE CANNOT RUN WITHOUT, READ BEFORE ANY GATE HAS RUN. `52 §5.1` step 2.
+ *
+ * THE DEFECT THIS CLOSES SHIPPED TWICE. Until this existed the runner spawned every gate and read
+ * the EXIT CODE, so the only account of an unmet prerequisite was the gate's own. `passkey` and
+ * `queue` each found no build and exited 0, which is a pass, and each one's header claimed in
+ * prose that it printed a skip. A gate is the worst-placed thing in the tree to report that it
+ * could not run, because the report and the thing being reported on are the same program: the
+ * report is written by the code that did not run.
+ *
+ * SO THE PREREQUISITE IS THE RUNNER'S QUESTION NOW. A gate whose declared need is unmet is not
+ * spawned at all, and the line that arrives is this file's rather than the gate's. There is no
+ * exit code in that path for a gate to get wrong.
+ *
+ * WHY IT IS READ AS TEXT AND NOT BY `import()` FOR THE GATES THAT ARE STILL SCRIPTS, which is what
+ * `52 §5.1` step 2 says. Measured before step 3 landed:
+ * `node -e "import('./tools/gates/em-dash.mjs').then(m => console.log(m.needs))"` printed
+ * `em-dash: 0 em dashes used as punctuation, over 415 files` and then `undefined`. A gate that does
+ * its work at module top level RUNS when it is imported, which is precisely what asking before
+ * running is for; and reading `needs` off the namespace would mean reading it after the gate had
+ * finished, which is not a prerequisite check but an epilogue. That is still true of the gates below
+ * registered as scripts, and this reader is for those. The ones registered with `call(...)`
+ * are asked by `importedNeeds` instead, off the module, and none of the scripts this reader covers
+ * declares anything today: every gate that has a prerequisite is one registered with `call(...)`, so this reader
+ * now guards the next script gate that grows one rather than any gate in the table. It stays for that
+ * reason, and because a gate may be registered as a script for as long as its author likes:
+ * see `IMPORTED OR SPAWNED`. Either way the property step 2
+ * is for holds, and it is the only one that matters here: nothing the gate can say decides whether
+ * the gate runs.
+ *
+ * A DECLARATION THIS CANNOT READ IS A REFUSAL AND NEVER AN EMPTY LIST, and this paragraph is about
+ * the spawned half alone. The whole mechanism turns
+ * on a missing declaration meaning "no prerequisites", so a declaration that was present and
+ * unparsed would silently mean the same thing and put the gate straight back in charge of its own
+ * verdict. What is readable is a LITERAL list of quoted lower-case names, over one line or several;
+ * what is not is a value computed at runtime, `export const needs = needsOf(root)`, which cannot be
+ * read before the gate runs by construction. That one is exit 2 naming the file, and so is a name
+ * no key of `NEEDS` defines, because a prerequisite nothing knows how to check is one nothing can
+ * find unmet.
+ */
+const NEEDS = {
+  /* A BUILD THAT IS THERE IS NOT A BUILD OF THIS CODE, and this line asked only the first question
+     until 22 September. `existsSync(apps/web/build)` let `layout` and `a11y` measure a build older
+     than the source, and they reported nineteen findings about an app that no longer existed, every
+     one of which was chased before anybody looked at the build's date. `bundle` already knew how to
+     prove a build stale; its walk is in `lib.mjs` now and this asks it too, so a stale build is
+     the same refusal as a missing one: the gate is not run, the line names the file that is newer,
+     and the command below is the fix. The runner does not build on its own, because a gate run that
+     silently builds is a run whose timing and output nobody asked for. A variant list this cannot
+     read is a refusal in the same voice rather than a stack trace, for the reason this file opens
+     with: one unreadable fact must not end the run before a single gate has been asked. */
+  'web-build': {
+    unmet: () => webBuildUnmet(root).catch((cause) => cause.message),
+    what: 'a built web app at apps/web/build that is newer than its source',
+    how: 'pnpm --filter @braindog/web build',
+    built: true,
+  },
+  /* THE ONE PREREQUISITE THAT IS NOT A FILE. `deploy-parity` asks whether the internet is serving
+     this tree, and nothing on a developer's machine can answer that. */
+  host: {
+    unmet: () => (process.env.DEPLOY_HOST ? null : 'DEPLOY_HOST is not set'),
+    what: 'DEPLOY_HOST naming the host to compare against',
+    how: 'DEPLOY_HOST=<host> node tools/gates/run.mjs --only deploy-parity',
+    built: false,
+  },
+  /* A BUILD THE GATE FINDS FOR ITSELF, ONE PART AT A TIME, AND THE ONE NEED THIS RUNNER NEVER REFUSES.
+     `a11y` audits five builds and skips each absent one by name; `prefs` and `self-test` read source as
+     well as a build. `web-build` would refuse all of each when the web app alone is missing, which is
+     silent in the direction of measuring less, so each of them argued for declaring nothing. Declaring
+     nothing put them in `--unbuilt`, in the job that builds nothing, where every one of them skips. This
+     says which JOB asks them, and never whether they run: a build they miss is still their own exit 3,
+     which is red under CI. */
+  builds: {
+    unmet: () => null,
+    what: 'the builds it reads, each found and named by the gate itself',
+    how: 'pnpm --filter @braindog/web build && pnpm --filter @braindog/site build',
+    built: true,
+  },
+};
+
+/* `built` IS WHETHER A WEB BUILD MEETS THE NEED, and `--built` and `--unbuilt` below read nothing else. A
+   need that does not say is a need neither selection can place, which is exit 2 the moment either is
+   asked for, rather than a gate left out of both jobs without a word. */
+
+/* `52 §5.1` ALSO NAMES `pack-build`, AND NOTHING DECLARES IT. Its one gate is `licence-closure`,
+   which that section specifies and this tree has never had. A key here that no gate asks for would
+   be a third account of the same fact, kept in step with nothing, so the name arrives with the gate
+   that needs it and an unknown name is loud in the meantime. */
+
+/** A literal list of single-quoted members, over one line or several. */
+const DECLARATION = /^export const needs = \[([^\]]*)\];$/mu;
+const MEMBER = /^'([a-z][a-z-]*)'$/u;
+
+/** The script a GATES entry runs, wherever it lives: `theme` is not a file in this directory. */
+const scriptOf = (argv) =>
+  (Array.isArray(argv) ? argv.find((a) => typeof a === 'string' && a.endsWith('.mjs')) : undefined) ?? null;
+
+const refuse = (line) => {
+  console.error(`  ${line}`);
+  process.exit(2);
+};
+
+function declaredNeeds(name, file) {
+  /* `typecheck` IS `pnpm -r run typecheck` AND HAS NO FILE TO ASK. It also has no prerequisite: a
+     tree that cannot typecheck is the finding. */
+  if (file === null) return [];
+  /* AND A REGISTERED GATE'S FILE CAN BE ABSENT, WHICH READING ONE MADE FATAL. Measured: delete
+     `bundle.mjs` and leave its `GATES` line, and `readFileSync` threw `ENOENT` from here, so the run
+     ended in a stack trace with none of the other thirty gates spawned. This file's own rule is
+     that it reports every failure rather than stopping at the first, and one gate's file going
+     missing is the weakest reason there is to stop. So the question is not asked: the gate is spawned
+     as it was before any of this existed, and the spawn's own non-zero exit names it. A RENAME is
+     loud without this, because the new name is in the directory and in no `GATES` entry; a deletion
+     leaves nothing in the directory for that scan to see. */
+  if (!existsSync(file)) return [];
+  const source = readFileSync(file, 'utf8');
+  /* AT THE START OF A LINE, because a header that explains why its gate declares nothing names the
+     words in prose, and `a11y` and `prefs` both do. */
+  if (!/^export const needs\b/mu.test(source)) return [];
+  const found = DECLARATION.exec(source);
+  if (found === null)
+    refuse(
+      `${name} names \`export const needs\` and this runner cannot read it. It must be a literal ` +
+        `list of quoted names, \`export const needs = ['web-build'];\`, because a prerequisite ` +
+        `computed at runtime cannot be read before the gate runs, and an unread one would mean no ` +
+        `prerequisites and hand the gate back the verdict on itself.`,
+    );
+  return found[1]
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((member) => {
+      const m = MEMBER.exec(member);
+      if (m === null) refuse(`${name} declares ${member} as a prerequisite, and a prerequisite is a quoted lower-case name.`);
+      if (!Object.hasOwn(NEEDS, m[1]))
+        refuse(`${name} declares the prerequisite ${m[1]}, and this runner knows ${Object.keys(NEEDS).join(' and ')}.`);
+      return m[1];
+    });
+}
+
+/**
  * Which of them this run is asking for: `52 §2`'s flags, less `--negative`.
  *
  *   node tools/gates/run.mjs --except layout,a11y,keys,prefs,bundle    the ones that read source
  *   node tools/gates/run.mjs --only theme                              that one
  *   node tools/gates/run.mjs --allow-skip bundle                       a skip there is not red
+ *   node tools/gates/run.mjs --unbuilt                                 every gate that needs nothing
+ *   node tools/gates/run.mjs --built --except layout,a11y              every gate a web build meets, less two
  *
  * SELECTION IS NOT TOLERANCE, and `52 §6` is about the other thing: *"there is no `skip`, `only`,
  * `retry` or `allow-failure` on a gate"* forbids a red gate being waved through, and nothing here
@@ -260,6 +406,19 @@ if (unregistered.length > 0) {
  * what it EXCLUDES picks the new one up; and if the new one turns out to need a build it exits 3,
  * which is red under CI, so what arrives is a sentence naming the gate rather than a green run
  * that checked one thing fewer than it claims.
+ *
+ * AND BETTER THAN EITHER LIST IS NO LIST: `--unbuilt` AND `--built` (PRF-B01). Each reads the gates' own
+ * `needs` against `NEEDS` above, so the job that builds nothing and the job that builds the app each say
+ * which half they are and never which gates. `--unbuilt` is every gate that declares no need. `--built` is
+ * every gate that declares one and whose every need a web build meets (`built: true`). A gate that needs a
+ * live host is in neither, by construction rather than by a name left out. Both together are the two
+ * halves at once. `--only` narrows either and `--except` takes from either, so the one list a workflow
+ * still carries is the one it has a reason for.
+ *
+ * THE NEEDS ARE READ FROM EACH GATE'S TEXT HERE, BEFORE ANYTHING IS IMPORTED, because choosing what to
+ * import is the question. A called gate's module is read again below once it is imported, and a module
+ * that says something other than its text is exit 2: the job would have been chosen by the account that
+ * did not run. A need a gate declares that `NEEDS` does not define is exit 2 in `declaredNeeds`.
  *
  * A NAME THAT MATCHES NOTHING IS EXIT 2. `--except a11y,ally` would otherwise run everything and
  * report success, and a typo that widens coverage is not the failure mode worth guarding. A typo
@@ -287,7 +446,28 @@ if (misspelt.length) {
   process.exit(2);
 }
 
-const SELECTED = GATES.filter(([name]) => (only === null || only.includes(name)) && !except.includes(name));
+const BY_NEED = { unbuilt: process.argv.includes('--unbuilt'), built: process.argv.includes('--built') };
+let needsRead = null;
+if (BY_NEED.unbuilt || BY_NEED.built) {
+  const unplaced = Object.entries(NEEDS).filter(([, spec]) => typeof spec.built !== 'boolean').map(([need]) => need);
+  if (unplaced.length)
+    refuse(
+      `NEEDS says of ${unplaced.join(' and ')} neither \`built: true\` nor \`built: false\`, so --built and ` +
+        `--unbuilt cannot place a gate that declares it, and it would be in neither job without a word.`,
+    );
+  needsRead = new Map(GATES.map(([name, [, argv]]) => [name, declaredNeeds(name, scriptOf(argv))]));
+}
+/** Whether `--unbuilt` or `--built` picks this gate; true when neither was asked for. */
+function pickedByNeed(name) {
+  if (needsRead === null) return true;
+  const needs = needsRead.get(name);
+  if (needs.length === 0) return BY_NEED.unbuilt;
+  return BY_NEED.built && needs.every((need) => NEEDS[need].built);
+}
+
+const SELECTED = GATES.filter(
+  ([name]) => pickedByNeed(name) && (only === null || only.includes(name)) && !except.includes(name),
+);
 if (SELECTED.length === 0) {
   console.error('  that selection is empty, and a run of no gates must not read as a run of every gate.');
   process.exit(2);
@@ -347,125 +527,6 @@ if (costed.length) {
 }
 
 /**
- * WHAT A GATE CANNOT RUN WITHOUT, READ BEFORE ANY GATE HAS RUN. `52 §5.1` step 2.
- *
- * THE DEFECT THIS CLOSES SHIPPED TWICE. Until this existed the runner spawned every gate and read
- * the EXIT CODE, so the only account of an unmet prerequisite was the gate's own. `passkey` and
- * `queue` each found no build and exited 0, which is a pass, and each one's header claimed in
- * prose that it printed a skip. A gate is the worst-placed thing in the tree to report that it
- * could not run, because the report and the thing being reported on are the same program: the
- * report is written by the code that did not run.
- *
- * SO THE PREREQUISITE IS THE RUNNER'S QUESTION NOW. A gate whose declared need is unmet is not
- * spawned at all, and the line that arrives is this file's rather than the gate's. There is no
- * exit code in that path for a gate to get wrong.
- *
- * WHY IT IS READ AS TEXT AND NOT BY `import()` FOR THE GATES THAT ARE STILL SCRIPTS, which is what
- * `52 §5.1` step 2 says. Measured before step 3 landed:
- * `node -e "import('./tools/gates/em-dash.mjs').then(m => console.log(m.needs))"` printed
- * `em-dash: 0 em dashes used as punctuation, over 415 files` and then `undefined`. A gate that does
- * its work at module top level RUNS when it is imported, which is precisely what asking before
- * running is for; and reading `needs` off the namespace would mean reading it after the gate had
- * finished, which is not a prerequisite check but an epilogue. That is still true of the gates below
- * registered as scripts, and this reader is for those. The ones registered with `call(...)`
- * are asked by `importedNeeds` instead, off the module, and none of the scripts this reader covers
- * declares anything today: every gate that has a prerequisite is one registered with `call(...)`, so this reader
- * now guards the next script gate that grows one rather than any gate in the table. It stays for that
- * reason, and because a gate may be registered as a script for as long as its author likes:
- * see `IMPORTED OR SPAWNED`. Either way the property step 2
- * is for holds, and it is the only one that matters here: nothing the gate can say decides whether
- * the gate runs.
- *
- * A DECLARATION THIS CANNOT READ IS A REFUSAL AND NEVER AN EMPTY LIST, and this paragraph is about
- * the spawned half alone. The whole mechanism turns
- * on a missing declaration meaning "no prerequisites", so a declaration that was present and
- * unparsed would silently mean the same thing and put the gate straight back in charge of its own
- * verdict. What is readable is a LITERAL list of quoted lower-case names, over one line or several;
- * what is not is a value computed at runtime, `export const needs = needsOf(root)`, which cannot be
- * read before the gate runs by construction. That one is exit 2 naming the file, and so is a name
- * no key of `NEEDS` defines, because a prerequisite nothing knows how to check is one nothing can
- * find unmet.
- */
-const NEEDS = {
-  /* A BUILD THAT IS THERE IS NOT A BUILD OF THIS CODE, and this line asked only the first question
-     until 22 September. `existsSync(apps/web/build)` let `layout` and `a11y` measure a build older
-     than the source, and they reported nineteen findings about an app that no longer existed, every
-     one of which was chased before anybody looked at the build's date. `bundle` already knew how to
-     prove a build stale; its walk is in `lib.mjs` now and this asks it too, so a stale build is
-     the same refusal as a missing one: the gate is not run, the line names the file that is newer,
-     and the command below is the fix. The runner does not build on its own, because a gate run that
-     silently builds is a run whose timing and output nobody asked for. A variant list this cannot
-     read is a refusal in the same voice rather than a stack trace, for the reason this file opens
-     with: one unreadable fact must not end the run before a single gate has been asked. */
-  'web-build': {
-    unmet: () => webBuildUnmet(root).catch((cause) => cause.message),
-    what: 'a built web app at apps/web/build that is newer than its source',
-    how: 'pnpm --filter @braindog/web build',
-  },
-  /* THE ONE PREREQUISITE THAT IS NOT A FILE. `deploy-parity` asks whether the internet is serving
-     this tree, and nothing on a developer's machine can answer that. */
-  host: {
-    unmet: () => (process.env.DEPLOY_HOST ? null : 'DEPLOY_HOST is not set'),
-    what: 'DEPLOY_HOST naming the host to compare against',
-    how: 'DEPLOY_HOST=<host> node tools/gates/run.mjs --only deploy-parity',
-  },
-};
-
-/* `52 §5.1` ALSO NAMES `pack-build`, AND NOTHING DECLARES IT. Its one gate is `licence-closure`,
-   which that section specifies and this tree has never had. A key here that no gate asks for would
-   be a third account of the same fact, kept in step with nothing, so the name arrives with the gate
-   that needs it and an unknown name is loud in the meantime. */
-
-/** A literal list of single-quoted members, over one line or several. */
-const DECLARATION = /^export const needs = \[([^\]]*)\];$/mu;
-const MEMBER = /^'([a-z][a-z-]*)'$/u;
-
-/** The script a GATES entry runs, wherever it lives: `theme` is not a file in this directory. */
-const scriptOf = (argv) =>
-  (Array.isArray(argv) ? argv.find((a) => typeof a === 'string' && a.endsWith('.mjs')) : undefined) ?? null;
-
-const refuse = (line) => {
-  console.error(`  ${line}`);
-  process.exit(2);
-};
-
-function declaredNeeds(name, file) {
-  /* `typecheck` IS `pnpm -r run typecheck` AND HAS NO FILE TO ASK. It also has no prerequisite: a
-     tree that cannot typecheck is the finding. */
-  if (file === null) return [];
-  /* AND A REGISTERED GATE'S FILE CAN BE ABSENT, WHICH READING ONE MADE FATAL. Measured: delete
-     `bundle.mjs` and leave its `GATES` line, and `readFileSync` threw `ENOENT` from here, so the run
-     ended in a stack trace with none of the other thirty gates spawned. This file's own rule is
-     that it reports every failure rather than stopping at the first, and one gate's file going
-     missing is the weakest reason there is to stop. So the question is not asked: the gate is spawned
-     as it was before any of this existed, and the spawn's own non-zero exit names it. A RENAME is
-     loud without this, because the new name is in the directory and in no `GATES` entry; a deletion
-     leaves nothing in the directory for that scan to see. */
-  if (!existsSync(file)) return [];
-  const source = readFileSync(file, 'utf8');
-  if (!source.includes('export const needs')) return [];
-  const found = DECLARATION.exec(source);
-  if (found === null)
-    refuse(
-      `${name} names \`export const needs\` and this runner cannot read it. It must be a literal ` +
-        `list of quoted names, \`export const needs = ['web-build'];\`, because a prerequisite ` +
-        `computed at runtime cannot be read before the gate runs, and an unread one would mean no ` +
-        `prerequisites and hand the gate back the verdict on itself.`,
-    );
-  return found[1]
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((member) => {
-      const m = MEMBER.exec(member);
-      if (m === null) refuse(`${name} declares ${member} as a prerequisite, and a prerequisite is a quoted lower-case name.`);
-      if (!Object.hasOwn(NEEDS, m[1]))
-        refuse(`${name} declares the prerequisite ${m[1]}, and this runner knows ${Object.keys(NEEDS).join(' and ')}.`);
-      return m[1];
-    });
-}
-
-/**
  * IMPORTED OR SPAWNED, one gate at a time. `52 §5.1` step 3, on every gate registered with
  * `call(...)`; the rest are spawned exactly as they were.
  *
@@ -487,7 +548,8 @@ function declaredNeeds(name, file) {
  * IT ALSO TAKES A SHAPE STEP 2 HAD TO REFUSE AND MAKES IT LEGAL. `export const needs =
  * needsOf(root)` cannot be read out of text before the gate runs, by construction, so step 2
  * refuses it; read off the module it is an ordinary value, computed by the gate and read before the
- * gate is called.
+ * gate is called. EXCEPT UNDER `--built` AND `--unbuilt`, which choose from the text before anything is
+ * imported, so there a computed `needs` is the same exit 2 and every gate keeps a literal list.
  *
  * THE DIALECT IS DECLARED IN `GATES` AND IS NEVER GUESSED FROM THE TEXT, AND THE FIRST VERSION OF
  * THIS GOT THAT WRONG IN A WAY THAT WAS ONE COMMIT FROM COSTING SOMETHING. It asked the text one
@@ -680,6 +742,16 @@ for (const [name, [cmd, argv]] of SELECTED) {
       `${name} names \`export default\` and it is not a function this runner can call. A gate is either a ` +
         `default-exported function that returns 1, 3 or nothing, or a script with no default export at all.`,
     );
+  /* THE TEXT CHOSE THE JOB, SO THE MODULE HAS TO AGREE WITH IT: see `--unbuilt` above. */
+  if (needsRead !== null) {
+    const said = [...importedNeeds(name, mod.needs)].sort().join(', ') || 'nothing';
+    const read = [...needsRead.get(name)].sort().join(', ') || 'nothing';
+    if (said !== read)
+      refuse(
+        `${name} needs ${said} by its module and ${read} by its text, and --built and --unbuilt chose by the ` +
+          `text. Write \`needs\` as a literal list, \`export const needs = ['web-build'];\`, so the two are one.`,
+      );
+  }
   dialects.set(name, { how: 'imported', gate: mod.default, needs: mod.needs, slices: importedSlices(name, mod.slices) });
 }
 

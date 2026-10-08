@@ -25,14 +25,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
-const BUILD = new URL('../build/', import.meta.url);
+import { BUILD, missing, when } from './built.ts';
+
 const NOT_FOUND = new URL('404.html', BUILD);
 
-const NO_BUILD = existsSync(NOT_FOUND)
-  ? null
-  : 'apps/site/build/404.html is missing. Run "pnpm --filter @braindog/site build" first: this reads the served bytes.';
-
-const when = (reason) => (reason ? { skip: reason } : {});
+const NO_BUILD = missing(['404.html']);
 
 /** Every place a page asks for something under `_app`, as written: `href`, `src` and the start script's `import(...)`. */
 const asks = (html) => [...html.matchAll(/(?:href=|src=|import\()["']([^"']*_app\/[^"']*)["']/g)].map((m) => m[1]);

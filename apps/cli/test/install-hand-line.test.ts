@@ -203,7 +203,7 @@ test('AND THE sh LINES PASTED INTO POWERSHELL 5.1 RUN NOTHING, since the shell i
 /* Git Bash on Windows, sh anywhere else: skipped only where no `sh` answers at all. */
 const hasSh = spawnSync('sh', ['-c', 'exit 0']).status === 0;
 
-test('PASTED INTO sh, BOTH LINES REACH claude WITH THE PROFILE THEY NAME AND EVERY ARGUMENT', { skip: !hasSh }, () => {
+test('PASTED INTO sh, BOTH LINES REACH claude WITH THE PROFILE THEY NAME AND EVERY ARGUMENT', { skip: hasSh ? false : 'there is no sh on this machine' }, () => {
   const dir = mkdtempSync(join(scratch, 'sh-'));
   mkdirSync(join(dir, 'bin'));
   writeFileSync(join(dir, 'bin', 'claude'), '#!/bin/sh\nprintf "dir=%s\\n" "${CLAUDE_CONFIG_DIR-}"\nfor a in "$@"; do printf "arg=%s\\n" "$a"; done\n', { mode: 0o755 });

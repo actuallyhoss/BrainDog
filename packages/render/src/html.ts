@@ -288,6 +288,37 @@ const toneGlyph = (tone?: string): string => {
   return `<span class="glyph" role="img" aria-label="${t.label}">${t.glyph}</span>`;
 };
 
+/**
+ * A LATE PART IS STRIPED IN SVG TOO (DIRECTION §42). The working accent is BrainDog red and late is a deeper red of the
+ * same hue, so a late segment or arc beside a working one must differ by a mark and not by its shade alone. A CSS
+ * stripe cannot reach an SVG shape, so the shape is painted with a `<pattern>` of its own, drawn in `--chart-late`
+ * through `currentColor` (`.late-hatch` in `blocks-charts.css`) and in the block's own ink with no stylesheet. The
+ * shape takes it as an inline `fill` or `stroke`, because the stylesheet's `--part` rule outranks any attribute.
+ *
+ * ITS ID IS THE BLOCK'S, AND ONE CALL NEVER HANDS IT OUT TWICE. `url(#id)` paints from the first element with that id
+ * in the document, so two charts sharing one would paint from whichever came first, and from nothing at all when
+ * that one sits in a closed fold. A hash of what the block says keeps the output the same for the same input; the
+ * count within one `toHTML` call parts two blocks that say the same thing. `svelte/Split.svelte` and
+ * `svelte/p/Ring.svelte` take theirs from `$props.id()`, which the parity test reads past.
+ */
+const LATE = 'bad';
+let lateSeen: Map<string, number> | null = null;
+
+function lateId(b: Block): string {
+  let h = 0x811c9dc5;
+  for (const ch of `${b.kind}\u0000${b.heading ?? ''}\u0000${b.rows.map((r) => `${r.tone ?? ''}\u0001${r.cells.join('\u0001')}`).join('\u0002')}`)
+    h = Math.imul(h ^ ch.codePointAt(0)!, 0x01000193);
+  const base = `late-${(h >>> 0).toString(36)}`;
+  if (!lateSeen) return base;
+  const n = lateSeen.get(base) ?? 0;
+  lateSeen.set(base, n + 1);
+  return n ? `${base}-${n}` : base;
+}
+
+/** The stripes, one tile `w` by `h` in the drawing's own units: a diagonal band on the late red at 30%. */
+const latePattern = (id: string, w: number, h: number): string =>
+  `<defs><pattern class="late-hatch" id="${id}" patternUnits="userSpaceOnUse" width="${w}" height="${h}"><rect class="late-ground" width="${w}" height="${h}" fill="currentColor" fill-opacity="0.3"></rect><path class="late-stripe" d="M0 0H${w / 2}L0 ${h / 2}ZM${w} 0V${h / 2}L${w / 2} ${h}H0Z" fill="currentColor"></path></pattern></defs>`;
+
 /* ── the eight primitives ─────────────────────────────────────────────────── */
 
 function panel(b: Block, o: RenderOptions): string {
@@ -701,12 +732,18 @@ function split(b: Block, o: RenderOptions): string {
   const plan = splitPlan(rows.map((r) => signedOf(plain(inline(r.cells[1] ?? '', o)))));
   const partOf = (i: number) => plan.parts.find((p) => p.at === i);
   const said = (r: Row) => plain(inline(r.cells[0] ?? '', o));
+  /* The track is 1000 by 100 stretched to its box, so the 10 by 60 tile's stripe follows its width: about 3px apart on
+     a phone's full-width track, 5px on a wide tile's. */
+  const late = plan.parts.some((p) => rows[p.at]!.tone === LATE) ? lateId(b) : '';
   const track = plan.empty
     ? `<p class="split-empty">${escape(SPLIT_ZERO)}</p>`
     : `<svg class="split-track" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(
         splitSentence(plan.parts.map((p) => ({ label: said(rows[p.at]!), share: p.share }))),
-      )}">${plan.parts
-        .map((p) => `<rect class="split-seg" data-step="${p.step}"${toneAttrs(rows[p.at]!.tone)} x="${p.x}" y="0" width="${p.width}" height="100"></rect>`)
+      )}">${late ? latePattern(late, 10, 60) : ''}${plan.parts
+        .map(
+          (p) =>
+            `<rect class="split-seg" data-step="${p.step}"${toneAttrs(rows[p.at]!.tone)}${rows[p.at]!.tone === LATE ? ` style="fill:url(#${late})"` : ''} x="${p.x}" y="0" width="${p.width}" height="100"></rect>`,
+        )
         .join('')}${plan.cuts ? `<path class="split-cut" d="${plan.cuts}" vector-effect="non-scaling-stroke"></path>` : ''}</svg>`;
   const legend = rows.length
     ? `<ul class="split-legend">${rows
@@ -1434,12 +1471,15 @@ function ring(b: Block, o: RenderOptions): string {
       .map(([k, v]) => ` ${k}="${v}"`)
       .join('');
   const circle = (cls: string, attrs: string): string => `<circle class="${cls}"${attrs} cx="18" cy="18" r="16" pathLength="100"></circle>`;
+  /* An arc is a stroke whose dashes already draw its length, so its mark is the pattern and not a dash: a 4 by 4 tile
+     in a 64px dial is a stripe of about 2.5px every 5px, near the CSS hatch's 3 in 6; a 3 by 3 one blurred at 1x. */
+  const late = plan.arcs.some((a) => a.tone === LATE) ? lateId(b) : '';
   const dial = plan.ring
-    ? `<div class="ring-dial"><svg class="ring-mark" viewBox="0 0 36 36" role="img" aria-label="${escape(plan.name)}">${circle('ring-track', paint(RING_PAINT.track))}${plan.arcs
+    ? `<div class="ring-dial"><svg class="ring-mark" viewBox="0 0 36 36" role="img" aria-label="${escape(plan.name)}">${late ? latePattern(late, 4, 4) : ''}${circle('ring-track', paint(RING_PAINT.track))}${plan.arcs
         .map((a) =>
           circle(
             'ring-arc',
-            ` data-step="${a.step}"${toneAttrs(a.tone)}${paint(RING_PAINT.arc)} stroke-opacity="${RING_STEP_OPACITY[a.step]}" stroke-dasharray="${a.dash}" stroke-dashoffset="${a.offset}" transform="rotate(-90 18 18)"`,
+            ` data-step="${a.step}"${toneAttrs(a.tone)}${paint(RING_PAINT.arc)}${a.tone === LATE ? ` style="stroke:url(#${late})"` : ''} stroke-opacity="${RING_STEP_OPACITY[a.step]}" stroke-dasharray="${a.dash}" stroke-dashoffset="${a.offset}" transform="rotate(-90 18 18)"`,
           ),
         )
         .join('')}</svg>${plan.centre ? `<span class="ring-figure num" aria-hidden="true">${escape(plan.centre)}</span>` : ''}</div>`
@@ -1760,9 +1800,16 @@ function markdown(m: Markdown, o: RenderOptions): string {
 }
 
 export function toHTML(segments: Segment[], opts: RenderOptions = {}): string {
-  return segments
-    .map((s) => (s.type === 'block' ? block(s, opts) : s.type === 'degraded' ? degraded(s) : markdown(s, opts)))
-    .join('');
+  /* One count of late patterns for the whole call (`lateId`); a call made while drawing shares the outer one. */
+  const own = lateSeen === null;
+  if (own) lateSeen = new Map();
+  try {
+    return segments
+      .map((s) => (s.type === 'block' ? block(s, opts) : s.type === 'degraded' ? degraded(s) : markdown(s, opts)))
+      .join('');
+  } finally {
+    if (own) lateSeen = null;
+  }
 }
 
 /** The accessible name of a drawn figure reads as a sentence, not as three floating numbers (13 §7). */

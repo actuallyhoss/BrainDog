@@ -148,7 +148,7 @@ async function ledger(rows: { accounts?: object[]; obligations?: object[] } = {}
 }
 
 const armed = (sql: NodeSql) =>
-  sql.one<{ key: string; due_at: string; state: string; payload: string }>("SELECT key, due_at, state, payload FROM schedule WHERE kind = 'snapshot'");
+  sql.one<{ key: string; due_at: string; state: string; payload: string }>("SELECT key, due_at, state, payload FROM schedule WHERE kind = 'snapshot' AND key = 'snapshots'");
 
 const nights = (sql: NodeSql): Record<string, unknown>[] =>
   sql
@@ -206,7 +206,7 @@ test('AND A SECOND DRAIN THE SAME NIGHT WRITES NOTHING, because `on` is unique a
   clock.set(Date.parse(armed(sql)!.due_at));
   await k.drain();
   /* The row a platform redelivers, or a second alarm five seconds later: re-arm it and fire again. */
-  sql.exec("UPDATE schedule SET state = 'pending', due_at = ? WHERE kind = 'snapshot'", new Date(clock.now()).toISOString());
+  sql.exec("UPDATE schedule SET state = 'pending', due_at = ? WHERE kind = 'snapshot' AND key = 'snapshots'", new Date(clock.now()).toISOString());
   const out = await k.drain();
   assert.equal(out.failed, 0, 'a night already taken walked the retry ladder instead of doing nothing');
   assert.equal(nights(sql).length, 1);
@@ -234,7 +234,7 @@ test('AND A NIGHT SOMEBODY DELETED IS NOT PUT BACK, because the unique day came 
   sql.exec("UPDATE entry SET deleted_at = ? WHERE register = 'snapshots'", new Date(clock.now()).toISOString());
   assert.deepEqual(nights(sql), [], 'the fixture did not delete the night it was about to test');
 
-  sql.exec("UPDATE schedule SET state = 'pending', due_at = ? WHERE kind = 'snapshot'", new Date(clock.now()).toISOString());
+  sql.exec("UPDATE schedule SET state = 'pending', due_at = ? WHERE kind = 'snapshot' AND key = 'snapshots'", new Date(clock.now()).toISOString());
   const out = await k.drain();
   assert.equal(out.failed, 0);
   const all = sql.all<{ x: number }>("SELECT 1 AS x FROM entry WHERE register = 'snapshots'").length;

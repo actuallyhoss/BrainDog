@@ -35,7 +35,7 @@
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import { fixOf, no, ok, refused } from '@braindog/ports';
+import { no, ok, refused } from '@braindog/ports';
 import { jsonPath, evaluate, parseWhere, INBOX_RAW, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry, Json } from './index.ts';
@@ -1039,16 +1039,13 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
 
          A BAD DECLARATION IS A `review`, NOT A DISCARD. The sender did nothing wrong; the pattern
          did, and the payload is the evidence for fixing it. */
-      store('review', `${String(ceiling)} is not a confidence this record knows, so ${matched.ingest} did not write.`);
+      /* SAID BY THE PATTERN'S NAME AND NOT ITS LEVEL, which is a word out of a declaration nobody reading the inbox chose.
+         `not a confidence` is kept, so a check that matched the sentence still finds it. */
+      const reason = `The level set on ${patternSaid(deps, matched)} is not a confidence this record knows, so nothing from this one was written.`;
+      store('review', reason);
       /* AND WHICH PATTERN HELD IT, as every other held text says, so a fixed version reads it again (`readBefore`). */
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'needs-review');
-      return ok<Arrived>({
-        raw,
-        ingest: matched.ingest,
-        state: 'review',
-        wrote: [],
-        reason: `${String(ceiling)} is not a confidence this record knows.`,
-      });
+      return ok<Arrived>({ raw, ingest: matched.ingest, state: 'review', wrote: [], reason });
     }
 
     /* `43 §5.1` STEP 6, WHICH IS AFTER THE FIELDS AND BEFORE THE CONFIDENCE, because a route reads
@@ -1059,7 +1056,9 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
          suggestion a person ACCEPTS INTO a register, and the whole of what went wrong is that no
          register was named. The bytes, the state and the reason are stored; what happens next is an
          edit to the table or to the pattern, and both of those are edits to the declaration. */
-      const reason = `${matched.ingest} read this one and its routing table takes no row like it: route miss on ${routed.miss}.`;
+      /* SAID IN THE LIST'S WORDS, each field the table sorts by as its label, and a part of one (`amount.currency`) as the
+         field's own: "found nowhere to file one with this kind and amount's currency". `routed.miss` is those ids. */
+      const reason = `${opening(patternSaid(deps, matched))} read this one and found nowhere to file one with this ${routeSaid(deps, matched.writes.register)}.`;
       store('review', reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'needs-review');
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'review', wrote: [], reason, confidence: 'needs-review' });
@@ -1141,8 +1140,8 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
        that makes a pattern nobody has approved yet safe to leave switched on. */
     if (confidence !== 'exact') {
       const state = confidence === 'proposed' ? 'proposed' : 'review';
-      /* THE REASON NAMES FIELD IDS AND NOTHING OUT OF THE PAYLOAD but a printed tail's digits, which end a value the
-         record already held (`byTail` below): `43 §6`'s leak rule. The middle arm is new with the combinators:
+      /* THE REASON NAMES FIELDS BY THEIR LABELS AND NOTHING OUT OF THE PAYLOAD but a printed tail's digits, which end a
+         value the record already held (`byTail` below): `43 §6`'s leak rule. The middle arm is new with the combinators:
          "files at ${ceiling}" was the only explanation this could give, and it is a false one when the ceiling is
          `exact` and a field defaulted. */
       /**
@@ -1153,22 +1152,25 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
        * unreadable one is almost always a format that changed at their end and can be fixed here. Both
        * were named by one clause that said *could not read*, which is true of only one of them.
        *
-       * THE ABSENT CLAUSE IS WORD FOR WORD WHAT IT WAS. Only the unreadable fields are lifted out of
-       * it, so a message with nothing but absent fields reads exactly as it read before and no
-       * receipt already in a record changes meaning.
+       * AND EACH SAYS THE PATTERN BY ITS NAME AND THE FIELDS BY THEIR LABELS (REC-A03). It named the pattern by its id
+       * and the fields by theirs, "bank-from-out could not read account, on out of this one", in front of a person who
+       * chose neither word. `could not read ... out of this one` and `could not make sense of` are kept, so a check that
+       * matched the sentence still finds it; a receipt already in a record keeps the words it was written with.
        */
       const absent = missed.filter((field) => !invalid.includes(field));
+      const words = wordsFor(deps, matched, register, arrival.channel);
+      const by = opening(patternSaid(deps, matched));
       /* EXCEPT AN ACCOUNT NOT FOUND, which is said in his words (REC-A02 step 7): the message printed no digits to ask
          about, so it waits on its own question, and its reason names the field as the record speaks it and no pattern. */
       const unfound = absent.length > 0 && invalid.length === 0 && absent.every((field) => read.lookups.includes(field));
       const clauses = [
         unfound
-          ? `${opening(wordsFor(deps, matched, register, arrival.channel).fields(absent))} could not be found in this one.`
+          ? `${opening(words.fields(absent))} could not be found in this one.`
           : absent.length
-            ? `${matched.ingest} could not read ${absent.join(', ')} out of this one.`
+            ? `${by} could not read ${words.fields(absent)} out of this one.`
             : '',
         invalid.length
-          ? `${matched.ingest} found ${invalid.join(', ')} in this one and could not make sense of ${invalid.length === 1 ? 'it' : 'them'}, so the format may have changed.`
+          ? `${by} found ${words.fields(invalid)} in this one and could not make sense of ${new Set(invalid).size === 1 ? 'it' : 'them'}, so the format may have changed.`
           : '',
       ].filter((clause) => clause !== '');
       /**
@@ -1181,23 +1183,25 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
        * not in as the effect (`test/ingest-review-reason.test.ts`).
        *
        * SO A HELD ARRIVAL SAYS WHAT HAPPENS TO IT, which is that nothing is written until somebody
-       * accepts the suggestion opened below. Where the state really is `proposed` the sentence is word
-       * for word what it was, so no receipt already in a record changes meaning.
+       * accepts the suggestion opened below. Where the state really is `proposed` it keeps the words *"proposed rather
+       * than written"*. The verb after the pattern's name has no person (`will`, a past tense), because the name is often
+       * plural, "HSBC Egypt alerts", and "HSBC Egypt alerts waits" is not how a person speaks.
        */
-      const held = state === 'review' ? 'waits for a person on everything it reads, so nothing from this one is written until somebody accepts it.' : '';
+      const guessed = new Set(soft).size === 1 ? 'it' : 'them';
+      const held = state === 'review' ? 'will not write anything it reads until somebody accepts it, so this one waits for a person.' : '';
       /* THE CEILING IS NAMED ONLY WHEN IT IS WHAT HELD THIS ONE. With nothing missed or soft and the ceiling `exact`,
          the one cause left is a printed tail, and the sentence after this one says so. */
       const cause = missed.length
         ? clauses.join(' ')
         : soft.length
           ? held
-            ? `${matched.ingest} chose or defaulted ${soft.join(', ')} rather than reading them, and it ${held}`
-            : `${matched.ingest} chose or defaulted ${soft.join(', ')} rather than reading them, so what it read is proposed rather than written.`
+            ? `${by} chose or defaulted ${words.fields(soft)} rather than reading ${guessed}, and it ${held}`
+            : `${by} chose or defaulted ${words.fields(soft)} rather than reading ${guessed}, so what it read is proposed rather than written.`
           : held
-            ? `${matched.ingest} ${held}`
+            ? `${by} ${held}`
             : ceiling === 'exact'
               ? ''
-              : `${matched.ingest} files at ${ceiling}, so what it read is proposed rather than written.`;
+              : `${by} will ask before it writes anything, so what it read is proposed rather than written.`;
       /* A TAIL IS SAID WHATEVER ELSE HELD THE ARRIVAL, because accepting the rowset confirms it, and a person should not
          confirm an account they were never told was read from its last digits. The digits are the end of the value the
          row already holds, so the sentence carries nothing the record did not have before the message came. */
@@ -1208,9 +1212,8 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
       store(state, reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', confidence);
 
-      /* THE QUESTION IS SAID IN A PERSON'S WORDS, the reason in the record's. The reason is the inbox's and stays word for
-         word what it was; the question is what Decide draws, and it named the pattern and the list by their ids
-         (`heldAsked`). */
+      /* THE QUESTION IS SAID IN A PERSON'S WORDS, and since REC-A03 the reason is too. The reason is the inbox's; the
+         question is what Decide draws, and it named the pattern and the list by their ids (`heldAsked`). */
       /* A LOOKUP THE MESSAGE GAVE NO DIGITS FOR IS ONE QUESTION PER DOOR AND WHAT WAS MISSED, not one per payee: the
          person's answer is the same for every charge it holds (which account), so splitting it by shop asked it again for
          each shop. A miss that is not a lookup's joins by payee as it did. */
@@ -1221,7 +1224,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
         rows: [extracted],
         raw,
         ...(lookupMissed ? { joins: JSON.stringify(['door', doorOf, ...[...missed].sort()]) } : {}),
-        ...heldAsked(deps, wordsFor(deps, matched, register, arrival.channel), {
+        ...heldAsked(deps, words, {
           absent,
           invalid,
           soft,
@@ -1274,7 +1277,6 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
      * put the two side by side without parsing a sentence.
      */
     if (existing && conflict === 'review') {
-      const like = existing.seq === null ? existing.id : `${register}#${existing.seq}`;
       /**
        * A `near` KEY IS NOT "THE SAME" ON ITS DAY OR ITS PREFIX, and the sentence said it was. Every field `named` lists
        * went into one "with the same ..." clause, so the seed's own `SAME_MOVEMENT` key, on two alerts a day apart whose
@@ -1293,7 +1295,10 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
           ...(Array.isArray(dedupe) ? [] : [`${said(dedupe.near.day)} within a day of it`]),
           ...(!Array.isArray(dedupe) && dedupe.near.prefix ? [`${said(dedupe.near.prefix.field)} starting the same way`] : []),
         ]);
-      const reason = `This looks like ${like}, with ${listedIn((field) => fieldSaid(schema, field))}, so ${matched.ingest} held it for a person rather than skip it or file it twice.`;
+      /* THE ROW BY ITS TITLE AND THE PATTERN BY ITS NAME (REC-A03), where this said `transactions#1` and `bank-card`: the
+         row's id still rides in `resembles`, for a screen and not for a person. */
+      const title = rowTitle(deps.sql, register, existing.id);
+      const reason = `This looks like ${title ?? `one already in ${words.list}`}, with ${listedIn((field) => fieldSaid(schema, field))}, so ${patternSaid(deps, matched)} held it for a person rather than skip it or file it twice.`;
       store('review', reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'needs-review');
       const suggestion = openRowset(deps, at, {
@@ -1301,7 +1306,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
         register,
         rows: [extracted],
         resembles: existing.id,
-        ...nearAsked(words, rowTitle(deps.sql, register, existing.id), listedIn((field) => words.fields([field]))),
+        ...nearAsked(words, title, listedIn((field) => words.fields([field]))),
       });
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'review', wrote: [], reason, confidence: 'needs-review', suggestion });
     }
@@ -1323,19 +1328,21 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
        exist. It is the same answer the unreadable-field branch above gives, for the same reason, and
        it is what keeps the `write.refused` observation the write left behind. */
     if (!wrote.ok) {
-      const reason = `${register} refused what ${matched.ingest} read: ${fixOf(wrote)}`;
-      store('review', reason);
       /* THE FIELD THE LIST REFUSED IS SAID BY ITS LABEL, and the refusal's own sentence is not, because it names fields
-         and lists by their ids. */
+         and lists by their ids. The reason said it whole, "transactions refused what bank-card read: ..."; it is the
+         list and the pattern by their names now, and the part refused by its label where the list has that field. */
       const words = wordsFor(deps, matched, register, arrival.channel);
       const faulted = refused(wrote) && typeof wrote.refusal.at === 'string' ? wrote.refusal.at.replace(/^fields\./, '') : null;
+      const part = faulted !== null && Object.hasOwn(deps.schemaOf(register)?.fields ?? {}, faulted) ? words.fields([faulted]) : null;
+      const reason = `${opening(words.list)} would not take what ${patternSaid(deps, matched)} read from this one${part === null ? '' : `, because of its ${part}`}.`;
+      store('review', reason);
       const suggestion = openRowset(deps, at, {
         ingest: matched.ingest,
         register,
         rows: [extracted],
         question: fit(words, [(source, list) => `${list} would not take ${source} as read. Fix it and add it?`]),
         context:
-          faulted !== null && Object.hasOwn(deps.schemaOf(register)?.fields ?? {}, faulted) ? `The part it would not take is its ${words.fields([faulted])}.` : '',
+          part === null ? '' : `The part it would not take is its ${part}.`,
       });
       return ok<Arrived>({
         raw,
@@ -2997,6 +3004,34 @@ function wordsFor(deps: IngestDeps, matched: IngestDecl, register: string, chann
     list: renamed(register) ?? listName(deps.sql, register),
     fields: (ids) => listedAnd([...ids].sort((a, b) => place(a) - place(b)).map((id) => fieldSaid(schema, id, renamed(`${register}.${id}`)))),
   };
+}
+
+/**
+ * What a held reason calls the pattern that read the arrival (REC-A03): its own `description`, else its door's, else the
+ * title of the add-on that declared it, else its door's add-on, as `wordsFor` names where a question came from. With
+ * none of the four it is "the pattern", because its id is a word nobody chose for a person to read. Lower case as
+ * declared; a sentence that opens with it says it through `opening`.
+ */
+function patternSaid(deps: IngestDeps, matched: IngestDecl): string {
+  const door = matched.door === undefined ? undefined : deps.ingests().find((i) => i.ingest === matched.door);
+  return described(matched) ?? described(door) ?? packTitle(deps.sql, matched) ?? packTitle(deps.sql, door) ?? 'the pattern';
+}
+
+/**
+ * The fields a routing table sorts by, as a person reads them: each by its label on the first list the table files to,
+ * and a part of one by the field's label and the part's name, `amount.currency` as "amount's currency".
+ */
+function routeSaid(deps: IngestDeps, route: string | Route): string {
+  if (typeof route === 'string') return '';
+  const first = route.to[0]?.register;
+  const schema = first === undefined ? null : deps.schemaOf(first);
+  return listedAnd(
+    route.by.map((path) => {
+      const [field = path, ...part] = path.split('.');
+      const said = fieldSaid(schema, field);
+      return part.length === 0 ? said : `${said}'s ${part.join(' ').replace(/_/g, ' ')}`;
+    }),
+  );
 }
 
 /**

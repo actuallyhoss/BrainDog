@@ -58,16 +58,47 @@ export type Reply =
 const RPC = { invalid: -32600, method: -32601, params: -32602, internal: -32603, resource: -32002 } as const;
 
 const answer = (id: Id, result: unknown): Reply => ({ jsonrpc: '2.0', id, result });
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** Whether a revision is the stateless one or later, the first to put `resultType` on a result. Only a date is one. */
+const stateless = (version: string): boolean => DATE.test(version) && version >= VERSIONS[0];
+
 /**
- * A result of anything but `initialize`, which says it is whole.
+ * A result, which says it is whole when the revision it is answered under asks that.
  *
- * THE 2026-07-28 REVISION REQUIRES `resultType` ON EVERY RESULT, and this server answers `initialize` with that revision.
- * Only `server/discover` carried the field, so a client of the revision took the handshake, then refused `tools/list`,
- * `prompts/list` and both resource lists as invalid: Claude Code connected, read the instructions and exposed none of
- * the tools, on every session, while every test here spoke as a 2025-06-18 client and passed. A client of an earlier
- * revision reads past a field it does not know, as it already does `ttlMs` and `cacheScope`.
+ * THE 2026-07-28 REVISION REQUIRES `resultType` ON EVERY RESULT. Only `server/discover` carried the field, so a client
+ * of the revision took the handshake, then refused `tools/list`, `prompts/list` and both resource lists as invalid:
+ * Claude Code connected, read the instructions and exposed none of the tools, on every session.
+ *
+ * AND ONLY THAT REVISION GETS IT. A client of 2025-11-25 or earlier reads `ping` against a closed, empty result, so a
+ * key it does not know is a reply it may refuse; it is answered as its own revision draws a result, with nothing added.
  */
-const whole = (id: Id, result: Record<string, unknown>): Reply => answer(id, { resultType: 'complete', ...result });
+const whole = (id: Id, result: Record<string, unknown>, version: string): Reply =>
+  answer(id, stateless(version) ? { resultType: 'complete', ...result } : result);
+
+/**
+ * The revision a request is answered under: the one its own `_meta` names, as every request of the stateless revision
+ * does, else the one its transport knows (the HTTP header, or what `initialize` agreed on a stdio pipe), else the newest.
+ *
+ * THE NEWEST WHEN NOTHING SAYS, because a caller built before `version` was handed in passes nothing, and the client
+ * that broke without `resultType` was the newest one. HTTP always says: `serveMcp` hands the header, or 2025-03-26, the
+ * revision the specification tells a server to assume when a request carries no header.
+ */
+function revisionOf(params: Record<string, unknown>, version: string | undefined): string {
+  const meta = isObject(params._meta) ? params._meta : {};
+  const said = meta['io.modelcontextprotocol/protocolVersion'];
+  return typeof said === 'string' && DATE.test(said) ? said : (version ?? VERSIONS[0]);
+}
+
+/**
+ * The version an `initialize` reply agreed, or `null` for any other reply: what a stdio loop keeps, since a pipe sends
+ * no header and its later requests are answered under the revision the handshake chose.
+ */
+export function agreed(reply: Reply | null): string | null {
+  if (reply === null || !('result' in reply) || !isObject(reply.result)) return null;
+  const v = reply.result.protocolVersion;
+  return typeof v === 'string' && isObject(reply.result.serverInfo) ? v : null;
+}
 const fail: (id: Id | null, n: number, message: string, data?: unknown) => Reply = (id, code, message, data) => ({
   jsonrpc: '2.0',
   id,
@@ -156,7 +187,7 @@ const DECIDES_NOT = {
  * there are. A client that names no date is answered with the newest.
  */
 export function negotiate(asked: unknown): (typeof VERSIONS)[number] | null {
-  if (typeof asked !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(asked)) return VERSIONS[0];
+  if (typeof asked !== 'string' || !DATE.test(asked)) return VERSIONS[0];
   return VERSIONS.find((v) => v <= asked) ?? null;
 }
 
@@ -170,8 +201,17 @@ export function negotiate(asked: unknown): (typeof VERSIONS)[number] | null {
  * `origin` IS WHERE THE HOST SERVES THE APP, `https://brain.dog` or a self-host's own address, and only a host knows it:
  * the tools put it in front of a filed question's `decide` link and read it for nothing else. Left out, as a caller
  * built before it passes nothing, a filed question answers without the link.
+ *
+ * `version` IS THE REVISION THE TRANSPORT KNOWS this request speaks (`revisionOf`), and it decides only whether a
+ * result carries `resultType`. `initialize` is answered under the revision it negotiates, whatever is passed.
  */
-export async function handle<C>(message: unknown, surface: McpSurface<C>, ctx: C, origin?: string): Promise<Reply | null> {
+export async function handle<C>(
+  message: unknown,
+  surface: McpSurface<C>,
+  ctx: C,
+  origin?: string,
+  version?: string,
+): Promise<Reply | null> {
   if (Array.isArray(message)) return fail(null, RPC.invalid, 'Send one message at a time; a batch is not accepted.');
   if (!isObject(message)) return fail(null, RPC.invalid, 'A message is a JSON object.');
 
@@ -189,7 +229,7 @@ export async function handle<C>(message: unknown, surface: McpSurface<C>, ctx: C
   if (!isObject(params)) return fail(id, RPC.params, 'params is an object.');
 
   try {
-    return await dispatch(id, message.method, params, surface, ctx, origin);
+    return await dispatch(id, message.method, params, surface, ctx, origin, revisionOf(params, version));
   } catch (e) {
     const ref = crypto.randomUUID();
     console.error('mcp', ref, message.method, e);
@@ -204,8 +244,17 @@ async function dispatch<C>(
   surface: McpSurface<C>,
   ctx: C,
   origin: string | undefined,
+  version: string,
 ): Promise<Reply> {
   const mcp = tools(surface, origin);
+  const said = (result: Record<string, unknown>) => whole(id, result, version);
+  /* EVERY LIST IS ONE PAGE, AND SAYS SO BY CARRYING NO `nextCursor`. So a cursor is one this server never issued, which
+     the specification answers -32602; a client that sends one is never handed the whole list again as if it were the
+     next page. `null` is read as no cursor, as a missing key is. */
+  const paged = (p: Record<string, unknown>): Reply | null =>
+    p.cursor === undefined || p.cursor === null
+      ? null
+      : fail(id, RPC.params, 'This list is one page and issues no cursor. Ask again without one.', { cursor: p.cursor });
 
   switch (method) {
     case 'initialize': {
@@ -213,12 +262,14 @@ async function dispatch<C>(
       /* THE REVISION'S OWN ANSWER to a version the server cannot meet: -32602, naming what it speaks. */
       if (protocolVersion === null)
         return fail(id, RPC.params, 'Unsupported protocol version', { supported: [...VERSIONS], requested: params.protocolVersion });
-      return answer(id, { protocolVersion, capabilities: CAPABILITIES, serverInfo: SERVER, instructions: INSTRUCTIONS });
+      /* ANSWERED UNDER THE REVISION IT AGREES, so a client of the stateless one reads `resultType` here as on every other
+         result, and an older client's handshake carries nothing it does not know. */
+      return whole(id, { protocolVersion, capabilities: CAPABILITIES, serverInfo: SERVER, instructions: INSTRUCTIONS }, protocolVersion);
     }
 
     /* WHAT A 2026-07-28 CLIENT ASKS BEFORE ANYTHING ELSE, which that revision says every server answers:
        the versions, the capabilities, who this is and the instructions. The same for every caller, so
-       any cache may keep it. */
+       any cache may keep it. Only that revision has the method, so it is always answered as that revision. */
     case 'server/discover':
       return whole(id, {
         supportedVersions: [...VERSIONS],
@@ -227,16 +278,17 @@ async function dispatch<C>(
         instructions: INSTRUCTIONS,
         ttlMs: HOUR,
         cacheScope: 'public',
-      });
+      }, VERSIONS[0]);
 
+    /* `{}` FOR AN OLDER CLIENT, which reads a ping's answer as an empty result and nothing else. */
     case 'ping':
-      return whole(id, {});
+      return said({});
 
     /* THE INSTRUCTIONS ARE NOT SENT AGAIN HERE. They went out in `initialize`, or in `server/discover` for a client of the
        stateless revision, and a session that asked for both carried the whole text twice; Claude Code puts the
        instructions in every session's system prompt on its own. Once a connection is the specification's place for them. */
     case 'tools/list':
-      return whole(id, { tools: TOOLS.map(listedTool), ttlMs: HOUR, cacheScope: 'private' });
+      return paged(params) ?? said({ tools: TOOLS.map(listedTool), ttlMs: HOUR, cacheScope: 'private' });
 
     case 'tools/call': {
       const args = params.arguments ?? {};
@@ -246,14 +298,16 @@ async function dispatch<C>(
       /* THE REVISION SENDS `inputResponses` ON A RETRY OF THE ORIGINAL REQUEST, and a client may put it in the request's
          params or among the tool's arguments, so both places are read. */
       if (params.name === 'propose' && (Object.hasOwn(params, 'inputResponses') || Object.hasOwn(args, 'inputResponses')))
-        return whole(id, render({ result: DECIDES_NOT, text: refusalBrief(DECIDES_NOT.refusal), structured: DECIDES_NOT.refusal }));
-      return whole(id, render(await mcp.answer(params.name, args, ctx)));
+        return said(render({ result: DECIDES_NOT, text: refusalBrief(DECIDES_NOT.refusal), structured: DECIDES_NOT.refusal }));
+      return said(render(await mcp.answer(params.name, args, ctx)));
     }
 
     /* A minute, not an hour: the list names pages, and a page appears when its row does. */
     case 'resources/list': {
+      const wrong = paged(params);
+      if (wrong) return wrong;
       const listing = await mcp.resources(ctx);
-      return whole(id, {
+      return said({
         resources: listing.map(({ uri, name, description }) => ({ uri, name, description, mimeType: JSON_TYPE })),
         ttlMs: MINUTE,
         cacheScope: 'private',
@@ -261,7 +315,7 @@ async function dispatch<C>(
     }
 
     case 'resources/templates/list':
-      return whole(id, { resourceTemplates: TEMPLATES.map((t) => ({ ...t, mimeType: JSON_TYPE })), ttlMs: HOUR, cacheScope: 'private' });
+      return paged(params) ?? said({ resourceTemplates: TEMPLATES.map((t) => ({ ...t, mimeType: JSON_TYPE })), ttlMs: HOUR, cacheScope: 'private' });
 
     case 'resources/read': {
       if (typeof params.uri !== 'string') return fail(id, RPC.params, 'resources/read needs a uri.');
@@ -270,7 +324,7 @@ async function dispatch<C>(
         return refused(r)
           ? fail(id, RPC.resource, r.refusal.fix, { refusal: r.refusal })
           : fail(id, RPC.resource, 'This resource did not answer. Read it again.');
-      return whole(id, {
+      return said({
         contents: [{ uri: params.uri, mimeType: JSON_TYPE, text: JSON.stringify(r.value ?? null) }],
         ttlMs: ttlOf(params.uri),
         cacheScope: 'private',
@@ -279,7 +333,7 @@ async function dispatch<C>(
 
     /* None yet. The skill and the instructions teach; a prompt library is a third thing to keep true. */
     case 'prompts/list':
-      return whole(id, { prompts: [], ttlMs: HOUR, cacheScope: 'private' });
+      return paged(params) ?? said({ prompts: [], ttlMs: HOUR, cacheScope: 'private' });
 
     default:
       return fail(id, RPC.method, `There is no method called ${method}.`, { allowed: METHODS });

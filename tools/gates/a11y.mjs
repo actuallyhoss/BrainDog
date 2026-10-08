@@ -52,18 +52,19 @@ import { answers, forward, forwards, startRecord, VARIANTS as RECORDS } from './
 import { routesOf } from './routes.mjs';
 
 /**
- * AND WHY THIS GATE DECLARES NO `needs`, WHICH IS THE QUESTION A READER OF `layout.mjs` ARRIVES
- * WITH. `52 §5.1` step 2 lets a gate name a prerequisite the runner checks, and `layout` names
+ * AND WHY THIS GATE NEEDS `builds` AND NOT `web-build`, WHICH IS THE QUESTION A READER OF `layout.mjs`
+ * ARRIVES WITH. `52 §5.1` step 2 lets a gate name a prerequisite the runner checks, and `layout` names
  * `web-build` because it skips on `apps/web/build` alone. This gate does not: `surfaces` below names
  * five builds, each skipped by name on its own, and a tree with the marketing site built and the
  * record app not still gets a real contrast audit of the shop window. A declaration of `web-build`
  * here would be the runner refusing a run that had something to measure, which is a worse failure
  * than the one step 2 exists to fix, because it is silent in the direction of measuring less.
  *
- * STEP 3 DOES NOT CHANGE THAT. `run.mjs` reads `mod.needs` off this module, finds nothing, and runs
- * the gate, which is the same answer it reached by finding no `export const needs` in the text. The
- * absence is the declaration here, and the paragraph above is the whole of its argument.
+ * `builds` IS NEVER REFUSED BY THE RUNNER (`NEEDS` in `run.mjs`), so the five-surface audit still runs
+ * whatever is built. The line only places the gate in `--built`, the job that builds, rather than in
+ * `--unbuilt`, where every surface would be absent and the gate would exit 3.
  */
+export const needs = ['builds'];
 
 /**
  * Addresses a surface names by hand that the derivation for its app does not yield.

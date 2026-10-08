@@ -8,7 +8,9 @@
  * asked a register named `[object Object]` to hold them.
  *
  * THE ORACLE IS `43 §9.5`'s TWO ROWS, copied out of the document, including the reason:
- * *`register` absent, `needs-review`, `reason = 'needs-review: route miss on kind, amount.currency'`*.
+ * *`register` absent, `needs-review`, `reason = 'needs-review: route miss on kind, amount.currency'`*. The reason a
+ * person reads says the same in words since REC-A03: the pattern by its name and each field the table sorts by as its
+ * label, "found nowhere to file one with this kind and amount's currency".
  */
 
 import { test } from 'node:test';
@@ -39,6 +41,7 @@ const reader = (writes: unknown) => ({
   kind: 'ingest' as const,
   body: {
     ingest: 'bank-sms',
+    description: 'Bank texts',
     channel: 'email',
     match: { all: [{ field: 'from', is: 'alerts@bank.example' }] },
     extract: {
@@ -94,15 +97,15 @@ test('AND A MISS IS A ROW SOMEBODY LOOKS AT, not a row guessed into the nearest 
   /* `§9.5`, verbatim: *`register` absent, `needs-review`, `reason = 'needs-review: route miss on
      kind, amount.currency'`*. Guessing here is the failure the table exists to prevent: a credit
      filed as a debit is a number that is right and a sign that is wrong, and no later check catches
-     it because both rows look ordinary. */
+     it because both rows look ordinary. The miss is said in words, with no field path and no pattern id. */
   const missed = await lands(ROUTE, M1('EGP', 'credited'));
   assert.equal(missed.state, 'review');
-  assert.match(missed.reason, /route miss on kind, amount\.currency/);
+  assert.equal(missed.reason, "Bank texts read this one and found nowhere to file one with this kind and amount's currency.");
   assert.equal(missed.egp, 0);
   assert.equal(missed.usd, 0);
 
   /* AND THE SAME WHEN THE CURRENCY IS THE HALF THAT MISSES. */
   const other = await lands(ROUTE, M1('KWD'));
   assert.equal(other.state, 'review');
-  assert.match(other.reason, /route miss on kind, amount\.currency/);
+  assert.match(other.reason, /found nowhere to file one with this kind and amount's currency\.$/);
 });

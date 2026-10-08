@@ -11,12 +11,12 @@ ponytail.
 
 ## 1 · Purpose and boundary
 
-**What it does.** One pure function carries everything. `handle(message, surface, ctx)` in `src/rpc.ts` takes one
-parsed JSON-RPC 2.0 message and returns one reply, or `null` for a notification, which is never answered and never
-runs anything. It answers `initialize` with the instructions and a negotiated protocol version; `server/discover` with the
-versions, the capabilities and the instructions; `ping`; `tools/list`
-with the tools and the instructions again; `tools/call`; `resources/list`, `resources/templates/list` and
-`resources/read`; and `prompts/list`, which is empty for now. The tools and resources are `tools(surface)` in
+**What it does.** One pure function carries everything. `handle(message, surface, ctx, origin?, version?)` in
+`src/rpc.ts` takes one parsed JSON-RPC 2.0 message and returns one reply, or `null` for a notification, which is never
+answered and never runs anything. It answers `initialize` with the instructions and a negotiated protocol version;
+`server/discover` with the versions, the capabilities and the instructions; `ping`; `tools/list` with the tools, and
+not the instructions again (they went out once, at the handshake); `tools/call`; `resources/list`,
+`resources/templates/list` and `resources/read`; and `prompts/list`, which is empty for now. The tools and resources are `tools(surface)` in
 `src/index.ts`, over `McpSurface<C>`, a structural type naming only the record methods the tools call. A `Result`
 becomes an MCP result: a value as its JSON, a refusal as an error result carrying the refusal, a conflict as
 `VERSION_STALE` with the current row and the other actor (§4.3). Nothing is remembered between messages (10 §1),
@@ -93,6 +93,7 @@ export type McpSurface<C> = {
   dryRun?(args: { rule: Record<string, unknown>; limit?: number }, ctx: C): Answer;   // a rule change's preview, §4.4
   scriptTry?(args: { body: Record<string, unknown>; input?: unknown }, ctx: C): Answer;   // propose with "try", §4.4
   inbox?(args: { state?: string }, ctx: C): Answer;              // braindog:inbox and inbox/{state}
+  inboxPatterns?(args: { days?: number }, ctx: C): Answer;      // braindog:inbox/patterns
   figures?(ctx: C): Answer<{ id: string; name?: string }[]>;     // every declared figure, §4.4; no host answers it yet
 };
 
@@ -236,15 +237,24 @@ itself. In order:
 |---|---|---|
 | `-32600` | steps 1, 2, 3 and 5 | a sentence saying what a message is |
 | `-32601` | step 8 | `There is no method called <m>.`, then `{ allowed }` |
-| `-32602` | step 7; `tools/call` with no `name`, or with `arguments` that is not an object; `resources/read` with no `uri`; `initialize` naming a version older than every one in `VERSIONS` | a sentence, then `{ allowed }` for a missing tool name, or `{ supported, requested }` for the version |
+| `-32602` | step 7; `tools/call` with no `name`, or with `arguments` that is not an object; `resources/read` with no `uri`; `initialize` naming a version older than every one in `VERSIONS`; any list sent a `cursor` (§5.5) | a sentence, then `{ allowed }` for a missing tool name, `{ supported, requested }` for the version, or `{ cursor }` |
 | `-32603` | step 9 | `internal`, then `{ ref }` |
 | `-32002` | `resources/read` of an address that is not there, or that the record refuses | the refusal's sentence, then `{ refusal }` |
 
-**Versions.** `initialize` echoes `params.protocolVersion` when it is one of `VERSIONS` (`2026-07-28`, `2025-06-18`,
-`2025-03-26`). A date it does not know is answered with the newest of `VERSIONS` at or below it, because a client
-cannot speak a revision written after its own: `2025-11-25` gets `2025-06-18`. A date older than all three is `-32602`,
-`Unsupported protocol version`, with `{ supported, requested }`, and a request naming no date gets the newest. This
-is `negotiate`.
+**Versions.** `initialize` echoes `params.protocolVersion` when it is one of `VERSIONS` (`2026-07-28`, `2025-11-25`,
+`2025-06-18`, `2025-03-26`). A date it does not know is answered with the newest of `VERSIONS` at or below it, because
+a client cannot speak a revision written after its own: `2025-09-01` gets `2025-06-18`. A date older than all four is
+`-32602`, `Unsupported protocol version`, with `{ supported, requested }`, and a request naming no date gets the
+newest. This is `negotiate`.
+
+**The revision a result is drawn for.** Only `2026-07-28` and later put `resultType: 'complete'` on a result, and only a
+request answered under one of them gets it. A client of `2025-11-25` or earlier checks a `ping` answer against a closed,
+empty result, so it is answered `{}`, and no other result of its carries the key either. The revision is, in order:
+what the request's own `_meta['io.modelcontextprotocol/protocolVersion']` names; else `version`, which the transport
+passes (`serveMcp` hands the `MCP-Protocol-Version` header, or `2025-03-26` when there is none, as the specification
+says to assume; a stdio loop hands what its `initialize` agreed, read off the reply with `agreed`); else the newest.
+`initialize` is answered under the revision it negotiates, and `server/discover`, which only the newest has, always
+under the newest.
 
 **`server/discover`**, which the 2026-07-28 revision says every server answers, returns the versions, the
 capabilities, who this is and the instructions, the same for every caller (§4.3). It reads nothing from the record.
@@ -276,6 +286,7 @@ its own rows and derives the actor (30 §3), from a token's hints only.
 type Text = { type: 'text'; text: string };      // text is compact JSON, never pretty-printed
 
 type InitializeResult = {
+  resultType?: 'complete';                        // when protocolVersion is 2026-07-28; absent for an older one
   protocolVersion: (typeof VERSIONS)[number];
   capabilities: { tools: {}; resources: {}; prompts: {} };
   serverInfo: { name: 'braindog'; version: string };
@@ -290,8 +301,7 @@ type DiscoverResult = {
   ttlMs: 3_600_000; cacheScope: 'public';         // the same answer for every caller
 };
 type ToolsListResult = {
-  tools: { name: string; description: string; inputSchema: object; annotations?: { readOnlyHint: true } }[];
-  instructions: string;                           // INSTRUCTIONS, every time
+  tools: { name: string; title: string; description: string; inputSchema: object; annotations: object }[];
   ttlMs: 3_600_000; cacheScope: 'private';        // anything a record answers is private: 10 §4 rule 3
 };
 type CallToolResult =
@@ -304,6 +314,10 @@ type ListTemplatesResult = { resourceTemplates: { uriTemplate: string; name: str
 type ReadResourceResult  = { contents: [{ uri: string; mimeType: 'application/json'; text: string }]; ttlMs: number; cacheScope: 'private' };   // ttlOf(uri)
 type ListPromptsResult   = { prompts: []; ttlMs: 3_600_000; cacheScope: 'private' };
 ```
+
+Every result above also carries `resultType: 'complete'` when it is answered under `2026-07-28` (§3, the revision a
+result is drawn for), and none under an older revision; `ping` is `{}` there. No list carries `nextCursor`: each is one
+page (§5.5).
 
 Invariants. An `ok` result has one content block, `JSON.stringify` of the value, and no `structuredContent`, because
 nothing consumes it and it would double the bytes. A refusal's text is the refusal itself,
@@ -509,8 +523,9 @@ Ten lines, 264 words, 1,437 bytes, **400 tokens** by `tokenBudget`, which is the
 because the calibration of §9 is not built. It carries the rules every tool would otherwise repeat: call `context`
 first, and read the Home page for what leads; minor units, shifted by the currency's own decimals; re-read on `VERSION_STALE`; never decide, propose; never a
 credential, and how to deposit one; the handoff and `tried`; when a learning is worth recording; `meet`; the refusal
-teaches; read on a phone. It is returned in `initialize`, in `server/discover`, and again with every `tools/list`,
-because a client that skipped the first still reads the others.
+teaches; read on a phone. It is returned in `initialize` and in `server/discover`, and not again with `tools/list`:
+a session that asked for both carried the whole text twice, and a client puts the instructions in every session's
+system prompt on its own.
 
 ### 4.7 · Resources
 
@@ -687,7 +702,14 @@ drops its cursor.
    name, for every skill that is not retired, when `boot` lists `skills`. No `declaration/<slug>` or
    `automation/<id>` is listed one by one; they are reached through their templates. Each carries
    `mimeType: 'application/json'`, and the list carries `ttlMs: 60_000` and `cacheScope: 'private'`. Listing costs a
-   read of each fixed resource, page and figure, which is the price of never advertising a refusal.
+   read of each fixed resource, page and figure, which is the price of never advertising a refusal. The fixed
+   resources and the pages are read eight at a time and listed in the order given, however the reads finish
+   (`pooled`); a read that throws fails the whole listing, which the wire answers `-32603`.
+
+   **One page.** The list is answered whole and carries no `nextCursor`, so no cursor is ever issued. A request that
+   sends `params.cursor` (anything but a missing key or `null`) is `-32602`, *This list is one page and issues no
+   cursor*, with `{ cursor }`, and reads nothing; it is never handed the whole list again as though it were the next
+   page. `tools/list`, `resources/templates/list` and `prompts/list` are one page by the same rule.
 2. `resources/templates/list`: the six `TEMPLATES`, `braindog:schema/{register}`, `braindog:page/{slug}`,
    `braindog:metric/{id}`, `braindog:skill/{name}`, `braindog:declaration/{slug}` and `braindog:automation/{id}`, each
    with `mimeType: 'application/json'`, and `ttlMs: 3_600_000` and `cacheScope: 'private'`. It reads nothing.
@@ -723,8 +745,9 @@ What an install does change is read, never pushed:
 
 **Off, behind `const MRTR = false` in `rpc.ts`.** `rpc.ts` renders `propose` as it renders every tool (§5.4): the
 record's answer as JSON, carrying the suggestion's id, its `decide` link when the host handed an origin (§4.4), and
-`dry_run` or `script_try` when §4.4 adds one. Every result but `initialize` carries `resultType: 'complete'`, which the
-2026-07-28 revision requires and a client of it refuses a list without. The input-required shape is answered only
+`dry_run` or `script_try` when §4.4 adds one. Every result answered under the 2026-07-28 revision, `initialize`
+included, carries `resultType: 'complete'`, which that revision requires and a client of it refuses a list without; a
+result answered under an older revision carries none (§3). The input-required shape is answered only
 to a request whose `_meta` carries the client capability the 2026-07-28 revision names for it, and that name could not
 be confirmed from the specification's own text, which this repository does not hold; the `requests` of kind
 `decision` below are this project's design, not a kind the revision is known to name. So the shape stays off and the

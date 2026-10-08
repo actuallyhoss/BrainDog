@@ -16,9 +16,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 import { bodyOf, docOf, type Doc } from '../src/lib/docs/pages.ts';
 import { parse } from '../../../packages/render/src/parse.ts';
+import { BUILD, missing, when } from './built.ts';
 
 const ROOT = new URL('../src/docs/', import.meta.url);
-const BUILD = new URL('../build/', import.meta.url);
 const LLMS = new URL('llms.txt', BUILD);
 
 /** Every `.md` under `src/docs/`, as the glob in `lib/docs/index.ts` keys it: `/src/docs/01-start/01-welcome.md`. */
@@ -30,13 +30,7 @@ const files: [string, string][] = existsSync(ROOT)
       .map((rel): [string, string] => [`/src/docs/${rel}`, readFileSync(new URL(rel, ROOT), 'utf8')])
   : [];
 
-const NO_BUILD = existsSync(LLMS)
-  ? null
-  : 'apps/site/build/llms.txt is missing. Run "pnpm --filter @braindog/site build" first: this check reads the list ' +
-    'an agent is served, and a check with nothing to read is a pass that means nothing.';
-
-/** `{ skip: reason }` or nothing, because `exactOptionalPropertyTypes` refuses `{ skip: undefined }`. */
-const when = (reason: string | null): { skip: string } | Record<string, never> => (reason ? { skip: reason } : {});
+const NO_BUILD = missing(['llms.txt'], 'this check reads the list an agent is served');
 
 /** Every file as a page, or the sentence `docOf` stops the build with. */
 const read = (): { docs: Doc[]; broken: string[] } => {

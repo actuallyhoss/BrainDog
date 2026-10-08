@@ -662,12 +662,18 @@ export async function workedIn(here: Position, moved: readonly MovedRepo[]): Pro
 }
 
 /**
- * SessionEnd: the people met in this session's commits, then the run goes idle, with the branch and
- * commit it stopped at.
+ * SessionEnd: the people met in this session's commits, then the run ends, with the branch and commit it
+ * stopped at.
  *
- * IDLE, NEVER DONE. A terminal closing is not the work finishing, and a crashed session never says it
- * stopped, so only a person or the agent itself marks a run done. A run already handed off, done or
- * abandoned has no declared move to idle, so the record refuses this and the run stays as it was.
+ * `end`, AND THE RECORD PICKS THE STATE (AGT-C04). This hook used to write `idle`, and the twelve-hour sweep takes an
+ * idle run as abandoned, so about 740 of the owner's 752 runs that closed normally read Abandoned the next day. Now it
+ * sends no state at all: a run that left a fresh next step waits as a handoff, and any other is done, its helpers with
+ * it. A crashed session still never says it stopped, and the sweep still takes that one. Ending a run that already
+ * ended changes nothing, so a hook that fires twice writes one end.
+ *
+ * AN OLDER HOST HAS NO `end`, and answers that it has no such method (`ROUTE_UNKNOWN`, or `NOT_IN_THIS_BUILD` from a
+ * host whose record is older than its routes). Only then does the hook write `idle` as it always did, so a self-host
+ * not yet updated keeps the run it had. A host that did not answer is not asked twice: the budget is spent.
  */
 export async function hookEnd(io: Io): Promise<void> {
   const event = eventOf(io.stdin, io.cwd);
@@ -678,7 +684,7 @@ export async function hookEnd(io: Io): Promise<void> {
   const file = own !== null && id !== null ? sessionPath(io.env, event.cwd, id) : sessionPath(io.env, event.cwd);
   const held = own ?? readSession(file);
   if (!held || held.host !== to.key) return;
-  /* Another session in this folder wrote the folder's file since, so the run in it is not this session's to idle. */
+  /* Another session in this folder wrote the folder's file since, so the run in it is not this session's to end. */
   if (event.client_id !== undefined && held.client_id !== undefined && event.client_id !== held.client_id) return;
   /* WHEN THE SESSION WAS LAST HEARD FROM, so a resume soon after knows its card is still in the conversation. Written
      before anything is sent, so a host that is slow to answer cannot cost it. The folder's file too, while it still
@@ -700,14 +706,15 @@ export async function hookEnd(io: Io): Promise<void> {
   /* One client and one deadline for both, so the hook's whole budget is one number. */
   const run = { spoken: held.spoken, client_id: event.client_id ?? held.client_id };
   const client = clientFor(to, async () => sessionHeaders(at, 'claude', run, { env: io.env }), AbortSignal.timeout(budget));
-  /* THE HARVEST GOES FIRST, AND STOPS SENDING AT HALF THE BUDGET. A write brings an idle run back to
-     active, so people met after the handoff would undo it; and the handoff, which is what this hook is
-     for, keeps time to land. */
+  /* THE HARVEST GOES FIRST, AND STOPS SENDING AT HALF THE BUDGET. A write brings a run that waits as a
+     handoff back to active, so people met after the end would undo it; and the end, which is what this
+     hook is for, keeps time to land. */
   const until = Date.now() + budget / 2;
   if (moved.length > 0) await harvest(moved, client, (args) => client.call('meet', args), until);
-  await client.handoff({
-    state: 'idle',
-    ...(at.branch === null ? {} : { branch: at.branch }),
-    ...(at.head === null ? {} : { head: at.head }),
-  });
+  const where = { ...(at.branch === null ? {} : { branch: at.branch }), ...(at.head === null ? {} : { head: at.head }) };
+  const ended = await client.call('end', where);
+  if (refused(ended) && OLDER_HOST.has(ended.refusal.code)) await client.handoff({ state: 'idle', ...where });
 }
+
+/** What a host with no `end` answers: no such method at all, or a route whose record is older than it. */
+const OLDER_HOST: ReadonlySet<string> = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD']);

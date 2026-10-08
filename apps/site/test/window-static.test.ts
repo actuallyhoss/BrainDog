@@ -26,18 +26,12 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 import { EXAMPLES } from '../src/lib/examples/index.ts';
+import { BUILD, missing, when } from './built.ts';
 
-const BUILD = new URL('../build/', import.meta.url);
 const INDEX = new URL('index.html', BUILD);
 const ASSETS = new URL('_app/immutable/assets/', BUILD);
 
-const NO_BUILD = existsSync(INDEX)
-  ? null
-  : 'apps/site/build/index.html is missing. Run "pnpm --filter @braindog/site build" first: ' +
-    'these checks read the served bytes, and a check with nothing to read is a pass that means nothing.';
-
-/** `{ skip: reason }` or nothing, because `exactOptionalPropertyTypes` refuses `{ skip: undefined }`. */
-const when = (reason: string | null): { skip: string } | Record<string, never> => (reason ? { skip: reason } : {});
+const NO_BUILD = missing(['index.html']);
 
 /* THE CASES ARE READ FROM THE EXAMPLES THE WINDOW DRAWS, by the id its tab and panel carry and the label its
    tab shows, so a case added or renamed there is a case this checks without an edit here. */

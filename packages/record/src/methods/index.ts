@@ -36,6 +36,8 @@ import { methods as pattern } from './pattern.ts';
 import { methods as personName } from './person-name.ts';
 import { methods as undo } from './undo.ts';
 import { methods as understand } from './understand.ts';
+import { methods as signs } from './signs.ts';
+import { methods as inboxPatterns } from './inbox-patterns.ts';
 /* END METHODS */
 
 /**
@@ -110,6 +112,8 @@ export function methods(deps: RecordDeps) {
     ...personName(deps),
     ...undo(deps),
     ...understand(deps),
+    ...signs(deps),
+    ...inboxPatterns(deps),
     /* END METHODS */
   };
 }

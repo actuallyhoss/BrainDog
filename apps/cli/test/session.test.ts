@@ -157,7 +157,7 @@ test('SHOW PRINTS THE RUN, ITS STATE, THE LAST HANDOFF AND WHO ELSE IS LIVE HERE
   assert.deepEqual(host.seen.map((s) => s.method), ['context']);
   assert.equal(host.seen[0]?.authorization, `Bearer ${TOKEN}`);
 
-  /* Open is not working: a run nobody has heard from in thirty minutes is said to have gone quiet. */
+  /* Open is not working: a run nobody has heard from in fifteen minutes is said to have gone quiet. */
   const quiet = await stub(t, { context: { ...CONTEXT, live: { same_repo: [{ ...LIVE_OTHER, quiet: true, age_s: 2_400 }, LIVE_SELF], elsewhere: [] } } });
   const later = setup(t, quiet.base);
   assert.equal(await session(['show'], later.io), 0, later.said.join('\n'));

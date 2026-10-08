@@ -142,6 +142,8 @@ test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS SIX OF THEM, which is th
 async function listedOver<C>(surface: McpSurface<C>, ctx: C): Promise<string[]> {
   const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'resources/list' }, surface, ctx)) as Reply;
   assert.ok('result' in reply, JSON.stringify(reply));
+  /* ONE PAGE, WHOLE: nothing here pages, so a listing that offered a next page would send a client to a refusal. */
+  assert.equal((reply.result as { nextCursor?: unknown }).nextCursor, undefined, 'resources/list offered a next page');
   return (reply.result as { resources: { uri: string }[] }).resources.map((r) => r.uri);
 }
 
@@ -159,6 +161,7 @@ test('AND THE RESOURCES GO THE SAME WAY, more quietly, which is the half of this
     'braindog:context',
     'braindog:sessions/live',
     'braindog:inbox',
+    'braindog:inbox/patterns',
     'braindog:actions',
     'braindog:automations',
     'braindog:arrangement',

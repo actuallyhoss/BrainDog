@@ -179,10 +179,15 @@
   }
 
   /* A LATE PART'S KEY IS STRIPED like every late mark (DIRECTION §42). Its arc or segment is an SVG shape, which a CSS
-     stripe cannot reach; the renderer's own pattern is what that needs. */
+     stripe cannot reach, so the renderer paints it with a `<pattern>` of its own (`lateId` in `src/html.ts`): the band
+     and its 30% ground are drawn in `currentColor`, and this is what makes that colour the late red. */
   .split-item[data-intent='bad'] > .split-dot,
   .ring-item[data-intent='bad'] > .ring-dot {
     background: var(--chart-late-hatch);
+  }
+
+  .late-hatch {
+    color: var(--chart-late);
   }
 
   /* A row with no part keeps its place in the legend, and its dot is an empty ring. */

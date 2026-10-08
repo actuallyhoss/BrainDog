@@ -36,7 +36,8 @@
 import type { Refusal, Sql } from '@braindog/ports';
 
 import { FORMAT_VERSION, execScript } from './migrate.ts';
-import { SEAT_SESSION } from './migrations/0026_session_started.ts';
+import { SEAT_SESSION } from './migrations/0028_runs.ts';
+import { SIGNS_KEY } from './signs.ts';
 import { RENAME_SLASH } from './migrations/0016_slash.ts';
 
 export type Section = 'header' | 'data' | 'origin' | 'governance' | 'local';
@@ -928,7 +929,8 @@ function notEmpty(sql: Sql, shapes: Map<string, TableShape>): string | null {
        a file into an empty record adopts the file's identity, which is the point; the seeded
        counters are likewise not content. `migration` is a fact about this database and never
        imported at all, and the two shadow tables are derived from `entry`. The kernel's own
-       declaration row is seed in the same way. */
+       declaration row is seed in the same way, and so is the vital signs' nightly row, armed as any record opens
+       (`armSigns` in `index.ts`), which the file's own schedule clears when it carries one. */
     if (shape.section === 'header' || SEEDED.has(name)) continue;
     const n = Number(
       sql.one<{ n: number }>(
@@ -936,7 +938,9 @@ function notEmpty(sql: Sql, shapes: Map<string, TableShape>): string | null {
           ? "SELECT count(*) AS n FROM counter WHERE next > 1 OR name NOT IN ('decision', 'suggestion')"
           : name === 'declaration'
             ? "SELECT count(*) AS n FROM declaration WHERE pack_id IS NOT 'kernel'"
-            : `SELECT count(*) AS n FROM ${name}`,
+            : name === 'schedule'
+              ? `SELECT count(*) AS n FROM schedule WHERE NOT (kind = 'snapshot' AND key = '${SIGNS_KEY}')`
+              : `SELECT count(*) AS n FROM ${name}`,
       )?.n ?? 0,
     );
     if (n > 0) found.push(`${n} ${name}`);

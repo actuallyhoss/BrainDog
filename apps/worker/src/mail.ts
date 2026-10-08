@@ -685,27 +685,48 @@ const codeOf = (e: unknown): string => {
 const SUPPRESSED = 'E_RECIPIENT_SUPPRESSED';
 
 /**
+ * A refusal about the one address and not this host: suppressed, a recipient the service will not take, or an address it
+ * would not parse. Counted as a host fault, a stranger could type five of them and have sign-in tell everyone mail is down.
+ */
+const ADDRESS_FAULT = /^E_(?:RECIPIENT_|VALIDATION)/u;
+
+/**
  * Send one kind of mail to one address. `true` when the binding took it, `false` for every other outcome, each of which
  * writes its `op: 'mail'` line with `ok: false` and why.
  *
  * ONE ADDRESS, ONE MESSAGE, ONE ATTEMPT: that is this call's whole ceiling. A retry is the caller's, on its own clock.
  */
 export async function sendMail(env: MailEnv, kind: MailKind, to: string, vars: MailVars = {}): Promise<boolean> {
+  return (await mailOutcome(env, kind, to, vars)) === 'sent';
+}
+
+/**
+ * How one send went: `sent`; `host`, a fault of this deployment's that every letter would meet (no binding, no sender,
+ * no link, the service refusing); or `address`, a fault of the one address (not an address, or suppressed).
+ *
+ * THE DIFFERENCE IS WHAT SIGN-IN MAY SAY (LCH-A04). A host fault says nothing about who has an account, so a run of them
+ * may be told on the sign-in screen as "mail is not going out". An address fault is about one person, and saying it
+ * would tell a stranger whether that mailbox is real, so it is never counted.
+ */
+export type MailOutcome = 'sent' | 'host' | 'address';
+
+/** `sendMail`, with the outcome kept apart. The same lines, the same one attempt, and never a throw. */
+export async function mailOutcome(env: MailEnv, kind: MailKind, to: string, vars: MailVars = {}): Promise<MailOutcome> {
   try {
     const binding = bindingOf(env.EMAIL);
     const from = (SIGN_IN_KINDS.has(kind) ? env.AUTH_MAIL_FROM : env.MAIL_FROM || env.AUTH_MAIL_FROM)?.trim() ?? '';
     if (binding === null || from === '') {
       op({ op: 'mail', kind, ok: false, why: binding === null ? 'no-binding' : 'no-sender' }, 'error');
-      return false;
+      return 'host';
     }
     const address = to.trim();
     if (!/^[^\s@]+@[^\s@]+$/u.test(address)) {
       op({ op: 'mail', kind, ok: false, why: 'address' }, 'error');
-      return false;
+      return 'address';
     }
     if (NEEDS_LINK.has(kind) && flat(vars.link) === '') {
       op({ op: 'mail', kind, ok: false, why: 'no-link' }, 'error');
-      return false;
+      return 'host';
     }
     const letter = letterOf(kind, { ...vars, support: vars.support ?? env.SUPPORT_ADDRESS });
     try {
@@ -713,29 +734,45 @@ export async function sendMail(env: MailEnv, kind: MailKind, to: string, vars: M
     } catch (e) {
       const code = codeOf(e);
       op({ op: 'mail', kind, ok: false, why: 'refused', code, permanent: code === SUPPRESSED }, 'error');
-      return false;
+      return ADDRESS_FAULT.test(code) ? 'address' : 'host';
     }
     op({ op: 'mail', kind, ok: true });
-    return true;
+    return 'sent';
   } catch {
-    /* A FAULT IN THIS MODULE, OR IN THE LOG ITSELF, IS STILL A `false` AND NEVER A THROW: the caller's answer has gone,
+    /* A FAULT IN THIS MODULE, OR IN THE LOG ITSELF, IS STILL AN ANSWER AND NEVER A THROW: the caller's answer has gone,
        or its walk has other records to reach. */
-    return false;
+    return 'host';
   }
 }
 
-/** The two lines that mail the operator, and nothing else: every other alert is read the next morning. */
-export type OpsKind = 'crash' | 'refuse';
+/**
+ * The letters a person waits on at the sign-in and sign-up screens, whose outcomes the Directory counts
+ * (`Directory$.letterSent`). Not the passkey notices, which nobody is waiting for.
+ */
+const WAITED_ON: ReadonlySet<MailKind> = new Set<MailKind>(['signin', 'signup.verify', 'signup.known', 'invite.prove']);
+export const isWaitedOn = (kind: MailKind): boolean => WAITED_ON.has(kind);
+
+/**
+ * The lines that mail the operator, and nothing else: every other alert is read the next morning. `model` is a model
+ * that did not answer (ENG-A01), `night` a nightly walk with a failure or a Directory copy not written (LCH-C01).
+ */
+export type OpsKind = 'crash' | 'refuse' | 'model' | 'night';
 
 /** Where each one sends whoever reads it, as DEPLOYMENT.md's "## Alerts" table says it. */
 const RUNBOOK: Record<OpsKind, string> = {
   crash:
     'find the ref the person was shown, read where and error in Workers Logs; if it started with a deploy, DEPLOYMENT.md "Rolling back"; more than one door, 53 §5.11',
   refuse: '53 §5.3 (docs/53-SPEC-OPERATIONS.md)',
+  model:
+    'read raw on the op: model line in Workers Logs; a message that names the model means the route table (MODELS in apps/worker/src/inference.ts), one that names the account or the gateway means the provider\'s console',
+  night: '53 §5.4 (docs/53-SPEC-OPERATIONS.md): read the op: walk lines with ok false from the same night in Workers Logs',
 };
 
-/** The fields a mail repeats from its line: ids and codes. `error` stays in the log, where it is scrubbed and cut. */
-const OPS_FIELDS = ['ref', 'where', 'rec', 'code'] as const;
+/**
+ * The fields a mail repeats from its line: ids, codes, a model's name and the night's counts. `error` and `raw` stay in
+ * the log, where they are scrubbed and cut: a provider's message can quote what it was sent.
+ */
+const OPS_FIELDS = ['ref', 'where', 'rec', 'code', 'model', 'why', 'records', 'backups', 'backups_failed', 'directory'] as const;
 
 /** One mail per kind in this long, however many lines a burst writes. */
 export const OPS_QUIET_MS = 15 * 60 * 1000;
@@ -747,7 +784,7 @@ const opsSent = new Map<OpsKind, number>();
 export type OpsEnv = MailEnv & { OPS_ALERT_TO?: string | undefined; BRAINDOG_BUILD?: string | undefined };
 
 /**
- * Mail the operator that a `crash` or `refuse` line was written. `true` when one went out.
+ * Mail the operator that a `crash`, `refuse`, `model` or `night` line was written. `true` when one went out.
  *
  * CLOUDFLARE CANNOT MAIL ON A LOG LINE FOR THIS ACCOUNT, so the Worker does: Observability alerts are not offered and the
  * zone's plan has no Health Checks. `OPS_ALERT_TO` unset is off.

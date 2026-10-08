@@ -443,7 +443,7 @@ test('sessionsLive DERIVES stale, quiet, age_s, ran_s AND same_repo, leaves fini
   assert.deepEqual(runs(sql), [1, 2, 3], 'reading who is live opened a run');
   assert.equal(value<LiveRun[]>(await api.sessionsLive({}, owner)).every((r) => r.same_repo === false), true);
 
-  /* Quiet is thirty minutes, before the ladder's forty-five: told first, guessed past later. */
+  /* Quiet is fifteen minutes, before the ladder's forty-five: told first, guessed past later. */
   clock.advance(31 * MIN);
   const later = value<LiveRun[]>(await api.sessionsLive({}, owner)).find((r) => r.spoken === 'S2');
   assert.deepEqual([later?.state, later?.quiet, later?.stale, later?.ran_s], ['active', true, false, 0]);
@@ -516,7 +516,8 @@ test('WHAT CHANGED LEAVES OUT THE RECORDâ€™S BOOKKEEPING: the sweep and a toolâ€
     "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('01J00000000000000000000001', ?, 'purge', 'sweep', '{}', 'pending', 0)",
     iso(clock.now()),
   );
-  assert.equal((await api.kernel.drain()).done, 1);
+  /* THE SIGNS' NIGHT MAY RUN BESIDE THE SWEEP, so at least the one. */
+  assert.ok((await api.kernel.drain()).done >= 1);
   assert.equal((await run(api, 'S1')).state, 'abandoned');
 
   const quiet = (line: EventLine): boolean => (line.actor === 'system' && line.kind === 'state') || line.field === 'seen';

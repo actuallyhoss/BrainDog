@@ -290,7 +290,7 @@ test('A NEAR MATCH ASKS BY THE TITLE OF THE ROW IT LOOKS LIKE, cut short rather 
   const { k, sql } = await record(CARD({ on_conflict: 'review' }));
   assert.equal(arrive(k, said('Halden Coffee', '6518'), 'n1').state, 'matched');
   const near = arrive(k, said('Halden Coffee', '6518').replace('today', 'this morning'), 'n2');
-  assert.equal(near.reason, 'This looks like transactions#1, with the same merchant and amount, so bank-card-used held it for a person rather than skip it or file it twice.');
+  assert.equal(near.reason, 'This looks like Halden Coffee, with the same merchant and amount, so the pattern held it for a person rather than skip it or file it twice.');
   const n = asked(k, sql, near);
   assert.equal(n.question, 'Add this email to Transactions as a second one? It looks like Halden Coffee.');
   assert.equal(n.context, 'Compared with Halden Coffee, it has the same merchant and amount. Say no if it is that one.');

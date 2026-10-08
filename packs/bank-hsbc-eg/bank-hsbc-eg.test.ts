@@ -603,9 +603,13 @@ test('THE FIVE SPELLINGS FOLD TO ONE PAYEE KEY, and Talabat\'s two to another', 
  * eight stars, which only the record's literal rule reads, and a figure with no currency of the pattern's own is read in
  * the account's, which the kernel resolves; so on a bare kernel the account and the amount may be unread beside the day.
  * What a claim test holds is the claim, and that nothing it names is a field the line plainly gives a bare kernel.
+ *
+ * THE REASON SAYS THE ADD-ON BY ITS TITLE AND THE FIELDS BY THEIR LABELS (REC-A03), so it is read back as those: which
+ * pattern claimed the line is `Arrived.ingest`'s to say, and the sentence carries no id. An install that kept no title
+ * on the add-on's row (`normalise` in `packages/declare` drops `title` today) says "The pattern", and never the id.
  */
-const unreadIn = (reason: string | null | undefined, ingest: string): string[] | null =>
-  new RegExp(`^${ingest} could not read (.+) out of this one\\.$`, 'u').exec(reason ?? '')?.[1]?.split(', ') ?? null;
+const unreadIn = (reason: string | null | undefined): string[] | null =>
+  /^(?:HSBC Egypt alerts|The pattern) could not read (.+) out of this one\.$/u.exec(reason ?? '')?.[1]?.split(/, | and /u) ?? null;
 
 test('AN INSTAPAY TRANSFER IS CLAIMED BY ITS OWN PATTERN IN EACH DIRECTION, and a bare kernel stops at the date it cannot read', async () => {
   const { k, sql } = await bare();
@@ -618,9 +622,9 @@ test('AN INSTAPAY TRANSFER IS CLAIMED BY ITS OWN PATTERN IN EACH DIRECTION, and 
     const out = mail(k, body, sha);
     assert.equal(out.ingest, ingest, `${sha} was claimed by ${out.ingest}`);
     assert.equal(out.state, 'review', `${sha}: ${out.reason}`);
-    const unread = unreadIn(out.reason, ingest);
-    assert.ok(unread?.includes('on'), `${sha} read the day a bare kernel cannot: ${out.reason}`);
-    for (const field of unread!) assert.ok(['account', 'amount', 'on'].includes(field), `${sha} could not read ${field}, which the line gives: ${out.reason}`);
+    const unread = unreadIn(out.reason);
+    assert.ok(unread?.includes('date'), `${sha} read the day a bare kernel cannot: ${out.reason}`);
+    for (const field of unread!) assert.ok(['account', 'amount', 'date'].includes(field), `${sha} could not read ${field}, which the line gives: ${out.reason}`);
   }
   assert.equal(k.count('transactions'), before, 'a transfer with no date wrote a row');
   sql.close();
@@ -632,10 +636,10 @@ test('THE `From HSBC:` LINE IS CLAIMED BY ITS SIGN: a glued `-` is the debit, a 
   const debit = mail(k, FROM_OUT, 'from-out');
   assert.deepEqual([debit.ingest, debit.state], ['bank-from-out', 'review'], debit.reason);
   const claimed = (reason: string | null | undefined, ingest: string): void => {
-    const unread = unreadIn(reason, ingest);
+    const unread = unreadIn(reason);
     /* THE SECOND FIGURE AND THE `16AUG26` DAY ARE THE TWO A BARE KERNEL CANNOT READ, and the rest follow the account. */
-    assert.ok(unread?.includes('amount') && unread.includes('on'), `${ingest} read what a bare kernel cannot: ${reason}`);
-    for (const field of unread!) assert.ok(['account', 'amount', 'balance_after', 'on'].includes(field), `${ingest} could not read ${field}, which the line gives: ${reason}`);
+    assert.ok(unread?.includes('amount') && unread.includes('date'), `${ingest} read what a bare kernel cannot: ${reason}`);
+    for (const field of unread!) assert.ok(['account', 'amount', 'balance after', 'date'].includes(field), `${ingest} could not read ${field}, which the line gives: ${reason}`);
   };
   claimed(debit.reason, 'bank-from-out');
   const credit = mail(k, FROM_PLUS, 'from-plus');

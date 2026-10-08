@@ -8,7 +8,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { handle, METHODS, VERSIONS, type Reply } from '../src/rpc.ts';
+import { agreed, handle, METHODS, VERSIONS, type Reply } from '../src/rpc.ts';
+import { serveMcp } from '../src/http.ts';
 import { INSTRUCTIONS } from '../src/instructions.ts';
 import { TOOLS } from '../src/index.ts';
 import { stub, type Ctx } from './stub.ts';
@@ -45,8 +46,16 @@ test('initialize hands over the instructions and a version both sides speak', as
     assert.equal(r.protocolVersion, asked, 'a supported version is not echoed');
     assert.equal(r.instructions, INSTRUCTIONS);
     assert.equal(r.serverInfo.name, 'braindog');
+    /* THE HANDSHAKE IS ANSWERED UNDER THE REVISION IT AGREES: whole for the stateless one, as its every result is, and
+       with nothing an older client's closed result does not know. */
+    assert.equal((r as { resultType?: string }).resultType, asked === VERSIONS[0] ? 'complete' : undefined, asked);
   }
   assert.equal(result<{ protocolVersion: string }>(await handle(req('initialize', {}), surface, ctx)).protocolVersion, '2026-07-28');
+  /* A transport that says the request is older does not take `resultType` off a handshake that agrees the newest. */
+  assert.equal(
+    result<{ resultType?: string }>(await handle(req('initialize', { protocolVersion: VERSIONS[0] }), surface, ctx, undefined, '2025-06-18')).resultType,
+    'complete',
+  );
   assert.equal(calls.length, 0, 'initialize read the record');
 });
 
@@ -94,11 +103,55 @@ test('ping answers, and prompts are an empty list for now', async () => {
   assert.deepEqual(result(await handle(req('prompts/list'), surface, ctx)), { resultType: 'complete', prompts: [], ttlMs: 3_600_000, cacheScope: 'private' });
 });
 
-test('EVERY RESULT BUT initialize SAYS IT IS WHOLE, because a 2026-07-28 client refuses a list that does not', async () => {
+test('AN OLDER CLIENT IS ANSWERED A BARE {} TO A PING, because its revision reads that answer as a closed, empty result', async () => {
+  /* `resultType` went on every result for every client, and a 2025-06-18 or 2025-11-25 client that checks a ping's
+     answer against the empty result its revision draws may refuse a key it does not know. */
+  const { surface } = stub();
+  for (const older of VERSIONS.slice(1)) {
+    assert.deepEqual(result(await handle(req('ping'), surface, ctx, undefined, older)), {}, `${older} ping`);
+    const listed = result<Record<string, unknown>>(await handle(req('tools/list'), surface, ctx, undefined, older));
+    assert.equal(listed.resultType, undefined, `${older} tools/list`);
+    assert.ok(Array.isArray(listed.tools));
+  }
+  assert.deepEqual(result(await handle(req('ping'), surface, ctx, undefined, VERSIONS[0])), { resultType: 'complete' });
+  /* THE REQUEST'S OWN WORD WINS over the transport's, since a stateless client names its revision on every request. */
+  const named = req('ping', { _meta: { 'io.modelcontextprotocol/protocolVersion': VERSIONS[0] } });
+  assert.deepEqual(result(await handle(named, surface, ctx, undefined, '2025-06-18')), { resultType: 'complete' });
+  /* A word that is not a date is no revision, and the transport's stands. */
+  const junk = req('ping', { _meta: { 'io.modelcontextprotocol/protocolVersion': 'latest' } });
+  assert.deepEqual(result(await handle(junk, surface, ctx, undefined, '2025-06-18')), {});
+});
+
+test('OVER HTTP THE REVISION IS THE HEADER, and a request with none is taken as 2025-03-26, which says no resultType', async () => {
+  const { surface } = stub();
+  const ping = (headers: Record<string, string>, meta?: string) =>
+    new Request('https://app.brain.dog/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(req('ping', meta === undefined ? {} : { _meta: { 'io.modelcontextprotocol/protocolVersion': meta } })),
+    });
+  const answered = async (r: Request) => ((await (await serveMcp(r, surface, ctx)).json()) as { result: unknown }).result;
+  assert.deepEqual(await answered(ping({})), {});
+  assert.deepEqual(await answered(ping({ 'mcp-protocol-version': '2025-06-18' })), {});
+  assert.deepEqual(await answered(ping({ 'mcp-protocol-version': '2025-11-25' })), {});
+  assert.deepEqual(await answered(ping({ 'mcp-protocol-version': VERSIONS[0], 'mcp-method': 'ping' }, VERSIONS[0])), { resultType: 'complete' });
+});
+
+test('A STDIO LOOP KEEPS THE REVISION ITS HANDSHAKE AGREED, read from the reply by agreed', async () => {
+  const { surface } = stub();
+  for (const asked of ['2025-06-18', '2025-11-25', VERSIONS[0], '2099-01-01'])
+    assert.equal(agreed(await handle(req('initialize', { protocolVersion: asked }), surface, ctx)), asked > VERSIONS[0] ? VERSIONS[0] : asked);
+  assert.equal(agreed(await handle(req('ping'), surface, ctx)), null);
+  assert.equal(agreed(await handle(req('initialize', { protocolVersion: '1999-01-01' }), surface, ctx)), null);
+  assert.equal(agreed(null), null);
+});
+
+test('EVERY RESULT SAYS IT IS WHOLE TO A 2026-07-28 CLIENT, which refuses a list that does not', async () => {
   /* Claude Code took the handshake at this revision and then dropped every tool, on every session, because only
      `server/discover` carried `resultType`. Every method is asked here as that client asks it. */
   const { surface } = stub();
   const asked: [string, Record<string, unknown>][] = [
+    ['initialize', { protocolVersion: VERSIONS[0] }],
     ['server/discover', {}],
     ['ping', {}],
     ['tools/list', {}],
@@ -108,11 +161,15 @@ test('EVERY RESULT BUT initialize SAYS IT IS WHOLE, because a 2026-07-28 client 
     ['prompts/list', {}],
   ];
   for (const [method, params] of asked) {
-    const r = result<Record<string, unknown>>(await handle(req(method, params), surface, ctx));
+    const r = result<Record<string, unknown>>(await handle(req(method, params), surface, ctx, undefined, VERSIONS[0]));
     assert.equal(r.resultType, 'complete', `${method} answered without resultType`);
   }
+  const read = result<Record<string, unknown>>(
+    await handle(req('resources/read', { uri: 'braindog:schema/obligations' }), surface, ctx, undefined, VERSIONS[0]),
+  );
+  assert.equal(read.resultType, 'complete', 'resources/read answered without resultType');
   assert.deepEqual(
-    METHODS.filter((m) => m !== 'initialize' && m !== 'resources/read' && !asked.some(([method]) => method === m)),
+    METHODS.filter((m) => m !== 'resources/read' && !asked.some(([method]) => method === m)),
     [],
     'a method was added and is not asked here',
   );
@@ -374,6 +431,24 @@ test('resources are listed, templated and read, with how long each may be held',
   assert.deepEqual(read.contents[0], { uri: 'braindog:schema/obligations', mimeType: 'application/json', text: '{"fields":[]}' });
   assert.equal(read.ttlMs, 3_600_000);
   assert.equal((read as { cacheScope?: string }).cacheScope, 'private');
+});
+
+test('EVERY LIST IS ONE PAGE: it carries no nextCursor, and a cursor the server never issued is -32602', async () => {
+  /* `resources/list` read no cursor, so a client that sent one was handed the whole list again as if it were the next
+     page. Nothing here pages, so no cursor is ever issued, and one that arrives is refused before the record is read. */
+  const { surface, calls } = stub();
+  for (const method of ['resources/list', 'resources/templates/list', 'tools/list', 'prompts/list']) {
+    const whole = result<Record<string, unknown>>(await handle(req(method), surface, ctx));
+    assert.equal(whole.nextCursor, undefined, `${method} offered a next page`);
+    assert.ok(result(await handle(req(method, { cursor: null }), surface, ctx)), `${method} refused a null cursor`);
+  }
+  const before = calls.length;
+  for (const method of ['resources/list', 'resources/templates/list', 'tools/list', 'prompts/list']) {
+    const wrong = error(await handle(req(method, { cursor: 'c_2' }), surface, ctx));
+    assert.equal(wrong.code, -32602, method);
+    assert.match(wrong.message, /one page/);
+  }
+  assert.equal(calls.length, before, 'a refused cursor read the record');
 });
 
 test('a resource that is not there, or is refused, is -32002 with the sentence', async () => {

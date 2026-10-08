@@ -229,6 +229,12 @@ export type McpSurface<C> = {
    */
   inbox?(args: { state?: string }, ctx: C): Answer;
   /**
+   * What each pattern did with the last 14 days of arrivals, door by door: filed, skipped with its reason, waiting, and
+   * how many no pattern read (the record's `inboxPatterns`, REC-A03). READ+ on the inbox's own reach, so who may read it is
+   * the record's to say, and optional for the command line's reason above.
+   */
+  inboxPatterns?(args: { days?: number }, ctx: C): Answer;
+  /**
    * One arrival filed as a row in a list, or set aside (the record's `triage`). DATA,
    * and it admits a token only when its owner gave it the `inbox` reach. Optional for the command line's reason above:
    * both HTTP hosts hand `serveMcp` the whole record, and `apps/cli/src/surface.ts` routes it once its client knows it.
@@ -943,6 +949,7 @@ const FIXED: readonly Resource[] = [
   resource('digest/today', 'What the digest would say if it went now.'),
   resource('decisions', 'What has been proposed and not yet answered.'),
   resource('inbox', 'What arrived and nothing filed yet, newest first, with how many arrivals are in each state.'),
+  resource('inbox/patterns', 'What each pattern did with the last 14 days of messages: what it filed, what it skipped and why, what waits, and how many none of them read.'),
   resource('actions', 'Every scheduled action: what it calls, how often, whether it is paused and why, and this month so far. Keys by name only.'),
   resource('automations', 'Every automation: what starts it, when it runs next, and how its runs went this month.'),
   resource('arrangement', 'How this BrainDog is arranged: its packs, what else is on offer, its voice and settings, its pages, and what waits.'),
@@ -2673,6 +2680,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     if (head === 'actions' && !rest)
       return surface.actions ? surface.actions(ctx) : unbuilt('actions', 'Nothing else lists scheduled actions yet.');
     if (head === 'digest' && rest === 'today') return surface.digestToday({}, ctx);
+    /* WHAT EACH PATTERN DID, ahead of the states below, which would otherwise hand `patterns` to `inbox` as a state and
+       answer its refusal. The window is the record's default; an agent wanting another asks the route. */
+    if (head === 'inbox' && rest === 'patterns')
+      return surface.inboxPatterns
+        ? surface.inboxPatterns({}, ctx)
+        : unbuilt(uri, 'Read braindog:inbox/skipped for what the patterns skipped, each with its reason.');
     /* THE STATE IS THE RECORD'S TO CHECK. The segment is held to a name here so a path never reaches it, and a name that
        is not a state is refused by the record, with the seven words it takes; a second list of states here would be a second
        list to keep in step. Who may read it is the record's too, so an agent's token is refused in the record's words. */

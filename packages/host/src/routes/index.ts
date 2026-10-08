@@ -26,6 +26,8 @@ import { ROUTES as pattern } from './pattern.ts';
 import { ROUTES as personName } from './person-name.ts';
 import { ROUTES as retype } from './retype.ts';
 import { ROUTES as understand } from './understand.ts';
+import { ROUTES as signs } from './signs.ts';
+import { ROUTES as inboxPatterns } from './inbox-patterns.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -43,5 +45,7 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...personName,
   ...retype,
   ...understand,
+  ...signs,
+  ...inboxPatterns,
   /* END ROUTES */
 ];

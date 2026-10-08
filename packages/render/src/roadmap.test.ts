@@ -293,10 +293,12 @@ test('THE KEY NAMES ONLY THE COLOURS DRAWN, what is in hand first, and a plan in
   const key = (...tones: (RoadmapRow['tone'] | undefined)[]) => roadmapLegend(tones.map((tone) => (tone ? { tone } : {})));
   assert.deepEqual(key('good', undefined, 'bad', 'warn', 'bad'), [
     { label: 'Under way' },
-    { tone: 'warn', label: 'At risk' },
+    { tone: 'warn', label: 'Due soon' },
     { tone: 'bad', label: 'Late' },
     { tone: 'good', label: 'Done' },
   ]);
+  /* Warn is set from the due date alone, so it says when, never a judgement of the work (research-audit-31-32 §4). */
+  assert.ok(!key('warn', undefined).some((k) => /risk/iu.test(k.label)), 'warn claims a risk nothing measured');
   assert.deepEqual(key('bad', undefined), [{ label: 'Under way' }, { tone: 'bad', label: 'Late' }], 'never a state no bar is in');
   /* One colour is nothing to tell apart, whichever it is. */
   assert.deepEqual(key(undefined, undefined), []);
@@ -308,4 +310,7 @@ test('THE KEY NAMES ONLY THE COLOURS DRAWN, what is in hand first, and a plan in
   /* From a plan: a row that is skipped is not drawn, so its colour is not in the key. */
   const plan = roadmapPlan([{ start: '2026-09-01', end: '2026-09-05', title: 'A' }, { start: '', end: 'soon', title: 'B', tone: 'bad' }, { start: '', end: '2026-09-09', title: 'C', tone: 'good' }], '2026-09-03');
   assert.deepEqual(roadmapLegend(roadmapLines(plan)).map((k) => k.label), ['Under way', 'Done']);
+  /* A project's plan is its open work, so no bar is done and the key never says "Done". */
+  const open = roadmapPlan([{ start: '2026-09-01', end: '2026-09-05', title: 'A' }, { start: '', end: '2026-09-09', title: 'B', tone: 'warn' }, { start: '', end: '2026-08-30', title: 'C', tone: 'bad' }], '2026-09-03');
+  assert.deepEqual(roadmapLegend(roadmapLines(open)).map((k) => k.label), ['Under way', 'Due soon', 'Late']);
 });

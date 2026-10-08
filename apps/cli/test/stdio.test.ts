@@ -210,11 +210,31 @@ test('A CLIENT OF THE NEWEST REVISION IS HANDED A LIST IT ACCEPTS', async (t) =>
 
   const init = await s.ask('initialize', { protocolVersion: VERSIONS[0], capabilities: {}, clientInfo: { name: 'claude-code', version: '2.2.0' } });
   assert.equal(init.result.protocolVersion, VERSIONS[0]);
+  /* THE HANDSHAKE TOO, the one result left without it, which a client of the revision may check as it checks a list. */
+  assert.equal(init.result.resultType, 'complete', `initialize answered a ${VERSIONS[0]} client without resultType`);
+  assert.deepEqual((await s.ask('ping')).result, { resultType: 'complete' });
   for (const method of ['tools/list', 'prompts/list', 'resources/templates/list']) {
     const listed = await s.ask(method);
     assert.equal(listed.result.resultType, 'complete', `${method} answered a ${VERSIONS[0]} client without resultType`);
   }
   assert.equal(((await s.ask('tools/list')).result.tools as unknown[]).length, TOOLS.length);
+});
+
+/* `apps/cli/src/stdio.ts` HANDS `handle` THE REVISION ITS HANDSHAKE AGREED (`agreed` in `@braindog/mcp/rpc`). A pipe
+   sends no header, so without that the loop would answer every later request as the newest revision. */
+test('AN OLDER CLIENT GETS A BARE PING AND NO resultType, as its own revision draws a result', async (t) => {
+  /* A 2025-06-18 or 2025-11-25 client reads a ping's answer as a closed, empty result, so a key it does not know is a
+     reply it may refuse; every result carried one, for every client. */
+  const host = await stubHost(t);
+  for (const older of ['2025-06-18', '2025-11-25']) {
+    const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+    const init = await s.ask('initialize', { protocolVersion: older, capabilities: {}, clientInfo: { name: 'strict', version: '1' } });
+    assert.equal(init.result.protocolVersion, older);
+    assert.equal(init.result.resultType, undefined, `initialize answered a ${older} client with resultType`);
+    assert.deepEqual((await s.ask('ping')).result, {}, `ping answered a ${older} client with more than {}`);
+    assert.equal((await s.ask('tools/list')).result.resultType, undefined, `tools/list answered a ${older} client with resultType`);
+    assert.equal((await s.end()).code, 0);
+  }
 });
 
 test('initialize and tools/list answer without touching the host, and the list is what the server serves', async (t) => {
@@ -318,6 +338,7 @@ const ANSWERS: Record<string, unknown> = {
   digestToday: { lines: [] },
   actions: [],
   inbox: { rows: [], cursor: null, counts: { untriaged: 0, review: 0, skipped: 0, matched: 0, proposed: 0, ignored: 0 } },
+  inboxPatterns: { patterns: [] },
   automations: [],
   arrangement: { packs: [] },
   pages: [],

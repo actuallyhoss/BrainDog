@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { copy } from '../copy.ts';
-import { archiveArrival, fileArrival, type Fetch } from './inbox-write.ts';
+import { archiveArrival, fileArrival, fileAsSecond, type Fetch } from './inbox-write.ts';
 
 const BASE = 'http://record.test';
 
@@ -56,4 +56,24 @@ test('no record, or an answer that is not the record, is a calm sentence and nev
   assert.deepEqual(await fileArrival(BASE, 'raw_3', 'obligations', host(null).io), { from: 'unreachable', fix: copy.recordNotReached });
   const page = host(() => new Response('<html>Not found</html>', { status: 404, headers: { 'content-type': 'text/html' } }));
   assert.deepEqual(await archiveArrival(BASE, 'raw_3', page.io), { from: 'unreachable', fix: copy.recordNotReached });
+});
+
+test('a repeat filed as a second one sends the arrival alone, and answers where it went', async () => {
+  const { io, sent } = host(() => json(200, { ok: true, value: { raw: 'raw_9', ingest: 'hsbc_card', state: 'matched', wrote: ['01J'] } }));
+  assert.deepEqual(await fileAsSecond(BASE, 'raw_9', io), { from: 'written', state: 'matched', row: null });
+  assert.equal(sent[0]!.url, `${BASE}/api/fileAsSecond`);
+  assert.equal(sent[0]!.init?.method, 'POST');
+  assert.deepEqual(JSON.parse(String(sent[0]!.init?.body)), { id: 'raw_9' });
+
+  /* A pattern that only proposes leaves it waiting on a person, never said to be filed. */
+  const proposed = host(() => json(200, { ok: true, value: { raw: 'raw_9', ingest: 'hsbc_card', state: 'proposed', wrote: [] } }));
+  assert.deepEqual(await fileAsSecond(BASE, 'raw_9', proposed.io), { from: 'written', state: 'review', row: null });
+
+  /* HELD AGAIN by another of the pattern's skips is never said to be filed: the record's reason is the answer. */
+  const again = host(() => json(200, { ok: true, value: { raw: 'raw_9', ingest: 'hsbc_card', state: 'skipped', wrote: [], reason: 'A balance alert is not a movement.' } }));
+  assert.deepEqual(await fileAsSecond(BASE, 'raw_9', again.io), { from: 'refused', fix: 'A balance alert is not a movement.' });
+
+  const fix = 'Only a message skipped as a repeat can be filed as a second one.';
+  const refused = host(() => json(422, { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix, at: 'raw' } }));
+  assert.deepEqual(await fileAsSecond(BASE, 'raw_9', refused.io), { from: 'refused', fix });
 });

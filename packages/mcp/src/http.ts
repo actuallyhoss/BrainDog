@@ -134,6 +134,13 @@ function nameOf(header: string): string | null {
   }
 }
 
+/** The revision a request's `_meta` names, or `null` when it names none. */
+const versionIn = (meta: Record<string, unknown>): string | null =>
+  typeof meta['io.modelcontextprotocol/protocolVersion'] === 'string' ? (meta['io.modelcontextprotocol/protocolVersion'] as string) : null;
+
+/** What a request with no version header is taken to speak. */
+const OLDEST = VERSIONS[VERSIONS.length - 1]!;
+
 /**
  * Step 7: the headers that mirror the body, checked against it.
  *
@@ -148,7 +155,7 @@ function disagrees(message: Record<string, unknown>, headers: Headers): Failure 
   const method = String(message.method);
   const params = isObject(message.params) ? message.params : {};
   const meta = isObject(params._meta) ? params._meta : {};
-  const inBody = typeof meta['io.modelcontextprotocol/protocolVersion'] === 'string' ? (meta['io.modelcontextprotocol/protocolVersion'] as string) : null;
+  const inBody = versionIn(meta);
   const said = headers.get('mcp-protocol-version');
 
   if (said !== null && inBody !== null && said !== inBody)
@@ -254,6 +261,10 @@ export async function serveMcp<C>(
   const said = saidOf(meta);
   const who = options.session && said !== null ? options.session(ctx, said) : ctx;
 
-  const reply = await handle(message, surface, who, options.origin);
+  /* THE REVISION THIS REQUEST SPEAKS, as `disagrees` has already held it to its body: the header, else the body's own,
+     else 2025-03-26, which the specification tells a server to assume of a request that sends no header. `handle`
+     reads it only to decide whether a result says `resultType`, which no client older than 2026-07-28 expects. */
+  const version = request.headers.get('mcp-protocol-version') ?? versionIn(meta) ?? OLDEST;
+  const reply = await handle(message, surface, who, options.origin, version);
   return reply === null ? bare(202) : json(statusOf(reply), reply);
 }

@@ -19,6 +19,7 @@ braindog:sessions/live | Who else is working now, on what, and in which reposito
 braindog:digest/today | What the digest would say if it went now. It sends nothing | A minute
 braindog:decisions | What has been proposed and not yet answered | A minute
 braindog:inbox | What arrived that nothing filed, newest first, with a count for each state | Read fresh
+braindog:inbox/patterns | What each pattern did with the last 14 days of messages: what it filed, what it skipped and why, what waits, and how many none of them read | Read fresh
 braindog:actions | Every scheduled action: what it calls, how often, whether it is paused and why, and this month so far | A minute
 braindog:automations | Every automation: what starts it, when it runs next, and how its runs went this month | A minute
 braindog:arrangement | How the record is arranged: its packs, what else is on offer, its voice and settings, its pages, and what waits | A minute

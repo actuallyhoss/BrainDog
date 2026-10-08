@@ -134,6 +134,28 @@ test('toHTML draws a named dial with the figure in its centre, and the rows as w
   assert.match(parts, /<span class="ring-figure num" aria-hidden="true">20<\/span>/u);
 });
 
+test('A LATE ARC IS STRIPED AS WELL AS RED (DIRECTION §42): it is stroked with a pattern of its own, and the rest are not', () => {
+  const html = toHTML(parse('```ring | Week\nDeep work | 12\nInvoices | 6 | | bad\n```'));
+  const id = /<pattern class="late-hatch" id="([^"]+)" patternUnits="userSpaceOnUse" width="4" height="4">/u.exec(html)?.[1];
+  assert.ok(id, 'a late arc drew no pattern');
+  assert.match(html, new RegExp(`<circle class="ring-arc" data-step="1" data-intent="bad"[^>]* style="stroke:url\\(#${id}\\)"`, 'u'));
+  assert.match(html, /<path class="late-stripe" d="M0 0H2L0 2ZM4 0V2L2 4H0Z" fill="currentColor">/u, 'the pattern is a stripe, not a wash');
+  assert.equal(html.match(/url\(#/gu)?.length, 1, 'only the late arc is striped');
+  /* A dial with nothing late carries no pattern, and a progress ring that is late is striped too. */
+  assert.doesNotMatch(toHTML(parse('```ring\nA | 12\nB | 6 | | warn\n```')), /<pattern|url\(#/u);
+  assert.match(toHTML(parse('```ring\nInvoice | 2 | 5 | bad\n```')), /data-intent="bad"[^>]* style="stroke:url\(#late-/u);
+});
+
+test('TWO LATE DIALS ON ONE PAGE PAINT FROM TWO PATTERNS, even when they say the same thing', () => {
+  const src = '```ring\nA | 12\nB | 6 | | bad\n```';
+  const html = toHTML([...parse(src), ...parse(src), ...parse('```ring\nC | 1\nD | 9 | | bad\n```')]);
+  const ids = [...html.matchAll(/<pattern [^>]*id="([^"]+)"/gu)].map((m) => m[1]);
+  assert.equal(ids.length, 3);
+  assert.equal(new Set(ids).size, 3, `one id painted two dials: ${ids.join(', ')}`);
+  /* The same input draws the same page, so a host can cache it. */
+  assert.equal(toHTML(parse(src)), toHTML(parse(src)));
+});
+
 /* ── the Svelte drawer, compared as a tree ────────────────────────────────── */
 
 /* The same hooks `parity.test.ts` registers: each test file is its own process under `node --test`. */
@@ -160,9 +182,21 @@ const { default: Block } = (await import(new URL('../svelte/Block.svelte', impor
 const ENTITY: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", '#x27': "'" };
 const decode = (s: string): string => s.replace(/&(amp|lt|gt|quot|#39|#x27);/gu, (_, e: string) => ENTITY[e] ?? '');
 
+/**
+ * The late pattern's id as its place on the page: each side mints its own (`lateId`, `$props.id()`), so the two can
+ * only be held equal once the names are read past. Every id must be one of a kind and every `url(#…)` must name a
+ * pattern drawn, or a late arc is painted from another chart's pattern or from nothing.
+ */
+function lateIds(html: string): string {
+  const ids = [...html.matchAll(/<pattern [^>]*id="([^"]+)"/gu)].map((m) => m[1]!);
+  assert.equal(new Set(ids).size, ids.length, `a pattern id is used twice: ${ids.join(', ')}`);
+  for (const [, ref] of html.matchAll(/url\(#([^)]+)\)/gu)) assert.ok(ids.includes(ref!), `url(#${ref}) names no pattern`);
+  return ids.reduce((h, id, i) => h.replaceAll(`"${id}"`, `"late${i}"`).replaceAll(`#${id})`, `#late${i})`), html);
+}
+
 /** `parity.test.ts`'s `tree`: no comments, no whitespace between tags, attributes in one order, entities read. */
 function tree(html: string): string {
-  return html
+  return lateIds(html)
     .replace(/<!--[\s\S]*?-->/gu, '')
     .replace(/\s+/gu, ' ')
     .replace(/> </gu, '><')
@@ -184,6 +218,8 @@ const SHAPES: Record<string, string> = {
   'parts, one with a note, one with a tone, one with no number':
     '```ring | Week\nDeep work | 12 | mornings\nMeetings | 6\nAdmin | 2 | | warn\nTravel | soon\n```',
   'parts in two currencies': '```ring\nCairo | EGP 6,000.00\nLondon | £300.00\n```',
+  'parts with one late, striped': '```ring | Owed\nPaid | 12\nOverdue | 6 | 3 invoices | bad\n```',
+  'progress that is late, striped': '```ring\nInvoice | 2 | 5 | bad\n```',
 };
 
 for (const [name, src] of Object.entries(SHAPES)) {
@@ -202,4 +238,22 @@ test('and the comparison is not vacuous: the dial is on the Svelte side too', ()
   const svelte = tree(render(Block, { props: { block: seg as BlockSegment, opts: {} } }).body);
   assert.match(svelte, /<svg [^>]*class="ring-mark"/u);
   assert.match(svelte, /class="ring-legend"/u);
+});
+
+test('AND IN THE APP, two late dials on one page paint from two patterns (`$props.id()`)', async () => {
+  /* One render with two blocks in it, as a page draws them: two renders would each start their count again. Compiled
+     here and loaded from memory, its imports made absolute, so the test writes nothing to the tree. */
+  const block = new URL('../svelte/Block.svelte', import.meta.url).href;
+  const { js } = compile(`<script>import Block from ${JSON.stringify(block)}; let { a, b } = $props();</script><Block block={a} /><Block block={b} />`, {
+    generate: 'server',
+    filename: 'Two.svelte',
+  });
+  const code = js.code.replace(/from '(svelte[^']*)'/gu, (_, spec: string) => `from '${import.meta.resolve(spec)}'`);
+  const { default: Two } = (await import(`data:text/javascript,${encodeURIComponent(code)}`)) as { default: Component<{ a: BlockSegment; b: BlockSegment }> };
+  const [a] = parse('```ring\nA | 12\nB | 6 | | bad\n```') as BlockSegment[];
+  const body = render(Two, { props: { a: a!, b: a! } }).body;
+  const ids = [...body.matchAll(/<pattern [^>]*id="([^"]+)"/gu)].map((m) => m[1]);
+  assert.equal(ids.length, 2);
+  assert.notEqual(ids[0], ids[1], 'one id painted two dials');
+  lateIds(body);
 });

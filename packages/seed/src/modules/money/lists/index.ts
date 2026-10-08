@@ -1,0 +1,32 @@
+/**
+ * Money's lists, in the order a record has always held them. Each list is its own file, cut out of `money.ts` with no
+ * change (REC-B01 job 1), and the order here is the order of the document, which the pinned fingerprint holds.
+ */
+
+import { ACCOUNTS_REGISTER } from './accounts.ts';
+import { BALANCES_REGISTER } from './balances.ts';
+import { BOOKS_REGISTER } from './books.ts';
+import { CATEGORIES_REGISTER } from './categories.ts';
+import { FX_REGISTER } from './fx.ts';
+import { INSTALLMENTS_REGISTER } from './installments.ts';
+import { OBLIGATIONS_REGISTER } from './obligations.ts';
+import { RECURRING_REGISTER } from './recurring.ts';
+import type { MoneyRegister } from './shared.ts';
+import { SNAPSHOTS_REGISTER } from './snapshots.ts';
+import { TRANSACTIONS_REGISTER } from './transactions.ts';
+
+export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
+  obligations: OBLIGATIONS_REGISTER,
+  accounts: ACCOUNTS_REGISTER,
+
+  /* `holdings` WAS DECLARED HERE FROM 1.5.0 TO 1.8.0. money-core 2.0.0 gave it to a pack of its own, now the file
+     `packs/holdings/holdings.pack.json`, and its reasons went with it: what one person holds is not what everybody's Money is for. */
+  fx: FX_REGISTER,
+  categories: CATEGORIES_REGISTER,
+  transactions: TRANSACTIONS_REGISTER,
+  recurring: RECURRING_REGISTER,
+  installments: INSTALLMENTS_REGISTER,
+  balances: BALANCES_REGISTER,
+  snapshots: SNAPSHOTS_REGISTER,
+  books: BOOKS_REGISTER,
+};

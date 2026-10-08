@@ -743,8 +743,8 @@
     const mark = project ? names?.marks?.get(project) : undefined;
     return {
       agent: said(f.agent) || null,
-      /* GONE QUIET AS THE RECORD SAYS IT (`isQuiet`): open, and not heard from in 30 minutes. */
-      live: liveOf(f.state, isQuiet({ fields: f as never, updated_at: row.created }, clock)),
+      /* GONE QUIET AS THE RECORD SAYS IT (`isQuiet`): open, and not heard from in 15 minutes (`WORKING_MS`). */
+      live: liveOf(f.state, isQuiet({ fields: f as never }, clock)),
       doing: said(f.doing),
       project: project ? (names?.get(project) ?? null) : null,
       mark: mark ? { mark: mark.mark, hue: mark.hue } : null,

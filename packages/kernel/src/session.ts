@@ -21,15 +21,17 @@
 
 import type { Sql } from '@braindog/ports';
 
+import { STALE_MS, heardAt, presenceOf } from './presence.ts';
+
 import type { Json } from './coerce.ts';
 import type { Declaration } from './declare.ts';
-import { SESSION_BODY } from './migrations/0026_session_started.ts';
+import { SESSION_BODY } from './migrations/0028_runs.ts';
 
 /** The register's id. */
 export const SESSION = 'session';
 
 /**
- * The kernel's declaration, parsed from the bytes of the newest migration that seats it, 26, so that there is one copy
+ * The kernel's declaration, parsed from the bytes of the newest migration that seats it, 28, so that there is one copy
  * of it.
  *
  * The id is read out of the body rather than written here: this is an envelope around the row the
@@ -64,54 +66,56 @@ const KINDS: readonly string[] =
 
 /**
  * The fields only the record writes: when the run was last heard from, the project it resolved to,
- * the token that opened it, and when it started. A caller's patch naming one is refused `IMMUTABLE_FIELD`.
+ * the token that opened it, and when it started; and migration 28's nine (`0028_runs.ts`), which say how its work went
+ * and how its step closed. A caller's patch naming one is refused `IMMUTABLE_FIELD`.
  */
-export const KERNEL_WRITTEN: readonly string[] = ['last_seen', 'project', 'token_id', 'started'];
+export const KERNEL_WRITTEN: readonly string[] = [
+  'last_seen',
+  'project',
+  'token_id',
+  'started',
+  'stretch_at',
+  'next_at',
+  'closed_as',
+  'closed_at',
+  'taken_by',
+  'took',
+  'parent',
+  'wrote',
+  'seen_before',
+];
 
 /**
- * A run not heard from in 45 minutes is stale: the ladder no longer adopts it for a write that names no run. Worked out
- * when read, and never stored.
+ * The clock lives in `presence.ts`: working, stale and quiet, and the reads that compare `last_seen` with it. Exported
+ * again from here so a reader that imported them from the ladder keeps working.
  */
-export const STALE_MS = 45 * 60_000;
+export { QUIET_MS, STALE_MS, isQuiet, isStale } from './presence.ts';
 
 /**
- * A run still open and not heard from in 30 minutes has gone quiet, which is what a person is shown: open is not
- * working. Linear marks an agent's session stale at the same mark. Worked out when read, and never stored, because a
- * run that crashed never says so.
+ * The states a run leaves for `active` when the ladder re-attaches it, because a run that writes is working. `handoff`
+ * is one: a session that left a step and is resumed and worked in is working again, and the step it left is no longer
+ * fresh (`stretch_at`). A resumed session that only reads writes nothing, so its step still waits.
  */
-export const QUIET_MS = 30 * 60_000;
-
-/** The states a run is open in: working, or resting with nothing handed on. */
-const OPEN: readonly string[] = ['active', 'idle'];
+export const REVIVED: readonly string[] = ['idle', 'handoff', 'done', 'abandoned'];
 
 /**
- * The states a run leaves for `active` when the ladder re-attaches it, because a run that writes is
- * working. `handoff` is not one: it is a request waiting for the next run, and a write from the
- * run that asked does not answer it.
+ * Whether a run left a next step in its current stretch of work, the one a later session should take up.
+ *
+ * FRESH IS WRITTEN SINCE THE STRETCH BEGAN (`next_at` at or after `stretch_at`). A session resumed and worked in starts
+ * a new stretch, so the step it was handed and did not write again is not what it leaves. A run from before these two
+ * fields with a step and no times is given the benefit: a step kept that should have gone costs a line on a card, a
+ * step dropped that should have stayed costs the next session its start.
  */
-export const REVIVED: readonly string[] = ['idle', 'done', 'abandoned'];
-
-/** When a run was last heard from, in milliseconds: its `last_seen`, or when its row last changed when it has none. */
-function heardAt(row: { fields: Record<string, Json>; updated_at: string }): number {
-  return Date.parse(typeof row.fields.last_seen === 'string' ? row.fields.last_seen : row.updated_at);
+export function leftFreshStep(fields: Record<string, Json>): boolean {
+  if (typeof fields.next !== 'string' || fields.next.trim() === '') return false;
+  const stretch = typeof fields.stretch_at === 'string' ? Date.parse(fields.stretch_at) : NaN;
+  if (!Number.isFinite(stretch)) return true;
+  const at = typeof fields.next_at === 'string' ? Date.parse(fields.next_at) : NaN;
+  return Number.isFinite(at) && at >= stretch;
 }
 
-/** Whether a run has gone stale. A row with no `last_seen` is judged by when it last changed. */
-export function isStale(row: { fields: Record<string, Json>; updated_at: string }, nowMs: number): boolean {
-  return heardAt(row) < nowMs - STALE_MS;
-}
-
-/** A run's state, from its column, or from its fields for a reader handed the fields alone. */
-const stateOf = (row: { state?: string | null; fields: Record<string, Json> }): string =>
-  row.state ?? (typeof row.fields.state === 'string' ? row.fields.state : '');
-
-/**
- * Whether a run is open, active or idle, and has not been heard from in thirty minutes. A finished run, or one waiting
- * on a handoff, is never quiet: it stopped on purpose.
- */
-export function isQuiet(row: { state?: string | null; fields: Record<string, Json>; updated_at: string }, nowMs: number): boolean {
-  return OPEN.includes(stateOf(row)) && heardAt(row) < nowMs - QUIET_MS;
-}
+/** Whether a run works for another, by the `parent` it was opened with: a helper, whose steps are its parent's. */
+export const isHelper = (fields: Record<string, Json>): boolean => typeof fields.parent === 'string' && fields.parent !== '';
 
 /**
  * How long a run has been going, in whole seconds: from its start to now while it works, and to the last time it was
@@ -121,7 +125,7 @@ export function isQuiet(row: { state?: string | null; fields: Record<string, Jso
  * clock, a run that stopped three days ago read as three days of work, and every quiet run aged as if it were busy.
  */
 export function runAge(row: { state?: string | null; fields: Record<string, Json>; created_at: string; updated_at: string }, nowMs: number): number {
-  const working = stateOf(row) === 'active' && !isQuiet(row, nowMs);
+  const working = presenceOf(row, nowMs) === 'working';
   return Math.max(0, Math.floor(((working ? nowMs : heardAt(row)) - Date.parse(row.created_at)) / 1000));
 }
 
@@ -350,7 +354,7 @@ export function begun(now: string, register: RunRegister = RUNS): Record<string,
 export function opening(hints: SessionHints, register: RunRegister = RUNS): Record<string, Json> {
   const out: Record<string, Json> = {};
   for (const [key, value] of Object.entries(hints))
-    if (key !== 'spoken' && typeof value === 'string' && value !== '' && register.has(key)) out[key] = value;
+    if (key !== 'spoken' && typeof value === 'string' && value !== '' && register.has(key) && !KERNEL_WRITTEN.includes(key)) out[key] = value;
   const { agent } = agentOf(hints, register.kinds);
   if (agent !== undefined && (out.agent === undefined || out.agent === 'other')) out.agent = agent;
   if (typeof out.doing === 'string') out.doing = clipTitle(out.doing);

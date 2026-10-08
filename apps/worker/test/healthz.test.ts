@@ -11,9 +11,13 @@
  * need no record; each is compared here with the module that owns it, `primitives` with the renderer's own, because the
  * Worker holds a copy of that one (`src/health.ts` says why).
  *
- * NO DURABLE OBJECT, NO DIRECTORY, NO CREDENTIAL. A liveness probe that woke a record would be a probe that costs a
- * storage read every minute and fails when one record is sick, which is not the question it asks. The env here throws
- * on every binding a record or the Directory would need, so a route that reached for one fails the test by name.
+ * NO RECORD AND NO CREDENTIAL. A liveness probe that woke a record would be a probe that costs a storage read every
+ * minute and fails when one record is sick, which is not the question it asks. The env here throws on every binding a
+ * record would need, so a route that reached for one fails the test by name.
+ *
+ * AND THE DIRECTORY ONCE, FOR THE NIGHT (LCH-C01). Before it, `/healthz` could not say whether last night's copies were
+ * taken, and a night that did not run reached nobody. The Directory here answers `night()` alone; a HEAD never asks, and a
+ * Directory that throws is `night: null` beside a 200.
  */
 
 import { test } from 'node:test';
@@ -36,6 +40,25 @@ const trap = (name: string) =>
 const LAUNCH_ENV = { SIGNUP: 'open', BILLING: '' };
 const LAUNCH = launchState(LAUNCH_ENV);
 
+/* THE DIRECTORY'S ONE METHOD THIS DOOR MAY CALL, answering whatever the test last told it, and every other key a trap. */
+let kept: unknown = null;
+let asked = 0;
+const directory = {
+  idFromName: (name: string) => name,
+  get: () =>
+    new Proxy(
+      {},
+      {
+        get: (_, key) => {
+          if (key === 'night') return async () => (asked++, kept instanceof Error ? Promise.reject(kept) : kept);
+          if (key === 'then') return undefined;
+          touched.push(`DIRECTORY.${String(key)}`);
+          throw new Error(`the Directory's ${String(key)} was reached for /healthz`);
+        },
+      },
+    ),
+};
+
 async function ask(path: string, init: RequestInit & { host?: string; build?: string; vars?: Record<string, string> } = {}) {
   const { default: worker } = await bundled();
   const env = {
@@ -45,7 +68,7 @@ async function ask(path: string, init: RequestInit & { host?: string; build?: st
     ...init.vars,
     BRAINDOG_BUILD: init.build ?? '2026.09.23+abc1234',
     RECORD: trap('RECORD'),
-    DIRECTORY: trap('DIRECTORY'),
+    DIRECTORY: directory,
     INGRESS: trap('INGRESS'),
     ASSETS: trap('ASSETS'),
   };
@@ -56,23 +79,25 @@ test('GET /healthz IS 200 WITH THE TUPLE OF 53 §13 #9, `ok` BESIDE IT, with no-
   touched.length = 0;
   const out = await ask('/healthz');
   assert.equal(out.status, 200, await out.clone().text());
-  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234', ...TUPLE, launch: LAUNCH });
+  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234', ...TUPLE, launch: LAUNCH, night: null });
   assert.equal(out.headers.get('cache-control'), 'no-store');
   assert.match(out.headers.get('content-type') ?? '', /^application\/json/);
   assert.deepEqual(touched, [], 'a binding was reached for a liveness probe');
 });
 
 test('AN UNSET BUILD IS null, as `/.well-known/braindog-build` says it', async () => {
-  assert.deepEqual(await (await ask('/healthz', { build: '' })).json(), { ok: true, app: null, ...TUPLE, launch: LAUNCH });
+  assert.deepEqual(await (await ask('/healthz', { build: '' })).json(), { ok: true, app: null, ...TUPLE, launch: LAUNCH, night: null });
 });
 
-test('HEAD ANSWERS HEAD: the same status and headers, and no body', async () => {
+test('HEAD ANSWERS HEAD: the same status and headers, and no body, and asks the Directory nothing', async () => {
   touched.length = 0;
+  asked = 0;
   const out = await ask('/healthz', { method: 'HEAD' });
   assert.equal(out.status, 200);
   assert.equal(out.headers.get('cache-control'), 'no-store');
   assert.equal(await out.text(), '');
   assert.deepEqual(touched, []);
+  assert.equal(asked, 0);
 });
 
 test('ANY OTHER METHOD IS 405 WITH Allow, and the path is exactly /healthz', async () => {
@@ -89,7 +114,7 @@ test('A BROWSER ON THE OLD HOST IS ANSWERED WHERE IT STANDS, not sent to /app/he
      `accept: text/html` would follow a 308 to the app shell and read a 200 from the wrong thing. */
   const out = await ask('/healthz', { host: 'app.brain.example.test', headers: { accept: 'text/html' } });
   assert.equal(out.status, 200);
-  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234', ...TUPLE, launch: LAUNCH });
+  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234', ...TUPLE, launch: LAUNCH, night: null });
 });
 
 test('HEALTH CARRIES THE LAUNCH: open, no bot check, and the sentence that says sign-ups from one address are limited', async () => {
@@ -106,4 +131,75 @@ test('HEALTH CARRIES THE LAUNCH: open, no bot check, and the sentence that says 
   const text = await keyed.text();
   assert.ok(!text.includes('0x-a-secret-value'), 'the secret was answered');
   assert.equal((JSON.parse(text) as { launch: { botCheck: boolean } }).launch.botCheck, true);
+});
+
+test("HEALTH CARRIES LAST NIGHT, from one Directory call: its counts, and `ran` only when it is fresh and whole", async () => {
+  const at = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  kept = { at, records: 12, backups: 12, backups_failed: 0, directory: 'ok' };
+  touched.length = 0;
+  asked = 0;
+  const whole = (await (await ask('/healthz')).json()) as { night: Record<string, unknown> };
+  assert.deepEqual(whole.night, { at, records: 12, backups: 12, backups_failed: 0, directory: 'ok', ran: true });
+  assert.equal(asked, 1, 'one Directory call a probe');
+  assert.deepEqual(touched, []);
+
+  /* A FAILED COPY, A DIRECTORY NOT COPIED, OR A NIGHT OLDER THAN 26 HOURS IS A NIGHT THAT DID NOT RUN WHOLE. */
+  kept = { at, records: 12, backups: 11, backups_failed: 1, directory: 'ok' };
+  assert.equal(((await (await ask('/healthz')).json()) as { night: { ran: boolean } }).night.ran, false);
+  kept = { at, records: 12, backups: 12, backups_failed: 0, directory: 'failed' };
+  assert.equal(((await (await ask('/healthz')).json()) as { night: { ran: boolean } }).night.ran, false);
+  kept = { at: new Date(Date.now() - 27 * 60 * 60 * 1000).toISOString(), records: 12, backups: 12, backups_failed: 0, directory: 'ok' };
+  const late = await ask('/healthz');
+  assert.equal(late.status, 200, 'a late night is a fact beside the liveness, never a failed probe');
+  const lateSaid = (await late.json()) as { ok: boolean; night: { ran: boolean } };
+  assert.deepEqual([lateSaid.ok, lateSaid.night.ran], [true, false]);
+
+  /* A DIRECTORY THAT NEVER ANSWERS IS `null` TOO, after a short wait, so the probe is not held on it. */
+  kept = new Promise(() => {});
+  const started = Date.now();
+  const hung = await ask('/healthz');
+  assert.equal(hung.status, 200);
+  assert.equal(((await hung.json()) as { night: unknown }).night, null);
+  assert.ok(Date.now() - started < 5_000, `held ${Date.now() - started}ms`);
+
+  /* AND A DIRECTORY THAT THROWS IS `null` BESIDE A 200: the Worker answering is the liveness. */
+  kept = new Error('the Directory is down');
+  const down = await ask('/healthz');
+  assert.equal(down.status, 200);
+  assert.equal(((await down.json()) as { night: unknown }).night, null);
+  kept = null;
+});
+
+test('THE CRON KEEPS ITS NIGHT FOR /healthz, and a night that cannot run mails "BrainDog night" before it goes red', async () => {
+  const { cloud } = await import('./cloud-harness.ts');
+  const sent: Record<string, unknown>[] = [];
+  const mail = { OPS_ALERT_TO: 'ops@example.test', MAIL_FROM: 'hello@brain.example.test', EMAIL: { send: async (m: Record<string, unknown>) => void sent.push(m) } };
+  const c = await cloud(mail);
+  const kv = new Map<string, unknown>();
+  Object.assign(c.dirStorage, { get: async (k: string) => kv.get(k), put: async (k: string, v: unknown) => void kv.set(k, v) });
+  await c.provision('rec_01JZ8QK3F7R2M9V4XN6TCB5HAJ', 'nightly', 'ada@example.test');
+  const scheduled = (c.bundle.default as unknown as { scheduled(c: object, env: object, ctx: object): Promise<void> }).scheduled;
+  const quietly = async (fn: () => Promise<unknown>) => {
+    const kept = [console.log, console.error];
+    console.log = console.error = () => {};
+    try {
+      return await fn();
+    } finally {
+      [console.log, console.error] = kept as [typeof console.log, typeof console.error];
+    }
+  };
+  await quietly(() => scheduled({}, c.env, { waitUntil: () => {} }).catch(() => {}));
+  const night = kv.get('ops-night') as { records: number; backups: number; directory: string } | undefined;
+  assert.ok(night, 'the walk kept no night');
+  assert.equal(night.records, 1);
+  assert.deepEqual([night.backups, night.directory, sent.length], [1, 'ok', 0], 'a whole night mails nobody');
+  const said = (await (await c.ask('/healthz')).json()) as { night: { records: number; ran: boolean } };
+  assert.equal(said.night.records, 1);
+  assert.equal(said.night.ran, true);
+
+  /* NO BUCKET IS A NIGHT THAT CANNOT RUN: mailed, then thrown. */
+  const bare = await cloud({ ...mail, BLOBS: undefined });
+  Object.assign(bare.dirStorage, { get: async () => undefined, put: async () => {} });
+  await quietly(() => assert.rejects(scheduled({}, bare.env, { waitUntil: () => {} }), /no BLOBS binding/u));
+  assert.ok(sent.some((m) => m['subject'] === 'BrainDog night'), 'no night mail went');
 });

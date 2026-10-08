@@ -17,14 +17,14 @@
  *
  * A MISSING BUILD IS A SKIP THAT SAYS SO. The gate suite's own rule, and the reason for it is that
  * a check with nothing to read is the same silence as no check at all: it has to be louder than a
- * pass, not quieter.
+ * pass, not quieter. In the CI step that has just built the site it is a failure (`built.ts`).
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
-const BUILD = new URL('../build/', import.meta.url);
+import { BUILD, missing, when } from './built.ts';
 
 /**
  * The documents a build must have written for these checks to mean anything: one per page the header and the
@@ -50,13 +50,7 @@ const REQUIRED = [
   '404.html',
 ] as const;
 
-const absent = REQUIRED.filter((page) => !existsSync(new URL(page, BUILD)));
-
-const NO_BUILD =
-  absent.length === 0
-    ? null
-    : `apps/site/build is missing ${absent.join(', ')}. Run "pnpm --filter @braindog/site build" first: ` +
-      'these checks read the served bytes, and a check with nothing to read is a pass that means nothing.';
+const NO_BUILD = missing(REQUIRED);
 
 /**
  * EVERY PAGE THE BUILD WROTE, not a list of them typed here. The site grew pages for each kind of person, the
@@ -69,9 +63,6 @@ const PAGES: readonly string[] = NO_BUILD
       .map((rel) => rel.replaceAll('\\', '/'))
       .filter((rel) => rel.endsWith('.html') && !rel.startsWith('_app/'))
       .sort();
-
-/** `{ skip: reason }` or nothing, because `exactOptionalPropertyTypes` refuses `{ skip: undefined }`. */
-const when = (reason: string | null): { skip: string } | Record<string, never> => (reason ? { skip: reason } : {});
 
 const read = (page: string): string => readFileSync(new URL(page, BUILD), 'utf8');
 

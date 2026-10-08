@@ -171,7 +171,7 @@ test('A PAYEE THE TEXT DID NOT CARRY NEVER HOLDS A CHARGE on a list that has no 
   const kept = await record(ACCOUNTS(), TRANSACTIONS(true), CARD({ extract: reads }));
   const held = arrive(kept.k, said('Halden Coffee'), 'n2');
   assert.equal(held.state, 'review');
-  assert.match(held.reason ?? '', /counterparty_text/u);
+  assert.match(held.reason ?? '', /could not read paid to, as printed out of this one/u);
   kept.sql.close();
 });
 

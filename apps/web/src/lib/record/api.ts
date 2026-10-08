@@ -1014,7 +1014,7 @@ export const runsIn = (runs: readonly Entry[], project: string): Entry[] =>
 export const runName = (run: Entry): string => `${REGISTERS.session?.seq_prefix ?? 'S'}${run.seq}`;
 
 /**
- * Whether a run is working now: active, and heard from within the kernel's 30 minutes (`QUIET_MS`, its `isQuiet`), past
+ * Whether a run is working now: active, and heard from within the kernel's 15 minutes (`QUIET_MS`, its `WORKING_MS`), past
  * which it has gone quiet. Worked out on read, as the kernel does, because a run that crashed never says so. A run never
  * heard from is not working.
  */
@@ -1682,7 +1682,7 @@ function lastTouchIn(audit: readonly { by: string; at: string; target?: string |
  *
  * NOT WHO CHANGED THE ROW LAST, WHETHER THAT ACTOR IS STILL AT IT: only an agent has a run to be at,
  * so a row last touched by `you` or a rule answers `false` before the runs are even read. Then two
- * clocks, not one — the touch itself has to sit inside the kernel's 30 minutes before a run goes quiet
+ * clocks, not one — the touch itself has to sit inside the kernel's 15 minutes before a run goes quiet
  * (`QUIET_MS`), because an agent that is still running does not mean it is still on the row it wrote
  * three hours ago, and the run that agent is named on has to be heard from inside that same window
  * (`workingAt`) — the same fact `sessions.live` shows for a run, asked here of a row instead.

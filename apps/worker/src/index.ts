@@ -55,7 +55,7 @@ import { serveAsks, type ModelJobInference, type SlashAnswer } from '@braindog/h
 import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/host/model-jobs';
 
 import { alarmScheduler } from './alarm.ts';
-import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel } from './slash.ts';
+import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
 import { slashErasing, slashPlanMoved } from './slash.ts';
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
 import { workerModelJobs } from './slash-jobs.ts';
@@ -67,7 +67,7 @@ import { fileKey, serveFiles, servesFiles } from './files.ts';
 import { cloudSnapshots, type Pitr } from './copies.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
 import { directoryCopies } from './directory-copy.ts';
-import { isMailKind, opsAlert, sendMail, type OpsKind } from './mail.ts';
+import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail } from './deliver.ts';
 import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
 import { NO_SHARE_KEY, linkOpened, opensShare, serveShared, sharedNone, type SharedDoor } from '@braindog/host';
@@ -77,7 +77,7 @@ import { bindingLimiter as linkLimiter, refusedFor as linkRefused } from '@brain
 import { shareKeyOf } from './share.ts';
 import { consume, pump } from './pump.ts';
 import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
-import { HEALTHZ, healthz } from './health.ts';
+import { HEALTHZ, healthz, type Night } from './health.ts';
 import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } from './launch.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
@@ -245,7 +245,7 @@ type Env = {
   MAIL_FROM?: string;
   /** Where a reader of any mail may write with a question, named in its footer. Empty, and the footer names none. */
   SUPPORT_ADDRESS?: string;
-  /** Where a `crash` or `refuse` line is mailed, at most once a kind in 15 minutes (`opsAlert`). Unset, and none is. */
+  /** Where a `crash`, `refuse`, `model` or `night` line is mailed, at most once a kind in 15 minutes (`opsAlert`). Unset, and none is. */
   OPS_ALERT_TO?: string;
   /** The app's host name: the cookie's origin, the passkeys' relying party, and what a cookie write must come from. */
   PUBLIC_HOST?: string;
@@ -424,6 +424,9 @@ const UNSENT_MOST = 50;
  * row wakes it then, so a lapse ended a minute ago holds a run for at most this long.
  */
 const LAPSE_HOLD_MS = 15 * 60_000;
+
+/** Schema breaks in a row on one model before the operator is mailed (`#modelFailed`). */
+const SCHEMA_STREAK = 3;
 
 /** This record's id for a log line, or `null` for a record not yet made, or one whose identity cannot be read. */
 const recOf = (api: RecordApi): string | null => {
@@ -704,16 +707,19 @@ export class Record$ extends DurableObject<Env> {
     let api!: RecordApi;
     /* SLASH'S MODEL: his own key where he chose it in Settings, read from Slash's store on each press, or the
        included model (`slash.ts`). */
-    const slashModel = workerSlashModel(this.env, () => api, { store: () => sql });
+    /* A MODEL THAT DID NOT ANSWER IS THE OPERATOR'S (ENG-A01), told by every one of the three below: the record's own
+       model, its automations' answers and its model jobs. `api` is read when a call fails, by which time it is made. */
+    const onFail = (fail: ModelFail) => this.#modelFailed(api, fail);
+    const slashModel = workerSlashModel(this.env, () => api, { store: () => sql, onFail });
     const sql = guardedSql(this.ctx.storage);
     /* WHAT ANSWERS AN AUTOMATION'S QUESTION TO SLASH, off the same endpoint and the same key path as `slashModel`, so
        `answersSlash` below and `/api/version`'s `slash` are one fact. The storage is this object's own, the one the door's
        engine is handed, so the two engines count one `ask_cap`. Before this line a Worker with a model said `slash: true`
        and refused `ask_slash` at propose as if it had none (`test/slash-answers.test.ts`). */
-    this.#answers = workerSlashAnswers(this.env, () => api, { sql, clock: { now: () => Date.now() }, plan: () => this.#planOf(api) });
+    this.#answers = workerSlashAnswers(this.env, () => api, { sql, clock: { now: () => Date.now() }, plan: () => this.#planOf(api), onFail });
     /* AND WHAT ANSWERS ITS MODEL JOBS, over the same storage, so a job's ledger row sits beside every ask's and the
        background allowance is counted out of the one `slash_call` table (`@braindog/host/model-jobs`). */
-    this.#jobs = workerModelJobs(this.env, () => api, { sql, clock: { now: () => Date.now() } });
+    this.#jobs = workerModelJobs(this.env, () => api, { sql, clock: { now: () => Date.now() }, onFail });
     this.#jobsMeter = backgroundMeter(sql);
     this.#jobsStore = sql;
     /* THE RECORD'S COPIES, IN THE BUCKET THE NIGHT WRITES TO (`copies.ts`). Taken, listed and gone back to from inside
@@ -955,6 +961,34 @@ export class Record$ extends DurableObject<Env> {
       api.kernel.ackOutbox({ id: job.id, state: 'done', leasedUntil: job.leasedUntil, ...answered });
     }
     return jobs.length === UNSENT_MOST;
+  }
+
+  /**
+   * One model call that did not answer (ENG-A01): an `op: 'model'` line at error level with the provider's own words, and
+   * the operator mailed "BrainDog model" through the Directory's window, as a crash is, one a quarter hour for the fleet.
+   *
+   * NOT MAILED: a call on the owner's own key (`whose: 'owner'`), which is his provider's to mend, and a reply that broke
+   * its schema until `SCHEMA_STREAK` in a row, because one odd answer is the model's and three are a prompt or a model
+   * that changed. Logged every time, so the line is there to read when the mail comes.
+   */
+  #modelFailed(api: RecordApi | undefined, fail: ModelFail): void {
+    const rec = api === undefined ? null : recOf(api);
+    op(
+      {
+        op: 'model',
+        rec,
+        model: fail.model,
+        provider: fail.provider || null,
+        why: fail.why,
+        raw: fail.raw || null,
+        sent: fail.sent,
+        whose: fail.whose,
+        ...(fail.streak > 0 ? { streak: fail.streak } : {}),
+      },
+      'error',
+    );
+    if (fail.whose === 'owner' || (fail.why === 'schema' && fail.streak < SCHEMA_STREAK)) return;
+    this.ctx.waitUntil(opsAlert(this.env, { op: 'model', rec, model: fail.model, why: fail.why }, alertClaim(this.env)));
   }
 
   /**
@@ -1783,7 +1817,7 @@ export class Record$ extends DurableObject<Env> {
       this.#slash ??= workerSlashDoor(
         this.env,
         () => api,
-        { sql: guardedSql(this.ctx.storage), clock: { now: () => Date.now() }, plan: () => this.#planOf(api) },
+        { sql: guardedSql(this.ctx.storage), clock: { now: () => Date.now() }, plan: () => this.#planOf(api), onFail: (fail) => this.#modelFailed(api, fail) },
         new Set([`https://${this.env.PUBLIC_HOST ?? ''}`]),
       );
       return serveSlash(request, this.#slash, ctx);
@@ -2234,7 +2268,66 @@ export class Directory$ extends DurableObject<Env> {
     await this.ctx.storage.put(key, now);
     return true;
   }
+
+  /**
+   * The night's tally, kept by `nightly()` after the walk (LCH-C01), for `/healthz` to say. One key, beside the alert
+   * windows and outside the tables the Directory's copy is made of: a restore must not bring back an old night.
+   */
+  async nightDone(night: Night): Promise<void> {
+    await this.ctx.storage.put(NIGHT_KEY, night);
+  }
+
+  /** The last night `nightDone` kept, or `null` before the first. */
+  async night(): Promise<Night | null> {
+    return (await this.ctx.storage.get<Night>(NIGHT_KEY)) ?? null;
+  }
+
+  /**
+   * One sign-in letter's send, counted (LCH-A04): `true` went, `false` met a fault of this host's. The last
+   * `LETTERS_KEPT` are kept, newest last. An address's own fault never arrives here (`mailOutcome`), so the count says
+   * nothing about who has an account.
+   */
+  async letterSent(went: boolean): Promise<void> {
+    const kept = (await this.ctx.storage.get<boolean[]>(LETTERS_KEY)) ?? [];
+    await this.ctx.storage.put(LETTERS_KEY, [...kept, went].slice(-LETTERS_KEPT));
+  }
+
+  /** Whether sign-in mail is down: the last `LETTERS_DOWN_AFTER` sends all failed. What `/auth/methods` says as `magic: 'down'`. */
+  async lettersDown(): Promise<boolean> {
+    const kept = (await this.ctx.storage.get<boolean[]>(LETTERS_KEY)) ?? [];
+    const last = kept.slice(-LETTERS_DOWN_AFTER);
+    return last.length === LETTERS_DOWN_AFTER && last.every((went) => !went);
+  }
 }
+
+/** Where the Directory keeps the last night (`nightDone`), and the last sign-in sends (`letterSent`). */
+const NIGHT_KEY = 'ops-night';
+const LETTERS_KEY = 'ops-letters';
+const LETTERS_KEPT = 20;
+const LETTERS_DOWN_AFTER = 5;
+
+/**
+ * The last night for `/healthz`, from one Directory call, or `null` where the Directory did not answer.
+ *
+ * NEVER A THROW AND NEVER A 5xx: the probe's first question is whether this Worker answers, and it does. A Directory that
+ * is down is `null` here and every other door's problem, said by them. NOT CACHED: one storage read on the one object
+ * every isolate already wakes, and a watch that asks hourly, or a monitor a minute, costs a request each.
+ */
+async function nightOf(env: Env): Promise<Night | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    /* A DIRECTORY THAT IS SLOW IS ONE THAT DID NOT ANSWER: a probe that hung on it would read this Worker as down. */
+    const late = new Promise<null>((done) => (timer = setTimeout(() => done(null), NIGHT_WAIT_MS)));
+    return await Promise.race([env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).night(), late]);
+  } catch {
+    return null;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/** How long `/healthz` waits on the Directory for the night before it answers `night: null`. */
+const NIGHT_WAIT_MS = 1500;
 
 /** The Directory's window over every isolate's ops mail, for `opsAlert`. */
 const alertClaim =
@@ -2646,8 +2739,10 @@ export default {
 
 /** The walk, wired to the Directory, the objects and the bucket. Exported from nowhere: the cron is its one caller. */
 async function nightly(env: Env): Promise<void> {
-  if (!env.BLOBS)
+  if (!env.BLOBS) {
+    await opsAlert(env, { op: 'night', why: 'no BLOBS binding' }, alertClaim(env));
     throw new Error('The nightly copy did not run: this deployment has no BLOBS binding, so there is nowhere to put one.');
+  }
   const blobs = env.BLOBS;
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const copies = r2Snapshots(blobs, { recipient: env.AGE_RECIPIENT ?? '' });
@@ -2732,11 +2827,31 @@ async function nightly(env: Env): Promise<void> {
     counts: (held) => writeCounts({ blobs, assets: env.ASSETS }, held, new Date(tonight)),
     speak: op,
     now: () => Date.now(),
+  }).catch(async (e: unknown) => {
+    /* A WALK THAT THREW IS A NIGHT THAT DID NOT RUN, mailed before the throw makes the invocation red. */
+    await opsAlert(env, { op: 'night', why: 'the walk stopped' }, alertClaim(env));
+    throw e;
   });
   /* AND A NIGHT THAT COPIED NOTHING MAKES THE INVOCATION ITSELF RED. Every per-record failure is
      already in the tail, but a tail is read by somebody who is already worried; a failed cron run
      is what tells them to be. */
   const red = [fleetFailure(walked), directoryFailed].filter((line): line is string => line !== null);
+  /* AND THE NIGHT IS KEPT FOR `/healthz` (LCH-C01), so a watch from outside can say a night did not run, and a night with
+     a failure in it mails the operator before the invocation goes red, because a red cron row is read by somebody
+     already looking. Counts only: which record failed is in the walk's own lines. */
+  const night: Night = {
+    at: new Date().toISOString(),
+    records: walked.records,
+    backups: walked.backups,
+    backups_failed: walked.failed,
+    directory: directoryFailed === null ? 'ok' : 'failed',
+  };
+  try {
+    await directory.nightDone(night);
+  } catch (e) {
+    op({ op: 'walk', rec: 'directory', night: 'unkept', why: e instanceof Error ? e.message : String(e) }, 'error');
+  }
+  if (walked.failed > 0 || directoryFailed !== null) await opsAlert(env, { op: 'night', ...night }, alertClaim(env));
   if (red.length > 0) throw new Error(red.join(' '));
 }
 
@@ -2745,7 +2860,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     /* LIVENESS BEFORE EVERYTHING, THE OLD HOST'S REDIRECT INCLUDED. Measured at afb3b1b2 `/healthz` was the router's 404
        on `PUBLIC_HOST` and a 308 to `/app/healthz` on a legacy host for a caller sending `accept: text/html`, so a monitor
        either read the Worker as down or followed the redirect to the app shell and read somebody else's 200. */
-    if (HEALTHZ.test(url.pathname)) return healthz(request, env.BRAINDOG_BUILD, launchState(env));
+    if (HEALTHZ.test(url.pathname)) return healthz(request, env.BRAINDOG_BUILD, launchState(env), request.method === 'GET' ? await nightOf(env) : undefined);
     /* THE OLD HOST FIRST, AND ONLY FOR A PAGE LOAD. `legacyRedirect` answers
        `null` for every path this Worker serves itself, the build id and sign-in included, so an agent, a webhook
        sender and a stale tab on `app.brain.dog` are served where they stand. Unset `LEGACY_HOSTS` is no host at all. */
@@ -3578,7 +3693,7 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
     ...(env.AUTH_MAIL_FROM && env.EMAIL
       ? {
           mail: (to: string, link: string, kind?: string) =>
-            ctx.waitUntil(sendMail(env, isMailKind(kind) ? kind : 'signin', to, { link })),
+            ctx.waitUntil(signInLetter(env, isMailKind(kind) ? kind : 'signin', to, { link })),
         }
       : {}),
     operator: { key: env.PROVISION_KEY, provision: async (args) => provision(env, { ...args, tz: await askedZone(copy) }) },
@@ -3587,6 +3702,26 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
     reached: url.host,
     ...((env.SESSION_SECRET ?? '').length >= 32 ? { device: devices(env), invite: invites(env) } : {}),
   });
+}
+
+/**
+ * A letter a person waits on at sign-in or sign-up, sent, and whether it went told to the Directory (LCH-A04), so
+ * sign-in can say "mail is not going out" when the last five did not (`Directory$.lettersDown`).
+ *
+ * STILL INSIDE `waitUntil`, AFTER THE ANSWER: a known and an unknown address answer in the same time, as they always did.
+ * AN ADDRESS'S OWN FAULT IS NOT COUNTED (`mailOutcome`), so the count is the host's and says nothing about who is signed
+ * up. A Directory that does not take the count is a line, and the letter's outcome stands.
+ */
+async function signInLetter(env: Env, kind: MailKind, to: string, vars: MailVars): Promise<boolean> {
+  const outcome = await mailOutcome(env, kind, to, vars);
+  if (outcome !== 'address' && isWaitedOn(kind)) {
+    try {
+      await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).letterSent(outcome === 'sent');
+    } catch (e) {
+      op({ op: 'mail', kind, counted: false, why: e instanceof Error ? e.message : String(e) }, 'error');
+    }
+  }
+  return outcome === 'sent';
 }
 
 /** The three sign-up routes and the one method each answers, as `AUTH_ROUTES` declares them. */
@@ -3709,7 +3844,7 @@ async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: k
   const mail = out.status === 200 ? out.mail : undefined;
   if (mail && 'kind' in mail && (mail.kind === 'signup.verify' || mail.kind === 'signup.known') && env.AUTH_MAIL_FROM && env.EMAIL) {
     const link = mail.kind === 'signup.known' ? `${origin}/app/signin#magic=${mail.link}` : `${origin}/app/signup#verify=${mail.link}`;
-    ctx.waitUntil(sendMail(env, mail.kind, mail.to, { link }));
+    ctx.waitUntil(signInLetter(env, mail.kind, mail.to, { link }));
   }
   /* AFTER THE MAIL, so a known address is still sent its sign-in link, and the 403 is the one every address gets. */
   if (out.status === 200 && (out.body as Partial<SignupNeeds> | undefined)?.needs === 'code')

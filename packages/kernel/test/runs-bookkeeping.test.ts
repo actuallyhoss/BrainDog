@@ -59,7 +59,9 @@ const feed = (k: Awaited<ReturnType<typeof record>>['k']): { rows: Feed[]; match
 /** The hourly row, due now, as `createRecord` arms it on a real record. */
 const sweep = async (k: Awaited<ReturnType<typeof record>>['k'], sql: NodeSql, at: number): Promise<void> => {
   sql.exec("INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES (?, ?, 'purge', ?, '{}', 'pending', 0)", `01J0000000000000000000${String(at).slice(-4)}`, iso(at), `sweep-${at}`);
-  assert.equal((await k.drain()).done, 1);
+  /* THE SWEEP RAN, and the signs' nightly row may have run beside it, armed as the record opened (`armSigns`). */
+  assert.ok((await k.drain()).done >= 1);
+  assert.ok(Date.parse(sql.one<{ due_at: string }>('SELECT due_at FROM schedule WHERE key = ?', `sweep-${at}`)!.due_at) > at, 'the sweep did not run');
 };
 
 test('THE SWEEP WRITES NO FEED LINE: a run it writes off keeps the line in its history, and every feed reads past it', async () => {

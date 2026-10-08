@@ -34,7 +34,7 @@ const unreachable = (): Settled => ({ from: 'unreachable', fix: copy.recordNotRe
 
 const STATES = ['matched', 'ignored', 'untriaged', 'review'] as const;
 
-async function post(base: string, method: 'fileArrival' | 'archiveArrival' | 'triage', body: Record<string, unknown>, io: Fetch): Promise<Settled> {
+async function post(base: string, method: 'fileArrival' | 'archiveArrival' | 'triage' | 'fileAsSecond', body: Record<string, unknown>, io: Fetch): Promise<Settled> {
   let res: Response;
   try {
     res = await io(`${base}/api/${method}`, {
@@ -53,11 +53,17 @@ async function post(base: string, method: 'fileArrival' | 'archiveArrival' | 'tr
   if (typeof said !== 'object' || said === null || !('ok' in said)) return unreachable();
 
   if ((said as { ok: unknown }).ok === true) {
-    const value = (said as { value?: { state?: unknown; entry?: { register?: unknown; seq?: unknown; version?: unknown } | null } }).value;
+    const value = (said as { value?: { state?: unknown; reason?: unknown; entry?: { register?: unknown; seq?: unknown; version?: unknown } | null } }).value;
     const entry = value?.entry;
     /* THE RAIL'S COUNT FOLLOWS the next time the layout reads, rather than holding the number from before. */
     forget();
-    const state = STATES.find((s) => s === value?.state) ?? 'matched';
+    /* HELD AGAIN IS NOT FILED. `fileAsSecond` runs the pattern again with only its repeat check set aside, so another of
+       its skips can still hold the message, and then nothing was filed: the record's reason is said, as a refusal is. */
+    if (value?.state === 'skipped')
+      return { from: 'refused', fix: typeof value.reason === 'string' && value.reason !== '' ? value.reason : 'It was held again, so nothing was filed.' };
+    /* A PROPOSED ONE WAITS, as one in review does: `fileAsSecond` answers the kernel's own states, and a second one whose
+       pattern only proposes is waiting on a person, not filed. */
+    const state = value?.state === 'proposed' ? 'review' : (STATES.find((s) => s === value?.state) ?? 'matched');
     return {
       from: 'written',
       state,
@@ -77,6 +83,14 @@ const fetched: Fetch = (url, init) => fetch(url, init);
 /** File one arrival as a row in `register`, titled by its subject. */
 export const fileArrival = (base: string, id: string, register: string, io: Fetch = fetched): Promise<Settled> =>
   post(base, 'fileArrival', { id, register }, io);
+
+/**
+ * File a message skipped as a repeat after all, as a second one beside the row it looked like (REC-A03): "It is a second
+ * one". The record runs it again with its pattern's repeat check off for this one run, so the answer is where it went,
+ * filed or waiting, and a message that was not skipped as a repeat is the record's refusal.
+ */
+export const fileAsSecond = (base: string, id: string, io: Fetch = fetched): Promise<Settled> =>
+  post(base, 'fileAsSecond', { id }, io);
 
 /** Archive one arrival. Its bytes are kept. */
 export const archiveArrival = (base: string, id: string, io: Fetch = fetched): Promise<Settled> =>

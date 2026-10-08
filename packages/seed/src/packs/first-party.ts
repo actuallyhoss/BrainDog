@@ -420,11 +420,16 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   still the page's first line, by name, and `people-in-touch-90d` stays declared and draws nothing. WORK 1.16.0 AND
  *   PEOPLE 3.1.0 ARE RELEASED, so each is a version of its own. Blocks on pages a record already holds, no list, field
  *   or figure, so each is a minor step that reaches a record on its own.
+ * - money-core 3.14.0: an account's `last4` reads "Digits the bank prints", where it said "Last four digits", the words a
+ *   question about an unknown card quotes back (`loop/scope/area-record-a.md`, REC-A02 job 7). Some banks print two,
+ *   three or six, and the field holds whatever the message names. The id stays `last4`, so every bank pattern's lookup
+ *   still reads it. A label on a field a record already holds, so a minor step that reaches a record on its own. Money's
+ *   module is cut into a folder in the same step (`modules/money/`, REC-B01 job 1), which moves no byte of the document.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.15.0',
   people: '3.2.0',
-  'money-core': '3.13.0',
+  'money-core': '3.14.0',
   estate: '2.1.0',
   work: '1.17.0',
 };

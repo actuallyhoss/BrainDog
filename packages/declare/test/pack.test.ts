@@ -881,3 +881,14 @@ test('and a space after the comparator is not a second comparator', () => {
   assert.equal(satisfies('1.5.0', '>= 1.0.0 < 2.0.0'), true);
   assert.equal(satisfies('3.0.0', '>= 1.0.0 < 2.0.0'), false);
 });
+
+/* A PACK'S TITLE IS KEPT FOR WHAT NAMES IT TO A PERSON (a held message's reason, the inbox's report), and kept out of its
+   checksum, so a pack installed before the title was kept does not read as changed (batch 35, held-reasons). */
+test('a pack’s title is kept in its manifest, said once, and leaves its checksum as it was', async () => {
+  const plain = value<Pack>(await normalise(DOC()));
+  const titled = value<Pack>(await normalise(DOC({ title: '  Studio\n  books ' })));
+  assert.equal(titled.manifest.title, 'Studio books');
+  assert.equal(plain.manifest.title, undefined);
+  assert.equal(titled.checksum, plain.checksum);
+  assert.equal(value<Pack>(await normalise(DOC({ title: '   ' }))).manifest.title, undefined);
+});

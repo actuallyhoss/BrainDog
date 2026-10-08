@@ -55,7 +55,7 @@ test('Not now stands in the row with the answers, not at the far end of the form
 test('the question’s own page has a side only with something in it: who asked and why beside the answers on a wide page', () => {
   const gate = src('../../routes/decide/[id]/+page.svelte');
   /* THE SIDE IS DRAWN WHERE IT HAS SOMETHING TO SAY (`[id]/side.ts`); with nothing, who asked is the line over the answers. */
-  for (const part of ["<div class=\"gate-form\" data-side={sided ? '' : undefined}>", '<div class="gate-side">', '<div class="gate-main">', '{cardWords.askedBy}', '{cardWords.why}', '{cardWords.changes}'])
+  for (const part of ["<div class=\"gate-form\" data-side={sided ? '' : undefined}>", '<div class="gate-side">', '<div class="gate-main">', '{cardWords.askedBy}', '{cardWords.why}'])
     assert.ok(gate.includes(part), `the gate no longer draws ${part}`);
   /* AT LEAST THE CARD'S 280px, and wider on a wide page, only where there is a side. */
   assert.match(gate, /\.gate-form\[data-side\] \{\n\s+display: grid;\n\s+grid-template-columns: minmax\(0, 1fr\) clamp\(280px, 26cqi, 360px\);/u);

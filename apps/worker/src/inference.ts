@@ -71,12 +71,13 @@ export type Missing = 'no adapter on this host' | 'the provider did not answer' 
 const refuse = <T>(code: 'NOT_IN_THIS_BUILD' | 'PROPOSAL_SCHEMA' | 'SLASH_BUDGET_SPENT', fix: string, at: string): Result<T> => no<T>(code, fix, { at });
 
 /** No model answered for this call. `NOT_IN_THIS_BUILD` is borrowed; the port's header argues for it. */
-export const modelMissing = <T>(model: string, why: Missing): Result<T> =>
-  refuse<T>(
-    'NOT_IN_THIS_BUILD',
-    `No model answered for '${model}': ${why}. The repair is a deploy of a host that serves it, not an edit.`,
-    'model',
-  );
+export const modelMissing = <T>(model: string, why: Missing, raw = ''): Result<T> =>
+  no<T>('NOT_IN_THIS_BUILD', `No model answered for '${model}': ${why}. The repair is a deploy of a host that serves it, not an edit.`, {
+    at: 'model',
+    /* THE PROVIDER'S OWN WORDS, SCRUBBED AND CUT (`scrubRaw`), as `detail`: a screen folds it under Details, and the
+       Worker's hook (`includedInference`) writes it in the operator's log line. Absent where nothing was thrown. */
+    ...(raw === '' ? {} : { detail: raw }),
+  });
 
 /** The answer is not the JSON the call pinned, and nobody is retrying it. */
 export const schemaFailed = <T>(model: string, why: string): Result<T> =>
@@ -182,6 +183,37 @@ const tokensIn = (text: string): number => Math.ceil(new TextEncoder().encode(te
 const NO_SUCH_MODEL = /no such model|model not found|not a valid model|unknown model/iu;
 
 const sayOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** The most of the provider's own message a log line keeps. */
+export const RAW_MOST = 300;
+
+/**
+ * The provider's own words for a failed call, fit for a log line: anything shaped like a key cut out, then cut at
+ * `RAW_MOST`. `''` for a throw that said nothing.
+ *
+ * KEPT BECAUSE THE TWO PHRASES TELL NOBODY WHAT TO FIX. On his record the night's resolve failed eight times as "the
+ * provider did not answer", and whether that was the route table, the gateway or the account could not be said, because
+ * the platform's sentence was thrown away here. That sentence is the operator's whole lead.
+ *
+ * SCRUBBED BECAUSE A PROVIDER QUOTES WHAT IT WAS SENT. A bearer, a `key=` or a `"token": "..."` pair, any long opaque run
+ * (an API token, an account id in a gateway path), and a `"content"` string, which is a person's prompt quoted back. Then
+ * the cut, which is the brake on whatever the patterns miss: a quoted prompt past the first 300 characters never lands.
+ */
+export const scrubRaw = (said: string): string =>
+  said
+    .replace(/\b(bearer|basic)\s+\S+/giu, '$1 [cut]')
+    /* A KEY BY ITS SHAPE, short or long: the prefixes the common providers mint, and a key named in prose ("API key
+       provided: ..."), where the value carries a digit, so "API key invalid" keeps its words. */
+    .replace(/\b(?:sk|pk|rk)[-_][\w-]{6,}|\b(?:ghp|gho|ghu|ghs|ghr|github_pat|glpat|xox[abprse]|cfut|cfat|AIza)[\w-]{6,}|\b(?:AKIA|ASIA)[A-Z0-9]{12,}/gu, '[cut]')
+    .replace(/\b((?:api|access|secret|auth)[ _-]?(?:key|token)s?)((?:\s+provided)?\s*:?\s+)(?=\S*\d)\S{6,}/giu, '$1$2[cut]')
+    .replace(/(["']?)\b([\w-]*(?:key|token|secret|password|authorization)[\w-]*)\1(\s*[:=]\s*)("(?:[^"\\]|\\.)*"|'[^']*'|[^\s,;}&]+)/giu, '$1$2$1$3[cut]')
+    /* A PERSON'S WORDS QUOTED BACK: a chat message's `content`, a completion's `prompt`, an embedding's `text` or `input`,
+       as a string or a list of them. */
+    .replace(/(["']?)\b(content|prompt|text|input)\1(\s*:\s*)(?:"(?:[^"\\]|\\.)*"?|\[(?:[^\]"]|"(?:[^"\\]|\\.)*"?)*\]?)/giu, '$1$2$1$3"[cut]"')
+    .replace(/[A-Za-z0-9_\-+/=]{32,}/gu, '[cut]')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .slice(0, RAW_MOST);
 
 /**
  * The gateway wrapper every call carries.
@@ -317,13 +349,15 @@ const int8 = (row: number[]): Int8Array => {
  */
 export function aiInference(env: AiEnv): Inference {
   /** The binding's answer, or one of the three `Missing` reasons, so neither caller re-reads the platform's error. */
-  const call = async (provider: string, inputs: Record<string, unknown>): Promise<{ answer: unknown } | { why: Missing }> => {
+  /* `raw` IS THE PLATFORM'S OWN SENTENCE, scrubbed and cut (`scrubRaw`), carried beside the phrase and never instead. */
+  const call = async (provider: string, inputs: Record<string, unknown>): Promise<{ answer: unknown } | { why: Missing; raw: string }> => {
     const ai = env.AI;
-    if (ai === undefined) return { why: 'no adapter on this host' };
+    if (ai === undefined) return { why: 'no adapter on this host', raw: '' };
     try {
       return { answer: await ai.run(provider, inputs, through(env)) };
     } catch (e) {
-      return { why: NO_SUCH_MODEL.test(sayOf(e)) ? 'the provider does not serve it' : 'the provider did not answer' };
+      const said = sayOf(e);
+      return { why: NO_SUCH_MODEL.test(said) ? 'the provider does not serve it' : 'the provider did not answer', raw: scrubRaw(said) };
     }
   };
 
@@ -354,7 +388,7 @@ export function aiInference(env: AiEnv): Inference {
         max_tokens: req.maxTokens,
         response_format: formatFor(rate.shape, req.schema),
       });
-      if ('why' in got) return modelMissing<Completion>(req.model, got.why);
+      if ('why' in got) return modelMissing<Completion>(req.model, got.why, got.raw);
 
       const { text, usage, cutOff } = readAnswer(rate.shape, got.answer);
 
@@ -388,7 +422,7 @@ export function aiInference(env: AiEnv): Inference {
       if (texts.length === 0) return ok({ model: EMBED_MODEL, dims: 0, vectors: [], usage: { in: 0, out: 0, neurons: null } });
 
       const got = await call(EMBED_MODEL, { text: [...texts] });
-      if ('why' in got) return modelMissing<Embeddings>(EMBED_MODEL, got.why);
+      if ('why' in got) return modelMissing<Embeddings>(EMBED_MODEL, got.why, got.raw);
 
       const rows = (got.answer as { data?: unknown } | null)?.data;
       /* A COUNT THAT DOES NOT MATCH IS NOT SALVAGEABLE, because the caller writes `entry_vec` by

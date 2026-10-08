@@ -101,6 +101,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.14.0',
+      notes: 'An account asks for the digits the bank prints, where it asked for the last four digits.',
+    },
+    {
       version: '3.13.0',
       notes: 'Coming and going opens on one heading. The next 30 days under it no longer has a second heading of its own.',
     },

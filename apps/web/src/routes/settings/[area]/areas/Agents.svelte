@@ -78,7 +78,7 @@
   /**
    * Each run's state as its face draws it, from the run's own `state` and when it was last heard from.
    *
-   * THE KERNEL'S OWN QUIET, `isQuiet`: an open run not heard from in 30 minutes has gone quiet, worked out when read, as
+   * THE KERNEL'S OWN QUIET, `isQuiet`: an open run not heard from in 15 minutes (`WORKING_MS`) has gone quiet, worked out when read, as
    * the record works it out for its live runs, so a face here and the board of runs never disagree about one run. The
    * 45 minutes of `isStale` is when the record stops joining a call to a run, which is not what a person is shown.
    */
@@ -86,13 +86,11 @@
     const out = new Map<number, RunLive>();
     for (const row of rows) {
       if (typeof row !== 'object' || row === null) continue;
-      const r = row as { seq?: unknown; fields?: unknown; updated_at?: unknown; created?: unknown };
+      const r = row as { seq?: unknown; fields?: unknown };
       if (typeof r.seq !== 'number' || typeof r.fields !== 'object' || r.fields === null) continue;
       const f = r.fields as Record<string, unknown>;
-      /* `last_seen` FIRST, which `isQuiet` reads itself, then when the row last changed; a row that says neither is
-         judged as heard from long ago, so it is never shown at work. */
-      const changed = typeof r.updated_at === 'string' ? r.updated_at : typeof r.created === 'string' ? r.created : new Date(0).toISOString();
-      out.set(r.seq, liveOf(f.state, isQuiet({ fields: f as never, updated_at: changed }, nowMs)));
+      /* `last_seen` ALONE, which `isQuiet` reads itself: a run that never said it is never shown at work. */
+      out.set(r.seq, liveOf(f.state, isQuiet({ fields: f as never }, nowMs)));
     }
     return out;
   }

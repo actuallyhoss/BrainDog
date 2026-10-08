@@ -46,7 +46,7 @@
   import Arranged from './[id]/Arranged.svelte';
   import Applied from './[id]/Applied.svelte';
   import { updatesOf, words as changeWords } from './[id]/changes.ts';
-  import { AIM, DECIDED_FIRST, evidenceOf, sentenceOf, waitedOf, waitedWords, WORDS as LEAD } from './lead.ts';
+  import { AIM, DECIDED_FIRST, evidenceIn, sentenceOf, waitedOf, waitedWords, WORDS as LEAD } from './lead.ts';
   import { proposedOf } from './[id]/proposed.ts';
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './[id]/arranged.ts';
   import { answerFor, reasonState, record, setReason, withdraw, type Answer } from '$lib/record/answer.ts';
@@ -280,8 +280,8 @@
 
   /**
    * THE SUGGESTION ON THE OPEN QUESTION, AND WHY: the suggested option's reason as it was filed, braces and all, so its
-   * rows are links (`Cited`), and the one share that reason claims, when it claims one, drawn as squares. No structured
-   * figure exists on a question, so a reason that names no "N of M" draws words and no chart.
+   * rows are links (`Cited`), and the one share the question's body gives in its `evidence` field, drawn as squares. The
+   * share is never read out of the reason's words, so a body with no `evidence` draws words and no chart.
    */
   const leadWhy = $derived.by(() => {
     if (!lead || from !== 'live') return null;
@@ -290,7 +290,7 @@
     const body = aboutFor(lead)?.body;
     const text = reasonIn(body, option.key) ?? option.body;
     const figures = figuresIn(body);
-    return { option, text, figures, evidence: text.trim() === '' ? null : evidenceOf(text, figures, now) };
+    return { option, text, figures, evidence: evidenceIn(body, now) };
   });
 
   /**

@@ -27,7 +27,7 @@ import assert from 'node:assert/strict';
 
 import { fixOf, refused, type Result } from '@braindog/ports';
 
-import { aiInference, type AiEnv, type AiOptions, type CompleteRequest } from '../src/inference.ts';
+import { aiInference, RAW_MOST, scrubRaw, type AiEnv, type AiOptions, type CompleteRequest } from '../src/inference.ts';
 
 /** The triage schema of `46 §5`, cut to the two fields the model actually contributes. */
 const TRIAGE = {
@@ -371,4 +371,37 @@ test('A RAGGED OR UNREADABLE EMBEDDING ROW IS REFUSED, not quantised down to wha
 
   const empty = answering(() => ({ data: [[]] }));
   assert.equal(codeOf(await aiInference(empty.env).embed(['one'])), 'NOT_IN_THIS_BUILD');
+});
+
+test("THE PROVIDER'S OWN WORDS RIDE THE REFUSAL AS `detail`, beside the phrase, so the operator can tell route from account", async () => {
+  const said = '5016: AiError: Your account 0123456789abcdef0123456789abcdef has no access to @cf/zai-org/glm-5.3-flash';
+  const { env } = answering(() => { throw new Error(said); });
+  const out = await aiInference(env).complete(ask);
+  assert.ok(refused(out));
+  assert.match(out.refusal.fix, /did not answer/u, 'the phrase stays the sentence a person reads');
+  assert.equal(out.refusal.detail, '5016: AiError: Your account [cut] has no access to @cf/zai-org/glm-5.3-flash');
+
+  const embedded = await aiInference(env).embed(['one']);
+  assert.ok(refused(embedded));
+  assert.match(String(embedded.refusal.detail), /has no access/u);
+
+  /* NOTHING THROWN, NOTHING TO QUOTE: an unbound binding is the phrase alone. */
+  const unbound = await aiInference({ AI_GATEWAY: 'braindog-alpha' }).complete(ask);
+  assert.ok(refused(unbound));
+  assert.equal(unbound.refusal.detail, undefined);
+});
+
+test("A KEY OR A PERSON'S PROMPT IN THE PROVIDER'S MESSAGE NEVER REACHES `detail`, and nothing past 300 characters does", async () => {
+  const prompt = 'Sam wrote: my card ending 7731 was charged twice';
+  const said = `400 Bad Request: Authorization: Bearer cf-live-0a1b2c3d api_key="sk_live_abc" body {"messages":[{"role":"user","content":"${prompt}"}],"x":"${'pad '.repeat(120)}${prompt}"}`;
+  const { env } = answering(() => { throw new Error(said); });
+  const out = await aiInference(env).complete(ask);
+  assert.ok(refused(out));
+  const detail = String(out.refusal.detail);
+  assert.ok(detail.length <= RAW_MOST, `${detail.length} characters`);
+  for (const secret of ['cf-live-0a1b2c3d', 'sk_live_abc', prompt]) assert.ok(!detail.includes(secret), secret);
+  assert.match(detail, /^400 Bad Request/u);
+  assert.equal(scrubRaw('a long token run ' + 'A1'.repeat(30)), 'a long token run [cut]');
+  assert.equal(scrubRaw('bad input {"text":["Ada 7731"]} key sk-proj-ab12cd'), 'bad input {"text":"[cut]"} key [cut]');
+  assert.equal(scrubRaw('API key invalid for this route'), 'API key invalid for this route', 'words that are no key stay');
 });

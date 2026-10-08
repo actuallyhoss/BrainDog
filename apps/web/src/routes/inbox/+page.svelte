@@ -32,6 +32,9 @@
   and a fortnight's arrivals as a line, and the figure beside it. So an inbox with nothing waiting still says how things
   reach it and whether the rules are working, rather than one sentence on a bare board. Every filing and
   archiving, a person's or an agent's, names who did it and can be put back, through `triage`'s `back`.
+
+  UNDER THEM, WHAT EACH PATTERN DID (`patterns.ts`): the record's report of the fortnight, per pattern what it filed and
+  what it held and why, and the messages it held as repeats, each with "It is a second one", which files it (REC-A03).
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -67,6 +70,7 @@
   import type { Pattern, Series, SettledItem, Tally } from './series.ts';
   import { daysOf, figureOf, sentenceOf, whoFiledOf } from './days.ts';
   import { SOURCE_DAYS, countSaid, drawsLine, lastSaid, lineSaid, nothingEver, quietWords, sourcesOf } from './sources.ts';
+  import { panelOf, type PatternReport } from './patterns.ts';
 
   /**
    * THIS UNIT'S OWN WORDS, beside the one screen that says them. The press's cost is not named: the door meters it, and a
@@ -109,6 +113,15 @@
     noneFiledWhy: 'What you or an agent files from the inbox, and what a rule files as it arrives, is listed here.',
     noneArchived: 'Nothing has been archived',
     noneArchivedWhy: 'What you or an agent archives from the inbox is kept here, and can be put back.',
+    patternsDid: 'What each pattern did',
+    heldMark: 'Held',
+    needsMark: 'Needs you',
+    repeats: 'Held as repeats',
+    repeatsWhy: 'A message that looks like one already filed is held. If it is a real second payment, file it.',
+    second: 'It is a second one',
+    secondNamed: (subject: string) => `File “${subject}” as a second one`,
+    secondFiled: 'Filed as a second one.',
+    secondWaits: 'Taken as a second one. It waits for you in the inbox.',
   };
 
   /**
@@ -167,12 +180,52 @@
     void import('./series.ts')
       .then((m) => m.readArrivals(apiBase(), Date.now(), SOURCE_DAYS))
       .then((read) => (arrivals = read));
+    void rereadPatterns();
   });
 
   /* WHAT COMES IN, BY THE WAY IT CAME, from every arrival of the fortnight whatever became of it. `null` until read, and
      a read that failed draws no tile rather than three quiet rows that would be a guess. */
   let arrivals = $state.raw<{ lines: { channel: string; ts: string }[]; partial: boolean } | null>(null);
   const ways = $derived(arrivals ? sourcesOf(arrivals.lines, clock) : null);
+
+  /**
+   * WHAT EACH PATTERN DID, the record's report of the fortnight drawn as one tile under "What comes in", and the messages
+   * it held as repeats, each with the press that files it as a second one (REC-A03). A report the record does not answer
+   * draws no tile, and a press answers in place: the line says it was filed, or says the record's own sentence.
+   */
+  let report = $state.raw<PatternReport | null>(null);
+  const panel = $derived(panelOf(report));
+  let repeats = $state<(InboxItem & { reason: string })[]>([]);
+  let seconding = $state<string | null>(null);
+  let seconded = $state<Record<string, { text: string; refused: boolean }>>({});
+
+  async function rereadPatterns() {
+    const m = await import('./patterns.ts');
+    const [read, held] = await Promise.all([m.readReport(apiBase()), m.readRepeats(apiBase())]);
+    report = read;
+    /* A REPEAT ALREADY ANSWERED STAYS, saying what became of it, until the screen is opened again. */
+    const kept = repeats.filter((r) => seconded[r.id] !== undefined && !held.some((h) => h.id === r.id));
+    repeats = [...held, ...kept].sort((a, b) => b.arrived.localeCompare(a.arrived));
+  }
+
+  async function second(item: InboxItem) {
+    if (seconding !== null) return;
+    seconding = item.id;
+    try {
+      const m = await import('$lib/record/inbox-write.ts');
+      const out = await m.fileAsSecond(apiBase(), item.id);
+      if (out.from === 'written') {
+        seconded = { ...seconded, [item.id]: { text: out.state === 'matched' ? words.secondFiled : words.secondWaits, refused: false } };
+        void retally();
+        void rereadPatterns();
+        if (out.state !== 'matched') void rereadWaiting();
+      } else {
+        seconded = { ...seconded, [item.id]: { text: out.fix, refused: true } };
+      }
+    } finally {
+      seconding = null;
+    }
+  }
 
   /**
    * THE SERIES AND THE TALLY. What waits is the screen's first series; filed and archived are the record's `matched` and
@@ -628,6 +681,67 @@
         </div>
       {/if}
 
+      {#if panel || repeats.length > 0}
+        <!-- WHAT EACH PATTERN DID, under the ways in: per pattern what it filed and held in the fortnight, each held
+             reason in words, and the repeats it held, each with the press that files it as a second one. A held or
+             needs-you line carries its word as well as its red. -->
+        <Tile icon="filter" title={words.patternsDid}>
+          {#if panel}
+            <p class="did-sentence num">{panel.sentence}</p>
+            {#each panel.doors as d (d.key)}
+              <div class="did-door">
+                {#if panel.doors.length > 1}<h3 class="did-door-name">{d.name}</h3>{/if}
+                <ul class="did">
+                  {#each d.patterns as p (p.key)}
+                    <li class="did-line">
+                      <span class="did-head">
+                        <span class="did-name">{p.name}</span>
+                        <span class="did-counts num">{p.counts}</span>
+                      </span>
+                      {#each p.held as why, i (i)}
+                        <span class="did-why"><span class="did-mark">{words.heldMark}</span>{why}</span>
+                      {/each}
+                      {#if p.waiting}
+                        <span class="did-why"><span class="did-mark">{words.needsMark}</span>{p.waiting}</span>
+                      {/if}
+                    </li>
+                  {/each}
+                  {#if d.unread}
+                    <li class="did-line"><span class="did-why did-unread">{d.unread}</span></li>
+                  {/if}
+                </ul>
+              </div>
+            {/each}
+          {/if}
+          {#if repeats.length > 0}
+            <div class="did-door">
+              <h3 class="did-door-name">{words.repeats}</h3>
+              <p class="did-why did-plain">{words.repeatsWhy}</p>
+              <ul class="did">
+                {#each repeats as r (r.id)}
+                  {@const answer = seconded[r.id]}
+                  <li class="did-line repeat">
+                    <span class="repeat-main">
+                      <span class="did-head">
+                        <span class="did-name">{r.subject}</span>
+                        <span class="did-counts num">{since(r.arrived, clock)}</span>
+                      </span>
+                      <span class="did-why did-plain">{r.reason}</span>
+                      {#if answer}
+                        <span class="did-why" data-refused={answer.refused ? '' : undefined} role="status">{answer.text}</span>
+                      {/if}
+                    </span>
+                    {#if !answer || answer.refused}
+                      <Button size="sm" aria-label={words.secondNamed(r.subject)} disabled={seconding !== null} onclick={() => second(r)}>{words.second}</Button>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          {/if}
+        </Tile>
+      {/if}
+
       <div class="main">
         {#if view !== 'waiting'}
           {@render settledSeries()}
@@ -1047,6 +1161,111 @@
     font-variant-numeric: tabular-nums;
     text-align: end;
     white-space: nowrap;
+  }
+
+  /* WHAT EACH PATTERN DID: the fortnight's sentence, then a line a pattern, its name and counts on one line and each held
+     reason under it, led by its word in the deeper red. A hairline between lines, inside the tile, as the ways in. */
+  .did-sentence {
+    margin: 0 0 var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .did-door + .did-door {
+    margin-block-start: var(--sp-4);
+  }
+
+  .did-door-name {
+    margin: 0 0 var(--sp-1);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    line-height: 22px;
+  }
+
+  .did {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .did-line {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-block: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .did-line + .did-line {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .did-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .did-name {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    line-height: 22px;
+  }
+
+  .did-counts {
+    flex: none;
+    color: var(--ink2);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .did-why {
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .did-plain,
+  .did-unread {
+    color: var(--dim);
+  }
+
+  .did-why[data-refused] {
+    color: var(--danger-text);
+  }
+
+  .did-mark {
+    margin-inline-end: var(--sp-2);
+    color: var(--danger-text);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+  }
+
+  /* A REPEAT: its words on the left and the press on the right, the press under them on a phone. */
+  .repeat {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2) var(--sp-3);
+  }
+
+  .repeat-main {
+    display: flex;
+    flex: 1 1 18rem;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
   }
 
   /* AN EMPTY INBOX IS A TILE ON THE BOARD like everything else on it, never a sentence floating on the ground. */

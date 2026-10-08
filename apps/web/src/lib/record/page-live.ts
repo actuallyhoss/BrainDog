@@ -1294,8 +1294,9 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     ...(cardGroups ? { groups: cardGroups } : {}),
     ...(bylines ? { bylines } : {}),
     ...(inherited === undefined ? {} : { inherited }),
-    /* GONE QUIET AS THE RECORD SAYS IT (`isQuiet`): open, and not heard from in 30 minutes. */
-    ...(live ? { quiet: got.map((r) => isQuiet({ fields: r.fields as never, updated_at: r.updated_at ?? r.created_at }, now)) } : {}),
+    /* GONE QUIET AS THE RECORD SAYS IT (`isQuiet`): open, and not heard from in 15 minutes (`WORKING_MS`), read off its
+       `last_seen` alone, so a run that never said it is never shown at work. */
+    ...(live ? { quiet: got.map((r) => isQuiet({ fields: r.fields as never }, now)) } : {}),
     ...(working ? { working } : {}),
     ...(workingNow ? { working_now: workingNow } : {}),
     ...(scopeCells ? { scopeCells } : {}),

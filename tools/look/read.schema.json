@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brain.dog/schemas/look-read.json",
+  "title": "A reading of a look",
+  "description": "What the reading agent writes as read.json beside a look's said.json, against tools/look/rubric.md. Every answer names the images it was read from.",
+  "type": "object",
+  "required": ["look", "screens", "faults", "notDrawn", "verdict"],
+  "additionalProperties": false,
+  "$defs": {
+    "check": {
+      "enum": ["board", "header", "accent", "late", "buttons", "type", "width", "chart", "raw", "words", "agree", "cut", "empty", "phone", "template", "theme"]
+    },
+    "images": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^[a-z0-9-]+-[0-9]+-(light|dark)(-full)?\\.png$|^sheet-[a-z]+-(light|dark)(-[0-9]+)?\\.png$" }
+    }
+  },
+  "properties": {
+    "look": {
+      "type": "object",
+      "required": ["said", "source", "record", "set", "seen", "readAt", "reader"],
+      "additionalProperties": false,
+      "properties": {
+        "said": { "type": "string", "description": "The said.json this reading is of, as a path under the look's folder." },
+        "source": { "enum": ["seed", "lived", "file", "live"] },
+        "record": { "type": "string" },
+        "set": { "enum": ["six", "nine", "all"] },
+        "seen": { "type": "boolean", "description": "Copied from said.json. Only a real record counts as seen." },
+        "readAt": { "type": "string", "format": "date-time" },
+        "reader": { "type": "string", "description": "Who read it: the reading agent, or the loop's integrator when it signs." }
+      }
+    },
+    "screens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["screen", "name", "verdict", "checks"],
+        "additionalProperties": false,
+        "properties": {
+          "screen": { "type": "string", "description": "The screen's key, as said.json names it." },
+          "name": { "type": "string", "description": "What the person calls it." },
+          "verdict": { "enum": ["pass", "fail", "cannot-tell"] },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["check", "verdict", "images", "seen"],
+              "additionalProperties": false,
+              "properties": {
+                "check": { "$ref": "#/$defs/check" },
+                "verdict": { "enum": ["pass", "fail", "n/a", "cannot-tell"] },
+                "images": { "$ref": "#/$defs/images" },
+                "seen": { "type": "string", "minLength": 1, "description": "What is on the picture, quoted where there are words." }
+              }
+            }
+          }
+        }
+      }
+    },
+    "faults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["screen", "check", "images", "what", "costs"],
+        "additionalProperties": false,
+        "properties": {
+          "screen": { "type": "string" },
+          "check": { "$ref": "#/$defs/check" },
+          "images": { "$ref": "#/$defs/images" },
+          "what": { "type": "string", "minLength": 1, "description": "One plain sentence: what is wrong and where." },
+          "costs": { "enum": ["blocks", "hurts", "polish"] }
+        }
+      }
+    },
+    "notDrawn": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["screen", "why"],
+        "additionalProperties": false,
+        "properties": { "screen": { "type": "string" }, "why": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "verdict": {
+      "enum": ["pass", "fail"],
+      "description": "pass only when every screen passes, notDrawn is empty and look.seen is true."
+    }
+  }
+}

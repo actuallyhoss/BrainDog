@@ -82,7 +82,7 @@ test('A SECOND ARRIVAL LIKE A ROW ALREADY FILED IS HELD FOR A PERSON, naming the
   assert.equal(second.confidence, 'needs-review');
   assert.equal(
     second.reason,
-    'This looks like transactions#1, with the same merchant and amount, so bank-card held it for a person rather than skip it or file it twice.',
+    'This looks like Halden Coffee, with the same merchant and amount, so the pattern held it for a person rather than skip it or file it twice.',
   );
 
   const raw = sql.one<{ state: string; reason: string }>('SELECT state, reason FROM inbox_raw WHERE id = ?', second.raw);
@@ -190,7 +190,7 @@ test('A NEAR KEY SAYS WHICH FIELDS ARE EQUAL AND WHICH ARE ONLY CLOSE', async ()
   assert.equal(next.state, 'review');
   assert.equal(
     next.reason,
-    'This looks like transactions#1, with the same amount and account, on within a day of it and what starting the same way, so bank-card held it for a person rather than skip it or file it twice.',
+    'This looks like Halden Coffee Roasters, with the same amount and account, on within a day of it and what starting the same way, so the pattern held it for a person rather than skip it or file it twice.',
   );
   sql.close();
 });

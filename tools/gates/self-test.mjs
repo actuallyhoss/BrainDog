@@ -28,6 +28,10 @@ import { dirname, join } from 'node:path';
 
 import { keyPaths, webBuildUnmet } from './lib.mjs';
 
+/* IN `--built`, NOT `--unbuilt`: its browser negatives read `apps/web/build` and skip without one, so the job that builds
+   nothing would see it exit 3. `builds` is never refused by the runner; it only says which job asks for this gate. */
+export const needs = ['builds'];
+
 const here = dirname(fileURLToPath(import.meta.url));
 const negatives = join(here, 'negative');
 
@@ -116,6 +120,10 @@ const CASES = [
      ONLY class a gate used to see would leave the whole widening untested, which is the state this
      fixture is here to end. */
   { gate: 'nul-bytes-backspace', run: 'nul-bytes', expect: /a raw BACKSPACE at offset/, findings: 1 },
+
+  /* A TEST FILE NOTHING RUNS, AND A SKIP THAT GIVES NO REASON: `orphan-tests`' two findings, one fixture each. */
+  { gate: 'orphan-tests', expect: /is run by nothing/, findings: 1 },
+  { gate: 'orphan-tests-skip', run: 'orphan-tests', expect: /which gives no reason/, findings: 1 },
 
   /* THE FOUR HALVES OF `graph`, ONE FIXTURE EACH. A gate with three checks and one fixture is a
      gate with one check under test and two that have never been asked to fire, and this one's

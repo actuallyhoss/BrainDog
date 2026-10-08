@@ -119,7 +119,7 @@ test('THE KEY AND EACH NAME\'S TITLE ARE ON BOTH SIDES: the colours drawn are na
   assert.match(svelte, /<span class="roadmap-item-title" title="A long name that the left column will cut with an ellipsis">A long name/u);
   assert.match(
     svelte,
-    /<ul aria-label="What the colours mean" class="roadmap-legend"><li class="roadmap-key">Under way<\/li><li class="roadmap-key" data-key="warn">At risk<\/li><li class="roadmap-key" data-key="bad">Late<\/li><li class="roadmap-key" data-key="good">Done<\/li><\/ul>/u,
+    /<ul aria-label="What the colours mean" class="roadmap-legend"><li class="roadmap-key">Under way<\/li><li class="roadmap-key" data-key="warn">Due soon<\/li><li class="roadmap-key" data-key="bad">Late<\/li><li class="roadmap-key" data-key="good">Done<\/li><\/ul>/u,
   );
   /* One colour has no key, on either side. */
   const plain = parse(SHAPES['a fraction of a day, a link in a title, and today outside the span']!)[0] as BlockSegment;

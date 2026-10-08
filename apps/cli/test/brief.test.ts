@@ -81,7 +81,7 @@ test('TWO SESSIONS IN ONE WORKING TREE are said word for word, and never about t
   assert.ok(briefing(attached(full()), AT, undefined).includes(TWO_SESSIONS));
   const s46 = full().live.same_repo[0]!;
   const self = { ...s46, spoken: 'S47', doing: 'this very session' };
-  /* Quiet as the record works it out, at thirty minutes; and `stale` alone, at forty-five, from a host older than `quiet`. */
+  /* Quiet as the record works it out, at fifteen minutes (`WORKING_MS`); and `stale` alone, at forty-five, from a host older than `quiet`. */
   const { quiet: _, ...older } = { ...s46, stale: true };
   for (const runs of [[self], [{ ...s46, state: 'idle' }], [{ ...s46, state: 'handoff' }], [{ ...s46, quiet: true }], [older as typeof s46], []]) {
     const text = briefing(attached({ ...full(), live: { same_repo: runs, elsewhere: [] } }), AT, undefined);

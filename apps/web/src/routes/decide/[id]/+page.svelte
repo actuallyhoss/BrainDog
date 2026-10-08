@@ -52,7 +52,7 @@
   import '$lib/decide/form.css';
   import { cardWords, spoken } from '$lib/decide/card.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
-  import { acceptKey, amountSaid, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords, type Held } from '../press.ts';
+  import { acceptKey, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords, type Held } from '../press.ts';
   import { mergeListOf, mergeOf, words as mergeWords, type Press } from '../merge.ts';
   import MergeCard from '../MergeCard.svelte';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
@@ -173,8 +173,6 @@
   const lists = $derived(
     new Map<string, string>(((page.data.lists ?? page.data.index?.registers ?? []) as { id: string; name: string }[]).map((l) => [l.id, l.name])),
   );
-  /** A list by the name the reader knows it by. */
-  const listName = (register: string | undefined): string => (register ? (lists.get(register) ?? copy.valueWord(register)) : '');
   const story = $derived(
     about ? arrangedOf(about.kind, about.body, { lists, labels: heard(), pagesNow: live?.pagesNow }) : null,
   );
@@ -709,33 +707,26 @@
   );
 
   /**
-   * THE SIDE BESIDE THE CHOICES (`side.ts`), for a question still open: what answering changes in a line each, the share
-   * the suggested answer's reason claims, and the things the reasons name, each only where the record holds it. Who
-   * asked and why it is asked lead it.
+   * THE SIDE BESIDE THE CHOICES (`side.ts`), for a question still open: the share the asker gave on the question's body
+   * and the things the reasons name, each only where the record holds it. Who asked and why it is asked lead it. What
+   * answering changes is drawn whole under the answers (`section.does`) and is not said again beside them.
    */
   const side = $derived.by(() => {
     if (!question || !costed) return null;
     const body = about?.body;
     return sideOf({
       why: question.context ? spoken(question.context) : '',
-      reasons: question.options.map((o) => ({ text: reasonIn(body, o.key) ?? o.body, suggested: o.recommended === true })),
+      reasons: question.options.map((o) => ({ text: reasonIn(body, o.key) ?? o.body })),
+      body,
       figures: figuresIn(body),
-      facts: {
-        arranged: story,
-        appears: story ? [] : (preview?.appears ?? []),
-        changed: updates.length,
-        added: picked === null ? 0 : (picked?.length ?? pickable.length),
-        list: listName(live?.rowset?.register),
-        money: moves.length > 0 ? cardWords.moves(amountSaid(moves)) : '',
-      },
       now,
     });
   });
   /* A QUESTION WITH NOTHING FOR THE SIDE HAS NONE: who asked is the quiet line over the answers, and the tile reads as
      one centred column at a form's measure, never a blank column beside the choices. A receipt reads the same way. */
   const sided = $derived(side?.any === true);
-  /** The side's parts under the answers on a phone, beside them on a laptop: what it changes, the evidence, what is linked. */
-  const sideMore = $derived(side !== null && (side.changes.length > 0 || side.evidence !== null || side.links.length > 0));
+  /** The side's parts under the answers on a phone, beside them on a laptop: the evidence and what is linked. */
+  const sideMore = $derived(side !== null && (side.evidence !== null || side.links.length > 0));
 
   /**
    * DRAWN ONCE THE READ HAS ANSWERED LIVE. The read is bracketed by `opened()` and `closed()`, so a call
@@ -900,8 +891,8 @@
         {/if}
 
         <!-- THE FORM AND ITS SIDE (DIRECTION §39). On a wide tile the answers and what accepting does are the first
-             column, and beside them a side says who asked and when, why, what answering changes, the evidence and what
-             is linked, each only where the record holds it. On a narrow one both are let go of and read in one column:
+             column, and beside them a side says who asked and when, why, the evidence and what is linked, each only
+             where the record holds it. On a narrow one both are let go of and read in one column:
              who asked, why, the answers, what accepting does, then the evidence and what is linked. A QUESTION WITH
              NOTHING FOR THE SIDE HAS NO SIDE: who asked is one quiet line over the answers and the tile is one centred
              column (`side.ts`). The side's parts are groups with a name, never landmarks of their own. -->
@@ -1172,24 +1163,18 @@
             {/if}
           </div>
 
-          <!-- THE REST OF THE SIDE, written after the answers so a phone reads it under them: what answering changes in
-               a line each (beside the choices only, since a phone has the whole of it just above), the share the
-               suggested answer's reason claims, and the things the reasons name, each a link to it by its own name. -->
+          <!-- THE REST OF THE SIDE, written after the answers so a phone reads it under them: the share the asker gave
+               on the question's body, and the things the reasons name, each a link to it by its own name. What answering
+               changes is not here: it is whole under the answers, at every width, and said once. -->
           {#if side && sided && sideMore}
             <div class="gate-side gate-more">
-              {#if side.changes.length > 0}
-                <div class="gate-part gate-changes" role="group" aria-labelledby="gate-changes-h">
-                  <h2 class="gate-side-h" id="gate-changes-h">{cardWords.changes}</h2>
-                  <ul class="gate-lines">
-                    {#each side.changes as line, i (i)}<li dir="auto">{line}</li>{/each}
-                  </ul>
-                </div>
-              {/if}
               {#if side.evidence}
                 {@const ev = side.evidence}
                 <div class="gate-part" role="group" aria-labelledby="gate-ev-h">
                   <h2 class="gate-side-h" id="gate-ev-h">{sideWords.evidence}</h2>
-                  <div class="gate-ev">
+                  <!-- THE SQUARES ARE FOR THE EYE; the sentence under them is what they mean, and a screen reader hears it
+                       there, once. -->
+                  <div class="gate-ev" aria-hidden="true">
                     <Waffle
                       parts={[
                         { label: '', value: ev.value, tone: 'ink' },
@@ -1294,12 +1279,6 @@
     clip-path: none;
   }
 
-  /* WHAT IT CHANGES, IN A LINE EACH, IS THE SIDE'S ALONE: in one column the whole of it is just above, under the
-     answers, and the lines would say it twice. */
-  .gate-more .gate-changes {
-    display: none;
-  }
-
   /* TWO COLUMNS, ON A WIDE PAGE WITH SOMETHING FOR THE SIDE: the answers and what accepting does, and beside them a
      side under quiet headings, a hairline at its start. The side is written in two halves, who asked and why before the
      answers and the rest after them, so one column reads in order; here both sit in the second column, one under the
@@ -1340,8 +1319,7 @@
       padding-block-start: var(--sp-5);
     }
 
-    .gate-form[data-side] .gate-part,
-    .gate-form[data-side] .gate-more .gate-changes {
+    .gate-form[data-side] .gate-part {
       display: flex;
       flex-direction: column;
       gap: var(--sp-2);
@@ -1371,7 +1349,6 @@
 
   /* ── the side's own parts ──────────────────────────────────────────────── */
 
-  .gate-lines,
   .gate-links {
     display: grid;
     gap: var(--sp-1);

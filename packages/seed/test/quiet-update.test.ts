@@ -335,10 +335,24 @@ const QUIETEST_FIRST: Body[] = [
 ];
 
 /**
- * WORK 1.16.0 AND PEOPLE 3.1.0, THE VERSIONS BEFORE THIS BUILD'S, made from this build's document by undoing the one
- * change each new version makes (work 1.17.0, people 3.2.0), and held below to the fingerprint released under each.
+ * MONEY-CORE 3.13.0, WORK 1.16.0 AND PEOPLE 3.1.0, THE VERSIONS BEFORE THIS BUILD'S, made from this build's document by
+ * undoing the one change each new version makes (money-core 3.14.0, work 1.17.0, people 3.2.0), and held below to the
+ * fingerprint released under each.
  */
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
+  /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
+  'money-core': {
+    version: '3.13.0',
+    released: '2e09983b40aba73e',
+    undo: (doc) => ({
+      ...doc,
+      declarations: (doc.declarations as Body[]).map((d) =>
+        d.register === 'accounts' && Array.isArray(d.fields)
+          ? { ...d, fields: (d.fields as Body[]).map((f) => (f.id === 'last4' ? { ...f, label: 'Last four digits' } : f)) }
+          : d,
+      ),
+    }),
+  },
   /* A CARD NAMED ITS PROJECT, where it says its day and who holds it. A record without Projects had no third column. */
   work: {
     version: '1.16.0',
@@ -413,7 +427,7 @@ const BEFORE: Record<string, { version: string; released: string; undo: (doc: Bo
   'money-core': {
     version: '3.12.0',
     released: 'f7558a5590d4ee11',
-    undo: (doc) => withPage(doc, 'money', (now) => now.map((b) => (b.kind === 'bridge' ? headed(b, 'The next 30 days', 'scale') : b))),
+    undo: (doc) => withPage(latestUndone('money-core', doc), 'money', (now) => now.map((b) => (b.kind === 'bridge' ? headed(b, 'The next 30 days', 'scale') : b))),
   },
   /* TWELVE WEEKS OF DOTS where the two lists are, and no figure for the second of them. */
   people: {
@@ -594,9 +608,10 @@ test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and go
 /* ── work 1.17.0 and people 3.2.0, over the versions before them ───────────────────────────────────────────────────── */
 
 /**
- * WORK 1.17.0 AND PEOPLE 3.2.0 REACH A RECORD ON THEIR OWN. One gives the Board's cards another column and takes one
- * away, the other takes two lists off a page; no list, field or figure goes, `people-in-touch-90d` included. So a record
- * holding the versions before, rebuilt to the fingerprint released under each (`LATEST`), is updated with no question.
+ * MONEY-CORE 3.14.0, WORK 1.17.0 AND PEOPLE 3.2.0 REACH A RECORD ON THEIR OWN. The first relabels an account's digits,
+ * the second gives the Board's cards another column and takes one away, the third takes two lists off a page; no list,
+ * field or figure goes, `people-in-touch-90d` included. So a record holding the versions before, rebuilt to the
+ * fingerprint released under each (`LATEST`), is updated with no question.
  */
 test('THE BOARD’S CARDS AND PEOPLE SHOWN ONCE GO IN ON THEIR OWN over the versions released before them, and ask nothing', async () => {
   const sql = openSqlite();
@@ -613,6 +628,7 @@ test('THE BOARD’S CARDS AND PEOPLE SHOWN ONCE GO IN ON THEIR OWN over the vers
     steps.filter((s) => s.from !== s.to),
     [
       { pack: 'people', from: '3.1.0', to: FIRST_PARTY_VERSIONS.people, did: 'updated' },
+      { pack: 'money-core', from: '3.13.0', to: FIRST_PARTY_VERSIONS['money-core'], did: 'updated' },
       { pack: 'work', from: '1.16.0', to: FIRST_PARTY_VERSIONS.work, did: 'updated' },
     ],
     JSON.stringify(steps),

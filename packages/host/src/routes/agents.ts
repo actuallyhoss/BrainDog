@@ -5,6 +5,9 @@
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same
  * name to the guard its group implies.
  *
+ * `end` IS A DATA WRITE, as `attach` and `handoff` are in `index.ts`: a token's call needing `propose`, the end hook's
+ * one write, and the record picks the state.
+ *
  * THE JOB ROWS ARE HERE, and their methods are in
  * `packages/record/src/jobs.ts`, not beside `triage`. `docs/30-BLUEPRINT.md` §5 has named every one of them since tier C
  * was written; a record without them answers each `NOT_IN_THIS_BUILD` through `handlersFor`, never a 500.
@@ -15,6 +18,7 @@ import type { Route } from '../index.ts';
 export const ROUTES: readonly Route[] = [
   { name: 'usedBy', group: 'READ+', writes: false, what: 'Which runs used one key or one tool, the one that used it last first, each with its agent, its machine, when and how often.',
     takes: { spoken: 'text' } },
+  { name: 'end', group: 'DATA', writes: true, what: 'Say this agent’s session closed. Its run ends as done, or waits for the next session when it left a fresh next step. An agent only.' },
   { name: 'triage', group: 'DATA', writes: true, what: 'File one arrival from the inbox as a row, set it aside, or put a filed or archived one back.' },
   { name: 'createJob', group: 'JOBS', writes: true, what: 'Start one job of a kind the owner approved. It waits in the queue until a runner claims it.' },
   { name: 'cancelJob', group: 'JOBS', writes: true, what: 'Stop one job. A runner working on it reads the stop and ends it.' },

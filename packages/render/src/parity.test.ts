@@ -52,9 +52,20 @@ const { default: Markdown } = (await import(new URL('../svelte/Markdown.svelte',
 const ENTITY: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", '#x27': "'" };
 const decode = (s: string): string => s.replace(/&(amp|lt|gt|quot|#39|#x27);/gu, (_, e: string) => ENTITY[e] ?? '');
 
+/**
+ * A late part's pattern id as its place on the page (`lateId` in the mirror, `$props.id()` in the app: each side mints
+ * its own). Every id must be one of a kind and every `url(#…)` must name a pattern drawn, or the two are not one tree.
+ */
+function lateIds(html: string): string {
+  const ids = [...html.matchAll(/<pattern [^>]*id="([^"]+)"/gu)].map((m) => m[1]!);
+  assert.equal(new Set(ids).size, ids.length, `a pattern id is used twice: ${ids.join(', ')}`);
+  for (const [, ref] of html.matchAll(/url\(#([^)]+)\)/gu)) assert.ok(ids.includes(ref!), `url(#${ref}) names no pattern`);
+  return ids.reduce((h, id, i) => h.replaceAll(`"${id}"`, `"late${i}"`).replaceAll(`#${id})`, `#late${i})`), html);
+}
+
 /** The markup as a browser would build it: no comments, no whitespace between tags, attributes in one order. */
 function tree(html: string): string {
-  return html
+  return lateIds(html)
     .replace(/<!--[\s\S]*?-->/gu, '')
     .replace(/\s+/gu, ' ')
     .replace(/> </gu, '><')
@@ -176,6 +187,7 @@ const SHAPES: Record<string, string> = {
   'a split with a tone, a part with no number and a hole':
     '```split | Where it goes\nPayroll | GBP 6,000.00 | 4 people\nRent | GBP 3,000.00 |  | warn\nRefunds | −£40.00\nTools | pending\nUncategorised | GBP 900.00 | 12 rows | hole\n```',
   'a split that is all zero': '```split\nA | 0\nB | 0 | none yet\n```',
+  'a split with a late part, striped': '```split | Owed\nPaid | 600\nOverdue | 300 | 3 invoices | bad\nDue soon | 100 |  | warn\n```',
   'a bridge that does not add up': '```bridge | This month\nStart | £9,000\nComing in | +£2,000 | 5 invoices\nGoing out | −£1,600\nEnd of month | £9,000\n```',
   'a bridge that goes under zero': '```bridge\nStart | 100\nTax | -300 | due 5 Nov\nEnd | -200\n```',
   'a bridge with a row that has no number': '```bridge\nStart | 100\nSomething | soon\nEnd | 100\n```',

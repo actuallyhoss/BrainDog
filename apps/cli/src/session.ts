@@ -148,7 +148,7 @@ async function show(rest: string[], io: AgentIo): Promise<number> {
   const others = c.live.same_repo.filter((r) => r.spoken !== own);
   if (others.length === 0) io.out('Nobody else is live in this repository.');
   else {
-    /* OPEN IS NOT WORKING: a run not heard from in thirty minutes is said to have gone quiet, as the record works it out. */
+    /* OPEN IS NOT WORKING: a run not heard from in fifteen minutes (`WORKING_MS`) is said to have gone quiet, as the record works it out. */
     const stateOf = (r: (typeof others)[number]) => (r.quiet === true ? 'gone quiet' : typeof r.state === 'string' ? clip(r.state, 40) : 'unknown');
     const named = others.slice(0, PER_LINE).map((r) => `${clip(r.spoken, 40)} ${stateOf(r)}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
     io.out(`Also live here: ${named.join('; ')}.`);

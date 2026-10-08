@@ -63,7 +63,7 @@ import type { CallContext, RecordApi, SlashModel } from '@braindog/record';
 import type { Slash } from '@braindog/slash';
 
 import { keyOpener } from './actions.ts';
-import { aiInference, type AiBinding, type JsonSchema } from './inference.ts';
+import { aiInference, scrubRaw, type AiBinding, type JsonSchema } from './inference.ts';
 import { isBound, type KekBinding } from './keys.ts';
 
 export type SlashEnv = {
@@ -149,9 +149,54 @@ const LINES: JsonSchema = { type: 'object', properties: { lines: { type: 'object
 const VERDICTS: JsonSchema = { type: 'object', properties: { verdicts: { type: 'object' } }, required: ['verdicts'] };
 const MENTIONS: JsonSchema = { type: 'object', properties: { mentions: { type: 'array', items: { type: 'object' } } }, required: ['mentions'] };
 
+/**
+ * One call to a model that did not answer, for the operator (ENG-A01): what `index.ts` writes as an `op: 'model'` line
+ * and mails as "BrainDog model".
+ *
+ * `why` IS THE PORT'S PHRASE, or `schema` for an answer that broke the JSON it was pinned to; `raw` is the provider's own
+ * sentence, scrubbed and cut (`scrubRaw`), and `''` where nothing was thrown. `provider` is the id the binding was asked
+ * for, `''` where nothing was sent. `streak` counts schema breaks in a row on this model (0 for every other failure), so
+ * the hook can let one bad reply pass and mail the third. `whose: 'owner'` is a call on the owner's own key: his
+ * provider's bill and his provider's fault, logged and never mailed to the operator.
+ *
+ * A BUDGET REFUSAL IS NOT A FAILURE AND NEVER REACHES THIS: the ceiling said no before anything was sent, which is the
+ * ceiling working.
+ */
+export type ModelFail = {
+  model: string;
+  provider: string;
+  why: string;
+  raw: string;
+  sent: boolean;
+  whose: 'operator' | 'owner';
+  streak: number;
+};
+
+/** Where a failed call is told. Never throws into the call: a hook that failed is a log line lost, not an ask lost. */
+export type OnModelFail = (fail: ModelFail) => void;
+
+const told = (onFail: OnModelFail | undefined, fail: ModelFail): void => {
+  try {
+    onFail?.(fail);
+  } catch {
+    /* See `OnModelFail`. */
+  }
+};
+
+/** The port's phrase out of its sentence, so the line carries the three words a query can group by. */
+const phraseOf = (fix: string): string =>
+  /no adapter on this host|the provider does not serve it|the provider did not answer/u.exec(fix)?.[0] ?? 'the provider did not answer';
+
 /** Nothing reached the binding, which the package reads by this mark and not by the class, as it reads `SlashKeyClosedError`'s. */
 class NotSent extends Error {
   readonly sent = false;
+  readonly why: string;
+  readonly raw: string;
+  constructor(message: string, why = message, raw = '') {
+    super(message);
+    this.why = why;
+    this.raw = raw;
+  }
 }
 
 /**
@@ -166,9 +211,13 @@ class NotSent extends Error {
 class Reached extends Error {
   readonly reached = true;
   readonly model: string;
-  constructor(message: string, model: string) {
+  readonly why: string;
+  readonly raw: string;
+  constructor(message: string, model: string, why = message, raw = '') {
     super(message);
     this.model = model;
+    this.why = why;
+    this.raw = raw;
   }
 }
 
@@ -195,15 +244,22 @@ const counted = (v: unknown): number => (typeof v === 'number' && Number.isFinit
  * in `MODELS`, which holds `glm-5.3-flash` and not `@cf/zai-org/glm-5.3-flash`: handing the id through billed every row 0
  * neurons, measured in `test/slash-included.test.ts`'s door case.
  */
-export function includedInference(env: SlashEnv, most: () => number | Promise<number> = () => INCLUDED_NEURONS_PER_CALL): SlashInference | undefined {
+export function includedInference(
+  env: SlashEnv,
+  most: () => number | Promise<number> = () => INCLUDED_NEURONS_PER_CALL,
+  onFail?: OnModelFail,
+): SlashInference | undefined {
   const ai = env.AI;
   if (ai === undefined || env.SLASH_INCLUDED !== 'yes') return undefined;
+  /* SCHEMA BREAKS IN A ROW, over every call this adapter makes: an answer that keeps its schema starts it over. */
+  let streak = 0;
   return {
     complete: async (call) => {
       let last: unknown;
       let ran = false;
+      let provider = '';
       const port = aiInference({
-        AI: { run: async (model, inputs, options) => ((ran = true), (last = await ai.run(model, inputs, options))) },
+        AI: { run: async (model, inputs, options) => ((ran = true), (provider = model), (last = await ai.run(model, inputs, options))) },
         AI_GATEWAY: env.AI_GATEWAY,
       });
       const out = await port.complete({
@@ -213,14 +269,28 @@ export function includedInference(env: SlashEnv, most: () => number | Promise<nu
         schema: call.jsonSchema as JsonSchema,
         budget: { neurons: await most() },
       });
-      if (out.ok) return { text: out.value.text, usage: { in: out.value.usage.in, out: out.value.usage.out }, model: call.model };
-      const fix = 'refusal' in out ? out.refusal.fix : 'The included model did not answer.';
-      if (!ran) throw new NotSent(fix);
-      if ('refusal' in out && out.refusal.code === 'PROPOSAL_SCHEMA') {
+      if (out.ok) {
+        streak = 0;
+        return { text: out.value.text, usage: { in: out.value.usage.in, out: out.value.usage.out }, model: call.model };
+      }
+      const refusal = 'refusal' in out ? out.refusal : undefined;
+      const fix = refusal?.fix ?? 'The included model did not answer.';
+      const raw = refusal?.detail ?? '';
+      /* THE CEILING SAYING NO IS NOT A MODEL THAT FAILED, so the hook hears every refusal but that one. */
+      const budget = refusal?.code === 'SLASH_BUDGET_SPENT';
+      if (!ran) {
+        if (!budget) told(onFail, { model: call.model, provider: '', why: phraseOf(fix), raw, sent: false, whose: 'operator', streak: 0 });
+        throw new NotSent(fix, budget ? fix : phraseOf(fix), raw);
+      }
+      if (refusal?.code === 'PROPOSAL_SCHEMA') {
+        streak += 1;
+        told(onFail, { model: call.model, provider, why: 'schema', raw: scrubRaw(fix), sent: true, whose: 'operator', streak });
         const usage = (last as { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } } | null)?.usage;
         throw new SlashAnsweredError(fix, { in: counted(usage?.prompt_tokens), out: counted(usage?.completion_tokens) }, call.model);
       }
-      throw new Reached(fix, call.model);
+      streak = 0;
+      told(onFail, { model: call.model, provider, why: phraseOf(fix), raw, sent: true, whose: 'operator', streak: 0 });
+      throw new Reached(fix, call.model, phraseOf(fix), raw);
     },
   };
 }
@@ -243,8 +313,8 @@ export type WorkerSlashModel = SlashModel & UnderstandModel;
  * writes no row, and its rules draft. A record of 150 lists is 186 and is still asked. The package is imported only
  * when the record's model is asked, by which time the meter has imported it already (`slash-meter.ts`).
  */
-export function includedModel(env: SlashEnv): WorkerSlashModel | undefined {
-  const inference = includedInference(env, recordAskMost);
+export function includedModel(env: SlashEnv, onFail?: OnModelFail): WorkerSlashModel | undefined {
+  const inference = includedInference(env, recordAskMost, onFail);
   if (inference === undefined) return undefined;
   const ask = async (instructions: string, input: unknown, schema: JsonSchema): Promise<unknown> => {
     const reply = await inference.complete({
@@ -286,6 +356,11 @@ export type SlashWire = {
    * the object's storage is wrapped. Absent, the record's model is the included one alone.
    */
   store?: (() => Sql) | undefined;
+  /**
+   * Where a model that did not answer is told (`ModelFail`): the Worker's log line and the operator's mail, `index.ts`'s.
+   * Absent, a failure is the throw alone, as it always was.
+   */
+  onFail?: OnModelFail | undefined;
 };
 
 /**
@@ -308,6 +383,38 @@ const wireOf = (env: SlashEnv, api: () => Pick<RecordApi, 'kernel'>, options: Sl
   };
 };
 
+/**
+ * The owner's own model, each ask told to `onFail` when it throws, with `whose: 'owner'`, and the throw passed on as it was.
+ *
+ * HIS KEY, HIS PROVIDER: the line is written so the operator can see the record's model is down, and the hook in
+ * `index.ts` mails nothing for it, because nothing the operator does mends somebody else's account.
+ */
+const ownTold = (model: WorkerSlashModel, key: { provider: string; model: string }, onFail: OnModelFail | undefined): WorkerSlashModel => {
+  if (onFail === undefined) return model;
+  const wrap =
+    <I, O>(ask: (input: I) => Promise<O>) =>
+    async (input: I): Promise<O> => {
+      try {
+        return await ask(input);
+      } catch (e) {
+        const said = e instanceof Error ? e.message : String(e);
+        const sent = !(typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false);
+        told(onFail, { model: key.model, provider: key.provider, why: 'your key did not answer', raw: scrubRaw(said), sent, whose: 'owner', streak: 0 });
+        throw e;
+      }
+    };
+  return {
+    ...model,
+    name: model.name,
+    draft: wrap(model.draft.bind(model)),
+    resolve: wrap(model.resolve.bind(model)),
+    mentions: wrap(model.mentions.bind(model)),
+    ...(model.form ? { form: wrap(model.form.bind(model)) } : {}),
+    ...(model.skill ? { skill: wrap(model.skill.bind(model)) } : {}),
+    ...(model.headline ? { headline: wrap(model.headline.bind(model)) } : {}),
+  };
+};
+
 /** Where Slash on this Worker has nothing to answer with: no included model, and no key of his chosen. */
 const NO_MODEL_HERE = 'Slash answers on your own key on this host, and none is chosen yet. Pick your key in Settings.';
 
@@ -323,7 +430,7 @@ const NO_MODEL_HERE = 'Slash answers on your own key on this host, and none is c
  * has Slash, and Settings is where it is set up.
  */
 export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kernel'>, options: SlashWire = {}): WorkerSlashModel | undefined {
-  const included = includedModel(env);
+  const included = includedModel(env, options.onFail);
   const store = options.store;
   if (store === undefined || !isBound(env.KEK)) return included;
   const own = () => slashOwnKeyOf(store());
@@ -335,7 +442,7 @@ export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kern
     }
     const model = slashOwnModel(key, wireOf(env, api, options));
     if (model === undefined) throw new NotSent(SLASH_KEY_GONE.fix);
-    return model;
+    return ownTold(model, key, options.onFail);
   };
   return {
     /* READ ON EACH ASK AS THE REST IS, because the record names who drafted by it and treats `included` as the one model
@@ -422,7 +529,7 @@ export const CLOUD_TIERS = ['a', 'b'] as const;
  * passes `workerSlashModel`, which is assigned after this module's own `#open` has begun.
  */
 export async function workerSlashEngine(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): Promise<Slash | undefined> {
-  const included = includedInference(env);
+  const included = includedInference(env, undefined, deps.onFail);
   const inference = included ?? (isBound(env.KEK) ? ownOnly : undefined);
   if (inference === undefined) return undefined;
   const slash = await import('@braindog/slash');

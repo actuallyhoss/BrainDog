@@ -3,9 +3,8 @@
  * waited, as the design system draws Decide.
  *
  * EVERY FIGURE HERE IS READ, NEVER MADE. The count is the questions still waiting; an age is the time since a question
- * was opened; the evidence is a pair of numbers the proposer wrote in its own reason ("41 of 58 lines"), and when the
- * reason holds no such pair there is no chart at all. There is no structured "how sure" field on a question, so this file
- * does not pretend there is one.
+ * was opened; the evidence is a pair of numbers the asker put on the question's body as data (`evidenceIn`), and when the
+ * body holds no such pair there is no chart at all. A pair is never read out of a reason's prose.
  *
  * PURE AND NODE-LOADABLE, with the clock an argument, so `lead.test.ts` can say what day it is. The screen's own words
  * live here beside the only code that says them, as `views.ts` keeps its `WORDS`.
@@ -197,27 +196,31 @@ export function waitedOf(
 }
 
 /**
- * A SHARE THE PROPOSER WROTE IN ITS OWN REASON, "41 of September's 58 HSBC lines", as the figures a waffle draws, with
- * the sentence it came from as that chart's reading.
+ * A SHARE THE ASKER GAVE AS DATA, the question body's own `evidence: { value, of, said? }` ("41 of 58", and the
+ * sentence that says what they count), as the figures a waffle draws, with that sentence as the chart's reading.
  *
- * The first "N of M" in the reason, read after its braces are resolved (`citedWords`), where N is no more than M and M
- * is at least three. Between "of" and the second figure only an article, a possessive or a short determiner may stand,
- * so "one of them 2 days later" is not read as a share. No pair, no chart: the reason is still drawn as words.
+ * NEVER READ OUT OF PROSE. The first "N of M" in an agent's reason was drawn here as Evidence, and an agent's reasons
+ * say "2 of 5 steps" as often as "41 of 58 lines" (audit 31-32, finding 5): a chart that a sentence's grammar can
+ * summon is not evidence of anything. No field, no chart; the reason is still drawn as words.
+ *
+ * `value` and `of` are whole numbers with `value` no more than `of` and `of` at least three, so a waffle has a whole
+ * worth drawing. `said` may cite the body's figures in braces, and is read through them (`citedWords`); with none, the
+ * reading is the pair itself.
  */
-const PAIR = /(?<![\p{L}\p{N}.,])(\d[\d,]*) of (?:(?:the|its|your|our|their|his|her|these|those|this|last|all)\s+|\p{L}+['’]s\s+){0,2}(\d[\d,]*)(?![\p{N}.,]\d)/iu;
-
 export type Evidence = { value: number; max: number; said: string };
 
-export function evidenceOf(text: string, figures: Record<string, unknown> = {}, now?: number): Evidence | null {
-  const words = citedWords(text, figures, now);
-  const m = PAIR.exec(words);
-  if (!m) return null;
-  const value = Number((m[1] ?? '').replaceAll(',', ''));
-  const max = Number((m[2] ?? '').replaceAll(',', ''));
-  if (!Number.isSafeInteger(value) || !Number.isSafeInteger(max) || max < 3 || value > max || max > 100_000) return null;
-  /* THE SENTENCE THAT HOLDS THE PAIR, so the chart's reading is the proposer's claim and not a line made up for it. */
-  const dot = words.lastIndexOf('. ', m.index);
-  const stop = words.indexOf('. ', m.index + m[0].length);
-  const said = words.slice(dot < 0 ? 0 : dot + 2, stop < 0 ? undefined : stop + 1).trim();
-  return { value, max, said };
+const EVIDENCE_MOST = 100_000;
+
+const isRow = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+export function evidenceIn(body: unknown, now?: number): Evidence | null {
+  if (!isRow(body) || !isRow(body.evidence)) return null;
+  const { value, of, said } = body.evidence;
+  if (!Number.isSafeInteger(value) || !Number.isSafeInteger(of)) return null;
+  const v = value as number;
+  const max = of as number;
+  if (v < 0 || max < 3 || v > max || max > EVIDENCE_MOST) return null;
+  const figures = isRow(body.figures) ? body.figures : {};
+  const words = typeof said === 'string' ? citedWords(said, figures, now).trim() : '';
+  return { value: v, max, said: words !== '' ? words : `${v.toLocaleString('en-GB')} of ${max.toLocaleString('en-GB')}` };
 }

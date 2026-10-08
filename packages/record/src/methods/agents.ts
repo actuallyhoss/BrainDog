@@ -4,12 +4,12 @@
  * `usedBy` IS THE FIRST, built as the worked example of `methods/`: a real method a caller needs, so the first change
  * that carries the mechanism proves it end to end, from this file through `methods/index.ts` and the route row in
  * `host/src/routes/agents.ts` to a caller. `triage` is beside it: the one door an agent's token files or sets aside an
- * arrival by.
+ * arrival by. `end` is the third: how a session that closed says so, once.
  */
 
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { sessionDeclaration, type ArrivalSettled, type Entry, type Patch, type WriteContext } from '@braindog/kernel';
+import { agentOf, sessionDeclaration, type ArrivalSettled, type Entry, type Patch, type WriteContext } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -71,6 +71,18 @@ const TRIAGE_TAKES = ['arrival', 'register', 'fields', 'ignore', 'note', 'back',
 
 /** The sentence every token without the `inbox` reach is given, whatever else it holds. */
 const NO_REACH = 'Triage needs a token its owner gave the inbox reach.';
+
+/**
+ * What `end` answers, as the kernel's `endRun` gives it: the run by its spoken id, the state it ended in, and whether
+ * this call changed it. `changed: false` is a run that had already ended, which a second end leaves as it was.
+ */
+export type Ended = { run: string; state: 'done' | 'handoff'; changed: boolean };
+
+/** The keys `end` takes. No `state`: the record picks it from what the run left (`endRun` in the kernel). */
+const END_TAKES = ['branch', 'head'] as const;
+
+/** The longest branch or commit `end` takes, as `attach` and `handoff` hold every line they take (`LINE` in `index.ts`). */
+const END_LINE = 280;
 
 export function methods(deps: RecordDeps) {
   const { kernel, sql, guard, scoped, readable, admin, no, tail } = deps;
@@ -150,6 +162,57 @@ export function methods(deps: RecordDeps) {
   const toolUses = (row: Entry): Use[] => usesOf(`entry:${row.id}`, SEEN_WRITTEN);
 
   return {
+    /**
+     * A session closed: end the caller's run, once. A token's call, needing `propose`, and the end hook's one write.
+     *
+     * THE RECORD PICKS THE STATE, NOT THE CALLER (AGT-C04). The hook used to write `idle`, and twelve hours later the
+     * sweep took every idle run as abandoned, so about 740 of the owner's 752 runs that closed normally read Abandoned a
+     * day later. The kernel's `endRun` decides instead: a run that left a fresh next step and works for nobody waits as a
+     * handoff; any other is done, its old next step cleared and "Ended at <head> with no next step." written. Its helpers
+     * that are still open end as done in the same write.
+     *
+     * IT FINDS THE CALLER'S RUN AND OPENS NONE, which is why it does not go through `runFor` as `triage` does: a session
+     * that closes without ever having written has nothing to end, and opening a run only to end it would be a run nobody
+     * worked in. The kernel refuses that call in its own words.
+     *
+     * ENDING AN ENDED RUN CHANGES NOTHING and answers `changed: false`, so a hook that fires twice, or a retry after a
+     * lost answer, writes one end. A person is never a run; a person closes one from the app with `handoff`.
+     */
+    async end(args: { branch?: string; head?: string } | undefined, ctx: CallContext): Promise<Result<Ended>> {
+      const stop = guard(ctx, 'propose');
+      if (stop) return { ok: false, refusal: stop };
+      const p = ctx.principal;
+      if (p.kind !== 'token')
+        return no('FORBIDDEN', 'end is how an agent says its session closed, and a person is never a run. Close a run from the app.', { at: 'principal' });
+      const a = (args ?? {}) as Record<string, unknown>;
+      if (a.state !== undefined)
+        return no('FIELD_UNKNOWN', 'end picks the state itself from what the run left, so it takes none. Send branch and head only.', {
+          at: 'state',
+          allowed: [...END_TAKES],
+        });
+      const stray = Object.keys(a).find((k) => !(END_TAKES as readonly string[]).includes(k));
+      if (stray !== undefined)
+        return no('FIELD_UNKNOWN', `${stray} is not something end takes. It takes ${END_TAKES.join(' and ')}.`, { at: stray, allowed: [...END_TAKES] });
+      const said: { branch?: string; head?: string } = {};
+      for (const key of END_TAKES) {
+        const v = a[key];
+        if (v === undefined || v === null) continue;
+        if (typeof v !== 'string' || v.trim() === '') return no('VALUE_MALFORMED', `${key} is a line of text, such as ${key === 'branch' ? 'main' : 'the commit the session stopped at'}.`, { at: key });
+        if (v.trim().length > END_LINE) return no('OUT_OF_BOUNDS', `${key} is at most ${String(END_LINE)} characters, and this one is ${String(v.trim().length)}.`, { at: key });
+        said[key] = v.trim();
+      }
+      /* WHO ENDS IT, AS `writerOf` IN `index.ts` SAYS A TOKEN'S WRITE: its kind of agent, its token and its run's hints,
+         so the kernel's ladder finds the run this session wrote as, by its client id or its spoken name. */
+      const hints = { ...(ctx.session ?? {}), ...said };
+      const w: WriteContext = {
+        actor: `agent:${agentOf(hints).agent ?? 'other'}`,
+        principal: { kind: 'token', token: p.id },
+        session: hints,
+        ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+      };
+      return tail(kernel.endRun(w, said));
+    },
+
     /**
      * Which runs used a key or a tool, the one that used it last first: at most `USED_BY_MOST`, each with its agent, its
      * machine, when it last used it and how many times among the newest `USED_BY_WALK` uses.

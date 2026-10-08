@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { existsSync } from 'node:fs';
 
-import { isMailKind, letterOf, OPS_QUIET_MS, opsAlert, SENDER, recordLetter, sendMail, type MailKind } from '../src/mail.ts';
+import { isMailKind, isWaitedOn, letterOf, mailOutcome, OPS_QUIET_MS, opsAlert, SENDER, recordLetter, sendMail, type MailKind } from '../src/mail.ts';
 
 const KINDS: MailKind[] = [
   'signin',
@@ -301,4 +301,46 @@ test("THE DIRECTORY'S WINDOW HOLDS ACROSS ISOLATES: a claim that says no sends n
     );
   });
   assert.equal(email.sent.length, 1);
+});
+
+test('A MODEL THAT DID NOT ANSWER MAILS "BrainDog model" WITH THE RECORD, THE MODEL AND THE PHRASE, and never the raw message', async () => {
+  const email = binding();
+  const env = { ...OPS, EMAIL: email };
+  const line = { op: 'model', rec: 'rec_1', model: 'glm-5.3-flash', why: 'the provider did not answer', raw: `5016: account 1234 said no to ${ADDRESS}` } as const;
+  await logged(async () => {
+    assert.equal(await opsAlert(env, line, undefined, 30 * HOUR), true);
+    assert.equal(await opsAlert(env, line, undefined, 30 * HOUR + OPS_QUIET_MS - 1), false, 'one a quarter hour');
+  });
+  assert.equal(email.sent.length, 1);
+  assert.equal(email.sent[0]?.subject, 'BrainDog model');
+  const text = String(email.sent[0]?.text);
+  for (const said of ['op: model', 'rec: rec_1', 'model: glm-5.3-flash', 'why: the provider did not answer', 'route table', "provider's console"]) assert.ok(text.includes(said), said);
+  assert.ok(!text.includes('5016') && !text.includes(ADDRESS), 'raw stays in the log');
+});
+
+test('A NIGHT THAT DID NOT RUN WHOLE MAILS "BrainDog night" WITH ITS COUNTS and the runbook at 53 §5.4', async () => {
+  const email = binding();
+  const env = { ...OPS, EMAIL: email };
+  const night = { op: 'night', records: 12, backups: 11, backups_failed: 1, directory: 'ok' } as const;
+  await logged(async () => assert.equal(await opsAlert(env, night, undefined, 40 * HOUR), true));
+  assert.equal(email.sent[0]?.subject, 'BrainDog night');
+  const text = String(email.sent[0]?.text);
+  for (const said of ['records: 12', 'backups: 11', 'backups_failed: 1', 'directory: ok', '53 §5.4']) assert.ok(text.includes(said), said);
+});
+
+test('A SEND SAYS WHOSE FAULT IT WAS: the host for no binding, no sender or a refusal, the address for a bad or suppressed one', async () => {
+  const vars = { link: LINK };
+  await logged(async () => {
+    assert.equal(await mailOutcome({ AUTH_MAIL_FROM: 'hello@brain.dog', EMAIL: binding() }, 'signin', ADDRESS, vars), 'sent');
+    assert.equal(await mailOutcome({ AUTH_MAIL_FROM: 'hello@brain.dog' }, 'signin', ADDRESS, vars), 'host');
+    assert.equal(await mailOutcome({ AUTH_MAIL_FROM: '', EMAIL: binding() }, 'signin', ADDRESS, vars), 'host');
+    assert.equal(await mailOutcome({ AUTH_MAIL_FROM: 'hello@brain.dog', EMAIL: binding('E_RATE_LIMIT_EXCEEDED') }, 'signin', ADDRESS, vars), 'host');
+    assert.equal(await mailOutcome({ AUTH_MAIL_FROM: 'hello@brain.dog', EMAIL: binding('E_RECIPIENT_SUPPRESSED') }, 'signin', ADDRESS, vars), 'address');
+    /* A REFUSAL OF THE ONE ADDRESS IS ITS OWN, so a stranger typing bad ones cannot make sign-in say mail is down. */
+    assert.equal(await mailOutcome({ AUTH_MAIL_FROM: 'hello@brain.dog', EMAIL: binding('E_RECIPIENT_NOT_ALLOWED') }, 'signin', ADDRESS, vars), 'address');
+    assert.equal(await mailOutcome({ AUTH_MAIL_FROM: 'hello@brain.dog', EMAIL: binding('E_VALIDATION_ERROR') }, 'signin', ADDRESS, vars), 'address');
+    assert.equal(await mailOutcome({ AUTH_MAIL_FROM: 'hello@brain.dog', EMAIL: binding() }, 'signin', 'not an address', vars), 'address');
+  });
+  /* THE LETTERS A PERSON WAITS ON, and not the notices nobody is waiting for. */
+  assert.deepEqual(KINDS.filter(isWaitedOn), ['signin', 'signup.verify', 'signup.known', 'invite.prove']);
 });

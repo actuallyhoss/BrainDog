@@ -139,8 +139,8 @@ const rowsOf = (c: Context, id: string): Brief[] => {
 export const live = (state: string | null): boolean => state === null || state === 'active' || state === 'idle';
 
 /**
- * Whether another run is working now: active, and not gone quiet. The record works `quiet` out at thirty minutes of
- * silence (`QUIET_MS` in `packages/kernel/src/session.ts`), and `stale` at forty-five, which is all a host older than
+ * Whether another run is working now: active, and not gone quiet. The record works `quiet` out at fifteen minutes of
+ * silence (`WORKING_MS` in `packages/kernel/src/presence.ts`), and `stale` at forty-five, which is all a host older than
  * `quiet` says.
  */
 export const working = (r: Context['live']['same_repo'][number]): boolean => r.state === 'active' && r.quiet !== true && !r.stale;

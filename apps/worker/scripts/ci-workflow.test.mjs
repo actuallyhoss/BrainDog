@@ -7,9 +7,10 @@
  * workspace in no leg is a package whose tests CI never runs while every run is green. So the legs are read here against
  * `pnpm-workspace.yaml`, and this file runs in the `apps` leg, which puts the check on every push.
  *
- * AND EVERY GATE `gates` LEAVES OUT IS RUN SOMEWHERE ELSE. Its `--except` list is the other place a check can go quietly
- * missing: a name added there for a good reason in one commit is a gate nobody runs after the reason has gone. Each name
- * on it is accounted for below by the job or workflow that runs it instead.
+ * AND THE GATES ARE CHOSEN BY WHAT THEY NEED, NOT BY NAME. A list of gate names is the other place a check can go
+ * quietly missing: a name added for a good reason in one commit is a gate nobody runs after the reason has gone. So
+ * `gates` runs `--unbuilt` and `build` runs `--built`, and the one name list left is the pair PRF-B10 moves. The site's
+ * tests and the gate runner's own tests are held to a step that follows the build they read.
  *
  * THE FILE IS READ AS LINES AT THE INDENTS IT IS WRITTEN IN. No YAML parser is a dependency of this workspace, and the
  * shape read here is the one the file is written in: a job at two spaces under `jobs:`, its steps at six under `steps:`,
@@ -198,36 +199,116 @@ test('each leg typechecks and then tests its own workspaces, under its own 25-mi
   assert.ok(legs().some((leg) => leg.leg === 'web' && leg.browser === true), 'the web leg, whose figure-fit test launches chromium, installs none');
 });
 
-test('the links test runs in exactly one leg, and the root pnpm test still runs everything', () => {
+test('the docs tests run by their glob in exactly one leg, and the root pnpm test still runs everything', () => {
   const all = steps(job(ci, 'test'));
-  const links = at(all, /node --test docs\/test\/links\.test\.mjs/, 'runs the links test');
-  assert.equal(all[links].if, 'matrix.links');
+  const docs = at(all, /node --test docs\/test\/\*\.test\.mjs/, 'runs the docs tests by their glob');
+  assert.equal(all[docs].if, 'matrix.links');
   assert.deepEqual(legs().filter((leg) => leg.links === true).map((leg) => leg.leg), ['apps']);
 
   const scripts = JSON.parse(read('package.json')).scripts;
-  assert.equal(scripts.test, 'pnpm -r --workspace-concurrency=1 run test && node --test docs/test/links.test.mjs');
+  assert.equal(scripts.test, 'pnpm -r --workspace-concurrency=1 run test && node --test docs/test/*.test.mjs');
   assert.equal(scripts.typecheck, 'pnpm -r run typecheck');
 });
 
-test('every gate the gates job leaves out is run by a job or a workflow that can', () => {
+/* THE REGISTRY, READ AS TEXT. `run.mjs` runs its gates when it is imported, so the names are read off `GATES` the way
+   this file reads the workflow: one entry per line at two spaces, `['name', ...`, between `const GATES = [` and `];`. */
+function registry() {
+  const lines = read('tools', 'gates', 'run.mjs').split('\n');
+  const start = lines.indexOf('const GATES = [');
+  assert.ok(start !== -1, 'tools/gates/run.mjs has no `const GATES = [` line to read the gate names from');
+  const end = lines.indexOf('];', start);
+  const names = lines.slice(start + 1, end).map((line) => /^ {2}\['([\w-]+)',/.exec(line)?.[1]).filter(Boolean);
+  assert.ok(names.length > 20, `read ${names.length} gate names from run.mjs, so this is not reading the registry`);
+  return names;
+}
+
+/** Every run of the gate runner in a block of workflow text, by its arguments. */
+const runnerRuns = (text) => [...text.matchAll(/(?:node tools\/gates\/run\.mjs|pnpm gates --)([^\n]*)/g)].map((m) => m[1].trim());
+
+/** Every gate a run line names, after `--only`, `--except` or `--allow-skip`. */
+const named = (args) => [...args.matchAll(/--(?:only|except|allow-skip) ([\w,-]+)/g)].flatMap((m) => m[1].split(','));
+
+/* EVERY NAME A WORKFLOW HANDS THE RUNNER IS A GATE. `run.mjs` is exit 2 on a misspelt one, but only in the run that
+   reaches it, and `gates.yml`'s run is on a push to master alone: a renamed gate would be a red master rather than a
+   red pull request. Read here, every workflow is held to the registry on every push. */
+test('every gate a workflow names is one the registry knows', () => {
+  const known = registry();
+  const dir = join(ROOT, '.github', 'workflows');
+  for (const file of readdirSync(dir).filter((name) => /\.ya?ml$/.test(name))) {
+    const text = read('.github', 'workflows', file).split('\n').filter(meaningful).join('\n');
+    for (const args of runnerRuns(text)) {
+      const unknown = named(args).filter((name) => !known.includes(name));
+      assert.deepEqual(unknown, [], `${file} hands the gate runner ${unknown.join(', ')}, which tools/gates/run.mjs does not register`);
+    }
+  }
+});
+
+/* SELECTION BY NEED, NOT BY NAME (PRF-B01). A list of names is a gate somebody adds tomorrow that runs nowhere, and
+   the ten names the gates job once left out were each a place for that. So `gates` runs `--unbuilt`, `build` runs
+   `--built`, and the one list left is the build job's `--except layout,a11y`, which PRF-B10 removes once a red screen
+   check stops the deploy. Any other name in a run line of ci.yml is red here. */
+test('the gates job runs every gate that needs nothing built, and names none', () => {
   const gatesJob = job(ci, 'gates');
   assert.equal(key(gatesJob, 4, 'timeout-minutes'), '25');
   const runs = steps(gatesJob).filter((step) => /pnpm gates|run\.mjs/.test(step.body));
   assert.equal(runs.length, 1, 'the gates job runs the gate runner more than once, or not at all');
-  const except = listAfter(runs[0].body, '--except');
+  assert.equal(runs[0].run, 'node tools/gates/run.mjs --unbuilt');
+});
 
-  const build = steps(job(ci, 'build')).find((step) => /tools\/gates\/run\.mjs --only/.test(step.body));
-  assert.ok(build, 'the build job runs no gates');
-  const afterBuild = listAfter(build.body, '--only');
+test('the build job runs every gate a web build satisfies, and names only the two that wait for PRF-B10', () => {
+  const all = steps(job(ci, 'build'));
+  const runs = all.map((step, index) => [step, index]).filter(([step]) => /pnpm gates|run\.mjs/.test(step.body));
+  assert.equal(runs.length, 1, 'the build job runs the gate runner more than once, or not at all');
+  const [[step, index]] = runs;
+  assert.match(step.run, /^node tools\/gates\/run\.mjs --built\b/, 'the build job does not select its gates by what they need');
+  assert.deepEqual(named(step.run).sort(), ['a11y', 'layout'], 'the build job names a gate other than layout and a11y, the two PRF-B10 moves here');
+  assert.match(step.run, /--except layout,a11y$/);
+  assert.ok(at(all, /pnpm --filter @braindog\/web build/, 'builds the app') < index, 'the built gates run before the app is built');
 
-  const gates = read('.github', 'workflows', 'gates.yml');
-  const onPush = /if: github\.event_name == 'push'\n\s+run: pnpm gates -- --only ([\w,-]+)/.exec(gates);
-  assert.ok(onPush, 'gates.yml runs no gate on a push to master');
-  const browserGates = onPush[1].split(',');
+  const everyName = runnerRuns(code).flatMap(named).sort();
+  assert.deepEqual(everyName, ['a11y', 'layout'], `ci.yml names gates in its run lines beyond the PRF-B10 pair: ${everyName.join(', ')}`);
+});
 
-  /* `typecheck` is every leg's first step, and `deploy-parity` needs a live host, which only `deploy.yml` has. */
-  const accounted = ['typecheck', ...afterBuild, ...browserGates, 'deploy-parity'].sort();
-  assert.deepEqual([...except].sort(), accounted, 'a gate is left out of the gates job and run nowhere else, or run twice');
+/* THE SITE'S TESTS READ THE SITE AS BUILT, AND THEY RAN NOWHERE THAT HAD ONE (LCH-B01). The `apps` leg builds no site,
+   so they skipped there, and the job that builds it ran none of them. `SITE_BUILT=1` makes a missing build a failure
+   instead of a skip (`apps/site/test/built.ts`), so this step without the flag would be the same green as before. */
+test('the build job tests the site against its build, with a missing build a failure', () => {
+  const all = steps(job(ci, 'build'));
+  const build = at(all, /pnpm --filter @braindog\/site build/, 'builds the site');
+  const tests = at(all, /pnpm --filter @braindog\/site test/, 'runs the site\'s tests after building it');
+  const diff = at(all, /git diff --exit-code/, 'checks the build changed no tracked file');
+  assert.ok(build < tests, 'the site\'s tests run before the build they read');
+  assert.ok(tests < diff, 'the site\'s tests run after the diff check, so a file they write is never seen');
+  assert.equal(all[tests].if, null, 'the site\'s tests are conditional');
+  assert.equal(all[tests].run, 'pnpm --filter @braindog/site test');
+  assert.match(all[tests].body, /^ {8}env:\n {10}SITE_BUILT: '1'$/m, 'the site\'s tests run without SITE_BUILT=1, so a missing build skips again');
+});
+
+/* AND THE RUNNER'S OWN TESTS RUN SOMEWHERE (PRF-B01). `tools` is no workspace, so no leg reaches `tools/gates/test`,
+   and the tests that hold what a gate needs and how a run is cut had run on no runner. */
+test('the build job runs the gate runner\'s own tests by their glob, after the builds', () => {
+  const all = steps(job(ci, 'build'));
+  const runner = at(all, /node --test tools\/gates\/test\/\*\.test\.mjs/, 'runs tools/gates/test');
+  assert.equal(all[runner].run, 'node --test tools/gates/test/*.test.mjs');
+  assert.equal(all[runner].if, null);
+  assert.ok(at(all, /pnpm --filter @braindog\/web build/, 'builds the app') < runner, 'the runner\'s tests run before the app is built');
+});
+
+/* AND THE LOOK'S TESTS, WHICH NOTHING RAN: `tools/look` is no workspace, as `tools/gates` is not (batch 35). */
+test('the build job runs the look\'s own tests by their glob', () => {
+  const all = steps(job(ci, 'build'));
+  const look = at(all, /node --test tools\/look\/test\/\*\.test\.mjs/, 'runs tools/look/test');
+  assert.equal(all[look].run, 'node --test tools/look/test/*.test.mjs');
+  assert.equal(all[look].if, null);
+});
+
+/* THE SELF-HOST'S APP-PATH TEST SKIPS WITHOUT `apps/web/build`, so it runs only after the job builds the app (batch 35). */
+test('the build job runs the self-host\'s app-path test after building the app', () => {
+  const all = steps(job(ci, 'build'));
+  const web = at(all, /pnpm --filter @braindog\/web build/, 'builds the app');
+  const path = at(all, /node --test apps\/selfhost\/test\/app-path\.test\.ts/, 'runs the app-path test');
+  assert.ok(web < path, 'the app-path test runs before the build it reads');
+  assert.equal(all[path].if, null);
 });
 
 test('build dry-runs both production deploys after both builds and the diff check, with no Cloudflare credential', () => {

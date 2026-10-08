@@ -91,6 +91,11 @@ export type Manifest = {
   provides: string[];
   note?: string;
   /**
+   * The pack's name as a person reads it ("HSBC Egypt alerts"), when its file gives one. A held message's reason and the
+   * inbox's report name a pattern by it rather than by an id. Kept out of the checksum, as `provides` is.
+   */
+  title?: string;
+  /**
    * The settings a person can change without editing the file, by name. Absent when the pack declares none.
    *
    * A CLOSED SUBSET OF THE FIELD TYPES (text, enum, bool, money, day and duration), each with an optional
@@ -679,6 +684,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     },
     provides: [],
     ...(typeof doc.note === 'string' ? { note: doc.note } : {}),
+    ...(typeof doc.title === 'string' && doc.title.trim() !== '' ? { title: doc.title.trim().replace(/\s+/g, ' ') } : {}),
     /* ONLY WHEN THERE ARE SETTINGS, so a pack written before `config:` existed keeps its checksum. */
     ...(Object.keys(settings.value).length > 0 ? { config: settings.value } : {}),
   };
@@ -999,8 +1005,10 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   }
   manifest.provides = derived;
   /* `provides` IS OMITTED FROM THE HASH because it is derived from the declarations that are
-     already in it — hashing both would let one pack have two checksums for one file. */
-  const { provides: _provides, ...hashed } = manifest;
+     already in it — hashing both would let one pack have two checksums for one file. `title` IS OMITTED because it is
+     how a person reads the pack's name and not what the pack does, and keeping it out leaves every pack installed
+     before the title was kept with the checksum it has, rather than showing each titled one as changed. */
+  const { provides: _provides, title: _title, ...hashed } = manifest;
   const canonical = canonicalise({ manifest: hashed, declarations: declarations.map((d) => d.body), seeds });
   if (canonical === null) return malformed('This pack holds something the record cannot write down.');
   return ok({ manifest, declarations, seeds, canonical, checksum: await digest(canonical), source });

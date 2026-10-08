@@ -1,12 +1,12 @@
 name: ci
 
 # 52 §2's `ci.yml`, less most of the browser. `test` typechecks and tests the whole tree in four
-# legs, `gates` runs every gate that reads source, and `build` builds the app and the site,
-# dry-runs both production deploys, and runs the gates that read that build and are quick enough to
-# wait for (`self-test`, `bundle`, `prefs`, `keys`, `passkey`, `queue`). `layout` and `a11y` are
-# `gates.yml`'s, and the reason for the split is at the top of that file and beside the `--only`
-# list below. It names the gates that are elsewhere rather than counting them, because a count here
-# goes stale the day a gate is added. `windows`, on a pull request labelled `full-gates` only, runs
+# legs, `gates` runs every gate that needs nothing built (`--unbuilt`), and `build` builds the app
+# and the site, tests the site against its build, dry-runs both production deploys, runs every gate
+# that reads a web build (`--built`) and the gate runner's own tests. `layout` and `a11y` are
+# `gates.yml`'s until PRF-B10, and the reason for the split is at the top of that file and beside
+# the `--except` below. The runner chooses the gates from what each declares it needs, so no line
+# here names one it runs. `windows`, on a pull request labelled `full-gates` only, runs
 # the kernel, self-host and CLI tests on Windows through `windows.yml`, which also runs them weekly.
 #
 # FOUR LEGS AND A GATES JOB, BECAUSE ONE JOB COULD NO LONGER HOLD A WORKFLOW'S WORTH OF TESTS. The
@@ -69,8 +69,9 @@ jobs:
     # workspace, so a package added tomorrow cannot go untested here without a run saying so. That
     # test runs in the `apps` leg, which is how the check reaches every push.
     #
-    # THE ROOT `pnpm test` IS UNCHANGED. It still runs every workspace and then the links test in one
-    # command, so a full run at a desk is the union of these four legs and nothing else.
+    # THE ROOT `pnpm test` IS UNCHANGED IN SHAPE. It still runs every workspace and then the docs'
+    # tests in one command, so a full run at a desk is the union of these four legs and nothing else.
+    # What reads a build (the site's built pages, the gate runner's own tests) is the build job's.
     name: test ${{ matrix.leg }}
     # PINNED, NOT `ubuntu-latest`. GitHub rolls that label to a new image about once a year and the
     # rollout is silent; the same commit then compiles against a different libc, a different browser
@@ -106,8 +107,8 @@ jobs:
           - leg: web
             dirs: 'apps/web packages/render packages/theme packages/skin'
             browser: true
-          # The hosts, the CLI and the site. The links test rides here because `docs/` is not a
-          # workspace, so no filter reaches it.
+          # The hosts, the CLI and the site. The docs' tests ride here because `docs/` is not a
+          # workspace, so no filter reaches them.
           - leg: apps
             dirs: 'apps/worker apps/selfhost apps/cli apps/site'
             links: true
@@ -134,7 +135,8 @@ jobs:
 
       # FIRST, and for the reason `run.mjs` gives about its own first gate: a type error invalidates
       # every result under it. Over this leg's workspaces only, so the four legs together typecheck
-      # what the root `pnpm typecheck` does, and `gates` below leaves the `typecheck` gate out.
+      # what the root `pnpm typecheck` does. `gates` below runs the `typecheck` gate over the whole tree
+      # once more, because `--unbuilt` is every gate that declares no need and `typecheck` declares none.
       - run: pnpm -r $FILTERS run typecheck
 
       # ONLY WHERE A TEST LAUNCHES CHROMIUM, and a hosted image has none cached (the first run on
@@ -148,8 +150,9 @@ jobs:
       # ONE WORKSPACE AT A TIME, as the root `pnpm test` runs them, so a leg is the same run a desk
       # makes of those folders.
       - run: pnpm -r --workspace-concurrency=1 $FILTERS run test
+      # EVERY DOCS TEST BY ITS GLOB, so a new one needs no line here (PRF-B01).
       - if: matrix.links
-        run: node --test docs/test/links.test.mjs
+        run: node --test docs/test/*.test.mjs
 
   gates:
     # A JOB OF ITS OWN, so the greps no longer wait for the whole suite, and a red gate and a red
@@ -163,42 +166,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
 
-      # THE GATES THAT READ SOURCE. Named as an exclusion rather than as a list of them, because a
-      # list of what to run stops running the gate somebody adds tomorrow and says nothing about it;
-      # an exclusion picks it up, and if the new gate turns out to need a build it exits 3,
-      # which `run.mjs` makes red under CI. The failure that arrives is then a sentence naming the
-      # gate rather than a green run that checked one thing fewer than it claims.
+      # EVERY GATE THAT NEEDS NOTHING BUILT, CHOSEN BY THE RUNNER AND NOT BY A LIST HERE (PRF-B01).
+      # `--unbuilt` is every gate whose `needs` (`tools/gates/run.mjs`, `NEEDS`) names no build and no
+      # live host, and `--built` in the build job below is every gate a web build satisfies. The two are
+      # read off the gates themselves, so a gate added tomorrow runs in one of them with no line here.
+      # This step named ten gates to leave out until October, and every name was a place a gate could
+      # go quietly unrun after its reason had gone. `ci-workflow.test.mjs` is red on any gate name in
+      # a run line here but the two the build job still waits on.
       #
-      # `typecheck` is excluded because every leg of `test` runs it over its own workspaces, and the
-      # four legs together are the gate's `pnpm -r run typecheck`. Running `svelte-check` over
-      # `apps/web` again here is a minute spent to learn nothing.
-      #
-      # `bundle`, `keys`, `prefs`, `layout`, `a11y`, `passkey` and `queue` all read `apps/web/build`,
-      # and this job does not build. **`passkey` and `queue` joined that list on 21 September and it
-      # is a correction, not a widening:** they read the build like the other five and USED TO EXIT 0
-      # when they did not find one, so every push counted two browser gates as passed that had never
-      # opened a browser. `d5bbe8d0` made them exit 3 and `77acdadc` moved the question to the
-      # runner, which reads a declared `needs` before it spawns anything, and the first push after
-      # that turned this step red. The red was right: the exclusion list was written against two
-      # gates that lied.
-      #
-      # `self-test` is excluded for the same reason at one remove. Five of its sixty-six seeded
-      # negatives are browser gates, so without a build it catches sixty-one and says so, and its own
-      # exit code is the failure rather than the runner's skip. The other sixty-one are worth having
-      # on every push, so its home is `build` below, the job that builds, and it has run there since
-      # `36cb6645`, once no gate it seeds held a fixed port (see the comment on `build`'s last step).
-      #
-      # NOT BUILDING IS DELIBERATE. `bundle`'s staleness guard makes the build a PREREQUISITE
-      # rather than a step, so a job that builds must build everything the gates it runs measure,
-      # and that is `build` below for the six it can afford and `gates.yml` for the rest. Building
-      # here as well would pay for the same Vite builds twice in one push on a single runner.
-      #
-      # `deploy-parity` joins the excluded list for a different reason than the others: they need a
-      # build this job does not do, or run in `test`, and it needs a LIVE HOST, which only
-      # `deploy.yml` has. `ci-workflow.test.mjs` holds the whole list to that account: every name
-      # left out here is `typecheck`, in `build`'s `--only` list below, in `gates.yml`'s push run, or
-      # `deploy-parity`.
-      - run: pnpm gates -- --except typecheck,bundle,keys,prefs,layout,a11y,passkey,queue,self-test,deploy-parity
+      # NOT BUILDING IS STILL DELIBERATE. A gate that turns out to need a build and has not said so
+      # exits 3 here, which `run.mjs` makes red under CI: the failure is a sentence naming the gate,
+      # and the fix is its `needs` line, which moves it to the build job. `deploy-parity` needs a live
+      # host, which only `deploy.yml` has, so it is in neither selection.
+      - run: node tools/gates/run.mjs --unbuilt
 
   build:
     # A JOB OF ITS OWN, because it answers a different question and can answer it at the same time.
@@ -210,11 +190,12 @@ jobs:
     # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     # Four Vite builds for the app (the shipped record plus the cloud, quiet and busy variants), one
-    # for the site, and six gates that read them. The job took 2 min 39 s on the self-hosted runner on 21
-    # September before the gates were added, and the first three (`bundle`, `passkey`, `queue`) measured 6.4 s in `gates.yml` run
-    # 35587734418. `self-test`, `prefs` and `keys` add about 4.5 minutes (measured once), which is
+    # for the site, the site's tests, the gates that read them and the runner's tests. The job took
+    # 2 min 39 s on the self-hosted runner on 21 September before the gates were added, and the first
+    # three (`bundle`, `passkey`, `queue`) measured 6.4 s in `gates.yml` run 35587734418. `self-test`, `prefs` and `keys` add about 4.5 minutes (measured once), which is
     # why the ceiling moved from 15 to 20: a ceiling for a hang, not a budget. The two dry runs
-    # have not been measured in this job yet.
+    # have not been measured in this job yet, nor have the site's tests and the runner's tests, which
+    # take about ten seconds together at a desk.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -225,7 +206,19 @@ jobs:
       # `apps/web/build` is absent, which is every `test` leg, so only a job that builds first can
       # run it on every push.
       - run: node --test apps/web/test/csp.test.ts
+      # AND THE SELF-HOST SERVING THAT BUILD UNDER ITS APP PATH, which skips without `apps/web/build` in
+      # every `test` leg for the same reason.
+      - run: node --test apps/selfhost/test/app-path.test.ts
       - run: pnpm --filter @braindog/site build
+      # THE SITE'S OWN TESTS, WITH THE BUILD THEY READ (LCH-B01, PRF-B01). The `apps` leg runs them
+      # too, with no build, so the ones that read the served bytes skip there and say why: 37 skips
+      # rode that green leg on every push, and nothing else ran them. Here they run right after the
+      # build, and `SITE_BUILT=1` turns a missing page from a skip into a failure that names it
+      # (`apps/site/test/built.ts`). A screenshot put back on the home page is red in this step.
+      - name: Test the site against its build
+        env:
+          SITE_BUILT: '1'
+        run: pnpm --filter @braindog/site test
       # THE CLI BUNDLE TOO, so a change esbuild cannot bundle is red on the push and not first at the deploy, which
       # builds it before anything goes live.
       - run: pnpm --filter braindog-cli build
@@ -271,25 +264,30 @@ jobs:
       # it is a download of about 150 MB and a minute or two with no cache.
       - run: pnpm exec playwright install --with-deps chromium
 
-      # THE GATES THAT READ THIS BUILD, WHICH `gates` HAS TO EXCLUDE BECAUSE IT DOES NOT BUILD.
+      # EVERY GATE A WEB BUILD SATISFIES, CHOSEN BY THE RUNNER (PRF-B01). `--built` reads each gate's
+      # `needs` as `--unbuilt` does in `gates` above, so the two jobs together run every gate but
+      # `deploy-parity`, and neither names one. A gate that declares `web-build` tomorrow runs here
+      # from that push.
       #
-      # A LIST AND NOT AN EXCLUSION, and `gates`'s argument against lists does not reach it. A gate
-      # added tomorrow that needs a build is still selected by `gates`'s exclusion, `run.mjs` refuses
-      # it there for want of the build, and a refusal under CI is red. So a new gate cannot go unrun
-      # because it is missing from this list: the run that would have skipped it is red and names it.
+      # `layout` AND `a11y` ARE THE ONE LIST LEFT, AND THE REASON IS THE CANCELLATION RATE. They are
+      # about 14 of the 19 minutes `pnpm gates` took on this runner, and a `ci` run of 21 minutes or
+      # more was cancelled by the next push more than half the time over five days. A cancelled `ci`
+      # is a deploy that never starts. They stay in `gates.yml` until PRF-B10 makes a red screen check
+      # stop the deploy, which removes this `--except`; `ci-workflow.test.mjs` names that unit.
       #
-      # `layout` AND `a11y` ARE NOT HERE, AND THE REASON IS THE CANCELLATION RATE. They are about 14
-      # of the 19 minutes `pnpm gates` took on this runner, and over five days of pushes a `ci` run
-      # of 21 minutes or more would have been cancelled by the next push more than half the time. A
-      # cancelled `ci` is a deploy that never starts. They stay in `gates.yml`.
-      #
-      # `prefs`, `keys` AND `self-test` JOINED ONCE NO GATE HELD A FIXED PORT (`a9897f7a`). This
-      # runner is the PC the same gates are run on by hand, and while `prefs` bound 4183, `keys`
-      # 4184, `layout` 5189 and `a11y` 5186, a CI run and a desk run of one gate could collide and
-      # go red for a reason that is about the machine rather than the tree. All four take port 0 now,
-      # proven on 22 September by a desk run of all four, green. `run.mjs` runs a selection in
-      # registry order, so `self-test` runs first whatever order the list is written in.
-      - run: node tools/gates/run.mjs --only self-test,bundle,prefs,keys,passkey,queue
+      # NO GATE HOLDS A FIXED PORT (`a9897f7a`), so a CI run and a desk run of the same gate on this
+      # runner cannot collide. `run.mjs` runs a selection in registry order, so `self-test` runs
+      # first.
+      - run: node tools/gates/run.mjs --built --except layout,a11y
+
+      # THE GATE RUNNER'S OWN TESTS, WHICH NO SCRIPT REACHED (PRF-B01). `tools` is no workspace, so no
+      # leg's filter finds `tools/gates/test`, and the tests that hold the runner's promises (what a
+      # gate needs, how a run is cut into shards) had never run on this runner. After the builds,
+      # because some of them read what the build wrote. By glob, so a new one needs no line here.
+      - run: node --test tools/gates/test/*.test.mjs
+      # AND THE LOOK'S OWN TESTS, FOR THE SAME REASON: `tools/look` is no workspace either, so no leg
+      # reaches `tools/look/test`. They build nothing and need no build; by glob, as above.
+      - run: node --test tools/look/test/*.test.mjs
 
   windows:
     # THE KERNEL, THE SELF-HOST AND THE CLI ON WINDOWS, which is the owner's own machine and which

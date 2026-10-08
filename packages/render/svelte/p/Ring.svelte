@@ -17,6 +17,10 @@
   const said = (r: Row, i: number): string => text(inline(r.cells[i] ?? '', opts));
   const plan = $derived(ringPlan(block.rows.map((r) => ({ label: said(r, 0), value: said(r, 1), third: said(r, 2), ...(r.tone ? { tone: r.tone } : {}) }))));
   /* The glyph only for a word `TONES` owns, as `toneGlyph` in the mirror checks. */
+  /* A late arc is striped as well as red (DIRECTION §42). Its dashes already draw its length, so the mark is a pattern
+     of its own, and `$props.id()` keeps two dials on one page from painting from one another's (`lateId` in the mirror). */
+  const uid = $props.id();
+  const late = $derived(plan.arcs.some((a) => a.tone === 'bad') ? `${uid}-late` : '');
   const glyph = (tone?: string) => (tone && Object.hasOwn(TONES, tone) ? TONES[tone as keyof typeof TONES] : null);
 </script>
 
@@ -29,6 +33,17 @@
     {#if plan.ring}
       <div class="ring-dial">
         <svg class="ring-mark" viewBox="0 0 36 36" role="img" aria-label={plan.name}>
+          {#if late}
+            <defs
+              ><pattern class="late-hatch" id={late} patternUnits="userSpaceOnUse" width="4" height="4"
+                ><rect class="late-ground" width="4" height="4" fill="currentColor" fill-opacity="0.3"></rect><path
+                  class="late-stripe"
+                  d="M0 0H2L0 2ZM4 0V2L2 4H0Z"
+                  fill="currentColor"
+                ></path></pattern
+              ></defs
+            >
+          {/if}
           <circle class="ring-track" {...RING_PAINT.track} cx="18" cy="18" r="16" pathLength="100"></circle>
           {#each plan.arcs as a}
             <circle
@@ -36,6 +51,7 @@
               data-step={a.step}
               data-intent={a.tone}
               {...RING_PAINT.arc}
+              style={a.tone === 'bad' ? `stroke:url(#${late})` : undefined}
               stroke-opacity={RING_STEP_OPACITY[a.step]}
               stroke-dasharray={a.dash}
               stroke-dashoffset={a.offset}

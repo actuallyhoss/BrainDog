@@ -213,18 +213,20 @@ test('the record says when it next has something to do, which is one alarm per c
   // The alternative is a cron worker fanning out across every tenant, waking records that have
   // nothing to do in order to ask them.
   const { k, sql } = await record();
-  /* NOTHING TO DO IS NO ALARM. This helper installs declarations but never calls `createRecord` —
-     and the weekly analysis is the RECORD's row, armed when the record is created, because 09 §2
-     sources it from use rather than from anything being declared. */
-  assert.equal(k.pending().nextDueMs, null, 'a record with nothing to do armed an alarm');
+  /* NOTHING DECLARED IS ONE ALARM, THE SIGNS' NIGHT (`armSigns`): every record reads its vital signs at five past
+     midnight, armed as it opens, so a record with nothing else to do still has that. The weekly analysis is the
+     RECORD's row, armed when the record is created, because 09 §2 sources it from use rather than from anything being
+     declared, and this helper never calls `createRecord`. */
+  const armed = sql.all<{ kind: string; key: string; due_at: string }>("SELECT kind, key, due_at FROM schedule WHERE state = 'pending'");
+  assert.deepEqual(armed.map((r) => [r.kind, r.key]), [['snapshot', 'signs']], 'a record with nothing to do armed more than its signs');
+  assert.equal(k.pending().nextDueMs, Date.parse(armed[0]!.due_at));
 
   value(k.create('obligations', { what: 'a', due: day(30) }, { actor: 'p_1' }));
-  const at = k.pending().nextDueMs;
-  assert.ok(at !== null);
-  assert.equal(new Date(at).toISOString().slice(0, 10), day(23), 'the alarm is set for the wrong reminder');
+  const reminder = sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'reminder' AND state = 'pending' ORDER BY due_at LIMIT 1");
+  assert.equal(reminder?.due_at.slice(0, 10), day(23), 'the alarm is set for the wrong reminder');
+  assert.equal(k.pending().nextDueMs, Math.min(Date.parse(armed[0]!.due_at), Date.parse(reminder.due_at)), 'the alarm is not the soonest row');
 
-  assert.equal(k.due().length, 0, 'a reminder in the future is due now');
-  assert.equal(k.due().length, 0);
+  assert.equal(k.due().filter((r) => r.kind === 'reminder').length, 0, 'a reminder in the future is due now');
   sql.close();
 });
 
@@ -236,8 +238,9 @@ test('and hands over what is due when the time comes', async () => {
   value(k.create('obligations', { what: 'Invoice 41', due: day(10) }, { actor: 'p_1' }));
 
   clock.set(NOW + 4 * DAY);
-  assert.equal(k.due().length, 1, 'the -7d reminder for a date ten days out should be due on day three');
-  const [first] = k.due();
+  /* The reminders only: the signs' night is due every day as well (`armSigns`). */
+  assert.equal(k.due().filter((r) => r.kind === 'reminder').length, 1, 'the -7d reminder for a date ten days out should be due on day three');
+  const [first] = k.due().filter((r) => r.kind === 'reminder');
   const payload = JSON.parse(first!.payload) as { register: string; field: string; offset: string };
   assert.deepEqual(
     { register: payload.register, field: payload.field, offset: payload.offset },

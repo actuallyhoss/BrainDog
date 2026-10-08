@@ -55,7 +55,8 @@ const CONTEXT = {
 };
 
 /**
- * `attach` answers S7, resumed when the event says so; `handoff` answers the row; `meet` adds a person, or
+ * `attach` answers S7, resumed when the event says so; `handoff` answers the row; `end` answers the run done, or
+ * with `endSays` refuses with that code, as a host from before `end` does with no such method; `meet` adds a person, or
  * refuses as a record without People does when `people` is false. With `hang`, nothing ever answers. With `card`,
  * the context carries the record's own card, as a host that draws one does. `context` answers the same context,
  * `boot` says the sign-in speaks for Sam, and `list` answers no rows, for the commands and the MCP server.
@@ -65,7 +66,13 @@ async function stubHost(
   hang = false,
   people = true,
   card?: string,
-  o: { self?: Record<string, unknown>; legacy?: boolean; projects?: { repos?: string[]; folders?: string[] }[]; joined?: string | null } = {},
+  o: {
+    self?: Record<string, unknown>;
+    legacy?: boolean;
+    projects?: { repos?: string[]; folders?: string[] }[];
+    joined?: string | null;
+    endSays?: string;
+  } = {},
 ) {
   const seen: Seen[] = [];
   const server = createServer((req, res) => {
@@ -86,6 +93,11 @@ async function stubHost(
       if (method === 'attach')
         return answer({ ok: true, value: { session: row, spoken: 'S7', resumed: body.source !== 'startup', project: 'things#1', context: card === undefined ? CONTEXT : { ...CONTEXT, card } } });
       if (method === 'handoff') return answer({ ok: true, value: { ...row, state: body.state } });
+      if (method === 'end' && o.endSays !== undefined) {
+        res.writeHead(o.endSays === 'ROUTE_UNKNOWN' ? 404 : o.endSays === 'NOT_IN_THIS_BUILD' ? 501 : 403, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, refusal: { code: o.endSays, fix: 'This host does not end runs.' } }));
+      }
+      if (method === 'end') return answer({ ok: true, value: { run: 'S7', state: 'done', changed: true } });
       if (method === 'context') return answer({ ok: true, value: CONTEXT });
       /* With `projects`, a Projects list declaring `scopes:` and a People list declaring `meets:` with its self part. */
       const registers = o.projects === undefined ? [] : [{ id: 'things', name: 'Projects', count: o.projects.length }, { id: 'people', name: 'People', count: 1 }];
@@ -306,7 +318,7 @@ test('NOT SIGNED IN is one line saying how to get a token, exit 0, and nothing i
 
 /* ── the end hook ──────────────────────────────────────────────────────── */
 
-test('THE END HOOK SETS IDLE, NEVER DONE, on the run the session file names, and prints nothing', async (t) => {
+test('THE END HOOK ENDS THE RUN THE SESSION FILE NAMES, sending no state, and prints nothing', async (t) => {
   const host = await stubHost(t);
   const config = folder('config');
   const cwd = folder('kiln');
@@ -316,7 +328,8 @@ test('THE END HOOK SETS IDLE, NEVER DONE, on the run the session file names, and
   const before = Date.now();
   const out = await run(['hook', 'end'], env, JSON.stringify({ session_id: 'claude-run-1', cwd, hook_event_name: 'SessionEnd', reason: 'prompt_input_exit' }));
   assert.deepEqual([out.code, out.stdout, out.stderr], [0, '', '']);
-  assert.deepEqual(host.seen.map((s) => [s.method, s.body]), [['handoff', { state: 'idle' }]]);
+  /* `end`, and no state: the record picks done or handoff from what the run left. */
+  assert.deepEqual(host.seen.map((s) => [s.method, s.body]), [['end', {}]]);
   assert.equal(host.seen[0]!.headers['x-braindog-session'], 'S7');
   assert.equal(host.seen[0]!.headers['x-braindog-client'], 'claude-run-1');
   /* When it ended, so a resume within the hour knows the card is still in the conversation. The rest is as it was. */
@@ -324,7 +337,7 @@ test('THE END HOOK SETS IDLE, NEVER DONE, on the run the session file names, and
   assert.ok(Date.parse(ended?.seen ?? '') >= before - 1_000, JSON.stringify(ended));
   assert.deepEqual({ ...ended, seen: undefined }, { host: host.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: '2026-09-15T00:00:00Z', seen: undefined });
 
-  /* Another session in the same folder wrote the file since: its run is not this one's to idle. */
+  /* Another session in the same folder wrote the file since: its run is not this one's to end. */
   const other = await run(['hook', 'end'], env, JSON.stringify({ session_id: 'claude-run-2', cwd, reason: 'other' }));
   assert.equal(other.code, 0);
   assert.equal(host.seen.length, 1);
@@ -334,6 +347,27 @@ test('THE END HOOK SETS IDLE, NEVER DONE, on the run the session file names, and
   assert.deepEqual(Object.values(await run(['hook', 'end'], env, JSON.stringify({ cwd: bare }))).slice(0, 3), [0, '', '']);
   assert.equal((await run(['hook', 'end'], envFor(folder('config'), {}), '')).stdout, '');
   assert.equal(host.seen.length, 1);
+});
+
+test('AN OLDER HOST WITH NO END IS SENT THE IDLE HANDOFF IT ALWAYS WAS, by either word it says it has none; a host that refuses end otherwise is not', async (t) => {
+  for (const older of ['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD'] as const) {
+    const host = await stubHost(t, false, true, undefined, { endSays: older });
+    const cwd = folder('kiln');
+    const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+    writeSession(sessionPath(env, cwd), { host: host.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: '2026-09-15T00:00:00Z' });
+    const out = await run(['hook', 'end'], env, JSON.stringify({ session_id: 'claude-run-1', cwd, hook_event_name: 'SessionEnd', reason: 'logout' }));
+    assert.deepEqual([out.code, out.stdout, out.stderr], [0, '', ''], older);
+    assert.deepEqual(host.seen.map((s) => [s.method, s.body]), [['end', {}], ['handoff', { state: 'idle' }]], older);
+    assert.equal(host.seen[1]!.headers['x-braindog-session'], 'S7');
+  }
+
+  /* A host that has end and refuses it, to a token that may not, is not answered with a second write. */
+  const refusing = await stubHost(t, false, true, undefined, { endSays: 'FORBIDDEN' });
+  const cwd = folder('kiln');
+  const env = envFor(folder('config'), { BRAINDOG_HOST: refusing.base, BRAINDOG_TOKEN: TOKEN });
+  writeSession(sessionPath(env, cwd), { host: refusing.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: '2026-09-15T00:00:00Z' });
+  await run(['hook', 'end'], env, JSON.stringify({ session_id: 'claude-run-1', cwd, hook_event_name: 'SessionEnd', reason: 'logout' }));
+  assert.deepEqual(refusing.seen.map((s) => s.method), ['end']);
 });
 
 /* ── the people harvest ────────────────────────────────────────────────── */
@@ -356,7 +390,7 @@ function repository(dir = folder('repo')): { dir: string; commit: (author?: stri
   };
 }
 
-test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run goes idle: no bots, not the owner, nobody with one commit, at most ten, and silent when refused', async (t) => {
+test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run ends: no bots, not the owner, nobody with one commit, at most ten, and silent when refused', async (t) => {
   const repo = repository();
   /* Ada's first commit is before the session, so her one commit in it is her second in the repository. */
   repo.commit('Ada Lovelace <123+ada@users.noreply.github.com>');
@@ -381,8 +415,8 @@ test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run 
   const host = await stubHost(t, false, true, undefined, { projects, self });
   const out = await run(['hook', 'end'], signedIn(host.base), end);
   assert.deepEqual([out.code, out.stdout, out.stderr], [0, '', '']);
-  /* The record's projects and the owner's own row read once, when the repository joined its project, then the meets, then the handoff. */
-  assert.deepEqual(host.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', 'history', ...Array<string>(10).fill('meet'), 'handoff']);
+  /* The record's projects and the owner's own row read once, when the repository joined its project, then the meets, then the end. */
+  assert.deepEqual(host.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', 'history', ...Array<string>(10).fill('meet'), 'end']);
   const met = host.seen.filter((s) => s.method === 'meet');
   /* Newest first: GitHub's private address as a handle and a key, the owner's commit left out, and one person once. */
   const source = `commit ${last.slice(0, 7)} in ${name}`;
@@ -396,28 +430,28 @@ test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run 
     assert.equal(s.headers['x-braindog-session'], 'S7');
   }
 
-  /* People switched off: the first is refused, no more are sent, and the run still goes idle. */
+  /* People switched off: the first is refused, no more are sent, and the run still ends. */
   const off = await stubHost(t, false, false, undefined, { projects, self });
   const quiet = await run(['hook', 'end'], signedIn(off.base), end);
   assert.deepEqual([quiet.code, quiet.stdout, quiet.stderr], [0, '', '']);
-  assert.deepEqual(off.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', 'history', 'meet', 'handoff']);
+  assert.deepEqual(off.seen.map((s) => s.method), ['boot', 'schema', 'schema', 'list', 'list', 'history', 'meet', 'end']);
 
   /* FAIL CLOSED: no row marked the owner's, the project's history unreadable, or a time in it that is no time. Nobody is
-     met, nothing is said, and the run still goes idle. */
+     met, nothing is said, and the run still ends. */
   for (const o of [{ projects }, { projects, self, joined: null }, { projects, self, joined: '2999-01-01T00:00:00Z' }, { projects, self, joined: 'soon' }]) {
     const closed = await stubHost(t, false, true, undefined, o);
     const said = await run(['hook', 'end'], signedIn(closed.base), end);
     assert.deepEqual([said.code, said.stdout, said.stderr], [0, '', '']);
     assert.deepEqual(closed.seen.filter((s) => s.method === 'meet'), [], JSON.stringify(o));
-    assert.equal(closed.seen.at(-1)?.method, 'handoff');
+    assert.equal(closed.seen.at(-1)?.method, 'end');
   }
 
-  /* No project lists the repository: nobody is met, and the run still goes idle. */
+  /* No project lists the repository: nobody is met, and the run still ends. */
   const unlisted = await stubHost(t, false, true, undefined, { projects: [{ repos: ['github.com/acme/other'] }], self });
   const none = await run(['hook', 'end'], signedIn(unlisted.base), end);
   assert.deepEqual([none.code, none.stdout, none.stderr], [0, '', '']);
   assert.deepEqual(unlisted.seen.filter((s) => s.method === 'meet'), []);
-  assert.equal(unlisted.seen.at(-1)?.method, 'handoff');
+  assert.equal(unlisted.seen.at(-1)?.method, 'end');
 
   /* A port nobody listens on: nothing said, and exit 0. */
   const down = await run(['hook', 'end'], signedIn('http://127.0.0.1:9'), end);
@@ -641,7 +675,7 @@ test('THE END HOOK READS EVERY REPOSITORY THAT MOVED UNDER A FOLDER THAT IS NOT 
     { name: 'Grace Hopper', email: 'grace@navy.example', where: `commit ${grace.slice(0, 7)} in glaze` },
     { name: 'Linus', email: 'linus@example.org', where: `commit ${linus.slice(0, 7)} in kiln` },
   ]);
-  assert.equal(host.seen.at(-1)?.method, 'handoff');
+  assert.equal(host.seen.at(-1)?.method, 'end');
   /* Three moved, so the run is not placed by any one of them. */
   assert.equal(host.seen.at(-1)?.headers['x-braindog-repo'], undefined);
 });
@@ -656,9 +690,9 @@ test('THE END HOOK PLACES A RUN STARTED IN A FOLDER THAT IS NOT A REPOSITORY by 
   const host = await stubHost(t);
   const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
   const end = (id: string) => run(['hook', 'end'], env, JSON.stringify({ session_id: id, cwd: top, hook_event_name: 'SessionEnd', reason: 'logout' }));
-  const handoff = () => host.seen.filter((s) => s.method === 'handoff').at(-1)!;
+  const handoff = () => host.seen.filter((s) => s.method === 'end').at(-1)!;
 
-  /* One moved: the handoff says kiln's remote, folder, branch and commit, so the record places the run in kiln's project. */
+  /* One moved: the end says kiln's remote, folder, branch and commit, so the record places the run in kiln's project. */
   assert.equal((await run(['hook', 'start'], env, event(top, { session_id: 'claude-run-one', source: 'startup' }))).code, 0);
   const head = kiln.commit();
   host.seen.splice(0);
@@ -668,7 +702,7 @@ test('THE END HOOK PLACES A RUN STARTED IN A FOLDER THAT IS NOT A REPOSITORY by 
   assert.equal(one.headers['x-braindog-remote'], 'github.com/sam/kiln');
   assert.equal(one.headers['x-braindog-cwd'], kiln.dir);
   assert.equal(one.headers['x-braindog-client'], 'claude-run-one');
-  assert.deepEqual({ state: one.body.state, head: one.body.head }, { state: 'idle', head });
+  assert.deepEqual({ state: one.body.state, head: one.body.head }, { state: undefined, head });
   assert.equal(typeof one.body.branch, 'string');
 
   /* Two moved: no guess. The run keeps the folder's own position, with no repository and no remote. */
@@ -681,7 +715,7 @@ test('THE END HOOK PLACES A RUN STARTED IN A FOLDER THAT IS NOT A REPOSITORY by 
   assert.equal(two.headers['x-braindog-cwd'], top);
   assert.equal(two.headers['x-braindog-repo'], undefined);
   assert.equal(two.headers['x-braindog-remote'], undefined);
-  assert.deepEqual(two.body, { state: 'idle' });
+  assert.deepEqual(two.body, {});
 
   /* None moved: the folder's position too. */
   assert.equal((await run(['hook', 'start'], env, event(top, { session_id: 'claude-run-none', source: 'startup' }))).code, 0);

@@ -21,23 +21,19 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 import { ENTRIES } from '../src/routes/changelog/entries.ts';
+import { BUILD, missing, when } from './built.ts';
 
-const BUILD = new URL('../build/', import.meta.url);
 const REQUIRED = ['index.html', 'slash.html', 'pricing.html', 'agents.html', 'changelog.html', '404.html'] as const;
 
-const absent = REQUIRED.filter((page) => !existsSync(new URL(page, BUILD)));
-const when =
-  absent.length === 0
-    ? {}
-    : { skip: `apps/site/build is missing ${absent.join(', ')}. Run "pnpm --filter @braindog/site build" first.` };
+const NO_BUILD = missing(REQUIRED);
 
 /* EVERY PAGE THE BUILD WROTE, walked rather than listed, as `content.test.ts` does: the docs and the pages for
    each kind of person are pages a stranger reads too, and a list typed here would leave the newest out. */
 const PAGES: readonly string[] =
-  absent.length === 0
+  NO_BUILD === null
     ? readdirSync(BUILD, { recursive: true, encoding: 'utf8' })
         .map((rel) => rel.replaceAll('\\', '/'))
         .filter((rel) => rel.endsWith('.html') && !rel.startsWith('_app/'))
@@ -71,7 +67,7 @@ test('one changelog entry says Spark is now Slash, and names both settings a sel
   );
 });
 
-test('no page this site serves names Spark outside the entry announcing the rename', when, () => {
+test('no page this site serves names Spark outside the entry announcing the rename', when(NO_BUILD), () => {
   const allowed = announcing.flatMap((e) => [e.title, e.body]).map((s) => s.replace(/\s+/g, ' '));
   for (const page of PAGES) {
     let text = words(readFileSync(new URL(page, BUILD), 'utf8'));
@@ -81,7 +77,7 @@ test('no page this site serves names Spark outside the entry announcing the rena
   }
 });
 
-test('the changelog calls the assistant Slash', when, () => {
+test('the changelog calls the assistant Slash', when(NO_BUILD), () => {
   const text = words(readFileSync(new URL('changelog.html', BUILD), 'utf8'));
   /* `ok` AND NOT `match`, because a failed `match` prints the whole page as its `actual`. */
   assert.ok(/\bSlash\b/.test(text), 'changelog.html never says Slash');

@@ -37,7 +37,10 @@ import { fileURLToPath } from 'node:url';
 
 import { pressedOnly } from '@braindog/kernel';
 
+import { figuresIn, reasonIn } from '../../../lib/cite.ts';
 import { mayAnswer, whyNotAnswering } from '../answering.ts';
+import { evidenceIn } from '../lead.ts';
+import { sideOf } from './side.ts';
 
 const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
 
@@ -341,35 +344,55 @@ test('a merge is the one decision card with Undo, and Backspace is held and neve
 });
 
 /**
- * THE SIDE IS THERE ONLY WITH SOMETHING TO SAY (`side.ts`). MEASURED on the critic's second pass at 1,512: the side held
- * "Asked by BrainDog 5w ago" and nothing else on most questions, a blank column beside the choices. With something to
- * say it holds who asked, why, what answering changes, the evidence and what is linked; with nothing the tile is one
- * centred column and who asked is the line over the answers.
+ * THE SIDE, AS THIS PAGE ASKS FOR IT (`side.ts`, `../lead.ts`), held by what it returns and not by the markup's text.
+ * The tests that stood here read the side's markup as regexes, and passed with it present whatever it said (audit
+ * 31-32, finding 6). These hold what the page is handed for a question as the record sends one: its why, each answer's
+ * reason as filed (`reasonIn`), and its body. Each fails on a revert of finding 5.
  */
-test('the side is drawn only with something in it, as groups and never landmarks, and the page is one centred column without it', () => {
-  assert.match(page, /import \{ sideOf, words as sideWords \} from '\.\/side\.ts';/u, 'the side is no longer read from its module');
-  assert.match(page, /const sided = \$derived\(side\?\.any === true\);/u, 'the side is drawn whether or not it has anything to say');
-  assert.match(page, /<div class="gate-form" data-side=\{sided \? '' : undefined\}>\n\s+\{#if sided\}/u, 'who asked keeps a column of its own with nothing beside it');
-  assert.match(page, /<div class="gate-main">\n\s+\{#if !sided\}\{@render askedBy\(true\)\}\{\/if\}/u, 'a question with no side no longer says who asked over its answers');
-  assert.match(page, /<div class="page" data-plain=\{sided \? undefined : ''\}>/u, 'a question with no side is not marked to be centred');
-  assert.match(page, /\.page\[data-plain\] :global\(\.tile\.gate\) \{\n\s+padding-inline: max\(20px, calc\(\(100% - 46rem\) \/ 2\)\);/u, 'a question with no side is not centred at a measure');
+const asked = (q: { context?: string; options: { key: string; body: string }[]; body?: unknown }) =>
+  sideOf({
+    why: q.context ?? '',
+    reasons: q.options.map((o) => ({ text: reasonIn(q.body, o.key) ?? o.body })),
+    body: q.body,
+    figures: figuresIn(q.body),
+    now: Date.parse('2026-10-08T09:00:00Z'),
+  });
 
-  /* EVERY PART OF THE SIDE IS A GROUP WITH A NAME. A `section` with a name is a landmark, and five of them beside the
-     options made a rotor's list of the page longer than the page. */
-  const from = page.indexOf('<div class="gate-form"');
-  const to = page.indexOf('<!-- THE QUESTION\'S COMMENTS');
-  const form = page.slice(from, to);
-  const parts = form.match(/<div class="gate-part[^"]*" role="group" aria-labelledby="[a-z-]+">/gu) ?? [];
-  assert.equal(parts.length, 5, 'the side no longer has its five parts, each a named group');
-  assert.doesNotMatch(form, /<(section|aside)[^>]*class="gate-(part|side)/u, 'a part of the side is a landmark again');
-  for (const id of ['gate-by-h', 'gate-why-h', 'gate-changes-h', 'gate-ev-h', 'gate-linked-h']) {
-    assert.equal(form.split(`aria-labelledby="${id}"`).length, 2, `${id} names no part, or more than one`);
-    assert.equal(form.split(`id="${id}"`).length, 2, `${id} is not one heading`);
-  }
-  /* EACH ONLY WHERE THE RECORD HOLDS IT, and the rest of the side written after the answers, so a phone reads it there. */
-  for (const held of ['{#if question.context}', '{#if side.changes.length > 0}', '{#if side.evidence}', '{#if side.links.length > 0}']) assert.ok(form.includes(held), `${held} no longer guards its part`);
-  assert.ok(form.indexOf('<div class="gate-side gate-more">') > form.indexOf('<section class="does"'), 'the evidence and what is linked are read before the answers on a phone');
-  /* A LINK IN THE SIDE IS A 44px LINE UNDER A THUMB, and one column is the default, two only on a wide page with a side. */
-  assert.match(page, /@media \(pointer: coarse\) \{\n\s+\.gate-link \{\n\s+min-block-size: var\(--tap\);/u, 'a linked thing is a smaller target than a thumb');
-  assert.match(page, /@container \(inline-size >= 55rem\) \{\n\s+\.gate-form\[data-side\] \{\n\s+display: grid;/u, 'two columns are drawn without a side, or on a narrow page');
+test('a question whose only news is what answering changes has no side, so that news is said once, under the answers', () => {
+  /* AN ARRANGEMENT THAT ADDS A PAGE AND MOVES MONEY, with no why and nothing cited: the side used to hold its headline
+     beside the answers on a wide screen, the same lines the tile under the answers draws whole. */
+  const side = asked({
+    options: [
+      { key: 'accept', body: 'Adds the page Cash this month and moves £12.98.' },
+      { key: 'decline', body: '' },
+    ],
+    body: { kind: 'arrange', options: [{ id: 'accept', because: 'Adds the page Cash this month and moves £12.98.' }] },
+  });
+  assert.equal(side.any, false, 'the side is drawn, with what answering changes in it a second time');
+  assert.equal('changes' in side, false, 'the side holds what answering changes again');
+});
+
+test('an agent’s “2 of 5 steps” is words and never a chart; a pair on the body is the one chart', () => {
+  const prose = asked({
+    context: 'The import stopped part way: 2 of 5 steps are done.',
+    options: [{ key: 'accept', body: '' }],
+    body: { options: [{ id: 'accept', because: "41 of September's 58 HSBC lines were typed in by hand." }] },
+  });
+  assert.equal(prose.evidence, null, 'a share was read out of an agent’s sentence and drawn as Evidence');
+  assert.equal(prose.any, true, 'why it is asked still keeps the side');
+
+  const given = asked({
+    options: [{ key: 'accept', body: 'Files them by your rules.' }],
+    body: { evidence: { value: 37, of: 41, said: 'Your rules would have filed 37 of the 41 correctly.' } },
+  });
+  assert.deepEqual(given.evidence, { value: 37, max: 41, said: 'Your rules would have filed 37 of the 41 correctly.' });
+  assert.deepEqual(evidenceIn({ evidence: { value: 37, of: 41 } }), { value: 37, max: 41, said: '37 of 41' });
+});
+
+/* THE SQUARES AND THEIR SENTENCE ARE ONE CLAIM, heard once. Whether a screen reader hears a node is the markup's alone,
+   so this one line reads the markup: the waffle sits in a box hidden from it, and the sentence under it is read. */
+test('the evidence is heard once: the squares are hidden from a screen reader, and the sentence under them is read', () => {
+  const ev = page.slice(page.indexOf('{#if side.evidence}'), page.indexOf('{#if side.links.length > 0}'));
+  assert.match(ev, /<div class="gate-ev" aria-hidden="true">\s+(?:<!--[^]*?-->\s+)?<Waffle/u, 'the squares say the sentence to a screen reader too');
+  assert.match(ev, /<p class="gate-ev-said">\{ev\.said\}<\/p>/u, 'the sentence under the squares is gone');
 });

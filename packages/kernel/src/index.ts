@@ -53,6 +53,8 @@ import {
   type PlannedRecord,
 } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
+import { runsDataSteps } from './migrations/0028_runs.ts';
+import { SIGNS_KEY, fileSignReading, nextSignsDue, readSigns, runSignsNight, type SignReading, type VitalSign } from './signs.ts';
 import { checkBrainl, exportBrainl, importBrainl, signBrainl, tables as fileTables, type ImportReport, type Section, type Signer } from './brainl.ts';
 import {
   drainSchedule,
@@ -237,7 +239,9 @@ import {
   begun,
   clipTitle,
   findSession,
+  isHelper,
   isRunName,
+  leftFreshStep,
   learned,
   opening,
   owned,
@@ -282,7 +286,24 @@ import { extensions } from './api/index.ts';
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
 export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
-export { KERNEL_WRITTEN, QUIET_MS, STALE_MS, TITLE_MAX, agentOf, clipTitle, isQuiet, isStale, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
+export { KERNEL_WRITTEN, REVIVED, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
+/* THE RECORD'S VITAL SIGNS (`signs.ts`): the closed list, and what a sign and a reading are. */
+export { VITAL_SIGNS, type SignReading, type VitalSign } from './signs.ts';
+/* THE ONE CLOCK (`presence.ts`): every reader that asks whether a run is working, quiet or gone asks here. */
+export {
+  ABANDON_MS,
+  QUIET_MS,
+  STALE_MS,
+  WORKING_MS,
+  isQuiet,
+  isStale,
+  liveRuns,
+  presenceOf,
+  workingRuns,
+  type Presence,
+  type RunRow,
+  type WorkingRun,
+} from './presence.ts';
 export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type VaultGrant, type Waiting } from './device.ts';
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
@@ -3773,6 +3794,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
              and while its name is still the record's own, the name follows what this call tells the record, as it does
              for a run's other writes (`learnRun`): in this write, and with no line of its own in the history. */
           if (register === SESSION && current) {
+            /* WHEN ITS STEP WAS WRITTEN, so a step left this stretch is told from one handed down from the last
+               (`leftFreshStep`). A step cleared is a change of step too. */
+            const runs = runRegister();
+            if (touched.includes('next') && runs.has('next_at')) merged.next_at = now;
+            /* AND THE WRITE COUNTED, as any other write of the run's is (`worked`), unless it is the run's opening or an
+               attach, which say who the run is and do no work. */
+            if (!/^(opened|attached):/u.test(w.note ?? '')) {
+              if (typeof current.fields.wrote === 'number' && runs.has('wrote')) merged.wrote = current.fields.wrote + 1;
+              if (typeof current.fields.stretch_at !== 'string' && runs.has('stretch_at')) merged.stretch_at = now;
+            }
             if (touched.includes('doing') && typeof merged.doing === 'string') merged.doing = clipTitle(merged.doing);
             Object.assign(merged, learned({ fields: merged, created_at: current.created_at }, w.session ?? {}, projectNamed(merged.project), runRegister(), touched));
           }
@@ -4195,6 +4226,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* THE HEARTBEAT IS NOT A WRITE: no version, no `updated_at`, no event (`41 §13` #6). As a
          write, every agent write would turn the next edit of its run's row into a conflict. */
       if (!back) sql.exec("UPDATE entry SET fields = json_set(fields, '$.last_seen', ?) WHERE id = ?", now, found.id);
+      /* AND THE RUN'S WORK COUNTED, in place for the same reason: one more write, and the stretch it began when this is
+         the first since the run opened or came back. A run the data steps have not reached has no `wrote` yet, and is
+         counted from the log when they do (`runsDataSteps`). */
+      worked(found.id, now, back);
       /* A RE-ATTACHED RUN IS PLACED AGAIN, in place like the heartbeat and for the same reason: a
          run that came back in another folder is in that folder's project, and the record noting
          where it found the run is not an edit anybody made. */
@@ -4210,7 +4245,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return { actor, own: false };
     }
 
-    const opened = openRun(w, project, now, 'opened: auto');
+    const opened = openRun(w, project, now, 'opened: auto', true);
     if (opened.ok) return { actor: `${prefix}${String(opened.value.seq)}`, own: false };
     /* A RUN THAT CANNOT BE OPENED IS A DEFECT, NOT A REFUSAL. The write it serves has passed every
        check and still goes in, under the caller's own name, and this observation is how anybody finds
@@ -4223,16 +4258,54 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
+   * One write a run signed, counted on the run in place: `wrote` one more, and `stretch_at` stamped when this write
+   * begins a stretch, because it is the first since the run opened or since it came back (`back`). In a transaction
+   * only. A run with no `wrote` is one the data steps have not reached, and is left for them.
+   */
+  function worked(id: string, now: string, back: boolean): void {
+    const runs = runRegister();
+    if (runs.has('wrote'))
+      sql.exec(
+        "UPDATE entry SET fields = json_set(fields, '$.wrote', json_extract(fields, '$.wrote') + 1) WHERE id = ? AND json_type(fields, '$.wrote') = 'integer'",
+        id,
+      );
+    if (runs.has('stretch_at'))
+      sql.exec(
+        "UPDATE entry SET fields = json_set(fields, '$.stretch_at', ?) WHERE id = ? AND (? OR json_extract(fields, '$.stretch_at') IS NULL)",
+        now,
+        id,
+        back ? 1 : 0,
+      );
+  }
+
+  /**
+   * The run a new run works for, by the `parent` hint (`S42`), when that run is one this key opened; or `null`. A key
+   * names only its own runs as parents, so no key can hang its runs under another key's session and end them with it.
+   */
+  function parentOf(w: WriteContext): string | null {
+    const said = w.session?.parent?.trim();
+    if (!said || !isRunName(said) || !runRegister().has('parent')) return null;
+    const run = bySeq(SESSION, Number(said.slice((registers.get(SESSION)?.seq_prefix ?? 'S').length)));
+    if (!run || owned(run.fields.token_id, w.principal?.token ?? null)) return null;
+    return said;
+  }
+
+  /**
    * A new run, opened under its own name with `note` saying why. In a transaction only.
    *
    * THE NUMBER IS READ BEFORE THE ROW TAKES IT, so the `create` event is signed by the run it creates;
    * nothing else allocates in this transaction in between.
+   *
+   * `working` is a run opened by a write it signs, which is its first write and begins its first stretch; a run opened
+   * for an attach or a handoff has written nothing yet. Either way it is given its `wrote`, so the data steps of
+   * migration 28 pass it by.
    */
-  function openRun(w: WriteContext, project: string | null, now: string, note: string): Result<Entry> {
+  function openRun(w: WriteContext, project: string | null, now: string, note: string, working = false): Result<Entry> {
     const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
     const seq = Number(sql.one<{ n: number }>('SELECT next AS n FROM counter WHERE name = ?', `seq:${SESSION}`)?.n ?? 1);
     const runs = runRegister();
     const fields = opening(w.session ?? {}, runs);
+    const parent = parentOf(w);
     /* A RUN IS NEVER UNTITLED: until its agent says what it is doing, it is named for the agent and where it opened. A
        project is named by its title and never by its number, which is no name a person reads. */
     if (typeof fields.doing !== 'string') {
@@ -4247,6 +4320,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         last_seen: now,
         ...(w.principal?.token === undefined ? {} : { token_id: w.principal.token }),
         ...(project === null ? {} : { project }),
+        ...(runs.has('wrote') ? { wrote: working ? 1 : 0 } : {}),
+        ...(working && runs.has('stretch_at') ? { stretch_at: now } : {}),
+        ...(parent === null ? {} : { parent }),
       },
       ...(w.batch === undefined ? {} : { batch: w.batch }),
     });
@@ -4380,6 +4456,75 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const opened = openRun(w, at.project?.spoken ?? null, instant(clock.now()), note);
       if (!opened.ok) return opened as Result<never>;
       return ok({ run: opened.value, spoken: `${prefix}${String(opened.value.seq)}`, opened: true });
+    });
+  }
+
+  /**
+   * A session that closed, ending its run once (AGT-C04): the end hook's call, through the record's `end`.
+   *
+   * THE RECORD PICKS THE STATE, NOT THE CALLER. A run that left a fresh next step in this stretch and works for no other
+   * run waits as a handoff, its step kept for the next session. Any other is done, its stale step cleared, with the note
+   * "Ended at <head> with no next step." Before this the hook wrote idle, and twelve hours later the sweep wrote off
+   * every session that had closed normally: about 740 of 752 runs on the owner's record read abandoned.
+   *
+   * ITS HELPERS END WITH IT. A subagent's run still open when the session that started it closes is done in the same
+   * transaction, signed by that session, since nothing of it can still be working.
+   *
+   * ONCE. A run already done or waiting as a handoff is answered as it stands, `changed: false`, with nothing written,
+   * so a hook that fires twice or a retried call changes nothing. A run the sweep wrote off ends as any other: the
+   * session closed, which is truer than the sweep's guess. NO RUN IS OPENED TO BE ENDED: a session that never wrote has
+   * no run, and is refused.
+   */
+  function endRun(w: WriteContext, args: { branch?: string; head?: string }): Result<{ run: string; state: 'done' | 'handoff'; changed: boolean }> {
+    type Ended = { run: string; state: 'done' | 'handoff'; changed: boolean };
+    const barred = schemaRefusal(state);
+    if (barred) return barred;
+    if (w.principal?.kind !== 'token')
+      return no('FORBIDDEN', 'A run belongs to an agent token, and a person is never one.', { at: 'principal' });
+    const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
+    return transaction((): Result<Ended> => {
+      const at = locateRun(w);
+      if (at.found?.foreign) return notYours<Ended>(`${prefix}${String(at.found.seq)}`);
+      const run = at.found ? byId(at.found.id) : null;
+      if (!run)
+        return no<Ended>('NOT_FOUND', 'This session wrote nothing to the record, so it has no run to end. Ending is for a session that wrote.', {
+          at: 'session',
+        });
+      const spoken = `${prefix}${String(run.seq)}`;
+      const was = run.state ?? '';
+      if (was === 'done' || was === 'handoff') return ok({ run: spoken, state: was, changed: false });
+      const now = instant(clock.now());
+      const where: Patch = {};
+      if (typeof args.branch === 'string' && args.branch.trim() !== '') where.branch = args.branch.trim();
+      if (typeof args.head === 'string' && args.head.trim() !== '') where.head = args.head.trim();
+      const head = where.head ?? where.branch;
+      const step = !isHelper(run.fields) && leftFreshStep(run.fields);
+      const to: 'done' | 'handoff' = step ? 'handoff' : 'done';
+      const note = step
+        ? `Ended${typeof head === 'string' ? ` at ${head}` : ''} and left a next step.`
+        : `Ended${typeof head === 'string' ? ` at ${head}` : ''} with no next step.`;
+      const opts = { actor: spoken, cascade: false, stamp: { last_seen: now }, ...(w.batch === undefined ? {} : { batch: w.batch }) };
+      /* WHERE IT STOPPED AND THE STEP IT DID NOT LEAVE FIRST, THEN THE END, so the end is the run's newest line and the
+         sentence a person reads beside it (a write's note goes on its first line only). */
+      const before: Patch = { ...where, ...(step || run.fields.next === undefined ? {} : { next: null }) };
+      if (Object.keys(before).length > 0) {
+        const placed = writing(SESSION, run.id, before, opts);
+        if (!placed.ok) return placed as Result<never>;
+      }
+      const ended = writing(SESSION, run.id, { state: to }, { ...opts, note });
+      if (!ended.ok) return ended as Result<never>;
+      /* AND ITS HELPERS STILL OPEN, done with it. */
+      const helpers = sql.all<{ id: string }>(
+        `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND state IN ('active', 'idle', 'abandoned')
+         AND json_extract(fields, '$.parent') = ?`,
+        SESSION,
+        spoken,
+      );
+      for (const h of helpers) {
+        const done = writing(SESSION, h.id, { state: 'done' }, { ...opts, stamp: {}, note: 'Ended with the session it worked for.' });
+        if (!done.ok) return done as Result<never>;
+      }
+      return ok({ run: spoken, state: to, changed: true });
     });
   }
 
@@ -6552,13 +6697,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   function sweepRecord(cutoffMs = clock.now() - 30 * 86_400_000, limit?: number) {
     const out = purge(sql, cutoffMs, clock.now(), transaction, mint, limit);
+    /* MIGRATION 28'S DATA STEPS, 200 runs an hour until every run has had them (`runsDataSteps`): the runs the sweep
+       wrote off after their sessions closed are ended, and every run's writes and step are counted from the log. */
+    transaction(() => runsDataSteps(sql));
     const sessions = transaction(() =>
       sweepSessions(
         sql,
         clock.now(),
-        (id, to) =>
-          writing(SESSION, id, { state: to }, { actor: 'system', cascade: false, note: 'Nothing heard from this run in twelve hours.' })
-            .ok,
+        (id, to, note) => writing(SESSION, id, { state: to }, { actor: 'system', cascade: false, note }).ok,
       ),
     );
     /* A DEVICE GRANT past its time, or silent for fourteen days, is let go in the same hour. */
@@ -6827,7 +6973,20 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * be asked of a number that only exists now.
      */
     snapshot: (row) => {
-      const { metric, register } = JSON.parse(row.payload) as { metric?: string; register?: string };
+      const { metric, register, signs } = JSON.parse(row.payload) as { metric?: string; register?: string; signs?: boolean };
+      /* THE RECORD'S VITAL SIGNS, A ROW A SIGN FOR THE DAY THAT ENDED (`signs.ts`), through the same door for the same
+         reason as the ledger's night. ARMED AGAIN WHATEVER HAPPENED: a sign that could not be read is a night missing
+         from its fourteen, which the sign itself shows, and a check that stopped after one bad night would watch
+         nothing. The failure is observed, so the hole has a cause. */
+      if (signs === true) {
+        const tz = recordTz();
+        try {
+          runSignsNight(sql, clock.now(), tz);
+        } catch (e) {
+          observe(sql, clock.now(), [{ kind: 'write.refused', subject: `signs.night:${e instanceof Error ? e.name : 'Error'}` }]);
+        }
+        return nextSignsDue(clock.now(), tz);
+      }
       /* THE LEDGER'S NIGHT COMES THROUGH THE SAME DOOR, and the payload is what tells them apart: a
          metric's row says `metric`, the ledger's says `register`. `armDerived` has the reason a
          thirteenth schedule kind was not worth a migration. It is armed again either way, because a
@@ -8378,7 +8537,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     createRecord(args: CreateRecordArgs): Result<Provisioned> {
       const refused = schemaRefusal(state);
       if (refused) return refused;
-      return createRecord(sql, clock.now(), FORMAT_VERSION, args, transaction, mint);
+      const made = createRecord(sql, clock.now(), FORMAT_VERSION, args, transaction, mint);
+      /* THE SIGNS' NIGHT WAS ARMED AS THE KERNEL OPENED, before this record had a zone, so a new record's first night
+         was due at 00:05 UTC. Moved to the record's own night now that it has one, while it still waits. */
+      if (made.ok)
+        sql.exec(
+          "UPDATE schedule SET due_at = ? WHERE kind = 'snapshot' AND key = ? AND state = 'pending'",
+          instant(nextSignsDue(clock.now(), recordTz())),
+          SIGNS_KEY,
+        );
+      return made;
     },
 
     /** What this record calls itself, or `null` before anybody has said. */
@@ -9389,6 +9557,25 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     projectSuggestions: (): ProjectSuggestion[] => projectSuggestions(sql, registers),
     inScope,
     runFor,
+    endRun,
+    /**
+     * Every vital sign of the record now, each with its state, its number, its sentence, its facts and its last 14
+     * days (`signs.ts`). Reads only. The record's `signs`, the host's route and `braindog signs` all read this answer.
+     */
+    signs: (): Result<{ signs: VitalSign[] }> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      return ok({ signs: readSigns(sql, clock.now(), recordTz()) });
+    },
+    /**
+     * One reading of a sign the record layer or the host owns, filed for today. Refuses an id outside the list and a
+     * sign the kernel reads itself (`fileSignReading`).
+     */
+    signRead: (id: string, reading: SignReading): Result<{ sign: string; day: string }> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      return transaction(() => fileSignReading(sql, id, reading, clock.now(), recordTz()));
+    },
     findRun,
     /** Whether a line of the log is the record's own bookkeeping, which a feed leaves out and the log keeps. Reads only. */
     bookkeeping,
@@ -9572,6 +9759,39 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       },
     },
   };
+
+  /**
+   * The record's timezone as `Intl` can read it, `UTC` when it cannot: `armDerived`'s guard, for the signs' night.
+   */
+  function recordTz(): string {
+    const tz = recordIdentity(sql)?.tz ?? 'UTC';
+    try {
+      new Intl.DateTimeFormat('en', { timeZone: tz });
+      return tz;
+    } catch {
+      return 'UTC';
+    }
+  }
+
+  /** The signs' nightly row, armed unless one is already waiting (`armDerived`'s `WHERE`, for the same reason). */
+  function armSigns(): void {
+    sql.exec(
+      `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts)
+       VALUES (?, ?, 'snapshot', ?, ?, 'pending', 0)
+       ON CONFLICT (kind, key) DO UPDATE
+         SET due_at = excluded.due_at, payload = excluded.payload, state = 'pending', attempts = 0
+         WHERE schedule.state IN ('done', 'failed')`,
+      mint(),
+      instant(nextSignsDue(clock.now(), recordTz())),
+      SIGNS_KEY,
+      JSON.stringify({ signs: true }),
+    );
+  }
+
+  /* THE RECORD'S VITAL SIGNS ARE READ EVERY NIGHT, armed as the record opens rather than by a declaration, because no
+     pack declares them: every record has them (`signs.ts`). One `snapshot` row keyed `SIGNS_KEY`, like the ledger's
+     night; armed only when none is waiting, so opening the record a thousand times moves nothing. */
+  if (!state.refusal) armSigns();
 
   /* AN EXTENSION NEVER HIDES A METHOD OF THE KERNEL'S. The spread below lets the later name win without a word, so a
      file under `api/` that reused a name would quietly replace the method every caller already relies on. Asked once per

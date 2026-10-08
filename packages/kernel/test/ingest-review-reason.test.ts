@@ -9,8 +9,8 @@
  * not in it. The same false word sat on the sibling sentence for a field the pattern chose or
  * defaulted under a `needs-review` ceiling.
  *
- * `proposed` STAYS WHERE IT IS TRUE. An arrival whose state IS `proposed` keeps its sentence word for
- * word, so no receipt already in a record changes meaning.
+ * `proposed` STAYS WHERE IT IS TRUE. An arrival whose state IS `proposed` keeps the words "proposed rather than
+ * written". And since REC-A03 every one of these says the pattern by its name, here its description, never its id.
  */
 
 import { test } from 'node:test';
@@ -41,6 +41,7 @@ const UNSURE = (extract: Record<string, unknown>, confidence: string): Declarati
   kind: 'ingest',
   body: {
     ingest: 'bank-unsure',
+    description: 'Bank alerts',
     channel: 'email',
     match: { all: [{ field: 'body', contains: 'from bank:' }] },
     extract,
@@ -82,7 +83,7 @@ test('A LINE HELD FOR A PERSON IS NOT CALLED PROPOSED, and its reason says nothi
   assert.equal(k.count('transactions'), 0);
   assert.doesNotMatch(out.reason ?? '', /proposed/, `the reason calls a held arrival proposed: ${out.reason}`);
   assert.doesNotMatch(out.reason ?? '', /files at/, 'the reason is in the record\'s jargon, not in words a stranger reads');
-  assert.equal(out.reason, 'bank-unsure waits for a person on everything it reads, so nothing from this one is written until somebody accepts it.');
+  assert.equal(out.reason, 'Bank alerts will not write anything it reads until somebody accepts it, so this one waits for a person.');
   assert.equal(sql.one<{ reason: string }>('SELECT reason FROM inbox_raw')?.reason, out.reason, 'the stored reason is another sentence');
   sql.close();
 });
@@ -98,7 +99,7 @@ test('AND A CHOSEN OR DEFAULTED FIELD UNDER THE SAME CEILING is not called propo
   assert.doesNotMatch(out.reason ?? '', /proposed/, `the reason calls a held arrival proposed: ${out.reason}`);
   assert.equal(
     out.reason,
-    'bank-unsure chose or defaulted ref rather than reading them, and it waits for a person on everything it reads, so nothing from this one is written until somebody accepts it.',
+    'Bank alerts chose or defaulted ref rather than reading it, and it will not write anything it reads until somebody accepts it, so this one waits for a person.',
   );
   sql.close();
 });
@@ -107,12 +108,12 @@ test('AND WHERE THE STATE IS `proposed` THE SENTENCE IS WORD FOR WORD WHAT IT WA
   const ceiling = await record(UNSURE(READS, 'proposed'));
   const held = arrive(ceiling.k);
   assert.equal(held.state, 'proposed');
-  assert.equal(held.reason, 'bank-unsure files at proposed, so what it read is proposed rather than written.');
+  assert.equal(held.reason, 'Bank alerts will ask before it writes anything, so what it read is proposed rather than written.');
   ceiling.sql.close();
 
   const soft = await record(UNSURE({ ...READS, ref: { default: { value: 'none', of: { text: { after: 'ref: ' } } } } }, 'exact'));
   const chose = arrive(soft.k);
   assert.equal(chose.state, 'proposed');
-  assert.equal(chose.reason, 'bank-unsure chose or defaulted ref rather than reading them, so what it read is proposed rather than written.');
+  assert.equal(chose.reason, 'Bank alerts chose or defaulted ref rather than reading it, so what it read is proposed rather than written.');
   soft.sql.close();
 });

@@ -1,0 +1,10 @@
+{
+  "name": "@braindog/look",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "look": "node run.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}
