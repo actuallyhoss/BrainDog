@@ -11,6 +11,12 @@
 
   OFFLINE SAYS THE UNREACHABLE SENTENCE WITH RETRY, and the technical reason goes under Details, never in the sentence: a person
   told a socket error has been told nothing they can act on, and the one thing they can do is try again.
+
+  A DRAW FAULT IS NOT OFFLINE. `fault` is a read that answered and a screen that then threw while drawing it: the
+  fault is BrainDog's own code, so it says "This screen could not be drawn" with the screen's name, and never that the
+  record could not be reached. `/usage` said exactly that over a `toLocaleString` thrown on a field the Directory
+  never sent, which sent the reader looking at his connection for a bug in the screen. The reason folds under Details
+  the same way, and Retry draws again.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
@@ -22,11 +28,14 @@
   let {
     state,
     refusal = null,
+    screen,
     onretry,
   }: {
-    state: 'waiting' | 'empty' | 'refused' | 'offline';
-    /** The record's sentence for a refusal, or the technical reason for an offline read. */
+    state: 'waiting' | 'empty' | 'refused' | 'offline' | 'fault';
+    /** The record's sentence for a refusal, or the technical reason for an offline read or a draw fault. */
     refusal?: string | null | undefined;
+    /** The screen's name as its header says it, which a draw fault names. */
+    screen?: string | undefined;
     /** Ask again. Without it the offline state offers no action, rather than a button that does nothing. */
     onretry?: (() => void) | undefined;
   } = $props();
@@ -43,6 +52,18 @@
 {:else if state === 'refused'}
   <!-- THE RECORD'S OWN SENTENCE, when it gave one: it says what was wrong and what to do, which a general line cannot. -->
   <Empty kind="error" compact title={refusal ?? copy.readRefused} />
+{:else if state === 'fault'}
+  <!-- THE SAME FRAME AS OFFLINE, with the screen named on its own line, since a compact `Empty` hides its body. -->
+  <div class="read-offline">
+    <Empty kind="error" compact title={copy.readFault} actions={onretry ? retry : undefined} />
+    {#if screen}<p class="read-screen">{copy.readFaultOn(screen)}</p>{/if}
+    {#if refusal}
+      <details class="read-details">
+        <summary class="read-summary tap">{copy.readDetails}</summary>
+        <p class="read-reason">{refusal}</p>
+      </details>
+    {/if}
+  </div>
 {:else}
   <div class="read-offline">
     <Empty kind="error" compact title={copy.readOffline} actions={onretry ? retry : undefined} />
@@ -60,6 +81,13 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-1);
+  }
+
+  .read-screen {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--t-base);
   }
 
   /* THE REASON IS QUIET AND WRAPS. It is there for whoever reports the fault, so it reads below the sentence in the

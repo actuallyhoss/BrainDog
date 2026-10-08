@@ -222,10 +222,48 @@ const ledger = (held: number): AccountUsage => {
         projects: [{ scope: 'Kiln', ...t(100) }, { scope: 'global', ...t(50) }],
         actions: [{ scope: 'Kiln', action: 'stripe-balance', ...t(100) }, { scope: 'global', action: 'rates', ...t(50) }],
         days: [{ day: '2026-09-01', ...t(40) }, { day: '2026-09-09', ...t(110) }],
+        counted: [],
+        /* AS THE DIRECTORY ANSWERS IT: asks and neurons by day, and no allowance of asks anywhere in it. */
+        slash: { asks: 41, neurons: 12_300, days: [{ day: '2026-09-02', asks: 40, neurons: 12_000 }, { day: '2026-09-09', asks: 1, neurons: 300 }] },
       },
     ],
   };
 };
+
+test("SLASH'S LINE IS ASKS AND NEURONS, and an allowance only when the answer carries one", () => {
+  /* IT READ `included`, `used` AND `packs`, which the Directory never sent, and `toLocaleString` on nothing threw the
+     whole of `/usage` into "BrainDog could not reach this record". */
+  const [studio] = usageFromLedger(ledger(0), '2026-09', '2026-09-15').records;
+  assert.equal(studio?.slash, 'Slash was asked 41 times this month, and the model spent 12,300 neurons answering.');
+  assert.deepEqual(studio?.asks, { asks: 41, neurons: 12_300, cap: null });
+  assert.doesNotMatch(studio?.slash ?? '', /credit|of the|allows/u, 'an allowance was said that the answer never carried');
+
+  const past = usageFromLedger(ledger(0), '2026-08', undefined, undefined, false).records[0];
+  assert.equal(past?.slash, 'Slash was asked 41 times in August, and the model spent 12,300 neurons answering.');
+
+  const one = ledger(0);
+  const r = one.records[0]!;
+  r.slash = { asks: 0, neurons: 0, days: [] };
+  assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, 'Slash was not asked anything this month.');
+  r.slash = { asks: 1, neurons: 0, days: [], cap: 600 };
+  assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, 'Slash was asked once this month, of the 600 asks a month allows.');
+  delete r.slash;
+  assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, null, 'a host a release behind says nothing of Slash');
+});
+
+test('A MONTH THAT CANNOT BE DRAWN FROM AN ANSWER THAT CAME IS A DRAW FAULT, never the record out of reach', async () => {
+  /* AN ANSWER THIS READER CANNOT READ: a record with no month. The read reached the host and the host answered, so the
+     screen says it could not be drawn and keeps the reason for Details; "could not reach this record" is a failed read's. */
+  const broken = ledger(0) as unknown as { records: Record<string, unknown>[] };
+  delete broken.records[0]!.month;
+  const read = await readUsage(host({ '/account/usage': () => json(200, { ok: true, value: broken }) }).io, NOW_MS);
+  assert.equal(read.ok, 'fault');
+  assert.ok(read.ok === 'fault' && read.refusal.code === 'DRAW_FAULT' && /allowance|month/u.test(read.refusal.fix), JSON.stringify(read));
+  assert.notEqual(read.ok === 'fault' ? read.refusal.fix : '', copy.recordNotReached);
+  assert.equal(copy.readFault, 'This screen could not be drawn');
+  assert.match(copy.readFaultOn(words.usage), /\bUsage\b/u);
+  assert.doesNotMatch(copy.readFaultOn(words.usage), /reach/u);
+});
 
 test('THE LEDGER FIRST: this month against the allowance, and waiting said when the plan held a run', async () => {
   const { io, sent } = host({ '/account/usage': () => json(200, { ok: true, value: ledger(0) }) });

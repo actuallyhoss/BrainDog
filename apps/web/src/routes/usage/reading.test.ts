@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { daysOf, usageFromLedger, words, type AccountUsage, type Allowed, type Group, type UsageView } from '../../lib/record/actions.ts';
-import { creditsOf, daysSaid, heatOf, projectParts, projectsSaid, ringsOf, sentenceOf, weekBars, weeksSaid } from './reading.ts';
+import { asksOf, daysSaid, heatOf, projectParts, projectsSaid, ringsOf, sentenceOf, weekBars, weeksSaid } from './reading.ts';
 
 const t = (runs: number, held = 0) => ({ runs, requests: runs * 2, bytes: runs * 1_000, ms: runs * 10, failures: 0, held });
 
@@ -33,6 +33,7 @@ const ledger = (used: number, held = 0, slash?: AccountUsage['records'][number][
         { day: '2026-09-08', ...t(used - 40) },
         { day: '2026-09-20', ...t(5) },
       ],
+      counted: [],
       ...(slash ? { slash } : {}),
     },
   ],
@@ -43,9 +44,9 @@ test('the per-day array keeps the month up to today, drops days with nothing, an
   assert.deepEqual(days, [{ day: '2026-09-02', runs: 4 }]);
   const view = usageFromLedger(ledger(100), '2026-09', '2026-09-15');
   assert.deepEqual(view.days, [{ day: '2026-09-01', runs: 40 }, { day: '2026-09-08', runs: 60 }]);
-  assert.equal(view.records[0]?.credits, null, 'a host that does not count credits says no credits');
-  const counted = usageFromLedger(ledger(100, 0, { included: 200, used: 150, packs: 50 }), '2026-09', '2026-09-15');
-  assert.deepEqual(counted.records[0]?.credits, { included: 200, used: 150, packs: 50 });
+  assert.equal(view.records[0]?.asks, null, 'a host that does not count Slash says nothing of it');
+  const counted = usageFromLedger(ledger(100, 0, { asks: 41, neurons: 12_300, days: [] }), '2026-09', '2026-09-15');
+  assert.deepEqual(counted.records[0]?.asks, { asks: 41, neurons: 12_300, cap: null });
 });
 
 test('the sentence names the busiest meter, and only waiting actions are the red phrase', () => {
@@ -114,10 +115,13 @@ test('the heat grid: weeks from Monday, nothing drawn for days outside the month
   assert.equal(daysSaid(view), 'Busiest on Tue 8 Sep, with 60 runs.');
 });
 
-test('credits as a ring only where the host counts them', () => {
-  const r = usageFromLedger(ledger(100, 0, { included: 200, used: 190, packs: 0 }), '2026-09').records[0] as Allowed;
-  assert.deepEqual(creditsOf(r), { used: 190, max: 200, tone: 'warn' });
-  assert.equal(creditsOf({ ...r, credits: null }), null);
+test("Slash's asks as a ring only where the answer carries an allowance of them", () => {
+  const capped = usageFromLedger(ledger(100, 0, { asks: 190, neurons: 9_000, days: [], cap: 200 }), '2026-09').records[0] as Allowed;
+  assert.deepEqual(asksOf(capped), { used: 190, max: 200, tone: 'warn' });
+  /* THE DIRECTORY'S OWN ANSWER CARRIES NO ALLOWANCE, so no ring: the line says the asks alone. */
+  const bare = usageFromLedger(ledger(100, 0, { asks: 41, neurons: 12_300, days: [] }), '2026-09').records[0] as Allowed;
+  assert.equal(asksOf(bare), null);
+  assert.equal(asksOf({ ...capped, asks: null }), null);
 });
 
 test('the page keeps the sample and the clock out of its words', () => {

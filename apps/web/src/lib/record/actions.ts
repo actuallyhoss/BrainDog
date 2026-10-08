@@ -70,7 +70,19 @@ export type ActionRow = {
 /** `resumeAction`'s answer. */
 export type Resumed = { ingest: string; kind: Channel };
 
-/** The Directory's ledger, as `GET /account/usage` answers. `@braindog/record`'s `AccountUsage`, the keys read here. */
+/**
+ * The Directory's ledger, as `GET /account/usage` answers: `@braindog/record/directory`'s `AccountUsage`, key for key.
+ *
+ * THE DIRECTORY'S SHAPE, WRITTEN OUT, because the web does not depend on `@braindog/record` and the graph gate refuses a
+ * relative import across packages. It was this reader's own idea of the answer, and the two parted: Slash was read as
+ * `included`, `used` and `packs` while the Directory answered `asks`, `neurons` and `days`, so `toLocaleString` ran on
+ * nothing and `/usage` said the record could not be reached. `usage-contract.test.ts` now builds the answer with the
+ * Directory's own code and runs this reader over it, so the day the two part again a test goes red, not his screen.
+ *
+ * TWO KEYS ARE WIDER THAN THE DIRECTORY'S, and the contract test names both. `slash` is optional, for a host a release
+ * behind that answers without it, and its `cap` and the record's `extra` are never sent today: the allowance of asks is
+ * the record's own `ask_cap`, which the Directory never reads. When a host carries them they are said; until then nothing is.
+ */
 type LedgerTotals = Totals & { ms: number; held: number };
 export type AccountUsage = {
   from: string;
@@ -79,6 +91,7 @@ export type AccountUsage = {
   records: {
     record: string;
     slug: string | null;
+    /** One of the Directory's `PLANS`: `free`, `hosted`, `plus` or `selfhost`. */
     plan: string;
     closed: boolean;
     month: { month: string; used: LedgerTotals; allowance: { runs: number; requests: number; bytes: number; ms: number } | null; resets: string };
@@ -86,11 +99,13 @@ export type AccountUsage = {
     projects: ({ scope: string } & LedgerTotals)[];
     actions: ({ scope: string; action: string } & LedgerTotals)[];
     days: ({ day: string } & LedgerTotals)[];
+    /** The deliveries and arrivals over the range, by action: counted, and in none of the totals above. `/usage` reads them. */
+    counted: ({ action: string } & LedgerTotals)[];
     /**
-     * Slash's credits this month: how many the plan includes, how many are used, and how many packs hold on top.
-     * Absent from a host that does not count them yet, and then nothing is said.
+     * Slash's asks over the range and the neurons the model spent on them, by day: counted, and in none of the totals
+     * above. `cap` is the month's allowance of asks, which no host sends yet.
      */
-    slash?: { included: number; used: number; packs: number };
+    slash?: { asks: number; neurons: number; days: { day: string; asks: number; neurons: number }[]; cap?: number | null };
     /** Extra usage past the allowance, when the owner turned it on: units this month, and the cost and cap in minor units. */
     extra?: { on: boolean; units: number; cost: number; cap: number; currency: string };
   }[];
@@ -222,9 +237,17 @@ export const words = {
   planName: { free: 'Free', hosted: 'Cloud', plus: 'Cloud Plus' } as Record<string, string>,
   planLine: (plan: string, runs: string, requests: string, bytes: string, hours: string) =>
     `On ${plan}: ${runs} runs, ${requests} requests, ${bytes} fetched and ${hours} of run time a month.`,
-  slashLine: (left: number, included: number, packs: number) =>
-    `Slash has ${left.toLocaleString('en-GB')} of ${included.toLocaleString('en-GB')} credits left this month` +
-    (packs > 0 ? `, and ${packs.toLocaleString('en-GB')} more in packs.` : '.'),
+  /* SLASH IN THE LEDGER'S OWN TERMS: asks and the neurons the model spent on them, and an allowance only when the answer
+     carries one. It said "credits left" out of `included` and `packs`, two keys the Directory never sent. `when` is
+     "this month" or "in September". */
+  slashLine: (asks: number, neurons: number, cap: number | null, when: string) =>
+    asks === 0
+      ? `Slash was not asked anything ${when}${cap !== null ? `, of the ${cap.toLocaleString('en-GB')} asks a month allows` : ''}.`
+      : `Slash was asked ${asks === 1 ? 'once' : `${asks.toLocaleString('en-GB')} times`} ${when}` +
+        (cap !== null ? `, of the ${cap.toLocaleString('en-GB')} asks a month allows` : '') +
+        (neurons > 0 ? `, and the model spent ${neurons.toLocaleString('en-GB')} ${neurons === 1 ? 'neuron' : 'neurons'} answering.` : '.'),
+  thisMonth: 'this month',
+  inMonth: (month: string) => `in ${month}`,
   extraLine: (units: number, cost: string, cap: string) =>
     `Extra usage is on: ${units.toLocaleString('en-GB')} ${units === 1 ? 'unit' : 'units'} this month, ${cost} of the ${cap} cap.`,
   /* A member's page. The ledger is the owner's, and an empty one read as nothing having run. */
@@ -370,11 +393,11 @@ export type Allowed = {
   slash: string | null;
   extra: string | null;
   /**
-   * Slash's credits this month as the host counted them, the numbers behind `slash`: what the plan includes, what is
-   * used, and what packs hold on top. `null` when the host does not count them. Added for a chart of the month and for
-   * Settings, which says the same figures; `slash` stays the sentence.
+   * Slash's asks over the month as the ledger counted them, the numbers behind `slash`: the asks, the neurons the model
+   * spent on them, and the month's allowance of asks when the answer carries one (`null` when it does not, which is
+   * every host today). `null` when the host does not count Slash at all. `slash` stays the sentence.
    */
-  credits: { included: number; used: number; packs: number } | null;
+  asks: { asks: number; neurons: number; cap: number | null } | null;
 };
 
 /**
@@ -568,7 +591,7 @@ const money = (minor: number, currency: string): string => {
 };
 
 /** One record of the ledger, against its allowance: its four meters, the one nearest its limit, and its plan. */
-function allowedOf(r: AccountUsage['records'][number], current: boolean): Allowed {
+function allowedOf(r: AccountUsage['records'][number], current: boolean, month: string): Allowed {
   const allowance = r.month.allowance;
   const used = current ? r.month.used : r.totals;
   const resets = dayWords(r.month.resets);
@@ -586,7 +609,8 @@ function allowedOf(r: AccountUsage['records'][number], current: boolean): Allowe
       }))
     : [];
   const planName = Object.hasOwn(words.planName, r.plan) ? (words.planName[r.plan] ?? null) : null;
-  const slash = r.slash ? words.slashLine(Math.max(0, r.slash.included - r.slash.used), r.slash.included, r.slash.packs) : null;
+  const asks = r.slash ? { asks: r.slash.asks, neurons: r.slash.neurons, cap: typeof r.slash.cap === 'number' ? r.slash.cap : null } : null;
+  const slash = asks ? words.slashLine(asks.asks, asks.neurons, asks.cap, current ? words.thisMonth : words.inMonth(monthWords(month))) : null;
   const extra = r.extra?.on ? words.extraLine(r.extra.units, money(r.extra.cost, r.extra.currency), money(r.extra.cap, r.extra.currency)) : null;
   return {
     name: r.slug ?? r.record,
@@ -603,7 +627,7 @@ function allowedOf(r: AccountUsage['records'][number], current: boolean): Allowe
     binding: top !== undefined && top.share > 0 ? words.meterNoun[top.k] : null,
     slash,
     extra,
-    credits: r.slash ? { included: r.slash.included, used: r.slash.used, packs: r.slash.packs } : null,
+    asks,
   };
 }
 
@@ -636,7 +660,7 @@ export function usageFromLedger(said: AccountUsage, month: string, through?: str
     }
     for (const d of r.days) days.set(d.day, (days.get(d.day) ?? 0) + d.runs);
   }
-  const records: Allowed[] = said.records.filter((r) => !r.closed).map((r) => allowedOf(r, current));
+  const records: Allowed[] = said.records.filter((r) => !r.closed).map((r) => allowedOf(r, current, month));
   return {
     from: 'ledger',
     month,
@@ -695,7 +719,28 @@ export const usageHref = (project: string): string => `/usage?project=${encodeUR
 /** A month as a person says it: `2026-09` is September. */
 export const monthWords = (month: string): string => MONTHS[Number(month.slice(5, 7)) - 1] ?? month;
 
-export type UsageRead = { ok: true; view: UsageView } | { ok: false; refusal: Refusal } | { ok: 'none' };
+/**
+ * What `/usage`'s read came to. `fault` is a read that answered and a month that could not be drawn from it, never a
+ * refusal of the record's, because the record was reached and said what it said. It carries a refusal's shape
+ * (`DRAW_FAULT`, and the thrown reason as `fix`, which a screen folds under Details) so a caller that treats every
+ * answer short of a month alike, as Settings' bill does, reads it with no case of its own.
+ */
+export type UsageRead = { ok: true; view: UsageView } | { ok: false; refusal: Refusal } | { ok: 'none' } | { ok: 'fault'; refusal: Refusal };
+
+/**
+ * The month, drawn, or the fault that stopped it.
+ *
+ * A THROW HERE IS THIS SCREEN'S, NOT THE RECORD'S. Every request above it is `send`, which never throws, so whatever
+ * escapes a builder is the reader misreading an answer it was given. It was caught by `read()` as a failed read and
+ * drawn as "BrainDog could not reach this record", which is how a missing key looked like a dead line for a month.
+ */
+function drawn(build: () => UsageView): UsageRead {
+  try {
+    return { ok: true, view: build() };
+  } catch (e) {
+    return { ok: 'fault', refusal: { code: 'DRAW_FAULT', fix: e instanceof Error ? e.message : String(e) } };
+  }
+}
 
 /**
  * `/usage`'s one read: the ledger first, then the record's own events.
@@ -729,7 +774,7 @@ export async function readUsage(io: Fetch, now: number, base = '', api: string =
         scripts: scripts.ok && Array.isArray(scripts.value) ? scripts.value : undefined,
         actions: actions.ok && Array.isArray(actions.value) ? actions.value : undefined,
       });
-      return { ok: true, view: usageFromLedger(ledger.value, range.month, current ? range.to : undefined, names, current) };
+      return drawn(() => usageFromLedger(ledger.value, range.month, current ? range.to : undefined, names, current));
     }
     /* A LEDGER WITH NO RECORD IN IT IS A MEMBER'S, since usage is the owner's (`directory.ts` `usage`). It read "Nothing
        has run this month" over a record that ran all month; now the record's own runs are drawn under the sentence. */
@@ -741,8 +786,10 @@ export async function readUsage(io: Fetch, now: number, base = '', api: string =
   if (events.ok) {
     /* THE RECORD'S EVENTS ARE THIS MONTH'S ONLY (`ActionRow.month`), so a past month read from them is a month with
        nothing to say, never this month's runs under last month's name. */
-    const view = usageFromActions(current ? events.value : [], range.month, 'events', current ? range.to : undefined, current);
-    return { ok: true, view: member ? { ...view, owner: false } : view };
+    return drawn(() => {
+      const view = usageFromActions(current ? events.value : [], range.month, 'events', current ? range.to : undefined, current);
+      return member ? { ...view, owner: false } : view;
+    });
   }
   if (member) return { ok: true, view: usageFromLedger({ from: range.from, to: range.to, totals: { ...zero(), ms: 0, held: 0 }, records: [] }, range.month, undefined, NO_NAMES, current) };
   if (events.refusal.code === 'ROUTE_UNKNOWN') return { ok: 'none' };

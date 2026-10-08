@@ -7,7 +7,8 @@
   THE FIGURES ARE TILES, EACH WITH ITS CHART AND THE LINE THAT READS IT. The month's allowance leads:
   its four meters as rings, amber once one is near its limit and red once actions wait on it, with the binding meter's
   own sentence under them. Then the runs by week as bars, the projects as one stacked bar, the days as a heat grid, and
-  Slash's credits as a ring where the host counts them. A chart with nothing behind it is no tile at all.
+  Slash's asks as a ring where the answer carries an allowance of them. A chart with nothing behind it is no tile at
+  all: with no allowance, the Slash line sits under the month's allowance instead.
 
   THE LISTS SIT ON THE GROUND UNDER THEM: the projects, each with its actions under
   it and the global ones under Everywhere, then the deliveries and arrivals, then Slash's own section, `SlashUsage`.
@@ -17,7 +18,9 @@
   nothing about limits because the record cannot see them. No record at all is the record's refusal.
 
   ONE READ, THROUGH `read()`. The page draws the month and hands waiting, refused and offline to `ReadState`,
-  so this screen fails the way every screen that reads fails, with Retry. Its two empty answers keep their own
+  so this screen fails the way every screen that reads fails, with Retry. A month that could not be drawn from an
+  answer that came is a draw fault, said as one ("This screen could not be drawn", and Usage named), never as a record
+  out of reach: the reader's own build of the month returns it, and a boundary round the board catches the rest. Its two empty answers keep their own
   sentences: a host with nothing to count, and a month with no runs, which says so once rather than over zeroes.
 
   DELIVERIES AND ARRIVALS LAST, from a second read of the same ledger (`countedOf` below): what the outbox sent and what
@@ -43,7 +46,7 @@
   import HeatGrid from '$lib/viz/HeatGrid.svelte';
   import Ring from '$lib/viz/Ring.svelte';
   import Stacked from '$lib/viz/Stacked.svelte';
-  import { creditsOf, daysSaid, heatOf, projectParts, projectsSaid, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
+  import { asksOf, daysSaid, heatOf, projectParts, projectsSaid, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
 
   /* THE MONTH AND THE PROJECT ARE THE ADDRESS'S, so the switcher is two links, Back returns to the month before, and
      a project's "Runs on" can link straight to its slice (`usageHref`). A month the ledger cannot answer is this one. */
@@ -58,20 +61,26 @@
    * designed empty state; only its refusal is the record saying no. The raw `fetch` stays until
    * `readUsage` reads through the client: the ledger is a host door, not a record method.
    */
-  async function usageOf(): Promise<Result<UsageView | null>> {
+  async function usageOf(): Promise<Result<UsageView | Fault | null>> {
     const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase(page.url), month);
     if (out.ok === true) return { ok: true, value: out.view };
     if (out.ok === 'none') return { ok: true, value: null };
+    /* AN ANSWER, NOT A REFUSAL: the record was reached, and the fault is this screen's, drawn below as one. */
+    if (out.ok === 'fault') return { ok: true, value: { fault: out.refusal.fix } };
     return { ok: false, refusal: out.refusal };
   }
 
+  /** A month the reader could not draw from the answer it was given, and the reason, for Details. */
+  type Fault = { fault: string };
+
   /* THE RECORD'S ADDRESS AND THE MONTH ARE THE QUESTION, so moving to another record, or another month, asks again
      rather than drawing the last answer under the new name. The project is not: a slice is drawn from the same month. */
-  const usage = read(() => `${apiBase(page.url)} ${month}`, usageOf, { empty: (v) => v === null || v.totals.runs === 0 });
+  const usage = read(() => `${apiBase(page.url)} ${month}`, usageOf, { empty: (v) => v === null || ('totals' in v && v.totals.runs === 0) });
 
   const n = (v: number): string => v.toLocaleString('en-GB');
 
-  const view = $derived(usage.value);
+  const fault = $derived(usage.value && 'fault' in usage.value ? usage.value.fault : null);
+  const view = $derived(usage.value && !('fault' in usage.value) ? usage.value : null);
   /* A SLICE THAT MATCHES NOTHING SHOWS EVERY PROJECT, with the link back, rather than an empty page under a filter. */
   const sliced = $derived(view && project !== null ? view.groups.filter((g) => g.scope === project) : []);
   const groups = $derived(view ? (sliced.length > 0 ? sliced : view.groups) : []);
@@ -79,7 +88,14 @@
   /* WHAT THE FIGURES SAY, from `reading.ts`, where the tests hold them. Today is the ledger's day, in UTC, so the heat
      grid draws nothing for a day that has not come. */
   const today = new Date().toISOString().slice(0, 10);
-  const sentence = $derived(view ? sentenceOf(view) : null);
+  /* THE HEAD SITS OUTSIDE THE BOARD'S BOUNDARY, so a sentence that cannot be said is no sentence, and the board says why. */
+  const sentence = $derived.by(() => {
+    try {
+      return view ? sentenceOf(view) : null;
+    } catch {
+      return null;
+    }
+  });
   const heat = $derived(view ? heatOf(view, today) : null);
   const parts = $derived(view ? projectParts(view.groups) : null);
 
@@ -198,140 +214,152 @@
 <div class="page">
   {#if usage.state === 'waiting' || usage.state === 'refused' || usage.state === 'offline'}
     <ReadState state={usage.state} refusal={usage.refusal} onretry={usage.reread} />
+  {:else if fault !== null}
+    <ReadState state="fault" screen={words.usage} refusal={fault} onretry={usage.reread} />
   {:else if !view}
     <Empty kind="no-data-yet" title={words.noLedger} />
   {:else}
-    <div class="tiles">
-      <!-- THE ALLOWANCE LEADS, one tile a record the person owns: the four meters as rings, each with its own line under
-           it, and the binding meter's sentence as the line that reads them. A plan with no limit has no rings; its tile
-           holds the month's runs by week instead, so the week bars are not drawn twice. -->
-      {#each view.records as r (r.name)}
-        {@const rings = ringsOf(r)}
-        {@const bound = rings.find((m) => m.binding)}
-        <Tile
-          data-wide=""
-          lead
-          icon="observe"
-          title={view.current ? reading.allowance : reading.allowanceIn(monthWords(view.month))}
-          meta={view.records.length > 1 ? r.name : (r.plan ?? undefined)}
-        >
-          {#if rings.length > 0}
-            <ul class="rings">
-              {#each rings as m (m.key)}
-                <li class="ring">
-                  <Ring value={m.share} max={1} tone={m.tone} size={72} format={() => m.figure} summary={`${m.line}. ${m.said}`} />
-                  <span class="ring-name">{m.name}</span>
-                  <span class="ring-line num">{m.amount}</span>
-                </li>
-              {/each}
-            </ul>
-            {#if r.waiting && r.binding}
-              <p class="reading">{words.waitingUntil(r.resets, r.binding)}</p>
-            {:else if bound}
-              <p class="reading">{bound.name}: {bound.said}</p>
+    <!-- A THROW WHILE DRAWING THE BOARD IS THIS SCREEN'S FAULT, said as one with the reason under Details, and never the
+         offline sentence: by this point the record has answered. -->
+    <svelte:boundary>
+      <div class="tiles">
+        <!-- THE ALLOWANCE LEADS, one tile a record the person owns: the four meters as rings, each with its own line under
+             it, and the binding meter's sentence as the line that reads them. A plan with no limit has no rings; its tile
+             holds the month's runs by week instead, so the week bars are not drawn twice. The plan is named beside the
+             record's name when there are several, or the tile drew no plan at all for an owner of more than one. -->
+        {#each view.records as r (r.name)}
+          {@const rings = ringsOf(r)}
+          {@const bound = rings.find((m) => m.binding)}
+          <Tile
+            data-wide=""
+            lead
+            icon="observe"
+            title={view.current ? reading.allowance : reading.allowanceIn(monthWords(view.month))}
+            meta={view.records.length > 1 ? [r.name, r.plan].filter(Boolean).join(' · ') : (r.plan ?? undefined)}
+          >
+            {#if rings.length > 0}
+              <ul class="rings">
+                {#each rings as m (m.key)}
+                  <li class="ring">
+                    <Ring value={m.share} max={1} tone={m.tone} size={72} format={() => m.figure} summary={`${m.line}. ${m.said}`} />
+                    <span class="ring-name">{m.name}</span>
+                    <span class="ring-line num">{m.amount}</span>
+                  </li>
+                {/each}
+              </ul>
+              {#if r.waiting && r.binding}
+                <p class="reading">{words.waitingUntil(r.resets, r.binding)}</p>
+              {:else if bound}
+                <p class="reading">{bound.name}: {bound.said}</p>
+              {/if}
+            {:else}
+              <p class="figure num">{n(view.totals.runs)}<span class="figure-unit">{reading.runs(view.totals.runs)}</span></p>
+              {#if view.totals.runs > 0}<Bars items={weekBars(view)} subject={words.overTime} />{/if}
+              <p class="reading">{words.noLimit}</p>
             {/if}
-          {:else}
+            <!-- THE SLASH LINE HERE when there is no allowance of asks to draw a ring against, which is every host today. -->
+            {#if r.slash && !asksOf(r)}<p class="slash-line">{r.slash}</p>{/if}
+            {#if r.extra}<p class="aside-line">{r.extra}</p>{/if}
+          </Tile>
+        {/each}
+
+        {#if view.totals.runs > 0 && !(view.records.length > 0 && view.records.every((r) => r.meters.length === 0))}
+          <Tile icon="history" title={reading.weeks}>
             <p class="figure num">{n(view.totals.runs)}<span class="figure-unit">{reading.runs(view.totals.runs)}</span></p>
-            {#if view.totals.runs > 0}<Bars items={weekBars(view)} subject={words.overTime} />{/if}
-            <p class="reading">{words.noLimit}</p>
-          {/if}
-          {#if r.extra}<p class="aside-line">{r.extra}</p>{/if}
-        </Tile>
-      {/each}
-
-      {#if view.totals.runs > 0 && !(view.records.length > 0 && view.records.every((r) => r.meters.length === 0))}
-        <Tile icon="history" title={reading.weeks}>
-          <p class="figure num">{n(view.totals.runs)}<span class="figure-unit">{reading.runs(view.totals.runs)}</span></p>
-          <Bars items={weekBars(view)} subject={words.overTime} />
-          <p class="reading">{weeksSaid(view)}</p>
-        </Tile>
-      {/if}
-
-      {#if parts}
-        <Tile icon="board" title={reading.byProject} count={parts.length}>
-          <Stacked {parts} subject={reading.byProject} />
-          <p class="reading">{projectsSaid(view.groups)}</p>
-        </Tile>
-      {/if}
-
-      {#if heat}
-        <Tile icon="calendar" title={reading.days}>
-          <HeatGrid rows={heat.rows} cols={heat.cols} values={heat.values} subject={reading.days} />
-          <p class="reading">{daysSaid(view)}</p>
-        </Tile>
-      {/if}
-
-      {#each view.records as r (r.name)}
-        {@const c = creditsOf(r)}
-        {#if c && r.slash}
-          <Tile icon="slash" title={reading.credits} meta={view.records.length > 1 ? r.name : undefined}>
-            <div class="ring-solo"><Ring value={c.used} max={c.max} tone={c.tone} size={112} label={reading.creditsOf(c.max)} summary={r.slash} /></div>
-            <p class="reading">{r.slash}</p>
+            <Bars items={weekBars(view)} subject={words.overTime} />
+            <p class="reading">{weeksSaid(view)}</p>
           </Tile>
         {/if}
-      {/each}
-    </div>
 
-    <!-- A MONTH WITH NO RUNS SAYS SO ONCE, in place of the lists it would have. -->
-    {#if view.totals.runs === 0}
-      <Empty kind="no-data-yet" title={view.current ? words.noUsage : words.noUsageIn(monthWords(view.month))} />
-    {:else}
-      <!-- BY PROJECT, EACH PROJECT'S ACTIONS UNDER IT and the global ones last under Everywhere; a project's "Runs on"
-           opens its slice, and the link beside the heading shows every project again. -->
-      <Section title={sliced.length > 0 ? words.only(sliced[0]?.name ?? '') : reading.projects} count={sliced.length > 0 ? 0 : groups.length}>
-        {#snippet aside()}
-          {#if sliced.length > 0}<a class="use-all tap" href={at(`/usage?month=${view.month}`)}>{words.allProjects}</a>{/if}
-        {/snippet}
-        <div class="use-groups">
-          {#each groups as g (g.key)}
-            <div class="use-group" data-faint={g.faint ? '' : undefined}>
-              <h3 class="use-group-h">
-                <IconWell name={g.faint ? 'globe' : 'board'} size="l" />
-                <span class="use-group-name">{g.name}</span>
-                <span class="use-counts num">{countsOf(g.totals)}</span>
-              </h3>
-              {@render list(g.actions)}
-            </div>
-          {/each}
-        </div>
-      </Section>
-    {/if}
+        {#if parts}
+          <Tile icon="board" title={reading.byProject} count={parts.length}>
+            <Stacked {parts} subject={reading.byProject} />
+            <p class="reading">{projectsSaid(view.groups)}</p>
+          </Tile>
+        {/if}
 
-    <!-- DELIVERIES AND ARRIVALS, EACH KIND ONE ROW: the name and its count beside it, wrapping under it on a phone. A
-         month with neither draws nothing, since there is nothing the owner can do about a zero here. -->
-    {#if countedRows.sent.length > 0 || countedRows.arrived.length > 0}
-      <Section title={said.counted}>
-        <p class="use-why">{said.countedWhy}</p>
-        <div class="use-groups">
-          {#each countedGroups as g (g.key)}
-            {#if g.rows.length > 0}
-              <div class="use-group">
+        {#if heat}
+          <Tile icon="calendar" title={reading.days}>
+            <HeatGrid rows={heat.rows} cols={heat.cols} values={heat.values} subject={reading.days} />
+            <p class="reading">{daysSaid(view)}</p>
+          </Tile>
+        {/if}
+
+        {#each view.records as r (r.name)}
+          {@const c = asksOf(r)}
+          {#if c && r.slash}
+            <Tile icon="slash" title={reading.asks} meta={view.records.length > 1 ? r.name : undefined}>
+              <div class="ring-solo"><Ring value={c.used} max={c.max} tone={c.tone} size={112} label={reading.asksOf(c.max)} summary={r.slash} /></div>
+              <p class="reading">{r.slash}</p>
+            </Tile>
+          {/if}
+        {/each}
+      </div>
+
+      <!-- A MONTH WITH NO RUNS SAYS SO ONCE, in place of the lists it would have. -->
+      {#if view.totals.runs === 0}
+        <Empty kind="no-data-yet" title={view.current ? words.noUsage : words.noUsageIn(monthWords(view.month))} />
+      {:else}
+        <!-- BY PROJECT, EACH PROJECT'S ACTIONS UNDER IT and the global ones last under Everywhere; a project's "Runs on"
+             opens its slice, and the link beside the heading shows every project again. -->
+        <Section title={sliced.length > 0 ? words.only(sliced[0]?.name ?? '') : reading.projects} count={sliced.length > 0 ? 0 : groups.length}>
+          {#snippet aside()}
+            {#if sliced.length > 0}<a class="use-all tap" href={at(`/usage?month=${view.month}`)}>{words.allProjects}</a>{/if}
+          {/snippet}
+          <div class="use-groups">
+            {#each groups as g (g.key)}
+              <div class="use-group" data-faint={g.faint ? '' : undefined}>
                 <h3 class="use-group-h">
-                  <IconWell name={g.icon} size="l" />
-                  <span class="use-group-name">{g.title}</span>
+                  <IconWell name={g.faint ? 'globe' : 'board'} size="l" />
+                  <span class="use-group-name">{g.name}</span>
+                  <span class="use-counts num">{countsOf(g.totals)}</span>
                 </h3>
-                <ul class="ledger use-list">
-                  {#each g.rows as r (r.key)}
-                    <li>
-                      <div class="line use-row">
-                        <span class="line-title">{r.name}</span>
-                        <span class="line-when use-counts">{r.counts}</span>
-                      </div>
-                    </li>
-                  {/each}
-                </ul>
+                {@render list(g.actions)}
               </div>
-            {/if}
-          {/each}
-        </div>
-      </Section>
-    {/if}
+            {/each}
+          </div>
+        </Section>
+      {/if}
 
-    <!-- SLASH'S SECTION, THIS MONTH AND THE OWNER'S ONLY: the ledger's door answers the owner alone, and the status door
-         says this month's count and nothing of a month gone. It draws nothing on a host without a model. -->
-    {#if view.current && view.owner}
-      <SlashUsage month={view.month} />
-    {/if}
+      <!-- DELIVERIES AND ARRIVALS, EACH KIND ONE ROW: the name and its count beside it, wrapping under it on a phone. A
+           month with neither draws nothing, since there is nothing the owner can do about a zero here. -->
+      {#if countedRows.sent.length > 0 || countedRows.arrived.length > 0}
+        <Section title={said.counted}>
+          <p class="use-why">{said.countedWhy}</p>
+          <div class="use-groups">
+            {#each countedGroups as g (g.key)}
+              {#if g.rows.length > 0}
+                <div class="use-group">
+                  <h3 class="use-group-h">
+                    <IconWell name={g.icon} size="l" />
+                    <span class="use-group-name">{g.title}</span>
+                  </h3>
+                  <ul class="ledger use-list">
+                    {#each g.rows as r (r.key)}
+                      <li>
+                        <div class="line use-row">
+                          <span class="line-title">{r.name}</span>
+                          <span class="line-when use-counts">{r.counts}</span>
+                        </div>
+                      </li>
+                    {/each}
+                  </ul>
+                </div>
+              {/if}
+            {/each}
+          </div>
+        </Section>
+      {/if}
+
+      <!-- SLASH'S SECTION, THIS MONTH AND THE OWNER'S ONLY: the ledger's door answers the owner alone, and the status door
+           says this month's count and nothing of a month gone. It draws nothing on a host without a model. -->
+      {#if view.current && view.owner}
+        <SlashUsage month={view.month} />
+      {/if}
+      {#snippet failed(error, reset)}
+        <ReadState state="fault" screen={words.usage} refusal={error instanceof Error ? error.message : String(error)} onretry={reset} />
+      {/snippet}
+    </svelte:boundary>
   {/if}
 </div>
 
@@ -403,6 +431,14 @@
      ring that ran out is red, and so is the phrase in the sentence, which is enough red for one fact. */
   .reading {
     margin: auto 0 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .slash-line {
+    margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink2);
     font-size: var(--t-base);

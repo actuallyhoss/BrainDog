@@ -18,10 +18,10 @@ export const said = {
   days: 'Runs by day',
   byProject: words.byProject,
   projects: 'Projects',
-  credits: 'Slash credits',
+  asks: 'Slash asks',
   runs: (n: number) => (n === 1 ? 'run' : 'runs'),
   runsSaid: (n: number) => (n === 1 ? '1 run' : `${n.toLocaleString('en-GB')} runs`),
-  creditsOf: (max: number) => `of ${max.toLocaleString('en-GB')} used`,
+  asksOf: (max: number) => `of ${max.toLocaleString('en-GB')} asks`,
 } as const;
 
 /** Where a meter reads as near its limit: the Directory's `NOTICE_AT`, as `actions.ts` holds it. */
@@ -170,11 +170,12 @@ export function daysSaid(view: Pick<UsageView, 'days'>): string | null {
   return `Busiest on ${weekday} ${dateSaid(busiest.day)}, with ${said.runsSaid(busiest.runs)}.`;
 }
 
-/** Slash's credits as a ring: what is used against what the plan and the packs hold. `null` when the host does not count them. */
-export function creditsOf(r: Allowed): { used: number; max: number; tone: 'ink' | 'warn' | 'danger' } | null {
-  if (!r.credits) return null;
-  const max = r.credits.included + r.credits.packs;
-  if (max <= 0) return null;
-  const share = r.credits.used / max;
-  return { used: r.credits.used, max, tone: share >= 1 ? 'danger' : share >= NEAR ? 'warn' : 'ink' };
+/**
+ * Slash's asks as a ring: the month's asks against its allowance of them. `null` when the answer carries no allowance,
+ * which is every host today: a ring with no end says nothing, so the page says the Slash line alone.
+ */
+export function asksOf(r: Allowed): { used: number; max: number; tone: 'ink' | 'warn' | 'danger' } | null {
+  if (!r.asks || r.asks.cap === null || r.asks.cap <= 0) return null;
+  const share = r.asks.asks / r.asks.cap;
+  return { used: r.asks.asks, max: r.asks.cap, tone: share >= 1 ? 'danger' : share >= NEAR ? 'warn' : 'ink' };
 }
