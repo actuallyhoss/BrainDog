@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { countOpenQuestions } from '../src/govern.ts';
+import { figureLists as figureListsSync } from '../src/money-figures.ts';
 import { BUILT_IN_FIGURES, builtInFigure } from '../src/built-in-figures.ts';
 import { registersOf, registersOfBlock, WHOLE_RECORD, type PageBlock } from '../src/pages.ts';
 import { openRecord, type Declaration, type Reading } from '../src/index.ts';
@@ -174,3 +175,89 @@ test('A PAGE PER THING GATES ON ITS OWN QUESTIONS, `questions-open:{{spoken}}` f
   assert.ok(registersOf(page.body as never).includes(WHOLE_RECORD), 'one thing\'s count is still a fact about every list');
   sql.close();
 });
+
+/* ── the signs of a living record (REC-A01) ──────────────────────────────── */
+
+const signs = ['arrivals-waiting', 'arrivals-oldest-days', 'arrivals-newest-hours', 'feeds-behind', 'rules-fired-7d'] as const;
+const read = (k: Awaited<ReturnType<typeof openRecord>>, id: string): Reading => value<Reading>(k.metric(BUILT_IN_FIGURES[id.split(':')[0]!]!));
+
+test('THE FIVE SIGNS NAME NO LIST, and on a record with no door, no feed and no rule each answers no value, never nought', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  for (const id of signs) {
+    const reading = read(k, id);
+    assert.equal(reading.value, null, `${id} answered ${reading.value} on a record with nothing to measure`);
+    assert.equal(reading.met, null, `${id} drew a dead record ${reading.met ? 'green' : 'red'}`);
+    assert.deepEqual(figureListsOf(id), ['*'], `${id} named a list`);
+  }
+  sql.close();
+});
+
+test('WITH A DOOR, WHAT WAITS IS COUNTED, how old the oldest is and how long since anything came, and one door alone', async () => {
+  const { CARD, CASH, record, text, used } = await import('./ingest-tail-kit.test.ts');
+  const r = await record(CARD(), CASH);
+  const SENT = r.clock.now();
+  /* A DOOR AND NOTHING WAITING IS A TRUE ZERO; NOTHING EVER CAME IS STILL NO VALUE. */
+  assert.equal(read(r.k, 'arrivals-waiting').value, 0);
+  assert.equal(read(r.k, 'arrivals-oldest-days').value, 0);
+  assert.equal(read(r.k, 'arrivals-newest-hours').value, null);
+
+  text(r.k, used('1234', 'CORNER SHOP', '12.00'));
+  text(r.k, used('1234', 'NILE BOOKS', '40.00'));
+  assert.equal(read(r.k, 'arrivals-waiting').value, 2);
+  assert.equal(read(r.k, 'arrivals-waiting').met, false);
+  assert.equal(read(r.k, 'arrivals-newest-hours').value, 0);
+
+  /* READ LATER: the oldest has waited three days, and nothing has come for seventy-two hours. */
+  const { readSign } = await import('../src/built-in-figures.ts');
+  const at = (id: string, ms: number) => value<Reading>(readSign(r.sql, { nowMs: ms }, BUILT_IN_FIGURES[id]!));
+  assert.equal(at('arrivals-oldest-days', SENT + 3 * DAY + 60_000).value, 3);
+  assert.equal(at('arrivals-newest-hours', SENT + 3 * DAY + 60_000).value, 72);
+
+  /* ONE DOOR, BY ITS PARAMETER, as a page or the daily reading asks: `arrivals-waiting:<door>`. */
+  const atDoor = (door: string) => r.k.block({ kind: 'stat', cells: [{ metric: `arrivals-waiting:${door}` }] }).readings?.[0]?.reading?.value;
+  assert.equal(atDoor('bank-sms'), 2);
+  assert.equal(atDoor('elsewhere'), null, 'a door the record does not have counted as nothing waiting');
+
+  /* A TEXT NO PATTERN READ WAITS TOO, as the Inbox counts it, and at the door it was sent to; a forgery waits on nobody. */
+  assert.equal(r.k.arrive({ channel: 'webhook', ingest: 'bank-sms', body: 'Your one-time code is 448812.', sha256: 'unread-1', verified: true }).ok, true);
+  assert.equal(r.k.arrive({ channel: 'webhook', ingest: 'bank-sms', body: 'Your one-time code is 990011.', sha256: 'forged-1', verified: false }).ok, true);
+  assert.equal(read(r.k, 'arrivals-waiting').value, 3);
+  assert.equal(atDoor('bank-sms'), 3);
+  r.sql.close();
+});
+
+test('FEEDS BEHIND ARE THOSE WHOSE LAST GOOD RUN IS OLDER THAN TWICE THEIR PERIOD; RULES FIRED COUNT RUNS THAT ENDED WELL', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const ago = (days: number) => new Date(NOW - days * DAY).toISOString();
+  /* A DAILY SCRIPT AND A DAILY POLL, written as the install leaves them: a declaration and its clock. */
+  sql.exec("INSERT INTO declaration (id, version, kind, body, checksum, created_at) VALUES ('script.rates', 1, 'script', ?, 'x', ?)", JSON.stringify({ script: 'rates', runs: { every: '1d' } }), ago(10));
+  sql.exec("INSERT INTO schedule (id, due_at, kind, key, payload) VALUES ('s1', ?, 'script', 'rates', '{}')", ago(0));
+  sql.exec("INSERT INTO declaration (id, version, kind, body, checksum, created_at) VALUES ('ingest.gold', 1, 'ingest', ?, 'x', ?)", JSON.stringify({ ingest: 'gold', channel: 'poll', every: '1d' }), ago(10));
+  sql.exec("INSERT INTO schedule (id, due_at, kind, key, payload) VALUES ('s2', ?, 'poll', 'gold', '{}')", ago(0));
+  /* THE SCRIPT RAN WELL YESTERDAY; THE POLL LAST RAN WELL FIVE DAYS AGO. */
+  sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES ('e1', ?, 'script:rates', 'pull', 'declaration:script.rates', 'declaration', ?)", ago(1), JSON.stringify({ outcome: 'ok' }));
+  sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES ('e2', ?, 'ingest:gold', 'pull', 'declaration:ingest.gold', 'declaration', ?)", ago(5), JSON.stringify({ outcome: 'ok' }));
+  sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES ('e3', ?, 'ingest:gold', 'pull', 'declaration:ingest.gold', 'declaration', ?)", ago(0), JSON.stringify({ outcome: 'failed' }));
+  assert.equal(read(k, 'feeds-behind').value, 1);
+
+  /* A RULE THAT RAN WELL THIS WEEK, ONE THAT FAILED, AND ONE FROM LAST MONTH. */
+  sql.exec("INSERT INTO declaration (id, version, kind, body, checksum, created_at) VALUES ('rule.tidy', 1, 'rule', '{}', 'x', ?)", ago(40));
+  assert.equal(read(k, 'rules-fired-7d').value, 0, 'a record with a rule that never ran is a true zero');
+  for (const [id, state, days] of [['a1', 'done', 1], ['a2', 'failed', 1], ['a3', 'done', 30]] as const)
+    sql.exec("INSERT INTO automation_run (id, rule, version, trigger, state, actor, started_at, finished_at) VALUES (?, 'tidy', 1, 'write', ?, 'rule:tidy', ?, ?)", id, state, ago(days), ago(days));
+  assert.equal(read(k, 'rules-fired-7d').value, 1);
+  assert.equal(read(k, 'rules-fired-7d').met, true);
+  sql.close();
+});
+
+test('THE SIGNS READ AN UNVERIFIED ARRIVAL BY THE INBOX’S OWN WORDS, written twice and held to one here', async () => {
+  const { UNVERIFIED } = await import('../src/ingest.ts');
+  const { UNVERIFIED_REASON } = await import('../src/built-in-figures.ts');
+  assert.equal(UNVERIFIED_REASON, UNVERIFIED);
+});
+
+function figureListsOf(id: string): string[] {
+  return figureListsSync(BUILT_IN_FIGURES[id]!);
+}

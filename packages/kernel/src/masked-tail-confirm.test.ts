@@ -45,7 +45,10 @@ function literals(text: string, entries: readonly (readonly [string, Json])[], f
   const first = hay.trimStart().split(' ')[0] ?? '';
   const digits = /\*+-?(\d{3,})$/.exec(first)?.[1];
   if (digits === undefined) return [];
-  const ending = entries.filter(([literal]) => literal.length > digits.length && literal.endsWith(digits));
+  /* AND THE REVERSE TAIL: a stored value of three digits or more that the printed digits end in. */
+  const ending = entries.filter(
+    ([literal]) => (literal.length > digits.length && literal.endsWith(digits)) || (/^\d{3,}$/.test(literal) && literal.length < digits.length && digits.endsWith(literal)),
+  );
   if (ending.length === 0) return [];
   return ending.length > 1 ? 'ambiguous' : [ending[0]![1]];
 }
@@ -95,10 +98,27 @@ const BANK: Declaration = {
   } as never,
 };
 
+/** A second pattern reading the same account the same way: money in, where `BANK` reads money out. */
+const BANK_IN: Declaration = {
+  id: 'ingest.bank-in',
+  kind: 'ingest',
+  body: {
+    ingest: 'bank-in',
+    channel: 'email',
+    match: { all: [{ field: 'body', contains: 'was credited' }] },
+    extract: {
+      account: { lookup: { register: 'accounts', by: 'number', between: ['Account ***', ' was'] } },
+      what: { text: { between: ['from ', ' for'] } },
+      amount: { money: { after: 'for ', currency: 'EGP' } },
+    },
+    writes: { register: 'transactions', confidence: 'exact' },
+  } as never,
+};
+
 async function record(): Promise<{ k: Kernel; sql: NodeSql; savings: string; deposit: string }> {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW), { literals });
-  const installed = await k.install([ACCOUNTS, TRANSACTIONS, BANK]);
+  const installed = await k.install([ACCOUNTS, TRANSACTIONS, BANK, BANK_IN]);
   assert.ok(installed.ok, JSON.stringify(installed));
   const made = (fields: Record<string, unknown>): string => {
     const got = k.create('accounts', fields, { actor: 'p_1' });
@@ -184,5 +204,45 @@ test('A LOOKUP THAT FOUND THE WHOLE VALUE IS UNCHANGED, and files at exact the f
   assert.equal(whole.state, 'matched', `${whole.state} at ${whole.confidence}: ${whole.reason}`);
   assert.equal(whole.confidence, 'exact');
   assert.equal(k.get(whole.wrote[0]!)?.fields.account, deposit);
+  sql.close();
+});
+
+const credit = (k: Kernel, printed: string, pounds: string): Arrived => {
+  sent += 1;
+  const r = k.arrive({
+    channel: 'email',
+    headers: { From: 'alerts@bank.example', Subject: 'Credit' },
+    body: `Your Account ***${printed} was credited from Orchard Prints for EGP ${pounds} today.`,
+    sha256: `masked-tail-${String(sent)}`,
+  }) as { ok: boolean; value: Arrived };
+  assert.ok(r.ok, JSON.stringify(r));
+  return r.value;
+};
+
+test('ONE CONFIRMATION SERVES EVERY PATTERN: the account and its digits are confirmed, whichever wording asked (REC-A02)', async () => {
+  const { k, sql, savings } = await record();
+  accept(k, debit(k, '518', '75.00').suggestion);
+
+  /* ANOTHER PATTERN, THE SAME ACCOUNT AND DIGITS: confirmed already, so it files at exact the first time. */
+  const inward = credit(k, '518', '300.00');
+  assert.equal(inward.state, 'matched', `${inward.state} at ${inward.confidence}: ${inward.reason}`);
+  assert.equal(k.get(inward.wrote[0]!)?.fields.account, savings);
+  sql.close();
+});
+
+test('THE REVERSE TAIL: digits printed longer than a value they end in are a tail too, confirmed once like the other way', async () => {
+  const { k, sql } = await record();
+  /* AN ACCOUNT WHOSE NUMBER WAS TYPED AS ITS LAST THREE, and a bank that prints four. */
+  const short = k.create('accounts', { name: 'Giza wallet', number: '291' }, { actor: 'p_1' });
+  assert.ok(short.ok, JSON.stringify(short));
+
+  const first = debit(k, '4291', '10.00');
+  assert.equal(first.state, 'proposed', `${first.state} at ${first.confidence}: ${first.reason}`);
+  assert.equal(first.reason, 'Filed to Giza wallet by its last digits 4291. Confirm it once and later ones file straight away.');
+  accept(k, first.suggestion);
+
+  const second = debit(k, '4291', '20.00');
+  assert.equal(second.state, 'matched', `${second.state} at ${second.confidence}: ${second.reason}`);
+  assert.equal(k.get(second.wrote[0]!)?.fields.account, short.value.id);
   sql.close();
 });

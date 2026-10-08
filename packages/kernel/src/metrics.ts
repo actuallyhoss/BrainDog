@@ -28,7 +28,7 @@ import { fixOf, no, ok } from '@braindog/ports';
 import { KERNEL_FIELDS, compile, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
-import { GOVERNANCE_OPEN, readOpenQuestions } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, RECORD_SIGNS, readOpenQuestions, readSign } from './built-in-figures.ts';
 import { isCurrencyCode } from './coerce.ts';
 import type { Leg } from './forecast.ts';
 import { across, convertMinor, dayFieldOf, pairParts, rateFor, rateIsStale, type Part, type Rate, type Reduce } from './fx.ts';
@@ -979,6 +979,9 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
      (`built-in-figures.ts`) and every caller of this reads it as it reads any other. `questions-open:<what>` comes here
      with its `about` filled, and counts that one thing's. */
   if (decl.source === GOVERNANCE_OPEN) return readOpenQuestions(sql, ctx, decl);
+  /* AND THE RECORD'S OWN SIGNS (REC-A01), which read what arrives and what runs, and answer no value, never nought, where
+     there is nothing to measure. */
+  if (decl.source === RECORD_SIGNS) return readSign(sql, ctx, decl);
   const refusals: Refusal[] = [];
   const at = (code: string, fix: string, key?: string): void => {
     refusals.push({ code, fix: `${decl.metric}: ${fix}`, ...(key === undefined ? {} : { at: key }) });

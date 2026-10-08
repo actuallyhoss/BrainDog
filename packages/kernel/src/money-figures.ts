@@ -25,7 +25,7 @@ import { no, ok } from '@braindog/ports';
 import { compile, jsonPath, type Schema } from '@braindog/where';
 
 import { GROUP_CAP } from './buckets.ts';
-import { GOVERNANCE_OPEN } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, RECORD_SIGNS } from './built-in-figures.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { across, type Amount, type Part } from './fx.ts';
 import type { Entry } from './index.ts';
@@ -562,6 +562,9 @@ export function figureLists(
      so it names `*`, which only somebody who reads every list may: named by no list, the record's `metric` answered a
      member invited to one list how many questions were waiting on the owner. */
   if (decl.source === GOVERNANCE_OPEN) return ['*'];
+  /* THE RECORD'S SIGNS TOO: what waits in the inbox and what runs on a clock belongs to no list, and to every reader of
+     every list. */
+  if (decl.source === RECORD_SIGNS) return ['*'];
   const out = new Set<string>();
   const add = (d: Pick<MetricDecl, 'source' | 'value' | 'legs'>) => {
     if (d.source.startsWith('register.')) out.add(d.source.slice('register.'.length));

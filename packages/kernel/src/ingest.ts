@@ -36,12 +36,13 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { fixOf, no, ok, refused } from '@braindog/ports';
-import { jsonPath, evaluate, INBOX_RAW, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, evaluate, parseWhere, INBOX_RAW, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry, Json } from './index.ts';
 import { instant } from './migrate.ts';
 import { attempt } from './tx.ts';
-import { slashMayWrite } from './slash.ts';
+import { SESSION_PREFIX } from './session.ts';
+import { SLASH, slashMayWrite } from './slash.ts';
 import { parseAnswer, readRow, type Mapping } from './map.ts';
 import { startAtDoor } from './script.ts';
 
@@ -72,17 +73,52 @@ export type Extractor =
   | { before: string }
   | { between: readonly [string, string] }
   | { text: { after?: string; before?: string; between?: readonly [string, string] } }
-  | { money: { currency?: string; after?: string; before?: string; between?: readonly [string, string] } }
+  | { money: { currency?: string | CurrencyOf; after?: string; before?: string; between?: readonly [string, string] } }
   | { date: { format: string; after?: string; before?: string; between?: readonly [string, string] } }
   | { int: { after?: string; before?: string; between?: readonly [string, string] } }
   | { decimal: { sep?: string; after?: string; before?: string; between?: readonly [string, string] } }
   | { enum: { map: Record<string, string>; after?: string; before?: string; between?: readonly [string, string] } }
-  | { lookup: { register: string; by: string; after?: string; before?: string; between?: readonly [string, string] } }
+  | { lookup: LookupForm }
   /* READONLY, because a declaration is data a pack or a `.brain` file handed over, and `as const` is
      how every fixture in this repository writes one. */
   | { first: readonly Extractor[] }
   | { nth: { n: number; of: Extractor } }
   | { default: { value: Json; of: Extractor } };
+
+/**
+ * A `lookup`'s arguments: the list and the field it reads, its anchor, and three optional keys (`declare.ts` checks
+ * them at install).
+ *
+ * `says` IS THE NOUN THE QUESTION USES for what the message printed, "card" in "Which account is the card ending
+ * 1234?". Absent, it is "account". It also says the digits are digits: a bare run of them, with no stars before it,
+ * counts as a printed tail only on a lookup that says what it reads (`unknownTail`).
+ *
+ * `where` IS A FILTER OVER THE LIST, so a card text is never matched to a current account that ends alike: only the rows
+ * it admits are read, and only they are offered as answers.
+ *
+ * `split` SAYS THE FIELD MAY HOLD SEVERAL VALUES PARTED BY COMMAS, for an account the bank prints two ways and for a card
+ * that was replaced. Each part is read as a value of its own, and an answer for new digits is added to the others.
+ */
+export type LookupForm = {
+  register: string;
+  by: string;
+  says?: string;
+  where?: Predicate | string;
+  split?: boolean;
+  after?: string;
+  before?: string;
+  between?: readonly [string, string];
+};
+
+/**
+ * A money form's currency read off the row another field of the same pattern found: `{ of: 'account', field: 'balance' }`
+ * is the currency of the account's balance (a money field) or the code in a text field.
+ *
+ * THE THIRD RUNG, AFTER THE CODE BEFORE AND THE CODE AFTER THE NUMBER. A text that prints no code is in its account's
+ * currency, and a pattern that wrote a fallback of its own filed every such text in that currency whatever the account
+ * held. The lookup is read first (`readFields` orders it so), and the form is handed the row's code in place of this.
+ */
+export type CurrencyOf = { of: string; field: string };
 
 /**
  * What reading one field ACTUALLY DID — `43 §4.3`'s outcome, so `43 §5.1`'s confidence rule has
@@ -327,6 +363,11 @@ export type Arrived = {
    * organisation by, through its `bank:` key, and the key is the record's to make (`keyOf`), not this file's.
    */
   counterparty?: string;
+  /**
+   * The row a text skipped as a repeat repeats, by its id: a handle for the screen that offers "It is a second one", never
+   * a word a person reads. The reason says the row by its name, amount and day (`repeatSaid`).
+   */
+  repeats?: string;
 };
 
 /**
@@ -676,16 +717,43 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
   /* WHO SENT IT AND WHO WAS PAID ride on the answer, whatever path it took through the pipeline below: a redelivery
      carries its sender as the first delivery did, and the payee is set where the pattern read it. */
   const from = arrival.channel === 'email' ? senderOf(lower(arrival.headers ?? {}).from) : null;
-  let counterparty: string | undefined;
+  const heard: Heard = {};
   const said = (out: Result<Arrived>): Result<Arrived> =>
-    !out.ok || ((from === null || from.address === '') && counterparty === undefined)
+    !out.ok || ((from === null || from.address === '') && heard.counterparty === undefined)
       ? out
-      : ok<Arrived>({ ...out.value, ...(from !== null && from.address !== '' ? { sender: from } : {}), ...(counterparty === undefined ? {} : { counterparty }) });
+      : ok<Arrived>({
+          ...out.value,
+          ...(from !== null && from.address !== '' ? { sender: from } : {}),
+          ...(heard.counterparty === undefined ? {} : { counterparty: heard.counterparty }),
+        });
 
   /* `attempt` RATHER THAN `transaction`, because the refusal below is a VALUE. A raw row written and
      then reported as a failure is the worst of both: the caller believes nothing happened and the
      record holds bytes whose receipt says nothing was written and cannot say why. */
-  return said(attempt(deps.sql, transaction, () => {
+  return said(attempt(deps.sql, transaction, () => runArrival(deps, arrival, null, heard)));
+}
+
+/** What one run of the pipeline heard on the way, for the answer `arrive` hands back: the payee as printed. */
+type Heard = { counterparty?: string };
+
+/** The arrival's verdict, written on its inbox row. */
+type Store = (state: Arrived['state'], reason: string | null) => void;
+
+/** One line of the log about the arrival, with a field and the value it was, where the line names one. */
+type Note = (kind: string, actor: string, target: string, targetKind: string, to: string | null, also?: { field: string; from: string }) => void;
+
+/**
+ * An arrival already in the inbox, run through the pipeline again from its stored bytes: its row, its state and reason
+ * as they stood, and the instant it first came, which is the `ts` a pattern's `match:` reads.
+ */
+type Stored = { id: string; state: string; reason: string | null; ts: string };
+
+/**
+ * The pipeline itself, inside the caller's transaction. `stored` is null for a new arrival and the inbox row for one run
+ * again (`replayHeld`): a run again is never a redelivery, starts no script, sweeps no door, and writes over its own row.
+ */
+function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, heard: Heard): Result<Arrived> {
+  {
     const at = instant(deps.nowMs);
     const headers = lower(arrival.headers ?? {});
     const body = arrival.body ?? '';
@@ -693,11 +761,13 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     /* IDEMPOTENT ON THE HASH. A redelivery is the ordinary case — every webhook sender retries, and
        most mail servers will too — and writing the row twice is the failure people notice as a
        duplicate invoice. */
-    const already = deps.sql.one<{ id: string; state: string; reason: string | null }>(
-      'SELECT id, state, reason FROM inbox_raw WHERE channel = ? AND sha256 = ?',
-      arrival.channel,
-      arrival.sha256,
-    );
+    const already =
+      stored ??
+      deps.sql.one<{ id: string; state: string; reason: string | null }>(
+        'SELECT id, state, reason FROM inbox_raw WHERE channel = ? AND sha256 = ?',
+        arrival.channel,
+        arrival.sha256,
+      );
 
     /**
      * BUT A REDELIVERY IS THE SAME BYTES AT A DOOR THAT ACCEPTED THEM, NOT ANY EARLIER SIGHTING OF THEM.
@@ -721,10 +791,11 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
      * with no `UNVERIFIED` on it has had the only answer this record can give it.
      */
     const rescue =
-      already !== undefined &&
-      already.state === 'untriaged' &&
-      arrival.verified !== false &&
-      (already.reason === UNVERIFIED || arrival.ingest !== undefined);
+      stored !== null ||
+      (already !== undefined &&
+        already.state === 'untriaged' &&
+        arrival.verified !== false &&
+        (already.reason === UNVERIFIED || arrival.ingest !== undefined));
     if (already && !rescue) {
       const receipt = deps.sql.one<{ wrote: string; ingest_id: string }>(
         'SELECT wrote, ingest_id FROM ingest_receipt WHERE raw_id = ?',
@@ -774,7 +845,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       subject: headers.subject ?? '',
       body,
       state: 'untriaged',
-      ts: at,
+      ts: stored?.ts ?? at,
     };
 
     /**
@@ -815,7 +886,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     };
     const matched = unverified ? undefined : offered(deps.ingests()).find((i) => i.match === undefined || evaluate(i.match, fields, INBOX_RAW));
 
-    const store = (state: Arrived['state'], reason: string | null): void => {
+    const store: Store = (state, reason) => {
       /* A RESCUE MOVES THE ROW IT FOUND. The bytes are the same by their hash and the first `ts` is when they
          turned up, so only the verdict changes; an INSERT here would fail on `UNIQUE (channel, sha256)` and roll
          the whole arrival back. */
@@ -836,16 +907,18 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       );
     };
 
-    const note = (kind: string, actor: string, target: string, targetKind: string, to: string | null): void => {
+    const note: Note = (kind, actor, target, targetKind, to, also) => {
       slashMayWrite(actor, kind);
       deps.sql.exec(
-        'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         deps.mint(),
         at,
         actor,
         kind,
         target,
         targetKind,
+        also?.field ?? null,
+        also?.from ?? null,
         to,
       );
     };
@@ -856,7 +929,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        first time its bytes were offered anything: a redelivery returned above, and a rescued row that was offered before
        (`reason` not `UNVERIFIED`) started its scripts then. */
     const door = arrival.ingest ?? matched?.ingest;
-    if (!unverified && door !== undefined && (already === undefined || already.reason === UNVERIFIED))
+    if (stored === null && !unverified && door !== undefined && (already === undefined || already.reason === UNVERIFIED))
       startAtDoor(deps.sql, { mint: deps.mint, nowMs: deps.nowMs }, { door, body, headers }, BODY_BYTES_MAX);
 
     if (!matched) {
@@ -868,6 +941,12 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
          pattern here recognised this"; untriaged with `UNVERIFIED` on it is "nothing was tried",
          and only the second is answered by fixing the sender's signature rather than the pattern. */
       store('untriaged', unverified ? UNVERIFIED : null);
+      /* A NAMED DOOR'S TEXT THAT NO PATTERN READ IS WRITTEN DOWN AGAINST THE DOOR, once, so the report of what each
+         pattern did (`patternReport`) has a line for it: the inbox row keeps no ingest, and a door whose texts all go
+         unread looked, in every count, like a door nothing was sent to. Only a verified arrival, the first time it was
+         offered anything, so a forgery costs one INSERT as it always did. */
+      if (!unverified && stored === null && arrival.ingest !== undefined && (already === undefined || already.reason === UNVERIFIED))
+        note('arrive', `ingest:${arrival.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'untriaged');
       /* A RESCUE THAT FOUND NOTHING IS STILL A REDELIVERY when the row reads as it did, which is the same bytes
          at a door that does not want them, again. Answered as new, it would observe the shape and queue a draft
          once per retry, which is the bill the kernel's `redelivered` check exists to stop. A row that loses its
@@ -908,7 +987,22 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     const skipped = (matched.skip ?? []).find((rule) => evaluate(rule.when, fields, INBOX_RAW));
     if (skipped) {
       store('skipped', skipped.reason);
+      /* AND WHICH PATTERN SKIPPED IT, which the inbox row cannot hold, so the report of what each pattern did counts it. */
+      note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'skipped');
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason: skipped.reason });
+    }
+
+    /* THE DOOR, as the tail's question names it: the one the arrival was named for, the one its pattern reads at, or for
+       unnamed mail the pattern itself. */
+    const doorOf = arrival.ingest ?? matched.door ?? matched.ingest;
+
+    /* BEFORE THIS ARRIVAL IS FILED, WHAT WAITS AT ITS DOOR IS LOOKED AT AGAIN (DIRECTION §42). Digits written on an account
+       by hand, or an answer given, can make held texts readable, and they were never read again: the owner's card ending
+       7731 was set on his account and the texts held before it went on waiting under a question each. A run again sweeps
+       nothing, so a sweep never starts a sweep. */
+    if (stored === null) {
+      const swept = sweepDoor(deps, doorOf);
+      if (!swept.ok) return swept as Result<never>;
     }
 
     /* THE ROW IS THE BODY — `43 §5.1` step 3, in four words: *`text` → one row, the body*. The
@@ -920,62 +1014,10 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
 
        THEN STEP 4 OVER IT, once, before a single form runs. */
     const text = deps.normalise === undefined ? body : deps.normalise(body);
-    const extracted: Record<string, unknown> = {};
-    const missed: string[] = [];
-    /**
-     * The subset of `missed` the message DID carry and this build could not read (`43 §4.5`).
-     *
-     * ONLY A `map:` CAN FILL THIS. The `extract:` branch below reads a form over free text, where a
-     * form that matches nothing has found nothing — there is no value there to be unreadable, which is
-     * why `FieldOutcome` on that path has no `invalid` member at all. A `map:` reads a named path out
-     * of a JSON answer, so `{"date": "29.08.2026"}` is a field that was sent and a field we could not
-     * read, and those are two different sentences to put in front of a person.
-     */
-    const invalid: string[] = [];
-
-    /* THE OUTCOME PER FIELD, not only the value — `43 §5.1` step 7 files a row by the worst of them
-       and this loop used to keep the value alone. */
-    const soft: string[] = [];
-    /* AND THE FIELDS A `lookup` FILLED BY A PRINTED TAIL, which the fold below holds for a person until one is accepted. */
-    const tails: Tail[] = [];
-
-    /* A MAP READS THE BODY AS JSON, once, and each field by its path; an extract reads the text with anchors. The
-       outcomes are the same words, so everything below files a mapped row exactly as it files an extracted one.
-
-       AND THE MAPPED HALF IS `readRow`, WHICH A CONNECTOR'S PAGE CALLS TOO. One arrival here and five
-       hundred rows there is the same read over a different number of roots (`30 §2`). */
-    if (matched.map !== undefined && matched.extract === undefined) {
-      /* A ROUTED WRITE HAS NO SCHEMA YET AND THIS IS THE ORDER SAYING SO: `43 §5.1` reads the
-         fields at step 5 and routes at step 6, because the route reads the values step 5 produced.
-         So a mapped row under a route is typed by nothing, exactly as it was before routes could be
-         written at all, rather than by whichever target happened to be listed first. */
-      const fields = (typeof matched.writes.register === 'string' ? deps.schemaOf(matched.writes.register)?.fields : undefined) ?? {};
-      const got = readRow({ exponent: exponentOf, day: deps.day ?? day }, matched.map, parseAnswer(body), at, (field) => fields[field]?.type);
-      Object.assign(extracted, got.fields);
-      missed.push(...got.missed);
-      soft.push(...got.soft);
-      /* AND WHICH OF THE MISSED ONES WERE SENT. `readRow` keeps them apart and this is where the
-         distinction has to survive, because `missed` alone cannot tell the reason sentence below
-         whether to send a person to the provider or to the format. */
-      invalid.push(...got.invalid);
-    } else {
-      for (const [field, declared] of Object.entries(matched.extract ?? {})) {
-        /* A FIELD'S `strip:` IS READ AFTER ITS FORM AND NEVER BY IT. The form is handed on without the key, because
-           `slices` takes the first key that is not `note` as the form, and `{ strip, text }` would have cut the text by
-           the list of prefixes. A value the prefixes leave empty is a miss, as an empty slice is. */
-        const { form, strip } = stripOf(declared);
-        const got = resolve(deps, form, text);
-        const value = strip === null || typeof got.value !== 'string' ? got.value : stripped(got.value, strip) || null;
-        if (value === null) missed.push(field);
-        else {
-          extracted[field] = value;
-          /* A ROW FOUND BY ITS PRINTED TAIL IS NOT A CHOICE OR A DEFAULT, and the fold below says which it is. */
-          if (got.outcome === 'tail' && got.tail !== undefined && typeof got.value === 'string')
-            tails.push({ field, digits: got.tail.digits, row: got.value, register: got.tail.register });
-          else if (got.outcome !== 'exact') soft.push(field);
-        }
-      }
-    }
+    /* EVERY FIELD, BY `readFields`, which reads and writes nothing else: a held arrival looked at again (`sweepDoor`) is
+       read by the same function, so what the sweep decides and what a run again does cannot disagree. */
+    const read = readFields(deps, matched, body, text, at);
+    const { extracted, missed, invalid, soft, tails } = read;
 
     /* `writes.set` FILLS IN AFTER THE PAYLOAD, NEVER BEFORE IT, so a field the message itself sent is
        never overwritten by a fixed one. A setting `fillConfig` filled empty is left out rather than
@@ -998,6 +1040,8 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
          A BAD DECLARATION IS A `review`, NOT A DISCARD. The sender did nothing wrong; the pattern
          did, and the payload is the evidence for fixing it. */
       store('review', `${String(ceiling)} is not a confidence this record knows, so ${matched.ingest} did not write.`);
+      /* AND WHICH PATTERN HELD IT, as every other held text says, so a fixed version reads it again (`readBefore`). */
+      note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'needs-review');
       return ok<Arrived>({
         raw,
         ingest: matched.ingest,
@@ -1032,7 +1076,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
      * here alone, out of the row and out of what could not be read.
      */
     const payee = extracted[COUNTERPARTY];
-    if (typeof payee === 'string' && payee.trim() !== '') counterparty = payee.trim().replace(/\s+/g, ' ');
+    if (typeof payee === 'string' && payee.trim() !== '') heard.counterparty = payee.trim().replace(/\s+/g, ' ');
     const declaredFields = deps.schemaOf(register)?.fields;
     if (declaredFields !== undefined && !Object.hasOwn(declaredFields, COUNTERPARTY)) {
       delete extracted[COUNTERPARTY];
@@ -1062,10 +1106,31 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        THE MIDDLE LEVEL HAD NO WAY TO BE REACHED and this comment said so: "there is no combinator
        here that chooses or defaults, so there is no honest third outcome to derive". There are three
        now, and `proposed` stopped being a level only a declared ceiling could produce. */
-    /* A ROW FOUND ONLY BY ITS PRINTED TAIL IS `proposed` UNTIL A PERSON HAS ACCEPTED ONE: once per ingest, account and
-       tail, read from the rowsets this ingest opened and the decisions that accepted them (`confirmedTail`). A lookup
+    /* A ROW FOUND ONLY BY ITS PRINTED TAIL IS `proposed` UNTIL A PERSON HAS ACCEPTED ONE: once per account and tail,
+       whichever pattern asked, read from the rowsets and the tail questions a person answered (`confirmedTail`). A lookup
        that matched the whole value never reaches `tails`, so it files as it always did. */
-    const pending = tails.filter((t) => !confirmedTail(deps.sql, matched.ingest, t));
+    const pending = tails.filter((t) => !confirmedTail(deps.sql, t));
+
+    /**
+     * ONE QUESTION PER DOOR, LIST AND DIGITS, WHERE THE ACCOUNT IS THE ONLY THING NOT READ (REC-A02).
+     *
+     * Digits printed for an account nobody holds them on, and nothing else missing: the arrival waits under the one
+     * question "Which account is the card ending 1234?", which every later text printing those digits at that door
+     * joins. It was a question per text, each asking to add a row with its account empty, which the list refuses.
+     *
+     * AND DIGITS AN AGENT WROTE ON AN ACCOUNT ARE CONFIRMED ONCE (DIRECTION §42). They read, and the row they name is an
+     * agent's word about money, so the first text that reads them waits under the same one question with that account
+     * suggested, and never under one per text. Digits a person wrote are their word, and file.
+     *
+     * A MESSAGE THAT PRINTS NO DIGITS KEEPS THE QUESTION IT HAD, joined by door and missed field below.
+     */
+    const unknown = read.unknowns[0];
+    if (unknown !== undefined && missed.length === 1 && missed[0] === unknown.field && invalid.length === 0)
+      return ok(holdTail(deps, { at, raw, door: doorOf, matched, register, extracted, text, tail: unknown, suggested: null, store, note }));
+    const agent = missed.length === 0 ? read.agents.find((a) => !confirmedTail(deps.sql, { digits: a.digits, row: a.row })) : undefined;
+    if (agent !== undefined)
+      return ok(holdTail(deps, { at, raw, door: doorOf, matched, register, extracted, text, tail: agent, suggested: agent.row, store, note }));
+
     const confidence = worse(
       missed.length ? 'needs-review' : soft.length || pending.length ? 'proposed' : 'exact',
       ceiling,
@@ -1093,8 +1158,15 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        * receipt already in a record changes meaning.
        */
       const absent = missed.filter((field) => !invalid.includes(field));
+      /* EXCEPT AN ACCOUNT NOT FOUND, which is said in his words (REC-A02 step 7): the message printed no digits to ask
+         about, so it waits on its own question, and its reason names the field as the record speaks it and no pattern. */
+      const unfound = absent.length > 0 && invalid.length === 0 && absent.every((field) => read.lookups.includes(field));
       const clauses = [
-        absent.length ? `${matched.ingest} could not read ${absent.join(', ')} out of this one.` : '',
+        unfound
+          ? `${opening(wordsFor(deps, matched, register, arrival.channel).fields(absent))} could not be found in this one.`
+          : absent.length
+            ? `${matched.ingest} could not read ${absent.join(', ')} out of this one.`
+            : '',
         invalid.length
           ? `${matched.ingest} found ${invalid.join(', ')} in this one and could not make sense of ${invalid.length === 1 ? 'it' : 'them'}, so the format may have changed.`
           : '',
@@ -1139,10 +1211,16 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       /* THE QUESTION IS SAID IN A PERSON'S WORDS, the reason in the record's. The reason is the inbox's and stays word for
          word what it was; the question is what Decide draws, and it named the pattern and the list by their ids
          (`heldAsked`). */
+      /* A LOOKUP THE MESSAGE GAVE NO DIGITS FOR IS ONE QUESTION PER DOOR AND WHAT WAS MISSED, not one per payee: the
+         person's answer is the same for every charge it holds (which account), so splitting it by shop asked it again for
+         each shop. A miss that is not a lookup's joins by payee as it did. */
+      const lookupMissed = missed.some((field) => read.lookups.includes(field));
       const suggestion = openRowset(deps, at, {
         ingest: matched.ingest,
         register,
         rows: [extracted],
+        raw,
+        ...(lookupMissed ? { joins: JSON.stringify(['door', doorOf, ...[...missed].sort()]) } : {}),
         ...heldAsked(deps, wordsFor(deps, matched, register, arrival.channel), {
           absent,
           invalid,
@@ -1179,9 +1257,12 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
 
     const conflict = matched.on_conflict ?? 'skip';
     if (existing && conflict === 'skip') {
-      const reason = `${existing.seq === null ? existing.id : `${register}#${existing.seq}`} already says this.`;
+      /* A SKIP IS NEVER SILENT (REC-A03): it keeps the row it repeats, on its `match` line, and says it by its name,
+         amount and day, so the Inbox can offer "It is a second one" on the text itself. */
+      const reason = repeatSaid(deps, register, existing, matched.dedupe);
       store('skipped', reason);
-      return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason });
+      note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'skipped', { field: 'repeats', from: existing.id });
+      return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason, repeats: existing.id });
     }
 
     /**
@@ -1283,7 +1364,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     note('extract', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', '1');
 
     return ok<Arrived>({ raw, ingest: matched.ingest, state: 'matched', wrote: [wrote.value.id], confidence });
-  }));
+  }
 }
 
 /**
@@ -1320,10 +1401,20 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
 function openRowset(
   deps: IngestDeps,
   at: string,
-  item: { ingest: string; register: string; rows: Record<string, unknown>[]; question: string; context?: string; resembles?: string; tails?: Tail[] },
+  item: {
+    ingest: string;
+    register: string;
+    rows: Record<string, unknown>[];
+    question: string;
+    context?: string;
+    resembles?: string;
+    tails?: Tail[];
+    raw?: string;
+    joins?: string;
+  },
 ): string {
   const context = item.context ?? '';
-  const joins = joinsOn(deps, item.register, item.rows);
+  const joins = item.joins ?? joinsOn(deps, item.register, item.rows);
   const asked = deps.sql.one<{ id: string; body: string }>(
     `SELECT s.id, s.body FROM suggestion s JOIN event e ON e.target = 'suggestion:' || s.id AND e.kind = 'suggest'
       WHERE s.body_kind = 'rowset' AND s.status = 'open' AND s.opened_by = ? AND json_extract(s.body, '$.register') = ?
@@ -1345,9 +1436,12 @@ function openRowset(
     /* A TAIL ONCE, as `confirmedTail` reads one: the digits and the row they were matched to. */
     const tails = [...held.tails, ...(item.tails ?? []).filter((t) => !held.tails.some((h) => h.digits === t.digits && h.row === t.row))];
     const rows = [...held.rows, ...item.rows];
+    /* THE ARRIVAL BESIDE ITS ROW, place for place, so a held text looked at again finds the row it is asked as. A body
+       filed before `raws` has none and keeps none: its rows are found by what they say (`sameRow`). */
+    const raws = Array.isArray(held.body.raws) && item.raw !== undefined ? { raws: [...(held.body.raws as unknown[]), item.raw] } : {};
     deps.sql.exec(
       'UPDATE suggestion SET body = ? WHERE id = ?',
-      JSON.stringify({ ...held.body, rows, count: rows.length, ...(tails.length ? { tails } : {}) }),
+      JSON.stringify({ ...held.body, rows, count: rows.length, ...(tails.length ? { tails } : {}), ...raws }),
       asked.id,
     );
     deps.sql.exec(
@@ -1376,6 +1470,7 @@ function openRowset(
       ...(item.resembles === undefined ? {} : { resembles: item.resembles }),
       /* THE TAILS THIS ONE WAITS ON, so accepting it is the confirmation `confirmedTail` reads, with no table beside it. */
       ...(item.tails === undefined ? {} : { tails: item.tails }),
+      ...(item.raw === undefined ? {} : { raws: [item.raw] }),
     }),
     `ingest:${item.ingest}`,
     at,
@@ -1429,6 +1524,1419 @@ function joinsOn(deps: IngestDeps, register: string, rows: readonly Record<strin
   });
   const once = keys.filter((key, i) => keys.indexOf(key) === i);
   return once.length === 1 ? once[0]! : JSON.stringify(once);
+}
+
+/* ── the digits a lookup reads an account by (REC-A02) ─────────────────── */
+
+/** The shortest bare run of digits read as an account's number rather than an amount, for the reverse tail. */
+const BARE_NUMBER = 8;
+
+/**
+ * The most digits a bare run may hold and still be read as a printed tail, on a lookup that says what it reads: a card's
+ * last four, or six. A longer bare run is an account's whole number, which the reverse tail reads.
+ */
+const BARE_TAIL_MOST = 6;
+
+/** A field id as `34 §4` spells one, the only shape that is read into a path or out of a row's fields here. */
+const FIELD_ID = /^[a-z][a-z0-9_]{0,31}$/;
+
+const isDigit = (ch: string | undefined): boolean => ch !== undefined && ch >= '0' && ch <= '9';
+
+/** The parts of a value a `split` lookup holds, parted by commas: `7731, 1234` is two. */
+const partsOf = (value: string): string[] =>
+  value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
+
+/**
+ * The digits a slice's first token prints, and whether stars stood before them: the run after the first run of stars
+ * and one `-` or space, or the token itself when it is digits alone. `null` for a token that prints neither, for fewer
+ * than three digits, and for digits a letter follows (`*44KIOSK` is a name).
+ */
+function firstRun(masked: string): { digits: string; starred: boolean } | null {
+  let first = 0;
+  while (masked[first] === ' ') first += 1;
+  const text = masked.slice(first);
+  const space = text.indexOf(' ');
+  const end = space === -1 ? text.length : space;
+  const star = text.indexOf('*');
+  if (star !== -1 && star < end) {
+    let at = star;
+    while (text[at] === '*') at += 1;
+    if (text[at] === '-' || text[at] === ' ') at += 1;
+    const from = at;
+    while (isDigit(text[at])) at += 1;
+    if (at - from < 3 || /^[A-Za-z]/.test(text.slice(at))) return null;
+    return { digits: text.slice(from, at), starred: true };
+  }
+  const token = text.slice(0, end).replace(/[.,;:)]+$/, '');
+  return /^\d{3,}$/.test(token) ? { digits: token, starred: false } : null;
+}
+
+/** The reverse tail: printed digits longer than a stored value of three digits or more that they end in (`printedTail`). */
+function reverseTail(masked: string, whole: string): string | null {
+  if (!/^\d{3,}$/.test(whole)) return null;
+  const run = firstRun(masked);
+  if (run === null || (!run.starred && run.digits.length < BARE_NUMBER)) return null;
+  return run.digits.length > whole.length && run.digits.endsWith(whole) ? run.digits : null;
+}
+
+/** The first `lookup` a form holds, however deep under `first`, `nth` or `default`, or `null`. */
+function lookupOf(form: Extractor, depth = 1): LookupForm | null {
+  if (form === null || typeof form !== 'object' || depth > NESTING) return null;
+  if ('lookup' in form) return form.lookup;
+  if ('first' in form) {
+    for (const arm of Array.isArray(form.first) ? form.first : []) {
+      const got = lookupOf(arm, depth + 1);
+      if (got !== null) return got;
+    }
+    return null;
+  }
+  if ('nth' in form) return lookupOf(form.nth.of, depth + 1);
+  if ('default' in form) return lookupOf(form.default.of, depth + 1);
+  return null;
+}
+
+/** The noun a lookup says, trimmed, or `null` where it says none. */
+const saysOf = (lookup: LookupForm): string | null => (typeof lookup.says === 'string' && lookup.says.trim() !== '' ? lookup.says.trim() : null);
+
+/** A field a lookup read, and the digits the message printed for it. */
+type Printed = { field: string; digits: string; lookup: LookupForm };
+
+/**
+ * The digits a message printed where a `lookup` reads, whatever row they name or none: `unknownTail` beside
+ * `printedTail`, with no row needed. Digits behind stars are always a tail, because the stars are the bank saying so; a
+ * bare run of three to six counts only on a lookup that `says` what it reads, since a bare number is a figure as often as
+ * not. `null` for a form with no lookup, and for a message that prints no digits there, which keeps the question it had.
+ */
+export function unknownTail(form: Extractor, text: string, depth = 1): { digits: string; lookup: LookupForm } | null {
+  if (form === null || typeof form !== 'object' || depth > NESTING) return null;
+  if ('first' in form) {
+    for (const arm of Array.isArray(form.first) ? form.first : []) {
+      const got = unknownTail(arm, text, depth + 1);
+      if (got !== null) return got;
+    }
+    return null;
+  }
+  if ('nth' in form) return unknownTail(form.nth.of, text, depth + 1);
+  if ('default' in form) return unknownTail(form.default.of, text, depth + 1);
+  if (!('lookup' in form)) return null;
+  const lookup = form.lookup;
+  const mask = maskAtEnd(lookup.between?.[0] ?? lookup.after ?? '');
+  for (const anchored of slices(form as Record<string, unknown>, text)) {
+    const run = firstRun(mask + anchored);
+    if (run === null) continue;
+    if (run.starred || (saysOf(lookup) !== null && run.digits.length <= BARE_TAIL_MOST)) return { digits: run.digits, lookup };
+  }
+  return null;
+}
+
+/**
+ * The digits a lookup that found `row` as a whole value printed, when they are digits and one of the row's own values,
+ * or `null`. What an agent wrote on an account is asked about by these (DIRECTION §42).
+ */
+function wholeDigits(deps: IngestDeps, form: Extractor, text: string, row: string): { digits: string; lookup: LookupForm } | null {
+  const lookup = lookupOf(form);
+  if (lookup === null) return null;
+  const held = lookupTable(deps, lookup)
+    .filter((r) => r.id === row)
+    .map((r) => r.value);
+  const mask = maskAtEnd(lookup.between?.[0] ?? lookup.after ?? '');
+  for (const anchored of slices({ lookup } as Record<string, unknown>, text)) {
+    const run = firstRun(mask + anchored);
+    if (run !== null && held.includes(run.digits)) return { digits: run.digits, lookup };
+  }
+  return null;
+}
+
+/**
+ * Every value a lookup reads, row by row: `deps.rows` as the record hands it down, or, for a lookup with a `where` or a
+ * `split`, the list read here through `deps.sql`, each live row the filter admits and each part of a value it splits.
+ *
+ * A FILTER OVER A LIST THIS RECORD DOES NOT HOLD ADMITS NOTHING, and so does one `where` cannot read: a card text is never
+ * matched to an account the filter was written to keep out, by a filter that quietly stopped filtering.
+ */
+function lookupTable(deps: IngestDeps, lookup: LookupForm): { id: string; value: string }[] {
+  const split = lookup.split === true;
+  if (!split && (lookup.where === undefined || lookup.where === null)) return deps.rows(lookup.register, lookup.by);
+  if (typeof lookup.by !== 'string' || !FIELD_ID.test(lookup.by)) return [];
+  const admits = filterOf(deps, lookup.register, lookup.where);
+  const out: { id: string; value: string }[] = [];
+  for (const row of liveRows(deps.sql, lookup.register)) {
+    if (!admits(row)) continue;
+    const value = row.fields[lookup.by];
+    if (value === null || value === undefined || typeof value === 'object') continue;
+    for (const part of split ? partsOf(String(value)) : [String(value)]) out.push({ id: row.id, value: part });
+  }
+  return out;
+}
+
+/**
+ * A lookup's `where` as a test of one row: a sentence ("kind is card") read against the list as a page's filter is, or the
+ * tree form. No filter admits every row; a filter this record cannot read, or over a list it does not hold, admits none.
+ */
+function filterOf(deps: Pick<IngestDeps, 'schemaOf' | 'nowMs'>, register: string, where: Predicate | string | undefined | null): (row: LiveRow) => boolean {
+  if (where === undefined || where === null) return () => true;
+  const schema = deps.schemaOf(register);
+  if (schema === null) return () => false;
+  const said = typeof where === 'string' ? parseWhere(where, schema, { nowMs: deps.nowMs }) : { predicate: where, bad: [] };
+  const predicate = said.predicate;
+  if (said.bad.length > 0 || predicate === undefined) return () => false;
+  return (row) => evaluate(predicate, row.fields, schema, row);
+}
+
+/** A live row of a list, with the columns a `where` may name beside its fields. */
+type LiveRow = { id: string; seq: number | null; fields: Record<string, unknown>; state: string | null; version: number; created_at: string; updated_at: string };
+
+function liveRows(sql: Sql, register: string): LiveRow[] {
+  return sql
+    .all<{ id: string; seq: number | null; fields: string; state: string | null; version: number; created_at: string; updated_at: string }>(
+      'SELECT id, seq, fields, state, version, created_at, updated_at FROM entry WHERE register = ? AND deleted_at IS NULL ORDER BY seq, rowid',
+      register,
+    )
+    .flatMap((r) => {
+      const fields = parsed(r.fields);
+      return fields === null ? [] : [{ ...r, fields }];
+    });
+}
+
+/** A JSON object out of a column, or `null` for anything else. */
+function parsed(text: string | null | undefined): Record<string, unknown> | null {
+  if (typeof text !== 'string') return null;
+  try {
+    const value = JSON.parse(text) as unknown;
+    return value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether the digits in `by` on `row` were last written by an agent: a run (`S42`) or Slash. A person's own word, the
+ * record's import and a rule are not asked about, as they never were.
+ */
+function writtenByAgent(sql: Sql, row: string, by: string): boolean {
+  const actor = sql.one<{ actor: string }>(
+    "SELECT actor FROM event WHERE target = ? AND ((kind = 'edit' AND field = ?) OR kind = 'create') ORDER BY rowid DESC LIMIT 1",
+    `entry:${row}`,
+    by,
+  )?.actor;
+  return actor !== undefined && (actor === SLASH || RUN_ACTOR.test(actor));
+}
+
+/** A run's name as its writes are signed. */
+const RUN_ACTOR = new RegExp(`^${SESSION_PREFIX}\\d+$`);
+
+/* ── a money form's currency, read off its account ─────────────────────── */
+
+/** Every `currency: { of, field }` a form holds. */
+function currenciesOf(form: unknown, depth = 1): CurrencyOf[] {
+  if (form === null || typeof form !== 'object' || depth > NESTING) return [];
+  const f = form as Record<string, unknown>;
+  if (Array.isArray(f.first)) return f.first.flatMap((arm) => currenciesOf(arm, depth + 1));
+  const inner = (f.nth as { of?: unknown } | undefined)?.of ?? (f.default as { of?: unknown } | undefined)?.of;
+  if (inner !== undefined) return currenciesOf(inner, depth + 1);
+  const money = f.money as { currency?: unknown } | undefined;
+  const c = money?.currency;
+  return c !== null && typeof c === 'object' && typeof (c as CurrencyOf).of === 'string' && typeof (c as CurrencyOf).field === 'string' ? [c as CurrencyOf] : [];
+}
+
+/**
+ * `form` with each `currency: { of, field }` replaced by the code the row in `extracted[of]` holds there, or taken out
+ * where it holds none: then only a code the text prints is read, and a text with neither waits (REC-A03).
+ */
+function currencyFilled(deps: IngestDeps, form: Extractor, extracted: Record<string, unknown>, depth = 1): Extractor {
+  if (form === null || typeof form !== 'object' || depth > NESTING) return form;
+  if ('first' in form) return { ...form, first: (Array.isArray(form.first) ? form.first : []).map((arm) => currencyFilled(deps, arm, extracted, depth + 1)) };
+  if ('nth' in form) return { ...form, nth: { ...form.nth, of: currencyFilled(deps, form.nth.of, extracted, depth + 1) } };
+  if ('default' in form) return { ...form, default: { ...form.default, of: currencyFilled(deps, form.default.of, extracted, depth + 1) } };
+  if (!('money' in form)) return form;
+  const said = form.money.currency;
+  if (said === undefined || typeof said === 'string') return form;
+  const code = currencyOfRow(deps.sql, extracted[said.of], said.field);
+  const { currency: _theirs, ...rest } = form.money;
+  return { ...form, money: code === null ? rest : { ...rest, currency: code } } as Extractor;
+}
+
+/** The currency a row keeps in `field`: a money value's code, or a code written as text. `null` for anything else. */
+function currencyOfRow(sql: Sql, row: unknown, field: string): string | null {
+  if (typeof row !== 'string' || !FIELD_ID.test(field)) return null;
+  const fields = parsed(sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ? AND deleted_at IS NULL', row)?.fields);
+  const value = fields?.[field];
+  const code = value !== null && typeof value === 'object' ? (value as { currency?: unknown }).currency : value;
+  return typeof code === 'string' && /^[A-Z]{3}$/u.test(code) ? code : null;
+}
+
+/* ── every field of one arrival ─────────────────────────────────────────── */
+
+/**
+ * What one arrival's fields read, and how: the values, what could not be read, what was guessed, the rows found by a
+ * printed tail, the digits printed for an account nobody holds them on (`unknowns`), the accounts found by digits an
+ * agent wrote (`agents`), and which fields a lookup reads.
+ */
+type Read = {
+  extracted: Record<string, unknown>;
+  missed: string[];
+  /**
+   * The subset of `missed` the message DID carry and this build could not read (`43 §4.5`).
+   *
+   * ONLY A `map:` CAN FILL THIS. The `extract:` branch reads a form over free text, where a form that matches nothing has
+   * found nothing, so there is no value there to be unreadable. A `map:` reads a named path out of a JSON answer, so
+   * `{"date": "29.08.2026"}` is a field that was sent and a field we could not read, and those are two different
+   * sentences to put in front of a person.
+   */
+  invalid: string[];
+  /* THE OUTCOME PER FIELD, not only the value: `43 §5.1` step 7 files a row by the worst of them. */
+  soft: string[];
+  tails: Tail[];
+  unknowns: Printed[];
+  agents: (Printed & { row: string })[];
+  lookups: string[];
+};
+
+/**
+ * Every field of one arrival, read and nothing written.
+ *
+ * A MAP READS THE BODY AS JSON, once, and each field by its path; an extract reads the text with anchors. The outcomes are
+ * the same words, so everything after files a mapped row exactly as it files an extracted one. And the mapped half is
+ * `readRow`, which a connector's page calls too.
+ *
+ * A FIELD WHOSE ROW ANOTHER FIELD'S CURRENCY IS READ OFF IS READ FIRST, so `currency: { of: account }` has the account
+ * in hand; the rest keep their declared order.
+ */
+function readFields(deps: IngestDeps, matched: IngestDecl, body: string, text: string, at: string): Read {
+  const read: Read = { extracted: {}, missed: [], invalid: [], soft: [], tails: [], unknowns: [], agents: [], lookups: [] };
+  if (matched.map !== undefined && matched.extract === undefined) {
+    /* A ROUTED WRITE HAS NO SCHEMA YET AND THIS IS THE ORDER SAYING SO: `43 §5.1` reads the fields at step 5 and routes
+       at step 6, because the route reads the values step 5 produced. */
+    const fields = (typeof matched.writes.register === 'string' ? deps.schemaOf(matched.writes.register)?.fields : undefined) ?? {};
+    const got = readRow({ exponent: exponentOf, day: deps.day ?? day }, matched.map, parseAnswer(body), at, (field) => fields[field]?.type);
+    Object.assign(read.extracted, got.fields);
+    read.missed.push(...got.missed);
+    read.soft.push(...got.soft);
+    read.invalid.push(...got.invalid);
+    return read;
+  }
+  const entries = Object.entries(matched.extract ?? {});
+  const first = new Set(entries.flatMap(([, form]) => currenciesOf(form).map((c) => c.of)));
+  entries.sort(([a], [b]) => Number(first.has(b)) - Number(first.has(a)));
+  for (const [field, declared] of entries) {
+    /* A FIELD'S `strip:` IS READ AFTER ITS FORM AND NEVER BY IT. The form is handed on without the key, because `slices`
+       takes the first key that is not `note` as the form, and `{ strip, text }` would have cut the text by the list of
+       prefixes. A value the prefixes leave empty is a miss, as an empty slice is. */
+    const { form: bare, strip } = stripOf(declared);
+    const form = currencyFilled(deps, bare, read.extracted);
+    const lookup = lookupOf(form);
+    if (lookup !== null) read.lookups.push(field);
+    const got = resolve(deps, form, text);
+    const value = strip === null || typeof got.value !== 'string' ? got.value : stripped(got.value, strip) || null;
+    if (value === null) {
+      read.missed.push(field);
+      const tail = lookup === null ? null : unknownTail(form, text);
+      if (tail !== null) read.unknowns.push({ field, ...tail });
+      continue;
+    }
+    read.extracted[field] = value;
+    /* A ROW FOUND BY ITS PRINTED TAIL IS NOT A CHOICE OR A DEFAULT, and the fold says which it is. */
+    if (got.outcome === 'tail' && got.tail !== undefined && typeof got.value === 'string')
+      read.tails.push({ field, digits: got.tail.digits, row: got.value, register: got.tail.register });
+    else if (got.outcome !== 'exact') read.soft.push(field);
+    else if (lookup !== null && typeof value === 'string') {
+      const printed = wholeDigits(deps, form, text, value);
+      if (printed !== null && writtenByAgent(deps.sql, value, printed.lookup.by)) read.agents.push({ field, row: value, ...printed });
+    }
+  }
+  return read;
+}
+
+/* ── one question per door, list and digits (REC-A02) ───────────────────── */
+
+/** The answer that says none of the accounts offered is the one. */
+export const NONE = 'none';
+
+/** The most accounts a tail question offers, the ones with no digits first. */
+const TAIL_OPTIONS_MOST = 12;
+
+/** How many waiting arrivals are run again in one go: as many as one rowset may hold (`MAX_ROWS` in `govern.ts`). */
+const REPLAY_BATCH = 200;
+
+/** How long after an answer digits moved to another account still ask to move what they filed. */
+const MOVE_DAYS = 30;
+
+/** The cause of a tail question: the door, the list the lookup reads and the digits. */
+export const tailCause = (door: string, register: string, digits: string): string => `tail:${door}:${register}:${digits}`;
+
+/**
+ * What a tail question keeps about what it asks, so an answer can be carried out without the pattern that asked: the
+ * door, the list and field the lookup reads, the digits, the noun, whether the field splits, and its filter.
+ */
+type TailAsked = { door: string; register: string; by: string; digits: string; says: string; split: boolean; where?: Predicate | string; ingest: string; field: string };
+
+/** The words a tail question and its reason are said in: the list's word for one of its rows, and the field's label. */
+function tailWords(sql: Sql, tail: TailAsked): { one: string; label: string } {
+  const list = declaredList(sql, tail.register);
+  const one = typeof list.one === 'string' && list.one.trim() !== '' ? list.one.trim() : 'account';
+  const fields = Array.isArray(list.fields) ? (list.fields as { id?: unknown; label?: unknown }[]) : [];
+  const label = fields.find((f) => f?.id === tail.by)?.label;
+  const words = tail.by.replace(/_/g, ' ');
+  return { one, label: typeof label === 'string' && label.trim() !== '' ? label.trim() : words.charAt(0).toUpperCase() + words.slice(1) };
+}
+
+/** A row of a list said by its title, or by the list's word for one and its number: never an id. */
+function rowSaid(sql: Sql, register: string, row: { id: string; seq: number | null }): string {
+  const title = rowTitle(sql, register, row.id);
+  if (title !== null) return title;
+  const list = declaredList(sql, register);
+  const one = typeof list.one === 'string' && list.one.trim() !== '' ? list.one.trim() : 'account';
+  return `${opening(one)} ${row.seq ?? ''}`.trim();
+}
+
+/** The options a tail question offers: the rows the lookup's filter admits, the suggested one and those with no digits first, then "None of these". */
+function tailOptions(deps: Pick<IngestDeps, 'sql' | 'schemaOf' | 'nowMs'>, tail: TailAsked, suggested: string | null): { id: string; label: string; because: string; recommended?: true }[] {
+  const { one, label } = tailWords(deps.sql, tail);
+  const rows = liveRows(deps.sql, tail.register).filter(filterOf(deps, tail.register, tail.where));
+  const valueOf = (r: LiveRow): string => {
+    const v = r.fields[tail.by];
+    return v === null || v === undefined || typeof v === 'object' ? '' : String(v).trim();
+  };
+  const rank = (r: LiveRow): number => (r.id === suggested ? 0 : valueOf(r) === '' ? 1 : 2);
+  const offered = [...rows].sort((a, b) => rank(a) - rank(b) || (a.seq ?? 0) - (b.seq ?? 0)).slice(0, TAIL_OPTIONS_MOST);
+  return [
+    ...offered.map((r) => ({
+      id: r.id,
+      label: rowSaid(deps.sql, tail.register, r),
+      because: valueOf(r) === '' ? `Nothing is in its ${label} yet.` : `${label}: ${valueOf(r)}.`,
+      ...(r.id === suggested ? { recommended: true as const } : {}),
+    })),
+    {
+      id: NONE,
+      label: 'None of these',
+      because: `They keep waiting, and the ${tail.says} ending ${tail.digits} is not asked about again until a new ${one} is added.`,
+    },
+  ];
+}
+
+/** What a held arrival brings to its tail question. */
+type Holding = {
+  at: string;
+  raw: string;
+  door: string;
+  matched: IngestDecl;
+  register: string;
+  extracted: Record<string, unknown>;
+  text: string;
+  tail: Printed;
+  suggested: string | null;
+  store: Store;
+  note: Note;
+};
+
+/**
+ * Hold an arrival under the one question for its door, list and digits, opening it or joining it.
+ *
+ * THE REASON IS IN HIS WORDS, from the list's declaration: "No account has 1234 in Digits the bank prints. It waits for
+ * you to say which account it is." No pattern id and no list id. Digits an agent wrote say so, and that it waits for one
+ * confirmation.
+ *
+ * AN ANSWER OF "NONE OF THESE" STANDS until an account is added: the arrival waits with it and nothing is asked again.
+ */
+function holdTail(deps: IngestDeps, h: Holding): Arrived {
+  const asked: TailAsked = {
+    door: h.door,
+    register: h.tail.lookup.register,
+    by: h.tail.lookup.by,
+    digits: h.tail.digits,
+    says: saysOf(h.tail.lookup) ?? 'account',
+    split: h.tail.lookup.split === true,
+    ...(h.tail.lookup.where === undefined || h.tail.lookup.where === null ? {} : { where: h.tail.lookup.where }),
+    ingest: h.matched.ingest,
+    field: h.tail.field,
+  };
+  const { one, label } = tailWords(deps.sql, asked);
+  const cause = tailCause(h.door, asked.register, asked.digits);
+  const named = h.suggested === null ? null : rowTitle(deps.sql, asked.register, h.suggested);
+  const held = { raw: h.raw, ingest: h.matched.ingest, state: 'review' as const, wrote: [], confidence: 'needs-review' as const };
+
+  const declined = declinedTail(deps.sql, cause, asked.register);
+  if (declined !== null) {
+    const reason = `No ${one} has ${asked.digits} in ${label}. You said it is none of the ones offered, so it waits until a new ${one} is added.`;
+    h.store('review', reason);
+    h.note('match', `ingest:${h.matched.ingest}`, `inbox_raw:${h.raw}`, 'inbox_raw', 'needs-review');
+    keepRaw(deps.sql, declined, h.raw);
+    return { ...held, reason };
+  }
+
+  const reason =
+    h.suggested === null
+      ? `No ${one} has ${asked.digits} in ${label}. It waits for you to say which ${one} it is.`
+      : `${named ?? `The ${one}`} has ${asked.digits} in ${label}, put there by an agent, so it waits for you to confirm it once.`;
+  h.store('review', reason);
+  h.note('match', `ingest:${h.matched.ingest}`, `inbox_raw:${h.raw}`, 'inbox_raw', 'needs-review');
+  const suggestion = askTail(deps, h.at, { cause, asked, raw: h.raw, register: h.register, extracted: h.extracted, text: h.text, suggested: h.suggested });
+  return { ...held, reason, suggestion };
+}
+
+/**
+ * The open tail question for `cause`, grown by one arrival, or a new one. Its body holds the arrivals it waits on
+ * (`raws`, each once), how many, the total per currency of what they would file, the newest message's own words cut to
+ * 280 characters, and the accounts offered, read again each time so an account added since is among them.
+ */
+function askTail(
+  deps: IngestDeps,
+  at: string,
+  q: { cause: string; asked: TailAsked; raw: string; register: string; extracted: Record<string, unknown>; text: string; suggested: string | null },
+): string {
+  const open = deps.sql.one<{ id: string; body: string }>(
+    "SELECT id, body FROM suggestion WHERE body_kind = 'options' AND status = 'open' AND json_valid(body) AND json_extract(body, '$.cause') = ? ORDER BY rowid LIMIT 1",
+    q.cause,
+  );
+  const was = open === undefined ? null : parsed(open.body);
+  const raws = Array.isArray(was?.raws) ? (was.raws as unknown[]).filter((r): r is string => typeof r === 'string') : [];
+  /* A QUESTION ASKED AGAIN AFTER "NONE OF THESE" CARRIES WHAT WAITED UNDER THE ANSWERED ONE, which is still held. */
+  if (open === undefined) raws.push(...declinedRaws(deps.sql, q.cause).filter((r) => r !== q.raw));
+  const fresh = !raws.includes(q.raw);
+  const totals: Record<string, number> = { ...((was?.totals as Record<string, number> | undefined) ?? {}) };
+  if (fresh) {
+    /* THE FIRST MONEY FIELD THE LIST DECLARES, as it would be filed: one sum per currency, and two currencies never added. */
+    const money = Object.entries(deps.schemaOf(q.register)?.fields ?? {}).find(([, f]) => f.type === 'money')?.[0];
+    const amount = money === undefined ? undefined : (q.extracted[money] as { amount?: unknown; currency?: unknown } | undefined);
+    if (amount !== undefined && Number.isInteger(amount.amount) && typeof amount.currency === 'string')
+      totals[amount.currency] = (totals[amount.currency] ?? 0) + (amount.amount as number);
+    raws.push(q.raw);
+  }
+  const suggested = q.suggested ?? (typeof was?.suggested === 'string' ? was.suggested : null);
+  const options = tailOptions(deps, q.asked, suggested);
+  const { one } = tailWords(deps.sql, q.asked);
+  const sums = Object.entries(totals)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([currency, minor]) => moneyText(minor, currency));
+  const agent = suggested === null ? '' : `An agent put ${q.asked.digits} on ${rowTitle(deps.sql, q.asked.register, suggested) ?? `one ${one}`}. `;
+  const nobody = options.length === 1 ? `No ${one} could be it yet; add it, and it is offered here. ` : '';
+  const waiting = `${raws.length} ${raws.length === 1 ? 'message waits' : 'messages wait'} for this${sums.length ? `, ${listedAnd(sums)} in all` : ''}.`;
+  const body = {
+    ...(was ?? {}),
+    cause: q.cause,
+    tail: q.asked,
+    options,
+    raws,
+    count: raws.length,
+    totals,
+    sample: cutTo(q.text.replace(/\s+/g, ' ').trim(), 280),
+    context: cutTo(`${agent}${nobody}${waiting}`, 280),
+    ...(suggested === null ? {} : { suggested }),
+  };
+  if (open !== undefined) {
+    deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify(body), open.id);
+    if (fresh)
+      deps.sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v, note) VALUES (?, ?, ?, 'suggest', ?, 'suggestion', 'rows', ?, ?, ?)",
+        deps.mint(),
+        at,
+        `ingest:${q.asked.door}`,
+        `suggestion:${open.id}`,
+        String(raws.length - 1),
+        String(raws.length),
+        `One more message joined this question, ${raws.length} in all.`,
+      );
+    return open.id;
+  }
+  const id = `SG${deps.allocate('suggestion')}`;
+  deps.sql.exec(
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'options', ?, 'open', ?, ?)",
+    id,
+    JSON.stringify(body),
+    `ingest:${q.asked.door}`,
+    at,
+  );
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'suggest', ?, 'suggestion', ?)",
+    deps.mint(),
+    at,
+    `ingest:${q.asked.door}`,
+    `suggestion:${id}`,
+    `Which ${one} is the ${q.asked.says} ending ${q.asked.digits}?`.slice(0, 280),
+  );
+  return id;
+}
+
+/**
+ * The open tail questions over `register` offered again from the rows it holds now. Their options are read when a text
+ * joins them, so an account added for the answer ("add it, and it is offered here") was not offered until the next text
+ * came. The record calls this after a row is added to a list; it reads nothing where no tail question is open. Answers
+ * how many questions it offered again.
+ */
+export function offerAgain(deps: Pick<IngestDeps, 'sql' | 'schemaOf' | 'nowMs'>, register: string): number {
+  const open = deps.sql.all<{ id: string; body: string }>(
+    "SELECT id, body FROM suggestion WHERE body_kind = 'options' AND status = 'open' AND json_valid(body) AND json_extract(body, '$.tail.register') = ? ORDER BY rowid LIMIT 50",
+    register,
+  );
+  let n = 0;
+  for (const q of open) {
+    const body = parsed(q.body);
+    const tail = body === null ? null : tailAsked(body);
+    if (body === null || tail === null) continue;
+    const options = tailOptions(deps, tail, typeof body.suggested === 'string' ? body.suggested : null);
+    if (JSON.stringify(options) === JSON.stringify(body.options)) continue;
+    const { one } = tailWords(deps.sql, tail);
+    const context = typeof body.context === 'string' ? body.context.replace(`No ${one} could be it yet; add it, and it is offered here. `, '') : body.context;
+    deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...body, options, context }), q.id);
+    n += 1;
+  }
+  return n;
+}
+
+/**
+ * The tail question for `cause` answered "None of these", while it stands: no row was added to the list since. Its id,
+ * or `null` when there is none or an account has been added (which opens the question again).
+ */
+function declinedTail(sql: Sql, cause: string, register: string): string | null {
+  const last = sql.one<{ id: string; status: string; resolved_as: string | null }>(
+    "SELECT id, status, resolved_as FROM suggestion WHERE body_kind = 'options' AND json_valid(body) AND json_extract(body, '$.cause') = ? ORDER BY rowid DESC LIMIT 1",
+    cause,
+  );
+  if (last === undefined || last.status !== 'resolved' || last.resolved_as !== 'addressed' || settledAnswer(sql, last.id) !== NONE) return null;
+  /* AFTER IT BY THE LOG'S OWN ORDER, not by the clock: two writes in one instant are still one before the other. */
+  const when = sql.one<{ n: number }>("SELECT rowid AS n FROM event WHERE kind = 'resolve' AND target = ? ORDER BY rowid DESC LIMIT 1", `suggestion:${last.id}`)?.n;
+  if (when === undefined) return null;
+  const added = sql.one<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM event e JOIN entry x ON e.target = 'entry:' || x.id WHERE e.kind = 'create' AND e.rowid > ? AND x.register = ? AND x.deleted_at IS NULL",
+    when,
+    register,
+  )?.n ?? 0;
+  return added > 0 ? null : last.id;
+}
+
+/** The arrivals still held under the questions for `cause` answered "None of these", oldest question first. */
+function declinedRaws(sql: Sql, cause: string): string[] {
+  const out: string[] = [];
+  for (const q of sql.all<{ id: string; body: string }>(
+    "SELECT id, body FROM suggestion WHERE body_kind = 'options' AND status = 'resolved' AND json_valid(body) AND json_extract(body, '$.cause') = ? AND json_extract(body, '$.applied.none') = 1 ORDER BY rowid",
+    cause,
+  )) {
+    const raws = parsed(q.body)?.raws;
+    if (!Array.isArray(raws)) continue;
+    const held = sql.all<{ id: string }>("SELECT id FROM inbox_raw WHERE id IN (SELECT value FROM json_each(?)) AND state IN ('review', 'proposed')", JSON.stringify(raws));
+    for (const r of held) if (!out.includes(r.id)) out.push(r.id);
+  }
+  return out;
+}
+
+/** Add one arrival to a question's `raws`, once, without asking it again. */
+function keepRaw(sql: Sql, suggestion: string, raw: string): void {
+  const body = parsed(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', suggestion)?.body);
+  if (body === null) return;
+  const raws = Array.isArray(body.raws) ? (body.raws as string[]) : [];
+  if (raws.includes(raw)) return;
+  sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...body, raws: [...raws, raw], count: raws.length + 1 }), suggestion);
+}
+
+/* ── an answer, carried out ─────────────────────────────────────────────── */
+
+/** How a question an arrival opened was answered: the option, who pressed it, and the batch the decision was made in. */
+export type Answered = { id: string; option: string | null; actor: string; batch: string | null };
+
+/**
+ * A decision just made on a question the inbox asked, carried out (REC-A02). The record calls this from `decide`, in the
+ * decision's own transaction, so a refusal here takes the decision back with it.
+ *
+ * A TAIL QUESTION ANSWERED WITH AN ACCOUNT, in one change: the digits are written to the field the lookup reads (added to
+ * the others where it splits) and taken off any other account that held them; the account and digits are confirmed for
+ * every pattern; every arrival that waited on it runs again from its stored bytes, oldest first, in batches of 200; and
+ * the question closes saying what happened: "Filed 17 to Credit Card. 2 were already there." Everything written is put
+ * in the decision's batch, so one Undo puts all of it back.
+ *
+ * "NONE OF THESE" keeps them waiting and stops the asking (`declinedTail`). A move question answered "Move them" moves
+ * the rows a wrong answer filed. Anything else is not the inbox's, and is left alone.
+ *
+ * ONCE. The answer is marked on the question (`applied`), so the door's sweep, which carries out an answer the record did
+ * not hand here, never does it twice.
+ */
+export function answerAsked(deps: IngestDeps, a: Answered): Result<string | null> {
+  const q = deps.sql.one<{ body_kind: string; body: string; status: string }>('SELECT body_kind, body, status FROM suggestion WHERE id = ?', a.id);
+  const body = q?.body_kind === 'options' && q.status === 'resolved' ? parsed(q.body) : null;
+  if (body === null || a.option === null || typeof body.cause !== 'string') return ok(null);
+  if (body.cause.startsWith('tail:')) return answerTail(deps, a, body);
+  if (body.cause.startsWith('move:')) return answerMove(deps, a, body);
+  return ok(null);
+}
+
+/** A tail question's `tail`, as `askTail` wrote it, or `null` for a body this build cannot read. */
+function tailAsked(body: Record<string, unknown>): TailAsked | null {
+  const t = body.tail as Partial<TailAsked> | undefined;
+  if (t === undefined || t === null || typeof t !== 'object') return null;
+  const strings = [t.door, t.register, t.by, t.digits, t.says, t.ingest, t.field];
+  if (!strings.every((s) => typeof s === 'string' && s !== '') || !FIELD_ID.test(t.by!)) return null;
+  return t as TailAsked;
+}
+
+/** The log's place of the answer a question holds now: its latest `resolve` as addressed, or `null` when it has none. */
+const answeredAt = (sql: Sql, suggestion: string): number | null =>
+  sql.one<{ n: number }>("SELECT rowid AS n FROM event WHERE kind = 'resolve' AND target = ? AND to_v = 'addressed' ORDER BY rowid DESC LIMIT 1", `suggestion:${suggestion}`)?.n ??
+  null;
+
+/**
+ * Whether the answer a question holds now was carried out. `applied.resolve` is the place of the answer it carried out, so
+ * a question an Undo put back in Decide and answered again is carried out again, and the same answer never twice.
+ */
+function carriedOut(sql: Sql, suggestion: string, body: Record<string, unknown>): boolean {
+  const applied = body.applied as { resolve?: unknown } | undefined;
+  if (applied === undefined || applied === null) return false;
+  return typeof applied.resolve !== 'number' || applied.resolve === answeredAt(sql, suggestion);
+}
+
+function answerTail(deps: IngestDeps, a: Answered, asked: Record<string, unknown>): Result<string | null> {
+  /* READ AGAIN, NOT AS THE CALLER READ IT: the door's sweep reads its questions once and an answer carried out on the way
+     (each answer sweeps the door again) would otherwise be carried out a second time, closing with "Filed 0". */
+  const body = parsed(deps.sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', a.id)?.body) ?? asked;
+  if (carriedOut(deps.sql, a.id, body)) return ok(null);
+  const tail = tailAsked(body);
+  if (tail === null) return ok(null);
+  const at = instant(deps.nowMs);
+  const mark = lastEvent(deps.sql);
+  const resolve = answeredAt(deps.sql, a.id);
+  const keep = (more: Record<string, unknown>): void =>
+    deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...body, ...more }), a.id);
+
+  if (a.option === NONE) {
+    keep({ applied: { none: true, at, resolve } });
+    return ok(null);
+  }
+  const rows = liveRows(deps.sql, tail.register);
+  const chosen = rows.find((r) => r.id === a.option);
+  if (chosen === undefined)
+    return no('ROW_UNKNOWN', `The ${tail.says} ending ${tail.digits} was answered with an account that is no longer there. Pick another.`, { at: 'option' });
+
+  /* THE DIGITS ON THE ACCOUNT, added to what it holds where the field splits, and written over it where it does not. */
+  const valueOf = (r: LiveRow): string => {
+    const v = r.fields[tail.by];
+    return v === null || v === undefined || typeof v === 'object' ? '' : String(v).trim();
+  };
+  const holds = (r: LiveRow): boolean => (tail.split ? partsOf(valueOf(r)) : [valueOf(r)]).includes(tail.digits);
+  if (!holds(chosen)) {
+    const now = valueOf(chosen);
+    const wrote = deps.write(tail.register, chosen.id, { [tail.by]: tail.split && now !== '' ? `${now}, ${tail.digits}` : tail.digits }, a.actor);
+    if (!wrote.ok) return wrote as Result<never>;
+  }
+  /* AND OFF EVERY OTHER ACCOUNT THAT HELD THEM, so the next text names one account and not two. What a wrong answer
+     filed there is offered to be moved, once (`askMove`). */
+  const off: LiveRow[] = [];
+  for (const other of rows) {
+    if (other.id === chosen.id || !holds(other)) continue;
+    const rest = tail.split ? partsOf(valueOf(other)).filter((p) => p !== tail.digits).join(', ') : '';
+    const wrote = deps.write(tail.register, other.id, { [tail.by]: rest === '' ? null : rest }, a.actor);
+    if (!wrote.ok) return wrote as Result<never>;
+    off.push(other);
+  }
+  keep({ applied: { row: chosen.id, at, resolve } });
+
+  const raws = Array.isArray(body.raws) ? (body.raws as unknown[]).filter((r): r is string => typeof r === 'string') : [];
+  /* WHAT AN UNDONE ANSWER FILED IS FILED AGAIN: a text whose rows the Undo took back waits under this question again. */
+  const ran = replayHeld(deps, raws.map((raw) => ({ raw })), true);
+  const name = rowSaid(deps.sql, tail.register, chosen);
+  const line = filedSaid(ran, name);
+  keep({ applied: { row: chosen.id, at, resolve, wrote: ran.wrote }, said: line });
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'note', ?, 'suggestion', ?)",
+    deps.mint(),
+    at,
+    `ingest:${tail.door}`,
+    `suggestion:${a.id}`,
+    line.slice(0, 280),
+  );
+  for (const other of off) askMove(deps, at, { tail, from: other.id, to: chosen.id, since: deps.nowMs - MOVE_DAYS * 86_400_000 });
+  /* WHAT ELSE WAITED AT THE DOOR FOR THESE DIGITS is read again now, not at the next text: a question per message filed
+     before this one existed is folded or filed (`sweepDoor`). */
+  const swept = sweepDoor(deps, tail.door);
+  if (!swept.ok) return swept as Result<never>;
+  inBatch(deps.sql, mark, a.batch, rows.map((r) => r.id));
+  return ok(line);
+}
+
+/**
+ * A tail question an Undo put back in Decide, made to wait again: the texts its answer filed, whose rows the Undo took
+ * back, are held under it once more with the reason they had, and what its answer did is taken off it, so Decide asks it
+ * as it was and the count of what waits is true. `undo.ts` calls this as it reopens a question; the door's sweep calls it
+ * too, for a record whose Undo does not. Answers how many texts wait again.
+ */
+export function reopenedTail(sql: Sql, suggestion: string): number {
+  const q = sql.one<{ body: string; status: string }>('SELECT body, status FROM suggestion WHERE id = ?', suggestion);
+  const body = q?.status === 'open' ? parsed(q.body) : null;
+  const tail = body === null ? null : tailAsked(body);
+  if (body === null || tail === null) return 0;
+  const { one, label } = tailWords(sql, tail);
+  const again = sql.all<{ id: string }>(
+    `UPDATE inbox_raw SET state = 'review', reason = ?
+      WHERE id IN (SELECT value FROM json_each(?)) AND state = 'matched' AND ${UNDONE_SQL} RETURNING id`,
+    `No ${one} has ${tail.digits} in ${label}. It waits for you to say which ${one} it is.`,
+    JSON.stringify(Array.isArray(body.raws) ? body.raws : []),
+  );
+  const { applied: _applied, said: _said, ...rest } = body;
+  if (body.applied !== undefined || body.said !== undefined) sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify(rest), suggestion);
+  return again.length;
+}
+
+/** "Filed 17 to Credit Card. 2 were already there. 1 still waits." */
+function filedSaid(ran: Replayed, name: string): string {
+  return [
+    `Filed ${ran.filed} to ${name}.`,
+    ran.already ? `${ran.already} ${ran.already === 1 ? 'was' : 'were'} already there.` : '',
+    ran.waiting ? `${ran.waiting} still ${ran.waiting === 1 ? 'waits' : 'wait'}.` : '',
+  ]
+    .filter((part) => part !== '')
+    .join(' ');
+}
+
+/** The newest line of the log, so what one answer writes after it can be put in the decision's batch. */
+const lastEvent = (sql: Sql): number => sql.one<{ n: number | null }>('SELECT max(rowid) AS n FROM event')?.n ?? 0;
+
+/**
+ * Every change to a row written since `mark`, put in `batch`: the rows a run again filed, the digits written, and what
+ * rules those writes started. `IngestDeps.write` names no batch, so each write took its own, and an Undo of the decision
+ * would have put back the press and none of what it did. Nothing else holds those batches yet: they were minted inside
+ * this transaction.
+ */
+function inBatch(sql: Sql, mark: number, batch: string | null, existed: readonly string[]): void {
+  if (batch === null || batch === '') return;
+  /* NEVER THE MAKING OF A ROW THAT WAS THERE BEFORE THE ANSWER. A person's edit of a row they made minutes ago is folded
+     into the row's `create` line, which moves to the end of the log (`index.ts`, the grace fold), so an account added and
+     then picked as the answer had its own making put in the decision's batch, and Undo took the account away. */
+  sql.exec(
+    "UPDATE event SET batch = ? WHERE rowid > ? AND target_kind = 'entry' AND NOT (kind = 'create' AND target IN (SELECT 'entry:' || value FROM json_each(?)))",
+    batch,
+    mark,
+    JSON.stringify(existed),
+  );
+}
+
+/* ── held arrivals, run again ───────────────────────────────────────────── */
+
+/** What running held arrivals again did: how many filed, how many were already there, how many still wait. */
+type Replayed = { filed: number; already: number; waiting: number; wrote: string[] };
+
+/** A held arrival to run again, and the per-message question it is asked in, with the row it is asked as. */
+type Again = { raw: string; from?: { suggestion: string; row: Record<string, unknown> } };
+
+/**
+ * Held arrivals run through the pipeline again from their stored bytes, oldest first, `REPLAY_BATCH` at a time, inside
+ * the caller's transaction. Each is offered the patterns it was offered when it came: a text named for a door is named
+ * for that door again. An arrival no longer held (filed by hand, archived) is left as it is.
+ *
+ * THE QUESTION IT WAS ASKED IN LOSES ITS ROW FIRST, so a run again that holds it once more asks once more rather than
+ * twice; a question left with nothing in it closes as filed, or as asked again as one question. Never as declined.
+ */
+function replayHeld(deps: IngestDeps, items: readonly Again[], undone = false): Replayed {
+  const out: Replayed = { filed: 0, already: 0, waiting: 0, wrote: [] };
+  const from = new Map(items.map((item) => [item.raw, item.from]));
+  const ids = [...from.keys()];
+  for (let i = 0; i < ids.length; i += REPLAY_BATCH) {
+    /* `undone` ALSO TAKES A TEXT FILED ONCE WHOSE ROWS ARE ALL GONE, which is what an Undo of the answer that filed it
+       leaves: `matched`, with nothing to show for it. */
+    const rows = deps.sql.all<{ id: string; ts: string; channel: string; headers: string | null; body: string | null; sha256: string; state: string; reason: string | null }>(
+      `SELECT id, ts, channel, headers, body, sha256, state, reason FROM inbox_raw
+        WHERE id IN (SELECT value FROM json_each(?))
+          AND (state IN ('review', 'proposed') OR (? = 1 AND state = 'matched' AND ${UNDONE_SQL}))
+        ORDER BY ts, rowid`,
+      JSON.stringify(ids.slice(i, i + REPLAY_BATCH)),
+      undone ? 1 : 0,
+    );
+    for (const row of rows) {
+      const pattern = matchedBy(deps, row.id);
+      const asked = from.get(row.id);
+      if (asked !== undefined) takeRow(deps.sql, asked.suggestion, row.id, asked.row);
+      const ran = runArrival(
+        deps,
+        {
+          channel: row.channel as Channel,
+          headers: (parsed(row.headers) ?? {}) as Record<string, string>,
+          body: row.body ?? '',
+          sha256: row.sha256,
+          verified: true,
+          ...(row.channel === 'webhook' && pattern !== null ? { ingest: pattern.door ?? pattern.ingest } : {}),
+        },
+        { id: row.id, state: row.state, reason: row.reason, ts: row.ts },
+        {},
+      );
+      const state = ran.ok ? ran.value.state : 'review';
+      if (ran.ok && state === 'matched') {
+        out.filed += 1;
+        out.wrote.push(...ran.value.wrote);
+      } else if (state === 'skipped') out.already += 1;
+      else out.waiting += 1;
+      if (asked !== undefined) closeIfEmpty(deps, asked.suggestion, state === 'matched' ? 'filed' : 'asked-again');
+    }
+  }
+  return out;
+}
+
+/** An inbox row (`inbox_raw`) that filed rows and has none of them left: its receipts name rows, and none is live. */
+const UNDONE_SQL = `EXISTS (SELECT 1 FROM ingest_receipt r WHERE r.raw_id = inbox_raw.id AND json_valid(r.wrote) AND json_array_length(r.wrote) > 0)
+  AND NOT EXISTS (SELECT 1 FROM ingest_receipt r, json_each(r.wrote) w JOIN entry x ON x.id = w.value
+                   WHERE r.raw_id = inbox_raw.id AND json_valid(r.wrote) AND x.deleted_at IS NULL)`;
+
+/** The pattern that last read an arrival, from its `match` line, as it is declared now, or `null`. */
+function matchedBy(deps: IngestDeps, raw: string): IngestDecl | null {
+  const actor = deps.sql.one<{ actor: string }>("SELECT actor FROM event WHERE kind = 'match' AND target = ? ORDER BY rowid DESC LIMIT 1", `inbox_raw:${raw}`)?.actor;
+  if (actor === undefined || !actor.startsWith('ingest:')) return null;
+  return deps.ingests().find((i) => i.ingest === actor.slice('ingest:'.length)) ?? null;
+}
+
+/**
+ * Take one arrival's row out of the question it is asked in: by its place in `raws`, or, in a question filed before
+ * `raws` were kept, the row that says what it says (`sameRow`).
+ */
+function takeRow(sql: Sql, suggestion: string, raw: string, row: Record<string, unknown>): void {
+  const q = sql.one<{ body: string; status: string }>('SELECT body, status FROM suggestion WHERE id = ?', suggestion);
+  const body = q?.status === 'open' ? parsed(q.body) : null;
+  if (body === null || !Array.isArray(body.rows)) return;
+  const rows = body.rows as Record<string, unknown>[];
+  const raws = Array.isArray(body.raws) ? (body.raws as unknown[]) : null;
+  let at = raws === null ? -1 : raws.indexOf(raw);
+  if (at === -1) at = rows.findIndex((r) => canonical(r) === canonical(row));
+  if (at === -1) return;
+  const keep = <T>(list: readonly T[]): T[] => list.filter((_, i) => i !== at);
+  sql.exec(
+    'UPDATE suggestion SET body = ? WHERE id = ?',
+    JSON.stringify({ ...body, rows: keep(rows), count: rows.length - 1, ...(raws === null ? {} : { raws: keep(raws) }) }),
+    suggestion,
+  );
+}
+
+/** Close a question an arrival opened once it asks about nothing: filed, or asked again as one question. */
+function closeIfEmpty(deps: IngestDeps, suggestion: string, as: 'filed' | 'asked-again'): void {
+  const q = deps.sql.one<{ body: string; status: string; opened_by: string }>('SELECT body, status, opened_by FROM suggestion WHERE id = ?', suggestion);
+  const body = q?.status === 'open' ? parsed(q.body) : null;
+  if (body === null || !Array.isArray(body.rows) || body.rows.length > 0) return;
+  deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = ? WHERE id = ?", as, suggestion);
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'resolve', ?, 'suggestion', ?, ?)",
+    deps.mint(),
+    instant(deps.nowMs),
+    q!.opened_by,
+    `suggestion:${suggestion}`,
+    as,
+    as === 'filed' ? 'Filed once the account could be read.' : 'Asked again as one question.',
+  );
+}
+
+/** A value as one string whatever order its keys were built in, so two rows that say the same thing compare equal. */
+function canonical(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  return `{${Object.keys(value as Record<string, unknown>)
+    .sort()
+    .map((k) => `${JSON.stringify(k)}:${canonical((value as Record<string, unknown>)[k])}`)
+    .join(',')}}`;
+}
+
+/**
+ * Whether a row a question holds is the row an arrival reads as now: every field both have says the same, and they share
+ * at least one. The account the question's row was missing is not one both have, so a question filed before `raws` were
+ * kept still finds the arrival it was asked about once the account can be read.
+ */
+function sameRow(asked: Record<string, unknown>, now: Record<string, unknown>): boolean {
+  const both = Object.keys(asked).filter((k) => Object.hasOwn(now, k));
+  return both.length > 0 && both.every((k) => canonical(amountOnly(asked[k])) === canonical(amountOnly(now[k])));
+}
+
+/**
+ * A money value as its amount alone, for `sameRow`: a pattern updated to read the account's currency reads the same text
+ * in another currency than the question kept, and it is still the same text.
+ */
+const amountOnly = (value: unknown): unknown =>
+  value !== null && typeof value === 'object' && !Array.isArray(value) && 'amount' in value && 'currency' in value ? (value as { amount: unknown }).amount : value;
+
+/* ── the door, looked at again before each arrival is filed ─────────────── */
+
+/** The most held arrivals one sweep reads. Past it the rest wait for the next arrival at the door. */
+const SWEEP_MOST = 200;
+
+/**
+ * Before an arrival at `door` is filed, what waits there is looked at again (DIRECTION §42):
+ *
+ * 1. an answer the record did not carry out yet is carried out (`answerTail`), so a decision made where the hook was
+ *    not wired still files its texts at the next one;
+ * 2. an open tail question whose digits are now on exactly one account, by a person's hand or confirmed, is answered by
+ *    that: its texts run again, and it closes as filed with what happened;
+ * 3. a text held under a version of its pattern that has since been updated runs again, once (`readBefore`);
+ * 4. a text held under a question of its own, asked with its account empty, runs again where the account can now be
+ *    read or the digits it printed now have a question: it files, or joins the one question, and its old question closes
+ *    as filed or as asked again as one question;
+ * 5. digits moved from one account to another after an answer offer, once, to move what they filed (`askMove`).
+ *
+ * READS NOTHING AT A DOOR WITH NOTHING HELD, so an ordinary arrival costs a handful of indexed reads.
+ */
+function sweepDoor(deps: IngestDeps, door: string): Result<null> {
+  const patterns = deps.ingests().filter((i) => i.ingest === door || i.door === door);
+  if (patterns.length === 0) return ok(null);
+  const at = instant(deps.nowMs);
+  const questions = deps.sql
+    .all<{ id: string; body: string; status: string; resolved_as: string | null; opened_at: string }>(
+      `SELECT id, body, status, resolved_as, opened_at FROM suggestion
+        WHERE body_kind = 'options' AND json_valid(body) AND json_extract(body, '$.cause') LIKE ? ESCAPE '\\' ORDER BY rowid`,
+      `tail:${door.replace(/[\\%_]/g, (c) => `\\${c}`)}:%`,
+    )
+    .flatMap((q) => {
+      const body = parsed(q.body);
+      const tail = body === null ? null : tailAsked(body);
+      return body === null || tail === null ? [] : [{ ...q, parsed: body, tail }];
+    });
+
+  for (const q of questions) {
+    if (q.status !== 'resolved' || q.resolved_as !== 'addressed' || carriedOut(deps.sql, q.id, q.parsed)) continue;
+    const answer = settledAnswer(deps.sql, q.id);
+    const made = deps.sql.one<{ actor: string; batch: string | null }>(
+      "SELECT e.actor AS actor, e.batch AS batch FROM event r JOIN event e ON e.rowid = r.rowid - 1 AND e.kind = 'decide' WHERE r.kind = 'resolve' AND r.target = ? ORDER BY r.rowid DESC LIMIT 1",
+      `suggestion:${q.id}`,
+    );
+    const done = answerTail(deps, { id: q.id, option: answer, actor: made?.actor ?? 'system', batch: made?.batch ?? null }, q.parsed);
+    if (!done.ok) return done as Result<never>;
+  }
+
+  for (const q of questions) {
+    if (q.status !== 'open') continue;
+    /* A QUESTION AN UNDO PUT BACK holds its texts again, whether or not the Undo told this file (`reopenedTail`). */
+    if (q.parsed.applied !== undefined) {
+      reopenedTail(deps.sql, q.id);
+      q.parsed = parsed(deps.sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', q.id)?.body) ?? q.parsed;
+    }
+    const holders = lookupTable(deps, { register: q.tail.register, by: q.tail.by, ...(q.tail.split ? { split: true } : {}), ...(q.tail.where === undefined ? {} : { where: q.tail.where }) }).filter(
+      (r) => r.value === q.tail.digits,
+    );
+    const row = holders[0]?.id;
+    if (row === undefined || holders.some((h) => h.id !== row)) continue;
+    if (writtenByAgent(deps.sql, row, q.tail.by) && !confirmedTail(deps.sql, { digits: q.tail.digits, row })) continue;
+    const raws = Array.isArray(q.parsed.raws) ? (q.parsed.raws as unknown[]).filter((r): r is string => typeof r === 'string') : [];
+    deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'filed' WHERE id = ? AND status = 'open'", q.id);
+    const ran = replayHeld(deps, raws.map((raw) => ({ raw })));
+    const name = rowTitle(deps.sql, q.tail.register, row) ?? `the ${tailWords(deps.sql, q.tail).one}`;
+    const line = `${q.tail.digits} is on ${name} now. ${filedSaid(ran, name)}`;
+    deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...q.parsed, applied: { row, at, wrote: ran.wrote }, said: line }), q.id);
+    deps.sql.exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'resolve', ?, 'suggestion', 'filed', ?)",
+      deps.mint(),
+      at,
+      `ingest:${door}`,
+      `suggestion:${q.id}`,
+      line.slice(0, 280),
+    );
+  }
+
+  /* A PATTERN UPDATED SINCE IT HELD A TEXT reads that text again, once (REC-A02 step 11), here as well as where the record
+     hands an install to `rerunHeld`: a pack's update lands on more than one path, and a text its fix would read must not
+     wait on which one it took. The run again writes a newer `match` line, so the next sweep finds nothing to do. */
+  const unread = readBefore(deps.sql, patterns, SWEEP_MOST);
+  if (unread.length > 0) rerun(deps, patterns.map((p) => p.ingest), new Set(unread));
+
+  const asking = deps.sql.all<{ id: string; body: string; opened_by: string }>(
+    `SELECT id, body, opened_by FROM suggestion WHERE body_kind = 'rowset' AND status = 'open' AND opened_by IN (SELECT value FROM json_each(?)) ORDER BY rowid LIMIT 50`,
+    JSON.stringify(patterns.map((p) => `ingest:${p.ingest}`)),
+  );
+  if (asking.length > 0) {
+    const waiting = new Set(questions.filter((q) => q.status === 'open').flatMap((q) => (Array.isArray(q.parsed.raws) ? (q.parsed.raws as string[]) : [])));
+    const again = heldAgain(deps, patterns, asking, waiting);
+    if (again.length > 0) replayHeld(deps, again);
+  }
+
+  for (const q of questions) {
+    if (q.status !== 'resolved') continue;
+    const applied = q.parsed.applied as { row?: unknown; at?: unknown } | undefined;
+    if (typeof applied?.row !== 'string' || typeof applied.at !== 'string' || Date.parse(applied.at) < deps.nowMs - MOVE_DAYS * 86_400_000) continue;
+    const holders = lookupTable(deps, { register: q.tail.register, by: q.tail.by, ...(q.tail.split ? { split: true } : {}) }).filter((r) => r.value === q.tail.digits);
+    const to = holders[0]?.id;
+    if (to === undefined || to === applied.row || holders.some((h) => h.id !== to)) continue;
+    askMove(deps, at, { tail: q.tail, from: applied.row, to, since: Date.parse(applied.at) - 86_400_000 });
+  }
+  return ok(null);
+}
+
+/**
+ * The texts held at a door under a question of their own that are worth running again: asked with a lookup's field
+ * empty, and now either readable or printing digits a tail question can hold. Oldest first, at most `SWEEP_MOST`.
+ */
+function heldAgain(deps: IngestDeps, patterns: readonly IngestDecl[], asking: readonly { id: string; body: string; opened_by: string }[], waiting: ReadonlySet<string>): Again[] {
+  const byName = new Map(patterns.map((p) => [`ingest:${p.ingest}`, p]));
+  const questions = asking.flatMap((q) => {
+    const body = parsed(q.body);
+    return body === null || !Array.isArray(body.rows) ? [] : [{ id: q.id, by: q.opened_by, rows: body.rows as Record<string, unknown>[], raws: Array.isArray(body.raws) ? (body.raws as unknown[]) : null }];
+  });
+  const held = heldBy(deps.sql, [...byName.keys()], SWEEP_MOST);
+  const out: Again[] = [];
+  for (const raw of held) {
+    if (waiting.has(raw.id)) continue;
+    const actor = raw.actor;
+    const pattern = byName.get(actor);
+    if (pattern === undefined) continue;
+    const body = raw.body ?? '';
+    const read = readFields(deps, pattern, body, deps.normalise === undefined ? body : deps.normalise(body), raw.ts);
+    if (read.lookups.length === 0) continue;
+    const mine = questions.filter((q) => q.by === actor);
+    let found: { suggestion: string; row: Record<string, unknown> } | undefined;
+    for (const q of mine) {
+      const at = q.raws === null ? q.rows.findIndex((r) => sameRow(r, read.extracted)) : q.raws.indexOf(raw.id);
+      if (at !== -1 && q.rows[at] !== undefined) {
+        found = { suggestion: q.id, row: q.rows[at]! };
+        break;
+      }
+    }
+    if (found === undefined) continue;
+    /* ONLY A ROW ASKED WITH A LOOKUP'S FIELD EMPTY, which the account now fills or the digits now ask about. A row held
+       for anything else is left to its question. */
+    const empty = read.lookups.filter((f) => !Object.hasOwn(found!.row, f));
+    if (empty.length === 0) continue;
+    const readable = empty.every((f) => Object.hasOwn(read.extracted, f));
+    const asked = read.unknowns.some((u) => empty.includes(u.field)) && read.missed.length === 1;
+    if (readable || asked) out.push({ raw: raw.id, from: found });
+  }
+  return out;
+}
+
+/**
+ * The arrivals held for a person whose pattern, by their latest `match` line, is one of `actors`, oldest first. The
+ * pattern is asked of each held row through the log's index on its target, so held texts at other doors cost one read
+ * each and never crowd these out.
+ */
+function heldBy(sql: Sql, actors: readonly string[], most: number): { id: string; ts: string; body: string | null; actor: string }[] {
+  return sql.all<{ id: string; ts: string; body: string | null; actor: string }>(
+    `SELECT id, ts, body, actor FROM (
+       SELECT i.id, i.ts, i.body, i.rowid AS n,
+              (SELECT e.actor FROM event e WHERE e.kind = 'match' AND e.target = 'inbox_raw:' || i.id ORDER BY e.rowid DESC LIMIT 1) AS actor
+         FROM inbox_raw i WHERE i.state IN ('review', 'proposed'))
+      WHERE actor IN (SELECT value FROM json_each(?)) ORDER BY ts, n LIMIT ?`,
+    JSON.stringify(actors),
+    Math.min(most, 1_000_000),
+  );
+}
+
+/* ── a wrong answer ─────────────────────────────────────────────────────── */
+
+/**
+ * Digits taken off one account and put on another within `MOVE_DAYS` of an answer: one question, once, offering to move
+ * what those digits filed onto the first account to the second. Nothing moves until it is answered.
+ *
+ * WHAT THEY FILED is read from the receipts since then: each row an arrival printing those digits filed, whose lookup's
+ * field still names the first account. Never the rows a person typed.
+ */
+function askMove(deps: IngestDeps, at: string, m: { tail: TailAsked; from: string; to: string; since: number }): void {
+  const cause = `move:${m.tail.register}:${m.tail.digits}:${m.to}`;
+  const asked = deps.sql.one<{ id: string }>(
+    "SELECT id FROM suggestion WHERE body_kind = 'options' AND json_valid(body) AND json_extract(body, '$.cause') = ? LIMIT 1",
+    cause,
+  );
+  if (asked !== undefined) return;
+  const moved = filedBy(deps, m.tail.digits, m.from, instant(m.since));
+  if (moved.rows.length === 0 || moved.register === null) return;
+  const fromName = rowTitle(deps.sql, m.tail.register, m.from) ?? 'the account it was on';
+  const toName = rowTitle(deps.sql, m.tail.register, m.to) ?? 'the account it is on now';
+  const list = declaredList(deps.sql, moved.register);
+  const n = moved.rows.length;
+  const things = n === 1 ? (typeof list.one === 'string' && list.one.trim() !== '' ? list.one.trim() : 'one') : listName(deps.sql, moved.register).toLowerCase();
+  const id = `SG${deps.allocate('suggestion')}`;
+  deps.sql.exec(
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'options', ?, 'open', ?, ?)",
+    id,
+    JSON.stringify({
+      cause,
+      move: { register: moved.register, rows: moved.rows, from: m.from, to: m.to },
+      options: [
+        { id: 'move', label: `Move them to ${toName}`, because: `The ${m.tail.says} ending ${m.tail.digits} is ${toName}, so they were never spent on ${fromName}.`, recommended: true },
+        { id: 'keep', label: 'Keep them where they are', because: `They stay on ${fromName}.` },
+      ],
+      count: n,
+      context: cutTo(`The ${m.tail.says} ending ${m.tail.digits} was on ${fromName} and is on ${toName} now. ${n} filed by it are still on ${fromName}.`, 280),
+    }),
+    `ingest:${m.tail.door}`,
+    at,
+  );
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'suggest', ?, 'suggestion', ?)",
+    deps.mint(),
+    at,
+    `ingest:${m.tail.door}`,
+    `suggestion:${id}`,
+    `Move the ${n} ${things} the ${m.tail.says} ending ${m.tail.digits} filed to ${toName}?`.slice(0, 280),
+  );
+}
+
+/** The rows arrivals printing `digits` filed onto `account` since `since`, with the field that names it. */
+function filedBy(deps: IngestDeps, digits: string, account: string, since: string): { register: string | null; rows: { id: string; field: string }[] } {
+  const receipts = deps.sql.all<{ ingest_id: string; wrote: string; body: string | null }>(
+    `SELECT r.ingest_id, r.wrote, i.body FROM ingest_receipt r JOIN inbox_raw i ON i.id = r.raw_id WHERE r.ts >= ? ORDER BY r.ts LIMIT ?`,
+    since,
+    REPLAY_BATCH * 5,
+  );
+  const patterns = new Map(deps.ingests().map((p) => [p.ingest, p]));
+  const rows: { id: string; field: string }[] = [];
+  let register: string | null = null;
+  for (const receipt of receipts) {
+    const pattern = patterns.get(receipt.ingest_id);
+    if (pattern === undefined) continue;
+    const body = receipt.body ?? '';
+    const text = deps.normalise === undefined ? body : deps.normalise(body);
+    const printing = Object.entries(pattern.extract ?? {}).flatMap(([field, declared]) => {
+      const lookup = lookupOf(stripOf(declared).form);
+      if (lookup === null) return [];
+      const mask = maskAtEnd(lookup.between?.[0] ?? lookup.after ?? '');
+      return slices({ lookup } as Record<string, unknown>, text).some((s) => firstRun(mask + s)?.digits === digits) ? [field] : [];
+    });
+    if (printing.length === 0) continue;
+    let ids: unknown;
+    try {
+      ids = JSON.parse(receipt.wrote);
+    } catch {
+      continue;
+    }
+    for (const id of Array.isArray(ids) ? ids : []) {
+      const entry = deps.sql.one<{ register: string; fields: string }>('SELECT register, fields FROM entry WHERE id = ? AND deleted_at IS NULL', String(id));
+      const fields = parsed(entry?.fields);
+      const field = printing.find((f) => fields?.[f] === account);
+      if (entry === undefined || field === undefined) continue;
+      register ??= entry.register;
+      if (entry.register === register) rows.push({ id: String(id), field });
+    }
+  }
+  return { register, rows };
+}
+
+function answerMove(deps: IngestDeps, a: Answered, body: Record<string, unknown>): Result<string | null> {
+  if (body.applied !== undefined || a.option !== 'move') return ok(null);
+  const move = body.move as { register?: unknown; rows?: unknown; from?: unknown; to?: unknown } | undefined;
+  if (typeof move?.register !== 'string' || typeof move.to !== 'string' || typeof move.from !== 'string' || !Array.isArray(move.rows)) return ok(null);
+  const mark = lastEvent(deps.sql);
+  let moved = 0;
+  for (const r of move.rows as { id?: unknown; field?: unknown }[]) {
+    if (typeof r?.id !== 'string' || typeof r.field !== 'string' || !FIELD_ID.test(r.field)) continue;
+    const fields = parsed(deps.sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ? AND deleted_at IS NULL', r.id)?.fields);
+    /* A ROW SOMEBODY MOVED SINCE IS THEIRS, and stays where they put it. */
+    if (fields?.[r.field] !== move.from) continue;
+    const wrote = deps.write(move.register, r.id, { [r.field]: move.to }, a.actor);
+    if (!wrote.ok) return wrote as Result<never>;
+    moved += 1;
+  }
+  const line = `Moved ${moved} to ${rowTitle(deps.sql, String((body.cause as string).split(':')[1]), move.to) ?? 'the other account'}.`;
+  deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...body, applied: { moved }, said: line }), a.id);
+  inBatch(deps.sql, mark, a.batch, (move.rows as { id?: unknown }[]).flatMap((r) => (typeof r?.id === 'string' ? [r.id] : [])));
+  return ok(line);
+}
+
+/* ── a pattern updated, and a repeat filed as a second one ─────────────── */
+
+/**
+ * The arrivals held under these patterns, run again once, because a pattern's new version may read them (REC-A02 step
+ * 11). The record calls this when an install changes an ingest's version; nothing read a held arrival again when its
+ * pattern was fixed, so a fix reached only the texts that came after it.
+ */
+export function rerunHeld(deps: IngestDeps, ingests: readonly string[]): Result<Replayed> {
+  return ok(rerun(deps, ingests, null));
+}
+
+/** `rerunHeld`'s work: the arrivals held under `ingests`, or only those of them in `only`, run again oldest first. */
+function rerun(deps: IngestDeps, ingests: readonly string[], only: ReadonlySet<string> | null): Replayed {
+  const named = new Set(ingests.map((i) => `ingest:${i}`));
+  if (named.size === 0) return { filed: 0, already: 0, waiting: 0, wrote: [] };
+  const asking = deps.sql.all<{ id: string; body: string; opened_by: string }>(
+    "SELECT id, body, opened_by FROM suggestion WHERE body_kind = 'rowset' AND status = 'open' AND opened_by IN (SELECT value FROM json_each(?))",
+    JSON.stringify([...named]),
+  );
+  const held = heldBy(deps.sql, [...named], Number.MAX_SAFE_INTEGER).filter((raw) => only === null || only.has(raw.id));
+  const items: Again[] = [];
+  for (const raw of held) {
+    const actor = raw.actor;
+    const pattern = deps.ingests().find((i) => `ingest:${i.ingest}` === actor);
+    const body = raw.body ?? '';
+    const read = pattern === undefined ? null : readFields(deps, pattern, body, deps.normalise === undefined ? body : deps.normalise(body), raw.ts);
+    let from: Again['from'];
+    for (const q of asking.filter((x) => x.opened_by === actor)) {
+      const b = parsed(q.body);
+      const rows = Array.isArray(b?.rows) ? (b.rows as Record<string, unknown>[]) : [];
+      const at = Array.isArray(b?.raws) ? (b.raws as unknown[]).indexOf(raw.id) : read === null ? -1 : rows.findIndex((r) => sameRow(r, read.extracted));
+      if (at !== -1 && rows[at] !== undefined) {
+        from = { suggestion: q.id, row: rows[at]! };
+        break;
+      }
+    }
+    items.push({ raw: raw.id, ...(from === undefined ? {} : { from }) });
+  }
+  return replayHeld(deps, items);
+}
+
+/**
+ * The held arrivals under `patterns` that the pattern's live version never read: their latest `match` line is older than
+ * the version, so whatever it fixed has not reached them. A pattern still at its first version has held nothing under
+ * another. Oldest first, at most `most`.
+ */
+function readBefore(sql: Sql, patterns: readonly IngestDecl[], most: number): string[] {
+  const since = patterns.flatMap((p) => {
+    const live = sql.one<{ version: number; created_at: string }>(
+      'SELECT version, created_at FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1',
+      `ingest.${p.ingest}`,
+    );
+    return live === undefined || live.version <= 1 ? [] : [{ actor: `ingest:${p.ingest}`, at: live.created_at }];
+  });
+  if (since.length === 0) return [];
+  return sql
+    .all<{ id: string }>(
+      `SELECT h.id FROM (
+         SELECT i.id, i.ts, i.rowid AS n,
+                (SELECT e.rowid FROM event e WHERE e.kind = 'match' AND e.target = 'inbox_raw:' || i.id ORDER BY e.rowid DESC LIMIT 1) AS last
+           FROM inbox_raw i WHERE i.state IN ('review', 'proposed')) h
+         JOIN event m ON m.rowid = h.last
+         JOIN json_each(?) s ON json_extract(s.value, '$.actor') = m.actor AND m.ts < json_extract(s.value, '$.at')
+        ORDER BY h.ts, h.n LIMIT ?`,
+      JSON.stringify(since),
+      Math.min(most, 1_000_000),
+    )
+    .map((r) => r.id);
+}
+
+/**
+ * A text skipped as a repeat, filed after all as a second one: "It is a second one" in the Inbox (REC-A03). It runs again
+ * with its pattern's repeat check off for this one run, so it is written beside the row it looked like.
+ */
+export function fileAsSecond(deps: IngestDeps, raw: string): Result<Arrived> {
+  const row = deps.sql.one<{ id: string; ts: string; channel: string; headers: string | null; body: string | null; sha256: string; state: string; reason: string | null }>(
+    'SELECT id, ts, channel, headers, body, sha256, state, reason FROM inbox_raw WHERE id = ?',
+    raw,
+  );
+  if (row === undefined || row.state !== 'skipped')
+    return no<Arrived>('OUT_OF_BOUNDS', 'Only a message skipped as a repeat can be filed as a second one.', { at: 'raw' });
+  const pattern = matchedBy(deps, raw);
+  if (pattern === null) return no<Arrived>('OUT_OF_BOUNDS', 'The pattern that read this message is gone, so it cannot be filed again from here.', { at: 'raw' });
+  const once: IngestDeps = {
+    ...deps,
+    ingests: () =>
+      deps.ingests().map((i) => {
+        if (i.ingest !== pattern.ingest) return i;
+        const { dedupe: _key, ...rest } = i;
+        return { ...rest, on_conflict: 'new' as const };
+      }),
+  };
+  return runArrival(
+    once,
+    {
+      channel: row.channel as Channel,
+      headers: (parsed(row.headers) ?? {}) as Record<string, string>,
+      body: row.body ?? '',
+      sha256: row.sha256,
+      verified: true,
+      ...(row.channel === 'webhook' ? { ingest: pattern.door ?? pattern.ingest } : {}),
+    },
+    { id: row.id, state: row.state, reason: row.reason, ts: row.ts },
+    {},
+  );
+}
+
+/** Three letters a month is said by in a reason: `7 Oct`. */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * Why a text was skipped as a repeat, by the row it repeats: "Looks like a repeat of Corner Shop, EGP 120.00, 7 Oct."
+ * Its title, its first money field and the day it moved, each left out where the row has none. Never a list's id or a
+ * row's number.
+ */
+function repeatSaid(deps: IngestDeps, register: string, existing: { id: string }, dedupe: Dedupe | undefined): string {
+  const fields = deps.schemaOf(register)?.fields ?? {};
+  const row = parsed(deps.sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', existing.id)?.fields) ?? {};
+  const on = dedupe === undefined ? [] : Array.isArray(dedupe) ? dedupe : dedupe.near.on;
+  const money = [...on, ...Object.keys(fields)].find((f) => fields[f]?.type === 'money' && row[f] !== undefined);
+  const amount = money === undefined ? null : (row[money] as { amount?: unknown; currency?: unknown });
+  const dayField = (dedupe !== undefined && !Array.isArray(dedupe) ? dedupe.near.day : undefined) ?? Object.keys(fields).find((f) => fields[f]?.type === 'day' && typeof row[f] === 'string');
+  const when = dayField === undefined ? null : row[dayField];
+  const parts = [
+    rowTitle(deps.sql, register, existing.id) ?? 'one already there',
+    amount !== null && Number.isInteger(amount.amount) && typeof amount.currency === 'string' ? moneyText(amount.amount as number, amount.currency) : '',
+    typeof when === 'string' && /^\d{4}-\d{2}-\d{2}/.test(when) ? `${Number(when.slice(8, 10))} ${MONTHS[Number(when.slice(5, 7)) - 1] ?? ''}`.trim() : '',
+  ].filter((part) => part !== '');
+  return `Looks like a repeat of ${parts.join(', ')}.`;
+}
+
+/* ── what each pattern did (REC-A03) ────────────────────────────────────── */
+
+/** One pattern's last days: what it filed, what it skipped and why, and what waits. `ingest` is a handle, `said` its name. */
+export type PatternLine = { ingest: string; said: string; filed: number; skipped: { reason: string; n: number }[]; waiting: number };
+
+/** One door's last days: each pattern that reads there, and how many of its texts no pattern read. */
+export type DoorLine = { door: string; said: string; patterns: PatternLine[]; unread: number };
+
+export type PatternReport = { days: number; since: string; doors: DoorLine[] };
+
+/**
+ * What each pattern did with the last `days` of arrivals, door by door: filed, skipped with its reason, waiting, and one
+ * line for the texts no pattern read. The Inbox draws it under "What comes in" and an agent reads it as
+ * `braindog:inbox/patterns`. Every arrival in the window is counted once, by the pattern its own log names.
+ *
+ * NAMES, NEVER IDS, in what a person reads: a pattern is said by its description, else its add-on's title, else its door's.
+ */
+export function patternReport(sql: Sql, nowMs: number, days = 14): PatternReport {
+  const span = Number.isInteger(days) && days > 0 && days <= 366 ? days : 14;
+  const since = instant(nowMs - span * 86_400_000);
+  const decls = sql
+    .all<{ body: string; pack: string | null }>("SELECT body, pack_id AS pack FROM declaration WHERE kind = 'ingest' AND superseded_at IS NULL AND retired = 0")
+    .flatMap((r) => {
+      const body = parsed(r.body);
+      return body === null || typeof body.ingest !== 'string' ? [] : [body as unknown as IngestDecl];
+    });
+  const byId = new Map(decls.map((d) => [d.ingest, d]));
+  const doorOfPattern = (id: string): string => byId.get(id)?.door ?? id;
+  const doors = new Map<string, DoorLine>();
+  const doorLine = (door: string): DoorLine => {
+    let line = doors.get(door);
+    if (line === undefined) {
+      const own = byId.get(door);
+      line = { door, said: described(own) ?? packTitle(sql, own) ?? (own === undefined ? (UNNAMED_DOOR[door] ?? 'A door with no name') : 'A door with no name'), patterns: [], unread: 0 };
+      doors.set(door, line);
+    }
+    return line;
+  };
+  const patternLine = (id: string): PatternLine => {
+    const door = doorLine(doorOfPattern(id));
+    let line = door.patterns.find((p) => p.ingest === id);
+    if (line === undefined) {
+      const decl = byId.get(id);
+      line = { ingest: id, said: described(decl) ?? packTitle(sql, decl) ?? door.said, filed: 0, skipped: [], waiting: 0 };
+      door.patterns.push(line);
+    }
+    return line;
+  };
+  for (const d of decls) if (d.channel !== 'pull') patternLine(d.ingest);
+
+  const arrived = sql.all<{ id: string; channel: string; state: string; reason: string | null; receipt: string | null; matched: string | null; door: string | null }>(
+    `SELECT i.id, i.channel, i.state, i.reason,
+            (SELECT r.ingest_id FROM ingest_receipt r WHERE r.raw_id = i.id ORDER BY r.ts DESC LIMIT 1) AS receipt,
+            (SELECT e.actor FROM event e WHERE e.kind = 'match' AND e.target = 'inbox_raw:' || i.id ORDER BY e.rowid DESC LIMIT 1) AS matched,
+            (SELECT e.actor FROM event e WHERE e.kind = 'arrive' AND e.target = 'inbox_raw:' || i.id ORDER BY e.rowid DESC LIMIT 1) AS door
+       FROM inbox_raw i WHERE i.ts >= ? AND i.state NOT IN ('erased')`,
+    since,
+  );
+  for (const a of arrived) {
+    const by = (a.receipt ?? (a.matched?.startsWith('ingest:') ? a.matched.slice('ingest:'.length) : null)) as string | null;
+    if (a.state === 'untriaged') {
+      /* AN ARRIVAL NOTHING VERIFIED WAS OFFERED NO PATTERN, and is not a pattern's to count. */
+      if (a.reason === UNVERIFIED) continue;
+      const door = a.door?.startsWith('ingest:') ? a.door.slice('ingest:'.length) : a.channel;
+      doorLine(door).unread += 1;
+      continue;
+    }
+    if (by === null) continue;
+    const line = patternLine(by);
+    if (a.state === 'matched') line.filed += 1;
+    else if (a.state === 'skipped') {
+      const reason = a.reason ?? 'Skipped with no reason kept.';
+      const kept = line.skipped.find((s) => s.reason === reason);
+      if (kept) kept.n += 1;
+      else line.skipped.push({ reason, n: 1 });
+    } else if (a.state === 'review' || a.state === 'proposed') line.waiting += 1;
+  }
+  return { days: span, since, doors: [...doors.values()].filter((d) => d.patterns.length > 0 || d.unread > 0) };
+}
+
+/** What the report calls arrivals that came in by a channel and named no door, such as mail to the record's address. */
+const UNNAMED_DOOR: Readonly<Record<string, string>> = { email: 'Mail', webhook: 'Messages', api: 'Messages sent in', paste: 'Pasted', pull: 'Imports' };
+
+/** A pattern's own `description`, as a person reads it, or `null`. */
+function described(decl: IngestDecl | undefined): string | null {
+  const said = (decl as { description?: unknown } | undefined)?.description;
+  return typeof said === 'string' && said.trim() !== '' ? said.trim().replace(/\s+/g, ' ') : null;
 }
 
 /* ── what a person reads: the question an unwritten extraction asks ───── */
@@ -2000,15 +3508,16 @@ function tailOf(deps: IngestDeps, form: Extractor, text: string, value: Json, de
   const lookup = form.lookup;
   const table = literalsOf(deps, form);
   if (table === null) return null;
-  const row = table.find(([, id]) => id === value);
-  if (row === undefined) return null;
+  /* EVERY VALUE THE ROW HOLDS, which is more than one on a lookup that splits them. */
+  const held = table.filter(([, id]) => id === value).map(([literal]) => literal);
+  if (held.length === 0) return null;
   const mask = maskAtEnd(lookup.between?.[0] ?? lookup.after ?? '');
   let digits: string | null = null;
   for (const anchored of slices(form as Record<string, unknown>, text)) {
     const masked = mask + anchored;
     const whole = deps.literals(masked, table);
     if (whole !== AMBIGUOUS && whole.some((id) => id === value)) return null;
-    digits ??= printedTail(masked, row[0]);
+    for (const one of held) digits ??= printedTail(masked, one);
   }
   return digits === null ? null : { digits, register: lookup.register };
 }
@@ -2019,8 +3528,15 @@ function tailOf(deps: IngestDeps, form: Extractor, text: string, value: Json, de
  * THE SHAPE `matchMaskedTail` READS, and read back only after it has answered: a run of stars, one `-` or space, then
  * the digits, in the first token, where the anchor put the mask, with no letter straight after them. Three digits at
  * least, and fewer than the whole value, because a value no longer than the digits would have been a whole token.
+ *
+ * AND THE OTHER WAY ROUND, THE REVERSE TAIL (REC-A02): digits printed LONGER than a value of three digits or more that
+ * they end in, `***7731` against a stored `731`, or a whole account number against its last four. Behind stars, or a
+ * bare run of `BARE_NUMBER` digits or more, which is an account's number and not an amount, since an amount is printed
+ * with its separators. The digits answered are the ones printed, which is what a confirmation is kept by.
  */
 function printedTail(masked: string, whole: string): string | null {
+  const reverse = reverseTail(masked, whole);
+  if (reverse !== null) return reverse;
   /* SPACES ONLY, as `matchMaskedTail` skips them, so the first token here is the first token there. */
   let first = 0;
   while (masked[first] === ' ') first += 1;
@@ -2060,7 +3576,12 @@ type Tail = { field: string; digits: string; row: string; register: string };
 const CONFIRMS_READ = 500;
 
 /**
- * Whether a person has accepted an arrival `ingest` filed to `tail.row` by `tail.digits`, in whichever field.
+ * Whether a person has said that `tail.digits`, as a bank prints them, are `tail.row`: by accepting an arrival filed to
+ * that row by those digits, or by answering a tail question with that row.
+ *
+ * ACROSS PATTERNS (REC-A02). What a person confirmed is that these digits are that account, which stays true whichever
+ * pattern, field or door printed them; read per pattern, the same card was asked about once for its texts and again for
+ * its mails.
  *
  * ACCEPTED, NOT ANSWERED. A rowset resolved `addressed` may have been accepted or rejected, so the decision is read as
  * well, and it is found the way `govern.ts` finds it (`SETTLED_BY`): `decide` writes the `decide` event and the
@@ -2069,11 +3590,11 @@ const CONFIRMS_READ = 500;
  * acceptance, on a rowset asking the same question, read as the acceptance. A rejection, a question reopened and
  * answered no, and an erased one all read as not confirmed, so the next arrival waits again.
  */
-function confirmedTail(sql: Sql, ingest: string, tail: Tail): boolean {
+export function confirmedTail(sql: Sql, tail: { digits: string; row: string }): boolean {
   const answered = sql.all<{ id: string; body: string }>(
-    `SELECT id, body FROM suggestion WHERE body_kind = 'rowset' AND opened_by = ? AND status = 'resolved'
-       AND resolved_as = 'addressed' AND instr(body, '"tails"') > 0 ORDER BY opened_at DESC LIMIT ?`,
-    `ingest:${ingest}`,
+    `SELECT id, body FROM suggestion WHERE body_kind = 'rowset' AND opened_by LIKE 'ingest:%' AND status = 'resolved'
+       AND resolved_as = 'addressed' AND instr(body, '"tails"') > 0 AND instr(body, ?) > 0 ORDER BY opened_at DESC LIMIT ?`,
+    tail.digits,
     CONFIRMS_READ,
   );
   for (const row of answered) {
@@ -2083,21 +3604,32 @@ function confirmedTail(sql: Sql, ingest: string, tail: Tail): boolean {
     } catch {
       continue;
     }
-    /* THE ACCOUNT AND THE TAIL, NOT THE FIELD. What a person confirmed is that these digits from this ingest are that
-       account, which stays true whichever of the ingest's fields printed them. */
+    /* THE ACCOUNT AND THE TAIL, NOT THE FIELD. */
     const same = Array.isArray(tails) && tails.some((t: Partial<Tail> | null) => t?.digits === tail.digits && t.row === tail.row);
-    if (!same) continue;
-    const settled = sql.one<{ answer: string }>(
+    if (same && settledAnswer(sql, row.id) === 'accept') return true;
+  }
+  /* AND A TAIL QUESTION ANSWERED WITH THAT ROW, at any door: the answer is the row's id. */
+  const asked = sql.all<{ id: string }>(
+    `SELECT id FROM suggestion WHERE body_kind = 'options' AND status = 'resolved' AND resolved_as = 'addressed'
+       AND json_valid(body) AND json_extract(body, '$.tail.digits') = ? ORDER BY opened_at DESC LIMIT ?`,
+    tail.digits,
+    CONFIRMS_READ,
+  );
+  return asked.some((q) => settledAnswer(sql, q.id) === tail.row);
+}
+
+/** The option a person picked on a question, from the decision its latest `resolve` follows, or `null`. */
+function settledAnswer(sql: Sql, suggestion: string): string | null {
+  return (
+    sql.one<{ answer: string }>(
       `SELECT d.answer AS answer FROM event r
          JOIN event e ON e.rowid = r.rowid - 1 AND e.kind = 'decide' AND e.target LIKE 'decision:%'
          JOIN decision d ON d.id = substr(e.target, 10)
         WHERE r.kind = 'resolve' AND r.target = ? AND r.to_v = 'addressed'
         ORDER BY r.rowid DESC LIMIT 1`,
-      `suggestion:${row.id}`,
-    );
-    if (settled?.answer === 'accept') return true;
-  }
-  return false;
+      `suggestion:${suggestion}`,
+    )?.answer ?? null
+  );
 }
 
 /**
@@ -2130,7 +3662,7 @@ function rowNamed(sql: Sql, tail: Tail): string {
  */
 function literalsOf(deps: IngestDeps, form: Extractor): readonly (readonly [string, Json])[] | null {
   if ('enum' in form) return Object.entries(form.enum.map);
-  if ('lookup' in form) return deps.rows(form.lookup.register, form.lookup.by).map((r) => [r.value, r.id] as const);
+  if ('lookup' in form) return lookupTable(deps, form.lookup).map((r) => [r.value, r.id] as const);
   return null;
 }
 
@@ -2150,7 +3682,9 @@ function candidates(deps: IngestDeps, form: Extractor, anchored: string): Json[]
   if ('date' in form && deps.dates !== undefined) return deps.dates(anchored, form.date.format);
   const n = deps.numbers;
   if (n === undefined) return null;
-  if ('money' in form) return n.money(anchored, form.money.currency) as Json[];
+  /* A CURRENCY READ OFF ANOTHER FIELD'S ROW HAS BEEN FILLED IN BY NOW (`currencyFilled`); one that could not be is no
+     fallback at all, so only a code the text prints is read. */
+  if ('money' in form) return n.money(anchored, typeof form.money.currency === 'string' ? form.money.currency : undefined) as Json[];
   if ('int' in form) return n.int(anchored);
   /* `sep` IS ONE OF TWO CHARACTERS AND THE TYPE HERE SAYS `string`, because `Extractor` is the
      shape a declaration arrives in and `declare.ts`'s `extractorFault` is what holds it to
@@ -2193,8 +3727,9 @@ function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null
        *unless the exponent is 3*, so `KWD 1.250` is one and a quarter dinars rather than one
        thousand two hundred and fifty; and the scale is `10 ** exponent`, so `JPY 1250` is 1250 yen
        and not 125,000 of a subunit that does not exist. Both were hard-coded at two. */
-    if (!form.money.currency) return null;
-    const exp = exponentOf(form.money.currency);
+    const declared = form.money.currency;
+    if (typeof declared !== 'string' || declared === '') return null;
+    const exp = exponentOf(declared);
     const n = number(anchored, undefined, exp);
     if (n === null) return null;
     /* A VALUE THAT WOULD NEED ROUNDING IS REFUSED — 07 §3, and it is the difference between an
@@ -2203,7 +3738,7 @@ function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null
        number nobody sent into a ledger. */
     const minor = n * 10 ** exp;
     if (Math.abs(minor - Math.round(minor)) > 1e-6) return null;
-    return { amount: Math.round(minor), currency: form.money.currency };
+    return { amount: Math.round(minor), currency: declared };
   }
 
   /* AND THE DATE FALLBACK, reached only when no reader was handed down. `day` reads four formats
@@ -2247,7 +3782,7 @@ function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null
        word cannot be found at all, because a token is one word. */
     const said = /\S+/.exec(anchored)?.[0]?.replace(/[.,;:]+$/, '') ?? '';
     if (!said) return null;
-    return deps.rows(form.lookup.register, form.lookup.by).find((r) => r.value === said)?.id ?? null;
+    return lookupTable(deps, form.lookup).find((r) => r.value === said)?.id ?? null;
   }
   return null;
 }

@@ -132,7 +132,9 @@ test('AN ARRIVAL THAT RESEMBLES NOTHING IS FILED AS BEFORE, and skip still skips
   arrive(skip.k, COFFEE, 'c1');
   const again = arrive(skip.k, COFFEE.replace('today', 'this morning'), 'c2');
   assert.equal(again.state, 'skipped');
-  assert.equal(again.reason, 'transactions#1 already says this.');
+  /* SAID BY THE ROW IT REPEATS, its name and amount, and never the list's id and a number (REC-A03). */
+  assert.equal(again.reason, 'Looks like a repeat of Halden Coffee, EGP 85.00.');
+  assert.ok(again.repeats, 'the skip did not keep the row it repeats');
   assert.equal(again.suggestion, undefined);
   skip.sql.close();
 });

@@ -55,7 +55,7 @@ export type Form =
   | { int: Anchor }
   | { decimal: Anchor & { sep?: '.' | ',' } }
   | { enum: Anchor & { map: Record<string, Json> } }
-  | { lookup: Anchor & { register: string; by: string } }
+  | { lookup: Anchor & { register: string; by: string; says?: string; where?: unknown; split?: boolean } }
   | { first: Form[] }
   | { nth: { n: number; of: Form } }
   | { default: { value: Json; of: Form } };
@@ -292,6 +292,11 @@ function matchFolded(folded: string, entries: readonly (readonly [string, Json])
  *
  * AND A TAIL IS AT LEAST THREE DIGITS, the shortest the bank was measured printing. Shorter, `***-8` and `***27`
  * each filed at `exact` against the one row ending in them.
+ *
+ * AND THE OTHER WAY ROUND (REC-A02): when exactly one row's stored digits, three or more, are the end of LONGER printed
+ * digits, that is a tail match too. A card whose last four he typed as `7731` is printed `***7731`, a whole token, and
+ * one he typed as its last three is printed with four. Like the masked tail it is a guess about money, so the kernel
+ * files it once for a person to confirm (`tailOf`), as it does the other direction.
  */
 function matchMaskedTail(folded: string, entries: readonly (readonly [string, Json])[]): Json[] | 'ambiguous' {
   let answer: Json | undefined;
@@ -299,6 +304,8 @@ function matchMaskedTail(folded: string, entries: readonly (readonly [string, Js
   while (folded[first] === ' ') first += 1;
   const space = folded.indexOf(' ', first);
   const firstEnd = space === -1 ? folded.length : space;
+  /* EACH DIGIT RUN THE FIRST TOKEN PRINTS: behind a run of stars, or the token itself when it is digits alone. */
+  const runs: { digits: string; starred: boolean }[] = [];
   for (let i = folded.indexOf('*'); i !== -1 && i < firstEnd; i = folded.indexOf('*', i + 1)) {
     if (folded[i - 1] === '*') continue;
     let at = i;
@@ -307,17 +314,33 @@ function matchMaskedTail(folded: string, entries: readonly (readonly [string, Js
     const from = at;
     while (folded[at] !== undefined && folded[at]! >= '0' && folded[at]! <= '9') at += 1;
     if (at - from < 3 || isWordChar(folded[at])) continue;
-    const digits = folded.slice(from, at);
+    runs.push({ digits: folded.slice(from, at), starred: true });
+  }
+  const bare = folded.slice(first, firstEnd).replace(/[.,;:)]+$/u, '');
+  if (runs.length === 0 && bare.length >= BARE_NUMBER && [...bare].every((ch) => ch >= '0' && ch <= '9')) runs.push({ digits: bare, starred: false });
 
+  for (const { digits, starred } of runs) {
     for (const [literal, value] of entries) {
       const whole = fold(literal);
-      if (whole.length <= digits.length || !whole.endsWith(digits)) continue;
+      /* THE STORED VALUE ENDS IN WHAT WAS PRINTED, behind stars; or THE REVERSE TAIL, what was printed ends in a stored
+         value of three digits or more, `***7731` against `395` and an account's whole number against its last four. */
+      const tail = starred && whole.length > digits.length && whole.endsWith(digits);
+      const reverse = whole.length >= 3 && whole.length < digits.length && isDigits(whole) && digits.endsWith(whole);
+      if (!tail && !reverse) continue;
       if (answer !== undefined && JSON.stringify(answer) !== JSON.stringify(value)) return 'ambiguous';
       answer = value;
     }
   }
   return answer === undefined ? [] : [answer];
 }
+
+/**
+ * The shortest bare run of digits the reverse tail reads, with no stars before it: an account's whole number, and not an
+ * amount, which is printed with its separators. The kernel reads the same run back by the same number (`ingest.ts`).
+ */
+const BARE_NUMBER = 8;
+
+const isDigits = (text: string): boolean => text.length > 0 && [...text].every((ch) => ch >= '0' && ch <= '9');
 
 /**
  * `matchFolded` over text that has not been folded yet, which is the form a caller outside this file wants, and for
@@ -489,16 +512,26 @@ export function run(form: Form, text: string, folded: string, ctx: RunCtx, at = 
     }
 
     case 'lookup': {
-      const { register, by } = body as { register?: string; by?: string };
+      const { register, by, split } = body as { register?: string; by?: string; split?: unknown };
       if (typeof register !== 'string' || typeof by !== 'string')
         throw unknown(at, 'A lookup: needs register: and by:, naming the list to search and the field to match.');
       const rows = ctx.lookup(register, by);
-      return resolveOne(picked, folded, () => rows.map((r) => [r.value, r.id] as [string, Json]), 'lookup');
+      /* A FIELD THAT SPLITS HOLDS SEVERAL VALUES PARTED BY COMMAS, each read as a value of the row on its own: an
+         account the bank prints two ways, and a card that was replaced. */
+      return resolveOne(picked, folded, () => rows.flatMap((r) => (split === true ? splitValues(r.value) : [r.value]).map((v) => [v, r.id] as [string, Json])), 'lookup');
     }
 
     default:
       throw unknown(at, `Use one of: ${EXTRACTORS.join(', ')}, or ${COMBINATORS.join(', ')}.`);
   }
+}
+
+/** The values a field that splits holds: `7731, 1234` is two, and an empty part is none. */
+export function splitValues(value: string): string[] {
+  return value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
 }
 
 /** `enum` and `lookup` answer once for the whole form, so their slices resolve together. */

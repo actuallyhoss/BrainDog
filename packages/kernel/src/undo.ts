@@ -42,6 +42,7 @@ import type { Json } from './coerce.ts';
 import { jcs } from './declare.ts';
 import type { Patch } from './index.ts';
 import type { KernelParts } from './parts.ts';
+import { reopenedTail } from './ingest.ts';
 import { SESSION, SESSION_PREFIX } from './session.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
 import { attempt } from './tx.ts';
@@ -1023,6 +1024,8 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
       if (whole) {
         sql.exec("UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL WHERE id = ?", q.id);
         readAgain(sql, q.id, every);
+        /* A REOPENED "which account" QUESTION HOLDS ITS TEXTS AGAIN at once, not at the next text (REC-A02). */
+        reopenedTail(sql, q.id);
       } else sql.exec("UPDATE suggestion SET resolved_as = 'undone' WHERE id = ?", q.id);
       governLine(sql, parts.mint(), at, actor, whole ? 'suggest' : 'resolve', q.id, whole ? 'reopened' : 'undone', batch);
     }

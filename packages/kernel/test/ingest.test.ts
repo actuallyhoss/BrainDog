@@ -141,7 +141,7 @@ test('and a DIFFERENT email about the same thing is skipped by its key, with the
   const out = value<Arrived>(send(k, `Reminder: ${MAIL}`, 'a2'));
 
   assert.equal(out.state, 'skipped');
-  assert.match(out.reason ?? '', /transactions#1 already says this/);
+  assert.equal(out.reason, 'Looks like a repeat of Halden Coffee, EGP 1,316.24, 3 Apr.');
   assert.equal(k.count('transactions'), 1);
   // A skipped arrival has no receipt, which is what makes "what did this do" answerable by existence.
   assert.equal(sql.all('SELECT 1 FROM ingest_receipt').length, 1);
@@ -195,7 +195,7 @@ test('a lookup that resolves to nothing is a review too, not a broken reference'
   const { k, sql } = await record(HSBC());
   const out = value<Arrived>(send(k, MAIL.replace('4471', '9999'), 'c1'));
   assert.equal(out.state, 'review');
-  assert.match(out.reason ?? '', /account/);
+  assert.match(out.reason ?? '', /^Account could not be found/);
   sql.close();
 });
 

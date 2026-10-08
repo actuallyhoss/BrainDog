@@ -171,7 +171,7 @@ import { runway, type Horizon, type Leg, type Runway } from './forecast.ts';
 import { WALK_SOURCE } from './money-figures.ts';
 import { referencedBy } from './referenced.ts';
 import { createJob, sweepJobs } from './jobs.ts';
-import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders } from './ingest.ts';
+import { answerAsked, arrive, day, exponentOf, fileAsSecond, offerAgain, patternReport, propose, rerunHeld, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders, type PatternReport } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import { firstSlotMs } from './slot.ts';
@@ -420,7 +420,7 @@ export type {
 export type { Arranging, Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 /* `exponentOf` IS EXPORTED SO THE RECORD'S CURRENCY TABLE IS NOT A SECOND EXPONENT READER. It is
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
-export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, resolve as extractOutcome, senderOf, shapeOf } from './ingest.ts';
+export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, fileAsSecond, patternReport, resolve as extractOutcome, senderOf, shapeOf, tailCause } from './ingest.ts';
 export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
 export { applyPage, writePoints } from './fetched.ts';
@@ -455,7 +455,7 @@ export type {
  */
 export type DeclarationBundle = { declarations: Declaration[] };
 export type { Analysis, Counted, Finding, Observation, Signal } from './observe.ts';
-export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, NumberReaders, Sender } from './ingest.ts';
+export type { Answered, Arrival, Arrived, Confidence, DoorLine, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, NumberReaders, PatternLine, PatternReport, Sender } from './ingest.ts';
 export type { ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
@@ -7791,6 +7791,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     inboxWaiting: (): number =>
       Number(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM inbox_raw WHERE state IN ('untriaged', 'review')")?.n ?? 0),
 
+    /** What each pattern did with the last `days` days of arrivals, door by door (REC-A03 step 5). */
+    patternReport: (days = 14): PatternReport => patternReport(sql, clock.now(), days),
+    /** "It is a second one": a text skipped as a repeat, filed after all (REC-A03 step 3). */
+    fileAsSecond: (raw: string): Result<Arrived> => attempt(sql, transaction, () => fileAsSecond(ingestDeps(), raw)),
     /**
      * How many arrivals are in each state the inbox can be read in, every one of the six named and zero when none.
      *
@@ -8251,6 +8255,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             if (!carried.ok) return carried as Result<never>;
           }
           answered(id, verdict, actor);
+          /* AN ANSWER TO A QUESTION THE INBOX ASKED (which account a card's digits are, or moving what a wrong answer filed) IS
+             CARRIED OUT HERE, in the decision's transaction and batch, so one Undo puts all of it back (REC-A02). */
+          if ('decide' in verdict) {
+            const carried = answerAsked(ingestDeps(), { id, option: verdict.decide.option, actor, batch: out.value.batch ?? null });
+            if (!carried.ok) return carried as Result<never>;
+          }
         }
         return out;
       }),
@@ -8778,6 +8788,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
            AFTER `reload`, so the identity's timezone is the one just installed. */
         armDerived(batch);
+        /* A PATTERN UPDATED READS WHAT ITS OLDER VERSION HELD, once (REC-A02 step 11). */
+        const patterns = batch.flatMap((d) => (d.kind === 'ingest' && typeof (d.body as { ingest?: unknown }).ingest === 'string' ? [(d.body as { ingest: string }).ingest] : []));
+        if (patterns.length > 0) transaction(() => rerunHeld(ingestDeps(), patterns));
       }
       return out;
     },
@@ -9382,7 +9395,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     keyState,
     /** A row as a person says it, `S42` or `things#3`, from its id. */
     nameOf,
-    create: (register: string, fields: Patch, w: WriteContext) => write(register, null, fields, w),
+    create: (register: string, fields: Patch, w: WriteContext) => {
+      const made = write(register, null, fields, w);
+      /* AN ACCOUNT ADDED IS OFFERED AT ONCE on the open "which account" question over its list. */
+      if (made.ok) offerAgain(ingestDeps(), register);
+      return made;
+    },
     update: (register: string, ref: string, patch: Patch, w: WriteContext) => write(register, ref, patch, w),
     /* Four arguments and no fifth: a `Door` is the kernel's own to open. */
     write: (register: string, ref: string | null, patch: Patch, w: WriteContext) => write(register, ref, patch, w),

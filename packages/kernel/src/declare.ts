@@ -19,7 +19,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
-import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, type Predicate } from '@braindog/where';
+import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, parseWhere, type Predicate } from '@braindog/where';
 
 import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, looksLikeCredential, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
@@ -2459,6 +2459,8 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
       const wrong = stripFault(form, bare, `${id}.extract.${field}`);
       if (wrong) return wrong;
     }
+    const crossed = currencyOfFault(extract as Record<string, unknown>, id, installed);
+    if (crossed) return crossed;
   }
 
   /* `25 §3.1`'s paths, which become `select()` calls over somebody else's JSON. A path outside the
@@ -2982,8 +2984,11 @@ const ANCHORS = ['after', 'before', 'between'] as const;
 
 /** `42 §4.7`'s form table, second column: what each extractor holds beside an anchor. */
 const ARGUMENTS: Record<string, readonly string[]> = {
-  text: [], money: ['currency'], date: ['format'], int: [], decimal: ['sep'], enum: ['map'], lookup: ['register', 'by'],
+  text: [], money: ['currency'], date: ['format'], int: [], decimal: ['sep'], enum: ['map'], lookup: ['register', 'by', 'says', 'where', 'split'],
 };
+
+/** The longest noun a lookup's `says` may be: "card", "account", "wallet". It is said inside a question. */
+const SAYS_MOST = 24;
 
 /**
  * `42 §4.2`'s `Cur`, SPELLED ONCE. `mappingFault` tested it inline and a form needs the same test,
@@ -3248,10 +3253,13 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
         ['.', ','],
       );
 
-    if (only === 'money' && 'currency' in args && !isCur(args.currency))
+    /* OR THE ACCOUNT'S OWN CURRENCY (REC-A03): `{ of: <field>, field: <the account's field> }`, read off the row another
+       field of the pattern looked up. Which field that is, and that it is a lookup, is the pattern's to say and is asked
+       where the whole extract is in hand (`currencyOfFault`). */
+    if (only === 'money' && 'currency' in args && !isCur(args.currency) && !isCurrencyOf(args.currency))
       return bad(
         'EXTRACTOR_UNKNOWN',
-        `${at}.money's currency is ${JSON.stringify(args.currency ?? null)}, and it is the code to fall back on when the text names none: an ISO 4217 code in upper case, USD or EUR.`,
+        `${at}.money's currency is ${JSON.stringify(args.currency ?? null)}, and it is the code to fall back on when the text names none: an ISO 4217 code in upper case, USD or EUR, or { of: account, field: balance } for the currency of the account another field found.`,
         `${at}.money.currency`,
       );
 
@@ -3272,7 +3280,7 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
         );
     }
 
-    if (only === 'lookup')
+    if (only === 'lookup') {
       for (const k of ['register', 'by'] as const)
         if (!isLiteral(args[k]))
           return bad(
@@ -3280,6 +3288,9 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
             `${at}.lookup's ${k} is ${JSON.stringify(args[k] ?? null)}. A lookup resolves a row by naming the register to look in and the field to match on.`,
             `${at}.lookup.${k}`,
           );
+      const wrong = lookupKeysFault(args, at);
+      if (wrong) return wrong;
+    }
   }
 
   /* AND A LITERAL HAS A CEILING — `42 §4.7`, 1 to 200 bytes — under `OUT_OF_BOUNDS` and not
@@ -3365,6 +3376,142 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
 /** `43 §4.4`'s grammar, and its ceiling. An empty path is the root and is legal. */
 /** What one `map:` entry may carry beside its `path` and `type`. */
 const MAPPING_KEYS = new Set(['path', 'type', 'from', 'minor', 'currency', 'format', 'values', 'other', 'note']);
+
+/** `currency: { of, field }`: the field of this pattern whose row the currency is read off, and that row's field. */
+function isCurrencyOf(value: unknown): value is { of: string; field: string } {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return Object.keys(v).length === 2 && typeof v.of === 'string' && FIELD_ID_RE.test(v.of) && typeof v.field === 'string' && FIELD_ID_RE.test(v.field);
+}
+
+const FIELD_ID_RE = /^[a-z][a-z0-9_]{0,31}$/u;
+
+/** How deep a form may nest, as `extractorFault` counts it: a walk over a declared form goes no deeper. */
+const NESTING_CEILING = 3;
+
+/**
+ * A lookup's three optional keys (REC-A02): `says`, the noun its question uses for what the message printed; `where`, a
+ * filter over the list; `split`, that the field holds several values parted by commas.
+ *
+ * EACH IS HELD TO ITS SHAPE HERE, and `where` to the list's fields where the batch says what they are
+ * (`lookupWhereFault`): a filter that names no field of the list would install and then admit nothing, and every text
+ * would wait for an account the lookup could never read.
+ */
+function lookupKeysFault(args: Record<string, unknown>, at: string): Refusal | null {
+  if ('says' in args) {
+    const says = args.says;
+    if (typeof says !== 'string' || says.trim() === '' || says.length > SAYS_MOST || !/^[\p{L}][\p{L} '-]*$/u.test(says.trim()))
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.lookup's says is ${JSON.stringify(says ?? null)}, and it is the word its question uses for what the message printed, card or account: letters, at most ${SAYS_MOST}.`,
+        `${at}.lookup.says`,
+      );
+  }
+  if ('split' in args && typeof args.split !== 'boolean')
+    return bad(
+      'EXTRACTOR_UNKNOWN',
+      `${at}.lookup's split is ${JSON.stringify(args.split ?? null)}, and it is true when the field may hold several values parted by commas, or false.`,
+      `${at}.lookup.split`,
+    );
+  if ('where' in args) {
+    const where = args.where;
+    const sentence = typeof where === 'string' && where.trim() !== '' && where.length <= LITERAL_BYTES;
+    if (!sentence && (where === null || typeof where !== 'object' || Array.isArray(where)))
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.lookup's where is ${JSON.stringify(where ?? null)}, and it is a filter over the list the lookup reads, such as kind is card.`,
+        `${at}.lookup.where`,
+      );
+  }
+  return null;
+}
+
+/** Every lookup a form holds, however deep, with the path a refusal names it by. */
+function lookupsIn(form: unknown, at: string, depth = 0): { at: string; lookup: Record<string, unknown> }[] {
+  if (form === null || typeof form !== 'object' || depth > NESTING_CEILING) return [];
+  const f = form as Record<string, unknown>;
+  if (f.lookup !== null && typeof f.lookup === 'object') return [{ at: `${at}.lookup`, lookup: f.lookup as Record<string, unknown> }];
+  if (Array.isArray(f.first)) return f.first.flatMap((arm, i) => lookupsIn(arm, `${at}.first[${i}]`, depth + 1));
+  const inner = (f.nth as { of?: unknown } | undefined)?.of ?? (f.default as { of?: unknown } | undefined)?.of;
+  return inner === undefined ? [] : lookupsIn(inner, `${at}.${'nth' in f ? 'nth' : 'default'}.of`, depth + 1);
+}
+
+/** Every `currency: { of, field }` a form holds, however deep, with its path. */
+function currenciesIn(form: unknown, at: string, depth = 0): { at: string; of: string; field: string }[] {
+  if (form === null || typeof form !== 'object' || depth > NESTING_CEILING) return [];
+  const f = form as Record<string, unknown>;
+  const money = f.money as { currency?: unknown } | undefined;
+  if (money !== null && typeof money === 'object') return isCurrencyOf(money.currency) ? [{ at: `${at}.money.currency`, ...money.currency }] : [];
+  if (Array.isArray(f.first)) return f.first.flatMap((arm, i) => currenciesIn(arm, `${at}.first[${i}]`, depth + 1));
+  const inner = (f.nth as { of?: unknown } | undefined)?.of ?? (f.default as { of?: unknown } | undefined)?.of;
+  return inner === undefined ? [] : currenciesIn(inner, `${at}.${'nth' in f ? 'nth' : 'default'}.of`, depth + 1);
+}
+
+/**
+ * A pattern's account-currency reads, against the rest of its extract: `of` names another field of it whose form is a
+ * lookup, which is read first; and where the batch holds that lookup's list, `field` is one of its fields that holds a
+ * currency (money, or a code as text). A currency read off a field that finds no row is no currency on every text.
+ */
+function currencyOfFault(extract: Record<string, unknown>, id: string, installed?: Known): Refusal | null {
+  for (const [field, form] of Object.entries(extract)) {
+    for (const c of currenciesIn(withoutStrip(form), `${id}.extract.${field}`)) {
+      const looked = lookupsIn(withoutStrip(extract[c.of]), `${id}.extract.${c.of}`)[0];
+      if (c.of === field || looked === undefined)
+        return bad(
+          'EXTRACTOR_UNKNOWN',
+          `${c.at} reads the currency of the row ${c.of} finds, and ${c.of === field ? 'that is this field itself' : Object.hasOwn(extract, c.of) ? `${c.of} is not a lookup` : `${id} reads no field called ${c.of}`}. Name the field whose lookup finds the account.`,
+          c.at,
+        );
+      const fields = listFields(installed, looked.lookup.register);
+      const held = fields?.find((f) => f.id === c.field);
+      if (fields !== null && (held === undefined || !['money', 'text', 'enum'].includes(String(held.type))))
+        return bad(
+          'EXTRACTOR_UNKNOWN',
+          `${c.at} reads the currency in ${c.field} of ${String(looked.lookup.register)}, and ${held === undefined ? 'it has no such field' : `${c.field} is ${String(held.type)}, which holds no currency`}. Name its money field, such as balance.`,
+          c.at,
+        );
+    }
+    for (const l of lookupsIn(withoutStrip(form), `${id}.extract.${field}`)) {
+      const wrong = lookupWhereFault(l.lookup, l.at, installed);
+      if (wrong) return wrong;
+    }
+  }
+  return null;
+}
+
+/** A list's declared fields as the batch or the record holds them, or `null` when neither says. */
+function listFields(installed: Known | undefined, register: unknown): { id?: unknown; type?: unknown; values?: unknown; of?: unknown; to?: unknown }[] | null {
+  if (installed === undefined || typeof register !== 'string') return null;
+  const body = installed.get(`register.${register}`) as { fields?: unknown } | undefined;
+  return body !== undefined && Array.isArray(body.fields) ? (body.fields as { id?: unknown; type?: unknown }[]) : null;
+}
+
+/** A lookup's `where`, compiled against its list's fields where they are known, so a filter that reads nothing is refused. */
+function lookupWhereFault(lookup: Record<string, unknown>, at: string, installed?: Known): Refusal | null {
+  if (lookup.where === undefined) return null;
+  const fields = listFields(installed, lookup.register);
+  if (fields === null) return null;
+  const schema = {
+    register: String(lookup.register),
+    fields: Object.fromEntries(
+      fields
+        .filter((f) => typeof f.id === 'string')
+        .map((f) => [
+          f.id as string,
+          {
+            type: String(f.type),
+            ...(Array.isArray(f.values) ? { values: f.values as string[] } : {}),
+            ...(typeof f.of === 'string' ? { of: f.of } : {}),
+            ...(typeof f.to === 'string' ? { to: f.to } : {}),
+          },
+        ]),
+    ),
+  };
+  /* A SENTENCE IS READ AS A PAGE'S FILTER IS, with the instant only a relative day would need. */
+  const said = typeof lookup.where === 'string' ? parseWhere(lookup.where, schema, { nowMs: 0 }) : { predicate: lookup.where as Predicate, bad: [] };
+  const refused = said.bad[0] ?? compile(said.predicate, schema).bad[0];
+  return refused ? bad(refused.code, `${at}.where: ${refused.fix}`, `${at}.where`, refused.allowed) : null;
+}
 
 /**
  * One `map:` entry (`map.ts`, `43 §4.5`): read from a path with a type, a `value` the declaration states, or

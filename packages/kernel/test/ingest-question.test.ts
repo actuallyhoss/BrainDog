@@ -119,7 +119,7 @@ test('A FIELD IT COULD NOT READ IS ASKED BY ITS LABEL, on the list by its name, 
   const { k, sql } = await record(CARD());
   const out = arrive(k, said('Halden Coffee', '9999'), 'a1');
   assert.equal(out.state, 'review');
-  assert.equal(out.reason, 'bank-card-used could not read account out of this one.', 'the inbox keeps its sentence word for word');
+  assert.equal(out.reason, 'Account could not be found in this one.', 'the inbox says the field by its label and no pattern by its id');
 
   const { question, context } = asked(k, sql, out);
   assert.equal(question, 'Add this email to Transactions? Its account could not be read.');
@@ -189,7 +189,7 @@ test('THE SAME QUESTION IS ASKED ONCE while it is open, and the arrival asked it
   const second = arrive(k, said('HALDEN Coffee', '8888', '40.00'), 's2');
   assert.equal(second.state, 'review');
   assert.equal(second.suggestion, first.suggestion, 'the same question was filed twice');
-  assert.equal(second.reason, 'bank-card-used could not read account out of this one.');
+  assert.equal(second.reason, 'Account could not be found in this one.');
   const held = sql.one<{ state: string; reason: string }>('SELECT state, reason FROM inbox_raw WHERE id = ?', second.raw);
   assert.deepEqual({ ...held }, { state: 'review', reason: second.reason }, 'the arrival is kept, held, with its reason');
   const open = () => sql.one<{ n: number }>("SELECT count(*) AS n FROM suggestion WHERE body_kind = 'rowset' AND status = 'open'")!.n;
@@ -213,26 +213,25 @@ test('THE SAME QUESTION IS ASKED ONCE while it is open, and the arrival asked it
   );
   assert.doesNotMatch(joined[0]!.note, /SG\d|inbox_raw|bank-card-used/u, 'the note names an id');
 
-  /* A CHARGE AT ANOTHER SHOP IS ITS OWN QUESTION, though the words are the same: one card of a hundred unrelated charges
-     is read by its first row and accepted whole. */
+  /* A CHARGE AT ANOTHER SHOP JOINS TOO, WHEN WHAT WAS NOT READ IS THE ACCOUNT (REC-A02): the answer is the same for every
+     charge it holds, so a question per shop asked it again for each shop. The message prints no tail a lookup that says
+     nothing of what it reads could take for one, so it keeps this question, joined by its door and what was missed. */
   const bakery = arrive(k, said('Cedar Lane Bakery', '8888', '40.00'), 's2b');
-  assert.ok(bakery.suggestion);
-  assert.notEqual(bakery.suggestion, first.suggestion, 'an unrelated charge joined the open question');
-  assert.equal(k.question(bakery.suggestion!), k.question(first.suggestion!), 'the premise: the same words');
-  assert.deepEqual(merchants(bakery.suggestion!), ['Cedar Lane Bakery']);
-  assert.equal(open(), 2);
+  assert.equal(bakery.suggestion, first.suggestion, 'a charge whose account was not read was asked again for its shop');
+  assert.deepEqual(merchants(first.suggestion!), ['Halden Coffee', 'HALDEN Coffee', 'Cedar Lane Bakery']);
+  assert.equal(open(), 1);
 
   /* A DIFFERENT CAUSE IS A DIFFERENT QUESTION. */
   const unpriced = arrive(k, 'Your card ending 9999 was used at Halden Coffee for a coffee today.', 's3');
   assert.ok(unpriced.suggestion, 'a different question was taken for the same one');
   assert.notEqual(unpriced.suggestion, first.suggestion);
   assert.equal(k.question(unpriced.suggestion!), 'Add this email to Transactions? Its amount and account could not be read.');
-  assert.equal(open(), 3);
+  assert.equal(open(), 2);
 
   /* ACCEPTED, IT ADDS EVERY CHARGE IT HOLDS, and once it is answered the next one is asked again: a new question. */
-  const yes = k.decide(first.suggestion!, { decide: { option: 'accept', reason: 'both are mine' } }, 'p_1');
+  const yes = k.decide(first.suggestion!, { decide: { option: 'accept', reason: 'all are mine' } }, 'p_1');
   assert.ok(yes.ok, JSON.stringify(yes));
-  assert.equal(yes.value.wrote.length, 2);
+  assert.equal(yes.value.wrote.length, 3);
   const third = arrive(k, said('Nile Books', '7777', '12.00'), 's4');
   assert.ok(third.suggestion, 'an answered question kept the next one from being asked');
   assert.notEqual(third.suggestion, first.suggestion);
@@ -370,7 +369,7 @@ test('A LIST OR A FIELD A PERSON RENAMED IS ASKED BY ITS NEW WORD, as the record
   const { question } = asked(k, sql, out.value);
   assert.equal(question, 'Add this email to Spending? Its card could not be read.');
   inWords(question);
-  assert.equal(out.value.reason, 'bank-card-used could not read account out of this one.', 'the inbox keeps its sentence word for word');
+  assert.equal(out.value.reason, 'Card could not be found in this one.', 'the inbox says the field as the record speaks it and no pattern by its id');
 
   /* A WORD NOBODY TYPED, OR ONE LEFT BLANK, IS THE DECLARATION'S. */
   const blank = arriveThrough({ ...deps, words: () => ({ label_transactions: '  ' }) }, { channel: 'email', headers: {}, body: said('Nile Books', '9999', '12.00'), sha256: 'w2' }, k.transaction);
