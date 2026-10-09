@@ -45,14 +45,22 @@ export const passed = (r) =>
   r !== null && typeof r === 'object' && typeof r.at === 'string' && Number.isInteger(r.records) && r.records > 0 && Number.isInteger(r.rows) && r.rows >= 0 && r.pass === true;
 
 /**
+ * THE OWNER'S WAIVER, the one other way a new migration ships: a date, the word `owner`, and why, written when he says
+ * to ship without a rehearsal because no copy of a real record could be had. It is his call (LCH-C06 is his rule), so
+ * the gate takes it only in that shape, and a rehearsal that later passes writes its receipt beside it.
+ */
+export const waived = (w) =>
+  w !== null && typeof w === 'object' && typeof w.at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w.at) && w.by === 'owner' && typeof w.why === 'string' && w.why.trim().length > 0;
+
+/**
  * The lock as it is written: one line per file, in file order, so a diff of it is one line per migration.
  */
 export function lockText(lock) {
   const lines = Object.keys(lock)
     .sort()
     .map((file) => {
-      const { checksum: sum, applied, rehearsed } = lock[file];
-      return `  ${JSON.stringify(file)}: ${JSON.stringify({ checksum: sum, applied: applied === true, rehearsed: rehearsed ?? null })}`;
+      const { checksum: sum, applied, rehearsed, waived: w } = lock[file];
+      return `  ${JSON.stringify(file)}: ${JSON.stringify({ checksum: sum, applied: applied === true, rehearsed: rehearsed ?? null, ...(w ? { waived: w } : {}) })}`;
     });
   return `{\n${lines.join(',\n')}\n}\n`;
 }
@@ -126,7 +134,7 @@ export function verdict(files, lock) {
       );
       continue;
     }
-    if (entry.applied !== true && !passed(entry.rehearsed))
+    if (entry.applied !== true && !passed(entry.rehearsed) && !waived(entry.waived))
       findings.push(
         `  ${at(f.file)} has no passing rehearsal in the lock. Run apps/cli/scripts/migration-rehearsal.mjs --record <a copy of a record> before it ships; a PASS writes the receipt.`,
       );

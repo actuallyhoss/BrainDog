@@ -91,7 +91,7 @@ const ANSWERED = /^Failed to load resource: the server responded with a status o
 /**
  * Every fault one settled screen prints, as the sentences this gate says. `where` names the page-run (`/usage @390`).
  *
- * `text` is the words of `#main` and `errors` the page's own, `{ kind: 'uncaught' | 'console', text }`, as `openPage`
+ * `text` is the words of `#main`, `code` the words of each `pre` and `code` in it, and `errors` the page's own, `{ kind: 'uncaught' | 'console', text }`, as `openPage`
  * collects them, and `failed` each answer that was not ok, `{ status, path }`. Pure, so a test reads it without a browser
  * and `layout` can call it on every page-run.
  *
@@ -99,7 +99,7 @@ const ANSWERED = /^Failed to load resource: the server responded with a status o
  * one `ALLOWED` names, or, with `missing` (an address drawn as not found on purpose), the record's not found to an
  * `/api/` read. One answer of that status that is neither keeps the line red.
  */
-export function checkScreen({ where, text = '', errors = [], failed = [] }, { missing = false } = {}) {
+export function checkScreen({ where, text = '', code = [], errors = [], failed = [] }, { missing = false } = {}) {
   const hostsWord = (f) =>
     ALLOWED.some((a) => statusOf(a.status) === f.status && f.path.endsWith(a.path)) || (missing && MISSING.has(f.status) && f.path.includes('/api/'));
   const answered = (status) => {
@@ -114,10 +114,15 @@ export function checkScreen({ where, text = '', errors = [], failed = [] }, { mi
     if (e?.kind === 'uncaught') out.push(`${where}  threw an uncaught error: ${first}`);
     else if (e?.kind === 'console') out.push(`${where}  wrote an error to the console: ${first}`);
   }
-  for (const own of OWN) if (own.find.test(text)) out.push(`${where}  ${own.said}`);
+  /* CODE IS QUOTED, NOT PRINTED. A `pre` or `code` on a screen is a sample a person copies (the site's `/agents` shows a
+     call with its braces and its keys), so its words are taken out of what the rules read, once per sample, and the
+     same braces in the prose round it are still read. */
+  let prose = text;
+  for (const c of code) if (c) prose = prose.replace(c, '\n');
+  for (const own of OWN) if (own.find.test(prose)) out.push(`${where}  ${own.said}`);
   /* THE LINT'S SENTENCE WITHOUT WHAT IT NAMED. It quotes a key spoken (`next due at`), and a key-shaped secret drawn on a
      screen is a key too: spoken, it is still the secret, in a log anybody with the run can read. */
-  for (const f of lintText(text, { name: where, ids: true })) if (LINT_HELD.has(f.rule)) out.push(`${where}  ${f.said.replace(/:.*$/su, '.')} (${f.rule})`);
+  for (const f of lintText(prose, { name: where, ids: true })) if (LINT_HELD.has(f.rule)) out.push(`${where}  ${f.said.replace(/:.*$/su, '.')} (${f.rule})`);
   return out;
 }
 
@@ -126,12 +131,13 @@ export function checkScreen({ where, text = '', errors = [], failed = [] }, { mi
  * `innerText`, so what is hidden is not read and what is drawn is read as a person reads it, line by line.
  */
 export async function readScreen(opened, where) {
-  const text = await opened.page
-    .locator('main#main')
-    .first()
-    .innerText({ timeout: budget('ready').settleTimeoutMs })
-    .catch(() => '');
-  return { where, text, errors: [...opened.errors], failed: [...(opened.failed ?? [])] };
+  const main = opened.page.locator('main#main').first();
+  const text = await main.innerText({ timeout: budget('ready').settleTimeoutMs }).catch(() => '');
+  /* The outermost `pre` and `code` in it, each as it is drawn, for `checkScreen` to leave out of what it reads. */
+  const code = await main
+    .evaluate((el) => [...el.querySelectorAll('pre, code')].filter((c) => !c.parentElement?.closest('pre, code')).map((c) => c.innerText))
+    .catch(() => []);
+  return { where, text, code, errors: [...opened.errors], failed: [...(opened.failed ?? [])] };
 }
 
 /** A planted tree's folder of captured screens. Only a planted tree holds one: the repository's own root never does, so

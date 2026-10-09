@@ -34,6 +34,6 @@
   "0033_shape_reach.ts": {"checksum":"0ba95864c62726909bc71f0e6bde5c0123600512915bf8b2c14b05e859ea2257","applied":true,"rehearsed":null},
   "0034_rule_stat.ts": {"checksum":"d23d2ca072a9e8327c9965ede160f26b6ad535f1ce073b101bb5b39fd5af2c48","applied":true,"rehearsed":null},
   "0035_repeat_marks.ts": {"checksum":"3a20ff1e7c457006847bbcf6c94d8b9098a28fb89dc03dd3fabf2f52c7bbc056","applied":true,"rehearsed":null},
-  "0036_runs_before.ts": {"checksum":"79f2a5a10de5583e63aebab7c7177d4a15f842c6b242ed106e4e6076dc1af9df","applied":false,"rehearsed":null},
-  "0037_cause_answered.ts": {"checksum":"6100f6cabd9b9b2398f29baef4eb095d8b95085399d917a9e45cb5a006b35d39","applied":false,"rehearsed":null}
+  "0036_runs_before.ts": {"checksum":"79f2a5a10de5583e63aebab7c7177d4a15f842c6b242ed106e4e6076dc1af9df","applied":false,"rehearsed":null,"waived":{"at":"2026-10-09","by":"owner","why":"Shipped on the owner's word without a rehearsal: the live build could not export a copy and the night copy needs his backup key"}},
+  "0037_cause_answered.ts": {"checksum":"6100f6cabd9b9b2398f29baef4eb095d8b95085399d917a9e45cb5a006b35d39","applied":false,"rehearsed":null,"waived":{"at":"2026-10-09","by":"owner","why":"Shipped on the owner's word without a rehearsal: the live build could not export a copy and the night copy needs his backup key"}}
 }

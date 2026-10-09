@@ -52,18 +52,20 @@
       <rect class="viz-fill viz-fade" data-tone={HEAT_TONES[cell.level]} x={cell.x} y={cell.y} width={g.size} height={g.tall} rx={Math.min(3, g.size / 2)} />
     {/each}
   </svg>
-  <table class="viz-hidden">
-    {#if subject}<caption>{subject}</caption>{/if}
-    <thead>
-      <tr><td></td>{#each cols as col, c (c)}<th scope="col">{col}</th>{/each}</tr>
-    </thead>
-    <tbody>
-      {#each rows as row, r (r)}
-        <tr>
-          <th scope="row">{row}</th>
-          {#each cols as _, c (c)}<td>{format(values[r]?.[c] ?? 0)}</td>{/each}
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+  <div class="viz-hidden">
+    <table>
+      {#if subject}<caption>{subject}</caption>{/if}
+      <thead>
+        <tr><td></td>{#each cols as col, c (c)}<th scope="col">{col}</th>{/each}</tr>
+      </thead>
+      <tbody>
+        {#each rows as row, r (r)}
+          <tr>
+            <th scope="row">{row}</th>
+            {#each cols as _, c (c)}<td>{format(values[r]?.[c] ?? 0)}</td>{/each}
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
 </div>

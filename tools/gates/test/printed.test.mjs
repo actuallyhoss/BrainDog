@@ -51,6 +51,15 @@ test('braces: single and empty are this gate, double are the lint', () => {
   assert.match(doubled[0], /\(braces\)$/);
 });
 
+test('braces and a key inside code are a sample and pass; the same braces in the prose round it still fail', () => {
+  const sample = 'braindog.update({ id: "SG10", next_step: "{step}" })';
+  assert.deepEqual(checkScreen({ where: WHERE, text: `Ask it like this\n${sample}\nand it answers.`, code: [sample] }), []);
+  assert.deepEqual(checkScreen({ where: WHERE, text: 'Use {name}', code: ['{name}'] }), []);
+  assert.equal(checkScreen({ where: WHERE, text: `Hello {name}\n${sample}`, code: [sample] }).length, 1);
+  assert.equal(checkScreen({ where: WHERE, text: 'Hello {name}\nthen {name}', code: ['{name}'] }).length, 1);
+  assert.equal(said('Hello {name}').length, 1);
+});
+
 test('a raw id, a raw time and a key are the lint, and the finding never quotes them', () => {
   const id = said('Used by tools#8');
   assert.match(id.join('\n'), /\(raw-id\)/);

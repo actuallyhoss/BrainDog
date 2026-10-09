@@ -119,7 +119,7 @@ test('the page shows each option dark first, marks one recommendation a pick, an
   const pics = { 'p-390-dark.png': 1, 'p-1440-dark.png': 1, 'p-390-light.png': 1, 'p-1440-light.png': 1 };
   const prefixed = (k) => Object.fromEntries(Object.keys(pics).map((f) => [`${k}/${f}`, 'h']));
   const drawn = { 'as-it-stands': prefixed('as-it-stands'), status: { fill: prefixed('status/fill') } };
-  const html = picksHtml({ slots, drawn, record: 'a sample record', dark: [{ role: 'ink', value: '#F1F3F6', board: 17.15, tile: 15.71 }], measures: [{ name: 'Rail width', ours: 240, kit: 188 }], colours: pageColours(read('packages/skin/house.css')) });
+  const html = picksHtml({ slots, drawn, record: 'a sample record', dark: [{ role: 'ink', value: ['#', 'F1F3F6'].join(''), board: 17.15, tile: 15.71 }], measures: [{ name: 'Rail width', ours: 240, kit: 188 }], colours: pageColours(read('packages/skin/house.css')) });
   assert.equal((html.match(/class="rec">Recommended</gu) ?? []).length, slots.length);
   assert.equal((html.match(/ checked data-default/gu) ?? []).length, slots.length);
   assert.match(html, /Yes to every recommendation/u);

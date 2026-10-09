@@ -1,7 +1,7 @@
 page: board_specimen
 title: Specimen
 icon: home
-requires: [register.session]
+requires: [register.session, register.recurring, register.tasks]
 
 blocks:
   - kind: note
@@ -52,7 +52,7 @@ blocks:
     heading: Every month
     span: 6
     source: register.recurring
-    columns: [name, category, amount]
+    columns: [what, category, amount]
     limit: 6
     empty: Nothing goes out every month yet.
     icon: calendar-clock
@@ -66,6 +66,6 @@ blocks:
   - kind: capture
     heading: Add a task
     span: 8
-    register: register.tasks
+    register: tasks
     empty: There is no list of tasks yet.
     icon: list

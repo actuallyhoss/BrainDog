@@ -150,3 +150,14 @@ test('A ROOT WITH NO MIGRATION HAS NOT PASSED: it is red, never a skip', (t) => 
   t.after(() => rmSync(root, { recursive: true, force: true }));
   assert.equal(run(root).status, 1);
 });
+
+test("THE OWNER'S WAIVER LETS A NEW MIGRATION SHIP, and only in its full shape", async () => {
+  const { waived } = await import('../migration-lock.mjs');
+  assert.equal(waived({ at: '2026-10-09', by: 'owner', why: 'no copy could be had' }), true);
+  assert.equal(waived({ at: '2026-10-09', by: 'agent', why: 'no copy could be had' }), false, 'only the owner waives');
+  assert.equal(waived({ at: '2026-10-09', by: 'owner', why: '  ' }), false, 'a waiver says why');
+  assert.equal(waived({ at: 'yesterday', by: 'owner', why: 'x' }), false, 'a waiver has a date');
+  assert.equal(waived(null), false);
+  const lock = { '0001_a.ts': { checksum: 'a'.repeat(64), applied: false, rehearsed: null, waived: { at: '2026-10-09', by: 'owner', why: 'x' } } };
+  assert.match(lockText(lock), /"waived":\{"at":"2026-10-09","by":"owner","why":"x"\}/, 'the lock keeps the waiver when rewritten');
+});
