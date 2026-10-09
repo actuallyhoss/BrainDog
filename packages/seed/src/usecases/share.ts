@@ -17,6 +17,9 @@ import { dated, dayOf } from './dates.ts';
 import { listsOf, pagesOf, useCase } from './index.ts';
 import { homePageOf, withoutRows } from './install.ts';
 
+/* WHAT EACH VERSION CHANGED, for the screen that offers the update; here because a screen already reads this file. */
+export { USE_CASE_CHANGES, type UseCaseChange } from './changes.ts';
+
 type Body = Record<string, unknown>;
 
 /**

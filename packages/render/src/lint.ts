@@ -162,7 +162,7 @@ const BRACED = /\{\{\s*([^{}]*?)\s*\}\}/g;
 const CAMEL = /\b[a-z]{2,}(?:[A-Z][a-z0-9]+)+\b/;
 const SNAKE = /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/;
 const DOTTED = /^[A-Za-z_]\w*(?:\.\w+)+$/;
-/* Not a mail address (`first_last@gmail.com`), a handle (`@sam_dev`) or a file's name (`invoice_2026.pdf`): those are a person's own. */
+/* Not a mail address (`first_last@gmail.com`), a handle (`@mara_dev`) or a file's name (`invoice_2026.pdf`): those are a person's own. */
 const PROSE_KEY = /(?<![\w.@])(?:[a-z]\w*\.)*(?:[a-z]{2,}(?:[A-Z][a-z0-9]+)+|[a-z][a-z0-9]*(?:_[a-z0-9]+)+)\b(?![.@]\w)/g;
 /* A run's handle (`S731`): the one id a part may print on purpose, beside the run's name (`ids`). */
 const HANDLE = /\bS\d{2,6}\b/g;
@@ -189,7 +189,20 @@ const CUT_MONEY = [
   new RegExp(`(?:${SYMBOL}|€)\\s?\\d[\\d,.]*\\s?(?:…|\\.\\.\\.)`, 'g'),
   new RegExp(`(?:${SYMBOL})\\s?\\d{1,3}(?:,\\d{3})*,\\d{1,2}(?![\\d,])`, 'g'),
 ];
-const WORDS = /\b(rows?|list items?|entit(?:y|ies))\b/gi;
+/**
+ * THE WORDS A PERSON NEVER READS ON A PAGE, as `tools/gates/words.json` lists them (its entries marked `page`), each
+ * with the name a finding says. One list for the page and for the source the app ships: the words gate goes red, and
+ * `lint.test.ts` fails, the day this and the file disagree. Held here rather than imported, because this package is
+ * published on its own and the file is not in it.
+ */
+export const PAGE_WORDS: readonly { name: string; shape: string; case?: true }[] = [
+  { name: 'row', shape: '\\brows?\\b' },
+  { name: 'list item', shape: '\\blist items?\\b' },
+  { name: 'entity', shape: '\\bentit(?:y|ies)\\b' },
+  { name: 'credential', shape: '\\bcredentials?\\b' },
+  { name: 'register', shape: "\\b(?:the|a|an|this|that|each|every|your|its|one|no|which|new)\\s+registers?\\b|\\bregister's\\b" },
+];
+const WORDS = PAGE_WORDS.map((w) => ({ name: w.name, re: new RegExp(w.shape, w.case ? 'gu' : 'giu') }));
 
 type RuleSpec = {
   rule: LintRule;
@@ -289,8 +302,8 @@ const RULES: readonly RuleSpec[] = [
   {
     rule: 'plain-words',
     copy: true,
-    says: 'The words row, list item or entity, where the words should name the thing itself.',
-    find: (v) => all(v.lines, WORDS, (m) => `"${(m[1] ?? '').toLowerCase()}"`).map((h, i) => ({ raw: `${i}`, label: h.label })),
+    says: 'A word for the machinery, such as row, entity or credential, where the words should name the thing itself.',
+    find: (v) => WORDS.flatMap((w) => all(v.lines, w.re, () => `"${w.name}"`)).map((h, i) => ({ raw: `${i}`, label: h.label })),
     said: (_n, names) => `Says a word for the machinery where it should name the thing${names}.`,
   },
 ];

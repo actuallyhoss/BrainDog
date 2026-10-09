@@ -1,0 +1,240 @@
+/**
+ * The record's own vitals (SHL-A06): three readings in the shape `signs.ts` sets (PRF-A01), joined to its closed list
+ * with one import and one spread. Every write has an author, the file says the format this build reads, and every
+ * amount is whole minor units with a currency.
+ *
+ * WHY THIS EXISTS. The record promises all three (§3's actor grammar, `30 §11`'s format, "minor units, never add
+ * currencies"), and nothing read a live record to say they held. These read the record's own tables and say what they
+ * find with names, never ids, on every record alike (DIRECTION §27).
+ *
+ * `system` IS RIGHT FOR THE KERNEL'S OWN WORK (`30 §3`: migrations, purges, the scheduler, the dead-letter question), so
+ * `writes-authored` does not count it as such. It counts a write signed by nobody, and a change to a list's items signed
+ * `system` that nothing stands behind: no write by somebody else in the same batch, no sentence of the sweep that made
+ * it, and not the nightly snapshot, whose row says it was taken by the night. The kernel's `opts.actor ?? 'system'`
+ * fallbacks are what this catches.
+ *
+ * `format-current` READS GREEN ON EVERY RECORD THAT OPENED, because `applyMigrations` brings a record up to this build
+ * at every open (`migrate.ts`), and none on a file with no record made in it, as every sign reads an empty record. It
+ * goes red on a file read without opening it, or on an open that half failed. The
+ * guard that an older file still opens is `test/old-format.test.ts`.
+ *
+ * ONLY TYPES COME FROM `signs.ts`. It spreads `SIGNS_VITALS` into `VITAL_SIGNS` at load, so a value imported back from
+ * it would be read before it exists whenever this file is the one loaded first. Nothing from `migrate.ts` is read at
+ * load either, for the same reason.
+ */
+
+import type { Sql } from '@braindog/ports';
+
+import { isCurrencyCode } from './coerce.ts';
+import { FORMAT_VERSION, KERNEL_MIGRATION } from './migrate.ts';
+import type { SignReader, SignReading, SignState } from './signs.ts';
+
+const HOUR = 3_600_000;
+
+/* ── the thresholds, one line each ───────────────────────────────────── */
+
+/** Writes of this many hours back are judged for their author: the scope's "the last day". */
+export const AUTHORED_WINDOW_HOURS = 24;
+/** Red when more than this many writes in the window have no author. */
+export const UNAUTHORED_MOST = 0;
+/** Red when the record is more than this many updates behind the build. */
+export const FORMAT_BEHIND_MOST = 0;
+/** Red when more than this many amounts are not whole or have no currency. */
+export const AMOUNTS_BROKEN_MOST = 0;
+
+/** The kinds of line that change a list's items. Every other kind signed `system` is the kernel's own work by grammar. */
+export const ITEM_WRITES: readonly string[] = ['create', 'edit', 'state', 'link', 'tag', 'untag', 'delete', 'restore'];
+
+/** An actor that is a value lost on the way, not an author: empty, or a JavaScript nothing written as text. */
+export const NO_AUTHOR: readonly string[] = ['', 'undefined', 'null'];
+
+/** What the nightly snapshot writes in its row's `taken` (kernel `writeNight`): the night schedule is its author. */
+export const NIGHT_TAKEN = 'nightly';
+
+/* ── helpers ───────────────────────────────────────────────────────────── */
+
+const reading = (state: SignState, value: number | null, said: string, facts: string[] = []): SignReading => ({ state, value, said, facts: facts.slice(0, 6) });
+
+/** `n thing` or `n things`. */
+const count = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+
+/** An id said as words, only where nothing declares a name: `gold-rate` is `gold rate`. */
+const plain = (id: string): string => id.replace(/[-_.:]+/g, ' ').trim();
+
+/** A JSON object, or `null`. */
+function parsed(text: string | null | undefined): Record<string, unknown> | null {
+  if (typeof text !== 'string') return null;
+  try {
+    const v: unknown = JSON.parse(text);
+    return v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Most first: `[name, n]` for each name, so a fact reads the busiest first. */
+function tally(all: readonly string[]): [string, number][] {
+  const by = new Map<string, number>();
+  for (const n of all) by.set(n, (by.get(n) ?? 0) + 1);
+  return [...by].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+type List = { id: string; name: string; title: string | null; money: string[] };
+
+/** Every live list: its id, the name a person reads, its title field and its money fields. */
+function lists(sql: Sql): Map<string, List> {
+  const out = new Map<string, List>();
+  for (const d of sql.all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 ORDER BY id")) {
+    const body = parsed(d.body);
+    const id = d.id.slice('register.'.length);
+    const fields = Array.isArray(body?.fields) ? (body.fields as unknown[]).filter((f): f is Record<string, unknown> => f !== null && typeof f === 'object') : [];
+    const name = typeof body?.name === 'string' && body.name.trim() !== '' ? body.name.trim() : plain(id);
+    const title = typeof body?.title === 'string' ? body.title : null;
+    out.set(id, { id, name, title, money: fields.filter((f) => f.type === 'money' && typeof f.id === 'string').map((f) => f.id as string) });
+  }
+  return out;
+}
+
+/** `A`, `A and B`, `A, B and C`, or the first three and how many more. */
+function names(all: readonly string[]): string {
+  const shown = all.slice(0, 3);
+  const more = all.length - shown.length;
+  if (more > 0) return `${shown.join(', ')} and ${more} more`;
+  return shown.length <= 1 ? (shown[0] ?? '') : `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)!}`;
+}
+
+/* ── writes-authored ───────────────────────────────────────────────────── */
+
+/**
+ * WHAT STANDS BEHIND A `system` WRITE, read across the whole write (`id = g OR batch = g`: the first line of a write is
+ * the batch its other lines carry, and a rule's lines carry the batch of the write that started it): a line signed by
+ * somebody else, a sentence the sweep wrote, or the night's own mark on the row it took.
+ */
+const BACKED = `SELECT 1 AS x FROM event WHERE (id = ? OR batch = ?) AND (
+    (actor <> 'system' AND trim(actor) NOT IN (SELECT value FROM json_each(?)))
+    OR (note IS NOT NULL AND trim(note) <> '')
+    OR (kind = 'create' AND json_valid(to_v) AND json_extract(to_v, '$.taken') = ?)
+  ) LIMIT 1`;
+
+function readAuthored(sql: Sql, nowMs: number): SignReading {
+  const since = new Date(nowMs - AUTHORED_WINDOW_HOURS * HOUR).toISOString();
+  const writes = Number(sql.one<{ n: number }>('SELECT count(DISTINCT coalesce(batch, id)) AS n FROM event WHERE ts >= ?', since)?.n ?? 0);
+  if (writes === 0) return reading('none', null, `Nothing was written in the last ${AUTHORED_WINDOW_HOURS} hours.`);
+  const lines = sql.all<{ id: string; batch: string | null; actor: string; register: string | null }>(
+    `SELECT e.id, e.batch, e.actor, n.register FROM event e
+       LEFT JOIN entry n ON e.target_kind = 'entry' AND n.id = substr(e.target, 7)
+      WHERE e.ts >= ? AND (trim(e.actor) IN (SELECT value FROM json_each(?)) OR (e.actor = 'system' AND e.kind IN (SELECT value FROM json_each(?))))
+      ORDER BY e.ts, e.rowid`,
+    since,
+    JSON.stringify(NO_AUTHOR),
+    JSON.stringify(ITEM_WRITES),
+  );
+  /* ONE WRITE IS ONE COUNT, however many fields it touched: the lines are grouped by the write they belong to. */
+  const groups = new Map<string, { nobody: boolean; register: string | null }>();
+  for (const l of lines) {
+    const g = l.batch ?? l.id;
+    const was = groups.get(g);
+    const nobody = NO_AUTHOR.includes(l.actor.trim());
+    groups.set(g, { nobody: (was?.nobody ?? false) || nobody, register: was?.register ?? l.register });
+  }
+  const bare = [...groups].filter(([g, w]) => w.nobody || sql.one(BACKED, g, g, JSON.stringify(NO_AUTHOR), NIGHT_TAKEN) === undefined);
+  const facts = [`${count(writes, 'write')} in the last ${AUTHORED_WINDOW_HOURS} hours, ${bare.length} without an author.`];
+  if (bare.length <= UNAUTHORED_MOST) return reading('green', 0, `Every write in the last ${AUTHORED_WINDOW_HOURS} hours has an author.`, facts);
+  const all = lists(sql);
+  const where = (register: string | null): string => (register === null ? 'the record itself' : (all.get(register)?.name ?? plain(register)));
+  const nobody = tally(bare.filter(([, w]) => w.nobody).map(([, w]) => where(w.register)));
+  const unbacked = tally(bare.filter(([, w]) => !w.nobody).map(([, w]) => where(w.register)));
+  facts.push(...nobody.map(([name, n]) => `${count(n, 'write')} to ${name} signed by nobody.`));
+  facts.push(...unbacked.map(([name, n]) => `${count(n, 'write')} to ${name} signed by BrainDog with no schedule, script or add-on behind ${n === 1 ? 'it' : 'them'}.`));
+  const at = tally(bare.map(([, w]) => where(w.register))).map(([name]) => name);
+  return reading('red', bare.length, `${count(bare.length, 'write')} in the last ${AUTHORED_WINDOW_HOURS} hours ${bare.length === 1 ? 'has' : 'have'} no author: ${names(at)}.`, facts);
+}
+
+/* ── format-current ────────────────────────────────────────────────────── */
+
+function readFormat(sql: Sql): SignReading {
+  /* A FILE WITH NO RECORD MADE IN IT is nothing to judge by, as every sign reads an empty record (`signs.ts`). */
+  const own = sql.one<{ format_ver: number }>('SELECT format_ver FROM record LIMIT 1')?.format_ver;
+  if (own === undefined) return reading('none', null, 'No record has been made in this file yet.');
+  const applied = sql.all<{ version: number }>('SELECT version FROM migration ORDER BY version').map((r) => Number(r.version));
+  const have = new Set(applied);
+  const missing = Array.from({ length: KERNEL_MIGRATION }, (_, i) => i + 1).filter((v) => !have.has(v));
+  const newer = applied.filter((v) => v > KERNEL_MIGRATION);
+  /* THE TWO PLACES THE FORMAT TRAVELS (`applyOne`): `dog_meta`, which an export reads, and the record's own line. */
+  const meta = sql.one<{ value: string }>("SELECT value FROM dog_meta WHERE key = 'format'")?.value;
+  const said: string[] = [];
+  const facts = [`Format ${FORMAT_VERSION} is what this build reads, with ${count(KERNEL_MIGRATION, 'update')} to the layout.`];
+  if (missing.length > 0) {
+    said.push(`This record is ${count(missing.length, 'update')} behind this build.`);
+    facts.push(`${count(applied.filter((v) => v <= KERNEL_MIGRATION).length, 'update')} of ${KERNEL_MIGRATION} are in.`);
+  }
+  if (newer.length > 0) said.push(`This record was written by a newer build, ${count(newer.length, 'update')} ahead of this one.`);
+  const wrong = [meta === undefined || Number(meta) !== FORMAT_VERSION, Number(own) !== FORMAT_VERSION].filter(Boolean).length;
+  if (meta === undefined) said.push('Its file does not say its format.');
+  else if (Number(meta) !== FORMAT_VERSION) said.push(`Its file says format ${String(meta).slice(0, 20)} where this build reads format ${FORMAT_VERSION}.`);
+  if (Number(own) !== FORMAT_VERSION) facts.push(`The record says format ${String(own)} of itself.`);
+  const behind = missing.length + newer.length + wrong;
+  if (behind <= FORMAT_BEHIND_MOST) return reading('green', 0, `This record is in format ${FORMAT_VERSION} with all ${KERNEL_MIGRATION} updates in.`, facts);
+  if (said.length === 0) said.push(`The record says format ${String(own)} of itself where this build reads format ${FORMAT_VERSION}.`);
+  return reading('red', behind, said.join(' '), facts);
+}
+
+/* ── amounts-whole ─────────────────────────────────────────────────────── */
+
+type Fault = 'fraction' | 'number' | 'currency';
+
+/** What a fact says of each fault, after the bill and its list. */
+const FAULT_SAID: Record<Fault, string> = { fraction: 'holds a fraction of its smallest unit', number: 'holds no number', currency: 'holds no currency' };
+
+/**
+ * Why one stored amount is not whole minor units with a currency, or `null` when it is. An empty field is fine. A bare
+ * number, as an older import left one, has no currency, and a bare `12.5` is said as the fraction it also is.
+ */
+export function amountFault(v: unknown): Fault | null {
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v === 'number') return Number.isInteger(v) ? 'currency' : 'fraction';
+  if (typeof v !== 'object' || Array.isArray(v)) return 'currency';
+  const { amount, currency } = v as { amount?: unknown; currency?: unknown };
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return 'number';
+  if (!Number.isInteger(amount)) return 'fraction';
+  return typeof currency === 'string' && isCurrencyCode(currency) ? null : 'currency';
+}
+
+function readAmounts(sql: Sql): SignReading {
+  const holding = [...lists(sql).values()].filter((l) => l.money.length > 0);
+  if (holding.length === 0) return reading('none', null, 'No list on this record holds an amount.');
+  let held = 0;
+  const broken: { list: string; what: string | null; why: Fault }[] = [];
+  for (const l of holding)
+    for (const row of sql.all<{ fields: string }>('SELECT fields FROM entry WHERE register = ? AND deleted_at IS NULL', l.id)) {
+      const fields = parsed(row.fields) ?? {};
+      for (const f of l.money) {
+        const v = fields[f];
+        if (v === undefined || v === null || v === '') continue;
+        held++;
+        const why = amountFault(v);
+        const t = l.title === null ? null : fields[l.title];
+        if (why !== null) broken.push({ list: l.name, what: typeof t === 'string' && t.trim() !== '' ? t.trim().slice(0, 60) : null, why });
+      }
+    }
+  if (held === 0) return reading('none', null, 'No amount is held on this record yet.');
+  const facts = [`${count(held, 'amount')} held, ${broken.length} not whole or without a currency.`];
+  if (broken.length <= AMOUNTS_BROKEN_MOST) return reading('green', 0, 'Every amount is whole, with its currency.', facts);
+  facts.push(...broken.map((b) => `${b.what ?? 'One amount'} in ${b.list} ${FAULT_SAID[b.why]}.`));
+  const at = tally(broken.map((b) => b.list)).map(([name]) => name);
+  return reading('red', broken.length, `${count(broken.length, 'amount')} ${broken.length === 1 ? 'is' : 'are'} not whole or ${broken.length === 1 ? 'has' : 'have'} no currency, in ${names(at)}.`, facts);
+}
+
+/* ── the list ──────────────────────────────────────────────────────────── */
+
+const kernel = (sign: string, name: string, thresholds: Record<string, number>, read: NonNullable<SignReader['read']>): SignReader => ({ sign, name, hand: 'kernel', version: 1, thresholds, read });
+
+/**
+ * THE THREE, in SHL-A06's order. `signs.ts` joins them to `VITAL_SIGNS` with `...SIGNS_VITALS`. The ids are kebab case,
+ * as PRF-A01's are; a person reads the names.
+ */
+export const SIGNS_VITALS: readonly SignReader[] = [
+  kernel('writes-authored', 'Every write has an author', { AUTHORED_WINDOW_HOURS, UNAUTHORED_MOST }, (sql, nowMs) => readAuthored(sql, nowMs)),
+  kernel('format-current', 'The record is in the current format', { FORMAT_BEHIND_MOST }, (sql) => readFormat(sql)),
+  kernel('amounts-whole', 'Every amount is whole', { AMOUNTS_BROKEN_MOST }, (sql) => readAmounts(sql)),
+];

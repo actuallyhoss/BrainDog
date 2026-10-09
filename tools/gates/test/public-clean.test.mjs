@@ -148,13 +148,16 @@ test('(b) and (c) hold on this repository as it is', () => {
 
 /**
  * THE LIST ONLY SHRINKS. The ceiling was the list as it was written (9 October): 99 files, 590 lines; 97 and 588 once
- * packages/mcp/src/index.ts named none; 81 and 382 once LCH-C11 job 3 swept packages/kernel/test. Lower these as
- * the sweep takes entries off; raising them is the one edit this test exists to make deliberate.
+ * packages/mcp/src/index.ts named none; 81 and 382 once LCH-C11 job 3 swept packages/kernel/test; 62 and 204 once jobs
+ * 4, 5 and 7 swept packages/record, packages/mcp and apps/cli's 19 files (batch 44); 43 and 148 once the kernel, mcp
+ * and seed source left and two render and two page-live files went (batch 45); 1 and 6 once the web, the cli's source
+ * and the render lint went (batch 46); 0 and 0 once the record's index named none (batch 47). The sweep is done, so a
+ * ceiling above 0 now is a raise, and raising them is the one edit this test exists to make deliberate.
  */
 test('the allowance never grows', () => {
   const files = Object.keys(ALLOWED);
   const lines = Object.values(ALLOWED).reduce((a, n) => a + n, 0);
-  assert.ok(files.length <= 81, `ALLOWED holds ${files.length} files, over the ceiling of 81`);
-  assert.ok(lines <= 382, `ALLOWED holds ${lines} lines, over the ceiling of 382`);
+  assert.ok(files.length <= 0, `ALLOWED holds ${files.length} files, over the ceiling of 0`);
+  assert.ok(lines <= 0, `ALLOWED holds ${lines} lines, over the ceiling of 0`);
   assert.ok(Object.values(ALLOWED).every((n) => Number.isInteger(n) && n > 0), 'every entry is a count of one or more');
 });

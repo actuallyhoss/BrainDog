@@ -19,8 +19,8 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { conflictFault, installFault, installOrder, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, stagedBatch, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
-import { configReads, configValue, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
+import { conflictFault, installFault, installOrder, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { KEYS_REACH_ALL, approvalLines, configReads, configValue, egressChanged, egressOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
 import { normaliseChecked } from './theme-check.ts';
 
@@ -208,8 +208,11 @@ const offered = (items: readonly { id: string; title: string }[]): string => {
   return `${shown.map((e) => e.title || e.id).join(', ')}${more} (by id: ${shown.map((e) => e.id).join(', ')})`;
 };
 
-/** A key an arrangement needs, worked out by the record (REC-A06 step 6): its label, the one host it opens, and whether a run by itself uses it. */
-export type ArrangeNeed = { label: string; opens: string; scheduled: boolean };
+/**
+ * A key an arrangement needs, worked out by the record (REC-A06 step 6): its label, the one host it opens, whether a run by
+ * itself uses it, and the parts that need it (F67), so Decide unticks the part a missing key holds and leaves the rest.
+ */
+export type ArrangeNeed = { label: string; opens: string; scheduled: boolean; parts: string[] };
 
 /**
  * THE KEYS IT NEEDS, FROM THE CALLS IT WOULD MAKE, as the kernel prints each (`CALLS OUT <host> · <cadence> · grant
@@ -217,8 +220,8 @@ export type ArrangeNeed = { label: string; opens: string; scheduled: boolean };
  * cannot be asked for that nothing in the arrangement opens, nor one left out that something does. A call with a cadence
  * runs with nobody signed in, so its keys are a scheduled run's.
  */
-export function needsOf(approve: readonly string[]): ArrangeNeed[] {
-  const out = new Map<string, ArrangeNeed>();
+export function needsOf(approve: readonly string[]): Omit<ArrangeNeed, 'parts'>[] {
+  const out = new Map<string, Omit<ArrangeNeed, 'parts'>>();
   for (const line of approve) {
     const m = /^CALLS OUT (.+?) · (.*)$/u.exec(line);
     if (!m) continue;
@@ -241,6 +244,96 @@ export function needsOf(approve: readonly string[]): ArrangeNeed[] {
     }
   }
   return [...out.values()];
+}
+
+/**
+ * THE KEYS IT NEEDS, EACH WITH THE PARTS THAT NEED IT (F67), so Decide unticks the part a missing key holds and leaves the
+ * rest. `owners` is each part's own lines; a key two parts call out with is both parts'.
+ */
+export function needsByPart(approve: readonly string[], owners: ReadonlyMap<string, readonly string[]>): ArrangeNeed[] {
+  return needsOf(approve).map((n) => ({
+    ...n,
+    parts: [...owners].filter(([, lines]) => needsOf(lines).some((m) => m.label === n.label)).map(([part]) => part),
+  }));
+}
+
+/**
+ * One call out of an arrangement, listed on the question by host and how often (REC-A06 step 5): the part that makes it,
+ * the host it goes to, the interval it runs on (`null` when only a rule runs it), and the most a rule may make in a day.
+ */
+export type ArrangeCall = { part: string; host: string | null; every: string | null; per_day: number | null };
+type Call = ArrangeCall;
+const callAt = (part: string, host: string | null, every: string | null, per_day: number | null): Call => ({ part, host, every, per_day });
+
+/**
+ * TWO ARRANGEMENTS WITH ONE CAUSE AS ONE QUESTION (REC-A06 step 8): the open one, widened with the parts of the next, which
+ * govern files in its place and notes once. Both are bodies as `prepare` filed them, so nothing here is the proposer's.
+ *
+ * WHAT BOTH CARRY IS SAID ONCE. An add-on installed by both, a line both call out and a part both hold are one; a page or
+ * a declaration both send is the next one's, as the later reading; settings run in order, so the later value stands;
+ * entries are the open one's and then the next one's, the next one's links moved past the open one's. A key both need is
+ * one key, needed by the parts of both.
+ */
+export function arrangeUnion(open: Record<string, unknown>, next: Record<string, unknown>): Record<string, unknown> {
+  const list = (x: unknown): unknown[] => (Array.isArray(x) ? x : []);
+  const maps = (x: unknown): Body[] => list(x).filter(isMap);
+  const once = <T>(items: readonly T[], key: (t: T) => string): T[] => [...new Map(items.map((t) => [key(t), t] as const)).values()];
+  const out: Body = { ...open };
+  const set = (key: string, items: unknown[]) => {
+    if (items.length === 0) delete out[key];
+    else out[key] = items;
+  };
+  set('why', once([...list(open.why), ...list(next.why)], (w) => JSON.stringify(w)).slice(0, 12));
+  if (out.usecase === undefined && next.usecase !== undefined) out.usecase = next.usecase;
+  set('alongside', [...new Set([...list(open.alongside), ...list(next.alongside)])]);
+  const a = isMap(open.packs) ? open.packs : {};
+  const b = isMap(next.packs) ? next.packs : {};
+  const packs: Body = {};
+  for (const verb of ['install', 'enable', 'disable']) {
+    const ids = [...new Set([...list(a[verb]), ...list(b[verb])])];
+    if (ids.length > 0) packs[verb] = ids;
+  }
+  if (open.packs !== undefined || next.packs !== undefined) out.packs = packs;
+  set('plan', once([...maps(open.plan), ...maps(next.plan)], (s) => `${String(s.pack)}${s.replan === true ? ' again' : ''}`));
+  /* THE LINE EVERY KEY SHARES STAYS LAST, where `approvalLines` puts it. */
+  const lines = [...new Set([...list(open.approve), ...list(next.approve)].filter((l): l is string => typeof l === 'string'))];
+  set('approve', [...lines.filter((l) => l !== KEYS_REACH_ALL), ...lines.filter((l) => l === KEYS_REACH_ALL)]);
+  /* A PAGE OR A DECLARATION BOTH SEND IS THE NEXT ONE'S, in the open one's place. */
+  const later = (key: string) => {
+    const mine = maps(open[key]);
+    const theirs = maps(next[key]);
+    return [...mine.map((x) => theirs.find((y) => y.id === x.id) ?? x), ...theirs.filter((y) => !mine.some((x) => x.id === y.id))];
+  };
+  set('pages', later('pages'));
+  set('declarations', later('declarations'));
+  set('settings', [...maps(open.settings), ...maps(next.settings)]);
+  const first = maps(open.rows).length;
+  set('rows', [
+    ...maps(open.rows),
+    ...maps(next.rows).map((r) => (isMap(r.links) ? { ...r, links: Object.fromEntries(Object.entries(r.links).map(([f, to]) => [f, typeof to === 'number' ? to + first : to])) } : r)),
+  ]);
+  set('calls', once([...maps(open.calls), ...maps(next.calls)], (c) => `${String(c.part)} ${String(c.host)} ${String(c.every)}`));
+  /* A PART BOTH HOLD IS ONE, needing what either said it needs. */
+  const parts = new Map<string, Body>();
+  for (const p of [...maps(open.parts), ...maps(next.parts)]) {
+    const had = parts.get(String(p.id));
+    const requires = [...new Set([...list(had?.requires), ...list(p.requires)])];
+    parts.set(String(p.id), { ...(had ?? p), ...(requires.length === 0 ? {} : { requires }) });
+  }
+  set('parts', [...parts.values()]);
+  const needs = new Map<string, Body>();
+  for (const n of [...maps(open.needs), ...maps(next.needs)]) {
+    const had = needs.get(String(n.label));
+    needs.set(
+      String(n.label),
+      had === undefined
+        ? n
+        : { ...had, opens: had.opens || n.opens, scheduled: had.scheduled === true || n.scheduled === true, parts: [...new Set([...list(had.parts), ...list(n.parts)])] },
+    );
+  }
+  set('needs', [...needs.values()]);
+  if (isMap(open.names) || isMap(next.names)) out.names = { ...(isMap(open.names) ? open.names : {}), ...(isMap(next.names) ? next.names : {}) };
+  return out;
 }
 
 /** A part's id: a handle the accept names, never shown. */
@@ -516,9 +609,19 @@ export function arranger(d: ArrangeDeps) {
   /**
    * `kept` is each declaration an update leaves as the owner changed it, with the name the owner gave it. `order` is the
    * packs in the order they install, which is the order a proposal files and `apply` runs. `state` is the record as the
-   * last of them leaves it, which an arrangement's pages are linted against.
+   * last of them leaves it, which an arrangement's pages are linted against. `calls` is each pack's own lines and what
+   * it calls out, so a key and a call are said beside the part that needs them (F67), never only for the whole.
    */
-  type Planned = { order: string[]; plan: Body[]; approve: string[]; state: Installed; config: Map<string, Record<string, ConfigDecl>>; packs: Map<string, Pack>; kept: Map<string, string> };
+  type Planned = {
+    order: string[];
+    plan: Body[];
+    approve: string[];
+    state: Installed;
+    config: Map<string, Record<string, ConfigDecl>>;
+    packs: Map<string, Pack>;
+    kept: Map<string, string>;
+    calls: Map<string, { approve: string[]; out: Call[] }>;
+  };
 
   /**
    * A declaration by the name the record holds for it now, which for one the owner changed is theirs and not the pack's.
@@ -555,7 +658,7 @@ export function arranger(d: ArrangeDeps) {
     }
     const ids = installOrder(coming, base);
     let state: Installed = base;
-    const out: Planned = { order: ids, plan: [], approve: [], state: base, config: new Map(), packs: new Map(), kept: new Map() };
+    const out: Planned = { order: ids, plan: [], approve: [], state: base, config: new Map(), packs: new Map(), kept: new Map(), calls: new Map() };
     for (const id of ids) {
       const read = await packOf(id, docs, heldBy(state), useCaseFor(ids, id));
       if (!read.ok) return read;
@@ -630,6 +733,7 @@ export function arranger(d: ArrangeDeps) {
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),
       });
       out.approve.push(...diff.approve.filter((line) => !out.approve.includes(line)));
+      out.calls.set(id, { approve: [...diff.approve], out: diff.calls_out.filter((c) => c.change !== 'same').map((c) => callAt(`install:${id}`, c.host, c.every || null, c.per_day)) });
       out.config.set(id, pack.manifest.config ?? {});
       out.packs.set(id, pack);
       /* THE RECORD AS THE INSTALL LEAVES IT, from `declare`, which stages it. The fold this replaced carried
@@ -809,6 +913,7 @@ export function arranger(d: ArrangeDeps) {
     rows: readonly Body[];
     choices: readonly Body[];
     names: Record<string, string>;
+    declarations?: readonly Body[];
   }): Part[] {
     const out: Part[] = [];
     const requires = (ids: readonly string[]) => (ids.length === 0 ? {} : { requires: [...new Set(ids)] });
@@ -849,6 +954,24 @@ export function arranger(d: ArrangeDeps) {
         (o.planned.packs.get(q)?.declarations ?? []).some((decl) => decl.kind === 'register' && text.has(decl.id.slice('register.'.length)) && !kernel.register(decl.id.slice('register.'.length))),
       );
       out.push({ id: `page:${slug}`, kind: 'page', label: `The ${said} page`, page: String(page.id), ...requires(from.map((q) => `install:${q}`)) });
+    }
+    /* A DECLARATION IS A PART OF ITS OWN (REC-A06 step 5), named by its own name and needing the install that brings a
+       list it reads. govern's `partsOf` adds the settings it reads. */
+    for (const decl of o.declarations ?? []) {
+      const id = String(decl.id);
+      const own = isMap(decl.body) ? [decl.body.name, decl.body.title].find((x): x is string => typeof x === 'string' && x.trim() !== '') : undefined;
+      const said = own?.trim() ?? (o.names[id] || id.slice(id.indexOf('.') + 1).replace(/[-_.]+/gu, ' '));
+      const reads = new Set<string>();
+      const walk = (x: unknown): void => {
+        if (typeof x === 'string') reads.add(x.replace(/^register\./u, ''));
+        else if (Array.isArray(x)) x.forEach(walk);
+        else if (isMap(x)) Object.values(x).forEach(walk);
+      };
+      walk(decl.body);
+      const from = o.planned.order.filter((q) =>
+        (o.planned.packs.get(q)?.declarations ?? []).some((x) => x.kind === 'register' && !kernel.register(x.id.slice('register.'.length)) && reads.has(x.id.slice('register.'.length))),
+      );
+      out.push({ id: `declaration:${id}`, kind: 'declaration', label: `${decl.was === 0 ? 'Add' : 'Change'} ${said}`, declaration: id, ...requires(from.map((q) => `install:${q}`)) });
     }
     for (const c of o.choices) out.push({ ...c, id: `choice:${String(c.id)}`, kind: 'choice', label: String(c.question) });
     return out;
@@ -1050,8 +1173,13 @@ export function arranger(d: ArrangeDeps) {
        earlier update in the arrangement retires, it asked the page nothing more. A page over `rates` filtering on
        `nosuch` was filed and refused at the accept, after both packs had installed. The planned record holds the lists
        as the packs leave them, so `lint` reads each page against those and nothing is skipped. */
+    /* THE DECLARATIONS FIRST, against the record as the packs leave it, and then the pages beside them, so a page over a
+       list this declares reads that list. */
+    const declared = declarationsOf(body.declarations, planned.value.state);
+    if (!declared.ok) return declared;
     const staged = pages.map((p) => ({ id: String(p.id), kind: 'page' as const, body: p.body as never }));
-    const unfit = staged.length === 0 ? null : kernel.lint(staged, ...plannedOf(planned.value.state));
+    const declaring = declared.value.filed.map((x) => ({ id: String(x.id), kind: x.kind as Declaration['kind'], body: x.body as never }));
+    const unfit = staged.length === 0 ? null : kernel.lint([...declaring, ...staged], ...plannedOf(planned.value.state));
     if (unfit) return { ok: false, refusal: { ...unfit, at: `body.pages${unfit.at ? `: ${unfit.at}` : ''}` } };
 
     const settings: Body[] = [];
@@ -1064,6 +1192,9 @@ export function arranger(d: ArrangeDeps) {
     /* A SETTING A DECLARATION READS, on an add-on this does not install, plans that add-on again (`replanned`). */
     const again: Body[] = [];
     const calls: string[] = [];
+    /* EACH PART'S OWN LINES AND CALLS, so a key and a call out are said beside the part that makes them (F67). */
+    const lines = new Map<string, string[]>();
+    const heard: Call[] = [];
     const sentFor = new Map<string, Body>();
     for (const s of settings) if (!order.value.install.includes(String(s.pack))) sentFor.set(String(s.pack), { ...(sentFor.get(String(s.pack)) ?? {}), ...(s.values as Body) });
     for (const [pack, values] of sentFor) {
@@ -1072,6 +1203,8 @@ export function arranger(d: ArrangeDeps) {
       if (!one.ok) return { ok: false, refusal: { ...(one as { refusal: Refusal }).refusal, at: 'body.settings' } };
       again.push(...one.value.plan);
       calls.push(...one.value.approve);
+      lines.set(`setting:${pack}`, one.value.approve);
+      heard.push(...(one.value.calls.get(pack)?.out ?? []).map((c) => ({ ...c, part: `setting:${pack}` })));
     }
     if (body.voice !== undefined) {
       const said = voiceOf(body.voice, 'body.voice', order.value.install);
@@ -1092,10 +1225,15 @@ export function arranger(d: ArrangeDeps) {
     if (!choices.ok) return choices;
 
     const names = namesFor(planned.value, lead ?? speakerNow() ?? order.value.install.find((id) => id.startsWith(USE_CASE)) ?? null);
-    const approve = [...new Set([...planned.value.approve, ...enable.flatMap((id) => kernel.callsWhenEnabled(id)), ...calls])];
-    /* WHAT IT NEEDS IS THE RECORD'S TO SAY, from what it calls out; a `needs` the proposer sent is not read. */
-    const needs = needsOf(approve);
-    const parts = partsOf({ planned: planned.value, sent: sh.sent, enable, disable, settings, pages, rows, choices: choices.value, names });
+    const approve = [...new Set([...planned.value.approve, ...enable.flatMap((id) => kernel.callsWhenEnabled(id)), ...calls, ...[...declared.value.lines.values()].flat()])];
+    for (const id of planned.value.order) lines.set(`install:${id}`, planned.value.calls.get(id)?.approve ?? []);
+    for (const id of enable) lines.set(`enable:${id}`, kernel.callsWhenEnabled(id));
+    for (const [part, said] of declared.value.lines) lines.set(part, said);
+    const listedCalls = [...planned.value.order.flatMap((id) => planned.value.calls.get(id)?.out ?? []), ...heard, ...declared.value.calls];
+    /* WHAT IT NEEDS IS THE RECORD'S TO SAY, from what it calls out, with the parts that need each; a `needs` the proposer
+       sent is not read. */
+    const needs = needsByPart(approve, lines);
+    const parts = partsOf({ planned: planned.value, sent: sh.sent, enable, disable, settings, pages, rows, choices: choices.value, names, declarations: declared.value.filed });
     return ok({
       ...(typeof body.usecase === 'string' ? { usecase: body.usecase } : {}),
       ...(beside.length === 0 ? {} : { alongside: beside.map((id) => id.slice(USE_CASE.length)) }),
@@ -1112,10 +1250,81 @@ export function arranger(d: ArrangeDeps) {
       ...(pages.length === 0 ? {} : { pages }),
       ...(settings.length === 0 ? {} : { settings }),
       ...(rows.length === 0 ? {} : { rows }),
+      ...(declared.value.filed.length === 0 ? {} : { declarations: declared.value.filed }),
+      ...(listedCalls.length === 0 ? {} : { calls: listedCalls }),
       ...(parts.length === 0 ? {} : { parts }),
       ...(Object.keys(names).length === 0 ? {} : { names }),
     });
   }
+
+  /**
+   * THE DECLARATIONS AN ARRANGEMENT CARRIES (REC-A06 step 5), each `{ id, kind, body }`, checked as a `change` is: the
+   * kernel's own checks over the batch, with the record laid under it as the add-ons before it leave it, and what each
+   * calls out worked out here from its body, never from the proposer. Only a call that is new, or whose host, key or
+   * fields differ from the one installed, is asked about (the kernel's `review`). A page goes under `pages`, where it is
+   * drawn as one. Each is filed with `was`, the version it replaces (`0` for none), so a press after somebody else moved
+   * it lands nothing.
+   */
+  function declarationsOf(raw: unknown, state: Installed): Result<{ filed: Body[]; lines: Map<string, string[]>; calls: Call[] }> {
+    const out = { filed: [] as Body[], lines: new Map<string, string[]>(), calls: [] as Call[] };
+    if (raw === undefined) return ok(out);
+    const shape = 'A declaration is {"id":"<kind>.<name>","kind":"<kind>","body":{...}}, as a change installs one.';
+    if (!Array.isArray(raw) || raw.length === 0 || raw.length > 12) return refuse('VALUE_MALFORMED', `declarations is a list of one to 12. ${shape}`, 'body.declarations');
+    const live = new Map(kernel.declarations().map((r) => [r.id, r]));
+    for (const [i, d] of raw.entries()) {
+      const at = `body.declarations[${i}]`;
+      if (!isMap(d) || typeof d.id !== 'string' || typeof d.kind !== 'string' || !d.id.startsWith(`${d.kind}.`) || d.id.length === d.kind.length + 1 || !isMap(d.body))
+        return refuse('VALUE_MALFORMED', shape, at);
+      if (d.kind === 'page') return refuse('VALUE_MALFORMED', 'A page goes under pages, where Decide draws it as one: {"pages":[{"id":"page.<slug>","kind":"page","body":{...}}]}.', at);
+      if (out.filed.some((x) => x.id === d.id)) return refuse('VALUE_MALFORMED', `Two declarations here are both ${d.id}. Send each once.`, `${at}.id`);
+      const was = live.get(d.id);
+      out.filed.push({ id: d.id, kind: d.kind, body: d.body, was: was ? was.version : 0 });
+    }
+    const staged = out.filed.map((x) => ({ id: String(x.id), kind: x.kind as Declaration['kind'], body: x.body as never }));
+    const unfit = kernel.lint(staged, ...plannedOf(state));
+    if (unfit) {
+      /* THE ONE AT FAULT IS NAMED, as `body.declarations[i]`, so the proposer knows which part to send again: the kernel
+         says it by its id in the fix, and the longest id the fix holds is the one it means. */
+      const i = out.filed.reduce((best, x, j) => (unfit.fix.includes(String(x.id)) && (best < 0 || String(x.id).length > String(out.filed[best]!.id).length) ? j : best), out.filed.length === 1 ? 0 : -1);
+      return { ok: false, refusal: { ...unfit, at: `body.declarations${i < 0 ? '' : `[${i}]`}${unfit.at ? `: ${unfit.at}` : ''}` } };
+    }
+    for (const x of out.filed) {
+      const e = newCall(x, live.get(String(x.id)));
+      if (e === null) continue;
+      const part = `declaration:${String(x.id)}`;
+      out.lines.set(part, approvalLines([e]));
+      out.calls.push(callAt(part, e.host, e.every, e.per_day));
+    }
+    return ok(out);
+  }
+
+  /**
+   * WHAT A DECLARATION CALLS OUT THAT THE ONE LIVE UNDER ITS ID DID NOT, as the kernel's `review` and govern's `newEgress`
+   * read a change: an ingest's or a script's call, or a digest's webhook. `null` when it calls out nothing new, so a feed
+   * changed without changing where it calls is asked nothing, at filing and at the yes alike. A digest posting the
+   * record's lists to a host went in with no line before this.
+   */
+  function newCall(x: Body, held: { body: string } | undefined): ReturnType<typeof egressOf> {
+    if (x.kind !== 'ingest' && x.kind !== 'script' && x.kind !== 'digest') return null;
+    const opens = (label: string) => kernel.opensOf(label);
+    const e = egressOf(x.body, undefined, opens);
+    if (e === null || held === undefined) return e;
+    try {
+      const before = egressOf(JSON.parse(held.body), undefined, opens);
+      return before !== null && !egressChanged(before, e) ? null : e;
+    } catch {
+      return e;
+    }
+  }
+
+  /** A declaration as a person says it: its own name, or the words of its id after the kind. */
+  const declSaid = (x: Body): string => {
+    const own = isMap(x.body) ? [x.body.name, x.body.title].find((y): y is string => typeof y === 'string' && y.trim() !== '') : undefined;
+    const id = String(x.id);
+    if (own !== undefined) return own.trim();
+    const said = id.slice(id.indexOf('.') + 1).replace(/[-_.]+/gu, ' ');
+    return said.charAt(0).toUpperCase() + said.slice(1);
+  };
 
   /**
    * THE ROWS A PLAN IS MADE OF (`slash.ts` `formedRows`), checked against the lists as they are: each list is here, each field
@@ -1218,18 +1427,39 @@ export function arranger(d: ArrangeDeps) {
   }
 
   async function apply(kind: 'pack' | 'settings' | 'arrange', body: Body, actor: string): Promise<Result<Body>> {
-    const done: { installed: string[]; enabled: string[]; disabled: string[]; pages: string[]; settings: string[]; rows: string[] } = {
+    const done: { installed: string[]; enabled: string[]; disabled: string[]; pages: string[]; settings: string[]; rows: string[]; declarations: string[] } = {
       installed: [],
       enabled: [],
       disabled: [],
       pages: [],
       settings: [],
       rows: [],
+      declarations: [],
     };
-    const stopped = <T>(r: Result<T>): Result<Body> => {
+    /* ALL OR NONE WITHIN WHAT WAS TAKEN (REC-A06). Each write that lands leaves how to take it back, and one that will not
+       land takes every earlier one back, newest first, so the question reopens holding the whole take with none of it
+       applied, and a second yes starts from where the first did. This said "Already applied, and kept: ..." and kept
+       them: an install landed, the settings after it were refused, and the reopened question held an add-on that was
+       already in. Only what cannot be taken back is still said as kept, in those words: an update, whose older version
+       the host no longer offers, and an add-on that took over declarations another add-on had handed it. */
+    const undo: { said: string; back: () => Promise<boolean> }[] = [];
+    const stopped = async <T>(r: Result<T>): Promise<Result<Body>> => {
       const refusal = (r as { refusal?: Refusal }).refusal ?? { code: 'VALUE_MALFORMED' as const, fix: 'It would not apply.' };
-      const kept = [...done.installed, ...done.enabled, ...done.disabled, ...done.pages, ...done.settings];
+      const kept: string[] = [];
+      for (const step of undo.splice(0).reverse()) if (!(await step.back().catch(() => false))) kept.unshift(step.said);
       return { ok: false, refusal: { ...refusal, fix: kept.length === 0 ? refusal.fix : `${refusal.fix} Already applied, and kept: ${kept.join(', ')}.` } };
+    };
+    /* WHAT A SETTING HELD BEFORE THIS PRESS, key by key, so taking it back writes those values and not the defaults. */
+    const heldValues = (pack: string, keys: readonly string[]): Body => {
+      const read = kernel.packConfig(pack);
+      if (!read.ok) return {};
+      return Object.fromEntries(keys.map((k) => [k, Object.hasOwn(read.value.values, k) ? read.value.values[k] : (read.value.config[k]?.default ?? null)]));
+    };
+    /* A DECLARATION PUT BACK AS IT WAS: the body it held, or retired when this press brought it. */
+    const putBack = (id: string, kind: string, was: { body: string } | undefined) => async (): Promise<boolean> => {
+      if (was === undefined) return kernel.retire([id], { actor }).ok;
+      const out = await kernel.install([{ id, kind, body: JSON.parse(was.body) } as never], undefined, { actor });
+      return out.ok;
     };
 
     const packs = (isMap(body.packs) ? body.packs : {}) as { install?: string[]; enable?: string[]; disable?: string[] };
@@ -1238,12 +1468,44 @@ export function arranger(d: ArrangeDeps) {
     const disable = kind === 'pack' && typeof body.disable === 'string' ? [body.disable] : (packs.disable ?? []);
     const approved = Array.isArray(body.approve) ? (body.approve as string[]) : [];
     const docs = new Map<string, Body>(kind === 'pack' && typeof body.install === 'string' && isMap(body.doc) ? [[body.install, body.doc]] : []);
+    const declarations = kind === 'arrange' && Array.isArray(body.declarations) ? (body.declarations as Body[]).filter(isMap) : [];
 
     const steps = Array.isArray(body.plan) ? (body.plan as Body[]) : [];
     /* A PATCH WHOSE ENTRY MOVED SINCE THE QUESTION WAS FILED REFUSES ALL OF IT, before anything is installed, so the owner
        is never left with the add-ons in and the changes they were for refused. */
     const stale = kind === 'arrange' && Array.isArray(body.rows) ? staleOf(body.rows as Body[]) : null;
     if (stale) return stopped(stale);
+    /* AND SO DOES A DECLARATION SOMEBODY CHANGED SINCE, or one that would now call out something the owner was not shown. */
+    const live = new Map(kernel.declarations().map((r) => [r.id, r]));
+    for (const [i, x] of declarations.entries()) {
+      const now = live.get(String(x.id))?.version ?? 0;
+      if (typeof x.was === 'number' && x.was !== now)
+        return stopped(refuse('PLAN_STALE', `${declSaid(x)} changed after this was proposed. Propose it again against it as it is now.`, `body.declarations[${i}]`));
+      /* AGAINST THE ONE LIVE NOW, which is the one it was filed against: a call it makes already is not asked again. */
+      const e = newCall(x, live.get(String(x.id)));
+      if (e !== null && !approved.includes(e.line))
+        return stopped(refuse('PLAN_STALE', `${declSaid(x)} now calls out something this proposal did not show: ${e.line}. Propose it again.`, 'body.approve'));
+    }
+    /* AND A TURN ON THAT WOULD CALL OUT SOMETHING UNSHOWN, before anything is in. */
+    for (const id of enable) {
+      const unshown = on(id) ? [] : kernel.callsWhenEnabled(id).filter((line) => !approved.includes(line));
+      if (unshown.length > 0) return stopped(refuse('PLAN_STALE', `${id} would call out something this proposal did not show: ${unshown.join('; ')}. Propose it again.`, 'body.approve'));
+    }
+    /* AND THE ENTRIES, written once and rolled back, when every list they go to is here already: a value the list refuses
+       is found before an add-on is in, not after. Entries for a list this press brings are written after it, as before. */
+    const rows = kind === 'arrange' && Array.isArray(body.rows) ? (body.rows as Body[]) : [];
+    if (rows.length > 0 && rows.every((r) => kernel.register(String(r.register)) !== undefined)) {
+      const rehearsal = { rows: null as Result<string[]> | null };
+      try {
+        kernel.transaction(() => {
+          rehearsal.rows = writeRows(rows, actor);
+          throw rehearsal;
+        });
+      } catch (e) {
+        if (e !== rehearsal) throw e;
+      }
+      if (rehearsal.rows !== null && !rehearsal.rows.ok) return stopped(rehearsal.rows);
+    }
     /* A SETTING A DECLARATION READS PLANS ITS ADD-ON AGAIN (`replan`), installed over itself at the version it holds. */
     const replans = steps.filter((x) => x.replan === true && typeof x.pack === 'string').map((x) => String(x.pack));
     /* WHAT IS INSTALLED FROM THE HOST'S WHOLE CATALOGUE IS FETCHED AGAIN, held to its checksum again, and must be the version
@@ -1266,6 +1528,14 @@ export function arranger(d: ArrangeDeps) {
     if (kind === 'arrange' || kind === 'settings')
       for (const s of settings)
         if (typeof s.pack === 'string' && isMap(s.values) && [...(packs.install ?? []), ...replans].includes(s.pack)) given.set(s.pack, { ...(given.get(s.pack) ?? {}), ...s.values });
+    /* AN ADD-ON INSTALLED OVER ITSELF AGAIN, with the settings in hand: how a replan is taken back. */
+    const again = async (id: string, values: Body): Promise<boolean> => {
+      const state = d.installed();
+      const pack = await packOf(id, docs, heldBy(state), useCaseFor(packs.install ?? [], id));
+      if (!pack.ok) return false;
+      const diff = await plan(pack.value, state, { settings: values });
+      return (await install(pack.value, diff, d.host(actor), diff.planHash, diff.approve)).ok;
+    };
     const filled = new Set<string>();
     const spokeBefore = speakerNow();
     for (const id of [...(packs.install ?? []), ...replans.filter((x) => !(packs.install ?? []).includes(x))]) {
@@ -1285,6 +1555,7 @@ export function arranger(d: ArrangeDeps) {
         const back = await kernel.enablePack(id, { actor });
         if (!back.ok) return stopped(back);
         done.enabled.push(id);
+        undo.push({ said: id, back: async () => kernel.disablePack(id, { actor }).ok });
         continue;
       }
       const state = d.installed();
@@ -1295,28 +1566,35 @@ export function arranger(d: ArrangeDeps) {
       if (unshown.length > 0)
         return stopped(refuse('PLAN_STALE', `${id} now calls out something this proposal did not show: ${unshown.join('; ')}. Propose it again.`, 'body.approve'));
       const from = state.packs.find((p) => p.id === id)?.version ?? null;
+      /* WHAT TAKES IT BACK, read before it lands: a fresh add-on comes out whole, and one over itself goes in again with the
+         settings it held. One that had declarations live under it before (a handover), or an update, cannot be. */
+      const before = replanning ? heldValues(id, Object.keys(given.get(id) ?? {})) : null;
+      const fresh = from === null && running(id) === undefined;
       const put = await install(pack.value, diff, d.host(actor), diff.planHash, diff.approve);
       if (!put.ok) return stopped(put);
       if (given.has(id)) filled.add(id);
-      if (replanning) continue;
+      if (replanning) {
+        undo.push({ said: id, back: () => again(id, before ?? {}) });
+        continue;
+      }
       done.installed.push(id);
+      undo.push({ said: id, back: async () => fresh && uninstall(id, d.host(actor)).ok });
       await carryUpdate(d.catalogue, kernel, id, from, actor);
       await afterInstall(id, actor);
     }
     for (const id of enable) {
       if (on(id)) continue;
-      const unshown = kernel.callsWhenEnabled(id).filter((line) => !approved.includes(line));
-      if (unshown.length > 0)
-        return stopped(refuse('PLAN_STALE', `${id} would call out something this proposal did not show: ${unshown.join('; ')}. Propose it again.`, 'body.approve'));
       const back = await kernel.enablePack(id, { actor });
       if (!back.ok) return stopped(back);
       done.enabled.push(id);
+      undo.push({ said: id, back: async () => kernel.disablePack(id, { actor }).ok });
     }
     for (const id of disable) {
       if (running(id)?.disabled_at !== null) continue;
       const off = kernel.disablePack(id, { actor });
       if (!off.ok) return stopped(off);
       done.disabled.push(id);
+      undo.push({ said: id, back: async () => (await kernel.enablePack(id, { actor })).ok });
     }
     /* THE VOICE RULE, WRITTEN DOWN (`declare` `voiceWrites`). The use case an arrangement sets the record up for speaks;
        any other use case this press added or turned on goes beside the one that spoke before, which keeps its voice. Every
@@ -1326,12 +1604,38 @@ export function arranger(d: ArrangeDeps) {
     const joined = [...done.installed.filter((id) => !updated.has(id)), ...done.enabled].filter((id) => id.startsWith(USE_CASE));
     if (lead !== null || joined.length > 0) {
       const speaker = (lead !== null && on(lead) ? lead : null) ?? (spokeBefore !== null && on(spokeBefore) ? spokeBefore : null) ?? speakerNow();
-      if (speaker !== null) writeVoice(kernel, speaker, actor);
+      if (speaker !== null) {
+        const spoke = new Map(speakingStates(kernel).flatMap((s) => (s.id.startsWith(USE_CASE) ? [[s.id, s.speaks ?? null] as const] : [])));
+        writeVoice(kernel, speaker, actor);
+        /* TAKEN BACK BY WRITING WHAT EACH USE CASE STILL HERE SAID BEFORE. One this press brought is gone by then. */
+        undo.push({
+          said: 'the voice',
+          back: async () =>
+            [...spoke].every(([id, was]) => !stateOf(id) || speakingStates(kernel).find((s) => s.id === id)?.speaks === was || kernel.setPackConfig(id, { [SPEAKS]: was }, { actor }).ok),
+        });
+      }
+    }
+    /* THE DECLARATIONS IT CARRIES (REC-A06 step 5), one install, each at the version the owner was shown, before the pages
+       that may read them. */
+    if (declarations.length > 0) {
+      const was = declarations.map((x) => live.get(String(x.id)));
+      const put = await kernel.install(
+        declarations.map((x) => ({ id: String(x.id), kind: x.kind, body: x.body }) as never),
+        declarations.map((x, i) => ({ id: String(x.id), version: was[i]?.version ?? 0 })),
+        { actor },
+      );
+      if (!put.ok) return stopped('refusal' in put ? put : refuse('PLAN_STALE', 'A declaration here changed after this was proposed. Propose it again.', 'body.declarations'));
+      for (const [i, x] of declarations.entries()) {
+        done.declarations.push(String(x.id));
+        undo.push({ said: declSaid(x), back: putBack(String(x.id), String(x.kind), was[i]) });
+      }
     }
     for (const page of Array.isArray(body.pages) ? (body.pages as Body[]) : []) {
+      const was = kernel.declarations().find((r) => r.id === String(page.id));
       const put = await kernel.install([{ id: String(page.id), kind: 'page', body: page.body as never }], undefined, { actor });
       if (!put.ok) return stopped(put);
       done.pages.push(String(page.id));
+      undo.push({ said: String(page.id), back: putBack(String(page.id), 'page', was) });
     }
     for (const s of settings) {
       /* ALREADY WRITTEN BY ITS INSTALL, which kept the values as chosen. */
@@ -1339,12 +1643,13 @@ export function arranger(d: ArrangeDeps) {
         if (!done.settings.includes(String(s.pack))) done.settings.push(String(s.pack));
         continue;
       }
+      const before = heldValues(String(s.pack), Object.keys(isMap(s.values) ? s.values : {}));
       const set = kernel.setPackConfig(String(s.pack), s.values, { actor });
       if (!set.ok) return stopped(set);
       done.settings.push(String(s.pack));
+      undo.push({ said: String(s.pack), back: async () => kernel.setPackConfig(String(s.pack), before, { actor }).ok });
     }
     /* THE ROWS, ALL OR NONE, in order, each written as the owner who accepted, with a link set to the row it points at. */
-    const rows = kind === 'arrange' && Array.isArray(body.rows) ? (body.rows as Body[]) : [];
     if (rows.length > 0) {
       const wrote = writeRows(rows, actor);
       if (!wrote.ok) return stopped(wrote);

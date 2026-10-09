@@ -41,6 +41,20 @@ async function signsOf(name, over) {
 /** The automation signs, which the profiles do not exercise yet (PRF-A08's recipes). */
 const FLOW = new Set(['scripts-paused', 'scripts-refused', 'scripts-sourceless', 'automations-failed', 'automations-parked', 'automations-idle', 'automations-stopped-chains']);
 
+/**
+ * The signs of what runs by itself and what arrives (SHL-C01, `signs-actions.ts`) that may read green on the untended
+ * record, each with why. The others of the five read none on both profiles: neither declares a scheduled action.
+ */
+const UNTENDED_GREEN = new Map([
+  ['schedule-failed', 'tending is answering and filing; a job that runs by itself dies of its own fault, and none does here'],
+  ['arrivals-unverified', 'both profiles send only verified texts, tended or not; an arrival nothing verified is the sender\'s, not the owner\'s'],
+]);
+
+/** And the one that may read red on the tended record, with why. */
+const TENDED_RED = new Map([
+  ['doors-silent', 'both profiles stop their texts about three and a half days before the end (`lastDaysQuiet` 2 and the spread in `daysOf`), a door gone quiet; on default nothing files, so it reads none'],
+]);
+
 const of = (signs, id) => {
   const s = signs.find((x) => x.sign === id);
   assert.ok(s, `${id} is not a sign`);
@@ -64,8 +78,10 @@ test('DEFAULT: arrivals, numbers and questions by cause read red, in the sentenc
   for (const id of HIS) assert.equal(of(signs, id).state, 'red', `${id} read ${of(signs, id).state}: ${of(signs, id).said}`);
   /* AND NONE GREEN: an untended record that reads well anywhere has a sign that cannot see it. Outside the automation
      signs (SHL-D01, `signs-flow.ts`): neither profile writes a script or an automation that fails, so on both they
-     read what is true of that, which is green or nothing to judge by. */
-  for (const s of signs) if (!FLOW.has(s.sign)) assert.notEqual(s.state, 'green', `${s.sign} reads green on an untended record: ${s.said}`);
+     read what is true of that, which is green or nothing to judge by. And outside `UNTENDED_GREEN`, each with its reason. */
+  for (const s of signs) if (!FLOW.has(s.sign) && !UNTENDED_GREEN.has(s.sign)) assert.notEqual(s.state, 'green', `${s.sign} reads green on an untended record: ${s.said}`);
+  for (const [id, why] of UNTENDED_GREEN) t.diagnostic(`default     may read green: ${id}, since ${why}`);
+  for (const id of ['actions-paused', 'actions-held', 'doors-silent']) assert.equal(of(signs, id).state, 'none', `${id} read ${of(signs, id).state}: ${of(signs, id).said}`);
 
   const arrivals = of(signs, 'arrivals-filed');
   assert.match(arrivals.said, /^30 messages have waited more than a day\. The newest transaction in Ledger is from \d{1,2} [A-Z][a-z]+\./);
@@ -81,7 +97,10 @@ test('LIVED-WELL: the same weeks tended, and every sign the kernel reads is gree
   const { signs } = await signsOf('lived-well');
   for (const s of signs) t.diagnostic(`lived-well  ${s.state.padEnd(5)} ${s.name}: ${s.said}`);
   for (const id of KERNEL) assert.equal(of(signs, id).state, 'green', `${id} read ${of(signs, id).state}: ${of(signs, id).said}`);
-  for (const s of signs) assert.notEqual(s.state, 'red', `${s.sign} reads red on a tended record: ${s.said}`);
+  for (const s of signs) if (!TENDED_RED.has(s.sign)) assert.notEqual(s.state, 'red', `${s.sign} reads red on a tended record: ${s.said}`);
+  for (const [id, why] of TENDED_RED) t.diagnostic(`lived-well  may read red: ${id}, since ${why}`);
+  for (const id of ['actions-paused', 'actions-held']) assert.equal(of(signs, id).state, 'none', `${id} read ${of(signs, id).state}: ${of(signs, id).said}`);
+  for (const id of ['schedule-failed', 'arrivals-unverified']) assert.equal(of(signs, id).state, 'green', `${id} read ${of(signs, id).state}: ${of(signs, id).said}`);
   assert.equal(of(signs, 'arrivals-filed').said, 'Every message has been filed or set aside within a day.');
   assert.equal(of(signs, 'numbers-arrive').said, 'Every series has its numbers on time.');
   assert.equal(of(signs, 'questions-by-cause').said, 'No question is waiting.');

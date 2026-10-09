@@ -275,6 +275,17 @@ export const account = {
   identitySignInWays: 'How you sign in',
   identityPasskeysWay: 'Passkeys',
   identityPasskeys: (n: number) => (n === 0 ? 'None yet' : n === 1 ? 'One passkey' : `${n} passkeys`),
+
+  /* A PASSKEY'S NAME (LCH-A04): each passkey is a line under How you sign in, named for the device that made it, and
+     renamed here through the host's `POST /auth/passkey/rename`. The host's own sentence answers an empty name. */
+  identityPasskeyWay: 'Passkey',
+  identityRenamePasskey: 'Rename',
+  identityRenamePasskeyOf: (name: string) => `Rename ${name}`,
+  identityPasskeyNameLabel: 'Name for this passkey',
+  identityPasskeyNameHint: 'Up to 64 characters, such as the device it lives on.',
+  identityPasskeySaveName: 'Save',
+  identityPasskeyRenamed: (name: string) => `This passkey is called ${name} now.`,
+  identityPasskeyNotRenamed: 'The name did not save. Try again.',
   identityChangeEmail: 'Change email',
   identityEmailLabel: 'New email address',
   identityEmailHint: 'We mail a link to it. Nothing changes until you open that link.',
@@ -557,6 +568,17 @@ export const account = {
      just shown the address belongs to whoever is reading it. */
   /* MAIL THAT IS NOT GOING OUT (`magic: 'down'`): no link is offered, and this line says why and what to do instead. */
   mailDown: 'Mail is not going out right now. Use a passkey, or try in a few minutes.',
+  /* THE FIRST DOOR (`routes/signin/first-door.ts`): a record with no way into it yet (`noDoorYet`), and a first run whose
+     way in is a letter that cannot go (`mailHeld`). The claim link is handed to whoever provisioned the record and is
+     never mailed (`33 §4`), so it is in a terminal and not an inbox. */
+  firstDoorTitle: 'This record has no passkey yet.',
+  firstDoorWhy: 'Open the link you were given when the record was set up. You can add a passkey once you are in.',
+  /* IN PLACE OF `mailDown`, which says "Use a passkey" to somebody who has none yet. */
+  firstDoorMailDown: 'Mail is not going out right now, so your sign-in link cannot be sent. Try again in a few minutes.',
+  /* THE SENT SCREEN'S SECOND LINE, a minute after the press (LCH-A04): the host answers alike for any address, so the
+     screen cannot know the letter failed, and this is what it can say that is true either way. */
+  linkSentLater: 'Nothing yet? Check the address, or send it again.',
+  sendAgain: 'Send it again',
   googleSaid: {
     cancelled: 'Google sign-in was cancelled. Nothing changed.',
     unknown: 'Nobody here signs in with that Google address. Use another way in, or start a record of your own.',

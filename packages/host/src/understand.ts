@@ -188,8 +188,8 @@ function cached(store: UnderstandStore | undefined, hashes: readonly string[]): 
   if (!store || hashes.length === 0 || !ready(store)) return out;
   try {
     const rows = store.all<{ hash: string; same: number; confidence: number }>(
-      `SELECT hash, same, confidence FROM understand_verdict WHERE hash IN (${hashes.map(() => '?').join(', ')})`,
-      ...hashes,
+      `SELECT hash, same, confidence FROM understand_verdict WHERE hash IN (SELECT value FROM json_each(?))`,
+      JSON.stringify(hashes),
     );
     for (const r of rows) out.set(r.hash, { hash: r.hash, same: r.same === 1, confidence: r.confidence });
   } catch {

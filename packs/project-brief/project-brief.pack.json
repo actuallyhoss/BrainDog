@@ -1,16 +1,17 @@
 {
   "pack": "project-brief",
-  "version": "1.2.1",
+  "version": "2.0.0",
   "title": "Project brief",
-  "summary": "A line on what each project is, the plan for it, and what is in the way.",
-  "changes": "Nothing a person sees changed: the note on the block it adds to a project's page is reworded.",
+  "summary": "What each project is in a line, the stage it is at, what is in the way, and a plan made of steps you can tick.",
+  "changes": "The plan is steps now, each with what it gains, ticked by hand or when the task or thread it links to is done. A project has a stage. The one line is About, the one Portfolio already has. A brief written before keeps its words: run Bring briefs over once to move them.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
     "format": 1,
     "primitives": 1,
     "packs": {
-      "portfolio": "^1.0.0"
+      "portfolio": "^1.16.0",
+      "work": "^1.0.0"
     }
   },
   "extends": {
@@ -20,19 +21,44 @@
           "id": "summary",
           "label": "One line",
           "type": "text",
-          "search": true
+          "retired": true
         },
         {
           "id": "plan",
           "label": "The plan",
           "type": "list",
-          "of": "text"
+          "of": "text",
+          "retired": true
         },
         {
           "id": "blockers",
           "label": "In the way",
           "type": "list",
           "of": "text"
+        },
+        {
+          "id": "stage",
+          "label": "Stage",
+          "type": "enum",
+          "index": true,
+          "values": [
+            "raw",
+            "researched",
+            "designed",
+            "building",
+            "ready",
+            "live",
+            "blocked"
+          ],
+          "labels": {
+            "raw": "Raw",
+            "researched": "Researched",
+            "designed": "Designed",
+            "building": "Building",
+            "ready": "Ready",
+            "live": "Live",
+            "blocked": "Blocked"
+          }
         }
       ]
     }
@@ -41,7 +67,7 @@
     {
       "page": "page.project",
       "after": "Where it stands",
-      "note": "The one line, the plan and what is in the way, on the project page itself, where a person reads about the project.",
+      "note": "The one line, the stage and what is in the way, on the project page itself, where a person reads about the project.",
       "block": {
         "kind": "cards",
         "heading": "The brief",
@@ -50,13 +76,13 @@
         "where": "name is {{name}}",
         "columns": [
           {
-            "field": "summary",
+            "field": "about",
             "label": "One line",
             "as": "title"
           },
           {
-            "field": "plan",
-            "label": "The plan",
+            "field": "stage",
+            "label": "Stage",
             "as": "fact"
           },
           {
@@ -66,11 +92,230 @@
           }
         ],
         "limit": 1,
-        "empty": "Nobody has written a line, a plan or what is in the way for {{name}} yet."
+        "empty": "Nobody has written a line, a stage or what is in the way for {{name}} yet."
+      }
+    },
+    {
+      "page": "page.project",
+      "after": "Where it stands",
+      "note": "The plan as steps in order, each with what it gains, ticked where it is read.",
+      "block": {
+        "kind": "steps",
+        "heading": "Plan steps",
+        "span": 12,
+        "source": "register.plan_steps",
+        "where": "thing is {{name}}",
+        "columns": [
+          {
+            "field": "what"
+          },
+          {
+            "field": "gain",
+            "label": "What it gains"
+          }
+        ],
+        "order": [
+          {
+            "field": "rank",
+            "dir": "asc"
+          },
+          {
+            "field": "seq",
+            "dir": "asc"
+          }
+        ],
+        "limit": 50,
+        "empty": "No steps in the plan for {{name}} yet."
       }
     }
   ],
   "declarations": [
+    {
+      "register": "plan_steps",
+      "name": "Plan steps",
+      "one": "plan step",
+      "holds": "the plan for each project, one step at a time, in order, with what each one gains and whether it is done",
+      "title": "what",
+      "fields": [
+        {
+          "id": "what",
+          "label": "Step",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "gain",
+          "label": "What it gains",
+          "type": "text",
+          "search": true
+        },
+        {
+          "id": "thing",
+          "label": "Project",
+          "type": "ref",
+          "to": "things",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "rank",
+          "label": "Order",
+          "type": "int"
+        },
+        {
+          "id": "done",
+          "label": "Done",
+          "type": "bool",
+          "default": false
+        },
+        {
+          "id": "task",
+          "label": "Task",
+          "type": "ref",
+          "to": "tasks",
+          "index": true
+        },
+        {
+          "id": "track",
+          "label": "Thread",
+          "type": "ref",
+          "to": "tracks",
+          "index": true
+        }
+      ],
+      "steps": {
+        "of": "thing",
+        "done": "done",
+        "order": "rank"
+      }
+    },
+    {
+      "rule": "project_brief_tick_task",
+      "name": "Tick the plan steps linked to a task when the task is done",
+      "on": {
+        "written": {
+          "register": "tasks",
+          "op": [
+            "update"
+          ],
+          "fields": [
+            "state"
+          ]
+        }
+      },
+      "when": "state is done",
+      "steps": [
+        {
+          "script": {
+            "id": "project_brief_tick",
+            "as": "ticking"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "project_brief_tick_thread",
+      "name": "Tick the plan steps linked to a thread when the thread is done",
+      "on": {
+        "written": {
+          "register": "tracks",
+          "op": [
+            "update"
+          ],
+          "fields": [
+            "state"
+          ]
+        }
+      },
+      "when": "state is done",
+      "steps": [
+        {
+          "script": {
+            "id": "project_brief_tick",
+            "as": "ticking"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "project_brief_bring_over",
+      "name": "Bring briefs over",
+      "on": {
+        "manual": true
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "project_brief_about",
+            "as": "about"
+          }
+        },
+        {
+          "script": {
+            "id": "project_brief_steps",
+            "as": "steps"
+          }
+        }
+      ]
+    },
+    {
+      "script": "project_brief_tick",
+      "title": "Tick the plan steps linked to a task or a thread that is done",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "tasks",
+        "tracks",
+        "plan_steps"
+      ],
+      "writes": [
+        "plan_steps"
+      ],
+      "source": "/* A STEP LINKED TO A TASK OR A THREAD IS DONE WHEN IT IS. A rule starts this when either moves to done; the row is read\n   again first, because the run is queued and a host takes it later, so one reopened in between ticks nothing. A step\n   already ticked is left as it is, and nothing is unticked when the work is reopened: a person ticks a step back by hand. */\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  if (!id) return;\n  const row = await ctx.record.get(id);\n  if (!row || row.fields.state !== 'done') return;\n  /* THE FIELD THAT POINTS AT ITS LIST: a ref is matched only against a row of the list it points at. */\n  const field = { tasks: 'task', tracks: 'track' }[row.register];\n  if (!field) return;\n  const open = await ctx.record.list('plan_steps', { all: [{ field, is: row.id }, { none: [{ field: 'done', is: true }] }] });\n  for (const step of open) ctx.update('plan_steps#' + step.seq, { done: true }, step.version);\n}\n"
+    },
+    {
+      "script": "project_brief_about",
+      "title": "Copy each project's One line into About where About is empty",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "things"
+      ],
+      "writes": [
+        "things"
+      ],
+      "limits": {
+        "writes": 1000
+      },
+      "source": "/* EVERY PROJECT, FIFTY SEQ NUMBERS AT A TIME. A script's list answers one page of fifty and takes no cursor, so a list\n   read whole stopped at fifty projects and a record with more never had the rest brought over. A window of fifty seq\n   numbers cannot be cut short, and the walk ends when fewer than a page lie past it. */\nasync function every(ctx, register) {\n  const out = [];\n  for (let from = 0; ; from += 50) {\n    const rest = await ctx.record.list(register, { field: 'seq', gt: from });\n    if (rest.length < 50) return out.concat(rest);\n    out.push(...(await ctx.record.list(register, { all: [{ field: 'seq', gt: from }, { field: 'seq', lte: from + 50 }] })));\n  }\n}\n\n/* THE ONE LINE IS PORTFOLIO'S ABOUT, SINCE project-brief 2.0.0, and a brief written before kept it in One line. Run once\n   after the update: each project whose About is empty takes its One line, and a project whose About anybody wrote keeps\n   it, with the run saying so where the two differ, since the old line is then drawn nowhere. Run again it finds nothing\n   to copy, so a second press changes nothing. */\nexport default async function run(ctx) {\n  for (const project of await every(ctx, 'things')) {\n    const line = typeof project.fields.summary === 'string' ? project.fields.summary.trim() : '';\n    const about = typeof project.fields.about === 'string' ? project.fields.about.trim() : '';\n    if (line === '') continue;\n    if (about === '') ctx.update('things#' + project.seq, { about: line }, project.version);\n    else if (about !== line) ctx.log(project.fields.name + ' kept its About. Its old one line was: ' + line);\n  }\n}\n"
+    },
+    {
+      "script": "project_brief_steps",
+      "title": "Make each line of a project's old plan a step, split into the step and what it gains at the last bracket",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "things",
+        "plan_steps"
+      ],
+      "writes": [
+        "plan_steps"
+      ],
+      "limits": {
+        "writes": 1000
+      },
+      "source": "/* EVERY ROW OF A LIST, FIFTY SEQ NUMBERS AT A TIME. A script's list answers one page of fifty and takes no cursor, so a\n   list read whole stopped at fifty, and a record with more projects, or more steps, was brought over in part or twice.\n   A window of fifty seq numbers cannot be cut short, and the walk ends when fewer than a page lie past it. */\nasync function every(ctx, register, options) {\n  const out = [];\n  for (let from = 0; ; from += 50) {\n    const rest = await ctx.record.list(register, { field: 'seq', gt: from }, options);\n    if (rest.length < 50) return out.concat(rest);\n    out.push(...(await ctx.record.list(register, { all: [{ field: 'seq', gt: from }, { field: 'seq', lte: from + 50 }] }, options)));\n  }\n}\n\n/* \"title (gain)\" as a step and what it gains, split at the bracket that opens the last one, so \"Ship it (v2 (beta))\"\n   gains \"v2 (beta)\" and \"Ship it (v2 (beta)) (first sale)\" gains \"first sale\": every word lands on one side or the other.\n   A line that does not end in a bracket, whose last bracket never opens, or that is nothing but one, is all step. */\nfunction split(line) {\n  const text = line.trim();\n  if (!text.endsWith(')')) return { what: text };\n  let depth = 0;\n  let at = -1;\n  for (let i = text.length - 1; i >= 0 && at < 0; i--) {\n    if (text[i] === ')') depth++;\n    else if (text[i] === '(' && --depth === 0) at = i;\n  }\n  const what = at > 0 ? text.slice(0, at).trim() : '';\n  if (what === '') return { what: text };\n  const gain = text.slice(at + 1, -1).trim();\n  return gain === '' ? { what } : { what, gain };\n}\n\n/* THE PLAN IS STEPS, SINCE project-brief 2.0.0, and a brief written before kept it as lines of text. Run once after the\n   update: each line of a project's old plan becomes a step under it, in the order the lines were written, after any step\n   the project already has. A line already made a step, even one since deleted, is passed over, so a second press writes\n   nothing twice and a step somebody added first does not keep the rest out. A run stops short of the most a script may\n   write and says so, and the next press takes the projects it did not reach. */\nexport default async function run(ctx) {\n  const had = new Map();\n  for (const step of await every(ctx, 'plan_steps', { includeDeleted: true })) {\n    const at = had.get(step.fields.thing) || { whats: new Set(), rank: 0 };\n    at.whats.add(step.fields.what);\n    if (typeof step.fields.rank === 'number' && step.fields.rank > at.rank) at.rank = step.fields.rank;\n    had.set(step.fields.thing, at);\n  }\n  let room = 900;\n  for (const project of await every(ctx, 'things')) {\n    const at = had.get(project.id) || { whats: new Set(), rank: 0 };\n    const lines = Array.isArray(project.fields.plan) ? project.fields.plan : [];\n    const steps = lines.filter((l) => typeof l === 'string' && l.trim() !== '').map(split).filter((s) => !at.whats.has(s.what));\n    if (steps.length === 0) continue;\n    if (steps.length > room) {\n      ctx.log('Stopped before ' + project.fields.name + '. Run it again to bring over the rest.');\n      return;\n    }\n    steps.forEach((step, i) => ctx.write('plan_steps', { ...step, thing: project.id, rank: at.rank + i + 1, done: false }));\n    room -= steps.length;\n  }\n}\n"
+    },
     {
       "page": "briefs",
       "title": "Briefs",
@@ -80,7 +325,8 @@
       },
       "icon": "thing",
       "requires": [
-        "register.things"
+        "register.things",
+        "register.plan_steps"
       ],
       "blocks": [
         {
@@ -123,9 +369,14 @@
               "width": "minmax(14ch,1fr)"
             },
             {
-              "field": "summary",
+              "field": "about",
               "label": "One line",
               "width": "minmax(24ch,2fr)"
+            },
+            {
+              "field": "stage",
+              "label": "Stage",
+              "width": "12ch"
             },
             {
               "field": "lane",
@@ -143,21 +394,25 @@
           "empty": "No project is in play."
         },
         {
-          "kind": "table",
+          "kind": "cards",
           "heading": "The plan",
           "span": 12,
           "source": "register.things",
-          "where": "lane is building or earning, plan is set",
+          "where": "lane is building or earning",
           "columns": [
             {
               "field": "name",
-              "label": "Project",
-              "width": "minmax(14ch,1fr)"
+              "as": "title"
             },
             {
-              "field": "plan",
-              "label": "The plan",
-              "width": "minmax(24ch,2fr)"
+              "field": "progress",
+              "label": "",
+              "as": "ring"
+            },
+            {
+              "field": "what",
+              "label": "Next step",
+              "as": "next"
             }
           ],
           "order": [
@@ -167,7 +422,7 @@
             }
           ],
           "limit": 50,
-          "empty": "No project in play has a plan written down."
+          "empty": "No project is in play."
         }
       ]
     }

@@ -1,0 +1,61 @@
+{
+  "id": "salma-arabic",
+  "name": "سلمى",
+  "who": "Bakes cakes and sweets at home in Cairo and takes orders on WhatsApp. She types in Arabic, Egyptian dialect, and reads the screen in English for now.",
+  "expects": "shop",
+  "standing": false,
+  "said": "أنا سلمى، عندي محل حلويات صغير في القاهرة وبنسى مين طلب إيه ومين دفع.",
+  "says": {
+    "plain": "أنا سلمى، عندي محل حلويات صغير في القاهرة وبنسى مين طلب إيه ومين دفع.",
+    "hard": "أنا سلمى، بعمل كيك في البيت والناس بتطلب مني على واتساب."
+  },
+  "chip": "I run a small shop",
+  "answer": "messages",
+  "answers": {
+    "name": "سلمى",
+    "currency": "EGP",
+    "kind": "messages",
+    "things": ["كيك", "بسبوسة", "كنافة"]
+  },
+  "email": "salma@people.braindog.test",
+  "slug": "salmas-sweets",
+  "zone": "Africa/Cairo",
+  "locale": "ar-EG",
+  "languages": ["ar-EG", "en"],
+  "start": "2026-10-05T10:00:00Z",
+  "first": "منى عايزة كيكة شوكولاتة يوم الخميس، دفعت 450",
+  "later": [
+    { "day": 7, "said": ["هدى عايزة بسبوسة كبيرة يوم السبت"] },
+    {
+      "day": 15,
+      "said": [
+        "ريم عايزة كنافة يوم الخميس",
+        "أحمد عايز كيكة عيد ميلاد يوم الجمعة",
+        "نادية عايزة علبة حلويات يوم السبت",
+        "يوسف عايز تورتة يوم الأحد"
+      ]
+    }
+  ],
+  "expect": {
+    "who": {
+      "question": "Who are you?",
+      "chips": 5,
+      "promises": [
+        { "says": "free, with no card", "match": "free\\b.{0,24}\\bno card" },
+        { "says": "nothing is saved until you keep it", "match": "nothing (is )?saved until you keep" },
+        { "says": "yours to export or move", "match": "yours to (export|move|take)" }
+      ]
+    },
+    "heard": {
+      "usecase": "shop",
+      "title": "حلويات سلمى",
+      "lit": ["سلمى", "محل حلويات صغير", "طلب", "دفع"],
+      "places": ["Today", "Orders", "Products", "People", "Money"]
+    },
+    "question": { "about": "arrivesBy", "choices": 3 },
+    "keep": { "lists": ["orders", "products", "people", "transactions"], "currency": "EGP" },
+    "tell": { "lists": ["people", "orders", "transactions"] },
+    "today": { "first": "source", "lists": ["orders", "people"] },
+    "offer": { "id": "week:orders", "before": 13, "after": 15 }
+  }
+}

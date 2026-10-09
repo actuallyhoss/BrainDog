@@ -251,8 +251,8 @@ export function presetOf(kind: ActionKind, id: string | null | undefined, held: 
 /**
  * The declaration's name, from what the person called it: `Orders from the shop` is `orders_from_the_shop`.
  *
- * A LETTER FIRST AND AT MOST 32, which every ingest name the product ships keeps to (`founder-poll.ts`). A name with no
- * letter in it at all makes none, and the sheet says to give it one.
+ * A LETTER FIRST AND AT MOST 32, which every ingest name the product ships keeps to (the live feed's `FEED_NAME_MOST`,
+ * `packs/live-feed/fill.ts`). A name with no letter in it at all makes none, and the sheet says to give it one.
  */
 export function nameOf(said: string): string | null {
   const id = said

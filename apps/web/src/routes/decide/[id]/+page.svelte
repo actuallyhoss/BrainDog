@@ -40,7 +40,21 @@
   import Arranged from './Arranged.svelte';
   import Applied from './Applied.svelte';
   import { heard } from '$lib/voice.svelte.ts';
-  import { appliedLines, arrangedOf, heldOf, isArranging, KEYS_CONTEXT, partialOf, type KeysContext, type Partial } from './arranged.ts';
+  import {
+    appliedLines,
+    arrangedOf,
+    asksTwice,
+    heldOf,
+    isArranging,
+    KEYS_CONTEXT,
+    partialOf,
+    stopping,
+    TICKS_CONTEXT,
+    ticksOf,
+    type KeysContext,
+    type Partial,
+    type TicksContext,
+  } from './arranged.ts';
   import { proposedOf } from './proposed.ts';
   import { updatesOf, words as changeWords } from './changes.ts';
   import { joinedCount, pickableOf, rowsToSend, words as pickWords } from './picked.ts';
@@ -98,6 +112,8 @@
     if (String(page.params.id) !== id) return closed(true, at);
     live = out.from === 'live' ? out.value : null;
     unticked = [];
+    partsOff = [];
+    again = false;
     chosenKey = null;
     refusal = out.from === 'refused' ? out.fix : '';
     from = out.from;
@@ -201,6 +217,24 @@
     },
     onheld: readHeld,
   } satisfies KeysContext);
+
+  /* THE PARTS OF AN ARRANGEMENT, A TICK EACH (REC-A07 step 2): the ones unticked by hand are kept here, and what Accept
+     sends is worked out from them and the keys the record holds (`ticksOf`), so a part whose key is missing is off
+     without anybody unticking it and comes back on once the key is held. */
+  let partsOff = $state<string[]>([]);
+  const taking = $derived(story?.takes ? ticksOf(story.takes, new Set(partsOff)) : null);
+  /* A LIVE DOOR THAT GOES WITH NOBODY TO TAKE IT (REC-A16) asks twice: the first press says what stops, the second sends. */
+  let again = $state(false);
+  setContext(TICKS_CONTEXT, {
+    get unticked() {
+      return new Set(partsOff);
+    },
+    tick(id: string, on: boolean) {
+      partsOff = on ? partsOff.filter((x) => x !== id) : [...partsOff, id];
+      noneTicked = false;
+      again = false;
+    },
+  } satisfies TicksContext);
 
   /** What an accepted arrangement did, and how far one got when the record stopped part way. */
   let applied = $state<string[]>([]);
@@ -308,8 +342,14 @@
     if (sending !== null || holding !== null || !question) return;
     deferring = false;
     fix = '';
-    noneTicked = key === 'accept' && pickable.length > 0 && picked === null;
+    noneTicked = key === 'accept' && ((pickable.length > 0 && picked === null) || taking?.parts?.length === 0);
     if (noneTicked) return;
+    /* THE FIRST ACCEPT OF ONE THAT STOPS MESSAGES BEING FILED SAYS SO AND SENDS NOTHING; the second sends. */
+    if (key === 'accept' && !again && asksTwice(story, taking?.parts)) {
+      again = true;
+      return;
+    }
+    if (key !== 'accept') again = false;
     /* WITH THE RECORD'S ONE LINE OPEN, another answer changes the choice and keeps the words already typed. */
     if (asked !== null) {
       asked = key;
@@ -589,8 +629,11 @@
     const accepting = a.option === 'accept' && about !== undefined && isArranging(about.kind) ? about : null;
     const had = accepting ? sidebarNow() : null;
     const rows = only ?? (a.option === 'accept' && picked ? picked : undefined);
-    const out = await answerQuestion(apiBase(), a.question, a.option, said, undefined, rows);
+    /* THE PARTS TICKED, on accepting an arrangement some of which is off; every part ticked sends none, the whole. */
+    const parts = accepting && taking?.parts ? taking.parts : undefined;
+    const out = await answerQuestion(apiBase(), a.question, a.option, said, undefined, rows, parts);
     sending = null;
+    again = false;
     /* THE RECORD KEEPS A REASON FOR THIS ONE: the line opens under the answers, focused, with the choice kept. */
     if (out.from === 'refused' && out.wants === 'reason' && said === undefined) {
       asked = key;
@@ -613,6 +656,14 @@
     fix = '';
     part = null;
     asked = null;
+    /* TAKEN IN PART: what was ticked is in, and the rest is the same question, open, read again so what is left is
+       what is drawn. Nothing is committed on this screen, since the question is not answered yet. */
+    if (accepting && out.from === 'written' && out.open && parts) {
+      toasts.push(copy.arrangeTookSome(parts.length), { intent: 'good' });
+      await invalidateAll();
+      await readLive(a.question);
+      return;
+    }
     const shown = question ? labelOf({ key: a.option, title: a.title }, question, []) : a.title;
     committed = { ...a, title: shown, reason: said?.trim() ?? '' };
     noteOffered = notedAfter(a.option, rows !== undefined);
@@ -1070,7 +1121,9 @@
                   </div>
                 </form>
               {/if}
-              {#if noneTicked}<p class="commit-fix" role="status" data-intent="bad">{pickWords.none}</p>{/if}
+              {#if noneTicked}<p class="commit-fix" role="status" data-intent="bad">{pickable.length > 0 ? pickWords.none : copy.arrangeTakeNone}</p>{/if}
+              <!-- ASKED TWICE: what stops being filed, said on the first Accept, with the mark and the words, never colour alone. -->
+              {#if again && story?.stops}<p class="commit-fix" role="status" data-intent="bad">{copy.arrangeStopsAgain(stopping(story, taking?.parts).map((s) => s.name))}</p>{/if}
               {#if fix && !deferring}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
             </section>
 

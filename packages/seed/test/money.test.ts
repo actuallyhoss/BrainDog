@@ -22,7 +22,7 @@ import type { Param, Row, Sql } from '@braindog/ports';
 import { refused, sayOf } from '@braindog/ports';
 
 import { ACCOUNTS, CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, PAGES, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, cashPoints, cashSeries, day, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
-import { MONEY_HOME_SETTING, MONEY_METRICS, MONEY_PAGES, MONEY_TARGET_SETTINGS, nightOf } from '../src/modules/money.ts';
+import { MONEY_METRICS, MONEY_PAGES, MONEY_TARGET_SETTINGS, nightOf } from '../src/modules/money.ts';
 import { USE_CASES } from '../src/usecases/index.ts';
 
 function openSqlite(): Sql {
@@ -349,12 +349,8 @@ test('THE WHOLE BOOK YOU OWE IS A FIGURE NOW, and it is the receivable one with 
   assert.equal(minor(last.net), minor(last.cash) + minor(last.owed_to_me) - minor(last.owed_by_me));
 });
 
-test('THE HOME CURRENCY SETTING HAS NO DEFAULT, because a figure converted at a rate nobody asked for looks like one a person chose', () => {
-  /* A DEFAULT OF `GBP` WAS TRIED AND MEASURED WRONG: `founder-poll.test.ts` holds a record with an Egyptian account and
-     a dollar account and asserts Cash now reads `null` until somebody chooses, and with the default in place it did
-     not. The question stays open until it is answered. */
-  assert.equal((MONEY_HOME_SETTING.home_currency as { default?: string }).default, undefined);
-});
+/* THE HOME CURRENCY HAS NO DEFAULT: `money-settings.test.ts` holds that on a record with an Egyptian account and a
+   dollar account, where Cash now reads nothing until somebody chooses. */
 
 /* ── every list that holds a dated amount is in the cash walk ────────────── */
 

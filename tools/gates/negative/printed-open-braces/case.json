@@ -1,0 +1,8 @@
+{
+  "gate": "printed",
+  "rule": "a template printed with single braces",
+  "expect": "pair of braces",
+  "findings": 1,
+  "total": 1,
+  "why": "A TEMPLATE PRINTED AND NOT FILLED, `{name}`: this gate's own `open-braces` rule, which the lint's double-brace rule does not see. The rest of the screen is the decoy every printed tree carries: a date in words, an amount, a run's handle beside its name and a person's name, none of which is a finding, so a rule that grew too wide takes the count above one."
+}

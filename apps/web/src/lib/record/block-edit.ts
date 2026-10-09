@@ -62,8 +62,10 @@ export const blockWords = {
   shortLabel: 'What its switch says',
   shortHelp: 'Both, or neither.',
   when: 'Show it only when',
-  whenHelp: 'A sentence about a figure, such as owed > 0. Empty draws it always.',
+  whenHelp: 'A sentence about a figure, such as owed > 0, or owed has nothing while it has no value yet. Leave it blank to show it always.',
   whenKept: 'This block is shown by a rule the editor cannot draw, so it is kept as written.',
+  whenNothing: 'Only when it has nothing',
+  whenBad: 'Name a figure, then > 0, < 10, = 3 or has nothing. Leave it blank to show it always.',
   sort: 'Sort by',
   sortNone: 'None',
   sortUp: 'Lowest first',
@@ -232,12 +234,89 @@ export function draftOf(block: BlockBody): Draft {
     first: typeof block.first === 'number' ? String(block.first) : '',
     shortWhere: text(short?.where),
     shortLabel: text(short?.label),
-    when: block.when === undefined || typeof block.when === 'string' ? text(block.when) : null,
+    when: whenSaid(block.when),
     empty: text(block.empty),
     sortField: sort?.field ?? '',
     sortDir: sort?.dir ?? 'asc',
     sortKept: block.order !== undefined && sort === null,
   };
+}
+
+/* ── when: a sentence in the sheet, a leaf in the record ─────────────────── */
+
+/**
+ * The kernel's comparisons and the signs the sheet writes them in. `drawnWhen` (`packages/kernel/src/pages.ts`) reads
+ * these six, and `empty` beside none of them (`declare.ts` refuses the two together).
+ */
+const SIGNS: readonly (readonly [string, string])[] = [
+  ['gte', '>='],
+  ['lte', '<='],
+  ['not', '!='],
+  ['gt', '>'],
+  ['lt', '<'],
+  ['is', '='],
+];
+const FIGURE = /^[a-z][a-z0-9_-]{0,31}(?::.+?)?$/u;
+const NUMBER = /^-?\d+(?:\.\d+)?$/u;
+/* THE WORDS FOR A FIGURE WITH NO VALUE, the first of each the one the sheet prints. */
+const NOTHING = ['has nothing', 'is empty', 'has no value'];
+const SOMETHING = ['has a value', 'is not empty', 'is set'];
+
+/**
+ * A typed `when` as the kernel's leaf: `owed > 0` is `{ metric: 'owed', gt: 0 }`, `cash-now has nothing` is
+ * `{ metric: 'cash-now', empty: true }`. `undefined` for an empty box (no condition) and `null` for words it cannot read.
+ */
+export function whenOf(said: string): Record<string, unknown> | null | undefined {
+  const t = said.trim().replace(/\s+/gu, ' ');
+  if (t === '') return undefined;
+  const lower = t.toLowerCase();
+  for (const [words, empty] of [
+    [NOTHING, true],
+    [SOMETHING, false],
+  ] as const)
+    for (const w of words)
+      if (lower.endsWith(` ${w}`)) {
+        const metric = t.slice(0, -w.length - 1).trim();
+        return FIGURE.test(metric) ? { metric, empty } : null;
+      }
+  for (const [op, sign] of SIGNS) {
+    const at = t.indexOf(sign);
+    if (at <= 0) continue;
+    const metric = t.slice(0, at).trim();
+    const n = t.slice(at + sign.length).trim();
+    if (!FIGURE.test(metric) || !NUMBER.test(n)) return null;
+    return { metric, [op]: Number(n) };
+  }
+  return null;
+}
+
+/** Whether the typed `when` is one the record would take: empty, or a sentence `whenOf` reads. */
+export const whenFits = (said: string): boolean => whenOf(said) !== null;
+
+/**
+ * A stored `when` as the sheet's sentence, `''` for none, or `null` when the sheet cannot say it and so keeps it.
+ *
+ * KEPT UNLESS IT READS BACK AS ITSELF: a leaf the sentence would turn into another leaf (a second comparison, a key the
+ * sheet has no words for) is shown as kept, never offered in a box that would change it on save.
+ */
+export function whenSaid(when: unknown): string | null {
+  if (when === undefined) return '';
+  if (typeof when === 'string') return when;
+  if (!isObject(when) || typeof when.metric !== 'string') return null;
+  let said: string | null = null;
+  if (typeof when.empty === 'boolean') said = `${when.metric} ${when.empty ? NOTHING[0] : SOMETHING[0]}`;
+  else for (const [op, sign] of SIGNS) if (typeof when[op] === 'number') said ??= `${when.metric} ${sign} ${String(when[op])}`;
+  return said !== null && same(whenOf(said), when) ? said : null;
+}
+
+/**
+ * The sentence "only when it has nothing" makes of what is typed: the figure kept, its test made `has nothing`.
+ * `null` when no figure is named yet, so the choice has nothing to say it about.
+ */
+export function whenNothing(said: string): string | null {
+  const leaf = whenOf(said);
+  const metric = isObject(leaf) && typeof leaf.metric === 'string' ? leaf.metric : FIGURE.test(said.trim()) ? said.trim() : null;
+  return metric === null ? null : `${metric} ${NOTHING[0]}`;
 }
 
 /** A typed count, read as decimal digits only (`Number('0x10')` is 16). `null` for anything else. */
@@ -303,7 +382,12 @@ export function patchOf(before: BlockBody, draft: Draft, where?: { value: unknow
     put('short', w && l ? { where: w, label: l } : undefined);
   }
 
-  if (draft.when !== null) put('when', draft.when.trim() || undefined);
+  /* THE SENTENCE GOES BACK AS THE KERNEL'S LEAF, which is the only `when:` it installs (`declare.ts`). One it cannot
+     read goes as typed, so the record's refusal names it rather than the sheet dropping it without a word. */
+  if (draft.when !== null) {
+    const leaf = whenOf(draft.when);
+    put('when', leaf === null ? draft.when.trim() : leaf);
+  }
   /* THE SORT IS WRITTEN AS THE KERNEL'S `order`, one term, and only when it says something new: a stored term with no
      `dir` already runs highest first, so the same field the same way goes back as it was written. */
   if (!draft.sortKept) {

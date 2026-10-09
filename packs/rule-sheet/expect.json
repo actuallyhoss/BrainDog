@@ -106,6 +106,12 @@
       "text": "UYW 12.3456"
     },
     {
+      "rule": "Values: money past sixteen digits prints every digit",
+      "page": "Values",
+      "selector": ".typed[data-form=\"money\"]",
+      "text": "JPY 900,719,925,474,099,312"
+    },
+    {
       "rule": "Values: a quantity is a number with its unit",
       "page": "Values",
       "selector": ".typed[data-form=\"quantity\"]",

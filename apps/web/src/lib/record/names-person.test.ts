@@ -18,7 +18,7 @@ test('WHERE SOMEONE WAS MET IS SAID IN WORDS, newest first, one line a place, an
     '2026-08-27 · commit 8b1e4d0 in portage',
     '2026-09-02 · commit c47d19e in portage',
     '2026-09-28 · mail: Renewal quote',
-    '2026-10-01 · mail from encore.example',
+    '2026-10-01 · mail from brightwell.example',
     '2026-10-03 · bank text',
     '2025-12-11 · import',
     '2026-09-30 · agent run S740',
@@ -26,13 +26,13 @@ test('WHERE SOMEONE WAS MET IS SAID IN WORDS, newest first, one line a place, an
   ];
   assert.deepEqual(seenIn(lines, NOW), [
     'A bank text, 3 Oct',
-    'A mail from Encore, 1 Oct',
+    'A mail from Brightwell, 1 Oct',
     'An agent run, 30 Sep',
     'A mail about “Renewal quote”, 28 Sep',
     '2 commits in portage, last on 2 Sep',
     'An import, 11 Dec 2025',
   ]);
-  for (const said of seenIn(lines, NOW)) assert.doesNotMatch(said, /8b1e4d0|c47d19e|S740|encore\.xyz|—/u, said);
+  for (const said of seenIn(lines, NOW)) assert.doesNotMatch(said, /8b1e4d0|c47d19e|S740|brightwell\.example|—/u, said);
 });
 
 test('A LINE IN NO SHAPE `meet` WRITES IS SAID AS WRITTEN, less any id or path in it', () => {
@@ -42,16 +42,16 @@ test('A LINE IN NO SHAPE `meet` WRITES IS SAID AS WRITTEN, less any id or path i
 });
 
 test('AN IDENTITY IS AN ADDRESS OR A HANDLE BY ITS SERVICE, and a folder, a repository or a domain is never one', () => {
-  assert.equal(identitySaid('email:sam@brain.dog'), 'sam@brain.dog');
-  assert.equal(identitySaid('github:sam'), 'GitHub · sam');
+  assert.equal(identitySaid('email:mara@lindqvist.example'), 'mara@lindqvist.example');
+  assert.equal(identitySaid('github:mara'), 'GitHub · mara');
   assert.equal(identitySaid('git:jokonkwo'), 'Git · jokonkwo');
   assert.equal(identitySaid('phone:+201000000000'), '+201000000000');
-  assert.equal(identitySaid('folder:/Users/sam/Developer'), null);
-  assert.equal(identitySaid('remote:github.com/sam/braindog'), null);
+  assert.equal(identitySaid('folder:/Users/mara/Developer'), null);
+  assert.equal(identitySaid('remote:github.com/mara/braindog'), null);
   assert.equal(identitySaid('domain:brain.dog'), null);
   assert.deepEqual(
-    identitiesOf({ email: 'sam@brain.dog', keys: ['email:sam@brain.dog', 'github:sam', 'folder:/Users/sam'], handles: ['git:sam'], aliases: ['Sam Avery'] }),
-    ['sam@brain.dog', 'GitHub · sam', 'Git · sam', 'Sam Avery'],
+    identitiesOf({ email: 'mara@lindqvist.example', keys: ['email:mara@lindqvist.example', 'github:mara', 'folder:/Users/mara'], handles: ['git:mara'], aliases: ['Mara Lindqvist'] }),
+    ['mara@lindqvist.example', 'GitHub · mara', 'Git · mara', 'Mara Lindqvist'],
     'each once, and the folder left out',
   );
 });
@@ -94,11 +94,11 @@ type Row = { id: string; seq: number; fields: Record<string, unknown>; deleted_a
 const row = (id: string, seq: number, fields: Record<string, unknown>, deleted = false): Row => ({ id, seq, fields, deleted_at: deleted ? '2026-10-01T09:00:00.000Z' : null });
 
 const CONTACTS: Row[] = [
-  row(SELF, 1, { name: 'Sam', email: 'sam@brain.dog', keys: ['email:sam@brain.dog', 'github:sam', 'folder:/Users/sam/Developer'], me: true, works_at: ORG, seen: ['2026-09-02 · commit c47d19e in portage'] }),
-  /* ROHAN WAS MET TWICE AND FOLDED TWICE: number 2 into number 4, and number 4 into number 3, the one kept. */
-  row(FOLD, 2, { name: 'rohanmehta', folded_into: MID }, true),
-  row(KEEP, 3, { name: 'Rohan Mehta', works_at: ORG, seen: ['2026-09-01 · commit 3f2a91c in portage', '2026-09-05 · commit 9a8b7c6 in portage'] }),
-  row(MID, 4, { name: 'S. Mehta', folded_into: KEEP }, true),
+  row(SELF, 1, { name: 'Mara', email: 'mara@lindqvist.example', keys: ['email:mara@lindqvist.example', 'github:mara', 'folder:/Users/mara/Developer'], me: true, works_at: ORG, seen: ['2026-09-02 · commit c47d19e in portage'] }),
+  /* JOAQUIN WAS MET TWICE AND FOLDED TWICE: number 2 into number 4, and number 4 into number 3, the one kept. */
+  row(FOLD, 2, { name: 'joaquinherrera', folded_into: MID }, true),
+  row(KEEP, 3, { name: 'Joaquin Herrera', works_at: ORG, seen: ['2026-09-01 · commit 3f2a91c in portage', '2026-09-05 · commit 9a8b7c6 in portage'] }),
+  row(MID, 4, { name: 'S. Herrera', folded_into: KEEP }, true),
 ];
 
 function host(): { io: Fetch; sent: string[] } {
@@ -137,7 +137,7 @@ test("THE RECORD'S OWN PERSON CARRIES THE SELF MARKER AND THEIR IDENTITIES, with
     seen: ['A commit in portage, 2 Sep'],
     org: { register: 'firms', seq: 1, name: 'Brightloom' },
     self: true,
-    identities: ['sam@brain.dog', 'GitHub · sam'],
+    identities: ['mara@lindqvist.example', 'GitHub · mara'],
   });
   assert.equal(personWords.self, 'Self');
   assert.equal(personWords.identities, 'Your identities');
@@ -149,7 +149,7 @@ test('A ROW MERGED INTO ANOTHER IS NEVER DRAWN: the trail is followed to the row
   assert.equal(out.from, 'live');
   if (out.from !== 'live') return;
   assert.equal(out.entry?.seq, 3, 'number 2 went into 4, and 4 into 3');
-  assert.equal(out.entry?.fields.name, 'Rohan Mehta');
+  assert.equal(out.entry?.fields.name, 'Joaquin Herrera');
   assert.equal(out.folded, 2, 'the number asked for, so the page moves its address to the kept one');
   assert.deepEqual(out.person?.seen, ['2 commits in portage, last on 5 Sep']);
   assert.equal(out.person?.self, false);

@@ -163,3 +163,182 @@ END)`;
 
 /** A band's place in the order, as SQL over `COST_SQL`'s answer, for an `ORDER BY` that ranks as `costRank` does. */
 export const COST_RANK_SQL = `(CASE ${COST_SQL} ${COSTS.map((c, i) => `WHEN '${c}' THEN ${i}`).join(' ')} ELSE ${COSTS.length} END)`;
+
+/* ── How long a question can wait (AGT-C08 job 3) ── */
+
+/**
+ * Whether an open question can wait, as a word the record computes, ranked first in the queue: "the ranking is a
+ * saved-view sort" (P.84), and nothing in the order knew that something falls due tomorrow.
+ *
+ * - `soon` — a row it would change carries a deadline day inside 48 hours (a field declared `deadline: true`, typed a
+ *            day, in the row as it is or in what the question would write), or it moves money, as `BAND_SQL` reads
+ *            money (`kernel/index.ts`). A question that cannot wait is met first.
+ * - `old`  — open for more than three days.
+ * - `new`  — the rest.
+ *
+ * COMPUTED, NEVER DECLARED, for the reason at the top of this file: a proposer that could say its question is urgent
+ * would say so every time. Nothing is stored, so an old record ranks the moment this ships. The words a person reads
+ * for each are `packages/render`'s, as the bands' are.
+ */
+export const WAITS = ['soon', 'old', 'new'] as const;
+
+export type Wait = (typeof WAITS)[number];
+
+/** How far ahead a deadline makes a question `soon`: 48 hours, read as the days they reach. */
+export const SOON_MS = 48 * 3_600_000;
+
+/** How long a question is open before it is `old`: three days. */
+export const OLD_MS = 3 * 86_400_000;
+
+/** An open question as `waitOf` reads it: its kind, its body (stored JSON text or already read), and when it was asked. */
+export type WaitingQuestion = { body_kind: string; body: unknown; opened_at: string };
+
+/** What `waitOf` reads of the record: a list's deadline fields, and a live row's fields by the `at` a rowset names. */
+export type WaitRows = {
+  deadlines: (register: string) => readonly string[];
+  held: (register: string, at: string) => Record<string, unknown> | null;
+};
+
+/** `?` parameters `WAIT_SQL` and `WAIT_RANK_SQL` take, in order: the first and last day `soon` reaches, and the instant before which a question is `old`. */
+export function waitParams(nowMs: number): [string, string, string] {
+  return [day(nowMs), day(nowMs + SOON_MS), new Date(nowMs - OLD_MS).toISOString()];
+}
+
+/**
+ * How long this question can wait, at `nowMs`. Without `rows` only what the body itself says is read (money, and the
+ * deadline days it would write), which is all a caller with no record can know; the queue reads the rows too.
+ */
+export function waitOf(question: WaitingQuestion, nowMs: number, rows?: WaitRows): Wait {
+  const body = typeof question.body === 'string' ? readJson(question.body) : obj(question.body);
+  const [from, to, oldBefore] = waitParams(nowMs);
+  if (question.body_kind === 'rowset' && (movesMoney(body) || dueInside(body, from, to, rows))) return 'soon';
+  return typeof question.opened_at === 'string' && question.opened_at < oldBefore ? 'old' : 'new';
+}
+
+/** A wait's place in the order, lowest first; out of the set sorts last. */
+export const waitRank = (w: string): number => {
+  const at = (WAITS as readonly string[]).indexOf(w);
+  return at < 0 ? WAITS.length : at;
+};
+
+const day = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+const readJson = (text: string): Record<string, unknown> => {
+  try {
+    return obj(JSON.parse(text));
+  } catch {
+    return {};
+  }
+};
+
+/** What one rowset row would write: a new row itself, or an update's patch. */
+const writeOf = (r: Record<string, unknown>): Record<string, unknown> | null =>
+  r.at === undefined ? r : r.patch !== null && typeof r.patch === 'object' && !Array.isArray(r.patch) ? (r.patch as Record<string, unknown>) : null;
+
+/** A money value as the record holds one: an integer amount in minor units and a three-letter currency. */
+const isMoney = (v: unknown): boolean => {
+  const m = obj(v);
+  return Number.isInteger(m.amount) && typeof m.currency === 'string' && /^[A-Z]{3}$/.test(m.currency);
+};
+
+function movesMoney(body: Record<string, unknown>): boolean {
+  return arr(body.rows).some((r) => {
+    if (r === null || typeof r !== 'object' || Array.isArray(r)) return false;
+    const w = writeOf(r as Record<string, unknown>);
+    return w !== null && Object.values(w).some(isMoney);
+  });
+}
+
+/** A day, or an instant read as its day, from `from` to `to`. */
+const inside = (v: unknown, from: string, to: string): boolean =>
+  typeof v === 'string' && /^[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(v) && v.slice(0, 10) >= from && v.slice(0, 10) <= to;
+
+function dueInside(body: Record<string, unknown>, from: string, to: string, rows?: WaitRows): boolean {
+  if (rows === undefined || typeof body.register !== 'string' || !Array.isArray(body.rows)) return false;
+  const register = body.register;
+  const deadlines = rows.deadlines(register);
+  if (deadlines.length === 0) return false;
+  return body.rows.some((r) => {
+    if (r === null || typeof r !== 'object' || Array.isArray(r)) return false;
+    const row = r as Record<string, unknown>;
+    const held = typeof row.at === 'string' ? rows.held(register, row.at) : null;
+    return [writeOf(row), held].some((w) => w !== null && deadlines.some((f) => Object.hasOwn(w, f) && inside(w[f], from, to)));
+  });
+}
+
+/**
+ * A list's deadline fields as SQL, for the list named by `register` (an SQL expression): declared `deadline: true`,
+ * typed a day, not retired, on the live declaration. `waitRows` and `WAIT_SQL` both read through it.
+ */
+const deadlineIdsSql = (register: string): string =>
+  `SELECT json_extract(df.value, '$.id') AS id FROM declaration d, json_each(CASE WHEN json_valid(d.body) THEN d.body END, '$.fields') AS df
+    WHERE d.id = 'register.' || ${register} AND d.superseded_at IS NULL AND d.retired = 0 AND df.type = 'object'
+      AND json_type(df.value, '$.id') = 'text' AND json_type(df.value, '$.deadline') = 'true' AND json_extract(df.value, '$.type') = 'day'
+      AND COALESCE(json_type(df.value, '$.retired'), '') <> 'true'`;
+
+/**
+ * The live row a rowset names, as SQL: its row id, its spoken id (`tasks#4`), or its list's prefix and number (`S4`),
+ * each matched exactly, each a search by the row id or by list and number. `waitRows` and `WAIT_SQL` both read through it.
+ */
+const heldSql = (register: string, at: string): string => {
+  const prefix = `(SELECT json_extract(d.body, '$.seq_prefix') FROM declaration d WHERE d.id = 'register.' || ${register} AND d.superseded_at IS NULL
+    AND d.retired = 0 AND json_valid(d.body) AND json_type(d.body, '$.seq_prefix') = 'text' AND json_extract(d.body, '$.seq_prefix') <> '#' ORDER BY d.version DESC LIMIT 1)`;
+  /* THREE SCALAR READS AND NOT ONE WITH AN OR: SQLite met the OR by walking every live row of the list, once a row a
+     question names, on every draw of the queue. Each read here is a search by the row id or by list and number. */
+  const live = `e.register = ${register} AND e.deleted_at IS NULL AND json_valid(e.fields)`;
+  return `COALESCE(
+      (SELECT e.fields FROM entry e WHERE e.id = ${at} AND ${live}),
+      (SELECT e.fields FROM entry e WHERE e.seq = CAST(substr(${at}, length(${register}) + 2) AS INTEGER) AND ${at} = ${register} || '#' || e.seq AND ${live}),
+      (SELECT e.fields FROM entry e WHERE e.seq = CAST(substr(${at}, length(${prefix}) + 1) AS INTEGER) AND ${at} = ${prefix} || e.seq AND ${live}))`;
+};
+
+/** The structural SQL port `waitRows` reads by, so this file imports none. */
+export type WaitSql = { all<T = Record<string, unknown>>(sql: string, ...params: (string | number | null)[]): T[] };
+
+/** `WaitRows` over the record, through the very SQL `WAIT_SQL` reads, so the two cannot drift apart. */
+export function waitRows(sql: WaitSql): WaitRows {
+  return {
+    deadlines: (register) =>
+      sql.all<{ id: string }>(deadlineIdsSql('?'), register).map((r) => r.id),
+    held: (register, at) => {
+      const fields = sql.all<{ f: string | null }>(`SELECT ${heldSql('g.value', 'a.value')} AS f FROM json_each(?) AS g, json_each(?) AS a`, JSON.stringify(register), JSON.stringify(at))[0]?.f;
+      return typeof fields === 'string' ? readJson(fields) : null;
+    },
+  };
+}
+
+/** `movesMoney` as SQL over a `suggestion` row, the rule `kernel/index.ts`'s `MONEY_ROWS_SQL` holds for `BAND_SQL`. */
+const MOVES_MONEY_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r, json_each(CASE
+      WHEN r.type <> 'object' THEN NULL
+      WHEN json_type(r.value, '$.at') IS NULL THEN r.value
+      WHEN json_type(r.value, '$.patch') = 'object' THEN json_extract(r.value, '$.patch') END) AS f
+    WHERE f.type = 'object' AND json_type(f.value, '$.amount') = 'integer' AND json_type(f.value, '$.currency') = 'text'
+      AND json_extract(f.value, '$.currency') GLOB '[A-Z][A-Z][A-Z]' AND length(json_extract(f.value, '$.currency')) = 3)`;
+
+/** `dueInside` as SQL: a deadline day from the first `?` to the second, in what a row would write or in the row as it is. */
+const DUE_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.register') AS g, json_each(body, '$.rows') AS r,
+      json_each(json_array(
+        CASE WHEN r.type <> 'object' THEN NULL WHEN json_type(r.value, '$.at') IS NULL THEN json(r.value)
+          WHEN json_type(r.value, '$.patch') = 'object' THEN json_extract(r.value, '$.patch') END,
+        CASE WHEN r.type = 'object' AND json_type(r.value, '$.at') = 'text' THEN json(${heldSql('g.value', "json_extract(r.value, '$.at')")}) END)) AS w,
+      json_each(CASE WHEN w.type = 'object' THEN w.value END) AS f
+    WHERE json_type(body, '$.register') = 'text' AND f.type = 'text' AND f.value GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*'
+      AND substr(f.value, 1, 10) BETWEEN ? AND ? AND f.key IN (${deadlineIdsSql('g.value')}))`;
+
+/**
+ * `waitOf` as SQL over a `suggestion` row's `body_kind`, `body` and `opened_at`, reading the rows the way `waitRows`
+ * does. It takes `waitParams(nowMs)` as its three `?`, in order, at the place it is written in the statement.
+ * `test/weigh-sql.test.ts` holds it to `waitOf`'s answer on one set of questions. A body that is not a JSON object
+ * reads as `{}`, as `waitOf` reads it.
+ */
+export const WAIT_SQL = `(CASE
+  WHEN (CASE WHEN body_kind = 'rowset' AND json_valid(body) AND json_type(body) = 'object' AND json_type(body, '$.rows') = 'array'
+    THEN (${MOVES_MONEY_SQL} OR ${DUE_SQL}) ELSE 0 END) THEN 'soon'
+  WHEN opened_at < ? THEN 'old'
+  ELSE 'new' END)`;
+
+/**
+ * A wait's place in the order as SQL, for an `ORDER BY` that ranks as `waitRank` does: `soon` first. Like `WAIT_SQL`,
+ * it takes `waitParams(nowMs)` as its three `?`. `openQuestions` orders by it, then by band, then oldest first.
+ */
+export const WAIT_RANK_SQL = `(CASE ${WAIT_SQL} ${WAITS.map((w, i) => `WHEN '${w}' THEN ${i}`).join(' ')} ELSE ${WAITS.length} END)`;

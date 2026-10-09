@@ -5,10 +5,13 @@
  * stat figure with no answer, a run's handle and an ISO instant in the side, and "cake" for an icon.
  */
 
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { LINT_RULES, lintHtml, lintPage, lintText, parse, toHTML, type LintFinding, type LintRule } from './index.ts';
+import { PAGE_WORDS } from './lint.ts';
+import { OWNER } from '../../../fixtures/names.ts';
 
 const rules = (fs: readonly LintFinding[]): LintRule[] => fs.map((f) => f.rule);
 const draw = (src: string, values: Record<string, string> = {}): string => toHTML(parse(src), { resolve: (p) => values[p] ?? null });
@@ -63,7 +66,7 @@ test('raw-key: a key in a figure slot, or joined words in the product copy; not 
 test('raw-id: a row number, a run handle, a ULID, a UUID or a random id where a name goes', () => {
   for (const id of ['tools#8', 'S731', '01J9ZQ4X8M2K7V3N6P5R1T0W9Y', '3f2b8c1e-9a4d-4e6f-8b2a-1c5d7e9f0a3b', 'a3f9c2e81b7d4f60', 'V1StGXR8Z5jdHi6BmyT0aq'])
     assert.equal(red(lintText(`Started by ${id} this morning`), 'raw-id').said, 'Prints an id where a name goes.');
-  assert.deepEqual(lintText('Started by Sam this morning, the 3rd of 12'), []);
+  assert.deepEqual(lintText(`Started by ${OWNER.name} this morning, the 3rd of 12`), []);
 });
 
 test('raw-id: a part that prints handles on purpose declares it, and his own notes keep their hashes', () => {
@@ -114,6 +117,21 @@ test('plain-words: row, list item and entity in the product copy', () => {
   assert.equal(red(lintText('Open this row to edit the entity'), 'plain-words').said, 'Says a word for the machinery where it should name the thing: "row", "entity".');
   assert.deepEqual(lintText('Open this bill to change it. Arrow keys move between bills.'), []);
   assert.deepEqual(lintText('Three wins in a row', { name: 'Note', theirs: true }), []);
+});
+
+test('plain-words: credential, and register as a noun, never register the verb', () => {
+  assert.equal(red(lintText('Paste the credential into the register'), 'plain-words').said, 'Says a word for the machinery where it should name the thing: "credential", "register".');
+  red(lintText("Each register's fields"), 'plain-words');
+  assert.deepEqual(lintText('Register a passkey to sign in. Your keys stay in the vault.'), []);
+});
+
+test('plain-words READS THE WORDS GATE\'S LIST: PAGE_WORDS is words.json\'s page entries, word for word', () => {
+  const list = JSON.parse(readFileSync(new URL('../../../tools/gates/words.json', import.meta.url), 'utf8')) as {
+    words: { name: string; shape: string; case?: true; page: boolean }[];
+  };
+  const page = list.words.filter((w) => w.page).map((w) => ({ name: w.name, shape: w.shape, ...(w.case ? { case: true as const } : {}) }));
+  assert.deepEqual(PAGE_WORDS, page);
+  for (const w of PAGE_WORDS) red(lintText(`Open the ${w.name} here`), 'plain-words');
 });
 
 test('A WHOLE DECLARED PAGE, DRAWN BY toHTML, HAS NOTHING TO FIND, and a code sample is never read', () => {

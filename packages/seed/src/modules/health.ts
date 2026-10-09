@@ -2,9 +2,9 @@
  * Health: the record's vital signs, as one page every record can open (PRF-A05 job 5, DIRECTION §40 "says so in the app
  * when one fails").
  *
- * DRAWN FROM THREE NAMES THE KERNEL ANSWERS AND NOTHING ELSE: the built-in page source `signs` (each vital sign with its
- * name, its state and its sentence, `packages/kernel/src/pages.ts`) and the built-in figures `signs-red` and `green-days`
- * (`packages/kernel/src/built-in-figures.ts`). No list, no figure of its own, so the page leans on no register and every
+ * DRAWN FROM FOUR NAMES THE KERNEL ANSWERS AND NOTHING ELSE: the built-in page source `signs` (each vital sign with its
+ * name, its state and its sentence, `packages/kernel/src/pages.ts`) and the built-in figures `signs-red`, `signs-unread`
+ * and `green-days` (`packages/kernel/src/built-in-figures.ts`). No list, no figure of its own, so the page leans on no register and every
  * record that holds it can draw it, whatever else it installs. Nothing here knows whose record it is (DIRECTION §27).
  *
  * IN PEOPLE, BECAUSE PEOPLE IS THE ADD-ON NEARLY EVERY RECORD HOLDS: onboarding installs it for the person's own row even
@@ -23,9 +23,9 @@
 
 import type { SeedPage } from './base.ts';
 
-/** The one source and the two figures the page reads, by the names the kernel answers them under. */
+/** The one source and the three figures the page reads, by the names the kernel answers them under. */
 export const HEALTH_SOURCE = 'signs';
-export const HEALTH_FIGURES = ['signs-red', 'green-days'] as const;
+export const HEALTH_FIGURES = ['signs-red', 'signs-unread', 'green-days'] as const;
 
 /**
  * A group of signs in one state: the state's word as the heading, and under it each sign by its name with its sentence.
@@ -69,8 +69,7 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
          NOUGHT IS "NOTHING NEEDS A LOOK", NEVER "ALIVE". `signs-red` reads 0 once one sign is green, however many of the
          rest are still `none` (`readVitals`, `built-in-figures.ts`), so "Everything on this record is alive." was said of
          a record with one sign read. What nought proves is that no sign read red, and the line says that and no more.
-         HOW MANY ARE UNREAD IS NOT SAID HERE: a `when:` and a `{{path}}` reach figures, lists and rows, and no figure
-         counts the signs that read `none`, so the Not read yet group below is what says it, sign by sign. */
+         HOW MANY ARE UNREAD IS SAID UNDER IT, from `signs-unread`, so nought red is never read as all of it. */
       {
         kind: 'note',
         lead: true,
@@ -92,11 +91,27 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
         when: { metric: 'signs-red', gt: 1 },
         body: '{{signs-red}} things on this record need a look.',
       },
+      /* HOW MUCH THE LINE HAS NOT SEEN, from `signs-unread` (health-words-43): the signs with nothing to judge by yet. Two
+         notes, since only a lead note has its `(s)` settled, and none at all while every sign has been read. */
+      {
+        kind: 'note',
+        span: 12,
+        when: { metric: 'signs-unread', is: 1 },
+        body: 'One sign has not been read yet.',
+      },
+      {
+        kind: 'note',
+        span: 12,
+        when: { metric: 'signs-unread', gt: 1 },
+        body: '{{signs-unread}} signs have not been read yet.',
+      },
       /* RED FIRST, since that is what the page is opened for, then what is alive, then what has not been read. */
       group('red', 'Needs a look', 'octagon-alert'),
       group('green', 'Alive', 'circle-check'),
       group('none', 'Not read yet', 'circle-dashed'),
-      /* HOW LONG IT HAS HELD, from `green-days`: days running, to yesterday, with a sign green and none red. Drawn only
+      /* HOW LONG IT HAS HELD, from `green-days`: days running, to yesterday, with every watched sign green (the seven-day
+         hold's count, `hold.ts`). NOT "NOTHING WAS RED": the hold watches ten of the signs, and a day an automation sign
+         read red still counts, so "nothing has been red" was said of days with a red sign on this page. Drawn only
          while there is a run to speak of. Said up to yesterday, because today is not over and a sign red this morning
          does not undo the days before it. TWO NOTES AND NOT `day(s)`: only a lead note has its `(s)` settled
          (`apps/web/src/lib/record/page-live.ts`, `leadOf`), so a plain note would print "4 day(s)" as written. */
@@ -104,13 +119,13 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         span: 12,
         when: { metric: 'green-days', is: 1 },
-        body: 'Nothing was red yesterday.',
+        body: 'Every watched sign was green yesterday.',
       },
       {
         kind: 'note',
         span: 12,
         when: { metric: 'green-days', gt: 1 },
-        body: 'Nothing has been red for {{green-days}} days, up to yesterday.',
+        body: 'Every watched sign has been green for {{green-days}} days, up to yesterday.',
       },
     ],
   },

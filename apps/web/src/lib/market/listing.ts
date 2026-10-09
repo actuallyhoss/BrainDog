@@ -18,7 +18,7 @@ import type { CatalogueEntry, CatalogueIndex, CatalogueVersion, Category, Reach 
 import { MODULE_CHANGES } from '@braindog/seed/packs/changelog';
 import { firstPartyModules } from '@braindog/seed/packs/modules';
 import { USE_CASES } from '@braindog/seed/usecases';
-import { installsOf } from '@braindog/seed/usecases/share';
+import { USE_CASE_CHANGES, installsOf } from '@braindog/seed/usecases/share';
 
 import type { PackState } from '../record/packs.ts';
 
@@ -148,7 +148,8 @@ export function listingsOf(input: { kennel: CatalogueIndex | null; counts: Recor
       publisher: braindog,
       source: 'bundled',
       latest: u.version,
-      versions: bundledVersions(u.version, [], reach),
+      /* WHAT EACH VERSION CHANGED, so an update offered to a record on an older one says what it brings (`changes.ts`). */
+      versions: bundledVersions(u.version, USE_CASE_CHANGES[u.usecase] ?? [], reach),
       count: counted(listingKey('usecase', u.usecase)),
     };
   });

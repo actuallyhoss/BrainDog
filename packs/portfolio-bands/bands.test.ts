@@ -436,9 +436,8 @@ test('THE WHOLE PATH ON A SELF-HOST: installed, its names set, due, run, applied
   const { useCaseDocument } = await import('../../packages/seed/src/usecases/index.ts');
 
   const dir = mkdtempSync(join(tmpdir(), 'braindog-bands-'));
-  /* THE SELF-HOST'S SANDBOX ON THE SAME STEADY CLOCK, through `scriptClock` on `start`. Held in a variable so this file
-     typechecks before the server takes the option, and the option is only read once it does. */
-  const options = {
+  /* THE SELF-HOST'S SANDBOX ON THE SAME STEADY CLOCK, through `scriptClock` on `start`. */
+  const running = await start({
     scriptClock: STEADY,
     file: join(dir, 'record.brain'),
     directory: join(dir, 'directory.sqlite'),
@@ -446,8 +445,7 @@ test('THE WHOLE PATH ON A SELF-HOST: installed, its names set, due, run, applied
     host: '127.0.0.1',
     pollMs: 0,
     actions: { openKey: async () => null, send: async () => new Response('{}'), resolve: async () => [] },
-  };
-  const running = await start(options);
+  });
   try {
     const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
     const person = running.directory.person$('ada@example.test', 'Ada');

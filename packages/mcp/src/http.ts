@@ -240,6 +240,12 @@ export async function serveMcp<C>(
     build?: string;
     /** Called after a `tools/call` is answered without a protocol error (AGT-A02; the scope's critic moved this half to AGT-B01's marks). */
     called?: (ctx: C, name: string) => void | Promise<void>;
+    /**
+     * Who is calling, by the host's own word, for the minute between `called` marks: a host that takes the bearer off
+     * the request before it reaches here (the Worker hands the record its principal instead) names the caller from
+     * `ctx`, so two keys stay two callers. Left out, or answering nothing, the bearer is read off the request.
+     */
+    caller?: (ctx: C) => string | undefined;
   } = {},
 ): Promise<Response> {
   const res = await answered(request, surface, ctx, options);
@@ -275,7 +281,7 @@ async function answered<C>(request: Request, surface: McpSurface<C>, ctx: C | nu
      else 2025-03-26, which the specification tells a server to assume of a request that sends no header. `handle`
      reads it only to decide whether a result says `resultType`, which no client older than 2026-07-28 expects. */
   const version = request.headers.get('mcp-protocol-version') ?? versionIn(meta) ?? OLDEST;
-  const reply = await handle(message, surface, who, options.origin, version, callerOf(request, said));
+  const reply = await handle(message, surface, who, options.origin, version, callerOf(options.caller?.(who) ?? request.headers.get('authorization') ?? '', said));
   if (options.called && reply !== null && !('error' in reply) && isObject(message) && message.method === 'tools/call') {
     const name = isObject(message.params) && typeof message.params.name === 'string' ? message.params.name : '';
     if (name !== '') await options.called(who, name);
@@ -284,13 +290,13 @@ async function answered<C>(request: Request, surface: McpSurface<C>, ctx: C | nu
 }
 
 /**
- * Who is calling, as a key for the minute between `called` marks (`rpc.ts`): the bearer and what the client says of its
- * session, folded to eight hex characters so the bearer itself is never kept. They are what the record tells one run
+ * Who is calling, as a key for the minute between `called` marks (`rpc.ts`): the bearer (or the host's own name for
+ * the caller, `caller`) and what the client says of its session, folded to eight hex characters so the bearer itself is never kept. They are what the record tells one run
  * from another by, so two sessions on one key that say different things are two callers, and sessions that say nothing
  * are one caller as they are one run.
  */
-function callerOf(request: Request, said: unknown): string {
-  const text = `${request.headers.get('authorization') ?? ''}\n${said === null ? '' : JSON.stringify(said)}`;
+function callerOf(key: string, said: unknown): string {
+  const text = `${key}\n${said === null ? '' : JSON.stringify(said)}`;
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
   return (h >>> 0).toString(16).padStart(8, '0');

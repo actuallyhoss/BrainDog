@@ -590,6 +590,14 @@ export type AutomationRow = {
   lastFired: string | null;
   /** This calendar month so far, UTC. An inline rule's firings are events and are not counted here. */
   month: { runs: number; done: number; failed: number; cancelled: number };
+  /** How many times it has fired, counted up to 1,000 (`rule_stat`). Absent from a host older than the count. */
+  fired?: number;
+  /** When it last did, or `null` when `fired` is 0. */
+  last_at?: string | null;
+  /** One sentence on why it has not fired, when `fired` is 0, and `null` otherwise. */
+  why_idle?: string | null;
+  /** The key rules of one shape share (same trigger, list and kinds of action), so a page can draw them as one line. A handle, never shown. */
+  family?: string | null;
 };
 
 /** One run, as `automations({ rule })` shows it: what started it, how it ended, and each step it took. */

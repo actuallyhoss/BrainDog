@@ -1,7 +1,6 @@
 {
-  "//": "Planted for `ledger`: the entry script's recorded number set to 33900, the edit PRF-B03 says must be red.",
+  "//": "Planted for `ledger`: the budget as the real file holds it. The rise to 33900 is the debt's newest line in ledger.json, the edit PRF-B03 says must be red.",
   "bundle": {
-    "mainJsBrotli": 30720,
-    "mainJsBaseline": 33900
+    "mainJsBrotli": 30720
   }
 }

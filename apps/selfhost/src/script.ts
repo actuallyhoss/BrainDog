@@ -78,9 +78,12 @@ export function scriptSandbox(
     send?: Send | undefined;
     resolve?: Resolve | undefined;
     now?: (() => number) | undefined;
+    /** The sandbox's meter clock (`CtxHost.clock`). Absent is the machine's; a test that is not about limits hands one that stands still. */
+    clock?: (() => number) | undefined;
     outbound?: 'on' | 'off' | undefined;
   },
 ): ScriptRunner {
+  const sandboxed: typeof runInQuickJs = (decl, host) => runInQuickJs(decl, options.clock === undefined ? host : { ...host, clock: options.clock });
   const runner = (run: typeof runInQuickJs): ScriptRunner =>
     scriptRunner<Pinned>({
       run,
@@ -91,13 +94,13 @@ export function scriptSandbox(
       reads: scriptReads(api),
       now: options.now,
     });
-  if (options.outbound !== 'off') return runner(runInQuickJs);
+  if (options.outbound !== 'off') return runner(sandboxed);
   const now = options.now ?? Date.now;
   return async (s) => {
     /* ONE FLAG A RUN, so a held fetch in one run never holds the next. */
     let asked = false;
     const answer = await runner((decl, host) =>
-      runInQuickJs(decl, {
+      sandboxed(decl, {
         ...host,
         fetch: async () => {
           asked = true;

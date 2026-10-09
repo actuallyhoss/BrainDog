@@ -1,6 +1,7 @@
 /**
  * `context` over a run written the way an import writes one: a repository and a next step, and no `project` or
- * `last_seen`, because both are `KERNEL_WRITTEN` and an import is a caller like any other.
+ * `last_seen`, because both are `KERNEL_WRITTEN` and an import is a caller like any other. Since AGT-C10 an import may
+ * send the day a run was last seen where it came from, which lands as `seen_before` and leaves `last_seen` empty.
  *
  * MEASURED BEFORE THE REPAIR: an agent attaching in the repository that run named was told `handoff: null`, because the
  * handoff query keyed on `project` whenever a project resolved and the import could not write one; and the same run was
@@ -141,8 +142,15 @@ test('a run placed on another project is not the handoff, although it names this
 test('among imported runs, the one waiting to be picked up is the handoff, not the one the import wrote last', async () => {
   const { sql, write, ask } = await seeded();
   const waiting = await write('S41', { state: 'handoff', next: 'Kern the lowercase pairs' });
-  await write('S42', { state: 'done', next: 'Ship the specimen page' });
-  await write('S43', { state: 'abandoned', next: 'Try the variable axis' });
+  /* AND AS THE IMPORT WRITES A RUN NOW (AGT-C10): with the day it was last seen in the old system, which lands as
+     `seen_before`, and a finished run's step dropped, so a done or abandoned run carried in holds none to hand over. */
+  const SEEN = '2026-09-21T10:00:00.000Z';
+  const done = await write('S42', { state: 'done', next: 'Ship the specimen page', last_seen: SEEN });
+  const gone = await write('S43', { state: 'abandoned', next: 'Try the variable axis', last_seen: SEEN });
+  for (const r of [done, gone]) {
+    assert.equal(r.fields.next, undefined, `${String(r.fields.state)} carried run kept its step`);
+    assert.deepEqual([r.fields.seen_before, r.fields.last_seen], [SEEN, undefined]);
+  }
   const { here } = await ask();
   assert.equal(here.handoff?.from, `S${String(waiting.seq)}`, `the handoff was ${JSON.stringify(here.handoff)}`);
   assert.equal(here.handoff?.next, 'Kern the lowercase pairs');

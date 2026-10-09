@@ -69,11 +69,11 @@ test('every tree in this repository has a case naming a registered gate', () => 
 });
 
 test('a registered gate with no planted fault is named, and a gap that gained one must come off', () => {
-  const registered = new Set(['self-test', 'em-dash', 'graph', 'typecheck', 'passkey']);
-  const { missing, closed, open } = uncovered(registered, new Set(['em-dash', 'passkey']));
+  const registered = new Set(['self-test', 'em-dash', 'graph', 'rule-sheet', 'signin-live']);
+  const { missing, closed, open } = uncovered(registered, new Set(['em-dash', 'signin-live']));
   assert.deepEqual(missing, ['graph']);
-  assert.deepEqual(closed, ['passkey']);
-  assert.ok(open.includes('typecheck') && !open.includes('passkey'));
+  assert.deepEqual(closed, ['signin-live']);
+  assert.ok(open.includes('rule-sheet') && !open.includes('signin-live'));
 });
 
 test('the gaps are today\'s six at most, and the list only shrinks', () => {

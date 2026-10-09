@@ -18,13 +18,13 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { WORDS, wordsWith } from '../shell-words.mjs';
+import { WORDS, hashOf, hashedWith, wordsWith } from '../shell-words.mjs';
 
 const gate = join(import.meta.dirname, '..', 'shell-words.mjs');
 
@@ -39,14 +39,19 @@ function tree(files) {
   return root;
 }
 
-/** The gate run as a script at a tree of `files`, with `words` as its private list, and what it printed. */
-function run(files, words = null) {
+/**
+ * The gate run as a script at a tree of `files`, with `words` as its private list and `hashed` as the words its
+ * hashes file bans, and what it printed. The hashes are the tree's own, so the tracked file changes no case here.
+ */
+function run(files, words = null, hashed = []) {
   const root = tree(files);
   const list = join(root, 'private-words.json');
+  const hashes = join(root, 'private-words.hashes.json');
   if (words !== null) writeFileSync(list, JSON.stringify(words));
+  writeFileSync(hashes, JSON.stringify({ hashes: hashed.map((w) => ({ hash: hashOf(w), length: w.length })) }));
   try {
     const r = spawnSync(process.execPath, [gate], {
-      env: { ...process.env, BRAINDOG_GATE_ROOT: root, BRAINDOG_PRIVATE_WORDS: list },
+      env: { ...process.env, BRAINDOG_GATE_ROOT: root, BRAINDOG_PRIVATE_WORDS: list, BRAINDOG_PRIVATE_HASHES: hashes },
       encoding: 'utf8',
     });
     return { code: r.status, out: `${r.stdout}${r.stderr}`.split(String.fromCharCode(92)).join('/') };
@@ -151,4 +156,112 @@ test('each word of the tracked list is read', () => {
   const read = wordsWith({ words: WORDS, whole: new Set() });
   const tokens = ['EGP', 'quartzCo', 'paydays', 'hsbcBank', 'instaPay', 'salaryBand', 'payrollRun', 'registrarName'];
   assert.deepEqual(tokens.map((t) => read(t).length), tokens.map(() => 1));
+});
+
+/* THE HASHED WORDS. A word banned by its hash alone is a finding in the core and in its tests, and the line that says
+   so names the file and the line and never the word or the token that carried it, because CI's log is public. `acme`
+   stands in for one of the owner's own names, and `acme` appears in no line the gate prints below. */
+test('a hashed word in a renderer component is a finding, printed without the word', () => {
+  const { code, out } = run(
+    { ...KERNEL, 'packages/render/svelte/Studio.svelte': "<script>\n  export let label = 'Acme studio';\n</script>\n<span>{label}</span>\n" },
+    null,
+    ['acme'],
+  );
+  assert.equal(code, 1, out);
+  assert.match(out, /packages\/render\/svelte\/Studio\.svelte:2\s+a private word of 4 letters/);
+  assert.match(out, /a private word named in the core or its tests/);
+  assert.doesNotMatch(out, /acme/i);
+});
+
+test('a hashed word in a test is a finding, and a tracked word there is not', () => {
+  const { code, out } = run(
+    {
+      ...KERNEL,
+      'packages/kernel/test/client.test.ts': "export const payrollRun = { label: 'Payroll' };\n",
+      'packages/kernel/test/fixtures/client.ts': "export const slug = 'acme-co';\n",
+      'apps/web/src/lib/client.test.ts': '/* acme, in a comment, is not code */\nexport const who = { acmeCo: true };\n',
+    },
+    null,
+    ['acme'],
+  );
+  assert.equal(code, 1, out);
+  assert.match(out, /packages\/kernel\/test\/fixtures\/client\.ts:1\s+a private word of 4 letters/);
+  assert.match(out, /apps\/web\/src\/lib\/client\.test\.ts:2\s+a private word of 4 letters/);
+  assert.match(out, /2 finding\(s\)/);
+  assert.doesNotMatch(out, /payroll|acme/i);
+});
+
+/* A WINDOW STARTS WHERE A PART STARTS, as a tracked word does, so `macmeal` and `placmes` hold no `acme`. */
+test('a hashed word is read at a part boundary and on over the next part, and never inside one', () => {
+  const read = hashedWith(new Map([[hashOf('acme'), { hash: hashOf('acme'), length: 4, whole: false }]]));
+  assert.deepEqual(['acmeCo', 'brain.acme.example', 'ACME_PAY', 'acMe', 'ac-me'].map((t) => read(t).length), [1, 1, 1, 1, 1]);
+  assert.deepEqual(['macmeal', 'placmes', 'acm', 'loadingAcm'].map((t) => read(t).length), [0, 0, 0, 0]);
+  const whole = hashedWith(new Map([[hashOf('cook'), { hash: hashOf('cook'), length: 4, whole: true }]]));
+  assert.deepEqual(['cook.gg', 'cookGg', 'cookery', 'cooker'].map((t) => whole(t).length), [1, 1, 0, 0]);
+});
+
+/* A USE-CASE FINDING QUOTES ITS TOKEN, AND A TOKEN CAN CARRY A HASHED WORD BESIDE THE TRACKED ONE. */
+test('a tracked word in the same token as a hashed one is found without printing the token', () => {
+  const { code, out } = run({ 'packages/kernel/src/pay.ts': 'export const acmePayroll = 1;\n' }, null, ['acme']);
+  assert.equal(code, 1, out);
+  assert.match(out, /pay\.ts:1\s+payroll, in a name that also holds a private word/);
+  assert.match(out, /pay\.ts:1\s+a private word of 4 letters/);
+  assert.match(out, /1 is a use case named/);
+  assert.doesNotMatch(out, /acme/i);
+});
+
+/* THE MACHINE THAT HOLDS THE PRIVATE FILE STILL SEES WHICH WORD IT WAS, and sees it once in the core. */
+test('a hashed word the private file also names is printed by name, once', () => {
+  const { code, out } = run({ 'packages/kernel/src/host.ts': "export const HOST = 'brain.acme.example';\n" }, ['acme'], ['acme']);
+  assert.equal(code, 1, out);
+  assert.match(out, /host\.ts:1\s+acme, in brain\.acme\.example/);
+  assert.match(out, /1 finding\(s\)/);
+});
+
+/* `--hash` ADDS ONE WORD, ONCE, AND NEVER SAYS IT. */
+test('--hash adds a word to the hashes file once and prints only its length', () => {
+  const root = tree({});
+  const file = join(root, 'hashes.json');
+  writeFileSync(file, JSON.stringify({ why: 'kept', hashes: [] }));
+  const hash = (...args) =>
+    spawnSync(process.execPath, [gate, '--hash', ...args], { env: { ...process.env, BRAINDOG_PRIVATE_HASHES: file }, encoding: 'utf8' });
+  try {
+    const first = hash('Acme');
+    assert.equal(first.status, 0, first.stderr);
+    assert.match(first.stdout, /a word of 4 letters added, 1 in all/);
+    assert.doesNotMatch(first.stdout, /acme/i);
+    assert.match(hash('acme').stdout, /already banned, 1 in all/);
+    assert.equal(hash('cook', '--whole').status, 0);
+    assert.notEqual(hash('two words').status, 0);
+    const doc = JSON.parse(readFileSync(file, 'utf8'));
+    assert.equal(doc.why, 'kept');
+    assert.deepEqual(
+      doc.hashes.map((e) => [e.hash, e.length, e.whole === true]).sort(),
+      [[hashOf('acme'), 4, false], [hashOf('cook'), 4, true]].sort(),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/* A BROKEN HASHES FILE IS NOT AN EMPTY ONE, for the private list's reason. */
+test('a hashes file that is not hashes and lengths is refused', () => {
+  const root = tree(KERNEL);
+  const file = join(root, 'hashes.json');
+  writeFileSync(file, JSON.stringify({ hashes: [{ hash: 'acme', length: 4 }] }));
+  try {
+    const r = spawnSync(process.execPath, [gate], { env: { ...process.env, BRAINDOG_GATE_ROOT: root, BRAINDOG_PRIVATE_HASHES: file }, encoding: 'utf8' });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /is not a hash and a length/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/* THE TRACKED FILE IS THERE AND READS, which is what CI bans by. Its words are not this test's to know. */
+test('the tracked hashes file holds only hashes and lengths', () => {
+  const doc = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'private-words.hashes.json'), 'utf8'));
+  assert.ok(doc.hashes.length > 0);
+  for (const e of doc.hashes) assert.ok(/^[0-9a-f]{64}$/.test(e.hash) && Number.isInteger(e.length) && e.length >= 2, JSON.stringify(e));
+  assert.deepEqual(Object.keys(doc).sort(), ['hashes', 'why']);
 });

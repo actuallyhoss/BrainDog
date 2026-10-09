@@ -85,6 +85,11 @@ export const historyWords = {
   onlyBooks: 'Nothing changed, apart from BrainDog keeping its own books.',
   /* A RUN'S WORK, FOLDED UNDER ITS NEWEST LINE. */
   more: (n: number): string => `+${count(n)} more`,
+  /* WHAT BRAINDOG DID ON ITS OWN, said apart from the agents in the sentence under the title (`awaySaid`). */
+  itself: 'BrainDog itself',
+  /* ONE PASS OF BRAINDOG'S OWN UPDATE, said as one line that opens to what it did (`passOf`). */
+  showSteps: (n: number): string => (n === 1 ? 'Show what it did' : `Show the ${count(n)} things it did`),
+  hideSteps: 'Hide what it did',
 } as const;
 
 /* ── the record's own bookkeeping ──────────────────────────────────────── */
@@ -173,6 +178,51 @@ export function groupOf(kind: ActorKind): Group {
   return 'person';
 }
 
+/** Who wrote the lines `whatsNew` answered, as the record counts them (`byWho`, `packages/record/src/update-pass.ts`). */
+export type ByWho = { you: number; people: number; agents: number; rules: number; record: number };
+
+/** The record's count if it is one, and `null` for a host older than `byWho` or anything that is not a count. */
+export function byWhoOf(v: unknown): ByWho | null {
+  if (v === null || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const keys = ['you', 'people', 'agents', 'rules', 'record'] as const;
+  return keys.every((k) => Number.isSafeInteger(o[k]) && (o[k] as number) >= 0)
+    ? { you: o.you as number, people: o.people as number, agents: o.agents as number, rules: o.rules as number, record: o.record as number }
+    : null;
+}
+
+/* ── one pass of BrainDog's own update ─────────────────────────────────── */
+
+/** What the record says of a pass beside its line (`PassSaid` in the record): its sentence and its counts. */
+export type PassSaid = { said: string; updated: number; asked: number; steps: number; at: string };
+
+/** A line of the log that may be one pass of the update, with every line the pass wrote under it as `steps`. */
+export type Passed = AuditEvent & { pass?: PassSaid; steps?: readonly AuditEvent[] };
+
+/** A pass as Activity draws it: the one sentence its line reads, and what it did, each a line of its own. */
+export type PassLine = { said: string; steps: Told[] };
+
+/**
+ * ONE PASS OF THE UPDATE IS ONE LINE (SHL-A21). The night's update writes an install, a carry and a question a line,
+ * which filled Activity with "Installed the Agents add-on" and "Installed the Work add-on"; the record now sends the
+ * pass as one line, with the sentence that names how many add-ons and whether anything was kept, and every line it
+ * wrote under it. This says that line, and its steps as lines Activity already draws, each keyed under the pass so two
+ * passes never share a key. `null` for any other line, and for a pass the record sent no steps for.
+ */
+export function passOf(e: Passed): PassLine | null {
+  const { pass, steps } = e;
+  if (pass === undefined || pass === null || !Array.isArray(steps) || steps.length === 0) return null;
+  const said = typeof pass.said === 'string' && pass.said.trim() !== '' ? pass.said : e.note;
+  const seen = new Map<string, number>();
+  const told = steps.map((s): Told => {
+    const k = `${keyOf(e)}/${keyOf(s)}`;
+    const n = seen.get(k) ?? 0;
+    seen.set(k, n + 1);
+    return { key: n === 0 ? k : `${k}~${n}`, e: s, count: 1, many: null, note: s.note, from: s.at };
+  });
+  return { said, steps: told };
+}
+
 /* ── the sentence under the title ─────────────────────────────────────── */
 
 /**
@@ -182,17 +232,42 @@ export function groupOf(kind: ActorKind): Group {
  * record saying there is more than the lines it sent, and then the count is a floor and the agents are counted over
  * the newest lines only, which the sentence says, because a count that stops at the page size and reads as the whole
  * is a confident wrong answer.
+ *
+ * `byWho` IS THE RECORD'S OWN COUNT OF WHO WROTE THOSE LINES (SHL-A21), worked out where an agent reads it too. The
+ * record's own lines (its update, its seed, Slash) are said apart, "and 3 by BrainDog itself", and never counted as an
+ * agent's or a person's. One pass of the update is one line there, and so one here.
  */
-export function awaySaid(actors: readonly string[], me: string | null, names: ReadonlyMap<string, string>, capped: boolean): string {
+export function awaySaid(
+  actors: readonly string[],
+  me: string | null,
+  names: ReadonlyMap<string, string>,
+  capped: boolean,
+  byWho: ByWho | null = null,
+): string {
   const n = actors.length;
   if (n === 0) return historyWords.nothingNew;
-  const agents = actors.filter((by) => isAgent(actor(by, me, names).kind)).length;
+  /* THE RECORD'S OWN COUNT WHEN IT SENT ONE, so this sentence and an agent asking `whatsNew` read the same number; a host
+     older than `byWho` is counted here as before. */
+  const agents = byWho ? byWho.agents : actors.filter((by) => isAgent(actor(by, me, names).kind)).length;
+  const own = byWho ? byWho.record : 0;
   const head = capped ? historyWords.moreAway(n) : n === 1 ? historyWords.oneAway : historyWords.manyAway(n);
-  if (agents === 0) return `${head}.`;
+  const itself = historyWords.itself;
+  const few = (k: number): string => (k === 1 ? 'one' : count(k));
+  if (agents === 0) {
+    if (own === 0) return `${head}.`;
+    if (n === 1 && !capped) return `${head}, by ${itself}.`;
+    if (capped) return own === n ? `${head}; ${itself} made all of the newest ${count(n)}.` : `${head}; ${itself} made ${few(own)} of the newest ${count(n)}.`;
+    return own === n ? `${head}; all of them by ${itself}.` : `${head}; ${few(own)} of them by ${itself}.`;
+  }
   if (n === 1 && !capped) return `${head}, by an agent.`;
-  if (capped) return agents === n ? `${head}; agents made all of the newest ${count(n)}.` : `${head}; agents made ${count(agents)} of the newest ${count(n)}.`;
+  /* AND WHAT BRAINDOG DID ON ITS OWN APART, never inside the agents' number: a night's update is nobody's work. */
+  const tail = own === 0 ? '' : `, and ${few(own)} by ${itself}`;
+  if (capped) {
+    if (agents === n) return `${head}; agents made all of the newest ${count(n)}.`;
+    return `${head}; agents made ${count(agents)} of the newest ${count(n)}${own === 0 ? '' : `, and ${itself} made ${few(own)}`}.`;
+  }
   if (agents === n) return `${head}; all of them by agents.`;
-  return agents === 1 ? `${head}; one of them by an agent.` : `${head}; ${count(agents)} of them by agents.`;
+  return agents === 1 ? `${head}; one of them by an agent${tail}.` : `${head}; ${count(agents)} of them by agents${tail}.`;
 }
 
 /* ── the reader's clock ────────────────────────────────────────────────── */

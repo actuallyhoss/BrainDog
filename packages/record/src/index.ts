@@ -208,6 +208,7 @@ import { rerank } from './rerank.ts';
 import { aboutOf, ladder, type Caller, type Gate } from './ladder.ts';
 import { OLDER, card as cardOf } from './card.ts';
 import { alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
+import { byWhoOf, passesOf, passFolder, passKept, type ByWho, type UpdatePass } from './update-pass.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_ASKED_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
@@ -223,7 +224,10 @@ export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, typ
 export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
 export { LATE_DAYS, isWorking, lateAt, nothingWaits, presenceOf, waiting, type Presence, type WaitingNow, type WaitingQuestion, type WaitingReader, type WaitingRun } from './waiting.ts';
 export { headlineAgrees, type Disagrees } from './headlines.ts';
+/* THE RULE `pages()` DROPS A PAGE BY (PGS-A01), so a reader of the record names the kernel's rule and not a copy of it. */
+export { whollyWithheld } from '@braindog/kernel';
 export { fileRecordSigns, readBriefingSign, readToolsSign, type RecordSignsDeps } from './signs.ts';
+export { PASS_KIND, installedTwice, passSentence, type ByWho, type PassSaid, type UpdatePass } from './update-pass.ts';
 export { CARD_AIM, CARD_MOST, OLDER, TWO_SESSIONS, card, type Card, type CardAt } from './card.ts';
 export { ALSO_HERE_MOST, STEP_DAYS, TREE_WARNING, alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
 export { lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_MS, TEMPLATE_ALL, type AnswerRule, type PageFinding, type PageLintRound, type PagesCleanReading } from './page-lint.ts';
@@ -1169,6 +1173,12 @@ export type EventLine = Omit<LogLine, 'rowid'> & {
   seq: number | null;
   /** What the thing is called: a row's title, or a question. */
   title: string | null;
+  /**
+   * On the one line a pass of BrainDog's own update is said as (kind `update`, SHL-A21): its sentence and counts, with
+   * every line it wrote under it as `steps`, newest first, each still undone on its own.
+   */
+  pass?: import('./update-pass.ts').PassSaid;
+  steps?: EventLine[];
 };
 
 /**
@@ -1185,11 +1195,12 @@ type Walked = EventLine & { rowid: number };
  *
  * `upTo` is the newest event in the answer, which is what `markRead` takes to say all of these were seen.
  * `sinceCapped` says there is more between the mark and the oldest line here; the rest is `recentHistory`'s.
+ * `byWho` counts the lines answered by who wrote them (`update-pass.ts`), here and on `recentHistory`'s page alike.
  */
-export type WhatsNew = { events: EventLine[]; upTo: Cursor | null; sinceCapped: boolean };
+export type WhatsNew = { events: EventLine[]; upTo: Cursor | null; sinceCapped: boolean; byWho: ByWho };
 
 /** `recentHistory`: one page of the log, newest first, and the cursor for the page below it. */
-export type HistoryPage = { events: EventLine[]; cursor: Cursor | null };
+export type HistoryPage = { events: EventLine[]; cursor: Cursor | null; byWho: ByWho };
 
 /**
  * `inbox`: one page of the arrivals in the state asked for, newest first, the cursor for the page below it, and how many
@@ -1286,7 +1297,7 @@ export type Understanding = {
 /**
  * What `meet` is told (`loop/contract-17.md`): who, by a name, an address, a handle or keys (`kind:value`), whether a person
  * or an organisation, the organisation a person is with and its domain, their role, and where they were met. `source` is
- * a short plain phrase (`commit 4464966 in braindog`, `mail from encore.example`); `where` is the older word for it.
+ * a short plain phrase (`commit 4464966 in braindog`, `mail from halden.example`); `where` is the older word for it.
  */
 export type MeetSaid = {
   name?: string;
@@ -1811,6 +1822,8 @@ export async function createRecordApi(deps: RecordDeps) {
     ...(deps.delivers === undefined ? {} : { delivers: deps.delivers }),
     ...(deps.answersSlash === undefined ? {} : { answersSlash: deps.answersSlash }),
     ...(deps.sign === undefined ? {} : { sign: deps.sign }),
+    /* THE BUILD THIS HOST RUNS, so the door's `behind` can say a session that named another build is behind. */
+    ...(deps.build?.app ? { build: deps.build.app } : {}),
     /* `43 §4.3`'s three number forms, wired where both halves can be reached: the readers are
        rank 9, the record that reads an arrival is rank 7, and this package is 11. Without these
        lines a record reads them the way `ingest.ts` does alone, which is wrong against `§4.3`
@@ -3190,7 +3203,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ORDER BY d.id`,
       )
       .map((r) => r.id);
-  const firstPartyTick = async (today: string): Promise<string[]> => {
+  const firstPartyPass = async (today: string): Promise<string[]> => {
     const { shippedVersion, updateFirstParty } = await import('@braindog/seed/packs/quiet');
     const { firstPartyManifest } = await import('@braindog/seed/packs');
     const { moduleDocument, dayOf } = await import('@braindog/seed/usecases/install');
@@ -3209,6 +3222,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     );
     const last = kernel.prefsOf(FIRST_PARTY_HOLDER)[FIRST_PARTY_LAST] as { versions?: unknown; day?: unknown } | undefined;
     if (last?.versions === shipped && last.day === today) return [];
+    /* WHERE THIS PASS STARTS IN THE LOG, so what it writes is read back as one line with its steps (`update-pass.ts`). */
+    const from = kernel.newestEvent();
     const actor = 'system';
     const host = packHost({ principal: { kind: 'system', id: actor } });
     const speaking = speakingNow(kernel);
@@ -3283,6 +3298,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     } catch {
       stopped = true;
     }
+    /* WHERE THE PASS ENDS: before who the record's own person is is looked for, so that line is said as its own and never
+       inside an update it had no part in. */
+    const to = kernel.newestEvent();
     const name = (id: string): string => moduleName(id);
     const listed = (lose: readonly string[] | undefined): string =>
       lose === undefined || lose.length === 0 ? 'change what you made' : lose.length === 1 ? lose[0]! : `${lose.slice(0, -1).join(', ')} and ${lose.at(-1)!}`;
@@ -3303,10 +3321,35 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     } catch {
       said.push('Finding which person is you stopped partway, and runs again tomorrow.');
     }
-    kernel.setPref(FIRST_PARTY_HOLDER, FIRST_PARTY_LAST, { versions: shipped, day: today, steps: said });
+    const pass: UpdatePass = {
+      from,
+      to,
+      at: today,
+      updated: steps.filter((st) => st.did === 'updated').map((st) => name(st.pack)),
+      asked: steps.filter((st) => st.did === 'asked').map((st) => name(st.pack)),
+    };
+    kernel.setPref(FIRST_PARTY_HOLDER, FIRST_PARTY_LAST, { versions: shipped, day: today, steps: said, passes: passKept(passesOf(last), pass) });
     if (steps.some((st) => st.did === 'updated' || st.did === 'asked') && scheduler) await kernel.tail(scheduler);
     return said;
   };
+  /**
+   * ONE PASS AT A TIME. Two ticks that met (a deploy's and the night's, or two requests while the first was still loading
+   * its modules) each read yesterday's versions before either kept today's, and each put the same version in: Activity
+   * said the Agents add-on twice in one day. A tick that finds a pass under way answers nothing, as a second pass the same
+   * day does (`installedTwice` in `update-pass.ts` reads the log for the fault).
+   */
+  let firstPartyRunning = false;
+  const firstPartyTick = async (today: string): Promise<string[]> => {
+    if (firstPartyRunning) return [];
+    firstPartyRunning = true;
+    try {
+      return await firstPartyPass(today);
+    } finally {
+      firstPartyRunning = false;
+    }
+  };
+  /** The passes the tick kept, newest last, which a read of the log folds (`passFolder`). */
+  const updatePasses = (): UpdatePass[] => passesOf(kernel.prefsOf(FIRST_PARTY_HOLDER)[FIRST_PARTY_LAST]);
 
   /** How many writes `understand` names, the first ones, so a large slice is still a short answer. */
   const UNDERSTAND_SAID = 10;
@@ -5374,7 +5417,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * A write the ladder let through, once it is written: one more change of its kinds kept by that agent, and the row
-   * answered with the rung it was written at (`rung`), so the agent can say "Done, and Sam can undo it".
+   * answered with the rung it was written at (`rung`), so the agent can say "Done, and Ada can undo it".
    */
   const keptOnLadder = (rung: { caller: Caller; gate: Gate } | null, out: Result<Entry>): Result<Entry | Asked> => {
     if (!out.ok || !rung?.gate.write) return out;
@@ -5611,7 +5654,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const candidate = (ref: string, keeps: boolean, rows: number[]): MergeCluster['candidates'][number] | null => {
       const r = kernel.get(ref, { includeDeleted: true });
       if (!r || r.register !== register) return null;
-      /* BY NAME, AND NEVER BY AN ADDRESS OR A HANDLE: a person met with only an address is "someone at encore.example", and one
+      /* BY NAME, AND NEVER BY AN ADDRESS OR A HANDLE: a person met with only an address is "someone at halden.example", and one
          with no name at all is said as "this one" by the card (`''`). */
       const titled = title === undefined ? null : text(r.fields[title]);
       const name = titled === null ? '' : (scrubbed(titled) ?? '');
@@ -5943,8 +5986,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     want: number,
     setups = false,
     skip?: (e: LogLine) => boolean,
+    folds = false,
   ): { lines: Walked[]; next: number | null } => {
     const lines: Walked[] = [];
+    /* AND A PASS OF BRAINDOG'S OWN UPDATE AS ONE LINE WITH ITS STEPS UNDER IT (`update-pass.ts`), before the setup is
+       looked for, so an install the pass made is never read as a record setting itself up. */
+    const fold = folds ? passFolder<Walked>(updatePasses()) : null;
     /* THE FEED SAYS A RECORD SETTING ITSELF UP AS ONE LINE (`kernel/src/feed.ts`); the log keeps every write. */
     const setup = setups
       ? setupCollapser<Walked>((line) => {
@@ -5953,10 +6000,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           return Array.isArray(tags) && tags.includes('example');
         })
       : null;
-    const keep = (line: Walked): void => {
+    const put = (line: Walked): void => {
       for (const out of setup ? setup.push(line) : [line]) lines.push(out);
     };
+    const keep = (line: Walked): void => {
+      for (const one of fold ? fold.push(line) : [line]) put(one);
+    };
     const done = (next: number | null): { lines: Walked[]; next: number | null } => {
+      if (fold) for (const one of fold.flush()) put(one);
       if (setup) lines.push(...setup.flush());
       return { lines, next };
     };
@@ -6354,9 +6405,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * asks this.
    */
   const shown = (ctx: CallContext, line: Walked): EventLine => {
-    if (holdsRowids(ctx)) return line;
+    const steps = line.steps as Walked[] | undefined;
     const { rowid: _rowid, ...rest } = line;
-    return rest;
+    const out: EventLine = holdsRowids(ctx) ? line : rest;
+    /* A PASS'S STEPS LEAVE AS ITS LINE DOES, each held to the same rule. */
+    return steps === undefined ? out : { ...out, steps: steps.map((st) => shown(ctx, st)) };
   };
 
   /** Where a line sits, said to this caller: its rowid to an owner, and its id to anybody else. */
@@ -6524,9 +6577,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const reader = readerOf(ctx);
     const muted = mutesOf(ctx);
     const skip = (e: LogLine): boolean => kernel.bookkeeping(e) || (muted.size > 0 && mutedFor(e, muted));
-    const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(reader), NEWS + 1, true, skip);
+    const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(reader), NEWS + 1, true, skip, true);
     const events = lines.slice(0, NEWS);
-    return { events: events.map((line) => shown(ctx, line)), upTo: events[0] ? pointAt(ctx, events[0]) : null, sinceCapped: next !== null };
+    return {
+      events: events.map((line) => shown(ctx, line)),
+      upTo: events[0] ? pointAt(ctx, events[0]) : null,
+      sinceCapped: next !== null || lines.length > NEWS,
+      byWho: byWhoOf(events, reader),
+    };
   };
 
   /**
@@ -6763,6 +6821,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               reads: (list) => readable(ctx, list) === null,
               pages: every,
               dismissed: new Set(Array.isArray(prefs['pen.dismissed']) ? prefs['pen.dismissed'] : []),
+              use: { sql, nowMs: clock.now() },
             })
           : [],
       whatsNew: newsFor(ctx),
@@ -6776,10 +6835,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const brief = (decl: RegisterDecl, scopeField: string, row: Entry, scope: Brief['scope']): Brief => {
     const shown = new Set([decl.title, ...((decl as { mobile?: readonly string[] }).mobile ?? [])]);
+    /* THE AGENT A ROW IS HANDED TO, BY THE FIELD THE LIST'S `hand.agent` NAMES, written as `agent` whatever the field is
+       called, so the card's Next line finds a step handed to the run on every list that declares one and not only on
+       one whose short view happens to show it (worker-door-tests-44's finding). */
+    const handAgent = decl.hand?.agent;
     const out: Brief = { spoken: kernel.nameOf(row.id), version: row.version, scope, state: row.state };
     for (const f of decl.fields) {
       if (f.retired || f.id === scopeField || f.id === decl.state || BRIEF_KEYS.includes(f.id)) continue;
       const value = row.fields[f.id];
+      if (f.id === handAgent && typeof value === 'string' && value !== '') {
+        out.agent = value;
+        continue;
+      }
       if (f.type === 'secret') {
         out[f.id] = typeof value === 'string' ? kernel.keyState(value) : { sealed: false, opened: 0, last_opened: null, last_by: null };
         continue;
@@ -8262,7 +8329,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!filed.ok) throw new Error(`pages-clean was not filed: ${'refusal' in filed ? filed.refusal.fix : 'the record changed under it'}`);
       /* AND THE RECORD'S TWO SIGNS (`signs.ts`): whether a new session's briefing is true, and whether agents were given
          the tool list. A system principal reads the whole briefing, as a session in that repository would be handed it. */
-      const signs = await fileRecordSigns(kernel, { sql, briefing: (repo) => briefing({ principal: { kind: 'system', id: 'signs' }, session: { repo } }) }, clock.now());
+      const signs = await fileRecordSigns(
+        kernel,
+        { sql, briefing: (repo) => briefing({ principal: { kind: 'system', id: 'signs' }, session: { repo } }), build, offers: deps.catalogueOffers },
+        clock.now(),
+      );
       if (signs.refused.length > 0) throw new Error(`signs were not filed: ${signs.refused.join('; ')}`);
       return { ran: true, state: reading.state, findings: round.findings.length, pages: round.pages };
     },
@@ -8452,7 +8523,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (typeof b.key === 'string' && typeof now === 'string' && now !== b.key) rekeyed.set(b.key, now);
       });
       const shownLook = lookShown(out.value.look as Record<string, unknown> | undefined, blocks, next, rekeyed);
-      /* WHO KEPT SLASH'S ARRANGEMENT, BY NAME, so the history line "Slash arranged · Sam kept" survives a reload and the
+      /* WHO KEPT SLASH'S ARRANGEMENT, BY NAME, so the history line "Slash arranged · Ada kept" survives a reload and the
          Undo is not offered again (`keepLook`). A reader who may not know who is here reads Someone, as everywhere. */
       const look =
         shownLook?.by === 'slash'
@@ -8664,7 +8735,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                 ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [plan.refused] })
                 : cost
                   ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [cost] })
-                  : heldBlock(ctx, kernel.block(previewed(block) as never));
+                  : heldBlock(ctx, kernel.block(previewed(block) as never, { inbox: allows(ctx, 'owner') === null || inboxReached(ctx) }));
         /* HER NAMES BACK, in place of the ones nobody declared, so the drawing says the figure she wrote. */
         const back = renamed[i]!.back;
         if (back.size === 0) return drawn;
@@ -9485,7 +9556,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (said.keys !== undefined && said.keys !== null) {
         const keys = said.keys;
         if (!Array.isArray(keys) || keys.length > MEET_KEYS_MOST || keys.some((k) => typeof k !== 'string' || !/^[a-z][a-z0-9.-]*:\S/iu.test(k.trim())))
-          return no('VALUE_MALFORMED', `keys is a list of at most ${MEET_KEYS_MOST}, each kind:value, as github:ada or domain:encore.example.`, { at: 'keys' });
+          return no('VALUE_MALFORMED', `keys is a list of at most ${MEET_KEYS_MOST}, each kind:value, as github:ada or domain:halden.example.`, { at: 'keys' });
       }
       /* EACH KIND IS MET BY ITS OWN ROLE'S PARTS. An organisation is with no organisation, its `role` is what kind it is
          (`vendor`, `merchant`, the kernel's word), and an address or a handle is one of its keys, so each goes only where
@@ -10307,7 +10378,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /**
      * Keep how Slash arranged a page, once its Undo has passed: who kept it is written beside the version they saw, and the
-     * page read answers their name as `look.kept`, so "Slash arranged · Sam kept" holds after a reload. Nothing about the
+     * page read answers their name as `look.kept`, so "Slash arranged · Ada kept" holds after a reload. Nothing about the
      * look itself changes.
      */
     async keepLook(args: { page: string } | undefined, ctx: CallContext) {
@@ -11496,16 +11567,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (all !== undefined && all !== true && all !== false && all !== 'true' && all !== 'false')
         return no('VALUE_MALFORMED', "everything is true or false. True also returns the runs the sweep closed and agents' last-seen stamps.", { at: 'everything' });
       const limit = Math.min(Math.max(1, asked ?? 50), 200);
-      const { lines, next } = walk(ctx, cursor, 1, limit + 1, false, all === true || all === 'true' ? undefined : (e) => kernel.bookkeeping(e));
+      const { lines, next } = walk(ctx, cursor, 1, limit + 1, false, all === true || all === 'true' ? undefined : (e) => kernel.bookkeeping(e), true);
       const events = lines.slice(0, limit);
-      const last = events.at(-1);
+      /* A PASS ENDS THE PAGE ON ITS OLDEST STEP, so the page below starts under the whole pass and never says it twice. */
+      const end = events.at(-1);
+      const last = (end?.steps as Walked[] | undefined)?.at(-1) ?? end;
       /* A FULL PAGE ENDS ON A LINE THE CALLER WAS SHOWN, and its cursor names that line. A page the walk cap cut short
          ends on `next`, an event they were not shown: its rowid to whoever `holdsRowids`, as before, and sealed
          for anybody else, since its id would hand them the hidden event's millisecond (`history-cursor.ts`). */
       let below: Cursor | null = null;
       if (lines.length > limit) below = last ? pointAt(ctx, last) : null;
       else if (next !== null) below = holdsRowids(ctx) ? next : await cursors.seal(next);
-      return ok({ events: events.map((line) => shown(ctx, line)), cursor: below });
+      return ok({ events: events.map((line) => shown(ctx, line)), cursor: below, byWho: byWhoOf(events, readerOf(ctx)) });
     },
 
     /**
@@ -11715,7 +11788,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        handed the guards above rather than a copy of them, so a method there is held to the same ladder as every method
        in this file; the `guards` gate reads those files as it reads this one, and refuses a name two files both define,
        since the later one would win here without a word. */
-    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom }),
+    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; } }),
     /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/`: the owner's, in a browser, and a runner's,
        for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin` as every ADMIN method
        here is, and a runner's admit the one principal every guard above refuses. */

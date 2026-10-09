@@ -1,0 +1,55 @@
+{
+  "id": "layla-student",
+  "name": "Layla",
+  "who": "A pharmacology student at Cairo University in her third year. Her courses, assignments and exam dates live in four group chats and she keeps losing track of what is due.",
+  "expects": "student",
+  "standing": true,
+  "said": "I'm Layla, a pharmacology student at Cairo University. I keep missing assignments and exam dates.",
+  "says": {
+    "plain": "I'm Layla, a pharmacology student at Cairo University. I keep missing assignments and exam dates.",
+    "hard": "I'm Layla. Pharmacology finals are in May and I keep losing track of what is due."
+  },
+  "chip": "I'm a student",
+  "answer": "Pharmacology, Biochemistry, Physiology",
+  "answers": {
+    "name": "Layla",
+    "currency": "EGP",
+    "kind": "courses",
+    "things": ["Pharmacology", "Biochemistry", "Physiology"]
+  },
+  "email": "layla@people.braindog.test",
+  "slug": "laylas-studies",
+  "zone": "Africa/Cairo",
+  "locale": "en-EG",
+  "languages": ["en-EG", "ar-EG"],
+  "start": "2026-10-05T17:00:00Z",
+  "first": "Pharmacology essay on beta blockers due Thursday",
+  "later": [
+    { "day": 2, "said": ["Biochemistry lab report due Sunday", "Study session for Physiology on Saturday, two hours"] },
+    { "day": 7, "said": ["Physiology quiz next Tuesday", "Finished the beta blockers essay"] },
+    { "day": 30, "said": ["Pharmacology midterm on 12 November"] },
+    { "day": 60, "said": ["Biochemistry final on 20 December", "Pharmacology final on 23 December", "Physiology final on 27 December"] }
+  ],
+  "expect": {
+    "who": {
+      "question": "Who are you?",
+      "chips": 5,
+      "promises": [
+        { "says": "free, with no card", "match": "free\\b.{0,24}\\bno card" },
+        { "says": "nothing is saved until you keep it", "match": "nothing (is )?saved until you keep" },
+        { "says": "yours to export or move", "match": "yours to (export|move|take)" }
+      ]
+    },
+    "heard": {
+      "usecase": "student",
+      "title": "Layla's Studies",
+      "lit": ["Layla", "student", "assignments"],
+      "places": ["Today", "Courses", "Assignments", "People"]
+    },
+    "question": { "about": "things", "choices": 3 },
+    "keep": { "lists": ["courses", "assignments", "study_sessions", "people"], "currency": "EGP" },
+    "tell": { "lists": ["assignments"] },
+    "today": { "first": "source", "lists": ["assignments"] },
+    "offer": { "id": "calendar:assignments", "before": 30, "after": 60 }
+  }
+}

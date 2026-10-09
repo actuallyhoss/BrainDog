@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { WORK, flatNav, isHere } from '../nav.ts';
+import { WORK, flatNav, isHere, tabsOf } from '../nav.ts';
 import { AGENTS_PAGE, RAIL_MOST, agentsHref, railOf } from './rail.ts';
 
 type Entry = { title: string; href: string; icon: string; row?: true };
@@ -115,4 +115,28 @@ test('"2 working" opens the Agents place, wherever the rail put it, and the agen
   const renamed = [{ key: 'section:Agents', href: '/p/crew', label: 'Agents', icon: 'session', near: ['/p/crew'] }];
   assert.equal(agentsHref(renamed), '/p/crew', 'the Agents place was passed over for the pack\'s page');
   assert.equal(agentsHref(rail.places.filter((i) => i.label !== 'Agents')), AGENTS_PAGE);
+});
+
+/* MARIAM'S RECORD AFTER SIGN-UP (use case 6): the rules gave Money and People, the shop use case its section, in the
+   order they were made. The shop's section is Shop today and Orders once the use case folds; both rank the same. */
+const shopOf = (name: string): [string, Entry[]] => [name, [page('Orders', '/p/orders'), page('Products', '/p/products')]];
+const mariam = (name: string): [string, Entry[]][] => [['Money', [page('Money', '/p/money')]], ['People', [page('People', '/p/people')]], shopOf(name)];
+
+test("a shop's orders come straight after Decide, so the phone's bar is Today, Decide, Orders, Money and People", () => {
+  for (const name of ['Orders', 'Shop']) {
+    const rail = railOf(flatNav(mariam(name), 0, WORDS), 'Decide');
+    assert.deepEqual(rail.places.map((i) => i.label), ['Today', 'Decide', name, 'Money', 'People']);
+    const orders = rail.places[2];
+    assert.ok(orders);
+    assert.equal(orders.href, '/p/orders', 'the place opens the Orders page, where the week offer is drawn');
+    assert.deepEqual(tabsOf(rail.places).map((i) => i.label), ['Today', 'Decide', name, 'Money', 'People']);
+    assert.deepEqual(rail.more.map((i) => i.label), ['Activity']);
+  }
+});
+
+test('a record without a shop keeps its rail and its bar exactly as they were', () => {
+  const rail = railOf(flatNav(SECTIONS, 3, WORDS, { work: WORK }), 'Decide');
+  assert.deepEqual(tabsOf(rail.places).map((i) => i.label), ['Today', 'Decide', 'Work', 'Projects', 'Money']);
+  assert.deepEqual(rail.places.map((i) => i.label), ['Today', 'Decide', 'Work', 'Projects', 'Money', 'People', 'Agents']);
+  assert.deepEqual(rail.more.map((i) => i.label), ['Services', 'Activity']);
 });

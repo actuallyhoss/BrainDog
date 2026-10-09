@@ -376,7 +376,6 @@ const CALLS: Record<string, Record<string, unknown>> = {
   handoff: { doing: 'Driving the tool list', next: 'Report what answered' },
   meet: { name: 'Ada', where: 'commit 4464966 in braindog' },
   triage: { arrival: 'a1', ignore: true },
-  understand: {},
 };
 
 /** What the stub record answers each method, shaped only where a tool or a resource reads a field off it. */
@@ -406,7 +405,7 @@ const ANSWERS: Record<string, unknown> = {
   automations: [],
   arrangement: { packs: [] },
   pages: [],
-  understandPlan: { dry: true, kinds: [], writes: [], more: 0, questions: [], asks: {}, done: true },
+  understandPlan: { dry: true, kinds: [], writes: [], more: 0, questions: [], asks: {}, done: true },  previewPage: { page: 'handoffs', title: 'Next steps left', blocks: [] },
 };
 
 /**

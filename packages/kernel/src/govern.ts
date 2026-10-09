@@ -297,13 +297,31 @@ function hydrate(register: GovernRegister, row: Record<string, unknown>): Record
 /**
  * `cause` IS THE FILER'S KEY FOR WHAT IT ASKS, so it is asked once (`cause.ts`): left out, an agent's run derives one.
  */
-export type Proposal = { question: string; body_kind: BodyKind; body: Record<string, unknown>; cause?: string };
+export type Proposal = {
+  question: string;
+  body_kind: BodyKind;
+  body: Record<string, unknown>;
+  cause?: string;
+  /**
+   * WHAT CHANGED SINCE IT WAS ANSWERED, one sentence (AGT-C08). A question with this cause that the person declined, or
+   * answered with an option, is answered from memory and nothing is filed; with `again` it is filed, and the sentence
+   * is kept under the question so the person reads why it is back.
+   */
+  again?: string;
+};
+
+/**
+ * What the person said the last time this cause was asked, when it is answered from memory: `said` is "No" or the
+ * option they picked, `reason` their words (or that they gave none), `at` the instant they answered.
+ */
+export type Remembered = { said: string; reason: string; at: string };
 
 /**
  * What filing answers: the question's id, and `joined` when an open question already asked it and nothing was filed.
- * `widened` when the open one was a rowset and this one's further rows were added to it.
+ * `widened` when the open one was a rowset or an arrangement and this one's further rows or parts were added to it.
+ * `answered` when the person already answered this cause and nothing was filed: `id` is then the question they answered.
  */
-export type Filed = { id: string; joined?: true; widened?: number };
+export type Filed = { id: string; joined?: true; widened?: number; answered?: Remembered };
 
 /** The one sentence a rowset that would change nothing is refused with. */
 export const NOTHING_TO_DECIDE = 'Everything this asks for is already so. Nothing to decide.';
@@ -338,8 +356,10 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
     const bad = causeFault(p.cause);
     if (bad !== null) return no<Filed>('VALUE_MALFORMED', bad, { at: 'cause' });
   }
+  if (p.again !== undefined && (typeof p.again !== 'string' || p.again.trim() === '' || new TextEncoder().encode(p.again).length > AGAIN_BYTES))
+    return no<Filed>('VALUE_MALFORMED', `again is one sentence of at most ${AGAIN_BYTES} bytes saying what changed since this was last answered, or leave it out.`, { at: 'again' });
 
-  const wrong = checkBody(deps, p.body_kind, p.body ?? {});
+  const wrong = checkBody(deps, p.body_kind, p.body ?? {}, p.cause ?? null);
   if (wrong) return { ok: false, refusal: wrong };
 
   /* A ROWSET THAT CHANGES NOTHING IS NOT A QUESTION. SG69 on the owner's record proposed values its rows already held,
@@ -432,8 +452,14 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
      for migration 31's reason: an automation's run waits on its own question, and two runs asking alike are two asks. */
   const by = typeof actor === 'function' ? actor() : actor;
   const cause = p.cause ?? (RUN_ID.test(by) ? causeOf(p.body_kind, body, p.question) : null);
+  /* ANSWERED ALREADY (AGT-C08). The person said no to this cause, or picked an option of it, and the proposer is told
+     what they said, when and why, and nothing is filed. With `again` it is asked anyway, and that sentence goes under
+     it. An open question holding the cause is newer than any answer, so it is joined below instead. */
+  const memory = cause !== null && !openWith(deps.sql, cause) ? remembered(deps, cause, p.body_kind, body) : null;
+  if (memory !== null && p.again === undefined) return ok(memory);
   const asked = askedAlready(deps, by, p, body, cause);
-  if (asked !== null) return ok(asked);
+  if (!asked.ok) return asked;
+  if (asked.value !== null) return ok(asked.value);
 
   const id = `SG${deps.allocate('suggestion')}`;
   const at = instant(deps.nowMs);
@@ -459,7 +485,100 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
      immutable `decision.question` — the record's permanent answer to "what was asked", wrong, with
      the original nowhere. */
   event(deps, at, by, 'suggest', `suggestion:${id}`, 'suggestion', p.question);
+  /* WHY IT IS BACK, under the question, after the `suggest` event so `questionOf` still reads the question first. Only
+     when an answer was set aside: an `again` on a cause nobody answered says nothing the question does not. */
+  if (memory !== null && p.again !== undefined) event(deps, at, by, 'note', `suggestion:${id}`, 'suggestion', AGAIN, p.again.trim());
   return ok({ id });
+}
+
+/** What a note holds in `to_v` when it is the proposer's word on what changed since the person last answered. */
+const AGAIN = 'again';
+
+/** The most `again` may say: one sentence, as a note is. */
+const AGAIN_BYTES = 280;
+
+/** Whether an open question holds `cause`. */
+const openWith = (sql: Sql, cause: string): boolean => sql.one('SELECT 1 AS y FROM suggestion WHERE status = ? AND cause = ?', 'open', cause) != null;
+
+/**
+ * What the person last said to `cause`, when it was a no or a pick, or `null` when they have not answered it, or said yes.
+ *
+ * THE NEWEST ANSWERED QUESTION WITH THE CAUSE, read through `suggestion_cause_closed` (migration 37), because a decline
+ * by `wont-fix` or `incorrect` writes no decision row and `decision_cause` cannot find it; its `resolve` event carries
+ * the day and the reason. THE NEWEST ONE DECIDES: one taken back by the agent, or closed because the rows already said
+ * it, is not an answer, and it leaves no memory rather than handing back an older no that the ask it closed had set
+ * aside. An accept of anything but options is no memory: the rows now hold it and C07's rule refuses the same ask
+ * (`NOTHING_TO_DECIDE`), or they moved since and asking again is fair.
+ *
+ * AND ONLY FOR WHAT THAT QUESTION REACHED. A cause is the filer's key, and a script keeps one key for every month it
+ * asks: a pick about Rent and Phone is no answer to the same ask about Gym, so an ask that reaches an entry or a part
+ * the answered one did not is asked (`reaches`).
+ */
+function remembered(deps: GovernDeps, cause: string, kind: BodyKind, body: Record<string, unknown>): Filed | null {
+  const sql = deps.sql;
+  const q = sql.one<{ id: string; body_kind: string; body: string; resolved_as: string | null; opened_by: string }>(
+    "SELECT id, body_kind, body, resolved_as, opened_by FROM suggestion WHERE cause = ? AND status <> 'open' ORDER BY opened_at DESC, rowid DESC LIMIT 1",
+    cause,
+  );
+  if (!q || !['wont-fix', 'incorrect', 'addressed'].includes(q.resolved_as ?? '')) return null;
+  const was = parse(q.body);
+  if (q.body_kind !== kind || !was) return null;
+  const before = reaches(deps, kind, was);
+  for (const r of reaches(deps, kind, body)) if (!before.has(r)) return null;
+  const resolved = sql.one<{ ts: string; note: string | null; batch: string | null; actor: string }>(
+    "SELECT ts, note, batch, actor FROM event WHERE kind = 'resolve' AND target = ? ORDER BY rowid DESC LIMIT 1",
+    `suggestion:${q.id}`,
+  );
+  /* A PERSON'S ANSWER ONLY. A rule closing its own ask when its run ended (`flow.ts`), Slash, or the asker itself said
+     nothing about the question, and remembering that as a no would silence a fair ask. */
+  if (!resolved || resolved.actor.startsWith('rule:') || resolved.actor === SLASH || resolved.actor === q.opened_by) return null;
+  const reason = (words: string | null | undefined): string => (words?.trim() && !pressedOnly(words) ? words.trim() : 'No reason was given.');
+  if (q.resolved_as !== 'addressed') return { id: q.id, answered: { said: 'No', reason: reason(resolved.note), at: resolved.ts } };
+  /* AN ANSWER WITH A DECISION BEHIND IT: the decision written in the same batch as the `resolve`. */
+  const d = resolved.batch === null
+    ? null
+    : sql.one<{ answer: string; reason: string | null; ts: string }>(
+        "SELECT d.answer AS answer, d.reason AS reason, d.ts AS ts FROM event e JOIN decision d ON e.target = 'decision:' || d.id WHERE e.kind = 'decide' AND e.batch = ? ORDER BY e.rowid DESC LIMIT 1",
+        resolved.batch,
+      );
+  if (!d) return null;
+  if (q.body_kind === 'options') {
+    const options = listOf(parse(q.body)?.options).filter(isMap);
+    const label = options.find((o) => o.id === d.answer)?.label;
+    return { id: q.id, answered: { said: typeof label === 'string' && label.trim() ? label.trim() : d.answer, reason: reason(d.reason), at: d.ts } };
+  }
+  return d.answer === 'reject' ? { id: q.id, answered: { said: 'No', reason: reason(d.reason), at: d.ts } } : null;
+}
+
+/**
+ * What an ask reaches, as keys to compare: each entry a rowset or an option changes, with the change, by row id so a
+ * spoken id and a row id agree; each entry a rowset makes; each part of an arrangement. Empty for the kinds that reach
+ * nothing of the kind, whose cause alone says what they ask.
+ */
+function reaches(deps: GovernDeps, kind: string, body: Record<string, unknown>): Set<string> {
+  const out = new Set<string>();
+  const entry = (list: string, r: Record<string, unknown>) =>
+    out.add(typeof r.at === 'string' ? canon([deps.row(list, r.at)?.id ?? `${list}:${r.at}`, r.patch ?? null]) : canon([list, r]));
+  if (kind === 'rowset' && typeof body.register === 'string') for (const r of listOf(body.rows).filter(isMap)) entry(body.register, r);
+  if (kind === 'options')
+    for (const o of listOf(body.options).filter(isMap)) {
+      const lists = o.patches === undefined ? null : patchLists(o.patches, 'patches');
+      if (lists?.ok) for (const [list, rows] of lists.value) for (const r of rows) entry(list, r);
+    }
+  if (arranging(kind as BodyKind)) for (const part of partsOf(body)) out.add(part.id);
+  return out;
+}
+
+/**
+ * The sentence an agent passes on when its proposal was answered from memory: what was said, the day, the reason, and
+ * how to ask again. It names `again` every time, so an answer that has gone stale is never the last word.
+ */
+export function rememberedLine(a: Remembered): string {
+  const day = new Date(a.at);
+  const when = Number.isFinite(day.getTime()) ? day.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : a.at.slice(0, 10);
+  const said = a.said === 'No' ? 'This was declined' : `This was answered "${a.said}"`;
+  const why = a.reason === 'No reason was given.' ? 'No reason was given.' : `The reason: ${a.reason.replace(/[.\s]+$/u, '')}.`;
+  return `${said} on ${when}. ${why} Nothing was filed. If something has changed, propose it again and say what in again.`;
 }
 
 /** A row's fields as they stand, by its list and its spoken id or row id, or `null` for a row that is not there or is gone. */
@@ -485,16 +604,26 @@ function heldFields(deps: GovernDeps, register: string, at: string): Record<stri
  * opener taking its question back took the joiner's with it. The opener asking again, or a later run of its key, is
  * the same agent and writes nothing; an agent joining twice writes once.
  */
-function askedAlready(deps: GovernDeps, by: string, p: Proposal, body: Record<string, unknown>, cause: string | null): Filed | null {
+function askedAlready(deps: GovernDeps, by: string, p: Proposal, body: Record<string, unknown>, cause: string | null): Result<Filed | null> {
   if (cause !== null) {
-    const held = deps.sql.one<{ id: string; opened_by: string }>("SELECT id, opened_by FROM suggestion WHERE status = 'open' AND cause = ?", cause);
+    const held = deps.sql.one<{ id: string; opened_by: string; body_kind: string; body: string }>(
+      "SELECT id, opened_by, body_kind, body FROM suggestion WHERE status = 'open' AND cause = ?",
+      cause,
+    );
     if (held) {
+      /* ONE OPEN ARRANGEMENT PER CAUSE, AND IT CARRIES THE WHOLE LIST (REC-A06 step 8). A second arrangement with the
+         cause adds the parts the open one lacks to it, so an agent that finds a fourth key to ask for does not wait for
+         the first three to be answered, and the owner reads one card. */
+      if (held.body_kind === 'arrange' && p.body_kind === 'arrange') {
+        const wider = widenArrangement(deps, held, body, by, cause);
+        if (wider !== null) return wider;
+      }
       if (!sameAgent(deps.sql, held.opened_by, by) && joinersOf(deps.sql, held.id).every((j) => !sameAgent(deps.sql, j, by)))
         event(deps, instant(deps.nowMs), by, 'note', `suggestion:${held.id}`, 'suggestion', JOINED, 'Asked the same thing too, and joined this question instead of asking again.');
-      return { id: held.id, joined: true };
+      return ok({ id: held.id, joined: true });
     }
   }
-  if (p.body_kind !== 'rowset' || p.cause !== undefined || cause === null) return null;
+  if (p.body_kind !== 'rowset' || p.cause !== undefined || cause === null) return ok(null);
 
   const register = String(body.register);
   const rows = body.rows as Record<string, unknown>[];
@@ -520,9 +649,70 @@ function askedAlready(deps: GovernDeps, by: string, p: Proposal, body: Record<st
     deps.sql.exec('UPDATE suggestion SET body = ?, cause = ?, kind = ? WHERE id = ?', JSON.stringify(wider), widerCause, kind, q.id);
     const more = lacking.length === 1 ? 'one more thing, and added it' : `${lacking.length} more things, and added them`;
     event(deps, instant(deps.nowMs), by, 'note', `suggestion:${q.id}`, 'suggestion', String(lacking.length), `Asked the same of ${more} to this question.`);
-    return { id: q.id, joined: true, widened: lacking.length };
+    return ok({ id: q.id, joined: true, widened: lacking.length });
   }
-  return null;
+  return ok(null);
+}
+
+/**
+ * The open arrangement `held` widened with the parts `next` adds, or `null` when it adds none and is a plain join.
+ *
+ * CHECKED WHOLE BEFORE IT IS STORED, as the record's `prepare` checked each half: twelve of each thing and sixty entries
+ * hold for the union too, and a union past them is refused in the proposer's words with nothing changed. The kind is
+ * stamped again, because what accepting would do is now more.
+ */
+function widenArrangement(
+  deps: GovernDeps,
+  held: { id: string; opened_by: string; body: string },
+  next: Record<string, unknown>,
+  by: string,
+  cause: string,
+): Result<Filed> | null {
+  const open = parse(held.body);
+  if (!open) return null;
+  const union = uniteArrangements(open, next);
+  if (union === null) return null;
+  const wrong = checkArranging(deps, 'arrange', union.body, cause);
+  if (wrong) return { ok: false, refusal: { ...wrong, fix: `Added to the arrangement already waiting for this, it would be too much. ${wrong.fix}` } };
+  const kind = stampOf(kindsOfProposal('arrange', union.body, recordReader(deps.sql, held.opened_by)));
+  deps.sql.exec('UPDATE suggestion SET body = ?, kind = ? WHERE id = ?', JSON.stringify(union.body), kind, held.id);
+  const more = union.added === 1 ? 'one more part, and added it' : `${union.added} more parts, and added them`;
+  /* ONE NOTE, whose value is the count, so `joinersOf` reads it as a join, as a widened rowset's is. */
+  event(deps, instant(deps.nowMs), by, 'note', `suggestion:${held.id}`, 'suggestion', String(union.added), `Asked for ${more} to this question.`);
+  return ok({ id: held.id, joined: true, widened: union.added });
+}
+
+/** What an arrangement holds besides its parts, which the open one keeps as it is. */
+const UNITED_KEYS = new Set(['packs', 'plan', 'pages', 'settings', 'declarations', 'parts', 'rows', 'names', 'approve', 'why', 'needs', 'alongside']);
+
+/**
+ * Two arrangements with one cause as one: the open one whole, then every part of `next` it does not hold, or `null`
+ * when it holds them all. `added` is how many parts that is.
+ *
+ * BY PART, AS AN ACCEPT TAKES THEM (`partsOf`). A part the open one already holds stays as the open one asks it, so what
+ * the owner may already have read on the card does not change under them; only what is new is added. The reasons, what
+ * it needs and the calls out it shows are the two lists together, each said once. Entries keep pointing at each other
+ * by place, moved past the open one's (`mergeArrangement`).
+ */
+export function uniteArrangements(open: Record<string, unknown>, next: Record<string, unknown>): { body: Record<string, unknown>; added: number } | null {
+  const held = new Set(partsOf(open).map((p) => p.id));
+  const fresh = partsOf(next)
+    .map((p) => p.id)
+    .filter((id) => !held.has(id));
+  if (fresh.length === 0) return null;
+  const merged = mergeArrangement(narrowArrangement(next, new Set(fresh)), open);
+  for (const [key, value] of Object.entries(open)) if (!UNITED_KEYS.has(key)) merged[key] = value;
+  for (const key of Object.keys(merged)) if (!UNITED_KEYS.has(key) && !(key in open)) delete merged[key];
+  const once = (key: string) => {
+    const seen = new Set<string>();
+    const out = [...listOf(open[key]), ...listOf(next[key])].filter((x) => {
+      const k = canon(x);
+      return seen.has(k) ? false : (seen.add(k), true);
+    });
+    if (out.length > 0) merged[key] = key === 'why' ? out.slice(0, ARRANGE_CEILING) : out;
+  };
+  for (const key of ['why', 'needs', 'alongside']) once(key);
+  return { body: merged, added: fresh.length };
 }
 
 /** Which row a rowset row is about: an update by its target, a new row by everything it says. */
@@ -635,7 +825,7 @@ export function showsOf(value: unknown): Shows | null {
   return null;
 }
 
-function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknown>): Refusal | null {
+function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknown>, cause: string | null = null): Refusal | null {
   const missing = (key: string): Refusal => ({
     code: 'REQUIRED_MISSING',
     fix: `A ${kind} proposal needs ${key}.`,
@@ -657,6 +847,10 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
         };
       if (o.shows !== undefined && showsOf(o.shows) === null)
         return { code: 'VALUE_MALFORMED', fix: `${o.id} shows ${JSON.stringify(o.shows)}. ${SHOWS_SAID}`, at: 'body.options' };
+    }
+    for (const [n, o] of (options as Record<string, unknown>[]).entries()) {
+      const bad = o.patches === undefined ? null : patchesFault(deps, o.patches, `body.options[${n}].patches`);
+      if (bad) return bad;
     }
     const about = body.about;
     if (about !== undefined && (typeof about !== 'string' || about.trim() === '' || new TextEncoder().encode(about).length > ABOUT_BYTES))
@@ -693,7 +887,7 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
     return checkUpdates(deps, register, rows as Record<string, unknown>[]);
   }
 
-  if (arranging(kind)) return checkArranging(deps, kind, body);
+  if (arranging(kind)) return checkArranging(deps, kind, body, cause);
 
   if (kind === 'pattern') {
     if (!body.ingest || typeof body.ingest !== 'object') return missing('ingest');
@@ -1542,7 +1736,7 @@ function replacedAbout(sql: Sql, id: string, list: string, fields: ReadonlySet<s
  * body reaches here. What is held here is what the gate needs to apply it: one pack per verb, settings that
  * are a map of values, and an arrangement that changes something and says why.
  */
-function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, unknown>): Refusal | null {
+function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, unknown>, cause: string | null = null): Refusal | null {
   const packId = (v: unknown, at: string): Refusal | null =>
     typeof v === 'string' && PACK_ID.test(v)
       ? null
@@ -1708,8 +1902,9 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
       at: 'body',
     };
 
+  /* THE ONE HOLDING THIS CAUSE IS NOT COUNTED: the proposal joins it, or widens it (step 8), and opens nothing. */
   const open = deps.sql
-    .all<{ id: string }>("SELECT id FROM suggestion WHERE body_kind = 'arrange' AND status = 'open' ORDER BY rowid")
+    .all<{ id: string }>("SELECT id FROM suggestion WHERE body_kind = 'arrange' AND status = 'open' AND (? IS NULL OR cause IS NOT ?) ORDER BY rowid", cause, cause)
     .map((r) => r.id);
   if (open.length >= OPEN_ARRANGEMENTS)
     return {
@@ -1966,6 +2161,77 @@ function mergeArrangement(rest: Record<string, unknown>, taken: Record<string, u
   return out;
 }
 
+/* ── what an option writes (F61) ─────────────────────────────────────────── */
+
+/** An entry by its spoken id, `recurring#5`, whose list is the part before the `#`. */
+const SPOKEN_AT = /^([a-z][a-z0-9_-]{0,31})#[1-9]\d*$/u;
+
+/** The most entries one option may change, as a rowset's ceiling. */
+const OPTION_PATCHES = MAX_ROWS;
+
+/**
+ * An option's `patches` by list: each `{ at, version, patch }`, with `register` when `at` is not a spoken id that names
+ * its list. A refusal when one cannot say which list it is about.
+ */
+function patchLists(raw: unknown, at: string): Result<Map<string, Record<string, unknown>[]>> {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > OPTION_PATCHES)
+    return no('VALUE_MALFORMED', `patches is a list of one to ${OPTION_PATCHES} changes, each {"at":"recurring#5","version":3,"patch":{"day_of_month":"last"}}.`, { at });
+  const out = new Map<string, Record<string, unknown>[]>();
+  for (const [i, p] of raw.entries()) {
+    if (!isMap(p)) return no('VALUE_MALFORMED', 'Each patch is {"at":"recurring#5","version":3,"patch":{...}}.', { at: `${at}[${i}]` });
+    const { register, ...row } = p;
+    const list = typeof register === 'string' ? register : typeof p.at === 'string' ? SPOKEN_AT.exec(p.at)?.[1] : undefined;
+    if (list === undefined)
+      return no('VALUE_MALFORMED', `${JSON.stringify(p.at ?? null)} does not say which list it is in. Name the entry as recurring#5, or add "register".`, { at: `${at}[${i}].at` });
+    out.set(list, [...(out.get(list) ?? []), row]);
+  }
+  return ok(out);
+}
+
+/**
+ * Whether an option's `patches` can be applied as filed: each list is here, and each entry is checked as a rowset's
+ * update is (`checkUpdates`): live, read at a version, changing something, once.
+ */
+function patchesFault(deps: GovernDeps, raw: unknown, at: string): Refusal | null {
+  const lists = patchLists(raw, at);
+  if (!lists.ok) return 'refusal' in lists ? lists.refusal : null;
+  for (const [list, rows] of lists.value) {
+    if (!deps.hasRegister(list)) return { code: 'REGISTER_UNKNOWN', fix: `There is no list called ${list}.`, at };
+    const bad = checkUpdates(deps, list, rows);
+    if (bad) return { ...bad, at: bad.at?.replace(/^body\.rows/u, at) ?? at };
+  }
+  return null;
+}
+
+/**
+ * The picked option's patches, written as the person deciding in the decision's batch: ALL OR NONE. Every entry is
+ * found at the version it was read at before the first is written, so a stale one writes nothing at all and the
+ * question stays open, with the entry's name in the refusal. The writes then compare-and-set again, as a rowset's do.
+ */
+function applyPatches(deps: GovernDeps, raw: unknown, actor: string, batch: string): Result<string[]> {
+  const lists = patchLists(raw, 'patches');
+  if (!lists.ok) return lists as Result<string[]>;
+  for (const [list, rows] of lists.value)
+    for (const r of rows) {
+      const row = deps.row(list, String(r.at));
+      const now = row && !row.deleted ? deps.sql.one<{ version: number; fields: string }>('SELECT version, fields FROM entry WHERE id = ?', row.id) : null;
+      if (!now) return no('VALUE_MALFORMED', 'An entry this option changes is gone, so none of it was written. It can be asked again with what is there now.', { at: 'option' });
+      if (now.version !== r.version) {
+        const name = ['title', 'name', 'label'].map((k) => parse(now.fields)?.[k]).find((v): v is string => typeof v === 'string' && v.trim() !== '');
+        const which = name === undefined ? 'An entry this option changes' : `"${name.trim()}"`;
+        return no('VERSION_STALE', `${which} changed after this was asked, so none of this option was written. It can be asked again with what it says now.`, { at: 'option' });
+      }
+    }
+  const wrote: string[] = [];
+  for (const [list, rows] of lists.value)
+    for (const r of rows) {
+      const made = applyUpdate(deps, list, r, actor, batch);
+      if (!made.ok) return made as Result<string[]>;
+      wrote.push(made.value.id);
+    }
+  return ok(wrote);
+}
+
 /** The keys a `rowset` row that updates carries, and nothing beside them. */
 const UPDATE_KEYS = ['at', 'version', 'patch'];
 
@@ -2205,6 +2471,8 @@ export function pressedOnly(reason: string): boolean {
 function oneAnswer(deps: GovernDeps, id: string, bodyKind: BodyKind, raw: string, option: string): string | null {
   const body = parse(raw);
   if (!body || costOf(bodyKind, body) !== 'call') return null;
+  /* AN OPTION THAT WRITES CHANGES SOMETHING ELSE, so the one-press sentence would not be true of it. */
+  if (listOf(body.options).some((o) => isMap(o) && o.patches !== undefined)) return null;
   const by = deps.sql.one<{ by: string }>('SELECT opened_by AS by FROM suggestion WHERE id = ?', id)?.by ?? '';
   if (!by.startsWith('rule:') && by !== SLASH) return null;
   const picked = ((body.options ?? []) as { id?: unknown; because?: unknown }[]).find((o) => o?.id === option);
@@ -2510,6 +2778,18 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     if (row.body_kind === 'change' && body.prediction) {
       const wrote_ = writePrediction(deps, id, body.prediction as Prediction, String(body.declaration_id ?? id), at);
       if (!wrote_.ok) return wrote_ as Result<Decided>;
+    }
+  }
+
+  /* AN OPTION THAT CHANGES ENTRIES (F61), such as a script asking which day a payment falls on: the one picked is
+     written here, in the decision's batch and signed by the person deciding, all of it or none, so undoing the decision
+     undoes what the pick wrote. The options not picked write nothing. */
+  if (row.body_kind === 'options') {
+    const chosen = listOf(body.options).find((o) => isMap(o) && o.id === option);
+    if (isMap(chosen) && chosen.patches !== undefined) {
+      const made = applyPatches(deps, chosen.patches, actor, batch);
+      if (!made.ok) return made as Result<Decided>;
+      wrote.push(...made.value);
     }
   }
 

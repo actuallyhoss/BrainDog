@@ -1,0 +1,8 @@
+{
+  "gate": "words",
+  "rule": "an id in a sentence",
+  "expect": "an id in a sentence: .*say the thing's name",
+  "findings": 1,
+  "total": 1,
+  "why": "AN ID IS BUILT IN A TEMPLATE, SO IT IS FOUND IN ONE. A list and a number joined by # is how tools#8 reaches a screen, and in a copy file it is two interpolations either side of the mark. The decoy is a rank, #1 after a space, which names no list."
+}

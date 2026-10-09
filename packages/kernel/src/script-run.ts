@@ -44,6 +44,21 @@ export type ScriptWrite =
   | { op: 'create'; register: string; fields: unknown }
   | { op: 'update'; spoken: string; patch: unknown; version: number };
 
+/**
+ * The one question a run may end by asking (N6): what the script returned as `{ ask }`, beside its writes.
+ *
+ * `unknown` ON THE ANSWER AND THIS SHAPE ONLY AS THE PROMISE, because it is the script's own return value carried out of
+ * the sandbox untouched, so `finishScript` reads every part of it as it would a stranger's. Each option's patches are the
+ * writes picking it makes, in the words a script already uses for `ctx.update`: a spoken id, the version it read, the
+ * fields. `about` is what the question is about, one name or a list of them.
+ */
+export type ScriptAsk = {
+  cause?: string;
+  question: string;
+  about?: string | string[];
+  options: { label: string; id?: string; because?: string; patches?: { id: string; version: number; fields: Record<string, unknown> }[] }[];
+};
+
 /** What the sandbox spent. Structurally `@braindog/script`'s `ScriptUsage`. */
 export type ScriptUsage = { fetches: number; bytes: number; wall_ms: number; cpu_ms: number };
 
@@ -52,7 +67,7 @@ export type ScriptUsage = { fetches: number; bytes: number; wall_ms: number; cpu
  * the sandbox started. `held` is the host's to say because the allowance is the Directory's, exactly as for a `call`.
  */
 export type ScriptAnswer =
-  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage }
+  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage; ask?: unknown }
   | { refused: { code: string | null; why: string }; log: string; usage: ScriptUsage }
   | { held: { until: number; say: string } };
 
@@ -96,6 +111,15 @@ export type ScriptRunDeps = Pick<ActionDeps, 'sql' | 'recordId' | 'nowMs' | 'min
   write: (register: string, ref: string | null, patch: Record<string, unknown>, w: { actor: string; batch: string; note: string; version?: number }) => Result<unknown>;
   /** The register a spoken id names, or `null` when it names no row. */
   registerOf: (spoken: string) => string | null;
+  /**
+   * The gate's `propose`, for the one question a run may ask: `govern.ts` checks the body, holds one open question per
+   * cause, and answers `joined` when one is already open, or `answered` when the person already answered its cause and
+   * nothing was filed (`remembered`), which the run line must not call a new question.
+   *
+   * OPTIONAL IN THE TYPE ONLY, so a host's own `ScriptRunDeps` (a trial, a test's double) still builds: a run that asks
+   * with none here writes what it wrote and says on its line that nobody was asked.
+   */
+  propose?: (p: { question: string; body_kind: 'options'; body: Record<string, unknown>; cause: string }, actor: string) => Result<{ id: string; joined?: true; answered?: unknown }>;
 };
 
 /** How many refused runs in a row pause a script. Design section 2, point 8. */
@@ -128,10 +152,10 @@ export const WRITES_CEILING = 1_000;
  * off any UTF-8 continuation byte, so a three-byte character straddling the line is dropped whole rather than kept as
  * a replacement character.
  */
-function cutLog(log: string): string {
+function cutLog(log: string, most = LOG_BYTES): string {
   const bytes = new TextEncoder().encode(log);
-  if (bytes.length <= LOG_BYTES) return log;
-  let end = LOG_BYTES;
+  if (bytes.length <= most) return log;
+  let end = most;
   while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end -= 1;
   return new TextDecoder().decode(bytes.subarray(0, end));
 }
@@ -173,6 +197,86 @@ const hostOf = (origin: string | undefined): string | null => {
 };
 
 const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * How much one question's `about` may hold: `govern.ts`'s `ABOUT_BYTES`, written out again because govern keeps it to
+ * itself. A drift goes red in `script-ask.test.ts`, whose longest list must still file.
+ */
+export const ABOUT_BYTES = 80;
+
+const bytesOf = (text: string): number => new TextEncoder().encode(text).length;
+
+/**
+ * One `about` from a script's: a name as it is, or a list of names joined into one, as many as fit and the rest counted
+ * ("Rent, 30 September; Salary, 30 September and 3 more"). `undefined` when it names nothing, so the question carries
+ * none rather than a blank the gate refuses.
+ *
+ * CUT HERE AND NOT REFUSED. A script asking about forty lines is right to, and a question nobody was asked because its
+ * list was long would be the run failing for being thorough; the question itself still says how many.
+ */
+export function aboutOf(about: unknown): string | undefined {
+  const names = (Array.isArray(about) ? about : [about]).filter((a): a is string => typeof a === 'string').map((a) => a.trim()).filter((a) => a !== '');
+  if (names.length === 0) return undefined;
+  const more = (k: number) => (k < names.length ? ` and ${names.length - k} more` : '');
+  for (let k = names.length; k >= 1; k -= 1) {
+    const said = names.slice(0, k).join('; ') + more(k);
+    if (bytesOf(said) <= ABOUT_BYTES) return said;
+  }
+  return cutLog(names[0]!, ABOUT_BYTES - bytesOf(more(1))).trimEnd() + more(1);
+}
+
+/** A question as the gate takes it, worked out from a script's `ask`. */
+type Asked = { question: string; body: Record<string, unknown>; cause: string };
+
+/**
+ * A script's `ask`, checked as its writes are and turned into an `options` question: `{ asked }`, or `{ why }` for the
+ * log when the record will not file it.
+ *
+ * EVERY PATCH IS A WRITE THE SCRIPT ASKS FOR, made later and by somebody else. Picking an option applies its patches
+ * signed by the person deciding (`govern.ts` `decide`), so a patch outside the declaration's `writes:` would be the
+ * script reaching a list the owner never approved, with the owner's own hand. Checked here like a write, before anything
+ * is written, and a bad one refuses the whole run.
+ *
+ * THE SCRIPT'S WORDS BECOME THE GATE'S SHAPE. `{ id, version, fields }`, the words of `ctx.update`, become the gate's
+ * `{ at, version, patch }`; each option gets the `id` and `because` the gate needs, its own when it gave them, else an
+ * id from its label and the label as its reason; `about` is joined into one name (`aboutOf`). The cause is the script's,
+ * or `script:<id>` for one that gave none, so a daily run asks once whatever it gave.
+ */
+function askOf(deps: Pick<ScriptRunDeps, 'registerOf'>, script: string, writes: readonly string[], most: number, ask: unknown): { asked: Asked } | { why: string } {
+  const only = writes.length ? writes.join(', ') : 'nothing';
+  if (!isObject(ask) || typeof ask.question !== 'string' || ask.question.trim() === '' || !Array.isArray(ask.options))
+    return { why: `${script} returned an ask that is not a question: it is { question, options: [{ label, patches }] }, with a cause and about if it likes.` };
+  const ids = new Set<string>();
+  const options: Record<string, unknown>[] = [];
+  for (const [i, o] of (ask.options as unknown[]).entries()) {
+    if (!isObject(o) || typeof o.label !== 'string' || o.label.trim() === '') return { why: `${script} asked a question whose answer ${i + 1} has no label.` };
+    const label = o.label.trim();
+    const patches = o.patches ?? [];
+    if (!Array.isArray(patches)) return { why: `${script} asked a question whose answer "${label}" carries patches that are not a list.` };
+    if (patches.length > most) return { why: `${script} asked a question whose answer "${label}" makes ${patches.length} changes, and one run may make ${most}.` };
+    const mapped = [];
+    for (const p of patches as unknown[]) {
+      if (!isObject(p) || typeof p.id !== 'string' || !isObject(p.fields) || Object.keys(p.fields).length === 0)
+        return { why: `${script} asked a question whose answer "${label}" carries a change that is not { id, version, fields }.` };
+      const register = deps.registerOf(p.id);
+      if (register === null || !writes.includes(register))
+        return { why: `${script} asked a question whose answer "${label}" would change ${p.id}${register === null ? ', which names nothing in the record' : ` in ${register}`}, and it may write only to ${only}.` };
+      /* A WHOLE VERSION OR NO QUESTION. A write a run makes may leave it out, but a change made days later by whoever
+         answers must say what it read, so a line edited since is not overwritten by an old reading of it. */
+      if (typeof p.version !== 'number' || !Number.isSafeInteger(p.version) || p.version < 1)
+        return { why: `${script} asked a question whose answer "${label}" changes ${p.id} without the version it read.` };
+      mapped.push({ at: p.id, version: p.version, patch: p.fields });
+    }
+    const own = typeof o.id === 'string' && o.id.trim() !== '' ? o.id.trim() : label.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '').slice(0, 40);
+    const id = own === '' || ids.has(own) ? `${own || 'answer'}-${i + 1}` : own;
+    ids.add(id);
+    const because = typeof o.because === 'string' && o.because.trim() !== '' ? o.because.trim() : label;
+    options.push({ id, label, because, ...(mapped.length > 0 ? { patches: mapped } : {}) });
+  }
+  const about = aboutOf(ask.about);
+  const cause = typeof ask.cause === 'string' ? ask.cause : `script:${script}`;
+  return { asked: { question: ask.question.trim(), body: { options, ...(about === undefined ? {} : { about }) }, cause } };
+}
 
 /**
  * The settings a run's `ctx.config` holds: its pack's values now, defaults filled, or `{}`.
@@ -332,6 +436,15 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     done();
     return refuse(`${script} wrote nothing: its write ${shapeless + 1} carries no fields.`);
   }
+  /* AND ITS QUESTION, BEFORE ANYTHING IS WRITTEN, for the reason `askOf` gives. `null` and `undefined` ask nothing. */
+  const checked = answer.ask === undefined || answer.ask === null ? null : askOf(deps, script, decl.writes, Math.min(declared ?? WRITES_CEILING, WRITES_CEILING), answer.ask);
+  if (checked !== null && 'why' in checked) {
+    done();
+    return refuse(`${script} wrote nothing and asked nothing: its question was not one the record can put to anybody; its log says why.`, checked.why);
+  }
+  const asked = checked?.asked ?? null;
+  let filed: { id: string; joined?: true; answered?: unknown } | null = null;
+  let askRefused = false;
 
   /* ONE BATCH FOR THE RUN, so the history shows its rows as one change, and one note on each that says which run. */
   const batch = deps.mint();
@@ -367,6 +480,17 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
         return out;
       }
     }
+    /* THE QUESTION GOES IN WITH THE WRITES, so a question the gate refuses takes the run's writes back with it and a
+       run is applied whole or not at all. Signed as the run, like its writes; a second run asking with the same cause
+       finds the first's question open and joins it (`govern.ts` `askedAlready`), so a daily script asks once. */
+    if (asked !== null && deps.propose) {
+      const out = deps.propose({ question: asked.question, body_kind: 'options', body: asked.body, cause: asked.cause }, actor);
+      if (!out.ok) {
+        askRefused = true;
+        return out;
+      }
+      filed = out.value;
+    }
     return ok(null);
   }));
 
@@ -381,6 +505,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     /* THE ACK WAS ROLLED BACK WITH THE WRITES, so it is made again on its own. */
     done();
     const why = 'refusal' in applied ? applied.refusal.fix : 'a row it updates was changed by somebody else first.';
+    if (askRefused) return refuse(`${script} wrote nothing and asked nothing: the record refused its question; its log says why.`, why);
     return refuse(`${script} wrote nothing: write ${failedAt + 1} of ${answer.writes.length} was refused; its log says why.`, why);
   }
   const n = answer.writes.length;
@@ -392,9 +517,22 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     stopped.length === 0
       ? ''
       : ` Its writes started no ${stopped[0]}${stopped.length > 1 ? ` or ${stopped.length - 1} more` : ''}: ${stopped.length > 1 ? 'those runs' : 'that run'} would be at depth ${SCRIPT_CHAIN_CEILING + 1} of one chain of rules and scripts, and a chain stops at depth ${SCRIPT_CHAIN_CEILING} so that it cannot run for ever. A person's own write starts it again.`;
+  /* WHAT IT ASKED, BEFORE THE STOP, so the line's cut at 280 characters takes the long sentence and not this one. */
+  /* READ BACK THROUGH A CAST because `filed` is set inside the savepoint's closure, which narrowing does not see. */
+  const put = filed as { id: string; joined?: true; answered?: unknown } | null;
+  const said =
+    asked === null
+      ? ''
+      : put === null
+        ? " It asked a question that nobody was shown: this record does not put a script's questions to anybody yet."
+        : put.answered !== undefined
+          ? ' Its question was answered on Decide before, so it asked nothing new.'
+          : put.joined
+            ? ' Its question was already waiting on Decide, so it asked nothing new.'
+            : ' It asked one question, which waits on Decide.';
   const metered = keepLog(
     deps,
-    meter(deps, { ...base, ...spent, outcome: 'ok', failures: 0 }, `${script} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one row' : `${n} rows`}.${stop}`),
+    meter(deps, { ...base, ...spent, outcome: 'ok', failures: 0 }, `${script} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one row' : `${n} rows`}.${said}${stop}`),
     answer.log,
     decl,
   );

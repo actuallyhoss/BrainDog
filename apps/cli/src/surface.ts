@@ -53,7 +53,7 @@ const reachable = <T>(r: Result<T>): Result<T> =>
  * rule change, and left off this list a stdio agent would be told this record cannot draw a change or try a rule when
  * its host can.
  *
- * `understandPlan` JOINED WITH ITS TOOL (`understand`), for the same lesson: an agent working for the owner from the
+ * `understandPlan` JOINED WITH ITS RESOURCE (`braindog:understand`), for the same lesson: an agent working for the owner from the
  * command line sees what the record would link before it meets anyone, as it does over `POST /mcp`. Who may read it is
  * the record's to say.
  *

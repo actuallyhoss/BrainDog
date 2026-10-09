@@ -25,8 +25,8 @@
  * as they should: neither mutant touches what the door answers.
  *
  * WHAT IT FOUND AT HEAD: one session over `/mcp` moves all three signs from 0 to 1 and its key's last tool call, and a
- * key posting the door's own kinds to `/api/heard` is refused FORBIDDEN at `kind` and moves nothing. And two keys on one
- * record within a minute count as one session that made a call: the case below that says so is a todo, with why.
+ * key posting the door's own kinds to `/api/heard` is refused FORBIDDEN at `kind` and moves nothing. Two keys on one
+ * record within a minute counted as one session that made a call, until the Worker named its caller by the key's id.
  *
  * EVERY ANSWER OF 500 OR MORE IS COUNTED, as there.
  */
@@ -291,7 +291,7 @@ test('A CLIENT POSTING { kind: "called" } TO /api/heard IS REFUSED AND MOVES NOT
  * `x-braindog-ctx`), this case went green. It waits on `serveMcp` taking a `caller` from its host and the Worker passing
  * the key's id (this batch's report, "blocked").
  */
-test('TWO KEYS IN ONE MINUTE ARE TWO SESSIONS THAT MADE A CALL, and each key’s last tool call moves', { todo: 'waits on serveMcp keying called by the caller’s key on the Worker' }, async () => {
+test('TWO KEYS IN ONE MINUTE ARE TWO SESSIONS THAT MADE A CALL, and each key’s last tool call moves', async () => {
   /* WHAT HIS RECORD HAS EVERY MORNING: two machines, each with its own key, starting within the same minute. */
   const r = await record();
   const mac = await r.key('MacBook');

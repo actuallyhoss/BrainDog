@@ -25,7 +25,8 @@ import { readFileSync } from 'node:fs';
 
 import type { Methods, Said } from '../../lib/auth.ts';
 import { stateOf, type Seen, type Ways } from '../../lib/signin.ts';
-import { actable, firstDoor, mailHeld, noDoorYet } from './first-door.ts';
+import { account } from '../../lib/copy/account.ts';
+import { actable, mailHeld, noDoorYet } from './first-door.ts';
 
 /** What `https://app.brain.dog/auth/methods` answered, field for field, less `demo`: there is no demo left to read. */
 const LIVE: Methods = { passkey: true, magic: false, key: false, open: false, me: null, firstRun: true };
@@ -145,7 +146,7 @@ test("a host whose mail is down offers no link and the screen says so", () => {
   const down: Methods = { ...LIVE, firstRun: false, magic: 'down' };
   assert.equal(stateOf(seen(down)).name, 'signed-out');
   assert.deepEqual(waysFor(down), { passkey: true, magic: false, key: false, lead: 'passkey', keyOpen: false });
-  assert.match(PAGE, /host\?\.magic === 'down'[^}]*\}<p class="status" role="status">\{noMail \? firstDoor\.mailDown : copy\.mailDown\}/);
+  assert.match(PAGE, /host\?\.magic === 'down'[^}]*\}<p class="status" role="status">\{noMail \? copy\.firstDoorMailDown : copy\.mailDown\}/);
   assert.equal(mailHeld(down, actable(waysFor(down)), null), false, 'a passkey exists, so the shared line is right');
 });
 
@@ -167,6 +168,6 @@ test('a first run whose mail is down says mail is down, never the claim link', (
   assert.equal(mailHeld(down, ways, 'out'), false);
   assert.equal(mailHeld({ ...down, me: { person: 'p_01', email: 'ada@example.com', record: 'studio', provedAt: 1 } }, null, null), false);
   /* THE SENTENCE OFFERS NOTHING HE DOES NOT HAVE: no passkey, no link he was given, no em dash. */
-  assert.doesNotMatch(firstDoor.mailDown, /passkey|you were given|\u2014/u);
-  assert.match(firstDoor.mailDown, /Mail is not going out/);
+  assert.doesNotMatch(account.firstDoorMailDown, /passkey|you were given|\u2014/u);
+  assert.match(account.firstDoorMailDown, /Mail is not going out/);
 });

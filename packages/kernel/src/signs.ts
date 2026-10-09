@@ -8,9 +8,10 @@
  * names a list, a bank or a use case (DIRECTION §27).
  *
  * FIVE ARE READ HERE, OVER THE KERNEL'S OWN TABLES: arrivals, numbers, questions by cause, the oldest question, runs.
- * FOUR ARE FILED by the layers that know more, through `fileSignReading`: whether the model answers and whether agents
- * get the tool list (the host), whether the briefing is true (the record), whether pages print clean (the host). Until
- * one is filed it reads `none`.
+ * FIVE ARE FILED by the layers that know more, through `fileSignReading`: whether the model answers and whether agents
+ * get the tool list (the host), whether the briefing is true (the record), whether pages print clean (the host), whether
+ * what shipped has arrived (the record, PRF-A20). Until one is filed it reads `none`. The automation signs and those of
+ * what runs by itself join by a spread each (`signs-flow.ts`, `signs-actions.ts`).
  *
  * NONE IS NOT GREEN. A sign with nothing to judge by (no door, no series, no question ever asked, no run this week)
  * says so, and an empty record reads `none` on every sign by construction. Each reader is its own count, written apart
@@ -29,6 +30,7 @@ import { nextOccurrence } from './digest.ts';
 import { dayIn } from './finished.ts';
 import { UNVERIFIED } from './ingest.ts';
 import { intervalMs } from './pull.ts';
+import { SIGNS_ACTIONS } from './signs-actions.ts';
 import { SIGNS_FLOW } from './signs-flow.ts';
 
 export type SignState = 'green' | 'red' | 'none';
@@ -285,6 +287,9 @@ function feedsOn(sql: Sql): { name: string; everyMs: number; lastGoodMs: number 
     const decl = sql.one<{ body: string; created_at: string }>('SELECT body, created_at FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', id);
     const body = parsed(decl?.body);
     if (decl === undefined || body === null) continue;
+    /* A SCRIPT WHOSE EGRESS IS EMPTY FETCHES NOTHING (F60): a daily script over the record's own rows is not a feed, and
+       its quiet days would read as numbers that did not arrive. */
+    if (row.kind === 'script' && Array.isArray(body.egress) && body.egress.length === 0) continue;
     const every = intervalMs(String((row.kind === 'script' ? (body.runs as { every?: unknown } | undefined)?.every : body.every) ?? ''));
     if (every === null) continue;
     const good = sql.one<{ ts: string | null }>(
@@ -503,8 +508,9 @@ const kernel = (sign: string, name: string, thresholds: Record<string, number>, 
 const filed = (sign: string, name: string, hand: 'record' | 'host'): SignReader => ({ sign, name, hand, version: 1, thresholds: {}, read: null });
 
 /**
- * THE KERNEL'S FIVE AND THE FOUR FILED, in the order 2.2 sets them, then the seven automation signs (SHL-D01,
- * `signs-flow.ts`) with one spread. The ids are 2.2's; a person reads the names.
+ * THE KERNEL'S FIVE AND THE FOUR FILED, in the order 2.2 sets them, then `arrived` (PRF-A20, filed by the record), the
+ * seven automation signs (SHL-D01, `signs-flow.ts`) and the five of what runs by itself and arrives (SHL-C01,
+ * `signs-actions.ts`), a spread each. The ids are 2.2's; a person reads the names.
  */
 export const VITAL_SIGNS: readonly SignReader[] = [
   kernel('arrivals-filed', 'Arrivals file by themselves', { ARRIVAL_WAIT_MS, ARRIVALS_WAITING_MOST, ARRIVAL_AHEAD_MS, ARRIVALS_WINDOW_DAYS }, readArrivals, 2),
@@ -516,7 +522,9 @@ export const VITAL_SIGNS: readonly SignReader[] = [
   kernel('oldest-question', 'No question waits too long', { QUESTION_DAYS_MOST }, readOldest),
   kernel('runs-true', 'Runs end as they ended', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs) => readRuns(sql, nowMs), 2),
   filed('pages-clean', 'Pages print clean', 'host'),
+  filed('arrived', 'What shipped has arrived', 'record'),
   ...SIGNS_FLOW,
+  ...SIGNS_ACTIONS,
 ];
 
 /** The sign called `id` on the closed list, or `null`. */
@@ -571,7 +579,7 @@ const FACTS_MOST = 6;
 const FACT_MOST = 200;
 
 /**
- * The record layer or the host files today's reading of one of the four signs it owns. A later filing the same day
+ * The record layer or the host files today's reading of one of the signs it owns. A later filing the same day
  * replaces the earlier one. Refuses an id outside the list, one the kernel reads itself, and a reading out of shape.
  */
 export function fileSignReading(sql: Sql, id: string, r: SignReading, nowMs: number, tz: string): Result<{ sign: string; day: string }> {

@@ -11,7 +11,8 @@
  * filed, and the kernel copies them from the suggestion onto the decision event word for word. Sending them back would
  * let a browser say it approved lines the record never showed.
  *
- * THREE ANSWERS. `written` drops the shell's kept `boot`, so the rail's count follows once the layout reads again.
+ * THREE ANSWERS. `written` drops the shell's kept `boot`, so the rail's count follows once the layout reads again; it
+ * says `open` when an arrangement was taken in part and the rest still waits as the same question.
  * `refused` is the record's own sentence, and that includes a host that did not answer and a session that ran out.
  * `conflict` is a row the proposal would change that moved since it was filed: the screen reads again and says so.
  *
@@ -34,20 +35,25 @@ import { forget, type Fetch } from './boot-live.ts';
 /**
  * `rows`: on accepting a proposal that adds several rows, the places of the ones ticked; the rest are declined.
  *
+ * `parts`: on accepting an arrangement, the ids of the parts ticked (`arranged.ts` `ticksOf`); the kernel takes those and
+ * the rest stay open as the same question (`govern.ts` `decide`). Left out, the whole of it is taken. An empty list is
+ * none, which is not an accept, so it is refused here and never sent.
+ *
  * `reason` ABSENT IS NOT `reason` EMPTY. Absent, nobody has been asked yet, and the record is sent the option alone so
  * the kernel says whether it wants one. Typed and blank, somebody was asked and wrote nothing, which is refused here.
  */
-export type Verdict = { decide: { option: string; reason?: string; rows?: number[] } } | { defer: { until: string; why: string } };
+export type Verdict = { decide: { option: string; reason?: string; rows?: number[]; parts?: string[] } } | { defer: { until: string; why: string } };
 
 export type Written =
-  | { from: 'written'; decision: string | null; applied?: Record<string, string[]> }
+  | { from: 'written'; decision: string | null; applied?: Record<string, string[]>; open?: true }
   | { from: 'refused'; fix: string; wants?: 'reason' }
   | { from: 'conflict'; fix: string };
 
 /** A verdict with nothing to send says so here, and the record is not asked. */
 function missing(verdict: Verdict): string | null {
   if ('decide' in verdict) {
-    const { option, reason } = verdict.decide;
+    const { option, reason, parts } = verdict.decide;
+    if (parts !== undefined && parts.length === 0) return copy.arrangeTakeNone;
     return option === '' || (reason !== undefined && reason.trim() === '') ? copy.reasonRequired : null;
   }
   return verdict.defer.until === '' || verdict.defer.why.trim() === '' ? copy.reasonRequired : null;
@@ -60,6 +66,7 @@ const trimmed = (verdict: Verdict): Verdict =>
           option: verdict.decide.option,
           ...(verdict.decide.reason !== undefined ? { reason: verdict.decide.reason.trim() } : {}),
           ...(verdict.decide.rows ? { rows: verdict.decide.rows } : {}),
+          ...(verdict.decide.parts ? { parts: verdict.decide.parts } : {}),
         },
       }
     : { defer: { until: verdict.defer.until, why: verdict.defer.why.trim() } };
@@ -69,13 +76,15 @@ export async function writeDecision(base: string, id: string, verdict: Verdict, 
   const said = missing(verdict);
   if (said !== null) return { from: 'refused', fix: said };
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const out = await client.call<{ decision?: unknown; applied?: unknown }>('decide', { id, ...trimmed(verdict) });
+  const out = await client.call<{ decision?: unknown; applied?: unknown; status?: unknown }>('decide', { id, ...trimmed(verdict) });
   if (out.ok) {
     forget();
     const decision = out.value && typeof out.value.decision === 'string' ? out.value.decision : null;
     /* AN ACCEPTED ARRANGEMENT SAYS WHAT IT APPLIED, and the screen says it back. */
     const applied = out.value && typeof out.value.applied === 'object' && out.value.applied !== null ? (out.value.applied as Record<string, string[]>) : undefined;
-    return { from: 'written', decision, ...(applied ? { applied } : {}) };
+    /* AND ONE TAKEN IN PART IS STILL OPEN, holding the parts left (`govern.ts` `decide`, `status: 'open'`). */
+    const open = out.value && out.value.status === 'open';
+    return { from: 'written', decision, ...(applied ? { applied } : {}), ...(open ? { open: true as const } : {}) };
   }
   if ('conflict' in out) return { from: 'conflict', fix: copy.decideConflict };
   const wants = out.refusal.code === 'REQUIRED_MISSING' && out.refusal.at === 'reason';
@@ -83,13 +92,14 @@ export async function writeDecision(base: string, id: string, verdict: Verdict, 
 }
 
 /**
- * Answer one with an option, the reason where there is one, and on accepting some rows of several, which.
+ * Answer one with an option, the reason where there is one, on accepting some rows of several, which, and on accepting
+ * some parts of an arrangement, which.
  *
  * WITHOUT A REASON THE KERNEL DECIDES: the option goes alone, and a record
  * that wants a sentence answers `wants: 'reason'`, so the caller asks for one and sends again.
  */
-export const answerQuestion = (base: string, id: string, option: string, reason?: string, io?: Fetch, rows?: number[]): Promise<Written> =>
-  writeDecision(base, id, { decide: { option, ...(reason !== undefined ? { reason } : {}), ...(rows ? { rows } : {}) } }, io);
+export const answerQuestion = (base: string, id: string, option: string, reason?: string, io?: Fetch, rows?: number[], parts?: string[]): Promise<Written> =>
+  writeDecision(base, id, { decide: { option, ...(reason !== undefined ? { reason } : {}), ...(rows ? { rows } : {}), ...(parts ? { parts } : {}) } }, io);
 
 /** Park one until a day, with why it can wait. */
 export const parkQuestion = (base: string, id: string, until: string, why: string, io?: Fetch): Promise<Written> =>

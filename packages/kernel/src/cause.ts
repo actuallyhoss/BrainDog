@@ -11,10 +11,13 @@
  * nothing here is clever: two bodies share a cause only when they ask for the very same thing in any order. Anything
  * looser needs a cause its filer set.
  *
- * NO IMPORTS, because migration 31's data step derives causes with this file and `migrate.ts` imports the migration:
- * a cause that reached back into the kernel would be a cycle at the moment a record opens. The hash is SHA-256 written
- * out here, synchronous, since `propose` runs inside the write's transaction and WebCrypto answers a promise.
+ * NO IMPORTS BUT `ids.ts`, which imports nothing, because migration 31's data step derives causes with this file and
+ * `migrate.ts` imports the migration: a cause that reached back into the kernel would be a cycle at the moment a record
+ * opens. The hash is SHA-256 written out here, synchronous, since `propose` runs inside the write's transaction and
+ * WebCrypto answers a promise. `moot` and `recheck` read the record by the shape of its SQL port, named here.
  */
+
+import { ulids } from './ids.ts';
 
 /**
  * The shape of a cause: a letter or digit, then at most 199 of letters, digits and `# @ . _ : / -`, so a derived one
@@ -95,6 +98,201 @@ export function noop(body: Record<string, unknown>, holds?: (register: string, a
     if (held === null) return false;
     return Object.entries(r.patch).every(([field, value]) => canon(value ?? null) === canon(held[field] ?? null));
   });
+}
+
+/** The calls `moot` and `recheck` make on the record, by the shape of its SQL port, so this file imports no port. */
+export type MootSql = {
+  one<T = Record<string, unknown>>(sql: string, ...params: (string | number | null)[]): T | undefined;
+  all<T = Record<string, unknown>>(sql: string, ...params: (string | number | null)[]): T[];
+  exec(sql: string, ...params: (string | number | null)[]): void;
+};
+
+/** An open question as `moot` reads it: its kind and its body, as stored (JSON text) or already read. */
+export type MootQuestion = { body_kind: string; body: unknown };
+
+/** What a moot question's close says, the line the owner reads in its history. No ids and no list's words. */
+export const MOOT_HELD = 'This already says what was asked.';
+export const MOOT_GONE = 'What this asked about has since been deleted.';
+
+/**
+ * Whether what a question asks is already so, and answering it would change nothing (AGT-C08, "how good is braindog's
+ * mcp at cleaning up stale stuff?", D40.10).
+ *
+ *   - a rowset whose every row already holds every value it proposes (`noop`), or whose rows are all deleted;
+ *   - a change whose declaration, or every one of a bundle's, is live with that very body;
+ *   - a pack already installed, already on, or already off, as asked;
+ *   - settings whose pack already holds every value asked, `null` being a setting left at its default.
+ *
+ * EXACT, AND A MISS ONLY MEANS THE OWNER IS STILL ASKED. A value spelled differently, a field-level change, an arrange,
+ * a pattern or a choice between options is never moot here: a question closed for the wrong reason is an answer nobody
+ * gave, which is worse than one left open an hour too long.
+ */
+export function moot(question: MootQuestion, sql: MootSql): boolean {
+  return mootWhy(question, sql) !== null;
+}
+
+/** The sentence a moot question closes with, or `null` when it is not moot. */
+export function mootWhy(question: MootQuestion, sql: MootSql): string | null {
+  const body = readBody(question.body);
+  if (body === null) return null;
+  switch (question.body_kind) {
+    case 'rowset':
+      if (noop(body, (register, at) => liveFields(sql, register, at))) return MOOT_HELD;
+      return allGone(sql, body) ? MOOT_GONE : null;
+    case 'change':
+      return changeHeld(sql, body.to) ? MOOT_HELD : null;
+    case 'pack':
+      return packHeld(sql, body) ? MOOT_HELD : null;
+    case 'settings':
+      return settingsHeld(sql, body) ? MOOT_HELD : null;
+    default:
+      return null;
+  }
+}
+
+const readBody = (body: unknown): Record<string, unknown> | null => {
+  if (isMap(body)) return body;
+  if (typeof body !== 'string') return null;
+  try {
+    const out: unknown = JSON.parse(body);
+    return isMap(out) ? out : null;
+  } catch {
+    return null;
+  }
+};
+
+/** A spoken id, `tasks#4`, as `coerce.ts` reads one. */
+const SPOKEN_AT = /^([a-z][a-z0-9_]{0,31})#(\d+)$/;
+
+/**
+ * The row a rowset names, in `register`, as the kernel's `get` finds it: a spoken id, a prefixed one (`S12`, from the
+ * list's own `seq_prefix`), or a row id. `null` when it names no row of that list.
+ */
+function rowAt(sql: MootSql, register: string, at: string): { fields: string; deleted_at: string | null } | null {
+  type Found = { fields: string; deleted_at: string | null };
+  const said = at.trim();
+  const spoken = SPOKEN_AT.exec(said);
+  if (spoken) return spoken[1] === register ? (sql.one<Found>('SELECT fields, deleted_at FROM entry WHERE register = ? AND seq = ?', register, Number(spoken[2])) ?? null) : null;
+  const prefix = sql.one<{ p: string | null }>(
+    "SELECT json_extract(body, '$.seq_prefix') AS p FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 AND json_valid(body) ORDER BY version DESC LIMIT 1",
+    `register.${register}`,
+  )?.p;
+  if (typeof prefix === 'string' && prefix !== '#' && said.startsWith(prefix) && /^[1-9][0-9]*$/.test(said.slice(prefix.length)))
+    return sql.one<Found>('SELECT fields, deleted_at FROM entry WHERE register = ? AND seq = ?', register, Number(said.slice(prefix.length))) ?? null;
+  return sql.one<Found>('SELECT fields, deleted_at FROM entry WHERE id = ? AND register = ?', at, register) ?? null;
+}
+
+/** A live row's fields, for `noop`; `null` for a row deleted or not there, which `noop` reads as a change. */
+function liveFields(sql: MootSql, register: string, at: string): Record<string, unknown> | null {
+  const row = rowAt(sql, register, at);
+  return row === null || row.deleted_at !== null ? null : readBody(row.fields);
+}
+
+/** Every row a rowset names is one that was there and is deleted now, so there is nothing left to change. */
+function allGone(sql: MootSql, body: Record<string, unknown>): boolean {
+  if (typeof body.register !== 'string' || !Array.isArray(body.rows) || body.rows.length === 0) return false;
+  const register = body.register;
+  return body.rows.every((r) => {
+    if (!isMap(r) || typeof r.at !== 'string') return false;
+    const row = rowAt(sql, register, r.at);
+    return row !== null && row.deleted_at !== null;
+  });
+}
+
+/** The live body of a declaration, as `{ kind, body }`, or `null` when none is live. */
+function liveDeclaration(sql: MootSql, id: string): { kind: string; body: Record<string, unknown> } | null {
+  const row = sql.one<{ kind: string; body: string }>(
+    'SELECT kind, body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1',
+    id,
+  );
+  const body = row ? readBody(row.body) : null;
+  return row && body ? { kind: row.kind, body } : null;
+}
+
+/**
+ * A change's `to` that the record already holds: one whole declaration, or a bundle of them, each live with the very
+ * body asked. A field-level change (`add`, `retire`, `retype`, `narrow`) is merged at the press, so it is never moot here.
+ */
+function changeHeld(sql: MootSql, to: unknown): boolean {
+  if (!isMap(to)) return false;
+  const whole = (d: unknown): boolean => {
+    if (!isMap(d) || typeof d.id !== 'string' || typeof d.kind !== 'string' || !isMap(d.body)) return false;
+    if (['add', 'retire', 'retype', 'narrow'].some((k) => k in d)) return false;
+    const live = liveDeclaration(sql, d.id);
+    return live !== null && live.kind === d.kind && canon(live.body) === canon(d.body);
+  };
+  if (Array.isArray(to.declarations)) return to.declarations.length > 0 && to.declarations.every(whole);
+  return whole(to);
+}
+
+/** A pack already in the state a pack question asks: installed and on, on, or off. An install with its own document is moot only at that version. */
+function packHeld(sql: MootSql, body: Record<string, unknown>): boolean {
+  const verb = ['install', 'enable', 'disable'].find((v) => typeof body[v] === 'string');
+  if (verb === undefined) return false;
+  const row = sql.one<{ version: string; disabled_at: string | null }>('SELECT version, disabled_at FROM pack WHERE id = ?', String(body[verb]));
+  if (!row) return false;
+  if (verb === 'disable') return row.disabled_at !== null;
+  if (row.disabled_at !== null) return false;
+  return verb === 'enable' || body.doc === undefined || (isMap(body.doc) && body.doc.version === row.version);
+}
+
+/** Settings whose installed pack declares every one and already holds every value asked; `null` is a setting at its default. */
+function settingsHeld(sql: MootSql, body: Record<string, unknown>): boolean {
+  if (typeof body.pack !== 'string' || !isMap(body.values) || Object.keys(body.values).length === 0) return false;
+  const manifest = readBody(sql.one<{ manifest: string }>('SELECT manifest FROM pack WHERE id = ?', body.pack)?.manifest);
+  if (manifest === null || !isMap(manifest.config)) return false;
+  const declared = manifest.config;
+  const held = isMap(manifest.config_values) ? manifest.config_values : {};
+  return Object.entries(body.values).every(([key, value]) => Object.hasOwn(declared, key) && canon(value ?? null) === canon(held[key] ?? null));
+}
+
+/** How many open questions one recheck reads, so an hour's tick costs the same whatever the queue holds. */
+export const RECHECK_BOUND = 200;
+
+/** The kinds `moot` can find already so; every other open question is left out of the walk. */
+const MOOTABLE = "body_kind IN ('rowset', 'change', 'pack', 'settings')";
+
+/**
+ * Close each open question that is already so, as `moot` (AGT-C08 job 2). The hourly sweep runs it (`sweepRecord`), so a
+ * question about rows the owner then changes by hand to what it asked is gone inside the hour.
+ *
+ * BOUNDED AND TURNING. At most `RECHECK_BOUND` questions a tick, oldest first, and each hour starts that many further
+ * on, so a queue longer than the bound is walked whole over its hours rather than its first two hundred forever.
+ *
+ * ONE JSON PARAMETER, NEVER ONE A QUESTION. The closes and their lines are each one statement over `json_each`, so a
+ * long walk never meets the driver's ceiling on parameters.
+ *
+ * COUNTED ON NO BRAKE. `moot` is neither a yes nor a no: no decision is written, nothing is observed as `incorrect`, and
+ * no ladder moves, because the agent asked rightly and the owner answered by doing it. The line in history is the
+ * record's (`system`), with the sentence that says why.
+ *
+ * Run it inside the caller's transaction. `mint` is the record's own, so the lines sort with every other; the default
+ * mints over `nowMs` for a caller that has none.
+ */
+export function recheck(sql: MootSql, nowMs: number, mint: () => string = ulids(() => nowMs)): { closed: string[] } {
+  const open = `status = 'open' AND ${MOOTABLE}`;
+  const total = sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM suggestion WHERE ${open}`)?.n ?? 0;
+  if (total === 0) return { closed: [] };
+  type Open = { id: string; body_kind: string; body: string };
+  const read = (offset: number, limit: number): Open[] =>
+    limit <= 0 ? [] : sql.all<Open>(`SELECT id, body_kind, body FROM suggestion WHERE ${open} ORDER BY opened_at ASC, id ASC LIMIT ? OFFSET ?`, limit, offset);
+  const from = total <= RECHECK_BOUND ? 0 : (Math.floor(nowMs / 3_600_000) * RECHECK_BOUND) % total;
+  const walked = [...read(from, RECHECK_BOUND), ...read(0, Math.min(from, from + RECHECK_BOUND - total))];
+  const shut = walked.flatMap((q) => {
+    const why = mootWhy(q, sql);
+    return why === null ? [] : [{ q: q.id, e: mint(), why }];
+  });
+  if (shut.length === 0) return { closed: [] };
+  const list = JSON.stringify(shut);
+  sql.exec(`UPDATE suggestion SET status = 'resolved', resolved_as = 'moot' WHERE status = 'open' AND id IN (SELECT json_extract(value, '$.q') FROM json_each(?))`, list);
+  sql.exec(
+    `INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note)
+     SELECT json_extract(value, '$.e'), ?, 'system', 'resolve', 'suggestion:' || json_extract(value, '$.q'), 'suggestion', 'moot', json_extract(value, '$.why')
+     FROM json_each(?) ORDER BY key`,
+    new Date(nowMs).toISOString(),
+    list,
+  );
+  return { closed: shut.map((s) => s.q) };
 }
 
 /** Each row as `[target, values]`, sorted: an update by its `at` and its patch, a new row by its own fields. */

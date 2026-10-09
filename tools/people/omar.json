@@ -1,0 +1,60 @@
+{
+  "id": "omar-personal",
+  "name": "Omar",
+  "who": "An engineer in Dubai on a monthly salary. He wants to see where the money goes, save for a car, and finally practise the oud he bought last year.",
+  "expects": "personal",
+  "standing": true,
+  "said": "I'm Omar. I want to track my spending and bills and save for a car. I get paid 18000 on the 25th.",
+  "says": {
+    "plain": "I'm Omar. I want to track my spending and bills and save for a car. I get paid 18000 on the 25th.",
+    "hard": "I'm Omar. I want to see where my salary goes each month and finally learn the oud."
+  },
+  "chip": "I freelance",
+  "answer": "AED",
+  "answers": {
+    "name": "Omar",
+    "currency": "AED",
+    "kind": "accounts",
+    "things": ["Current account", "Credit card"]
+  },
+  "file": {
+    "name": "current-account-september.csv",
+    "type": "text/csv",
+    "text": "Date,Description,Amount,Currency\n2026-09-01,Rent,-6500.00,AED\n2026-09-02,Carrefour,-412.35,AED\n2026-09-04,DEWA,-388.10,AED\n2026-09-07,Salik top-up,-100.00,AED\n2026-09-12,Talabat,-86.50,AED\n2026-09-18,Du mobile,-299.00,AED\n2026-09-25,Salary,18000.00,AED\n2026-09-27,Oud lesson,-250.00,AED\n"
+  },
+  "email": "omar@people.braindog.test",
+  "slug": "omars-money",
+  "zone": "Asia/Dubai",
+  "locale": "en-AE",
+  "languages": ["en-AE", "ar-AE"],
+  "start": "2026-10-05T16:00:00Z",
+  "first": "Spent 412 at Carrefour",
+  "later": [
+    { "day": 1, "said": ["Talabat 86", "Petrol 120"] },
+    { "day": 7, "said": ["Rent 6500", "Practised the oud for 30 minutes"] },
+    { "day": 14, "said": ["Oud lesson 250", "Practised the oud for 45 minutes"] },
+    { "day": 90, "said": ["Netflix 56", "Spotify 22", "iCloud 4"] }
+  ],
+  "expect": {
+    "who": {
+      "question": "Who are you?",
+      "chips": 5,
+      "promises": [
+        { "says": "free, with no card", "match": "free\\b.{0,24}\\bno card" },
+        { "says": "nothing is saved until you keep it", "match": "nothing (is )?saved until you keep" },
+        { "says": "yours to export or move", "match": "yours to (export|move|take)" }
+      ]
+    },
+    "heard": {
+      "usecase": "personal",
+      "title": "Omar's Money",
+      "lit": ["Omar", "spending", "bills", "18000"],
+      "places": ["Today", "Savings goals", "People", "Money"]
+    },
+    "question": { "about": "currency", "choices": 3 },
+    "keep": { "lists": ["savings_goals", "transactions", "people"], "currency": "AED" },
+    "tell": { "lists": ["transactions"] },
+    "today": { "first": "source", "lists": ["transactions"] },
+    "offer": { "id": "column:transactions.category", "before": 30, "after": 90 }
+  }
+}

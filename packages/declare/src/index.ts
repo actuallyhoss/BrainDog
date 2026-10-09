@@ -283,6 +283,14 @@ export type Installed = {
    */
   used?: readonly string[];
   /**
+   * The webhook doors that hold a live address now, by id (`heldDigest` in `@braindog/record`): the token half of `used`
+   * alone. `used` keeps every door that ever filed, so a door whose last text came a year ago and whose address a retire
+   * broke reads as one in use, and an update dropping it was said to stop texts that no longer come (REC-A16).
+   *
+   * OPTIONAL: a caller that cannot say has `used` read in its place, which marks more doors live and never fewer.
+   */
+  addressed?: readonly string[];
+  /**
    * A `where` sentence read against a list, as the kernel reads it: the compiled predicate, or `null` when it does not
    * read (a title no row holds yet still reads, as the kernel's `stranded` lets it). `@braindog/where`'s `parseWhere`
    * is the answer; the record hands it in.
@@ -343,8 +351,12 @@ export type Diff = {
    * What this version stops declaring. `to` IS THE PACK IT HANDS THE DECLARATION TO (the manifest's `hands`): it is not
    * retired and orphans nothing, it is staged again under `to` with `body`, the live body as JCS text with `pack` set to
    * `to`, and it stays live until and after that pack is installed.
+   *
+   * `live` IS A DOOR OR PATTERN THE RECORD IS USING that this version retires outright (`PlanOptions.live`): texts still
+   * arrive there, and after the update nothing files them. Never on one handed on, which stays live. Absent when the
+   * caller passed no `live`, so a plan that cannot say marks nothing.
    */
-  retires: { id: string; rows: number; to?: string; body?: string }[];
+  retires: { id: string; rows: number; to?: string; body?: string; live?: true }[];
   /**
    * Declarations the record will hold and this plan will not stage, each named once for `conflictFault`.
    *
@@ -1433,8 +1445,13 @@ const newer = (a: string, b: string): number => order(parts(a), parts(b));
  * setting will not take, or a key the pack does not declare, is a warning, and the setting keeps what it would have had.
  * THE SAME DOOR PLANS A LATER CHANGE: the pack planned again at its own version with the new value names, as `changes`,
  * exactly the declarations that read it.
+ *
+ * `options.live` IS EVERY DOOR AND PATTERN THE RECORD IS USING, by declaration id (`ingest.<name>`): one that took an
+ * arrival in the last 30 days, holds a live address, or reads a door that does (the record's `arrange-retires.ts`). Each
+ * one this version retires outright is marked `live: true`. Without it money-core 3.0.0 was planned as four retires and
+ * nothing more, and the owner's card texts stopped filing the day he said yes (REC-A16).
  */
-export type PlanOptions = { settings?: Readonly<Record<string, unknown>> | undefined };
+export type PlanOptions = { settings?: Readonly<Record<string, unknown>> | undefined; live?: ReadonlySet<string> | undefined };
 
 export async function plan(given: Pack, installed: Installed, options: PlanOptions = {}): Promise<Diff> {
   /* THE BODIES ARE COMPARED AS THEY WOULD BE STORED, with every setting filled in. The installed body
@@ -1641,6 +1658,11 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
   /* WHAT IS HANDED STAYS LIVE, so nothing below may treat it as gone: not a figure that reads it, not a list a field
      points at, and not half of a rename. */
   const handed = new Set(retires.filter((r) => r.to !== undefined).map((r) => r.id));
+  /* WHAT GOES OUTRIGHT AND IS STILL IN USE, after the doors above have followed their patterns, so a door handed on is
+     never marked: it keeps answering under the pack it went to. */
+  const using = options.live;
+  if (using !== undefined)
+    for (const [i, r] of retires.entries()) if (r.to === undefined && r.id.startsWith('ingest.') && using.has(r.id)) retires[i] = { ...r, live: true };
 
   /* A RETIRE AND AN ADD OF ONE BODY ARE ONE DECLARATION UNDER TWO IDS. Both lists were built in this
      function from one `Installed` and never compared, so a rename was planned as two unrelated moves;

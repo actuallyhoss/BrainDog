@@ -159,8 +159,8 @@ export const HELD = {
     why: 'block kinds called `agents` and `steps`, which are not the lists.',
   },
   'apps/web/src/lib/page/home.ts': {
-    ids: ['agents', 'steps'],
-    why: 'block kinds called `agents` and `steps` (which a home keeps when empty, and which fold), which are not the lists.',
+    ids: ['agents'],
+    why: 'the block kind called `agents` (which folds), which is not the list.',
   },
   'apps/web/src/lib/page/BlockSlot.svelte': {
     ids: ['steps'],

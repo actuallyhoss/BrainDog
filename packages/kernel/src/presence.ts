@@ -58,10 +58,25 @@ const OPEN: readonly string[] = ['active', 'idle'];
 export const stateOf = (row: { state?: string | null; fields: Record<string, Json> }): string =>
   row.state ?? (typeof row.fields.state === 'string' ? row.fields.state : '');
 
-/** When a run was last heard from, in milliseconds: its `last_seen`, or when its row last changed when it has none. */
+/**
+ * When a run was last heard from, in milliseconds: its `last_seen`; else the day it was last seen where it was carried in
+ * from (`seen_before`, AGT-C10); else when its row last changed.
+ *
+ * THE CARRIED DAY BEFORE THE ROW'S OWN, because an imported run's row changed on the morning of the import, and read
+ * that way 295 runs of the owner's were all last seen the same day. `runAge` reads this, so it follows with no change.
+ */
 export function heardAt(row: { fields: Record<string, Json>; updated_at: string }): number {
-  return Date.parse(typeof row.fields.last_seen === 'string' ? row.fields.last_seen : row.updated_at);
+  const seen = row.fields.last_seen;
+  if (typeof seen === 'string' && seen !== '') return Date.parse(seen);
+  const before = row.fields.seen_before;
+  const changed = Date.parse(row.updated_at);
+  /* NEVER LATER THAN THE ROW THAT CARRIES IT: an adapter's clock or zone that runs ahead would otherwise keep a run
+     carried in fresh, offered as company and never stale, until the day it named. */
+  return typeof before === 'string' && before !== '' ? Math.min(Date.parse(before), changed) : changed;
 }
+
+/** `heardAt` in SQL, for the rows a query keeps and orders: `min` with a null in it is null, so `coalesce` falls on. */
+const HEARD_SQL = "coalesce(json_extract(fields, '$.last_seen'), min(json_extract(fields, '$.seen_before'), updated_at), updated_at)";
 
 /**
  * The one word for a run now.
@@ -90,13 +105,40 @@ export function isStale(row: { fields: Record<string, Json>; updated_at: string 
   return heardAt(row) < nowMs - STALE_MS;
 }
 
-/** The rows of the runs register that `where` keeps, newest heard from first, with their fields read. */
+/** A beat closer to the last than this moves nothing: one statement a minute at most, however often an agent calls. */
+export const BEAT_MS = 60_000;
+
+/**
+ * A run says it is still working: its `last_seen` moves to now, in place, and answers whether it moved (AGT-C03).
+ *
+ * A HEARTBEAT IS NOT A WRITE (P.132): no version, no `updated_at`, no event, the same in-place statement the ladder
+ * gives a found run (`attribute` in `index.ts`), so a session that reads, thinks or edits files reads as working without
+ * a line in its history or a conflict on its next edit of its own row.
+ *
+ * ONLY AN OPEN RUN THAT HAS A CLOCK. Active or idle, never one that ended, left a step or was written off: a beat
+ * revives nothing. And never a run with no `last_seen`, one carried in from before, whose clock this would start. A
+ * `last_seen` under `BEAT_MS` old stays, so a beat on every tool call is one statement a minute.
+ */
+export function beatRun(sql: Sql, id: string, nowMs: number): boolean {
+  const moved = sql.one<{ id: string }>(
+    `UPDATE entry SET fields = json_set(fields, '$.last_seen', ?)
+     WHERE id = ? AND register = '${RUNS}' AND deleted_at IS NULL AND state IN ('active', 'idle')
+       AND json_extract(fields, '$.last_seen') IS NOT NULL AND json_extract(fields, '$.last_seen') <= ?
+     RETURNING id`,
+    new Date(nowMs).toISOString(),
+    id,
+    new Date(nowMs - BEAT_MS).toISOString(),
+  );
+  return moved !== undefined;
+}
+
+/** The rows of the runs register that `where` keeps, newest heard from first (as `heardAt` reads it), with their fields read. */
 function runsWhere(sql: Sql, where: string, ...params: string[]): RunRow[] {
   return sql
     .all<Omit<RunRow, 'fields'> & { fields: string }>(
       `SELECT id, seq, state, fields, created_at, updated_at FROM entry
        WHERE register = '${RUNS}' AND deleted_at IS NULL AND ${where}
-       ORDER BY coalesce(json_extract(fields, '$.last_seen'), updated_at) DESC`,
+       ORDER BY ${HEARD_SQL} DESC`,
       ...params,
     )
     .map((r) => ({ ...r, fields: JSON.parse(r.fields) as Record<string, Json> }));
@@ -129,9 +171,10 @@ export function workingRuns(sql: Sql, nowMs: number): WorkingRun[] {
 
 /**
  * The runs still open, active or idle, heard from inside `STALE_MS`: what an agent starting here is told is around it.
- * A run silent longer is no company, whatever its state says, so a briefing names no dead run.
+ * A run silent longer is no company, whatever its state says, so a briefing names no dead run, and a run carried in this
+ * morning that was last seen in September is not one either.
  */
 export function liveRuns(sql: Sql, nowMs: number): RunRow[] {
   const since = new Date(nowMs - STALE_MS).toISOString();
-  return runsWhere(sql, "state IN ('active', 'idle') AND coalesce(json_extract(fields, '$.last_seen'), updated_at) >= ?", since);
+  return runsWhere(sql, `state IN ('active', 'idle') AND ${HEARD_SQL} >= ?`, since);
 }

@@ -10,15 +10,15 @@ import { bylinesIn, changedLine, keepSeen, seenOn, type Byline, type Seen, type 
 
 const now = Date.parse('2026-10-06T12:00:00Z');
 const hoursAgo = (h: number): string => new Date(now - h * 3_600_000).toISOString();
-const names = new Map([['p_sam', 'Sam']]);
+const names = new Map([['p_owner', 'Mara']]);
 const none: Seen = { page: 0, rows: {} };
 
 const tasks = {
   register: 'tasks',
   entries: [{ seq: 1 }, { seq: 2 }, { seq: 3 }],
   changes: [
-    { by: 'agent', who: 'S42', agent: 'claude', for: 'p_sam', at: hoursAgo(2), batch: 'b_1', run: 'S42' },
-    { by: 'you', who: 'p_sam', at: hoursAgo(1) },
+    { by: 'agent', who: 'S42', agent: 'claude', for: 'p_owner', at: hoursAgo(2), batch: 'b_1', run: 'S42' },
+    { by: 'you', who: 'p_owner', at: hoursAgo(1) },
     null,
   ],
 };
@@ -27,7 +27,7 @@ test('A ROW AN AGENT CHANGED CARRIES ITS BYLINE BY NAME, and a row the reader ch
   const lines = bylinesIn([tasks], none, 'p_other', names, now);
   assert.deepEqual([...lines.keys()], ['tasks#1']);
   const one = lines.get('tasks#1');
-  assert.equal(one?.said, 'Claude for Sam · 2h ago');
+  assert.equal(one?.said, 'Claude for Mara · 2h ago');
   assert.equal(one?.batch, 'b_1', 'its Undo puts back that batch');
   assert.equal(one?.run, 'S42', 'the run is a handle beside the name, never the name');
   assert.equal(one?.unseen, true, 'a page never left has seen nothing');

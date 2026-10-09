@@ -423,7 +423,7 @@ test('A HOST THAT IGNORES THE CURSOR cannot loop a screen: a page that goes nowh
 
 /* A MERGE THE RECORD READ AS ONE QUESTION rides to the merge card on the question, whole, and nothing else does. */
 test('WHAT A SUGGESTION IS carries the merge group the record put on it, and one with none carries none', () => {
-  const merge = { candidates: [{ name: 'Rohan Mehta' }, { name: 'rohanmehta' }], options: [{ option: 'merge', says: 'Merge all' }] };
+  const merge = { candidates: [{ name: 'Joaquin Herrera' }, { name: 'joaquinherrera' }], options: [{ option: 'merge', says: 'Merge all' }] };
   const row = { id: 'SG7', body_kind: 'rowset', body: { register: 'people', rows: [] }, opened_by: 'slash' };
   assert.deepEqual(aboutOf({ ...row, merge }), { kind: 'rowset', body: { register: 'people', rows: [] }, by: 'slash', merge });
   assert.equal('merge' in aboutOf(row), false);
@@ -433,8 +433,8 @@ test('WHAT A SUGGESTION IS carries the merge group the record put on it, and one
 test('a suggestion that carries the record’s merge carries it onto its question, and a half one carries nothing', () => {
   const merge = {
     candidates: [
-      { name: 'Rohan Mehta', row: 'people#1', keeps: true, org: 'Encore', seen: ['3 commits in braindog'], known_by: ['email'], rows: [] },
-      { name: 'rohanmehta', row: 'people#4', keeps: false, org: null, seen: [], known_by: ['github'], rows: [0] },
+      { name: 'Joaquin Herrera', row: 'people#1', keeps: true, org: 'Brightwell', seen: ['3 commits in braindog'], known_by: ['email'], rows: [] },
+      { name: 'joaquinherrera', row: 'people#4', keeps: false, org: null, seen: [], known_by: ['github'], rows: [0] },
     ],
     options: [
       { option: 'merge', says: 'Merge all', decide: { option: 'merge' } },

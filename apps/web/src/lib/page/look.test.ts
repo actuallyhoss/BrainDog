@@ -112,7 +112,7 @@ test('a pin is the person’s own look with blocks pinned, and only an arrangeme
   assert.equal(isPinned(look({ by: 'owner' })), false, 'the person’s look with nothing pinned pins nothing');
   assert.equal(isPinned(look({ by: 'slash', pinned: ['late'] })), false);
   assert.equal(slashOpen(look({ by: 'slash' })), true);
-  assert.equal(slashOpen(look({ by: 'slash', kept: 'Sam' })), false);
+  assert.equal(slashOpen(look({ by: 'slash', kept: 'Mara' })), false);
   assert.equal(slashOpen(look({ by: 'rule' })), false);
   assert.equal(slashOpen(null), false);
   assert.notEqual(offerKey('money', look({ by: 'slash', order: ['a', 'b'] })), offerKey('money', look({ by: 'slash', order: ['b', 'a'] })));
@@ -134,9 +134,9 @@ test('a look is written under the page declaration it is laid over, which a temp
 });
 
 test('the history says who arranged the page and who kept it, in names', () => {
-  assert.equal(historyOf(look({ by: 'slash', kept: 'Sam' })), 'Slash arranged · Sam kept');
+  assert.equal(historyOf(look({ by: 'slash', kept: 'Mara' })), 'Slash arranged · Mara kept');
   assert.equal(historyOf(look({ by: 'slash' })), 'Slash arranged');
-  assert.equal(historyOf(look({ by: 'slash' }), 'Sam'), 'Slash arranged · Sam kept', 'kept in this tab, before the record says so');
+  assert.equal(historyOf(look({ by: 'slash' }), 'Mara'), 'Slash arranged · Mara kept', 'kept in this tab, before the record says so');
   assert.equal(historyOf(look({ by: 'owner', pinned: ['late'] })), 'Pinned as it is');
   assert.equal(historyOf(look({ by: 'rule' })), null, 'the rules arranging a page is nothing to say');
 });
@@ -160,7 +160,7 @@ test('the next action opens the row it names, and a row it cannot name is the li
 const LOOK_KEYS = new Set(['look', 'basis', 'lead', 'order', 'hide', 'headline', 'next', 'pinned', 'by']);
 
 test("a look is written with its kind first, so it is declared as the page's look, and only with keys a look has", () => {
-  const body = bodyOf('money', look({ by: 'slash', lead: 'cash', order: ['cash', 'late'], next: { row: 'tasks#1', text: 'Pay rent' }, kept: 'Sam' }));
+  const body = bodyOf('money', look({ by: 'slash', lead: 'cash', order: ['cash', 'late'], next: { row: 'tasks#1', text: 'Pay rent' }, kept: 'Mara' }));
   assert.equal(Object.keys(body)[0], 'look');
   assert.deepEqual(body, { look: 'money', basis: 'b1', by: 'slash', lead: 'cash', order: ['cash', 'late'], next: { row: 'tasks#1', text: 'Pay rent' } });
   for (const key of Object.keys(body)) assert.ok(LOOK_KEYS.has(key), `${key} is not a key a look has`);

@@ -70,13 +70,13 @@ test('LAST IN TOUCH IS THE DAY, OR FAILING IT THE NEWEST MET LINE, and nothing i
 
 test('TWENTY-FOUR COLLEAGUES OF ONE COMPANY ARE ONE LINE, where the most recent of them stands, folded below them', () => {
   seq = 0;
-  const encore = Array.from({ length: 24 }, (_, i) => row({ name: `Colleague ${i}`, org: 7, in_touch: `2026-09-${String(10 + (i % 15)).padStart(2, '0')}` }));
-  const priya = row({ name: 'Priya', org: 7, in_touch: '2026-10-05' });
+  const brightwell = Array.from({ length: 24 }, (_, i) => row({ name: `Colleague ${i}`, org: 7, in_touch: `2026-09-${String(10 + (i % 15)).padStart(2, '0')}` }));
+  const teodor = row({ name: 'Teodor', org: 7, in_touch: '2026-10-05' });
   const jo = row({ name: 'Jo', in_touch: '2026-10-04' });
   const solo = row({ name: 'Ana', org: 9, in_touch: '2026-10-02' });
   const quiet = row({ name: 'Registry' });
-  const merged = row({ name: 'priya', org: 7, in_touch: '2026-10-06', merged_into: priya.seq });
-  const bands = foldPeople([...encore, jo, quiet, solo, merged, priya], people, TODAY);
+  const merged = row({ name: 'teodor', org: 7, in_touch: '2026-10-06', merged_into: teodor.seq });
+  const bands = foldPeople([...brightwell, jo, quiet, solo, merged, teodor], people, TODAY);
 
   assert.deepEqual(
     bands.map((b) => b.band),
@@ -91,7 +91,7 @@ test('TWENTY-FOUR COLLEAGUES OF ONE COMPANY ARE ONE LINE, where the most recent 
   assert.equal(group.kind, 'org');
   if (group.kind === 'org') {
     assert.equal(group.members.length, 25, 'the merged duplicate is left out');
-    assert.equal(group.members[0]!.entry.fields.name, 'Priya', 'the most recent leads the group');
+    assert.equal(group.members[0]!.entry.fields.name, 'Teodor', 'the most recent leads the group');
     assert.equal(group.day, '2026-10-05');
     assert.ok(folds(group.members.length));
   }
@@ -103,7 +103,7 @@ test('TWENTY-FOUR COLLEAGUES OF ONE COMPANY ARE ONE LINE, where the most recent 
 
 test('THE PERSON WHOSE RECORD IT IS IS MARKED, by the list saying so and never by who is reading', () => {
   seq = 0;
-  const me = row({ name: 'Sam', self: true, in_touch: '2026-10-06' });
+  const me = row({ name: 'Mara', self: true, in_touch: '2026-10-06' });
   const [band] = foldPeople([me], people, TODAY);
   const item = band!.items[0]!;
   assert.equal(item.kind === 'person' && item.member.self, true);
@@ -143,7 +143,7 @@ test('WHAT SOMEBODY IS KNOWN BY IS SAID BY KIND, each once, a repository by its 
   assert.deepEqual(keySaid('phone:+447700900123'), { label: 'Phone', value: '+447700900123' }, 'a number is never taken for a hash');
   assert.deepEqual(keySaid('github:deadbee1'), { label: 'GitHub', value: 'deadbee1' }, 'nor is a login');
   assert.deepEqual(keySaid('bank:chillout'), { label: 'Bank payee', value: 'chillout' });
-  assert.deepEqual(keySaid('folder:/Users/sam/Developer/portage'), { label: 'Folder', value: 'portage' }, 'a folder by its name, never its path');
+  assert.deepEqual(keySaid('folder:/Users/mara/Developer/portage'), { label: 'Folder', value: 'portage' }, 'a folder by its name, never its path');
   assert.deepEqual(keySaid('constructor:x'), { label: 'Constructor', value: 'x' });
   assert.deepEqual(
     knownOf({ email: 'jo@okonkwo.example', keys: ['email:jo@okonkwo.example', 'github:jokonkwo'], handles: ['git:jokonkwo'] }, { email: 'email', keys: 'keys', handles: 'handles' }),
@@ -164,14 +164,14 @@ test('WHAT SOMEBODY IS KNOWN BY IS SAID BY KIND, each once, a repository by its 
 });
 
 test('WHO SOMEBODY IS IS ONE LINE, each part only when the row has it', () => {
-  assert.equal(whoSaid({ role: 'Contractor', org: 'Encore', projects: ['Kiln', 'Portage'] }), 'Contractor at Encore, on Kiln and Portage.');
-  assert.equal(whoSaid({ role: null, org: 'Encore', projects: [] }), 'At Encore.');
+  assert.equal(whoSaid({ role: 'Contractor', org: 'Brightwell', projects: ['Kiln', 'Portage'] }), 'Contractor at Brightwell, on Kiln and Portage.');
+  assert.equal(whoSaid({ role: null, org: 'Brightwell', projects: [] }), 'At Brightwell.');
   assert.equal(whoSaid({ role: null, org: null, projects: ['Kiln'] }), 'On Kiln.');
   assert.equal(whoSaid({ role: null, org: null, projects: [] }), null);
   assert.equal(whoSaid({ role: 'Client', org: null, projects: ['A', 'B', 'C', 'D', 'E'] }), 'Client, on A, B, C and 2 more.');
-  assert.deepEqual(whoParts({ role: 'Contractor', org: { name: 'Encore', href: '/r/orgs/3' }, projects: [{ name: 'Kiln', href: '/r/things/1' }] }), [
+  assert.deepEqual(whoParts({ role: 'Contractor', org: { name: 'Brightwell', href: '/r/orgs/3' }, projects: [{ name: 'Kiln', href: '/r/things/1' }] }), [
     { text: 'Contractor at ' },
-    { text: 'Encore', href: '/r/orgs/3' },
+    { text: 'Brightwell', href: '/r/orgs/3' },
     { text: ', on ' },
     { text: 'Kiln', href: '/r/things/1' },
     { text: '.' },

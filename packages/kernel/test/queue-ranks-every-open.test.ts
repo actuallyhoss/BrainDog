@@ -96,3 +96,29 @@ test('A QUESTION PUT OFF IS NOT COUNTED as waiting, and one asked exactly two we
   assert.deepEqual(queue(k).waiting, { stale: 1, hardToUndo: 0 });
   sql.close();
 });
+
+test('A QUESTION THAT CANNOT WAIT LEADS (AGT-C08): money asked today goes before an expensive question a month old', async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW - 30 * DAY);
+  const k = await openRecord(sql, clock);
+  const BILLS: Declaration = {
+    id: 'register.bills',
+    kind: 'register',
+    body: { id: 'bills', name: 'Bills', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'money' }] } as never,
+  };
+  value(await k.install([TASKS, BILLS]));
+  value(k.create('tasks', { what: 'Glaze test' }, OWNER));
+  const old = value<{ id: string }>(
+    k.propose({ question: 'Rename the glaze test?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ at: 'tasks#1', version: 1, patch: { what: 'Glaze test two' } }] } }, 'slash'),
+  );
+  clock.set(NOW);
+  const money = value<{ id: string }>(
+    k.propose({ question: 'Add the rent?', body_kind: 'rowset', body: { register: 'bills', rows: [{ what: 'Rent', amount: { amount: 900_00, currency: 'EGP' } }] } }, 'slash'),
+  );
+  const read = (k.block({ kind: 'queue', source: 'governance.open' } as PageBlock) as unknown as { queue: { id: string }[] }).queue;
+  assert.deepEqual(read.map((q) => q.id), [money.id, old.id], 'the oldest led, not the one that cannot wait');
+  /* AND THE SAME ORDER WITH A FILTER, which the record ranks in TypeScript rather than SQL. */
+  const filtered = (k.block({ kind: 'queue', source: 'governance.open', where: 'who is slash' } as PageBlock) as unknown as { queue: { id: string }[] }).queue;
+  assert.deepEqual(filtered.map((q) => q.id), [money.id, old.id]);
+  sql.close();
+});

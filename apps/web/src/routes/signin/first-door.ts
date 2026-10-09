@@ -14,10 +14,9 @@
  * note, *"This browser cannot use a passkey here."* The browser was not the problem and changing it
  * would have changed nothing. The way in is the claim link `POST /auth/provision` hands the operator.
  *
- * THE SENTENCES ARE HERE AND THEY BELONG IN `lib/copy.ts`. `50 §3` puts every sentence in one file so
- * the no-over-explaining rule is reviewable in one pass, and `tools/gates/dead-copy.mjs` reads that
- * file and `lib/first-run.ts` and no other. This run could not write either of them. Moving these three
- * keys into `copy.ts` is the repair, and nothing else has to change with them.
+ * THE SENTENCES ARE IN `lib/copy/account.ts` (`firstDoorTitle`, `firstDoorWhy`, `firstDoorMailDown`), where every
+ * sentence the product types is reviewable in one pass (`50 §3`) and `tools/gates/dead-copy.mjs` reads it. This file
+ * decides which of them is true; it no longer holds their words.
  */
 
 import type { Methods } from '../../lib/auth.ts';
@@ -61,7 +60,7 @@ export const noDoorYet = (it: Methods, ways: Ways | null, note: Note): boolean =
  * NOT `noDoorYet`, AND THAT WAS THE DEAD END. `waysOf` counts `magic: 'down'` as no way, so a stranger who had just
  * signed up got the same empty `Ways` as a record nobody has claimed, and read "Open the link you were given when the
  * record was set up". Nobody gave him a link: his way in is the letter, and what is true is that mail is not going out.
- * The page swallows the browser note here for the reason it does under `noDoorYet`, and prints `firstDoor.mailDown`.
+ * The page swallows the browser note here for the reason it does under `noDoorYet`, and prints `copy.firstDoorMailDown`.
  */
 export const mailHeld = (it: Methods, ways: Ways | null, note: Note): boolean =>
   it.me === null && it.firstRun === true && it.magic === 'down' && ways === null && note !== 'out';
@@ -73,13 +72,3 @@ export const mailHeld = (it: Methods, ways: Ways | null, note: Note): boolean =>
  * 401 (`signInFirst` in `lib/at.ts`), so the pill would have been a button back to this screen, and
  * on the first run the claim link sentence is the one way in there is. `methods.demo` went with it.
  */
-
-/** The sentences for `noDoorYet` and `mailHeld`. See the header: these belong in `lib/copy.ts`. */
-export const firstDoor = {
-  title: 'This record has no passkey yet.',
-  /* WHAT HE CAN DO, AND IT IS THE ONLY THING HE CAN DO. The claim link is handed to whoever
-     provisioned the record and is never mailed (`33 §4`), so it is in a terminal and not an inbox. */
-  why: 'Open the link you were given when the record was set up. You can add a passkey once you are in.',
-  /* FOR `mailHeld`, IN PLACE OF `copy.mailDown`, which says "Use a passkey" to somebody who has none yet. */
-  mailDown: 'Mail is not going out right now, so your sign-in link cannot be sent. Try again in a few minutes.',
-} as const;

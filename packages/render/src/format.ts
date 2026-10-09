@@ -39,19 +39,46 @@ export const exponentOf = (currency: string): number => EXPONENT[currency.toUppe
 /**
  * Code first, then the amount. `{{money:129900 EGP}}` is `EGP 1,299.00`; `{{money:1299 JPY}}` is
  * `JPY 1,299`. A negative amount reads `EGP −1,299.00` with a real minus sign, not a hyphen.
+ *
+ * BY THE DIGITS, NEVER BY DIVISION. It divided by a power of ten and printed the float, and a float
+ * holds sixteen digits: `{{money:900719925474099312 JPY}}` drew `JPY 900,719,925,474,099,300`, the
+ * last digits made up by the arithmetic, on a figure somebody reconciles against a statement. The
+ * amount is a run of digits now (a whole number, a `bigint` or a string of them), the point is
+ * placed by slicing it and the groups of three are counted off it, so every digit it is handed is a
+ * digit it prints. A number already past 2^53 has lost its digits before it arrives; the typed value
+ * hands the author's digits over as a string, so that one never does.
  */
-export function money(minor: number, currency: string): string {
+export function money(minor: number | bigint | string, currency: string): string {
   /* AN INTEGER, OR IT IS NOT MONEY. `02 §3`: money is always an integer in minor units. A float
      arrived here and was silently rounded to a penny — `money(0.5, 'USD')` drew `USD 0.01` — which
      is the one class of defect that makes somebody act on a false number, arriving through the
      formatter rather than through the record. `MISSING` is what this module draws for a figure it
-     cannot state, and an unstateable figure is what a fractional minor unit is. */
-  if (!Number.isInteger(minor)) return MISSING;
+     cannot state, and an unstateable figure is what a fractional minor unit is. A string is held to
+     the same rule: digits with one leading hyphen, or nothing. */
+  let text: string;
+  if (typeof minor === 'bigint') text = minor.toString();
+  else if (typeof minor === 'number') {
+    if (!Number.isInteger(minor)) return MISSING;
+    text = BigInt(minor).toString();
+  } else {
+    if (!/^-?\d+$/.test(minor)) return MISSING;
+    text = minor;
+  }
+  const negative = text.startsWith('-');
   const exp = exponentOf(currency);
-  const negative = minor < 0;
-  const amount = Math.abs(minor) / 10 ** exp;
-  const body = amount.toLocaleString(NUM, { minimumFractionDigits: exp, maximumFractionDigits: exp });
-  return `${currency.toUpperCase()} ${negative ? MINUS : ''}${body}`;
+  const digits = (negative ? text.slice(1) : text).replace(/^0+/, '').padStart(exp + 1, '0');
+  const whole = digits.slice(0, digits.length - exp);
+  /* COUNTED OFF, NOT LOOKED AHEAD. `\B(?=(\d{3})+$)` rescans the rest of the digits at every one of
+     them, so an author's fifty thousand digits held the page for a second; this is one pass. */
+  const head = whole.length % 3 || 3;
+  const groups = [whole.slice(0, head)];
+  for (let i = head; i < whole.length; i += 3) groups.push(whole.slice(i, i + 3));
+  const grouped = groups.join(',');
+  const body = exp === 0 ? grouped : `${grouped}.${digits.slice(digits.length - exp)}`;
+  /* NOUGHT HAS NO SIGN. `-0` is a string a person can type and a value `Math.abs` used to fold away;
+     `EGP −0.00` would be a debt of nothing. */
+  const zero = /^[0.,]+$/.test(body);
+  return `${currency.toUpperCase()} ${negative && !zero ? MINUS : ''}${body}`;
 }
 
 /**
@@ -369,9 +396,11 @@ export function day(iso: string): string {
  * wrong on the audit log, which the restore screen sends somebody to with the words "find the
  * moment", and which a person reads to say which change they mean out loud.
  *
- * UTC, LIKE `day()` ABOVE IT, and for the same reason: the ledger stores an instant and this
- * product does not yet know the reader's zone. It is the one number on that screen that has to be
- * the same for two people looking at it from different places.
+ * UTC, ON PURPOSE, THOUGH THE READER'S ZONE IS KNOWN NOW. `relative()` and `since()` count the
+ * reader's own day (PGS-B04), because "today" and "in 1d" are about where the reader is. This is not:
+ * the ledger stores an instant, and the moment it names is the one number on that screen that has to
+ * read the same for two people looking at it from different places, so one of them can say it to the
+ * other. `day()` above it is UTC for its own reason, a named day held at noon.
  */
 export function stamp(iso: string): string {
   const t = Date.parse(iso);
@@ -436,13 +465,52 @@ const band = (n: number): string => {
  * functions, two units, one table.
  *
  * They count days now, both of them, and a day is a day rather than a distance from lunchtime.
+ *
+ * AND THE DAY IS THE READER'S, NOT GREENWICH'S. It was counted from midnight UTC, and he reads in
+ * Cairo: from midnight to two or three in the morning his "today" was the day before, so a task due
+ * that morning read "in 1d" and a deadline passed in the night read "today". The calendar day is
+ * found with `Intl.DateTimeFormat` in a zone: the one the caller names (the record's own, for text
+ * drawn off the browser), else the browser's own when there is a window, else UTC. A zone `Intl`
+ * does not know falls to UTC rather than throwing, because a formatter never stops a page.
  */
-const dayIndex = (ms: number): number => Math.floor(ms / 86_400_000);
+const CALENDARS = new Map<string, Intl.DateTimeFormat>();
 
-export function relative(iso: string, now: number = Date.now()): string {
+function calendarIn(zone: string): Intl.DateTimeFormat {
+  let found = CALENDARS.get(zone);
+  if (found === undefined) {
+    try {
+      found = new Intl.DateTimeFormat('en-u-nu-latn-ca-gregory', { timeZone: zone, year: 'numeric', month: 'numeric', day: 'numeric' });
+    } catch {
+      found = calendarIn('UTC'); // UTC is a zone every `Intl` knows, so this cannot come back here
+    }
+    CALENDARS.set(zone, found);
+  }
+  return found;
+}
+
+/** The zone "today" is counted in: the one named, else the browser's own, else UTC. */
+export function readerZone(zone?: string): string {
+  if (zone) return zone;
+  /* `'window' in globalThis` AND NOT `typeof window`: this package is checked without the DOM's types,
+     and a worker or a test has no window, so text drawn there counts in UTC unless it names a zone. */
+  if ('window' in globalThis) return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  return 'UTC';
+}
+
+const dayIndex = (ms: number, zone: string): number => {
+  /* `formatToParts` throws on an invalid time where `Math.floor` gave NaN; a formatter never throws. */
+  if (!Number.isFinite(ms)) return Number.NaN;
+  const parts = calendarIn(zone).formatToParts(ms);
+  const part = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.find((p) => p.type === type)?.value);
+  return Math.floor(Date.UTC(part('year'), part('month') - 1, part('day')) / 86_400_000);
+};
+
+export function relative(iso: string, now: number = Date.now(), zone?: string): string {
   const t = noon(iso);
   if (t === null) return iso;
-  const days = dayIndex(t) - dayIndex(now);
+  /* The day named is the day named, held at noon UTC by `noon()`, so its index is read in UTC; only
+     "today" belongs to the reader. */
+  const days = dayIndex(t, 'UTC') - dayIndex(now, readerZone(zone));
   const size = band(Math.abs(days));
   if (size === '') return 'today';
   return days > 0 ? `in ${size}` : `${size} ago`;
@@ -490,10 +558,10 @@ export function relative(iso: string, now: number = Date.now()): string {
  * whole band. The comment here claimed they could not. Both count CALENDAR DAYS now, which is the
  * thing each was reaching for: `dayIndex` above, and `relative()`'s own ladder below it.
  */
-export function since(iso: string, now: number = Date.now()): string {
+export function since(iso: string, now: number = Date.now(), zone?: string): string {
   const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return relative(iso, now);
-  if (DAY.test(iso)) return relative(iso, now);
+  if (!Number.isFinite(t)) return relative(iso, now, zone);
+  if (DAY.test(iso)) return relative(iso, now, zone);
 
   const ms = t - now;
   const n = Math.abs(ms);
@@ -509,12 +577,12 @@ export function since(iso: string, now: number = Date.now()): string {
         ? `${Math.min(55, Math.round(mins / 5) * 5)} min`
         : n < 86_400_000
           ? `${Math.min(23, Math.round(mins / 60))}h`
-          : band(Math.abs(dayIndex(t) - dayIndex(now)));
+          : band(Math.abs(dayIndex(t, readerZone(zone)) - dayIndex(now, readerZone(zone))));
   return ms > 0 ? `in ${size}` : `${size} ago`;
 }
 
 /** `date:` links to the calendar and `day:` does not — a future date raises "what else is then". */
-export const dateLong = (iso: string, now?: number): string => `${day(iso)} · ${relative(iso, now)}`;
+export const dateLong = (iso: string, now?: number, zone?: string): string => `${day(iso)} · ${relative(iso, now, zone)}`;
 
 /**
  * A size, in the unit that tells one file from another.
@@ -636,7 +704,7 @@ export const ref = (spoken: string): string => {
 export const TYPED = ['date', 'day', 'until', 'ago', 'money', 'quantity', 'pct', 'ref'] as const;
 export type TypedForm = (typeof TYPED)[number];
 
-export function formatTyped(form: TypedForm, arg: string, now?: number): string | null {
+export function formatTyped(form: TypedForm, arg: string, now?: number, zone?: string): string | null {
   const a = arg.trim();
   switch (form) {
     /* ONE ARM, because there was a ternary with two identical ones: `dateLong` IS
@@ -647,10 +715,10 @@ export function formatTyped(form: TypedForm, arg: string, now?: number): string 
        one side of it. */
     case 'date':
     case 'day':
-      return noon(a) === null ? null : dateLong(a, now);
+      return noon(a) === null ? null : dateLong(a, now, zone);
     case 'until':
     case 'ago':
-      return noon(a) === null ? null : relative(a, now);
+      return noon(a) === null ? null : relative(a, now, zone);
     /* `^[A-Z]{3}$`, WHICH IS `36 §5.6` RULE 1 — it was `[A-Za-z]`, so `{{money:129900 egp}}` drew
        `EGP 1,299.00` and the author never learned that the code is upper case. `05 §7.2`'s rule for
        this whole family is that an argument which does not parse *"renders as the author's text,
@@ -658,8 +726,10 @@ export function formatTyped(form: TypedForm, arg: string, now?: number): string 
        the next code they type may not round-trip. `money()` still upper-cases for its own callers,
        where the code comes from a typed field rather than from prose. */
     case 'money': {
+      /* THE AUTHOR'S DIGITS, AS DIGITS. `Number(m[1])` came first, and past 2^53 it kept sixteen of
+         them and invented the rest before `money()` ever saw the figure. */
       const m = /^(-?\d+)\s+([A-Z]{3})$/.exec(a);
-      return m ? money(Number(m[1]), m[2]!) : null;
+      return m ? money(m[1]!, m[2]!) : null;
     }
     case 'quantity': {
       const m = /^(-?[\d.]+)\s*(.*)$/.exec(a);

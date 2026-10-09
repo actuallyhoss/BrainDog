@@ -37,6 +37,10 @@ test('SEVERAL AMOUNTS ARE EACH SAID AS A HEADLINE, and what is not money comes b
 test('A LEDGER STAYS EXACT: money, symbolFigure and a sentence not marked as a headline keep every minor unit', () => {
   assert.equal(money(3_385_000, 'GBP'), 'GBP 33,850.00');
   assert.equal(symbolFigure(money(3_385_000, 'GBP')), '£33,850.00');
+  /* Every digit, past sixteen of them: money is placed by slicing its digits, never divided into a float (PGS-B04, and
+     the edge cases in format-zone.test.ts). */
+  assert.equal(money('900719925474099312', 'JPY'), 'JPY 900,719,925,474,099,312');
+  assert.equal(symbolFigure(money(900_719_925_474_099_312n, 'GBP')), '£9,007,199,254,740,993.12');
   assert.equal(symbolText('Cash is GBP 33,850.00 across 2 accounts'), 'Cash is £33,850.00 across 2 accounts');
   assert.equal(symbolText('Cash is GBP 33,850.00 and EGP 412,300.00', true), 'Cash is £33,850 and EGP 412,300');
 });

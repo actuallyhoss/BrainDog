@@ -1,0 +1,8 @@
+{
+  "gate": "words",
+  "rule": "an empty root is a skip, not a pass",
+  "expect": "nothing was read",
+  "findings": 1,
+  "skip": true,
+  "why": "A ROOT WITH NO COPY FILE IS A MISTYPED ROOT, and the gate exits 3 and names it rather than passing over nothing. The seeded name is the fixture's own directory, so named once is the skip line saying which root it read."
+}

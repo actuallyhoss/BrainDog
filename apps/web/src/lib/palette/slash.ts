@@ -242,7 +242,7 @@ function moneyIn(body: Record<string, unknown>): { amount: number; currency: str
 
 /**
  * THE FILED PROPOSAL AS A QUEUE QUESTION, so the palette draws it with the one decision card (DIRECTION §37): where it
- * was asked, Enter accepts, a six-second Undo follows, and its line reads "Slash suggested · Sam accepted".
+ * was asked, Enter accepts, a six-second Undo follows, and its line reads "Slash suggested · Mara accepted".
  *
  * ITS QUESTION IS THE ASK, which is what the record filed it under (`packages/slash/src/propose.ts`), and its why is
  * Slash's sentence, drawn just above the card with its links (`Cited`), so the card says no why of its own. An

@@ -2,9 +2,9 @@
  * The rail as DIRECTION §39 draws it: the places, then the things a place holds, then the rest.
  *
  * THE PLACES ARE THE SEVEN A DAY RUNS THROUGH, Today and Decide first and then the declared sections in the order a
- * founder reaches for them (Work, Projects, Money, People, Agents), every other section after them in the reader's
- * order. Decide is a place whether or not anything waits: it is where a question goes, and a row that comes and goes
- * moves every row under it. Past seven, a place is under More with Activity.
+ * founder reaches for them (Work, a shop's Orders, Projects, Money, People, Agents), every other section after them in
+ * the reader's order. Decide is a place whether or not anything waits: it is where a question goes, and a row that
+ * comes and goes moves every row under it. Past seven, a place is under More with Activity.
  *
  * THE THINGS ARE A SECTION'S OWN ROWS, never its views. Projects holds a page per project (each `row`, a page made about
  * one thing), and each is drawn under the section's name. Work's other pages, Work page and Board, are views of Work,
@@ -20,8 +20,15 @@
 import type { Flat, FlatItem } from '../nav.ts';
 import { WORK_PAGE } from '../work/page.ts';
 
-/** The places in the order the rail draws them, by the section's plain name. Any other section follows, in its order. */
-const PLACES = ['work', 'projects', 'money', 'people', 'agents'];
+/**
+ * The places in the order the rail draws them, by the section's plain name. Any other section follows, in its order.
+ *
+ * A SHOP'S ORDERS COME STRAIGHT AFTER DECIDE (use case 6, step 7): they are what a shop opens the app for, and the
+ * phone's bar is the rail's first five, so ranked after the founder's places they fell off it into More. The shop use
+ * case names its section Shop today and Orders once it folds; both are here, so neither moves the other's rail. A
+ * record with neither (his own) reads exactly as before.
+ */
+const PLACES = ['work', 'orders', 'shop', 'projects', 'money', 'people', 'agents'];
 
 /** How many places the rail draws, Today and Decide included. */
 export const RAIL_MOST = 7;

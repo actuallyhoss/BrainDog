@@ -121,6 +121,9 @@ const SEPARATOR = /^(?:\s*,\s*|\s+and\s+)$/u;
 /** A trigger word in lower case and capitalised, so the name after it stays case-sensitive. */
 const either = (words: string): string => words.split('|').map((w) => `[${w.charAt(0).toUpperCase()}${w.charAt(0)}]${w.slice(1)}`).join('|');
 
+/** The list a project a sentence names is filed in, Projects', which every other list leans on (`propose.ts` reads the record's name from it). */
+export const PROJECTS: Row['register'] = 'things';
+
 type NameRule = { at: RegExp; register: 'things' | 'people'; role?: string };
 
 /* In order: a rule that takes a name keeps it from the rules after it. */

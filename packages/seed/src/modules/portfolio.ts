@@ -158,6 +158,11 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
     /* THE PROJECTS, for every register with a `scope:` field: a run is placed in the project whose
        repositories or folders it is working in, and is global anywhere else. */
     scopes: { repos: 'repos', folders: 'folders' },
+    /* A PROJECT OTHER ENTRIES POINT AT STAYS, SINCE portfolio 1.16.0 (REC-C08, "there is no delete"). A task, a bill, a
+       service or a person that names it was left pointing at nothing when it went; now the delete is refused and the
+       sentence names the lists that still point at it and how many, as Accounts does. A project nothing points at
+       goes, and comes back, as before. Finished is how a project leaves the board. */
+    delete: 'refuse_while_referenced',
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
       /* WHAT IT IS, IN A LINE, SINCE portfolio 1.6.0: "a variable type family, licensed direct". Drawn under the name on
@@ -462,6 +467,41 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* WHETHER ANYBODY HAS SAID WHERE A PROJECT STANDS, SINCE portfolio 1.16.0 (REC-C16): how it is going, how far along,
+     the day it aims for or the agent on it. The project page draws those four when one is said, and its own figures
+     when none is, so a project nobody has described is never a dash. A tree, because it ORs four fields. */
+  'project-said': {
+    metric: 'project-said',
+    name: 'Said where it stands',
+    source: 'register.things',
+    where: {
+      all: [
+        { field: 'name', is: '{{it}}' },
+        { any: [{ field: 'health', present: true }, { field: 'progress', present: true }, { field: 'aim', present: true }, { field: 'agent', present: true }] },
+      ],
+    },
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* WHAT WAS WORKED ON THIS WEEK, SINCE portfolio 1.16.0 (REC-C16): the tasks on a project written to in the last seven
+     days, made, moved or finished. Read off the day the record stamps a task with when it changes, so it says the
+     project is moving or has gone quiet without anybody typing a word about it. */
+  'project-moved-7d': {
+    metric: 'project-moved-7d',
+    name: 'Changed this week',
+    source: 'register.tasks',
+    where: 'thing is {{it}}, updated_at after -8d',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   'project-done-7d': {
     metric: 'project-done-7d',
     name: 'Done this week',
@@ -649,6 +689,18 @@ const EARNS = {
   order: [{ field: 'revenue', dir: 'desc' }],
   limit: 8,
   when: { metric: 'projects-earning-said', gt: 0 },
+};
+
+/* HOW MANY OF THE PROJECTS IN PLAY SAY WHAT THEY EARNED, ALWAYS DRAWN BESIDE THE SPLIT, SINCE portfolio 1.16.0 (REC-C08
+   step 6, "0 of 14"). The split is hidden while none says, so a record where nobody had said read nothing at all about
+   earnings, and a split of two said nothing of the nine silent beside them. Two counts, never a sum: projects that earn
+   in two currencies are counted once each, and no amount is added. Drawn while one project is in play, since "0 of 0"
+   says nothing the line at the top does not. */
+const EARNS_SAID = {
+  kind: 'note',
+  span: 12,
+  when: { metric: 'projects-live', gt: 0 },
+  body: '{{projects-earning-said}} of {{projects-live}} projects in play say what they earned in a year',
 };
 
 /* WHAT AGENTS HOLD, and what each one is doing next on it. An agent takes a project by setting itself as its agent. */
@@ -860,6 +912,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         when: { metric: 'projects-looked-up', lte: FOLD_PAST },
       },
       { ...EARNS, key: 'open-earns' },
+      { ...EARNS_SAID, key: 'open-earns-said' },
       /* SIDE BY SIDE, HALF EACH, in the open tile, and a half holds three columns. So what an agent holds leaves its
          next step out here: with four projects or fewer every one of them is a card straight above, and a card says
          its next step. Who holds it and who changed it last stay, since no card says who last said where it stands. One
@@ -878,6 +931,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         when: { metric: 'projects-looked-up', gt: FOLD_PAST },
       },
       EARNS,
+      { ...EARNS_SAID, key: 'earns-said' },
       WITH_AGENT,
       COMING_UP,
       {
@@ -1076,6 +1130,24 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         tones: { at_risk: 'warn', off_track: 'bad' },
         limit: 1,
         empty: 'Nobody has said where {{name}} stands yet.',
+        /* ONLY WHILE SOMEBODY HAS SAID ONE OF THE FOUR, SINCE portfolio 1.16.0 (REC-C16). On a record nobody had
+           described a project on, which is every imported one, the card was a dash and nothing else on every project
+           page; the figures under the same heading speak instead. */
+        when: { metric: 'project-said:{{name}}', gt: 0 },
+      },
+      {
+        /* WHERE IT STANDS FROM WHAT HAPPENED ON IT, SINCE portfolio 1.16.0 (REC-C16): drawn while nobody has said, so
+           its figures stand alone, which is how a project stays until its owner answers the tidy after an import. What
+           was worked on this week, from the day the record stamps each task it writes. What is open is At a glance's
+           first figure straight above, so it is not said twice. */
+        kind: 'stat',
+        heading: 'Where it stands',
+        icon: 'target',
+        span: 12,
+        area: 'rail',
+        key: 'stands-figures',
+        cells: [{ metric: 'project-moved-7d:{{name}}', label: 'Changed this week' }],
+        when: { metric: 'project-said:{{name}}', is: 0 },
       },
       {
         /* THE WORK ON IT THAT WAITS ON A PERSON: handed back by an agent to be checked, or blocked, and who changed it last.

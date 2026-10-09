@@ -271,7 +271,7 @@ test('the log names no row and no list in its own words', () => {
  */
 test('the record keeping its books is told from a change to somebody’s things', () => {
   const sweep = ev(iso(29, 9), 'system', 'state', 'session#712', 'Nothing heard from this run in twelve hours.');
-  const folder = ev(iso(29, 9), 'S729', 'edit', 'session#729', 'cwd set to /Users/sam/Developer/braindog');
+  const folder = ev(iso(29, 9), 'S729', 'edit', 'session#729', 'cwd set to /Users/mara/Developer/braindog');
   const runNote = ev(iso(29, 9), 'S729', 'edit', 'session#729', 'next set to Ship the payout retry');
   const stamp = { ...ev(iso(29, 9), 'S729', 'edit', 'tools#3', 'last seen set to 2 Oct 2026'), field: 'seen' };
   const stampSaid = ev(iso(29, 9), 'S729', 'edit', 'tools#3', 'last seen from 1 Oct 2026 to 2 Oct 2026');

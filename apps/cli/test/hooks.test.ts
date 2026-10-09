@@ -20,6 +20,10 @@ import { eventOf, HOOK_MS, heldFor, hookBudget, notSignedIn, readSession, REMEMB
 import { replaceByHand, hookCommand, installInto, serversFileOf } from '../src/install.ts';
 import { sessionHeaders } from '../src/position.ts';
 import { REPLACE, REPLACE_FILE } from './replace.ts';
+import { OWNER } from '../../../fixtures/names.ts';
+
+/* The owner as `boot` names them: the first word of the invented owner's name. */
+const FIRST = OWNER.name.split(' ')[0]!;
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
@@ -59,7 +63,7 @@ const CONTEXT = {
  * with `endSays` refuses with that code, as a host from before `end` does with no such method; `meet` adds a person, or
  * refuses as a record without People does when `people` is false. With `hang`, nothing ever answers. With `card`,
  * the context carries the record's own card, as a host that draws one does. `context` answers the same context,
- * `boot` says the sign-in speaks for Sam, and `list` answers no rows, for the commands and the MCP server.
+ * `boot` says the sign-in speaks for the owner (`FIRST`), and `list` answers no rows, for the commands and the MCP server.
  */
 async function stubHost(
   t: { after: (fn: () => Promise<void>) => void },
@@ -114,7 +118,7 @@ async function stubHost(
       if (method === 'heard') return answer({ ok: true, value: { marked: true } });
       /* With `projects`, a Projects list declaring `scopes:` and a People list declaring `meets:` with its self part. */
       const registers = o.projects === undefined ? [] : [{ id: 'things', name: 'Projects', count: o.projects.length }, { id: 'people', name: 'People', count: 1 }];
-      if (method === 'boot') return answer({ ok: true, value: { registers, now: '2026-10-02T09:00:00Z', me: { kind: 'token', person: 'p_owner', name: 'Sam', level: 'owner' } } });
+      if (method === 'boot') return answer({ ok: true, value: { registers, now: '2026-10-02T09:00:00Z', me: { kind: 'token', person: 'p_owner', name: FIRST, level: 'owner' } } });
       const register = String(body.register ?? new URLSearchParams(url.search).get('register'));
       if (method === 'schema')
         return answer({
@@ -210,7 +214,7 @@ test('THE START HOOK ATTACHES, KEEPS THE SESSION FILE, AND PRINTS THE CARD, then
   assert.match(lines[0]!, /^BrainDog · run S7 · project Kiln · Claude Code on \S/u);
   /* The machine as a person names it, never its network name. */
   assert.equal(lines[0]!.includes(hostname()), false, lines[0]);
-  assert.deepEqual(lines.slice(1), ['Next     Kern the lowercase pairs. (S6, 10m ago, check before acting)', 'Waiting  1 on Sam: Let kilnfonts.example lapse?', 'More     call context']);
+  assert.deepEqual(lines.slice(1), ['Next     Kern the lowercase pairs. (S6, 10m ago, check before acting)', `Waiting  1 on ${FIRST}: Let kilnfonts.example lapse?`, 'More     call context']);
 
   /* A question waits, so whose it is was read beside the attach. */
   assert.deepEqual(host.seen.map((s) => s.method), ['attach', 'boot']);
@@ -778,7 +782,7 @@ test('THE END HOOK READS EVERY REPOSITORY THAT MOVED UNDER A FOLDER THAT IS NOT 
   repository(join(top, '.cache', 'x')).commit();
   repository(join(top, 'node_modules', 'y')).commit();
   const host = await stubHost(t, false, true, undefined, {
-    self: { name: 'Sam Avery', aliases: ['Sam'], email: 'sam@avery.example', keys: ['email:sam.avery@example.com', 'github:actuallyhoss'] },
+    self: { name: OWNER.name, aliases: [FIRST], email: 'Mara@Lindqvist.example', keys: ['email:maralind@gmail.com', 'github:maralind'] },
     legacy: true,
     projects: [{ folders: [join(top, 'glaze')] }, { folders: [join(top, 'studio', 'kiln')] }],
   });
@@ -799,7 +803,7 @@ test('THE END HOOK READS EVERY REPOSITORY THAT MOVED UNDER A FOLDER THAT IS NOT 
   ])
     for (let twice = 0; twice < 2; twice++) a.commit(machine);
   /* Every key on his row, and his aliases at an address the row does not hold yet. */
-  for (const self of ['Sam <sam@avery.example>', 'Sam Avery <sam.avery+work@googlemail.com>', 'Sam <1234+actuallyhoss@users.noreply.github.com>', 'Sam <sam@new-job.example>', 'Sam <sam@new-job.example>'])
+  for (const self of [`${FIRST} <${OWNER.email}>`, `${OWNER.name} <m.a.ralind+work@googlemail.com>`, `${FIRST} <1234+maralind@users.noreply.github.com>`, `${FIRST} <mara@new-job.example>`, `${FIRST} <mara@new-job.example>`])
     a.commit(self);
   const linus = b.commit('Linus <linus@example.org>');
   c.commit('Stranger <stranger@example.org>');

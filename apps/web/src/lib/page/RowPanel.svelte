@@ -9,7 +9,7 @@
   list of invoices gets its amount and its day and no project box. A reader who may not write reads the same panel
   with the boxes off and no Save.
 
-  WHO ELSE CHANGED IT LEADS THE BODY, for a week: "Claude for Sam · 2h ago · Undo", the agent's name the door to the run
+  WHO ELSE CHANGED IT LEADS THE BODY, for a week: "Claude for Mara · 2h ago · Undo", the agent's name the door to the run
   that made the change, and Undo putting that change back on the record (`host.undoBy`), saying first what else it takes
   back when the change touched more than this row (`UndoAsk.svelte`). A row a person changed last
   carries no such line. Opening the row is seeing it, so the row's tint goes as the panel opens.

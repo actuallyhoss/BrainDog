@@ -233,7 +233,7 @@ test('brainl, import: a long text binds on its own, so one row of them is never 
 /* THE STATEMENTS STILL BUILT FROM A LIST, each bounded by something other than the data: a fixed list in the source, or
    index.ts's own sweep in a later batch. Counted by the `() => '?'` that makes a mark per value, so `push.ts`'s
    `Array.from` helper is one of them as much as a `.map`. A new one fails here; one swept lowers this to the new count. */
-const PLACEHOLDER_CEILING = 12;
+const PLACEHOLDER_CEILING = 9;
 
 test(`packages/kernel/src builds at most ${PLACEHOLDER_CEILING} placeholder lists with () => '?', and no new one`, () => {
   const src = new URL('../src/', import.meta.url).pathname;

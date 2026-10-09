@@ -16,12 +16,20 @@
   import Proposed from './Proposed.svelte';
   import KeyNeeded from './KeyNeeded.svelte';
   import { getContext } from 'svelte';
-  import { KEYS_CONTEXT, type Arranged, type KeysContext } from './arranged.ts';
+  import { KEYS_CONTEXT, TICKS_CONTEXT, ticksOf, type Arranged, type KeysContext, type TicksContext } from './arranged.ts';
 
   let { arranged, compact = false }: { arranged: Arranged; compact?: boolean } = $props();
 
   /* THE QUESTION'S OWN PAGE HANDS A CLIENT DOWN (`+page.svelte`); the queue does not, and there a key is only said. */
   const keys = getContext<KeysContext | undefined>(KEYS_CONTEXT);
+
+  /* A TICK PER PART, ON THE QUESTION'S OWN PAGE ONLY (REC-A07 step 2), and only where there is something to pick: more
+     than one part, or one that waits on a key. A part that is off says why under its name, and a part off for a key or
+     for a part it needs cannot be ticked until that is held or ticked. */
+  const ticks = getContext<TicksContext | undefined>(TICKS_CONTEXT);
+  const takes = $derived(arranged.takes ?? []);
+  const taking = $derived(ticksOf(takes, ticks?.unticked));
+  const picking = $derived(!compact && ticks !== undefined && (takes.length > 1 || taking.off.size > 0));
 
   const folded = new Set(['needs', 'changes', 'choices', 'appears', 'words', 'settings', 'rows']);
 </script>
@@ -32,6 +40,33 @@
     <p class="arr-summary">{arranged.summary ? copy.arrangeLeadSummary(arranged.lead, arranged.summary) : arranged.lead}</p>
   {:else}
     <p class="arr-lead">{arranged.lead}</p>
+  {/if}
+  {#if picking && ticks}
+    <section class="arr-part" aria-label={copy.arrangeTakesH}>
+      <h3 class="arr-h">{copy.arrangeTakesH}</h3>
+      <p class="arr-note">{copy.arrangeTakesHint}</p>
+      <ul class="arr-lines arr-takes">
+        {#each takes as t (t.id)}
+          {@const why = taking.off.get(t.id)}
+          {@const forced = why !== undefined && why !== ''}
+          <li>
+            <label class="arr-take" data-off={why !== undefined ? '' : undefined}>
+              <input
+                type="checkbox"
+                checked={why === undefined}
+                disabled={forced}
+                aria-label={copy.arrangeTake(t.name)}
+                aria-describedby={forced ? `take-why-${t.id}` : undefined}
+                onchange={(e) => ticks.tick(t.id, e.currentTarget.checked)}
+              />
+              <span class="arr-title">{t.name}</span>
+            </label>
+            {#if forced}<p class="arr-take-why" id="take-why-{t.id}"><Icon name={t.keys.length ? 'key' : 'alert'} size="s" />{why}</p>{/if}
+          </li>
+        {/each}
+      </ul>
+      {#if taking.parts && taking.parts.length > 0}<p class="arr-note" role="status">{copy.arrangeTakeSome(taking.parts.length, takes.length)}</p>{/if}
+    </section>
   {/if}
   {#each arranged.parts as p (p.part)}
     {#if p.part === 'why'}
@@ -68,6 +103,15 @@
           {/each}
         </ul>
         <p class="arr-note">{copy.arrangeCallsNote}</p>
+      </section>
+    {:else if p.part === 'stops'}
+      <!-- WHAT STOPS IS NEVER FOLDED: it is what accepting loses, and Accept asks twice for it. -->
+      <section class="arr-part arr-calls" aria-label={copy.arrangeStopsH}>
+        <h3 class="arr-h arr-calls-h"><Icon name="alert" size="s" />{copy.arrangeStopsH}</h3>
+        <ul class="arr-lines">
+          {#each p.lines as line, i (i)}<li class="arr-stop">{line}</li>{/each}
+        </ul>
+        {#if !compact}<p class="arr-note">{copy.arrangeStopsNote}</p>{/if}
       </section>
     {:else if p.part === 'packs'}
       <section class="arr-part" aria-label={copy.arrangePacks}>
@@ -315,6 +359,42 @@
     color: var(--action-text);
     font-size: var(--t-sm);
     font-weight: 500;
+  }
+
+  /* WHAT ACCEPT TAKES: a tick and the part's name on one line, and why it is off under it, with its mark. */
+  .arr-takes {
+    gap: var(--sp-2);
+  }
+
+  .arr-take {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: 44px;
+    cursor: pointer;
+  }
+
+  .arr-take[data-off] .arr-title {
+    color: var(--ink2);
+  }
+
+  .arr-take-why {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-1);
+    margin: 0;
+    padding-inline-start: var(--sp-5);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .arr-take-why :global(.icon) {
+    flex: none;
+    color: var(--warn);
+  }
+
+  .arr-stop {
+    color: var(--ink);
   }
 
   @media (max-width: 480px) {

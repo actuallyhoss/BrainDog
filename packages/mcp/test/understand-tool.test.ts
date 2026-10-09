@@ -1,5 +1,5 @@
 /**
- * What an agent reads before it meets anyone and after it proposes (DIRECTION §38): the `understand` tool says the
+ * What an agent reads before it meets anyone and after it proposes (DIRECTION §38): the `braindog:understand` resource says the
  * record's `understandPlan` in names, `meet`'s description says where honestly, and a proposal's answer says the money
  * it moves one currency at a time and what it changes, in the decision card's words.
  *
@@ -38,15 +38,13 @@ const plain = (s: string) => {
 
 /* ── the tool list ────────────────────────────────────────────────────────── */
 
-test('UNDERSTAND IS ONE READ-ONLY TOOL that takes nothing and says when to reach for it', () => {
-  const found = TOOLS.filter((t) => t.name === 'understand');
-  assert.equal(found.length, 1);
-  const tool = found[0]!;
-  assert.equal(tool.writes, false);
-  assert.deepEqual(Object.keys((tool.input as { properties?: object }).properties ?? {}), []);
-  assert.match(tool.description, /\bmeet\b/u, 'the description says to read it before meeting anyone');
-  assert.match(tool.description, /names/u);
-  plain(tool.description);
+test('UNDERSTAND IS A RESOURCE AND NO TOOL, and says when to reach for it', async () => {
+  assert.equal(TOOLS.some((t) => t.name === 'understand'), false);
+  const r = (await tools(stub().surface).resources({ who: 'agent' })).find((x) => x.uri === 'braindog:understand');
+  assert.ok(r);
+  assert.match(r.description, /\bmeet\b/u, 'the description says to read it before meeting anyone');
+  assert.match(r.description, /names/u);
+  plain(r.description);
 });
 
 test('MEET SAYS WHERE IS SAID HONESTLY: mail, commits and the web are not believed alone, and your own run is session in <repo>', () => {
@@ -64,14 +62,14 @@ test('MEET SAYS WHERE IS SAID HONESTLY: mail, commits and the web are not believ
 
 test('UNDERSTAND ANSWERS THE PLAN IN NAMES, asks the record nothing but understandPlan, and passes on nothing that acts', async () => {
   const { surface, calls } = stub({ understandPlan: async () => ({ ok: true, value: SLICE }) });
-  const said = await tools(surface).answer('understand', {}, { who: 'agent' });
-  assert.ok(said.result.ok);
-  const value = said.result.value as Record<string, unknown>;
+  const said = await tools(surface).read('braindog:understand', { who: 'agent' });
+  assert.ok(said.ok);
+  const value = said.value as Record<string, unknown>;
   assert.equal(value.undo, undefined, 'an undo is a handle no tool takes');
   assert.equal(value.filed, undefined, 'a dry slice files nothing');
   assert.deepEqual(value.writes, SLICE.writes);
   assert.equal(
-    said.text,
+    (said.value as { said: string }).said,
     [
       'Would link 3 payments to who they were with, 1 run to its project · would add 1 organisation',
       'Link LOWRY ST STUDIOS RENT AUG to Lowry St Studios',
@@ -82,20 +80,20 @@ test('UNDERSTAND ANSWERS THE PLAN IN NAMES, asks the record nothing but understa
     ].join('\n'),
   );
   assert.ok(!calls.some((c) => ['meet', 'create', 'update', 'propose'].includes(c.method)), 'it wrote');
-  plain(said.text);
+  plain((said.value as { said: string }).said);
 });
 
 test('A RECORD WITHOUT UNDERSTAND PLAN IS A SENTENCE THAT SAYS WHAT TO DO INSTEAD, and a refusal passes through', async () => {
   const before = stub().surface;
   delete before.understandPlan;
-  const older = await tools(before).answer('understand', {}, { who: 'agent' });
-  assert.equal(!older.result.ok && 'refusal' in older.result ? older.result.refusal.code : null, 'NOT_IN_THIS_BUILD');
-  assert.match(older.text, /meet/iu);
+  const older = await tools(before).read('braindog:understand', { who: 'agent' });
+  assert.equal(!older.ok && 'refusal' in older ? older.refusal.code : null, 'NOT_IN_THIS_BUILD');
+  assert.match(!older.ok && 'refusal' in older ? older.refusal.fix : '', /meet/iu);
 
   const refused = await tools(
     stub({ understandPlan: async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only the owner reads what the record would link.' } }) as never }).surface,
-  ).answer('understand', {}, { who: 'agent' });
-  assert.equal(!refused.result.ok && 'refusal' in refused.result ? refused.result.refusal.code : null, 'FORBIDDEN');
+  ).read('braindog:understand', { who: 'agent' });
+  assert.equal(!refused.ok && 'refusal' in refused ? refused.refusal.code : null, 'FORBIDDEN');
 });
 
 test('NOTHING TO LINK IS SAID AS SUCH, whether or not the walk read to the end', () => {

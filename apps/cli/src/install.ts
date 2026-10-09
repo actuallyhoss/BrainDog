@@ -1,6 +1,7 @@
 /**
- * `braindog install`: the two hook entries in Claude Code's settings, shown first and written only when asked: the user
- * profile by default, each `--config-dir` profile folder, or each `--settings` file the person names.
+ * `braindog install`: the three hook entries in Claude Code's settings (a session's start, its end, and the beat after
+ * each tool call), shown first and written only when asked: the user profile by default, each `--config-dir` profile
+ * folder, or each `--settings` file the person names.
  *
  * A DRY RUN BY DEFAULT. Settings belong to the person, and a hook runs in every session they start, so the
  * command prints exactly what it would add and changes nothing without `--apply`. With it, the file as it
@@ -64,13 +65,42 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 type Env = Record<string, string | undefined>;
-type Entry = { hooks: { type: 'command'; command: string; timeout: number }[] };
+type Hook = { type: 'command'; command: string; timeout: number; statusMessage?: string };
+type Entry = { hooks: Hook[] };
 
-/* Claude Code allows a hook sixty seconds by default; these are shorter, and longer than the hook's own eight. */
+/**
+ * WHAT CLAUDE CODE SHOWS WHILE A BRAINDOG HOOK RUNS (AGT-B10). Before it, a session start sat silent for as long as the
+ * attach took, which on his Mac read as Claude Code hanging. `statusMessage` is the field Claude Code's hook settings
+ * name for the line it shows beside its spinner while the command runs.
+ */
+export const HOOK_STATUS = 'Connecting to BrainDog...';
+
+/**
+ * TEN SECONDS EACH, two more than the hook's own eight (`HOOK_MS`), so the hook ends itself before Claude Code has to.
+ * They were twenty and fifteen, and a start with the network cut held the session for all twenty.
+ *
+ * AND THE BEAT (AGT-C03), after every tool call, so a session that edits files for an hour and writes nothing to the
+ * record still reads Working. Its script reads one file's age and stops there unless five minutes have passed
+ * (`beat.ts`), so a tool call pays for a node start at most once in five minutes. IT SAYS NOTHING WHILE IT RUNS: a
+ * status line after every tool call would flash under the agent's own work, mostly for a hook that read one file's age
+ * and stopped.
+ */
 const EVENTS = [
-  { event: 'SessionStart', which: 'start', timeout: 20 },
-  { event: 'SessionEnd', which: 'end', timeout: 15 },
+  { event: 'SessionStart', which: 'start', timeout: 10, status: true },
+  { event: 'SessionEnd', which: 'end', timeout: 10, status: true },
+  { event: 'PostToolUse', which: 'beat', timeout: 10, status: false },
 ] as const;
+type Which = (typeof EVENTS)[number]['which'];
+
+/** The words a settings file says when it already runs every hook below as written. */
+export const HOOKS_HELD = 'already runs every BrainDog hook';
+
+/**
+ * BRAINDOG'S OWN HOOK FOR THIS EVENT, written by any earlier install: its own script, `braindog-hook.sh` or `.ps1`, run
+ * with this event's word last. By the script's name and not the whole command, so an entry from before a checkout moved
+ * is replaced in place rather than joined by a second hook that does the same thing.
+ */
+const isOurs = (command: string, which: Which): boolean => new RegExp(`braindog-hook\\.(?:sh|ps1)"?\\s+${which}\\s*$`, 'u').test(command);
 
 /**
  * WHAT `--replace <replace.json>` TAKES OUT, READ FROM THAT FILE AND FROM NOTHING COMPILED HERE.
@@ -255,7 +285,7 @@ export function serversFileOf(dir: string, home: string = homedir()): string {
 }
 
 /** The command Claude Code runs: the PowerShell shim on Windows, the POSIX one elsewhere. */
-export function hookCommand(which: 'start' | 'end', scripts: string, platform: string = process.platform): string {
+export function hookCommand(which: Which, scripts: string, platform: string = process.platform): string {
   return platform === 'win32'
     ? `powershell -NoProfile -ExecutionPolicy Bypass -File "${join(scripts, 'braindog-hook.ps1')}" ${which}`
     : `sh "${join(scripts, 'braindog-hook.sh')}" ${which}`;
@@ -603,15 +633,33 @@ function planSettings(named: string, options: Options): Plan {
   }
 
   const added: { event: string; entry: Entry }[] = [];
-  for (const { event, which, timeout } of EVENTS) {
+  const changed: { event: string; hook: Hook }[] = [];
+  for (const { event, which, timeout, status } of EVENTS) {
     const list = next[event] ?? [];
     if (!Array.isArray(list)) throw new Error(`hooks.${event} in ${file} is not a list, so braindog install leaves the file alone.`);
-    const command = hookCommand(which, options.scripts, options.platform);
-    const present = list.some((group) => isObject(group) && Array.isArray(group.hooks) && group.hooks.some((h) => isObject(h) && h.command === command));
-    if (!present) added.push({ event, entry: { hooks: [{ type: 'command', command, timeout }] } });
+    const hook: Hook = { type: 'command', command: hookCommand(which, options.scripts, options.platform), timeout, ...(status ? { statusMessage: HOOK_STATUS } : {}) };
+    const same = (h: unknown) =>
+      isObject(h) && h.type === hook.type && h.command === hook.command && h.timeout === hook.timeout && h.statusMessage === hook.statusMessage;
+    const ours = (h: unknown) => isObject(h) && typeof h.command === 'string' && (h.command === hook.command || isOurs(h.command, which));
+    const hooksOf = (group: unknown): unknown[] => (isObject(group) && Array.isArray(group.hooks) ? group.hooks : []);
+    if (list.some((group) => hooksOf(group).some(same))) continue;
+    /*
+     * AN OLDER BRAINDOG ENTRY IS REPLACED WHERE IT STANDS, one `~` line, in its own group with its matcher kept. Added
+     * beside it instead, as before, every session would run the hook twice, the old one with the old timeout.
+     */
+    let swapped = false;
+    next[event] = list.map((group) => {
+      if (swapped || !hooksOf(group).some(ours)) return group;
+      swapped = true;
+      const hooks = [...hooksOf(group)];
+      hooks[hooks.findIndex(ours)] = hook;
+      return { ...(group as Record<string, unknown>), hooks };
+    });
+    if (swapped) changed.push({ event, hook });
+    else added.push({ event, entry: { hooks: [hook] } });
   }
-  if (added.length === 0 && removed.length === 0)
-    return { lines: [`${file} already runs both BrainDog hooks${old ? ` and no ${old.name} hook` : ''}. Nothing to change.`], write: null };
+  if (added.length === 0 && changed.length === 0 && removed.length === 0)
+    return { lines: [`${file} ${HOOKS_HELD}${old ? ` and no ${old.name} hook` : ''}. Nothing to change.`], write: null };
 
   const lines = [`${options.apply ? 'Changed' : 'braindog install would change'} ${file}${had ? '' : ', a new file'}:`];
   /*
@@ -621,6 +669,7 @@ function planSettings(named: string, options: Options): Plan {
    * event heading the line says which of the two.
    */
   for (const { event, command } of removed) lines.push(`  - hooks.${event}, ${String(old?.name)}'s: ${describe({ command })}`);
+  for (const { event, hook } of changed) lines.push(`  ~ hooks.${event}: ${JSON.stringify(hook)}`);
   for (const { event, entry } of added) lines.push(`  + hooks.${event}: ${JSON.stringify(entry)}`);
   for (const { event, entry } of added) next[event] = [...((next[event] as unknown[] | undefined) ?? []), entry];
   return { lines, write: { file, had, value: { ...settings, hooks: next } } };

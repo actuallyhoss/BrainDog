@@ -188,8 +188,10 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   assert.equal(said.split('\n')[0], 'BrainDog · run S6 · Claude Code on MacBook · project Kiln');
   assert.doesNotMatch(text, /Studio-MacBook/u, 'the machine was said by its own name');
   /* THE CARD IS THE RECORD'S (AGT-B07), whose rules its own tests hold: a step left more than a week ago is not handed
-     over, so the seed's fortnight-old one is no Next, and the question asked twice by one run is said once. */
-  assert.equal(slots.get('Next'), undefined, `a step a fortnight old was handed over: ${slots.get('Next') ?? ''}`);
+     over, so the seed's fortnight-old one is no Next, and the question asked twice by one run is said once. The task the
+     seed hands to claude is Next, since the briefing carries the field Tasks' hand.agent names (worker-door-tests-44). */
+  assert.doesNotMatch(slots.get('Next') ?? '', /Sign off instances/u, `a step a fortnight old was handed over: ${slots.get('Next') ?? ''}`);
+  assert.match(slots.get('Next') ?? '', /^Variable axis QA on the new cut \(tasks#\d+, handed to you\)/u);
   const waiting = slots.get('Waiting') ?? '';
   assert.match(waiting, /^\d+ on [^:]+: bank-card-used-sms could not read account out of this one\. · /u);
   assert.equal(waiting.split('bank-card-used-sms').length, 2, `one question was said twice: ${waiting}`);

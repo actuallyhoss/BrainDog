@@ -55,7 +55,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
    * the Money page's Accounts tile cuts Cash now into the accounts it is held in and its parts add up to the headline.
    *
    * DRAWN WHATEVER THE NUMBER OF BOOKS: one book with three accounts still wants to see where its money sits, which the
-   * by-book bar could never say. The name is the record's own ("HSBC current", "Tax reserve"), never a word of ours.
+   * by-book bar could never say. The name is the record's own ("Main current", "Tax reserve"), never a word of ours.
    */
   'cash-by-account': {
     metric: 'cash-by-account',

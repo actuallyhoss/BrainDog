@@ -1,0 +1,147 @@
+{
+  "about": "The words a person must never read in BrainDog, each with the word to say instead (EXP-B07). tools/gates/words.mjs reads every copy object the app ships against it. The entries marked page are the page lint's plain-words rule too (packages/render/src/lint.ts, PAGE_WORDS), held equal by the gate and by lint.test.ts. A shape is a regular expression read case-blind unless case is true; unless is a shape that, when the whole string matches it, forgives it. held is today's debt by file and count, read only on the repository itself, and it only shrinks.",
+  "words": [
+    {
+      "name": "row",
+      "shape": "\\brows?\\b",
+      "say": "the thing's own name: a bill, a task, a person",
+      "page": true,
+      "why": "A row is how the database holds a thing, not what the person calls it (D35.35)."
+    },
+    {
+      "name": "list item",
+      "shape": "\\blist items?\\b",
+      "say": "the thing's own name",
+      "page": true,
+      "why": "The machinery's word for whatever the list holds."
+    },
+    {
+      "name": "entity",
+      "shape": "\\bentit(?:y|ies)\\b",
+      "say": "the thing's own name",
+      "page": true,
+      "why": "An engineer's word for a thing; nobody keeps an entity."
+    },
+    {
+      "name": "credential",
+      "shape": "\\bcredentials?\\b",
+      "say": "key",
+      "page": true,
+      "why": "The product calls them keys, and the Keys page is where they live."
+    },
+    {
+      "name": "register",
+      "shape": "\\b(?:the|a|an|this|that|each|every|your|its|one|no|which|new)\\s+registers?\\b|\\bregister's\\b",
+      "say": "list",
+      "page": true,
+      "why": "Register as a noun is the kernel's word for a list. To register, the verb, is plain and is not matched."
+    },
+    {
+      "name": "pack",
+      "shape": "\\bpacks?\\b",
+      "say": "add-on",
+      "page": false,
+      "why": "Say add-ons, not packs, on screen (W.48)."
+    },
+    {
+      "name": "slug",
+      "shape": "\\bslugs?\\b",
+      "say": "address",
+      "page": false,
+      "why": "A developer's word for the end of an address."
+    },
+    {
+      "name": "schema",
+      "shape": "\\bschemas?\\b",
+      "say": "the fields a list holds",
+      "page": false,
+      "why": "Developer vocabulary in visible copy (D1.32)."
+    },
+    {
+      "name": "declaration",
+      "shape": "\\bdeclarations?\\b",
+      "say": "what an add-on sets up",
+      "page": false,
+      "why": "How the engine is built, not what the person sees."
+    },
+    {
+      "name": "MCP",
+      "shape": "\\bMCP\\b",
+      "case": true,
+      "say": "the agent app by its name, such as Claude Code or Cursor",
+      "page": false,
+      "why": "A protocol's initials; the person knows the app they use."
+    },
+    {
+      "name": "snapshot",
+      "shape": "\\bsnapshots?\\b",
+      "say": "backup",
+      "page": false,
+      "why": "The Backups page holds copies of the record, and a backup is the word for one."
+    },
+    {
+      "name": "Spark",
+      "shape": "\\bSpark\\b",
+      "case": true,
+      "say": "Slash",
+      "page": false,
+      "why": "The assistant was renamed Slash, everywhere (DIRECTION 31)."
+    },
+    {
+      "name": "recommended",
+      "shape": "\\brecommended\\b",
+      "say": "suggested",
+      "page": false,
+      "why": "Suggested is the one word (RQ-EXP-412)."
+    },
+    {
+      "name": "Submit",
+      "shape": "\\bsubmit\\b",
+      "say": "a verb and its object, such as Save the bill",
+      "page": false,
+      "why": "A button says what it does to what (RQ-EXP-408)."
+    },
+    {
+      "name": "OK",
+      "shape": "^\\s*OK\\s*$",
+      "case": true,
+      "say": "Done, or a verb and its object",
+      "page": false,
+      "why": "A button says what it does to what (RQ-EXP-408)."
+    },
+    {
+      "name": "isn't code",
+      "shape": "\\bisn['\u2019]t code\\b",
+      "say": "not just code",
+      "page": false,
+      "why": "The product's words are \"not just code\" (RQ-EXP-417)."
+    },
+    {
+      "name": "an id in a sentence",
+      "shape": "(?:\\b[a-z][a-z0-9_-]*|\\{\\})#(?:\\d+|\\{\\})|\\bS\\d{2,6}\\b|\\b(?=[0-9A-HJKMNP-TV-Z]*\\d)[0-9A-HJKMNP-TV-Z]{26}\\b",
+      "case": true,
+      "say": "the thing's name; a run's handle only beside its name",
+      "page": false,
+      "why": "Names, never ids, in anything a person reads. The page lint's raw-id rule holds the same on a drawn page."
+    },
+    {
+      "name": "the long dash",
+      "shape": "\u2014",
+      "unless": "^[\\s\u2014]*$",
+      "say": "a comma, a colon or a new sentence",
+      "page": false,
+      "why": "No em dashes in copy a person reads. A dash alone is the drawn mark for no value and is forgiven. The page lint's em-dash rule holds the same on a drawn page."
+    }
+  ],
+  "titles": {
+    "keys": "(?:title|heading|label|button)s?$",
+    "say": "the same words with no full stop",
+    "why": "A title, a heading, a label or a button is a name, not a sentence (RQ-EXP-409). A key ending in one of those words holds one."
+  },
+  "buttons": ["Undo", "Cancel", "Done", "Close", "Back"],
+  "held": {
+    "apps/web/src/lib/copy/agents.ts": { "count": 1, "why": "doorAny says \"Any MCP client\" on the Agents door. EXP-B08 names the apps instead." },
+    "apps/web/src/lib/copy/shell.ts": { "count": 1, "why": "mcp is \"MCP\", the door's name in the shell. EXP-B08 names it for what it does." },
+    "apps/web/src/lib/copy/account.ts": { "count": 1, "why": "firstDoorTitle ends in a full stop. EXP-B08 drops it." }
+  }
+}

@@ -6,7 +6,7 @@
  *
  *   BrainDog · run S731 · project BrainDog · Claude Code on MacBook
  *   Next     Cut page answers to block summaries. (S729, Claude Code, 5h ago, check before acting)
- *   Waiting  2 on Sam: Update the prism tool to match this Mac? · ...
+ *   Waiting  2 on Mara: Update the copperleaf tool to match this Mac? · ...
  *   Learned  Money is minor units plus currency. Never add two currencies.
  *   More     3 dead ends · 5 learnings · 4 keys by name · call context
  *
@@ -172,7 +172,7 @@ export function machineOf(network: string): string {
  * `all`, a path becomes its file's name and a handle the context can name becomes the row's words.
  *
  * THE QUESTIONS ARE WRITTEN BY OTHER RUNS AND BY THE RECORD'S OWN SCANS, and one on the owner's record read "Change
- * tools#8 to how fly-prism is set up in ~/.claude.json on Maras-MacBook-Pro.local?". A handoff's step keeps its
+ * tools#8 to how fly-copperleaf is set up in ~/.claude.json on Maras-MacBook-Pro.local?". A handoff's step keeps its
  * paths and handles, which the next run needs; only the machine's network name goes from it.
  */
 export function plainly(said: string, c: Context, all: boolean): string {
@@ -267,7 +267,7 @@ export type CardFor = {
   agent?: string | null | undefined;
   /** Items the caller adds to More, such as what the start hook's skills sync did. */
   more?: string[] | undefined;
-  /** Whom the questions wait on, by name ("Sam"), when the record said; "the owner" otherwise. */
+  /** Whom the questions wait on, by name ("Mara"), when the record said; "the owner" otherwise. */
   decider?: string | null | undefined;
   /** How many questions wait in all, when the record counted them: `context` sends only the newest. */
   waiting?: number | null | undefined;

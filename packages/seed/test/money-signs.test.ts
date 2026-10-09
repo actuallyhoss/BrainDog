@@ -69,11 +69,11 @@ test('MONEY DECLARES ITS FIRST SIGN OF LIFE, and the record installs it with the
   assert.ok(held, 'money-core installed without ledger-rows-7d');
 });
 
-test('A RECORD WITH NOTHING ON ITS LEDGER READS NOUGHT AND MISSES ITS MARK, never a quiet week that looks good', async () => {
+test('A RECORD WITH NOTHING ON ITS LEDGER READS NOUGHT AND IS NOT JUDGED, never a quiet week that looks good', async () => {
   const k = await moneyCore();
   const read = rows7d(k);
   assert.equal(read.value, 0);
-  assert.equal(read.met, false, 'an empty Ledger read as a sign that is fine');
+  assert.equal(read.met, null, 'an empty Ledger is judged neither kept nor missed: nothing held is no verdict');
 });
 
 test('THE SEVEN DAYS ARE TODAY AND THE SIX BEFORE IT, cleared rows only, in any currency, a transfer counted', async () => {

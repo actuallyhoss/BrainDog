@@ -1,0 +1,55 @@
+{
+  "id": "yara-own",
+  "name": "Yara",
+  "who": "Keeps eleven beehives on her family's land outside Amman. No use case fits her: she wants her own lists, in her own words, for the hives and what she finds in each.",
+  "expects": "none",
+  "standing": false,
+  "said": "I'm Yara. I keep eleven beehives and want to log inspections and honey per hive.",
+  "says": {
+    "plain": "I'm Yara. I keep eleven beehives and want to log inspections and honey per hive.",
+    "hard": "I'm Yara. Eleven boxes at the bottom of the garden, and I never remember which one I opened last."
+  },
+  "chip": "I run a small shop",
+  "answer": "Hives, Inspections",
+  "answers": {
+    "name": "Yara",
+    "currency": "JOD",
+    "kind": "hives",
+    "things": ["Hives", "Inspections"]
+  },
+  "email": "yara@people.braindog.test",
+  "slug": "yaras-hives",
+  "zone": "Asia/Amman",
+  "locale": "en-JO",
+  "languages": ["en-JO", "ar-JO"],
+  "start": "2026-10-05T06:00:00Z",
+  "first": "Hive 4 inspected, queen seen, 6 frames of brood",
+  "later": [
+    { "day": 3, "said": ["Hive 7 inspected, no queen seen, add a frame of eggs"] },
+    { "day": 7, "said": ["Hive 2 inspected, calm, 4 kg honey taken", "Hive 9 inspected, swarm cells"] },
+    { "day": 14, "said": ["Hive 4 inspected, 3 kg honey taken"] },
+    { "day": 30, "said": ["Hive 11 inspected, strong colony"] }
+  ],
+  "expect": {
+    "who": {
+      "question": "Who are you?",
+      "chips": 5,
+      "promises": [
+        { "says": "free, with no card", "match": "free\\b.{0,24}\\bno card" },
+        { "says": "nothing is saved until you keep it", "match": "nothing (is )?saved until you keep" },
+        { "says": "yours to export or move", "match": "yours to (export|move|take)" }
+      ]
+    },
+    "heard": {
+      "usecase": "none",
+      "title": "Yara's Hives",
+      "lit": ["Yara", "beehives", "inspections"],
+      "places": ["Today", "Hives", "Inspections", "People"]
+    },
+    "question": { "about": "things", "choices": 2 },
+    "keep": { "lists": ["hives", "inspections", "people"], "currency": "JOD" },
+    "tell": { "lists": ["inspections"] },
+    "today": { "first": "source", "lists": ["inspections"] },
+    "offer": { "id": "page:hives", "before": 13, "after": 30 }
+  }
+}

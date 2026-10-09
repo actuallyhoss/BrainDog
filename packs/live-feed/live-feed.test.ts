@@ -2,9 +2,9 @@
  * Live numbers, polled, as a pack file: one JSON address, a key named by its label in the vault, and which number in
  * the answer is which measure.
  *
- * WHY A FILE AND NOT THE BUILDER IT REPEATS. `pollPack` in `packages/seed/src/usecases/founder-poll.ts` builds the
- * same declaration in code, and it requires the founder's use case, because that is where `datapoints` is declared
- * there. A record whose readings come from any other pack could not use it, and a feed that one person polls became
+ * WHY A FILE AND NOT A BUILDER IN CODE. The seed's old `pollPack` built the same declaration in code, and it required
+ * the founder's use case, because that is where `datapoints` was declared for it. A record whose readings come from
+ * any other pack could not use it, and a feed that one person polls became
  * a use case compiled into the seed. This is the same declaration as a file anybody can read, with what a person
  * supplies named under `fill`. It names no pack it requires: it writes a list called `datapoints`, from whichever pack
  * declares it, and the last test holds the plan to refusing it on a record where no pack does. A person's own feeds are
@@ -22,7 +22,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 import { normalise } from '../../packages/declare/src/index.ts';
 import { readPackFile } from '../../packages/declare/src/catalogue.ts';
@@ -92,9 +92,9 @@ test('IT REQUIRES NO PACK BY NAME, and names no host but the example', () => {
 
 /**
  * THE DECLARATION IS THE ONE THE IMPORT FILED BEFORE, BUT FOR ITS NAME. The setup file's `polls` were built in code by
- * `pollPack` (`packages/seed/src/usecases/founder-poll.ts`), which goes now that the form and the importer fill this
- * file. So the poll it built for a synthetic setup file's poll, with a project and a key, is written out here, and a
- * spec that names no date and no money still fills it to the letter: moving onto this file changes nothing polled.
+ * the seed's old `pollPack`, which went when the form and the importer moved onto this file (REC-C01). So the poll it
+ * built for a synthetic setup file's poll, with a project and a key, is written out here, and a spec that names no
+ * date and no money still fills it to the letter: moving onto this file changes nothing polled.
  */
 test('A SETUP FILE’S POLL FILLS IT AS IT STANDS, and the poll is the one the old builder in the seed made', () => {
   const setup: FeedSpec = {
@@ -480,4 +480,23 @@ test('ON A RECORD, A WHOLE-DAY FEED WITH A TIME OF DAY AND A ZONE INSTALLS, so t
   said(await r.put(doc));
   assert.deepEqual([pollOf(doc).at, pollOf(doc).tz], ['07:00', 'Africa/Cairo']);
   r.sql.close();
+});
+
+test('ONE BUILDER: the importer, the setup file command and the form all fill this file, and none builds a poll of its own', () => {
+  /* MEASURED RED FIRST: with the importer still on the seed's `pollPack`, `apps/cli/src/import.ts` is the one file
+     named below, and the same poll could sit on Decide twice, as `poll-<id>` and as `feed-<id>`. */
+  const builds: string[] = [];
+  const fills: string[] = [];
+  for (const app of ['cli', 'web']) {
+    const src = new URL(`../../apps/${app}/src/`, import.meta.url);
+    for (const rel of readdirSync(src, { recursive: true, encoding: 'utf8' })) {
+      const path = rel.replaceAll('\\', '/');
+      if (!/\.(ts|svelte)$/u.test(path) || /\.test\.ts$/u.test(path)) continue;
+      const text = readFileSync(new URL(path, src), 'utf8');
+      if (/\bpollPack\b|usecases\/founder-poll/u.test(text)) builds.push(`apps/${app}/src/${path}`);
+      if (/\bfillFeed\(/u.test(text)) fills.push(`apps/${app}/src/${path}`);
+    }
+  }
+  assert.deepEqual(builds, []);
+  for (const caller of ['apps/cli/src/import.ts', 'apps/cli/src/feed.ts', 'apps/web/src/lib/record/poll-form.ts']) assert.ok(fills.includes(caller), `${caller} no longer fills the live feed`);
 });

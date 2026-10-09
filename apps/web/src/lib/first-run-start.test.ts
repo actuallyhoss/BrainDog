@@ -15,6 +15,7 @@ import { USE_CASES, arrange } from '@braindog/seed/usecases';
 import { carriedDocument, moduleDocument, moduleExamples, plantedRows } from '@braindog/seed/usecases/install';
 
 import { fileFor, withNeeds } from '../routes/start/accept.ts';
+import { firstRun } from './first-run.ts';
 
 const TODAY = '2026-09-26';
 const MODULE_IDS = ['portfolio', 'people', 'money-core', 'estate', 'work', 'agents'];
@@ -75,4 +76,18 @@ test('the four people are still heard: student, founder, team and guide', () => 
   assert.equal(arrange('I run a few companies and I send invoices').pick?.usecase, 'founder');
   assert.equal(arrange("I'm part of a team and we track tasks for a small team").pick?.usecase, 'team');
   assert.equal(arrange('I want to start a podcast and I do not know where to begin').pick?.usecase, 'guide');
+});
+
+/* AND THE FIVE STARTING POINTS /start AND /signup SHARE (use case 6, step 1): each one, alone, is heard by the arranger
+   as its own person, so a chip that stops reaching its use case fails here and not on a stranger's screen. */
+test('the five chips /start and /signup share each reach their own use case', () => {
+  const want: Record<string, string> = {
+    'I run a small shop': 'shop',
+    'I freelance': 'business',
+    "I'm a student": 'student',
+    'I run a few companies': 'founder',
+    "I'm part of a team": 'team',
+  };
+  assert.deepEqual([...firstRun.whoChips], Object.keys(want));
+  for (const chip of firstRun.whoChips) assert.equal(arrange(chip).pick?.usecase, want[chip], chip);
 });

@@ -4,7 +4,8 @@
  * `usedBy` IS THE FIRST, built as the worked example of `methods/`: a real method a caller needs, so the first change
  * that carries the mechanism proves it end to end, from this file through `methods/index.ts` and the route row in
  * `host/src/routes/agents.ts` to a caller. `triage` is beside it: the one door an agent's token files or sets aside an
- * arrival by. `end` is the third: how a session that closed says so, once.
+ * arrival by. `end` is the third: how a session that closed says so, once. `beat` is the fourth: how a session that is
+ * reading, thinking or editing files says it is still at work, with no write.
  */
 
 import type { Result } from '@braindog/ports';
@@ -80,6 +81,9 @@ export type Ended = { run: string; state: 'done' | 'handoff'; changed: boolean }
 
 /** The keys `end` takes. No `state`: the record picks it from what the run left (`endRun` in the kernel). */
 const END_TAKES = ['branch', 'head'] as const;
+
+/** What `beat` answers: the caller's run by its spoken id when the record found it, or `null` when it found none. */
+export type Beat = { run: string | null };
 
 /** The longest branch or commit `end` takes, as `attach` and `handoff` hold every line they take (`LINE` in `index.ts`). */
 const END_LINE = 280;
@@ -211,6 +215,38 @@ export function methods(deps: RecordDeps) {
         ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
       };
       return tail(kernel.endRun(w, said));
+    },
+
+    /**
+     * A session is still working: the caller's run is heard from now, and nothing else changes. A token's call, needing
+     * `propose`, as `end` and `attach` do.
+     *
+     * A HEARTBEAT IS NOT A WRITE (P.132). Last seen moved only when a run wrote, so a session that read, thought or edited
+     * files for half an hour read as Quiet beside one that had died. The kernel's `heartbeat` moves `last_seen` in place
+     * (`beatRun`): no version, no event, no line in the run's history, at most once a minute.
+     *
+     * IT FINDS THE CALLER'S RUN AND OPENS NONE, and revives none: a session that never wrote has no run to keep alive,
+     * and a run that ended, left a step or was written off stays where it stopped. Either answers `{ run: null }`, which
+     * is not a refusal, because a hook that beats on every tool call has nothing to do about it.
+     */
+    async beat(args: Record<string, never> | undefined, ctx: CallContext): Promise<Result<Beat>> {
+      const stop = guard(ctx, 'propose');
+      if (stop) return { ok: false, refusal: stop };
+      const p = ctx.principal;
+      if (p.kind !== 'token')
+        return no('FORBIDDEN', 'beat is how an agent says it is still working, and a person is never a run.', { at: 'principal' });
+      const stray = Object.keys((args ?? {}) as Record<string, unknown>)[0];
+      if (stray !== undefined) return no('FIELD_UNKNOWN', `${stray} is not something beat takes. It takes nothing: the run is the caller's own.`, { at: stray, allowed: [] });
+      /* WHO BEATS, AS `end` SAYS IT: the token and its run's hints, so the kernel's ladder finds the run this session
+         wrote as, by its client id or its spoken name. */
+      const hints = ctx.session ?? {};
+      const w: WriteContext = {
+        actor: `agent:${agentOf(hints).agent ?? 'other'}`,
+        principal: { kind: 'token', token: p.id },
+        session: hints,
+        ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+      };
+      return ok({ run: kernel.heartbeat(w) });
     },
 
     /**

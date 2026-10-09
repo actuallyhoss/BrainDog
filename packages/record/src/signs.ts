@@ -1,7 +1,8 @@
 /**
- * Two of the record's vital signs, filed by the record layer through the kernel's `signRead` (PRF-A05 jobs 2 and 3,
- * `loop/scope/area-proof-a.md` 2.2): whether the briefing a new session is handed is true (`briefing-true`), and whether
- * agents that connect are given the tool list (`tools-listed`). The route that reads every sign is `methods/signs.ts`.
+ * Three of the record's vital signs, filed by the record layer through the kernel's `signRead` (PRF-A05 jobs 2 and 3,
+ * `loop/scope/area-proof-a.md` 2.2): whether the briefing a new session is handed is true (`briefing-true`), whether
+ * agents that connect are given the tool list (`tools-listed`), and whether what shipped is what runs (`arrived`,
+ * PRF-A20: add-ons, the command and the model). The route that reads every sign is `methods/signs.ts`.
  *
  * WHY. The card a session on his record started with handed a next step from a run ten hours and 53 commits old, and
  * for a week no client was given the tools; nothing in the record could say either (D40.25, "whether the tools list").
@@ -18,9 +19,10 @@
 import { openHandoffs, type SignReading } from '@braindog/kernel';
 import type { Result, Sql } from '@braindog/ports';
 
-import type { Context } from './index.ts';
+import type { Build, Context, RecordDeps } from './index.ts';
 import { isHandle, spokenOf } from './question-handles.ts';
 import { scrubbed } from './scrub.ts';
+import type { CatalogueOffer } from './slash.ts';
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -52,12 +54,15 @@ export type DoorCounts = { hello: number; listed: number };
 export type RecordSignsKernel = {
   signRead: (id: string, reading: SignReading) => Result<{ sign: string; day: string }>;
   doorMarks?: (sinceMs?: number) => DoorCounts | Result<DoorCounts>;
-};
+} & Partial<ArrivedKernel>;
 
 /** What the record hands: its database, and what a new session standing in a repository would be handed. */
 export type RecordSignsDeps = {
   sql: Sql;
   briefing: (repo: string) => Context | null | Promise<Context | null>;
+  /** The host's build and its catalogue's newer versions, for `arrived`. Absent, that part of it reads nothing to judge by. */
+  build?: ArrivedDeps['build'];
+  offers?: ArrivedDeps['offers'];
 };
 
 /* ── helpers ───────────────────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -304,10 +309,187 @@ export function readToolsSign(kernel: RecordSignsKernel, sql: Sql, nowMs: number
   return reading('green', listed, `Agents connected ${count(hello, 'time')} this week and were given the tool list ${givenSaid(Math.min(listed, hello), hello)}.`, facts);
 }
 
+/* ── arrived ───────────────────────────────────────────────────────────────────────────────────────────────────────────── */
+
+/** An add-on behind its catalogue, an update waiting on its question, or a command behind the host: red past this many nights. */
+export const ARRIVED_NIGHTS = 2;
+
+/** Where the first night each add-on was seen behind is kept, under a name no person holds, as `lintTick` keeps its day. */
+export const ARRIVED_HOLDER = 'braindog:signs';
+export const ARRIVED_BEHIND = 'arrived.behind';
+
+/** What `arrived` needs of the record's kernel: its prefs, where the first night behind is kept. */
+export type ArrivedKernel = {
+  prefsOf: (person: string) => Record<string, unknown>;
+  setPref: (person: string, key: string, value: unknown) => void;
+};
+
+/** What the record hands `arrived`: the host's build (`Build`), and the catalogue's newer versions (`RecordDeps.catalogueOffers`). */
+export type ArrivedDeps = {
+  sql: Sql;
+  build?: Pick<Build, 'app' | 'slash' | 'host'> | undefined;
+  offers?: RecordDeps['catalogueOffers'];
+};
+
+/** A night as the record's tick counts it: the UTC day, as `lintTick` keeps its own. */
+const nightOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+/** Whole nights from one UTC day to another. */
+const nightsBetween = (from: string, to: string): number => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
+
+/** `3 October`, from a UTC day or an instant. */
+const daySaid = (at: string | number): string =>
+  new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'long' }).format(typeof at === 'number' ? at : Date.parse(at.length === 10 ? `${at}T12:00:00Z` : at));
+
+/** The day a build was made (`2026.10.09+1a2b3c4`), as a UTC day, or `null` for a checkout's (`dev+`) or no build at all. */
+export function buildDayOf(build: string | null | undefined): string | null {
+  const m = /^(\d{4})\.(\d{2})\.(\d{2})(?:\+|$)/u.exec(build ?? '');
+  return m === null ? null : `${m[1]}-${m[2]}-${m[3]}`;
+}
+
+/** An add-on as a person names it: its manifest's title, else its name with dashes as spaces. Never its version or a key. */
+const addOnName = (id: string, title: unknown): string => {
+  const t = typeof title === 'string' ? title.replace(/\s+/gu, ' ').trim().slice(0, 60) : '';
+  if (t !== '') return t;
+  const said = id.replace(/[-_]+/gu, ' ');
+  return said.charAt(0).toUpperCase() + said.slice(1);
+};
+
+type Installed = { id: string; version: string; title: unknown; on: boolean };
+
+function installedAddOns(sql: Sql): Installed[] {
+  if (!hasTable(sql, 'pack')) return [];
+  return sql
+    .all<{ id: string; version: string; title: unknown; off: string | null }>(
+      "SELECT id, version, json_extract(manifest, '$.title') AS title, disabled_at AS off FROM pack ORDER BY id",
+    )
+    .map((p) => ({ id: p.id, version: p.version, title: p.title, on: p.off === null }));
+}
+
+/** Open questions that would update an installed add-on, with when each was opened. */
+function updatesAsked(sql: Sql, installed: ReadonlySet<string>): { id: string; opened: number }[] {
+  if (!hasTable(sql, 'suggestion')) return [];
+  const out: { id: string; opened: number }[] = [];
+  for (const r of sql.all<{ body: string; opened_at: string }>("SELECT body, opened_at FROM suggestion WHERE body_kind = 'pack' AND status = 'open' ORDER BY opened_at")) {
+    let install: unknown;
+    try {
+      install = (JSON.parse(r.body) as Record<string, unknown>).install;
+    } catch {
+      continue;
+    }
+    const opened = Date.parse(r.opened_at);
+    if (typeof install === 'string' && installed.has(install) && !Number.isNaN(opened)) out.push({ id: install, opened });
+  }
+  return out;
+}
+
+/** `one`, `one and two`, `one, two and three`. */
+const joined = (parts: readonly string[]): string => (parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`);
+
+/**
+ * `arrived` (PRF-A20): whether what shipped is what runs. RED when an add-on switched on has had a newer version in this
+ * host's catalogue for more than two nights; when an update to one has waited on its question past two nights; when the
+ * newest session the command opened carries a build more than two days older than the one this host serves; or when
+ * this is the cloud and no model is set up behind Slash, which no ask would ever show. Each line names the add-on or the
+ * machine and says what turns the new thing on. A checkout's build (`dev+`, or none) says nothing about the command or
+ * the model; nor does a self-host about a model, since its plan may hold none. NONE when nothing here could be judged.
+ * Writes one pref: the first night each add-on was seen behind, rewritten each night with only the ones still behind,
+ * so the night after it updates is green.
+ */
+export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: ArrivedDeps, nowMs: number): Promise<SignReading> {
+  const tonight = nightOf(nowMs);
+  const addOns = installedAddOns(deps.sql);
+  const names = new Map(addOns.map((p) => [p.id, addOnName(p.id, p.title)]));
+  /* Each red thing: its line, and what it is called in the sentence that counts them. */
+  const red = new Map<string, { line: string; who: string }>();
+  const notes: string[] = [];
+  const fine: string[] = [];
+
+  /* AN UPDATE WAITING ON ITS QUESTION, first: answering it is what turns that add-on's new version on. */
+  if (addOns.length > 0) {
+    for (const q of updatesAsked(deps.sql, new Set(names.keys())))
+      if (nowMs - q.opened > ARRIVED_NIGHTS * DAY && !red.has(q.id))
+        red.set(q.id, { line: `The update to ${names.get(q.id)} has waited on its question since ${daySaid(q.opened)}. Answering it on Decide turns it on.`, who: names.get(q.id)! });
+  }
+
+  /* AN ADD-ON BEHIND ITS CATALOGUE, counted from the first night it was seen behind. */
+  const on = addOns.filter((p) => p.on);
+  if (deps.offers && on.length > 0) {
+    let offers: readonly CatalogueOffer[] | null = null;
+    try {
+      offers = await deps.offers(on.map(({ id, version }) => ({ id, version, on: true })));
+    } catch {
+      notes.push('The catalogue could not be read tonight, so whether an add-on is behind is not known.');
+    }
+    if (offers !== null && (kernel.prefsOf === undefined || kernel.setPref === undefined))
+      notes.push('This record keeps no prefs here, so how long an add-on has been behind is not known.');
+    else if (offers !== null) {
+      const was = kernel.prefsOf!(ARRIVED_HOLDER)[ARRIVED_BEHIND];
+      const kept = was !== null && typeof was === 'object' && !Array.isArray(was) ? (was as Record<string, { since?: unknown }>) : {};
+      const behind: Record<string, { to: string; since: string }> = {};
+      let young = 0;
+      for (const o of offers) {
+        const before = kept[o.id]?.since;
+        const since = typeof before === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(before) && before <= tonight ? before : tonight;
+        behind[o.id] = { to: o.to, since };
+        const name = names.get(o.id) ?? addOnName(o.id, o.title);
+        if (nightsBetween(since, tonight) >= ARRIVED_NIGHTS) {
+          if (!red.has(o.id)) red.set(o.id, { line: `${name} has had version ${o.to} waiting since ${daySaid(since)}. Updating it on Add-ons turns it on.`, who: name });
+        } else {
+          young++;
+          notes.push(`${name} has had version ${o.to} waiting since ${daySaid(since)}.`);
+        }
+      }
+      if (JSON.stringify(behind) !== JSON.stringify(kept)) kernel.setPref!(ARRIVED_HOLDER, ARRIVED_BEHIND, behind);
+      fine.push(young === 0 ? `${on.length === 1 ? 'the one add-on runs its' : `all ${on.length} add-ons run their`} newest version` : `${count(young, 'add-on')} ${young === 1 ? 'has' : 'have'} had a newer version waiting for under ${ARRIVED_NIGHTS} nights`);
+    }
+  }
+
+  /* THE COMMAND: the build of the newest session it opened against the build this host serves, both by the day they were made. */
+  const appDay = buildDayOf(deps.build?.app);
+  const newest = appDay !== null && hasTable(deps.sql, 'door_mark') ? deps.sql.one<{ build: string }>('SELECT build FROM door_mark WHERE build IS NOT NULL ORDER BY at DESC LIMIT 1') : undefined;
+  const cliDay = newest === undefined ? null : buildDayOf(newest.build);
+  if (appDay !== null && newest !== undefined && (newest.build === deps.build!.app || cliDay !== null)) {
+    if (newest.build === deps.build!.app) fine.push("the command runs this host's build");
+    else if (nightsBetween(cliDay!, appDay) > ARRIVED_NIGHTS)
+      red.set(' command', {
+        line: `The BrainDog command last heard from runs the build of ${daySaid(cliDay!)}, and this host serves the build of ${daySaid(appDay)}. Running braindog update on that computer turns it on.`,
+        who: 'the BrainDog command',
+      });
+    else fine.push(`the command is within ${ARRIVED_NIGHTS} days of this host's build`);
+  }
+
+  /* A MODEL, on the cloud only: without one Slash never asks, so no other sign could see it missing. On a checkout's
+     build too it says nothing, since a cloud run from a checkout binds no model by design. */
+  if (deps.build?.host === 'cloud' && appDay !== null) {
+    if (!deps.build.slash) red.set(' model', { line: "No model is set up on this host, so Slash cannot answer. It turns on once the host's operator binds one.", who: 'a model for Slash' });
+    else fine.push('a model is set up');
+  }
+
+  const lines = [...red.values()].map((r) => r.line);
+  if (lines.length > 0) {
+    const said = lines.length === 1 ? lines[0]! : `${count(lines.length, 'thing that shipped has', 'things that shipped have')} not arrived: ${joined([...red.values()].map((r) => r.who))}.`;
+    return reading('red', lines.length, said, [...lines, ...notes]);
+  }
+  if (fine.length === 0)
+    return reading(
+      'none',
+      null,
+      addOns.length === 0 && deps.build === undefined
+        ? 'No add-on is installed and this host does not say which build it serves.'
+        : deps.build?.app && appDay === null
+          ? 'This host runs a build from a checkout, so what shipped cannot be told from what runs.'
+          : 'Nothing here says which build this host serves or what its catalogue offers.',
+      notes,
+    );
+  const first = joined(fine);
+  return reading('green', 0, `${first.charAt(0).toUpperCase()}${first.slice(1)}.`, notes);
+}
+
 /* ── filing ────────────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
 /**
- * Read both signs and file each for today through the kernel's `signRead`. The record's tick calls it once a night
+ * Read the three signs and file each for today through the kernel's `signRead`. The record's tick calls it once a night
  * beside `lintTick`; a later filing the same day replaces the earlier one. Answers what each came to, and a refusal the
  * kernel gave is said in `refused`, never dropped.
  */
@@ -315,13 +497,14 @@ export async function fileRecordSigns(
   kernel: RecordSignsKernel,
   deps: RecordSignsDeps,
   nowMs: number,
-): Promise<{ briefing: SignReading; tools: SignReading; refused: string[] }> {
+): Promise<{ briefing: SignReading; tools: SignReading; arrived: SignReading; refused: string[] }> {
   const briefing = await readBriefingSign(deps, nowMs);
   const tools = readToolsSign(kernel, deps.sql, nowMs);
+  const arrived = await readArrivedSign(kernel, { sql: deps.sql, build: deps.build, offers: deps.offers }, nowMs);
   const refused: string[] = [];
-  for (const [id, r] of [['briefing-true', briefing], ['tools-listed', tools]] as const) {
+  for (const [id, r] of [['briefing-true', briefing], ['tools-listed', tools], ['arrived', arrived]] as const) {
     const filed = kernel.signRead(id, r);
     if (!filed.ok) refused.push(`${id}: ${'refusal' in filed ? filed.refusal.fix : 'the record changed under it'}`);
   }
-  return { briefing, tools, refused };
+  return { briefing, tools, arrived, refused };
 }

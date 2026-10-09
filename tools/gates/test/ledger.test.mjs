@@ -49,14 +49,14 @@ test('every number in budgets.json has a line, and the entry script carries its 
   assert.deepEqual(numbers.filter((p) => !covered.has(p)), []);
   const lines = BOOK.debts['bundle.mainJsBrotli'].lines;
   assert.equal(lines[0].at, 31744);
-  assert.equal(lines.at(-1).at, BUDGETS.bundle.mainJsBaseline);
+  assert.equal(BOOK.debts['bundle.mainJsBrotli'].key, 'bundle.mainJsBrotli');
+  assert.equal(BUDGETS.bundle.mainJsBaseline, undefined);
   assert.equal(lines.length, 14);
   assert.deepEqual([lines.at(-2).on, lines.at(-1).on, lines.at(-1).at], ['2026-10-06', BOOK.opened, 33800]);
 });
 
 test('a rise dated into the history is red: an entry older than the ledger has a line on the day it began', () => {
   const { book, budgets } = fresh();
-  budgets.bundle.mainJsBaseline = 33900;
   book.debts['bundle.mainJsBrotli'].lines.push({ at: 33900, on: '2026-10-07', why: 'Backdated.' });
   assert.match(run(book, budgets).findings.join('\n'), /line 15 is dated before the line above it/u);
   const { book: bare } = fresh();
@@ -70,17 +70,16 @@ test('the day the ledger began does not move', () => {
   assert.match(run(book, budgets).findings.join('\n'), /ledger\.json opens on 2026-12-01, and the ledger began on 2026-10-09/u);
 });
 
-test('the recorded number set to 33900 with no ledger line is red', () => {
+test('the entry script\'s number set to 33900 is red: a debt only falls', () => {
   const { book, budgets } = fresh();
-  budgets.bundle.mainJsBaseline = 33900;
+  book.debts['bundle.mainJsBrotli'].lines.push({ at: 33900, on: day, why: 'Re-recorded.' });
   const { findings } = run(book, budgets);
   assert.equal(findings.length, 1);
-  assert.match(findings[0], /bundle\.mainJsBaseline is 33900 in budgets\.json, and its newest line says 33800/u);
+  assert.match(findings[0], /bundle\.mainJsBrotli: the debt rose from 33800 to 33900 on 2026-10-10/u);
 });
 
-test('the recorded number set to 33900 with a ledger line is red too: a debt only falls', () => {
+test('the entry script\'s number set to 33900 with a reason is red too: a reason does not raise a debt', () => {
   const { book, budgets } = fresh();
-  budgets.bundle.mainJsBaseline = 33900;
   book.debts['bundle.mainJsBrotli'].lines.push({ at: 33900, on: day, why: 'Re-recorded with a reason.' });
   const { findings } = run(book, budgets);
   assert.equal(findings.length, 1);
@@ -89,7 +88,6 @@ test('the recorded number set to 33900 with a ledger line is red too: a debt onl
 
 test('a debt that falls is green, and the rises before `opened` are history', () => {
   const { book, budgets } = fresh();
-  budgets.bundle.mainJsBaseline = 33700;
   book.debts['bundle.mainJsBrotli'].lines.push({ at: 33700, on: day, why: 'Paid down.' });
   assert.deepEqual(run(book, budgets).findings, []);
 });

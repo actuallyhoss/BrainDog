@@ -11,7 +11,6 @@
     "./packs/quiet": "./src/packs/quiet.ts",
     "./usecases": "./src/usecases/index.ts",
     "./usecases/catalogue": "./src/usecases/catalogue.ts",
-    "./usecases/founder-poll": "./src/usecases/founder-poll.ts",
     "./usecases/install": "./src/usecases/install.ts",
     "./usecases/links": "./src/usecases/links.ts",
     "./usecases/names": "./src/usecases/names.ts",

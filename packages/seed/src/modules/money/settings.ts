@@ -7,9 +7,9 @@
  * The Money setting a record adds every currency up in. Read each time a figure is, so a change holds at once.
  *
  * AND IT DELIBERATELY HAS NO DEFAULT, WHICH A DEFAULT OF `GBP` WAS TRIED AGAINST AND MEASURED.
- * `founder-poll.test.ts` holds a record with one account in Egyptian pounds and one in dollars and
- * asserts that Cash now reads `null` until somebody chooses; with sterling defaulted in, the same
- * record answered 2808560. That is the whole argument: an unanswered question must read as
+ * `test/money-settings.test.ts` holds a record with one account in Egyptian pounds and one in dollars
+ * and asserts that Cash now reads `null` until somebody chooses; with sterling defaulted in, the same
+ * record answered a sterling figure. That is the whole argument: an unanswered question must read as
  * unanswered, because a figure converted at a rate nobody asked for looks exactly like a figure a
  * person chose, and this one is the number the owner decides against. Sterling being the pack's own
  * spelling of money, the shipped sample's currency and the app installer's chosen value does not

@@ -41,6 +41,30 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
     compare: 'previous',
   },
 
+  /**
+   * MONEY IN OVER THE LAST SEVEN DAYS, SINCE money-core 3.16.0: the Ledger's half of Today's "Money this week". The same
+   * sentence as `received-30d` over today and the six days before it (`after` leaves out its own day, as
+   * `ledger-rows-7d` says), and `on before +1d` leaves out a payment dated ahead, which has not come in yet.
+   *
+   * ONLY THE LEDGER, AND ONLY WHAT SETTLES NOTHING. Money paid to somebody who keeps no account is a paid bill or
+   * invoice, and `settled-in-7d` reads it; a page puts the two side by side and never adds them into one number. A
+   * Ledger entry reconciled to an invoice (`settles`, `lists/transactions.ts`) is the same payment as that invoice
+   * marked paid, as the sample's two paid invoices are, so this half leaves it to `settled-in-7d` and no payment is
+   * read twice (`test/money-week.test.ts`). The cost, said: a part payment reconciled to an invoice still part paid is
+   * in neither half until the invoice is paid.
+   */
+  'received-7d': {
+    metric: 'received-7d',
+    name: 'Received, 7 days',
+    source: 'register.transactions',
+    where: 'state is cleared, transfer is false, direction is in, settles is empty, on after -7d, on before +1d',
+    value: { sum: 'amount' },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '7d',
+    compare: 'none',
+  },
+
   /* WHAT NOBODY HAS SAID THE PURPOSE OF. The one figure over what moved that is a job rather than a
      fact, and the reason `txn-categorise` is worth declaring: it is what is left after the rule ran. */
   'txn-uncategorised': {

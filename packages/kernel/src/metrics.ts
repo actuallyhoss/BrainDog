@@ -33,14 +33,18 @@ import {
   HANDOFFS_OPEN,
   RECORD_DOOR,
   RECORD_KEYS,
+  RECORD_LISTS,
+  RECORD_PATHS,
   RECORD_PLACES,
   RECORD_RATES,
   RECORD_SIGNS,
   RECORD_VITALS,
   SESSIONS_WORKING,
+  readDeadPaths,
   readDoor,
   readHandoffsOpen,
   readKeysUnopenable,
+  readListsShrunk,
   readOpenQuestions,
   readProjectsUnplaced,
   readRatesAge,
@@ -48,6 +52,7 @@ import {
   readSign,
   readVitals,
 } from './built-in-figures.ts';
+import { RECORD_KEY_SCAN, readKeysInText } from './key-scan.ts';
 import { isCurrencyCode } from './coerce.ts';
 import type { Leg } from './forecast.ts';
 import type { VitalSign } from './signs.ts';
@@ -1030,8 +1035,9 @@ export type SourceReader = (sql: Sql, ctx: EvalContext, decl: MetricDecl) => Res
  * agents are working now, by the one clock (`presence.ts`). `handoffs.open`: the steps left for the next run.
  * `record.vitals`: `signs-red` and `green-days` (PRF-A05). `record.rates`: how old the newest rate is (REC-B02).
  * `record.door`: the agent door's own signs (AGT-B01). `record.places`: projects with no repository or folder, and
- * `record.keys`: keys whose sealed value cannot be opened (AGT-D01). Each answers no value, never nought, with nothing
- * to read.
+ * `record.keys`: keys whose sealed value cannot be opened (AGT-D01), and `record.key-scan`: keys written in plain text
+ * (`key-scan.ts`). `record.lists` and `record.paths`: what the night counted, the lists that shrank with nothing deleted
+ * (REC-A17) and the placeholders that name nothing (REC-A13). Each answers no value, never nought, with nothing to read.
  *
  * BUILT ON THE FIRST READ, NOT AS THE FILE LOADS: `built-in-figures.ts` reaches back here through `handoff.ts` and the
  * rest, so a table built at load could meet its words before they were set, and break the kernel's own load.
@@ -1047,6 +1053,9 @@ export const sourceReaders = (): Readonly<Record<string, SourceReader>> => (read
   [RECORD_DOOR]: readDoor,
   [RECORD_PLACES]: readProjectsUnplaced,
   [RECORD_KEYS]: readKeysUnopenable,
+  [RECORD_KEY_SCAN]: readKeysInText,
+  [RECORD_LISTS]: readListsShrunk,
+  [RECORD_PATHS]: readDeadPaths,
 });
 
 /**
@@ -1356,11 +1365,20 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     ...(unsaid ? { unsaid: true as const } : {}),
     delta,
     why,
-    met,
+    met: heldVerdict(met, inScope),
     ...(targetIn ? { targetIn } : {}),
     ...(grouped ? grouped.value : {}),
   });
 }
+
+/**
+ * A verdict as a reading over `held` things may give it: A MISS OVER NOTHING HELD IS NO VERDICT (audit 38-39, #11). A
+ * count held to at least one over a Ledger nobody has started read as missed, so a fresh record was told two things were
+ * wrong with it. Only the miss is withheld: nothing held meets an `lte` (no late bill on an empty list), and nought over
+ * rows that exist still misses, since a Ledger that holds rows and kept none this week has stopped.
+ * `test/fresh-met.test.ts` holds the three.
+ */
+export const heldVerdict = (met: boolean | null, held: number): boolean | null => (held === 0 && met === false ? null : met);
 
 /** The kinds that reduce over a field's values, so a row with the field empty gives them nothing to read. */
 const REDUCING: ReadonlySet<string> = new Set(['sum', 'avg', 'min', 'max']);

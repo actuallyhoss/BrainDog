@@ -1132,7 +1132,7 @@ function groupedSegments(block: BlockResult, kinds?: Readonly<Record<string, Kin
     people ? (cut ? seenWords.everyoneAt(name) : seenWords.showAll(run.total, name)) : cut ? seenWords.moreIn(name) : seenWords.moreAt(run.total - run.rows.length);
   return runs.flatMap((run) => {
     if (run.kind === 'loose') return drawSegments(only(block, run.rows), kinds);
-    /* UNDER ITS HEADING A CARD DOES NOT SAY THE GROUP AGAIN: twenty-four cards each reading "Encore" under "Encore". */
+    /* UNDER ITS HEADING A CARD DOES NOT SAY THE GROUP AGAIN: twenty-four cards each reading "Brightwell" under "Brightwell". */
     const cards = drawSegments(only(block, run.rows, block.group), kinds);
     const href = run.ref !== null && to ? `/r/${to}/${run.ref}` : null;
     const name = run.name.replace(/[*_`{}|\\]/gu, ' ').replace(/\s+/gu, ' ').trim();

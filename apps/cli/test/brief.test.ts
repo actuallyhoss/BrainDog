@@ -11,6 +11,13 @@ import assert from 'node:assert/strict';
 import type { Attached, Brief, Context } from '@braindog/client';
 
 import { MAX_CHARS, PER_SLOT, TWO_SESSIONS, ago, asked, briefing, briefingOf, nextLine, questionOf, since, words, type Where } from '../src/brief.ts';
+import { OWNER, PROJECTS } from '../../../fixtures/names.ts';
+
+/* The record's owner as the card names the one the questions wait on, and the network name of the owner's Mac. */
+const DECIDER = OWNER.name.split(' ')[0]!;
+const NETWORK = `${DECIDER}s-MacBook-Pro.local`;
+/* A tool, by the name of an invented project. */
+const TOOL = `fly-${PROJECTS[1].toLowerCase()}`;
 
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
 const SENTINEL = 'FAKE-VALUE-never-printed-9e2a';
@@ -95,12 +102,12 @@ test('TWO SESSIONS IN ONE WORKING TREE are said word for word, and never about t
 
 test('THE QUESTIONS WAIT ON A PERSON BY NAME, and read as words: no network name, no path, and a handle the context can name said by name', () => {
   const waiting = [
-    { id: 'SG70', question: 'Change tools#21 to how fly-prism is set up in ~/.claude.json on Maras-MacBook-Pro.local?' },
+    { id: 'SG70', question: `Change tools#21 to how ${TOOL} is set up in ~/.claude.json on ${NETWORK}?` },
     { id: 'SG12', question: 'Keep the address field?' },
   ];
   const c = { ...full(), waiting };
   const line = (o: { decider?: string | null } = {}) => briefing(attached(c), AT, undefined, o).split('\n').find((l) => l.startsWith('Waiting'))!;
-  assert.equal(line({ decider: 'Sam' }), 'Waiting  2 on Sam: Change braindog to how fly-prism is set up in .claude.json on MacBook? · Keep the address field?');
+  assert.equal(line({ decider: DECIDER }), `Waiting  2 on ${DECIDER}: Change braindog to how ${TOOL} is set up in .claude.json on MacBook? · Keep the address field?`);
   /* The record named nobody, or did not answer: the role, never an id. */
   assert.ok(line().startsWith('Waiting  2 on the owner: '), line());
   assert.ok(line({ decider: null }).startsWith('Waiting  2 on the owner: '), line({ decider: null }));
@@ -115,8 +122,8 @@ test('A FILE NAMED .local IS A FILE, NOT A MACHINE, and a path on Windows is its
   /* The step an agent acts on keeps its file names: `.env.local` read as ".this machine" once. */
   const step = (next: string) => nextLine(attached({ ...full(), handoff: { ...full().handoff!, next } }), undefined)!;
   assert.ok(step('Copy .env.local to the worker, then read ~/.claude/settings.local.json and config.local.yaml.').startsWith('Next     Copy .env.local to the worker, then read ~/.claude/settings.local.json and config.local.yaml. (S45'));
-  assert.ok(step('Deploy from Maras-MacBook-Pro.local.').startsWith('Next     Deploy from MacBook. (S45'));
-  const waiting = [{ id: 'SG9', question: 'Change tools#999 to how fenwick is set up in C:\\Users\\sam\\.claude.json, or in .\\setup.ps1?' }];
+  assert.ok(step(`Deploy from ${NETWORK}.`).startsWith('Next     Deploy from MacBook. (S45'));
+  const waiting = [{ id: 'SG9', question: `Change tools#999 to how fenwick is set up in C:\\Users\\${OWNER.handle}\\.claude.json, or in .\\setup.ps1?` }];
   const line = briefing(attached({ ...full(), waiting }), AT, undefined).split('\n').find((l) => l.startsWith('Waiting'))!;
   assert.equal(line, 'Waiting  1 on the owner: Change tools#999 to how fenwick is set up in .claude.json, or in setup.ps1?');
 });
@@ -128,10 +135,10 @@ test('A QUESTION THAT FITS IS SAID WHOLE, one that is only ids still waits, and 
     { id: 'SG1', question: 'Import bank_statements.csv?' },
     { id: 'SG0', question: 'Import card_statements.csv?' },
   ];
-  const line = (o: { waiting?: number } = {}) => briefing(attached({ ...full(), waiting }), AT, undefined, { decider: 'Sam', ...o }).split('\n').find((l) => l.startsWith('Waiting'))!;
-  assert.equal(line(), 'Waiting  4 on Sam: Ledger Post, sending plan was due 4 days ago, GBP 39.00. Did it go through? · SG12 · Import bank_statements.csv?');
+  const line = (o: { waiting?: number } = {}) => briefing(attached({ ...full(), waiting }), AT, undefined, { decider: DECIDER, ...o }).split('\n').find((l) => l.startsWith('Waiting'))!;
+  assert.equal(line(), `Waiting  4 on ${DECIDER}: Ledger Post, sending plan was due 4 days ago, GBP 39.00. Did it go through? · SG12 · Import bank_statements.csv?`);
   /* `context` sends the newest eight; the record counted thirty, so four distinct and the twenty-six it could not show. */
-  assert.ok(line({ waiting: 30 }).startsWith('Waiting  30 on Sam: Ledger Post'), line({ waiting: 30 }));
+  assert.ok(line({ waiting: 30 }).startsWith(`Waiting  30 on ${DECIDER}: Ledger Post`), line({ waiting: 30 }));
 });
 
 test('NO VALUE IS EVER PRINTED: keys are a count, and nothing that is not a string is read', () => {

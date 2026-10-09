@@ -34,7 +34,9 @@ const BEFORE_I = new RegExp(`^(${NAME})\\s+(?=I\\b)`, 'u');
 const ALONE = new RegExp(`^(${NAME})[.!]?$`, 'u');
 
 /* Words that open a sentence without being anybody's name. Checked on the first word only. */
-const NOT_A_NAME = new Set(['i', "i'm", 'im', 'we', 'me', 'my', 'our', 'so', 'well', 'yes', 'yeah', 'no', 'ok', 'okay', 'sure', 'and', 'but', 'also', 'just', 'currently', 'basically', 'honestly', 'hi', 'hello', 'hey']);
+/** The words a sentence opens with to greet, never a name: `tell/read.ts` leaves them out of its names too. */
+export const GREETINGS = ['hi', 'hello', 'hey'] as const;
+const NOT_A_NAME = new Set(['i', "i'm", 'im', 'we', 'me', 'my', 'our', 'so', 'well', 'yes', 'yeah', 'no', 'ok', 'okay', 'sure', 'and', 'but', 'also', 'just', 'currently', 'basically', 'honestly', ...GREETINGS]);
 
 const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim();
 const lead = (s: string): string => s.replace(/^[\s,.;:!–-]+/u, '');

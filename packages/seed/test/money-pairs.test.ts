@@ -175,11 +175,11 @@ test('THE SAMPLE RECORD PAIRS NOTHING IN ITS LEDGER, and its three typed marks s
 
 /* ── moves that are not moves: rent and a client, a repaid dinner, a refund ─────────────────────────────────────── */
 
-/** CIB and HSBC in pounds and a card, the three EGP accounts his ledger moves between, and people to name as Who. */
-function hisAccounts(k: Kernel): Record<'CIB' | 'HSBC' | 'Card', Entry> {
+/** Tamarisk and Corvane in pounds and a card, the three EGP accounts a ledger moves between (both banks invented), and people to name as Who. */
+function hisAccounts(k: Kernel): Record<'Tamarisk' | 'Corvane' | 'Card', Entry> {
   const acct = (name: string, kind: string) =>
     value<Entry>(k.create('accounts', { name, kind, balance: { amount: 0, currency: 'EGP' }, as_of: day(-1) }, OWNER));
-  return { CIB: acct('CIB', 'bank'), HSBC: acct('HSBC', 'bank'), Card: acct('Card', 'card') };
+  return { Tamarisk: acct('Tamarisk', 'bank'), Corvane: acct('Corvane', 'bank'), Card: acct('Card', 'card') };
 }
 const who = (k: Kernel, name: string): Entry => value<Entry>(k.create('people', { name }, OWNER));
 const egpRow = (k: Kernel, what: string, on: number, direction: 'in' | 'out', minor: number, account: Entry, more: Record<string, unknown> = {}) =>
@@ -192,8 +192,8 @@ test("RENT TO THE LANDLORD AND A CLIENT'S PAYMENT OF THE SAME ROUND SUM A DAY LA
      because one leg that cannot be a leg is enough to keep the pair apart. */
   const k = await moneyCore();
   const a = hisAccounts(k);
-  const rent = egpRow(k, 'RENT OCTOBER', -5, 'out', 1_500_000, a.CIB);
-  const invoice = egpRow(k, 'INVOICE 0412 ACME', -4, 'in', 1_500_000, a.HSBC, { party: who(k, 'Acme').id });
+  const rent = egpRow(k, 'RENT OCTOBER', -5, 'out', 1_500_000, a.Tamarisk);
+  const invoice = egpRow(k, 'INVOICE 0412 ACME', -4, 'in', 1_500_000, a.Corvane, { party: who(k, 'Acme').id });
   for (const e of [rent, invoice]) assert.equal(k.get(e.id)!.fields.transfer, false, `${String(e.fields.what)} was marked a move between his own accounts`);
   assert.equal(pairOf(k, rent), null);
   assert.equal(spent30d(k), 1_500_000, 'the rent left Spent');
@@ -205,8 +205,8 @@ test("RENT TO THE LANDLORD AND A CLIENT'S PAYMENT OF THE SAME ROUND SUM A DAY LA
   const owed = value<Entry>(
     k2.create('obligations', { what: 'Rent, October', direction: 'owed_by_me', amount: { amount: 1_500_000, currency: 'EGP' }, due: day(-5), state: 'open' }, OWNER),
   );
-  const paid = egpRow(k2, 'RENT OCTOBER', -5, 'out', 1_500_000, b.CIB, { settles: owed.id });
-  const client = egpRow(k2, 'INVOICE 0412 ACME', -4, 'in', 1_500_000, b.HSBC);
+  const paid = egpRow(k2, 'RENT OCTOBER', -5, 'out', 1_500_000, b.Tamarisk, { settles: owed.id });
+  const client = egpRow(k2, 'INVOICE 0412 ACME', -4, 'in', 1_500_000, b.Corvane);
   for (const e of [paid, client]) assert.equal(k2.get(e.id)!.fields.transfer, false, `${String(e.fields.what)} was marked beside a settled rent`);
 });
 
@@ -214,7 +214,7 @@ test('A FRIEND REPAYING DINNER INTO THE OTHER BANK STOPS BEING A MOVE THE MOMENT
   const k = await moneyCore();
   const a = hisAccounts(k);
   const dinner = egpRow(k, 'ZOOBA DINNER', -9, 'out', 150_000, a.Card);
-  const back = egpRow(k, 'INSTAPAY FROM OMAR', -7, 'in', 150_000, a.HSBC);
+  const back = egpRow(k, 'INSTAPAY FROM OMAR', -7, 'in', 150_000, a.Corvane);
   /* WRITTEN BARE, AS A BANK TEXT FILES IT, THE TWO STILL PAIR. Nothing on either row differs from a real move: see the
      declaration in `money.ts` for why the record cannot tell, and what it would need. */
   assert.equal(pairOf(k, dinner), back.id, 'the bare rows no longer pair, so the limit written beside `pairs:` is out of date');
@@ -229,11 +229,11 @@ test('A FRIEND REPAYING DINNER INTO THE OTHER BANK STOPS BEING A MOVE THE MOMENT
 
   const amazon = who(k, 'Amazon');
   const charge = egpRow(k, 'AMAZON EG', -14, 'out', 320_000, a.Card, { party: amazon.id });
-  const refund = egpRow(k, 'AMAZON EG REFUND', -12, 'in', 320_000, a.CIB, { party: amazon.id });
+  const refund = egpRow(k, 'AMAZON EG REFUND', -12, 'in', 320_000, a.Tamarisk, { party: amazon.id });
   for (const e of [charge, refund]) assert.equal(k.get(e.id)!.fields.transfer, false, `${String(e.fields.what)} was marked a move`);
 });
 
-test("HIS OWN MOVES STILL PAIR, FILED UNDER A CATEGORY: the card paid off from HSBC, as his ledger holds it on 24 and 25 August", async () => {
+test("HIS OWN MOVES STILL PAIR, FILED UNDER A CATEGORY: the card paid off from Corvane, as a real ledger holds it on 24 and 25 August", async () => {
   /* THE OBVIOUS REPAIR, `category is empty`, WOULD HAVE UNDONE THIS. Read from a real ledger through the route
      its import reads: both real moves between his own accounts since 13 July, EGP
      63,313.46 on 2 August and EGP 48,000.27 on 24 and 25 August, carry the category Transfers on both legs, and his
@@ -242,7 +242,7 @@ test("HIS OWN MOVES STILL PAIR, FILED UNDER A CATEGORY: the card paid off from H
   const k = await moneyCore();
   const a = hisAccounts(k);
   const transfers = value<Entry>(k.create('categories', { name: 'Transfers', direction: 'out', state: 'live' }, OWNER));
-  const out = egpRow(k, 'Internet Banking Transfer', -3, 'out', 4_800_027, a.HSBC, { category: transfers.id });
+  const out = egpRow(k, 'Internet Banking Transfer', -3, 'out', 4_800_027, a.Corvane, { category: transfers.id });
   const into = egpRow(k, 'Internet Banking Transfer', -4, 'in', 4_800_027, a.Card, { category: transfers.id });
   assert.equal(pairOf(k, out), into.id);
   assert.equal(pairOf(k, into), out.id);

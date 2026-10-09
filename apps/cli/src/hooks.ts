@@ -294,7 +294,7 @@ function signedInAs(env: Env, host: string | null): string | null {
   }
 }
 
-/* macOS's own name for the machine, "Sam's MacBook Pro", or nothing when it does not say within a second and a half. */
+/* macOS's own name for the machine, "Mara's MacBook Pro", or nothing when it does not say within a second and a half. */
 const computerName = () =>
   new Promise<string>((done) =>
     execFile('scutil', ['--get', 'ComputerName'], { timeout: 1_500, windowsHide: true }, (e, out) => done(e ? '' : String(out).trim())),
@@ -316,7 +316,7 @@ function prettyName(): string {
  * This machine as a person names it, for the card's first line: "MacBook Pro", never "Maras-MacBook-Pro.local".
  *
  * THE NAME IT WAS ENROLLED UNDER WHEN A PERSON CHOSE ONE. Otherwise the system's own name with its owner taken off
- * ("Sam's MacBook Pro" is "MacBook Pro"), and failing that what kind of machine it is. The login label is not used
+ * ("Mara's MacBook Pro" is "MacBook Pro"), and failing that what kind of machine it is. The login label is not used
  * when it is the default, because that is the network name, and on the owner's Mac it was a Windows PC's, copied over
  * with the hosts file.
  */
@@ -339,7 +339,7 @@ export type Decides = { decider: string | null; waiting: number | null };
 
 /**
  * The person the questions wait on, by the name the record has for them: the person this machine's sign-in speaks for,
- * as `boot` says it ("Sam"), and how many questions wait on Decide in all, where `context` lists only the newest. Each
+ * as `boot` says it ("Mara"), and how many questions wait on Decide in all, where `context` lists only the newest. Each
  * is `null` when the record does not say, refuses, or does not answer in time.
  *
  * ASKED ONLY WHEN A QUESTION WAITS, and beside the work that follows the attach rather than after it, because it is one

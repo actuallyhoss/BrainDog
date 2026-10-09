@@ -16,7 +16,9 @@ import { NOW, PAGES, installSeed } from '@braindog/seed';
 import './fixtures/fill.ts';
 import { answeredTypes, blockOf, pageReader, runsNamed, type Fetch } from './page-live.ts';
 import { toSegments } from './blocks.ts';
-import { PROJECTS } from '../../../../../fixtures/names.ts';
+/* TWO OF `fixtures/names.ts`'s invented projects, written here: a file under `src/` may not reach out of `apps/web` by a
+   relative path (`graph`, 31 §3 layer 3), and the names file is no package to import. */
+const PROJECTS = ['Lanternfish', 'Copperleaf'] as const;
 
 const AT = Date.parse('2026-10-09T12:00:00.000Z');
 const ISO = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/u;

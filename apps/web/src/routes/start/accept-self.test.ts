@@ -1,6 +1,7 @@
 /**
  * The first run meets the owner as themselves: "Make it mine" (and sign-up, which presses it in the page) meets the
- * person the sentence named, with the address they signed in with, and marks that row as them (People's `self`).
+ * person the sentence named (or the name they answered, or the one in their address), with the address they signed in
+ * with, and marks that entry as them (People's `self`): the first entry in their People, before any client.
  *
  * A FAKE RECORD, NOT A SOCKET: the client is the handful of calls `accept` makes, each answered as the record answers it
  * for a record that already holds People, so the test is only about who is met and how.
@@ -70,8 +71,32 @@ test('A NAME WITH NO ROW OF ITS OWN IS WRITTEN AS THEM, marked where the list ha
   assert.deepEqual((made[0]?.args as { fields: Record<string, unknown> }).fields, { name: 'Sami', note: "I'm a student", self: true });
 });
 
-test('NOBODY IS MET WITHOUT A NAME HEARD, since a person in People needs one', async () => {
+test('WITH NO NAME HEARD, THE PERSON IS STILL THE FIRST IN PEOPLE, by the name in their address (USE-B06)', async () => {
   const { client, calls } = record({ created: true, matched_by: 'none' });
   await accept(client, asked("I'm a student", 'sami@example.com'));
+  const meet = calls.find((c) => c.name === 'meet');
+  assert.ok(meet, 'a person who gave no name is not in their own People');
+  assert.equal((meet.args as { name?: string }).name, 'Sami');
+});
+
+test('THE NAME THEY ANSWERED IS THE ONE THEY ARE MET BY, over their address', async () => {
+  const { client, calls } = record({ created: true, matched_by: 'none' });
+  const a = asked("I'm a student", 'sami.k@example.com');
+  await accept(client, { ...a, proposal: { ...a.proposal, answers: { name: 'Layla' } } });
+  assert.equal((calls.find((c) => c.name === 'meet')?.args as { name?: string } | undefined)?.name, 'Layla');
+});
+
+test('NOBODY IS MET WITH NO NAME AND NO ADDRESS, since a person in People needs one', async () => {
+  const { client, calls } = record({ created: true, matched_by: 'none' });
+  await accept(client, asked("I'm a student", null));
   assert.equal(calls.filter((c) => c.name === 'meet' || c.name === 'create').length, 0);
+});
+
+test('THE PERSON IS PEOPLE’S FIRST ENTRY, before any client the sentence named', async () => {
+  const { client, calls } = record({ created: true, matched_by: 'none' });
+  await accept(client, asked("I'm Sam, I run Kiln and we bill Fenwick £2,000 a month on the 1st", 'sam@example.com'));
+  const meet = calls.findIndex((c) => c.name === 'meet');
+  const client1 = calls.findIndex((c) => c.name === 'create' && (c.args as { register?: string }).register === 'people');
+  assert.ok(meet >= 0, 'the person was not met');
+  assert.ok(client1 > meet, 'a client went into People before the person, or was not written');
 });

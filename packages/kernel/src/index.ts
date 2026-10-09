@@ -55,6 +55,10 @@ import {
 import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
 import { runsDataSteps } from './migrations/0028_runs.ts';
 import { SIGNS_KEY, fileSignReading, nextSignsDue, readSigns, runSignsNight, type SignReading, type VitalSign } from './signs.ts';
+import { scanKeys } from './key-scan.ts';
+import { carriedIn } from './run-carried.ts';
+import { markHand } from './hold.ts';
+import { countLists, deadPaths } from './night-counts.ts';
 import { DOOR_KINDS, DOOR_WINDOW_DAYS, doorMarks as readDoorMarks, markDoor, sweepDoorMarks, type DoorMark, type DoorSigns } from './door.ts';
 import { openFaults, type Fault } from './fault.ts';
 import { copyFacts, copyFailed, copyKept, type CopyFacts } from './copies.ts';
@@ -130,7 +134,8 @@ import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provis
 import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
-import { COST_SQL, COSTS, costOf, costRank, type Cost } from './weigh.ts';
+import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, waitParams, waitRank, type Cost } from './weigh.ts';
+import { recheck } from './cause.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts } from './pages.ts';
 import { doesOf } from './does.ts';
@@ -235,7 +240,7 @@ import { answeredOnly, askOwnRows, fileVerdicts, joinOrganisation, meet as meetP
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { builtInFigure, openSteps } from './built-in-figures.ts';
-import { workingRuns } from './presence.ts';
+import { beatRun, workingRuns } from './presence.ts';
 import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, type UndoApplied, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
 import { understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
@@ -400,6 +405,7 @@ export { clockOf, isMoneyFormat, verdictOf } from './metrics.ts';
 export { readDeclaredSigns, vitalOf } from './metrics.ts';
 export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
+export { KEYS_IN_TEXT, RECORD_KEY_SCAN, keysInText, placeOf, readKeysInText, scanKeys, type KeyFinding, type KeyScan } from './key-scan.ts';
 export { ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
 export type { Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
@@ -757,6 +763,8 @@ export type Entry = {
   deleted_at: string | null;
   /** On a write's answer only: the batch it was written under, which `undoPlan`/`undoApply` take to put it back. */
   batch?: string;
+  /** On a write's answer only: true when an op_id replayed a write already made, so nothing new was written. */
+  replayed?: true;
 };
 
 export type Patch = Record<string, unknown>;
@@ -1104,6 +1112,11 @@ export type RecordOptions = {
    * Absent, the kernel's own four-format table, unchanged, so a kernel used bare behaves as it did.
    */
   day?: IngestDeps['day'];
+  /**
+   * The build this host runs, handed to the figures as `build` so the door's `behind` (`record.door`) can say a session
+   * whose marks named another build is behind. The kernel cannot know its host's build. Absent, `behind` says nothing.
+   */
+  build?: string | null;
 };
 
 /**
@@ -2423,9 +2436,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
               ? dropped.reduce((sum, o) => sum + Number(o.n), 0)
               : Number(
                   sql.one<{ n: number }>(
-                    `SELECT count(DISTINCT entry.id) AS n FROM entry, json_each(entry.fields, '${path}') AS j WHERE entry.register = ? AND entry.deleted_at IS NULL AND j.value IN (${gone.map(() => '?').join(', ')})`,
+                    `SELECT count(DISTINCT entry.id) AS n FROM entry, json_each(entry.fields, '${path}') AS j WHERE entry.register = ? AND entry.deleted_at IS NULL AND j.value IN (SELECT value FROM json_each(?))`,
                     register,
-                    ...gone,
+                    JSON.stringify(gone),
                   )?.n ?? 0,
                 );
             return {
@@ -3466,7 +3479,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
              than answered with somebody else's row or silently dropped. */
           const was = byId(already.target.replace(/^entry:/, ''), true);
           const aimed = ref === null ? null : get(ref, { includeDeleted: true });
-          if (was && was.register === register && (ref === null || aimed?.id === was.id)) return ok(was);
+          if (was && was.register === register && (ref === null || aimed?.id === was.id)) return ok({ ...was, replayed: true } as Entry);
           return no<Entry>(
             'VALUE_MALFORMED',
             `op_id ${w.opId} was already used for a different write. A retry sends the same write again; a new write needs a new op_id.`,
@@ -3606,6 +3619,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          the same value added one, and `""` was a fourth state beside the three the kernel says are
          one. A default that is absent leaves the field absent, and a `required` field defaulted to
          nothing is `REQUIRED_MISSING` rather than quietly filled. */
+      /* A RUN CARRIED IN KEEPS THE DAY IT WAS LAST SEEN THERE (`run-carried.ts`, AGT-C10). Read before the defaults and
+         the field loop, which refused its `last_seen` and lost the whole run: on a create or a run never heard from here,
+         the time comes out of the patch as `seen_before`, stamped below, and a step left in another session drops. */
+      const carried = register === SESSION ? carriedIn(patch, current) : null;
+      if (carried && !carried.ok) return carried;
+      if (carried) patch = carried.value.patch;
       if (!current)
         for (const f of decl.fields) {
           if (f.default === undefined || patch[f.id] !== undefined || f.derived) continue;
@@ -3905,6 +3924,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* A run placed through a stamp writes its move as a line of its own, with `project` from and to, so the server's
          undo can put it back like any other edit. */
       if (register === SESSION && current && w.stamp?.project !== undefined && !touched.includes('project')) touched.push('project');
+      /* WHAT A CARRIED RUN BRINGS, after the stamp for the same reason: `seen_before` is the kernel's to write, and a
+         `next` from a session that is gone is cleared, the one the row held as well as the one the write sent. */
+      if (carried?.ok && carried.value.stamp.seen_before !== undefined) {
+        merged.seen_before = carried.value.stamp.seen_before;
+        if (current && !touched.includes('seen_before')) touched.push('seen_before');
+      }
+      if (carried?.ok && carried.value.dropNext && merged.next !== undefined) {
+        delete merged.next;
+        if (current && !touched.includes('next')) touched.push('next');
+      }
       /* A run a key makes by hand is that key's, as one the ladder opens is: otherwise it would be a
          person's, and any key could name it. */
       if (register === SESSION && !current && w.principal?.kind === 'token' && w.principal.token !== undefined)
@@ -4503,6 +4532,31 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (w.principal?.kind !== 'token') return w.actor;
     const at = locateRun(w);
     return at.found?.foreign ? w.actor : attribute(w, at, null, instant(clock.now())).actor;
+  }
+
+  /**
+   * A session saying it is still working (AGT-C03): its own run's `last_seen` moved to now, in place (`beatRun`).
+   *
+   * MEANT FOR A LONG STRETCH WITH NO WRITE. A session thinking for twenty minutes wrote nothing, so the Agents page read
+   * it as gone quiet while it worked. A beat moves the clock and nothing else: no event, no version, no `updated_at`,
+   * and under a minute since the last one it moves nothing at all.
+   *
+   * IT NEVER OPENS A RUN (`locateRun`, never `openRun`): a session that has not written has no run to keep awake, and a
+   * beat that opened one would make the very session it says is working. Only the caller's own run, and only a token's,
+   * because a person is never a run. Answers the run's name, or null for no run of its own that is working: nothing to
+   * do about it, so not a refusal, since a hook beats on every tool call (record `beat`).
+   */
+  function heartbeat(w: WriteContext): string | null {
+    if (schemaRefusal(state) || w.principal?.kind !== 'token') return null;
+    return transaction((): string | null => {
+      const at = locateRun(w);
+      if (!at.found || at.found.foreign) return null;
+      const run = byId(at.found.id);
+      /* A RUN THAT STOPPED STAYS STOPPED: one that ended, left a step or was written off is not woken by a beat. */
+      if (!run || (run.state !== 'active' && run.state !== 'idle')) return null;
+      beatRun(sql, run.id, clock.now());
+      return `${registers.get(SESSION)?.seq_prefix ?? 'S'}${String(run.seq)}`;
+    });
   }
 
   /** The refusal for a token whose call names a run another key opened, or `null` when it names its own or none. */
@@ -5295,12 +5349,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const gone = added.filter((v) =>
           sql.one(
             `SELECT 1 AS n FROM event t WHERE t.target = ? AND t.kind = 'tag' AND t.field = ? AND t.to_v = ? AND t.batch IN (
-               SELECT batch FROM event WHERE field = ? AND to_v IS NOT NULL AND batch IS NOT NULL AND target IN (${via.map(() => '?').join(', ')})) LIMIT 1`,
+               SELECT batch FROM event WHERE field = ? AND to_v IS NOT NULL AND batch IS NOT NULL AND target IN (SELECT value FROM json_each(?))) LIMIT 1`,
             `entry:${end}`,
             f,
             written(v as Json),
             field,
-            ...via,
+            JSON.stringify(via),
           ),
         );
         const left = held.filter((h) => !gone.some((v) => JSON.stringify(v) === JSON.stringify(h)));
@@ -5582,6 +5636,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     },
     /* THE VITAL SIGNS NOW, for the built-in `signs-red`, handed in because `metrics.ts` cannot import `signs.ts` without breaking the kernel's load. */
     signs: () => readSigns(sql, clock.now(), recordTz()),
+    /* THE HOST'S BUILD, for the door's `behind`: handed in by `openRecord`'s caller, null when it said none. */
+    build: opts.build ?? null,
   });
 
   /**
@@ -5994,7 +6050,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /*
      * THE OPEN QUESTIONS, for a `queue` block: what is waiting on a person, dearest first.
      *
-     * RANKED BY WHAT IT WOULD COST TO GET EACH ONE WRONG (`weigh.ts`), which is `19 §6`'s fourth
+     * FIRST BY HOW LONG IT CAN WAIT (`weigh.ts`, AGT-C08): one due inside two days or moving money leads, then one open
+     * past three days, then the rest, computed and never stored. Then RANKED BY WHAT IT WOULD COST TO GET EACH ONE WRONG (`weigh.ts`), which is `19 §6`'s fourth
      * countermeasure against the decision gate becoming a rubber stamp. The band is computed here
      * rather than stored, so it needs no migration and no proposer can assert it about their own
      * question. Within a band the OLDEST comes first: once there is a rank, the one worth meeting is
@@ -6016,17 +6073,24 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             ? []
             : sql
                 .all<Record<string, unknown>>(
-                  `SELECT id, body_kind, body, opened_by, opened_at, drafted_by, kind, cause, ${ALIKE_SQL} AS alike FROM suggestion s WHERE id IN (${ids.map(() => '?').join(', ')})`,
-                  ...ids,
+                  `SELECT id, body_kind, body, opened_by, opened_at, drafted_by, kind, cause, ${ALIKE_SQL} AS alike FROM suggestion s WHERE id IN (SELECT value FROM json_each(?))`,
+                  JSON.stringify(ids),
                 )
                 .map((r) => [String(r.id), r]),
         );
       const open = countOpenQuestions({ sql, nowMs });
       if (!keep) {
-        /* A STABLE ORDER: the band, then the oldest first within it, since the expensive question that has been sitting is
-           the one worth meeting, and the id when two were asked in the same millisecond, so two reads never swap them. */
+        /* A STABLE ORDER: how long it can wait first (`weigh.ts` `WAIT_RANK_SQL`, AGT-C08: due inside two days or moving
+           money, then open past three days, then new), then the band, then the oldest first within it, since the
+           expensive question that has been sitting is the one worth meeting, and the id when two were asked in the same
+           millisecond, so two reads never swap them. */
         const ids = sql
-          .all<{ id: string }>(`SELECT id FROM suggestion WHERE ${OPEN} ORDER BY ${BAND_RANK_SQL} ASC, opened_at ASC, id ASC LIMIT ?`, now, drawn)
+          .all<{ id: string }>(
+            `SELECT id FROM suggestion WHERE ${OPEN} ORDER BY ${WAIT_RANK_SQL} ASC, ${BAND_RANK_SQL} ASC, opened_at ASC, id ASC LIMIT ?`,
+            now,
+            ...waitParams(nowMs),
+            drawn,
+          )
           .map((r) => r.id);
         const rows = whole(ids);
         const questions = ids.flatMap((id) => {
@@ -6043,19 +6107,21 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* A `where:` IS READ OVER THE FACTS OF EVERY OPEN QUESTION, each fact read in SQL: who asked, the kind, the band,
          and what it is about. */
       const lean = sql
-        .all<{ id: string; body_kind: string | null; opened_by: string | null; opened_at: string | null; cost: string; about: string | null }>(
-          `SELECT id, body_kind, opened_by, opened_at, ${BAND_SQL} AS cost,
+        .all<{ id: string; body_kind: string | null; opened_by: string | null; opened_at: string | null; cost: string; wait: string; about: string | null }>(
+          `SELECT id, body_kind, opened_by, opened_at, ${BAND_SQL} AS cost, ${WAIT_SQL} AS wait,
              CASE WHEN json_valid(body) AND json_type(body) = 'object' AND json_type(body, '$.about') = 'text' THEN json_extract(body, '$.about') END AS about
            FROM suggestion WHERE ${OPEN}`,
+          ...waitParams(nowMs),
           now,
         )
         .map((r) => ({
           id: r.id,
+          wait: r.wait,
           at: String(r.opened_at ?? ''),
           facts: { who: String(r.opened_by ?? ''), kind: String(r.body_kind ?? ''), cost: r.cost as Cost, about: r.about !== null && r.about !== '' ? r.about : null },
         }));
       const kept = lean.filter((q) => keep(q.facts));
-      kept.sort((a, b) => costRank(a.facts.cost) - costRank(b.facts.cost) || a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+      kept.sort((a, b) => waitRank(a.wait) - waitRank(b.wait) || costRank(a.facts.cost) - costRank(b.facts.cost) || a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
       const ids = kept.slice(0, drawn).map((q) => q.id);
       const rows = whole(ids);
       const questions = ids.flatMap((id) => {
@@ -6647,6 +6713,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     transaction,
     write: (register, ref, patch, w) => write(register, ref, patch as Patch, w),
     registerOf: (spoken) => get(spoken)?.register ?? null,
+    /* THE ONE QUESTION A RUN MAY ASK (F61), filed through the gate's own `propose`: an `options` question whose options
+       carry their patches, one open per cause, signed by the run's actor. */
+    propose: (p, actor) => openSuggestion(governDeps(), actor, p),
   });
 
   /**
@@ -6881,6 +6950,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     );
     /* A STEP NOBODY TOOK IN THIRTY DAYS is closed in the same hour, its words kept on the run (`handoff.ts`). */
     transaction(() => expireHandoffs(sql, clock.now(), handoffWrite));
+    /* A QUESTION THAT IS ALREADY SO is closed as moot in the same hour, with the sentence that says why (`cause.ts`
+       `recheck`, AGT-C08): the owner answered it by doing it, so it leaves Decide and counts on no brake. */
+    transaction(() => recheck(sql, clock.now(), mint));
     /* A DEVICE GRANT past its time, or silent for fourteen days, is let go in the same hour. */
     transaction(() => deviceSweep(tokenDeps()));
     /* A JOB NOBODY TOOK IN A DAY, OR ONE WHOSE MACHINE STOPPED ANSWERING, is let go in the same hour (`jobs.ts`). */
@@ -7160,6 +7232,26 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           runSignsNight(sql, clock.now(), tz);
         } catch (e) {
           observe(sql, clock.now(), [{ kind: 'write.refused', subject: `signs.night:${e instanceof Error ? e.name : 'Error'}` }]);
+        }
+        /* THE KEY SCAN RIDES THE SAME NIGHT (`key-scan.ts`), a bounded slice of text read for a pasted key, armed again
+           whatever happened for the same reason. */
+        try {
+          transaction(() => scanKeys(sql, clock.now()));
+        } catch (e) {
+          observe(sql, clock.now(), [{ kind: 'write.refused', subject: `keys.scan:${e instanceof Error ? e.name : 'Error'}` }]);
+        }
+        /* AND THE NIGHT'S COUNTS (`night-counts.ts`): each list's live and deleted totals as a day's points, so a list that
+           shrank with no delete by a person shows, and a bounded walk of documents for placeholders that name nothing.
+           Each on its own, so one that throws costs only its own night. */
+        try {
+          transaction(() => countLists(sql, clock.now(), tz));
+        } catch (e) {
+          observe(sql, clock.now(), [{ kind: 'write.refused', subject: `night.counts:${e instanceof Error ? e.name : 'Error'}` }]);
+        }
+        try {
+          transaction(() => deadPaths({ sql, nowMs: clock.now(), tz, registers, unnamed: (block) => readBlock(pageDeps(), block).unnamed }));
+        } catch (e) {
+          observe(sql, clock.now(), [{ kind: 'write.refused', subject: `night.paths:${e instanceof Error ? e.name : 'Error'}` }]);
         }
         return nextSignsDue(clock.now(), tz);
       }
@@ -7921,9 +8013,17 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           .map((r) => JSON.parse(r.body) as ActionDecl),
       ),
 
-    /** One block, without a page around it — what a `draw` tool hands an agent. */
-    block: (decl: PageBlock, opts: { walk?: number | 'last' } = {}): BlockResult =>
-      readBlock(opts.walk === undefined ? pageDeps() : { ...pageDeps(), walk: opts.walk }, decl),
+    /** One block, without a page around it — what a `draw` tool hands an agent. `inbox` is the reader's reach, so a
+        one-block preview tells a `signs` block in the kernel's quiet words to a key the inbox does not reach. */
+    block: (decl: PageBlock, opts: { walk?: number | 'last'; inbox?: boolean } = {}): BlockResult =>
+      readBlock(
+        {
+          ...pageDeps(),
+          ...(opts.walk === undefined ? {} : { walk: opts.walk }),
+          ...(opts.inbox === undefined ? {} : { reader: { hold: (b: BlockResult) => b, inbox: opts.inbox } }),
+        },
+        decl,
+      ),
 
     /* ── the vault: what a key opens, never the key ───────────────────── */
 
@@ -8936,7 +9036,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * NO EVENT IS WRITTEN FOR THE REPLACE. The next export of the record must be the file it came from, manifest for
      * manifest, because that round trip is the only proof the import is complete, and an event would be one row more.
      */
-    async import(lines: Iterable<string>, opts: { replace?: boolean; before?: () => Promise<unknown> } = {}) {
+    async import(lines: Iterable<string>, opts: { replace?: boolean; before?: () => Promise<unknown>; by?: string } = {}) {
       /* The one destructive path that was not gated. `migrate.ts` says in bold that the refusal is
          sticky and every `Result`-returning method short-circuits on it; this one wrote seven rows
          into a record whose schema the code cannot read. */
@@ -9035,6 +9135,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       reload();
       rebuildFts();
       transaction(() => rebuildKeys(sql, instant(clock.now())));
+      /* A RECORD REPLACED FROM A FILE IS A HAND ON IT (`hold.ts`, PRF-A18), marked after the import so the night it
+         brought back does not overwrite the mark. */
+      transaction(() => markHand(sql, 'The record was replaced from a file.', opts.by ?? 'an operator', clock.now(), recordTz()));
       return out;
     },
 
@@ -9114,6 +9217,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * NOT ABOUT A ROW, so no target: the record as a whole is what was copied or put back.
      */
     lifecycle(kind: 'export' | 'restore.pitr', actor: string, note: string, to?: string): string {
+      /* A RESTORE IS A HAND ON THE RECORD (`hold.ts`, PRF-A18): the hold's run of green days ends on the day of it. */
+      if (kind === 'restore.pitr') return transaction(() => (markHand(sql, 'The record was put back to an earlier time.', actor, clock.now(), recordTz()), lifecycleEvent(kind, actor, note, to)));
       return lifecycleEvent(kind, actor, note, to);
     },
 
@@ -9776,6 +9881,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     inScope,
     runFor,
     endRun,
+    /** A token's own run told it is still working, its `last_seen` moved in place with no event (AGT-C03). Never opens one. */
+    heartbeat,
     /**
      * Every vital sign of the record now, each with its state, its number, its sentence, its facts and its last 14
      * days (`signs.ts`). Reads only. The record's `signs`, the host's route and `braindog signs` all read this answer.
@@ -9812,6 +9919,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const run = token === null ? null : findRun(w.session ?? {}, token);
         const who = run ? `${registers.get(SESSION)?.seq_prefix ?? 'S'}${String(run.seq)}` : token !== null ? `token:${token}` : w.actor;
         markDoor(sql, who, mark, clock.now());
+        /* A CALL IS A BEAT TOO: a session making calls is working, though it wrote nothing, so its own run's clock moves
+           (`heartbeat`, in place, no event). Only a run found; a mark still never opens one. */
+        if (run && mark.kind === 'called') heartbeat(w);
         return ok({ marked: true as const });
       });
     },
@@ -9839,7 +9949,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * reset (`retryDead`), and `schedule#<kind>`'s newest failed row goes back on the schedule, due now (`retryFailed`).
      * THE FAULT STAYS OPEN until a job of that kind completes, which clears it, so "Try again" that fails again says so.
      */
-    retryFault: (_w: WriteContext, args: { cause: string }): Result<{ cause: string; queued: number }> => {
+    retryFault: (w: WriteContext, args: { cause: string }): Result<{ cause: string; queued: number }> => {
       const barred = schemaRefusal(state);
       if (barred) return barred;
       const cause = typeof args?.cause === 'string' ? args.cause.trim() : '';
@@ -9847,9 +9957,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return transaction(() => {
         if (!openFaults(sql).some((f) => f.cause === cause))
           return no<{ cause: string; queued: number }>('ROW_UNKNOWN', 'Nothing is failing for that cause now, so there is nothing to try again.', { at: 'cause' });
-        if (cause.startsWith('outbox#')) return ok({ cause, queued: retryDead(sql, cause.slice('outbox#'.length), clock.now()) });
-        if (cause.startsWith('schedule#')) return ok({ cause, queued: retryFailed(sql, cause.slice('schedule#'.length), clock.now()) });
-        return no<{ cause: string; queued: number }>('VALUE_MALFORMED', 'This one tries again by itself at its next time.', { at: 'cause' });
+        const queued = cause.startsWith('outbox#')
+          ? retryDead(sql, cause.slice('outbox#'.length), clock.now())
+          : cause.startsWith('schedule#')
+            ? retryFailed(sql, cause.slice('schedule#'.length), clock.now())
+            : null;
+        if (queued === null) return no<{ cause: string; queued: number }>('VALUE_MALFORMED', 'This one tries again by itself at its next time.', { at: 'cause' });
+        /* A JOB REQUEUED BY A HAND ENDS THE HOLD'S RUN OF GREEN DAYS (`hold.ts`, PRF-A18): a green day an operator helped
+           along is not a day the record ran by itself. The system's own retries are not a hand. */
+        if (queued > 0 && w.actor !== 'system') markHand(sql, 'A failed job was tried again by hand.', w.actor, clock.now(), recordTz());
+        return ok({ cause, queued });
       });
     },
     /**

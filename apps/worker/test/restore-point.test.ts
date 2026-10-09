@@ -97,7 +97,7 @@ test('PAGED: a spent budget answers a cursor at a page\'s end, and asking again 
   assert.equal(first.cursor, 'r03');
   assert.equal(first.asked, 4);
   assert.match(sayTally(first), /More to walk\.$/u);
-  let cursor = first.cursor;
+  let cursor: string | undefined = first.cursor;
   while (cursor !== undefined) cursor = (await restorePoint(deps, { check: true, cursor })).cursor;
   assert.deepEqual(seen, ids, 'every record asked once, in order');
 });

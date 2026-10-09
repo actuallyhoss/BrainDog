@@ -1,0 +1,8 @@
+{
+  "gate": "words",
+  "rule": "a word for the machinery in the copy a screen prints",
+  "expect": "row: .*say the thing's own name",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE SENTENCE SAYS ROW AND SIX DECOYS DO NOT COUNT. The decoys are the places a copy file holds the word as code rather than copy: a block comment, a line comment, a module's address, a type's union, a quoted key, a value compared with ===, and the argument of a method call. A reader that took any of them as copy would count two or more, so the count proves each exemption as well as the finding."
+}

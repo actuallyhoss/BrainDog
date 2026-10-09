@@ -16,7 +16,7 @@
  * Unpin retires it, and the engine arranges the page again.
  *
  * WHAT SLASH ARRANGES WHILE THE PERSON IS LOOKING IS OFFERED BACK FOR SIX SECONDS (§37's Undo), and kept once they
- * pass, so its history reads "Slash arranged · Sam kept". What it arranged overnight was arranged while nobody was
+ * pass, so its history reads "Slash arranged · Mara kept". What it arranged overnight was arranged while nobody was
  * there, as a suggestion is filed to Decide rather than offered: it is the page as it opens, the menu says who arranged
  * it, and Pin or Change this page answers it.
  *

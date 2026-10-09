@@ -35,6 +35,12 @@ export type SeedRegister = {
   seq_prefix?: string;
   /** On the one register whose rows are projects: its fields listing repositories and folders. */
   scopes?: { repos?: string; folders?: string };
+  /**
+   * `refuse_while_referenced`, the one value the kernel keeps (`packages/kernel/src/referenced.ts`, `DELETE_RULES`): a
+   * row other live rows point at is not deleted, and the refusal names the lists and how many. Written as its one word,
+   * as Money's accounts declare it (`modules/money/lists/accounts.ts`), and held to that list at install (`declare.ts`).
+   */
+  delete?: 'refuse_while_referenced';
 };
 
 export type SeedField = FieldDecl & {

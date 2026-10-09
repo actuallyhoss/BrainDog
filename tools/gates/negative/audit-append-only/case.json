@@ -1,0 +1,8 @@
+{
+  "gate": "audit-append-only",
+  "rule": "a statement that rewrites a line of the audit log, on no list",
+  "expect": "rewrites the audit log",
+  "findings": 1,
+  "total": 1,
+  "why": "One planted `UPDATE event` in a package's source, the seventh the list does not hold. Beside it, the two things that are not one: a migration that deletes from the log, and a comment that names the statement. A planted tree is judged with no list, so the one finding is the seed and nothing else."
+}

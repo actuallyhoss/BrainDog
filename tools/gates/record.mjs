@@ -52,6 +52,9 @@ const KEYS = new Map();
 /** Which variant each running record is, by its base, for the one variant `forward` has to answer for. */
 const VARIANT_OF = new Map();
 
+/** Each running record's clock, by its base, as epoch milliseconds (`clockOf`). */
+const CLOCKS = new Map();
+
 /**
  * THE OTHER RECORDS, FOR THE HALF OF EVERY BRANCH THE GATES' OWN RECORD CANNOT DRAW, and the routes each one shows.
  *
@@ -134,7 +137,8 @@ async function connect(port, key) {
 }
 
 /**
- * Start one. `{ base, close, server, variants }`, where `base` is `http://127.0.0.1:<port>`.
+ * Start one. `{ base, now, ask, setPref, close, server, variants }`, where `base` is `http://127.0.0.1:<port>`, `now` its
+ * clock and `ask` and `setPref` its own doors with the gate's key (`recordAt`).
  *
  * `pollMs: 0` because nothing is ever delivered from a gate's record, and a ticker is a timer.
  *
@@ -210,9 +214,11 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
   const base = `http://127.0.0.1:${at}`;
   if (key !== undefined) KEYS.set(base, key);
   if (variant !== undefined) VARIANT_OF.set(base, variant);
+  CLOCKS.set(base, NOW);
   const stop = () => {
     KEYS.delete(base);
     VARIANT_OF.delete(base);
+    CLOCKS.delete(base);
     return running.close();
   };
 
@@ -227,8 +233,9 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
       await stop().catch(() => {});
       throw e;
     }
+  /* THE HANDLE IS ALSO WHAT `openPage` AND `routesFor` READ (`recordAt`): the base, the clock, a read and a setting. */
   return {
-    base,
+    ...recordAt(base),
     variants: Object.fromEntries(others.map((o) => [o.name, o.record.base])),
     close: async () => {
       for (const o of others) await o.record.close();
@@ -260,6 +267,74 @@ export const recordsAnswer = () => ({ ok: true, value: [{ slug: IDENTITY.slug, n
  * through before a passkey exists. It stays inside this process and is never printed, as it was before.
  */
 export const serverKeyFor = (base) => KEYS.get(base);
+
+/**
+ * The record's clock: the instant a record this module started reads as now, or `null` for a base it did not start.
+ *
+ * ONE CLOCK FOR THE RECORD AND THE PAGE (PRF-B04). The record was pinned at the seed's `NOW` and the page drew at the
+ * runner's own date, so Today's date line and Usage's "this month" were measured on a day the record never lived. A
+ * gate opens every page through `openPage` (`lib.mjs`), which pins the page to this instant. By base, so a record that
+ * lives on its own clock (the lived copy, PRF-B06) hands back its own.
+ */
+export const clockOf = (base) => CLOCKS.get(base) ?? null;
+
+/** The query string the client writes: a string as itself, anything else as JSON, an absent value left out. */
+const queryOf = (args) =>
+  new URLSearchParams(
+    Object.entries(args)
+      .filter(([, v]) => v !== undefined && v !== null)
+      .map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)]),
+  );
+
+/**
+ * One read through the record's own door, with the gate's key, as the record's envelope.
+ *
+ * THE RECORD IS ASKED, NEVER WRITTEN FOR. `routes.mjs` asks it for its own addresses with this, so an id a gate opens
+ * is one the record holds, and a record that does not answer is the envelope `forward` gives, not a throw.
+ */
+export async function ask(base, name, args = {}) {
+  const key = KEYS.get(base);
+  return fetch(new URL(`/api/${name}?${queryOf(args)}`, base), { headers: key === undefined ? {} : { authorization: `Bearer ${key}` } })
+    .then((r) => r.json())
+    .catch((e) => ({ ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: `The gate's record did not answer ${name}: ${e instanceof Error ? e.message : String(e)}.` } }));
+}
+
+/**
+ * Keep one of the person's own settings through the record's `setPref`, with the gate's key. `null` takes it away.
+ *
+ * THE COMMENT THAT MADE `bootWith` WAS WRONG. It said the record refuses `setPref` from a key, so the gate's server
+ * wrote the preferences into `boot` itself. The record refuses a token (`packages/record/src/index.ts` `setPref`), and
+ * the gate's key is the self-host's server key, which speaks as the owner, a person (`apps/selfhost/src/server.ts`
+ * `owner`): asked on 9 October, `setPref nav.shape bar` with this key answered `ok: true`. So a page reads what the
+ * record keeps, through the door a person's own Settings writes through, and no answer is written by a gate.
+ *
+ * A REFUSAL THROWS, in the record's own words, because a gate that measured a screen without the setting it asked for
+ * would measure the wrong screen and say nothing.
+ */
+export async function setPref(base, key, value) {
+  const bearer = KEYS.get(base);
+  const said = await fetch(new URL('/api/setPref', base), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(bearer === undefined ? {} : { authorization: `Bearer ${bearer}` }) },
+    body: JSON.stringify({ key, value }),
+  })
+    .then((r) => r.json())
+    .catch(() => null);
+  if (said?.ok !== true) throw new Error(`the gate's record would not keep ${key}: ${said?.refusal?.fix ?? 'it did not answer'}`);
+  return said.value;
+}
+
+/**
+ * What `openPage` and `routesFor` need of one running record: its base, its clock, a read and a setting kept.
+ *
+ * `startRecord`'s handle is one of these, and `recordAt(record.variants.cloud)` makes one for a variant.
+ */
+export const recordAt = (base) => ({
+  base,
+  now: clockOf(base),
+  ask: (name, args) => ask(base, name, args),
+  setPref: (key, value) => setPref(base, key, value),
+});
 
 /** Headers that describe one hop and not the message, so they are not copied across this one. */
 const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'host', 'content-length', 'content-encoding']);
@@ -344,6 +419,10 @@ export async function answers(origin) {
  *
  * HERE AND NOT IN `prefs.mjs`, which wrote it first, because `layout` draws the shell's other two shapes with it too, and
  * a gate another file imports is a library to `run.mjs` and would stop being run.
+ *
+ * GOING, WITH `recordPrefsOf` AND `bootWith` (PRF-B04). They rest on the wrong comment `setPref` above corrects: a gate
+ * keeps a preference with `openPage`'s `prefs`, which writes it through the record's own door. They stay exported only
+ * while `prefs.mjs` and `layout.mjs` still import them; the unit's jobs 4 and 5 move those two, and then all three go.
  */
 export const RECORD_PREFS = 'bd_gate_record';
 

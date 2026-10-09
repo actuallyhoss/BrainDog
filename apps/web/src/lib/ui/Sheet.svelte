@@ -46,6 +46,9 @@
     children: Snippet;
     footer?: Snippet | undefined;
   } = $props();
+  /* THE SHEET IS NAMED BY ITS TITLE, so a screen reader opening it hears what it is (a11y-44's finding: axe only
+     checks a dialog named by role, so the gate never saw a sheet open with no name). */
+  const uid = $props.id();
 
   let el = $state<HTMLDialogElement>();
 
@@ -230,6 +233,7 @@
 <dialog
   bind:this={el}
   class="sheet"
+  aria-labelledby="{uid}-title"
   onclick={onbackdrop}
   oncancel={(e) => (e.preventDefault(), close())}
   onclose={closed}
@@ -243,7 +247,7 @@
        an ellipsis rather than pushing Close down to a second row. -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <header class="sheet-head" onpointerdown={grab} onpointermove={drag} onpointerup={drop} onpointercancel={drop}>
-    <h2 class="sheet-title">{title}</h2>
+    <h2 class="sheet-title" id="{uid}-title">{title}</h2>
     <button type="button" class="sheet-close tap" onclick={close} aria-label={copy.close} title={copy.close}>
       <Icon name="close" size="m" />
     </button>

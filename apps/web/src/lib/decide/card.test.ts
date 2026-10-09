@@ -73,9 +73,9 @@ test('TWO CURRENCIES ARE NEVER ADDED, and amounts pointing both ways name what m
 test('WHO ASKED IS THE AGENT, THE APP AND THE RUN, and never an id', () => {
   const by = askerOf(ask({ app: 'Claude Code · MacBook', run: { id: '01J9Z8X7W6V5T4S3R2Q1P0N9M8', name: 'Tidy invoices' } }));
   assert.deepEqual(byWords(by), ['Claude', 'Claude Code · MacBook', 'Tidy invoices']);
-  const bare = askerOf(ask({ run: '01J9Z8X7W6V5T4S3R2Q1P0N9M8', app: '/Users/sam/repo' }));
+  const bare = askerOf(ask({ run: '01J9Z8X7W6V5T4S3R2Q1P0N9M8', app: '/Users/mara/repo' }));
   assert.deepEqual(byWords(bare), ['Claude'], 'a run named by its id and an app named by a path say nothing');
-  for (const id of ['tools#8', 'run_42', 'agent:claude', 'SG14', 'sam-mbp.local', '01J9Z8X7W6V5T4S3R2Q1P0N9M8']) assert.equal(nameOrNull(id), null, id);
+  for (const id of ['tools#8', 'run_42', 'agent:claude', 'SG14', 'mara-mbp.local', '01J9Z8X7W6V5T4S3R2Q1P0N9M8']) assert.equal(nameOrNull(id), null, id);
   for (const name of ['Claude Code', 'claude.ai', 'MacBook']) assert.equal(nameOrNull(name), name);
 });
 
@@ -111,7 +111,7 @@ test('AN ADDRESS SIGNS AS SOMEONE, and no address or id reaches the words (audit
   const card = cardOf(
     ask({
       question: 'Add alex@acme.com to Acme?',
-      why: 'Alex Ng <alex.ng@acme.com> replied from 192.168.1.4 about tasks#8 (see /Users/sam/Developer/braindog/notes.md).',
+      why: 'Alex Ng <alex.ng@acme.com> replied from 192.168.1.4 about tasks#8 (see /Users/mara/Developer/braindog/notes.md).',
       does: 'Adds 01J9Z8X7W6V5T4S3R2Q1P0N9M8 to people',
     }),
     { now, lead: true },
@@ -127,7 +127,7 @@ test('SPOKEN LEAVES WORDS ALONE and takes out only what is an address or an id',
   for (const s of same) assert.equal(spoken(s), s);
   assert.equal(spoken('alex@acme.com wrote back'), 'Someone wrote back');
   assert.equal(spoken('Seen on https://www.stripe.com/invoices/42.'), 'Seen on stripe.com.');
-  assert.equal(spoken('Running on sam-mbp.local'), 'Running');
+  assert.equal(spoken('Running on mara-mbp.local'), 'Running');
   assert.equal(spoken('From commit 4464966f in braindog'), 'From commit in braindog');
   assert.equal(spoken('Filed by agent:claude as SG14 for p_7x2k'), 'Filed');
   assert.equal(spoken('Proposed by agent:claude because the bill is late'), 'Proposed because the bill is late');
@@ -157,7 +157,7 @@ test('NO ADDRESS OR ID IN AN ANSWER, ITS REASON OR WHAT A CHANGE WAS AND BECOMES
   const card = cardOf(
     ask({
       options: [
-        { key: 'merge', label: 'Merge into rohan@x.com', because: 'Same address as tasks#8 in /Users/sam/Developer/braindog', recommended: true },
+        { key: 'merge', label: 'Merge into joaquin@x.com', because: 'Same address as tasks#8 in /Users/mara/Developer/braindog', recommended: true },
         { key: 'apart', label: 'people#4', because: '', recommended: false },
       ],
     }),
@@ -193,14 +193,14 @@ test("A SLASH PROPOSAL'S ANSWERED LINE READS AS ITS HISTORY", () => {
   const slash = cardOf(ask({ who: 'slash', kind: 'rowset', options: [] }), { now });
   assert.equal(slash.slash, true);
   const accept = slash.ways.find((w) => w.key === 'accept')!;
-  assert.equal(answeredLine(slash, accept, 'Sam', 'just now'), 'Slash suggested · Sam accepted');
-  assert.equal(answeredLine(slash, slash.ways.find((w) => w.key === 'reject')!, 'Sam', 'just now'), 'Slash suggested · Sam declined');
+  assert.equal(answeredLine(slash, accept, 'Mara', 'just now'), 'Slash suggested · Mara accepted');
+  assert.equal(answeredLine(slash, slash.ways.find((w) => w.key === 'reject')!, 'Mara', 'just now'), 'Slash suggested · Mara declined');
   const drafted = cardOf(ask({ who: 'agent:claude', drafted_by: 'slash:model' }), { now });
   assert.equal(drafted.slash, true, 'drafted by Slash for whoever filed it');
-  assert.equal(answeredLine(drafted, drafted.ways[1]!, 'Sam', 'just now'), 'Slash suggested · Sam chose Flat');
+  assert.equal(answeredLine(drafted, drafted.ways[1]!, 'Mara', 'just now'), 'Slash suggested · Mara chose Flat');
   const plain = cardOf(ask(), { now });
-  assert.equal(answeredLine(plain, plain.ways[0]!, 'Sam', 'just now'), 'Per seat · you, just now');
-  for (const s of [answeredLine(slash, accept, 'Sam', 'now'), slash.money, ...slash.ways.map((w) => w.label)]) assert.doesNotMatch(s, /—/u);
+  assert.equal(answeredLine(plain, plain.ways[0]!, 'Mara', 'just now'), 'Per seat · you, just now');
+  for (const s of [answeredLine(slash, accept, 'Mara', 'now'), slash.money, ...slash.ways.map((w) => w.label)]) assert.doesNotMatch(s, /—/u);
 });
 
 test('A MERGE IS STILL DRAWN AS ONE, from the options the record offers', () => {
@@ -358,4 +358,44 @@ test('THE FOUR DRAWS AND THE PALETTE DRAW THIS CARD', () => {
   assert.match(card, /import MergeCard from/u, 'a merge is a variant of the card');
   assert.match(card, /hold\(/u, 'a press is held for its Undo');
   assert.doesNotMatch(card, /—/u);
+});
+
+/* ── an arrangement in its own summary (REC-A07 step 3) ── */
+
+const ARRANGEMENT = {
+  why: ['The money has stood still since the move.'],
+  approve: ['CALLS OUT api.harbourline.example · every 1d · grant "Harbourline Bank"', 'CALLS OUT api.cedar.example · every 6h · grant "Cedar Mutual"'],
+  rows: [
+    { register: 'accounts', at: 'accounts#2', version: 3, patch: { name: 'Savings' }, before: { name: 'Everyday' } },
+    { register: 'books', fields: { name: 'Lanternfish' } },
+  ],
+};
+
+test('AN ARRANGEMENT SAYS ITSELF IN ITS OWN SUMMARY on every card, in place of the general line of what accepting does', () => {
+  const said = 'Rearranges this BrainDog: 2 keys, 1 update, 2 feeds, 1 addition.';
+  const arranging = ask({ kind: 'arrange', body_kind: 'arrange', options: [], does: 'Adds 1 to Books.', arranged: ARRANGEMENT });
+  assert.equal(cardOf(arranging, { now, lead: true }).does, said, 'the lead says the summary, not the general line');
+  assert.equal(cardOf(arranging, { now }).does, said, 'and so does a card further down the queue');
+  /* A HOST THAT HOLDS THE BODY hands it, and the question need not carry it. */
+  const bare = ask({ kind: 'arrange', body_kind: 'arrange', options: [], does: 'Adds 1 to Books.' });
+  assert.equal(cardOf(bare, { now, body: ARRANGEMENT }).does, said);
+  /* WITHOUT THE BODY the card says what it always said: the general line on the lead, nothing further down. */
+  assert.equal(cardOf(bare, { now, lead: true }).does, 'Adds 1 to Books.');
+  assert.equal(cardOf(bare, { now }).does, '');
+  /* ONLY AN ARRANGEMENT: a body beside any other kind is not read as one. */
+  assert.equal(cardOf(ask({ arranged: ARRANGEMENT }), { now }).does, '');
+  assert.doesNotMatch(said, /—|#\d|api\./u);
+});
+
+test('AN ARRANGEMENT NAMES A PACK BY ITS NAME, never by its id, and keeps its own last word', () => {
+  const said = (kind: string, arranged: Record<string, unknown>) => cardOf(ask({ kind, body_kind: kind, options: [], arranged }), { now }).does;
+  assert.equal(said('pack', { install: 'money-core', packs: { install: ['money-core'] } }), 'Adds Money.');
+  assert.equal(said('pack', { install: 'money-core', plan: [{ pack: 'money-core', from: '3.1.0', version: '3.2.0' }] }), 'Updates Money from 3.1.0 to 3.2.0.');
+  assert.equal(said('settings', { pack: 'money-core', words: { a: 'b' } }), 'Changes the words and settings of Money.');
+  assert.equal(said('arrange', { usecase: 'founder', packs: { install: ['usecase-founder', 'money-core'] } }), 'Sets this BrainDog up for Solo founder.');
+  /* "ON" IS THE COPY'S OWN, not a word left hanging where an id was taken out. */
+  assert.equal(said('pack', { enable: 'money-core' }), 'Turns Money back on.');
+  for (const s of [said('pack', { install: 'money-core' }), said('pack', { enable: 'usecase-founder' }), said('settings', { pack: 'money-core' })]) {
+    assert.doesNotMatch(s, /money-core|usecase-|#\d|—/u, s);
+  }
 });

@@ -17,6 +17,7 @@
  * own name for it when the screen has one, and every sentence is `copy.ts`'s.
  */
 import type { createClient } from '@braindog/client';
+import { arrangePartsOf } from '@braindog/kernel';
 import { moduleName, ruleName } from '@braindog/seed/usecases/names';
 
 import { copy } from '../../../lib/copy.ts';
@@ -60,9 +61,29 @@ export type Part =
   | { part: 'appears'; appears: Appears[]; examples: number }
   | { part: 'words'; lines: string[] }
   | { part: 'rows'; lists: { name: string; lines: string[] }[]; count: number }
-  | { part: 'settings'; lines: string[] };
+  | { part: 'settings'; lines: string[] }
+  | { part: 'stops'; lines: string[] };
 
-export type Arranged = { lead: string; parts: Part[]; summary: string };
+/**
+ * One part of an arrangement an accept may take or leave (REC-A06 step 7), by the id the record filed on it and the
+ * kernel's `partsOf` gives: `name` is the record's own label for it ("Add Stripe"), `requires` the parts it cannot be
+ * taken without, worked out as the kernel works them out so a tick here is never refused there, and `keys` the labels
+ * of the keys it needs that the record does not hold for a scheduled run.
+ */
+export type Take = { id: string; name: string; requires: string[]; keys: string[] };
+
+/**
+ * A door or pattern an update takes away while it still files messages (REC-A16): `part` is the part that takes it away,
+ * so Accept asks twice only when that part is taken. `unless` is the part that installs the add-on taking it over, when
+ * one does: such a door is said as a move, and asks twice only when its add-on is left unticked and the update is not.
+ */
+export type Stop = { part: string; name: string; unless?: string };
+
+/**
+ * `takes` only on an arrangement with parts, and `stops` only when a live door goes, with the add-on taking it if one
+ * does: both are left out otherwise, so a story without them reads as it always did.
+ */
+export type Arranged = { lead: string; parts: Part[]; summary: string; takes?: Take[]; stops?: Stop[] };
 
 /**
  * What the screen knows that the body does not: the record's name for each list, the labels it gives them now (the rail's
@@ -80,6 +101,13 @@ export type Context = {
 /** What the question's own page hands `Arranged.svelte` by context so a needed key gets a field: the client, and a re-read. */
 export type KeysContext = { readonly client: Pick<ReturnType<typeof createClient>, 'putKey'> | undefined; onheld: () => unknown };
 export const KEYS_CONTEXT = Symbol('arranged-keys');
+
+/**
+ * What the question's own page hands `Arranged.svelte` by context so each part gets a tick (REC-A07 step 2): the parts
+ * unticked by hand, and a press on one. Left out, as on the queue, the parts are not drawn and Accept takes the whole.
+ */
+export type TicksContext = { readonly unticked: ReadonlySet<string>; tick: (id: string, on: boolean) => void };
+export const TICKS_CONTEXT = Symbol('arranged-ticks');
 
 /**
  * The keys the record holds by label, from `listGrants`: a live grant sealed for a connector, or one only a person opens.
@@ -226,7 +254,12 @@ function byField(list: string, ids: readonly string[], ctx: Context): { fields: 
  * lands in the sidebar and what it shows. EVERYTHING ELSE IS NAMED, one line per kind: Money alone adds twenty measures,
  * and twenty bold titles would bury the page a person will actually open.
  */
-function planned(plan: unknown, doc: unknown, ctx: Context, name: (id: string) => string): { appears: Appears[]; examples: number; pages: number; lists: number; more: number } {
+function planned(
+  plan: unknown,
+  doc: unknown,
+  ctx: Context,
+  name: (id: string) => string,
+): { appears: Appears[]; examples: number; pages: number; lists: number; more: number; stops: Stop[] } {
   const known = declared(doc);
   const drawn: Appears[] = [];
   const named = new Map<string, string[]>();
@@ -236,6 +269,7 @@ function planned(plan: unknown, doc: unknown, ctx: Context, name: (id: string) =
   const moving: Appears[] = [];
   const kept: Appears[] = [];
   const out = { examples: 0, pages: 0, lists: 0, more: 0 };
+  const stops: Stop[] = [];
   for (const step of Array.isArray(plan) ? plan.filter(isRow) : []) {
     out.examples += typeof step.examples === 'number' ? step.examples : 0;
     /* WHAT AN UPDATE TAKES AWAY is named on its own, with the rows a list keeps: they stay, and nothing reads them. */
@@ -247,6 +281,16 @@ function planned(plan: unknown, doc: unknown, ctx: Context, name: (id: string) =
          beside `to` from its catalogue, until the owner installs that pack or turns it off. */
       if (text(gone.to) !== '') {
         moving.push({ kind: copy.arrangeMoving, title: copy.arrangeMovesTo(title, text(gone.to_name) || moduleName(text(gone.to))), lines: [] });
+        continue;
+      }
+      /* A DOOR OR PATTERN THAT STILL FILES MESSAGES (REC-A16, `live`, which the record marks for one that took an
+         arrival in thirty days or holds a live address). An add-on in the catalogue that declares it is added to the
+         same question as a second step (`taken_by`), and is named here; with none, messages to it stop being filed, which
+         is said on its own and asked twice. */
+      if (gone.live === true) {
+        const taker = takerOf(gone);
+        if (taker !== null) moving.push({ kind: copy.arrangeMoving, title: copy.arrangeTakenBy(title, taker.name), lines: [] });
+        stops.push({ part: `install:${text(step.pack)}`, name: title, ...(taker?.pack ? { unless: `install:${taker.pack}` } : {}) });
         continue;
       }
       const rows = typeof gone.rows === 'number' && gone.rows > 0 ? copy.arrangeRetiredRows(title, gone.rows) : title;
@@ -331,7 +375,21 @@ function planned(plan: unknown, doc: unknown, ctx: Context, name: (id: string) =
   appears.push(...extended);
   if (retired.size) appears.push({ kind: copy.arrangeRetires, title: '', lines: lines(retired) });
   appears.push(...moving, ...kept);
-  return { appears, ...out };
+  return { appears, ...out, stops };
+}
+
+/**
+ * The add-on that takes over a live door an update takes away, by name: `taken_by` as the record files it, an add-on's
+ * id beside the name it filed (`taken_by_name`, as `to` has `to_name`), or the two together. Null when none does.
+ */
+function takerOf(gone: Row): { name: string; pack: string } | null {
+  const by = gone.taken_by;
+  if (isRow(by)) {
+    const pack = text(by.pack) || text(by.id);
+    const name = text(by.name) || text(by.title) || (pack ? moduleName(pack) : '');
+    return name ? { name, pack } : null;
+  }
+  return text(by) !== '' ? { name: text(gone.taken_by_name) || moduleName(text(by)), pack: text(by) } : null;
 }
 
 /** A page an arrangement puts in place: new, or a change to one there now, with what it shows now beside what it will. */
@@ -488,6 +546,67 @@ function choicesOf(body: Row): Choice[] {
   return out;
 }
 
+/** A key a scheduled run cannot open yet: not held, or held only for a person. Unknown says nothing either way. */
+const waiting = (n: Need): boolean => n.held === 'none' || (n.held === 'person' && n.scheduled);
+
+/**
+ * THE PARTS AN ACCEPT MAY TAKE, from the kernel's own reading of the body (`arrangePartsOf`), so what goes together here
+ * is what the kernel refuses to split; each named by the label the record filed, else the kernel's own name for it. A part
+ * the record says needs a key the record cannot open for a scheduled run (`needs[].parts`) carries that key's label.
+ */
+function takesOf(body: Row, needs: readonly Need[]): Take[] {
+  /* ONLY ON A BODY THE RECORD FILED ITS PARTS ON (REC-A06 step 7). One filed before parts existed is taken whole, as it
+     was asked, and draws no ticks. */
+  if (!Array.isArray(body.parts) || body.parts.length === 0) return [];
+  const labels = new Map(body.parts.filter(isRow).map((p) => [text(p.id), text(p.label)] as const));
+  const keys = new Map<string, string[]>();
+  for (const n of Array.isArray(body.needs) ? body.needs.filter(isRow) : []) {
+    const need = needs.find((k) => k.label === (text(n.label) || text(n.key)));
+    if (!need || !waiting(need)) continue;
+    for (const part of strings(n.parts)) keys.set(part, [...new Set([...(keys.get(part) ?? []), need.label])]);
+  }
+  return arrangePartsOf(body).map((p) => ({
+    id: p.id,
+    name: labels.get(p.id) || `${p.name.charAt(0).toUpperCase()}${p.name.slice(1)}`,
+    requires: [...p.needs],
+    keys: keys.get(p.id) ?? [],
+  }));
+}
+
+/**
+ * WHAT ACCEPT TAKES NOW, from the parts and the ones unticked by hand: a part whose key is not held is off and says
+ * which key, and a part that needs one that is off is off with it and says which, until nothing more moves. `parts` is
+ * what Accept sends: `undefined` when every part is taken, which is an accept as it always was, and the ids taken
+ * otherwise, an empty list when none is.
+ */
+export function ticksOf(takes: readonly Take[], unticked: ReadonlySet<string> = new Set()): { off: Map<string, string>; parts: string[] | undefined } {
+  const off = new Map<string, string>();
+  for (const t of takes) if (t.keys.length) off.set(t.id, copy.arrangeTakeWaitsKey(t.keys));
+  for (const t of takes) if (unticked.has(t.id) && !off.has(t.id)) off.set(t.id, '');
+  for (let moved = true; moved; ) {
+    moved = false;
+    for (const t of takes) {
+      const on = off.has(t.id) ? undefined : t.requires.find((r) => off.has(r));
+      if (on === undefined) continue;
+      off.set(t.id, copy.arrangeTakeWaitsFor(takes.find((x) => x.id === on)?.name ?? on));
+      moved = true;
+    }
+  }
+  return { off, parts: off.size === 0 ? undefined : takes.filter((t) => !off.has(t.id)).map((t) => t.id) };
+}
+
+/**
+ * The live doors this accept stops filing: one goes by a part it takes, and the add-on that would take it over, if any,
+ * is left. A whole accept takes every part, and a part the question does not offer goes with the whole.
+ */
+export function stopping(arranged: Arranged | null, parts: readonly string[] | undefined): Stop[] {
+  const taken = (id: string) => parts === undefined || parts.includes(id) || !(arranged?.takes ?? []).some((t) => t.id === id);
+  return (arranged?.stops ?? []).filter((s) => taken(s.part) && (s.unless === undefined || !taken(s.unless)));
+}
+
+/** Whether Accept asks twice: this accept stops a live door being filed (`stopping`). */
+export const asksTwice = (arranged: Arranged | null, parts: readonly string[] | undefined): boolean => stopping(arranged, parts).length > 0;
+
 /**
  * A `pack`, `settings` or `arrange` body as the story Decide draws, or `null` for every other kind.
  */
@@ -511,6 +630,10 @@ export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arran
   const allCalls = strings(body.approve).map(callOf);
   const needs = needsOf(body, allCalls, ctx);
   if (needs.length) parts.push({ part: 'needs', keys: needs });
+  /* WHAT STOPS BEING FILED leads what it changes: it is the one thing accepting loses that nothing else will say. */
+  const plan = planned(body.plan, body.doc, ctx, name);
+  const stops = plan.stops.filter((s) => s.unless === undefined);
+  if (stops.length) parts.push({ part: 'stops', lines: stops.map((s) => copy.arrangeStopsFiling(s.name)) });
   const changes = kind === 'arrange' ? changesOf(body.rows, ctx) : null;
   if (changes) parts.push(changes);
   const rows = kind === 'arrange' ? rowsOf(body.rows, ctx) : null;
@@ -542,7 +665,6 @@ export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arran
   if (registers.length && kind === 'pack') packLines.push(text(body.disable) ? copy.arrangeListsLeave(registers) : copy.arrangeListsReturn(registers));
   if (packLines.length) parts.push({ part: 'packs', lines: packLines });
 
-  const plan = planned(body.plan, body.doc, ctx, name);
   const pages = (Array.isArray(body.pages) ? body.pages.filter(isRow) : []).map((p) => pageOf(p, ctx)).filter((a): a is Appears => a !== null);
   const appears = [...pages, ...plan.appears].map((a, i) => (i > 0 && a.kind === copy.arrangeAdds ? { ...a, kind: copy.arrangeAlso } : a));
   if (appears.length || plan.examples) parts.push({ part: 'appears', appears, examples: plan.examples });
@@ -587,7 +709,8 @@ export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arran
     wordLines.length ? copy.arrangeCountWords(wordLines.length) : '',
     otherLines.length ? copy.arrangeCountSettings(otherLines.length) : '',
   ].filter((b) => b !== '');
-  return { lead, parts, summary: bits.join(', ') };
+  const takes = kind === 'arrange' ? takesOf(body, needs) : [];
+  return { lead, parts, summary: bits.join(', '), ...(takes.length ? { takes } : {}), ...(plan.stops.length ? { stops: plan.stops } : {}) };
 }
 
 /** A row's title as a plan carries it: the first line of text among its fields. */

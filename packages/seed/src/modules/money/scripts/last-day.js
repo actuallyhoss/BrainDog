@@ -51,10 +51,15 @@ export default async function run(ctx) {
     asked.push({ row, day, said: `${f.what}, ${day} ${MONTHS[month - 1]}` });
   }
 
+  /* `day_of_month` AND NOTHING ELSE, on each line asked about, with the version it was read at: the gate refuses a pick
+     whose line was edited since, so an answer days later never overwrites what a person typed meanwhile. */
   const patches = (value) => asked.map((a) => ({ id: `recurring#${a.row.seq}`, version: a.row.version, fields: { day_of_month: value(a) } }));
+  /* EACH ANSWER SAYS WHAT IT DOES TO THE DAYS AHEAD, since the two labels alone read alike to somebody who never
+     thought about it. */
+  const it = asked.length === 1 ? 'It' : 'Each';
   const options = [
-    { label: LAST, patches: patches(() => 'last') },
-    { label: DATE, patches: patches((a) => String(a.day)) },
+    { label: LAST, because: `${it} moves with the month's end: the 31st in a long month, the 28th or 29th in February.`, patches: patches(() => 'last') },
+    { label: DATE, because: `${it} stays on that day, and falls on the month's end only when a month is shorter.`, patches: patches((a) => String(a.day)) },
   ];
 
   const answer = ctx.input && typeof ctx.input.answer === 'string' ? ctx.input.answer : null;
@@ -74,7 +79,33 @@ export default async function run(ctx) {
     n === 1
       ? '1 repeating line falls on the last day of its month. Is it the last day, or that date?'
       : `${n} repeating lines fall on the last day of their month. Is each the last day, or that date?`;
-  return { ask: { cause: 'money.last-day', question, about: asked.map((a) => a.said), options } };
+  return { ask: { cause: 'money.last-day', question, about: aboutOf(asked.map((a) => a.said)), options } };
+
+  /* ONE `about`, AS MANY NAMES AS FIT THE GATE'S 80 BYTES and the rest counted ("Rent, 30 June; Salary, 30 September
+     and 3 more"), the way the host joins a list (`aboutOf` in `packages/kernel/src/script-run.ts`), so what Decide shows
+     is what the script said. Written out here because a sandbox runs this function's text alone. */
+  function aboutOf(names) {
+    const MOST = 80;
+    const bytes = (s) => {
+      let n = 0;
+      for (const ch of s) {
+        const c = ch.codePointAt(0);
+        n += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
+      }
+      return n;
+    };
+    const more = (k) => (k < names.length ? ` and ${names.length - k} more` : '');
+    for (let k = names.length; k >= 1; k -= 1) {
+      const said = names.slice(0, k).join('; ') + more(k);
+      if (bytes(said) <= MOST) return said;
+    }
+    let first = '';
+    for (const ch of names[0]) {
+      if (bytes(first + ch + '…' + more(1)) > MOST) break;
+      first += ch;
+    }
+    return first.trimEnd() + '…' + more(1);
+  }
 }
 
 /**

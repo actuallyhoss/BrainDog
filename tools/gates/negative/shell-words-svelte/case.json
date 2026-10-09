@@ -1,0 +1,9 @@
+{
+  "gate": "shell-words",
+  "rule": "a private word in a renderer component",
+  "expect": "a private word named in the core",
+  "findings": 1,
+  "total": 1,
+  "env": { "BRAINDOG_PRIVATE_HASHES": "private-words.hashes.json" },
+  "why": "ONE, a hashed word in a string in `packages/render/svelte`, which the gate did not read before 9 October. The same word in a script comment and a markup comment is not a finding. The list is the tree's own, one invented word, so the case proves the hashing and the folder without publishing a real one."
+}

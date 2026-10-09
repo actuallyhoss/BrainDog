@@ -1,6 +1,6 @@
 /**
  * WHO CHANGED A ROW FOR YOU, ON A PAGE (DIRECTION §37, trust): a row an agent, a rule or Slash changed wears a faint tint
- * until you have seen it, and a quiet line, "Claude for Sam · 2h ago · Undo", where Undo puts that change back on the
+ * until you have seen it, and a quiet line, "Claude for Mara · 2h ago · Undo", where Undo puts that change back on the
  * record by its batch, saying first what else it takes back when the change touched more than the row (`byline-undo.ts`).
  *
  * THE RECORD SAYS WHO, AND `record/byline.ts` WORDS IT. A list block answers `changes` aligned with its rows: for each

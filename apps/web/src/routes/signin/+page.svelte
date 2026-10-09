@@ -10,17 +10,20 @@
   never greyed (`23 §3.1`), and exactly one of the rest is the filled button.
 
   NOTHING HAPPENS ON ARRIVAL. A passkey sheet nobody asked for is alarming, and a link in the address
-  is spent by a press rather than on load, so a mail scanner that opens it spends nothing.
+  is spent by a press rather than on load, so a mail scanner that opens it spends nothing. The passkey offered in
+  the email field's autofill is asked for on arrival and shows nothing until the field is touched (`offerPasskey`).
 
   ONE SHEET, THE MARK AT ITS TOP (`Entry.svelte`): the slogan, then every way in straight under it, the lead one the
   ink pill, and the passkey said in one line under its button. No figure, so no chart and no tile inside the sheet.
 -->
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
 
   import {
+    canAutofill,
     exchangeKey,
     methods,
+    passkeyAutofill,
     passkeyRegister,
     passkeySignIn,
     redeemLink,
@@ -28,6 +31,7 @@
     signOut,
     support,
     takeLink,
+    type Autofill,
     type Link,
     type Methods,
     type Said,
@@ -37,7 +41,7 @@
   import { copy } from '$lib/copy.ts';
   import { forget } from '$lib/record/boot-live.ts';
   import { googleStart, googleWhy, onwardOf, stateOf, type GoogleWhy, type How, type Shelf, type Step, type Ways } from '$lib/signin.ts';
-  import { actable, firstDoor, mailHeld, noDoorYet } from './first-door.ts';
+  import { actable, mailHeld, noDoorYet } from './first-door.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -74,6 +78,22 @@
   /** Why a sign-in through Google came back here without a session, until the next press. */
   let fromGoogle = $state<GoogleWhy | null>(null);
   let origin = $state('');
+
+  /**
+   * THE PASSKEY IN THE EMAIL FIELD'S AUTOFILL (LCH-A04). Where the browser offers it (`canAutofill`), the email field is
+   * drawn whenever a link can be sent, marked `username webauthn`, and this site's passkeys are offered in its autofill,
+   * so a returning phone signs in with one touch while the link stays for a device with none.
+   *
+   * NOT A SHEET NOBODY ASKED FOR. A conditional request shows nothing until the person touches the field, so the
+   * header's rule (nothing happens on arrival) still holds.
+   *
+   * ONE REQUEST AT A TIME. Every press withdraws the offer and waits for the browser to let go of it before asking for
+   * its own (`run`). `held` is the offer's own failure, so the effect that makes the offer does not make it again
+   * straight away; the next press clears it.
+   */
+  let autofill = $state(false);
+  let offer: Autofill | null = null;
+  let held = false;
 
   const view = $derived(stateOf({ methods: asked, entered, link, step, secure: here.secure, webauthn: here.webauthn, now }));
   const asking = $derived(step.at === 'asking' ? step.how : null);
@@ -117,6 +137,9 @@
   const noDoor = $derived(view.name === 'signed-out' && host !== null && noDoorYet(host, doors, view.note));
   /** A first run whose way in is a letter that cannot go out now: the mail-down line, never the claim link one. */
   const noMail = $derived(view.name === 'signed-out' && host !== null && mailHeld(host, doors, view.note));
+
+  /** Whether the email field is on screen: the link's way in when it leads or was asked for, and wherever autofill is. */
+  const fieldShown = $derived(doors !== null && doors.magic && (doors.lead === 'magic' || mailing || autofill));
 
   /** Whether a way in other than a passkey is drawn, so a sentence never points at one that is not there. */
   const otherWays = (ways: Ways | null): boolean => ways !== null && (ways.magic || ways.key);
@@ -179,8 +202,12 @@
     }
     link = takeLink(location.hash, clearHash);
     void load();
+    if (here.secure && here.webauthn) void canAutofill().then((yes) => (autofill = yes));
     window.addEventListener('hashchange', arrived);
-    return () => window.removeEventListener('hashchange', arrived);
+    return () => {
+      window.removeEventListener('hashchange', arrived);
+      void withdraw();
+    };
   });
 
   /** This tab's storage, or `null` where reading the property itself throws, as it does with site data blocked. */
@@ -220,6 +247,9 @@
     if (step.at === 'asking') return;
     fromGoogle = null;
     step = { at: 'asking', how };
+    held = false;
+    /* THE OFFER IN THE FIELD LETS GO FIRST, and a pick made just before the press is a sign-in that stands. */
+    if (await withdraw()) return;
     const at = opened();
     const out = await work();
     closed(true, at);
@@ -245,6 +275,34 @@
 
   const withPasskey = () => void run('passkey', () => passkeySignIn(), enter('passkey'));
 
+  /** Offer this site's passkeys in the email field's autofill, once, until it signs somebody in or is withdrawn. */
+  function offerPasskey() {
+    if (offer) return;
+    const mine = passkeyAutofill();
+    offer = mine;
+    void mine.done.then((out) => {
+      const ours = offer === mine;
+      if (ours) offer = null;
+      if (out.ok) return enter('passkey')(out.value);
+      /* WITHDRAWN BY A PRESS, which says what happens next itself; or closed by the person, which is not a failure. */
+      if (!ours || out.kind === 'cancelled') return;
+      held = true;
+      /* NOBODY PRESSED ANYTHING YET. A challenge that would not come, or a browser that said no before a pick, is the
+         offer's own trouble: drawn, it would turn the screen into "unreachable" or "locked" on arrival. The field and
+         the button stay, and the button's press says what is wrong if it still is. */
+      if (!mine.picked) return;
+      now = Date.now();
+      step = { at: 'failed', how: 'passkey', failure: out, when: now };
+    });
+  }
+
+  /** Take the offer away and wait for the browser to let go of it: `true` when it signed somebody in meanwhile. */
+  async function withdraw(): Promise<boolean> {
+    const mine = offer;
+    offer = null;
+    return mine ? (await mine.stop()).ok : false;
+  }
+
   function withKey(e: SubmitEvent) {
     e.preventDefault();
     const typed = key;
@@ -254,9 +312,12 @@
 
   function send(e: SubmitEvent) {
     e.preventDefault();
-    const to = email.trim();
-    void run('send', () => requestLink(to, goTo === `${BASE}/` ? null : goTo), () => (step = { at: 'sent', email: to }));
+    sendTo(email.trim());
   }
+
+  /** `when` starts the sent screen's minute, after which it says what fixes a letter that did not come (`SENT_LATE`). */
+  const sendTo = (to: string) =>
+    void run('send', () => requestLink(to, goTo === `${BASE}/` ? null : goTo), () => (step = { at: 'sent', email: to, when: Date.now() }));
 
   function spend() {
     const l = link;
@@ -300,6 +361,18 @@
   $effect(() => {
     if (view.name !== 'locked') return;
     const t = setInterval(() => (now = Date.now()), 15_000);
+    return () => clearInterval(t);
+  });
+
+  /* THE OFFER IS MADE WHILE THE FIELD IT LIVES IN IS ON SCREEN and a passkey can act, and nothing is out. */
+  $effect(() => {
+    if (fieldShown && doors?.passkey === true && step.at !== 'asking' && !held) untrack(offerPasskey);
+  });
+
+  /* THE SENT SCREEN'S MINUTE RUNS ON ITS OWN, so its second line arrives without a reload. */
+  $effect(() => {
+    if (view.name !== 'link-sent' || view.late) return;
+    const t = setInterval(() => (now = Date.now()), 5_000);
     return () => clearInterval(t);
   });
 
@@ -372,8 +445,16 @@
           <IconWell name="check" size="l" tone="earn" />
           <p class="calm-title">{copy.linkSentTitle}</p>
           <p class="calm-body">{copy.linkSentBody(view.email)}</p>
+          <!-- THE SECOND LINE, a minute on (`SENT_LATE`): the screen cannot know a letter failed, so it says what fixes one. -->
+          {#if view.late}<p class="calm-body">{copy.linkSentLater}</p>{/if}
         </div>
-        <div class="doors"><Button onclick={mail}>{copy.useAnotherEmail}</Button></div>
+        <div class="doors">
+          {#if view.late}
+            {@const to = view.email}
+            <Button weight="primary" onclick={() => sendTo(to)} aria-busy={asking === 'send'}>{copy.sendAgain}</Button>
+          {/if}
+          <Button onclick={mail}>{copy.useAnotherEmail}</Button>
+        </div>
       {:else if view.name === 'link-landing'}
         <div class="calm">
           <IconWell name="link" size="l" />
@@ -415,11 +496,11 @@
       {:else if noDoor}
         <!-- THE FIRST RUN, AND NOTHING CAN SIGN ANYBODY IN YET. The claim link is the way through,
              and it is in the terminal of whoever provisioned the record rather than in an inbox. -->
-        <div class="said"><Empty kind="no-permission" title={firstDoor.title} body={firstDoor.why} /></div>
+        <div class="said"><Empty kind="no-permission" title={copy.firstDoorTitle} body={copy.firstDoorWhy} /></div>
       {/if}
 
       {#if note}<p class="status" role="status">{note}</p>{/if}
-      {#if host?.magic === 'down' && !noDoor && (doors || view.name === 'signed-out')}<p class="status" role="status">{noMail ? firstDoor.mailDown : copy.mailDown}</p>{/if}
+      {#if host?.magic === 'down' && !noDoor && (doors || view.name === 'signed-out')}<p class="status" role="status">{noMail ? copy.firstDoorMailDown : copy.mailDown}</p>{/if}
       {#if fromGoogle && doors}<p class="status" role="status">{copy.googleSaid[fromGoogle]}</p>{/if}
 
       <!-- ONE BLOCK FOR EVERY STATE THAT OFFERS A WAY IN, so moving between signed out, asking and
@@ -455,7 +536,8 @@
           {/if}
 
           {#if doors.magic}
-            {#if doors.lead === 'magic' || mailing}
+            {#if fieldShown}
+              <!-- `username webauthn`: the address, and this site's passkeys in the same autofill (`offerPasskey`). -->
               <form class="form" onsubmit={send}>
                 <label class="field-label" for="in-email">{copy.emailLabel}</label>
                 <span class="field">
@@ -463,7 +545,7 @@
                     id="in-email"
                     class="field-input"
                     type="email"
-                    autocomplete="email"
+                    autocomplete="username webauthn"
                     spellcheck="false"
                     autocapitalize="none"
                     required

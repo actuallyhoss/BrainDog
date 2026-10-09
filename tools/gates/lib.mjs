@@ -441,3 +441,127 @@ export function readiness(gate, timeoutMs, root) {
     },
   };
 }
+
+/* ── one way to open a page (PRF-B04) ────────────────────────────────────── */
+
+/**
+ * The plan for one page a gate opens, made without a browser, so a test reads it whole.
+ *
+ * `{ url, context, clock, prefs, waitUntil, prerendered }`: `context` is what `browser.newContext` is given, `clock` the
+ * instant the page is pinned to (epoch milliseconds, or `null`), and `prefs` the settings the record keeps first.
+ *
+ * ONE CLOCK. A page draws on the record's clock: `clock`, or `record.now` when it is not given (`record.mjs` `clockOf`).
+ * Neither is a throw and not a default, because the default was the runner's own date, which is how Today's date line
+ * and Usage's "this month" were measured on a day the record never lived. `clock: null` leaves the page on the runner's
+ * time, said in the call, for the one planted fault that has to show a gate going red on it.
+ *
+ * WHAT THE RECORD KEEPS IS KEPT BY THE RECORD. `prefs` is the person's own settings, key by key as `setPref` takes them,
+ * and `null` takes one away. They are written through `record.setPref` before the page loads, so the page reads them
+ * from `boot` exactly as a person's page does. No gate writes them into an answer. They are THIS page's: the record
+ * keeps them past the page, so the next `openPage` on the same record hands back each one it does not keep itself, to
+ * what the record held before, as a fresh context once dropped a cookie.
+ *
+ * `height` is `layout.viewportHeightPx` unless a gate says otherwise. `touch` is a phone: a coarse pointer and the
+ * mobile viewport together, because a gate that emulated only a mouse never measured the size a thumb gets.
+ */
+export function pagePlan(
+  url,
+  { width, height, record, prefs = {}, clock, scheme, touch = false, reducedMotion = 'reduce', waitUntil = 'domcontentloaded', prerendered = false } = {},
+) {
+  if (!Number.isInteger(width) || width <= 0) throw new Error(`openPage ${url}: width is a whole number of pixels, and was ${String(width)}.`);
+  /* `record.now` is `null` for a base `record.mjs` did not start, and that is no clock, not `clock: null`: only the call
+     may say the page runs on the runner's date. */
+  const at = clock === undefined ? (record?.now ?? undefined) : clock;
+  if (at === undefined || (at !== null && Number.isNaN(new Date(at).getTime())))
+    throw new Error(`openPage ${url}: no clock. A page draws on the record's clock: pass the record, or its clock, or clock: null on purpose.`);
+  const keeps = Object.entries(prefs ?? {});
+  if (keeps.length > 0 && typeof record?.setPref !== 'function')
+    throw new Error(`openPage ${url}: ${keeps.map(([k]) => k).join(', ')} can only be kept by a record, and none was given.`);
+  return {
+    url,
+    context: {
+      viewport: { width, height: height ?? budget('layout').viewportHeightPx },
+      reducedMotion,
+      hasTouch: touch,
+      isMobile: touch,
+      /* THE SITE SHIPS A HASH CSP IN A META TAG and `a11y` injects axe as an inline script. Bypassing it changes what
+         a gate can run in the page, not what the page is. */
+      bypassCSP: true,
+      ...(scheme === undefined ? {} : { colorScheme: scheme }),
+    },
+    clock: at === null ? null : new Date(at).getTime(),
+    prefs: keeps,
+    waitUntil,
+    prerendered,
+  };
+}
+
+/** The settings `openPage` kept on each record, by its base, each with what the record held before it was kept. */
+const KEPT = new Map();
+
+/**
+ * Keep one page's settings on the record, and first hand back each one an earlier page kept that this page does not:
+ * a gate that drew the menu shape and then the default would otherwise draw the menu twice and call it the default.
+ */
+async function keepPrefs(record, prefs) {
+  if (typeof record?.setPref !== 'function') return;
+  const kept = KEPT.get(record.base) ?? new Map();
+  KEPT.set(record.base, kept);
+  const asked = new Set(prefs.map(([key]) => key));
+  for (const [key, was] of [...kept]) {
+    if (asked.has(key)) continue;
+    await record.setPref(key, was);
+    kept.delete(key);
+  }
+  if (prefs.length === 0) return;
+  const held = typeof record.ask === 'function' ? ((await record.ask('boot'))?.value?.me?.prefs ?? {}) : {};
+  for (const [key, value] of prefs) {
+    if (!kept.has(key)) kept.set(key, held[key] ?? null);
+    await record.setPref(key, value);
+  }
+}
+
+/**
+ * Open one page the one way every gate opens a page: the record's settings kept, the record's clock, the page's own
+ * ready mark waited for, and its errors collected.
+ *
+ *   const opened = await openPage(browser, `${origin}${APP_BASE}/today`, { width: 390, touch: true, record, ready });
+ *   // opened.state: what the screen settled into (`ready.settled`), `null` when it never did, which is a finding
+ *   // opened.errors: `{ kind: 'uncaught' | 'console', text }`, for this load only; `printed.mjs` reads them
+ *   // opened.goto(url): the next address in the same page, its errors collected afresh; resolves to its state
+ *   // opened.context: the caller's to close, in the `finally` of the `try` it opened it in
+ *
+ * `ready` IS REQUIRED. It is the gate's `readiness(...)`, and a page opened without waiting for its mark is the idiom
+ * that ended in `.catch(() => {})` and measured an empty document. The rest is `pagePlan`'s.
+ *
+ * THE CLOCK IS PINNED ON THE CONTEXT BEFORE THE PAGE EXISTS (`clock.setFixedTime`), so the first script that reads the
+ * date reads the record's. Timers still run, so a screen that settles on a timer still settles.
+ *
+ * A THROW HANDS THE CONTEXT BACK FIRST: a caller holds no handle to a context it was never given.
+ */
+export async function openPage(browser, url, options = {}) {
+  const { ready, record } = options;
+  if (typeof ready?.settled !== 'function') throw new Error(`openPage ${url}: no readiness, so nothing would wait for the screen to settle.`);
+  const plan = pagePlan(url, options);
+  await keepPrefs(record, plan.prefs);
+  const context = await browser.newContext(plan.context);
+  try {
+    if (plan.clock !== null) await context.clock.setFixedTime(plan.clock);
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push({ kind: 'uncaught', text: e instanceof Error ? e.message : String(e) }));
+    page.on('console', (m) => {
+      if (m.type() === 'error') errors.push({ kind: 'console', text: m.text() });
+    });
+    const goto = async (to) => {
+      errors.length = 0;
+      await page.goto(to, { waitUntil: plan.waitUntil });
+      return ready.settled(page, plan.prerendered);
+    };
+    const state = await goto(url);
+    return { context, page, state, errors, plan, goto };
+  } catch (e) {
+    await context.close().catch(() => {});
+    throw e;
+  }
+}

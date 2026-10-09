@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { propose } from '../../lib/start/propose.ts';
-import { accept, type Accepting } from './accept.ts';
+import { accept, fileFor, type Accepting } from './accept.ts';
 
 type Call = { name: string; args: unknown };
 
@@ -106,4 +106,52 @@ test('A PEOPLE LIST HELD BEFORE IS NOT CHANGED UNDER THE PERSON: the same losses
   const room = record(1, ['people'], [], { adds: [{ id: 'block.organisation-money', summary: '' }], retires: [{ id: 'page.relation', rows: 0, to: 'money-core' }] });
   await accept(room.client, asked());
   assert.equal(installs(room.calls, 'people'), 1, 'what Money made room for did not go in');
+});
+
+/* ── the one answer, and a shop's lists (use case 6, steps 2 and 3) ──────── */
+
+/** A page's cookie jar, for `pref.ts`: what the press writes is what the next read finds. */
+function jar(): () => void {
+  const was = (globalThis as { document?: unknown }).document;
+  let kept = '';
+  (globalThis as { document?: unknown }).document = {
+    get cookie() {
+      return kept;
+    },
+    set cookie(line: string) {
+      kept = line.split(';')[0] ?? '';
+    },
+  };
+  return () => void ((globalThis as { document?: unknown }).document = was);
+}
+
+test('THE ONE ANSWER IS KEPT AS PREF arrivesBy, which orders Today’s next steps; none is kept unasked', async () => {
+  const done = jar();
+  try {
+    const { read } = await import('../../lib/pref.ts');
+    const a = asked();
+    await accept(record(0).client, { ...a, proposal: { ...a.proposal, answers: { arrivesBy: 'messages' } } });
+    assert.equal(read().arrivesBy, 'messages', 'the answer to the one question was not kept');
+    done();
+    const fresh = jar();
+    try {
+      await accept(record(0).client, asked());
+      assert.equal(read().arrivesBy, undefined, 'an answer nobody gave was kept');
+    } finally {
+      fresh();
+    }
+  } finally {
+    done();
+  }
+});
+
+test('A SHOP IS MADE WITH ITS ORDERS AND PRODUCTS, and nothing in them that she did not say', async () => {
+  const { useCase } = await import('@braindog/seed/usecases');
+  const shop = useCase('shop');
+  assert.ok(shop, 'there is no shop use case to make');
+  const file = await fileFor(shop, ['people', 'money-core'], '2026-10-09', 'I run a small candle shop in Alexandria');
+  const pack = (file?.pack ?? {}) as { declarations?: { register?: string }[]; seeds?: unknown[] };
+  const lists = (pack.declarations ?? []).flatMap((d) => (typeof d.register === 'string' ? [d.register] : []));
+  assert.ok(lists.includes('orders') && lists.includes('products'), `a shop is made without Orders and Products: ${lists.join(', ')}`);
+  assert.equal(pack.seeds, undefined, 'a shop is made with entries she did not type');
 });

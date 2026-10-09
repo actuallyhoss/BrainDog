@@ -107,6 +107,30 @@ export function resolveDay(word: string, nowMs: number): string | null {
       break;
   }
 
+  /* A DAY WORD MAY CARRY AN OFFSET, so a page can say last month's spending: `bom-1m` is the first day of last month,
+     `eom-1m` its last, `boy-1y` the first day of last year. An offset in the word's own period moves the period and
+     then takes the word, which is the only reading that gets `eom-1m` right on 30 September: a month before the 30th
+     is 30 August, and the end of last month is the 31st. Any other offset is counted from the word's day, as `+30d`
+     is counted from today. `y` is read here and only here: `+2y` alone stays refused (`RELATIVE`). */
+  const anchored = ANCHORED.exec(word);
+  if (anchored) {
+    const [, anchor, sign, digits, unit] = anchored as unknown as [string, Anchor, string, string, Unit];
+    const n = Number(digits) * (sign === '-' ? -1 : 1);
+    const span = PERIOD[anchor];
+    if (span === 'month' && (unit === 'm' || unit === 'y')) {
+      const first = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + (unit === 'y' ? 12 * n : n), 1, 12);
+      return resolveDay(anchor, first);
+    }
+    if (span === 'year' && unit === 'y') return resolveDay(anchor, Date.UTC(d.getUTCFullYear() + n, 0, 1, 12));
+    const from = Date.parse(`${resolveDay(anchor, nowMs)}T12:00:00Z`);
+    if (unit === 'y') return iso(monthsOn(from, 12 * n));
+    return resolveDay(`${sign}${digits}${unit}`, from);
+  }
+
+  /* AND THE SAME WORDS AS THE PRINTER SAYS THEM ("the start of last month"), read back through the word they say. */
+  const spoken = wordOfSaid(word);
+  if (spoken !== null) return resolveDay(spoken, nowMs);
+
   /**
    * AND THE SAME DAY WRITTEN THE WAY A SCREEN WRITES IT.
    *
@@ -137,10 +161,92 @@ export function resolveDay(word: string, nowMs: number): string | null {
   if (m[3] === 'd') return iso(nowMs + n * DAY_MS);
   if (m[3] === 'w') return iso(nowMs + n * 7 * DAY_MS);
 
-  const months = n;
+  return iso(monthsOn(nowMs, n));
+}
+
+/** `months` calendar months from `ms`, at noon, the day CLAMPED to the last the target month has. */
+function monthsOn(ms: number, months: number): number {
+  const d = new Date(ms);
   const first = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, 1, 12));
   const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0, 12)).getUTCDate();
-  return iso(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d.getUTCDate(), last), 12));
+  return Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d.getUTCDate(), last), 12);
+}
+
+/* ── a day word with an offset, and the words a screen prints for one ── */
+
+type Anchor = 'bow' | 'bom' | 'eom' | 'boy' | 'eoy';
+type Unit = 'd' | 'w' | 'm' | 'y';
+
+/** A day word and an offset in four units: `bom-1m`, `eom+2w`, `boy-1y`. `34 §1.1`'s `anchored` production. */
+const ANCHORED = /^(bow|bom|eom|boy|eoy)([+-])(\d{1,4})([dwmy])$/;
+const PERIOD: Readonly<Record<Anchor, 'week' | 'month' | 'year'>> = { bow: 'week', bom: 'month', eom: 'month', boy: 'year', eoy: 'year' };
+const EDGE: Readonly<Record<Anchor, 'start' | 'end'>> = { bow: 'start', bom: 'start', eom: 'end', boy: 'start', eoy: 'end' };
+const NOUN: Readonly<Record<Unit, string>> = { d: 'day', w: 'week', m: 'month', y: 'year' };
+const UNIT_OF: Readonly<Record<string, Unit>> = { day: 'd', week: 'w', month: 'm', year: 'y' };
+const ANCHOR_OF: Readonly<Record<string, Anchor>> = { 'start week': 'bow', 'start month': 'bom', 'end month': 'eom', 'start year': 'boy', 'end year': 'eoy' };
+/** The unit that moves a word's own period: a week by `w`, a month by `m`, a year by `y`. */
+const OWN: Readonly<Record<'week' | 'month' | 'year', Unit>> = { week: 'w', month: 'm', year: 'y' };
+
+const counted = (n: number, unit: Unit): string => `${n} ${NOUN[unit]}${n === 1 ? '' : 's'}`;
+
+/**
+ * A day word as a person reads it, or `null` for anything that is not one: `bom-1m` is "the start of last month",
+ * `eom` "the end of this month", `bom-3m` "the start of the month 3 months ago", `eom+5d` "5 days after the end of
+ * this month", `+30d` "30 days from now". A date and `today` are already words and come back `null`, to be printed
+ * as written.
+ *
+ * THE PRINTER AND THE PARSER ARE ONE TABLE. `resolveDay` reads exactly what this prints (`wordOfSaid` checks each
+ * reading by printing it again), so a filter a page prints is a filter that parses back, which `34 §1.1` asks of
+ * every printed clause.
+ */
+export function daySaid(word: string): string | null {
+  const rel = RELATIVE.exec(word);
+  if (rel) {
+    const n = Number(rel[2]);
+    return `${counted(n, rel[3] as Unit)} ${rel[1] === '+' ? 'from now' : 'ago'}`;
+  }
+  if (Object.hasOwn(PERIOD, word)) return `the ${EDGE[word as Anchor]} of this ${PERIOD[word as Anchor]}`;
+  const m = ANCHORED.exec(word);
+  if (!m) return null;
+  const [, anchor, sign, digits, unit] = m as unknown as [string, Anchor, string, string, Unit];
+  const n = Number(digits);
+  if (n === 0) return null;
+  const span = PERIOD[anchor];
+  const edge = `the ${EDGE[anchor]} of`;
+  if (unit === OWN[span]) {
+    if (n === 1) return `${edge} ${sign === '-' ? 'last' : 'next'} ${span}`;
+    return `${edge} the ${span} ${counted(n, unit)} ${sign === '-' ? 'ago' : 'from now'}`;
+  }
+  return `${counted(n, unit)} ${sign === '-' ? 'before' : 'after'} ${edge} this ${span}`;
+}
+
+/** The day word a printed phrase says, or `null` when the phrase is not one `daySaid` prints. A leading "the" may go. */
+function wordOfSaid(said: string): string | null {
+  const t = said.trim().replace(/\s+/g, ' ').toLowerCase().replace(/^the /, '');
+  const word = phraseWord(t);
+  /* A PHRASE IS READ ONLY WHEN THE PRINTER WOULD SAY IT SO: "the start of the month 1 month ago" is "the start of
+     last month", and a second spelling of one day is a second language. */
+  return word !== null && daySaid(word)?.replace(/^the /, '') === t ? word : null;
+}
+
+function phraseWord(t: string): string | null {
+  let m = /^(start|end) of (this|last|next) (week|month|year)$/.exec(t);
+  if (m) {
+    const anchor = ANCHOR_OF[`${m[1]} ${m[3]}`];
+    if (!anchor) return null;
+    return m[2] === 'this' ? anchor : `${anchor}${m[2] === 'last' ? '-' : '+'}1${OWN[PERIOD[anchor]]}`;
+  }
+  m = /^(start|end) of the (week|month|year) (\d{1,4}) (week|month|year)s? (ago|from now)$/.exec(t);
+  if (m) {
+    const anchor = ANCHOR_OF[`${m[1]} ${m[2]}`];
+    return anchor ? `${anchor}${m[5] === 'ago' ? '-' : '+'}${m[3]}${UNIT_OF[m[4]!]}` : null;
+  }
+  m = /^(\d{1,4}) (day|week|month|year)s? (before|after) the (start|end) of this (week|month|year)$/.exec(t);
+  if (m) {
+    const anchor = ANCHOR_OF[`${m[4]} ${m[5]}`];
+    return anchor ? `${anchor}${m[3] === 'before' ? '-' : '+'}${m[1]}${UNIT_OF[m[2]!]}` : null;
+  }
+  return null;
 }
 
 export type SentenceDeps = {
@@ -632,7 +738,7 @@ function boundOf(sentence: string, field: string, decl: FieldSpec, said: string,
     case 'instant': {
       const day = resolveDay(said, nowMs);
       return day === null
-        ? { code: 'VALUE_MALFORMED', fix: `${sentence}: ${said} is not a date. Write 2026-10-01, +30d, or one of ${WORDS.join(', ')}.` }
+        ? { code: 'VALUE_MALFORMED', fix: `${sentence}: ${said} is not a date. Write 2026-10-01, +30d, bom-1m, or one of ${WORDS.join(', ')}.` }
         : { value: day };
     }
     case 'money': {
@@ -931,7 +1037,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       if (day === null) {
         bad.push({
           code: 'VALUE_MALFORMED',
-          fix: `${sentence}: ${rest || '(nothing)'} is not a date. Write 2026-10-01, +30d, or one of ${WORDS.join(', ')}.`,
+          fix: `${sentence}: ${rest || '(nothing)'} is not a date. Write 2026-10-01, +30d, bom-1m, or one of ${WORDS.join(', ')}.`,
           at: field,
           allowed: WORDS,
         });

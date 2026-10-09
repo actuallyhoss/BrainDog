@@ -1,6 +1,6 @@
 /**
  * WHO LAST CHANGED A ROW, AS A BYLINE (DIRECTION §37, "Trust and his screens: bylines, undo"): a row an agent, an app, a
- * rule or Slash changed wears "Claude for Sam · 2h ago" and a faint tint until the reader has seen it, and its Undo puts
+ * rule or Slash changed wears "Claude for Mara · 2h ago" and a faint tint until the reader has seen it, and its Undo puts
  * back the write it came in (by `batch`), naming first whatever else that write touched (`page/byline-undo.ts`).
  *
  * READ FROM THE RECORD'S `changes`, one a row (`packages/kernel/src/pages.ts` `changesOf`): who signed the row's newest
@@ -39,7 +39,7 @@ export type Byline = {
   run: string | null;
   /** Whether the reader has not seen the change yet, which the row draws as a faint tint. */
   unseen: boolean;
-  /** The line itself: "Claude for Sam · 2h ago", and "Claude · 2h ago" when it acted for the reader. */
+  /** The line itself: "Claude for Mara · 2h ago", and "Claude · 2h ago" when it acted for the reader. */
   said: string;
 };
 
@@ -99,7 +99,7 @@ function forOf(v: unknown, me: string | null, names: ReadonlyMap<string, string>
   if (id === null) return null;
   const whom = actor(id, me, names);
   if (whom.kind === 'you') return bylineWords.you;
-  /* A NAME THE RECORD WROTE OUT ("Sam") is kept as it is; an id nobody named is not a name, and is left out. */
+  /* A NAME THE RECORD WROTE OUT ("Mara") is kept as it is; an id nobody named is not a name, and is left out. */
   if (whom.kind === 'person' && whom.name === id && !NOT_A_NAME.test(id)) return id;
   return whom.kind === 'person' && names.has(id) ? whom.name : null;
 }

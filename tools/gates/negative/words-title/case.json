@@ -1,0 +1,8 @@
+{
+  "gate": "words",
+  "rule": "a title that ends in a full stop",
+  "expect": "a title that ends in a full stop",
+  "findings": 1,
+  "total": 1,
+  "why": "THE FIRST RUN'S OWN FILE IS READ, AND THE RULE IS ABOUT THE KEY. A body ending in a full stop is a sentence and is right; a label ending in an ellipsis is a promise of more and is right; only the title is a name with a stop on it."
+}

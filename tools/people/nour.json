@@ -1,0 +1,61 @@
+{
+  "id": "nour-team",
+  "name": "Nour",
+  "who": "Leads a team of six in Berlin shipping a mobile app, with three AI coders picking up what the team assigns. Their board lives in Notion today.",
+  "expects": "team",
+  "standing": true,
+  "said": "I'm Nour. I lead a team of six building a mobile app, and three AI agents pick up the tasks we assign.",
+  "says": {
+    "plain": "I'm Nour. I lead a team of six building a mobile app, and three AI agents pick up the tasks we assign.",
+    "hard": "Six of us ship a mobile app together and three AI coders pick up what we assign."
+  },
+  "chip": "I'm part of a team",
+  "answer": "tickets",
+  "answers": {
+    "name": "Nour",
+    "currency": "EUR",
+    "kind": "tickets",
+    "things": ["Login screen", "Push notifications", "Offline mode"]
+  },
+  "file": {
+    "name": "Sprint board.csv",
+    "type": "text/csv",
+    "text": "Name,Status,Assignee,Sprint,Due\nLogin screen,In progress,Nour,Sprint 12,2026-10-09\nPush notifications,Not started,Karim,Sprint 12,2026-10-14\nOffline mode,Not started,Agent Atlas,Sprint 13,2026-10-21\nCrash on resume,Done,Lina,Sprint 11,2026-09-30\n"
+  },
+  "email": "nour@people.braindog.test",
+  "slug": "nours-team",
+  "zone": "Europe/Berlin",
+  "locale": "en-DE",
+  "languages": ["en-DE", "de-DE", "ar"],
+  "start": "2026-10-05T08:00:00Z",
+  "first": "Login screen for Lina, due Friday",
+  "later": [
+    { "day": 1, "said": ["Push notifications for Karim, due Tuesday", "Offline mode for Atlas"] },
+    { "day": 7, "said": ["Crash on resume for Lina", "Dark mode for Atlas, due next Friday"] },
+    { "day": 14, "said": ["Onboarding copy for Nour", "App store screenshots for Karim"] },
+    { "day": 15, "said": ["Settings screen for Atlas"] },
+    { "day": 90, "said": ["Release 2.0 checklist for Nour"] }
+  ],
+  "expect": {
+    "who": {
+      "question": "Who are you?",
+      "chips": 5,
+      "promises": [
+        { "says": "free, with no card", "match": "free\\b.{0,24}\\bno card" },
+        { "says": "nothing is saved until you keep it", "match": "nothing (is )?saved until you keep" },
+        { "says": "yours to export or move", "match": "yours to (export|move|take)" }
+      ]
+    },
+    "heard": {
+      "usecase": "team",
+      "title": "Nour's Team",
+      "lit": ["Nour", "team of six", "tasks"],
+      "places": ["Today", "Work", "People", "Agents"]
+    },
+    "question": { "about": "kind", "choices": 3 },
+    "keep": { "lists": ["tasks", "people"], "currency": "EUR" },
+    "tell": { "lists": ["tasks"] },
+    "today": { "first": "agent", "lists": ["tasks"] },
+    "offer": { "id": "view:tasks.mine", "before": 13, "after": 15 }
+  }
+}

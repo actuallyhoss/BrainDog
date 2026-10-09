@@ -25,8 +25,9 @@ import { no, ok } from '@braindog/ports';
 import { compile, jsonPath, type Schema } from '@braindog/where';
 
 import { GROUP_CAP } from './buckets.ts';
-import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_DOOR, RECORD_KEYS, RECORD_PLACES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_DOOR, RECORD_KEYS, RECORD_LISTS, RECORD_PATHS, RECORD_PLACES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING } from './built-in-figures.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
+import { RECORD_KEY_SCAN } from './key-scan.ts';
 import { across, type Amount, type Part } from './fx.ts';
 import type { Entry } from './index.ts';
 import {
@@ -34,6 +35,7 @@ import {
   deltaFrom,
   evaluateMetric,
   groupNames,
+  heldVerdict,
   largestFirst,
   predicateOf,
   scopeCurrency,
@@ -417,7 +419,8 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
     held,
     delta,
     why,
-    met: verdict.met,
+    /* NO ACCOUNT HELD IS NO VERDICT, as a figure over an empty list has none (`heldVerdict`). */
+    met: heldVerdict(verdict.met, held),
     refusals: [],
     ...(verdict.targetIn ? { targetIn: verdict.targetIn } : {}),
     ...(now.whole.parts ? { parts: now.whole.parts } : {}),
@@ -570,7 +573,8 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
         : decl.compare === 'none'
           ? 'no comparison asked for'
           : 'a walk ahead has no window before it to compare with',
-    met: verdict.met,
+    /* A WALK WITH NO STEP HELD NOTHING TO JUDGE, so a miss over it is no verdict (`heldVerdict`). */
+    met: heldVerdict(verdict.met, walk.value.steps.length),
     refusals: [],
     ...(verdict.targetIn ? { targetIn: verdict.targetIn } : {}),
     ...(converted ? { fx: { into: home.home, home: home.home, asOf: converted.asOf, forward: converted.forward, stale: converted.stale, missing: [] } } : {}),
@@ -626,8 +630,18 @@ export function figureLists(
   if (decl.source === SESSIONS_WORKING) return ['session'];
   if (decl.source === HANDOFFS_OPEN) return ['session'];
   /* THE DOOR'S MARKS, THE KEYS AND THE PLACES, AND THE VITAL SIGNS read the whole record, so they name `*`: named by no
-     list, a member held to one list could read the key and door counts (kernel-figures-43). */
-  if (decl.source === RECORD_DOOR || decl.source === RECORD_KEYS || decl.source === RECORD_PLACES || decl.source === RECORD_VITALS) return ['*'];
+     list, a member held to one list could read the key and door counts (kernel-figures-43). AND THE KEYS IN PLAIN TEXT,
+     whose sentence names where another list keeps one, and the night's counts, which name every list and every note. */
+  if (
+    decl.source === RECORD_DOOR ||
+    decl.source === RECORD_KEYS ||
+    decl.source === RECORD_KEY_SCAN ||
+    decl.source === RECORD_LISTS ||
+    decl.source === RECORD_PATHS ||
+    decl.source === RECORD_PLACES ||
+    decl.source === RECORD_VITALS
+  )
+    return ['*'];
   /* A KEPT LINE (`series.<figure>`) IS READ BY WHOEVER READS ITS FIGURE: how many nights Cash now missed says something
      about the lists Cash now reads, so it names them. A line of a figure this record does not hold, or a line of a line,
      names the whole record, so nobody held to part of it is shown it. */

@@ -1,30 +1,48 @@
 <!--
-  A passkey, offered at the end of a new record's first run (`Made.svelte`), once the BrainDog is made.
+  A passkey, offered straight after the link (use case 6, step 4): sign-up draws this the moment the email link has
+  signed the person in, before the build is made, so their next visit is one touch on this device.
 
-  A PERSON WHO SIGNED UP HAS ONLY THEIR MAILBOX. They proved it with a link and landed here; without a passkey every
-  later sign-in is another email to wait for. So the end of the first run offers a way back in on this device, after
-  the build rather than before the question (research-firstrun-17), and "Not now" leaves it for Settings > Recovery.
+  A PERSON WHO SIGNED UP HAS ONLY THEIR MAILBOX. Without a passkey every later sign-in is another email to wait for.
+  So the ask comes while they are still holding the device that opened the link, in that device's own name ("Use this
+  iPhone", `passkeyAsk`), and the passkey is named for it as it is made (`platformLabel`, LCH-A04), so Settings lists
+  it by the device and not as "Passkey". One press; "Not now" leaves it for Settings > Recovery.
 
-  ASKED ONLY WHEN IT WOULD HELP: the host offers passkeys, this person has none yet (`firstRun` is about THIS person
-  once they are signed in, `packages/ports/src/auth.ts`), and this browser can make one. Everybody else never sees it.
+  ASKED ONLY WHEN IT WOULD HELP (`passkeyOffered`): the host offers passkeys, this person has none yet, and this browser
+  can make one. Everybody else never sees it, and `ondone` is told at once so the page moves on.
+
+  `ondone` IS THE CALLER'S WAY ON, told once: `true` when a passkey was made, `false` for "Not now" or nothing to offer.
+  The sheet closed on purpose is neither, and the ask stays.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { methods, passkeyRegister, support } from '$lib/auth.ts';
+  import { methods, passkeyRegister, platformLabel, support } from '$lib/auth.ts';
   import { copy } from '$lib/copy.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import { passkeyAsk, passkeyOffered } from './building.ts';
+
+  let { ondone }: { ondone?: ((kept: boolean) => void) | undefined } = $props();
 
   let shown = $state(false);
   let busy = $state(false);
   let said = $state<string | null>(null);
+  const label = platformLabel();
+  const ask = passkeyAsk(label);
+
+  let told = false;
+  function done(kept: boolean) {
+    if (told) return;
+    told = true;
+    ondone?.(kept);
+  }
 
   onMount(() => {
     const can = support();
-    if (!can.webauthn || !can.secure) return;
+    if (!can.webauthn || !can.secure) return done(false);
     void methods().then((out) => {
-      shown = out.ok && out.value.passkey && out.value.me !== null && out.value.firstRun === true;
+      shown = passkeyOffered(can, out);
+      if (!shown) done(false);
     });
   });
 
@@ -33,32 +51,38 @@
     if (busy) return;
     busy = true;
     said = null;
-    const out = await passkeyRegister();
+    const out = await passkeyRegister(undefined, label);
     busy = false;
     if (out.ok) {
       shown = false;
-      said = copy.passkeyAdded;
+      said = ask.kept;
+      done(true);
       return;
     }
     /* THE SHEET CLOSED ON PURPOSE IS NOT A FAILURE, and the ask stays where it was. */
     if (out.kind !== 'cancelled') said = copy.passkeyFirstFailed;
   }
+
+  function later() {
+    shown = false;
+    done(false);
+  }
 </script>
 
 {#if shown}
-  <section class="first" aria-labelledby="first-h">
+  <section class="first" aria-labelledby="first-h" data-passkey-first>
     <IconWell name="key" size="l" />
     <div class="first-main">
-      <!-- A PARAGRAPH AND NOT A HEADING, as `/start`'s own "again" note is: it sits above the page's one `h1`. -->
-      <p class="first-h" id="first-h">{copy.passkeyFirstTitle}</p>
-      <p class="first-why">{copy.passkeyFirstWhy}</p>
+      <!-- A PARAGRAPH AND NOT A HEADING: it sits beside the page's one `h1`, which is the step's. -->
+      <p class="first-h" id="first-h">{ask.title}</p>
+      <p class="first-why">{ask.why}</p>
       {#if said}<p class="first-said" role="status">{said}</p>{/if}
       <div class="first-go">
-        <!-- QUIET, NOT INK: the screen's one primary is the answer below it, and this is asked beside it. -->
-        <Button weight="quiet" onclick={() => void add()} aria-busy={busy}>
-          <Icon name="key" size="m" />{busy ? copy.addingPasskey : copy.addPasskeyHere}
+        <!-- THE ONE PRESS, AND THE STEP'S PRIMARY: nothing else is asked of the person on this screen. -->
+        <Button weight="primary" onclick={() => void add()} aria-busy={busy}>
+          <Icon name="key" size="m" />{busy ? copy.addingPasskey : ask.press}
         </Button>
-        <Button weight="bare" onclick={() => (shown = false)}>{copy.passkeyFirstLater}</Button>
+        <Button weight="bare" onclick={later}>{ask.later}</Button>
       </div>
     </div>
   </section>

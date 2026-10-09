@@ -190,12 +190,23 @@ test('A SEALED FIELD\'S GRANT IS NOT A KEY: the vault handle a key row holds is 
   sql.close();
 });
 
-test('ONCE THE RECORD ANSWERS keys-in-text BY NAME, it answers this declaration, and only a reader of every list reads it', () => {
-  /* A guard for the integrator: once `keys-in-text` is in `BUILT_IN_FIGURES` it must be this declaration, and it must
-     name the whole record, because its `why` names another list's row: named by no list, a member held to Projects
-     would read where the record keeps a key in Credentials (`pages.ts` `mayRead`). */
-  const built = (BUILT_IN_FIGURES as Record<string, unknown>)['keys-in-text'];
-  if (built === undefined) return;
-  assert.deepEqual(built, KEYS_IN_TEXT);
+test('THE RECORD ANSWERS keys-in-text BY NAME, this declaration by its own reader, and only a reader of every list reads it', async () => {
+  /* It must name the whole record, because its `why` names another list's row: named by no list, a member held to
+     Projects would read where the record keeps a key in Credentials (`pages.ts` `mayRead`). */
+  assert.deepEqual(BUILT_IN_FIGURES['keys-in-text'], KEYS_IN_TEXT);
   assert.deepEqual(figureLists(KEYS_IN_TEXT), ['*'], 'keys-in-text named no list, so a member held to one list reads it');
+  /* AND THE RECORD'S OWN `metric` READS IT, as a page does, and not by refusing a source it does not know. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const before = k.metric(KEYS_IN_TEXT);
+  assert.ok(before.ok, JSON.stringify(before));
+  assert.equal(before.value.value, null, 'read nought before the first walk ended');
+  plant(sql, 'credentials', { label: 'Deploy token', where: KEY }, 8);
+  scanKeys(sql, NOW);
+  const after = k.metric(KEYS_IN_TEXT);
+  assert.ok(after.ok, JSON.stringify(after));
+  assert.equal(after.value.value, 1);
+  assert.equal(after.value.met, false);
+  assert.ok(!JSON.stringify(after.value).includes(KEY.slice(4, 14)), 'the reading said a piece of the key');
+  sql.close();
 });

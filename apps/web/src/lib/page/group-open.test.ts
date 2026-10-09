@@ -36,7 +36,7 @@ const columns = [
 let seq = 0;
 const person = (fields: Fields): Entry => ({ seq: ++seq, fields, version: 1, created: '2026-09-01T00:00:00Z', by: 'p_owner' });
 const names = new Map([
-  ['organisations#7', 'Encore'],
+  ['organisations#7', 'Brightwell'],
   ['organisations#9', 'Halden Type Co'],
 ]);
 const orgOf = (e: Entry): string | null => (typeof e.fields.org === 'number' ? (names.get(`organisations#${e.fields.org}`) ?? null) : null);
@@ -84,7 +84,7 @@ const said = (drawn: Opening<Seg>[]): string[] =>
 function people() {
   seq = 0;
   return [
-    person({ name: 'Priya', org: 7 }),
+    person({ name: 'Teodor', org: 7 }),
     person({ name: 'Jo' }),
     person({ name: 'Mia', org: 7 }),
     person({ name: 'Lee', org: 7 }),
@@ -99,9 +99,9 @@ test('A FOLDED GROUP SHOWS ITS MOST RECENT AND A PRESS FOR THE REST, where a lin
   const drawn = openInPlace(toSegments(b), toSegments({ ...b, fold: false }), new Set());
   assert.ok(drawn, 'the two drawings line up');
   assert.deepEqual(said(drawn), [
-    '**[Encore](/r/organisations/7)** · 4 people',
-    'cards: [Priya](/r/people/1)',
-    'press: Show all 4 people at Encore',
+    '**[Brightwell](/r/organisations/7)** · 4 people',
+    'cards: [Teodor](/r/people/1)',
+    'press: Show all 4 people at Brightwell',
     'cards: [Jo](/r/people/2)',
     '**[Halden Type Co](/r/organisations/9)** · 2 people',
     'cards: [Ana](/r/people/6), [Kit](/r/people/7)',
@@ -113,8 +113,8 @@ test('PRESSED, THE GROUP OPENS IN PLACE with every person in it, and the others 
   const drawn = openInPlace(toSegments(b), toSegments({ ...b, fold: false }), new Set(['/r/organisations/7']));
   assert.ok(drawn);
   assert.deepEqual(said(drawn), [
-    '**[Encore](/r/organisations/7)** · 4 people',
-    'cards: [Priya](/r/people/1), [Mia](/r/people/3), [Lee](/r/people/4), [Raf](/r/people/5)',
+    '**[Brightwell](/r/organisations/7)** · 4 people',
+    'cards: [Teodor](/r/people/1), [Mia](/r/people/3), [Lee](/r/people/4), [Raf](/r/people/5)',
     'cards: [Jo](/r/people/2)',
     '**[Halden Type Co](/r/organisations/9)** · 2 people',
     'cards: [Ana](/r/people/6), [Kit](/r/people/7)',
@@ -135,8 +135,8 @@ test('A BLOCK WITH NOTHING FOLDED IS DRAWN AS IT WAS, and two drawings that do n
 });
 
 test('ONLY A LINK ALONE ON ITS LINE IS A LINE TO THE REST', () => {
-  assert.deepEqual(restOf({ type: 'markdown', text: '[Show all 4 people at Encore](/r/organisations/7)\n' }), { label: 'Show all 4 people at Encore', group: '/r/organisations/7' });
-  assert.equal(restOf({ type: 'markdown', text: '**[Encore](/r/organisations/7)** · 4 people' }), null);
+  assert.deepEqual(restOf({ type: 'markdown', text: '[Show all 4 people at Brightwell](/r/organisations/7)\n' }), { label: 'Show all 4 people at Brightwell', group: '/r/organisations/7' });
+  assert.equal(restOf({ type: 'markdown', text: '**[Brightwell](/r/organisations/7)** · 4 people' }), null);
   assert.equal(restOf({ type: 'markdown', text: '[x](https://example.com)' }), null, 'an address elsewhere is no group of this record');
   assert.equal(restOf({ type: 'block' }), null);
 });

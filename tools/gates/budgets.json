@@ -46,7 +46,9 @@
     "widths": [
       1512,
       390
-    ]
+    ],
+    "//seedContrastRatio": "The ratio the a11y-contrast seed plants a line of text at on the board (PRF-B02 2.4: text at 2 to 1). Far under 4.5, so axe's color-contrast must call it.",
+    "seedContrastRatio": 2
   },
   "look": {
     "//": "`tools/look/capture.mjs`, the real screens of a record (`loop/scope/area-proof-a.md` 2.4, PRF-A02). Its height is `layout.viewportHeightPx` and its wait `ready.settleTimeoutMs`, so a look and a gate agree on what drawn means.",

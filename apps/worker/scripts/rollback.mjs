@@ -166,7 +166,7 @@ export function decide(state, diff) {
   if (!Array.isArray(changed))
     return held(`git diff ${liveSha} ${headSha} could not be read in this checkout, so whether a migration shipped is unknown`);
 
-  const kernel = changed.filter((path) => path.startsWith(MIGRATIONS_DIR));
+  const kernel = changed.filter((path) => path.startsWith(MIGRATIONS_DIR) && /\/\d{4}_[a-z0-9_]+\.ts$/u.test(path));
   if (kernel.length > 0)
     return held(`a kernel migration shipped (${kernel.join(', ')}): every record that opened on this build has run it, and the build before refuses a record newer than it knows`);
   if (changed.includes(WRANGLER)) {

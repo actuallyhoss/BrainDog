@@ -60,7 +60,7 @@
   const orgName = (o: number): string => namedOrg(o) || seenWords.unnamedOrg;
   const nameOf = (e: Entry): string => String(e.fields[decl.title] ?? '').trim();
   const roleOf = (e: Entry): string => (role ? (display(register, role, e.fields[role], now, names) ?? '') : '');
-  /* WHAT A PERSON IS AND, OUTSIDE A GROUP, WHERE: "Contractor at Encore". Inside its group the organisation is the heading,
+  /* WHAT A PERSON IS AND, OUTSIDE A GROUP, WHERE: "Contractor at Brightwell". Inside its group the organisation is the heading,
      and one the record has not named yet is left unsaid rather than said as "At an organisation with no name yet". */
   const detailOf = (m: Member, at: number | null): string => {
     const r = roleOf(m.entry);

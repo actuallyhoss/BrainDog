@@ -128,7 +128,7 @@ export function groupsOf(rows: readonly JobRow[], now: number): Group[] {
 }
 
 /**
- * THE MACHINE BY ITS NAME, NOT ITS ADDRESS: a runner that reported `Sam-MacBook-Pro.local` or `build-box.lan` is said as
+ * THE MACHINE BY ITS NAME, NOT ITS ADDRESS: a runner that reported `Studio-MacBook-Pro.local` or `build-box.lan` is said as
  * the part a person named it, and a bare network address is not a name at all, so it reads as an unnamed machine.
  */
 export function machineOf(runner: string | null | undefined): string | null {

@@ -1,0 +1,9 @@
+{
+  "gate": "shell-words",
+  "rule": "a private word in a test",
+  "expect": "a private word named in the core",
+  "findings": 1,
+  "total": 1,
+  "env": { "BRAINDOG_PRIVATE_HASHES": "private-words.hashes.json" },
+  "why": "ONE, a hashed word in a test's code, which the gate skipped by rule before 9 October. `payrollRun` and `Payroll` beside it are tracked words and not findings, because a test may hand a record a use case; it may not name a client. The list is the tree's own, one invented word."
+}

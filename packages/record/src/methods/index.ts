@@ -43,6 +43,8 @@ import { methods as withdraw } from './withdraw.ts';
 import { methods as door } from './door.ts';
 import { methods as engine } from './engine.ts';
 import { methods as pagesCensus } from './pages-census.ts';
+import { methods as capture } from './capture.ts';
+import { methods as shape } from './shape.ts';
 /* END METHODS */
 
 /**
@@ -109,6 +111,8 @@ export type RecordDeps = {
   doorBuild?: import('./door.ts').DoorBuild | (() => import('./door.ts').DoorBuild);
   /** The operator's cut-off (`TOKENS_VALID_FROM`, `53 §5.11`), so doorHealth counts no key or runner it ended. */
   validFrom?: (() => string | undefined) | undefined;
+  /** The record's own checks on a new entry that `create` makes (`mergeShaped`, `keyHeld`, `huedOf` in `index.ts`), which `capture` asks of each entry. Absent, `capture` refuses only a merge. */
+  createDoor?: import('./capture.ts').CreateDoor | undefined;
 };
 
 export function methods(deps: RecordDeps) {
@@ -135,6 +139,8 @@ export function methods(deps: RecordDeps) {
     ...door(deps),
     ...engine(deps),
     ...pagesCensus(deps),
+    ...capture(deps),
+    ...shape(deps),
     /* END METHODS */
   };
 }

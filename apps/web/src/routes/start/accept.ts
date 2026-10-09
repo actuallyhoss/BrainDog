@@ -10,9 +10,10 @@
  * before it is read, the modules go in with none (`moduleDocument`), and the only rows written are the ones formed
  * from the person's own sentence: a guide's plan, the person, and the entries the sentence filled completely.
  *
- * IN THIS ORDER, because each step reads what the one before it made: the lists, and People again once every list it
- * links to is in; the person's own People row, before any client the sentence named; the record's currency, once Money
- * is in; then the sentence's entries.
+ * IN THIS ORDER, because each step reads what the one before it made: the lists (a shop's Orders and Products are its
+ * use case's, installed as any other), and People again once every list it links to is in; the person, the first entry
+ * in People, before any client the sentence named; the record's currency, once Money is in; then the sentence's
+ * entries; then the one answer, as the pref Today reads.
  *
  * A REFUSAL IS SAID IN THE PERSON'S WORDS ("Money was not added.") with the record's own sentence kept beside it for
  * Details and for the log. Whatever went in stays in: an install is not undone because a later step was refused.
@@ -29,6 +30,7 @@ import { modulesFor, useCase, type UseCase } from '@braindog/seed/usecases';
 import { moduleName } from '@braindog/seed/usecases/names';
 
 import { firstRun } from '../../lib/first-run.ts';
+import { write as writePref } from '../../lib/pref.ts';
 import { packDocument, relabelDocument, type PackState } from '../../lib/record/packs.ts';
 import { fileDrafted, type Drafted, type SlashClient } from '../../lib/record/slash.ts';
 import { hear, introduce, personRow, PEOPLE } from '../../lib/who.ts';
@@ -335,8 +337,10 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
 
   /* ── the person, first ─────────────────────────────────────────────────── */
   /* ONLY WITH PEOPLE ON, and People is on only where the person left it on: `introduce` reads the record, and a name heard
-     with People off was said back on the preview and is stored nowhere. */
-  const met = introduce(who, asked.email, states);
+     with People off was said back on the preview and is stored nowhere.
+     EVERY PERSON WHO SETS UP IS THE FIRST ENTRY IN THEIR PEOPLE (USE-B06): the name they typed, else the one they
+     answered, else the name in the address they kept the record with. Before any client the sentence named. */
+  const met = introduce(who, asked.email, states, { answered: asked.proposal.answers?.name ?? null, address: true });
   if (met) {
     const out = (await client.meet(met)) as Wire<{ row: { register: string; seq: number | null } | null; created: boolean; matched_by?: string }>;
     const row = out.ok ? out.value.row : null;
@@ -404,6 +408,12 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
     place.set(i, left.length);
     left.push({ register: row.register, fields, ...(still === undefined ? {} : { party: still }) });
   }
+
+  /* ── the one answer ────────────────────────────────────────────────────── */
+  /* WHERE THEIR WORK ARRIVES, the one question the first run asked (`start/question.ts`), kept as the pref Today's next
+     steps are ordered by (`arrivesBy`, `madeSteps`). Only now, with the record made: nothing is kept before the link. */
+  const arrivesBy = asked.proposal.answers?.arrivesBy;
+  if (arrivesBy !== undefined) writePref({ arrivesBy });
 
   /* ── the file they pointed at ─────────────────────────────────────────── */
   if (asked.imported) {

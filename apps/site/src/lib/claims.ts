@@ -73,7 +73,7 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'skills-updated', said: 'the ones you and other agents wrote, updated as they learn.', where: 'agents.value.gets.2.said', state: 'true' },
   { id: 'oauth-approve', said: 'It opens the app so you can approve it, once, and pick the record.', where: 'agents.connect.ways.0.said', state: 'true' },
   { id: 'cli-install', said: 'Install the command line, then point it at your record.', where: 'agents.connect.ways.1.said', state: 'true' },
-  { id: 'tool-count', said: 'Seventeen tools, and ten of them only read.', where: 'agents.mcp.title', state: 'true' },
+  { id: 'tool-count', said: 'Sixteen tools, and nine of them only read.', where: 'agents.mcp.title', state: 'true' },
   { id: 'door-rate', said: '120 a minute', where: 'agents.outside.ways.0.limits.2.what', state: 'true' },
   { id: 'report-key-blind', said: 'It cannot read anything, so it is safe to put in a CI job or on a server.', where: 'agents.outside.ways.1.said', state: 'true' },
   { id: 'report-rate', said: '600 rows a minute', where: 'agents.outside.ways.1.limits.5.what', state: 'true' },

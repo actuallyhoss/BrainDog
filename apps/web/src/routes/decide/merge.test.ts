@@ -15,13 +15,13 @@ const TWO = ['accept', 'reject'];
 const pair = {
   register: 'people',
   rows: [
-    { at: 'people#1', version: 3, patch: { handles: ['rohanmehta'], met: ['2026-09-20 · commit 4464966 in braindog', '2026-10-01 · mail from encore.example'] } },
+    { at: 'people#1', version: 3, patch: { handles: ['joaquinherrera'], met: ['2026-09-20 · commit 4464966 in braindog', '2026-10-01 · mail from brightwell.example'] } },
     { at: 'people#4', version: 1, patch: { merged_into: 'people#1', deleted_at: '2026-10-06T10:00:00.000Z' } },
   ],
 };
 const held = [
-  { seq: 1, fields: { name: 'Rohan Mehta', met: ['2026-09-20 · commit 4464966 in braindog'] } },
-  { seq: 4, fields: { name: 'rohanmehta', met: ['2026-09-30 · agent run S740', '2026-10-01 · mail from encore.example', '2026-10-02 · /Users/sam/Developer/encore'] } },
+  { seq: 1, fields: { name: 'Joaquin Herrera', met: ['2026-09-20 · commit 4464966 in braindog'] } },
+  { seq: 4, fields: { name: 'joaquinherrera', met: ['2026-09-30 · agent run S740', '2026-10-01 · mail from brightwell.example', '2026-10-02 · /Users/mara/Developer/brightwell'] } },
 ];
 
 test('the record’s merge is drawn as the names, where each was seen, and Merge all and Keep apart', () => {
@@ -30,16 +30,16 @@ test('the record’s merge is drawn as the names, where each was seen, and Merge
   assert.deepEqual(
     m.candidates.map((c) => [c.name, c.kept, c.seen]),
     [
-      ['Rohan Mehta', true, ['commit 4464966 in braindog']],
+      ['Joaquin Herrera', true, ['commit 4464966 in braindog']],
       /* NEWEST FIRST, WITHOUT THE DAY, AND NEVER A FILE PATH. */
-      ['rohanmehta', false, ['mail from encore.example', 'agent run S740']],
+      ['joaquinherrera', false, ['mail from brightwell.example', 'agent run S740']],
     ],
   );
   assert.deepEqual(m.all, { option: 'accept' });
   assert.deepEqual(m.apart, { option: 'reject' });
   /* A ROWSET IS ANSWERED WHOLE: its patch on the kept person carries every folded one's addresses at once. */
   assert.ok(m.candidates.every((c) => c.pick === null));
-  assert.equal(keptName(m), 'Rohan Mehta');
+  assert.equal(keptName(m), 'Joaquin Herrera');
 });
 
 test('a name is never a handle: a row the record would not give back is the one already here', () => {
@@ -49,8 +49,8 @@ test('a name is never a handle: a row the record would not give back is the one 
   assert.equal(keptName(m), '');
   assert.equal(words.mergedAll(keptName(m)), 'Merged them into one.');
   /* A NAME CARRIED ON THE BODY IS USED BEFORE THE ROW'S, and the record's handle is never one. */
-  const named = mergeOf({ kind: 'rowset', body: { ...pair, candidates: [{ at: 'people#4', name: 'people#4' }, { at: 'people#1', name: 'Rohan', seen: ['Encore'] }] } }, TWO, []);
-  assert.deepEqual(named?.candidates.map((c) => [c.name, c.seen]), [['Rohan', ['Encore']], ['', []]]);
+  const named = mergeOf({ kind: 'rowset', body: { ...pair, candidates: [{ at: 'people#4', name: 'people#4' }, { at: 'people#1', name: 'Joaquin', seen: ['Brightwell'] }] } }, TWO, []);
+  assert.deepEqual(named?.candidates.map((c) => [c.name, c.seen]), [['Joaquin', ['Brightwell']], ['', []]]);
 });
 
 test('three spellings fold into one in one question, and a rowset that does anything else is not a merge', () => {
@@ -83,8 +83,8 @@ test('a cluster asked as options draws a Pick only on the names the record offer
   const body = {
     options: [],
     candidates: [
-      { at: 'people#1', name: 'Rohan Mehta', seen: ['Encore', '6 commits'], kept: true },
-      { at: 'people#4', name: 'rohanmehta', seen: 'github' },
+      { at: 'people#1', name: 'Joaquin Herrera', seen: ['Brightwell', '6 commits'], kept: true },
+      { at: 'people#4', name: 'joaquinherrera', seen: 'github' },
       { at: 'people#6', name: 'jherrerastudio', seen: ['mail from herrera.studio'] },
     ],
   };
@@ -96,8 +96,8 @@ test('a cluster asked as options draws a Pick only on the names the record offer
   assert.deepEqual(
     m.candidates.map((c) => [c.name, c.kept, c.seen, c.pick?.option ?? null]),
     [
-      ['Rohan Mehta', true, ['6 commits', 'Encore'], null],
-      ['rohanmehta', false, ['github'], 'pick:people#4'],
+      ['Joaquin Herrera', true, ['6 commits', 'Brightwell'], null],
+      ['joaquinherrera', false, ['github'], 'pick:people#4'],
       /* A PICK MAY NAME THE ONE IT IS FOR BY NAME as well as by its handle. */
       ['jherrerastudio', false, ['mail from herrera.studio'], 'pick:jherrerastudio'],
     ],
@@ -110,7 +110,7 @@ test('a cluster asked as options draws a Pick only on the names the record offer
 test('where one was seen is the record’s lines, newest first, each once, at most three', () => {
   assert.deepEqual(seenOf(['2026-01-01 · a', '2026-01-02 · b', '2026-01-03 · a', '2026-01-04 · c', '2026-01-05 · d']), ['d', 'c', 'a']);
   assert.equal(SEEN_MOST, 3);
-  assert.deepEqual(seenOf('Encore'), ['Encore']);
+  assert.deepEqual(seenOf('Brightwell'), ['Brightwell']);
   assert.deepEqual(seenOf(['~/code/x', 'C:\\Users\\h', '', 7]), []);
   assert.deepEqual(seenOf(undefined), []);
 });
@@ -121,11 +121,11 @@ test('the card’s words are plain: no em dash, no word of the system’s, and n
     words.lead(2),
     words.lead(4),
     words.seen([]),
-    words.seen(['Encore']),
-    words.pickNamed('Rohan Mehta'),
-    words.mergedAll('Rohan Mehta'),
+    words.seen(['Brightwell']),
+    words.pickNamed('Joaquin Herrera'),
+    words.mergedAll('Joaquin Herrera'),
     words.mergedAll(''),
-    words.picked('Rohan Mehta'),
+    words.picked('Joaquin Herrera'),
     words.picked(''),
   ];
   for (const line of said) {
@@ -133,21 +133,21 @@ test('the card’s words are plain: no em dash, no word of the system’s, and n
     assert.doesNotMatch(line, /\b(row|rows|entity|list item|record)\b/iu, `"${line}" says a word of the system's`);
   }
   assert.equal(words.lead(3), 'These 3 may be the same.');
-  assert.equal(words.seen(['Encore', 'github']), 'Seen in Encore, github');
+  assert.equal(words.seen(['Brightwell', 'github']), 'Seen in Brightwell, github');
   assert.equal(words.seen([]), '', 'a name seen nowhere gets a line saying so');
 });
 
 /** The record's own cluster on a rowset that folds two into one (`packages/record` `MergeCluster`). */
 const cluster = {
   candidates: [
-    { name: 'Rohan Mehta', row: 'people#1', keeps: true, org: 'Encore', seen: ['a commit in braindog'], known_by: ['email'], rows: [] },
-    { name: 'rohanmehta', row: 'people#4', keeps: false, org: null, seen: ['mail from encore.example'], known_by: ['github'], rows: [1] },
+    { name: 'Joaquin Herrera', row: 'people#1', keeps: true, org: 'Brightwell', seen: ['a commit in braindog'], known_by: ['email'], rows: [] },
+    { name: 'joaquinherrera', row: 'people#4', keeps: false, org: null, seen: ['mail from brightwell.example'], known_by: ['github'], rows: [1] },
     { name: '', row: 'people#7', keeps: false, org: null, seen: [], known_by: ['email'], rows: [2] },
   ],
   options: [
     { option: 'merge', says: 'Merge all', decide: { option: 'merge' } },
     { option: 'apart', says: 'Keep apart', decide: { option: 'apart' } },
-    { option: 'pick:people#4', says: 'Pick rohanmehta', decide: { option: 'pick:people#4' } },
+    { option: 'pick:people#4', says: 'Pick joaquinherrera', decide: { option: 'pick:people#4' } },
     { option: 'pick:people#7', says: 'Pick this one', decide: { option: 'pick:people#7' } },
   ],
 };
@@ -160,13 +160,13 @@ test('a rowset carrying the record’s cluster is read by it: its names, Merge a
   assert.deepEqual(
     m.candidates.map((c) => [c.key, c.name, c.kept, c.pick?.option ?? null]),
     [
-      ['people#1', 'Rohan Mehta', true, null],
-      ['people#4', 'rohanmehta', false, 'pick:people#4'],
+      ['people#1', 'Joaquin Herrera', true, null],
+      ['people#4', 'joaquinherrera', false, 'pick:people#4'],
       ['people#7', '', false, 'pick:people#7'],
     ],
   );
-  assert.deepEqual(m.candidates[1]?.seen, ['mail from encore.example']);
-  assert.equal(keptName(m), 'Rohan Mehta');
+  assert.deepEqual(m.candidates[1]?.seen, ['mail from brightwell.example']);
+  assert.equal(keptName(m), 'Joaquin Herrera');
 });
 
 test('two names in the record’s cluster have no Pick, and a cluster it could not name is read off the patches', () => {
@@ -179,8 +179,8 @@ test('two names in the record’s cluster have no Pick, and a cluster it could n
   const whole = mergeOf({ kind: 'rowset', body: pair, merge: cluster }, TWO, held);
   assert.deepEqual([whole?.all, whole?.apart], [{ option: 'accept' }, { option: 'reject' }]);
   assert.deepEqual(whole?.candidates.map((c) => [c.name, c.seen, c.pick]), [
-    ['Rohan Mehta', ['a commit in braindog'], null],
-    ['rohanmehta', ['mail from encore.example'], null],
+    ['Joaquin Herrera', ['a commit in braindog'], null],
+    ['joaquinherrera', ['mail from brightwell.example'], null],
   ]);
   /* NO CLUSTER, OR ONE WITH A CANDIDATE THE RECORD GAVE NO HANDLE: the rowset's own two answers, whole. */
   for (const merge of [undefined, null, { candidates: [{ name: 'x' }, { name: 'y' }], options: [] }]) {
@@ -202,7 +202,7 @@ test('THE LIST A MERGE IS ABOUT IS READ OFF THE RECORD: its handles, else the on
   const lists = { contacts: { meets: { name: 'name' } }, firms: { org: { name: 'name' } } };
   const at = (...keys: string[]) => ({ candidates: keys.map((key) => ({ key, name: key, seen: [], kept: false, pick: null })), all: { option: 'merge' }, apart: { option: 'apart' } });
   assert.equal(mergeListOf(at('firms#1', 'firms#4'), lists), 'firms', 'organisations are merged on their own list');
-  assert.equal(mergeListOf(at('Rohan', 'Rohan Mehta'), lists), 'contacts', 'a cluster asked by names is the people list, whatever it is called');
+  assert.equal(mergeListOf(at('Joaquin', 'Joaquin Herrera'), lists), 'contacts', 'a cluster asked by names is the people list, whatever it is called');
   assert.equal(mergeListOf(at('firms#1', 'contacts#2'), lists), 'contacts', 'two lists in one merge fall back to the role');
-  assert.equal(mergeListOf(at('Rohan', 'Jo'), { firms: lists.firms }), null, 'a record with no people role names no list');
+  assert.equal(mergeListOf(at('Joaquin', 'Jo'), { firms: lists.firms }), null, 'a record with no people role names no list');
 });

@@ -2,6 +2,7 @@
   "//": "PRF-B03. Every number a gate is held to, with a dated line for each change. `tools/gates/ledger.mjs` reads it: a budget never rises unless `by` quotes the owner, a debt only falls, a held list only shrinks, and every deviation is named. Lines before `opened` are the history the old comment string held.",
   "opened": "2026-10-09",
   "budgets": {
+    "a11y.seedContrastRatio": { "kind": "setting", "lines": [ { "at": 2, "on": "2026-10-09", "why": "The ratio the a11y-contrast seed plants a line of text at on the board.", "by": "loop/scope/area-proof-b.md PRF-B02 2.4" } ] },
     "bundle.brotliQuality": {
       "kind": "setting",
       "lines": [
@@ -147,7 +148,7 @@
   "debts": {
     "bundle.mainJsBrotli": {
       "owes": "experience",
-      "key": "bundle.mainJsBaseline",
+      "key": "bundle.mainJsBrotli",
       "lines": [
         { "at": 31744, "on": "2026-09-03", "why": "First measured at 31744 (SvelteKit 2.70.3, Svelte 5.57.0), above the 30 KB budget for reasons outside this repository. 50 section 10 records the path back under 30 KB." },
         { "at": 31882, "on": "2026-09-07", "why": "+138: the phone's More sheet was given the registers, so a phone has a route to a list." },
@@ -319,11 +320,19 @@
         { "at": 10, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
       ]
     },
+    "tools/gates/printed.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/printed.mjs",
+      "lines": [
+        { "at": 1, "on": "2026-10-09", "why": "The skip's exit code 3, written once in the gate as every gate that skips writes it. It falls when the runner exports the code." }
+      ]
+    },
     "tools/gates/public-clean.mjs": {
       "owes": "proof",
       "file": "tools/gates/public-clean.mjs",
       "lines": [
-        { "at": 56, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+        { "at": 56, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." },
+        { "at": 5, "on": "2026-10-09", "why": "Fifty-one of them were ALLOWED's counts, and batches 44 to 47 emptied it." }
       ]
     },
     "tools/gates/queue.mjs": {
@@ -351,7 +360,8 @@
       "owes": "proof",
       "file": "tools/gates/refusals.mjs",
       "lines": [
-        { "at": 48, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+        { "at": 48, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." },
+        { "at": 46, "on": "2026-10-09", "why": "The budget of four left the gate for the four named deviations in this ledger (PRF-B03 job 4)." }
       ]
     },
     "tools/gates/rule-sheet.mjs": {
@@ -416,6 +426,13 @@
       "lines": [
         { "at": 12, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
       ]
+    },
+    "tools/gates/words.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/words.mjs",
+      "lines": [
+        { "at": 1, "on": "2026-10-09", "why": "Exit 3 for a root with no copy file, the runner's word for a gate that read nothing. No budget holds it." }
+      ]
     }
   },
   "held": {
@@ -449,9 +466,18 @@
         { "count": 5, "on": "2026-10-09", "why": "Files that still work out a run's state from last_seen and the clock, each still to move onto presence.ts." }
       ]
     },
+    "audit-append-only.ALLOWED": {
+      "lines": [
+        { "count": 6, "on": "2026-10-09", "why": "Statements that rewrite a line of the audit log, each with its reason: erase, the rule's run line, the grace fold, an answer's batch and a script's two run-line notes (REC-A17). The brief counted four." }
+      ]
+    },
     "public-clean.ALLOWED": {
       "lines": [
-        { "count": 81, "on": "2026-10-09", "why": "Files that still name one of the three private words, each with its count. The LCH-C11 sweep takes them off." }
+        { "count": 81, "on": "2026-10-09", "why": "Files that still name one of the three private words, each with its count. The LCH-C11 sweep takes them off." },
+        { "count": 62, "on": "2026-10-09", "why": "Batch 44 swept packages/record, packages/mcp and the cli's tests (LCH-C11 jobs 4, 5 and 7): 19 files, 178 lines." },
+        { "count": 43, "on": "2026-10-09", "why": "Batch 45 swept the kernel, mcp and seed source, two render files and the page-live pair: 19 files, 56 lines." },
+        { "count": 1, "on": "2026-10-09", "why": "Batch 46 swept the web, the cli's source and import, and the render lint: 42 files, 142 lines. The record's own index is the one left." },
+        { "count": 0, "on": "2026-10-09", "why": "Batch 47 swapped the record index's six lines (record-index-47). Nothing is allowed now." }
       ]
     }
   },

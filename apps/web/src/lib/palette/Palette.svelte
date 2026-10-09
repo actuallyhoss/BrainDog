@@ -214,7 +214,7 @@
   /**
    * SLASH'S FILED PROPOSAL, DRAWN WHERE IT WAS ASKED, as the one decision card (DIRECTION §37): when it arrives the
    * keyboard is on it (`cursor` is -1, above the rows), Enter accepts it, a six-second Undo follows on its line, and the
-   * line reads "Slash suggested · Sam accepted". `↓` goes down to the rows as ever, and `↑` from the first row comes
+   * line reads "Slash suggested · Mara accepted". `↓` goes down to the rows as ever, and `↑` from the first row comes
    * back to it. A proposal that moves money is not accepted by a key: Enter opens it on Decide, where Accept names the
    * amount.
    */

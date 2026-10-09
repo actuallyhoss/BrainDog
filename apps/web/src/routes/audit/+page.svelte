@@ -62,6 +62,7 @@
   import {
     awaySaid,
     below,
+    byWhoOf,
     burstsOf,
     busyOf,
     busySaid,
@@ -85,11 +86,13 @@
     lanesOf,
     lanesSaid,
     listOf,
+    passOf,
     reaches,
     runFolds,
     tallyOf,
     tallySaid,
     thingOf,
+    type ByWho,
     type RunFold,
     type Told,
   } from './lines.ts';
@@ -256,18 +259,20 @@
    * A SENTENCE, NOT THE SCREEN. The log below is what Activity is for, so a refusal here draws no sentence and settles
    * nothing: the call closes as answered, and the log's own read is the one that says the record could not be reached.
    */
-  let unseen = $state<{ actors: string[]; capped: boolean } | null>(null);
+  let unseen = $state<{ actors: string[]; capped: boolean; byWho: ByWho | null } | null>(null);
   $effect(() => {
     if (!route.data.live) return;
     const at = untrack(opened);
     void readUnseen(apiBase())
       .then((out) => {
-        if (out.from === 'live') unseen = { actors: out.actors, capped: out.capped };
+        /* AND THE RECORD'S OWN COUNT OF WHO, when the read carries it (`byWho`, SHL-A21): `byWhoOf` takes nothing that is
+           not a count, so a read older than it is counted here as before. */
+        if (out.from === 'live') unseen = { actors: out.actors, capped: out.capped, byWho: byWhoOf((out as { byWho?: unknown }).byWho) };
       })
       .catch(() => undefined)
       .finally(() => closed(true, at));
   });
-  const lead = $derived(unseen ? awaySaid(unseen.actors, me, names, unseen.capped) : undefined);
+  const lead = $derived(unseen ? awaySaid(unseen.actors, me, names, unseen.capped, unseen.byWho) : undefined);
 
   /**
    * THE PAGE BELOW, WHEN ASKED FOR. A log longer than one page says so with a control instead of stopping at two hundred
@@ -444,6 +449,18 @@
   }
 
   /**
+   * ONE PASS OF BRAINDOG'S OWN UPDATE IS ONE LINE, AND WHAT IT DID IS CLOSED AT FIRST (`passOf`, SHL-A21). A press opens
+   * the steps under it and a second shuts them: unlike a run's "+9 more", the button stays, since it names the pass.
+   * Kept by the pass line's key, which is its newest step's place in the log, so a page read again keeps it open.
+   */
+  let passesOpen = $state<ReadonlySet<string>>(new Set());
+  function togglePass(key: string) {
+    const next = new Set(passesOpen);
+    if (!next.delete(key)) next.add(key);
+    passesOpen = next;
+  }
+
+  /**
    * THE THREE TILES, and what each counts.
    *
    * WHO WORKED and BUSY HOURS count every change read, filtered or not: they say how the record has been, and a filter
@@ -588,9 +605,11 @@
 {#snippet entry(t: Told, first?: string)}
   {@const e = t.e}
   {@const by = actorSaid(e.by, me, names)}
-  {@const declared = e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
-  {@const thing = t.many ?? (declared === null && e.target ? thingFor(e.target) : null)}
-  {@const note = declared === null ? t.note : ''}
+  <!-- ONE PASS OF BRAINDOG'S OWN UPDATE (`passOf`) says the record's sentence as its whole line, and names nothing of its own. -->
+  {@const pass = passOf(e)}
+  {@const declared = pass === null && e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
+  {@const thing = pass !== null ? null : (t.many ?? (declared === null && e.target ? thingFor(e.target) : null))}
+  {@const note = declared === null && pass === null ? t.note : ''}
   <!-- AN AGENT'S LINE UNDER A MINUTE OLD WEARS THE ONE HUE THAT MEANS ALIVE; a row that came into being wears
        the green of done. Nothing here is red: a log is history, not need. -->
   {@const tone = isAgent(by.kind) && clock - Date.parse(e.at) <= 60_000 ? 'live' : e.kind === 'create' ? 'earn' : undefined}
@@ -608,7 +627,8 @@
              anchor that goes nowhere. -->
         <!-- AND A FIELD PUT ON A LIST IS SAID AS ONE. `declaredOf` makes "Added domain to Projects" of the
              line's target and note, and that sentence is the whole line, so the note is not said twice. -->
-        {#if declared !== null}<span class="line-title">{declared}</span>
+        {#if pass !== null}<span class="line-title">{pass.said}</span>
+        {:else if declared !== null}<span class="line-title">{declared}</span>
         {:else}<span class="line-title"
             ><span class="verb">{kindOf(e.kind).word}</span>{#if thing}{' '}{#if thing.href}<a class="target tap" href={at(thing.href)}
                   ><bdi class="target-name">{thing.text}</bdi></a
@@ -638,6 +658,21 @@
         >
       </span>
     </div>
+    <!-- WHAT ONE PASS DID, closed until asked for: each step a line of its own, as Activity draws any line, and each
+         still undone on its own in the record. -->
+    {#if pass !== null}
+      {@const open = passesOpen.has(t.key)}
+      <div class="fold-row">
+        <button type="button" class="fold tap" aria-expanded={open} onclick={() => togglePass(t.key)}
+          >{open ? historyWords.hideSteps : historyWords.showSteps(pass.steps.length)}</button
+        >
+      </div>
+      {#if open}
+        <ul class="ledger steps">
+          {#each pass.steps as s (s.key)}{@render entry(s)}{/each}
+        </ul>
+      {/if}
+    {/if}
   </li>
 {/snippet}
 
@@ -860,6 +895,21 @@
     padding-inline-start: calc(var(--well-l) + var(--sp-3) + var(--sp-2));
   }
 
+  /* WHAT ONE PASS OF THE UPDATE DID, opened under its line and set in by the well, so it reads as that line's and not
+     as lines of their own beside it. NO BLEED of its own: `.ledger` reaches a step past its column on both sides, which
+     inside a line already reaching out drew the steps' minutes a step right of every other and, on a phone, took back
+     the whole indent. */
+  .steps {
+    margin-inline: 0;
+    padding-inline-start: calc(var(--well-l) + var(--sp-3));
+  }
+
+  @media (width < 640px) {
+    .steps {
+      padding-inline-start: var(--sp-4);
+    }
+  }
+
   .fold {
     position: relative;
     min-block-size: var(--ctl-h-sm);
@@ -1036,12 +1086,13 @@
 
   /* THE WHOLE ROW WASHES UNDER THE POINTER, since the whole row is the link; and the hairlines beside it step aside. */
   @media (hover: hover) and (pointer: fine) {
-    .ledger > li:has(.target:hover) > .line {
+    /* ITS OWN TARGET, `> .line`: a step opened under a pass is a line of its own, and hovering it washes it alone. */
+    .ledger > li:has(> .line .target:hover) > .line {
       background: var(--hover-wash);
     }
 
-    .ledger > li:has(.target:hover) > .line::after,
-    .ledger > li:has(.target:hover) + li > .line::after {
+    .ledger > li:has(> .line .target:hover) > .line::after,
+    .ledger > li:has(> .line .target:hover) + li > .line::after {
       opacity: 0;
     }
   }

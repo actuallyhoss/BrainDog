@@ -399,8 +399,9 @@ export class ScriptRuns {
  * The main module of every loaded Worker: the prelude, the host functions it is built from, and the call.
  *
  * NOTHING HERE IS A CHECK, for the reason the prelude gives: it runs where the script can reach it. It collects the
- * writes and the log and hands them back, and `runScript` checks them again. `import *` and not a default import,
- * because a source with no default export would otherwise fail to link and look like the platform failing.
+ * writes, the log and the `ask` the script returned (as JSON) and hands them back, and `runScript` checks them again.
+ * `import *` and not a default import, because a source with no default export would otherwise fail to link and look
+ * like the platform failing.
  */
 const MAIN = `import { WorkerEntrypoint } from 'cloudflare:workers';
 import * as source from './script.js';
@@ -437,18 +438,20 @@ export default class extends WorkerEntrypoint {
     };
     if (typeof source.default !== 'function') return { invalid: true, log: '' };
     const ctx = withConfig(prelude(host)(meta), meta.config);
+    let ask;
     try {
-      await source.default(ctx);
+      const value = await source.default(ctx);
+      if (value !== null && typeof value === 'object' && value.ask !== undefined && value.ask !== null) ask = JSON.stringify(value.ask);
     } catch (e) {
       return { threw: e instanceof Error ? e.message : String(e), log: lines.join('\\n') };
     }
-    return { writes, log: lines.join('\\n') };
+    return { writes, log: lines.join('\\n'), ask };
   }
 }
 `;
 
 /** What the loaded module's `run` answers, before anything here has believed it. */
-type Handed = { writes?: unknown; log?: unknown; threw?: unknown; invalid?: unknown };
+type Handed = { writes?: unknown; log?: unknown; threw?: unknown; invalid?: unknown; ask?: unknown };
 
 /* ── one run ────────────────────────────────────────────────────────────────────────────────────── */
 
@@ -490,6 +493,22 @@ const cut = (text: string): string => {
 };
 
 const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * The `ask` a run returned, back from the JSON the loaded module made of it, or `undefined` for none.
+ *
+ * TEXT ACROSS THE BOUNDARY, because the script's own return value is whatever it built: a function or a class instance in
+ * it would fail the call back to this object, and the run with it, where JSON keeps the data and drops the rest. Text
+ * that does not parse was not written by the module (which stringifies every one), and is no question.
+ */
+function askOf(handed: unknown): Json | undefined {
+  if (typeof handed !== 'string') return undefined;
+  try {
+    return JSON.parse(handed) as Json;
+  } catch {
+    return undefined;
+  }
+}
 
 /** An update's version as the kernel reads it: a whole number, or none at all (absent, `null` or `NaN`), never anything else. */
 const lastWriterOrWhole = (v: unknown): boolean => v === undefined || v === null || Number.isNaN(v) || Number.isInteger(v);
@@ -610,7 +629,9 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     if (typeof handed.threw === 'string') return { refused: { code: null, why: `${script} threw: ${handed.threw}` }, log, usage: spent };
     const writes = checkWrites(full, limits, handed.writes);
     if (!Array.isArray(writes)) return { refused: writes, log, usage: spent };
-    return { writes, log, usage: spent };
+    /* AND THE ONE QUESTION IT MAY END BY ASKING (N6), carried as it came and checked by `finishScript`, which files it. */
+    const ask = askOf(handed.ask);
+    return ask === undefined ? { writes, log, usage: spent } : { writes, log, usage: spent, ask };
   } finally {
     if (timer !== undefined) clearTimeout(timer);
     wiring.runs.close(run);

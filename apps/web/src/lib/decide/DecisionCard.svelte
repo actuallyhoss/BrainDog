@@ -27,7 +27,7 @@
   where to choose them. Decide itself draws the whole form.
 
   ONE PRESS ANSWERS, WITH UNDO. Decide (or Accept, or Decline) makes the card its answered line at once ("Per seat ·
-  you, just now", or "Slash suggested · Sam accepted" for what Slash drafted), with Undo on it for six seconds, and
+  you, just now", or "Slash suggested · Mara accepted" for what Slash drafted), with Undo on it for six seconds, and
   only then is the answer sent (`press.ts` `hold`). Leaving the page, or the card leaving it, sends what was held at
   once. A record on an older build that still wants a reason opens one line under the card when the answer reaches it.
 
@@ -122,7 +122,7 @@
   const me = $derived(shell.me ?? null);
   const names = $derived(new Map(Object.entries(shell.names ?? {})));
   const answerable = $derived(may ?? (me !== null && (me.owner || mayOf({ me }, 'decide'))));
-  /* THE READER BY THE NAME THE RECORD GIVES THEM, for the line a Slash proposal leaves ("Slash suggested · Sam accepted"). */
+  /* THE READER BY THE NAME THE RECORD GIVES THEM, for the line a Slash proposal leaves ("Slash suggested · Mara accepted"). */
   const person = $derived((me?.person ? names.get(me.person) : undefined)?.trim() || copy.feedYou);
 
   const card = $derived(cardOf(question, { me: me?.person ?? null, names, now: Date.now(), lead }));

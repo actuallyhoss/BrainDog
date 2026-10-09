@@ -1,6 +1,7 @@
 /** Money's rules, and the automations that act on an answer to one of them. */
 
 import type { SeedRule } from '../base.ts';
+import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
 
 /**
  * The rules Money ships with. A rule asks where a person has a choice to make, and tells or acts where there is none.
@@ -152,4 +153,10 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     /* ENDED, THE STATE EVERY READER OF `recurring` ALREADY LEAVES OUT: the walk, the monthly figures and the page. */
     steps: [{ move: 'ended' }],
   },
+  /* AND ONE SCRIPT, ONCE A DAY, SINCE money-core 3.16.0: the question about lines on a month's last day (REC-B13,
+     `scripts/last-day.js`). A rule cannot ask it, since one question for many lines is no `once_per` of one row; the
+     script files it with its cause, and picking an answer writes `day_of_month` on each line through the gate, so no
+     automation here acts on it. It fetches nothing, so the record does not count it as a feed (`feedsOn` in
+     `packages/kernel/src/signs.ts`). */
+  LAST_DAY_SCRIPT,
 ];

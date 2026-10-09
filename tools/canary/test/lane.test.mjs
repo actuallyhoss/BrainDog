@@ -1,7 +1,7 @@
 /**
- * The four steps of `lane.d/`, as the workflow runs them: in name order, each saying what its red does in the line the
- * workflow reads, and each judging what it is for. The look and the sign-in drive a browser and are not run here;
- * their verdicts are, on answers written out below.
+ * The steps of `lane.d/`, as the workflow runs them: every file in the folder in name order, each saying what its red
+ * does in the line the workflow reads, and each judging what it is for. The look and the sign-in drive a browser and are
+ * not run here; their verdicts are, on answers written out below. The drill has its own file, `drill.test.mjs`.
  */
 
 import assert from 'node:assert/strict';
@@ -20,13 +20,18 @@ const DIR = join(import.meta.dirname, '..', 'lane.d');
 /** The workflow's own reading of a step's red (`.github/workflows/after-deploy.yml`). */
 const ON_RED = /^export const onRed = '(rollback|finding)';$/m;
 
-test('the lane is four steps in name order, and a red smoke or sign-in rolls back while a red look or sign is a finding', () => {
+test('every step in the folder is numbered, declares its red, and only a red smoke or sign-in rolls back', () => {
+  /* THE FOLDER, NOT A LIST OF NAMES: a later unit adds a step by adding a file, as the workflow reads it. */
   const files = readdirSync(DIR).filter((n) => /\.m?js$/.test(n)).sort();
-  assert.deepEqual(files, ['10-smoke.mjs', '20-signin-live.mjs', '30-look.mjs', '40-signs.mjs']);
-  assert.deepEqual(
-    files.map((f) => ON_RED.exec(readFileSync(join(DIR, f), 'utf8'))?.[1]),
-    ['rollback', 'rollback', 'finding', 'finding'],
-  );
+  assert.ok(files.length >= 5, `the lane holds ${files.length} steps`);
+  for (const f of ['10-smoke.mjs', '20-signin-live.mjs', '30-look.mjs', '40-signs.mjs', '50-drill.mjs']) assert.ok(files.includes(f), `${f} is gone from the lane`);
+  for (const f of files) {
+    assert.match(f, /^\d{2}-[a-z][a-z0-9-]*\.mjs$/, `${f} is not named NN-name.mjs, so its place in the order is not plain`);
+    const red = ON_RED.exec(readFileSync(join(DIR, f), 'utf8'))?.[1];
+    assert.ok(red, `${f} does not declare what its red does`);
+    assert.equal(red, /smoke|sign-?in/i.test(f) ? 'rollback' : 'finding', `${f} declares ${red}`);
+  }
+  assert.deepEqual(files.slice(0, 2), ['10-smoke.mjs', '20-signin-live.mjs'], 'the doors are proven before anything is looked at');
 });
 
 test('the smoke’s first-draw reads all answer on a fresh self-host, judged by the smoke’s own checks', async () => {

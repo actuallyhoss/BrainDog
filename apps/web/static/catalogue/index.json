@@ -1291,12 +1291,40 @@
       "kind": "pack",
       "id": "project-brief",
       "title": "Project brief",
-      "summary": "A line on what each project is, the plan for it, and what is in the way.",
+      "summary": "What each project is in a line, the stage it is at, what is in the way, and a plan made of steps you can tick.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.1",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "d8d479580e599db0cde18bfca374d7872032630f0f9f03dec26994c55b1252e1",
+          "bytes": 16010,
+          "published_at": "2026-10-09T10:33:51.561Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "work"
+            ],
+            "lists": [
+              "Plan steps"
+            ],
+            "pages": [
+              "Briefs"
+            ],
+            "rules": [
+              "Tick the plan steps linked to a task when the task is done",
+              "Tick the plan steps linked to a thread when the thread is done",
+              "Bring briefs over"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The plan is steps now, each with what it gains, ticked by hand or when the task or thread it links to is done. A project has a stage. The one line is About, the one Portfolio already has. A brief written before keeps its words: run Bring briefs over once to move them."
+        },
         {
           "version": "1.2.1",
           "checksum": "903d1ef936f4b8084ee4e0f46305a78b5272b31c263f1213a0799b763e03cb7e",
@@ -1382,7 +1410,8 @@
         }
       ],
       "categories": [
-        "templates",
+        "modules",
+        "automations",
         "made-by-braindog"
       ],
       "publisher": {

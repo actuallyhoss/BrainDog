@@ -17,7 +17,8 @@ export type Step =
   | { at: 'idle' }
   | { at: 'asking'; how: How }
   | { at: 'failed'; how: How; failure: Failure; when: number }
-  | { at: 'sent'; email: string }
+  /** `when` is when the host answered the send, for the sent screen's second line (`SENT_LATE`). */
+  | { at: 'sent'; email: string; when?: number }
   | { at: 'added' }
   | { at: 'out' };
 
@@ -57,7 +58,8 @@ export type State =
   | { name: 'asking'; ways: Ways | null; how: How }
   | { name: 'rejected'; ways: Ways | null; fix: string | null; closed: boolean }
   | { name: 'locked'; ways: Ways | null; how: How; minutes: number }
-  | { name: 'link-sent'; ways: Ways | null; email: string }
+  /** `late` once a minute has passed since the send with nobody back here: the screen adds its second line. */
+  | { name: 'link-sent'; ways: Ways | null; email: string; late: boolean }
   | { name: 'link-landing'; link: Link; asking: boolean }
   | { name: 'link-expired'; ways: Ways | null; link: Link['kind'] }
   | {
@@ -75,6 +77,15 @@ export type State =
        */
       link: Link | null;
     };
+
+/**
+ * How long the sent screen waits before its second line, "Nothing yet? Check the address, or send it again." (LCH-A04)
+ *
+ * THE HOST ANSWERS ALIKE FOR AN ADDRESS IT KNOWS AND ONE IT DOES NOT, and the letter goes out after the answer, so the
+ * screen can never say the letter failed. What it can say, once a letter would normally have come, is the two things
+ * that fix a letter that did not: the address, and another send.
+ */
+export const SENT_LATE = 60_000;
 
 function waysOf(it: Methods, webauthn: boolean): Ways | null {
   /* MAIL THAT IS NOT GOING OUT OFFERS NO LINK (`'down'`); the page says why in one line beside the other ways. */
@@ -150,7 +161,7 @@ export function stateOf(s: Seen): State {
   if (s.link && (step.at === 'idle' || step.at === 'out' || (step.at === 'asking' && step.how === 'link')))
     return { name: 'link-landing', link: s.link, asking: step.at === 'asking' };
   if (step.at === 'asking') return { name: 'asking', ways, how: step.how };
-  if (step.at === 'sent') return { name: 'link-sent', ways, email: step.email };
+  if (step.at === 'sent') return { name: 'link-sent', ways, email: step.email, late: step.when !== undefined && s.now - step.when >= SENT_LATE };
   if (!ways) return { name: 'not-configured' };
   return { name: 'signed-out', ways, note: step.at === 'out' ? 'out' : ways.lead === null ? 'unsupported' : null };
 }

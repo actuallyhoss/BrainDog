@@ -1,0 +1,8 @@
+{
+  "gate": "printed",
+  "rule": "an error written to the console",
+  "expect": "wrote an error to the console",
+  "findings": 1,
+  "total": 1,
+  "why": "AN ERROR WRITTEN TO THE CONSOLE, as a failed request writes one. A plain log line sits beside it and is not a finding. The rest of the screen is the decoy every printed tree carries: a date in words, an amount, a run's handle beside its name and a person's name, none of which is a finding, so a rule that grew too wide takes the count above one."
+}

@@ -24,6 +24,8 @@ import { EXTRA_ROUTES } from './routes/index.ts';
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
 export { serveVault, servesVault, VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor, type VaultGrantSeen, type VaultTokenAsk } from './vault.ts';
 export { keysReply, purposeOf, sealedUnderOf, serveKeys, servesKeys, type KeysAsk, type KeysDoor, type SealedUnder } from './keys.ts';
+/* THE SHAPE DOOR (PRF-A13), for the vault door's reason: both hosts take the whole surface from this one module. */
+export { SHAPE_HEADERS, serveShape, servesShape, type ShapeDoor } from './shape.ts';
 /* `POST /api/slash/read` IS A DOOR AND NOT A ROW IN `ROUTES`, and `slash-ask.ts` carries the measurement: `ROUTES` is the
    record's surface, `tools/gates/guards.mjs` looks for every routed name as a method of `packages/record/src/index.ts`, and
    this answer comes out of the engine the HOST built. It is exported from here for the reason the vault, key, session and
@@ -324,7 +326,7 @@ const CORE_ROUTES: readonly Route[] = [
      the hash that applying it needs, so what is put back is the plan the person read and nothing that moved since. */
   { name: 'undo', group: 'ADMIN', writes: true, what: 'Put back one set of changes, or what one decision did. Ask with dry first to read what would go back; a change somebody has made since is left alone.' },
   { name: 'undoRun', group: 'ADMIN', writes: true, what: 'Put back every change one agent run made. Ask with dry first to read what would go back; a change somebody has made since is left alone.' },
-  { name: 'ruleApply', group: 'ADMIN', writes: true, what: 'Run one rule over the rows already there. `dry` first: there is no undo.' },
+  { name: 'ruleApply', group: 'ADMIN', writes: true, what: 'Run one rule over the entries already there, as one batch one Undo takes back. `dry` first, to see what it would change.' },
   { name: 'examples', group: 'ADMIN', writes: false, what: 'The example rows setting up planted that nobody has touched, counted by list. It writes nothing.' },
   { name: 'clearExamples', group: 'ADMIN', writes: true, what: 'Delete every example row nobody has touched. A row somebody edited, or one a row of theirs points at, stays.' },
   { name: 'members', group: 'ADMIN', writes: false, what: 'Who is on this record, at what level, and where.' },

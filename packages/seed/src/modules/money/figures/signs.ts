@@ -30,7 +30,7 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
    * and the six before it (`after` leaves out its own day), and `on before +1d` leaves out a row dated ahead.
    *
    * A COUNT, NEVER A SUM, so no two currencies meet in it. NOUGHT IS NOT GOOD: the target is at least one, so a Ledger
-   * that has stopped, or a record that has never kept one, reads as missing its mark and never as a quiet week.
+   * that has stopped reads as missing its mark and never as a quiet week; one that has never held a row is not judged.
    */
   'ledger-rows-7d': {
     metric: 'ledger-rows-7d',

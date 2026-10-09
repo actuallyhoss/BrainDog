@@ -15,10 +15,13 @@ import {
   passkeyRegister,
   passkeys,
   passkeySignIn,
+  platformLabel,
   redeemLink,
   removePasskey,
+  renamePasskey,
   requestLink,
   signOut,
+  signOutAndLeave,
   support,
   takeLink,
   type Io,
@@ -295,6 +298,8 @@ test('NOTHING THROWS AND NOTHING LOGS, whatever comes back', async () => {
       signOut(broken),
       passkeys(broken),
       removePasskey('x', broken),
+      renamePasskey('x', 'Phone', broken),
+      signOutAndLeave('/app/signin', () => assert.fail('a failed sign-out went somewhere'), broken),
       passkeySignIn(mixed.io),
     ]);
     for (const out of outs) assert.equal(out.ok, false);
@@ -302,4 +307,51 @@ test('NOTHING THROWS AND NOTHING LOGS, whatever comes back', async () => {
     Object.assign(console, kept);
   }
   assert.deepEqual(said, [], 'something was written to the console');
+});
+
+/* ── names and the frame's Sign out (LCH-A04) ───────────────────────────── */
+
+test('a passkey is named for the device that made it, and an iPad asking as a Mac is still an iPad', () => {
+  const on = (userAgent: string, maxTouchPoints = 0) => platformLabel({ navigator: { userAgent, maxTouchPoints } });
+  assert.equal(on('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', 5), 'iPhone');
+  assert.equal(on('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15', 5), 'iPad');
+  assert.equal(on('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15'), 'Mac');
+  assert.equal(on('Mozilla/5.0 (Linux; Android 15; Pixel 9)', 5), 'Android');
+  assert.equal(on('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'), 'Windows Hello');
+  assert.equal(on('Mozilla/5.0 (X11; CrOS x86_64 14541.0.0)'), 'Chromebook');
+  assert.equal(on('Mozilla/5.0 (X11; Linux x86_64)'), 'Passkey');
+  assert.equal(platformLabel({}), 'Passkey');
+});
+
+test('a rename posts the id and the name to the host door, and answers the passkey as the host now holds it', async () => {
+  const { io, seen } = host({
+    '/auth/passkey/rename': () => ok({ id: 'k1', label: 'Work laptop', backedUp: true, createdAt: 5, lastUsed: null }),
+  });
+  const out = await renamePasskey('k1', 'Work laptop', io);
+  assert.deepEqual(out, { ok: true, value: { id: 'k1', label: 'Work laptop', backedUp: true, createdAt: 5, lastUsed: null } });
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0]?.method, 'POST');
+  assert.deepEqual(seen[0]?.body, { id: 'k1', label: 'Work laptop' });
+});
+
+test("an empty name comes back as the host's own sentence", async () => {
+  const { io } = host({ '/auth/passkey/rename': () => no(422, 'A passkey needs a name. Type one, such as the device it lives on.') });
+  assert.deepEqual(await renamePasskey('k1', '  ', io), {
+    ok: false,
+    kind: 'refused',
+    fix: 'A passkey needs a name. Type one, such as the device it lives on.',
+  });
+});
+
+test("the frame's Sign out ends the session first and only then loads the sign-in screen in full", async () => {
+  const went: string[] = [];
+  const { io, seen } = host({ '/auth/logout': () => ok({}) });
+  const out = await signOutAndLeave('/app/signin', (to) => went.push(`${seen.length}:${to}`), io);
+  assert.deepEqual(out, { ok: true, value: null });
+  assert.deepEqual(seen.map((r) => `${r.method} ${r.url}`), ['POST /auth/logout']);
+  assert.deepEqual(went, ['1:/app/signin'], 'the load comes after the logout answered');
+  const down = host({ '/auth/logout': () => json(502, {}) });
+  const kept: string[] = [];
+  assert.equal((await signOutAndLeave('/app/signin', (to) => kept.push(to), down.io)).ok, false);
+  assert.deepEqual(kept, [], 'a session that did not end leaves the page where it is');
 });

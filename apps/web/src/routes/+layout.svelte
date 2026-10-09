@@ -19,7 +19,7 @@
   every screen, under the 44px floor, and twice on `/search`.
 -->
 <script lang="ts">
-  import { apiBase, at, here } from '$lib/at.ts';
+  import { BASE, apiBase, at, here } from '$lib/at.ts';
   /* The shared skin first: `tokens.css` opens with the `@layer` statement, so the layer ORDER — and
      with it the rule that no installed theme can reach the a11y layer — is established before any
      other stylesheet is parsed. */
@@ -143,6 +143,22 @@
     opening = false;
     if (out.from === 'opened') return location.assign(out.to);
     toasts.push(out.from === 'absent' ? copy.recordNotOpened : out.fix, { intent: 'warn' });
+  }
+
+  /**
+   * SIGN OUT IN THE FRAME (LCH-A04): one press in the account menu, the session ends, and the sign-in screen is loaded in
+   * full (`signOutAndLeave`), so nothing this tab read under the session is drawn again. `lib/auth.ts` is imported on
+   * the press and not before, which keeps it out of the entry chunk every screen waits for. A press that did not end the
+   * session, or a chunk that would not load, leaves the page where it is and says so.
+   */
+  let signingOut = $state(false);
+  async function signOutHere() {
+    if (signingOut) return;
+    signingOut = true;
+    const out = await import('$lib/auth.ts').then((m) => m.signOutAndLeave(`${BASE}/signin`)).catch(() => null);
+    if (out?.ok) return;
+    signingOut = false;
+    toasts.push(copy.signOutFailed, { intent: 'warn' });
   }
 
   /* COMPARED INSIDE THE RECORD, as the rail compares: the address with the base and the slug taken off. */
@@ -956,6 +972,12 @@
           </a>
         </li>
       {/each}
+      <!-- SIGN OUT, THE ACCOUNT'S LAST ROW (LCH-A04): a press and not a link, 44px under a thumb like every row here. -->
+      <li>
+        <button type="button" class="more-row" onclick={() => void signOutHere()} aria-busy={signingOut}>
+          <Icon name="lock" size="m" /><span class="more-name">{signingOut ? copy.signingOut : copy.signOut}</span>
+        </button>
+      </li>
     </ul>
   </nav>
 </Sheet>

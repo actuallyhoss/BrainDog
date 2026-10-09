@@ -238,15 +238,19 @@ body: { text: "Summary up to {until:date}" }   # JSON, 8 KB at most; string leav
 | Key | `call` | `poll` | Rule |
 |---|---|---|---|
 | `url` | required | required | starts `https://`; the host is written out in full, with no brace, `$`, `@`, `%` or space in it |
-| `grant` | required | required | a vault label of at most 40 characters |
+| `grant` | required | optional | a vault label of at most 40 characters; a `poll` of an address that answers anybody names none |
 | `every` | required | required | at least fifteen minutes, and at least `floor:` when one is declared |
 | `body` | optional | refused | an object of at most 8 KB; each string leaf may use `{since}` and `{until}` |
 | `writes.register` | optional | required | the ingest pipeline's own `extract:` or `map:`, and `writes:` |
 
 A `poll` whose endpoint answers JSON reads it with `map:` in place of `extract:` (43 §4.5): one field per path,
-with `{ value: ... }` for what the declaration states and `{ arrived: true }` for when the answer came. A founder's
-project polled for its numbers is one such poll per measure, writing a datapoint
-(`packages/seed/src/usecases/founder-poll.ts`).
+with `{ value: ... }` for what the declaration states and `{ arrived: true }` for when the answer came. A project
+polled for its numbers is the live feed add-on (`packs/live-feed`): one poll per address, a map per measure, each
+writing a reading in `datapoints`, and past twenty measures a second poll of the same address. It is filled by one
+builder, `fillFeed` (`packs/live-feed/fill.ts`), from all three places a feed starts: `braindog feed propose` with a
+setup file, `braindog import`, and the form on a project's page. Each fill is the add-on `feed-<id>`, so one feed
+is one approval. A record that holds `poll-<id>` from an import before the live feed, installed or waiting on
+Decide, holds that poll already, and the import does not ask it again (`apps/cli/test/import-feed.test.ts`).
 
 Substitution is §3.1's with fewer names. `{since}` and `{until}` are the only placeholders a scheduled action
 has values for, with the formats `date`, `instant`, `epoch_s` and `epoch_ms`. `{since}` is the last successful

@@ -1,0 +1,8 @@
+{
+  "gate": "no-transcript",
+  "rule": "a hook that reads the event's transcript_path",
+  "expect": "reads the hook event's transcript_path",
+  "findings": 1,
+  "total": 1,
+  "why": "AGT-B10 job 4, his \"transcripts never read\". One line of code reads the event's transcript_path and is the one finding. The same name in a block comment, in a line comment and in a test beside it is no finding, so the gate is shown to read code and not prose."
+}

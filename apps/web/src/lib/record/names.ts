@@ -270,7 +270,7 @@ function daySaid(day: string, nowMs: number): string {
   return day.slice(0, 4) === new Date(nowMs).toISOString().slice(0, 4) ? said : `${said} ${day.slice(0, 4)}`;
 }
 
-/** A domain as the organisation a person reads it as: `encore.example` is Encore, and `mail.acme.co.uk` Acme. */
+/** A domain as the organisation a person reads it as: `brightwell.example` is Brightwell, and `mail.acme.co.uk` Acme. */
 function domainSaid(domain: string): string {
   const parts = domain.toLowerCase().replace(/^@/u, '').split('.').filter(Boolean);
   /* THE LABEL BEFORE THE SUFFIX, where a two-letter country sits under a short second level (`co.uk`, `com.eg`). */
@@ -287,7 +287,7 @@ type Seen = { kind: 'commit' | 'mail' | 'mail-from' | 'bank' | 'import' | 'agent
 
 /**
  * A met line as `meet` writes it (`2026-08-27 · commit 3f2a91c in portage`, `2026-09-28 · mail: Renewal quote`,
- * `2026-10-02 · mail from encore.example`, `bank text`, `import`, `agent run S740`), read into its parts, or `null` for a
+ * `2026-10-02 · mail from brightwell.example`, `bank text`, `import`, `agent run S740`), read into its parts, or `null` for a
  * line with no day in front.
  */
 function seenOf(line: string): Seen | null {
@@ -375,8 +375,8 @@ const SERVICES: Readonly<Record<string, string>> = {
 };
 
 /**
- * ONE ADDRESS OR HANDLE A PERSON IS KNOWN BY, as they read it: `email:sam@brain.dog` is "sam@brain.dog",
- * `github:sam` "GitHub · sam", `phone:+201…` the number. `null` for a key that is a place rather than a name (a
+ * ONE ADDRESS OR HANDLE A PERSON IS KNOWN BY, as they read it: `email:mara@lindqvist.example` is "mara@lindqvist.example",
+ * `github:mara` "GitHub · mara", `phone:+201…` the number. `null` for a key that is a place rather than a name (a
  * folder, a repository's address, a domain), which is a path or a hostname and never said on a person's row.
  */
 export function identitySaid(key: string): string | null {

@@ -1,0 +1,14 @@
+{
+  "where": "/packs @390",
+  "text": "Today\nThursday 3 September 2026\nLedger Post, sending plan\nGBP 39.00, due in 4 days\nS731 Review the specimen page, beside its name\nMara Lindqvist asked about the Kiln licence",
+  "errors": [
+    {
+      "kind": "console",
+      "text": "Failed to load resource: the server responded with a status of 500"
+    },
+    {
+      "kind": "log",
+      "text": "a log line is not an error"
+    }
+  ]
+}

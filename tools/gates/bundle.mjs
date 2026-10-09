@@ -394,17 +394,6 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
     console.error(`\n  bundle: ${debt.message}. The entry script fails above that debt, so without it nothing is measured.\n`);
     return 1;
   }
-  /* `mainJsBaseline` IS READ UNTIL ITS LINE LEAVES `budgets.json` (batch 42's file, sent as blocked), so the two cannot
-     say different numbers in the meantime and the whole-path dead-key check in `self-test` stays green. When the key is
-     gone this reads `undefined` and says nothing; delete these lines then. */
-  if (B.mainJsBaseline !== undefined && B.mainJsBaseline !== debt.at) {
-    console.error(
-      `\n  bundle: budgets.json records the entry script at ${B.mainJsBaseline} and the ledger's debt says ${debt.at}.` +
-        ' The ledger is the number; a debt only falls.\n',
-    );
-    return 1;
-  }
-
   /**
    * A row may carry a BASELINE: a recorded number the gate fails above, when the budget is already
    * exceeded by something outside this repository's control.

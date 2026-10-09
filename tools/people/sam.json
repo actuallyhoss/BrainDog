@@ -1,0 +1,55 @@
+{
+  "id": "sam-founder",
+  "name": "Sam",
+  "who": "Builds two apps on his own from Manchester, a habit tracker and a recipe planner. He wants to see what each one earns and costs, and he has one coding agent working beside him.",
+  "expects": "founder",
+  "standing": true,
+  "said": "I'm Sam, a solo founder with two apps. I want to see the revenue and costs of each project.",
+  "says": {
+    "plain": "I'm Sam, a solo founder with two apps. I want to see the revenue and costs of each project.",
+    "hard": "I'm Sam. I build two apps on my own and want to see what each one earns and costs."
+  },
+  "chip": "I run a few companies",
+  "answer": "Streakly, Pantry Plan",
+  "answers": {
+    "name": "Sam",
+    "currency": "GBP",
+    "kind": "apps",
+    "things": ["Streakly", "Pantry Plan"]
+  },
+  "email": "sam@people.braindog.test",
+  "slug": "sams-apps",
+  "zone": "Europe/London",
+  "locale": "en-GB",
+  "languages": ["en-GB"],
+  "start": "2026-10-05T19:00:00Z",
+  "first": "Streakly made £340 in September and the server cost £45",
+  "later": [
+    { "day": 3, "said": ["Pantry Plan has 212 users"] },
+    { "day": 7, "said": ["Streakly has 1,480 users", "Pantry Plan made £60 this week"] },
+    { "day": 30, "said": ["Streakly made £410 in October", "Pantry Plan made £95 in October"] },
+    { "day": 90, "said": ["Streakly made £520 in December", "Pantry Plan made £130 in December"] }
+  ],
+  "expect": {
+    "who": {
+      "question": "Who are you?",
+      "chips": 5,
+      "promises": [
+        { "says": "free, with no card", "match": "free\\b.{0,24}\\bno card" },
+        { "says": "nothing is saved until you keep it", "match": "nothing (is )?saved until you keep" },
+        { "says": "yours to export or move", "match": "yours to (export|move|take)" }
+      ]
+    },
+    "heard": {
+      "usecase": "founder",
+      "title": "Sam's Apps",
+      "lit": ["Sam", "founder", "revenue"],
+      "places": ["Today", "Projects", "Money", "People"]
+    },
+    "question": { "about": "things", "choices": 2 },
+    "keep": { "lists": ["datapoints", "transactions", "people"], "currency": "GBP" },
+    "tell": { "lists": ["datapoints", "transactions"] },
+    "today": { "first": "agent", "lists": ["datapoints"] },
+    "offer": { "id": "page:projects", "before": 30, "after": 90 }
+  }
+}

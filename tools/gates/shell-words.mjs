@@ -2,6 +2,7 @@
  * `shell-words`: the core packages' code names no use case.
  *
  *   node tools/gates/shell-words.mjs [root]
+ *   node tools/gates/shell-words.mjs --hash <word> [--whole]
  *
  * THE CORE IS A SHELL, AND IT STAYS ONE ONLY WHILE IT KNOWS NOTHING ABOUT WHAT RUNS IN IT. A pack
  * says what a record is for; the kernel, the record, the host and the rest run whatever a pack
@@ -54,9 +55,21 @@
  * `private-words.local.json` beside this file, which git ignores, and a machine that has it guards
  * them exactly as it guards `WORDS`. A machine without it reads the tracked list alone, and every
  * seeded count in `self-test` is made of tracked words, so the file changes no count there.
+ *
+ * AND A TRACKED LIST OF THEIR HASHES, BECAUSE A LIST ONLY ONE MACHINE HOLDS BANS NOTHING ANYWHERE ELSE.
+ * Measured on 9 October: 7 of the owner's 11 words were only in the private file, which was absent on
+ * the Mac and can never be in CI, so they were banned nowhere. `private-words.hashes.json` holds a
+ * hash and a length for each, and the gate hashes every window of that length that starts at a part
+ * boundary, so CI and a fork ban the word without the repository publishing it. A hit prints the
+ * file and the line and never the word or the token; the private file, where a machine has it, is
+ * still how its owner sees which word it was. `node tools/gates/shell-words.mjs --hash <word>` adds one.
+ *
+ * AND THE HASHES ARE READ IN TESTS TOO, where the tracked words are not. A test may say `payroll`,
+ * because a test of the core has to hand a record a use case; it has no reason to name a client.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -112,6 +125,44 @@ const WHOLE = new Set(PRIVATE_WORDS.filter((e) => e.whole).map((e) => e.word));
 const ALL = [...new Set([...WORDS, ...PRIVATE_WORDS.map((e) => e.word)])];
 
 /**
+ * THE HASHED WORDS, read from `private-words.hashes.json` beside this file, or from the file
+ * `BRAINDOG_PRIVATE_HASHES` names, which is how a test or a planted tree aims the gate at hashes of its own.
+ *
+ * THE TRACKED FILE MISSING IS A THROW, for the reason a broken private list is: a gate that read no
+ * hashes would pass every word they were there to catch. A file named by the variable may be absent,
+ * which is a test asking for none.
+ *
+ * SALTED WITH THE GATE'S NAME, so a table of plain sha256 digests of common words does not read the
+ * file at a glance. It stops nobody who already guesses a word: that is the price of banning a word
+ * without publishing it, and a CI secret, the other way, would ban nothing on a fork or another machine.
+ */
+const HASHES = process.env.BRAINDOG_PRIVATE_HASHES ?? fileURLToPath(new URL('./private-words.hashes.json', import.meta.url));
+
+export const hashOf = (word) => createHash('sha256').update(`braindog shell-words ${word}`).digest('hex');
+
+function privateHashes(file) {
+  if (!existsSync(file)) {
+    if (process.env.BRAINDOG_PRIVATE_HASHES) return [];
+    throw new Error(`${file} is missing, so no private word would be banned. It is tracked; restore it.`);
+  }
+  const doc = JSON.parse(readFileSync(file, 'utf8'));
+  if (!Array.isArray(doc?.hashes)) throw new Error(`${file} must hold { "hashes": [...] }.`);
+  return doc.hashes.map((e) => {
+    if (typeof e?.hash !== 'string' || !/^[0-9a-f]{64}$/.test(e.hash) || !Number.isInteger(e.length) || !(e.length > 1))
+      throw new Error(`${file}: ${JSON.stringify(e)} is not a hash and a length.`);
+    return { hash: e.hash, length: e.length, whole: e.whole === true };
+  });
+}
+
+/**
+ * THE HASHES, KEYED, AND WHICH OF THEM THIS MACHINE CAN NAME. A hash whose word is in the private file
+ * is matched by name in the core already, so the core's pass leaves it to that; the pass over tests,
+ * which reads no names, still reads it, and says the word, because a machine holding the file is its owner's.
+ */
+const HASHED = new Map(privateHashes(HASHES).map((e) => [e.hash, e]));
+const KNOWN = new Map(PRIVATE_WORDS.map((e) => [hashOf(e.word), e.word]));
+
+/**
  * Every package and every app is in scope by default, so a new core package is watched the day it exists.
  *
  * `packs` IS THE THIRD WORKSPACE ROOT AND IS LEFT OUT ON PURPOSE, the one text gate that does not read
@@ -128,12 +179,12 @@ const ALL = [...new Set([...WORDS, ...PRIVATE_WORDS.map((e) => e.word)])];
 const WORKSPACES = ['packages', 'apps'];
 
 /**
- * THE DIRECTORIES OF EACH MEMBER THAT ARE READ, per workspace. `src` everywhere, and beside it the one
- * other directory each workspace ships code from: a package's `grammars`, which the MCP server serves
- * to every agent, and an app's `scripts`, which its operator runs. See `SOURCE` below for what the
- * first two held when they were not read.
+ * THE DIRECTORIES OF EACH MEMBER THAT ARE READ, per workspace. `src` everywhere, and beside it the
+ * other directories each workspace ships code from: a package's `grammars`, which the MCP server serves
+ * to every agent, and its `svelte`, the renderer's components every page draws with; and an app's
+ * `scripts`, which its operator runs. See `SOURCE` below for what each held when it was not read.
  */
-const READ = { packages: ['src', 'grammars'], apps: ['src', 'scripts'] };
+const READ = { packages: ['src', 'grammars', 'svelte'], apps: ['src', 'scripts'] };
 
 /**
  * WHAT IS OUT, AND WHY. Every entry is a path under the root, a directory or a file, and every
@@ -196,7 +247,7 @@ const OUT = {
     },
   },
   'packages/seed/src/usecases/index.ts': {
-    why: 're-exports Personal\'s own row builder by its own name, the way `founder-poll.ts`\'s `pollPack` sits beside it (2 hits).',
+    why: 're-exports Personal\'s own row builder by its own name, the way a use case\'s own builders sit beside it (2 hits).',
     words: { payday: '`export { payDayRow, type PayDay } from \'./personal.ts\';`, requested for `propose.ts`: a name carried through, not a branch taken on it.' },
   },
   'apps/web/src/lib/start/propose.ts': {
@@ -243,8 +294,9 @@ export { OUT as EXEMPT };
  * `grammars` AND `scripts` ARE READ SINCE 25 SEPTEMBER, after that example was rewritten as a rate
  * fetch against `api.example.com`: read then, the four `apps/*\/scripts` directories and
  * `packages/mcp/grammars` held 0 hits between them, so the scope widened on a clean tree and the
- * first example that names a use case there is the first red. `packages/render/svelte` is still not
- * read; it held 0 hits on 23 September.
+ * first example that names a use case there is the first red. `packages/render/svelte` is read since 9
+ * October, when its 39 components held 0 hits as they had on 23 September, and
+ * `negative/shell-words-svelte` plants the first one.
  */
 const SOURCE = /\.(ts|mts|js|mjs|svelte)$/;
 const TEST = /\.test\.(ts|mts|js|mjs)$/;
@@ -261,6 +313,27 @@ function walk(dir, out) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
     else if (SOURCE.test(name) && !TEST.test(name)) out.push(full);
+  }
+  return out;
+}
+
+/**
+ * THE TESTS OF A MEMBER, for the hashes only: every test file anywhere in it and every file under a
+ * `test` directory, its fixtures among them. The whole member is walked, because a test sits beside
+ * its code in `src` as often as it sits in `test/`.
+ */
+function walkTests(dir, out, inTest = false) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return out;
+  }
+  for (const name of entries) {
+    if (skipDir(name)) continue;
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) walkTests(full, out, inTest || name === 'test');
+    else if (SOURCE.test(name) && (inTest || TEST.test(name))) out.push(full);
   }
   return out;
 }
@@ -454,6 +527,43 @@ export const wordsWith = ({ words, whole }) => (token) => {
  */
 export const wordsIn = wordsWith({ words: ALL, whole: WHOLE });
 
+/**
+ * THE HASHED WORDS ONE TOKEN HOLDS, as the hashes themselves: `wordsWith`'s reading with a digest where
+ * the word was. Each window starts at a part boundary and is as long as a hashed word, read on over
+ * later parts the way `run.startsWith(word)` is; a `whole` entry's window must also end where a part
+ * ends. A window inside a part is never hashed, so `loadingOlder` stays out here for the reason it does above.
+ *
+ * ONE READING PER TOKEN TEXT, KEPT FOR THE RUN. A file says `const`, `value` and `ok` hundreds of times, so each
+ * distinct token is hashed once in a run, however often it is written.
+ */
+export const hashedWith = (hashed) => {
+  const lengths = [...new Set([...hashed.values()].map((e) => e.length))];
+  const seen = new Map();
+  return (token) => {
+    if (lengths.length === 0) return [];
+    let found = seen.get(token);
+    if (found) return found;
+    const parts = partsOf(token);
+    const hits = new Set();
+    for (let i = 0; i < parts.length; i++) {
+      for (const length of lengths) {
+        let run = '';
+        let j = i;
+        while (j < parts.length && run.length < length) run += parts[j++];
+        if (run.length < length) continue;
+        const e = hashed.get(hashOf(run.slice(0, length)));
+        if (e && e.length === length && (!e.whole || run.length === length)) hits.add(e.hash);
+      }
+    }
+    found = [...hits];
+    seen.set(token, found);
+    return found;
+  };
+};
+
+/** `hashedWith` over this run's hashes. */
+export const hashedIn = hashedWith(HASHED);
+
 /** A token is a run of the characters an identifier or a slug is written in, separators included. */
 const TOKEN = /[A-Za-z0-9_$][A-Za-z0-9_$.-]*/g;
 
@@ -466,17 +576,31 @@ const TOKEN = /[A-Za-z0-9_$][A-Za-z0-9_$.-]*/g;
  * Measured on 23 September with a `goldRate` written on the line between two such strings in a
  * `.ts` file under `packages/kernel/src`: the gate read green.
  */
-export function hitsIn(source, markup = false) {
+export function hitsIn(source, markup = false, read = wordsIn) {
   const text = uncomment(markup ? source.replace(/<!--[\s\S]*?-->/g, blank) : source);
   const hits = [];
   let line = 1;
   let seen = 0;
   for (const m of text.matchAll(TOKEN)) {
     for (; seen < m.index; seen++) if (text[seen] === '\n') line++;
-    for (const word of wordsIn(m[0])) hits.push({ line, word, token: m[0] });
+    for (const word of read(m[0])) hits.push({ line, word, token: m[0] });
   }
   return hits;
 }
+
+/**
+ * HOW A HASHED HIT IS PRINTED: the file, the line and the word's length, never the word or the token
+ * that carried it, because CI's log is public. A machine whose private file names the word says it.
+ */
+const privateLine = (rel, line, hash) =>
+  `  ${rel}:${line}  ${KNOWN.has(hash) ? `${KNOWN.get(hash)}, a private word` : `a private word of ${HASHED.get(hash).length} letters`}`;
+
+/**
+ * A TOKEN A USE-CASE FINDING QUOTES, unless it also carries a private word this machine cannot name. Measured on 9
+ * October with `zephyrinePayroll` planted and `zephyrine` hashed: the hashed line hid the word and the `payroll`
+ * line beside it printed the whole token, so the log said the word anyway.
+ */
+const shown = (token) => (hashedIn(token).some((h) => !KNOWN.has(h)) ? 'a name that also holds a private word' : token);
 
 const outOf = (rel) => Object.keys(OUT).find((p) => rel === p || rel.startsWith(p + '/')) ?? null;
 
@@ -495,6 +619,7 @@ export default function shellWords(
 ) {
   const ROOT = resolve(root);
   const files = [];
+  const tests = [];
   for (const workspace of WORKSPACES) {
     let members;
     try {
@@ -502,13 +627,16 @@ export default function shellWords(
     } catch {
       continue;
     }
-    for (const m of members)
-      if (m.isDirectory() && !skipDir(m.name)) for (const dir of READ[workspace]) walk(join(ROOT, workspace, m.name, dir), files);
+    for (const m of members) {
+      if (!m.isDirectory() || skipDir(m.name)) continue;
+      for (const dir of READ[workspace]) walk(join(ROOT, workspace, m.name, dir), files);
+      walkTests(join(ROOT, workspace, m.name), tests);
+    }
   }
 
   /* A GATE THAT READ NOTHING HAS NOT PASSED. Exit 3 is this directory's word for "could not run". */
   if (files.length === 0) {
-    console.log(`  shell-words: no packages/*/{src,grammars} or apps/*/{src,scripts} under ${ROOT}, so no code was read`);
+    console.log(`  shell-words: no packages/*/{src,grammars,svelte} or apps/*/{src,scripts} under ${ROOT}, so no code was read`);
     return 3;
   }
 
@@ -518,10 +646,15 @@ export default function shellWords(
   const byWord = new Map(
     Object.entries(OUT).flatMap(([p, e]) => Object.keys(e.words ?? {}).map((w) => [`${p} ${w}`, 0])),
   );
+  /* A HASHED WORD IS NEVER EXEMPTED: no reason in `OUT` is a reason to name a client. */
+  let hidden = 0;
   let read = 0;
   for (const file of files) {
     const rel = relative(ROOT, file).replace(/\\/g, '/');
-    const hits = hitsIn(readFileSync(file, 'utf8'), file.endsWith('.svelte'));
+    const text = readFileSync(file, 'utf8');
+    const markup = file.endsWith('.svelte');
+    for (const h of hitsIn(text, markup, hashedIn)) if (!KNOWN.has(h.word)) findings.push(privateLine(rel, h.line, h.word)), hidden++;
+    const hits = hitsIn(text, markup);
     const out = outOf(rel);
     const allowed = out === null ? null : OUT[out].words ? Object.keys(OUT[out].words) : ALL;
     if (out === null || OUT[out].words) read++;
@@ -529,8 +662,15 @@ export default function shellWords(
       if (allowed !== null && allowed.includes(h.word)) {
         exempted.set(out, exempted.get(out) + 1);
         if (OUT[out].words) byWord.set(`${out} ${h.word}`, byWord.get(`${out} ${h.word}`) + 1);
-      } else findings.push(`  ${rel}:${h.line}  ${h.word}, in ${h.token}`);
+      } else findings.push(`  ${rel}:${h.line}  ${h.word}, in ${shown(h.token)}`);
     }
+  }
+
+  /* THE SECOND PASS, OVER TESTS, FOR THE HASHES ALONE. Read the way code is, comments blanked, so a
+     test's line numbers are the file's and a finding here is a name a test hands a record. */
+  for (const file of tests) {
+    const rel = relative(ROOT, file).replace(/\\/g, '/');
+    for (const h of hitsIn(readFileSync(file, 'utf8'), file.endsWith('.svelte'), hashedIn)) findings.push(privateLine(rel, h.line, h.word)), hidden++;
   }
 
   /* AN EXEMPTION THAT EXEMPTS NOTHING IS A FINDING, for the reason `OUT` gives. Only for a path that
@@ -554,19 +694,58 @@ export default function shellWords(
   if (findings.length === 0) {
     const held = [...exempted].reduce((sum, [, n]) => sum + n, 0);
     console.log(
-      `  shell-words: 0 use-case words in code over ${read} core files; ${held} in the ${Object.keys(OUT).length} exempted paths`,
+      `  shell-words: 0 use-case words in code over ${read} core files; ${held} in the ${Object.keys(OUT).length} exempted paths; ` +
+        `0 of ${HASHED.size} private words in those files or ${tests.length} test files`,
     );
     return;
   }
   for (const f of findings) console.error(f);
-  console.error(
-    `\n  shell-words: ${findings.length} finding(s), each a use case named in the core's code.\n` +
-      '  The core runs whatever a pack declares and knows none of it by name: move the word into the\n' +
-      '  pack that owns it, and let the core read it off the declaration.',
-  );
+  /* TWO SENTENCES, ONE PER KIND, so a red made only of hashed words does not call itself a use case. */
+  const plain = findings.length - hidden;
+  console.error(`\n  shell-words: ${findings.length} finding(s).`);
+  if (plain > 0)
+    console.error(
+      `  ${plain === findings.length ? 'Each is' : `${plain} ${plain === 1 ? 'is' : 'are'}`} a use case named in the core's code. The core runs whatever a\n` +
+        '  pack declares and knows none of it by name: move the word into the pack that owns it, and let the\n' +
+        '  core read it off the declaration.',
+    );
+  if (hidden > 0)
+    console.error(
+      `  ${hidden === findings.length ? 'Each is' : `${hidden} ${hidden === 1 ? 'is' : 'are'}`} a private word named in the core or its tests, found by its hash and\n` +
+        "  never printed: the owner's own names stay out of shared code, and a test says what it needs with an\n" +
+        '  invented one.',
+    );
   return 1;
+}
+
+/**
+ * `--hash <word>` ADDS ONE WORD TO THE TRACKED HASHES, and `--whole` beside it makes the word one that
+ * must end where a part ends, for `WHOLE`'s reason. It prints the length and never the word, so the
+ * line can be pasted anywhere. A word already there is said and left; a word that is not a lower-case
+ * run of letters and digits is refused, because no part the gate reads could ever hash to it.
+ */
+export function addHash(word, whole = false, file = HASHES) {
+  const w = String(word ?? '').toLowerCase();
+  if (!/^[a-z0-9]{2,}$/.test(w)) {
+    console.error('  shell-words --hash: give one word of letters and digits, two or more of them.');
+    return 1;
+  }
+  const doc = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { hashes: [] };
+  const hash = hashOf(w);
+  if (doc.hashes.some((e) => e.hash === hash)) {
+    console.log(`  shell-words --hash: that word of ${w.length} letters is already banned, ${doc.hashes.length} in all`);
+    return;
+  }
+  doc.hashes.push({ hash, length: w.length, ...(whole ? { whole: true } : {}) });
+  doc.hashes.sort((x, y) => x.hash.localeCompare(y.hash));
+  writeFileSync(file, `${JSON.stringify(doc, null, '  ')}\n`);
+  console.log(`  shell-words --hash: a word of ${w.length} letters added, ${doc.hashes.length} in all. Commit the file.`);
 }
 
 /* AND IT IS STILL A SCRIPT, because `self-test` spawns each gate at its seeded fixture and the header
    documents the command line. `?? 0` because a pass returns nothing. */
-if (import.meta.main) process.exitCode = shellWords(process.argv[2]) ?? 0;
+if (import.meta.main) {
+  const [, , ...args] = process.argv;
+  process.exitCode =
+    (args[0] === '--hash' ? addHash(args.find((a, i) => i > 0 && a !== '--whole'), args.includes('--whole')) : shellWords(args[0])) ?? 0;
+}

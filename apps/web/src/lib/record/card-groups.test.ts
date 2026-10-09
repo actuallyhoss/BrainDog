@@ -83,7 +83,7 @@ const rowOf = (e: Entry, org: string | null): TableRow =>
 
 function block(entries: Entry[], extra: Partial<BlockResult> = {}): BlockResult {
   const names = new Map([
-    ['organisations#7', 'Encore'],
+    ['organisations#7', 'Brightwell'],
     ['organisations#9', 'Halden Type Co'],
   ]);
   const said = (e: Entry) => (typeof e.fields.org === 'number' ? (names.get(`organisations#${e.fields.org}`) ?? null) : null);
@@ -114,19 +114,19 @@ const text = (segments: ReturnType<typeof toSegments>): string[] =>
 
 test('TWENTY-FOUR COLLEAGUES OF ONE COMPANY ARE ONE HEADING AND ONE CARD, the rest a line away on its page', () => {
   seq = 0;
-  const priya = person({ name: 'Priya', role: 'Contractor', org: 7, in_touch: '2026-10-05' });
+  const teodor = person({ name: 'Teodor', role: 'Contractor', org: 7, in_touch: '2026-10-05' });
   const jo = person({ name: 'Jo', in_touch: '2026-10-04' });
-  const encore = Array.from({ length: 23 }, (_, i) => person({ name: `Colleague ${i}`, org: 7, in_touch: '2026-09-20' }));
+  const brightwell = Array.from({ length: 23 }, (_, i) => person({ name: `Colleague ${i}`, org: 7, in_touch: '2026-09-20' }));
   const ana = person({ name: 'Ana', org: 9, in_touch: '2026-09-02' });
-  const segments = toSegments(block([priya, jo, ...encore, ana]));
+  const segments = toSegments(block([teodor, jo, ...brightwell, ana]));
   assert.deepEqual(text(segments), [
-    '**[Encore](/r/organisations/7)** · 24 people',
-    'cards: [Priya](/r/people/1)',
-    '[Show all 24 people at Encore](/r/organisations/7)',
+    '**[Brightwell](/r/organisations/7)** · 24 people',
+    'cards: [Teodor](/r/people/1)',
+    '[Show all 24 people at Brightwell](/r/organisations/7)',
     'cards: [Jo](/r/people/2), [Ana](/r/people/26)',
   ]);
   const card = segments[1];
-  assert.ok(card?.type === 'block' && card.rows[1]?.cells[2] === '', 'under its heading a card does not say Encore again');
+  assert.ok(card?.type === 'block' && card.rows[1]?.cells[2] === '', 'under its heading a card does not say Brightwell again');
   const loose = segments[3];
   assert.ok(loose?.type === 'block' && loose.rows[2]?.cells[2] === 'Halden Type Co', 'a person alone with their company still names it');
 });
@@ -144,17 +144,17 @@ test('A BLOCK THAT DOES NOT SAY group: IS DRAWN AS IT WAS, and the names come fr
 
 test('A PERSON FOLDED INTO ANOTHER IS NO CARD, so a merged duplicate never makes a group of one person twice', () => {
   seq = 0;
-  const priya = person({ name: 'Priya', org: 7, in_touch: '2026-10-05' });
-  const dup = person({ name: 'priya', org: 7, in_touch: '2026-10-06', merged_into: 1 });
-  assert.deepEqual(text(toSegments(block([dup, priya]))), ['cards: [Priya](/r/people/1)']);
+  const teodor = person({ name: 'Teodor', org: 7, in_touch: '2026-10-05' });
+  const dup = person({ name: 'teodor', org: 7, in_touch: '2026-10-06', merged_into: 1 });
+  assert.deepEqual(text(toSegments(block([dup, teodor]))), ['cards: [Teodor](/r/people/1)']);
 });
 
 test('A BLOCK THAT IS A SLICE OF ITS LIST DOES NOT COUNT A GROUP FROM THE SLICE, and one whose every card was merged away is blank', () => {
   seq = 0;
-  const encore = Array.from({ length: 5 }, (_, i) => person({ name: `Colleague ${i}`, org: 7, in_touch: '2026-09-20' }));
-  assert.deepEqual(text(toSegments(block(encore, { total: 80 }))), ['**[Encore](/r/organisations/7)**', 'cards: [Colleague 0](/r/people/1)', '[Show everyone at Encore](/r/organisations/7)']);
+  const brightwell = Array.from({ length: 5 }, (_, i) => person({ name: `Colleague ${i}`, org: 7, in_touch: '2026-09-20' }));
+  assert.deepEqual(text(toSegments(block(brightwell, { total: 80 }))), ['**[Brightwell](/r/organisations/7)**', 'cards: [Colleague 0](/r/people/1)', '[Show everyone at Brightwell](/r/organisations/7)']);
   seq = 0;
-  const dup = person({ name: 'priya', org: 7, merged_into: 9 });
+  const dup = person({ name: 'teodor', org: 7, merged_into: 9 });
   assert.deepEqual(toSegments(block([dup])), []);
 });
 
@@ -162,12 +162,12 @@ test('A BLOCK THAT IS A SLICE OF ITS LIST DOES NOT COUNT A GROUP FROM THE SLICE,
 
 test('A REF TO A FOLDED ROW READS AS THE ROW IT WAS FOLDED INTO, followed to the end, and a circle is left alone', () => {
   const rows = [
-    { id: 'A', seq: 1, fields: { name: 'Rohan Mehta' } },
-    { id: 'B', seq: 2, fields: { name: 'rohanmehta', merged_into: 'A' } },
-    { id: 'C', seq: 3, fields: { name: 'S. Mehta', merged_into: 'people#2' } },
+    { id: 'A', seq: 1, fields: { name: 'Joaquin Herrera' } },
+    { id: 'B', seq: 2, fields: { name: 'joaquinherrera', merged_into: 'A' } },
+    { id: 'C', seq: 3, fields: { name: 'S. Herrera', merged_into: 'people#2' } },
     { id: 'D', seq: 4, fields: { name: 'Loop one', merged_into: 'E' } },
     { id: 'E', seq: 5, fields: { name: 'Loop two', merged_into: 'D' } },
-    { id: 'F', seq: 6, fields: { name: 'Jo', merged_into: 'Rohan Mehta' } },
+    { id: 'F', seq: 6, fields: { name: 'Jo', merged_into: 'Joaquin Herrera' } },
   ];
   assert.deepEqual([...survivorsOf('people', rows)], [
     ['B', 'A'],
@@ -176,7 +176,7 @@ test('A REF TO A FOLDED ROW READS AS THE ROW IT WAS FOLDED INTO, followed to the
   ]);
   const map = refMapOf('people', rows);
   assert.equal(map.seqOf.get('B'), 1, 'what pointed at the folded row opens the one that stayed');
-  assert.equal(map.titleOf.get(2), 'Rohan Mehta', 'and its number is said by that one name');
+  assert.equal(map.titleOf.get(2), 'Joaquin Herrera', 'and its number is said by that one name');
   assert.equal(map.idOf.get(2), 'B', 'its own number still names its own row, for a write that means it');
   assert.equal(map.seqOf.get('D'), 4);
   const tasks = { ...REGISTERS.people!, meets: undefined } as unknown as RegisterDecl;

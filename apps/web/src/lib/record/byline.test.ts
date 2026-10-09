@@ -18,14 +18,14 @@ test('an agent’s run is said by its agent and for whom, with the run beside it
   assert.equal(b?.run, 'S42');
   assert.equal(b?.app, 'Claude Code · MacBook');
   assert.ok(!b?.said.includes('S42'));
-  const named = bylineOf({ by: 'agent', who: 'S42', agent: 'claude', for: 'p_owner', at: AT }, null, new Map([['p_owner', 'Sam']]), NOW);
-  assert.equal(named?.said, 'Claude for Sam · 2h ago');
+  const named = bylineOf({ by: 'agent', who: 'S42', agent: 'claude', for: 'p_owner', at: AT }, null, new Map([['p_owner', 'Mara']]), NOW);
+  assert.equal(named?.said, 'Claude for Mara · 2h ago');
 });
 
 test('a run whose agent the record does not name is An agent, and an id is never a name', () => {
   assert.equal(bylineOf({ who: 'S9', at: AT }, null, new Map(), NOW)?.name, 'An agent');
   assert.equal(bylineOf({ who: 'S9', agent: '01J8Z3K9Q2W4E6R8T0Y2V4X6Z8', at: AT }, null, new Map(), NOW)?.name, 'An agent');
-  const b = bylineOf({ who: 'S9', for: 'p_01J8Z3K9', app: '/Users/sam/x', at: AT }, null, new Map(), NOW);
+  const b = bylineOf({ who: 'S9', for: 'p_01J8Z3K9', app: '/Users/mara/x', at: AT }, null, new Map(), NOW);
   assert.equal(b?.for, null, 'a person nobody named is left out');
   assert.equal(b?.app, null, 'a path is not where an agent ran');
 });

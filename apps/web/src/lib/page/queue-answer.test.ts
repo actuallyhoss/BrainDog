@@ -24,7 +24,7 @@ test('A QUESTION PUT OFF SAYS WHEN IT COMES BACK, and why, and any other questio
 test('AN ANSWER, ITS REASON AND WHY A QUESTION WAS PUT OFF CARRY NO ADDRESS OR ID (audit 21 #4)', () => {
   const ways = waysOf({
     options: [
-      { key: 'merge', label: 'Merge into rohan@x.com', because: 'Seen at https://github.com/x/y as 01ARZ3NDEKTSV4RRFFQ69G5FAV', recommended: true },
+      { key: 'merge', label: 'Merge into joaquin@x.com', because: 'Seen at https://github.com/x/y as 01ARZ3NDEKTSV4RRFFQ69G5FAV', recommended: true },
       { key: 'pick', label: 'tasks#8', because: '', recommended: false },
     ],
   });
@@ -40,8 +40,8 @@ test('AN ANSWER, ITS REASON AND WHY A QUESTION WAS PUT OFF CARRY NO ADDRESS OR I
 
 test("THE RECORD'S OWN WHO-IS-WHO QUESTION IS DRAWN AS A MERGE ON THE QUEUE, and a rowset that is some other change is not", () => {
   const candidates = [
-    { at: 'people#3', name: 'Rohan Mehta', seen: ['Encore'] },
-    { at: 'people#1', name: 'Rohan', seen: [], kept: true },
+    { at: 'people#3', name: 'Joaquin Herrera', seen: ['Brightwell'] },
+    { at: 'people#1', name: 'Joaquin', seen: [], kept: true },
     { at: 'people#7', name: 'people#7', seen: ['/Users/x/repo', 'GitHub'] },
   ];
   const merge = queueMergeOf({ kind: 'rowset', body_kind: 'rowset', candidates, held: 3 }, ['accept', 'reject']);
@@ -49,8 +49,8 @@ test("THE RECORD'S OWN WHO-IS-WHO QUESTION IS DRAWN AS A MERGE ON THE QUEUE, and
   assert.deepEqual(
     merge.candidates.map((c) => [c.key, c.name, c.kept, c.pick]),
     [
-      ['people#1', 'Rohan', true, null],
-      ['people#3', 'Rohan Mehta', false, null],
+      ['people#1', 'Joaquin', true, null],
+      ['people#3', 'Joaquin Herrera', false, null],
       ['people#7', '', false, null],
     ],
     'the kept one first, a handle never drawn as a name, and no Pick on a rowset',
@@ -78,14 +78,14 @@ test('A QUESTION OF OPTIONS OVER A CLUSTER IS READ AS ITS OWN PAGE READS IT', ()
 test("THE RECORD'S OWN MERGE ON A ROWSET IS READ AS ITS OPTIONS: Merge all, Keep apart and a Pick for each one folded", () => {
   const merge = {
     candidates: [
-      { name: 'Rohan Mehta', row: 'people#1', keeps: true, org: 'Encore', seen: ['3 commits in encore', 'mail'], known_by: ['email'], rows: [] },
-      { name: 'rohanm', row: 'people#4', keeps: false, org: null, seen: ['a commit in portage'], known_by: ['github'], rows: [0] },
+      { name: 'Joaquin Herrera', row: 'people#1', keeps: true, org: 'Brightwell', seen: ['3 commits in brightwell', 'mail'], known_by: ['email'], rows: [] },
+      { name: 'jherrera', row: 'people#4', keeps: false, org: null, seen: ['a commit in portage'], known_by: ['github'], rows: [0] },
       { name: '', row: 'people#7', keeps: false, org: null, seen: [], known_by: [], rows: [1] },
     ],
     options: [
       { option: 'merge', says: 'Merge all', decide: { option: 'merge' } },
       { option: 'apart', says: 'Keep apart', decide: { option: 'apart' } },
-      { option: 'pick:people#4', says: 'Pick rohanm', decide: { option: 'pick:people#4' } },
+      { option: 'pick:people#4', says: 'Pick jherrera', decide: { option: 'pick:people#4' } },
       { option: 'pick:people#7', says: 'Pick this one', decide: { option: 'pick:people#7' } },
     ],
   };
@@ -95,13 +95,13 @@ test("THE RECORD'S OWN MERGE ON A ROWSET IS READ AS ITS OPTIONS: Merge all, Keep
   assert.deepEqual(
     read.candidates.map((c) => [c.key, c.name, c.kept, c.pick?.option ?? null]),
     [
-      ['people#1', 'Rohan Mehta', true, null],
-      ['people#4', 'rohanm', false, 'pick:people#4'],
+      ['people#1', 'Joaquin Herrera', true, null],
+      ['people#4', 'jherrera', false, 'pick:people#4'],
       ['people#7', '', false, 'pick:people#7'],
     ],
     'the kept one first and one Pick for each one folded',
   );
-  assert.deepEqual(read.candidates[0]?.seen, ['3 commits in encore', 'mail'], 'where they were seen stays newest first');
+  assert.deepEqual(read.candidates[0]?.seen, ['3 commits in brightwell', 'mail'], 'where they were seen stays newest first');
 
   const two = { candidates: merge.candidates.slice(0, 2), options: merge.options.slice(0, 2) };
   assert.deepEqual(

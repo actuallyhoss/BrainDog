@@ -52,8 +52,8 @@ export function rerank<T extends { id: string }>(sql: Pick<Sql, 'all'>, hits: re
   for (let i = 0; i < hits.length; i += CHUNK) {
     const ids = hits.slice(i, i + CHUNK).map((h) => h.id);
     for (const row of sql.all<{ id: string; model: string; dims: number; vec: unknown }>(
-      `SELECT id, model, dims, vec FROM entry_vec WHERE id IN (${ids.map(() => '?').join(', ')})`,
-      ...ids,
+      `SELECT id, model, dims, vec FROM entry_vec WHERE id IN (SELECT value FROM json_each(?))`,
+      JSON.stringify(ids),
     )) {
       const vec = int8Of(row.vec);
       if (vec !== null && vec.length === row.dims) vecs.set(row.id, { model: row.model, vec });

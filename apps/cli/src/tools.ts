@@ -401,7 +401,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
         continue;
       }
       const patch = { transport: f.transport, command: f.command, args: f.args, endpoint: f.endpoint, needs: n.needs };
-      /* THE OWNER'S QUESTION IN WORDS, 80 CHARACTERS AT MOST. It read "Change tools#8 to how fly-prism is set up
+      /* THE OWNER'S QUESTION IN WORDS, 80 CHARACTERS AT MOST. It read "Change tools#8 to how fly-copperleaf is set up
          in ~/.claude.json on Maras-MacBook-Pro.local?": an id, a path and a network name. Those three are the details. */
       const question = asking('Update the ', f.name, ` tool to match ${thisMachine()}?`);
       const out = await s.client.call<{ id: string }>('propose', {

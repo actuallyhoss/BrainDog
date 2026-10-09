@@ -19,6 +19,31 @@ export const DUE_FIGURES: Record<string, SeedMetric> = {
   },
 
   /**
+   * MONEY PAID TO YOU IN THE LAST SEVEN DAYS THAT NEVER TOUCHED AN ACCOUNT, SINCE money-core 3.16.0.
+   *
+   * A shop that keeps no bank account in its record still gets paid: "Nadia paid 900 on InstaPay" is kept as an
+   * invoice to Nadia, paid today, because a Ledger entry needs an account and she holds none. `received-7d` cannot see
+   * it, so Today's "Money this week" read nothing on the one week that had money in it. This is the other half: what
+   * was owed to you and was paid in today or the six days before it (`settled` is the day the record stamps when it is
+   * marked paid, `finished:` in `lists/obligations.ts`), and nothing dated ahead. An invoice paid into an account and
+   * reconciled on the Ledger is read here too, and `received-7d` leaves its Ledger entry out, so it counts once.
+   *
+   * ONE AMOUNT PER CURRENCY unless a home currency and its rates say otherwise (`MONEY` in `shared.ts`), so EGP 900 and
+   * USD 40 never read as 940.
+   */
+  'settled-in-7d': {
+    metric: 'settled-in-7d',
+    name: 'Paid to you, 7 days',
+    source: 'register.obligations',
+    where: 'state is paid, direction is owed to me, settled is set, settled after -7d, settled before +1d',
+    value: { sum: 'amount' },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '7d',
+    compare: 'none',
+  },
+
+  /**
    * THE WHOLE BOOK YOU OWE, AND IT WAS THE ONE FIGURE OF THE FOUR A SNAPSHOT HOLDS THAT NOTHING COMPUTED.
    *
    * `snapshots` stores `cash`, `owed_to_me`, `owed_by_me` and `net` on one row, and three of the four

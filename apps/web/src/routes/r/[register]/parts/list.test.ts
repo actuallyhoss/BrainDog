@@ -168,12 +168,12 @@ test('a default is held up against what the list declares now', () => {
 });
 
 test('A LIST OPENED AT ITS OWN ADDRESS ARRIVES, and a first load whose `from` has no address does not throw', () => {
-  const at = (path: string) => ({ url: new URL(`https://brain.dog/app/sam${path}`), params: { register: 'tasks' } });
+  const at = (path: string) => ({ url: new URL(`https://brain.dog/app/mara${path}`), params: { register: 'tasks' } });
   /* SvelteKit's first navigation in a static shell: `from` is the router's state before it had an address. */
   const nowhere = { url: null, params: null };
   assert.equal(arrivedAt(nowhere, at('/r/tasks')), 'tasks', 'a direct load is an arrival, and it threw on `from.url.pathname`');
   assert.equal(arrivedAt(null, at('/r/tasks')), 'tasks');
-  assert.equal(arrivedAt({ url: new URL('https://brain.dog/app/sam/p/money'), params: null }, at('/r/tasks')), 'tasks', 'from another page');
+  assert.equal(arrivedAt({ url: new URL('https://brain.dog/app/mara/p/money'), params: null }, at('/r/tasks')), 'tasks', 'from another page');
   assert.equal(arrivedAt(at('/r/tasks'), at('/r/tasks')), null, 'a move inside the list is not an arrival');
   assert.equal(arrivedAt(nowhere, at('/r/tasks?sort=due:asc')), null, 'an address that asks already is kept');
   assert.equal(arrivedAt(nowhere, null), null);

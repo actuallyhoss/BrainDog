@@ -175,7 +175,22 @@ export const decide = {
   arrangeNeedKept: (label: string) => `Kept “${label}” for scheduled runs`,
   /* TRUE OF THE RECORD TODAY: `govern.ts` refuses an approval whose key is missing, and `actions.ts` one held only for a
      person. When an accept can take some parts and leave the rest (REC-A06), this says that instead. */
-  arrangeNeedsNote: 'Add each key here before you accept. The record will not start anything whose key it does not hold.',
+  arrangeNeedsNote: 'A part that needs a key stays open until its key is held. Add the key here and it is taken with the rest; without it, Accept takes the rest and that part waits here.',
+  /* WHAT ACCEPT TAKES (REC-A07 step 2): a tick per part, and why one is off. */
+  arrangeTakesH: 'What Accept takes',
+  arrangeTakesHint: 'Untick a part to leave it for later. What you leave stays here as the same question.',
+  arrangeTake: (name: string) => `Take ${name}`,
+  arrangeTakeWaitsKey: (labels: readonly string[]) => `Stays open until ${list(labels.map((l) => `“${l}”`))} ${labels.length === 1 ? 'is' : 'are'} held.`,
+  arrangeTakeWaitsFor: (name: string) => `Waits for “${name}”, which it cannot be taken without.`,
+  arrangeTakeSome: (n: number, of: number) => `Accept takes ${n} of ${of} parts. The rest stay open here.`,
+  arrangeTakeNone: 'Nothing is ticked. Tick a part to accept it, or decline the whole question.',
+  arrangeTookSome: (n: number) => `Accepted ${n === 1 ? 'one part' : `${n} parts`}. The rest still waits here.`,
+  /* WHAT STOPS (REC-A16): a door an update takes away while messages still come to it, and no add-on takes it over. */
+  arrangeStopsH: 'What stops',
+  arrangeStopsFiling: (name: string) => `${name} goes. Messages to this address will stop being filed.`,
+  arrangeStopsNote: 'No add-on you can install takes it over. Accept asks a second time.',
+  arrangeStopsAgain: (names: readonly string[]) => `Messages to ${list([...names])} will stop being filed. Press Accept again to go ahead.`,
+  arrangeTakenBy: (name: string, pack: string) => `${name} moves to ${pack}, which this same yes adds.`,
   arrangeChangesH: 'What it changes',
   arrangeChangeOne: (list: string) => `One in ${list}`,
   arrangeChangeAny: 'One of your entries',

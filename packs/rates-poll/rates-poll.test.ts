@@ -78,7 +78,7 @@ test('the file reads clean as an add-on somebody opens from disk, and says what 
 
 test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
   /* TWO RE-EXPORTS HELD IT UP. `packages/seed/src/packs/index.ts` was a barrel nothing imported, and
-     `usecases/index.ts` handed `ratesPollPack` to `test/founder-poll.test.ts` as though a rates address were a use
+     `usecases/index.ts` handed `ratesPollPack` to the seed's old poll test as though a rates address were a use
      case. Either one keeps a caller reaching into `packages/seed` for a document that is now a file here. */
   const src = new URL('../../packages/seed/src/', import.meta.url);
   const offering: string[] = [];
@@ -280,7 +280,7 @@ test('AND THE MOST IT FILLS IS THE RECORD’S NUMBER, asked of the record rather
   assert.match(past!.fix, new RegExp(`1 to ${RATES_CURRENCIES_MOST} maps`, 'u'), `the record's own sentence: ${past!.fix}`);
 });
 
-/* ── the run, moved from `packages/seed/test/founder-poll.test.ts` ────────────────────────────── */
+/* ── the run, moved from the seed's old poll test ─────────────────────────────────────────────── */
 
 test('EXCHANGE RATES ARE POLLED LIKE ANY ADDRESS: approved once, one row of fx a currency, and Cash now converts', async () => {
   const sql = openSqlite();
@@ -309,7 +309,7 @@ test('EXCHANGE RATES ARE POLLED LIKE ANY ADDRESS: approved once, one row of fx a
   /* AN ACCOUNT IN EACH CURRENCY, THE HOME ONE SET, AND EACH READ AT THE POLLED RATE. Before the home currency is
      chosen there is nothing to convert into, so the figure is refused rather than added up across currencies. The
      sterling is the one worth having: no rate is quoted between it and the Egyptian pound, so it is read through the dollar
-     both rates are quoted against, which is the path `founder-poll.test.ts` held while this test lived there. */
+     both rates are quoted against, which is the path the seed's old poll test held while this test lived there. */
   for (const a of [
     { name: 'Nile current', kind: 'bank', balance: { amount: 5_200_000, currency: 'EGP' }, as_of: '2026-09-24', liquid: true },
     { name: 'Dollar float', kind: 'bank', balance: { amount: 340_000, currency: 'USD' }, as_of: '2026-09-24', liquid: true },

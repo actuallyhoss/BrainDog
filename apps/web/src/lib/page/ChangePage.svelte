@@ -5,7 +5,7 @@
   PIN THIS KEEPS THE PAGE AS IT IS DRAWN (DIRECTION §38: a composition is a proposal the person can pin, change or undo,
   and his pins always win): every block in its place, as the person's own look (`look.ts`), so the engine stops
   arranging it. Unpin lets the engine arrange it again. Either says what it did with an Undo. Under them, in a quiet
-  line, how the page came to look as it does: "Slash arranged · Sam kept", or that it is pinned. Only the owner pins,
+  line, how the page came to look as it does: "Slash arranged · Mara kept", or that it is pinned. Only the owner pins,
   as only the owner sets a declaration.
 
   ONE MENU AT EVERY WIDTH. The head drew four controls side by side from 900px up (How this is built, Share, Change this

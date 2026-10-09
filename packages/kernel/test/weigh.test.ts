@@ -9,7 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { COSTS, MANY_ROWS, costOf, costRank, worseCost } from '../src/weigh.ts';
+import { COSTS, MANY_ROWS, OLD_MS, WAITS, costOf, costRank, waitOf, waitParams, waitRank, worseCost, type WaitRows } from '../src/weigh.ts';
 
 test('the four bands are worst first, which is what makes the rank a sort', () => {
   assert.deepEqual([...COSTS], ['undo', 'shape', 'rows', 'call']);
@@ -82,4 +82,52 @@ test('a body this build cannot read is the cheapest band, not a throw', () => {
   assert.equal(costOf('rowset', { rows: 'not a list' }), 'rows');
   assert.equal(costOf('arrange', undefined), 'rows');
   assert.equal(costOf('pack', { disable: 42 }), 'shape');
+});
+
+/* ── how long a question can wait (AGT-C08) ── */
+
+const NOW = Date.UTC(2026, 9, 9, 9);
+const ASKED = new Date(NOW - 3_600_000).toISOString();
+/* One list, bills, whose `due` is a deadline; bills#1 falls due tomorrow and bills#2 next month. */
+const ROWS: WaitRows = {
+  deadlines: (register) => (register === 'bills' ? ['due'] : []),
+  held: (register, at) => (register !== 'bills' ? null : at === 'bills#1' ? { due: '2026-10-10' } : at === 'bills#2' ? { due: '2026-11-20' } : null),
+};
+const ask = (body: unknown, opened_at = ASKED) => ({ body_kind: 'rowset', body, opened_at });
+
+test('THE THREE WAITS ARE SOON FIRST, which is the order the queue meets them in', () => {
+  assert.deepEqual([...WAITS], ['soon', 'old', 'new']);
+  assert.ok(waitRank('soon') < waitRank('old') && waitRank('old') < waitRank('new'));
+  assert.equal(waitRank('later'), WAITS.length);
+  assert.deepEqual(waitParams(NOW), ['2026-10-09', '2026-10-11', '2026-10-06T09:00:00.000Z']);
+});
+
+test('A QUESTION ABOUT A ROW THAT FALLS DUE INSIDE 48 HOURS IS SOON, whether the row holds the day or the question writes it', () => {
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ at: 'bills#1', patch: { paid: true } }] }), NOW, ROWS), 'soon');
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ at: 'bills#2', patch: { due: '2026-10-11' } }] }), NOW, ROWS), 'soon');
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ name: 'Rent', due: '2026-10-09T18:00:00.000Z' }] }), NOW, ROWS), 'soon');
+  /* Next month, yesterday, a field that is not a deadline, or no record to read: it can wait. */
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ at: 'bills#2', patch: { paid: true } }] }), NOW, ROWS), 'new');
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ name: 'Gas', due: '2026-10-08' }] }), NOW, ROWS), 'new');
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ name: 'Gas', paid_on: '2026-10-10' }] }), NOW, ROWS), 'new');
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ at: 'bills#1', patch: { paid: true } }] }), NOW), 'new');
+});
+
+test('A QUESTION THAT MOVES MONEY IS SOON, as the band reads money; a currency that is not three capitals is not money', () => {
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ name: 'Rent', amount: { amount: 120000, currency: 'GBP' } }] }), NOW), 'soon');
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ at: 'bills#2', patch: { amount: { amount: 5, currency: 'USD' } } }] }), NOW), 'soon');
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ name: 'Rent', amount: { amount: 1.5, currency: 'GBP' } }] }), NOW), 'new');
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ name: 'Rent', amount: { amount: 100, currency: 'gbp' } }] }), NOW), 'new');
+  /* Only a rowset writes money: an options question naming a sum is a judgement. */
+  assert.equal(waitOf({ body_kind: 'options', body: { amount: { amount: 100, currency: 'GBP' } }, opened_at: ASKED }, NOW), 'new');
+});
+
+test('OPEN MORE THAN THREE DAYS IS OLD, and soon still comes first; a body that cannot be read only waits', () => {
+  const longAgo = new Date(NOW - OLD_MS - 1).toISOString();
+  assert.equal(waitOf(ask({ register: 'bills', rows: [] }, longAgo), NOW, ROWS), 'old');
+  assert.equal(waitOf(ask({ register: 'bills', rows: [] }, new Date(NOW - OLD_MS).toISOString()), NOW, ROWS), 'new');
+  assert.equal(waitOf(ask({ register: 'bills', rows: [{ at: 'bills#1', patch: { paid: true } }] }, longAgo), NOW, ROWS), 'soon');
+  assert.equal(waitOf(ask('not json', longAgo), NOW, ROWS), 'old');
+  assert.equal(waitOf(ask(JSON.stringify({ register: 'bills', rows: [{ at: 'bills#1', patch: {} }] })), NOW, ROWS), 'soon');
+  assert.equal(waitOf(ask(null), NOW, ROWS), 'new');
 });

@@ -1,0 +1,8 @@
+{
+  "gate": "printed",
+  "rule": "a key-shaped random string printed on a screen",
+  "expect": "Prints an id where a name goes",
+  "findings": 2,
+  "total": 2,
+  "why": "A KEY-SHAPED STRING, twenty-odd letters and digits in both cases, printed where a key's label goes: the lint's random-id half of `raw-id`, and `raw-key` beside it, since a random string in both cases reads as joined words. Two findings, and neither quotes the string. A key is never drawn, so its shape on a screen is a fault whatever it is. The rest of the screen is the decoy every printed tree carries: a date in words, an amount, a run's handle beside its name and a person's name, none of which is a finding, so a rule that grew too wide takes the count above two."
+}

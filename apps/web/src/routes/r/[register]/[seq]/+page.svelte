@@ -603,7 +603,7 @@
    * (`people.ts`): the people `meet` writes (`meets:`) or the organisations (`org:`). Never by the list's name, so any
    * record's people read this way, whoever it belongs to.
    *
-   * THE SENTENCE UNDER A PERSON'S NAME is who they are, "Contractor at Encore, on Kiln and Portage.", each name opening
+   * THE SENTENCE UNDER A PERSON'S NAME is who they are, "Contractor at Brightwell, on Kiln and Portage.", each name opening
    * its own page, then the last day they were in touch. An organisation's is its kind and how many people and projects
    * are with it. Then, on the ground, where the person was seen and what they are known by, which the lines `meet`
    * wrote said in an agent's words ("2026-08-27 · commit 8b1e4d0 in portage") and now say in a person's; then the facts,
@@ -630,7 +630,7 @@
     return Array.isArray(v) ? v.map((x) => namedRef(fieldTo(field), x)).filter((x): x is Named => x !== null) : [];
   };
   /**
-   * THE LINE UNDER THE NAME. A person: "Contractor at Encore, on Kiln and Portage. Last in touch 2 Sep." An
+   * THE LINE UNDER THE NAME. A person: "Contractor at Brightwell, on Kiln and Portage. Last in touch 2 Sep." An
    * organisation: "Client · 24 people, on Kiln and Portage." Each part only when the row has it.
    */
   const lead = $derived.by(() => {

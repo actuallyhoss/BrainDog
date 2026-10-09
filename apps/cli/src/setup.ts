@@ -1,5 +1,5 @@
 /**
- * `braindog setup <url> [--dry-run]`: one command sets a machine up from the record.
+ * `braindog setup <url> [--dry-run | --yes]`: one command sets a machine up from the record.
  *
  * THE STEPS IN ORDER, EACH ONE ALREADY A COMMAND OF ITS OWN: sign in unless a live login for the host is held,
  * `install --apply` into the user profile, the `braindog` MCP server registered at user scope, `tools write --scope
@@ -24,11 +24,12 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { createInterface } from 'node:readline/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { hostKey, hostsPath, readHosts, sameHost, saveHosts, target } from './http.ts';
-import { BRAINDOG_SERVER, installProfiles, PLACES_SKILL, profilesOf, serversFileOf } from './install.ts';
+import { BRAINDOG_SERVER, HOOKS_HELD, installProfiles, PLACES_SKILL, profilesOf, serversFileOf } from './install.ts';
 import { login } from './login.ts';
 import { connect, isObject, syncSkills, type AgentIo } from './skills.ts';
 import { runClaude, writeTools, type ClaudeRunner } from './tools.ts';
@@ -39,7 +40,7 @@ type Env = Record<string, string | undefined>;
 export type SetupIo = AgentIo & {
   /** The path of `main.ts` (the bundle, once built), which every tool wrapper and helper runs. */
   cli: string;
-  /** The folder of the two hook scripts `install` puts in the settings. */
+  /** The folder of the hook scripts `install` puts in the settings. */
   scripts: string;
   /** Aborted by Ctrl+C, which ends the wait for the six digits with one sentence. */
   signal?: AbortSignal | undefined;
@@ -47,9 +48,29 @@ export type SetupIo = AgentIo & {
   claude?: ClaudeRunner | undefined;
   /** How step 1 signs in: `login` unless a test holds it. */
   signIn?: typeof login | undefined;
+  /** Step 2's question: true for yes, false for anything else, null when no one is at a terminal. `askTerminal` unless a test holds it. */
+  ask?: ((question: string) => Promise<boolean | null>) | undefined;
 };
 
-const USAGE = 'braindog setup takes the address of one record, as in braindog setup https://brain.dog/app/<slug>, and --dry-run, and nothing else.';
+/**
+ * A yes or no from the person at the terminal, asked on stderr so standard output keeps one line per step. Null off a
+ * terminal, where nobody can answer and waiting would hang a script. Only `y` or `yes` is a yes.
+ */
+export async function askTerminal(question: string, signal?: AbortSignal): Promise<boolean | null> {
+  if (!process.stdin.isTTY || !process.stderr.isTTY) return null;
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  /* CTRL+C AT THE QUESTION IS A NO. Readline takes it from the terminal itself, and with no listener only pauses. */
+  rl.on('SIGINT', () => rl.close());
+  try {
+    return /^\s*y(?:es)?\s*$/iu.test(await rl.question(question, signal ? { signal } : {}));
+  } catch {
+    return false;
+  } finally {
+    rl.close();
+  }
+}
+
+const USAGE = 'braindog setup takes the address of one record, as in braindog setup https://brain.dog/app/<slug>, and --dry-run or --yes, and nothing else.';
 
 /** Whether a login the next command would send is held for this host now: the hosts file's, unexpired, or `BRAINDOG_TOKEN`. */
 function loginHeld(key: string, env: Env, file: string): boolean {
@@ -103,11 +124,11 @@ function registration(file: string): 'same' | 'other' | 'none' {
   return same ? 'same' : 'other';
 }
 
-/** `braindog setup <url> [--dry-run]`, and the exit code: the first failing step's, or 0. */
+/** `braindog setup <url> [--dry-run | --yes]`, and the exit code: the first failing step's, or 0. */
 export async function setup(args: string[], io: SetupIo): Promise<number> {
-  let parsed: { values: { 'dry-run'?: boolean | undefined }; positionals: string[] };
+  let parsed: { values: { 'dry-run'?: boolean | undefined; yes?: boolean | undefined }; positionals: string[] };
   try {
-    parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { 'dry-run': { type: 'boolean' } } });
+    parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { 'dry-run': { type: 'boolean' }, yes: { type: 'boolean' } } });
   } catch {
     /* parseArgs quotes what it could not read, and that could be a token pasted in the wrong place. */
     io.say(USAGE);
@@ -182,13 +203,19 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
   const profiles = profilesOf([], io.env);
   try {
     /*
-     * PLANNED DRY FIRST, WHICH WRITES NOTHING, so a run with nothing to add is said as one and applies nothing. Without
-     * `--replace`, `install` only ever adds, and each entry it would add is its own `  + hooks.` line. Its dry run's
-     * closing line names `install --apply` as the way to write it, which is not this command's way, so it is left out.
+     * PLANNED DRY FIRST, WHICH WRITES NOTHING, so a run with nothing to add is said as one and applies nothing. Each
+     * entry it would add is its own `  + hooks.` line, and an older BrainDog entry it would rewrite its own `  ~ hooks.`
+     * line. Its dry run's closing line names `install --apply` as the way to write it, which is not this command's way,
+     * so it is left out.
+     *
+     * AND THE PLAN IS SHOWN BEFORE ANYTHING IS WRITTEN (AGT-B10, his "Hooks install shows changes first"). It was
+     * applied first and shown after, so the first a person saw of a hook in every session was the line saying it was
+     * already there. On a terminal the step asks; `--yes` is the answer given ahead; off a terminal with no `--yes` it
+     * stops after the plan and says how to go on, because a yes nobody typed is not one.
      */
     const planned = installProfiles(profiles, [], { apply: false, scripts: io.scripts }).lines;
-    const pending = planned.some((line) => line.startsWith('  + hooks.') || line.startsWith(PLACES_SKILL));
-    const rest = (lines: string[]) => lines.filter((line) => !line.startsWith('Nothing was changed.') && !line.includes('already runs both BrainDog hooks'));
+    const pending = planned.some((line) => line.startsWith('  + hooks.') || line.startsWith('  ~ hooks.') || line.startsWith(PLACES_SKILL));
+    const rest = (lines: string[]) => lines.filter((line) => !line.startsWith('Nothing was changed.') && !line.includes(HOOKS_HELD));
     if (!pending) {
       io.out("2. Hooks: Claude Code's settings already run the BrainDog hooks and Agent Skill.");
       detail(rest(planned));
@@ -196,10 +223,21 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
       io.out("2. Hooks: the BrainDog hooks and Agent Skill would be added to Claude Code's settings, with a copy of the file kept first.");
       detail(rest(planned));
     } else {
+      io.out("2. Hooks: these changes to Claude Code's settings come next, with a copy of each file kept first:");
+      detail(rest(planned));
+      const yes = parsed.values.yes === true || (await (io.ask ?? ((q: string) => askTerminal(q, io.signal)))('Write these changes? [y/N] '));
+      if (yes === null) {
+        io.out(`   Nothing was written, because no one is at a terminal to say yes. Run braindog setup ${key} --yes to write them.`);
+        return 1;
+      }
+      if (!yes) {
+        io.out(`   Nothing was written to Claude Code's settings, so setup stopped there. Run braindog setup ${key} again to be asked again.`);
+        return 1;
+      }
       const applied = installProfiles(profiles, [], { apply: true, scripts: io.scripts }).lines;
       changed = true;
-      io.out("2. Hooks: the BrainDog hooks and Agent Skill were added to Claude Code's settings.");
-      detail(rest(applied));
+      io.out("   Written: the BrainDog hooks and Agent Skill are in Claude Code's settings.");
+      detail(rest(applied).filter((line) => !line.startsWith('  ') && !line.endsWith(':')));
     }
   } catch (e) {
     /* `install`'s own sentence, which names the file, says what became of it, and never quotes what is in it. */

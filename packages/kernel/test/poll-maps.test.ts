@@ -1,6 +1,6 @@
 /**
- * One poll, one request, several rows (`founder-poll.ts`): a poll whose `map` is a list reads each number out of the
- * same answer, and a poll of an address that needs no key names none and runs without the vault.
+ * One poll, one request, several rows (the live feed add-on, `packs/live-feed`): a poll whose `map` is a list reads each
+ * number out of the same answer, and a poll of an address that needs no key names none and runs without the vault.
  *
  * The host is a stand-in, so nothing leaves the machine and no key is real.
  */

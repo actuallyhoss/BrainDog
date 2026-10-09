@@ -1,6 +1,6 @@
 /**
  * A FOLDED GROUP OPENS WHERE IT IS (`BlockSlot.svelte`). A card block that says `group:` and `fold:` (People on a page)
- * shows each organisation's most recent person under its name and folds the rest behind "Show all 5 people at Encore".
+ * shows each organisation's most recent person under its name and folds the rest behind "Show all 5 people at Brightwell".
  * That line went to the organisation's page, so reading the fourth person meant leaving the page you were on. It is now
  * a press that opens the group in place, and the organisation's name over it is still the door to its page.
  *

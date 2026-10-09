@@ -18,13 +18,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { CallContext } from '@braindog/record';
 import { day, installSeed } from '@braindog/seed';
-import { HSBC_EG_INGESTS } from '../../../packages/seed/test/pack-files.ts';
 
 import { start } from '../src/server.ts';
 
@@ -35,11 +34,17 @@ const OWNER: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 
 const SMS = 'From HSBC: 16AUG26 ATM Cash Withdrawal from 310-527***-846 EGP 2500.00- Your available balance is EGP 31,040.25';
 
 /**
- * `bank-from-out`'s webhook twin, built the way `HSBC_EG_SMS_INGESTS` in `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json`
- * builds it: the mail pattern, carried by a webhook, verified by a path token. Written out because the seed's index
- * does not export the twins yet, and a copy of one spread is less to drift than a path into another package's source.
+ * THE BANK'S ADD-ON AS IT SHIPS, `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json`, installed whole on top of the seed the way
+ * `packages/host/test/ingest-shortcut.test.ts` installs it. This file once built `bank-from-out-sms` by hand from a copy
+ * of the add-on frozen at 1.3.1, so a change to the shipped door's pattern or its `verify:` could pass here unseen.
+ * Every ingest keeps the add-on's own name in its body, as a record that installed it holds them.
  */
-const TWIN = { ...HSBC_EG_INGESTS['bank-from-out']!, ingest: 'bank-from-out-sms', channel: 'webhook', verify: { kind: 'path' } };
+const BANK: Array<Record<string, unknown>> = JSON.parse(
+  readFileSync(new URL('../../../packs/bank-hsbc-eg/bank-hsbc-eg.pack.json', import.meta.url), 'utf8'),
+).declarations;
+
+/** The door the Shortcut posts at: the add-on's webhook twin of `bank-from-out`, verified by a path token. */
+const TWIN = BANK.find((d) => d.ingest === 'bank-from-out-sms')!;
 
 type Running = Awaited<ReturnType<typeof start>>;
 
@@ -49,7 +54,8 @@ async function host(): Promise<{ running: Running; port: number; dir: string }> 
   const k = running.api.kernel;
   assert.ok(k.createRecord({ id: REC, slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_owner' } }).ok);
   assert.ok((await installSeed(k)).ok);
-  assert.ok((await k.install([{ id: 'ingest.bank-from-out-sms', kind: 'ingest', body: TWIN as never }])).ok);
+  const put = await k.install(BANK.map((body) => ({ id: `ingest.${String(body.ingest)}`, kind: 'ingest' as const, body: body as never })));
+  assert.ok(put.ok, JSON.stringify(put));
   const made = k.create(
     'accounts',
     { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: true, last4: '846' },

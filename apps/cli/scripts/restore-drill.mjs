@@ -3,6 +3,21 @@
  * The restore drill: a sealed nightly copy of a Cloud record, opened, verified, restored and counted.
  *
  *   node apps/cli/scripts/restore-drill.mjs latest.brainl.age --identity <age identity file> [--key <pubkey|url>]
+ *   node apps/cli/scripts/restore-drill.mjs --record <rec_id> [--record <rec_id>] [--directory] --identity-cmd "<command>"
+ *                                           [--bucket <name>] [--report <origin>] [--no-round-trip]
+ *   node apps/cli/scripts/restore-drill.mjs --print-timer --record <rec_id> --directory --identity-cmd "<command>" ...
+ *
+ * FETCHED AS THE OPERATOR (LCH-C04 job 1). The Worker never serves a copy as a file (`apps/worker/src/route.ts`
+ * `copyAsked`), and only the operator holds the key that opens one, so `--record` and `--directory` fetch the night's
+ * sealed object with `wrangler r2 object get --remote`, signed in as the operator wrangler already is, into a folder
+ * under the OS temp directory that goes when the drill ends. `--record` is repeatable, and the run is PASS only when
+ * every copy is. `--directory` fetches the Directory's copy (`apps/worker/src/directory-copy.ts`, `latest.dirl.age`),
+ * loads it into an empty Directory in memory and asks, for every open record it lists, whether its owner can sign in.
+ * `--identity-cmd` reads the identity from a command's output, the rehearsal's rule (`migration-rehearsal.mjs`), so the
+ * key stays in the keychain or the password manager. After the count, each restored record goes round
+ * (`drill-trip.mjs` `roundTrip`). `--report <origin>` posts the counts to the operator door `/account/ops/drill` with
+ * `PROVISION_KEY` from the environment. `--print-timer` prints a monthly launchd file for the same arguments and
+ * installs nothing.
  *
  * WHY IT EXISTS. Until this, the only code that had ever opened one of the Cloud's copies was a test's decryptor, and the
  * only restore of one was a probe in a scratch clone. A backup nobody has put back
@@ -21,9 +36,11 @@
  *      sign-in would. A record whose tables all match and whose people come back as strangers is a FAIL.
  *   5. exports the restored record again and compares its manifest with the copy's, table by table over the union of
  *      both, count and hash, and counts each list's rows in the copy against the restored record.
- *   6. prints PASS or FAIL and the line for the ops record, and removes the folder, plaintext and record with it.
+ *   6. takes the restored record round (`drill-trip.mjs`), unless `--no-round-trip` says not to.
+ *   7. prints PASS or FAIL and the line for the ops record, and removes the folder, plaintext and record with it.
  *
- * NOTHING HERE WRITES TO A NETWORK, and no production record is touched. The copy is a file he fetched himself; the one request this can make is the GET a `--key` URL asks for.
+ * NO PRODUCTION RECORD IS WRITTEN. A copy is a file he fetched himself or one wrangler reads for him; the requests this
+ * makes are that read, the GET a `--key` URL asks for, and the one POST `--report` asks for, which carries counts only.
  *
  * THE DECRYPTOR IS A THIRD READING OF THE AGE SPEC, written from https://age-encryption.org/v1 over `node:crypto` and
  * sharing no code with the Worker's sealer (`apps/worker/src/seal.ts`, WebCrypto and its own ChaCha20) or the tests'
@@ -34,14 +51,16 @@
 
 import { spawnSync } from 'node:child_process';
 import { createDecipheriv, createHmac, createPrivateKey, createPublicKey, diffieHellman, hkdfSync } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { parseArgs } from 'node:util';
 
 import { openRecord } from '@braindog/kernel';
+
+import { roundTrip } from './drill-trip.mjs';
 
 const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
@@ -50,7 +69,16 @@ const say = (line) => process.stderr.write(`${line}\n`);
 const out = (line) => process.stdout.write(`${line}\n`);
 
 const USAGE =
-  'The drill takes one copy and the identity that opens it, as in node apps/cli/scripts/restore-drill.mjs latest.brainl.age --identity <a file outside this repository>, and --key <pubkey|url> to pin the signature.';
+  'The drill takes the copies it opens and the identity that opens them, as in node apps/cli/scripts/restore-drill.mjs --record <rec_id> --directory --identity-cmd "<a command that prints the age identity>", or a copy he fetched himself with --identity <a file outside this repository>. --key <pubkey|url> pins the signature, --report <origin> sends the counts, and --print-timer prints the monthly timer for the same arguments.';
+
+/** The production bucket (`apps/worker/wrangler.jsonc`, `env.production`); `--bucket` names another. */
+const BUCKET = 'braindog-blobs';
+/** Where the night's newest copies are (`snapshots.ts` for a record, `directory-copy.ts` for the Directory). */
+const RECORD_COPY = (rec) => `${rec}/snapshots/latest.brainl.age`;
+const DIRECTORY_COPY = 'directory/snapshots/latest.dirl.age';
+const REC_ID = /^rec_[0-9A-HJKMNP-TV-Z]{26}$/;
+/** The door that keeps the host's last drill (LCH-C04 job 3). */
+const DRILL_DOOR = '/account/ops/drill';
 
 // ─── bech32, for the identity he holds and the recipient it answers to ─────────────────────────────────────────────
 
@@ -210,6 +238,90 @@ function ageOpen(file, ids) {
   return { plain: Buffer.concat(parts) };
 }
 
+// ─── the identity, from a file or a command ───────────────────────────────────────────────────────────────────────
+
+/**
+ * The identities in a text, from a file or from a command. `what` begins each sentence.
+ *
+ * THE SENTENCE NAMES NO LINE AND QUOTES NOTHING, because the line it would quote is the secret.
+ */
+function keysIn(text, what) {
+  if (text.startsWith('age-encryption.org/'))
+    return { refused: `${what} is itself sealed with a passphrase. Give the drill the opened identity, through --identity-cmd or a file outside this repository deleted after.` };
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== '' && !l.startsWith('#'));
+  const keys = lines.map(secretOf);
+  if (lines.length === 0 || keys.some((k) => k === null))
+    return { refused: `${what} holds a line that is not an age identity (AGE-SECRET-KEY-1 and its checksum), so it was copied with a character wrong or it is not the key.` };
+  return { ids: keys.map(keyOf) };
+}
+
+/**
+ * The identities in the file he names. The file is read once, where he keeps it, and never copied, logged or printed.
+ *
+ * `..` AS A PATH STEP, NOT AS TWO CHARACTERS: a key saved in the repository as `..backup.key` is relative `..backup.key`,
+ * and a bare `startsWith('..')` let it through and read it (measured with path.win32.relative).
+ */
+function identitiesFromFile(path) {
+  const idPath = resolve(path);
+  const within = relative(resolve(REPO), idPath);
+  if (within === '' || (within !== '..' && !within.startsWith(`..${sep}`) && !isAbsolute(within)))
+    return { refused: `The identity file is inside the repository, and it must never be. Move it out of ${resolve(REPO)} and delete it from the tree before anything is committed; it was not read.` };
+  let text;
+  try {
+    text = readFileSync(idPath, 'latin1');
+  } catch {
+    return { refused: 'The identity file could not be read.' };
+  }
+  return keysIn(text, 'The identity file');
+}
+
+/**
+ * The identities a command prints: the keychain's or a password manager's command line, run by the shell, its output
+ * read and never shown. The rehearsal's rule (`migration-rehearsal.mjs` `identitiesFromCommand`), in the drill's words.
+ *
+ * ITS OWN ERROR OUTPUT IS NOT SAID EITHER. A password manager that fails may print the item it was asked for, and the
+ * exit code is enough to say what went wrong.
+ */
+function identitiesFromCommand(command) {
+  const r = spawnSync(command, { shell: true, encoding: 'latin1', stdio: ['inherit', 'pipe', 'pipe'], maxBuffer: 1 << 20 });
+  if (r.error) return { refused: `The identity command could not be run (${r.error.code ?? 'no reason given'}), so no identity was read.` };
+  if (r.status !== 0) return { refused: `The identity command exited ${r.status}, so no identity was read. Run it by itself to see why.` };
+  return keysIn(String(r.stdout ?? ''), 'What the identity command printed');
+}
+
+// ─── fetched as the operator ──────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The wrangler the drill runs: `BRAINDOG_WRANGLER` when it is set (a test's stand-in, or another install), else the one
+ * `apps/worker` installs. A `.mjs` or `.js` is run by this Node, so a stand-in needs no shebang.
+ */
+function wrangler() {
+  const named = process.env.BRAINDOG_WRANGLER;
+  const bin = named && named !== '' ? named : join(REPO, 'apps', 'worker', 'node_modules', '.bin', 'wrangler');
+  return /\.(m?js)$/.test(bin) ? { command: process.execPath, first: [bin] } : { command: bin, first: [] };
+}
+
+/**
+ * One object of the bucket, read with `wrangler r2 object get --remote` into `dest`, or the sentence that says why not.
+ *
+ * RUN FROM `apps/worker`, so wrangler reads that project's account the way a deploy does. Its output is not echoed on a
+ * success, and on a failure only its last lines are, which name the object and never a key.
+ */
+function fetchObject(bucket, key, dest) {
+  const w = wrangler();
+  const r = spawnSync(w.command, [...w.first, 'r2', 'object', 'get', `${bucket}/${key}`, '--remote', '--file', dest], {
+    encoding: 'utf8',
+    cwd: join(REPO, 'apps', 'worker'),
+    timeout: 300_000,
+  });
+  if (r.error) return { refused: `wrangler could not be run (${r.error.code ?? 'no reason given'}), so ${key} was not fetched. Install the Worker's packages, or name one with BRAINDOG_WRANGLER.` };
+  if (r.status !== 0 || !existsSync(dest)) {
+    const said = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split(/\r?\n/).filter((l) => l.trim() !== '').slice(-3);
+    return { refused: `wrangler did not fetch ${key} from ${bucket} (exit ${r.status}). Sign in with wrangler login as the operator, and check the night wrote it.`, said };
+  }
+  return { ok: true };
+}
+
 // ─── the file's own tables ────────────────────────────────────────────────────────────────────────────────────────
 
 /** One table of a `.brainl`, as its column names and rows. Empty when the file has no such table. */
@@ -275,20 +387,15 @@ const mmss = (ms) => `${String(Math.floor(ms / 60_000)).padStart(2, '0')}:${Stri
 
 // ─── the drill ────────────────────────────────────────────────────────────────────────────────────────────────────
 
-async function main() {
-  let values;
-  let positionals;
-  try {
-    ({ values, positionals } = parseArgs({ allowPositionals: true, strict: true, options: { identity: { type: 'string' }, key: { type: 'string' } } }));
-  } catch {
-    say(USAGE);
-    return 1;
-  }
-  const [copyPath, ...more] = positionals;
-  if (copyPath === undefined || more.length > 0) {
-    say(USAGE);
-    return 1;
-  }
+/**
+ * One record's copy, drilled: opened, verified, restored, counted and taken round. Answers what the run line and the
+ * report need, `{ pass, record, rows, tables, lists, people, bytes }`, and prints its own lines as it goes.
+ *
+ * `ctx.identities()` IS ASKED ONLY FOR A SEALED COPY, and answers the same identities for every copy of one run, so a
+ * password manager asks once.
+ */
+async function drillCopy(copyPath, ctx) {
+  const failedEarly = (bytes = 0) => ({ pass: false, record: null, rows: 0, tables: 0, lists: 0, people: 0, bytes });
   const began = performance.now();
 
   let sealed;
@@ -296,53 +403,28 @@ async function main() {
     sealed = readFileSync(copyPath);
   } catch {
     say(`${copyPath} could not be read.`);
-    return 1;
+    return failedEarly();
   }
   const isSealed = sealed.subarray(0, 32).toString('latin1').startsWith('age-encryption.org/');
   if (sealed.subarray(0, 40).toString('latin1').startsWith('-----BEGIN AGE ENCRYPTED FILE-----')) {
     say(`${copyPath} is armored age text, and the Cloud puts binary copies. Fetch the object again with wrangler, which writes the bytes as they are.`);
-    return 1;
+    return failedEarly(sealed.length);
   }
-  out(`restore drill · ${copyPath} · ${sealed.length} bytes`);
+  out(`restore drill · ${ctx.label ?? copyPath} · ${sealed.length} bytes`);
 
   // 1 · OPEN ───────────────────────────────────────────────────────────────────────────────────────────────────────
   let plain = sealed;
   if (isSealed) {
-    if (values.identity === undefined) {
-      say(`${copyPath} is sealed, so the drill needs the identity that opens it: add --identity <file>, the age identity kept outside this repository.`);
-      return 1;
+    const got = ctx.identities();
+    if (got.refused) {
+      say(got.refused);
+      return failedEarly(sealed.length);
     }
-    const idPath = resolve(values.identity);
-    const within = relative(resolve(REPO), idPath);
-    /* `..` AS A PATH STEP, NOT AS TWO CHARACTERS: a key saved in the repository as `..backup.key` is relative `..backup.key`,
-       and a bare `startsWith('..')` let it through and read it (measured with path.win32.relative). */
-    if (within === '' || (within !== '..' && !within.startsWith(`..${sep}`) && !isAbsolute(within))) {
-      say(`The identity file is inside the repository, and it must never be. Move it out of ${resolve(REPO)} and delete it from the tree before anything is committed; it was not read.`);
-      return 1;
-    }
-    let idText;
-    try {
-      idText = readFileSync(idPath, 'latin1');
-    } catch {
-      say('The identity file could not be read.');
-      return 1;
-    }
-    if (idText.startsWith('age-encryption.org/')) {
-      say('The identity file is itself sealed with a passphrase. Open it with age -d into a file outside this repository, run the drill with that, and delete it after.');
-      return 1;
-    }
-    const lines = idText.split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== '' && !l.startsWith('#'));
-    const keys = lines.map(secretOf);
-    if (lines.length === 0 || keys.some((k) => k === null)) {
-      /* THE SENTENCE NAMES NO LINE AND QUOTES NOTHING, because the line it would quote is the secret. */
-      say('The identity file holds a line that is not an age identity (AGE-SECRET-KEY-1 and its checksum), so it was copied with a character wrong or it is not the file.');
-      return 1;
-    }
-    const ids = keys.map(keyOf);
+    const ids = got.ids;
     const opened = ageOpen(sealed, ids);
     if (opened.refused) {
       say(opened.refused);
-      return 1;
+      return failedEarly(sealed.length);
     }
     plain = opened.plain;
     out(`  opened     ${plain.length} bytes of .brainl with the identity whose recipient is ${ids.map((id) => id.recipient).join(', ')}`);
@@ -354,17 +436,18 @@ async function main() {
      throwaway record is a file, so both live here and one `rmSync` removes both. Ctrl-C removes it too. */
   const scratch = mkdtempSync(join(tmpdir(), 'braindog-drill-'));
   const cleanup = () => rmSync(scratch, { recursive: true, force: true });
-  process.once('SIGINT', () => {
+  const interrupted = () => {
     cleanup();
     process.exit(130);
-  });
+  };
+  process.once('SIGINT', interrupted);
   try {
     const plainFile = join(scratch, 'copy.brainl');
     writeFileSync(plainFile, plain, { mode: 0o600 });
     const lines = plain.toString('utf8').replace(/^\uFEFF/, '').split(/\r?\n/);
 
     // 2 · VERIFY ─────────────────────────────────────────────────────────────────────────────────────────────────────
-    const verified = spawnSync(process.execPath, [MAIN, 'verify', plainFile, ...(values.key === undefined ? [] : ['--key', values.key])], {
+    const verified = spawnSync(process.execPath, [MAIN, 'verify', plainFile, ...(ctx.key === undefined ? [] : ['--key', ctx.key])], {
       encoding: 'utf8',
       cwd: scratch,
     });
@@ -372,8 +455,8 @@ async function main() {
     for (const line of verified.stdout.split(/\r?\n/)) if (line.trim() !== '') out(`  ${line}`);
     if (verified.status !== 0) {
       for (const line of verified.stderr.split(/\r?\n/)) if (line.trim() !== '') say(line);
-      out(`FAIL ${copyPath} · braindog verify refused it (exit ${verified.status}), so nothing was restored`);
-      return 1;
+      out(`FAIL ${ctx.label ?? copyPath} · braindog verify refused it (exit ${verified.status}), so nothing was restored`);
+      return failedEarly(sealed.length);
     }
 
     // 3 · RESTORE ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -387,8 +470,8 @@ async function main() {
     const init = spawnSync(process.execPath, [MAIN, 'init', 'drill', '--from', plainFile], { encoding: 'utf8', cwd: scratch, env });
     if (init.status !== 0) {
       for (const line of init.stderr.split(/\r?\n/)) if (line.trim() !== '') say(line);
-      out(`FAIL ${copyPath} · braindog init --from refused it (exit ${init.status}), so no host could serve this copy`);
-      return 1;
+      out(`FAIL ${ctx.label ?? copyPath} · braindog init --from refused it (exit ${init.status}), so no host could serve this copy`);
+      return failedEarly(sealed.length);
     }
     out(`  restored   with braindog init drill --from, into a throwaway data directory in ${scratch}, removed when the drill ends`);
     for (const line of init.stderr.split(/\r?\n/)) if (line.trim() !== '') out(`  ${line.trim()}`);
@@ -436,8 +519,8 @@ async function main() {
          copy's manifest counted, and it hashes each table, so equal counts of different rows still fail. */
       const exported = await k.export({ redactGrants: false });
       if (!exported.ok) {
-        out(`FAIL ${copyPath} · the restored record would not export: ${exported.refusal?.fix ?? JSON.stringify(exported)}`);
-        return 1;
+        out(`FAIL ${ctx.label ?? copyPath} · the restored record would not export: ${exported.refusal?.fix ?? JSON.stringify(exported)}`);
+        return failedEarly(sealed.length);
       }
       again = exported.value;
       const restoredLists = new Map(sql.all('SELECT register, count(*) AS n FROM entry GROUP BY register').map((r) => [r.register, Number(r.n)]));
@@ -493,18 +576,339 @@ async function main() {
       failed++;
       out('  nobody the copy names can open the restored record');
     }
-
-    // 6 · SAY SO ─────────────────────────────────────────────────────────────────────────────────────────────────────
     const took = mmss(performance.now() - began);
-    if (failed > 0) out(`FAIL ${record} · ${failed} of the copy's tables, lists and people did not come back as they were`);
-    else out(`PASS ${record} · ${tables} tables and ${lists.copy.size} lists came back as the copy's manifest says, and ${reach.filter((p) => p.got !== 'suspended').length} people can open it`);
-    out(`drill ${record} · ${rows} rows · ${sealed.length} bytes · restore ${took}`);
-    return failed > 0 ? 1 : 0;
+
+    // 6 · ROUND TRIP ─────────────────────────────────────────────────────────────────────────────────────────────────
+    /* ON THE RECORD JUST COUNTED, AFTER THE COUNT AND BEFORE THE FOLDER GOES, as `drill-trip.mjs` asks: step 5 of the
+       trip puts the copy back over itself, so the count above is of the copy as it came. Each step is one line of
+       counts, and a red step is one more thing that did not come back. `--no-round-trip` leaves it out and says so,
+       and the verdict line says so too, so a PASS without it is never read as the whole drill. */
+    let tripped = 'not run';
+    if (ctx.trip === false) out('  round trip not run: --no-round-trip');
+    else {
+      const trip = await roundTrip(data, { main: MAIN });
+      out('  round trip');
+      for (const s of trip.steps) out(`    ${s.pass ? '✓' : '✗'} ${s.name}: ${s.said}`);
+      const red = trip.steps.filter((s) => !s.pass).length;
+      if (!trip.pass) failed += Math.max(red, 1);
+      tripped = trip.pass ? `${trip.steps.length} steps` : `${red} of ${trip.steps.length} steps red`;
+    }
+
+    // 7 · SAY SO ─────────────────────────────────────────────────────────────────────────────────────────────────────
+    const people = reach.filter((p) => p.got !== 'suspended').length;
+    if (failed > 0) out(`FAIL ${record} · ${failed} of the copy's tables, lists, people and round trip steps did not come back as they were`);
+    else out(`PASS ${record} · ${tables} tables and ${lists.copy.size} lists came back as the copy's manifest says, and ${people} people can open it`);
+    out(`drill ${record} · ${rows} rows · ${sealed.length} bytes · restore ${took} · round trip ${tripped}`);
+    return { pass: failed === 0, record, rows, tables, lists: lists.copy.size, people, bytes: sealed.length };
   } finally {
+    process.removeListener('SIGINT', interrupted);
     cleanup();
   }
 }
 
+// ─── the Directory's copy ─────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The Directory's copy, drilled: opened, loaded into an empty Directory in memory, and asked, for every open record it
+ * lists, whether that record has an owner who can sign in. Answers `{ pass, records, owners, people, passkeys, bytes }`.
+ *
+ * WHY THIS IS THE QUESTION. Lose the Directory and every record survives with nobody able to reach one
+ * (`directory-copy.ts`). A copy that loads and still leaves a record with no way in is the same loss, found a month
+ * late. CAN SIGN IN is what the Directory alone can answer: the person is there, is not suspended, has an address a
+ * sign-in link can reach, is a member of the record, and the record has a live name that leads to it. A passkey is
+ * counted and not required, because a link signs a person in without one. A record that names no founding owner (an
+ * older row, `owner` empty) passes when one of its members can sign in, and its line says so.
+ *
+ * `load` IS THE DIRECTORY'S OWN (`packages/record/src/directory.ts`), the one a host runs to put a copy back, and it
+ * refuses a copy written at another Directory version: then the drill is run at the commit that wrote it.
+ */
+async function drillDirectory(copyPath, ctx) {
+  const failed = (bytes = 0) => ({ pass: false, records: 0, owners: 0, people: 0, passkeys: 0, bytes });
+  let file;
+  try {
+    file = readFileSync(copyPath);
+  } catch {
+    say(`${copyPath} could not be read.`);
+    return failed();
+  }
+  out(`restore drill · the Directory · ${file.length} bytes`);
+  let plain = file;
+  if (file.subarray(0, 32).toString('latin1').startsWith('age-encryption.org/')) {
+    const got = ctx.identities();
+    if (got.refused) {
+      say(got.refused);
+      return failed(file.length);
+    }
+    const opened = ageOpen(file, got.ids);
+    if (opened.refused) {
+      say(opened.refused);
+      return failed(file.length);
+    }
+    plain = opened.plain;
+    out(`  opened     ${plain.length} bytes of the Directory's lines with the identity whose recipient is ${got.ids.map((id) => id.recipient).join(', ')}`);
+  }
+  const lines = plain.toString('utf8').replace(/^﻿/, '').split(/\r?\n/);
+
+  /* IN MEMORY, SO NOTHING OF IT IS EVER A FILE. The lines hold every address on the deployment. */
+  const { createDirectory } = await import('../../../packages/record/src/directory.ts');
+  const sql = openSql(':memory:');
+  try {
+    const directory = createDirectory(sql, { now: () => Date.now() });
+    const loaded = directory.load(lines);
+    if (!loaded.ok) {
+      say(loaded.refusal?.fix ?? 'The Directory would not load the copy.');
+      out(`FAIL the Directory · it would not load into an empty Directory (${loaded.refusal?.code ?? 'refused'})`);
+      return failed(file.length);
+    }
+    out(`  loaded     ${loaded.value.tables} tables and ${loaded.value.rows} rows into an empty Directory, in memory`);
+
+    const signsIn = (person) =>
+      sql.one("SELECT 1 AS x FROM dir_person WHERE id = ? AND suspended_at IS NULL AND email LIKE '%_@_%'", person) !== undefined;
+    const open = sql.all(
+      `SELECT r.id AS id, r.owner AS owner,
+              (SELECT s.slug FROM dir_slug s WHERE s.record = r.id AND s.released_at IS NULL) AS slug
+         FROM dir_record r WHERE r.closed_at IS NULL ORDER BY r.id`,
+    );
+    let owners = 0;
+    let unnamed = 0;
+    for (const r of open) {
+      const name = r.slug ?? 'a record with no live name';
+      let why = null;
+      if (r.slug === null) why = 'no live name leads to it';
+      else if (r.owner === '') {
+        const members = sql.all('SELECT person FROM dir_member WHERE record = ?', r.id).map((m) => m.person);
+        if (members.some(signsIn)) unnamed++;
+        else why = 'it names no founding owner, and none of its members can sign in';
+      } else if (sql.one('SELECT 1 AS x FROM dir_person WHERE id = ?', r.owner) === undefined) why = 'its owner is not in the copy';
+      else if (!signsIn(r.owner)) why = 'its owner is suspended or has no address a sign-in link can reach';
+      else if (!directory.reaches(r.id, r.owner)) why = 'its owner is not a member of it';
+      if (why === null) owners++;
+      else out(row(name, '', '', `✗ ${why}`));
+    }
+    const people = Number(sql.one('SELECT count(*) AS n FROM dir_person')?.n ?? 0);
+    const passkeys = Number(sql.one('SELECT count(*) AS n FROM dir_passkey')?.n ?? 0);
+    const pass = owners === open.length && open.length > 0;
+    if (unnamed > 0) out(`  ${unnamed} of them name no founding owner, and a member of each can sign in`);
+    if (open.length === 0) out('FAIL the Directory · the copy lists no open record, so it is not a night of a host anybody uses');
+    else if (pass) out(`PASS the Directory · ${open.length} open records, each with an owner who can sign in · ${people} people · ${passkeys} passkeys`);
+    else out(`FAIL the Directory · ${open.length - owners} of ${open.length} open records have no owner who can sign in`);
+    return { pass, records: open.length, owners, people, passkeys, bytes: file.length };
+  } finally {
+    sql.close();
+  }
+}
+
+// ─── the report, and the timer ────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The run's counts, posted to the host's operator door, and the sentence that says what became of them.
+ *
+ * COUNTS ONLY: when, whether it passed, how many copies, rows, lists and people, and how many records the Directory
+ * lists. No id, name or address leaves this machine. THE KEY GOES ONLY OVER HTTPS, or to this machine for a test.
+ * A 404 is the door not being there yet (LCH-C04 job 3), which is told apart from a refused key.
+ */
+async function report(origin, run, key) {
+  if (key === '') return 'not sent: no key';
+  const url = new URL(DRILL_DOOR, origin);
+  const body = {
+    at: new Date().toISOString(),
+    pass: run.pass,
+    copies: run.copies.length,
+    rows: run.copies.reduce((n, c) => n + c.rows, 0),
+    lists: run.copies.reduce((n, c) => n + c.lists, 0),
+    people: run.copies.reduce((n, c) => n + c.people, 0),
+    records: run.directory?.records ?? null,
+  };
+  let answer;
+  try {
+    /* NO REDIRECT IS FOLLOWED, so the key goes to the origin he named and nowhere it points on to. */
+    answer = await fetch(url, { method: 'POST', redirect: 'manual', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  } catch {
+    return `not sent: ${url.host} could not be reached`;
+  }
+  if (answer.status === 404) return 'not sent: no door';
+  if (answer.status === 401) return 'not sent: the host refused the key';
+  if (!answer.ok) return `not sent: the host answered ${answer.status}`;
+  return `sent to ${url.host}`;
+}
+
+/** An origin the report may carry the key to, or null. */
+function reportOrigin(text) {
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    return null;
+  }
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  return url.protocol === 'https:' || (url.protocol === 'http:' && local) ? url.origin : null;
+}
+
+const xml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/**
+ * The monthly launchd file for these arguments, printed and never installed: he or the loop puts it in
+ * `~/Library/LaunchAgents` and loads it. The first of the month at 09:17 on the Mac's clock, which is after the night's
+ * copies at 03:17 UTC wherever the Mac is from UTC+5 westward.
+ *
+ * IT CARRIES NO SECRET. The identity comes from the command it names, and `PROVISION_KEY` is not written into it: a
+ * timer with no key reports "not sent: no key", which is said in its log, until the key has a home a command can read.
+ */
+function timer(args) {
+  const logs = join(homedir(), 'Library', 'Logs', 'braindog-restore-drill.log');
+  const argv = [process.execPath, fileURLToPath(import.meta.url), ...args];
+  const path = [dirname(process.execPath), '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(':');
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    '<dict>',
+    '  <key>Label</key><string>dog.brain.restore-drill</string>',
+    '  <key>ProgramArguments</key>',
+    '  <array>',
+    ...argv.map((a) => `    <string>${xml(a)}</string>`),
+    '  </array>',
+    `  <key>WorkingDirectory</key><string>${xml(resolve(REPO))}</string>`,
+    '  <key>EnvironmentVariables</key>',
+    `  <dict><key>PATH</key><string>${xml(path)}</string></dict>`,
+    '  <key>StartCalendarInterval</key>',
+    '  <dict><key>Day</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>17</integer></dict>',
+    `  <key>StandardOutPath</key><string>${xml(logs)}</string>`,
+    `  <key>StandardErrorPath</key><string>${xml(logs)}</string>`,
+    '</dict>',
+    '</plist>',
+  ].join('\n');
+}
+
+// ─── the run ──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+async function main() {
+  let values;
+  let positionals;
+  try {
+    ({ values, positionals } = parseArgs({
+      allowPositionals: true,
+      strict: true,
+      options: {
+        identity: { type: 'string' },
+        'identity-cmd': { type: 'string' },
+        key: { type: 'string' },
+        record: { type: 'string', multiple: true },
+        directory: { type: 'boolean' },
+        bucket: { type: 'string' },
+        report: { type: 'string' },
+        'print-timer': { type: 'boolean' },
+        'no-round-trip': { type: 'boolean' },
+      },
+    }));
+  } catch {
+    say(USAGE);
+    return 1;
+  }
+  const records = values.record ?? [];
+  if (positionals.length === 0 && records.length === 0 && !values.directory) {
+    say(USAGE);
+    return 1;
+  }
+  const odd = records.find((r) => !REC_ID.test(r));
+  if (odd !== undefined) {
+    say(`--record takes a record's id as the bucket names it (rec_ and 26 letters and digits), and ${odd} is not one.`);
+    return 1;
+  }
+  if (values.identity !== undefined && values['identity-cmd'] !== undefined) {
+    say('The drill takes the identity one way: --identity <file> or --identity-cmd "<command>", not both.');
+    return 1;
+  }
+  const origin = values.report === undefined ? undefined : reportOrigin(values.report);
+  if (origin === null) {
+    say(`--report takes the host's origin, as in https://app.brain.dog, and ${values.report} is not one the key may go to.`);
+    return 1;
+  }
+
+  /* THE TIMER IS PRINTED FROM THE SAME ARGUMENTS IT WILL RUN, less this flag, after they are checked, and never with a
+     copy on disk: a file fetched by hand is gone by next month. */
+  if (values['print-timer']) {
+    if (positionals.length > 0) {
+      say('The timer drills what the bucket holds that night, so it takes --record and --directory, and no file.');
+      return 1;
+    }
+    out(timer(process.argv.slice(2).filter((a) => a !== '--print-timer')));
+    return 0;
+  }
+
+  /* THE OPERATOR KEY IS TAKEN OUT OF THE ENVIRONMENT BEFORE ANY CHILD RUNS: the identity command, wrangler, `braindog`
+     and the round trip's host would each inherit it, and only the report needs it. */
+  const provisionKey = (process.env.PROVISION_KEY ?? '').trim();
+  delete process.env.PROVISION_KEY;
+
+  let held;
+  const identities = () =>
+    (held ??=
+      values['identity-cmd'] !== undefined
+        ? identitiesFromCommand(values['identity-cmd'])
+        : values.identity !== undefined
+          ? identitiesFromFile(values.identity)
+          : { refused: 'The copy is sealed, so the drill needs the identity that opens it: add --identity-cmd "<a command that prints it>", or --identity <file>, the age identity kept outside this repository.' });
+  const ctx = { identities, key: values.key, trip: !values['no-round-trip'] };
+  const bucket = values.bucket ?? BUCKET;
+
+  /* THE SEALED OBJECTS WRANGLER FETCHES GO IN ONE FOLDER, which goes whatever happens. They are ciphertext, and still
+     nothing of a record is left lying in the temp folder after a drill. */
+  const fetched = mkdtempSync(join(tmpdir(), 'braindog-drill-fetch-'));
+  /* CTRL-C TAKES IT TOO. A copy's own handler removes its plaintext and exits, and the exit removes this folder; between
+     copies nobody else listens, so this one exits. */
+  const gone = () => rmSync(fetched, { recursive: true, force: true });
+  const interrupted = () => {
+    if (process.listenerCount('SIGINT') === 1) process.exit(130);
+  };
+  process.on('exit', gone);
+  process.on('SIGINT', interrupted);
+  const run = { copies: [], directory: null };
+  try {
+    for (const copyPath of positionals) run.copies.push(await drillCopy(copyPath, ctx));
+    for (const rec of records) {
+      const dest = join(fetched, `${rec}.brainl.age`);
+      const got = fetchObject(bucket, RECORD_COPY(rec), dest);
+      if (got.refused) {
+        say(got.refused);
+        for (const line of got.said ?? []) say(`  ${line}`);
+        out(`FAIL ${rec} · its night's copy was not fetched`);
+        run.copies.push({ pass: false, record: rec, rows: 0, tables: 0, lists: 0, people: 0, bytes: 0 });
+        continue;
+      }
+      out(`  fetched    ${RECORD_COPY(rec)} from ${bucket}, with wrangler as the operator`);
+      run.copies.push(await drillCopy(dest, { ...ctx, label: rec }));
+      rmSync(dest, { force: true });
+    }
+    if (values.directory) {
+      const dest = join(fetched, 'directory.dirl.age');
+      const got = fetchObject(bucket, DIRECTORY_COPY, dest);
+      if (got.refused) {
+        say(got.refused);
+        for (const line of got.said ?? []) say(`  ${line}`);
+        out("FAIL the Directory · its night's copy was not fetched");
+        run.directory = { pass: false, records: 0, owners: 0, people: 0, passkeys: 0, bytes: 0 };
+      } else {
+        out(`  fetched    ${DIRECTORY_COPY} from ${bucket}, with wrangler as the operator`);
+        run.directory = await drillDirectory(dest, ctx);
+      }
+    }
+  } finally {
+    process.removeListener('SIGINT', interrupted);
+    process.removeListener('exit', gone);
+    gone();
+  }
+
+  const all = [...run.copies, ...(run.directory ? [run.directory] : [])];
+  run.pass = all.length > 0 && all.every((c) => c.pass);
+  if (all.length > 1) {
+    const red = all.filter((c) => !c.pass).length;
+    out(run.pass ? `ALL PASS · ${all.length} copies` : `FAIL · ${red} of ${all.length} copies did not come back as they were`);
+  }
+  if (origin !== undefined) out(`report ${await report(origin, run, provisionKey)}`);
+  return run.pass ? 0 : 1;
+}
+
 /* THE AGE READER IS THE REHEARSAL'S TOO (`migration-rehearsal.mjs`), and importing this file runs nothing. */
-export { ageOpen, keyOf, secretOf };
+export { ageOpen, identitiesFromCommand, keyOf, secretOf };
 if (import.meta.main) process.exitCode = await main();

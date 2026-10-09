@@ -55,6 +55,8 @@ import tokenBuild0032 from './migrations/0032_token_build.ts';
 import shapeReach0033 from './migrations/0033_shape_reach.ts';
 import ruleStat0034 from './migrations/0034_rule_stat.ts';
 import repeatMarks0035, { repeatMarks } from './migrations/0035_repeat_marks.ts';
+import runsBefore0036 from './migrations/0036_runs_before.ts';
+import causeAnswered0037 from './migrations/0037_cause_answered.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -95,6 +97,8 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 33, slug: 'shape_reach', sql: shapeReach0033 },
   { version: 34, slug: 'rule_stat', sql: ruleStat0034 },
   { version: 35, slug: 'repeat_marks', sql: repeatMarks0035 },
+  { version: 36, slug: 'runs_before', sql: runsBefore0036 },
+  { version: 37, slug: 'cause_answered', sql: causeAnswered0037 },
 ];
 
 /**
@@ -144,6 +148,9 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 33 rebuilds `device_grant` with an eighth reach, `shape`, `local` for migration 4's reason, so no file carries it.
  * Migration 34 adds `rule_stat`, `local` as `fault` is, so no file carries it.
  * Migration 35 adds no table and no column: it writes `match` lines in history, which every file already carries.
+ * Migration 36 adds no table and no column: it takes `next` off the runs never heard from here and not in `handoff`,
+ * in their fields, which an older file's runs import with and a newer reader reads without, so the format is still 1.
+ * Migration 37 adds `suggestion_cause_closed`, an index no file carries, so the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 

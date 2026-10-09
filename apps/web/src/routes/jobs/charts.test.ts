@@ -249,7 +249,7 @@ test('the title row says where a run is and since when, and how it ended, and ne
 
 test('a machine is said by its name and never by its network address', () => {
   assert.equal(machineOf('claude-mac'), 'claude-mac');
-  assert.equal(machineOf('Sam-MacBook-Pro.local'), 'Sam-MacBook-Pro');
+  assert.equal(machineOf('Studio-MacBook-Pro.local'), 'Studio-MacBook-Pro');
   assert.equal(machineOf('build-box.lan'), 'build-box');
   assert.equal(machineOf('192.168.1.20'), 'Unnamed machine');
   assert.equal(machineOf('fe80::1'), 'Unnamed machine');
@@ -261,14 +261,14 @@ test('a machine is said by its name and never by its network address', () => {
 
 test('the machines enrolled as runners, by the name a person gave them, the one seen last first', () => {
   const devices = [
-    { handle: 'h1', reach: 'runner', status: 'active', label: 'Sam-MacBook-Pro.local · braindog-cli · runner', last_used: '2026-10-06T09:00:00Z', approved_at: '2026-10-01T09:00:00Z' },
+    { handle: 'h1', reach: 'runner', status: 'active', label: 'Studio-MacBook-Pro.local · braindog-cli · runner', last_used: '2026-10-06T09:00:00Z', approved_at: '2026-10-01T09:00:00Z' },
     { handle: 'h2', reach: 'runner', status: 'revoked', label: 'old-box · braindog-cli · runner', last_used: '2026-10-07T09:00:00Z', approved_at: null },
     { handle: 'h3', reach: 'login', status: 'active', label: 'laptop · braindog-cli', last_used: null, approved_at: null },
     { handle: 'h4', reach: 'runner', status: 'approved', label: 'build-box.lan · braindog-cli · runner', last_used: '2026-10-07T08:00:00Z', approved_at: '2026-10-07T07:00:00Z' },
     { handle: 'h5', reach: 'runner', status: 'approved', label: null, last_used: null, approved_at: '2026-10-07T07:00:00Z' },
   ];
   const out = enrolledOf(devices);
-  assert.deepEqual(out.map((m) => [m.key, m.name]), [['h4', 'build-box'], ['h1', 'Sam-MacBook-Pro'], ['h5', 'Unnamed machine']]);
+  assert.deepEqual(out.map((m) => [m.key, m.name]), [['h4', 'build-box'], ['h1', 'Studio-MacBook-Pro'], ['h5', 'Unnamed machine']]);
   assert.equal(enrolledSaid(out[0]!, () => '1h ago'), 'Asked for work 1h ago');
   assert.equal(enrolledSaid(out[2]!, () => 'today'), 'Enrolled today, not seen since');
 });

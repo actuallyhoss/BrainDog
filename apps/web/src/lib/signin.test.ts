@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Failure, Methods, Said } from './auth.ts';
-import { googleStart, googleWhy, onwardOf, stateOf, type How, type Seen, type Shelf, type Step } from './signin.ts';
+import { SENT_LATE, googleStart, googleWhy, onwardOf, stateOf, type How, type Seen, type Shelf, type Step } from './signin.ts';
 
 const WHO = { person: 'p_01', email: 'ada@example.com', record: 'studio', provedAt: 1 };
 const NOW = 1_757_000_000_000;
@@ -117,6 +117,19 @@ test('LOCKED COUNTS DOWN IN WHOLE MINUTES, and gives the screen back when the ti
 
 test('link-sent names the address it was asked for', () => {
   assert.ok((() => { const s = stateOf(seen({ step: { at: 'sent', email: 'ada@example.com' } })); return s.name === 'link-sent' && s.email === 'ada@example.com'; })());
+});
+
+/* THE SECOND LINE (LCH-A04): a minute after the send, and not a moment before, the sent screen says what fixes a letter
+   that did not come. A send that carries no time never says it, so an older caller draws the one line it always drew. */
+test('the sent screen adds its second line once a minute has passed, and not before', () => {
+  const late = (now: number, when?: number) => {
+    const s = stateOf(seen({ step: { at: 'sent', email: 'ada@example.com', ...(when === undefined ? {} : { when }) }, now }));
+    return s.name === 'link-sent' ? s.late : null;
+  };
+  assert.equal(late(NOW, NOW), false);
+  assert.equal(late(NOW + SENT_LATE - 1, NOW), false);
+  assert.equal(late(NOW + SENT_LATE, NOW), true);
+  assert.equal(late(NOW + 10 * SENT_LATE), false, 'no time, no second line');
 });
 
 test('A LINK IN THE ADDRESS WAITS FOR A PRESS, and a spent one is link-expired', () => {

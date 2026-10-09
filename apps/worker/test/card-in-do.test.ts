@@ -36,7 +36,7 @@
  * record set up with Solo founder and nothing else carried a Signs line, "1 read red: Pages print clean. 2 pages print
  * something raw: Overview, Money.", so a fresh record's card is line one, Signs and More, not line one and More as the
  * scope's "Done when" says. The sign is not this file's to judge, so no case pins it either way. And a task handed to the
- * agent never reaches its Next line on a real record: the todo case below says why.
+ * agent never reached its Next line on a real record, until the briefing carried the field the list's hand.agent names.
  *
  * EVERY ANSWER OF 500 OR MORE IS COUNTED, as there.
  */
@@ -384,7 +384,7 @@ test('A CARD THAT WOULD RUN PAST 150 WORDS IS CUT TO 150, and line one and the s
  * Measured: with `agent` in Tasks' `mobile` in a scratch bundle, Next read "Proof the release notes for Kiln (tasks#1,
  * handed to you) · Cut the release notes ...". It waits on `brief` keeping the field a list's `hand.agent` names.
  */
-test('A TASK HANDED TO THE AGENT LEADS ITS NEXT LINE, before the step', { todo: 'waits on the briefing carrying the field hand.agent names' }, async () => {
+test('A TASK HANDED TO THE AGENT LEADS ITS NEXT LINE, before the step', async () => {
   const h = await record(shipped!);
   const task = await h.owner.create({ register: 'tasks', fields: { what: 'Proof the release notes for Kiln', agent: 'claude' } });
   assert.ok(task.ok, `a task could not be handed to the agent: ${JSON.stringify(task)}`);

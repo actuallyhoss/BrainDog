@@ -103,6 +103,11 @@
   import { reachWords, writeWords } from './reach.ts';
   import { liveOverlay, run, UNDO_MS, type Sent } from '$lib/data/optimistic.svelte.ts';
   import { ARRIVED_MS } from '$lib/data/optimistic.ts';
+  import OfferCard from '$lib/design/OfferCard.svelte';
+  import { offerActs, offerFor } from '$lib/design/pen.ts';
+  import { penWords } from '$lib/design/words.ts';
+  import { navPrefs } from '$lib/nav-prefs.svelte.ts';
+  import { forget } from '$lib/record/boot-live.ts';
 
 
   const id = $derived(page.params.register ?? '');
@@ -180,6 +185,36 @@
    */
   const hand = $derived(decl ? handFor(decl) : null);
   const shell = $derived(page.data as unknown as Shell);
+
+  /**
+   * THE ONE OFFER FOR THIS LIST (USE-B03), drawn above its entries: the page the record would make of it, most often the
+   * week Slash saw her read it by (offer-pattern-45). The pen's switch and her dismissals are hers on every device
+   * (`navPrefs`), and what she made or put away in this visit is gone at once, before `boot` is read again.
+   *
+   * Make it is the pen's own keep (`keep.ts`), the write Settings, Navigation makes, then the rail is read again and she
+   * is taken to the page; Not now is the dismissal, terminal.
+   */
+  let offerTick = $state(0);
+  const offerActions = offerActs({
+    keep: async (item) => (await import('$lib/design/keep.ts')).keepOffer(apiBase(), item),
+    dismiss: (offerId) => navPrefs.dismiss(offerId),
+    go: async (slug) => {
+      forget();
+      await goto(at(`/p/${slug}`), { invalidateAll: true });
+    },
+    say: (text, warn) => void toasts.push(text, warn ? { intent: 'warn' } : undefined),
+    changed: () => (offerTick += 1),
+    words: { made: copy.promoted, dismissed: penWords.dismissed, notReached: copy.recordNotReached },
+  });
+  /* `offerTick` IS READ so each press redraws: what the actions hold is plain, and the tick is their one signal. */
+  const offer = $derived.by(() => {
+    void offerTick;
+    return offerFor(shell.pen ?? [], id, { suggest: navPrefs.suggest, gone: (o) => navPrefs.isDismissed(o) || offerActions.hidden(o) });
+  });
+  const offerBusy = $derived.by(() => {
+    void offerTick;
+    return offerActions.busy();
+  });
 
   /**
    * WHAT THE CALLER'S LEVEL ON THIS LIST REACHES, asked of `may()` and never worked out here.
@@ -2445,6 +2480,12 @@
         <span>{copy.stale}</span>
         <Button onclick={refresh}>{copy.tryAgain}</Button>
       </p>
+    {/if}
+
+    <!-- THE OFFER, WHERE SHE IS: one card at most, above the list's figures and its entries, and none while the list is
+         still arriving, since an offer is drawn from use and a list being made has none yet. -->
+    {#if offer && !arriving}
+      <OfferCard item={offer} acts={offerActions} busy={offerBusy} />
     {/if}
 
     <!-- THE LIST'S FIGURES, over the whole list only (`ListSummary` says why): one tile above the list's own, 12 from it.

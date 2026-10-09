@@ -1,0 +1,55 @@
+{
+  "id": "mona-guide",
+  "name": "Mona",
+  "who": "Bakes at home in Riyadh and has always wanted a stall at the weekend market. She has the recipes and no plan, and she wants to be walked through it a step at a time.",
+  "expects": "guide",
+  "standing": true,
+  "said": "I'm Mona. I'm starting a new project, a weekend bakery stall, and I want a guide with the steps.",
+  "says": {
+    "plain": "I'm Mona. I'm starting a new project, a weekend bakery stall, and I want a guide with the steps.",
+    "hard": "I've always wanted to open a small bakery stall at the weekend market."
+  },
+  "chip": "I freelance",
+  "answer": "an idea",
+  "answers": {
+    "name": "Mona",
+    "currency": "SAR",
+    "kind": "an idea",
+    "things": ["Recipes", "A stall booked for November"]
+  },
+  "email": "mona@people.braindog.test",
+  "slug": "monas-bakery-stall",
+  "zone": "Asia/Riyadh",
+  "locale": "en-SA",
+  "languages": ["en-SA", "ar-SA"],
+  "start": "2026-10-05T15:00:00Z",
+  "first": "Asked the market about a stall, they said 300 a weekend",
+  "later": [
+    { "day": 3, "said": ["Picked four things to sell: date cookies, cardamom buns, sourdough, kunafa bites"] },
+    { "day": 7, "said": ["Booked the stall for the first weekend of November", "Chose card and cash"] },
+    { "day": 30, "said": ["First weekend sold out by noon"] },
+    { "day": 90, "said": ["Selling every weekend now, thinking of a second stall"] }
+  ],
+  "expect": {
+    "who": {
+      "question": "Who are you?",
+      "chips": 5,
+      "promises": [
+        { "says": "free, with no card", "match": "free\\b.{0,24}\\bno card" },
+        { "says": "nothing is saved until you keep it", "match": "nothing (is )?saved until you keep" },
+        { "says": "yours to export or move", "match": "yours to (export|move|take)" }
+      ]
+    },
+    "heard": {
+      "usecase": "guide",
+      "title": "Mona's Bakery Stall",
+      "lit": ["Mona", "project", "guide"],
+      "places": ["Today", "Milestones", "Steps", "People"]
+    },
+    "question": { "about": "kind", "choices": 3 },
+    "keep": { "lists": ["milestones", "steps", "choices", "people"], "currency": "SAR" },
+    "tell": { "lists": ["steps"] },
+    "today": { "first": "source", "lists": ["steps"] },
+    "offer": { "id": "install:portfolio", "before": 30, "after": 90 }
+  }
+}

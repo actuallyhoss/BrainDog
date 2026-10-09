@@ -338,7 +338,7 @@ export async function ownerOf(self: Owner, dirs: readonly string[]): Promise<Own
 
 /**
  * The owner with every address he signed a commit with under a name of his, from logs in `LOG_FORMAT`, so the commits
- * he made from an old address under another name ("Sam Avery" at the address he signs "Sam" with) are his too.
+ * he made from an old address under another name ("Teodor Vance" at the address he signs "Teo" with) are his too.
  */
 export function ownerIn(own: Owner, logs: readonly (string | null)[]): Owner {
   const keys = new Set(own.keys);
@@ -497,7 +497,7 @@ export function listedBy(projects: readonly Project[], repo: LocalRepo): Project
 const bare = (name: string): string => name.toLowerCase().replace(/[-_. ]/g, '');
 
 /**
- * The project that lists a local repository by its bare name (`encore`, `buffs-drafts`), as an older record keeps it:
+ * The project that lists a local repository by its bare name (`lanternfish`, `oxbow-drafts`), as an older record keeps it:
  * the name of its remote, of its folder, or of its folder with the one above (`bake/bot` as `crumb-bot`). `null` when
  * none does.
  *

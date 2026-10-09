@@ -74,7 +74,7 @@ import { pathToFileURL } from 'node:url';
 
 import { chromium } from '@playwright/test';
 
-import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
+import { APP_BASE, appShell, budget, openPage, readiness } from './lib.mjs';
 import { answers, forward, forwards, startRecord } from './record.mjs';
 
 /* THE PREREQUISITE, AND THIS IS THE OTHER GATE THAT PROVED IT HAD TO LEAVE THIS FILE. It exited 0
@@ -201,13 +201,22 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
     const { COSTS, costRank } = await import(pathToFileURL(join(root, 'packages', 'kernel', 'src', 'weigh.ts')).href);
 
     browser = await chromium.launch();
-    const context = await browser.newContext();
-    const page = await context.newPage();
+
+    /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (`openPage`, PRF-B04): on the record's clock, at the widest width the
+       product is judged at, and waited for. It opened in a bare context on the runner's own date, so a card's "due in"
+       was measured against a day the record never lived. The first address opens the page, inside the drive's `try`, so
+       a load that throws is a finding as it always was; the context belongs to the browser the `finally` closes. */
+    const WIDTH = Math.max(...budget('a11y').widths);
+    let opened = null;
+    let page = null;
 
     /** Load a route by address and report what it settled into. */
     async function open(route) {
-      await page.goto(`${ORIGIN}${APP_BASE}${route}`, { waitUntil: 'networkidle' });
-      return ready.settled(page);
+      const url = `${ORIGIN}${APP_BASE}${route}`;
+      if (opened !== null) return opened.goto(url);
+      opened = await openPage(browser, url, { width: WIDTH, record, ready, waitUntil: 'networkidle' });
+      page = opened.page;
+      return opened.state;
     }
 
     /** The queue block agents.ts names `heading: 'Waiting on you'`, found by the name its region carries. */

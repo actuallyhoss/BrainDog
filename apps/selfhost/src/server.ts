@@ -89,6 +89,11 @@ import { unwrap, type KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
 import { keysDoor, vaultDoor } from './vault.ts';
+/* BY PATH UNTIL `@braindog/host` EXPORTS `./shape` (its package.json), then `from '@braindog/host/shape'`. */
+import { serveShape, servesShape, type ShapeDoor } from '../../../packages/host/src/shape.ts';
+/* THE SHAPE COPY'S RECORD HALF, BUILT HERE OVER THE RECORD'S KERNEL so the door answers whether or not `methods/index.ts`
+   has spread it into the API yet; the same deps the record hands it, so the two cannot answer differently. */
+import { methods as shapeMethods } from '../../../packages/record/src/methods/shape.ts';
 /* OAUTH 2.1 ON THIS HOST: the host package's doors over this process's Directory. */
 import { oauthHere, servesOAuth, type OAuthHere } from './oauth.ts';
 import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
@@ -299,6 +304,8 @@ type Site = {
   door: Omit<AuthDoor, 'ip'>;
   /** The key doors: a vault grant's bearer, an agent's login token at the deposit door, and this process's key store when it has one. */
   vault: VaultDoor<CallContext>;
+  /** The shape door (PRF-A13): a shape grant's bearer, and the record's scrambled copy. */
+  shape: ShapeDoor;
   /** The app's own key doors: a browser session on one of this host's origins, and the same key store. */
   keys: KeysDoor<CallContext>;
   /** Slash's ask, `POST /api/slash/read`, built on the first question and kept (`46 §5.2`). */
@@ -1065,6 +1072,8 @@ export async function start(options: {
    * real clock, which is what every deployment runs.
    */
   now?: number | (() => number) | undefined;
+  /** The script sandbox's meter clock (CtxHost.clock). Absent is the machine's; a test that is not about limits hands one that stands still. */
+  scriptClock?: (() => number) | undefined;
   /**
    * The Directory: `<data>/directory.sqlite`, or `:memory:`. Without it nobody signs in from the app, and
    * `/auth/methods` says so. Opened here and closed with the server.
@@ -1405,7 +1414,7 @@ export async function start(options: {
         resolve: on?.resolve,
         rehearseOnThisMachine: on?.rehearseOnThisMachine,
       });
-      script ??= scriptSandbox(api, { openKey, send: on?.send, resolve: on?.resolve, now: clock.now, outbound: on ? 'on' : 'off' });
+      script ??= scriptSandbox(api, { openKey, send: on?.send, resolve: on?.resolve, now: clock.now, clock: options.scriptClock, outbound: on ? 'on' : 'off' });
       /* A CONNECTOR PAGES AND THE EXECUTOR ABOVE CANNOT. Without this the kernel finishes the row
          and meters it `dropped`, which is honest but means no self-host ever runs a connector. */
       paged ??= pagedRunner(api, {
@@ -1965,6 +1974,8 @@ export async function start(options: {
     /* AN AGENT'S LOGIN TOKEN MAY ADD A KEY AT THE DEPOSIT DOOR, checked as every `/api`
        bearer is (`vaultToken`); the record refuses anything but a token's context there. */
     vault: vaultDoor(api, options.keys, (asked) => vaultToken(asked, site)),
+    /* THE RECORD READS THE GRANT BEFORE IT READS A ROW (`shapeExport`), so the door hands the bearer on unread. */
+    shape: { copy: (bearer) => shapeMethods({ kernel: api.kernel, clock, validFrom }).shapeExport(bearer) },
     keys: keysDoor(api, options.keys, origins),
     slash: { ...slashDoor(slashConfig, () => api, options.keys, { sql: slashSql, clock }, origins), health: engineHealth },
     /* ONE BUDGET PER PROCESS, built here so it outlives a request and is shared by every ingest. */
@@ -2354,6 +2365,16 @@ async function answer(
         ? /* A LOGIN TOKEN'S SPENT MINUTE IS ITS 429, put back in the place of the grant's sentence (`vaultToken`). */
           await serveVault(request, site.vault).then((out) => vaultSpent.get(request) ?? out)
         : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'The key doors are at /api/vault/, and a grant names its own record.' } }),
+    );
+
+  /* THE SHAPE DOOR, BESIDE THE KEY DOORS AND FOR THEIR REASON: its bearer is a shape grant, which `contextFor` would
+     not know, it takes no cookie and no page, and it answers only at the root, since a grant names its own record. */
+  if (servesShape(path))
+    return write(
+      res,
+      named === null
+        ? await serveShape(request, site.shape)
+        : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'The shape door is at /api/shape, and a grant names its own record.' } }),
     );
 
   /* A LINK TO ONE PAGE, `Authorization: Share <token>`, BEFORE ANY CREDENTIAL IS READ: `contextFor` reads any

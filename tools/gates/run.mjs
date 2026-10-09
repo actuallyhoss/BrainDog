@@ -169,12 +169,22 @@ const GATES = [
      flippant register in anything a stranger reads", against 91 string literals carrying
      one, most of them in refusals, which is the prose somebody meets at the moment they are stuck. */
   ['em-dash', call(join(here, 'em-dash.mjs'))],
+  /* AND THE HOUSE WORDS, HELD BY A CHECK (EXP-B07): the list in `words.json` (row, credential, register as a noun, an id
+     in a sentence, the long dash) over every copy string the app ships. Beside `em-dash` because it reads the same
+     copy for a wider list, and its `page` entries are the page lint's, so a page and the source are judged by one. */
+  ['words', call(join(here, 'words.mjs'))],
   /* AND THE ONE CLOCK (AGT-C02): a run's `last_seen` compared with the time anywhere outside `presence.ts` is the
      rail, Today and Agents saying three numbers again. Today's hits are allowed by count, and the list only shrinks. */
   ['one-clock', call(join(here, 'one-clock.mjs'))],
   /* AND AN APPLIED MIGRATION IS NEVER EDITED (LCH-C06): each migration's checksum, by the runner's own `checksum`, against
      `packages/kernel/src/migrations/LOCK.json`, and a new one ships with a passing rehearsal's receipt. */
   ['migration-lock', call(join(here, 'migration-lock.mjs'))],
+  /* AND THE LOG ONLY GROWS (REC-A17, his "append-only audit"): every statement under `packages/*\/src` that updates or
+     deletes a line of `event` is on one list with its reason, and a seventh is red. Beside `migration-lock` because a
+     migration is the one other place the log is reshaped, and that gate holds it. */
+  ['audit-append-only', call(join(here, 'audit-append-only.mjs'))],
+  /* AND NO AGENT TRANSCRIPT IS READ (AGT-B10, his "transcripts never read"): a hook or package naming transcript_path or opening a client's session folder. */
+  ['no-transcript', call(join(here, 'no-transcript.mjs'))],
   /* AND ONE LEDGER FOR EVERY NUMBER A GATE IS HELD TO (PRF-B03): a budget never rises unless the owner is quoted, a debt
      only falls, a held list only shrinks, and a number written in a gate file is a debt. Beside the other source gates
      because it reads files and needs nothing built. */
@@ -207,6 +217,10 @@ const GATES = [
      checks the gate it lands on, presses the count and checks it reaches Decide. Its own ephemeral
      port, for the reason `passkey` has one. */
   ['queue', call(join(here, 'queue.mjs'))],
+  /* WHAT A SETTLED SCREEN PRINTS (PRF-B04 job 7): every address the gates' record gives, drawn once at 390 on the record's
+     clock, red on a raw id, a raw time, a key, a value that never arrived or a page error. Its own ephemeral port, for
+     the reason passkey has one. */
+  ['printed', call(join(here, 'printed.mjs'))],
   /* AND THE SAME SIGN-IN ON THE HOST THAT WAS DEPLOYED, with the canary's own passkey (PRF-A09). Here there is no
      CANARY_PASSKEY, so it runs on a fresh self-host and says "self-host only"; `after-deploy.yml` runs it against
      the deployed host. Its own ephemeral port, for the reason `passkey` has one. */

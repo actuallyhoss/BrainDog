@@ -14,31 +14,59 @@ import { firstRun } from '../../lib/first-run.ts';
 export const words = {
   /** The tab's title. */
   title: 'Start your BrainDog',
-  /** Under "Who are you?": what to say, and that nothing is kept yet. */
-  lede: 'Say who you are and what you want to keep here. It builds as you type, and nothing is saved until you keep it.',
-  /** The one press under the sentence. */
-  next: 'Continue',
+  /** Under "Who are you?": what to say. That nothing is kept yet is the second promise. */
+  lede: 'Say who you are and what you want to keep track of. Your BrainDog builds as you type.',
+  /** Over the chips, which are the first run's own (`firstRun.whoChips`). */
+  startFrom: 'Or start from one of these',
+  /**
+   * THREE PROMISES UNDER THE FIELD (use case 6, step 1), each one the product keeps: a free record takes no card
+   * (DIRECTION §35); nothing typed leaves this device until the email is sent; and Settings, Export hands every record
+   * its own file, on every plan. The first is said only on Free, since Cloud and Cloud Plus lead to a payment.
+   */
+  promises: ['Free, with no card', 'Nothing is saved until you keep it', 'Yours to export or move, any time'],
+
+  /** Over the lines heard, and the one press that says they are right. */
+  heardTap: 'Tap one to change it',
+  /** What the name heard became, said on its line. */
+  you: 'you',
+  /** A line opened to change: what it can become instead, and the way to take it out. */
+  becomeInstead: 'Make it',
+  takeOut: 'Take it out',
+  nameLabel: 'Your name',
+  keepLine: 'Done',
+  next: "That's me",
   /** When nothing in the sentence could be placed: the use cases to choose from, as /start offers them. */
   closest: 'What is it closest to?',
   closestWhy: 'I could not place what you said yet. Pick the closest, or say a little more.',
 
+  /** The one question (`lib/start/question.ts`), on its own step, with the way back to the words. */
+  questionTitle: 'One thing I could not guess',
+  questionNext: 'Continue',
+  questionSkip: 'Skip it',
+  back: 'Back',
+
   /** The second step: the sentence kept, and one email. */
   keepTitle: 'Keep it',
-  keepLede: 'One email, and we send a link. Open it on this device and your BrainDog is made, free, with no card.',
-  /** The same on Cloud or Cloud Plus, where the link leads to the payment and promises nothing free. */
+  /** On Cloud or Cloud Plus, where the link leads to the payment and promises nothing free. On Free the line under the
+      button says where to open the link (`openHere`). */
   keepLedePaid: 'One email, and we send a link. Open it on this device, pay, and your BrainDog is made.',
   keepSignedIn: 'You are signed in, so it is made as soon as you press.',
   keepSignedInPaid: 'You are signed in, so the payment comes next.',
-  /** The record's name, chosen from what was heard, as one quiet line with a way to change it. */
-  calledLine: (name: string) => `It will be called ${name}.`,
+  /** While the record's name is chosen from what was heard; then its title, with a way to change it. */
   calledFinding: 'Choosing a name from what you said',
   change: 'Change',
   send: 'Email me a link',
   sending: 'Sending',
   makeNow: 'Make my BrainDog',
   edit: firstRun.whoEdit,
-  /** While the mail travels, beside the build that waits for it. */
-  sentWhy: 'The link builds what you see here. If you open it on another device, you can say who you are again there.',
+  /** Under "Email me a link": where to open it, and the lock that signs her in after (use case 6, step 4). */
+  openHere: 'Open it on this phone. After that, this phone signs you in with its own lock, with no password to remember.',
+  openHereWide: 'Open it on this device. After that, this device signs you in with its own lock, with no password to remember.',
+  /** While the mail travels, beside the build that waits for it. What was said rides in the link. */
+  sentWhy: 'The link builds what you see here, on this device or another.',
+
+  /** Straight after the link, over the passkey (`PasskeyFirst`), before the build is made. */
+  lockTitle: 'Your email is confirmed',
 
   /** The screen while the record is made and the build is written into it, one line for each stage. */
   making: 'Making your BrainDog',

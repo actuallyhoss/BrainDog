@@ -149,7 +149,9 @@ export type PageBlock = {
    * every block unconditionally. Two implementations of one page, disagreeing about which blocks
    * are on it.
    */
-  when?: { metric: string; gt?: number; gte?: number; lt?: number; lte?: number; is?: number; not?: number };
+  /* `empty: true` holds while the figure reads with no value and no amount in any currency, and `empty: false` while it
+     has one (PGS-C06): the one test a figure with nothing in it meets. */
+  when?: { metric: string; empty?: boolean; gt?: number; gte?: number; lt?: number; lte?: number; is?: number; not?: number };
   /** A `series`'s lines: figures grouped by one date bucket, and how many buckets back and ahead it draws. */
   series?: SeriesLine[];
   back?: number;
@@ -615,7 +617,11 @@ export type RowEvent = { ts: string; actor: string; kind: string; field: string 
  * `look` is the look the page was read under (`compose.ts`): who arranged it, what leads, what was hidden and the one next
  * action. Answered when the host reads looks (`PageDeps.look`).
  */
-export type PageResult = { page: string; title: string; blocks: BlockResult[]; read_at?: string; look?: LookBody; [key: string]: unknown };
+/**
+ * `zone` is the record's own zone (an IANA name) the page was read in, so text drawn off the browser names the same day
+ * the record does (PGS-B04): a digest and the app say which zone their "today" is.
+ */
+export type PageResult = { page: string; title: string; blocks: BlockResult[]; read_at?: string; zone?: string; look?: LookBody; [key: string]: unknown };
 
 /**
  * The refusals that hold a block back from its reader rather than ask its author to fix it: outside the caller's
@@ -738,6 +744,12 @@ export type PageDeps = {
   tally?: (q: { register: string; field: string; where?: Predicate | undefined }) => Result<{ value: Json; n: number }[]>;
   /** The record's timezone, which a day of readings is counted in. `UTC` when absent. */
   tz?: string;
+  /**
+   * The entry the text sits on: a template page's row, or the row whose own screen draws a document. A one-word
+   * `{{path}}` is that entry's field when its list declares one, and `<field>.count` counts a list field of it (PGS-B03).
+   * Absent, a path reads as it always has.
+   */
+  here?: Entry;
   /** The record's home currency, or `null` when it has none, which an `inputs` block answers as `home`. */
   home?: () => string | null;
   /**
@@ -1208,9 +1220,10 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
   /* THE RECORD'S CLOCK, WHEN IT READ THE PAGE. What is out of date, what is late and which day is today on this page are
      the record's answers, so a host draws them against this rather than against its own clock. */
   const read_at = new Date(deps.ctx.nowMs).toISOString();
+  const zone = deps.tz ?? 'UTC';
   if (found.refusal) {
     const note = { kind: 'note', rows: [], matched: 0, refusals: [found.refusal] };
-    return ok({ ...found.decl, page: found.slug, read_at, blocks: [{ ...note, key: blockKeyOf(note) }] });
+    return ok({ ...found.decl, page: found.slug, read_at, zone, blocks: [{ ...note, key: blockKeyOf(note) }] });
   }
 
   /* AN EXPANDED PAGE SAYS WHICH ROW IT IS ABOUT, so a host can name the project without guessing it
@@ -1246,7 +1259,9 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
       const folded: BlockResult = { ...shorn(b), rows: [], matched: 0, refusals: [], drawn: false, why: 'when' };
       return added === undefined ? folded : { ...folded, added };
     }
-    const read = rowNamed(deps, found.row, readBlock(filters ? narrowed(deps, b, filters.clauses) : deps, b));
+    /* THE PAGE'S ROW IS THE ENTRY ITS TEXT SITS ON, so `{{money:price}}` and `{{blockers.count}}` read the row (PGS-B03). */
+    const on = found.row ? { ...deps, here: found.row } : deps;
+    const read = rowNamed(deps, found.row, readBlock(filters ? narrowed(on, b, filters.clauses) : on, b));
     if (b !== null && typeof b === 'object' && b.kind === 'section' && read.drawn === false) hiding.add(area);
     const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
     const drawn = astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
@@ -1259,6 +1274,7 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
     ...found.decl,
     page: found.slug,
     read_at,
+    zone,
     ...(found.row && found.row.seq !== null
       ? { param: { register: found.row.register, seq: found.row.seq, title: String((title && Object.hasOwn(found.row.fields, title) ? found.row.fields[title] : null) ?? '') } }
       : {}),
@@ -1629,6 +1645,10 @@ function drawnWhen(deps: PageDeps, block: PageBlock): boolean {
      whatever is late in dollars, and "Late to you" is not hidden because two currencies cannot be added. */
   const parts = read.value.parts;
   const said = parts ? parts.map((p) => p.amount) : read.value.value === null ? [] : [read.value.value];
+  /* EMPTY IS THE ONE TEST A FIGURE WITH NO VALUE MEETS (PGS-C06): true while no amount is held in any currency. A sum of
+     money over no rows reads 0 with no currency, which is no amount at all; 0 EGP typed as a balance is one, and a count
+     of nought is a count. A figure that cannot be read, or that nobody declared, still draws nothing, above. */
+  if (when.empty !== undefined) return when.empty === (said.length === 0 || (!parts && decl.format === 'money' && !read.value.unit && read.value.value === 0));
   return said.some((v) => {
     if (when.gt !== undefined) return v > when.gt;
     if (when.gte !== undefined) return v >= when.gte;
@@ -2993,12 +3013,17 @@ function listInherited(
 function metricBlock(deps: PageDeps, block: PageBlock, id: string, base: BlockResult, also: (...r: Refusal[]) => Refusal[]): BlockResult {
   if (block.kind !== 'bar' && block.kind !== 'split')
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: `A ${block.kind} does not read a figure yet; a bar or a split does.`, at: 'source' }) };
-  const decl = deps.metric(id);
-  if (!decl) return { ...base, refusals: also({ code: 'METRIC_UNKNOWN', fix: `There is no metric called ${id}.`, at: 'source' }) };
+  /* A FIGURE'S PARAMETER IS SPLIT OFF AT THE FIRST COLON, as a figure cell's is (PGS-A04), so a split on a project page
+     over `metric.<cost>:{{name}}` draws that project's parts. The refusal names the figure, never the parameter. */
+  const colon = id.indexOf(':');
+  const name = colon < 0 ? id : id.slice(0, colon);
+  const named = deps.metric(name);
+  if (!named) return { ...base, refusals: also({ code: 'METRIC_UNKNOWN', fix: `There is no metric called ${name}.`, at: 'source' }) };
+  const decl = colon < 0 ? named : (fill(named, null, id.slice(colon + 1)) as MetricDecl);
   if (typeof decl.group_by !== 'string' || decl.bucket !== undefined)
     return {
       ...base,
-      refusals: also({ code: 'DECLARATION_INVALID', fix: `A ${block.kind} over a figure draws its parts, so ${id} groups by a word, and a date cut into buckets is a series.`, at: 'source' }),
+      refusals: also({ code: 'DECLARATION_INVALID', fix: `A ${block.kind} over a figure draws its parts, so ${name} groups by a word, and a date cut into buckets is a series.`, at: 'source' }),
     };
   const read = deps.read(decl);
   if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
@@ -4529,7 +4554,9 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
      reads its moves and its checks, and a walk its legs and the figure it opens from, so a page with one on it is held
      from a member who may not read those lists as it is on Home and in the sell knob (`listsRead`). */
   const pointsAt = pointsBeside(beside);
-  const addFigure = (id: string): void => {
+  /* A FIGURE'S PARAMETER IS CUT AT THE FIRST COLON: `cost:{{name}}` reads the lists `cost` reads. */
+  const addFigure = (said: string): void => {
+    const id = said.indexOf(':') < 0 ? said : said.slice(0, said.indexOf(':'));
     const d = metric?.(id) ?? builtInFigure(id);
     if (d) for (const list of listsRead(d, (other) => metric?.(other) ?? null, pointsAt)) named.add(list);
   };
@@ -4639,6 +4666,7 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       const said = pathOf(path);
       if (!said) continue;
       if ('metric' in said) addFigure(said.metric);
+      else if ('own' in said) continue;
       else if ('change' in said || 'rowsOf' in said) {
         const head = 'change' in said ? said.change : said.rowsOf;
         if (metric?.(head) ?? builtInFigure(head)) addFigure(head);
@@ -4710,18 +4738,29 @@ export function pathsOf(block: PageBlock): string[] {
  */
 function pathOf(
   path: string,
+  own?: Schema['fields'],
 ):
   | { metric: string }
   | { change: string }
-  | { rowsOf: string; part: RowPart }
+  | { rowsOf: string; part: RowPart; field?: string }
   | { register: string; seq: number; field: string }
   | { register: string; count: true }
   | { register: string; state: string }
+  | { own: string; count?: true }
   | null {
   const parts = path.split('.');
+  /* THE ENTRY THE TEXT SITS ON IS READ FIRST (PGS-B03): one word its list declares is its field, and `<field>.count` over
+     one of its list fields is how many that field holds. A word it does not declare reads as it always has. */
+  const ownField = (word: string | undefined): boolean => own !== undefined && word !== undefined && Object.hasOwn(own, word);
+  if (parts.length === 1 && ownField(path)) return { own: path };
+  if (parts.length === 2 && parts[1] === 'count' && ownField(parts[0]) && own![parts[0]!]!.type === 'list') return { own: parts[0]!, count: true };
   if (parts.length === 1) return /^[a-z][a-z0-9_-]*$/.test(path) ? { metric: path } : null;
   if (parts.length !== 2) return null;
   const [head, tail] = parts as [string, string];
+  /* `<figure>.first_<field>` IS A FIELD OF THE FIRST ROW A FIGURE COUNTS, the row `.first` names, so a sentence can say
+     "Salma still owes EGP 1,350" (`rowsValue`). */
+  const firstOf = /^first_([a-z][a-z0-9_]*)$/.exec(tail);
+  if (firstOf && /^[a-z][a-z0-9_-]*$/.test(head)) return { rowsOf: head, part: 'first', field: firstOf[1]! };
   /* `<figure>.change` IS HOW FAR A FIGURE MOVED (`changeOf`). A list called `tasks` with a state called `change` would
      say the same words, so the record decides between the two by whether a figure of that name is declared. */
   if (tail === 'change' && /^[a-z][a-z0-9_-]*$/.test(head)) return { change: head };
@@ -4751,8 +4790,17 @@ function figure(v: Json | undefined): Json | undefined {
  * when the register declares it, so `tasks#1.constructor` is nothing rather than the prototype.
  */
 function valueAt(deps: PageDeps, path: string): Json | undefined {
-  const parsed = pathOf(path);
+  const here = deps.here;
+  const parsed = pathOf(path, here ? deps.schemaOf(here.register)?.fields : undefined);
   if (!parsed) return undefined;
+  /* THE ENTRY'S OWN FIELD, read from the entry in hand. A long field (a document) is named and stays unavailable, as it
+     is on any row: `05 §7.1` makes it an argument and not a figure. */
+  if ('own' in parsed) {
+    const spec = deps.schemaOf(here!.register)!.fields[parsed.own]!;
+    const held = Object.hasOwn(here!.fields, parsed.own) ? here!.fields[parsed.own] : undefined;
+    if (parsed.count) return Array.isArray(held) ? held.length : 0;
+    return FIGURES.has(spec.type) ? figure(held) : undefined;
+  }
   /* A FIGURE'S CHANGE WHEN A FIGURE HAS THE NAME, and otherwise the count of a list's rows in a state called `change`,
      which is what these words read as before a figure could be asked how far it moved. */
   if ('change' in parsed) {
@@ -4761,7 +4809,7 @@ function valueAt(deps: PageDeps, path: string): Json | undefined {
   }
   if ('rowsOf' in parsed) {
     const decl = deps.metric(parsed.rowsOf);
-    if (decl) return rowsValue(deps, decl, parsed.part);
+    if (decl) return rowsValue(deps, decl, parsed.part, parsed.field);
   }
   const said =
     'change' in parsed
@@ -4770,7 +4818,7 @@ function valueAt(deps: PageDeps, path: string): Json | undefined {
         : null
       : 'rowsOf' in parsed
         ? LIST_ID.test(parsed.rowsOf)
-          ? { register: parsed.rowsOf, state: parsed.part }
+          ? { register: parsed.rowsOf, state: parsed.field === undefined ? parsed.part : `first_${parsed.field}` }
           : null
         : parsed;
   if (!said) return undefined;
@@ -4847,18 +4895,22 @@ function dayFieldOf(node: Predicate | undefined, schema: Schema): string | null 
  *
  * - `first` is the first row's title, `names` the first few listed as a person lists them (`namesSaid`), `more` how
  *   many the figure counts besides the first, and `since` the first row's day on the line the figure draws.
+ * - `first_<field>` is one field of that first row, a field its list declares and a reader may be shown, so a sentence
+ *   names the amount beside the name: "{{orders-owed.first}} still owes {{money:orders-owed.first_owed}}".
  * - FIRST IS THE ONE FURTHEST PAST THE LINE: rows are ordered by the first day field the figure's `where` compares,
  *   oldest first, so the task late longest and the person quiet longest lead. A figure that compares no day keeps the
  *   list's own order.
  * - Over a list the reader may not open, or a figure that is not a list's rows, this is nothing, and a lead note then
  *   drops the clause (`leadOf`) as it does any figure it cannot read.
  */
-function rowsValue(deps: PageDeps, decl: MetricDecl, part: RowPart): Json | undefined {
+function rowsValue(deps: PageDeps, decl: MetricDecl, part: RowPart, field?: string): Json | undefined {
   if (!decl.source.startsWith('register.') || !mayRead(deps, decl)) return undefined;
   const register = decl.source.slice('register.'.length);
   const schema = deps.schemaOf(register);
   const title = deps.titleOf(register);
   if (!schema || !title) return undefined;
+  /* A FIELD OF THE FIRST ROW is one its list declares and a reader may be shown: never a document, a ref or a secret. */
+  if (field !== undefined && !(Object.hasOwn(schema.fields, field) && FIGURES.has(schema.fields[field]!.type))) return undefined;
   const said = predicateOf(decl.where, schema, deps.ctx);
   if (said.bad.length) return undefined;
   const by = dayFieldOf(said.predicate, schema);
@@ -4873,6 +4925,11 @@ function rowsValue(deps: PageDeps, decl: MetricDecl, part: RowPart): Json | unde
   /* `first` AND `since` ARE THE SAME ROW, the first with a title, so "Pell & Vine has been quiet since April" is one
      person's name and that person's day. */
   const lead = rows.find((r) => named(r) !== null);
+  /* `first_<field>` IS THE SAME ROW AS `first`, so the name and the amount in "Salma still owes EGP 1,350" are one row's. */
+  if (field !== undefined) {
+    const row = lead ?? rows[0]!;
+    return Object.hasOwn(row.fields, field) ? figure(row.fields[field]) : undefined;
+  }
   if (part === 'since') {
     const day = by === null ? undefined : (lead ?? rows[0]!).fields[by];
     return typeof day === 'string' && day !== '' ? day : undefined;
@@ -4976,11 +5033,18 @@ function stateNamed(deps: PageDeps, register: string, state: string): boolean {
  * open it, and the path draws the dash it drew before.
  */
 function namedAt(deps: PageDeps, path: string): boolean {
-  const parsed = pathOf(path);
+  const parsed = pathOf(path, deps.here ? deps.schemaOf(deps.here.register)?.fields : undefined);
   if (!parsed) return false;
+  if ('own' in parsed) return true;
   if ('metric' in parsed) return figureNamed(deps, parsed.metric);
   if ('change' in parsed) return figureNamed(deps, parsed.change) || stateNamed(deps, parsed.change, 'change');
-  if ('rowsOf' in parsed) return figureNamed(deps, parsed.rowsOf) || stateNamed(deps, parsed.rowsOf, parsed.part);
+  if ('rowsOf' in parsed) {
+    if (parsed.field === undefined) return figureNamed(deps, parsed.rowsOf) || stateNamed(deps, parsed.rowsOf, parsed.part);
+    /* `first_<field>` NAMES A FIELD THE FIGURE'S LIST DECLARES, so `first_ownd` is the author's typo and not a dash. */
+    const decl = deps.metric(parsed.rowsOf);
+    const schema = decl?.source.startsWith('register.') ? deps.schemaOf(decl.source.slice('register.'.length)) : null;
+    return (schema !== null && Object.hasOwn(schema.fields, parsed.field)) || stateNamed(deps, parsed.rowsOf, `first_${parsed.field}`);
+  }
   if ('state' in parsed) return stateNamed(deps, parsed.register, parsed.state);
   const schema = deps.schemaOf(parsed.register);
   if (!schema) return false;

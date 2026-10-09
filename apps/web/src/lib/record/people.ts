@@ -438,7 +438,7 @@ export type Named = { name: string; href?: string | undefined };
 export type Said = { text: string; href?: string | undefined };
 
 /**
- * WHO A PERSON IS, in one line under their name: "Contractor at Encore, on Kiln and Portage." Each part only when the row
+ * WHO A PERSON IS, in one line under their name: "Contractor at Brightwell, on Kiln and Portage." Each part only when the row
  * has it, the organisation and the projects by name and each opening its own page, and nothing at all for a row that has
  * none, so the page says its usual sentence instead.
  */

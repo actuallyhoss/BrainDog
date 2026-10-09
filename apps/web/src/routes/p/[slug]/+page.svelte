@@ -8,7 +8,8 @@
   nothing, are all questions about the URL, and the URL is the route's.
 -->
 <script lang="ts">
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
+  import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { tick, untrack } from 'svelte';
   import PageView from '$lib/page/PageView.svelte';
@@ -20,6 +21,13 @@
   import { pageReader, type Opened } from '$lib/record/page-live.ts';
   import { filterOf, sameFilter } from '$lib/page/filters.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
+  import OfferCard from '$lib/design/OfferCard.svelte';
+  import { offerActs } from '$lib/design/pen.ts';
+  import { pageOffer } from '$lib/design/page-offer.ts';
+  import { penWords } from '$lib/design/words.ts';
+  import { forget } from '$lib/record/boot-live.ts';
+  import { copy } from '$lib/copy.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
 
   const slug = $derived(route.params.slug ?? '');
   const showSource = $derived(route.url.searchParams.get('src') === '1');
@@ -142,6 +150,35 @@
   const strip = $derived(
     tabsOf((route.data as unknown as Shell).nav ?? [], `/p/${slug}`, { order: navPrefs.order, hidden: navPrefs.hidden }),
   );
+
+  /**
+   * THE WEEK OFFER, WHERE SHE IS (use case 6, step 7): her Orders place opens this page, not the list's own screen, so
+   * the one offer for the first list the page reads is drawn here too (`pageOffer`), with the same card and the same two
+   * presses as on the list's screen (`offerActs`). None on the page the offer made, and none until the page has read.
+   */
+  let offerTick = $state(0);
+  const offerActions = offerActs({
+    keep: async (item) => (await import('$lib/design/keep.ts')).keepOffer(apiBase(), item),
+    dismiss: (offerId) => navPrefs.dismiss(offerId),
+    go: async (made) => {
+      forget();
+      await goto(at(`/p/${made}`), { invalidateAll: true });
+    },
+    say: (text, warn) => void toasts.push(text, warn ? { intent: 'warn' } : undefined),
+    changed: () => (offerTick += 1),
+    words: { made: copy.promoted, dismissed: penWords.dismissed, notReached: copy.recordNotReached },
+  });
+  /* `offerTick` IS READ so each press redraws: what the actions hold is plain, and the tick is their one signal. */
+  const offer = $derived.by(() => {
+    void offerTick;
+    if (got?.from !== 'live') return null;
+    const pen = (route.data as unknown as Shell).pen ?? [];
+    return pageOffer(pen, { slug, blocks: got.page.blocks }, { suggest: navPrefs.suggest, gone: (o) => navPrefs.isDismissed(o) || offerActions.hidden(o) });
+  });
+  const offerBusy = $derived.by(() => {
+    void offerTick;
+    return offerActions.busy();
+  });
 </script>
 
 <svelte:window
@@ -151,4 +188,18 @@
 />
 
 {#if strip}<PageTabs {strip} />{/if}
+{#if offer}<div class="page-offer"><OfferCard item={offer} acts={offerActions} busy={offerBusy} /></div>{/if}
 <PageView {slug} {showSource} {got} {reread} />
+
+<style>
+  /* THE CARD SITS ON THE BOARD ABOVE THE PAGE, one tile gap from what follows, as on the list's own screen. The work
+     itself has no gutter (the strip, the head and the body each keep their own), so the card keeps one too, or it ran
+     edge to edge at 390. AND IT GIVES UP WHAT THE DOCKED PANEL TAKES, as the page's `.hosted` does, so a row open
+     beside the page never sits over it: the gutter, or the panel's width when that is more. */
+  .page-offer {
+    padding-block-start: var(--sp-3);
+    padding-inline: var(--gutter) max(var(--gutter), var(--dock-w, 0px));
+    margin-block-end: var(--tile-gap);
+    transition: padding-inline-end var(--d-panel) var(--ease-sheet);
+  }
+</style>

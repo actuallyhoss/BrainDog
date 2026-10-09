@@ -6,7 +6,8 @@
  * name to the guard its group implies.
  *
  * `end` IS A DATA WRITE, as `attach` and `handoff` are in `index.ts`: a token's call needing `propose`, the end hook's
- * one write, and the record picks the state.
+ * one write, and the record picks the state. `beat` IS ONE TOO, in the same group for the same caller, though it changes
+ * no version and writes no history: a session saying it is still working moves its run's clock in place (AGT-C03).
  *
  * THE JOB ROWS ARE HERE, and their methods are in
  * `packages/record/src/jobs.ts`, not beside `triage`. `docs/30-BLUEPRINT.md` §5 has named every one of them since tier C
@@ -19,6 +20,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'usedBy', group: 'READ+', writes: false, what: 'Which runs used one key or one tool, the one that used it last first, each with its agent, its machine, when and how often.',
     takes: { spoken: 'text' } },
   { name: 'end', group: 'DATA', writes: true, what: 'Say this agent’s session closed. Its run ends as done, or waits for the next session when it left a fresh next step. An agent only.' },
+  { name: 'beat', group: 'DATA', writes: true, what: 'Say this agent is still working between writes, so its run reads as working. Nothing is added to its history. An agent only.' },
   { name: 'triage', group: 'DATA', writes: true, what: 'File one arrival from the inbox as a row, set it aside, or put a filed or archived one back.' },
   { name: 'createJob', group: 'JOBS', writes: true, what: 'Start one job of a kind the owner approved. It waits in the queue until a runner claims it.' },
   { name: 'cancelJob', group: 'JOBS', writes: true, what: 'Stop one job. A runner working on it reads the stop and ends it.' },

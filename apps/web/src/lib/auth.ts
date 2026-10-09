@@ -2,7 +2,8 @@
  * Signing in, from the browser's side: the `/auth/*` calls and the WebAuthn half under them.
  *
  * ONLY `/signin` AND SETTINGS IMPORT THIS. The shell never does, so none of it reaches the entry chunk
- * every screen waits for, which is what the bundle gate measures.
+ * every screen waits for, which is what the bundle gate measures. The frame's Sign out (`routes/+layout.svelte`) is the
+ * one reach from the shell, and it is an `import()` made on the press, so this file is still a chunk of its own.
  *
  * NOTHING HERE THROWS AND NOTHING LOGS. Every outcome is a value the screen can tell apart from the
  * others, and a credential goes into one request body and nowhere else: not a console, not a URL, not
@@ -236,6 +237,101 @@ export async function passkeySignIn(io: Io = live()): Promise<Said<Who>> {
 }
 
 /**
+ * Whether this browser offers a site's passkeys in a field's autofill: conditional mediation, as WebAuthn calls it.
+ * Anything that is not a plain yes, a missing function or one that throws included, is no.
+ */
+export async function canAutofill(g: unknown = globalThis): Promise<boolean> {
+  const pkc = (g as { PublicKeyCredential?: { isConditionalMediationAvailable?: unknown } }).PublicKeyCredential;
+  if (typeof pkc?.isConditionalMediationAvailable !== 'function') return false;
+  try {
+    return (await (pkc.isConditionalMediationAvailable as () => Promise<unknown>).call(pkc)) === true;
+  } catch {
+    return false;
+  }
+}
+
+/** A passkey offered in the email field's autofill: `done` is what came of it, `stop` takes the offer away. */
+export type Autofill = {
+  /** A session when somebody picked a passkey from the field, `cancelled` once `stop` ran, or the failure. */
+  done: Promise<Said<Who>>;
+  /** Abort the offer, and answer once the browser has let go of it, with what `done` came to. */
+  stop: () => Promise<Said<Who>>;
+  /**
+   * Whether somebody picked a passkey from the field. A failure before a pick (the challenge would not come, the
+   * browser said no) is nobody's press, so the page keeps it to itself; a failure after one is the host's answer.
+   */
+  readonly picked: boolean;
+};
+
+/** The clock an offer waits on, `setTimeout` outside a test. */
+const timers = {
+  wait: (ms: number, then: () => void): (() => void) => {
+    const t = setTimeout(then, ms);
+    return () => clearTimeout(t);
+  },
+};
+
+/** How long before its challenge runs out a waiting offer is asked again, so a pick never meets a spent challenge. */
+const AUTOFILL_EARLY = 15_000;
+/** The challenge's life when the host does not say, the host's own `timeout`. */
+const CHALLENGE_LIFE = 300_000;
+
+/**
+ * Offer this site's passkeys in the email field's autofill (`autocomplete="username webauthn"`), so a returning phone
+ * signs in with one touch and nothing typed (LCH-A04).
+ *
+ * ONE CHALLENGE AT A TIME. The offer holds the browser's one pending request and one challenge from
+ * `/auth/passkey/assert/options`. A button pressed on the page calls `stop` and waits for it before asking for its own,
+ * because a second request while the first is pending is refused by the browser, which read as "Sign in with a passkey"
+ * failing on the first press and working on the second. An aborted offer is not a strike: its challenge is never
+ * presented, and the host strikes only an assertion. Minting a challenge is a rate (thirty a minute an address).
+ *
+ * A PAGE LEFT OPEN STAYS ABLE TO SIGN IN. A waiting offer is asked again a little before its challenge runs out, which
+ * is one more mint every five minutes, far under the host's rate.
+ */
+export function passkeyAutofill(io: Io = live(), clock: { wait: (ms: number, then: () => void) => () => void } = timers): Autofill {
+  const stopped = new AbortController();
+  let picked = false;
+  const round = async (): Promise<Said<Who>> => {
+    for (;;) {
+      if (stopped.signal.aborted) return { ok: false, kind: 'cancelled' };
+      const asked = await call(io, '/auth/passkey/assert/options', {});
+      if (!asked.ok) return asked;
+      const o = asked.value as AssertionOptions;
+      /* THIS ROUND'S OWN ABORT: `stop` ends it, and so does the challenge running out, which starts the next round. */
+      if (stopped.signal.aborted) return { ok: false, kind: 'cancelled' };
+      const now = new AbortController();
+      const end = () => now.abort();
+      stopped.signal.addEventListener('abort', end, { once: true });
+      let expired = false;
+      const cancel = clock.wait(Math.max(1_000, (o.timeout ?? CHALLENGE_LIFE) - AUTOFILL_EARLY), () => {
+        expired = true;
+        now.abort();
+      });
+      const credential = await assertion(io, o, { mediation: 'conditional', signal: now.signal });
+      cancel();
+      stopped.signal.removeEventListener('abort', end);
+      if (credential.ok) {
+        picked = true;
+        return signedIn(call(io, '/auth/passkey/assert', { credential: credential.value }));
+      }
+      if (!(expired && credential.kind === 'cancelled')) return stopped.signal.aborted ? { ok: false, kind: 'cancelled' } : credential;
+    }
+  };
+  const done = round().catch((): Said<Who> => ({ ok: false, kind: 'refused', fix: null }));
+  return {
+    done,
+    stop: () => {
+      stopped.abort();
+      return done;
+    },
+    get picked() {
+      return picked;
+    },
+  };
+}
+
+/**
  * Run a change to a way in, and when the host answers `stale`, sign in again with a passkey and run it once more.
  *
  * THE EXISTING WAY BACK, AND NOT A NEW ONE. A passkey sign-in on a page already signed in replaces the session with
@@ -251,21 +347,29 @@ async function afresh<T>(io: Io, run: () => Promise<Said<T>>): Promise<Said<T>> 
 }
 
 /**
- * The name a new passkey is given, from the platform that made it.
+ * The name a new passkey is given, from the device that made it (LCH-A04).
  *
  * A LIST OF KEYS THAT ALL SAY "Unnamed" CANNOT BE PRUNED. Recovery asks a person to keep more than one passkey, and
  * then to remove the one on the phone they lost, which they can only do if the rows say which is which. The host has
- * always taken a `label` (`packages/record/src/identity.ts`, `passkey.register`) and nothing sent one. What the
- * browser says about its platform is all there is to go on, so the name is the platform's own word for its
- * authenticator where there is one and "Passkey" everywhere else, never a guess at a model.
+ * always taken a `label` (`packages/record/src/identity.ts`, `passkey.register`). What the browser says about its
+ * platform is all there is to go on, so the name is the device's own word (iPhone, iPad, Mac, Android, Chromebook) or
+ * the platform's word for its authenticator (Windows Hello), and "Passkey" everywhere else, never a guess at a model.
+ * Settings, Identity renames it to anything the person likes (`renamePasskey`).
+ *
+ * AN IPAD SAYS IT IS A MAC. iPadOS asks for desktop pages with the Mac's user agent, and the one thing that tells the
+ * two apart is a touch screen, which no Mac has.
  */
 export function platformLabel(g: unknown = globalThis): string {
-  const nav = (g as { navigator?: { userAgent?: unknown; userAgentData?: { platform?: unknown } } }).navigator;
+  const nav = (g as { navigator?: { userAgent?: unknown; userAgentData?: { platform?: unknown }; maxTouchPoints?: unknown } }).navigator;
   const hint = typeof nav?.userAgentData?.platform === 'string' ? nav.userAgentData.platform : '';
   const ua = `${hint} ${typeof nav?.userAgent === 'string' ? nav.userAgent : ''}`;
+  const touch = typeof nav?.maxTouchPoints === 'number' && nav.maxTouchPoints > 1;
   if (/iPhone/u.test(ua)) return 'iPhone';
+  if (/iPad/u.test(ua) || (/Macintosh/u.test(ua) && touch)) return 'iPad';
   if (/Android/u.test(ua)) return 'Android';
   if (/Windows/u.test(ua)) return 'Windows Hello';
+  if (/CrOS|Chrome OS/u.test(ua)) return 'Chromebook';
+  if (/Macintosh|macOS|Mac OS X/u.test(ua)) return 'Mac';
   return 'Passkey';
 }
 
@@ -319,6 +423,31 @@ export async function passkeys(io: Io = live()): Promise<Said<PasskeyInfo[]>> {
 
 export async function removePasskey(id: string, io: Io = live()): Promise<Said<null>> {
   return afresh(io, () => done(call(io, '/auth/passkey/remove', { id })));
+}
+
+/**
+ * Give one of the person's own passkeys a name (`POST /auth/passkey/rename`, LCH-A04), and answer the passkey as the
+ * host now holds it. What a name may be is the host's to say: one line, at most 64 characters, trimmed, and an empty
+ * one refused with its sentence, which comes back as `refused` with `fix`. A name changes no way in, so no fresh proof.
+ */
+export async function renamePasskey(id: string, label: string, io: Io = live()): Promise<Said<PasskeyInfo>> {
+  const out = await call(io, '/auth/passkey/rename', { id, label });
+  if (!out.ok) return out;
+  const info = passkeyOf(out.value);
+  return info ? { ok: true, value: info } : { ok: false, kind: 'refused', fix: null };
+}
+
+/**
+ * Sign out from the frame's account menu, then load the sign-in screen in full (LCH-A04).
+ *
+ * A FULL LOAD AND NOT A MOVE, for the reason the sign-in page's onward buttons are full loads: everything this tab
+ * holds was read under the session that just ended, and a client-side move would draw it again. `go` is
+ * `location.assign` outside a test. A press that did not end the session leaves the page where it is and answers why.
+ */
+export async function signOutAndLeave(to: string, go: (href: string) => void = (href) => globalThis.location.assign(href), io: Io = live()): Promise<Said<null>> {
+  const out = await signOut(io);
+  if (out.ok) go(to);
+  return out;
 }
 
 /** One live session, as Settings lists it. `ref` tells two apart and opens neither; `record` is `null` for none. */
@@ -529,10 +658,16 @@ async function creation(io: Io, o: RegistrationOptions): Promise<Said<Registrati
   }
 }
 
-async function assertion(io: Io, o: AssertionOptions): Promise<Said<AssertionJSON>> {
+/** `mediation` and `signal` are the autofill's (`passkeyAutofill`): a pressed button asks with neither. */
+async function assertion(
+  io: Io,
+  o: AssertionOptions,
+  how: { mediation?: CredentialMediationRequirement; signal?: AbortSignal } = {},
+): Promise<Said<AssertionJSON>> {
   if (!io.credentials) return { ok: false, kind: 'unsupported' };
   try {
     const cred = (await io.credentials.get({
+      ...how,
       publicKey: {
         ...o,
         challenge: bytes(o.challenge),

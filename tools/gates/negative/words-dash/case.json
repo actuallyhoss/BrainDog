@@ -1,0 +1,8 @@
+{
+  "gate": "words",
+  "rule": "the long dash in a screen's own words",
+  "expect": "the long dash: .*say a comma, a colon or a new sentence",
+  "findings": 1,
+  "total": 1,
+  "why": "A SCREEN'S words.ts IS READ, AND A DASH ALONE IS FORGIVEN. The finding is an escaped dash inside a template, so the reader has to unescape and read templates to find it. The two decoys are a dash alone, written escaped and written plain: the drawn mark for no value, which no sentence holds. The comment's dash is not read at all."
+}

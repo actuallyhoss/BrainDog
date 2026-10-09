@@ -33,6 +33,7 @@ import { copy } from '../copy.ts';
 import { nameWords } from '../record/names.ts';
 import { acceptKey, amountSaid, declineKey, labelOf, twoWords } from '../../routes/decide/press.ts';
 import { words as decideWords } from '../../routes/decide/words.ts';
+import { arrangedOf, isArranging } from '../../routes/decide/[id]/arranged.ts';
 import { spoken } from './spoken.ts';
 
 /* SAID FROM HERE TOO, where every screen that draws a card already reads its words. */
@@ -84,7 +85,7 @@ export type Card = {
   when: string;
   /** When a question put off comes back, and why, or `null`. */
   later: string | null;
-  /** What accepting the lead does, in one line, or empty. */
+  /** What accepting the lead does, in one line, or empty; an arrangement's own summary on every card that is one. */
   does: string;
   /** How many things a joined question changes, or 0. */
   joined: number;
@@ -123,6 +124,8 @@ export type CardContext = {
   lead?: boolean;
   /** The record's own currency, said by its symbol; read from the shell when not handed. */
   home?: string | null;
+  /** The body of a `pack`, `settings` or `arrange` proposal, where the host holds it; the question's `arranged` otherwise. */
+  body?: Record<string, unknown> | null;
 };
 
 const ULID = /[0-9A-HJKMNP-TV-Z]{26}/u;
@@ -271,6 +274,26 @@ function joinedOf(q: QueueQuestion, merge: Merge | null): number {
 }
 
 /**
+ * AN ARRANGEMENT IS SAID IN ITS OWN SUMMARY (REC-A07 step 3): what it sets up, then the keys, updates, feeds and rows it
+ * holds, counted, as its own question page heads its story (`arranged.ts` `arrangedOf`, "Sets this BrainDog up for
+ * Money: 2 keys, 3 updates, 2 feeds."). It takes the place of the general line of what accepting does, and is said on
+ * every card, the lead's or not, since it is what the card is. Read from the body the record filed, which a host hands
+ * as `body` and the queue as the question's `arranged`; empty without one, and the card says what it always said.
+ */
+function arrangementOf(q: QueueQuestion, kind: string, body: unknown): string {
+  if (!isArranging(kind)) return '';
+  const filed = body ?? field(q, 'arranged');
+  if (filed === null || typeof filed !== 'object' || Array.isArray(filed)) return '';
+  const story = arrangedOf(kind, filed as Record<string, unknown>);
+  if (story === null || story.lead === '') return '';
+  const line = story.summary ? copy.arrangeLeadSummary(story.lead, story.summary) : story.lead;
+  /* A LINE WITH NOTHING TO TAKE OUT IS SAID WHOLE: `spoken` reads a last "on" as a word left hanging, and "Turns Money
+     back on" read "Turns Money back". Behind a closing mark it strips itself, that word is kept, so a line it leaves
+     alike had no address or id in it. */
+  return `${spoken(`${line} ·`) === line ? line : spoken(line)}.`;
+}
+
+/**
  * THE CARD, from one question.
  *
  * ACCEPT NAMES ITS AMOUNT AND REJECT SAYS DECLINE, on the record's own two answers (`press.ts` `labelOf`), so a button
@@ -288,8 +311,9 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
     w.key === 'accept' && said !== '' && twoWords(keyed) ? decideWords.acceptFor(said) : labelOf({ key: w.key, title: w.label }, keyed, moves);
   const ways = plain.map((w) => ({ ...w, label: labelled(w) }));
   const merge = queueMergeOf(q, plain.map((w) => w.key));
-  const does = ctx.lead && typeof q.does === 'string' ? spoken(saidOf(q.does)) : '';
   const filed = typeof q.body_kind === 'string' ? q.body_kind : q.kind;
+  const arranged = arrangementOf(q, filed, ctx.body);
+  const does = arranged !== '' ? arranged : ctx.lead && typeof q.does === 'string' ? spoken(saidOf(q.does)) : '';
   const cost = typeof q.cost === 'string' ? q.cost : '';
   return {
     id: q.id,
@@ -377,7 +401,7 @@ export const startsOn = (card: Pick<Card, 'enter' | 'decline' | 'merge'>): strin
 
 /**
  * THE LINE A CARD BECOMES ONCE IT IS ANSWERED. A proposal Slash drafted reads as its history does: "Slash suggested ·
- * Sam accepted", the reader by the name the record gives them. Every other question says what was chosen, by you, and
+ * Mara accepted", the reader by the name the record gives them. Every other question says what was chosen, by you, and
  * when.
  */
 export function answeredLine(card: Pick<Card, 'slash'>, way: Pick<Way, 'key' | 'label' | 'recommended'>, person: string, when: string): string {

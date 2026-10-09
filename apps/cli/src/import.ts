@@ -41,7 +41,8 @@ import { coerce, isPublicMail, looksLikeCredential, type FieldDecl } from '@brai
 import { no, ok, refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
-import { pollPack } from '@braindog/seed/usecases/founder-poll';
+import { fillFeed } from '@braindog/pack-live-feed/fill.ts';
+import FEED from '@braindog/pack-live-feed/live-feed.pack.json' with { type: 'json' };
 
 import { TOOLS, folderCatalogue, gatherAsks, holdsKey, isRef, loadAdapter, loadMap, packFrom, type CatalogueRead, type ImportMap, type Offer, type Plan, type PlannedRow, type Settled, type Skipped } from './adapter.ts';
 import { knownKeys } from './catalogue.ts';
@@ -176,6 +177,12 @@ export type Door = {
    * `packs`: a door without it asks nothing about a home currency.
    */
   home?: () => Promise<Result<{ pack: string; currency: string | null } | null>>;
+  /**
+   * Each placeholder a document holds and whether the record has anything by that name (`checkPaths`, REC-A12), so a
+   * note's `{{...}}` that names nothing can be said before it is written. OPTIONAL like `packs`: a door without it
+   * checks nothing.
+   */
+  checkPaths?: (args: { document: string }) => Promise<Result<{ paths: { path: string; named: boolean }[] }>>;
 };
 
 /**
@@ -1152,8 +1159,8 @@ export async function applyPlan(
   };
 
   /**
-   * A NEW PERSON OR ORGANISATION GOES THROUGH RESOLUTION BEFORE IT IS CREATED, so an imported "Sam" folds into the
-   * owner's own row and an address the record already knows lands on its person rather than a second one.
+   * A NEW PERSON OR ORGANISATION GOES THROUGH RESOLUTION BEFORE IT IS CREATED, so the owner's own name, imported, folds
+   * into the owner's own row and an address the record already knows lands on its person rather than a second one.
    *
    *   1. By key, here: a live row of the list holding one of the row's addresses, keys or handles (`keysOfRow`).
    *   2. By the owner's own names: a person named as the list's `self` row is named, or by one of its aliases.
@@ -1595,28 +1602,42 @@ export async function applyPlan(
     for (const s of settledThere)
       if (decide.open.has(s.key)) waiting.push({ label: s.label, question: s.question, answer: s.status === 'decided' ? `decided there${s.decision ? ` as ${s.decision}` : ''}` : 'dismissed there' });
 
-  /* A POLL IS A PACK TO INSTALL, filed once. Its project and organisation are the rows this import wrote or found. */
+  /* A POLL IS A FILL OF THE LIVE FEED ADD-ON, filed once. Its project and organisation are the rows this import wrote
+     or found. One builder, `fillFeed`, as `braindog feed propose` and the app's form use, so a poll the import files
+     and one he sets up himself are the same add-on, `feed-<id>`.
+
+     AN EARLIER RUN'S `poll-<id>` IS THE SAME POLL. Before the live feed the import filed its own pack under that name,
+     and a record that holds one, or has it waiting on Decide, holds this poll: proposing `feed-<id>` beside it would
+     ask him to approve the same requests to the same address twice. */
   for (const poll of decide === null ? [] : plan.polls) {
-    const pack = `poll-${poll.id}`;
-    if (installs.has(pack)) {
+    const pack = `feed-${poll.id}`;
+    if (installs.has(pack) || installs.has(`poll-${poll.id}`)) {
       report.polls.before++;
+      continue;
+    }
+    const project = poll.project ? ids.get(poll.project) : undefined;
+    const organisation = poll.organisation ? ids.get(poll.organisation) : undefined;
+    let doc: Record<string, unknown>;
+    try {
+      doc = fillFeed(FEED as Record<string, unknown>, {
+        id: poll.id,
+        url: poll.url,
+        every: poll.every,
+        ...(poll.grant ? { grant: poll.grant } : {}),
+        ...(project ? { project } : {}),
+        ...(organisation ? { organisation } : {}),
+        measures: poll.measures,
+      });
+    } catch (e) {
+      /* THE FILL'S OWN SENTENCE, such as an address that is not https:// or an id too long for a poll's name: filed
+         anyway it would be approved and then refused, or never once asked. */
+      report.refused.push({ label: poll.label, register: 'Decide', fix: e instanceof Error ? e.message : `${poll.id} could not be filled.` });
       continue;
     }
     if (o.dryRun) {
       report.polls.filed++;
       continue;
     }
-    const project = poll.project ? ids.get(poll.project) : undefined;
-    const organisation = poll.organisation ? ids.get(poll.organisation) : undefined;
-    const doc = pollPack({
-      id: poll.id,
-      url: poll.url,
-      every: poll.every,
-      ...(poll.grant ? { grant: poll.grant } : {}),
-      ...(project ? { project } : {}),
-      ...(organisation ? { organisation } : {}),
-      measures: poll.measures,
-    });
     const done = await door.propose({ question: `Poll ${hostOf(poll.url)} every ${poll.every} for ${and(poll.measures.map((m) => m.name))}?`, body_kind: 'pack', body: { install: pack, doc } });
     if (!done.ok) {
       if (unreachable(done)) throw new Unreachable();
@@ -2448,6 +2469,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     governance: (a) => client.governance(a),
     propose: (a) => client.call('propose', a),
     meet: (a) => client.call('meet', a),
+    checkPaths: (a) => client.checkPaths(a),
     packs: () => client.packs(),
     /* THE PACK THAT KEEPS A HOME CURRENCY IS WHICHEVER DECLARES THE SETTING, read the way the record reads it
        (`homeCurrency` in `packages/kernel/src/declare.ts`): no pack is named here, so a record set up any way answers. */

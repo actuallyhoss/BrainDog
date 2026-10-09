@@ -264,6 +264,23 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       ].join(' '),
     },
     {
+      /* `nextStepsHidden`: Today's next steps, and Hide keeping them hidden (planner-45 step 6). Home mounts TellOne and
+         WantMore on '/', so hidden draws neither and shown draws whichever the record's first Today calls for. */
+      name: 'nextStepsHidden',
+      what: "Today's next steps, and Hide keeping them hidden (planner-45 step 6)",
+      route: '/',
+      values: [{}, { nextStepsHidden: true }],
+      probe: () => String(document.querySelectorAll('#main [data-want-more], #main [data-tell-one]').length),
+    },
+    {
+      /* `arrivesBy`: the order of the next steps, forwarding first for work that arrives by messages. */
+      name: 'arrivesBy',
+      what: 'the order of the next steps, forwarding first for work that arrives by messages (planner-45 step 6)',
+      route: '/',
+      values: [{}, { arrivesBy: 'messages' }],
+      probe: () => [...document.querySelectorAll('#main [data-want-more] [data-step]')].map((e) => e.getAttribute('data-step')).join(','),
+    },
+    {
       name: 'nav',
       what: 'the order of the rail (19 §3: position lives in a per-user store and wins)',
       route: '/',

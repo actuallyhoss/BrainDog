@@ -57,6 +57,9 @@ import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
 import { workingRuns } from './presence.ts';
 import { SESSION } from './session.ts';
 import { intervalMs } from './pull.ts';
+/* `key-scan.ts` IMPORTS ONLY `coerce.ts` AT RUN TIME, and `coerce.ts` only types, so this adds no load ring. */
+import { KEYS_IN_TEXT } from './key-scan.ts';
+import { holdDays } from './hold.ts';
 
 /** The source a built-in figure over the open questions reads, the same word a `queue` block's source is. */
 export const GOVERNANCE_OPEN = 'governance.open';
@@ -207,8 +210,8 @@ const sign = (id: Sign, name: string, target: { lte: number } | { gte: number },
 /** The source the two figures over the vital signs read: the signs now, and the readings kept a row a day. */
 export const RECORD_VITALS = 'record.vitals';
 
-/** Which of the two a figure is: how many signs read red now, or how many days in a row held none red. */
-export type VitalsDecl = MetricDecl & { vitals: 'red-now' | 'green-days' };
+/** Which of the three a figure is: how many signs read red now, how many are not read yet, or how many days in a row held none red. */
+export type VitalsDecl = MetricDecl & { vitals: 'red-now' | 'green-days' | 'unread-now' };
 
 const SIGNS_RED: VitalsDecl = {
   metric: 'signs-red',
@@ -222,9 +225,23 @@ const SIGNS_RED: VitalsDecl = {
   vitals: 'red-now',
 };
 
+/* HOW MANY SIGNS HAVE NOTHING TO JUDGE BY YET (health-words-43): Health says nought red as "No vital sign needs a look",
+   and this is the count that says how much of the record that line has not seen. NO TARGET: a sign with nothing to
+   judge by yet is nothing wrong, and a fresh record told it missed a mark is audit 38-39 #11 again. */
+const SIGNS_UNREAD: VitalsDecl = {
+  metric: 'signs-unread',
+  name: 'Vital signs not read yet',
+  source: RECORD_VITALS,
+  value: { count: 'id' },
+  window: '1d',
+  compare: 'none',
+  format: 'int',
+  vitals: 'unread-now',
+};
+
 const GREEN_DAYS: VitalsDecl = {
   metric: 'green-days',
-  name: 'Days in a row with no sign red',
+  name: 'Days in a row with every watched sign green',
   source: RECORD_VITALS,
   value: { count: 'id' },
   target: { gte: 1 },
@@ -302,6 +319,48 @@ const KEYS_UNOPENABLE: MetricDecl = {
   format: 'int',
 };
 
+/* ── what the night counts (REC-A17 job 3, REC-A13 job 1) ────────────── */
+
+/** The source of `lists-shrunk`: the night's counts of each list (`night-counts.ts`, `countLists`). */
+export const RECORD_LISTS = 'record.lists';
+
+/** The source of `documents-dead-paths`: the night's walk over the documents (`night-counts.ts`, `deadPaths`). */
+export const RECORD_PATHS = 'record.paths';
+
+/** The series a list's count is kept under, a point a night: `counts:<list>:live` and `counts:<list>:deleted`. */
+export const countsSeries = (list: string, part: 'live' | 'deleted'): string => `counts:${list}:${part}`;
+
+/** The series the dead placeholders are kept under, a point a night. */
+export const DEAD_PATHS_SERIES = 'paths:dead';
+
+/**
+ * Lists holding fewer than the night before with nothing deleted to say why. A list a person deleted from, or one a
+ * sweep cleared of what was deleted long ago, is not counted: the first is in the log, and the second never touches
+ * what is live. What is left is a loss nobody made, which is the class of fault his rows must never meet.
+ */
+const LISTS_SHRUNK: MetricDecl = {
+  metric: 'lists-shrunk',
+  name: 'Lists that shrank with nothing deleted',
+  source: RECORD_LISTS,
+  value: { count: 'id' },
+  target: { lte: 0 },
+  window: '1d',
+  compare: 'none',
+  format: 'int',
+};
+
+/** Placeholders in the record's documents (`{{...}}`) that name nothing here. It names no list. */
+const DOCUMENTS_DEAD_PATHS: MetricDecl = {
+  metric: 'documents-dead-paths',
+  name: 'Placeholders in notes that name nothing',
+  source: RECORD_PATHS,
+  value: { count: 'id' },
+  target: { lte: 0 },
+  window: '1d',
+  compare: 'none',
+  format: 'int',
+};
+
 /** The figures the record answers by id when no declaration holds that id. */
 export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'questions-open': QUESTIONS_OPEN,
@@ -312,11 +371,15 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'feeds-behind': sign('feeds-behind', 'Feeds that are behind', { lte: 0 }, 'int'),
   'rules-fired-7d': sign('rules-fired-7d', 'Rules that ran this week', { gte: 1 }, 'int'),
   'signs-red': SIGNS_RED,
+  'signs-unread': SIGNS_UNREAD,
   'green-days': GREEN_DAYS,
   'rates-age-days': RATES_AGE_DAYS,
   'handoffs-open': HANDOFFS,
   'projects-unplaced': PROJECTS_UNPLACED,
   'keys-unopenable': KEYS_UNOPENABLE,
+  'keys-in-text': KEYS_IN_TEXT,
+  'lists-shrunk': LISTS_SHRUNK,
+  'documents-dead-paths': DOCUMENTS_DEAD_PATHS,
 };
 
 /** The built-in figure called `id`, or `null`; never one `Object.prototype` lends. */
@@ -440,38 +503,45 @@ function dayOfRead(ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz'>): string {
   }
 }
 
-/** The calendar day before `day`, both `YYYY-MM-DD`, as `signs.ts` counts its days. */
-const dayBefore = (day: string): string => new Date(Date.parse(`${day}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-
 /**
- * `signs-red` and `green-days`.
+ * `signs-red`, `signs-unread` and `green-days`.
  *
  * SIGNS RED NOW is the signs read as Health reads them (`readSigns`, handed in as `ctx.signs`), and a sign that reads
  * `none` is not counted either way. A reader with no signs handed in says nothing rather than guess. On a read of a past day it is that day's kept readings, since what a sign read on a day is not read again
  * later. NOTHING, NEVER NOUGHT, when no sign has anything to judge by: an empty record has no red sign and is not well.
  *
- * GREEN DAYS counts back from yesterday, the last day the night has kept, one day at a time: a day counts when at least
- * one sign read green and none read red. A day with no reading, or with every sign `none`, ends the run, so a night
- * that stopped reads nought and not the run before it. Today is never counted, since it is not over. NOTHING, NEVER
- * NOUGHT, when no kept day ever held a sign green or red. One query, however long the run.
+ * GREEN DAYS is the seven-day hold's count (`holdDays`, `hold.ts`): back from yesterday, the days on which every hold
+ * sign read green under an unchanged rule and no hand touched the record. A red, a `none`, a missing reading, a moved
+ * rule or a hand mark ends the run, so a night that stopped reads nought and not the run before it. Today is never
+ * counted, since it is not over. NOTHING, NEVER NOUGHT, when no kept day ever held a sign green or red.
  */
 export function readVitals(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz' | 'signs'>, decl: MetricDecl): Result<Reading> {
   const today = dayOfRead(ctx);
   if ((decl as VitalsDecl).vitals === 'green-days') {
-    const days = sql.all<{ day: string; red: number; green: number }>(
-      `SELECT day, SUM(state = 'red') AS red, SUM(state = 'green') AS green FROM sign_reading
-        WHERE day < ? GROUP BY day ORDER BY day DESC`,
-      today,
-    );
-    if (!days.some((d) => Number(d.red) > 0 || Number(d.green) > 0)) return judged(decl, null, 'no kept day has a sign that read green or red yet');
-    let run = 0;
-    let want = dayBefore(today);
-    for (const d of days) {
-      if (d.day !== want || Number(d.red) > 0 || Number(d.green) === 0) break;
-      run++;
-      want = dayBefore(want);
+    const judgedOnce = sql.one<{ x: number }>("SELECT 1 AS x FROM sign_reading WHERE day < ? AND state IN ('red', 'green') LIMIT 1", today);
+    if (judgedOnce === undefined) return judged(decl, null, 'no kept day has a sign that read green or red yet');
+    /* THE HOLD'S RULES, NOT A LOOSER COUNT OF ITS OWN (PRF-A18): a day counts only when every hold sign read green under
+       the rule of the day after and no hand touched the record (`hold.ts`), so the run Health says and the seven-day
+       hold the scorecard reads are one number. Its sentence says why the run ended. */
+    const hold = holdDays(sql, today);
+    return judged(decl, hold.days, hold.said);
+  }
+  /* SIGNS NOT READ YET are the signs that read `none`, the ones Health puts under Not read yet. On a past day it is that
+     day's kept readings, the person's own marks left out (a `hand` row is not a sign). NOTHING, NEVER NOUGHT, with no
+     signs to count: nought would say every sign was read on a record nobody has read. */
+  if ((decl as VitalsDecl).vitals === 'unread-now') {
+    if (ctx.asOfMs !== undefined) {
+      const kept = sql.one<{ unread: number | null; kept: number | null }>(
+        `SELECT SUM(state = 'none') AS unread, COUNT(*) AS kept FROM sign_reading WHERE day = ? AND sign <> 'hand'`,
+        today,
+      );
+      if (!Number(kept?.kept ?? 0)) return judged(decl, null, 'no sign was kept that day');
+      return judged(decl, Number(kept?.unread ?? 0), 'signs not read that day');
     }
-    return judged(decl, run, 'days in a row, to yesterday, with a sign green and none red');
+    if (ctx.signs === undefined) return judged(decl, null, 'the vital signs are not read here yet');
+    const all = ctx.signs();
+    if (all.length === 0) return judged(decl, null, 'this record has no vital signs to read');
+    return judged(decl, all.filter((s) => s.state === 'none').length, 'signs not read yet');
   }
   if (ctx.asOfMs !== undefined) {
     const kept = sql.one<{ red: number | null; judged: number | null }>(
@@ -640,4 +710,79 @@ function feedsOf(sql: Sql): { everyMs: number; lastGoodMs: number }[] {
     out.push({ everyMs: every, lastGoodMs: Math.max(...last) });
   }
   return out;
+}
+
+/* ── the night's counts, read back (REC-A17 job 3, REC-A13 job 1) ────── */
+
+/** What a person calls a list: its declared name, or its id with `_` as a space. */
+function listNamed(sql: Sql, list: string): string {
+  const name = sql.one<{ name: unknown }>(
+    "SELECT json_extract(body, '$.name') AS name FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND json_valid(body) AND json_extract(body, '$.id') = ?",
+    list,
+  )?.name;
+  const words = list.replace(/_/g, ' ');
+  return typeof name === 'string' && name.trim() !== '' ? name.trim() : words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * `lists-shrunk`: the lists whose live count fell between the two newest nights counted, by more than the deletes the
+ * log holds for that list between them. A list counted the night before and not the last night fell to nought.
+ *
+ * A DELETE IN THE LOG EXPLAINS A FALL, whoever made it, and so does a record-wide erase or a restore to an earlier
+ * moment, each a person's own act. THE SWEEP NEVER COUNTS: it clears what was deleted thirty days ago, which is the
+ * `deleted` count and never the live one. NOTHING, NEVER NOUGHT, before two nights are counted: one night has nothing
+ * to fall from.
+ */
+export function readListsShrunk(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz'>, decl: MetricDecl): Result<Reading> {
+  const live = "grain = 'day' AND substr(series, 1, 7) = 'counts:' AND substr(series, -5) = ':live'";
+  const days = sql.all<{ at: string }>(`SELECT DISTINCT at FROM metric_point WHERE ${live} AND at <= ? ORDER BY at DESC LIMIT 2`, dayOfRead(ctx)).map((d) => d.at);
+  if (days.length < 2) return judged(decl, null, 'the lists have not been counted on two nights yet');
+  const [last, before] = days as [string, string];
+  const points = sql.all<{ series: string; at: string; value: number; wrote_at: string }>(
+    `SELECT series, at, value, wrote_at FROM metric_point WHERE ${live} AND at IN (?, ?)`,
+    last,
+    before,
+  );
+  const listOf = (series: string): string => series.slice('counts:'.length, -':live'.length);
+  const then = new Map(points.filter((p) => p.at === before).map((p) => [listOf(p.series), p]));
+  const now = new Map(points.filter((p) => p.at === last).map((p) => [listOf(p.series), p]));
+  const from = [...then.values()].reduce((m, p) => (p.wrote_at > m ? p.wrote_at : m), '');
+  const to = [...now.values()].reduce((m, p) => (p.wrote_at > m ? p.wrote_at : m), '');
+  const whole = sql.one<{ n: number }>("SELECT count(*) AS n FROM event WHERE kind IN ('erase', 'restore.pitr') AND ts > ? AND ts <= ?", from, to);
+  if (Number(whole?.n ?? 0) > 0) return judged(decl, 0, 'the record was erased from or restored between the two nights, so nothing fell unexplained');
+  const shrunk: string[] = [];
+  for (const [list, p] of then) {
+    const fell = Number(p.value) - Number(now.get(list)?.value ?? 0);
+    if (fell <= 0) continue;
+    /* A ROW DELETED AND SWEPT THE SAME NIGHT IS NO LONGER IN `entry`, so its list is the one its sweep wrote down. */
+    const deleted = sql.one<{ n: number }>(
+      `SELECT count(*) AS n FROM event ev LEFT JOIN entry e ON e.id = substr(ev.target, 7)
+        WHERE ev.kind = 'delete' AND substr(ev.target, 1, 6) = 'entry:' AND ev.ts > ? AND ev.ts <= ?
+          AND COALESCE(e.register, (SELECT json_extract(p.from_v, '$') FROM event p
+                                     WHERE p.target = ev.target AND p.kind = 'purge' AND p.field = 'register' LIMIT 1)) = ?`,
+      p.wrote_at,
+      now.get(list)?.wrote_at ?? to,
+      list,
+    );
+    if (fell > Number(deleted?.n ?? 0)) shrunk.push(listNamed(sql, list));
+  }
+  if (shrunk.length === 0) return judged(decl, 0, 'no list holds fewer than the night before without a delete to say why');
+  const why = 'than the night before with nothing deleted to say why';
+  return judged(decl, shrunk.length, shrunk.length === 1 ? `${shrunk[0]} holds fewer ${why}` : `${shrunk.length} lists hold fewer ${why}, ${shrunk[0]} among them`);
+}
+
+/**
+ * `documents-dead-paths`: how many placeholders in the record's documents name nothing here, by the newest night the
+ * walk kept (`deadPaths`). NOTHING, NEVER NOUGHT, before the walk has been over every document once.
+ */
+export function readDeadPaths(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz'>, decl: MetricDecl): Result<Reading> {
+  const kept = sql.one<{ value: number }>(
+    "SELECT value FROM metric_point WHERE series = ? AND grain = 'day' AND at <= ? ORDER BY at DESC LIMIT 1",
+    DEAD_PATHS_SERIES,
+    dayOfRead(ctx),
+  );
+  if (kept === undefined) return judged(decl, null, 'the notes have not all been read for placeholders yet');
+  const n = Number(kept.value);
+  if (n === 0) return judged(decl, 0, 'every placeholder in the notes names something here');
+  return judged(decl, n, n === 1 ? 'one placeholder in the notes names nothing here' : `${n} placeholders in the notes name nothing here`);
 }

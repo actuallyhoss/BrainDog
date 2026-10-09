@@ -81,7 +81,7 @@ test('a build older than a source file is treated as absent, and the line names 
 
 test('a build newer than every source file runs the browser negatives', () => {
   const out = run(tree({ built: LATER, edited: EARLIER }));
-  for (const gate of BROWSER) assert.ok(out.includes(`${gate}: went red but never named`), `${gate} was not run:\n${out}`);
+  for (const gate of BROWSER) assert.ok(out.includes(['layout', 'a11y'].includes(gate) ? `${gate}: exports no RULES` : `${gate}: went red but never named`), `${gate} was not run:\n${out}`);
 });
 
 test('no build at all still says so', () => {

@@ -9,7 +9,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import { wrote } from '$lib/record/settings-write.ts';
-  import { signOut } from '$lib/auth.ts';
+  import { renamePasskey, signOut, type PasskeyInfo } from '$lib/auth.ts';
   import { PEOPLE } from '$lib/who.ts';
   import { createClient } from '@braindog/client';
   import { untrack } from 'svelte';
@@ -91,6 +91,45 @@
     }
     if (out.ok) s.signedOut = true;
     outSaid = out.ok ? copy.signedOut : copy.signOutFailed;
+  }
+
+  /* ── a passkey's name (LCH-A04) ────────── */
+
+  /**
+   * ONE PASSKEY RENAMED AT A TIME, in place on its own line. A passkey is named for the device that made it
+   * (`platformLabel`), which is right until somebody has two iPhones; this is where it becomes theirs. The answer is
+   * written into the shared list, so Recovery, one area away, shows the new name too.
+   */
+  let keyRenaming = $state<string | null>(null);
+  let typedKey = $state('');
+  let savingKey = $state(false);
+  let keyRefusal = $state('');
+  let keySaid = $state('');
+
+  function startKeyRename(k: PasskeyInfo): void {
+    keyRenaming = k.id;
+    typedKey = k.label ?? '';
+    keyRefusal = '';
+    keySaid = '';
+  }
+
+  async function saveKeyName(e: SubmitEvent): Promise<void> {
+    e.preventDefault();
+    const id = keyRenaming;
+    if (savingKey || id === null) return;
+    savingKey = true;
+    keyRefusal = '';
+    const at = opened();
+    const out = await renamePasskey(id, typedKey);
+    closed(true, at);
+    savingKey = false;
+    if (!out.ok) {
+      keyRefusal = out.kind === 'refused' && out.fix ? out.fix : copy.identityPasskeyNotRenamed;
+      return;
+    }
+    s.liveKeys = s.liveKeys?.map((k) => (k.id === out.value.id ? out.value : k)) ?? null;
+    keyRenaming = null;
+    keySaid = copy.identityPasskeyRenamed(out.value.label ?? copy.passkeyUnnamed);
   }
 
   /* ── your name and sign-in email ────────── */
@@ -374,8 +413,45 @@
       <li><IconWell name="monitor" /><span class="fact-key">{identityWords.here}</span><span class="fact-value">{s.hostAuth?.open && !signedOut ? identityWords.openHost : identityWords.notSignedIn}</span></li>
     {/if}
     {#if !signedOut}
-      {#if passkeysHere}
-        <li><IconWell name="key" /><span class="fact-key">{copy.identityPasskeysWay}</span><span class="fact-value">{copy.identityPasskeys(s.liveKeys?.length ?? 0)}</span></li>
+      {#if passkeysHere && (s.liveKeys?.length ?? 0) > 0}
+        <!-- EACH PASSKEY BY ITS NAME, with Rename on its own line (LCH-A04); the form takes the line's place while open. -->
+        {#each s.liveKeys ?? [] as k (k.id)}
+          {@const name = k.label ?? copy.passkeyUnnamed}
+          <li class="fact-act">
+            <IconWell name="key" /><span class="fact-key">{copy.identityPasskeyWay}</span>
+            {#if keyRenaming === k.id}
+              <form class="rename key-form" onsubmit={saveKeyName}>
+                <label class="identity-label" for="identity-key-name">{copy.identityPasskeyNameLabel}</label>
+                <span class="field rename-field" class:rename-bad={!!keyRefusal}>
+                  <input
+                    class="field-input"
+                    id="identity-key-name"
+                    type="text"
+                    autocomplete="off"
+                    maxlength="64"
+                    bind:value={typedKey}
+                    aria-describedby="identity-key-help"
+                    disabled={savingKey}
+                  />
+                </span>
+                <p class="identity-help" class:identity-bad={!!keyRefusal} id="identity-key-help" role={keyRefusal ? 'alert' : undefined}>
+                  {keyRefusal || copy.identityPasskeyNameHint}
+                </p>
+                <div class="rename-actions">
+                  <Button weight="primary" type="submit" disabled={savingKey}>{savingKey ? copy.identitySaving : copy.identityPasskeySaveName}</Button>
+                  <Button weight="bare" disabled={savingKey} onclick={() => (keyRenaming = null)}>{copy.identityCancel}</Button>
+                </div>
+              </form>
+            {:else}
+              <span class="fact-value">{name}</span>
+              <span class="fact-do">
+                <Button weight="bare" onclick={() => startKeyRename(k)} aria-label={copy.identityRenamePasskeyOf(name)}>{copy.identityRenamePasskey}</Button>
+              </span>
+            {/if}
+          </li>
+        {/each}
+      {:else if passkeysHere}
+        <li><IconWell name="key" /><span class="fact-key">{copy.identityPasskeysWay}</span><span class="fact-value">{copy.identityPasskeys(0)}</span></li>
       {/if}
     {/if}
     <!-- A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD was told "Can read, cannot change": the shell's
@@ -383,6 +459,7 @@
          What they hold is the lists, so the lists are named. -->
     <li><IconWell name="rows" /><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{me.lists && me.lists.length > 0 ? namesOf(me.lists) : (copy.levelMeans[me.level] ?? me.level)}</span></li>
   </ul>
+  {#if keySaid}<p class="hint" role="status">{keySaid}</p>{/if}
   <p class="hint">{copy.identityOutside}</p>
   {#if moving}<p class="hint" role="status">{copy.identityEmailMoving}</p>{/if}
   {#if movedSaid}<p class="hint" role="status">{movedSaid}</p>{/if}
@@ -578,6 +655,22 @@
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: 18px;
+  }
+
+  /* A LINE WITH ITS OWN ACTION: Rename at the end, across both of the line's rows; the form spans the words and it. */
+  .facts li.fact-act {
+    grid-template-columns: var(--well) minmax(0, 1fr) auto;
+  }
+
+  .fact-do {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .key-form {
+    grid-column: 2 / -1;
+    margin-block-end: 0;
   }
 
   .fact-value {

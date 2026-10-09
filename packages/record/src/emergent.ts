@@ -218,7 +218,7 @@ function pagesOffered(deps: PenDeps): PenItem[] {
       kind: 'page',
       register: list.id,
       title: list.name,
-      why: `${list.name} has ${list.rows.toLocaleString('en')} ${list.rows === 1 ? 'row' : 'rows'} and no page yet.`,
+      why: `${list.name} has ${list.rows.toLocaleString('en')} ${list.rows === 1 ? 'entry' : 'entries'} and no page yet.`,
       change: { to: { id: `page.${slug}`, kind: 'page', body } },
       list: list.id,
       draft: { id: `page.${slug}`, kind: 'page', body },

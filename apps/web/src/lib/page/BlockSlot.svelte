@@ -368,7 +368,7 @@
   }
 
   /* ── a folded group, opened in place ───────────────────────────────────────
-     A CARD BLOCK IN GROUPS FOLDS EACH LONG GROUP behind "Show all 4 people at Encore" (`blocks.ts` `groupedSegments`),
+     A CARD BLOCK IN GROUPS FOLDS EACH LONG GROUP behind "Show all 4 people at Brightwell" (`blocks.ts` `groupedSegments`),
      which went to the organisation's page. It opens here instead (`group-open.ts`): the block drawn a second time with
      nothing folded, and the groups pressed taken from that drawing. The organisation's name over a group is still the
      door to its page. NOT ON A BLOCK THAT IS A SLICE of its list, whose groups hold only the cards it was sent: there the

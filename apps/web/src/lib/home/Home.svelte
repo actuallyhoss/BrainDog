@@ -28,6 +28,8 @@
   import { VOICE_LINES, homeSlugOf } from '$lib/voice.ts';
   import type { LiveBlock, Opened } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
+  import { may } from '$lib/record/may.ts';
+  import { live as moving } from '$lib/data/live.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -36,7 +38,30 @@
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
   import { holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
-  import { drawsAny, homeDrawn, railed, slashLineOf, todayHome, type Holds, type HomeVoice, type HomeWaits } from '$lib/home/default-home.ts';
+  import {
+    FIRST_TODAY_MOST,
+    TELL_LINE,
+    drawsAny,
+    homeDrawn,
+    railed,
+    slashLineOf,
+    todayHome,
+    weekOf,
+    type Holds,
+    type HomeVoice,
+    type HomeWaits,
+    type WeekDecl,
+  } from '$lib/home/default-home.ts';
+  import { addedByHand, showTell, tellLists, wantMore } from '$lib/home/first-today.ts';
+  import TellOne from '$lib/home/TellOne.svelte';
+  import WantMore from '$lib/home/WantMore.svelte';
+  import { read as readPref } from '$lib/pref.ts';
+  import { REGISTERS, TITLES } from '$lib/record/held.ts';
+  import { learn } from '$lib/record/remote.ts';
+  import { madeSteps } from '$lib/start/made.ts';
+  import { playedBy } from '$lib/start/parts.ts';
+  import type { TellOptions } from '$lib/tell/read.ts';
+  import { createClient } from '@braindog/client';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { words } from '$lib/home/words.ts';
@@ -56,6 +81,12 @@
    */
   const today = $derived(new Date(data.now).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }));
 
+  /** The same day as `YYYY-MM-DD`, which the card reads "Friday" against. */
+  const dayOn = (now: number): string => {
+    const d = new Date(now);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
   /* THE TITLE IS THE VOICE'S WORD FOR HOME WHEN A USE CASE SAYS ONE, else Today. */
   const title = $derived.by(() => {
     const voiced = said('home');
@@ -70,19 +101,116 @@
      body arranged is the body drawn. */
   const voice = $derived<HomeVoice>(voiceOf(said));
 
-  /* WHAT TODAY'S BODY IS BUILT AROUND, read off the shell, by that same mode's helper: a block over a list the record
-     does not keep is not asked for. It carries one of the tasks list as the record words it (`one`), which names the
-     line a task is typed into, read again when the voice is heard so a list renamed in Settings › Words renames the
-     line too. */
-  const holds = $derived<Holds>(holdsOf(data, heard()));
-  const one = $derived(holds.one);
-
   /**
    * ONLY A PAGE THE RECORD HOLDS IS ASKED FOR. A use case may declare no Home page (a reading club shared as a file), and
    * asking for `home-<use case>` anyway logged a refusal on every Home load. `boot` names every page, so the use case's
    * page is asked for when it is there, then the record's `home` when that is, and otherwise Today's body is drawn.
    */
   const declares = $derived(homeSlugOf(homePage(), data.pages));
+
+  /* ── a first Today: use case 6, steps 5 and 6 (planner-45, the onboarding target) ──────────────────── */
+
+  /**
+   * EVERY LIST THE RECORD HOLDS, the empty ones too, with how many entries each holds as `boot` counted them: what
+   * `first-today.ts` reads. `index.registers` is the rail's and leaves the empty lists out.
+   */
+  const kept = $derived({
+    registers: data.lists.map((l) => ({
+      id: l.id,
+      name: l.name,
+      count: counted ? (counted.get(l.id) ?? 0) : (data.index.registers.find((r) => r.id === l.id)?.count ?? 0),
+    })),
+  });
+  const added = $derived(addedByHand(kept));
+
+  /** The device's own preferences: whether the next steps are hidden, and how her work arrives. Read again on Hide. */
+  let prefs = $state(readPref());
+  /** The card was pressed here: it goes at once and the next steps take its place, before `boot` counts what it added. */
+  let pressed = $state(false);
+  /**
+   * HOW MANY EACH LIST HOLDS, AS `boot` COUNTS THEM AGAIN after the press, each time the record moves: the shell's count
+   * is the one it was loaded with, so without this an Undo of what the card added left Today on the next steps.
+   */
+  let counted = $state<Map<string, number> | null>(null);
+  let counting = 0;
+  $effect(() => {
+    if (!pressed) return;
+    void moving.version;
+    const mine = ++counting;
+    const base = apiBase();
+    void import('$lib/record/boot-live.ts')
+      .then((m) => m.rereadBoot(base))
+      .then((got) => {
+        if (mine === counting && got.from === 'live') counted = new Map(got.boot.registers.map((r) => [r.id, r.count]));
+      })
+      .catch(() => undefined);
+  });
+  const told = $derived(pressed && counted === null);
+
+  /* ONLY WHO KEEPS THE RECORD AND MAY ADD TO IT: a colleague held to their own lists, or one who only reads, is not
+     onboarded on somebody else's record. */
+  const first = $derived(!data.refused && data.lists.length > 0 && landing(data) === null && may(data, 'append'));
+
+  /* THE CARD, ON A RECORD WHERE NOTHING IS ADDED BY HAND YET, until it is pressed, and again once an Undo empties it. */
+  const tell = $derived(first && !told && showTell(kept, prefs));
+
+  /* THE NEXT STEPS, under Today's blocks, on a first Today only: a record kept for months is not offered them, and its
+     Today reads as it did. Gone for good once hidden (`nextStepsHidden`). */
+  const steps = $derived.by(() => {
+    if (!first || prefs.nextStepsHidden === true || added > FIRST_TODAY_MOST) return [];
+    return told ? madeSteps(kept.registers.map((r) => r.id), prefs.arrivesBy) : wantMore(kept, prefs);
+  });
+
+  /**
+   * WHAT THE RECORD DECLARES ITS LISTS TO BE, which the card reads a sentence against and Today's week is found in. A
+   * tab learns a list's declaration when a reader first asks (`learn`); Home asks for the lists it has not learnt only
+   * where it needs them: while the card shows, and where Today's own body is drawn. `learnt` moves when they land.
+   */
+  let learnt = $state(0);
+  const asked = new Map<string, Promise<void>>();
+  $effect(() => {
+    if (data.refused || (declares !== null && !tell)) return;
+    const missing = data.lists.map((l) => l.id).filter((id) => REGISTERS[id] === undefined);
+    /* ALL OF THEM LEARNT ALREADY: said once, so a later read of the shell does not draw Today's body again for nothing. */
+    if (missing.length === 0) {
+      if (untrack(() => learnt) === 0) learnt = 1;
+      return;
+    }
+    const client = createClient({ base: apiBase() });
+    void Promise.all(missing.map((id) => learn(client.schema, id, asked))).finally(() => (learnt += 1));
+  });
+  /** The lists' declarations as this tab has learnt them, read again each time more land. */
+  const decls = $derived.by((): WeekDecl[] => {
+    void learnt;
+    return data.lists.flatMap((l) => (REGISTERS[l.id] ? [REGISTERS[l.id]!] : []));
+  });
+
+  /** The record's week, on Today's own body only: a page the record declares draws what it declares. */
+  const week = $derived(declares === null ? weekOf(decls, playedBy('meets')) : undefined);
+
+  /* WHAT TODAY'S BODY IS BUILT AROUND, read off the shell, by that same mode's helper: a block over a list the record
+     does not keep is not asked for. It carries one of the tasks list as the record words it (`one`), which names the
+     line a task is typed into, read again when the voice is heard so a list renamed in Settings › Words renames the
+     line too. And the record's week, where Today's own body is drawn over one. */
+  const holds = $derived<Holds>(week ? { ...holdsOf(data, heard()), week } : holdsOf(data, heard()));
+  const one = $derived(holds.one);
+
+  /** The entries of a list as this tab has named them, by the number a person can say. */
+  const knownIn = (register: string | null | undefined) => [...(register ? (TITLES.get(register) ?? []) : [])].map(([seq, name]) => ({ seq, name }));
+
+  /** What the card reads a sentence against: the lists, her day, the record's currency, its people and accounts. */
+  const tellOptions = $derived.by((): TellOptions => {
+    void learnt;
+    const lists = tellLists(kept, REGISTERS);
+    const into = lists.flatMap((l) => l.fields.filter((f) => f.type === 'ref' && f.required && /account/i.test(`${f.id} ${f.label ?? ''}`)).map((f) => f.to));
+    return {
+      lists,
+      today: dayOn(data.now),
+      currency: data.index.currency,
+      people: knownIn(playedBy('meets')),
+      accounts: into.flatMap((to) => knownIn(to)),
+    };
+  });
 
   /** The record's answer for Home's page, `null` while it is out or when this host cannot draw Today's body. */
   let got = $state<Opened | null>(null);
@@ -112,6 +240,8 @@
     /* A RECORD THAT REFUSED `boot` REFUSES THIS TOO, and each refusal is written into its log. */
     if (data.refused) return;
     const slug = declares;
+    /* TODAY'S OWN BODY WAITS FOR THE LISTS' DECLARATIONS, so a record that keeps a week opens on it and is not drawn twice. */
+    if (slug === null && learnt === 0) return;
     const spoken = voice;
     const held = holds;
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
@@ -156,6 +286,12 @@
      still out (`aria-busy`), on top of Home's own read already being out. */
   listen(reread, () => reading || typing() || document.querySelector('main [aria-busy="true"]') !== null);
 
+  /** After the card's press: it goes, the next steps come, and Today's body is read again, so what it added is drawn at once. */
+  function toldOne() {
+    pressed = true;
+    void reread();
+  }
+
   const live = $derived(got?.from === 'live' ? got : null);
 
   /* WHAT WAITS AND WHO IS WORKING, AS `boot` SAYS IT (EXP-E07): the rail's badge and this header say one number, and the
@@ -166,7 +302,7 @@
   });
 
   /* THE PAGE AS HOME DRAWS IT: its line lifted into the head, each row once, and nothing drawn that holds nothing. */
-  const shaped = $derived(live ? homeDrawn(live.page.blocks, live.now, voice, one, waits) : null);
+  const shaped = $derived(live ? homeDrawn(live.page.blocks, live.now, voice, one, waits, declares === null ? holds.week : undefined) : null);
 
   /* THE LINE `boot`'S COUNTS SAY BY THEMSELVES, for a page that draws nothing it can be counted from; `null` while nothing
      waits, which is the only time the calm line may be said. */
@@ -211,7 +347,7 @@
   const calm = $derived((shaped !== null && !drawsAny(shaped.blocks)) || (settled && got === null));
 
   /* A RECORD WITH NO LISTS AT ALL goes to the prompt (`+layout.ts`); this is what is left if it is reached anyway. */
-  const empty = $derived(data.index.registers.length === 0 && data.open === 0);
+  const empty = $derived(data.index.registers.length === 0 && data.lists.length === 0 && data.open === 0);
 
   /* WHERE A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD LANDS (`landing.ts`), and `null` for everybody else. */
   const lands = $derived(landing(data));
@@ -253,8 +389,8 @@
   {title}
   icon="today"
   kicker={today}
-  sentence={slashed ? slashSaid : lead?.text}
-  needs={slashed ? undefined : lead?.needs || undefined}
+  sentence={tell ? TELL_LINE : slashed ? slashSaid : lead?.text}
+  needs={tell || slashed ? undefined : lead?.needs || undefined}
   actions={capture && wide.current ? headCapture : undefined}
   below={capture && !wide.current ? headCapture : undefined}
 />
@@ -301,6 +437,9 @@
     <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain. -->
     {#if data.live}<ClearExamples />{/if}
 
+    <!-- A FIRST TODAY OPENS ON THE CARD: one real thing, read into the entries it becomes, added on one press. -->
+    {#if tell}<TellOne options={tellOptions} onadded={toldOne} />{/if}
+
     {#if calm && lands}
       <!--
         A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS TOLD WHICH LIST IS THEIRS, and is never told the record is
@@ -330,6 +469,9 @@
         <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} />
       </div>
     {/if}
+
+    <!-- AND UNDER TODAY'S BLOCKS, THE NEXT STEPS, until they are hidden. -->
+    {#if steps.length > 0}<WantMore {steps} onhide={() => (prefs = readPref())} />{/if}
   {/if}
 </div>
 
