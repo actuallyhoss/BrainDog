@@ -233,7 +233,7 @@ test('MARIAM: HER SHOP\'S ORDERS, READ THROUGH ITS OWN PAGE ON THREE WEEKS, is o
   assert.ok(offer, `Orders was not offered its week: ${JSON.stringify(pen.map((i) => i.id))}`);
   assert.equal(offer.why, 'Orders has 4 due this week. Give them a page of their own?');
   const body = offer.change.to.body as { nav: { section: string }; blocks: { kind: string; heading?: string; source?: string }[] };
-  assert.equal(body.nav.section, 'Shop', 'the week page was not offered beside the Orders page');
+  assert.equal(body.nav.section, 'Orders', 'the week page was not offered beside the Orders page');
   assert.deepEqual(body.blocks.map((b) => b.heading ?? b.kind), ['stat', 'Due this week', 'Owed', 'Running low']);
   assert.equal(body.blocks.at(-1)!.source, 'register.products');
 });

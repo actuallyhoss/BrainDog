@@ -100,6 +100,7 @@ type Dir = InstanceType<Bundle['Directory$']> & {
   knows(record: string): Promise<boolean> | boolean;
   close(record: string): unknown;
   resolve(slug: string): Promise<{ record: string; slug: string } | null> | { record: string; slug: string } | null;
+  drill(call: { op: 'read' } | { op: 'put'; drill: object }): unknown;
 };
 
 /**

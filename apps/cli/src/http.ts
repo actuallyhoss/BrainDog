@@ -22,7 +22,7 @@ export type Held = { value: string; expires: string; label: string };
 /** `docs/48-SPEC-CLI.md` §4.1, with the vault grants of the plan's §2.3. */
 export type HostsFile = {
   default?: string;
-  hosts: Record<string, { token?: Held; runner?: Held; vault?: Record<string, { value: string; expires: string }> }>;
+  hosts: Record<string, { token?: Held; runner?: Held; shape?: Held; vault?: Record<string, { value: string; expires: string }> }>;
 };
 
 /** The budget of one tool call. The plan's §1.7 sets twenty seconds. */

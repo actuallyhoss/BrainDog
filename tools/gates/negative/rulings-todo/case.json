@@ -1,0 +1,8 @@
+{
+  "gate": "rulings",
+  "rule": "a ruling whose test is todo and whose page line does not say what it waits on",
+  "expect": "has a test marked todo",
+  "findings": 1,
+  "total": 1,
+  "why": "THE PAGE CALLS IT BUILT AND THE TEST KNOWS IT IS NOT: ruling 901's one test is marked todo, and its line on the page has no \"waits on\"."
+}

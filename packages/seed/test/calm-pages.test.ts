@@ -58,9 +58,15 @@ test('EVERY PAGE THAT IS NOT ABOUT ONE ROW OPENS ON ITS LINE', () => {
 test(`NO PAGE SHOWS MORE THAN ${ABOVE_THE_FOLD} TILES BEFORE THE REST IS FOLDED SHUT`, () => {
   for (const [slug, page] of pages) {
     const leads = page.blocks.filter((b) => b.lead && b.when !== undefined).map((b) => b.when!);
+    /* AND A NOTE SAYING "MORE THAN ONE" BESIDE ITS TWIN SAYING "ONE" (`gt: n` and `is: n` on one figure, as Health says
+       how many signs are unread): only one of the two draws, so the pair is one tile. */
+    const twinOf = (b: Block): boolean =>
+      b.kind === 'note' &&
+      b.when?.gt !== undefined &&
+      page.blocks.some((o) => o !== b && o.kind === 'note' && o.when?.metric === b.when!.metric && o.when?.is === b.when!.gt);
     const standsIn = (b: Block): boolean =>
       b.when !== undefined &&
-      (b.when.lt !== undefined || leads.some((w) => w.metric === b.when!.metric && w.lt !== undefined && b.when!.gte === w.lt));
+      (b.when.lt !== undefined || twinOf(b) || leads.some((w) => w.metric === b.when!.metric && w.lt !== undefined && b.when!.gte === w.lt));
     const main = page.blocks.filter((b) => b.area !== 'rail');
     const fold = main.findIndex((b) => b.kind === 'section' && b.fold === true);
     /* A BOXED SECTION AND THE BLOCKS AFTER IT, UP TO THE NEXT SECTION, ARE ONE TILE, as the app draws them (`boxesOf` in

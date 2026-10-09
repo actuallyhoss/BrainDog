@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "a subject past 72 characters",
+  "expect": "subject of \\d+ characters, and a subject is at most",
+  "findings": 1,
+  "total": 1,
+  "why": "A 96-CHARACTER SUBJECT, the median the scope measured since 2 October. One good commit beside it, so the count proves the rule reads each commit and not the range."
+}

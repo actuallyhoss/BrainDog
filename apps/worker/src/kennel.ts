@@ -32,8 +32,8 @@
 
 import { httpStatus } from '@braindog/host';
 import { clearCookie, readSid, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
-import { emptyCatalogue, readCatalogue, type CatalogueIndex } from '@braindog/declare/catalogue';
-import { installedIdOf, listedEntries } from '@braindog/declare/catalogue';
+import { emptyCatalogue, readCatalogue, type CatalogueEntry, type CatalogueIndex, type CatalogueVersion, type EntryKind } from '@braindog/declare/catalogue';
+import { catalogueFile, fileChecksum, installedIdOf, listedEntries, offeredVersion } from '@braindog/declare/catalogue';
 import {
   acceptSubmission,
   emptyPublishers,
@@ -281,7 +281,7 @@ async function readingIndex(blobs: KennelBucket | undefined): Promise<CatalogueI
  * THE WAITING COPY IS ASKED LAST, and only on a miss, because it costs a read of the index: it answers only in the
  * moment between a listing's commit and its copy, or for a copy that never landed (`Change`).
  */
-async function fileOf(deps: KennelDeps, path: string): Promise<string | null> {
+async function fileOf(deps: Pick<KennelDeps, 'blobs' | 'assets'>, path: string): Promise<string | null> {
   const blobs = deps.blobs;
   if (blobs === undefined) return bundledFile(deps.assets, path);
   const kept = await blobs.get(PREFIX + path);
@@ -348,6 +348,186 @@ export async function writeCounts(deps: CountsDeps, held: ReadonlyMap<string, nu
   }
   await deps.blobs.put(PREFIX + COUNTS, JSON.stringify({ at: now.toISOString(), counts }), JSON_FILE);
   return Object.keys(counts).length;
+}
+
+/* ── one reader for installs ────────────────────────────────────────────── */
+
+/** One version as a record would install it: its entry, the version the index lists, and the file, its checksum held. */
+export type KennelFound = { entry: CatalogueEntry; version: CatalogueVersion; text: string };
+
+/** What `kennelReader` answers: the merged index, a file by its catalogue path, and one version checked whole. */
+export type KennelReader = {
+  /**
+   * The index a host installs from: the bundled catalogue and the Kennel's merged (`mergeIndexes`), EVERY ENTRY KEPT,
+   * `unlisted` ones and yanked versions included, because install by id reads them where a listing does not.
+   */
+  index(): Promise<CatalogueIndex>;
+  /** A published file or preview by its catalogue path, as `GET` serves it (`fileOf`), or `null`. */
+  file(path: string): Promise<string | null>;
+  /**
+   * One version and its file, or why not: an id or a version the index does not hold, a file that is not there, or a
+   * file whose checksum is not the one the index lists (`CHECKSUM_MISMATCH`). A yanked version is answered with its
+   * `yanked` reason, for the caller to offer or refuse.
+   */
+  version(kind: EntryKind, id: string, version: string): Promise<Result<KennelFound>>;
+};
+
+/**
+ * The Kennel read the way a host installs from it (SHL-B05's port is built over this, in `catalogue.ts`). THE SAME TWO
+ * READS THE PUBLIC DOORS MAKE, `mergeIndexes` over the bundled index and the Kennel's and `fileOf` for a file, so what a
+ * record installs by id is what `GET index.json` and `GET packs/...` serve, unlisted entries included. A Kennel index
+ * that does not read is the bundled catalogue alone, as a reader is served it; only a write refuses on it.
+ */
+export function kennelReader(deps: Pick<KennelDeps, 'blobs' | 'assets'>): KennelReader {
+  const index = async (): Promise<CatalogueIndex> => mergeIndexes(await bundledIndex(deps.assets, false), await readingIndex(deps.blobs));
+  const file = (path: string): Promise<string | null> => fileOf(deps, path);
+  return {
+    index,
+    file,
+    async version(kind, id, version) {
+      const entry = (await index()).entries.find((e) => e.kind === kind && e.id === id);
+      const said = kind === 'pack' ? 'add-on' : 'use case';
+      if (entry === undefined) return no('REF_UNKNOWN', `The catalogue holds no ${said} ${id}.`, { at: 'id' });
+      const listed = entry.versions.find((v) => v.version === version);
+      if (listed === undefined) return no('REF_UNKNOWN', `The catalogue holds ${entry.title} at ${entry.latest}, not at ${version}.`, { at: 'version' });
+      const text = await file(catalogueFile(id, version, kind));
+      if (text === null) return no('UNREACHABLE', `${entry.title} ${version} is listed, but its file is not there just now. Ask again in a moment.`, { at: 'version' });
+      if ((await fileChecksum(text)) !== listed.checksum)
+        return no('CHECKSUM_MISMATCH', `The file served for ${entry.title} ${version} is not the one the catalogue lists, so nothing was installed from it.`, { at: 'checksum' });
+      return ok({ entry, version: listed, text });
+    },
+  };
+}
+
+/* ── the four vital signs ───────────────────────────────────────────────── */
+
+/** How old `counts.json` may be before its sign is red: a night missed, and half a night more. */
+export const COUNTS_FRESH_MS = 36 * 3_600_000;
+/** How long the oldest submission may wait for review before its sign is red. */
+export const REVIEW_LATE_MS = 7 * 86_400_000;
+/** The most entries the index sign checks a file for in one night, newest version each. */
+export const VITAL_FILES_MOST = 500;
+
+/**
+ * One of the Kennel's four vital signs (SHL-B01 job 5), as the night's note in the ops record says it: which sign,
+ * whether it is well, and its line. A RED LINE CARRIES A MARK AND A WORD, never colour alone.
+ */
+export type KennelSign = { sign: 'index' | 'counts' | 'review' | 'outside'; ok: boolean; line: string };
+
+const well = (sign: KennelSign['sign'], line: string): KennelSign => ({ sign, ok: true, line: `✓ ${line}` });
+const red = (sign: KennelSign['sign'], line: string): KennelSign => ({ sign, ok: false, line: `✗ ${line} Needs a look.` });
+
+/** Up to three names, and how many more. */
+const someOf = (names: readonly string[]): string => (names.length <= 3 ? names.join(', ') : `${names.slice(0, 3).join(', ')} and ${String(names.length - 3)} more`);
+
+/** A span as the note says it: hours under two days, days after. */
+const ago = (ms: number): string => {
+  const hours = Math.max(0, Math.floor(ms / 3_600_000));
+  if (hours < 1) return 'under an hour';
+  if (hours < 48) return hours === 1 ? '1 hour' : `${String(hours)} hours`;
+  return `${String(Math.floor(hours / 24))} days`;
+};
+
+const why = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/**
+ * The Kennel's four vital signs for one night, in the order the note says them:
+ *
+ * 1. THE INDEX EQUALS ITS FILES. The bundled catalogue is `packs/` at the deployed commit (`from-packs`), so every
+ *    entry's newest version, bundled or the Kennel's, is fetched as a reader is served it and held to the checksum the
+ *    index lists. A file changed under a published version, or one that is gone, is named.
+ * 2. `counts.json` IS YOUNGER THAN 36 HOURS AND EVERY NUMBER IS ONE OF THE FIVE STEPS (`roundCount`).
+ * 3. HOW MANY SUBMISSIONS WAIT, AND THE AGE OF THE OLDEST: red past `REVIEW_LATE_MS`.
+ * 4. HOW MANY LISTED ADD-ONS HAVE A PUBLISHER THAT IS NOT BRAINDOG, the measure of strangers publishing (RQ-SHL-326).
+ *    None is red: it stays the open measure until a stranger's add-on is listed. An unlisted one, the probe's among
+ *    them, and one whose every version is yanked are not counted.
+ *
+ * EACH SIGN IS ITS OWN: a file that does not read is that sign's red line, and the others are still said. The walk
+ * calls this after the counts are written, so sign 2 reads tonight's file.
+ */
+export async function kennelVitals(deps: CountsDeps, now: Date): Promise<KennelSign[]> {
+  let indexes: Indexes;
+  try {
+    const kennel = (await stored(deps.blobs, INDEX, catalogueOf, () => emptyCatalogue('BrainDog Kennel'))).value;
+    indexes = { merged: mergeIndexes(await bundledIndex(deps.assets, true), kennel), kennel };
+  } catch (e) {
+    op({ op: 'kennel.vitals', sign: 'index', ok: false, error: why(e) }, 'error');
+    indexes = { failed: 'the catalogue index does not read' };
+  }
+  return [await indexSign(deps, indexes), await countsSign(deps.blobs, now), await reviewSign(deps.blobs, indexes, now), outsideSign(indexes)];
+}
+
+type Indexes = { merged: CatalogueIndex; kennel: CatalogueIndex } | { failed: string };
+
+async function indexSign(deps: CountsDeps, indexes: Indexes): Promise<KennelSign> {
+  if ('failed' in indexes) return red('index', `Kennel index: ${indexes.failed}.`);
+  const differ: string[] = [];
+  const entries = indexes.merged.entries.slice(0, VITAL_FILES_MOST);
+  for (const entry of entries) {
+    const listed = entry.versions.find((v) => v.version === entry.latest) ?? entry.versions[0];
+    if (listed === undefined) continue;
+    try {
+      const text = await fileOf(deps, catalogueFile(entry.id, listed.version, entry.kind));
+      if (text === null || (await fileChecksum(text)) !== listed.checksum) differ.push(`${entry.title} ${listed.version}`);
+    } catch (e) {
+      op({ op: 'kennel.vitals', sign: 'index', ok: false, error: why(e) }, 'error');
+      differ.push(`${entry.title} ${listed.version}`);
+    }
+  }
+  const total = String(entries.length);
+  return differ.length === 0
+    ? well('index', `Kennel index: all ${total} published files match it.`)
+    : red('index', `Kennel index: ${String(differ.length)} of ${total} files differ from it or are missing (${someOf(differ)}).`);
+}
+
+async function countsSign(blobs: KennelBucket, now: Date): Promise<KennelSign> {
+  let doc: unknown;
+  try {
+    const kept = await blobs.get(PREFIX + COUNTS);
+    if (kept === null) return red('counts', 'Kennel counts: never written.');
+    doc = JSON.parse(await kept.text()) as unknown;
+  } catch (e) {
+    op({ op: 'kennel.vitals', sign: 'counts', ok: false, error: why(e) }, 'error');
+    return red('counts', 'Kennel counts: the file does not read.');
+  }
+  const map = typeof doc === 'object' && doc !== null && !Array.isArray(doc) ? (doc as Record<string, unknown>) : {};
+  const at = typeof map.at === 'string' ? Date.parse(map.at) : Number.NaN;
+  const counts = typeof map.counts === 'object' && map.counts !== null && !Array.isArray(map.counts) ? Object.values(map.counts as Record<string, unknown>) : null;
+  if (!Number.isFinite(at) || counts === null) return red('counts', 'Kennel counts: the file does not read.');
+  const age = now.getTime() - at;
+  if (age > COUNTS_FRESH_MS) return red('counts', `Kennel counts: written ${ago(age)} ago, past 36 hours.`);
+  const off = counts.filter((n) => typeof n !== 'number' || roundCount(n) !== n).length;
+  if (off > 0) return red('counts', `Kennel counts: ${String(off)} of ${String(counts.length)} numbers are not rounded to 10, 50, 100, 500 or 1000.`);
+  return well('counts', `Kennel counts: written ${ago(age)} ago, all ${String(counts.length)} rounded.`);
+}
+
+async function reviewSign(blobs: KennelBucket, indexes: Indexes, now: Date): Promise<KennelSign> {
+  let review: Review;
+  try {
+    review = (await stored(blobs, REVIEW, readReview, emptyReview)).value;
+  } catch (e) {
+    op({ op: 'kennel.vitals', sign: 'review', ok: false, error: why(e) }, 'error');
+    return red('review', 'Kennel review: the review file does not read.');
+  }
+  /* A WAITING SUBMISSION ALREADY LISTED IS ONE WHOSE REVIEW FILE WAS NOT WRITTEN AFTER ITS INDEX, and does not wait. */
+  const kennel = 'failed' in indexes ? null : indexes.kennel;
+  const waiting = review.pending.filter(
+    (p) => kennel === null || !kennel.entries.some((e) => e.kind === p.entry.kind && e.id === p.entry.id && e.versions.some((v) => v.version === p.version.version)),
+  );
+  if (waiting.length === 0) return well('review', 'Kennel review: nothing waiting.');
+  const oldest = Math.min(...waiting.map((p) => Date.parse(p.submitted_at)).filter(Number.isFinite));
+  const age = Number.isFinite(oldest) ? now.getTime() - oldest : 0;
+  const said = `Kennel review: ${String(waiting.length)} waiting, the oldest ${ago(age)}.`;
+  return age > REVIEW_LATE_MS ? red('review', said) : well('review', said);
+}
+
+function outsideSign(indexes: Indexes): KennelSign {
+  if ('failed' in indexes) return red('outside', `Kennel publishers: ${indexes.failed}.`);
+  const outside = listedEntries(indexes.merged).filter((e) => e.kind === 'pack' && e.publisher !== undefined && e.publisher.kind !== 'braindog' && offeredVersion(e) !== null);
+  /* RED BY DESIGN UNTIL A STRANGER PUBLISHES, AND NOT A FAULT (`nightlyWalk`), so it carries its mark without "Needs a
+     look", which a line said every night would teach the operator to skip. */
+  if (outside.length === 0) return { sign: 'outside', ok: false, line: '✗ Kennel publishers: no listed add-on is by anyone but BrainDog yet.' };
+  return well('outside', `Kennel publishers: ${outside.length === 1 ? '1 listed add-on is' : `${String(outside.length)} listed add-ons are`} by publishers other than BrainDog.`);
 }
 
 /* ── the three files ────────────────────────────────────────────────────── */

@@ -169,8 +169,8 @@ function rowNamed(to: string, said: string): string | null {
 
 const DATED: ReadonlySet<string> = new Set(['day', 'instant']);
 
-/** The most words one day is written in (`90 days from now`), which is as far as `wordFor` looks. */
-const DAY_WORDS = 4;
+/** The most words one day is written in ("the start of the month 3 months ago"), which is as far as `wordFor` looks. */
+const DAY_WORDS = 8;
 
 /** The type the record reads a field as: declared, or one of the record's own columns. */
 const typeOf = (schema: Schema, field: string): string | undefined =>

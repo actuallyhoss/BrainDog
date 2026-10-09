@@ -1,0 +1,8 @@
+{
+  "gate": "hygiene",
+  "rule": "an empty root is a skip, not a pass",
+  "expect": "no tracked path to read",
+  "findings": 1,
+  "skip": true,
+  "why": "NO REPOSITORY AND NO FILES.TXT, which is what a mistyped root looks like from inside the gate. A gate that read no path has not passed, so it exits 3 and names where it looked."
+}

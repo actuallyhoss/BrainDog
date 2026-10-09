@@ -23,6 +23,7 @@
 import type { Sql } from '@braindog/ports';
 
 import { jcs } from './declare.ts';
+import { project, projectedText } from './fts.ts';
 
 /** The one spelling of *removed later* (`02 §10`). */
 export const ERASED = '--erased--';
@@ -105,7 +106,7 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   /* ── entry, entry_fts, entry_vec ── */
   const erasedEntries: string[] = [];
   const keys = new Set<string>();
-  for (const row of sql.all<{ rowid: number; id: string; fields: string }>('SELECT rowid, id, fields FROM entry')) {
+  for (const row of sql.all<{ rowid: number; id: string; register: string; fields: string; deleted_at: string | null }>('SELECT rowid, id, register, fields, deleted_at FROM entry')) {
     if (!names(row.fields, subjects)) continue;
     let fields: Record<string, unknown>;
     try {
@@ -118,8 +119,21 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
       keysIn(value, keys);
       fields[key] = ERASED;
     }
-    sql.exec('UPDATE entry SET fields = ?, deleted_at = COALESCE(deleted_at, ?) WHERE id = ?', JSON.stringify(fields), at, row.id);
-    sql.exec('DELETE FROM entry_fts WHERE rowid = ?', row.rowid);
+    /* ONLY WHAT NAMES THEM GOES, AND THE ENTRY STAYS (ruling 437): a payment whose note named her is still a payment, and
+       the balance it is part of is still true. An entry whose title WAS their name leaves every read. A kept entry's
+       search line is written again from what it still holds, so nothing erased stays findable. */
+    const decl = JSON.parse(sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL', `register.${row.register}`)?.body ?? '{}') as {
+      title?: string;
+      fields?: Parameters<typeof projectedText>[0];
+    };
+    const gone = decl.title !== undefined && fields[decl.title] === ERASED;
+    if (gone) sql.exec('UPDATE entry SET fields = ?, deleted_at = COALESCE(deleted_at, ?) WHERE id = ?', JSON.stringify(fields), at, row.id);
+    else sql.exec('UPDATE entry SET fields = ? WHERE id = ?', JSON.stringify(fields), row.id);
+    project(
+      sql,
+      { rowid: row.rowid, id: row.id, register: row.register, deleted: gone || row.deleted_at !== null },
+      projectedText(decl.fields ?? [], fields as Parameters<typeof projectedText>[1], decl.title),
+    );
     sql.exec('DELETE FROM entry_vec WHERE id = ?', row.id);
     /* AND THE IDENTITIES THE ROW ANSWERED TO, which hold its addresses and logins (`entities.ts`). */
     sql.exec('DELETE FROM entity_key WHERE row_id = ?', row.id);

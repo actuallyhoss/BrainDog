@@ -1,0 +1,8 @@
+{
+  "gate": "hygiene",
+  "rule": "a path under loop/",
+  "expect": "the loop's working notes",
+  "findings": 1,
+  "total": 1,
+  "why": "HIS DIRECTION, ADDED BY FORCE: `git add -f loop/DIRECTION.md` passes `.gitignore`, and only a read of what is tracked sees it."
+}

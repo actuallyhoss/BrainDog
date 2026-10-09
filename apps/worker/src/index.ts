@@ -43,6 +43,7 @@ import type { InviteAnswers, InviteCall, SignupNeeds, SignupStart } from '@brain
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
 import type { Plan } from '@braindog/record/directory';
+import type { DrillCall, HostDrill } from '@braindog/record/directory';
 import { answerOAuth, type OAuthAnswers, type OAuthCall } from '@braindog/record/oauth';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
@@ -59,16 +60,17 @@ import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/h
 import { alarmScheduler } from './alarm.ts';
 import { fileModelSign } from '@braindog/host/sign-model';
 import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
-import { slashErasing, slashPlanMoved } from './slash.ts';
+import { PLAN_AGENTS, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
 import { workerModelJobs } from './slash-jobs.ts';
 import { workerCatalogueOffers, workerCatalogueShelf } from './catalogue.ts';
-import { serveKennel, servesKennel, writeCounts } from './kennel.ts';
+import { kennelVitals, serveKennel, servesKennel, writeCounts } from './kennel.ts';
 /* MAIL ON THE CLOUD: Email Routing's messages into the same door as a forwarder's post. */
 import { fileKeeper, takeMail } from './email.ts';
 import { fileKey, serveFiles, servesFiles } from './files.ts';
 import { cloudSnapshots, type Pitr } from './copies.ts';
 import { readAsk as readRestorePoint, restorePoint, sayTally, type PointAnswer } from './restore-point.ts';
+import { drillAnswer, drillNote, readDrill } from './drill-door.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
 import { directoryCopies } from './directory-copy.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
@@ -473,9 +475,16 @@ function loggingAcks(api: RecordApi, sql: Sql): void {
  * over them, key by key. The headers' hints are already on `ctx`: `inward` put them there.
  */
 /* `origin` IS WHERE THIS HOST SERVES THE APP, the start of a filed question's `decide` link: the configured `PUBLIC_HOST` and never the request's own URL. Unset, it is left out, and so is the link. */
-/* `build` IS THIS DEPLOY'S BUILD (`BRAINDOG_BUILD`), sent on every answer as `braindog-build` so the bridge sees a deploy mid-session (AGT-A02). `called` stays unwired: AGT-B01's marks carry the tool call. */
+/* `build` IS THIS DEPLOY'S BUILD (`BRAINDOG_BUILD`), sent on every answer as `braindog-build` so the bridge sees a deploy mid-session (AGT-A02). */
+/* `caller` IS THE KEY'S OWN ID, because the bearer is taken off the request before the record's object sees it: without
+   it every key on a record read as one caller, and a second machine's first call in a minute went uncounted. */
 const serveMcp = (request: Request, api: RecordApi, ctx: CallContext, origin?: string, build?: string): Promise<Response> =>
-  answerMcp(request, api, ctx, { session: (c, said) => withSession(c, hintsOf(said)), ...(origin ? { origin } : {}), ...(build ? { build } : {}) });
+  answerMcp(request, api, ctx, {
+    session: (c, said) => withSession(c, hintsOf(said)),
+    caller: (c) => (c.principal.kind === 'token' ? c.principal.id : undefined),
+    ...(origin ? { origin } : {}),
+    ...(build ? { build } : {}),
+  });
 
 /** Built once a Worker isolate, not once a record: every record on it is offered the same packs and use cases. */
 const CATALOGUE = seedCatalogue();
@@ -622,19 +631,38 @@ export class Record$ extends DurableObject<Env> {
    */
   #plan: string | undefined;
 
-  /** The plan, asked of the Directory once a wake, or `null` where it could not be asked. Not cached when it fails. */
+  /**
+   * The plan, asked of the Directory once a wake, or `null` where it could not be asked. Not cached when it fails.
+   *
+   * AND THE PLAN'S COUNT OF AGENTS IS WRITTEN FROM IT (`planAgents`, audit 40-42 #4), so a record that missed billing's
+   * word, or was made with no `setPlan` at all, holds the cap the pricing page promises from its next wake and not only
+   * from its next move. A row that could not be written is the next wake's to write; the plan read still stands.
+   */
   async #planOf(api: RecordApi): Promise<string | null> {
     if (this.#plan !== undefined) return this.#plan;
     const record = api.kernel.identity()?.id;
     if (!record) return null;
+    let plan: string | null;
     try {
-      const plan = await this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory')).planFor(record);
-      if (plan === null) return null;
-      this.#plan = plan;
-      return plan;
+      plan = await this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory')).planFor(record);
     } catch {
       return null;
     }
+    if (plan === null) return null;
+    try {
+      planAgents(guardedSql(this.ctx.storage), plan);
+    } catch (e) {
+      op({ op: 'plan', did: 'agents', ok: false, rec: record, error: e instanceof Error ? e.message : String(e) }, 'error');
+      return plan;
+    }
+    this.#plan = plan;
+    return plan;
+  }
+
+  /** Whether this object holds the plan's count of agents yet (`PLAN_AGENTS`), which the kernel reads at every mint. */
+  #agentsHeld(sql: Sql): boolean {
+    if (!sql.one("SELECT 1 AS hit FROM sqlite_master WHERE type = 'table' AND name = 'host_meta'")) return false;
+    return Boolean(sql.one('SELECT 1 AS hit FROM host_meta WHERE key = ?', PLAN_AGENTS));
   }
 
   /**
@@ -842,9 +870,9 @@ export class Record$ extends DurableObject<Env> {
            self-host hands in (`@braindog/seed/usecases/catalogue`): without it a hosted Personal 1.0.0 record updated and
            left what it kept typed where nothing reads it. */
         catalogue: CATALOGUE,
-        /* NEWER VERSIONS IN THE CATALOGUE BUNDLED WITH THE SHELL, for Slash to ask about on Decide, as a self-host's folder gives. */
-        catalogueOffers: workerCatalogueOffers(this.env.ASSETS),
-        catalogueShelf: workerCatalogueShelf(this.env.ASSETS),
+        /* NEWER VERSIONS IN THE KENNEL AND THE CATALOGUE BUNDLED WITH THE SHELL, for Slash to ask about on Decide, as a self-host's folder gives. */
+        catalogueOffers: workerCatalogueOffers(this.env.ASSETS, this.env.BLOBS),
+        catalogueShelf: workerCatalogueShelf(this.env.ASSETS, this.env.BLOBS),
         /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
         ...(copies === undefined ? {} : { snapshots: copies }),
@@ -892,6 +920,11 @@ export class Record$ extends DurableObject<Env> {
       this.#oneOnly(api);
       /* AN ERASURE REACHES SLASH'S LEDGER TOO, in this same storage (`slashErasing`). */
       slashErasing(api, sql);
+      /* THE PLAN'S COUNT OF AGENTS, ON WAKE (audit 40-42 #4): a record with no `plan.agents` row asks its plan once
+         (`#planOf`), which writes it, so the fourth key on Free is refused though no `setPlan` ever reached this object.
+         Inside the block, so no mint is answered before the row is there. A plan with no count leaves no row and is
+         asked once a wake, which is one Directory read; a Directory that does not answer is asked again next wake. */
+      if (!api.kernel.refused() && !this.#agentsHeld(sql)) await this.#planOf(api);
       await this.#booted(api);
     });
     return api;
@@ -2003,6 +2036,14 @@ export class Directory$ extends DurableObject<Env> {
     return this.#directory().invites(call);
   }
 
+  /** The host's last restore drill: `put` by the operator's door only (`/account/ops/drill`), `read` for `GET /account/drill`. */
+  drill(call: DrillCall): HostDrill | null {
+    const drill = this.#directory().drill;
+    if (call.op === 'read') return drill.read();
+    drill.put(call.drill);
+    return drill.read();
+  }
+
   /** The live name of a record, or `null` for one with none: where `GET /app` sends a session back to. */
   slugOf(record: string): string | null {
     return this.#directory().slugOf(record);
@@ -2920,6 +2961,7 @@ async function nightly(env: Env): Promise<void> {
     /* AND WHAT EACH RECORD HAS ON, TALLIED INTO THE KENNEL'S PUBLIC INSTALL COUNTS (`writeCounts`). */
     installed: (record) => stub(record).packsOn(),
     counts: (held) => writeCounts({ blobs, assets: env.ASSETS }, held, new Date(tonight)),
+    kennel: () => kennelVitals({ blobs, assets: env.ASSETS }, new Date(tonight)),
     speak: op,
     now: () => Date.now(),
   }).catch(async (e: unknown) => {
@@ -3622,6 +3664,8 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
   if (OPS_INVITE.test(new URL(request.url).pathname)) return opsInvite(request, env);
   if (OPS_ALERT.test(new URL(request.url).pathname)) return opsAlertDoor(request, env);
   if (OPS_RESTORE_POINT.test(new URL(request.url).pathname)) return opsRestorePoint(request, env);
+  if (OPS_DRILL.test(new URL(request.url).pathname)) return opsDrill(request, env);
+  if (DRILL.test(new URL(request.url).pathname)) return drillRead(request, env);
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const billing: BillingDeps = {
     clock: () => Date.now(),
@@ -3632,8 +3676,10 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     provisionable,
     provision: (args) => provision(env, args),
     /* THE ALLOWANCE FOLLOWS THE PLAN: the Directory meters the record under the plan it now pays for. AND SO DO ITS SLASH
-       ASKS AND WHO MAY JOIN IT, which are the record's own object's to keep (`Record$.planMoved`). A record that misses
-       the word reads the plan from the Directory when it next wakes, so a failed RPC is logged and the plan still stands. */
+       ASKS AND WHO MAY JOIN IT, AND ITS COUNT OF AGENTS, which are the record's own object's to keep (`Record$.planMoved`).
+       A record that misses the word reads the plan from the Directory the next time it asks for it (`#planOf`: on a wake
+       that finds no count of agents, at an invitation, at Slash), and writes the count of agents from it, so a failed
+       RPC is logged and the plan still stands. */
     setPlan: async (record, plan) => {
       const refused = await directory.setPlan(record, plan);
       if (refused !== null) return refused;
@@ -3836,6 +3882,71 @@ async function opsRestorePoint(request: Request, env: Env): Promise<Response> {
   );
   op({ op: 'restore-point', mode: tally.mode, label: tally.label, asked: tally.asked, records: tally.records, copied: tally.copied, failed: tally.failed, more: tally.cursor !== undefined });
   return json({ ok: tally.failed === 0, value: { ...tally, said: sayTally(tally) } }, tally.failed === 0 ? 200 : 500);
+}
+
+/** The operator's door to the restore drill's report, and a signed-in person's read of the host's last drill. */
+const OPS_DRILL = /^\/+account\/+ops\/+drill\/*$/;
+const DRILL = /^\/+account\/+drill\/*$/;
+
+/**
+ * `/account/ops/drill`: the restore drill's counts (LCH-C04 job 3, `restore-drill.mjs --report`). `POST { at, pass, copies,
+ * rows, lists, people, records }`, read by `readDrill` and kept as the host's last drill in the Directory. When
+ * `OPS_RECORD` names the operator's record it also takes the note `drill <date> · pass · <n> records`, as the walk's
+ * summary does; a note that could not be written is a line, and the drill is still kept.
+ *
+ * Guarded as `/account/ops/restore-point` is: 404 with no `PROVISION_KEY`, 401 on a wrong key or none, a session cookie
+ * included, because the operator key is the one thing it reads.
+ */
+async function opsDrill(request: Request, env: Env): Promise<Response> {
+  const key = (env.PROVISION_KEY ?? '').trim();
+  if (key === '') return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This BrainDog has no operator key, so it has no operator doors.' } }, 404);
+  if (request.method !== 'POST')
+    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/account/ops/drill is told with POST.' } }, 405, [['allow', 'POST']]);
+  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
+  if (bearer === '' || !(await sameKey(bearer, key)))
+    return json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This route takes the operator key.', at: 'authorization' } }, 401);
+  let body: unknown = null;
+  try {
+    body = JSON.parse((await request.text()).slice(0, SIGNUP_BODY_MAX));
+  } catch {
+    body = null;
+  }
+  const told = readDrill(body);
+  if (!told.ok) return json({ ok: false, refusal: { code: 'BODY_MALFORMED', fix: told.fix, at: told.at } }, 400);
+  const drill = told.value;
+  await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).drill({ op: 'put', drill });
+  op({ op: 'drill', pass: drill.pass, copies: drill.copies, rows: drill.rows, lists: drill.lists, people: drill.people, records: drill.records });
+  const opsRecord = (env.OPS_RECORD ?? '').trim();
+  if (opsRecord !== '') {
+    let noted = false;
+    let why = 'the record is deleted, not made, or refused by this build';
+    try {
+      noted = await env.RECORD.get(env.RECORD.idFromName(opsRecord)).opsNote(drillNote(drill));
+    } catch (e) {
+      why = e instanceof Error ? e.message : String(e);
+    }
+    if (!noted) op({ op: 'drill', rec: opsRecord, note: 'failed', why }, 'error');
+  }
+  return json({ ok: true, value: drillAnswer(drill) }, 200);
+}
+
+/**
+ * `GET /account/drill`: the host's last restore drill for anyone signed in, `{ at, pass, records }` or `{ at: null }`
+ * before the first. THE SAME ANSWER FOR EVERY PERSON, because it is a fact about the host and never about one record
+ * (the scope's critic), and it holds counts only. Without sign-in on this host, or without a session, it is 401.
+ */
+async function drillRead(request: Request, env: Env): Promise<Response> {
+  if (request.method !== 'GET' && request.method !== 'HEAD')
+    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/account/drill is read with GET.' } }, 405, [['allow', 'GET, HEAD']]);
+  const mode = cookieMode(`https://${env.PUBLIC_HOST ?? ''}`);
+  const sid = mode === null || (env.SESSION_SECRET ?? '').length < 32 ? undefined : readSid(request, mode);
+  const refused = () => json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in to read when this host last tested its backups.' } }, 401);
+  if (mode === null || sid === undefined) return refused();
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const out = (await directory.auth({ flow: 'session', sid })) as unknown as AuthResult<Who>;
+  if (out.status !== 200) return refused();
+  const cookie = out.session === undefined ? undefined : out.session === 'clear' ? clearCookie(mode) : sessionCookie(out.session.sid, mode);
+  return withCookie(json({ ok: true, value: drillAnswer(await directory.drill({ op: 'read' })) }, 200), cookie);
 }
 
 /**

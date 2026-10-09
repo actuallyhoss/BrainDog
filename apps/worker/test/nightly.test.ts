@@ -341,7 +341,7 @@ test('A FORCED FAILURE LEAVES ONE FAILED NOTE AND ONE FAULT, and the same reason
   // LCH-C03's done-when, on the walk: before, a failed copy was a log line and the record learnt nothing.
   const { clock, sql, night, failedNotes } = await told(() => true);
   await night();
-  assert.deepEqual(failedNotes(), ['failed: the bucket said no']);
+  assert.deepEqual(failedNotes(), ['failed: the copy could not be saved'], 'the reason never reaches a note');
   assert.equal(openFaults(sql).length, 1);
   assert.equal(openFaults(sql)[0]!.cause, NIGHT_FAULT);
   assert.equal(copyFacts(sql).last_copy_at, null);

@@ -267,6 +267,8 @@
          they came for instead of a control that cannot work. Nothing is said about a fresh
          sign-in, because there is no door here for a sign-in to open. -->
     <p class="hint">{mailWords.unrouted}</p>
+    <p class="hint"><code>{mailWords.tokenFile}</code></p>
+    <p class="hint">{mailWords.unroutedDoes}</p>
   {:else if mintsHere === true && !anOwner}
     <!-- AND THE PERSON ONLY ONCE THE HOST HAS ANSWERED, which `mintsHere === true` is what
          says. Written as a bare `{:else if !anOwner}` this arm also caught the moment before

@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LATE_MS, ago, copiesOf, copyLine, exportLine } from './copies.ts';
+import { DRILL_DUE_MS, LATE_MS, ago, copiesOf, copyLine, drillLine, drillOf, exportLine, readDrill } from './copies.ts';
 
 const NOW = Date.parse('2026-10-09T12:00:00Z');
 const back = (ms: number) => new Date(NOW - ms).toISOString();
@@ -71,4 +71,75 @@ test('no line carries an em dash or an id', () => {
     exportLine({ last_copy_at: null, last_copy_bytes: null, last_export_at: null }, NOW),
   ];
   for (const line of lines) assert.doesNotMatch(line, /\u2014|#\d|[0-9A-HJKMNP-TV-Z]{26}/, line);
+});
+
+/* THIS HOST'S LAST RESTORE TEST (LCH-C04): `GET /account/drill`, `{ ok, value: { at, pass, records } | { at: null } }`. */
+
+const D = 24 * H;
+/** A door that answers `status` with `body`, and keeps the address it was asked. */
+const door = (status: number, body: unknown) => {
+  const asked: string[] = [];
+  const io = (async (url: string | URL | Request) => {
+    asked.push(String(url));
+    return new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch;
+  return { io, asked };
+};
+
+test('a passed test reads its age, and is no fault', async () => {
+  const { io, asked } = door(200, { ok: true, value: { at: back(12 * D), pass: true, records: 3 } });
+  const drill = await readDrill(io);
+  assert.deepEqual(asked, ['/account/drill']);
+  assert.deepEqual(drill, { at: back(12 * D), pass: true, records: 3 });
+  assert.deepEqual(drillLine(drill!, NOW), { text: "This host's last restore test: passed 12 days ago", fault: false, mark: null });
+});
+
+test('a failed test is a fault, and the word failed says so beside the red', async () => {
+  const { io } = door(200, { ok: true, value: { at: back(3 * D), pass: false, records: 0 } });
+  const line = drillLine((await readDrill(io))!, NOW);
+  assert.deepEqual(line, { text: "This host's last restore test: failed 3 days ago", fault: true, mark: null });
+});
+
+test('a host never tested reads "Never tested" as a fault, and stays red until the first test', async () => {
+  const { io } = door(200, { ok: true, value: { at: null } });
+  const drill = await readDrill(io);
+  assert.deepEqual(drill, { at: null });
+  const line = drillLine(drill!, NOW);
+  assert.equal(line.fault, true);
+  assert.equal(line.mark, 'Never tested');
+  assert.equal(line.text, 'No copy on this host has been restored as a test yet');
+});
+
+test("a self-host has no such door: its 404 draws no line, nor does a 401 or a host that cannot be reached", async () => {
+  assert.equal(await readDrill(door(404, '<!doctype html><title>Not found</title>').io), null);
+  assert.equal(await readDrill(door(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'x' } }).io), null);
+  /* THE STATUS DECIDES, NOT THE BODY: a 404 never reads as "Never tested", whatever it carries. */
+  assert.equal(await readDrill(door(404, { ok: true, value: { at: null } }).io), null);
+  assert.equal(await readDrill(door(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'x' } }).io), null);
+  assert.equal(await readDrill((async () => { throw new TypeError('offline'); }) as typeof fetch), null);
+  /* A 200 THAT IS NOT THE DOOR'S ANSWER is no line either, never a test that passed in 1970. */
+  assert.equal(await readDrill(door(200, '<html></html>').io), null);
+  assert.equal(drillOf({ at: 'soon', pass: true }), null);
+  assert.equal(drillOf({ at: back(D), pass: 'yes' }), null);
+});
+
+test('a pass past 35 days is overdue, marked with the word, and at 35 days it is not yet', () => {
+  assert.equal(drillLine({ at: back(DRILL_DUE_MS), pass: true, records: 1 }, NOW).fault, false);
+  const late = drillLine({ at: back(DRILL_DUE_MS + 60_000), pass: true, records: 1 }, NOW);
+  assert.deepEqual(late, { text: "This host's last restore test: passed 35 days ago", fault: true, mark: 'Overdue' });
+});
+
+test('no drill line carries an em dash, an id or a path', () => {
+  const lines = [
+    drillLine({ at: back(12 * D), pass: true, records: 3 }, NOW),
+    drillLine({ at: back(D), pass: false, records: 0 }, NOW),
+    drillLine({ at: null }, NOW),
+  ].flatMap((l) => [l.text, l.mark ?? '']);
+  for (const line of lines) assert.doesNotMatch(line, /\u2014|#\d|[0-9A-HJKMNP-TV-Z]{26}|\//, line);
+  /* NO COPY FILE, KEY OR BUCKET: the line says what was tested, never where the copies live or what opens them. */
+  for (const line of lines) assert.doesNotMatch(line, /\.brainl|\.dirl|\.age\b|\bbucket|blobs|\bR2\b|\bkeys?\b|identity|PROVISION/i, line);
+});
+
+test('a drill reported a moment ago reads "just now", as the operator sees it after the first report', () => {
+  assert.equal(drillLine({ at: back(30_000), pass: true, records: 3 }, NOW).text, "This host's last restore test: passed just now");
 });

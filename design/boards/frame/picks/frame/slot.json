@@ -1,0 +1,20 @@
+{
+  "pick": "frame",
+  "asks": "The frame itself",
+  "shown": "specimen",
+  "from": "EXP-B01",
+  "options": [
+    {
+      "id": "yes",
+      "says": "Yes to the frame.",
+      "live": true
+    },
+    {
+      "id": "no",
+      "says": "No: the frame is drawn again."
+    }
+  ],
+  "default": "yes",
+  "why": "The frame on the four boards drawn on 8 October is yes, in red.",
+  "taken": "DIRECTION 42"
+}

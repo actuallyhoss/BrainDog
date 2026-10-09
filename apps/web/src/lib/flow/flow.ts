@@ -19,6 +19,7 @@ import { notInThisBuild } from '@braindog/kernel';
 import { dropIndex, moveAt } from '../record/arrange.ts';
 import { often } from '../record/actions.ts';
 import { DAYS, EVERY, calendarWords, clockWords, inMonths } from './calendar.ts';
+import { idWords } from './chips.ts';
 
 /* ── the definition, as §3 sketches it and `rules.ts` declares it ──────────── */
 
@@ -1237,6 +1238,22 @@ export function sayParts(step: Step): Part[] {
   return out;
 }
 
+/**
+ * Each installed script's declared title, by its id, as far as the record has said it to this tab (`learnScripts`).
+ *
+ * A SCRIPT STEP IS SAID BY ITS TITLE. The canvas said "Run the script close_follow_ups", the key a person never types,
+ * where the script declares what it is called. A script this tab has not heard of yet is its id in words.
+ */
+const SCRIPT_TITLES = new Map<string, string>();
+
+/** Learn the titles of the scripts the record listed (`scripts`), for every step sentence drawn after. */
+export function learnScripts(rows: readonly { script: string; title: string }[]): void {
+  for (const r of rows) if (r.title.trim() !== '') SCRIPT_TITLES.set(r.script, r.title);
+}
+
+/** What a person calls a script: its declared title when the record has said it, else its id in words. A reference (`{{vars.which}}`) is left as the reference it is. */
+export const scriptName = (id: string): string => SCRIPT_TITLES.get(id) ?? (id.includes('\u0002') ? id : idWords(id));
+
 /** What one step does, in one line, with no braces. */
 export const sayStep = (step: Step): string => unmark(saying(step));
 
@@ -1286,7 +1303,7 @@ function saying(step: Step): string {
     /* THE ID OF ITS QUEUED RUN, NOT "THE ANSWER": the runner queues the script and goes on (`startScript`), and Decide
        had to follow this line with a sentence taking "keeping the answer as" back. Worded as the record's dry run is. */
     case 'script':
-      return at('id') === '' ? 'Run a script' : `Run the script ${at('id')}${at('as') ? `, keeping the id of its queued run as ${at('as')}` : ''}`;
+      return at('id') === '' ? 'Run a script' : `Run the script ${scriptName(at('id'))}${at('as') ? `, keeping the id of its queued run as ${at('as')}` : ''}`;
     case 'wait':
       return aloud(a) === '' ? 'Wait' : `Wait ${spanWords(aloud(a))}`;
     case 'schedule':

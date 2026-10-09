@@ -1,0 +1,12 @@
+node_modules/
+*.brain
+*.brainl
+*.sqlite
+_*
+!apps/*/static/_headers
+/loop/
+/REPORT.md
+/BUILD.md
+/CLAUDE.md
+/.claude/
+tools/gates/*.local.json

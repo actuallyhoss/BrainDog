@@ -11,7 +11,8 @@
     "./catalogue-offers": "./src/catalogue-offers.ts",
     "./automations": "./src/automations.ts",
     "./oauth": "./src/oauth.ts",
-    "./card": "./src/card.ts"
+    "./card": "./src/card.ts",
+    "./shape": "./src/methods/shape.ts"
   },
   "dependencies": {
     "@braindog/declare": "workspace:*",

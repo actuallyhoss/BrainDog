@@ -63,7 +63,7 @@ export function nightlyBackups(o: {
   at?: string;
   /** How often to ask. `0` never asks on its own; `check` still works. */
   tickMs?: number;
-  /** The log line, `export`, as a copy from the app writes it, or `failed: <reason>` for a night that did not copy. */
+  /** The log line, `export`, as a copy from the app writes it, or `failed: the copy could not be saved` for a night that did not copy (the reason goes to the fault, never the note). */
   logged?: (note: string) => void;
   say?: (line: string) => void;
   /** The Directory, through the connection the server holds, and its file; copies go in `directory-snapshots/` beside it. */
@@ -74,7 +74,7 @@ export function nightlyBackups(o: {
   const copies = fileSnapshots(o.sql, o.file, o.now);
   let busy = false;
   /* THE SAME EVENT AND THE SAME FACTS AS THE CLOUD'S (LCH-C03, RQ-LCH-273): a copy kept is `snapshot <id> <bytes> bytes`,
-     a copy that failed is `failed: <reason>` and one fault, through the kernel's `copyKept` and `copyFailed`, so Settings
+     a copy that failed is `failed: the copy could not be saved` and one fault holding the reason, through the kernel's `copyKept` and `copyFailed`, so Settings
      reads a self-host's copies with the same `copyFacts`. */
   const lifecycle = (_kind: 'export', _actor: string, note: string): void => o.logged?.(note);
   /* ONE FAILED NOTE A NIGHT, NOT ONE EVERY TEN MINUTES. A copy that cannot be written is tried again on every tick until

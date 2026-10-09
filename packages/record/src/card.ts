@@ -186,7 +186,7 @@ export function plainly(said: string, c: Context, all: boolean, at?: CardAt): st
   const out = said.replace(NETWORK, (network) => machineOf(network));
   if (!all) return out;
   return out
-    .replace(ROW_ID, (id) => at?.named?.(id) ?? 'a row you cannot see')
+    .replace(ROW_ID, (id) => at?.named?.(id) ?? 'an entry you cannot see')
     .replace(PATH, (path) => path.replace(/[\\/]+$/u, '').split(/[\\/]/u).at(-1) || 'a folder')
     .replace(HANDLE, (handle, list: string) => {
       const row = c.registers.flatMap((r) => [...r.rows, ...r.inherited]).find((b) => b.spoken === handle);

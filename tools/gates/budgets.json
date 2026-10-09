@@ -91,5 +91,15 @@
     "maxDays": 90,
     "//maxCallSites": "Two. A flag read in three places is a feature with three doors, and removing it means finding all of them — which is how a flag outlives the release it was for. One is the common case; two covers a surface and its keyboard path.",
     "maxCallSites": 2
+  },
+  "history": {
+    "//": "WAY-B02, his \"no fresh start though\" (HD.24). `commits.mjs` reads it.",
+    "//floor": "The least number of commits reachable from HEAD. 1,849 is the count the scope measured; the history may be rewritten clean, and it is never restarted, so a count under this is red by itself. A floor only falls with his words.",
+    "floor": 1849
+  },
+  "commits": {
+    "//": "WAY-B02, his \"stop making overly detailed git commits\" (W.25). `commits.mjs` reads it, and the commit-msg hook through it.",
+    "//subjectMax": "A subject is one sentence of at most 72 characters, the width git's own tools and every log viewer show whole.",
+    "subjectMax": 72
   }
 }

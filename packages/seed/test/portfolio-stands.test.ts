@@ -24,8 +24,14 @@ import { PORTFOLIO_PAGES } from '../src/modules/portfolio.ts';
 
 const PERSON = { actor: 'p_1' };
 
+const DAY = 86_400_000;
+
+/** The record's clock, kept so a test can write a task on a day before today. */
+let clock = fixedClock(NOW);
+
 async function seeded(): Promise<Kernel> {
-  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  clock = fixedClock(NOW);
+  const k = await openRecord(openSqlite(), clock);
   const out = await installSeed(k);
   assert.ok(out.ok, sayOf(out));
   return k;
@@ -89,6 +95,45 @@ test('THE TEMPLATE SAYS IT IN ONE HEADING, the card first, each on its own claus
     ['cards', { metric: 'project-said:{{name}}', gt: 0 }],
     ['stat', { metric: 'project-said:{{name}}', is: 0 }],
   ]);
+});
+
+test('THE FIGURES ARE WHAT CHANGED THIS WEEK AND HOW LONG SINCE IT WAS LAST WORKED, in that order', () => {
+  const blocks = PORTFOLIO_PAGES.project!.blocks as { key?: string; cells?: { metric: string; label: string }[] }[];
+  const figures = blocks.find((b) => b.key === 'stands-figures');
+  assert.deepEqual(figures?.cells?.map((c) => [c.metric, c.label]), [
+    ['project-moved-7d:{{name}}', 'Changed this week'],
+    ['project-last-worked:{{name}}', 'Last worked'],
+  ]);
+});
+
+test('LAST WORKED IS THE DAYS SINCE THE NEWEST WRITE ON ANY OF ITS TASKS, read off the record and not a typed day', async () => {
+  const k = await seeded();
+  const made = k.create('things', { name: 'Harbour', lane: 'building' }, PERSON);
+  assert.ok(made.ok, sayOf(made));
+  const spoken = `things#${made.value.seq}`;
+  /* ONE TASK MADE NINE DAYS AGO, ANOTHER MADE THEN AND MOVED FIVE DAYS LATER: the newest write is four days old. */
+  clock.set(NOW - 9 * DAY);
+  assert.ok(k.create('tasks', { what: 'Ship the first build', thing: spoken, state: 'open' }, PERSON).ok);
+  const moved = k.create('tasks', { what: 'Write the store listing', thing: spoken, state: 'open' }, PERSON);
+  assert.ok(moved.ok, sayOf(moved));
+  clock.set(NOW - 4 * DAY);
+  assert.ok(k.update('tasks', `tasks#${moved.value.seq}`, { state: 'doing' }, PERSON).ok);
+  clock.set(NOW);
+
+  const figures = headed(opened(k, pageOf(k, 'Harbour')), 'Where it stands')[1]!;
+  assert.notEqual(figures.drawn, false);
+  assert.deepEqual(figures.refusals, [], JSON.stringify(figures.refusals));
+  assert.equal(reading(figures, 'project-last-worked'), 4, 'the newest write on its tasks was four days ago');
+  assert.equal(reading(figures, 'project-moved-7d'), 1, 'and one task was written this week');
+});
+
+test('A PROJECT WITH NO TASK HAS NO LAST WORKED, never a nought that reads as worked on today', async () => {
+  const k = await seeded();
+  assert.ok(k.create('things', { name: 'Harbour', lane: 'building' }, PERSON).ok);
+  const figures = headed(opened(k, pageOf(k, 'Harbour')), 'Where it stands')[1]!;
+  assert.deepEqual(figures.refusals, [], JSON.stringify(figures.refusals));
+  assert.equal(reading(figures, 'project-last-worked') ?? null, null);
+  assert.equal(reading(figures, 'project-moved-7d'), 0);
 });
 
 /* ── the line beside what each one earns ────────────────────────────────── */

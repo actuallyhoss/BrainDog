@@ -702,6 +702,8 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'What it holds today',
     undefined,
     undefined,
+    /* SINCE money-core 3.16.0 (REC-A13 job 2): a category marked one way that holds money going the other. */
+    undefined,
     /* WHAT COMES IN AND GOES OUT IS OPEN, ONE TILE, SINCE money-core 3.11.0, and what already happened is folded under
        History. One view of the month is kept of three (3.4.0). */
     'Coming and going',

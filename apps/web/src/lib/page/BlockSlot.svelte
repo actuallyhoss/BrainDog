@@ -123,7 +123,7 @@
      rows were read against, so `{{ago:}}` agrees with the dates beside it. No `hole` is handed over, so a value the
      record cannot answer is marked and not pressable: nobody can supply a declared figure from this screen. */
   /* A FIGURE IN A SENTENCE READS AS MONEY, `£7,200.00` and not `GBP 7,200.00`, as the cells beside it do. */
-  /* THE PAGE'S HEADLINE LINE SAYS WHOLE UNITS IN THE RECORD'S OWN SIGN: "Cash is E£1,086,213", the way a person says it,
+  /* THE PAGE'S HEADLINE LINE SAYS WHOLE UNITS: "Cash is EGP 1,086,213", the way a person says it,
      where it said "EGP 1,086,213.41" (`money.ts` `symbolText`, DIRECTION §37). */
   const said = (text: string | null): string | null => (text === null ? null : symbolText(text, homeCurrency(), block.kind === 'note' && block.lead === true));
 

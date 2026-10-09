@@ -30,8 +30,9 @@ async function setup(t: { after: (fn: () => void | Promise<void>) => void }, ans
   const server: Server = createServer((req, res) => {
     const path = new URL(req.url ?? '/', 'http://stub').pathname;
     /* THE HOST'S STATIC CATALOGUE, answered as a host answers it: the folder's file, or a 404. Never counted as a call. */
-    if (catalogue !== undefined && path.startsWith('/app/catalogue/')) {
-      const file = join(catalogue, ...path.slice('/app/catalogue/'.length).split('/'));
+    const prefix = path.startsWith('/app/catalogue/') ? '/app/catalogue/' : path.startsWith('/api/kennel/v1/') ? '/api/kennel/v1/' : null;
+    if (catalogue !== undefined && prefix !== null) {
+      const file = join(catalogue, ...path.slice(prefix.length).split('/'));
       if (!existsSync(file)) return void res.writeHead(404).end();
       return void res.writeHead(200, { 'content-type': 'application/json' }).end(readFileSync(file));
     }
@@ -347,10 +348,16 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   const h = await setup(t);
   assert.equal(await pack(['install', PROJECT_BRIEF, '--dry-run'], h.io), 0, h.said.join('\n'));
   assert.equal(h.seen.length, 0, 'a dry run sent something');
-  assert.match(h.out[0] ?? '', /^Project brief 1\.2\.1 reads as an add-on/u);
-  assert.ok(h.out.includes('  Installs first: portfolio'), h.out.join('\n'));
-  assert.ok(h.out.includes('  Adds lists: none; pages: Briefs; rules: none'), h.out.join('\n'));
-  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.2\.1\? Nothing was sent\.$/u);
+  assert.match(h.out[0] ?? '', /^Project brief 2\.0\.0 reads as an add-on/u);
+  /* 2.0.0 (brief-48) needs Work too, for the steps a task ticks, and adds its Plan steps list and three rules. */
+  assert.ok(h.out.includes('  Installs first: portfolio, work'), h.out.join('\n'));
+  assert.ok(
+    h.out.includes(
+      '  Adds lists: Plan steps; pages: Briefs; rules: Tick the plan steps linked to a task when the task is done, Tick the plan steps linked to a thread when the thread is done, Bring briefs over',
+    ),
+    h.out.join('\n'),
+  );
+  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 2\.0\.0\? Nothing was sent\.$/u);
 
   h.out.length = 0;
   assert.equal(await pack(['install', PROJECT_BRIEF], h.io), 0, h.said.join('\n'));
@@ -359,7 +366,7 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   const body = asked[0]?.args.body as { install: string; doc: Record<string, unknown> };
   assert.equal(body.install, 'project-brief');
   assert.deepEqual(body.doc, JSON.parse(readFileSync(PROJECT_BRIEF, 'utf8')));
-  assert.match(h.out.at(-1) ?? '', /^Asked the owner: Install Project brief 1\.2\.1\? .*\/decide\/SG7$/u);
+  assert.match(h.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.0\.0\? .*\/decide\/SG7$/u);
 
   /* A USE CASE IS NOT AN ADD-ON, and a file that is neither is refused before anything is sent. */
   assert.equal(await usecase(['new', 'club', '--author', 'Halden'], h.io), 0);
@@ -375,7 +382,7 @@ test('pack install <id> with no --from resolves the id in the catalogue the host
   assert.equal(await pack(['install', 'project-brief', '--dry-run'], h.io), 0, h.said.join('\n'));
   assert.equal(h.seen.filter((s) => s.method === 'propose').length, 0, 'a dry run asked');
   assert.match(h.out.join('\n'), /Unsigned: nothing says who published it/u);
-  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.2\.1 from a catalogue\?.* Nothing was sent\.$/u);
+  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 2\.0\.0 from a catalogue\?.* Nothing was sent\.$/u);
 
   assert.equal(await pack(['install', 'project-brief'], h.io), 0, h.said.join('\n'));
   const asked = h.seen.filter((s) => s.method === 'propose');

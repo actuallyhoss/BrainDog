@@ -1,8 +1,9 @@
 /**
  * `model-answers` (PRF-A05 job 1): filed by the host from Slash's ledger and the dead model jobs, read back through the
  * kernel's own `signs`. A green week, a red week whose newest ask failed, a red week of a dead job saying the fault's
- * own sentence and never its error, the 9-in-10 line, a hold in flight and a spent month counted as nothing, the same
- * count Settings reads, the other dead work in the facts, and an empty ledger reading none.
+ * own sentence and never its error, the 9-in-10 line, a hold in flight counted as nothing, the same count Settings reads,
+ * a spent month read red until it turns and never as "No one asked", the other dead work in the facts, and an empty
+ * ledger reading none.
  */
 
 import { test } from 'node:test';
@@ -11,7 +12,7 @@ import assert from 'node:assert/strict';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { ok } from '@braindog/ports';
 
-import { fileModelSign, LEDGER_ANSWERED, LEDGER_FAILED, readModelSign, type ModelFault, type ModelSignKernel } from '../src/sign-model.ts';
+import { fileModelSign, LEDGER_ANSWERED, LEDGER_BUDGET, LEDGER_FAILED, readModelSign, type ModelFault, type ModelSignKernel } from '../src/sign-model.ts';
 import * as slashHealth from '../../slash/src/health.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
@@ -165,27 +166,38 @@ test('THROUGH THE KERNEL’S OWN FAULTS: a dead resolve job raised on the record
   assert.equal(readModelSign(k, sql, NOW).state, 'green');
 });
 
-test('ONE COUNT: the two clauses are Slash health\'s own, character for character', () => {
+test('ONE COUNT: the three clauses are Slash health\'s own, character for character', () => {
   assert.equal(LEDGER_ANSWERED, slashHealth.LEDGER_ANSWERED);
   assert.equal(LEDGER_FAILED, slashHealth.LEDGER_FAILED);
+  assert.equal(LEDGER_BUDGET, slashHealth.LEDGER_BUDGET);
 });
 
-test('AT THE 600 CAP SETTINGS AND THE SIGN AGREE: a spent month, a build without the model and a hold are no asks', async () => {
+test('AT THE 600 CAP THE ANSWERS ARE SETTINGS\' COUNT: a build without the model and a hold are no asks, and the spent month is red', async () => {
   const { sql, k } = await fresh();
   const clock = { now: () => NOW };
   for (const h of [30, 60, 90, 120, 150]) ask(sql, h, 'ok');
   ask(sql, 40, 'error', 'PROPOSAL_SCHEMA');
   /* THE NIGHT AT THE CAP: every ask after the 600th refused before anything was sent, under the model's name. */
-  for (let h = 1; h <= 20; h++) ask(sql, h, 'error', 'SLASH_BUDGET_SPENT');
+  for (let h = 1; h <= 20; h++) ask(sql, h, 'refused', 'SLASH_BUDGET_SPENT', '-');
   ask(sql, 2, 'error', 'NOT_IN_THIS_BUILD');
   ask(sql, 1, 'error', 'SLASH_PENDING');
   const r = readModelSign(k, sql, NOW);
   const h = slashHealth.health(sql, clock, { model: true });
-  assert.equal(r.state, 'green', r.said);
-  assert.equal(r.said, 'The model answered all 6 asks this week.');
+  /* THE NEWEST ASK WAS TURNED AWAY (audit 40-42, 5): red, with the day the asks come back. Settings says the meter beside
+     its own sentence, so its health still reads the last answer, and both count the same six. */
+  assert.equal(r.state, 'red', r.said);
+  assert.equal(r.value, 6);
+  assert.equal(r.said, "The month's asks are spent: 20 asks since 8 October did not reach the model. They come back on 1 November.");
   assert.equal(h.state, 'answering');
   assert.equal(Date.parse(h.last_ok!), NOW - 30 * HOUR, 'Settings\' last answer is the sign\'s');
+  assert.ok((r.facts ?? []).includes('6 asks this week, 6 answered.'), (r.facts ?? []).join(' | '));
   assert.ok((r.facts ?? []).some((f) => /last answered on 8 October/u.test(f)), (r.facts ?? []).join(' | '));
+
+  /* AN ANSWER AFTER THE REFUSALS (his own key, or a raised limit) is green again. */
+  ask(sql, 0.5, 'ok');
+  const back = readModelSign(k, sql, NOW);
+  assert.equal(back.state, 'green', back.said);
+  assert.equal(back.said, 'The model answered all 7 asks this week.');
 
   /* AND THEY TURN TOGETHER: three fresh failures after the last answer are red here and not answering there. */
   for (const m of [3, 2, 1]) ask(sql, m / 10, 'error', 'UNREACHABLE');
@@ -209,4 +221,62 @@ test('THE OTHER DEAD WORK, by its kind in words: in the facts of a green week an
   assert.ok((r.facts ?? []).includes(SAID.notify) && (r.facts ?? []).includes(SAID.export), (r.facts ?? []).join(' | '));
   assert.equal((r.facts ?? []).filter((f) => f === SAID.notify).length, 1, 'two causes of one kind are one sentence');
   assert.doesNotMatch((r.facts ?? []).join(' '), /hunter2|smtp|550|R2/u);
+});
+
+test('A SPENT MONTH IS RED, NEVER "answered all" (audit 40-42, 5): five answers and then fifty refusals', async () => {
+  const { sql, k } = await fresh();
+  for (const h of [100, 110, 120, 130, 140]) ask(sql, h, 'ok');
+  for (let i = 0; i < 50; i++) ask(sql, 1 + i, 'refused', 'SLASH_BUDGET_SPENT', '-');
+  assert.ok(fileModelSign(k, sql, NOW).ok);
+  const s = signOf(k);
+  assert.equal(s.state, 'red', s.said);
+  assert.equal(s.value, 5);
+  assert.doesNotMatch(s.said, /answered all/u);
+  assert.match(s.said, /month's asks are spent: 50 asks since 7 October did not reach the model\. They come back on 1 November\./u);
+  const r = readModelSign(k, sql, NOW);
+  /* SAID ONCE, by the headline, and not again among the facts. */
+  assert.ok(!(r.facts ?? []).some((f) => /turned away/u.test(f)), (r.facts ?? []).join(' | '));
+  assert.doesNotMatch([r.said, ...(r.facts ?? [])].join(' '), NO_ID);
+  assert.doesNotMatch([r.said, ...(r.facts ?? [])].join(' '), /—|\brow\b/u);
+});
+
+test('ONLY REFUSALS NEVER READ "No one asked": red while the month is spent, and once it turns, said as asks turned away', async () => {
+  const { sql, k } = await fresh();
+  /* The old name, from a ledger `call.ts` has not migrated yet, counts the same. */
+  for (let i = 0; i < 50; i++) ask(sql, 1 + i, 'refused', i % 2 === 0 ? 'SLASH_BUDGET_SPENT' : 'SPARK_BUDGET_SPENT', '-');
+  const r = readModelSign(k, sql, NOW);
+  assert.equal(r.state, 'red', r.said);
+  assert.doesNotMatch(r.said, /No one asked/u);
+  assert.match(r.said, /They come back on 1 November\./u);
+  /* The headline says the fifty; the facts do not say them again. */
+  assert.ok(!(r.facts ?? []).some((f) => /turned away/u.test(f)), (r.facts ?? []).join(' | '));
+
+  /* THE MONTH TURNED: fifty refusals at the end of September, read on 5 October with nothing asked since. */
+  const { sql: sql2, k: k2 } = await fresh();
+  for (let i = 0; i < 50; i++) ask(sql2, 8 * 24 + 13 + i, 'refused', 'SLASH_BUDGET_SPENT', '-');
+  const turned = readModelSign(k2, sql2, NOW - 4 * 24 * HOUR);
+  assert.equal(turned.state, 'none', turned.said);
+  assert.doesNotMatch(turned.said, /No one asked/u);
+  assert.equal(turned.said, "No ask reached the model this week: the month's asks were spent for all 50. They were back on 1 October.");
+});
+
+test('AN ANSWER AFTER A REFUSAL IS GREEN, and the refusal stays a fact', async () => {
+  const { sql, k } = await fresh();
+  for (const h of [30, 60, 90]) ask(sql, h, 'ok');
+  ask(sql, 5, 'refused', 'SLASH_BUDGET_SPENT', '-');
+  ask(sql, 2, 'ok');
+  const r = readModelSign(k, sql, NOW);
+  assert.equal(r.state, 'green', r.said);
+  assert.equal(r.said, 'The model answered all 4 asks this week.');
+  assert.ok((r.facts ?? []).includes("1 ask this week was turned away because the month's asks were spent."), (r.facts ?? []).join(' | '));
+});
+
+test('A CALL REFUSED FOR ITS SIZE IS NOT THE MONTH SPENT (model-sign-49): the per-call neuron ceiling writes under the model\'s name', async () => {
+  const { k, sql } = await fresh();
+  for (let h = 30; h > 25; h--) ask(sql, h, 'ok');
+  /* The worker's `budgetSpent`: one call that would spend more neurons than its ceiling, refused under the model. */
+  ask(sql, 1, 'refused', 'SLASH_BUDGET_SPENT');
+  const read = readModelSign(k, sql, NOW);
+  assert.notEqual(read.state, 'red', read.said);
+  assert.doesNotMatch(read.said, /month's asks are spent/u);
 });

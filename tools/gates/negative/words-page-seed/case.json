@@ -1,0 +1,8 @@
+{
+  "gate": "words",
+  "rule": "a word for the machinery in a page the seed declares",
+  "expect": "row: .*say the thing's own name",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE HEADING SAYS ROW AND SEVEN DECOYS DO NOT COUNT: a comment, an id and a source (keys a page does not print), a figure's path inside the body ({{bills.rows}}), a link's address (/r/rows), a key no page prints (note), a span in backticks and a type's angle brackets (code, drawn as code). A reader that took any of them as a page's words would count two or more."
+}

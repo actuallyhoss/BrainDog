@@ -1,0 +1,1 @@
+The tile is flat, radius 16, on one board.

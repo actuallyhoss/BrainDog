@@ -390,7 +390,7 @@ export const TOOLS: readonly Tool[] = [
     /* AND ITS FIGURES, BECAUSE NOTHING ELSE AN AGENT CALLS NAMES ONE. With the one tool
        that read figures gone, the probe called all nine reads with their most helpful arguments and not one answer
        named a figure the record holds; they were resources, and a client that reads no resources had none. */
-    description: 'Its registers with how many rows each, and its figures.',
+    description: 'Its registers with how many entries each, and its figures.',
     input: obj({ format: FORMAT }),
     writes: false,
   },
@@ -424,7 +424,7 @@ export const TOOLS: readonly Tool[] = [
        the list measured 2,528 before and 2,544 after. A figure's id is a bare lowercase name, which no row form is. */
     /* AND "NEVER ADD TWO CURRENCIES" MOVED HERE FROM THE INSTRUCTIONS, beside the one read that answers a figure, when
        the instructions were cut to the three rules every call needs. */
-    description: 'One row or figure, by its spoken id. Two currencies are never added.',
+    description: 'One entry or figure, by its spoken id. Two currencies are never added.',
     input: obj(
       /* SHORTER BY TEN TOKENS FOR `handoff`'s take and drop (AGT-C05): "from record_index" is what that tool's own
          description says of its figures, and a ref field's value is a row id by what it is. */
@@ -478,7 +478,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'history',
     title: 'See how one thing changed',
-    description: 'Every write to one row, in order, with who and when.',
+    description: 'Every write to one entry, in order, with who and when.',
     input: obj({ spoken: str('As get takes it.'), format: FORMAT }, ['spoken']),
     writes: false,
   },
@@ -543,6 +543,7 @@ export const TOOLS: readonly Tool[] = [
             'options: {"options":[...]}, two or more, each with id, label and because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change adds fields: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or to is a whole declaration of that id with the from_version you read. Others: braindog:grammar/proposals.',
         },
         cause: str('A short key for what this is about, so it is asked once.'),
+        again: str('One sentence on what changed since the person declined this or picked an option. Only then is it asked again, with this under it.'),
         withdraw: str('Alone, takes back an SG you asked.'),
       },
     ),
@@ -551,7 +552,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'create',
     title: 'Add something',
-    description: 'Add a row; it answers its number.',
+    description: 'Add an entry; it answers its number.',
     /* MONEY IS SAID WHERE IT IS WRITTEN. The instructions carried it as their second rule, read on every call; it
        matters on the two calls that write a value, and a brief answer now says every amount as a person reads it. */
     input: obj(
@@ -580,12 +581,12 @@ export const TOOLS: readonly Tool[] = [
        AND DELETING IS SAID, because nothing told an agent how. Other records hand their agents a
        delete tool; here it is `deleted_at` through the same verb and the same permission, and an
        agent had no way to find that out. */
-    description: 'Change a row. On VERSION_STALE, re-apply your change to current.',
+    description: 'Change an entry. On VERSION_STALE, re-apply your change to current.',
     input: obj(
       {
         spoken: str('As get takes it.'),
         patch: { type: 'object', description: 'As create takes fields; null clears one, deleted_at true deletes.' },
-        version: int("The row's version when you read it."),
+        version: int("The entry's version when you read it."),
         note: { type: 'string' },
         op_id: { type: 'string' },
       },
@@ -597,7 +598,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'log',
     title: 'Add a note',
-    description: 'Append one note to a row, changing nothing else.',
+    description: 'Append one note to an entry, changing nothing else.',
     /* A NOTE ABOUT NOTHING IN PARTICULAR IS ONE CALL. It needed a row, so an agent first
        asked `context` for its session's id, or wrote something to open one, and then logged on it: two calls for what
        a log tool elsewhere does in one. Left out, the note goes on the caller's own session, and `log` in `tools`
@@ -676,7 +677,7 @@ export const TOOLS: readonly Tool[] = [
        `ignore` says nothing beside its name, because "or set it aside" in the description already has.
        AND ITS ARGUMENTS SAY LESS. The seven are the record's, and the two that only go with `back` and the note that only
        goes with `register` are named and left to the record's sentence, which says when each is taken. */
-    description: 'File one arrival from the inbox as a row, or set it aside.',
+    description: 'File one arrival from the inbox as an entry, or set it aside.',
     input: obj(
       {
         arrival: str('Its id in braindog:inbox.'),
@@ -1022,6 +1023,43 @@ const resource = (path: string, description: string): Resource => ({
   ttlMs: ttlOf(`braindog:${path}`),
 });
 
+/**
+ * What is on offer, twelve at a time, and searched by a word (SHL-B05 job 6).
+ *
+ * THE OFFER WAS EVERY ADD-ON THE HOST HOLDS, and once the whole catalogue is on offer that is more than an arrangement
+ * read in a turn can carry. `braindog:arrangement` keeps the first twelve and says how many more there are;
+ * `braindog:arrangement/offer/<word>` is the twelve whose id, title, line or modules hold the word, and a number after
+ * it, or in place of it, is the next twelve. The record answers the whole offer and this package pages it, so the
+ * record's own arrangement read is unchanged for every other surface.
+ */
+export const OFFER_PAGE = 12;
+type Offered = { id: string; usecase?: string; summary?: string; modules?: readonly string[] };
+const offeredHas = (o: Offered, word: string): boolean =>
+  [o.id, o.usecase ?? '', o.summary ?? '', ...(o.modules ?? [])].some((said) => said.toLowerCase().includes(word));
+
+const OFFER_WORD = /^[a-z0-9][a-z0-9-]{0,31}$/u;
+const OFFER_PAGE_NUMBER = /^[1-9][0-9]{0,2}$/u;
+const offerAsked = (rest: string): { word: string; page: number } | null => {
+  const [head, first, second, ...extra] = rest.split('/');
+  if (head !== 'offer' || extra.length > 0) return null;
+  if (first === undefined) return { word: '', page: 1 };
+  if (second === undefined) return OFFER_PAGE_NUMBER.test(first) ? { word: '', page: Number(first) } : OFFER_WORD.test(first) ? { word: first, page: 1 } : null;
+  return OFFER_WORD.test(first) && OFFER_PAGE_NUMBER.test(second) ? { word: first, page: Number(second) } : null;
+};
+
+export function offerPaged(arrangement: unknown, word: string, page: number): Record<string, unknown> {
+  const whole = arrangement as { offer?: readonly Offered[] } & Record<string, unknown>;
+  const all = Array.isArray(whole.offer) ? whole.offer : [];
+  const found = word ? all.filter((o) => offeredHas(o, word)) : all;
+  const shown = found.slice((page - 1) * OFFER_PAGE, page * OFFER_PAGE);
+  const after = found.length - page * OFFER_PAGE;
+  const next = after > 0 ? `braindog:arrangement/offer/${word ? `${word}/` : ''}${page + 1}` : null;
+  const more =
+    after > 0 ? `${after} more on offer${word ? ` with ${word}` : ''}: read ${next}, or braindog:arrangement/offer/<word> to search them.` : null;
+  if (!word && page === 1) return { ...whole, offer: shown, ...(more ? { offer_more: more } : {}) };
+  return { offer: shown, ...(word ? { word } : {}), page, of: found.length, ...(more ? { offer_more: more } : {}) };
+}
+
 /** The resources with no parameter. Each is asked before it is listed, like everything else. */
 const FIXED: readonly Resource[] = [
   resource('whoami', 'Who you are to this record, and which verbs you reach.'),
@@ -1045,6 +1083,9 @@ const FIXED: readonly Resource[] = [
   resource('grammar/metric', 'What a figure declaration may contain, with one that installs.'),
   resource('grammar/proposals', 'The bodies that change what this BrainDog is: pack, settings and arrange.'),
   resource('grammar/ingest', 'What a door or a scheduled action may contain, with one of each.'),
+  /* THE LONG FORM, ONE KIND WHOLE, IS braindog:grammar/kind/<name> AND IS NO TEMPLATE: `TEMPLATES` is the site's /agents
+     list (`apps/site/test/content.test.ts`), and this description and the short form's own last line both name it. */
+  resource('grammar/kinds', 'Every kind of block a page draws, a line each, and what to reach for. grammar/kind/<name> says one whole.'),
   resource('grammar/script', 'What a script declaration may contain, what its ctx can reach, its limits, and two that install.'),
   resource('grammar/automations', 'What an automation may say: its triggers, its steps, its limits, what does not run yet, and two that install.'),
 ];
@@ -2328,6 +2369,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const filed = await decideAt(await surface.propose({ ...args, ...(body === undefined ? {} : { body }) } as never, ctx), ctx, turn);
       const question = typeof args.question === 'string' ? args.question : '';
       if (!filed.ok || !isObject(filed.value)) return { result: filed };
+      /* ANSWERED FROM MEMORY (govern-47): the person already declined this or picked an option, so nothing was filed and
+         the agent passes on what they said, the day and the reason, and how to ask again (the record's `said`). */
+      if (isObject(filed.value.answered)) {
+        const told = typeof filed.value.said === 'string' ? filed.value.said : '';
+        return { result: { ok: true, value: bare(filed.value) }, say: () => told };
+      }
       /* AN OPEN QUESTION WITH THIS CAUSE WAS JOINED AND NOTHING WAS FILED, so the answer names the one waiting and never
          says "Asked": the agent asks nobody twice, and passes on the question already there. Nothing new is dry run. */
       if (filed.value.joined === true) {
@@ -2979,10 +3026,23 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     if (head === 'arrangement' || head === 'grammar' || head === 'declaration') {
       const arranged = surface.arrangement;
       if (!arranged) return unbuilt(uri, 'Read braindog:boot instead.');
-      if (head === 'arrangement' && !rest) return arranged({}, ctx);
+      if (head === 'arrangement' && !rest) {
+        const seen = await arranged({}, ctx);
+        return seen.ok ? { ok: true, value: offerPaged(seen.value, '', 1) } : seen;
+      }
+      /* `offer/<word>`, `offer/<n>` or `offer/<word>/<n>`: a word is lower-case letters, digits and dashes, and a page
+         a whole number from 1. */
+      const asked = head === 'arrangement' ? offerAsked(rest) : null;
+      if (asked) {
+        const seen = await arranged({}, ctx);
+        return seen.ok ? { ok: true, value: offerPaged(seen.value, asked.word, asked.page) } : seen;
+      }
       /* THE RECORD'S OWN GRAMMARS (`packages/record/src/grammar.ts`), all but its `rule`: a rule is said in full by
          `grammar/automations` above, this package's text, and a second rule grammar here would be two to keep in step. */
-      if (head === 'grammar' && (rest === 'page' || rest === 'register' || rest === 'metric' || rest === 'proposals' || rest === 'ingest'))
+      if (
+        head === 'grammar' &&
+        (rest === 'page' || rest === 'register' || rest === 'metric' || rest === 'proposals' || rest === 'ingest' || rest === 'kinds' || /^kind\/[a-z_]+$/u.test(rest))
+      )
         return arranged({ grammar: rest }, ctx);
       if (head === 'declaration' && NAMED.test(rest)) return arranged({ page: rest }, ctx);
     }

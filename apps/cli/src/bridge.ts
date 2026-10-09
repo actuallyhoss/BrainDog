@@ -30,6 +30,12 @@
  * `op_id`: a host that predates it refuses an argument it does not list, and every write would fail. A read is never
  * sent twice, and nothing else is.
  *
+ * A WRITE THAT MAY HAVE LANDED SAYS SO (audit 40-42, finding 9). Every other write, and a resend still away, was told
+ * "could not be reached", so the agent wrote it again: a timeout, a 5xx and an unreadable answer all left after the host
+ * may have written. Now the away outcome says `maybe`, true for those three and false only when the request never left
+ * (refused, no such host, no route), and a write's call with `maybe` answers `UNREACHABLE_MAYBE`: read before sending
+ * again. A read and the handshake keep the old sentence, since nothing they do can be twice.
+ *
  * A DEPLOY MID-SESSION IS SEEN. Every answer carries `braindog-build` (AGT-A02). When it differs from the one seen at the
  * handshake, the bridge writes one `notifications/tools/list_changed` and refreshes its cache, and the handshake told
  * the app `tools.listChanged`, so the app asks for the new list.
@@ -44,7 +50,7 @@ import { homedir } from 'node:os';
 import { createInterface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 
-import type { McpSurface } from '@braindog/mcp';
+import { TOOLS, type McpSurface } from '@braindog/mcp';
 import { agreed, handle, VERSIONS, type Reply } from '@braindog/mcp/rpc';
 
 import { readDoorCache, writeDoorCache, type DoorCache } from './bridge-cache.ts';
@@ -176,11 +182,68 @@ export function withOpId(message: Message, takes: ReadonlySet<string>, mint: () 
   return { message: { ...message, params: { ...params, arguments: { ...args, op_id: mint() } } }, again: true };
 }
 
-/** What one POST came to. */
+/** The sentence a write answers when it left and no answer came: the host may have written it. */
+export const UNREACHABLE_MAYBE = 'BrainDog did not answer in time, so this may or may not be recorded. Read before you send it again.';
+
+/**
+ * The tools that only read, which a lost answer cannot have written twice. The host's list decides for every tool it
+ * lists, by `readOnlyHint`; a tool it does not list goes by this command's own list. Anything unknown is a write.
+ */
+export function readTools(list: unknown): Set<string> {
+  const out = new Set(TOOLS.filter((t) => !t.writes).map((t) => t.name));
+  for (const tool of isObject(list) && Array.isArray(list.tools) ? list.tools : []) {
+    if (!isObject(tool) || typeof tool.name !== 'string') continue;
+    if (isObject(tool.annotations) && tool.annotations.readOnlyHint === true) out.add(tool.name);
+    else out.delete(tool.name);
+  }
+  return out;
+}
+
+/* THE ERRORS THAT MEAN THE REQUEST NEVER LEFT: no connection was made, or its certificate failed before a byte of the
+   request was written, or the address could not be read, so the host cannot have written anything. */
+const NEVER_LEFT: ReadonlySet<string> = new Set([
+  'ERR_INVALID_URL',
+  'CERT_HAS_EXPIRED',
+  'CERT_NOT_YET_VALID',
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'ENETDOWN',
+  'EHOSTDOWN',
+  'EADDRNOTAVAIL',
+  'UND_ERR_CONNECT_TIMEOUT',
+]);
+
+/**
+ * Whether a fetch that threw may have reached the host. False only when an error in its chain names a connection that
+ * was never made, whatever ended the signal after; a timeout (the signal's own reason, which names no connection), a
+ * reset and anything this cannot read may have landed, so they are true.
+ */
+export function mayHaveLeft(err: unknown): boolean {
+  const seen = new Set<unknown>();
+  const queue: unknown[] = [err];
+  while (queue.length > 0) {
+    const e = queue.shift();
+    if (!isObject(e) || seen.has(e)) continue;
+    seen.add(e);
+    if (typeof e.code === 'string' && NEVER_LEFT.has(e.code)) return false;
+    queue.push(e.cause, ...(Array.isArray(e.errors) ? e.errors : []));
+  }
+  return true;
+}
+
+/** What one POST came to. `maybe` on `away` is true when the request left and its answer did not come back. */
 type Outcome =
   | { kind: 'answer'; reply: Reply | null; build: string | null }
   | { kind: 'signed-out' }
-  | { kind: 'away' }
+  | { kind: 'away'; maybe: boolean }
   | { kind: 'refused'; refusal: Refusal; build: string | null };
 
 /**
@@ -209,6 +272,8 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
   let refreshes = 0;
   /* THE TOOLS THE HOST SAYS TAKE `op_id`, from the last list it answered, or the cache's while it has answered none. */
   let takes = opTools(cache?.tools);
+  /* THE TOOLS THAT ONLY READ, from the same list: a lost answer to one of them cannot have written anything. */
+  let reads = readTools(cache?.tools);
 
   const open = new Map<Id, AbortController>();
   const inFlight = new Set<Promise<void>>();
@@ -234,12 +299,14 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     const params = isObject(message.params) ? message.params : {};
     const named = method === 'resources/read' ? params.uri : method === 'tools/call' || method === 'prompts/get' ? params.name : undefined;
     if (typeof named === 'string') headers.set('mcp-name', nameHeader(named));
+    /* BUILT BEFORE THE SENDING, so a body that cannot be written throws out of here as a request that never left. */
+    const sending = JSON.stringify(withHints(message, hintsOfHeaders(session)));
     let res: Response;
     try {
-      res = await go(`${target.base}/mcp`, { method: 'POST', headers, body: JSON.stringify(withHints(message, hintsOfHeaders(session))), redirect: 'error', signal });
-    } catch {
-      /* The error could quote the request, and the request holds the bearer. */
-      return { kind: 'away' };
+      res = await go(`${target.base}/mcp`, { method: 'POST', headers, body: sending, redirect: 'error', signal });
+    } catch (err) {
+      /* The error could quote the request, and the request holds the bearer: only its codes are read. */
+      return { kind: 'away', maybe: mayHaveLeft(err) };
     }
     const seen = res.headers.get('braindog-build');
     if (res.status === 401) {
@@ -248,20 +315,20 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     }
     if (res.status >= 500) {
       await res.body?.cancel().catch(() => undefined);
-      return { kind: 'away' };
+      return { kind: 'away', maybe: true };
     }
     if (res.status === 202) return { kind: 'answer', reply: null, build: seen };
     let body: unknown;
     try {
       body = await res.json();
     } catch {
-      return { kind: 'away' };
+      return { kind: 'away', maybe: true };
     }
     if (isObject(body) && body.jsonrpc === '2.0') return { kind: 'answer', reply: body as Reply, build: seen };
     /* A 403 FOR SOMEBODY NO LONGER ON THE RECORD, OR A 429, is the record's refusal in the shape `/api` gives it. */
     const r = isObject(body) ? body.refusal : undefined;
     if (isObject(r) && typeof r.code === 'string' && typeof r.fix === 'string') return { kind: 'refused', refusal: { code: r.code, fix: r.fix }, build: seen };
-    return { kind: 'away' };
+    return { kind: 'away', maybe: true };
   };
 
   /** The tool list again, after a deploy, kept for a session that starts while the host is away. Nothing is written. */
@@ -271,6 +338,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
       if (got.kind !== 'answer' || got.reply === null || !('result' in got.reply) || !isObject(got.reply.result)) return;
       writeDoorCache(home, target.key, { build: got.build ?? undefined, tools: got.reply.result });
       takes = opTools(got.reply.result);
+      reads = readTools(got.reply.result);
       cache = readDoorCache(home, target.key);
     });
   };
@@ -310,10 +378,15 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
   /**
    * The answer while the host is away. The handshake is the bundled server's, which agrees a revision with this app,
    * carrying the cached server's name, instructions and capabilities; the list is the cached one; a tool call refuses.
+   * A write whose request left (`maybe`) refuses with the sentence that says it may be recorded, so it is read first.
    */
-  const away = async (message: Message, id: Id | null): Promise<Reply | null> => {
+  const away = async (message: Message, id: Id | null, maybe: boolean): Promise<Reply | null> => {
     const v = versionIn(message) ?? version;
-    if (id !== null && message.method === 'tools/call') return toolRefusal(id, { code: 'UNREACHABLE', fix: UNREACHABLE_FIX }, v);
+    if (id !== null && message.method === 'tools/call') {
+      const name = isObject(message.params) ? message.params.name : undefined;
+      const written = maybe && !(typeof name === 'string' && reads.has(name));
+      return toolRefusal(id, { code: 'UNREACHABLE', fix: written ? UNREACHABLE_MAYBE : UNREACHABLE_FIX }, v);
+    }
     if (id !== null && message.method === 'tools/list' && cache?.tools !== undefined && !(isObject(message.params) && message.params.cursor !== undefined)) {
       const { resultType: _was, ...listed } = cache.tools;
       return { jsonrpc: '2.0', id, result: { ...(stateless(v) ? { resultType: 'complete' } : {}), ...listed } };
@@ -335,12 +408,16 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     let reply: Reply | null;
     try {
       const sent = withOpId(message, takes);
-      const once = () => post(sent.message, AbortSignal.any([stop.signal, AbortSignal.timeout(ms)])).catch((): Outcome => ({ kind: 'away' }));
+      /* POST THROWS only before it sends (its headers or its body), so a throw is a request that never left. */
+      const once = () => post(sent.message, AbortSignal.any([stop.signal, AbortSignal.timeout(ms)])).catch((): Outcome => ({ kind: 'away', maybe: false }));
       let got = await once();
-      /* SENT ONCE MORE WITH THE SAME ID, and only once: a host away twice is away, and the agent is told so. */
+      /* SENT ONCE MORE WITH THE SAME ID, and only once: a host away twice is away, and the agent is told so. A first
+         sending that may have landed still may have, however the second went. */
       if (got.kind === 'away' && sent.again && !stop.signal.aborted) {
         say('A write got no answer from the host, so it was sent once more with the same operation id.');
+        const first = got.maybe;
         got = await once();
+        if (got.kind === 'away' && first) got = { kind: 'away', maybe: true };
       }
       /* CANCELLED BY THE APP: it has said it will not read the answer, so none is written. */
       if (stop.signal.aborted) return;
@@ -349,7 +426,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
         refusing ??= signedOutSurface(io.signedOut ?? endedFix(target.key));
         reply = await onMachine(message, refusing, message);
       } else if (got.kind === 'away') {
-        reply = await away(message, id);
+        reply = await away(message, id, got.maybe);
         if (method === 'initialize') local = true;
       } else if (got.kind === 'refused') {
         heard(got.build);
@@ -366,6 +443,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
         if (method === 'tools/list' && reply !== null && 'result' in reply && isObject(reply.result) && !(isObject(message.params) && message.params.cursor !== undefined)) {
           writeDoorCache(home, target.key, { build: got.build ?? undefined, tools: reply.result });
           takes = opTools(reply.result);
+          reads = readTools(reply.result);
         }
       }
     } finally {

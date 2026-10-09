@@ -62,6 +62,8 @@ import { HEADLINE_MOST, PAGE_TILES_FIRST, SAMPLE_ROWS_MOST } from '@braindog/rec
 import type { SlashAsk } from './slash-answers.ts';
 import { BACKGROUND_JOBS_MONTH, backgroundSpent } from './model-jobs.ts';
 import { SLASH_MENTIONS_INSTRUCTIONS, SLASH_RESOLVE_INSTRUCTIONS, type MentionsInput, type ResolveInput, type UnderstandModel } from './understand.ts';
+import { turnedAway } from './slash-turned-away.ts';
+export { turnedAway, TURNED_AWAY_SQL } from './slash-turned-away.ts';
 
 /** How long a draft may take before Slash's own rules speak instead. */
 export const SLASH_TIMEOUT_MS = 30_000;
@@ -1179,6 +1181,8 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
     if (s === undefined || !hostDrafted(s.tier)) return null;
     if (drafted() < s.ask_cap) return null;
     const until = monthOf(deps.clock.now(), 1).slice(0, 10);
+    /* THE ASK TURNED AWAY LEAVES ITS ROW (`slash-turned-away.ts`, model-sign-49). */
+    turnedAway(deps.sql, new Date(deps.clock.now()).toISOString(), 'read', s.tier);
     return {
       code: 'SLASH_BUDGET_SPENT',
       fix: `Slash reads and answers each question on this host's model, and those asks are spent until ${until}. Raise the monthly limit, or wait.`,

@@ -504,13 +504,14 @@
     color: var(--dim);
   }
 
-  /* THE TITLE'S LINK REACHES OVER ITS ROW, so a press anywhere on the row opens the page. */
+  /* THE TITLE'S LINK REACHES OVER ITS ROW, so a press anywhere on the row opens the page. On `::before`, because that is
+     the box a target is measured by (`13 §7`, the layout gate): on `::after` the link measured its words alone. */
   .page-link {
     color: inherit;
     text-decoration: none;
   }
 
-  .page-link::after {
+  .page-link::before {
     content: '';
     position: absolute;
     inset: 0;

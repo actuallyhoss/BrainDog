@@ -99,7 +99,7 @@ test('a rule is what starts it and each step as a sentence, with a branch read a
        as queued". The canvas says the id now (`flow-script-as.test.ts`), and the line read both. */
     {
       label: 'Step 4',
-      value: `Run the script tidy, keeping the id of its queued run as queued. The run goes on without waiting for it: what the script writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused, or if its input hands on what a secret or file field holds.`,
+      value: `Run the script Tidy, keeping the id of its queued run as queued. The run goes on without waiting for it: what the script writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused, or if its input hands on what a secret or file field holds.`,
     },
     {
       label: 'Step 5',

@@ -6,9 +6,10 @@
   screen sends it with its switch on (`vault/+page.svelte`, `saveKey`), so a scheduled run can open it and the approval
   is not refused for a key only a person may open. The host seals it; the record is handed sealed bytes.
 
-  THE VALUE NEVER REACHES A LOG LINE OR THE PAGE'S TEXT. It lives in the field, is emptied whatever comes back, and the
+  THE VALUE NEVER REACHES A LOG LINE OR THE PAGE'S TEXT. It lives in the field until the record has kept it, and the
   toast and the tick say only the label. While the vault is behind a passphrase the record says so on the first try,
-  and the passphrase field appears for the second, sent with that one request and emptied too.
+  and the passphrase field appears for the second with the key still typed; the passphrase is sent with that one
+  request and emptied before it leaves (`key-needed.ts`).
 
   HELD IS A TICK AND A WORD; NEEDED IS THE DEEPER RED AND A WORD, never the colour alone. With no client (the queue, a
   reader who may not answer) the key is only said, with no field.
@@ -18,48 +19,29 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Button from '$lib/ui/Button.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { wantsPassphrase, words as vaultWords } from '$lib/record/vault.ts';
-  import type { createClient } from '@braindog/client';
+  import { words as vaultWords } from '$lib/record/vault.ts';
   import PassField from '../../vault/PassField.svelte';
   import type { Need } from './arranged.ts';
-
-  type KeyClient = Pick<ReturnType<typeof createClient>, 'putKey'>;
+  import { asksOpens as asks, blankForm, keep as keepKey, ready, type KeyClient } from './key-needed.ts';
 
   let { need, at, client, onheld }: { need: Need; at: number; client?: KeyClient | undefined; onheld?: (() => unknown) | undefined } = $props();
 
-  let value = $state('');
-  let opens = $state('');
-  let passphrase = $state('');
-  let locked = $state(false);
+  const form = $state(blankForm());
   let saving = $state(false);
   let said = $state('');
 
   const held = $derived(need.held === 'connector');
-  /* A NEW KEY SAYS WHAT IT OPENS or the record refuses it, so when the arrangement could not say (a script calling
-     several hosts, a call with none declared) the person is asked. A key held only for a person keeps its own. */
-  const asksOpens = $derived(need.opens === '' && need.held !== 'person');
+  const asksOpens = $derived(asks(need));
 
   async function keep(e: SubmitEvent) {
     e.preventDefault();
-    if (!client || saving || value === '' || (asksOpens && opens.trim() === '')) return;
+    if (!client || saving || !ready(need, form)) return;
     saving = true;
     said = '';
-    const args = {
-      label: need.label,
-      value,
-      /* WHAT IT OPENS is the arrangement's when it said one (`needsOf` gives one host or nothing), else the person's. */
-      ...(need.opens !== '' ? { opens: need.opens } : asksOpens ? { opens: opens.trim() } : {}),
-      sealed_under: 'connector' as const,
-      ...(locked && passphrase !== '' ? { passphrase } : {}),
-    };
-    /* EMPTIED BEFORE THE ANSWER, so nothing on the page holds the value while the request is out. */
-    value = '';
-    passphrase = '';
-    const out = await client.putKey(args);
+    const out = await keepKey(need, form, client);
     saving = false;
     if (!out.ok) {
-      if (wantsPassphrase(out)) locked = true;
-      said = 'refusal' in out ? out.refusal.fix : copy.writeRaced;
+      said = out.said;
       return;
     }
     toasts.push(copy.arrangeNeedKept(need.label), { intent: 'good' });
@@ -83,16 +65,16 @@
     <form class="need-form" onsubmit={keep}>
       {#if asksOpens}
         <label class="field-label" for={`need-${at}-opens`}>{vaultWords.opensAsk}</label>
-        <div class="field"><input class="field-input" id={`need-${at}-opens`} type="text" autocomplete="off" bind:value={opens} /></div>
+        <div class="field"><input class="field-input" id={`need-${at}-opens`} type="text" autocomplete="off" bind:value={form.opens} /></div>
         <p class="field-hint">{vaultWords.opensHint}</p>
       {/if}
-      <PassField id={`need-${at}`} label={copy.arrangeNeedField} hint={copy.arrangeNeedHint} autocomplete="new-password" bind:value invalid={said !== ''} />
-      {#if locked}
-        <PassField id={`need-${at}-pass`} label={vaultWords.passField} hint={vaultWords.keyPassHint} autocomplete="current-password" bind:value={passphrase} />
+      <PassField id={`need-${at}`} label={copy.arrangeNeedField} hint={copy.arrangeNeedHint} autocomplete="new-password" bind:value={form.value} invalid={said !== ''} />
+      {#if form.locked}
+        <PassField id={`need-${at}-pass`} label={vaultWords.passField} hint={vaultWords.keyPassHint} autocomplete="current-password" bind:value={form.passphrase} />
       {/if}
       {#if said}<p class="need-said" role="status"><Icon name="alert" size="s" />{said}</p>{/if}
       <div class="need-act">
-        <Button weight="primary" type="submit" disabled={saving || value === '' || (asksOpens && opens.trim() === '') || (locked && passphrase === '')}>
+        <Button weight="primary" type="submit" disabled={saving || !ready(need, form)}>
           {saving ? copy.arrangeNeedSaving : copy.arrangeNeedSave}
         </Button>
       </div>

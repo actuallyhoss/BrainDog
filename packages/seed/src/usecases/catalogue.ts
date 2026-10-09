@@ -15,6 +15,7 @@
 import { FIRST_PARTY_LISTS, packIdOf } from '@braindog/declare';
 
 import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
+import { AGENTS_SKILLS } from '../packs/agents-skills.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
 import { AGENTS_SIGNALS } from '../module-info.ts';
 import { GUIDE_FORMS, GUIDE_GROWS, GUIDE_NEXT } from './guide.ts';
@@ -42,8 +43,12 @@ export type SeedCatalogueEntry = {
   doc: (options: { holds: readonly string[]; usecase?: string | null }) => Record<string, unknown> | null;
   afterInstall?: (io: LinkIo) => Promise<unknown>;
   carry?: (io: CarryIo, from: string) => Promise<number>;
-  /** The skills a use case names for agents, which Slash offers once it is on. */
-  skills?: readonly { name: string; trigger: string }[];
+  /**
+   * The skills a use case names for agents, or an add-on ships, which Slash offers once it is on. ONE THAT SHIPS ITS TEXT
+   * carries `body` and `rev` (and `was`, the texts it replaced), and is offered with that text, written by the record
+   * (`managed`), so a newer `rev` reaches every record still holding an older one as it was shipped.
+   */
+  skills?: readonly { name: string; trigger: string; what?: string; body?: string; rev?: number; was?: readonly string[] }[];
   /** What a use case grows into once the figures it names say so, which Slash asks about on Decide (`@braindog/record` `Grows`). */
   grows?: { when: readonly { metric: string; gt?: number; gte?: number; lt?: number; lte?: number; is?: number }[]; install: readonly string[]; question: string; why: string };
   /** The first plan a model may form for what the owner said (`@braindog/record` `FormSpec`). */
@@ -144,7 +149,7 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
   }));
   return [
     ...modules,
-    { id: 'agents', kind: 'pack', title: 'agents', summary: String(agents.summary ?? ''), modules: before(AGENTS_PACK.manifest.requires), version: AGENTS_PACK.manifest.version, signals: AGENTS_SIGNALS, doc: () => agentsPackDocument() },
+    { id: 'agents', kind: 'pack', title: 'agents', summary: String(agents.summary ?? ''), modules: before(AGENTS_PACK.manifest.requires), version: AGENTS_PACK.manifest.version, signals: AGENTS_SIGNALS, doc: () => agentsPackDocument(), skills: AGENTS_SKILLS },
     ...useCases,
   ];
 }

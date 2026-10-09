@@ -84,6 +84,34 @@ test('AN AMOUNT WITH NO CURRENCY ASKS ONLY THE CURRENCY, even of a shop with no 
   assert.deepEqual(oneQuestion(p)?.choices, []);
 });
 
+test('THE DEVICE\'S CURRENCY IS NOT ASKED AGAIN: a currency is asked only where neither the words nor the device gave one', () => {
+  const cairo = { ...CTX, currency: 'EGP' };
+  /* A BARE AMOUNT IS STILL ASKED: its currency is one only the person knows, so the device's is suggested, not taken. */
+  const said = 'I run a candle shop and charge 900 a jar';
+  const p = propose(said, cairo);
+  assert.equal(p.currency, null, 'the device does not say the currency of an amount she typed');
+  assert.equal(p.currencyBy, undefined);
+  assert.ok(!p.heard.some((h) => h.became.includes('in EGP')), 'Money is not said in EGP beside an amount not kept');
+  assert.equal(oneQuestion(p, said, CAIRO)?.about, 'currency');
+  assert.equal(oneQuestion(p, said, CAIRO)?.suggested, 'EGP');
+  assert.equal(answer(p, 'currency', 'USD', said).currency, 'USD', 'what she chooses is the record\'s');
+  /* A SHOP WITH NO AMOUNT TAKES THE DEVICE'S, and is asked its one other thing. */
+  const shop = propose('I run a candle shop and track who owes me', cairo);
+  assert.equal(shop.currency, 'EGP', 'the device keeps Cairo time, so the record keeps EGP');
+  assert.equal(shop.currencyBy, 'device');
+  assert.equal(oneQuestion(shop, '', CAIRO)?.about, 'arrivesBy');
+  assert.equal(answer(shop, 'currency', 'USD'), shop, 'a currency not asked is not answered');
+  /* HER SENTENCE: no amount, no currency typed, and EGP from her device, so she is asked only where orders come in. */
+  const mariam = propose(MARIAM, cairo);
+  assert.equal(mariam.currency, 'EGP');
+  assert.equal(oneQuestion(mariam, MARIAM, CAIRO)?.about, 'arrivesBy');
+  /* A TYPED CURRENCY OUTRANKS THE DEVICE, and a device with none leaves the question to be asked. */
+  const typed = propose('We bill Fenwick £2,000 a month on the 1st', cairo);
+  assert.equal(typed.currency, 'GBP');
+  assert.equal(typed.currencyBy, undefined);
+  assert.equal(oneQuestion(propose(said, { ...CTX, currency: null }), said, CAIRO)?.about, 'currency');
+});
+
 test('NOTHING MISSING, NOTHING ASKED', () => {
   assert.equal(oneQuestion(propose('Sami, I run a few companies', CTX)), null);
   assert.equal(oneQuestion(propose('We bill Fenwick £2,000 a month on the 1st', CTX))?.about, 'name', 'a typed currency is not asked');

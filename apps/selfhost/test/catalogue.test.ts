@@ -94,7 +94,7 @@ test('the folder offers Slash a newer version of an installed add-on, verified, 
     writeFileSync(join(dir, ...out.value.path.split('/')), t);
   }
   writeFileSync(join(dir, 'index.json'), JSON.stringify(index));
-  const offers = catalogueOffersFrom(dir);
+  const offers = catalogueOffersFrom(dir, { kennel: 'off', fetch: async () => new Response(null, { status: 404 }), now: () => Date.now() });
   const got = await offers([{ id: 'bookshelf', version: '1.0.0', on: true }]);
   assert.equal(got.length, 1);
   assert.equal(got[0]!.to, '1.1.0');

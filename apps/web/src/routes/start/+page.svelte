@@ -85,6 +85,7 @@
     statusOf,
     stepsOf,
     words,
+    zoneCurrency,
     type CurrencyEnv,
     type Part as PartOf,
     type Said,
@@ -144,6 +145,8 @@
       return null;
     }
   })();
+  /* THE CURRENCY THIS DEVICE'S ZONE KEEPS, read in with the words, so a shop in Cairo keeps EGP without being asked. */
+  const deviceCurrency = zoneCurrency(zone);
 
   /* "09:38", in the person's own clock, beside each turn of the conversation. */
   const clock = (() => {
@@ -191,7 +194,7 @@
       return;
     }
     const wait = setTimeout(() => {
-      live = propose(said, { zone, locale });
+      live = propose(said, { zone, locale, currency: deviceCurrency });
     }, 140);
     return () => clearTimeout(wait);
   });
@@ -242,7 +245,7 @@
   let readings = 0;
 
   /** The model's reading, or the rules' where there is no model, for the words as they stand. */
-  const readingOf = (said: string): Promise<Proposal> => proposeFirst(said, { zone, locale }, door?.setup ?? null);
+  const readingOf = (said: string): Promise<Proposal> => proposeFirst(said, { zone, locale, currency: deviceCurrency }, door?.setup ?? null);
 
   async function read() {
     if (thinking) return;
@@ -543,14 +546,14 @@
   });
   const moduleParts = $derived.by<PartOf[]>(() => {
     if (proposal !== null)
-      return partsOf({ offered, modules, heard: proposal.heard, rows: proposal.rows, heldBy, byHand: onByHand, waiting: asksCurrency && currency === null ? money : null });
+      return partsOf({ offered, modules, heard: proposal.heard, rows: proposal.rows, names: proposal.names, heldBy, byHand: onByHand, waiting: asksCurrency && currency === null ? money : null });
     const liveOffered = [...new Set([...INSTALL_ORDER, ...(live?.modules ?? [])])];
     return partsOf({ offered: liveOffered, modules: live?.modules ?? [], heard: live?.heard ?? [], rows: live?.rows ?? [], heldBy: () => null, byHand: new Set(), waiting: null });
   });
   const allParts = $derived([...caseParts, ...moduleParts]);
   const steps = $derived(stepsOf(allParts));
   const onCount = $derived(allParts.filter((p) => p.on).length);
-  const status = $derived(proposal ? statusOf(onCount, allParts.length, waitingOn) : null);
+  const status = $derived(proposal ? statusOf(onCount, waitingOn) : null);
 
   /**
    * WHAT THE LAST THING SAID ADDED TAKES THE ARRIVAL TINT for a second and a half: a part that came on
@@ -806,11 +809,11 @@
                       <section class="reply" aria-labelledby="heard-h">
                         <h3 class="reply-h" id="heard-h" tabindex="-1" bind:this={heardHeading}>{firstRun.heardTitle}</h3>
                         {#if proposal.name}<p class="heard-name">{firstRun.heardName(proposal.name)}</p>{/if}
-                        {#if proposal.heard.length > 0}
+                        {#if proposal.heard.some((h) => h.you !== true)}
                           <ul class="heard">
-                            {#each proposal.heard as h, k (k)}
+                            {#each proposal.heard.filter((h) => h.you !== true) as h, k (k)}
                               <li class="heard-one">
-                                <IconWell name={iconOfBecame(h.became)} size="l" />
+                                <IconWell name={iconOfBecame(h.became, proposal.names)} size="l" />
                                 <span class="heard-main">
                                   <q class="phrase">{h.phrase}</q>
                                   <span class="became"><span class="sr">: </span>{h.became}</span>
@@ -933,14 +936,13 @@
 
         <!-- ── THE BUILD ─────────────────────────────────────────────────── -->
         <div class="build">
-          <Tile icon="home" title={waitingOn || onCount === 0 || proposal === null ? words.building : words.ready} count={words.parts(onCount, allParts.length)}>
+          <Tile icon="home" title={waitingOn || onCount === 0 || proposal === null ? words.building : words.ready}>
             <!-- EVERY PART IT CAN MAKE, EACH LIGHTING UP AS IT IS HEARD: its own glyph in an ink well once on, red while
                  it waits on an answer, and the ground's quiet well while off. Read aloud once, as one sentence. -->
             <p class="sr">
               {words.progress(
                 steps.order.filter((p) => p.on && p.state !== 'waiting').map((p) => p.name),
                 steps.order.find((p) => p.state === 'waiting')?.name ?? null,
-                steps.order.filter((p) => !p.on).map((p) => p.name),
               )}
             </p>
             <ol class="lights" aria-hidden="true">
@@ -960,7 +962,7 @@
               <ul class="heard-live">
                 {#each live.heard as h, i (i)}
                   <li class="heard-one">
-                    <IconWell name={iconOfBecame(h.became)} />
+                    <IconWell name={iconOfBecame(h.became, live?.names)} />
                     <span class="heard-main">
                       <q class="phrase">{h.phrase}</q>
                       <span class="became"><span class="sr">: </span>{h.became}</span>
@@ -1712,24 +1714,16 @@
       line-height: 36px;
     }
 
-    /* MAKE IT MINE RIDES THE BOTTOM EDGE as glass chrome: the button's own 44 and 4 either side, which is the
-       `--sticky` height, with the home indicator's inset paid once under it. */
+    /* MAKE IT MINE RIDES THE BOTTOM EDGE on the board's own flat colour (DIRECTION 39: no glass), as the tab bar does:
+       the button's own 44 and 4 either side, which is the `--sticky` height, with the home indicator's inset paid once
+       under it. */
     .make-bar {
       position: fixed;
       inset-inline: 0;
       inset-block-end: 0;
       z-index: var(--z-sheet);
       padding: var(--sp-1) var(--gutter) calc(var(--sp-1) + env(safe-area-inset-bottom));
-      background: var(--glass);
-      box-shadow: var(--glass-edge);
-      backdrop-filter: var(--glass-blur);
-    }
-
-    /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-    @supports (-webkit-backdrop-filter: none) {
-      .make-bar {
-        -webkit-backdrop-filter: var(--glass-blur);
-      }
+      background: var(--board);
     }
 
     .make-bar :global(.btn) {

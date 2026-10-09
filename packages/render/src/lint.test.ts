@@ -10,8 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { LINT_RULES, lintHtml, lintPage, lintText, parse, toHTML, type LintFinding, type LintRule } from './index.ts';
-import { PAGE_WORDS } from './lint.ts';
-import { OWNER } from '../../../fixtures/names.ts';
+import { BUTTON_WORDS, PAGE_WORDS } from './lint.ts';
 
 const rules = (fs: readonly LintFinding[]): LintRule[] => fs.map((f) => f.rule);
 const draw = (src: string, values: Record<string, string> = {}): string => toHTML(parse(src), { resolve: (p) => values[p] ?? null });
@@ -23,13 +22,13 @@ const red = (fs: readonly LintFinding[], rule: LintRule): LintFinding => {
   return f;
 };
 
-test('THE RULE LIST IS CLOSED AND SAYS ITSELF: ten rules, each named once, with a sentence and no em dash', () => {
-  assert.deepEqual(
-    LINT_RULES.map((r) => r.rule),
-    ['placeholder', 'braces', 'raw-key', 'raw-id', 'raw-instant', 'icon-word', 'only-a-dash', 'cut-money', 'em-dash', 'plain-words'],
-  );
+test('THE RULE LIST IS CLOSED AND SAYS ITSELF: sixteen rules, each named once, with a sentence and no em dash', () => {
+  assert.deepEqual(LINT_RULES.map((r) => r.rule), [
+    'placeholder', 'braces', 'raw-key', 'raw-id', 'raw-instant', 'icon-word', 'only-a-dash', 'cut-money', 'em-dash', 'plain-words',
+    'system-word', 'dev-name', 'bare-key', 'one-word-button', 'title-stop', 'raw-fault',
+  ]);
   for (const r of LINT_RULES) assert.match(r.says, /^[A-Z].*\.$/), assert.doesNotMatch(r.says, /—/);
-  assert.deepEqual(LINT_RULES.filter((r) => r.copy).map((r) => r.rule), ['em-dash', 'plain-words']);
+  assert.deepEqual(LINT_RULES.filter((r) => r.copy).map((r) => r.rule), ['em-dash', 'plain-words', 'system-word', 'one-word-button', 'title-stop']);
 });
 
 test('placeholder: a figure with no answer is the hole, named by its last word', () => {
@@ -66,7 +65,8 @@ test('raw-key: a key in a figure slot, or joined words in the product copy; not 
 test('raw-id: a row number, a run handle, a ULID, a UUID or a random id where a name goes', () => {
   for (const id of ['tools#8', 'S731', '01J9ZQ4X8M2K7V3N6P5R1T0W9Y', '3f2b8c1e-9a4d-4e6f-8b2a-1c5d7e9f0a3b', 'a3f9c2e81b7d4f60', 'V1StGXR8Z5jdHi6BmyT0aq'])
     assert.equal(red(lintText(`Started by ${id} this morning`), 'raw-id').said, 'Prints an id where a name goes.');
-  assert.deepEqual(lintText(`Started by ${OWNER.name} this morning, the 3rd of 12`), []);
+  /* `fixtures/names.ts`'s owner, written out: a test in `src/` may not climb out of its package (the graph gate). */
+  assert.deepEqual(lintText('Started by Mara Lindqvist this morning, the 3rd of 12'), []);
 });
 
 test('raw-id: a part that prints handles on purpose declares it, and his own notes keep their hashes', () => {
@@ -125,13 +125,78 @@ test('plain-words: credential, and register as a noun, never register the verb',
   assert.deepEqual(lintText('Register a passkey to sign in. Your keys stay in the vault.'), []);
 });
 
-test('plain-words READS THE WORDS GATE\'S LIST: PAGE_WORDS is words.json\'s page entries, word for word', () => {
+test('plain-words and system-word READ THE WORDS GATE\'S LIST: PAGE_WORDS and BUTTON_WORDS are words.json\'s, word for word', () => {
   const list = JSON.parse(readFileSync(new URL('../../../tools/gates/words.json', import.meta.url), 'utf8')) as {
-    words: { name: string; shape: string; case?: true; page: boolean }[];
+    words: { name: string; shape: string; case?: true; page: false | 'plain-words' | 'system-word' }[];
+    buttons: string[];
   };
-  const page = list.words.filter((w) => w.page).map((w) => ({ name: w.name, shape: w.shape, ...(w.case ? { case: true as const } : {}) }));
+  const page = list.words.filter((w) => w.page).map((w) => ({ name: w.name, shape: w.shape, ...(w.case ? { case: true as const } : {}), rule: w.page }));
   assert.deepEqual(PAGE_WORDS, page);
-  for (const w of PAGE_WORDS) red(lintText(`Open the ${w.name} here`), 'plain-words');
+  assert.deepEqual(BUTTON_WORDS, list.buttons);
+  for (const w of PAGE_WORDS) red(lintText(`Open the ${w.name} here`), w.rule);
+  for (const b of BUTTON_WORDS) assert.deepEqual(lintHtml(`<button>${b}</button>`), [], b);
+});
+
+test('system-word: pack, schema and MCP in the product copy; add-on and the agent app by name are plain', () => {
+  assert.equal(red(lintText('Install the pack to add its schema'), 'system-word').said, 'Says a word for how the app is built where a plain word goes: "pack", "schema".');
+  red(lintText('Connect any MCP client'), 'system-word');
+  assert.deepEqual(lintText('Install the add-on to add its fields. Connect Claude Code or Cursor.'), []);
+  assert.deepEqual(lintText('Six packs of paper and a spark of an idea', { name: 'Note', theirs: true }), []);
+});
+
+test('dev-name: his Decide on 7 October, a name from the code where a sentence stands', () => {
+  const decide = 'bank-card-used-sms could not read account out of this one. Accept it into transactions, or fix the pattern.';
+  assert.equal(red(lintText(decide, { name: 'Decide', theirs: true }), 'dev-name').said, 'Prints a name from the code where a sentence should say what it is.');
+  red(lintText("infer.resolve could not be delivered after 8 attempts: No model answered for 'glm-5.3-flash'", { name: 'Decide', theirs: true }), 'dev-name');
+  red(lintText('Waiting on the run of card-alerts-import-daily'), 'dev-name');
+  /* A site, a file, a mail address, plain English hyphens, a name standing alone, and one in the middle of his own note. */
+  assert.deepEqual(lintText('Crumb.gg is live at crumb.gg and brain.dog; notes in plan.md and package.json, mail tima@quartz.studio'), []);
+  assert.deepEqual(lintText('Move kilnfonts.example off auto-renew, and keep sending from portagemail.example'), [], "the seed's sample sites");
+  assert.deepEqual(lintText('An up-to-date, pay-as-you-go plan, end-to-end'), []);
+  assert.deepEqual(lintText('gstack-openclaw-ceo-review'), []);
+  assert.deepEqual(lintText('Fixed the bug in infer.resolve today', { name: 'Note', theirs: true }), []);
+});
+
+test('bare-key: his Renewals on 7 October printed a service type as its key; its name is green', () => {
+  const keys = ['vm', 'domain', 'database', 'edge', 'object'];
+  const part = { name: 'Each month, by type', keys };
+  assert.equal(red(lintText('vm E£547.97 71%', part), 'bare-key').said, 'Prints a value as its key where its name goes.');
+  assert.equal(red(lintText('Each month, by type: vm E£547.97 71%, Domain E£224.05 29%, database E£0, edge E£0', part), 'bare-key').said, 'Prints 3 values as their keys where their names go.');
+  assert.deepEqual(lintText('Server E£547.97 71%\nDomain E£224.05 29%\nWhat each domain points at', part), []);
+  assert.deepEqual(lintText('vm E£547.97 71%'), [], 'with no keys given, nothing is a key');
+});
+
+test('one-word-button: a drawn button or an answer\'s action of one word, unless it is on the approved list', () => {
+  assert.equal(red(lintHtml('<button type="button">Submit</button><button>Save</button>'), 'one-word-button').said, 'Has 2 buttons of one word: "Submit", "Save". Say what each does to what.');
+  red(lintText('Accept it into transactions?', { name: 'Decide', buttons: ['Accept', 'Dismiss'] }), 'one-word-button');
+  assert.deepEqual(lintHtml('<button>Save the bill</button><button>Cancel</button><button>Undo</button>'), []);
+  assert.deepEqual(lintHtml('<button type="button" class="prop-row" data-hole>Uncategorised</button>'), [], "a bar's bucket drawn as a control is a value");
+});
+
+test('title-stop: a heading, a button or a heading part that ends in a full stop; a sentence, an ellipsis and a short form do not', () => {
+  assert.equal(red(lintHtml('<h2 class="sec-title">What you owe.</h2><p>Three bills are due.</p>'), 'title-stop').said, 'Ends a title in a full stop.');
+  red(lintHtml('<button>Save the bill.</button>'), 'title-stop');
+  red(lintText('Who are you.', { name: 'First run', heading: true }), 'title-stop');
+  assert.deepEqual(lintHtml('<h2>What you owe</h2><p>Three bills are due.</p><h3>Acme Ltd.</h3><h3>Loading more...</h3>'), []);
+  assert.deepEqual(lintText('Who are you.', { name: 'Note', heading: true, theirs: true }), []);
+});
+
+test('raw-fault: a thrown error on a page; in his own words only a stack line', () => {
+  assert.equal(red(lintText("TypeError: Cannot read properties of undefined (reading 'amount')"), 'raw-fault').said, 'Prints an error from the code where a sentence should say what went wrong.');
+  red(lintText('Failed to fetch'), 'raw-fault');
+  red(lintText('at fillFeed (/app/packs/live-feed/fill.ts:194:12)', { name: 'Note', theirs: true }), 'raw-fault');
+  assert.deepEqual(lintText('Owed [object Object]'), [], 'a value that never arrived is the printed gate\'s own word');
+  assert.deepEqual(lintText('Fixed the TypeError on sign in', { name: 'Note', theirs: true }), []);
+  assert.deepEqual(lintText('The bank did not answer. Try again in a minute.'), []);
+});
+
+test('NO RULE READS CODE: a span in backticks or a type\'s angle brackets, in the words or the HTML, and the words beside them are read', () => {
+  assert.deepEqual(lintText('Run `infer.resolve` again today, with the `pack` and `rows` flags'), []);
+  assert.deepEqual(lintText('A Record<string, Pack> holds Map<string, Array<Row>> here'), []);
+  assert.deepEqual(lintHtml('<p>Returns Promise&lt;Row[]&gt; and <code>TypeError: x is not a function</code> to the caller</p>'), []);
+  assert.deepEqual(lintText('Who are you `x.`', { name: 'First run', heading: true }), []);
+  assert.deepEqual(rules(lintText('A Record<string, Pack> holds the rows')), ['plain-words']);
+  assert.deepEqual(rules(lintText('Run `x` now, then infer.resolve could not be delivered')), ['dev-name']);
 });
 
 test('A WHOLE DECLARED PAGE, DRAWN BY toHTML, HAS NOTHING TO FIND, and a code sample is never read', () => {

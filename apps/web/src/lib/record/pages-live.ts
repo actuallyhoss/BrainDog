@@ -147,8 +147,9 @@ export function bodyOfBlock(answered: Record<string, unknown>): BlockBody {
 function bodyOf(slug: string, answered: Record<string, unknown>): PageBody {
   /* `read_at` AND `declared_version` ARE THE ANSWER'S, the clock it was read by and the version it was read at, and a body
      carrying them back would declare one moment's reading. So is `look`, the arrangement the page was read under, which
-     is a declaration of its own (`look.<page>`) and which a page refuses as a key it does not have. */
-  const { blocks, read_at: _clock, declared_version: _version, look: _look, ...rest } = answered;
+     is a declaration of its own (`look.<page>`) and which a page refuses as a key it does not have. And `zone`, the
+     record's own zone the page was read in (PGS-B04), which is the reading's and no key a page has. */
+  const { blocks, read_at: _clock, declared_version: _version, look: _look, zone: _zone, ...rest } = answered;
   /* `page` IS THE FIRST KEY, because the record reads a declaration's kind from its first key and the answer does not keep
      the order a page was declared in: a body read back with `nav` first was refused as a declaration that begins with nav. */
   const named = { page: typeof rest.page === 'string' ? rest.page : slug, title: typeof rest.title === 'string' ? rest.title : '' };

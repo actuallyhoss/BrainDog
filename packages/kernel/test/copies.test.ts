@@ -56,7 +56,7 @@ test('A FAILED NIGHT IS NEVER A COPY: one failed note, one fault, and the last c
 
   assert.equal(copyFacts(sql).last_copy_at, new Date(kept).toISOString());
   assert.equal(copyFacts(sql).last_copy_bytes, 10);
-  assert.equal(exportNotes(sql).at(-1), 'failed: the bucket said no');
+  assert.equal(exportNotes(sql).at(-1), 'failed: the copy could not be saved');
   const faults = openFaults(sql);
   assert.equal(faults.length, 1);
   assert.equal(faults[0]!.cause, NIGHT_FAULT);
@@ -104,7 +104,30 @@ test('THE FACTS ARE LOCAL: a copy or a failure written after the dump never trav
   assert.equal(second.value.join('\n'), first.value.join('\n'));
 });
 
-test('A FAILED NOTE WITH NO REASON STILL SAYS THE NIGHT FAILED', () => {
-  assert.equal(failedNote('  '), 'failed: no reason given');
+test('A FAILED NOTE IS ALWAYS THE SAME WORDS, whatever the night threw', () => {
+  assert.equal(failedNote(), 'failed: the copy could not be saved');
   assert.equal(keptNote('x', 12.7), 'snapshot x 12 bytes');
+});
+
+test('AN ERROR NAMING A BUCKET AND A KEY NEVER REACHES A NOTE: the reason goes to the fault alone', async () => {
+  // Audit 40-42 finding 3: a note is history anyone reading the record sees, and the raw error named the bucket.
+  const { k, sql, clock } = await record();
+  const why = 'R2 bucket braindog-copies-prod refused PUT rec_01J9ZQ/snapshots/2026-10-09 (403)';
+  copyFailed(sql, life(k), why, clock.now());
+
+  const notes = sql.all<{ note: string | null }>('SELECT note FROM event').map((r) => r.note ?? '');
+  for (const word of ['bucket', 'braindog-copies-prod', 'rec_01J9ZQ', 'snapshots/', '403']) {
+    assert.ok(!notes.some((n) => n.includes(word)), `a note carries "${word}"`);
+  }
+  assert.equal(exportNotes(sql).at(-1), 'failed: the copy could not be saved');
+  const fault = sql.one<{ error: string }>('SELECT error FROM fault WHERE cause = ?', NIGHT_FAULT);
+  assert.equal(fault?.error, why, 'the reason is kept where only the fault reads it');
+
+  // A reason a page long still reaches the operator, capped, and the note stays the same words.
+  const long = `${why} ${'stack '.repeat(1000)}`;
+  copyFailed(sql, life(k), long, clock.now());
+  const again = sql.one<{ error: string; count: number }>('SELECT error, count FROM fault WHERE cause = ?', NIGHT_FAULT);
+  assert.equal(again?.error, long.slice(0, 500));
+  assert.equal(Number(again?.count), 2);
+  assert.equal(exportNotes(sql).at(-1), 'failed: the copy could not be saved');
 });

@@ -1,0 +1,46 @@
+page: board_frame
+title: Frame
+icon: home
+requires: [register.session]
+
+blocks:
+  - kind: note
+    span: 12
+    body: "{{questions-open}} question(s) are waiting on you"
+    lead: true
+  - kind: stat
+    heading: What you have
+    span: 8
+    source: figures.home
+    icon: wallet
+    lead: true
+  - kind: queue
+    heading: Needs your call
+    span: 4
+    source: governance.open
+    limit: 3
+    empty: Nothing needs your call.
+    icon: ask
+  - kind: table
+    heading: Due soon
+    span: 12
+    source: deadlines
+    columns: [{"field":"title","label":"Description","width":"minmax(14ch,1fr)"},{"field":"amount","label":"Amount","width":"15ch","align":"end","sign":{"field":"direction","minus":"out"}},{"field":"day","label":"Due","width":"13ch","align":"end"}]
+    limit: 6
+    empty: Nothing is due in the next two weeks.
+    horizon: 14
+    icon: calendar-clock
+  - kind: feed
+    heading: What changed
+    span: 6
+    source: activity
+    empty: Nothing has changed yet.
+    first: 6
+    icon: history
+  - kind: table
+    heading: Next steps left
+    span: 6
+    source: handoffs.open
+    limit: 6
+    empty: No run left a next step.
+    icon: session

@@ -403,7 +403,7 @@
             ]
           },
           "yanked": {
-            "reason": "Set a poll up from Settings",
+            "reason": "Set a poll up on a project's page, under Send numbers here",
             "at": "2026-09-28T15:05:40.127Z"
           }
         }
@@ -772,7 +772,7 @@
     {
       "kind": "pack",
       "id": "live-feed",
-      "title": "Live numbers",
+      "title": "Live feed",
       "summary": "Polls stats.example.com every 1h, one request each time, for Monthly recurring revenue, Active users.",
       "author": "BrainDog",
       "license": "MIT",
@@ -781,9 +781,9 @@
       "versions": [
         {
           "version": "2.0.0",
-          "checksum": "d102893d763468131761c8f35c15a9ea52fb5a7cf2fdb898e4caafcd430f0d96",
-          "bytes": 3504,
-          "published_at": "2026-10-09T01:51:31.441Z",
+          "checksum": "cae8f0f70bac242e1287e6811076dd37d06632800dd702a1ebabea0480b122f9",
+          "bytes": 3501,
+          "published_at": "2026-10-09T18:37:02.569Z",
           "bump": null,
           "reach": {
             "modules": [],
@@ -1452,7 +1452,7 @@
             ]
           },
           "yanked": {
-            "reason": "Set a poll up from Settings",
+            "reason": "Set a poll up on a project's page, under Send numbers here",
             "at": "2026-09-28T15:05:40.127Z"
           }
         },
@@ -1478,7 +1478,7 @@
             ]
           },
           "yanked": {
-            "reason": "Set a poll up from Settings",
+            "reason": "Set a poll up on a project's page, under Send numbers here",
             "at": "2026-09-28T15:05:40.127Z"
           }
         }
@@ -1632,9 +1632,9 @@
       "versions": [
         {
           "version": "1.0.0",
-          "checksum": "08bd05ea297f3172e8fc35d6a37c5524a3de9f420129fc47a02d982626f0329c",
-          "bytes": 15768,
-          "published_at": "2026-10-09T01:51:31.441Z",
+          "checksum": "8c580c6d5cd06302679d0eff8cbd56a610595ad1da78de8c9947cb366f2d79ae",
+          "bytes": 15861,
+          "published_at": "2026-10-09T16:22:30.780Z",
           "bump": null,
           "reach": {
             "modules": [

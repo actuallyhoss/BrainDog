@@ -209,7 +209,7 @@ export async function yankFromKennel(
 /* ── the operator's review ──────────────────────────────────────────────── */
 
 const REVIEW_USAGE =
-  'braindog kennel review takes nothing (what waits), show <kind> <id> <version>, list <kind> <id> <version> [--reason <why>], refuse <kind> <id> <version> --reason <why>, or trust <publisher>, each with --kennel <host> for a Kennel other than the public one.';
+  'braindog kennel review takes nothing (what waits), show <kind> <id> <version>, list <kind> <id> <version> [--reason <why>], refuse <kind> <id> <version> --reason <why>, or trust <publisher> [--probe], each with --kennel <host> for a Kennel other than the public one.';
 
 /** What a version reaches, as the review says it: one line for lists and pages, and every calls-out line on its own. */
 function reachSaid(given: Reach): string[] {
@@ -231,10 +231,10 @@ export async function kennel(args: string[], io: AgentIo): Promise<number> {
     return 1;
   }
   const { rest, kennel: given } = takeKennel(after);
-  let values: { reason?: string | undefined };
+  let values: { reason?: string | undefined; probe?: boolean | undefined };
   let positionals: string[];
   try {
-    ({ values, positionals } = parseArgs({ args: rest, allowPositionals: true, strict: true, options: { reason: { type: 'string' } } }));
+    ({ values, positionals } = parseArgs({ args: rest, allowPositionals: true, strict: true, options: { reason: { type: 'string' }, probe: { type: 'boolean' } } }));
   } catch {
     io.say(REVIEW_USAGE);
     return 1;
@@ -274,9 +274,16 @@ export async function kennel(args: string[], io: AgentIo): Promise<number> {
       io.say('braindog kennel review trust takes one publisher as the review list names it, key:<key id> or person:<person id>.');
       return 1;
     }
-    const got = await kennelCall<unknown>(base, 'publisher', io, { method: 'POST', body: { publisher, trusted: true }, bearer: operator });
+    /* `--probe` MARKS THE NIGHTLY PROBE'S KEY, the one publisher the Kennel takes ids beginning `probe-` from. Trusted
+       again without it, the key keeps its trust and loses the prefix. */
+    const probe = values.probe === true;
+    const got = await kennelCall<unknown>(base, 'publisher', io, { method: 'POST', body: { publisher, trusted: true, ...(probe ? { probe: true } : {}) }, bearer: operator });
     if (!got.ok) return refuse(io, got, saidWithCode(got));
-    io.out(`${oneLine(publisher)} is trusted: what they submit from now on is listed at once, without waiting for review.`);
+    io.out(
+      probe
+        ? `${oneLine(publisher)} is trusted as the nightly probe: what they submit is listed at once, and only they may publish add-ons whose ids begin probe-.`
+        : `${oneLine(publisher)} is trusted: what they submit from now on is listed at once, without waiting for review.`,
+    );
     return 0;
   }
 

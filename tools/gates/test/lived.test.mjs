@@ -48,12 +48,14 @@ const FLOW = new Set(['scripts-paused', 'scripts-refused', 'scripts-sourceless',
 const UNTENDED_GREEN = new Map([
   ['schedule-failed', 'tending is answering and filing; a job that runs by itself dies of its own fault, and none does here'],
   ['arrivals-unverified', 'both profiles send only verified texts, tended or not; an arrival nothing verified is the sender\'s, not the owner\'s'],
+  ['writes-authored', 'every write the profile makes is signed by a person, an agent or a mechanism, tended or not'],
+  ['format-current', 'this build brings the record to the current format at every open, tended or not'],
+  ['amounts-whole', 'the profile writes every amount through the kernel, which keeps it whole and in a currency, tended or not'],
 ]);
 
-/** And the one that may read red on the tended record, with why. */
-const TENDED_RED = new Map([
-  ['doors-silent', 'both profiles stop their texts about three and a half days before the end (`lastDaysQuiet` 2 and the spread in `daysOf`), a door gone quiet; on default nothing files, so it reads none'],
-]);
+/** And those that may read red on the tended record, with why: none. Its texts run to about a day and a half before the
+    end (`lastDaysQuiet` 0 and the spread in `daysOf`), so no busy door goes quiet and `doors-silent` reads green. */
+const TENDED_RED = new Map([]);
 
 const of = (signs, id) => {
   const s = signs.find((x) => x.sign === id);
@@ -100,7 +102,7 @@ test('LIVED-WELL: the same weeks tended, and every sign the kernel reads is gree
   for (const s of signs) if (!TENDED_RED.has(s.sign)) assert.notEqual(s.state, 'red', `${s.sign} reads red on a tended record: ${s.said}`);
   for (const [id, why] of TENDED_RED) t.diagnostic(`lived-well  may read red: ${id}, since ${why}`);
   for (const id of ['actions-paused', 'actions-held']) assert.equal(of(signs, id).state, 'none', `${id} read ${of(signs, id).state}: ${of(signs, id).said}`);
-  for (const id of ['schedule-failed', 'arrivals-unverified']) assert.equal(of(signs, id).state, 'green', `${id} read ${of(signs, id).state}: ${of(signs, id).said}`);
+  for (const id of ['schedule-failed', 'arrivals-unverified', 'doors-silent']) assert.equal(of(signs, id).state, 'green', `${id} read ${of(signs, id).state}: ${of(signs, id).said}`);
   assert.equal(of(signs, 'arrivals-filed').said, 'Every message has been filed or set aside within a day.');
   assert.equal(of(signs, 'numbers-arrive').said, 'Every series has its numbers on time.');
   assert.equal(of(signs, 'questions-by-cause').said, 'No question is waiting.');

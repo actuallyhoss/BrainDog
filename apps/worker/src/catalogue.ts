@@ -1,16 +1,21 @@
 /**
- * The hosted app's catalogue, read by the Worker for Slash: the folder bundled with the web shell (`apps/web/static/catalogue`)
- * and served by the static assets at `/app/catalogue/` (at `/catalogue/` before the app had a base path), the same one
- * `/packs` reads in the tab.
+ * The hosted app's catalogue, read by the Worker for Slash and the arranger: the Kennel this Worker hosts (`kennel.ts`,
+ * `kennelReader`), which is the folder bundled with the web shell (`apps/web/static/catalogue`, served by the static
+ * assets at `/app/catalogue/`) merged with what authors published to the Kennel's bucket. With no bucket bound, the
+ * bundled folder alone.
  *
  * THE SAME OFFERS A SELF-HOST GIVES (`@braindog/record/catalogue-offers`): a newer version of what a record holds, held to its
- * checksum and signature and read through its door, which Slash asks about once on Decide. Nothing installs from here.
+ * checksum and signature and read through its door, which Slash asks about once on Decide. Nothing installs from here
+ * until the owner says yes: the shelf below hands the arranger a document only for a question he accepts.
  *
  * THE ASSETS ANSWER THE SHELL FOR A PATH THEY DO NOT HOLD (`not_found_handling: single-page-application`), with a 200. So a
  * reply that is not JSON is a file that is not there, and only the two shapes a catalogue lists are ever asked for.
  */
 
+import { CATALOGUE_INDEX } from '@braindog/declare/catalogue';
 import { offersFromCatalogue, shelfFromCatalogue, type CatalogueReader } from '@braindog/record/catalogue-offers';
+
+import { kennelReader, type KennelBucket } from './kennel.ts';
 
 /** The part of the assets binding read here, so a test hands in a folder. */
 export type Assets = { fetch(request: Request): Promise<Response> };
@@ -44,8 +49,31 @@ export function assetsReader(assets: Assets): CatalogueReader {
   };
 }
 
-/** Slash's catalogue offers on the Worker, or none when no assets are bound. */
-export const workerCatalogueOffers = (assets: Assets | undefined) => (assets === undefined ? undefined : offersFromCatalogue(assetsReader(assets)));
+/**
+ * The catalogue a record installs from, read through the Kennel (`kennelReader`): the index is the bundled one and the
+ * Kennel's merged, EVERY ENTRY KEPT, so an unlisted add-on installs by its id and stays out of what is listed
+ * (`shelfFromCatalogue` lists with `listedEntries`). A file is the bucket's, then the bundled folder's. A Kennel index
+ * that does not read is the bundled catalogue alone, as the public door serves it.
+ */
+export function kennelCatalogueReader(deps: { assets?: Assets | undefined; blobs?: KennelBucket | undefined }): CatalogueReader {
+  const kennel = kennelReader(deps);
+  return async (path) => {
+    if (!PATH.test(path)) return null;
+    return path === CATALOGUE_INDEX ? JSON.stringify(await kennel.index()) : kennel.file(path);
+  };
+}
 
-/** The whole catalogue on the Worker, for the arranger, or none when no assets are bound. Handed in once `RecordDeps.catalogueShelf` is declared. */
-export const workerCatalogueShelf = (assets: Assets | undefined) => (assets === undefined ? undefined : shelfFromCatalogue(assetsReader(assets)));
+const kennelOf = (assets: Assets | undefined, blobs: KennelBucket | undefined) =>
+  assets === undefined && blobs === undefined ? undefined : kennelCatalogueReader({ assets, blobs });
+
+/** Slash's catalogue offers on the Worker, from the Kennel and the bundled folder, or none when neither is bound. */
+export const workerCatalogueOffers = (assets: Assets | undefined, blobs?: KennelBucket) => {
+  const read = kennelOf(assets, blobs);
+  return read === undefined ? undefined : offersFromCatalogue(read);
+};
+
+/** The whole catalogue on the Worker, for the arranger (`RecordDeps.catalogueShelf`): the Kennel's and the bundled folder's, or none when neither is bound. */
+export const workerCatalogueShelf = (assets: Assets | undefined, blobs?: KennelBucket) => {
+  const read = kennelOf(assets, blobs);
+  return read === undefined ? undefined : shelfFromCatalogue(read);
+};

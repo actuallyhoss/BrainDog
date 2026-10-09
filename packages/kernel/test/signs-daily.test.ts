@@ -31,7 +31,7 @@ test('THREE NIGHTS: due at 00:05 Cairo, one row a sign for the day that ended, t
   clock.advance(first - clock.now());
   assert.equal(runSignsNight(sql, clock.now(), TZ), VITAL_SIGNS.length);
   const one = rows(sql, '2026-10-08');
-  assert.equal(one.length, 22);
+  assert.equal(one.length, 25);
   assert.ok(one.every((r) => r.state === 'none'), 'an empty record had a day that was not none');
   assert.deepEqual(new Set(one.map((r) => r.hand)), new Set(['kernel', 'host', 'record']));
   for (const r of one) assert.equal(r.rule, ruleOf(signOf(r.sign)!));
@@ -49,15 +49,15 @@ test('THREE NIGHTS: due at 00:05 Cairo, one row a sign for the day that ended, t
   clock.advance(second - clock.now());
   assert.equal(runSignsNight(sql, clock.now(), TZ), VITAL_SIGNS.length - 1);
   const two = rows(sql, '2026-10-09');
-  assert.equal(two.length, 22);
+  assert.equal(two.length, 25);
   assert.equal(two.find((r) => r.sign === 'model-answers')?.state, 'green');
   assert.equal(two.find((r) => r.sign === 'questions-by-cause')?.state, 'red');
 
   /* NIGHT THREE, and run twice: the kernel's five are read again over themselves, nothing doubles. */
   clock.advance(nextSignsDue(clock.now(), TZ) - clock.now());
   assert.equal(runSignsNight(sql, clock.now(), TZ), VITAL_SIGNS.length);
-  assert.equal(runSignsNight(sql, clock.now(), TZ), 17, 'a night run again wrote over the filed signs');
-  assert.equal(rows(sql, '2026-10-10').length, 22);
+  assert.equal(runSignsNight(sql, clock.now(), TZ), 20, 'a night run again wrote over the filed signs');
+  assert.equal(rows(sql, '2026-10-10').length, 25);
   assert.equal(rows(sql, '2026-10-10').find((r) => r.sign === 'model-answers')?.state, 'none', 'yesterday’s filing stood for a day nothing was filed');
 
   const signs = readSigns(sql, clock.now() + MIN, TZ);
@@ -129,9 +129,9 @@ test('THROUGH THE KERNEL: the record arms the night as it opens, the night fires
   }
   const days = sql.all<{ day: string; n: number }>('SELECT day, count(*) AS n FROM sign_reading GROUP BY day ORDER BY day').map((r) => ({ day: r.day, n: Number(r.n) }));
   assert.deepEqual(days, [
-    { day: '2026-10-08', n: 22 },
-    { day: '2026-10-09', n: 22 },
-    { day: '2026-10-10', n: 22 },
+    { day: '2026-10-08', n: 25 },
+    { day: '2026-10-09', n: 25 },
+    { day: '2026-10-10', n: 25 },
   ]);
   const read = again.signs();
   assert.ok(read.ok);

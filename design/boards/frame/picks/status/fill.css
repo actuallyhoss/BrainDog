@@ -1,0 +1,12 @@
+/* A status as a soft fill of its colour behind its words, with no dot. Put after the product's sheets. Every part that
+   draws a status draws a dot inside the part that carries `data-intent`: `.glyph` on a stat, a feed line, a list item
+   or a card, `.td-glyph` in a table's first cell. The fill goes on whatever holds the dot. */
+[data-intent]:has(> :is(.glyph, .td-glyph)),
+[data-intent] :has(> :is(.glyph, .td-glyph)) {
+  background: color-mix(in srgb, var(--tone-fill, var(--status-idle)) 16%, var(--tile));
+  border-radius: 8px;
+  padding-inline: 8px;
+}
+[data-intent] :is(.glyph, .td-glyph) {
+  display: none;
+}

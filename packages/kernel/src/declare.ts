@@ -376,12 +376,16 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
   };
   const id = decl.id;
 
-  /* `register.<id>` OR `series.<id>` (`08 §2`, `25 §8`), OR THE WALK AHEAD, `forecast.runway` (`money-figures.ts`). A
-     bare register name is the commonest mistake and the evaluator reads it as none of them. */
-  if (typeof body.source !== 'string' || (body.source !== WALK_SOURCE && !/^(?:register|series)\.[a-z][a-z0-9_-]*$/u.test(body.source)))
+  /* `register.<id>` OR `series.<id>` (`08 §2`, `25 §8`), OR THE WALK AHEAD, `forecast.runway` (`money-figures.ts`), OR
+     THE AGENT DOOR'S OWN SIGNS, `record.door` (`built-in-figures.ts` readDoor, named by the figure's `sign`). A bare
+     register name is the commonest mistake and the evaluator reads it as none of them. */
+  if (
+    typeof body.source !== 'string' ||
+    (body.source !== WALK_SOURCE && body.source !== 'record.door' && !/^(?:register|series)\.[a-z][a-z0-9_-]*$/u.test(body.source))
+  )
     return bad(
       'DECLARATION_INVALID',
-      `${id} reads ${JSON.stringify(body.source ?? null)}; a metric's source is register.<id>, series.<id> or ${WALK_SOURCE}.`,
+      `${id} reads ${JSON.stringify(body.source ?? null)}; a metric's source is register.<id>, series.<id>, ${WALK_SOURCE} or record.door.`,
       'source',
     );
 
@@ -643,7 +647,9 @@ function metricFieldFault(id: string, source: unknown, value: unknown, groupBy: 
   /* A ROLLED FIGURE READS ITS ACCOUNTS' BALANCE AND DAY, which it names in `rolled` rather than as an aggregation. */
   const rolled = isRolled(value) ? (value as { rolled: { balance: string; as_of: string } }).rolled : null;
   for (const field of rolled ? [rolled.balance, rolled.as_of] : valueFields(value))
-    if (field !== 'id' && !declared.includes(field))
+    /* AND THE AGE OF WHEN AN ENTRY WAS MADE OR LAST WRITTEN (stands-50): `{ age: updated_at }` reads the stamp every
+       entry carries, which no list declares. */
+    if (field !== 'id' && !declared.includes(field) && !((field === 'created_at' || field === 'updated_at') && (value as { age?: unknown } | null)?.age === field))
       return bad('FIELD_UNKNOWN', `${id} reads ${field}, and ${register} has no field called ${field}.`, 'value', ['id', ...declared]);
   if (typeof groupBy === 'string' && !declared.includes(groupBy) && groupBy !== 'created_at' && groupBy !== 'updated_at')
     return bad('FIELD_UNKNOWN', `${id} groups by ${groupBy}, and ${register} has no field called ${groupBy}.`, 'group_by', declared);
@@ -821,6 +827,9 @@ function blockBody(decl: Declaration): Refusal | null {
 const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply', 'hue', 'picture'] as const;
 const CARD_FACTS = 3;
 
+/** The field types a list may be put in order by (`order: { field, dir }`). */
+const LIST_ORDERS: readonly string[] = ['int', 'decimal', 'duration', 'day', 'instant', 'text'];
+
 /** The field types a list of steps may be put in order by: lowest first. */
 const ORDERS_STEPS: readonly string[] = ['int', 'number', 'decimal', 'day', 'instant', 'text'];
 
@@ -871,22 +880,131 @@ const TONES = ['good', 'warn', 'bad', 'info'] as const;
  * live authority — the money page ships a block sourced from it. A source list that refused the
  * record's own page would be a check written from the document with the product left out.
  */
-const SOURCE = /^(?:register|metric)\.[a-z][a-z0-9_-]{0,31}$/u;
+const SOURCE = /^(?:register\.[a-z][a-z0-9_-]{0,31}|metric\.[a-z][a-z0-9_-]{0,31}(?::\S.{0,199})?)$/u;
 const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
 /* A SOURCE MUST BE HERE AND IN `pages.ts`'s `COMPUTED`, or a block reading it is refused at install while the reader
    stands ready. `runs_on` is a project's keys, tools, skills and actions; `deadlines` is every row due soon and
    `figures.home` the figures that ask a place on Home. `governance.later` is what was put off, soonest back first, and
    `governance.decided` what was answered, latest first. `sessions.working` is the runs working now, helpers folded under
    the run that started them, by the one clock in `presence.ts`. `signs` is every sign the record reads, red first.
-   `handoffs.open` is the next steps runs left and nobody has taken, newest first. */
+   `handoffs.open` is the next steps runs left and nobody has taken, newest first. `actions.blocking` is one project's
+   scheduled actions that are paused, failing or late (REC-C09). */
 const COMPUTED_SOURCES = [
   'forecast.runway', 'activity', 'sessions.live', 'sessions.working', 'actions', 'governance.open', 'governance.later',
-  'governance.decided', 'runs_on', 'deadlines', 'figures.home', 'signs', 'handoffs.open',
+  'governance.decided', 'runs_on', 'deadlines', 'figures.home', 'signs', 'handoffs.open', 'actions.blocking',
 ] as const;
 
 /** A metric id as a page says it: `project-owed:Kiln` is one document read about one project. */
 const metricNamed = (said: string): string => said.split(':')[0] ?? '';
 const METRIC_ID = /^[a-z][a-z0-9_-]{0,31}$/u;
+/** The comparisons a block's `when:` reads (`pages.ts` `drawnWhen`); `empty` is the test beside none of them. */
+const WHEN_COMPARES = ['gt', 'gte', 'lt', 'lte', 'is', 'not'] as const;
+
+/* ── a part that waits on what the record holds (SHL-A08) ──────────────────────────────────────────────────────── */
+
+/**
+ * `when: { holds: [...] }`: a part of an add-on that is there only while the record holds every list or role it names.
+ *
+ * THE PLAN RESOLVES IT, AND THE INSTALL NEVER SEES IT. `packages/declare`'s `resolveWhen` lays the add-on over what the
+ * record holds and what the add-on brings, keeps each part whose names are all held, takes the rest out and says them in
+ * the plan's `waiting`, and strips the key from every part it keeps. So a body this file stores never says it, and
+ * `pages.ts`, which reads a block's `when:` as a figure's test (`drawnWhen`), never meets the second shape. `validate`
+ * checks the shape where a part may say it and then reads the document as though every part were there.
+ *
+ * A NAME IS A LIST'S ID OR A ROLE A LIST PLAYS (`roles.ts`): `people` is held while the record has that list, and `meets`
+ * while some list plays the people `meet` writes, whatever it is called.
+ *
+ * ONE THAT REACHES THE INSTALL WAS NEVER PLANNED (`unplannedHolds`), as a setting that reaches it was never filled, and it
+ * is refused there rather than stored as a part that is always there.
+ */
+export const HOLDS_MOST = 8;
+export const HOLDS_ROLES: readonly string[] = ['rates', 'meets', 'org'];
+const HOLD_NAME = /^(?!.*__)[a-z][a-z0-9_]{0,31}$/u;
+
+type Part = Record<string, unknown>;
+const isPart = (v: unknown): v is Part => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/** A `when:` in the holds shape: an object with `holds` in it. Any other `when:` is a figure's test or a rule's condition. */
+export const isHolds = (when: unknown): when is { holds: unknown } => isPart(when) && Object.hasOwn(when, 'holds');
+
+/**
+ * Every place in one declaration's body a part may say `when: { holds }`, with where it is: `''` is the declaration
+ * itself (not a rule's, whose `when:` is what it fires on), then a list's fields, its pairing clause and its roles, a
+ * page's blocks with their columns and legs, and a figure's legs.
+ */
+export function holdingParts(kind: DeclKind, body: Part): { at: string; part: Part }[] {
+  const out: { at: string; part: Part }[] = kind === 'rule' ? [] : [{ at: '', part: body }];
+  const each = (key: string, of: Part, at: string): void => {
+    const items = of[key];
+    if (Array.isArray(items)) items.forEach((item, i) => isPart(item) && out.push({ at: `${at}${key}[${i}]`, part: item }));
+  };
+  if (kind === 'register') {
+    each('fields', body, '');
+    for (const key of ['pairs', ...HOLDS_ROLES]) if (isPart(body[key])) out.push({ at: key, part: body[key] as Part });
+  }
+  if (kind === 'page' && Array.isArray(body.blocks))
+    body.blocks.forEach((block, i) => {
+      if (!isPart(block)) return;
+      out.push({ at: `blocks[${i}]`, part: block });
+      each('columns', block, `blocks[${i}].`);
+      each('legs', block, `blocks[${i}].`);
+    });
+  if (kind === 'metric') each('legs', body, '');
+  return out;
+}
+
+/** The shape of every `when: { holds }` in a declaration, and the one part that may not wait: a required field. */
+function holdsFault(decl: Declaration): Refusal | null {
+  const body = decl.body as Part;
+  if (decl.kind === 'rule' && isHolds(body.when))
+    return bad('DECLARATION_INVALID', `${decl.id}'s when is what it fires on, so a rule cannot wait for a list this way. Put it in an add-on that requires the list.`, 'when');
+  for (const { at, part } of holdingParts(decl.kind, body)) {
+    const when = part.when;
+    if (when === undefined) continue;
+    const where = at === '' ? 'when' : `${at}.when`;
+    const said = at === '' ? decl.id : `${decl.id}.${at}`;
+    /* A BLOCK'S OTHER `when:` IS A FIGURE'S TEST, checked with the block. Nowhere else does a part read one. */
+    if (!isHolds(when)) {
+      if (decl.kind === 'page' && /^blocks\[\d+\]$/u.test(at)) continue;
+      return bad('DECLARATION_INVALID', `${said}'s when is { holds: [people] }: the lists or roles the record must hold for it to be there.`, where);
+    }
+    const beside = Object.keys(when).filter((k) => k !== 'holds');
+    if (beside.length > 0)
+      return bad('DECLARATION_INVALID', `${said}'s when says ${beside.join(' and ')} beside holds. A part that waits says only what it waits for: { holds: [people] }.`, where);
+    const names = when.holds;
+    if (!Array.isArray(names) || names.length === 0 || names.length > HOLDS_MOST)
+      return bad('DECLARATION_INVALID', `${said} waits for 1 to ${HOLDS_MOST} lists or roles, named in a list: when: { holds: [people] }.`, where);
+    const wrong = names.find((n) => typeof n !== 'string' || !HOLD_NAME.test(n));
+    if (wrong !== undefined)
+      return bad('DECLARATION_INVALID', `${said} waits for ${JSON.stringify(wrong)}, which is not a list's id or a role a list plays (${HOLDS_ROLES.join(', ')}).`, where);
+    if (new Set(names).size !== names.length) return bad('DECLARATION_INVALID', `${said} names one list twice in what it waits for.`, where);
+    /* A REQUIRED FIELD CANNOT COME AND GO: a row written while it waits would be refused for a field it cannot see. */
+    if (decl.kind === 'register' && at.startsWith('fields[') && (part.required === true || part.required_when !== undefined))
+      return bad('DECLARATION_INVALID', `${said} is required and waits for ${(names as string[]).join(', ')}. A field that comes and goes is optional: take required out, or the when.`, where);
+  }
+  return null;
+}
+
+/** The declaration as `validate` reads the rest of it: every part there, and no `when: { holds }` on any of them. */
+function withoutHolds(decl: Declaration): Declaration {
+  if (!holdingParts(decl.kind, decl.body as Part).some(({ part }) => isHolds(part.when))) return decl;
+  const body = structuredClone(decl.body) as Part;
+  for (const { part } of holdingParts(decl.kind, body)) if (isHolds(part.when)) delete part.when;
+  return { ...decl, body: body as Declaration['body'] };
+}
+
+/** The first `when: { holds }` in a batch about to be installed, which no plan resolved. */
+export function unplannedHolds(batch: readonly Declaration[]): Refusal | null {
+  for (const decl of batch)
+    for (const { at, part } of holdingParts(decl.kind, decl.body as Part))
+      if (isHolds(part.when))
+        return bad(
+          'DECLARATION_INVALID',
+          `${at === '' ? decl.id : `${decl.id}.${at}`} waits for what the record holds, which is worked out when its add-on is planned. Install it as part of an add-on, or take the when out.`,
+          at === '' ? `${decl.id}.when` : `${decl.id}.${at}.when`,
+        );
+  return null;
+}
 
 const isInt = (n: unknown, lo: number, hi: number): boolean => typeof n === 'number' && Number.isInteger(n) && n >= lo && n <= hi;
 
@@ -1566,7 +1684,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       )
         return bad(
           'DECLARATION_INVALID',
-          `${id}.${at} reads ${JSON.stringify(source ?? null)}; a block's source is register.<id>, metric.<id> or block.<n>.`,
+          `${id}.${at} reads ${JSON.stringify(source ?? null)}; a block's source is register.<id>, metric.<id> (or metric.<id>:<parameter>) or block.<n>.`,
           at,
         );
       /* `42 §4.5`: *"every register any block reads must be here"*, and this is the half of
@@ -1684,9 +1802,24 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
        A `when:` naming nothing is a block that is either always drawn or never — and both of those
        are indistinguishable from the block working. */
     if (block.when !== undefined) {
-      const when = block.when as { metric?: unknown };
+      const when = block.when as { metric?: unknown; empty?: unknown };
       if (when === null || typeof when !== 'object' || typeof when.metric !== 'string' || !METRIC_ID.test(metricNamed(when.metric)))
         return bad('DECLARATION_INVALID', `${id}.${at}'s when is one leaf naming a metric.`, at);
+      /* `empty:` IS THE ONE TEST A FIGURE WITH NO VALUE MEETS (PGS-C06). No comparison holds of a figure nobody has
+         given a value, so "No balance has been typed yet" could not be said where the sentence about cash goes.
+         `empty: true` holds while the figure has no value and no amount in any currency, `empty: false` once it has
+         one. It is the leaf's whole test: beside a comparison one of the two would never be read. */
+      if (when.empty !== undefined) {
+        if (typeof when.empty !== 'boolean')
+          return bad('DECLARATION_INVALID', `${id}.${at}'s when has empty: ${JSON.stringify(when.empty)}, and empty is true or false.`, at);
+        const beside = WHEN_COMPARES.filter((k) => Object.hasOwn(when, k));
+        if (beside.length > 0)
+          return bad(
+            'DECLARATION_INVALID',
+            `${id}.${at}'s when says empty and ${beside.join(' and ')}. A figure with no value meets no comparison, so empty is the whole test: { metric, empty: true }.`,
+            at,
+          );
+      }
     }
 
     if (block.columns !== undefined) {
@@ -3956,6 +4089,7 @@ function createFault(
 const REGISTER_KEYS = [
   'register', 'name', 'one', 'pack', 'series', 'fields', 'search', 'title', 'mobile', 'identity',
   'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes', 'steps', 'rates', 'meets', 'org', 'pairs',
+  'order',
   'delete',
   'owner_only',
   'hand',
@@ -4091,11 +4225,13 @@ function prefixHolder(self: string, prefix: string, installed?: Known): { who: s
  *   `by`        `decide`: once the row is made, only an accepted proposal changes the field.
  *   `currency_from` · `currency_fixed`  a money field's code: taken from the account a link names when an amount
  *               comes without one, and never changed once a row holds it (`currencyKeysFault`).
+ *   `when`      `{ holds: [people] }`: a field there only while the record holds those lists (`holdsFault`). The plan
+ *               takes it out, so a stored field never says it.
  */
 const FIELD_KEYS = [
   'id', 'type', 'of', 'values', 'required', 'index', 'unique', 'immutable', 'default', 'retired',
   'redact', 'transitions', 'remind', 'repeat', 'scope', 'min', 'max', 'required_when', 'by',
-  'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived', 'labels', 'currency_from', 'currency_fixed',
+  'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived', 'labels', 'currency_from', 'currency_fixed', 'when',
 ] as const;
 
 /**
@@ -4210,7 +4346,7 @@ function currencyKeysFault(id: string, fields: readonly Record<string, unknown>[
     if (link === undefined || link.type !== 'ref' || typeof link.to !== 'string')
       return bad(
         'DECLARATION_INVALID',
-        `${said} takes its currency from ${linkId}, and ${link === undefined ? `${id} has no field called ${linkId}` : `${linkId} is ${a(link.type)}, not a link to one row`}.`,
+        `${said} takes its currency from ${linkId}, and ${link === undefined ? `${id} has no field called ${linkId}` : `${linkId} is ${a(link.type)}, not a link to one entry`}.`,
         at,
       );
     const theirs = link.to === id ? fields : listFields(installed, link.to);
@@ -4751,6 +4887,11 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
       `${decl.id} reads the setting ${unfilled.key}, and a setting is filled only when its pack is planned and installed with a value for it.`,
       unfilled.at,
     );
+  /* A PART THAT WAITS (`when: { holds }`) IS CHECKED FOR ITS SHAPE, and the rest of the document is read as though every
+     part were there: the plan, not this check, decides which of them a record gets. */
+  const waits = holdsFault(decl);
+  if (waits) return waits;
+  decl = withoutHolds(decl);
   /* THE KERNEL'S REGISTER HAS ONE WRITER, its migrations (2, and 22 for the app a run is in). Every
      agent write resolves to a row of it, so a pack or a person declaring `register.session` would
      change what an agent is for the whole record. `PROVIDES_CONFLICT` is `30 §6`'s code for an id
@@ -5241,6 +5382,23 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
     if (fault) return fault;
   }
 
+  /* A LIST'S OWN ORDER (PGS-B06): what a read of it that names no order comes back in, where it came back by last change.
+     One field of this list that sorts, read lowest first or, with `dir: desc`, highest first: the Ledger by its date,
+     newest first. A money field does not sort, since two amounts in two currencies have no order. */
+  if (decl.body.order !== undefined) {
+    const order = decl.body.order;
+    const sorts = (fields as { id?: unknown; type?: unknown; retired?: unknown }[]).filter((f) => f.retired !== true && LIST_ORDERS.includes(String(f.type)));
+    if (!isPart(order) || Object.keys(order).some((k) => k !== 'field' && k !== 'dir') || (order.dir !== undefined && order.dir !== 'asc' && order.dir !== 'desc'))
+      return bad('DECLARATION_INVALID', `${id}'s order is one field and which way it reads: { field: date, dir: desc }.`, 'order', ['asc', 'desc']);
+    if (!sorts.some((f) => f.id === order.field))
+      return bad(
+        'DECLARATION_INVALID',
+        `${id} is put in order by ${JSON.stringify(order.field ?? null)}, and the order is a number, a day, a time or a text field of ${id}.`,
+        'order',
+        sorts.map((f) => String(f.id)),
+      );
+  }
+
   /* `delete:` TAKES THE ONE VALUE THE WRITE PATH KEEPS (`referenced.ts`). Any other would install a promise about
      deleting that nothing reads, which is the silence the unbuilt list above exists to refuse. */
   const deletes = decl.body.delete;
@@ -5437,6 +5595,8 @@ export type PlannedRecord = { known: Known; owners: Owners };
 export function lintBatch(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecord): Refusal | null {
   const off = disabledPackFault(sql, batch);
   if (off) return off;
+  const unplanned = unplannedHolds(batch);
+  if (unplanned) return unplanned;
   const known = knownTo(sql, batch, planned);
   const owners = ownersTo(sql, batch, planned);
   const held = heldIn(sql, planned);
@@ -5558,6 +5718,8 @@ export async function stageDeclarations(
   owners?: Owners,
   held?: ReadonlySet<string>,
 ): Promise<Result<(sql: Sql, now: number, transaction: <T>(fn: () => T) => T, expect?: Expected | Expected[]) => Result<Installed[]>>> {
+  const unplanned = unplannedHolds(batch);
+  if (unplanned) return { ok: false, refusal: unplanned };
   for (const decl of batch) {
     const wrong = validate(decl, known, owners, held);
     if (wrong) return { ok: false, refusal: wrong };

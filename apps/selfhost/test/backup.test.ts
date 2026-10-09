@@ -216,7 +216,7 @@ test('A NIGHT THAT FAILED IS TOLD AS THE CLOUD TELLS IT: one failed note and one
     assert.equal(await nightly.look(), null);
     now += 600_000;
     assert.equal(await nightly.look(), null);
-    assert.deepEqual(failedNotes(), ['failed: disk I/O error']);
+    assert.deepEqual(failedNotes(), ['failed: the copy could not be saved'], 'the reason never reaches a note');
     assert.equal(openFaults(running.sql).length, 1);
     assert.equal(openFaults(running.sql)[0]!.cause, NIGHT_FAULT);
     assert.equal(k.copyFacts().last_copy_at, null);

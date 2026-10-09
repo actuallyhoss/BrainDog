@@ -11,7 +11,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { AskSetup, SetupAsked, SetupReply } from './ask.ts';
-import { draftBrief, fromModel, outsideCatalogue, propose, proposeFirst, setupOffer } from './propose.ts';
+import { useCase } from '@braindog/seed/usecases';
+
+import { caseBecame, currencyFor, draftBrief, fromModel, heardWords, outsideCatalogue, propose, proposeFirst, setupOffer } from './propose.ts';
 
 const CTX = { zone: 'Europe/London', locale: 'en-GB' };
 
@@ -175,7 +177,7 @@ test("MARIAM'S SENTENCE: her as you, her words lit where she typed them, the sho
   assert.deepEqual(p.heard[0], { phrase: 'Mariam', became: 'you', at: [4, 10], you: true }, 'her name is the first line, and it becomes her');
   for (const h of p.heard) assert.equal(MARIAM.slice(...h.at!), h.phrase, `${h.phrase} is lit where she typed it`);
   const shop = p.heard.find((h) => h.phrase === 'a small candle shop');
-  assert.equal(shop?.became, 'Shop', 'the trade is lit whole, and it is the shop, not Projects');
+  assert.equal(shop?.became, 'Orders and Products', 'the trade is lit whole, and it is the shop\'s lists, not Projects');
 
   assert.equal(p.usecase, 'shop');
   assert.ok(p.also.includes('business'), 'freelancing is a business beside the shop');
@@ -183,11 +185,12 @@ test("MARIAM'S SENTENCE: her as you, her words lit where she typed them, the sho
 
   assert.deepEqual(p.places[0], { kind: 'today', id: 'today', name: 'Today', phrase: null, at: null }, 'Today first');
   const named = p.places.map((x) => x.name);
-  for (const place of ['Orders', 'Products', 'People', 'Money']) assert.ok(named.includes(place), `${place} is not among her places`);
-  assert.ok(named.indexOf('Orders') < named.indexOf('Money'), "the shop's lists come before the parts");
+  assert.deepEqual(named, ['Today', 'Orders', 'Products', 'Clients', 'Money'], 'her places, and no Projects she never spoke of');
   assert.equal(p.places.find((x) => x.name === 'Orders')?.phrase, 'a small candle shop');
-  assert.equal(p.places.find((x) => x.name === 'People')?.phrase, 'Mariam', 'People is there because she is');
-  assert.equal(p.places.find((x) => x.name === 'Money')?.phrase, 'freelance');
+  assert.equal(p.places.find((x) => x.name === 'Clients')?.phrase, 'Mariam', 'People, called Clients, is there because she is');
+  assert.equal(p.places.find((x) => x.name === 'Money')?.phrase, 'who owes me');
+  assert.ok(p.modules.includes('portfolio'), 'Projects is still installed, since Money stands on it');
+  assert.equal(p.currency, null, 'no currency typed and none from the device');
   /* NO COUNT AND NO ENTRY SHE DID NOT TYPE: a place is its name and the words that turned it on, and nothing is filled. */
   for (const x of p.places) assert.deepEqual(Object.keys(x).sort(), ['at', 'id', 'kind', 'name', 'phrase']);
   assert.deepEqual(p.rows, []);
@@ -213,9 +216,11 @@ test('EVERY PLACE SAYS THE WORDS THAT TURNED IT ON, and a part that only comes w
   const money = p.places.find((x) => x.id === 'money-core');
   assert.equal(money?.phrase, 'charge');
   assert.deepEqual(money?.at, [2, 8]);
-  const projects = p.places.find((x) => x.id === 'portfolio');
-  assert.equal(projects?.phrase, null, 'Projects comes because Money stands on it');
-  assert.equal(p.places.at(-1)?.id, 'portfolio', 'and it comes last');
+  assert.equal(p.places.find((x) => x.id === 'portfolio'), undefined, 'Projects comes only because Money stands on it, so it is not listed');
+  assert.ok(p.modules.includes('portfolio'), 'and it is still installed');
+  /* A PART LEANED ON IS LISTED WHERE A PHRASE OF THEIRS ASKED FOR IT. */
+  const asked = propose('I charge 500 a month for coaching and track my projects', CTX);
+  assert.ok(asked.places.some((x) => x.id === 'portfolio' && x.phrase !== null), 'a part asked for by name is listed');
   assert.deepEqual(p.heard.find((h) => h.loose)?.at, [9, 12], 'the amount with no currency is lit too');
 });
 
@@ -233,4 +238,94 @@ test("A MODEL'S READING IS LIT AND PLACED THE SAME WAY, and an amount the rules 
   assert.ok(p.heard.some((h) => h.loose && h.phrase === '900'), 'the amount the rules heard is kept for the one question');
   assert.equal(p.places.find((x) => x.id === 'orders')?.phrase, 'make candles');
   assert.equal(p.title, null, 'nothing names a business');
+});
+
+/* ── step 2 of use case 6: her words, as the mockup says them back ─────── */
+
+const CAIRO = { zone: 'Africa/Cairo', locale: 'en-GB', currency: 'EGP' };
+
+test('WHAT I HEARD, AS THE MOCKUP SAYS IT: Mariam is you, the shop its lists, freelance her Clients and Invoices, Money in EGP', () => {
+  const p = propose(MARIAM, CAIRO);
+  assert.deepEqual(
+    p.heard.map((h) => [h.phrase, h.became]),
+    [
+      ['Mariam', 'you'],
+      ['a small candle shop', 'Orders and Products'],
+      ['freelance as a designer', 'Clients and Invoices'],
+      ['orders', 'Orders'],
+      ['who owes me', 'Money, in EGP'],
+    ],
+  );
+  for (const h of p.heard) assert.equal(MARIAM.slice(...h.at!), h.phrase, `${h.phrase} is lit where she typed it`);
+  assert.deepEqual(p.names, { people: 'Clients' }, 'a freelancer\'s People are their Clients');
+  assert.equal(p.currency, 'EGP', 'her device keeps Cairo time, and Money keeps money');
+  assert.equal(p.currencyBy, 'device');
+  assert.deepEqual(p.places.map((x) => x.name), ['Today', 'Orders', 'Products', 'Clients', 'Money']);
+  assert.equal(p.title, "Mariam's Candles");
+});
+
+test('THE DEVICE\'S CURRENCY ONLY WHERE NONE WAS TYPED, and only where a part keeps money', () => {
+  assert.equal(propose("I'm a student", CAIRO).currency, null, 'nothing kept here holds an amount');
+  assert.equal(currencyFor(null, ['people', 'work'], CAIRO), null);
+  assert.equal(currencyFor(null, ['money-core'], CAIRO), 'EGP');
+  assert.equal(currencyFor('GBP', ['money-core'], CAIRO), 'GBP', 'what was typed outranks the device');
+  assert.equal(currencyFor(null, ['money-core'], { currency: 'XYZ' }), null, 'a currency nobody keeps is none');
+  assert.equal(currencyFor(null, ['money-core'], {}), null);
+  const typed = propose('I invoice Halden EGP 5,000 a month', { ...CAIRO, currency: 'USD' });
+  assert.equal(typed.currency, 'EGP');
+  assert.equal(typed.currencyBy, undefined);
+  assert.ok(!typed.heard.some((h) => h.became.endsWith(heardWords.inCurrency('USD'))), 'a device currency not taken is not said');
+  /* A BARE AMOUNT WAITS FOR THE ONE QUESTION: the device's is never said beside an amount it would not keep. */
+  const bare = propose('I run a candle shop and charge 900 a jar', CAIRO);
+  assert.equal(bare.currency, null);
+  assert.ok(bare.heard.some((h) => h.loose === true) && !bare.heard.some((h) => h.became.endsWith(heardWords.inCurrency('EGP'))));
+  assert.equal(currencyFor(null, ['money-core'], CAIRO, true), null);
+  assert.equal(currencyFor('GBP', ['money-core'], CAIRO, true), 'GBP');
+  /* THE TYPED ONE IS TYPED EVEN WHERE IT IS THE DEVICE'S, and is not said again. */
+  const same = propose('I invoice Halden EGP 5,000 a month', CAIRO);
+  assert.equal(same.currencyBy, undefined);
+  assert.ok(!same.heard.some((h) => h.became.endsWith(heardWords.inCurrency('EGP'))));
+  /* A FREELANCER WITH NO MONEY WORD STILL SEES THE CURRENCY TAKEN, on their Invoices. */
+  assert.equal(propose('Sami, I freelance', CAIRO).heard.find((h) => h.phrase === 'freelance')?.became, `Clients and Invoices, ${heardWords.inCurrency('EGP')}`);
+});
+
+test('A PHRASE IS LIT WHOLE: freelancing as anything, and who still owes them', () => {
+  const said = "I'm Jo. I freelance as a graphic designer and illustrator, and lose track of who still owes me.";
+  const p = propose(said, CTX);
+  const lit = p.heard.map((h) => h.phrase);
+  assert.ok(lit.includes('freelance as a graphic designer'), `lit: ${lit.join(' | ')}`);
+  assert.ok(lit.includes('who still owes me'), `lit: ${lit.join(' | ')}`);
+  assert.equal(p.heard.find((h) => h.phrase.startsWith('freelance'))?.became, 'Clients and Invoices');
+  /* "FREELANCE" ALONE IS A FREELANCER TOO, and a joining word never ends the phrase. */
+  assert.equal(propose('Sami, I freelance', CTX).heard.find((h) => h.phrase === 'freelance')?.became, 'Clients and Invoices');
+  assert.ok(propose('I freelance as a designer and teach', CTX).heard.some((h) => h.phrase === 'freelance as a designer'));
+});
+
+test('A USE CASE\'S PHRASE IS SAID AS ITS LISTS: the one it names, else all of them, else its title', () => {
+  const shop = useCase('shop');
+  const business = useCase('business');
+  assert.ok(shop && business);
+  assert.equal(caseBecame(shop, 'orders'), 'Orders');
+  assert.equal(caseBecame(shop, 'Product'), 'Products');
+  assert.equal(caseBecame(shop, 'a small candle shop'), 'Orders and Products');
+  assert.equal(caseBecame(business, 'my business'), business.title, 'a use case that brings no list is said by its title');
+});
+
+test("A MODEL'S READING TAKES THE DEVICE'S CURRENCY THE SAME WAY, and the rules' Clients stand in with their lines", async () => {
+  const thin = await proposeFirst(MARIAM, CAIRO, fake(reply({ usecase: 'shop', modules: ['money-core'], heard: [{ phrase: 'not in it', became: 'x' }] })).ask);
+  assert.equal(thin.currency, 'EGP');
+  assert.equal(thin.currencyBy, 'device');
+  assert.equal(thin.heard.filter((h) => h.became.endsWith(heardWords.inCurrency('EGP'))).length, 1, 'said once, not twice');
+  assert.deepEqual(thin.names, { people: 'Clients' });
+  const own = await proposeFirst(MARIAM, CAIRO, fake(reply({ usecase: 'shop', modules: ['money-core'], heard: [{ phrase: 'who owes me', became: 'Money' }] })).ask);
+  assert.equal(own.heard.find((h) => h.phrase === 'who owes me')?.became, 'Money, in EGP');
+  assert.equal(own.names, undefined, "the model's own lines carry no rename of the rules'");
+  /* A CURRENCY SHE TYPED THAT IS ALSO HER DEVICE'S IS STILL HERS, whatever the model read. */
+  const typedEgp = 'I run a candle shop and invoice Halden EGP 5,000 a month';
+  const mine = await proposeFirst(typedEgp, CAIRO, fake(reply({ usecase: 'shop', modules: ['money-core'], heard: [{ phrase: 'invoice', became: 'Money' }] })).ask);
+  assert.equal(mine.currency, 'EGP');
+  assert.equal(mine.currencyBy, undefined, 'typed, not taken from the device');
+  assert.ok(!mine.heard.some((h) => h.became.endsWith(heardWords.inCurrency('EGP'))), 'a typed currency is not said again');
+  const none = await proposeFirst('I keep my reading notes', CAIRO, fake(reply({ modules: ['work'] })).ask);
+  assert.equal(none.currency, null, 'nothing the model kept holds money');
 });

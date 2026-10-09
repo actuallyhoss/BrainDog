@@ -72,8 +72,8 @@ test('CURRENCY_FIXED IS TRUE OR LEFT OUT', () => {
 test('A LINK THAT IS NOT ONE is refused: no such field, a field of another type, a list of links, or no dot', () => {
   const said = (from: unknown) => validate(ledger({ currency_from: from }), installed)?.fix;
   assert.equal(said('wallet.balance'), 'transactions.amount takes its currency from wallet, and transactions has no field called wallet.');
-  assert.equal(said('what.balance'), 'transactions.amount takes its currency from what, and what is a text, not a link to one row.');
-  assert.equal(said('tags.balance'), 'transactions.amount takes its currency from tags, and tags is a list, not a link to one row.');
+  assert.equal(said('what.balance'), 'transactions.amount takes its currency from what, and what is a text, not a link to one entry.');
+  assert.equal(said('tags.balance'), 'transactions.amount takes its currency from tags, and tags is a list, not a link to one entry.');
   for (const shape of ['account', 'account.balance.amount', 7, 'Account.balance'])
     assert.equal(said(shape), 'transactions.amount: currency_from names a link of transactions and a money field of the list it points at, like account.balance.', String(shape));
 });

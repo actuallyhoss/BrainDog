@@ -94,7 +94,7 @@ test('A MEMBER HELD TO APPEND ON THE LIST THE SCRIPT READ SEES THAT IT RAN, AND 
 
   const line = await runLine(member);
   assert.equal(line.to?.outcome, 'ok', 'the run itself, its outcome and its counts, stays on her line');
-  assert.equal(line.note, 'tally ran and wrote one row.');
+  assert.equal(line.note, 'tally ran and wrote one line.');
   assert.equal(line.to?.log, '--redacted--', 'her run line carries the log, or drops it without saying one was kept');
   assert.ok(!JSON.stringify(await history(member)).includes('Omar'), 'recentHistory hands her the salary');
 

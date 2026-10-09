@@ -345,6 +345,19 @@ export function kindsOfProposal(bodyKind: string, body: unknown, read: KindReade
     case 'settings':
     case 'arrange':
       return [kind(null, ADDONS, 'addons')];
+    /* AN OPTION THAT WRITES (`patches`, govern-47) SAYS WHAT A PICK WRITES: each patch is an update to the list its
+       `register` or its spoken `at` names. Options that only say a choice are a call. */
+    case 'options': {
+      const patches = arr(b.options).flatMap((o) => arr(obj(o).patches));
+      if (patches.length === 0) return [kind(null, CALL, null)];
+      return merged(
+        patches.flatMap((raw) => {
+          const p = obj(raw);
+          const list = typeof p.register === 'string' ? p.register : typeof p.at === 'string' && p.at.includes('#') ? p.at.slice(0, p.at.indexOf('#')) : '?';
+          return kindsOfWrite({ list, op: 'update', patch: obj(p.patch), shape: read.shape(list) });
+        }),
+      );
+    }
     default:
       return [kind(null, CALL, null)];
   }

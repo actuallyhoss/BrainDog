@@ -119,8 +119,9 @@ test('record_index names every figure money-core declares, and resources/list ev
   const offered = (await tools(api as never).resources(owner)).map((r) => r.uri).filter((u) => u.startsWith('braindog:metric/'));
   /* `book-cash` (money-core 3.1.0) is a template too, `book is {{it}}`, so it is left out of `resources/list` the same
      way `project-owed` and the two project walks are: an address is offered only if reading it answers bare. So is
-     `book-spent-month`, which money-core declared after it, over the same slot. */
-  const templates = ['project-owed', 'project-in-by-month', 'project-out-by-month', 'book-cash', 'book-spent-month', 'project-in-month', 'project-out-month', 'project-kept-month'];
+     `book-spent-month`, which money-core declared after it, over the same slot. And `project-said` (portfolio 1.16.0),
+     whether one project says where it stands, read about one project at a time. */
+  const templates = ['project-owed', 'project-in-by-month', 'project-out-by-month', 'book-cash', 'book-spent-month', 'project-in-month', 'project-out-month', 'project-kept-month', 'project-said'];
   assert.deepEqual(offered.map((u) => u.slice('braindog:metric/'.length)).sort(), declared.filter((id) => !templates.includes(id)).sort());
   for (const uri of offered) assert.ok((await tools(api as never).read(uri, owner)).ok, `${uri} is offered and refuses`);
   sql.close();

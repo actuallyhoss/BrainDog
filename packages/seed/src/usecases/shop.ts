@@ -18,8 +18,8 @@ import { counted } from './counted.ts';
 /** An order not yet made or sent, which Due this week reads. */
 const TO_SEND = 'state is new or ready';
 
-/** An order nobody has paid for yet, which Owed to you reads: not marked paid, and no amount written as paid. */
-const OWED = 'state is not paid, paid is empty';
+/** An order nobody has paid for yet, which Owed to you reads: not marked paid, no amount written as paid, and a total to owe. */
+const OWED = 'state is not paid, paid is empty, total is set';
 
 export const SHOP = {
   usecase: 'shop',
@@ -59,7 +59,7 @@ export const SHOP = {
         name: 'Orders',
         one: 'order',
         icon: 'task',
-        holds: 'every order with who it is for, what and how many, the day it is due and what was paid',
+        holds: 'every order with who it is for, what and how many, the day it is due, what it comes to and what was paid',
         title: 'what',
         mobile: ['what', 'who', 'due'],
         state: 'state',
@@ -70,6 +70,8 @@ export const SHOP = {
           { id: 'what', label: 'What', type: 'text', required: true, search: true },
           { id: 'how_many', label: 'How many', type: 'int' },
           { id: 'due', label: 'Due', type: 'day', index: true, deadline: true, remind: ['-1d', '0d'] },
+          /* WHAT THE ORDER COMES TO, so the page can say what is still owed: "Salma still owes EGP 1,350". */
+          { id: 'total', label: 'Total', type: 'money' },
           /* AN AMOUNT WITH ITS CURRENCY, integer minor units: "paid 900 on InstaPay" is 900 in the currency she pays in. */
           { id: 'paid', label: 'Paid', type: 'money' },
           {
@@ -102,22 +104,28 @@ export const SHOP = {
           { id: 'tags', type: 'list', of: 'text' },
         ],
       },
-      /* WHAT THE ORDERS PAGE IS DRAWN ON, each over its tile's own clauses, so a tile is never drawn over nothing. */
+      /* WHAT THE ORDERS PAGE IS DRAWN ON, each over its tile's own clauses, so a tile is never drawn over nothing. The
+         month's orders are the ones written in the last 30 days, by the day the record wrote them: an order has no day
+         of its own but the one it is due. */
+      counted('orders-30d', 'Orders in the last 30 days', 'register.orders', 'created_at after -30d'),
       counted('orders-due-7d', 'Orders due this week', 'register.orders', `${TO_SEND}, due before +8d`),
       counted('orders-owed', 'Orders not paid yet', 'register.orders', OWED),
       {
         page: 'orders',
         title: 'Orders',
-        nav: { section: 'Shop', order: 10 },
+        nav: { section: 'Orders', order: 10 },
         icon: 'board',
         requires: ['register.orders'],
         blocks: [
           {
-            /* THE PAGE'S ONE LINE. A clause whose figure is nought is left out, so a new shop reads no line. */
+            /* THE PAGE'S ONE LINE, as the vision says it: "3 orders this month, 2 to ship this week, and Salma still owes
+               EGP 1,350". A clause whose figure is nought is left out, so a new shop reads no line, and the owed clause
+               names the first order nobody has paid and its total, one order's both. The clauses are cut at commas
+               (`leadOf`), so each goes on its own when it has nothing to say. */
             kind: 'note',
             lead: true,
             span: 12,
-            body: '{{orders-due-7d}} order(s) due this week, {{orders-owed}} not paid yet',
+            body: '{{orders-30d}} order(s) this month, {{orders-due-7d}} to ship this week, and {{orders-owed.first_who}} still owes {{orders-owed.first_total}}',
           },
           {
             /* WHAT TO MAKE OR SEND IN SEVEN DAYS, the late ones first. */
@@ -150,7 +158,7 @@ export const SHOP = {
             columns: [
               { field: 'who', label: 'Who', width: 'minmax(10ch,18ch)' },
               { field: 'what', label: 'Order', width: 'minmax(18ch,1fr)' },
-              { field: 'state', label: 'Status', width: '10ch' },
+              { field: 'total', label: 'Total', width: '14ch', align: 'end' },
               { field: 'due', label: 'Due', width: '14ch', align: 'end' },
             ],
             order: [{ field: 'due', dir: 'asc' }],

@@ -164,7 +164,7 @@ test(`THE LEVEL PAST THE STATED BOUND STAYS OPEN: ${BOUND + 2} levels, and the r
   const stuck = below.at(-2)!;
   assert.equal(
     last,
-    `close_follow_ups ran and wrote one row. Its writes started no rule.close_follow_ups on tasks#${stuck.seq}: that run would be at depth ${BOUND + 1} of one chain of rules and scripts, and a chain stops at depth ${BOUND} so that it cannot run for ever. A person's own write starts it again.`,
+    `“Close the follow-ups of a finished task” ran and wrote one line. Its writes started no rule.close_follow_ups on tasks#${stuck.seq}: that run would be at depth ${BOUND + 1} of one chain, and a chain stops at depth ${BOUND} so that it cannot run for ever. A person's own write starts it again.`,
   );
 });
 

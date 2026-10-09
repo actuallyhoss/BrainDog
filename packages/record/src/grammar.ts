@@ -17,7 +17,7 @@
 
 import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
-import { KINDS } from 'braindog-render';
+import { KINDS, KIND_LINES, REACH_FOR, isKind, kindLine, type Kind } from 'braindog-render';
 import { VOICE_KEYS } from '@braindog/declare';
 import { AGGREGATIONS, CAPABILITIES, FIELD_TYPES } from '@braindog/kernel';
 
@@ -30,10 +30,13 @@ import { REACHES_OUT } from './slash.ts';
  * Slash drafts rules against this one. MCP serves `register` and `metric` as resources and not `rule`, because its own
  * `grammar/automations` already says a rule in full.
  *
- * `ingest` IS LAST, after `proposals`, because a door and a scheduled action were learned from the lint alone, one
+ * `ingest` COMES AFTER `proposals`, because a door and a scheduled action were learned from the lint alone, one
  * refusal at a time, and the web's new-action sheet builds the same declaration this says.
+ *
+ * `kinds` IS LAST, and it is the kinds of block a page draws, each with its line (`KINDS_SHORT`). One kind whole is
+ * `kind/<name>`, which is asked by name and so is no entry here: the refusal names it in words.
  */
-export const GRAMMARS = ['page', 'register', 'metric', 'rule', 'proposals', 'ingest'] as const;
+export const GRAMMARS = ['page', 'register', 'metric', 'rule', 'proposals', 'ingest', 'kinds'] as const;
 
 const PAGE = {
   declaration: { id: 'page.<slug>', kind: 'page', body: 'the page body below' },
@@ -56,7 +59,7 @@ const PAGE = {
     heading: 'the words over it; on a section, the section itself',
     empty: 'the sentence drawn when it has no rows',
     body: "a note's own prose",
-    source: 'register.<id>, metric.<id>, block.<n>, forecast.runway, activity, sessions.live, sessions.working (the runs working now, a helper folded under the run that started it, most recently heard from first; columns and limit only, no where or order), actions, governance.open, governance.later (questions put off, soonest back first, on a queue), governance.decided (what was answered, latest first, as rows: question, answer, answer_label, reason, who, at, kind, about, list), runs_on (the keys, tools, skills and scheduled actions of the project about: names, then those that apply everywhere; on a table or cards, with no order), deadlines (what falls due across the lists; horizon: days ahead, 14 when it says nothing; where: list is tasks), figures.home (the figures pinned to Home, on a stat with no cells), handoffs.open (the next steps runs left and nobody has taken, newest first, as rows: run, agent, next, left_at, mark; about: one project; no order:) or signs (the record\'s vital signs as rows: sign, name, state, value, said; in the list\'s order, no order:)',
+    source: 'register.<id>, metric.<id> (or metric.<id>:<parameter> on a bar or a split, such as metric.project-cost:{{name}} on a project page), block.<n>, forecast.runway, activity, sessions.live, sessions.working (the runs working now, a helper folded under the run that started it, most recently heard from first; columns and limit only, no where or order), actions, governance.open, governance.later (questions put off, soonest back first, on a queue), governance.decided (what was answered, latest first, as rows: question, answer, answer_label, reason, who, at, kind, about, list), runs_on (the keys, tools, skills and scheduled actions of the project about: names, then those that apply everywhere; on a table or cards, with no order), deadlines (what falls due across the lists; horizon: days ahead, 14 when it says nothing; where: list is tasks), figures.home (the figures pinned to Home, on a stat with no cells), handoffs.open (the next steps runs left and nobody has taken, newest first, as rows: run, agent, next, left_at, mark; about: one project; no order:), actions.blocking (one project\'s scheduled actions that are paused, failing or late, as rows: name, why, since, status, said; about: the project, required; no order:) or signs (the record\'s vital signs as rows: sign, name, state, value, said; in the list\'s order, no order:)',
     where: 'a filter, such as state is open, or a predicate tree. On a capture, what the new row is preset with: about is parts#2 presets a link',
     register: 'the list a capture adds to, or the list whose one row inputs edits',
     row: "on inputs, the row it edits by its id, such as checks#1; the list's first row when it says nothing",
@@ -64,10 +67,10 @@ const PAGE = {
     columns: '[{field, label?}], 1 to 16; on cards, as: title, figure, fact, trend, ring, who, when, mark, next (the first open step under the card, from the list whose steps: {of, done, order?} names it), reply (a quieter line under the title, such as a second opinion), hue (a whole-number field from 0 to 359, drawn only on the card\'s mark) or picture (a file field the card leads with). On a stat or lines over readings, [when, value, name, unit, amount]: the fifth is the reading as money',
     stale: '{field, after, figure?} on cards: a card whose day in field is older than after (such as 7d) reads as out of date; figure: a rolled figure with read: as_of and group_by gives each card its own day',
     over_a_list: {
-      calendar: 'columns [title field, day or instant field]; back and ahead are whole months either side of this one, 0 to 12, defaults 2 and 0; at most 500 rows, and no limit',
+      calendar: 'columns [title field, day or instant field]; back and ahead are whole months either side of this one, 0 to 12, defaults 2 and 0; at most 500 entries, and no limit',
       link: 'columns [title field, url field, note field?]; a url is https, mailto or a path of this BrainDog',
       gallery: 'columns [caption field, file field]; limit at most 24',
-      embed: 'authored rows only, one: cells [url, title?, aspect?]; the url a YouTube, Vimeo, Loom, Figma or Google Maps address, the aspect 16:9 (the default), 4:3, 1:1 or 9:16',
+      embed: 'authored entries only, one: cells [url, title?, aspect?]; the url a YouTube, Vimeo, Loom, Figma or Google Maps address, the aspect 16:9 (the default), 4:3, 1:1 or 9:16',
     },
     back: 'on a calendar, whole months before this one; series, stat and lines read it too',
     ahead: 'on a calendar, whole months after this one; a series reads it too',
@@ -85,9 +88,9 @@ const PAGE = {
     range: 'true on progress: each row a band from low to high with what was spent marked on it, columns [label, spent, low, high]',
     tiles: "true on a queue: one tile per question, with its recommended option's shows ({swatch: [#rrggbb]}, {figure: text} or {file: {row, field}}). A question's body.about names what it is about, and where: about is <name> reads it",
     who: 'true on heat: a line a person, a dot in each of the twelve weeks they were in touch, columns [day, who]',
-    when: '{metric}: drawn only when that figure calls for it',
+    when: "{metric, gt|gte|lt|lte|is|not: <n>}: drawn only while that figure meets the test. {metric, empty: true}: drawn only while the figure has no value, in no currency, and nothing else holds then; empty: false once it has one. Empty is the leaf's whole test Or {holds: [people]}: the block is there only while the record holds those lists; the add-on's plan decides.",
   },
-  paths: '{{<metric>}} in any text is that figure, {{<list>.count}} how many rows the list has, {{<list>.<value>}} how many are in that value of its state, and {{icon:<glyph>}} a glyph',
+  paths: '{{<metric>}} in any text is that figure, {{<metric>.first}} the first row it counts and {{<metric>.first_<field>}} a field of that row, {{<list>.count}} how many rows the list has, {{<list>.<value>}} how many are in that value of its state, and {{icon:<glyph>}} a glyph. On a page about a row, {{<field>}} is that row\'s field when its list declares one and {{<field>.count}} how many a list field holds; a document is never read',
   example: {
     id: 'page.reading',
     kind: 'page',
@@ -112,6 +115,7 @@ const PAGE = {
     },
   },
   to_change_one: 'Read arrangement with page for its declaration, change the body, and propose body_kind change with {"to": that declaration}.',
+  which_kind: 'grammar kinds says what each kind is for, its cells and its forms, and what to reach for; grammar kind/<name> says one kind whole',
 };
 
 /**
@@ -150,6 +154,7 @@ const REGISTER = {
     org: 'on the one list meet writes organisations into, the field that plays each part: name, keys, kind, domain, merged_into',
     pairs: 'transfer detection: the fields the record matches two legs of one move by',
     hand: '{person?: <ref field>, agent?: <text field>, taken?: <state value>}: who holds a row, a person by a ref field and an agent by the text field it signs with, and the state a row moves to when an agent takes it. Either may be left out, but not both',
+    order: '{field, dir?: asc|desc}: the order a read with none of its own comes back in, by a number, day, time or text field of this list',
   },
   field: {
     id: 'lower-case letters, digits and single underscores; never id, seq, register, created_at, updated_at, deleted_at, version, spoken or title, and never starting with _ (required)',
@@ -181,6 +186,7 @@ const REGISTER = {
     qualifies: 'the field that makes an amount readable',
     unit: 'on a duration, how it is said',
     derived: "the record's own; never write it",
+    when: '{holds: [people]}: the field is there only while the record holds those lists or roles (rates, meets, org). Never on a required field',
   },
   example: {
     id: 'register.parts',
@@ -318,11 +324,17 @@ const PROPOSALS = {
   pack: '{"install":"<id from offer or updates>"}, {"enable":"<id>"} or {"disable":"<id>"}; install may carry "doc", a pack document the catalogue lacks, and never one for a pack it offers; {"file":<a .usecase.json document>} installs a shared use case and the modules it names. A pack on at an older version is updated',
   settings: '{"pack":"<id>","values":{"<setting>":<value or null for its default>}}, or {"voice":{"<key>":"<line>"}} for the use case on',
   arrange: {
-    shape: '{"why":[...],"usecase"?,"alongside"?:[<usecase>],"packs"?:{"install"?,"enable"?,"disable"?},"pages"?:[<page>],"settings"?:[<settings>],"voice"?:{...}}',
-    why: 'one to 12 reasons, each a sentence or {"text","at":"tasks#4"} citing a row',
+    shape: '{"why":[...],"usecase"?,"alongside"?:[<usecase>],"packs"?:{"install"?,"enable"?,"disable"?},"pages"?:[<page>],"settings"?:[<settings>],"voice"?:{...},"rows"?:[<entry or patch>],"declarations"?:[<declaration>],"choices"?:[<choice>]}',
+    why: 'one to 12 reasons, each a sentence or {"text","at":"tasks#4"} citing an entry',
     usecase: 'a use case id from offer, installed with the modules it builds on',
     alongside: 'use case ids from offer installed beside the one speaking, which keeps its voice and Home whichever way the ids sort',
-    limits: 'at most 12 of each; at most 3 arrangements wait at once',
+    settings: 'settings sent for an add-on this installs fill that install; a later change to a setting a declaration reads plans that add-on again on the same yes; a value may be a list of text',
+    rows: 'new entries {"register","fields","links"?:{"<field>":<place of an earlier entry>}} or patches {"register","at":"<list>#<n>","version","patch"}, checked as a rowset is; one whose version moved refuses the whole question',
+    declarations: '{"id":"<kind>.<name>","kind","body"} each, checked as a change is; a page goes under pages; each call out is listed on the question by host and how often',
+    choices: '{"id","question","suggested":"<option id>","options":[{"id","label","does"}]} each, two to six options, left to the owner',
+    parts: 'the record files each install, add-on turned on or off, add-on settings, entries by list, page, declaration and choice as a part with an id; the owner may accept some parts and the rest stay open as the same question; needs and calls are worked out by the record, each naming its parts, and anything sent under needs, calls, approve or parts is not read',
+    cause: 'one open arrangement per cause: a second proposal with the same cause adds its parts to the open one',
+    limits: 'at most 12 of each and 60 entries; at most 3 arrangements wait at once',
   },
   voice_keys: VOICE_KEYS,
   answered_by: 'the owner, in Decide. Nothing changes until they accept, and a pack is planned again then.',
@@ -396,14 +408,78 @@ const INGEST = {
   ],
 };
 
-const SERVED: Readonly<Record<(typeof GRAMMARS)[number], unknown>> = { page: PAGE, register: REGISTER, metric: METRIC, rule: RULE, proposals: PROPOSALS, ingest: INGEST };
+/**
+ * The kinds of block a page draws, the short form: every kind with its one line, and the ten lines of what to reach for.
+ *
+ * GENERATED FROM THE RENDERER'S TABLE, never written twice: a kind is a key of `KINDS` and its line is `kindLine`'s
+ * (`braindog-render`'s `kind-lines.ts`). An agent reads it in a turn, so it is held at or under 8 KB
+ * (`test/grammar-kinds.test.ts`), and whatever does not fit a line is in the long form, `kind/<name>`.
+ */
+export const KINDS_SHORT = {
+  reach_for: REACH_FOR,
+  kinds: Object.fromEntries((Object.keys(KINDS) as Kind[]).map((kind) => [kind, kindLine(kind)])) as Readonly<Record<Kind, string>>,
+  one_kind: 'grammar kind/<name> says one kind whole, such as kind/spec',
+};
+
+const WRITTEN: Readonly<Partial<Record<'verbatim' | 'header' | 'checkbox' | 'ordered' | 'indented' | 'prose' | 'hole', string>>> = {
+  verbatim: 'each line is kept exactly as written, never split on |',
+  header: 'the first line names the columns, and every line after it has as many',
+  checkbox: 'an entry may start [ ] or [x], to show it open or done',
+  ordered: 'drawn in order, numbered',
+  indented: 'two spaces a level',
+  prose: 'written as prose in body, not as cells',
+  hole: 'a last cell of hole marks an entry whose amount is not known yet: it keeps its words and stays out of the scale',
+};
+
+/** One kind whole, the long form: everything the short line says, and how it is written, how many it takes and how narrow it may be. */
+export function kindWhole(kind: Kind): Record<string, unknown> {
+  const spec = KINDS[kind];
+  const line = KIND_LINES[kind];
+  const onAList = (PAGE.block.over_a_list as Readonly<Record<string, string>>)[kind];
+  const written = (Object.keys(WRITTEN) as (keyof typeof WRITTEN)[]).filter((flag) => spec[flag] === true).map((flag) => WRITTEN[flag]!);
+  return {
+    kind,
+    line: kindLine(kind),
+    for: line.for,
+    cells: line.cells,
+    ...(spec.optional ? { optional: `the last ${spec.optional === 1 ? 'cell' : `${spec.optional} cells`} may be left off` } : {}),
+    forms: spec.forms ?? [],
+    ...(line.reads ? { reads: line.reads } : {}),
+    on_a_page_only: spec.pageOnly === true,
+    ...(onAList ? { over_a_list: onAList } : {}),
+    ...(written.length > 0 ? { written } : {}),
+    tone: spec.tone ? 'a last cell of good, warn, bad or info marks the entry with a glyph and a word' : 'takes no tone',
+    ...(spec.rows !== undefined ? { at_most: `${spec.rows} ${spec.rows === 1 ? 'entry' : 'entries'}` } : {}),
+    narrowest: `${spec.minSpan} twelfths; the size control refuses narrower`,
+    group: spec.purpose,
+  };
+}
+
+const SERVED: Readonly<Record<(typeof GRAMMARS)[number], unknown>> = {
+  page: PAGE,
+  register: REGISTER,
+  metric: METRIC,
+  rule: RULE,
+  proposals: PROPOSALS,
+  ingest: INGEST,
+  kinds: KINDS_SHORT,
+};
 
 export function grammarOf(name: string): Result<unknown> {
   if ((GRAMMARS as readonly string[]).includes(name)) return ok(SERVED[name as (typeof GRAMMARS)[number]]);
-  return no('ENUM_VALUE_UNKNOWN', `There is no grammar called ${name}. Ask for ${GRAMMARS.slice(0, -1).join(', ')} or ${GRAMMARS.at(-1)!}.`, {
-    at: 'grammar',
-    allowed: GRAMMARS,
-  });
+  if (name.startsWith('kind/')) {
+    const kind = name.slice('kind/'.length);
+    if (isKind(kind)) return ok(kindWhole(kind));
+    return no('ENUM_VALUE_UNKNOWN', `There is no kind of block called ${kind}. Read grammar kinds for every kind and its line.`, {
+      at: 'grammar',
+      allowed: Object.keys(KINDS).map((k) => `kind/${k}`),
+    });
+  }
+  return no(
+    'ENUM_VALUE_UNKNOWN',
+    `There is no grammar called ${name}. Ask for ${GRAMMARS.slice(0, -1).join(', ')} or ${GRAMMARS.at(-1)!}, or kind/<name> for one kind whole.`,
+    { at: 'grammar', allowed: GRAMMARS },
+  );
 }
 
 /**

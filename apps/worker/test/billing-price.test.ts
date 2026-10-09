@@ -63,8 +63,11 @@ const refusal = (r: Result<unknown>): Refusal => {
 
 const CENTS = PLAN_TABLE.hosted.cents.month;
 
+/** What Stripe says of a price sold every month (audit 43-44 #6): the fields the check now reads beside the amount. */
+const MONTHLY = { recurring: { interval: 'month', interval_count: 1 }, active: true };
+
 test('A STRIPE PRICE THAT IS THE TABLE’S OPENS THE PAYMENT PAGE', async () => {
-  const w = world({ ok: true, body: { id: 'price_cloud', unit_amount: CENTS, currency: 'usd' } });
+  const w = world({ ok: true, body: { id: 'price_cloud', unit_amount: CENTS, currency: 'usd', ...MONTHLY } });
   const out = await w.checkout();
   assert.ok(out.ok, out.ok ? '' : refusal(out).fix);
   assert.deepEqual((out as { value: unknown }).value, { url: 'https://checkout.stripe.com/c/pay_1' });
@@ -72,7 +75,7 @@ test('A STRIPE PRICE THAT IS THE TABLE’S OPENS THE PAYMENT PAGE', async () => 
 });
 
 test('A STRIPE PRICE AT ANOTHER AMOUNT IS REFUSED IN ONE SENTENCE, AND NO SESSION IS MADE', async () => {
-  const w = world({ ok: true, body: { id: 'price_cloud', unit_amount: CENTS + 300, currency: 'usd' } });
+  const w = world({ ok: true, body: { id: 'price_cloud', unit_amount: CENTS + 300, currency: 'usd', ...MONTHLY } });
   const r = refusal(await w.checkout());
   assert.equal(r.code, 'NOT_IN_THIS_BUILD');
   assert.equal(r.fix, `Cloud is ${planPrice('cloud')} here and Stripe charges $${(CENTS + 300) / 100} a month, so no payment page opens until the two agree.`);
@@ -80,14 +83,14 @@ test('A STRIPE PRICE AT ANOTHER AMOUNT IS REFUSED IN ONE SENTENCE, AND NO SESSIO
 });
 
 test('A STRIPE PRICE IN ANOTHER CURRENCY IS REFUSED, EVEN AT THE SAME FIGURE', async () => {
-  const w = world({ ok: true, body: { id: 'price_cloud', unit_amount: CENTS, currency: 'eur' } });
+  const w = world({ ok: true, body: { id: 'price_cloud', unit_amount: CENTS, currency: 'eur', ...MONTHLY } });
   const r = refusal(await w.checkout());
   assert.match(r.fix, /^Cloud is \$\d+ a month here and Stripe's price for it is in EUR, so no payment page opens until the two agree\.$/u);
   assert.ok(!w.asked.includes('create /v1/checkout/sessions'));
 });
 
 test('A TIERED PRICE WITH NO ONE AMOUNT IS REFUSED', async () => {
-  const w = world({ ok: true, body: { id: 'price_cloud', unit_amount: null, currency: 'usd' } });
+  const w = world({ ok: true, body: { id: 'price_cloud', unit_amount: null, currency: 'usd', ...MONTHLY } });
   assert.match(refusal(await w.checkout()).fix, /has no one amount/u);
   assert.ok(!w.asked.includes('create /v1/checkout/sessions'));
 });
@@ -100,8 +103,28 @@ test('A PRICE STRIPE DOES NOT KNOW NAMES ITS SETTING, AND A STRIPE THAT IS DOWN 
 });
 
 test('NO SENTENCE CARRIES A PRICE ID OR AN EM DASH', async () => {
-  for (const body of [{ unit_amount: 1, currency: 'usd' }, { unit_amount: CENTS, currency: 'gbp' }, { currency: 'usd' }]) {
+  for (const body of [{ unit_amount: 1, currency: 'usd' }, { unit_amount: CENTS, currency: 'gbp' }, { currency: 'usd' }, { unit_amount: CENTS, currency: 'usd', recurring: { interval: 'year', interval_count: 1 }, active: true }, { unit_amount: CENTS, currency: 'usd', ...MONTHLY, active: false }]) {
     const fix = refusal(await world({ ok: true, body: { id: 'price_cloud', ...body } }).checkout()).fix;
     assert.doesNotMatch(fix, /price_cloud|—/u, fix);
   }
+});
+
+test('A YEARLY PRICE AT THE MONTHLY AMOUNT IS REFUSED, NAMING WHAT STRIPE WOULD CHARGE', async () => {
+  const w = world({ ok: true, body: { id: 'price_cloud', unit_amount: CENTS, currency: 'usd', recurring: { interval: 'year', interval_count: 1 }, active: true } });
+  const r = refusal(await w.checkout());
+  assert.equal(r.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(r.fix, `Cloud is ${planPrice('cloud')} here and Stripe charges $${CENTS / 100} every year, so no payment page opens until the two agree.`);
+  assert.ok(!w.asked.includes('create /v1/checkout/sessions'), w.asked.join('\n'));
+});
+
+test('A PRICE EVERY THREE MONTHS, ONE THAT CHARGES ONCE, AND AN ARCHIVED ONE ARE REFUSED', async () => {
+  const at = (extra: Record<string, unknown>) => world({ ok: true, body: { id: 'price_cloud', unit_amount: CENTS, currency: 'usd', ...MONTHLY, ...extra } });
+  const quarterly = await at({ recurring: { interval: 'month', interval_count: 3 } });
+  assert.match(refusal(await quarterly.checkout()).fix, /Stripe charges \$\d+ every 3 months, so/u);
+  const once = await at({ recurring: null });
+  assert.match(refusal(await once.checkout()).fix, /Stripe charges \$\d+ once, so/u);
+  const archived = await at({ active: false });
+  const fix = refusal(await archived.checkout()).fix;
+  assert.equal(fix, `Cloud is ${planPrice('cloud')} here and Stripe's price for it, $${CENTS / 100} a month, is archived, so no payment page opens until it is on sale again.`);
+  for (const w of [quarterly, once, archived]) assert.ok(!w.asked.includes('create /v1/checkout/sessions'));
 });

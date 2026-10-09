@@ -94,41 +94,4 @@ test("SIGNS RED ON A PAST DAY is that day's kept readings, and a day with none k
   assert.equal(read(sql, 'signs-red', { asOfMs: Date.parse('2026-10-04T12:00:00Z') }).value, null);
 });
 
-test('GREEN DAYS counts back from yesterday through days with a sign green and none red; today is not over', async () => {
-  const { k, sql } = await record();
-  file(sql, 'model-answers', 'red', '2026-10-05');
-  file(sql, 'model-answers', 'green', '2026-10-06');
-  file(sql, 'tools-listed', 'red', '2026-10-06');
-  file(sql, 'model-answers', 'green', '2026-10-07');
-  file(sql, 'model-answers', 'green', '2026-10-08');
-  file(sql, 'tools-listed', 'none', '2026-10-08');
-  file(sql, 'model-answers', 'red', '2026-10-09');
-  const run = viaRecord(k, 'green-days');
-  assert.equal(run.value, 2);
-  assert.equal(run.met, true);
-});
-
-test('A DAY WITH NO READING, OR ONLY NONE, ENDS THE RUN: a night that stopped reads nought, not the run before it', async () => {
-  const gap = await record();
-  for (const day of ['2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07']) file(gap.sql, 'model-answers', 'green', day);
-  const stopped = viaRecord(gap.k, 'green-days');
-  assert.equal(stopped.value, 0);
-  assert.equal(stopped.met, false);
-  file(gap.sql, 'model-answers', 'green', '2026-10-08');
-  assert.equal(viaRecord(gap.k, 'green-days').value, 6);
-
-  const blank = await record();
-  file(blank.sql, 'model-answers', 'green', '2026-10-07');
-  file(blank.sql, 'model-answers', 'none', '2026-10-08');
-  assert.equal(viaRecord(blank.k, 'green-days').value, 0);
-});
-
-test("GREEN DAYS COUNTS THE RECORD'S DAYS: late on the 8th in UTC, Auckland's yesterday is already the 8th", async () => {
-  const { sql } = await record();
-  file(sql, 'model-answers', 'red', '2026-10-06');
-  file(sql, 'model-answers', 'green', '2026-10-07');
-  file(sql, 'model-answers', 'green', '2026-10-08');
-  const late = Date.UTC(2026, 9, 8, 13);
-  assert.equal(read(sql, 'green-days', { nowMs: late, tz: 'UTC' }).value, 1);
-  assert.equal(read(sql, 'green-days', { nowMs: late, tz: 'Pacific/Auckland' }).value, 2);
-});
+/* GREEN DAYS IS THE HOLD NOW (PRF-A18, `hold.ts`): its runs, the Auckland case among them, are in figures-47.test.ts. */

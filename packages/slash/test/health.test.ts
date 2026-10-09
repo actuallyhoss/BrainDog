@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { core, openStore } from '../src/call.ts';
-import { ANSWER_STALE_DAYS } from '../src/health.ts';
+import { ANSWER_STALE_DAYS, LEDGER_ANSWERED, LEDGER_BUDGET, LEDGER_FAILED } from '../src/health.ts';
 import { createSlash, engineHealth, engineSaid, FAILS_DOWN, type EngineHealth } from '../src/index.ts';
 import { canned, fakeRecord, fixedClock, NOW, OWNER, openSqlite } from './double.ts';
 
@@ -184,4 +184,37 @@ test('AN ANSWER 20 DAYS OLD AND TWO FRESH FAILURES IS not_answering: a stale ans
   recent.row(NOW - 2 * HOUR, 'error', 'UNREACHABLE');
   recent.row(NOW - HOUR, 'error', 'UNREACHABLE');
   assert.equal(engineHealth(recent.sql, fixedClock(NOW), MODEL).state, 'answering');
+});
+
+test('A SPENT MONTH IS ITS OWN CLAUSE (audit 40-42, 5): never an answer, never a failure, and every refusal counted', () => {
+  /* What the vital sign reads from these three clauses (`packages/host/src/sign-model.ts`); Settings says the meter. */
+  const counts = (sql: ReturnType<typeof ledger>['sql']) =>
+    sql.one<{ yes: number; no: number; spent: number }>(
+      `SELECT SUM(CASE WHEN ${LEDGER_ANSWERED} THEN 1 ELSE 0 END) AS yes, SUM(CASE WHEN ${LEDGER_FAILED} THEN 1 ELSE 0 END) AS no,
+              SUM(CASE WHEN ${LEDGER_BUDGET} THEN 1 ELSE 0 END) AS spent FROM slash_call`,
+    );
+  const clock = fixedClock(NOW);
+
+  /* Five answers, then fifty refusals: the refusals are newest, and none of them is read as an answer. */
+  const a = ledger();
+  for (let i = 0; i < 5; i++) a.row(NOW - (100 + i) * HOUR, 'ok', null);
+  /* EACH AS SLASH WRITES IT (`TURNED_AWAY_SQL`): under `-`. One more under the model's own name is a call refused for
+     its size (the worker's per-call neuron ceiling), never the month spent. */
+  for (let i = 0; i < 50; i++) a.row(NOW - (1 + i) * HOUR, 'refused', 'SLASH_BUDGET_SPENT', '-');
+  a.row(NOW - 60 * HOUR, 'refused', 'SLASH_BUDGET_SPENT');
+  assert.deepEqual({ ...counts(a.sql) }, { yes: 5, no: 0, spent: 50 });
+  assert.equal(a.sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM slash_call WHERE (${LEDGER_ANSWERED}) AND (${LEDGER_BUDGET})`)?.n, 0);
+  assert.equal(engineHealth(a.sql, clock, MODEL).last_ok, at(NOW - 100 * HOUR), 'the last answer is the last answer, not a refusal');
+
+  /* No answer and fifty refusals, under either name: fifty, not an empty ledger, and not fifty failures. */
+  const b = ledger();
+  for (let i = 0; i < 50; i++) b.row(NOW - (1 + i) * HOUR, 'error', i % 2 === 0 ? 'SLASH_BUDGET_SPENT' : 'SPARK_BUDGET_SPENT', '-');
+  assert.deepEqual({ ...counts(b.sql) }, { yes: 0, no: 0, spent: 50 });
+
+  /* An answer after a refusal: still one answer more, and the refusal still counted. */
+  const c = ledger();
+  c.row(NOW - 5 * HOUR, 'refused', 'SLASH_BUDGET_SPENT', '-');
+  c.row(NOW - 2 * HOUR, 'ok', null);
+  assert.deepEqual({ ...counts(c.sql) }, { yes: 1, no: 0, spent: 1 });
+  assert.deepEqual(engineHealth(c.sql, clock, MODEL), { state: 'answering', last_ok: at(NOW - 2 * HOUR), since: null });
 });

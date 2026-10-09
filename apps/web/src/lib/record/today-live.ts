@@ -454,7 +454,7 @@ type Reading = {
 
 /**
  * One figure, or one line a currency when it is held in several that were not added up. EACH IS A HEADLINE, the figure
- * Today opens on, so it is said in whole units and the record's own sign (`money.ts` `symbolText`): "E£1,086,213".
+ * Today opens on, so it is said in whole units and the record's own sign (`money.ts` `symbolText`): "EGP 1,086,213".
  */
 export function cashOf(r: Pick<Reading, 'value' | 'unit' | 'parts'>, label: string | null): CashLine[] {
   const said = (minor: number, currency: string) => moneyInText(money(minor, currency), undefined, 'headline');

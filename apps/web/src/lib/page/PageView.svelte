@@ -20,6 +20,7 @@
 -->
 <script lang="ts">
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
+  import type { Snippet } from 'svelte';
   import { apiBase } from '../at.ts';
   import { titleOf } from '$lib/title.ts';
   /* THE KINDS ONLY A DECLARED PAGE DRAWS, with the screen that draws them rather than in the sheet every screen waits
@@ -59,7 +60,7 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import { may } from '$lib/record/may.ts';
   import { words } from './words.ts';
-  import { heldTo, holdsOf, inVoice, keptAs, previewedBody, readToArrange, type ToArrange } from './home-arrange.ts';
+  import { heldTo, holdsOf, inVoice, keptAs, previewedBody, readToArrange, weekHeld, type ToArrange } from './home-arrange.ts';
   import { said } from '$lib/voice.svelte.ts';
   import BatchBar from './BatchBar.svelte';
   import { filterOf, filterQuery, filtersOf } from './filters.ts';
@@ -80,6 +81,7 @@
     was = null,
     select = false,
     whole = false,
+    offer,
   }: {
     /** The page's address, which arranging writes against and a missing page names. */
     slug: string;
@@ -97,6 +99,11 @@
     select?: boolean;
     /** Whether a home's questions are drawn whole (Decide) rather than compact (everywhere else). */
     whole?: boolean;
+    /**
+     * The pen's offer for this page (uc6-places-47), drawn under the page's header and inside `.hosted`, so the page's
+     * name comes first at every width and a row open in the docked panel never sits over the card.
+     */
+    offer?: Snippet | undefined;
   } = $props();
 
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
@@ -242,7 +249,9 @@
     if (!on || opening) return;
     opening = true;
     try {
-      const got = await readToArrange(apiBase(), on, () => previewedBody(slug, holdsOf(shell)));
+      /* WITH THE RECORD'S WEEK, as Home draws Today's own body: a Today kept by the first Done keeps what is due and
+         what came in (`weekHeld`). */
+      const got = await readToArrange(apiBase(), on, async () => previewedBody(slug, holdsOf(shell, undefined, await weekHeld(shell))));
       if ('fix' in got) {
         toasts.push(got.fix, { intent: 'warn' });
         return;
@@ -462,6 +471,7 @@
       <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={live.page.blocks} {all} bind:extra {showSource} {reread} />
     {/snippet}
   </PageHead>
+  {#if offer}<div class="page-offer">{@render offer()}</div>{/if}
 
   <!-- THE LINE THE PAGE OPENS ON, drawn once: in the header's row, or handed to the body to sit under its sentence. -->
   {#snippet lineInHead()}
@@ -592,6 +602,12 @@
 {/if}
 
 <style>
+  /* THE OFFER UNDER THE HEADER, one tile gap from what follows, in the page's own gutter. */
+  .page-offer {
+    padding-inline: var(--gutter);
+    margin-block-end: var(--tile-gap);
+  }
+
   .hosted {
     min-inline-size: 0;
     padding-inline-end: max(0px, calc(var(--dock-w, 0px) - var(--gutter)));

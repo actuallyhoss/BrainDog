@@ -1,0 +1,18 @@
+{
+  "pick": "level-bars",
+  "asks": "Labels on level bars beside a column of numbers",
+  "from": "EB 1.11 point 7",
+  "options": [
+    {
+      "id": "numbers-stay",
+      "says": "The column of numbers stays, and the bars carry no labels.",
+      "live": true
+    },
+    {
+      "id": "on-hover",
+      "says": "The numbers go, and each bar says its value on hover."
+    }
+  ],
+  "default": "numbers-stay",
+  "why": "The numbers already sit beside the bars, so a label on hover would say them twice."
+}

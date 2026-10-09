@@ -72,8 +72,8 @@ import { extname, join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { ACCENTS } from '../../packages/theme/src/record.ts';
-import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
-import { answers, bootWith, forward, forwards, RECORD_PREFS, recordPrefsOf, startRecord } from './record.mjs';
+import { APP_BASE, appShell, budget, openPage, readiness } from './lib.mjs';
+import { answers, forward, forwards, startRecord } from './record.mjs';
 
 /* AND WHY THIS GATE NEEDS `builds` AND NOT `web-build`, although it drives a browser like the four
    that declare `web-build`. `52 §5.1` step 2 lets the runner refuse a gate whose prerequisite is
@@ -265,16 +265,21 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     },
     {
       /* `nextStepsHidden`: Today's next steps, and Hide keeping them hidden (planner-45 step 6). Home mounts TellOne and
-         WantMore on '/', so hidden draws neither and shown draws whichever the record's first Today calls for. */
+         WantMore on '/', so hidden draws neither and shown draws whichever the record's first Today calls for.
+         ON A FRESH RECORD (`fresh`), because Today offers either only on a first Today: on the gates' record, kept for
+         months, both loads drew nothing and the case could never differ. */
       name: 'nextStepsHidden',
+      fresh: true,
       what: "Today's next steps, and Hide keeping them hidden (planner-45 step 6)",
       route: '/',
       values: [{}, { nextStepsHidden: true }],
       probe: () => String(document.querySelectorAll('#main [data-want-more], #main [data-tell-one]').length),
     },
     {
-      /* `arrivesBy`: the order of the next steps, forwarding first for work that arrives by messages. */
+      /* `arrivesBy`: the order of the next steps, forwarding first for work that arrives by messages. On a fresh record,
+         for the reason `nextStepsHidden` gives: the steps are a first Today's. */
       name: 'arrivesBy',
+      fresh: true,
       what: 'the order of the next steps, forwarding first for work that arrives by messages (planner-45 step 6)',
       route: '/',
       values: [{}, { arrivesBy: 'messages' }],
@@ -326,9 +331,10 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     /*
      * THE RECORD'S OWN KEYS (`PREF_KEYS`, contracts §7.3). A person's shape, switch and dismissals are kept by the record
      * and answered on `boot`'s `me.prefs`, and the cookie is only their first-paint copy. The gate's record is reached with
-     * a key, and a key is not a person, so `setPref` refuses it; instead this gate's server writes the case's `@record`
-     * into the `boot` it hands the page (`bootWith` in `record.mjs`), which is exactly the answer a person's `boot` carries. A value
-     * may be a function of the value before it, for a case whose second load names what the first one drew.
+     * its server key, which speaks as the owner, a person, so `setPref` answers it ok (`record.mjs` `setPref`): each load
+     * keeps the case's `@record` on the record through `openPage`'s `prefs`, the door a person's own Settings writes through,
+     * and the page reads it from `boot` as a person's page does. A value may be a function of the value before it, for a
+     * case whose second load names what the first one drew.
      */
     {
       /**
@@ -558,8 +564,8 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    * THE FIVE `look.*` KEYS ARE NOT EXCUSED ANY MORE, and have their cases above.
    *
    * `notify.muted` IS EXCUSED BECAUSE THE RECORD APPLIES IT, NOT THE PAGE. The record drops a muted rule's notes from what
-   * it answers (`mutedFor`), reading the mutes it keeps; this gate's `@record` only rewrites `boot`'s `me.prefs` on the way
-   * to the page, so it never reaches that read, and a case here would compare two loads of one unchanged answer. The test
+   * it answers (`mutedFor`), reading the mutes it keeps, so what it changes is the record's answer and not a page load;
+   * a case here would be asking the record's question of a screen. The test
    * that asks is the record's: "A RULE A PERSON MUTED LEAVES THEIR NOTICES" in `packages/record/test/prefs.test.ts`, with
    * `mutedFor` itself in `packages/kernel/test/digest.test.ts`.
    *
@@ -662,16 +668,20 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    * `null` and the `finally` does not close it a second time.
    */
   let record = null;
+  let fresh = null;
   let server = null;
   let browser = null;
   try {
     /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
     record = await startRecord();
+    /* AND A FIRST TODAY BESIDE IT (`startRecord`'s `fresh`), for the cases marked `fresh`: Today's next steps are a
+       first Today's, and the gates' record is kept for months. One `close()` each, in the `finally` below. */
+    fresh = await startRecord(0, { fresh: true });
+    /** The record this gate's port answers for: the gates' own, or the fresh one while a `fresh` case loads. */
+    let target = record;
 
     server = createServer(async (req, res) => {
-      const held = recordPrefsOf(req.headers.cookie);
-      if (held !== null && /^\/+api\/boot$/u.test(new URL(req.url ?? '/', 'http://x').pathname)) return bootWith(req, res, record.base, held);
-      if (forwards(new URL(req.url ?? '/', 'http://x').pathname)) return forward(req, res, record.base);
+      if (forwards(new URL(req.url ?? '/', 'http://x').pathname)) return forward(req, res, target.base);
       const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname).slice(1);
       if (rel.includes('..')) return res.writeHead(400).end();
       for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
@@ -705,7 +715,13 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     const unsettled = [];
     let checked = 0;
 
+    /* EVERY KEY THE RECORD KEEPS, TAKEN AWAY ON EVERY LOAD THAT DOES NOT NAME IT. The page writes to the record too:
+       `theme/follow.ts` sends an unstamped cookie's look to the record once where it has no word, and the next load's
+       cookie then loses to that word, so a case would read its first value every time. */
+    const cleared = Object.fromEntries(RECORD_KEYS.map((k) => [k, null]));
+
     for (const test of CASES) {
+      target = test.fresh ? fresh : record;
       const seen = new Map();
       /* A CASE IS COMPARED ONLY IF EVERY LOAD IN IT WAS REAL. Two probes of two screens, one of which
          was never there, is not a comparison of a preference. */
@@ -714,24 +730,25 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       let drew = '';
       for (const said of test.values) {
         const value = typeof said === 'function' ? said(drew) : said;
-        /* `@record` IS WHAT THE RECORD KEEPS FOR THE PERSON, and never goes in the cookie.
-           A LOAD THAT SAYS NOTHING OF THE RECORD MEETS ONE THAT KEEPS NOTHING, and not the gate's record as earlier loads
-           left it. Every load is a new browser with an unstamped cookie, and `theme/follow.ts` sends such a cookie's look to
-           the record once where it has no word; the next load's cookie then lost to that word, by design, so `text` read
-           its first value three times. */
+        /* `@record` IS WHAT THE RECORD KEEPS FOR THE PERSON, and never goes in the cookie: it is kept on the record through
+           `openPage`'s `prefs` (`setPref`), over `cleared`, so a load that says nothing of the record meets one that keeps
+           nothing, and not the record as earlier loads left it. */
         const { '@record': kept = {}, ...cookie } = value;
-        const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', bypassCSP: true });
         /* THE COOKIE, NOT A CLICK. `50 §4.7` has the shell read `bd_pref` in a one-statement inline
            script before first paint, so setting it is exactly what the product does. It keeps this
            gate about whether the preference REACHES the DOM rather than about the control that sets it,
-           which the a11y and layout gates already drive. */
-        await context.addCookies([
-          { name: 'bd_pref', value: encodeURIComponent(JSON.stringify(cookie)), url: `http://localhost:${PORT}` },
-          { name: RECORD_PREFS, value: encodeURIComponent(JSON.stringify(kept)), url: `http://localhost:${PORT}` },
-        ]);
-        const page = await context.newPage();
-        await page.goto(`http://localhost:${PORT}${APP_BASE}${test.route}`, { waitUntil: 'networkidle' });
-        const unmeasured = ready.check(`${test.name} ${JSON.stringify(value)}`, test.route, await ready.settled(page));
+           which the a11y and layout gates already drive. 1440 by 900 is this gate's viewport (`shape`). */
+        const opened = await openPage(browser, `http://localhost:${PORT}${APP_BASE}${test.route}`, {
+          width: 1440,
+          height: 900,
+          record: target,
+          prefs: { ...cleared, ...kept },
+          cookies: { bd_pref: encodeURIComponent(JSON.stringify(cookie)) },
+          ready,
+          waitUntil: 'networkidle',
+        });
+        const { context, page } = opened;
+        const unmeasured = ready.check(`${test.name} ${JSON.stringify(value)}`, test.route, opened.state);
         if (unmeasured) {
           unsettled.push(unmeasured);
           comparable = false;
@@ -821,6 +838,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
        socket still listening is a handle that keeps the runner from exiting. */
     if (server !== null) await new Promise((r) => server.close(() => r()));
     await record?.close().catch(() => {});
+    await fresh?.close().catch(() => {});
   }
 }
 

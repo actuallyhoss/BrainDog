@@ -35,13 +35,17 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   ],
   team: [
     {
+      version: '2.20.0',
+      notes: 'A project page says where the project stands from what happened on it this week until somebody says how it is going.',
+    },
+    {
       version: '2.19.0',
       notes:
         'Working now on Agent work lists only the runs heard from in the last fifteen minutes, with a helper folded under the run it helps, where it listed any run from today, even one quiet for hours.',
     },
   ],
   guide: [{ version: '1.6.1', notes: NAMED('Steps') }],
-  shop: [{ version: '1.0.0', notes: 'The first version: Orders and Products, and an Orders page in a Shop section of its own.' }],
+  shop: [{ version: '1.0.0', notes: 'The first version: Orders and Products, and an Orders page that says the month\'s orders, what ships this week and who still owes you.' }],
   business: [
     {
       version: '1.7.0',

@@ -249,7 +249,7 @@
 </Section>
 <!-- THE ONE CONTROL ON THIS SCREEN THAT IS ABOUT THE DEVICE, NOT THE RECORD. It says whether this browser is rung when
      something interrupts. It draws nothing until the host hands it a key, so on a host without one it is not here. -->
-<PushToggle />
+<PushToggle host={props.shell.host} />
 
 <style>
   /* THE QUIET HOURS, AS ONE ROW: the well, the sentence with its two pickers inside it, and the switch at the row's end

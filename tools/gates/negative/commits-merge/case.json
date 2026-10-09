@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "a merge commit",
+  "expect": "is a merge commit, and master is linear",
+  "findings": 1,
+  "total": 1,
+  "why": "TWO PARENTS AND A SHORT SUBJECT: master is linear, so a merge is refused for being one."
+}

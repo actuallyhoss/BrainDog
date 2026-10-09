@@ -219,7 +219,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
 }
 
 /** What one device flow asks the host for: a login, a vault grant over one scope, or one operation. */
-type Asked = { reach: 'login' } | { reach: 'vault'; scope: string } | { reach: OperationReach } | { reach: 'runner' };
+type Asked = { reach: 'login' } | { reach: 'vault'; scope: string } | { reach: OperationReach } | { reach: 'runner' } | { reach: 'shape' };
 
 /** The operation reaches this CLI asks for, each approving one ADMIN call (`OPERATIONS` in `packages/kernel/src/device.ts`). */
 export type OperationReach = 'export' | 'import' | 'token';
@@ -384,6 +384,24 @@ export async function approveRunner(raw: string, io: FlowIo & { label?: string |
     again: `Run braindog runner enrol ${host.key} to start again.`,
     nothing: 'this machine was not enrolled',
     stopped: 'Enrolment was stopped before it finished, and nothing was saved.',
+  }, io);
+  return typeof got === 'number' ? got : { key: host.key, bearer: got.bearer, expires: got.expires, label };
+}
+
+/**
+ * A standing shape grant for `braindog export --shape` (PRF-A13): the host as `hostKey` spells it, and the bearer of
+ * reach `shape` with its expiry and label, or the exit code once the reason has been said.
+ *
+ * THE LOGIN'S OWN FLOW; the caller keeps it beside the login (`keepShape` in `brainfile.ts`) and never prints it.
+ */
+export async function approveShape(raw: string, io: FlowIo & { label?: string | undefined }): Promise<{ key: string; bearer: string; expires: string; label: string } | number> {
+  const host = hostOf(raw, io.say);
+  if (typeof host === 'number') return host;
+  const label = `${(io.label ?? `${hostname()} · braindog-cli`).slice(0, 110)} · shape`;
+  const got = await approve(host, { reach: 'shape' }, label, {
+    again: `Run braindog export --shape --host ${host.key} to ask for a new code.`,
+    nothing: 'no shape grant was approved',
+    stopped: 'The approval was stopped before it finished, and no shape copy was taken.',
   }, io);
   return typeof got === 'number' ? got : { key: host.key, bearer: got.bearer, expires: got.expires, label };
 }

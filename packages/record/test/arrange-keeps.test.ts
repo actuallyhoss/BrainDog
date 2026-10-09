@@ -24,6 +24,7 @@ import { createRecordApi, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument } from '../../seed/src/index.ts';
 import { seedCatalogue } from '../../seed/src/usecases/catalogue.ts';
+import { notesKept, textKept, textShort, type KeptRow } from '../src/arrange-keeps.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 const agent: CallContext = { principal: { kind: 'token', id: 't', scope: 'propose', person: 'p_1', level: 'owner' } };
@@ -134,4 +135,71 @@ test('an update that leaves the changed list as the pack wrote it still says it 
   assert.deepEqual(ar.updates, [{ id: 'money-core', from: CURRENT, to: NEXT, keeps: ['register.fx'] }]);
   said(await api.propose({ question: 'Update money?', body_kind: 'pack', body: { install: 'money-core' } } as never, agent));
   sql.close();
+});
+
+/* ── a note written again keeps its text (REC-A13 step 4) ─────────────────── */
+
+const NOTE = 'A type family for screens.\n\nStage: building\n\nBlockers:\n- the italic is not drawn\n\nPlan:\n1. Draw the italic (so it ships)\n2. Hint it\n\nThe revenue is {{revenue.monthly}}.';
+
+test('a note written again keeps every character, in the new note or in what was lifted out of it', () => {
+  const after = 'Stage: building\n\nBlockers:\n\nPlan:\n\nThe revenue is `{{revenue.monthly}}`.';
+  const moved = ['A type family for screens.', ['the italic is not drawn'], { what: '1. Draw the italic', gain: '(so it ships)' }, { what: '2. Hint it' }];
+  assert.equal(textKept(NOTE, after, moved), true);
+  /* SPACE IS NOT TEXT: blank lines tidied away cost nothing. */
+  assert.equal(textKept(NOTE, after.replace(/\n+/gu, ' '), moved), true);
+  /* A STEP DROPPED IS TEXT LOST, by its own length, less the one character the code span's two backticks gave over the
+     list's dash the rewrite dropped. */
+  assert.equal(textKept(NOTE, after, moved.slice(0, 3)), false);
+  assert.equal(textShort(NOTE, after, moved.slice(0, 3)), [...'2.Hintit'].length - 1);
+  /* BY CHARACTER, so a note in another script is measured as it reads. */
+  assert.equal(textKept('\u{1F600}\u{1F600}', '\u{1F600}', ['\u{1F600}']), true);
+});
+
+const TYPES = new Map([
+  ['things', new Map([['name', 'text'], ['about', 'text'], ['note', 'document'], ['blockers', 'list'], ['lane', 'enum']])],
+  ['plan_steps', new Map([['what', 'text'], ['gain', 'text'], ['thing', 'ref']])],
+]);
+const types = (register: string) => TYPES.get(register) ?? new Map<string, string>();
+const pointsAt = (r: KeptRow, at: string) => r.fields?.thing === at;
+const named = (r: KeptRow) => `${String(r.before?.name)} in Projects`;
+
+test('an arrangement that rewrites a note and loses text is caught, by the entry and in words; one that keeps it is not', () => {
+  const change = (note: string, patch: Record<string, unknown> = {}): KeptRow => ({
+    register: 'things',
+    at: 'things#1',
+    before: { name: 'Typeface', note: NOTE },
+    patch: { note, about: 'A type family for screens.', blockers: ['the italic is not drawn'], ...patch },
+  });
+  const steps: KeptRow[] = [
+    { register: 'plan_steps', fields: { what: '1. Draw the italic', gain: '(so it ships)', thing: 'things#1' } },
+    { register: 'plan_steps', fields: { what: '2. Hint it', thing: 'things#1' } },
+  ];
+  const kept = 'Stage: building\n\nBlockers:\n\nPlan:\n\nThe revenue is `{{revenue.monthly}}`.';
+  assert.equal(notesKept([change(kept), ...steps], types, pointsAt, named), null);
+  /* A STEP NOT FILED, and a lane moved beside it, which is no text and pays for nothing. */
+  const lost = notesKept([change(kept, { lane: 'parked parked parked' }), steps[0]!], types, pointsAt, named);
+  assert.equal(lost?.at, 0);
+  assert.equal(lost?.fix, 'The new text of Typeface in Projects leaves out 7 characters of the old one that no field here takes. Keep every word of the old text, in the text or in the fields it moves to.');
+  assert.ok(!/\brow\b|\u2014/u.test(lost!.fix));
+  /* A NOTE NOT TOUCHED, or one that was empty, is no rewrite. */
+  assert.equal(notesKept([{ register: 'things', at: 'things#1', before: { note: NOTE }, patch: { lane: 'parked' } }], types, pointsAt, named), null);
+  assert.equal(notesKept([{ register: 'things', at: 'things#1', before: { note: '' }, patch: { note: 'New.' } }], types, pointsAt, named), null);
+});
+
+test('A PROPOSAL WHOSE NOTE REWRITE LOSES WORDS IS REFUSED BY PROPOSE ITSELF, at the entry (skills-49); one that keeps them is filed', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 12)), catalogue: seedCatalogue() });
+  for (const id of FIRST_PARTY) {
+    const pack = firstPartyDocument(id);
+    const planned = said<{ diff: Diff }>(await api.planPack({ doc: pack, source: { kind: 'local' } } as never, owner));
+    said(await api.installPack({ doc: pack, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
+  }
+  const made = said<{ id: string; version: number }>(await api.create({ register: 'things', fields: { name: 'Typeface', lane: 'building', note: NOTE } } as never, owner));
+  const at = api.kernel.nameOf(made.id);
+  const ask = (note: string) =>
+    api.propose({ question: 'Tidy the note?', body_kind: 'arrange', body: { why: ['A shorter note.'], rows: [{ register: 'things', at, version: made.version, patch: { note } }] } } as never, owner);
+  const lost = refused(await ask('Short.'));
+  assert.equal(lost.code, 'VALUE_MALFORMED');
+  assert.match(lost.fix, /^The new text of Typeface in Projects leaves out \d+ characters of the old one/u);
+  said(await ask(`${NOTE}\n\nMore.`));
 });

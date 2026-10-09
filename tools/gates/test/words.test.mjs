@@ -9,14 +9,15 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { breaks, judge, literalsOf, pageWords, readList } from '../words.mjs';
-import { PAGE_WORDS } from '../../../packages/render/src/lint.ts';
+import { breaks, judge, literalsOf, pageFiles, pageStrings, pageWords, readList } from '../words.mjs';
+import { BUTTON_WORDS, PAGE_WORDS } from '../../../packages/render/src/lint.ts';
+import { GUIDE, guide, readRaw } from '../words-guide.mjs';
 
 const gate = join(import.meta.dirname, '..', 'words.mjs');
 const list = readList();
@@ -93,14 +94,14 @@ test('EVERY WORD ON THE LIST IS FOUND, says what to use instead and why, and the
   assert.deepEqual(Object.keys(RED).sort(), list.words.map((w) => w.name).sort(), 'a sentence for each entry, and an entry for each sentence');
   for (const w of list.words) {
     assert.ok(w.say && w.why, `${w.name} says what to use and why`);
-    assert.equal(typeof w.page, 'boolean', `${w.name} says whether the page lint reads it`);
+    assert.ok([false, 'plain-words', 'system-word'].includes(w.page), `${w.name} says which rule of the page lint reads it, or false`);
     assert.doesNotMatch(`${w.say} ${w.why}`, new RegExp(DASH), `${w.name} is written without a long dash`);
     assert.deepEqual(breaks(list, { text: RED[w.name], key: null }).map((b) => b.rule), [w.name], RED[w.name]);
   }
 });
 
 test('the plain sentences beside them are green, and a dash alone is the mark for no value', () => {
-  for (const text of ['Register a passkey to sign in', 'Three bills in a line of four', 'Your #1 project', DASH, ` ${DASH} `, 'Okay, done', 'Run S7 again', 'Suggested'])
+  for (const text of ['Register a passkey to sign in', 'Three bills in a line of four', 'Your #1 project', DASH, ` ${DASH} `, 'Okay, done', 'Run S7 again', 'Suggested', 'Pack and send each order', 'It cost to make, pack and send'])
     assert.deepEqual(breaks(list, { text, key: null }), [], text);
 });
 
@@ -126,8 +127,28 @@ test('the held list names real files, each with a count and a reason, and the re
   assert.match(r.stdout, new RegExp(`, ${n} held in ${Object.keys(list.held).length} files`), 'the held count is printed, and every held finding is still there to hold');
 });
 
-test('THE PAGE LINT SAYS THE SAME: its words are the list\'s page entries, word for word', () => {
+test('THE PAGE LINT SAYS THE SAME: its words are the list\'s page entries and its buttons the list\'s, word for word', () => {
   assert.deepEqual(PAGE_WORDS, pageWords(list));
+  assert.deepEqual(BUTTON_WORDS, list.buttons);
+  assert.deepEqual(new Set(PAGE_WORDS.map((w) => w.rule)), new Set(['plain-words', 'system-word']));
+});
+
+test('A DECLARED PAGE IS READ BY ITS TITLE, HEADING, LABEL, BODY AND EMPTY, in a seed source and in a pack file', () => {
+  const ts = "export const p = { title: 'Bills', blocks: [{ heading: 'Each row', body: ['Rows {{bills.rows}}', 'See [it](/r/rows)'], empty: 'No rows yet', source: 'rows', note: 'a row' }] };\n";
+  assert.deepEqual(pageStrings(ts).map((l) => [l.key, l.text]), [['title', 'Bills'], ['heading', 'Each row'], ['body', 'Rows {}'], ['body', 'See [it]'], ['empty', 'No rows yet']]);
+  const json = '{\n  "title": "Live feed",\n  "pages": [{ "label": "Each row", "blocks": [{ "kind": "table", "source": "rows" }] }]\n}\n';
+  assert.deepEqual(pageStrings(json).map((l) => [l.key, l.text, l.line]), [['title', 'Live feed', 2], ['label', 'Each row', 3]]);
+  /* Code is never read: a span in backticks, and a type's angle brackets with the name before them, nested. */
+  const code = "export const p = { body: ['Run `pack` with the `rows` flag', 'A Map<string, Array<Row>> holds them', 'Typed `x` and the rows'] };\n";
+  assert.deepEqual(pageStrings(code).map((l) => breaks(list, l).map((b) => b.rule)), [[], [], ['row']]);
+});
+
+test('the declared pages are the seed\'s sources and each add-on\'s pack file, tests aside', () => {
+  const root = join(import.meta.dirname, '..', '..', '..');
+  const files = pageFiles(root);
+  assert.ok(files.includes('packs/live-feed/live-feed.pack.json'), 'a pack file');
+  assert.ok(files.some((f) => f.startsWith('packages/seed/src/modules/')), 'a seed module');
+  assert.ok(!files.some((f) => /\.test\.ts$/.test(f)), 'no test');
 });
 
 test('a planted tree is judged whole, by every kind of copy file, and an empty root is a skip', () => {
@@ -142,4 +163,12 @@ test('a planted tree is judged whole, by every kind of copy file, and an empty r
   for (const at of ['bills.ts:1', 'first-run.ts:1', 'decide/words.ts:1', 'agents.ts:1']) assert.ok(r.out.includes(at), `${at} in ${r.out}`);
   assert.equal(run({ 'apps/web/src/lib/copy/bills.ts': "export const bills = { open: 'Open this bill' };\n" }).code, 0);
   assert.equal(run({ 'README.md': 'nothing here\n' }).code, 3);
+});
+
+test('THE WRITING GUIDE IS THE LIST, PRINTED: docs/54-WRITING.md is what words.json makes, every word and button on it', () => {
+  const page = readFileSync(GUIDE, 'utf8');
+  assert.equal(page, guide(readRaw()), 'run node tools/gates/words-guide.mjs');
+  for (const w of list.words) assert.ok(page.includes(`| ${w.name} | ${w.say} |`), w.name);
+  assert.match(page, new RegExp(list.buttons.join(', ').replace(/, (\w+)$/, ' and $1')));
+  assert.doesNotMatch(page, new RegExp(DASH), 'the guide is written without a long dash');
 });

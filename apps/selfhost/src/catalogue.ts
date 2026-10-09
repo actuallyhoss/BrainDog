@@ -20,7 +20,9 @@ import { join } from 'node:path';
 
 import { CATALOGUE_INDEX } from '@braindog/declare/catalogue';
 import type { CatalogueOffer } from '@braindog/record';
-import { offersFromCatalogue, shelfFromCatalogue } from '@braindog/record/catalogue-offers';
+import { offersFromCatalogue, shelfFromCatalogue, type CatalogueReader } from '@braindog/record/catalogue-offers';
+
+import { kennelReader, type KennelDeps } from './kennel.ts';
 
 const PREFIX = '/app/catalogue/';
 const INDEX = /^\/app\/catalogue\/index\.json$/u;
@@ -66,27 +68,26 @@ export function catalogueFolder(named: string | undefined, shell: string | undef
   return undefined;
 }
 
-/** Newer versions of what a record holds, from the same folder, for Slash to ask about (`@braindog/record/catalogue-offers`). */
-export function catalogueOffersFrom(dir: string): (held: readonly { id: string; version: string; on: boolean }[]) => Promise<CatalogueOffer[]> {
-  return offersFromCatalogue((path) => {
-    try {
-      return readFileSync(join(dir, ...path.split('/')), 'utf8');
-    } catch {
-      return null;
-    }
-  });
-}
+/** The two shapes a catalogue lists, as a path inside it: no `..`, no other file. */
+const PATH = /^(?:index\.json|usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.usecase\.json|packs\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.pack\.json)$/u;
 
 /**
- * The whole catalogue in the same folder, for the arranger to install from (`catalogue-offers.ts` `shelfFromCatalogue`).
- * The record's deps take it once `RecordDeps.catalogueShelf` is declared; until then nothing hands it in.
+ * The catalogue a record installs from, read through the Kennel (`kennel.ts` `kennelReader`): the folder's index and the
+ * public Kennel's merged, the folder's first, and a file from the folder, then the public Kennel. With
+ * `BRAINDOG_KENNEL=off` or no network, the folder alone, as before.
  */
-export function catalogueShelfFrom(dir: string) {
-  return shelfFromCatalogue((path) => {
-    try {
-      return readFileSync(join(dir, ...path.split('/')), 'utf8');
-    } catch {
-      return null;
-    }
-  });
+export function kennelCatalogueReader(dir: string | undefined, deps?: KennelDeps): CatalogueReader {
+  const kennel = kennelReader(dir, deps);
+  return async (path) => {
+    if (!PATH.test(path)) return null;
+    return path === CATALOGUE_INDEX ? JSON.stringify(await kennel.index()) : kennel.file(path);
+  };
 }
+
+/** Newer versions of what a record holds, from the folder and the Kennel, for Slash to ask about (`@braindog/record/catalogue-offers`). */
+export function catalogueOffersFrom(dir: string | undefined, deps?: KennelDeps): (held: readonly { id: string; version: string; on: boolean }[]) => Promise<CatalogueOffer[]> {
+  return offersFromCatalogue(kennelCatalogueReader(dir, deps));
+}
+
+/** The whole catalogue, the folder's and the Kennel's, for the arranger to install from (`RecordDeps.catalogueShelf`, `shelfFromCatalogue`). */
+export const catalogueShelfFrom = (dir: string | undefined, deps?: KennelDeps) => shelfFromCatalogue(kennelCatalogueReader(dir, deps));

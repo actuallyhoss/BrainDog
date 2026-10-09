@@ -1,0 +1,12 @@
+{
+  "board": "quiet",
+  "title": "quiet",
+  "screens": [],
+  "checks": [
+    {
+      "id": "one-board",
+      "says": "Every block is a flat tile on one board.",
+      "by": "eye"
+    }
+  ]
+}

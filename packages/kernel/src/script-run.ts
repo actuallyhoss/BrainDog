@@ -81,6 +81,8 @@ export type Scripted = {
   host: string | null;
   scripted: {
     script: string;
+    /** The declaration's `title`, which the run line names it by when it has one (last-day-48). */
+    title?: string;
     /** The version it fired under, and the one whose source runs, even if a newer one was accepted since. */
     version: number;
     /** `script:<id>@v<n>`: what every row it writes says wrote it. */
@@ -332,6 +334,7 @@ export function prepareScript(deps: ScriptRunDeps, job: OutboxRow): Scripted | M
     host: hostOf(body.egress[0]),
     scripted: {
       script,
+      ...(typeof body.title === 'string' && body.title.trim() !== '' ? { title: body.title.trim() } : {}),
       version: version!,
       actor: `script:${script}@v${version}`,
       input: payload.input ?? null,
@@ -509,6 +512,8 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     return refuse(`${script} wrote nothing: write ${failedAt + 1} of ${answer.writes.length} was refused; its log says why.`, why);
   }
   const n = answer.writes.length;
+  /* THE RUN LINE NAMES THE SCRIPT AS A PERSON READS IT: its declaration's title, else its id. */
+  const named = s.scripted.title !== undefined ? `“${s.scripted.title}”` : script;
   /* AND WHERE THE CHAIN STOPPED, IN THE SAME LINE, since this line is the run as the script's history shows it. The
      first stop is named and the rest counted: the line is cut at 280 characters (`meter`), and a name for every row a
      wide close stopped on would push the sentence that says why past the cut. */
@@ -516,7 +521,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   const stop =
     stopped.length === 0
       ? ''
-      : ` Its writes started no ${stopped[0]}${stopped.length > 1 ? ` or ${stopped.length - 1} more` : ''}: ${stopped.length > 1 ? 'those runs' : 'that run'} would be at depth ${SCRIPT_CHAIN_CEILING + 1} of one chain of rules and scripts, and a chain stops at depth ${SCRIPT_CHAIN_CEILING} so that it cannot run for ever. A person's own write starts it again.`;
+      : ` Its writes started no ${stopped[0]}${stopped.length > 1 ? ` or ${stopped.length - 1} more` : ''}: ${stopped.length > 1 ? 'those runs' : 'that run'} would be at depth ${SCRIPT_CHAIN_CEILING + 1} of one chain, and a chain stops at depth ${SCRIPT_CHAIN_CEILING} so that it cannot run for ever. A person's own write starts it again.`;
   /* WHAT IT ASKED, BEFORE THE STOP, so the line's cut at 280 characters takes the long sentence and not this one. */
   /* READ BACK THROUGH A CAST because `filed` is set inside the savepoint's closure, which narrowing does not see. */
   const put = filed as { id: string; joined?: true; answered?: unknown } | null;
@@ -530,9 +535,17 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
           : put.joined
             ? ' Its question was already waiting on Decide, so it asked nothing new.'
             : ' It asked one question, which waits on Decide.';
+  /* A QUIET RUN IS STAMPED (last-day-48): one that wrote nothing, asked nothing and stopped nothing, so a feed leaves it
+     out (`bookkeeping` in index.ts) and a script that runs every night adds no line to Activity on a night with nothing
+     to say. The script's own history keeps it. Stamped as the line is written, never by rewriting it. */
+  const quiet = n === 0 && asked === null && stopped.length === 0;
   const metered = keepLog(
     deps,
-    meter(deps, { ...base, ...spent, outcome: 'ok', failures: 0 }, `${script} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one row' : `${n} rows`}.${said}${stop}`),
+    meter(
+      deps,
+      { ...base, ...spent, outcome: 'ok', failures: 0, ...(quiet ? { quiet: true as const } : {}) },
+      `${named} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one line' : `${n} lines`}.${said}${stop}`,
+    ),
     answer.log,
     decl,
   );

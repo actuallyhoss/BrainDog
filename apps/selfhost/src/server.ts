@@ -48,7 +48,7 @@ import { cutOffReadable } from '@braindog/kernel';
 import { readFileSync as readWhole, existsSync as present, renameSync as moveFile, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
 import { catalogueAnswer, catalogueFolder, catalogueOffersFrom, catalogueShelfFrom } from './catalogue.ts';
-import { serveKennelTo, servesKennel } from './kennel.ts';
+import { serveKennelTo, servesKennel, type KennelDeps } from './kennel.ts';
 import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, signCopies, type FileSnapshots } from './snapshots.ts';
 import { blobsFolder, eraseFile, keepAttachment, serveFiles, servesFiles } from './files.ts';
@@ -89,11 +89,10 @@ import { unwrap, type KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
 import { keysDoor, vaultDoor } from './vault.ts';
-/* BY PATH UNTIL `@braindog/host` EXPORTS `./shape` (its package.json), then `from '@braindog/host/shape'`. */
-import { serveShape, servesShape, type ShapeDoor } from '../../../packages/host/src/shape.ts';
+import { serveShape, servesShape, type ShapeDoor } from '@braindog/host/shape';
 /* THE SHAPE COPY'S RECORD HALF, BUILT HERE OVER THE RECORD'S KERNEL so the door answers whether or not `methods/index.ts`
    has spread it into the API yet; the same deps the record hands it, so the two cannot answer differently. */
-import { methods as shapeMethods } from '../../../packages/record/src/methods/shape.ts';
+import { methods as shapeMethods } from '@braindog/record/shape';
 /* OAUTH 2.1 ON THIS HOST: the host package's doors over this process's Directory. */
 import { oauthHere, servesOAuth, type OAuthHere } from './oauth.ts';
 import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
@@ -1062,6 +1061,8 @@ export async function start(options: {
    * this value has to be is the value this server was started with.
    */
   build?: string | undefined;
+  /** Take a shape copy on import (`--allow-shape`, PRF-A13). Absent is no: a shape copy is refused IMPORT_SHAPE. */
+  allowShape?: boolean | undefined;
   /**
    * A PINNED INSTANT, FOR A RECORD THAT IS A FIXTURE.
    *
@@ -1102,6 +1103,8 @@ export async function start(options: {
   shell?: string | undefined;
   /** A folder of published use cases served read-only under `/app/catalogue/` (`catalogue.ts`), or none. */
   catalogue?: string | undefined;
+  /** How the public Kennel is read (`kennel.ts` `KennelDeps`), a test's own. Absent: `BRAINDOG_KENNEL` and the network, read at each ask. */
+  kennel?: KennelDeps | undefined;
   /** 32 bytes for the Directory's MACs, derived from the KEK or `BRAINDOG_SESSION_SECRET`. Absent: no sessions. */
   sessionKey?: Uint8Array | undefined;
   /**
@@ -1628,6 +1631,7 @@ export async function start(options: {
     /* THE RECORD'S SWITCH FOR `ask_slash`, ON EXACTLY WHERE THE PASS ABOVE HAS SOMETHING TO ASK WITH. Off, install refuses
        the step with `NOT_IN_THIS_BUILD` (`unserved`), which is the honest answer on a host with no model. */
     answersSlash: answers !== undefined,
+    allowShape: options.allowShape === true,
     sign,
     /* THE OPERATOR'S CUT-OFF, READ AT EACH CALL, for the grant readers the record holds (device, vault, operation) and
        the owner's two listings, which mark what it ended. */
@@ -1673,9 +1677,11 @@ export async function start(options: {
     slashModel,
     slashMeter,
     engineHealth,
-    /* NEWER VERSIONS IN THIS HOST'S CATALOGUE, for Slash to ask about on Decide. */
-    ...(catalogueDir === undefined ? {} : { catalogueOffers: catalogueOffersFrom(catalogueDir) }),
-    ...(catalogueDir === undefined ? {} : { catalogueShelf: catalogueShelfFrom(catalogueDir) }),
+    /* NEWER VERSIONS IN THIS HOST'S CATALOGUE AND THE KENNEL, for Slash to ask about on Decide, and the whole of both for
+       the arranger: the folder first, then the public Kennel (`kennel.ts` `kennelReader`), so an add-on published only
+       to the Kennel installs by its id here as on the Cloud. With BRAINDOG_KENNEL=off, the folder alone. */
+    catalogueOffers: catalogueOffersFrom(catalogueDir, options.kennel),
+    catalogueShelf: catalogueShelfFrom(catalogueDir, options.kennel),
     snapshots: kept,
     destroy,
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
@@ -1833,7 +1839,7 @@ export async function start(options: {
       return;
     }
     /* THE KENNEL, BESIDE THE CATALOGUE AND FOR ITS REASON (`kennel.ts`): the same folder, then the public Kennel. */
-    if (servesKennel(new URL(req.url ?? '/', 'http://localhost').pathname)) return serveKennelTo(req, res, catalogueDir);
+    if (servesKennel(new URL(req.url ?? '/', 'http://localhost').pathname)) return serveKennelTo(req, res, catalogueDir, options.kennel);
     /* A RECORD THIS BUILD REFUSES ANSWERS NOTHING BUT THE REFUSAL, AT 503, HERE AND NOT METHOD BY METHOD. Kept up rather
        than exited (above), the process was measured answering `GET /api/boot` 200 over a file whose ledger names a
        migration this build does not have (`test/healthz.test.ts`): not every record method asks the kernel's refusal

@@ -164,7 +164,11 @@ jobs:
     # No run of this job on its own has been measured yet. It is a leg's ceiling, for a hang.
     timeout-minutes: 25
     steps:
+      # THE WHOLE HISTORY, because `commits` holds a floor on how many commits HEAD reaches (WAY-B02) and reads the
+      # pushed range: a shallow checkout reaches one commit and the floor is red.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup
 
       # EVERY GATE THAT NEEDS NOTHING BUILT, CHOSEN BY THE RUNNER AND NOT BY A LIST HERE (PRF-B01).
@@ -179,7 +183,11 @@ jobs:
       # exits 3 here, which `run.mjs` makes red under CI: the failure is a sentence naming the gate,
       # and the fix is its `needs` line, which moves it to the build job. `deploy-parity` needs a live
       # host, which only `deploy.yml` has, so it is in neither selection.
+      # THE COMMITS A PUSH OR A PULL REQUEST BRINGS, for `commits`: on a push to master origin/master is HEAD already, so
+      # without the range no commit would be read.
       - run: node tools/gates/run.mjs --unbuilt
+        env:
+          BRAINDOG_COMMITS_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || format('{0}..{1}', github.event.before, github.sha) }}
 
   build:
     # A JOB OF ITS OWN, because it answers a different question and can answer it at the same time.
@@ -305,6 +313,9 @@ jobs:
       - run: node --test tools/watch/*.test.mjs
       # AND THE DOOR CHECK'S RUNNER (`tools/door-check`), on every push and not only the nightly.
       - run: node --test tools/door-check/test/*.test.mjs
+      # AND THE PEOPLE'S WALKS (`tools/people`): each person's file is checked and walked on a fresh self-host, and
+      # `tools/people` is no workspace either. After the builds, because the walk reads the start screen's own modules.
+      - run: node --test tools/people/test/*.test.mjs
 
   windows:
     # THE KERNEL, THE SELF-HOST AND THE CLI ON WINDOWS, which is the owner's own machine and which

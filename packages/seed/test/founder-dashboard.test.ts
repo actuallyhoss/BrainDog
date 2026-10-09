@@ -189,6 +189,8 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     /* THE RAIL'S COLUMN SINCE portfolio 1.10.0: the figures, where it stands and what is handed back, one above the
        other beside the chart. */
     'At a glance',
+    /* TWICE SINCE portfolio 1.16.0: the typed card while somebody has said where it stands, else its own figures. */
+    'Where it stands',
     'Where it stands',
     'Handed back or blocked',
     /* THE TEMPLATE SINCE work 1.15.0: the plan, then one More about tile holding what changed, who worked on it, its

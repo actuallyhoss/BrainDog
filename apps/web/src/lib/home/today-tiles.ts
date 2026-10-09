@@ -318,7 +318,7 @@ export function sinceIcon(row: Pick<SinceRow, 'key' | 'label'>, listIcon: (list:
 /* ── cash ───────────────────────────────────────────────────────────────── */
 
 /**
- * A figure said roughly, for a line about the future: three significant figures of whole units, "about E£ 388,000".
+ * A figure said roughly, for a line about the future: three significant figures of whole units, "about EGP 388,000".
  * A forecast is arithmetic over dated rows, and its pennies are not a fact anybody should read as one.
  */
 export function aboutSaid(minor: number, currency: string): string {
@@ -331,7 +331,7 @@ export function aboutSaid(minor: number, currency: string): string {
 
 /**
  * What the walk says, in one line, and the phrase in it that needs him: going under is red, a low point is not.
- * "Lowest in the next 13 weeks: about E£ 388,000 on 23 Nov."
+ * "Lowest in the next 13 weeks: about EGP 388,000 on 23 Nov."
  */
 export function cashReading(f: Forecast): Sentence {
   if (f.crossed) {

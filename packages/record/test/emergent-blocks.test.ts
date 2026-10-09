@@ -83,7 +83,7 @@ test('A PAGE DRAWING A LIST WITHOUT ITS CALENDAR IS OFFERED ONE, appended whole 
     columns: [{ field: 'name' }, { field: 'due' }],
     empty: 'Nothing in Jobs falls in these months.',
   });
-  assert.match(item.why, /^Jobs puts a day on its rows in Due, and Jobs has no calendar of them\.$/u);
+  assert.match(item.why, /^Jobs puts a day on its entries in Due, and Jobs has no calendar of them\.$/u);
   assert.equal(api.kernel.lint([asDecl(item)]), null);
 });
 
@@ -124,7 +124,7 @@ test('THE COLUMN IS ADDED TO THE FIRST TABLE AS ITS LAST, and a table naming no 
   const blocks = blocksOf(column);
   assert.deepEqual(blocks[0]?.columns, [...TABLE.columns, { field: 'due', label: 'Due' }]);
   assert.deepEqual(blocks[1], { ...TABLE, heading: 'Again' }, 'only the first table over the list is offered the column');
-  assert.match(column.why, /^Due is filled on 100% of the 20 rows in Jobs, and the table on Jobs does not show it\.$/u);
+  assert.match(column.why, /^Due is filled on 100% of the 20 entries in Jobs, and the table on Jobs does not show it\.$/u);
 
   const bare = await withJobs(PEN_COLUMN_ROWS_FEWEST, [page('jobs', [{ kind: 'table', source: 'register.jobs', empty: 'No jobs yet.' }])]);
   value(await bare.setPref({ key: 'pen.dismissed', value: ['block:jobs:calendar:jobs', 'block:jobs:board:jobs', 'block:jobs:lines:jobs'] }, owner));

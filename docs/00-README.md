@@ -90,6 +90,7 @@ the code too (`tools/gates/docs-counts.mjs`).
 | 51 | [Spec · worker](51-SPEC-WORKER.md) | HISTORICAL | |
 | 52 | [Spec · testing and CI](52-SPEC-TESTING-AND-CI.md) | HISTORICAL | |
 | 53 | [Spec · operations](53-SPEC-OPERATIONS.md) | REFERENCE | |
+| 54 | [The writing guide](54-WRITING.md) | CONTRACT, made from `tools/gates/words.json` by `tools/gates/words-guide.mjs` | `tools/gates/test/words.test.mjs`, the page is the list printed |
 
 A builder reads the CONTRACT sections a change touches, and nothing else here. To learn how a part works, read its code.
 

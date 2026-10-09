@@ -44,8 +44,8 @@ const LISTS_NAMED_MOST = 3;
 /** A field id as `34 §4` spells one. A name that is not one is not a field a declaration could have installed. */
 const FIELD_ID = /^[a-z][a-z0-9_]{0,31}$/u;
 
-/** How many rows, said as a person says it. */
-const rows = (n: number): string => `${n} ${n === 1 ? 'row' : 'rows'}`;
+/** How many entries, said as a person says it (never "row" in copy a person reads). */
+const rows = (n: number): string => `${n} ${n === 1 ? 'entry' : 'entries'}`;
 
 /**
  * The refusal for deleting `entry` from `register` while live rows point at it, or `null` when the delete may go ahead.
@@ -103,7 +103,7 @@ export function referencedBy(parts: KernelParts, register: string, entry: string
   if (held.length === 0)
     return {
       code: 'DELETE_WHILE_REFERENCED',
-      fix: 'Rows you cannot open still point at this row, so it cannot be deleted: somebody who can open them has to point them elsewhere or delete them first.',
+      fix: 'Entries you cannot open still point at this one, so it cannot be deleted: somebody who can open them has to point them elsewhere or delete them first.',
       at: 'delete',
     };
 
@@ -114,7 +114,7 @@ export function referencedBy(parts: KernelParts, register: string, entry: string
   if (only !== undefined)
     return {
       code: 'DELETE_WHILE_REFERENCED',
-      fix: `${rows(only.n)} in ${only.name} still ${only.n === 1 ? 'points' : 'point'} at this row, so it cannot be deleted: point ${only.n === 1 ? 'that row' : 'those rows'} elsewhere or delete ${only.n === 1 ? 'it' : 'them'} first.`,
+      fix: `${rows(only.n)} in ${only.name} still ${only.n === 1 ? 'points' : 'point'} at this one, so it cannot be deleted: point ${only.n === 1 ? 'that entry' : 'those entries'} elsewhere or delete ${only.n === 1 ? 'it' : 'them'} first.`,
       at: 'delete',
     };
 
@@ -127,7 +127,7 @@ export function referencedBy(parts: KernelParts, register: string, entry: string
   const where = named.length === 0 ? last : `${named.join(', ')} and ${last}`;
   return {
     code: 'DELETE_WHILE_REFERENCED',
-    fix: `${hidden ? 'Rows' : rows(total)} still point at this row (${where}), so it cannot be deleted: point those rows elsewhere or delete them first.`,
+    fix: `${hidden ? 'Entries' : rows(total)} still point at this one (${where}), so it cannot be deleted: point those entries elsewhere or delete them first.`,
     at: 'delete',
   };
 }

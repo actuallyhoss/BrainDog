@@ -38,6 +38,7 @@ braindog:grammar/register | A list declaration: its keys, and each field's keys
 braindog:grammar/metric | A figure declaration
 braindog:grammar/proposals | The proposals that change what the record is: pack, settings and arrange
 braindog:grammar/ingest | A door or a scheduled action, with one of each
+braindog:grammar/kinds | Every kind of block a page draws, a line each, and what to reach for; braindog:grammar/kind/<name> says one whole
 braindog:grammar/script | A script: what its code can reach, and its limits
 braindog:grammar/automations | An automation: its triggers, its steps, its limits and what does not run yet
 ```

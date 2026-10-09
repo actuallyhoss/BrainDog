@@ -38,6 +38,7 @@
  */
 
 import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from '@braindog/kernel';
+import { daySaid } from '@braindog/where';
 import { day as longDay, money, parse, since, workingCell, WORKING_MARK, type Block } from 'braindog-render';
 import { KINDS, SECTION_TONES, kindSpec, showsOf, type CardRole, type KindSpec, type SectionTone } from 'braindog-render';
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
@@ -1708,27 +1709,10 @@ const exactness = (kind: string, cell: number): 'headline' | 'figure' | 'exact' 
  * everything it does not recognise exactly as written. A sentence it cannot improve is a sentence
  * it must not change: half a filter said in English and half in the dialect is worse than either.
  */
-/* THREE UNITS, WHICH IS WHAT THE GRAMMAR HAS. `34 §1.1`'s EBNF is `unit = "d" | "w" | "m"` and
-   `where.ts`'s `RELATIVE` reads exactly those, so `y` was a fourth spelling this table could print
-   and nothing in the product could compile — a sentence offered to a reader that the record refuses
-   the moment they use it. (The kernel's own parser does accept `y`, against the same EBNF; that is
-   filed as the kernel's bug, not answered by printing it here.) */
-const UNITS: Record<string, string> = { d: 'day', w: 'week', m: 'month' };
-
-/* `today`, `yesterday` and `tomorrow` are already English and pass through; `+90d` is not. That is
-   the whole of `resolveDay`'s grammar and the whole of what a block ever writes. */
-const spokenDay = (word: string): string => {
-  /* THREE UNITS IN THE PATTERN TOO, and dropping `y` from the table alone made it worse than before.
-     `+2y` still matched, `UNITS.y` was gone, and `?? 'day'` turned two YEARS into "2 days from now"
-     — which the compiler then accepted, resolving to a date two years out. It had been loudly wrong;
-     it became silently wrong. `34 §1.1`'s EBNF is `unit = "d" | "w" | "m"`, so a `+2y` this build
-     cannot read passes through verbatim and is refused by name. */
-  const rel = /^([+-])(\d+)([dwm])$/.exec(word.trim());
-  if (!rel) return word;
-  const [, sign, n, unit] = rel as unknown as [string, string, string, string];
-  const noun = UNITS[unit] ?? 'day';
-  return `${n} ${noun}${n === '1' ? '' : 's'} ${sign === '+' ? 'from now' : 'ago'}`;
-};
+/* A RELATIVE DAY IS SAID THROUGH THE SHARED PRINTER (`@braindog/where` `daySaid`), the table the parser reads back, so
+   `+90d` reads "90 days from now" and `bom-1m` "the start of last month", and a word it does not print (a date,
+   `today`, a unit the grammar lacks such as `+2y`) passes through as written and is refused by name where it is read. */
+const spokenDay = (word: string): string => daySaid(word.trim()) ?? word;
 
 export function saidPlainly(register: string, where: string | undefined): string {
   if (!where) return '';

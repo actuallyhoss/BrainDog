@@ -236,6 +236,10 @@ export function sharedPlanOf(value: unknown, nav: readonly string[] = [], links:
  * "Owner" were left out of what was proposed and never came back — reinstalling Portfolio later does not reach back
  * into a document already filed. `firstPartyModule` says each module's own lists without installing anything, so a
  * sibling in this same batch is held for that alone.
+ *
+ * BUT ONLY THE SIBLINGS INSTALLED BEFORE IT (uc6-walk-46): each module's document is cut to the lists held before it in
+ * install order, or a page of People that reads Money's Ledger is planned before the Ledger exists and the whole build
+ * is refused (`page.relation.requires`). accept's `refreshModule` gives People its Money page once Money is in.
  */
 export async function planShared(
   client: SharingClient,
@@ -257,7 +261,7 @@ export async function planShared(
   const modules: Record<string, unknown> = {};
   for (const m of read.value.usecase.modules) {
     const held = installed.find((p) => p.id === m);
-    const doc = held ? (held.disabled_at === null ? await relabelDoc(m, installed, read.value.usecase.usecase) : null) : await moduleDoc(m, withBatch, read.value.usecase.usecase);
+    const doc = held ? (held.disabled_at === null ? await relabelDoc(m, installed, read.value.usecase.usecase) : null) : await moduleDoc(m, withBatch.filter((p) => installed.some((i) => i.id === p.id) || read.value.usecase.modules.indexOf(p.id) <= read.value.usecase.modules.indexOf(m)), read.value.usecase.usecase);
     if (doc) modules[m] = doc;
   }
   const out = await client.planUseCase({

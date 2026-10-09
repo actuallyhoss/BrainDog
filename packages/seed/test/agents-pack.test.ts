@@ -8,13 +8,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { normalise, type Pack } from '@braindog/declare';
-import { openRecord, type Kernel } from '@braindog/kernel';
+import { KEYS_IN_TEXT, openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 import { DOOR_FIGURE_SIGNS } from '../../kernel/src/built-in-figures.ts';
 import { markDoor } from '../../kernel/src/door.ts';
 
 import { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, NOW, ROWS, RUNS, agentsPackDocument, declarations, installAgentsPack, installSeed } from '../src/index.ts';
 import * as AGENTS_MODULE from '../src/packs/agents.ts';
+import { MODULE_CHANGES } from '../src/changelog.ts';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -52,6 +53,18 @@ test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () =
   assert.equal(pack.manifest.pack, 'agents');
   assert.equal(pack.manifest.version, '1.10.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
+});
+
+/* THE VERSION SHIPPED IS THE VERSION SAID (agents-pack-49): the changelog's newest agents entry is the manifest's, so
+   the add-on's page never draws 1.10.0 with no notes, and its notes name the plain-text keys line and no word a person
+   should not read. */
+test('THE NEWEST CHANGE NOTE IS 1.10.0, and it says what Needs a look holds', () => {
+  const newest = MODULE_CHANGES.agents[0]!;
+  assert.equal(newest.version, AGENTS_PACK.manifest.version);
+  assert.match(newest.notes, /Needs a look/);
+  assert.match(newest.notes, /written in plain text/);
+  assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
+  assert.ok(!/\brows?\b|—|\(s\)/.test(newest.notes), 'the note says "row", an em dash or "(s)"');
 });
 
 const PROVIDES = [
@@ -525,13 +538,13 @@ test('THE KEYS, TOOLS AND RUNS FIGURES COUNT WHAT EACH CLAUSE SAYS, over the see
   sql.close();
 });
 
-const NOTES = ['keys-nowhere', 'keys-expired', 'tools-unseen'] as const;
+const NOTES = ['keys-nowhere', 'keys-expired', 'tools-unseen', 'keys-in-text'] as const;
 
 type Note = Drawn & { drawn?: boolean; when?: { metric?: string }; values?: Record<string, unknown> };
 const noteOn = (blocks: Drawn[], metric: string): Note | undefined => (blocks as Note[]).find((b) => b.kind === 'note' && b.when?.metric === metric);
 
 /**
- * NEEDS A LOOK, SINCE 1.10.0: one boxed tile under the runs, its three lines each drawn only while its figure is above
+ * NEEDS A LOOK, SINCE 1.10.0: one boxed tile under the runs, its four lines each drawn only while its figure is above
  * nought, closed by the folded section over what the brain learned, so the page still shows six tiles before its fold.
  */
 test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only while its figure is above nought', async () => {
@@ -539,16 +552,29 @@ test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only w
   const box = declared.findIndex((b) => b.kind === 'section' && b.heading === 'Needs a look');
   assert.ok(box > 0 && declared[box]!.box === true, 'Needs a look is not a boxed section');
   assert.ok(box > declared.findIndex((b) => b.heading === 'Earlier'), 'Needs a look is above the runs');
-  assert.deepEqual(declared.slice(box + 1, box + 4).map((b) => b.when?.metric), [...NOTES], 'the three lines are not in the box, or not in order');
-  const closer = declared[box + 4]!;
+  assert.deepEqual(declared.slice(box + 1, box + 1 + NOTES.length).map((b) => b.when?.metric), [...NOTES], 'the lines are not in the box, or not in order');
+  const closer = declared[box + 1 + NOTES.length]!;
   assert.deepEqual([closer.kind, closer.heading, closer.fold], ['section', 'What the brain learned', true], 'nothing closes the box, so it swallows what follows');
   for (const metric of NOTES) {
     const note = declared.find((b) => b.kind === 'note' && b.when?.metric === metric)!;
     assert.deepEqual(note.when, { metric, gt: 0 });
     assert.equal(note.tone, 'warn', `${metric}'s line is not toned`);
-    assert.ok(note.body?.startsWith(`{{${metric}}} `), `${metric}'s line does not say its number`);
+    assert.ok(note.body?.includes(`{{${metric}}}`), `${metric}'s line does not say its number`);
     assert.doesNotMatch(String(note.body), /—|credential|session|\brow\b/iu, `${metric}'s line reads as the machine`);
+    /* RIGHT FOR ONE (agents-pack-49): its figure's name, the number, then what to do, so "1 key(s) are past their day"
+       is never said. Filled as the host fills it, with one and with many. */
+    const name = metric === 'keys-in-text' ? KEYS_IN_TEXT.name : String(AGENTS_MODULE.AGENTS_METRICS[metric]?.name);
+    assert.ok(note.body?.startsWith(`${name}: `), `${metric}'s line does not lead with its figure's name`);
+    for (const n of [1, 3]) {
+      const said = String(note.body).replaceAll(`{{${metric}}}`, String(n));
+      assert.doesNotMatch(said, /\d+ \w+\(s\) (?:are|is|were|was|hold|holds|have|has)\b/u, `${metric}'s line reads wrong for ${n}: ${said}`);
+      assert.match(said, /\.$/u, `${metric}'s line is not a sentence`);
+    }
   }
+  assert.equal(
+    declared.find((b) => b.kind === 'note' && b.when?.metric === 'keys-in-text')?.body,
+    'Keys written in plain text: {{keys-in-text}} place(s). Move each to the vault.',
+  );
 
   /* THE SEED HOLDS LIVE KEYS KEPT NOWHERE, so that line is drawn with its count, and the two quiet ones are not. */
   const { k, sql } = await seeded();
@@ -558,7 +584,7 @@ test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only w
   assert.deepEqual(nowhere.refusals, []);
   /* THE PAGE HANDS THE SENTENCE WITH THE FIGURE'S READING BESIDE IT, and the host fills one into the other. */
   assert.deepEqual(nowhere.values, { 'keys-nowhere': reading(k, 'keys-nowhere') });
-  for (const quiet of ['keys-expired', 'tools-unseen']) assert.equal(noteOn(blocks, quiet)?.drawn, false, `${quiet} is drawn at nought`);
+  for (const quiet of ['keys-expired', 'tools-unseen', 'keys-in-text']) assert.equal(noteOn(blocks, quiet)?.drawn, false, `${quiet} is drawn at nought`);
   assert.ok(blocks.some((b) => b.kind === 'agents'), 'what the brain learned left the page rather than folding');
   /* AS THE RECORD MARKS IT FOR EVERY READER (`markDrawn`): the box is drawn over the one true line, and a section over
      nothing goes with its lines. */
@@ -573,7 +599,8 @@ test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only w
   value(fresh.k.create('session', { doing: 'One run', agent: 'claude', state: 'idle' } as never, { actor: 'p_seed', stamp: { last_seen: isoAgo(0) } }));
   const quietPage = opened(fresh.k, 'agents');
   for (const metric of NOTES) {
-    assert.equal(reading(fresh.k, metric), 0, `${metric} is not nought on a fresh record`);
+    /* THE KEY SCAN HOLDS NOTHING UNTIL ITS FIRST NIGHT, never a nought it has not read (`key-scan.ts`). */
+    assert.equal(reading(fresh.k, metric), metric === 'keys-in-text' ? null : 0, `${metric} is not nought on a fresh record`);
     assert.equal(noteOn(quietPage, metric)?.drawn, false, `${metric}'s line is drawn on a fresh record`);
   }
   assert.equal(boxOf(quietPage)?.drawn, false, 'Needs a look is drawn over nothing on a fresh record');

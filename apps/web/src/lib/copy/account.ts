@@ -803,9 +803,6 @@ export const account = {
   signupCheckAgain: 'Check again',
   signupNewHere: 'New here? Make a record',
   noRecordTitle: 'Make a record of your own',
-  passkeyFirstTitle: 'Keep a way back in',
-  passkeyFirstWhy: 'Add a passkey on this device, so you can sign in again without waiting for an email.',
-  passkeyFirstLater: 'Not now',
   passkeyFirstFailed: 'That did not add a passkey. You can add one later in Settings, under Recovery.',
 
   /* People and invitations. Stop and let back in, an invitation to chosen lists, a new link for one that ran
@@ -865,4 +862,12 @@ export const account = {
   copiesAgo: (n: number, unit: 'minute' | 'hour' | 'day') => `${n} ${unit}${n === 1 ? '' : 's'} ago`,
   exportedLast: (when: string) => `Last exported: ${when}`,
   exportedNever: 'Never exported',
+
+  /* SETTINGS > BACKUPS: THIS HOST'S LAST RESTORE TEST (LCH-C04), drawn by `areas/copies.ts` `drillLine`. The host's,
+     never the record's: only the operator holds the key that opens the copies, so every record reads the same line. */
+  drillPassed: (when: string) => `This host's last restore test: passed ${when}`,
+  drillFailed: (when: string) => `This host's last restore test: failed ${when}`,
+  drillNever: 'Never tested',
+  drillNeverSaid: 'No copy on this host has been restored as a test yet',
+  drillOverdue: 'Overdue',
 } as const;

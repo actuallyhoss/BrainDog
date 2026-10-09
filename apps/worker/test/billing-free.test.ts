@@ -47,7 +47,7 @@ function world(env: BillingEnv = ENV, people?: (record: string) => number | null
   const ada = (d.person$('ada@example.com', 'Ada') as { ok: true; value: { id: string } }).value.id;
   const who: Who = { person: ada, email: 'ada@example.com', record: null, provedAt: NOW };
   const asked: Asked[] = [];
-  const answers = new Map<string, StripeAnswer>([['read /v1/prices/price_cloud', { ok: true, body: { id: 'price_cloud', unit_amount: PLAN_TABLE.hosted.cents.month, currency: 'usd' } }], ['read /v1/prices/price_plus', { ok: true, body: { id: 'price_plus', unit_amount: PLAN_TABLE.plus.cents.month, currency: 'usd' } }]]);
+  const answers = new Map<string, StripeAnswer>([['read /v1/prices/price_cloud', { ok: true, body: { id: 'price_cloud', unit_amount: PLAN_TABLE.hosted.cents.month, currency: 'usd', recurring: { interval: 'month', interval_count: 1 }, active: true } }], ['read /v1/prices/price_plus', { ok: true, body: { id: 'price_plus', unit_amount: PLAN_TABLE.plus.cents.month, currency: 'usd', recurring: { interval: 'month', interval_count: 1 }, active: true } }]]);
   const stripe: Stripe = {
     create: async (path, form) => (asked.push({ verb: 'create', path, form }), answers.get(`create ${path}`) ?? { ok: false, status: 500, type: 'api_error', code: '' }),
     read: async (path) => (asked.push({ verb: 'read', path }), answers.get(`read ${path}`) ?? { ok: false, status: 500, type: 'api_error', code: '' }),

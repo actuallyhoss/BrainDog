@@ -6,10 +6,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { addedByHand, addedSaid, countWord, showTell, tellLists, wantMore } from './first-today.ts';
+import { firstPartyDocument } from '@braindog/seed/packs';
+
+import { addedByHand, addedSaid, countWord, heldSaid, readyRows, showTell, tellLists, wantMore } from './first-today.ts';
 import { optimist } from '../data/optimistic.ts';
 import { madeSteps } from '../start/made.ts';
 import { listsOfModules, playedBy } from '../start/parts.ts';
+import type { FieldDecl } from '../record/schema.ts';
+import { tellRead, type TellList } from '../tell/read.ts';
 
 /** A boot whose lists are those of these modules, every one empty, with the counts given by list. */
 const boot = (modules: string[], counts: Record<string, number> = {}) => ({
@@ -40,7 +44,8 @@ test('WHAT THE RECORD FILLS ITSELF, AND THE PERSON AS HER OWN FIRST PERSON, are 
 test('ONCE SOMETHING IS ADDED the card goes and the next steps take its place, in the order her answer puts them', () => {
   const told = boot(SHOP, { [projects]: 1, [people]: 2 });
   assert.equal(showTell(told), false);
-  const lists = told.registers.map((r) => r.id);
+  /* THE RECORD'S OWN LISTS, by their names (uc6-today-49), so the agent line says them as this record does. */
+  const lists = told.registers;
   assert.deepEqual(wantMore(told, {}), madeSteps(lists));
   assert.equal(wantMore(told, {})[0]?.kind, 'agent');
   /* WORK THAT ARRIVES BY MESSAGES puts forwarding first. */
@@ -74,9 +79,9 @@ test('THE CARD SAYS ITS COUNT AS A WORD, and the receipt names each entry by wha
   const made = ['orders', 'people', 'ledger'].map((register, i) => ({ register, seq: i + 1, title: 'x' }));
   assert.equal(addedSaid(made, lists), 'Added an order, a client and a payment');
   assert.equal(addedSaid([{ register: 'orders' }], lists), 'Added an order');
-  assert.equal(addedSaid([{ register: 'notes' }, { register: 'gone' }], lists), 'Added one in Notes and one in your BrainDog');
+  assert.equal(addedSaid([{ register: 'notes' }, { register: 'gone' }], lists), 'Added something in Notes and something in your BrainDog');
   for (const line of [addedSaid(made, lists), addedSaid([{ register: 'gone' }], lists)]) {
-    assert.doesNotMatch(line, /—|\brow\b|entity/u, 'no em dash, no "row", no ids');
+    assert.doesNotMatch(line, /—|\brow\b|entity|\bone in\b/u, 'no em dash, no "row", no ids, no "one in"');
   }
 });
 
@@ -123,4 +128,83 @@ test('ADD, THEN UNDO: the receipt names all three, and its one Undo asks the rec
   assert.deepEqual(asked, ['01J9CAPTURE'], 'one Undo, the whole batch');
   assert.equal(said[1]?.text, 'Put back 3 changes.');
   assert.equal(reads, 1, 'the screen is read again, so the card comes back on an empty record');
+});
+
+test('WHAT ONE PRESS ADDS IS WHAT IS READY: a payment with no account stays behind, and a pointer is counted over what is sent', () => {
+  const nadia = { register: 'people', fields: { name: 'Nadia' }, missing: [] };
+  const payment = { register: 'transactions', fields: { amount: { minor: 90000, currency: 'EGP' }, who: { $row: 0 } }, missing: ['account'] };
+  const order = { register: 'orders', fields: { what: '3 vanilla jars', who: { $row: 0 } }, missing: [] };
+  assert.deepEqual(readyRows([nadia, payment, order]), [
+    { register: 'people', fields: { name: 'Nadia' } },
+    { register: 'orders', fields: { what: '3 vanilla jars', who: { $row: 0 } } },
+  ]);
+  /* AN ENTRY POINTING AT ONE THAT STAYS BEHIND STAYS TOO, and so does one pointing at that, since the record writes a
+     capture all or none and a pointer to an entry not sent names nothing. */
+  const unnamed = { register: 'people', fields: {}, missing: ['name'] };
+  const owes = { register: 'orders', fields: { what: 'Candles', who: { $row: 0 } }, missing: [] };
+  const paid = { register: 'transactions', fields: { for: [{ $row: 1 }] }, missing: [] };
+  const later = { register: 'tasks', fields: { what: 'Wrap them' }, missing: [] };
+  assert.deepEqual(readyRows([unnamed, owes, paid, later]), [{ register: 'tasks', fields: { what: 'Wrap them' } }]);
+  assert.deepEqual(readyRows([]), []);
+});
+
+/* ── the receipt, read from the real lists ───────────────────────────────── */
+
+type Declared = { register?: string; name: string; one?: string; title: string; fields: FieldDecl[]; state?: string; done?: string[] };
+
+/** One of a first-party pack's lists, as the record holds it: People says "person" and Bills and invoices "item". */
+function seeded(pack: string, id: string): TellList {
+  const d = ((firstPartyDocument(pack as never)?.declarations ?? []) as Declared[]).find((x) => x.register === id);
+  assert.ok(d, `${pack} declares ${id}`);
+  return { id, name: d.name, title: d.title, fields: d.fields, ...(d.one ? { one: d.one } : {}), ...(d.state ? { state: d.state } : {}), ...(d.done ? { done: d.done } : {}) };
+}
+
+const ORDERS: TellList = {
+  id: 'orders',
+  name: 'Orders',
+  one: 'order',
+  title: 'what',
+  fields: [
+    { id: 'who', type: 'ref', to: 'people' },
+    { id: 'what', type: 'text', required: true },
+    { id: 'how_many', type: 'int' },
+    { id: 'due', type: 'day', deadline: true },
+    { id: 'paid', type: 'money' },
+  ],
+};
+const NADIA = 'Nadia wants 3 vanilla jars for Friday, paid 900 on InstaPay';
+const LISTS = [seeded('people', 'people'), ORDERS, seeded('money-core', 'transactions'), seeded('money-core', 'obligations')];
+const FRESH = { lists: LISTS, today: '2026-10-07', currency: 'EGP' };
+
+/** The press, as TellOne.svelte makes it: what is ready is sent, the capture answers in that order, the receipt reads it. */
+function press(opts: typeof FRESH & { accounts?: { seq: number; name: string }[] }): { said: string; sent: number } {
+  const { rows } = tellRead(NADIA, opts);
+  const sent = readyRows(rows);
+  const made = sent.map((r, i) => ({ register: r.register, seq: i + 1, title: 'x' }));
+  const said = [addedSaid(made.map((m, i) => ({ register: m.register, fields: sent[i]?.fields })), opts.lists), heldSaid(rows)].filter((l) => l !== '').join('. ');
+  return { said, sent: sent.length };
+}
+
+test('NADIA ON A FRESH SHOP: all three go in one press, and the receipt reads "Added an order, a client and a payment"', () => {
+  const fresh = press(FRESH);
+  assert.equal(fresh.sent, 3);
+  assert.equal(fresh.said, 'Added an order, a client and a payment');
+  assert.doesNotMatch(fresh.said, /\ba person\b|\ban item\b|\bone in\b|—/u);
+  /* A record that holds an account keeps the payment on its Ledger, and the receipt says the same. */
+  assert.equal(press({ ...FRESH, accounts: [{ seq: 1, name: 'InstaPay wallet' }] }).said, 'Added an order, a client and a payment');
+});
+
+test('AN ENTRY HELD BACK IS SAID ON THE RECEIPT with what it needs, and the rest still go', () => {
+  /* Accounts held but none this sentence names: the payment waits for one, the client and the order go. */
+  const two = { ...FRESH, accounts: [{ seq: 1, name: 'CIB current' }, { seq: 2, name: 'Cash box' }] };
+  const out = press(two);
+  assert.equal(out.sent, 2);
+  assert.match(out.said, /^Added an order and a client\. Not added: EGP 900\.00 in, by InstaPay\. It needs [Aa]ccount\.$/u);
+  assert.equal(heldSaid([{ register: 'people', fields: {}, missing: [], said: 'Nadia' }]), '');
+});
+
+test('THE LISTS CARRY THEIR COUNT, so an account held is known before its name is learnt', () => {
+  const decl = (id: string) => ({ id, name: id, one: id, title: 'name', fields: [] });
+  const b = { registers: [{ id: 'accounts', name: 'Accounts', count: 2 }, { id: 'people', name: 'People', count: 0 }] };
+  assert.deepEqual(tellLists(b, { accounts: decl('accounts'), people: decl('people') }).map((l) => [l.id, l.count]), [['accounts', 2], ['people', 0]]);
 });

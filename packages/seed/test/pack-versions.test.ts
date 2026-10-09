@@ -1385,30 +1385,34 @@ const DECLARED: Record<string, Version> = {
   'money-core@3.16.0': {
     holds: `
       metric.account-ages metric.arriving-30d metric.balances-stale metric.book-cash metric.book-spent-month metric.books-held metric.cash-accounts
-      metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-now metric.chasing metric.days-late-in metric.due-30d
+      metric.cash-as-of metric.cash-by-account metric.categories-against-direction metric.cash-by-book metric.cash-now metric.chasing metric.days-late-in metric.due-30d
       metric.currencies-held
       metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.in-30d
       metric.in-by-month metric.in-due-by-month metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d
       metric.ledger-newest-days metric.ledger-rows-7d metric.nights-missed-30d
       metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
       metric.owed-to-you metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
-      metric.project-out-month metric.project-owed metric.received-30d metric.runs-out-on metric.runway-days metric.spent-30d
+      metric.project-out-month metric.project-owed metric.received-30d metric.received-7d metric.runs-out-on metric.runway-days metric.settled-in-7d metric.spent-30d
       metric.spent-by-category-month metric.statement-oldest-days metric.txn-uncategorised metric.uncategorised-share-30d
       page.money page.money-book
       register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
       register.recurring register.snapshots register.transactions
       rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
       rule.recurring-stopped rule.txn-categorise
+      script.last_day
       setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'a8ac310c2f6ef805',
+    declares: '06d6906c4452a86e',
     history: [
       "Three more signs are declared, read by the kernel's new words: `ledger-newest-days` (age of the newest cleared row), `currencies-held` (currencies of the accounts' balances) and `uncategorised-share-30d` (money out with no category, 30 days) -> 1fdf9a3fd619ac95",
       "Folded into the unreleased 3.16.0 (batch 40): paydays (`recurring.day_of_month`, `recurring.weekend`, the `rest_days` setting and the leg naming both), `statement-oldest-days` (`rolled.read: age`) and `nights-missed-30d` (`series.cash-now`, once a kept line names its figure's lists) -> 978bc6c517e65459",
       "Then batch 42's step, first written as 3.17.0: a balance's age is the bank's last word (REC-B03): `cash-as-of` and `balances-stale` read the roll (`read: as_of`, `read: stale`), `account-ages` dates each account for the cards' `stale: { figure }`, `page.money` gains Last confirmed in Heads up, `page.money-book`'s cards read it, and `rule.cash-stale` goes; a row's currency comes from its account (REC-B04): `currency_from` on the Ledger's `amount`, `available` and `balance_after`, a balance check's `balance` and an instalment's `amount`, and `currency_fixed` on the Ledger's `amount` -> 2a1dd29a7593062b",
       "Folded into the one unreleased 3.16.0 (integrate 41-42): 3.17.0 above is no version of its own; a repeating line's `amount` declares `currency_from`, `day_of_month` is labelled Days of the month, and Money requires `register.balances` and draws What it holds today under Last confirmed -> a8ac310c2f6ef805",
+      "Folded into the one unreleased 3.16.0 (uc6-money-47): `received-7d` (the Ledger's money in, 7 days) and `settled-in-7d` (bills and invoices paid to you, 7 days), the two halves of Today's money this week -> 4dc97ed72aa38e02",
+      "Folded into the unreleased 3.16.0 (batch 48, F60): `script.last_day`, once a day, asks once in Decide whether repeating lines on the 28th to the 30th that end their month are paid on the last day or that date, and the pick writes `day_of_month` -> 913abc79c13c9220",
+      "Folded into the unreleased 3.16.0 (hop-figures-50, REC-A13 job 2): `categories-against-direction`, live categories marked one way that a Ledger entry going the other way points at (a `pointed` hop over `transactions.category`), and `page.money` gains its Heads up line; and PGS-B06 (list-order-50): the Ledger declares its order, by day, newest first -> 06d6906c4452a86e",
     ],
   },
   'work@1.17.0': {
@@ -1448,9 +1452,46 @@ const DECLARED: Record<string, Version> = {
       register.organisations register.people
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders
     `,
-    declares: 'd3d856a65e4d2519',
+    declares: 'a2e56f28aecca9ca',
     history: [
       "`page.health` is added: the record's vital signs by state, from the kernel's signs source and the figures signs-red and green-days -> d3d856a65e4d2519",
+      "`page.health` says nought red as 'No vital sign needs a look.' rather than 'Everything on this record is alive.', since signs-red reads 0 with one sign green and the rest unread -> 12f442c25447cbca",
+      "Folded into the unreleased 3.3.0 (figures-47): `page.health` says how many signs are not read yet under its first line, from the new built-in figure signs-unread, and its green-days lines say every watched sign was green, where they said nothing was red -> a2e56f28aecca9ca",
+    ],
+  },
+  /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
+  'portfolio@1.16.0': {
+    holds: `
+      metric.project-said
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-live
+      metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked
+      metric.projects-past-aim metric.projects-retired metric.projects-with-agent
+      page.portfolio
+      register.things
+      rule.project-past-aim
+    `,
+    declares: 'ae8100fc45762bd5',
+    history: [
+      "`register.things` declares `delete: refuse_while_referenced`; `page.portfolio` draws a note beside What each one earns, open and folded, counting `projects-earning-said` of `projects-live`; `project-said` counts a project whose health, progress, aim or agent is set -> ae8100fc45762bd5",
+    ],
+  },
+  /* WHAT WAS WORKED ON A PROJECT THIS WEEK, a figure over tasks and so Work's (batch 46, REC-C16). 1.17.0 IS RELEASED. */
+  'work@1.18.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-last-worked metric.project-moved-7d metric.project-open metric.tasks-after-week-yours
+      metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-late-yours metric.tasks-later metric.tasks-not-this-week
+      metric.tasks-overdue metric.tasks-today-yours metric.tasks-undated-yours metric.tasks-waiting
+      metric.tasks-this-week-yours
+      metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
+      register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
+    `,
+    declares: 'cf11d8e41eab6029',
+    history: [
+      "`project-moved-7d` is added: the tasks on a project written in the last seven days, read off `updated_at`, which a project page's Where it stands draws while nobody has said where it stands -> 9f91f6c3ff95d69d",
+      "`project-last-worked` is added: the days since a task on a project was last written, read off `updated_at`, which Where it stands draws as Last worked -> cf11d8e41eab6029",
     ],
   },
 };

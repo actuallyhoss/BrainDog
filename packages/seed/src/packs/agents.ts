@@ -458,7 +458,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         limit: 6,
         when: { metric: 'runs-earlier', gt: 0 },
       },
-      /* WHAT TO PUT RIGHT IN THE KEYS AND TOOLS, SINCE 1.10.0 (AGT-D01), as one tile of up to three lines, as Money's Heads
+      /* WHAT TO PUT RIGHT IN THE KEYS AND TOOLS, SINCE 1.10.0 (AGT-D01), as one tile of up to four lines, as Money's Heads
          up is: a boxed section draws the blocks after it, up to the next section, on one surface, and each line is drawn
          only while its figure is above nought, so a record with nothing wrong draws no tile at all (a section over
          nothing goes with its blocks). The heading is the word and the tone the mark, never the colour alone.
@@ -473,9 +473,14 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         span: 12,
         box: true,
       },
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', gt: 0 }, body: '{{keys-nowhere}} key(s) hold no value and do not say where they are kept' },
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', gt: 0 }, body: '{{keys-expired}} key(s) are past their day' },
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'tools-unseen', gt: 0 }, body: '{{tools-unseen}} tool(s) were not seen in a month' },
+      /* EACH LINE IS ITS FIGURE'S NAME, THEN THE NUMBER, THEN WHAT TO DO (agents-pack-49): "1 key(s) are past their day"
+         read wrong for one, so no verb follows a number and each line reads right for one and for many. */
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', gt: 0 }, body: 'Keys with no value and nowhere they are kept: {{keys-nowhere}}. Seal each in the vault or say where it lives.' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', gt: 0 }, body: 'Keys past their day: {{keys-expired}}. Renew or retire each.' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'tools-unseen', gt: 0 }, body: 'Tools not seen in a month: {{tools-unseen}}. Retire any you no longer use.' },
+      /* KEYS WRITTEN WHERE A KEY SHOULD NOT BE (the kernel's built-in `keys-in-text`, read a slice a night by its key
+         scan): a count of places, and the first one's list and number in the reading's why, never the key. */
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-in-text', gt: 0 }, body: 'Keys written in plain text: {{keys-in-text}} place(s). Move each to the vault.' },
       /* WHAT THE BRAIN LEARNED, FOLDED SHUT SINCE 1.10.0: a log looked up, not read each time the page opens, and the
          section that folds it is what closes Needs a look above it. */
       {
@@ -609,9 +614,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      clause of active and heard from today. `agents-working` goes, the one figure taken away, because the record answers
      the same question once for every page; no list or field goes. 1.8.0 is live.
      1.10.0 ONLY ADDS, SO IT IS MINOR: the figures `keys-sealed`, `keys-nowhere`, `keys-expired`, `tools-unseen` and
-     `runs-unplaced` (AGT-D01); Needs a look on the agents home under the runs, one tile of three lines each drawn only
-     while a key or tool needs putting right; What the brain learned folded shut under its own section; and five
-     figures over the agent door's own signs (`record.door`, AGT-B01). No list, field or figure goes. */
+     `runs-unplaced` (AGT-D01); Needs a look on the agents home under the runs, one tile of four lines each drawn only
+     while a key or tool needs putting right, the fourth over the kernel's `keys-in-text`; What the brain learned
+     folded shut under its own section; and five figures over the agent door's own signs (`record.door`, AGT-B01). No
+     list, field or figure goes. */
   manifest: { id: 'agents', version: '1.10.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,

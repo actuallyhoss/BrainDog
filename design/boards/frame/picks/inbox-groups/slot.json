@@ -1,0 +1,18 @@
+{
+  "pick": "inbox-groups",
+  "asks": "How Inbox is grouped",
+  "from": "RQ-EXP-389",
+  "options": [
+    {
+      "id": "keep",
+      "says": "Grouped by day, with a group for each sender.",
+      "live": true
+    },
+    {
+      "id": "reverse",
+      "says": "One list, newest first."
+    }
+  ],
+  "default": "keep",
+  "why": "A day and its senders is how a busy inbox is read."
+}

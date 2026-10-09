@@ -21,6 +21,11 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.16.0',
+      notes:
+        'A project that tasks, bills, services or people still point at can no longer be deleted: you are told which lists and how many, so you can move them first, or mark it Finished. Projects says how many of those in play say what they earned in a year. A project page says where it stands from what was worked on this week until somebody says how it is going.',
+    },
+    {
       version: '1.15.0',
       notes:
         'Projects no longer ends on folded headings over an empty page. With four projects or fewer, what each earns, what agents hold and what is coming up are open in one tile, and the parked and finished ones in another. Past four, each folds away as before.',
@@ -66,7 +71,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
-    { version: '3.3.0', notes: 'Health is a page of its own: each check this record runs on itself, by name, with what it last found. Anything that needs a look comes first, said in words and marked, and a check with nothing to go on yet says Not read yet.' },
+    { version: '3.3.0', notes: 'Health is a page of its own: each check this record runs on itself, by name, with what it last found. Anything that needs a look comes first, said in words and marked, and a check with nothing to go on yet says Not read yet. Under the first line it says how many checks have not been read yet.' },
     {
       version: '3.2.0',
       notes:
@@ -104,7 +109,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     {
       version: '3.16.0',
       notes:
-        "Money says more about how it is kept: how old the newest money on the Ledger and the oldest balance are, how many currencies the accounts are in, how much money out has no category, and how many nights the cash line missed. How old a balance is now comes from the last thing that said it: a bank message, a balance check or the account itself, not only the day somebody typed. When one is more than a week old, Heads up shows each account's last confirmed day, and a book's account cards are dated the same way. The note an account got each week its typed day was old is gone, as Heads up says it now. A repeating payment can say which days of the month it lands on, such as the 15th and the last day, and whether a payment due on a rest day moves to the working day before or after. Rest days start as Saturday and Sunday. An amount added with no currency takes its account's, and money on the Ledger never changes currency once it is kept.",
+        "Money says how old the newest Ledger money and oldest balance are, the currencies held, money out with no category, and nights the cash line missed. A balance is as old as the bank's last word, and Heads up shows each account's last confirmed day once one is a week old, in place of the weekly note. A repeating payment can land on set days of the month and move off rest days, and Decide asks about one on a month's last day. An amount keeps its account's currency. It says what came in this week. Heads up names any category marked one way that holds money going the other. The Ledger opens on its newest day.",
     },
     {
       version: '3.15.0',
@@ -188,6 +193,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   work: [
     {
+      version: '1.18.0',
+      notes: 'Counts the tasks on a project that changed this week, so a project page can say whether it is moving before anybody describes it. It also says how many days since a task on a project was last written, as Last worked under Where it stands.',
+    },
+    {
       version: '1.17.0',
       notes: 'A card on the Board says the day its task is due and who holds it, where it named the project. The project is still in the list under the board.',
     },
@@ -232,6 +241,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    {
+      version: '1.10.0',
+      notes:
+        'Agents shows Needs a look under the runs when a key holds no value and says nowhere it is kept, a key is past its day, a tool was not seen in a month, or a key is written in plain text where a key should not be. Each line names what it counts, then the number, then what to do. What the brain learned is folded until you open it, and Agents counts how the agent door is used.',
+    },
     { version: '1.9.0', notes: 'Agents counts an agent as working only when it was heard from in the last 15 minutes.' },
     {
       version: '1.8.0',

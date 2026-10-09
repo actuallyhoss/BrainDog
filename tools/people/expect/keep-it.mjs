@@ -24,6 +24,7 @@
 import { arrivalOf, checkout, openOwned, startSignup, verifySignup } from '../../../apps/web/src/lib/signup.ts';
 import { apiBase, BASE } from '../../../apps/web/src/lib/at.ts';
 import { propose } from '../../../apps/web/src/lib/start/propose.ts';
+import { nameSent, titleSent } from '../../../apps/web/src/routes/signup/build.ts';
 import { createClient } from '../../../packages/client/src/index.ts';
 import { cloud, ORIGIN } from '../../../apps/worker/test/cloud-harness.ts';
 
@@ -116,8 +117,10 @@ function tabOn(c, wrap) {
   return { web: { fetch: io }, client: (base) => createClient({ base, fetch: io }) };
 }
 
-/** The name the sign-up page sends at the start: its reading of her sentence (`propose`), the name heard in it. */
-const heardName = (person) => propose(person.said, { zone: person.zone ?? null, locale: person.locale ?? 'en' }).name ?? '';
+/** The page's reading of her sentence (`propose`), from which it sends both names (`nameSent`, `titleSent`). */
+const readingOf = (person) => propose(person.said, { zone: person.zone ?? null, locale: person.locale ?? 'en' });
+/** The name the sign-up page sends at the start: the name heard in her sentence (`nameSent`). */
+const heardName = (person) => nameSent(readingOf(person));
 
 /** A sign-up answer as `{ ok, why? }`, in the page's own words where it has them. */
 const told = (out) => (out.ok ? { ok: true } : { ok: false, why: out.fix ?? out.kind });
@@ -169,7 +172,8 @@ export async function keepIt(person, { title = person.expect?.heard?.title ?? pe
       seen.verified = told(verified);
       if (verified.ok) {
         const v = verified.value;
-        const made = await checkout({ slug: v.slug, name: v.name, tz: v.tz, plan: 'free' }, t.web);
+        /* THE RECORD IS MADE UNDER THE NAME SHE WAS SHOWN, as the page sends it once she is a person (`titleSent`). */
+        const made = await checkout({ slug: v.slug, name: titleSent(readingOf(person), v.name), tz: v.tz, plan: 'free' }, t.web);
         seen.made = told(made);
         if (made.ok) {
           const opened = await openOwned(v.slug, t.web);

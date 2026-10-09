@@ -47,9 +47,9 @@ import { extname, join, normalize } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
-import { answers, forward, forwards, startRecord, VARIANTS as RECORDS } from './record.mjs';
-import { routesOf } from './routes.mjs';
+import { APP_BASE, appShell, budget, openPage, readiness } from './lib.mjs';
+import { answers, forward, forwards, recordAt, startRecord, VARIANTS as RECORDS } from './record.mjs';
+import { routesFor, routesOf } from './routes.mjs';
 
 /**
  * AND WHY THIS GATE NEEDS `builds` AND NOT `web-build`, WHICH IS THE QUESTION A READER OF `layout.mjs`
@@ -171,9 +171,11 @@ export const stray = (apps, derived) =>
  * surfaces are builds of `apps/web`, three of them variant records of it, and a check that confused
  * the surface with the tree would look for `/settings/billing` in the marketing site.
  */
-export async function surfaces(root = join(import.meta.dirname, '..', '..')) {
+export async function surfaces(root = join(import.meta.dirname, '..', '..'), record = null) {
   const derived = {
-    web: await routesOf(join(root, 'apps', 'web'), [
+    /* AT THE RECORD'S OWN IDS once a record is given (PRF-B04, `routesFor`), and at the samples it had before without one,
+       which is how the coverage test and the early unsampled check read it. */
+    web: await routesFor(join(root, 'apps', 'web'), record, { extra: [
       '/p/kiln',
       '/t/3',
       '/nowhere',
@@ -181,7 +183,7 @@ export async function surfaces(root = join(import.meta.dirname, '..', '..')) {
       '/automations?tab=scripts',
       '/automations?tab=doors',
       '/automations/new',
-    ]),
+    ] }),
     site: await routesOf(join(root, 'apps', 'site')),
   };
 
@@ -230,6 +232,9 @@ export async function surfaces(root = join(import.meta.dirname, '..', '..')) {
     /* A ROUTE WITH NO SAMPLE IS A FAILURE AND NEVER A SKIP, which is `routes.mjs`'s own rule, and the
        tree it came from is named because two trees are derived here now. */
     unsampled: Object.entries(derived).flatMap(([tree, d]) => d.unsampled.map((u) => `${tree}: ${u}`)),
+    /* AN ADDRESS THE RECORD HAD NOTHING FOR, opened at its old sample and drawn as not found: counted in the summary as
+       not seen with data, never dropped. */
+    unseen: Object.entries(derived).flatMap(([tree, d]) => (d.unseen ?? []).map((u) => `${tree}: ${u}`)),
     strays: stray(APPS, derived),
   };
 }
@@ -266,7 +271,9 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
     console.error(`  ${e.message}`);
     return 1;
   }
-  const { apps: APPS, unsampled, strays } = await surfaces(root);
+  let { apps: APPS, unsampled, strays } = await surfaces(root);
+  /** The web's addresses the record had nothing for, filled once the record is asked (`routesFor`). */
+  let unseen = [];
   const AXE = join(root, 'node_modules', 'axe-core', 'axe.min.js');
   const A = budget('a11y');
   /* THE CONTRAST PLANT'S RATIO IS A NUMBER IN `budgets.json`, as every number this gate holds is to be. A
@@ -430,6 +437,10 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
     /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port, and its variants under the same
        handle, so the one `record.close()` below gives all of them back. See `record.mjs`. */
     record = await startRecord(0, { variants: true });
+    /* THE ROUTES AGAIN, NOW AT THE RECORD'S OWN IDS (PRF-B04): an address is one the record holds, and one it has nothing
+       for is counted as unseen. */
+    ({ apps: APPS, unseen } = await surfaces(root, record));
+    current = APPS[0];
 
     server = createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://x');
@@ -552,18 +563,19 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
 
       for (const scheme of SCHEMES) {
         for (const width of WIDTHS) {
-          const context = await browser.newContext({
-            /* THE SITE SHIPS A HASH CSP IN A META TAG, and `addScriptTag` below injects axe as an inline script, which
-               that policy refuses. Bypassing it here changes what the audit can run, not what the page is: the page
-               under test is the one production serves, policy and all. */
-            bypassCSP: true,
-            viewport: { width, height: 900 },
-            colorScheme: scheme,
-            // Motion off: axe reads a mid-animation opacity as the real one, and an entrance animation
-            // would have every panel failing contrast for the first 280ms of its life.
-            reducedMotion: 'reduce',
+          /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (PRF-B04, `openPage`): on the record's clock, the variant's own for
+             a variant pass, with motion off (axe reads a mid-animation opacity as the real one) and the CSP bypassed
+             (axe goes in as an inline script; that changes what the audit can run, not what the page is). */
+          const pass = app.record !== undefined && record.variants[app.record] ? recordAt(record.variants[app.record]) : record;
+          const opened = await openPage(browser, `http://localhost:${PORT}${app.spa ? APP_BASE : ''}${app.routes[0] ?? '/'}`, {
+            width,
+            scheme,
+            record: pass,
+            ready,
+            waitUntil: 'networkidle',
+            prerendered: !app.spa,
           });
-          const page = await context.newPage();
+          const { context, page } = opened;
           /* A gate that runs a browser over sixty-eight pages and prints nothing for four minutes is a
              gate people learn to kill. One line per pass, flushed as it goes. */
 
@@ -572,11 +584,9 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
           const open = async (route) => {
             /* UNDER `/app` FOR THE RECORD APP, and the route itself as the tree names it, because `MAY_REFUSE` is
                written in those words. The site is prerendered at the root. */
-            await page.goto(`http://localhost:${PORT}${app.spa ? APP_BASE : ''}${route}`, { waitUntil: 'networkidle' });
-            /* The one readiness site in this gate, because every load goes through here. The `5000` that
-               used to be written on this line was a bare literal in a directory whose shared file opens by
-               forbidding them; the number is `ready.settleTimeoutMs` now, and its expiry is a value. */
-            const state = await ready.settled(page, !app.spa);
+            /* The one readiness site in this gate, because every load goes through here (`opened.goto` waits for the
+               screen as `openPage` does, and collects the load's errors afresh). */
+            const state = await opened.goto(`http://localhost:${PORT}${app.spa ? APP_BASE : ''}${route}`);
             /* Two things, and the second is about the gate being TRUSTWORTHY rather than about the app.
                An un-laid-out rowgroup has no colours to measure, which is why the screenshots do it too.
                And every transition is killed outright: `reducedMotion` suppresses the animations that
@@ -888,6 +898,9 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
           : `      ${app.name}: 0 page-runs. Not built, so nothing on it was audited.`,
       );
     }
+    /* NOT SEEN WITH DATA (`routesFor`'s `unseen`): an address the record held nothing for, audited as not found. Said,
+       never dropped, so a sweep that quietly stopped reaching a screen with the record on it reads as one. */
+    if (unseen.length) console.log(`      not seen with data: ${unseen.length} address(es), ${unseen.join(', ')}`);
 
     if (mute.size) {
       /* ONE LINE, AND IT USED TO BE TWO. Three sentences in this file opened with a bare newline inside a

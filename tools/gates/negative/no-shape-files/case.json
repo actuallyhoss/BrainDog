@@ -1,0 +1,8 @@
+{
+  "gate": "no-shape-files",
+  "rule": "a shape copy of a record renamed past .gitignore",
+  "expect": "a shape copy of a record",
+  "findings": 1,
+  "total": 1,
+  "why": "record-copy.txt is a shape copy renamed so .gitignore's *.brainl misses it, the mark on line two. notes.md quotes the mark below line four and lists.ts names it in code, and neither is a copy."
+}

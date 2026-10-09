@@ -14,12 +14,14 @@
   shell hides this slot rather than this component reasoning about width.
 -->
 <script lang="ts">
-  import { at, here as inside } from '../at.ts';
+  import { BASE, at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
   import { isHere, placeOf, type FlatItem } from '../nav.ts';
   import Icon, { type IconName } from './Icon.svelte';
   import Mark from './Mark.svelte';
+  import Menu from './Menu.svelte';
+  import { toasts } from './toast.svelte.ts';
 
   let {
     entries,
@@ -41,7 +43,20 @@
     onfind?: (() => void) | undefined;
   } = $props();
 
-  const words = { unnamed: 'My BrainDog', you: 'You', find: 'Ask, add, or jump to anything' } as const;
+  const words = { unnamed: 'My BrainDog', you: 'You', find: 'Ask, add, or jump to anything', account: 'Your account and settings' } as const;
+
+  /* SIGN OUT AT EVERY WIDTH (LCH-A04), as the rail's account menu and the phone's More say it: auth.ts is loaded on the
+     press, and a press that did not end the session leaves the page where it is and says so. */
+  function signOut(): void {
+    void import('../auth.ts')
+      .then((m) => m.signOutAndLeave(`${BASE}/signin`))
+      .then(
+        (out) => {
+          if (!out.ok) toasts.push(copy.signOutFailed, { intent: 'warn' });
+        },
+        () => toasts.push(copy.signOutFailed, { intent: 'warn' }),
+      );
+  }
 
   /* COMPARED INSIDE THE RECORD, the address with the base and the slug taken off (`lib/at.ts`). */
   const path = $derived(placeOf(inside(page.url.pathname), page.url.searchParams));
@@ -75,7 +90,16 @@
   <button type="button" class="bar-find tap" onclick={() => onfind?.()}>
     <Icon name="search" size="m" /><span class="bar-find-words">{words.find}</span><kbd>/</kbd>
   </button>
-  <a class="bar-face tap" href={at('/settings')} aria-label={copy.settings} title={person || words.you}>{(person || words.you).slice(0, 1)}</a>
+  <!-- THE FACE OPENS A SMALL MENU: Settings, and Sign out, the two things a person does to their own session. -->
+  <div class="bar-person">
+    <Menu label={person || words.you} align="end">
+      {#snippet trigger()}
+        <span class="bar-face" title={person || words.you}><span aria-hidden="true">{(person || words.you).slice(0, 1)}</span><span class="sr-only">{words.account}</span></span>
+      {/snippet}
+      <a class="bar-mi" role="menuitem" href={at('/settings')}><Icon name="settings" size="s" />{copy.settings}</a>
+      <button type="button" class="bar-mi" role="menuitem" onclick={signOut}><Icon name="lock" size="s" />{copy.signOut}</button>
+    </Menu>
+  </div>
 </nav>
 
 <style>
@@ -233,6 +257,10 @@
     font-size: var(--t-xs);
   }
 
+  .bar-person {
+    flex: none;
+  }
+
   .bar-face {
     display: grid;
     place-items: center;
@@ -245,6 +273,31 @@
     font-size: var(--t-base);
     font-weight: 600;
     text-decoration: none;
+  }
+
+  /* The face is a letter to the eye, and the trigger says what it opens to a screen reader. */
+  .sr-only {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .bar-mi {
+    color: var(--ink2);
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .bar-mi:focus-visible {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  .bar-mi :global(.icon) {
+    color: var(--dim);
   }
 
   @media (forced-colors: active) {

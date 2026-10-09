@@ -62,13 +62,14 @@ test('THE PROPOSAL FORMS AROUND THE TURN THAT NAMED IT, when turn two only heard
   assert.deepEqual(podcast.ranked.find((r) => r.usecase === podcast.pick)?.why.map((w) => w.text), ['start a', 'podcast']);
 });
 
-/* EACH CHIP ON ITS OWN PROPOSES ITS OWN PERSON. The first run asks one question now, so the chips are the four people
-   the product is for and there is no second turn to hold them against. */
+/* EACH CHIP ON ITS OWN PROPOSES ITS OWN PERSON. The first run asks one question, and its chips are use case 6's five
+   starting points (his word of 9 October): a shop, a freelancer, a student, a founder of a few companies and a team. */
 const CHIPS: Record<string, string> = {
+  'I run a small shop': 'shop',
+  'I freelance': 'business',
   "I'm a student": 'student',
   'I run a few companies': 'founder',
   "I'm part of a team": 'team',
-  "I'm starting something new": 'guide',
 };
 
 test('THE TABLE IS EVERY CHIP, and each is what that chip alone proposes', () => {

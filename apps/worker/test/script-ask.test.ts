@@ -126,10 +126,10 @@ test("MONEY'S MONTH-END SCRIPT ASKS ITS ONE QUESTION, and the Cloud's runner han
   const answer = await run(LAST_DAY);
   assert.equal(answer.refused, undefined, answer.refused?.why);
   assert.deepEqual(answer.writes, []);
-  const ask = answer.ask as { cause: string; question: string; about: string[]; options: { label: string; patches: unknown[] }[] };
+  const ask = answer.ask as { cause: string; question: string; about: string; options: { label: string; patches: unknown[] }[] };
   assert.equal(ask.cause, 'money.last-day');
   assert.equal(ask.question, '2 repeating lines fall on the last day of their month. Is each the last day, or that date?');
-  assert.deepEqual(ask.about, ['Rent, 30 September', 'Salary, 30 September']);
+  assert.equal(ask.about, 'Rent, 30 September; Salary, 30 September');
   assert.deepEqual(
     ask.options.map((o) => o.label),
     ['The last day', 'That date'],

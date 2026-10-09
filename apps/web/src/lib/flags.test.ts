@@ -153,6 +153,8 @@ test('a flag name is never also a preference', () => {
     shape: true,
     chars: true,
     suggestPages: true,
+    nextStepsHidden: true,
+    arrivesBy: true,
     seen: true,
     columns: true,
     nav: true,

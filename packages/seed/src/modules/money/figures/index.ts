@@ -7,6 +7,7 @@
 import type { SeedMetric } from '../../base.ts';
 import { withTargetSetting, type Decl } from '../settings.ts';
 import { CASH_FIGURES } from './cash.ts';
+import { DIRECTION_FIGURES } from './direction.ts';
 import { DUE_FIGURES } from './due.ts';
 import { FLOW_FIGURES } from './flow.ts';
 import { INSTALMENTS_FIGURES } from './instalments.ts';
@@ -33,6 +34,12 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
      place in the document. */
 
   ...SIGNS_FIGURES,
+
+  /* ── which way a category is for ─────────────────────────────────────────
+     The categories an entry going the other way points at, since money-core 3.16.0 (REC-A13 job 2). After the signs,
+     so every figure above keeps its place in the document. */
+
+  ...DIRECTION_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */

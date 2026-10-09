@@ -198,6 +198,6 @@ test('THE RECORD’S COPIES ANSWER THROUGH THE API: none yet, then the night kep
   assert.equal(facts.last_copy_bytes, 2_100_000);
   assert.equal(facts.last_export_at, null);
   const failed = sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'export' ORDER BY ts DESC, id DESC LIMIT 1");
-  assert.equal(failed?.note, 'failed: the bucket refused the write');
+  assert.equal(failed?.note, 'failed: the copy could not be saved', 'the reason never reaches a note');
   sql.close();
 });

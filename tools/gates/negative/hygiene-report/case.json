@@ -1,0 +1,8 @@
+{
+  "gate": "hygiene",
+  "rule": "a builder's report at the root",
+  "expect": "a builder's report",
+  "findings": 1,
+  "total": 1,
+  "why": "A BUILDER'S REPORT AT THE ROOT, the file a wave used to leave behind."
+}

@@ -23,6 +23,8 @@ function seeded(pack: string, id: string): TellList {
 
 const PEOPLE = seeded('people', 'people');
 const LEDGER = seeded('money-core', 'transactions');
+const DUE = seeded('money-core', 'obligations');
+const ACCOUNTS = seeded('money-core', 'accounts');
 const TASKS = seeded('work', 'tasks');
 const ORDERS: TellList = {
   id: 'orders',
@@ -36,6 +38,8 @@ const ORDERS: TellList = {
     { id: 'what', type: 'text', required: true },
     { id: 'how_many', label: 'How many', type: 'int' },
     { id: 'due', type: 'day', deadline: true },
+    /* WHAT THE ORDER COMES TO, as the shop use case declares it (uc6-shop-49). */
+    { id: 'total', label: 'Total', type: 'money' },
     { id: 'paid', type: 'money' },
     { id: 'state', type: 'enum', values: ['new', 'ready', 'sent', 'paid'], default: 'new', required: true },
   ],
@@ -44,11 +48,14 @@ const ORDERS: TellList = {
 /* A Wednesday, so "Friday" is two days on. */
 const TODAY = '2026-10-07';
 const NADIA = 'Nadia wants 3 vanilla jars for Friday, paid 900 on InstaPay';
-const shop = { lists: [PEOPLE, ORDERS, LEDGER, TASKS], today: TODAY, currency: 'EGP' };
+/* A shop as the first run makes it, Money and all, before she has kept an account: Mariam's on day one. */
+const fresh = { lists: [PEOPLE, ORDERS, LEDGER, DUE, TASKS], today: TODAY, currency: 'EGP' };
+/* The same shop once it holds one account, her InstaPay wallet: what was paid goes on the Ledger. */
+const shop = { ...fresh, accounts: [{ seq: 1, name: 'InstaPay wallet' }] };
 
-test('the Nadia sentence on a shop record is a client, an order from her and money in', () => {
-  const { rows, left } = tellRead(NADIA, shop);
-  assert.deepEqual(rows.map((r) => r.register), ['people', 'orders', 'transactions']);
+test('the Nadia sentence on a fresh shop record is a client, an order from her and a paid item owed to her', () => {
+  const { rows, left } = tellRead(NADIA, fresh);
+  assert.deepEqual(rows.map((r) => r.register), ['people', 'orders', 'obligations']);
   assert.deepEqual(left, []);
 
   const [person, order, paid] = rows;
@@ -62,15 +69,64 @@ test('the Nadia sentence on a shop record is a client, an order from her and mon
   assert.equal(order!.icon, 'box');
   assert.deepEqual(order!.missing, []);
 
-  assert.equal(paid!.fields.direction, 'in');
-  assert.deepEqual(paid!.fields.amount, { amount: 90000, currency: 'EGP' });
-  assert.equal(paid!.fields.on, TODAY);
-  assert.equal(paid!.fields.state, 'cleared');
-  assert.equal(paid!.fields.what, 'Payment from Nadia, by InstaPay');
+  /* NO ACCOUNT, NO LEDGER ENTRY: owed to her, already paid, due and paid today, and linked to the new client. */
+  assert.deepEqual(paid!.fields, {
+    what: 'Payment from Nadia, by InstaPay',
+    amount: { amount: 90000, currency: 'EGP' },
+    state: 'paid',
+    direction: 'owed_to_me',
+    due: TODAY,
+    settled: TODAY,
+    party: { $row: 0 },
+  });
   assert.equal(paid!.said, 'EGP 900.00 in, by InstaPay');
-  assert.equal(paid!.detail, 'into Ledger, marked paid');
-  /* The account is the one thing the sentence cannot say on a record holding none: named, never guessed. */
-  assert.deepEqual(paid!.missing, ['account']);
+  assert.equal(paid!.detail, 'into Bills and invoices, marked paid');
+  /* Nothing is missing, so one press adds all three. */
+  assert.deepEqual(paid!.missing, []);
+});
+
+test('a record that holds an account keeps the payment on its Ledger, filed to that account', () => {
+  const { rows } = tellRead(NADIA, shop);
+  assert.deepEqual(rows.map((r) => r.register), ['people', 'orders', 'transactions']);
+  const paid = rows[2]!;
+  assert.equal(paid.fields.direction, 'in');
+  assert.deepEqual(paid.fields.amount, { amount: 90000, currency: 'EGP' });
+  assert.equal(paid.fields.on, TODAY);
+  assert.equal(paid.fields.state, 'cleared');
+  assert.equal(paid.fields.account, 'accounts#1');
+  assert.equal(paid.fields.what, 'Payment from Nadia, by InstaPay');
+  assert.equal(paid.said, 'EGP 900.00 in, by InstaPay');
+  assert.equal(paid.detail, 'into Ledger, marked paid');
+  assert.deepEqual(paid.missing, []);
+});
+
+test('accounts counted but not yet named still mean the Ledger, and which account is asked, never guessed', () => {
+  const counted = tellRead(NADIA, { ...fresh, lists: [...fresh.lists, { ...ACCOUNTS, count: 2 }] }).rows[2]!;
+  assert.equal(counted.register, 'transactions');
+  assert.deepEqual(counted.missing, ['account']);
+  /* An accounts list that holds none is a record with no account. */
+  assert.equal(tellRead(NADIA, { ...fresh, lists: [...fresh.lists, { ...ACCOUNTS, count: 0 }] }).rows[2]!.register, 'obligations');
+});
+
+test('with no account and no Bills and invoices, the Ledger entry says the account it needs', () => {
+  const { rows } = tellRead(NADIA, { ...fresh, lists: [PEOPLE, ORDERS, LEDGER, TASKS] });
+  assert.equal(rows[2]!.register, 'transactions');
+  assert.deepEqual(rows[2]!.missing, ['account']);
+});
+
+test('on a fresh record, money the reader paid is a paid item owed by her, and two currencies stay two items', () => {
+  const [wax] = tellRead('I paid 200 for wax', fresh).rows;
+  assert.deepEqual(wax!.fields, { what: 'Wax', amount: { amount: 20000, currency: 'EGP' }, state: 'paid', direction: 'owed_by_me', due: TODAY, settled: TODAY });
+  assert.equal(wax!.said, 'EGP 200.00 out');
+  assert.deepEqual(wax!.missing, []);
+  const two = tellRead('Nadia wants 3 jars, paid 500, paid US$40', fresh).rows.filter((r) => r.register === 'obligations');
+  assert.deepEqual(two.map((r) => r.fields.amount), [{ amount: 50000, currency: 'EGP' }, { amount: 4000, currency: 'USD' }]);
+  assert.deepEqual(two.map((r) => r.fields.party), [{ $row: 0 }, { $row: 0 }]);
+  /* Paid on a day she names is due and paid that day. */
+  const monday = tellRead('Mark paid 50 on Monday', fresh).rows[1]!;
+  assert.equal(monday.fields.due, '2026-10-05');
+  assert.equal(monday.fields.settled, '2026-10-05');
+  for (const r of tellRead(NADIA, fresh).rows) for (const line of [r.said, r.detail]) assert.doesNotMatch(line, /#\d|—|\brow\b|[0-9A-HJKMNP-TV-Z]{26}/u);
 });
 
 test('a payment through an account the record holds is filed to it', () => {
@@ -177,7 +233,7 @@ test('money never mixes two currencies: a second payment adds in only in the sam
   const same = tellRead('Nadia wants 3 jars, paid 500, paid 400', shop).rows;
   assert.deepEqual(same[1]!.fields.paid, { amount: 90000, currency: 'EGP' });
   assert.equal(same.filter((r) => r.register === 'transactions').length, 2);
-  const two = tellRead('Nadia wants 3 jars, paid 500, paid $40', shop).rows;
+  const two = tellRead('Nadia wants 3 jars, paid 500, paid US$40', shop).rows;
   assert.deepEqual(two[1]!.fields.paid, { amount: 50000, currency: 'EGP' });
   assert.deepEqual(two.filter((r) => r.register === 'transactions').map((r) => r.fields.amount), [{ amount: 50000, currency: 'EGP' }, { amount: 4000, currency: 'USD' }]);
   /* A symbol after the figure is still its currency, and a second figure in one clause is said back. */
@@ -196,4 +252,27 @@ test('money paid on a weekday or a date of the month is the one gone, and a comm
 
 test('a clause that places nothing leaves no one behind', () => {
   assert.deepEqual(tellRead('Nadia paid 0', shop), { rows: [], left: ['Nadia paid 0'] });
+});
+
+test('A BARE "$" IS THE RECORD\'S OWN DOLLAR OR A QUESTION, NEVER US DOLLARS ON EVERY RECORD (ruling 438); a code beside it wins', () => {
+  const paid = (said: string, currency: string): unknown => tellRead(`Mark paid ${said}`, { ...fresh, currency }).rows.find((r) => r.register === 'obligations')?.fields.amount;
+  assert.equal(paid('$40', 'EGP'), undefined, 'a dollar on a pound record is asked, not written');
+  assert.deepEqual(paid('$40', 'USD'), { amount: 4000, currency: 'USD' });
+  assert.deepEqual(paid('$40', 'CAD'), { amount: 4000, currency: 'CAD' });
+  for (const said of ['$12 EGP', 'EGP $12', '12$ EGP']) assert.deepEqual(paid(said, 'USD'), { amount: 1200, currency: 'EGP' }, said);
+  assert.deepEqual(paid('US$5', 'EGP'), { amount: 500, currency: 'USD' });
+  assert.deepEqual(paid('£5', 'EGP'), { amount: 500, currency: 'GBP' });
+  assert.deepEqual(paid('E£12', 'USD'), { amount: 1200, currency: 'EGP' });
+  assert.deepEqual(paid('900 LE', 'USD'), { amount: 90000, currency: 'EGP' });
+});
+
+test("AN AMOUNT SAID BESIDE AN ORDER WITH NO PAYMENT IS WHAT IT COMES TO (uc6-walk-50): the order's total, not a payment", () => {
+  for (const tail of ['1,350 not paid yet', 'EGP 1,350', 'total 1,350']) {
+    const { rows, left } = tellRead(`Salma wants 6 amber jars for Saturday, ${tail}`, fresh);
+    const order = rows.find((r) => r.register === 'orders');
+    assert.deepEqual(order?.fields.total, { amount: 135000, currency: 'EGP' }, tail);
+    assert.equal(order?.fields.paid, undefined, tail);
+    assert.equal(rows.some((r) => r.register === 'obligations' || r.register === 'transactions'), false, tail);
+    assert.deepEqual(left, [], tail);
+  }
 });

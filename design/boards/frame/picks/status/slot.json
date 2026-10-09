@@ -1,0 +1,19 @@
+{
+  "pick": "status",
+  "asks": "How a status is drawn",
+  "shown": "specimen",
+  "from": "EXP-A02",
+  "options": [
+    {
+      "id": "dot",
+      "says": "A small dot in the status colour, and its word beside it.",
+      "live": true
+    },
+    {
+      "id": "fill",
+      "says": "The word on a soft fill of the status colour, with no dot."
+    }
+  ],
+  "default": "dot",
+  "why": "A dot and its word keeps the colour small, so the two that ask for something are found by eye."
+}

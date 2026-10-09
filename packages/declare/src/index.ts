@@ -28,6 +28,8 @@ import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { FIRST_PARTY_LISTS } from './usecase.ts';
 import { cardsFault } from './cards.ts';
+import { holdsOf, resolveWhen, settleWhen } from './when.ts';
+export { holdsIn, holdsOf, resolveWhen, settleWhen, type Waiting } from './when.ts';
 import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, rowRegisterOf, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
@@ -316,6 +318,8 @@ export type SentenceSchema = {
 };
 
 export type Diff = {
+  /** The parts the plan took out until the record holds what they wait for (`when: { holds }`, when-49), by place. */
+  waiting: { at: string; holds: string[] }[];
   pack: { id: string; version: string; author: string; license: string; summary: string; checksum: string; source: PackSource };
   installed_version: string | null;
   direction: 'install' | 'upgrade' | 'downgrade' | 'reinstall';
@@ -1459,7 +1463,9 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
      a pack that reads a setting, and would miss the one a changed setting really makes. */
   const sent = settingsSent(given, options.settings);
   const config = settingsFor(given, installed, sent.values);
-  const pack = filledWith(given, config);
+  /* A PART THAT WAITS FOR A LIST THE RECORD DOES NOT HOLD IS TAKEN OUT (when-49), and the plan says what waits. */
+  const held = resolveWhen(filledWith(given, config), holdsOf(installed, given));
+  const pack = held.pack;
   const live = new Map(installed.declarations.map((d) => [d.id, d]));
   const mine = pack.manifest.pack;
   const was = installed.packs.find((p) => p.id === mine)?.version ?? null;
@@ -1810,6 +1816,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
       checksum: pack.checksum,
       source: pack.source,
     },
+    waiting: held.waiting,
     installed_version: was,
     direction: was === null ? 'install' : was === pack.manifest.version ? 'reinstall' : newer(pack.manifest.version, was) > 0 ? 'upgrade' : 'downgrade',
     requires: { format, primitives, packs: needs },
@@ -1841,7 +1848,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
        between the plan and the install — which no version number can see, and which is exactly what
        happens when the thing being approved is a file in somebody's editor. */
     planHash: `${installed.record_version}.${await digest(
-      jcs({ pack: pack.checksum, base, ...(config.length > 0 ? { config } : {}) } as unknown as Json),
+      jcs({ pack: pack.checksum, base, ...(config.length > 0 ? { config } : {}), ...(held.waiting.length > 0 ? { waiting: held.waiting } : {}) } as unknown as Json),
     )}`,
   };
 }
@@ -3050,7 +3057,7 @@ function faultOf(pack: Pack, diff: Diff): Result<never> | null {
   /* A TEXT SETTING IS A VALUE A PERSON CHOSE AFTER `normalise` LOOKED, so the colour rule is asked again of every body a
      setting filled. It sat in `install` after the approvals until a review of this list found `installFault` answering
      `null` for a chosen `shade: '#ff00aa'` that the accept refused (`plan-all-refusals.test.ts`). */
-  const filled = filledWith(pack, diff.config);
+  const filled = settleWhen(filledWith(pack, diff.config), diff.waiting ?? []);
   for (const d of filled.declarations) {
     if (d.kind === 'theme' || d === pack.declarations.find((o) => o.id === d.id)) continue;
     const painted = colour(d.body);
@@ -3076,7 +3083,7 @@ export type StagedDeclaration = { id: string; kind: string; body: Json; pack?: s
  * kept value's body, a rebased list, a handover and what `extends` lays are all staged in its place or beside it.
  */
 export function stagedBatch(pack: Pack, diff: Diff): StagedDeclaration[] {
-  const filled = filledWith(pack, diff.config);
+  const filled = settleWhen(filledWith(pack, diff.config), diff.waiting ?? []);
   /* WHAT THE OWNER CHANGED IS NOT STAGED, so it stands at its own version with `pack_id` null, and a later uninstall of
      this pack still cannot take it. */
   const keep = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
@@ -3139,7 +3146,7 @@ export function plannedState(installed: Installed, pack: Pack, diff: Diff): Inst
   };
   const keep = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
   const staying = new Map(diff.stays.flatMap((s) => (s.body === undefined ? [] : [[s.id, s.body] as const])));
-  for (const d of filledWith(pack, diff.config).declarations) if (!keep.has(d.id)) put(d.id, d.kind, mine, staying.get(d.id) ?? d.canonical);
+  for (const d of settleWhen(filledWith(pack, diff.config), diff.waiting ?? []).declarations) if (!keep.has(d.id)) put(d.id, d.kind, mine, staying.get(d.id) ?? d.canonical);
   for (const k of diff.kept) if (k.rebased !== undefined) put(k.id, 'register', null, k.rebased);
   for (const r of diff.retires) if (r.to !== undefined && r.body !== undefined) put(r.id, live.get(r.id)?.kind ?? 'register', r.to, r.body);
   for (const e of diff.extends) if (e.body !== undefined) put(e.id, 'register', null, e.body);
@@ -3313,7 +3320,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
      and refused every install, key in the vault or not (measured: `packs/mercury/mercury.test.ts`, "INSTALLED
      THROUGH THE RECORD'S OWN DOOR" and the self-host path). The colour rule for what a setting filled is asked in
      `installFault`. */
-  const filled = filledWith(pack, diff.config);
+  const filled = settleWhen(filledWith(pack, diff.config), diff.waiting ?? []);
 
   /* A SCRIPT'S LINE CARRIES ITS LABELS JOINED WITH ", " (`scriptEgress`), SO IT IS ASKED LABEL BY LABEL. Asked as the
      joined string, a script that sends two keys asked the vault for a key called "a, b" and could never install; the

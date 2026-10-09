@@ -42,7 +42,7 @@
   import { leaving, settled } from '$lib/ui/screen.svelte.ts';
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { watchKeyboard } from '$lib/a11y/keyboard.ts';
-  import Sidebar from '$lib/ui/Sidebar.svelte';
+  import Sidebar, { suggested } from '$lib/ui/Sidebar.svelte';
   import { assets } from '$app/paths';
 
   import { named } from '$lib/env.ts';
@@ -894,6 +894,14 @@
       {/if}
     </div>
 
+    <!-- THE HOLDING PEN, IN THE RAIL'S WORDS (USE-B03): an update that adds a page lands hidden, and on a phone this is
+         the one line that says so. Near the head, because it is news, and only when something waits. -->
+    {#if data.pen.length > 0}
+      <a class="more-row more-pen" href={at('/settings/navigation')}>
+        <Icon name="alert" size="m" /><span class="more-name">{suggested(data.pen.length)}</span><span class="more-tally">{copy.review}</span>
+      </a>
+    {/if}
+
     <!-- THE PLACES, AS THE RAIL DRAWS THEM (`railOf`). On a phone the tab bar carries the first five and this carries all
          of them, so a place past the fifth is one press from any screen. -->
     <ul class="more-list more-spine">
@@ -1401,6 +1409,11 @@
     flex: none;
     color: var(--dim);
     font-size: var(--t-sm);
+  }
+
+  /* The holding pen's line sits apart from the places under it, as the rail's sits apart at its foot. */
+  .more-pen {
+    margin-block-end: var(--sp-2);
   }
 
   /* A thing's own colour, where a place's glyph would be, as the rail draws it. */

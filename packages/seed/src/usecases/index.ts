@@ -22,7 +22,6 @@ import { STUDENT } from './student.ts';
 import { EARLIER_TICKETS, TEAM } from './team.ts';
 
 export type { UseCase } from '@braindog/declare';
-export { pollPack, type PolledMeasure, type PollSpec } from './founder-poll.ts';
 export { payDayRow, type PayDay } from './personal.ts';
 export { VOICE_KEYS, labelsOf, voiceOf } from '@braindog/declare';
 

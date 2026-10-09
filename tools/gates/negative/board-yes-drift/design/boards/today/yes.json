@@ -1,0 +1,39 @@
+{
+  "board": "today",
+  "units": [
+    "EXP-A01"
+  ],
+  "said": "yes, that one",
+  "taken": {
+    "on": "2026-10-08",
+    "from": "a planted yes"
+  },
+  "seen": true,
+  "images": {
+    "candidate/board-390-light.png": "5e6d6aee9c22c5bc56bcc86bc0425561ff834de059cbbf6ae799e027c5b05740",
+    "candidate/board-390-dark.png": "c0d155eafeefa8aad5b5d0d1243ca27d8c2a87488829a5beec4e5c9d75caca81",
+    "candidate/board-1440-light.png": "9817c144deb131f6ab485ec29ed4597ee263ceb978cfe166bcc133041b9e6c9a",
+    "candidate/board-1440-dark.png": "72baab55524bea18fdbe5b06552aa6220e8daaebaf2f64959defde5a38a9290a",
+    "candidate/board-1512-light.png": "eee47b38a372fdb4a083992ba6a4c385e7b4f2aceff86de93ce6cfe656ebf494",
+    "candidate/board-1512-dark.png": "be65a431e98e425ae04e04d15df8e8750cb7967a7720934020ff0e8c5bdfb9f1",
+    "candidate/board-1728-light.png": "cbc6179517303d8f48763e3394abbe4b30dc978c1f45d770ffe7578f51b86643",
+    "candidate/board-1728-dark.png": "d948bd118cd3c90f842f2bd564f7051fa7ec268b25865909eb345c8af81f2c7c"
+  },
+  "widths": [
+    390,
+    1440,
+    1512,
+    1728
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "commit": null,
+  "paths": {
+    "packages/skin/board.txt": "fd465e6589921d990e7dca8edd86d22f8317867bb0c1d262e6ca6bd6e3b17faa"
+  },
+  "drawn": {
+    "page.dog": "32a8e74beab966cce9de080bbb15f0e4959d50943f30ae7181165ffec77fc0f2"
+  }
+}

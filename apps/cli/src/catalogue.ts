@@ -90,7 +90,7 @@ import {
   type Signature,
   type Trust,
 } from '@braindog/declare/catalogue';
-import { DEFAULT_KENNEL } from '@braindog/declare/kennel';
+import { DEFAULT_KENNEL, KENNEL_BASE } from '@braindog/declare/kennel';
 import { parseYaml } from '@braindog/declare/yaml';
 import { refused, type Result } from '@braindog/ports';
 
@@ -843,14 +843,34 @@ async function diff(args: string[], io: AgentIo, kind: EntryKind): Promise<numbe
 /* ── install from a catalogue ───────────────────────────────────────────── */
 
 /**
- * The catalogue a host serves, as an address: `/app/catalogue/` on its origin, the folder the Worker's static assets and a
- * self-host both answer there (`apps/web/static/catalogue`, filled from `packs/` by `tools/catalogue/from-packs.mjs`).
+ * The catalogue a host serves, as an address: its Kennel at `/api/kennel/v1/` (`docs/14-KENNEL-AND-COMMUNITY.md` §1),
+ * which is the folder bundled with its shell (`apps/web/static/catalogue`, filled from `packs/` by
+ * `tools/catalogue/from-packs.mjs`) merged with what authors published to the Kennel, on the Cloud and on a self-host.
  *
  * THE HOST THE CLI ALREADY TALKS TO, so `pack install project-brief` needs no `--from`, and the import resolves a pack it
- * offers by id in the same place the app's Browse lists it. No token goes with the read: the catalogue is static and public.
+ * offers by id in the same place the app's Browse lists it. No token goes with the read: the Kennel's reads are public.
  */
 export function hostCatalogue(host: string | undefined, io: AgentIo): string {
-  return new URL('/app/catalogue/', target(host, io.env, hostsPath(io.env)).base).href;
+  return new URL(KENNEL_BASE, target(host, io.env, hostsPath(io.env)).base).href;
+}
+
+/**
+ * The host's catalogue that holds `id`: its Kennel, or else the bundled folder at `/app/catalogue/`.
+ *
+ * THE FOLDER IS ASKED ONLY WHEN THE KENNEL DOES NOT HOLD THE ID, for two reasons: a host deployed before its Kennel
+ * answers no index there, and the Kennel's public index leaves out an `unlisted` add-on, which installs by its id
+ * from the folder that ships it. When neither holds it, the Kennel is named, so the refusal lists every add-on it lists.
+ */
+export async function hostCatalogueFor(id: string, kind: EntryKind, host: string | undefined, io: AgentIo): Promise<string> {
+  const kennel = hostCatalogue(host, io);
+  const bare = kind === 'usecase' ? id.replace(/^usecase-/u, '') : id;
+  const holds = async (from: string): Promise<boolean> => {
+    const at = await catalogueAt(from, io);
+    return typeof at !== 'string' && at.index.entries.some((e) => e.id === bare && e.kind === kind);
+  };
+  if (await holds(kennel)) return kennel;
+  const folder = new URL('/app/catalogue/', kennel).href;
+  return (await holds(folder)) ? folder : kennel;
 }
 
 /** What installing a file would ask, said without asking: what it needs first and what it adds, from its own declarations. */
@@ -897,6 +917,7 @@ export async function installFromCatalogue(
   io: AgentIo,
   kind: EntryKind = 'usecase',
   dryRun = false,
+  hostsOwn = false,
 ): Promise<number> {
   const at = await catalogueAt(from, io);
   if (typeof at === 'string') {
@@ -964,15 +985,22 @@ export async function installFromCatalogue(
   const keep = keyToKeep(trust);
   if (keep !== null) remember(io, trustSubject(entry), keep);
   if (read.value.kind === 'usecase') return proposeFile(text, read.value.shared.usecase, host, io, question);
-  return proposePack(read.value.file.pack.manifest.pack, read.value.file.doc, question, host, io);
+  return proposePack(read.value.file.pack.manifest.pack, read.value.file.doc, question, host, io, hostsOwn);
 }
 
-async function proposePack(id: string, doc: Record<string, unknown>, question: string, host: string | undefined, io: AgentIo): Promise<number> {
+/**
+ * `byId` is for the host's own catalogue at its newest version: THE HOST INSTALLS WHAT ITS CATALOGUE HOLDS FROM ITS OWN
+ * DOCUMENT and refuses one sent beside it (`arrange.ts`, at `body.doc`), so that refusal is asked again by the id alone.
+ * A host whose catalogue does not hold it yet takes the document, as before.
+ */
+async function proposePack(id: string, doc: Record<string, unknown>, question: string, host: string | undefined, io: AgentIo, byId = false): Promise<number> {
   const { causeOf, connect, joinedSaid } = await import('./skills.ts');
   const at = await connect(host, io);
   if (typeof at === 'number') return at;
   /* ASKED ONCE (AGT-C07): the same pack asked for again, from here or another machine, joins the open question. */
-  const answer = await at.client.call<{ id: string; joined?: true; said?: string }>('propose', { question, body_kind: 'pack', body: { install: id, doc }, ...causeOf(`install#${id}`) });
+  const ask = (body: Record<string, unknown>) => at.client.call<{ id: string; joined?: true; said?: string }>('propose', { question, body_kind: 'pack', body, ...causeOf(`install#${id}`) });
+  let answer = await ask({ install: id, doc });
+  if (byId && refused(answer) && answer.refusal.at === 'body.doc') answer = await ask({ install: id });
   if (!answer.ok) {
     return refuse(io, answer, saidWithCode(answer));
   }
@@ -1164,17 +1192,17 @@ export async function pack(args: string[], io: AgentIo): Promise<number> {
       }
       return installPackFile(given, values.host, io, dryRun);
     }
-    /* NO --from IS THE HOST'S OWN CATALOGUE, which lists every pack in `packs/`. */
+    /* NO --from IS THE HOST'S OWN KENNEL, which lists every pack in `packs/` and every add-on published to it. */
     let from = values.from;
     if (from === undefined) {
       try {
-        from = hostCatalogue(values.host, io);
+        from = await hostCatalogueFor(given, 'pack', values.host, io);
       } catch (e) {
         io.say(e instanceof Error ? e.message : 'No BrainDog host is set, so there is no catalogue to find the id in. Pass --from <catalogue>.');
         return 1;
       }
     }
-    return installFromCatalogue(given, from, values.version, values.host, io, 'pack', dryRun);
+    return installFromCatalogue(given, from, values.version, values.host, io, 'pack', dryRun, values.from === undefined && values.version === undefined);
   }
   const sdk = sdkVerb(verb, 'pack');
   if (sdk) return sdk(rest, io);

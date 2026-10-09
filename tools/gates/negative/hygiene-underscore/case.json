@@ -1,0 +1,8 @@
+{
+  "gate": "hygiene",
+  "rule": "a basename starting _",
+  "expect": "leading underscore",
+  "findings": 1,
+  "total": 1,
+  "why": "A WORKING FILE BY ITS UNDERSCORE, beside the two `_headers` files Cloudflare reads, which are the one exception and stay green."
+}

@@ -155,6 +155,14 @@ export class SettingsState {
    * reads and writes the same state, so an effect that made this call tracked would loop for ever.
    */
   askMailDoor = async (): Promise<void> => {
+    /* A HOST THAT SAID WHICH IT IS IS NOT ASKED: `boot`'s `host` is its own word, the self-host routes no mail door and
+       the Cloud's is real. The GET was a 404 in the console of every self-host that opened Ingest or Billing. A host
+       older than the field is asked, as before. */
+    const host = this.#shell().host;
+    if (host !== undefined) {
+      this.mintsHere = host === 'cloud';
+      return;
+    }
     const at = opened();
     this.mintsHere = await mintsMail(apiBase());
     closed(true, at);

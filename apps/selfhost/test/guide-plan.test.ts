@@ -151,11 +151,16 @@ test('NO MODEL, A MODEL THAT FAILS, OR AN ANSWER OUTSIDE THE GUIDE\'S LIMITS FIL
   }
 });
 
-test('ROWS IN AN ARRANGEMENT ARE SLASH\'S ALONE: anybody else proposes rows as a rowset', async () => {
+test('ROWS IN AN ARRANGEMENT ARE HELD TO THE LISTS THE CALLER REACHES (arrange-47): one held to another list is refused at that entry', async () => {
   const { api } = await guideRecord();
-  const put = (await api.propose({ question: 'Add a plan?', body_kind: 'arrange', body: { why: ['A plan.'], rows: [{ register: 'milestones', fields: { what: 'Start' } }] } } as never, owner)) as { ok: boolean; refusal?: { code: string; at?: string } };
+  const body = { why: ['A plan.'], rows: [{ register: 'milestones', fields: { what: 'Start' } }] };
+  const held: CallContext = { principal: { kind: 'token', id: 'tok_h', scope: 'propose', person: 'p_owner', level: 'owner' }, registers: ['steps'] };
+  const put = (await api.propose({ question: 'Add a plan?', body_kind: 'arrange', body } as never, held)) as { ok: boolean; refusal?: { code: string; at?: string } };
   assert.equal(put.ok, false);
-  assert.equal(put.refusal?.at, 'body.rows');
+  assert.equal(put.refusal?.at, 'body.rows[0]');
+  /* AND THE OWNER, WHO REACHES MILESTONES, files it: the four-part question an agent puts is no longer refused for rows. */
+  const asked = (await api.propose({ question: 'Add a plan?', body_kind: 'arrange', body } as never, owner)) as { ok: boolean; refusal?: { code: string; at?: string } };
+  assert.equal(asked.ok, true, JSON.stringify(asked.refusal));
 });
 
 test('A MILESTONE REACHED ASKS ONCE WHETHER TO START THE NEXT ONE, and the guide\'s setting starts it instead', async () => {

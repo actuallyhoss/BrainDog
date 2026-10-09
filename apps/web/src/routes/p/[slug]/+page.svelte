@@ -188,18 +188,7 @@
 />
 
 {#if strip}<PageTabs {strip} />{/if}
-{#if offer}<div class="page-offer"><OfferCard item={offer} acts={offerActions} busy={offerBusy} /></div>{/if}
-<PageView {slug} {showSource} {got} {reread} />
+<!-- THE OFFER SITS UNDER THE PAGE'S HEADER (PageView's `offer`), so the page's name comes first. -->
+{#snippet offerCard()}{#if offer}<OfferCard item={offer} acts={offerActions} busy={offerBusy} />{/if}{/snippet}
+<PageView {slug} {showSource} {got} {reread} offer={offer ? offerCard : undefined} />
 
-<style>
-  /* THE CARD SITS ON THE BOARD ABOVE THE PAGE, one tile gap from what follows, as on the list's own screen. The work
-     itself has no gutter (the strip, the head and the body each keep their own), so the card keeps one too, or it ran
-     edge to edge at 390. AND IT GIVES UP WHAT THE DOCKED PANEL TAKES, as the page's `.hosted` does, so a row open
-     beside the page never sits over it: the gutter, or the panel's width when that is more. */
-  .page-offer {
-    padding-block-start: var(--sp-3);
-    padding-inline: var(--gutter) max(var(--gutter), var(--dock-w, 0px));
-    margin-block-end: var(--tile-gap);
-    transition: padding-inline-end var(--d-panel) var(--ease-sheet);
-  }
-</style>

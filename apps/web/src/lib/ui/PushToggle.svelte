@@ -26,6 +26,10 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
 
+  /* THE HOST `boot` NAMED, when it named one. Only the Worker serves the key, so a self-host is not asked: the GET was a
+     404 in the console of every self-host that opened Notifications. Absent is a host older than the field, asked. */
+  let { host }: { host?: 'cloud' | 'self-host' | undefined } = $props();
+
   let offer = $state<Offer>(null);
   let on = $state(false);
   let line = $state('');
@@ -51,6 +55,7 @@
 
   /* `hostKey` AND `startOf` NEVER REJECT, which is why nothing below catches: each turns every refusal into a value. */
   async function begin() {
+    if (host === 'self-host') return;
     const made = offerOf(await hostKey(apiBase()), {
       worker: 'serviceWorker' in navigator,
       push: 'PushManager' in window,

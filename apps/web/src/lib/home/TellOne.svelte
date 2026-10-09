@@ -5,8 +5,10 @@
   takes them all back (`undoChange`, through `data/optimistic.svelte.ts` `run`, the Undo every write on every screen has).
 
   NOTHING IS ADDED UNTIL THE PRESS, and the card says so beside the button. An entry the record would refuse (a required
-  field the sentence did not give) says what it needs, in words, and the press waits for it: all or none, as the record
-  writes them.
+  field the sentence did not give) says what it needs, in words, and stays behind: the press adds the entries that are
+  ready (`readyRows`), all or none of those, as the record writes them. The receipt names what went by what each is
+  ("Added an order, a client and a payment", `addedSaid`) and what stayed behind with what it needs (`heldSaid`), so
+  nothing held is dropped quietly when the card goes.
 
   ITS WORDS ARE ITS OWN, in `say` below and not in `copy.ts`, as `first-run.ts` keeps the first run's. `first-today.ts`
   says when Today draws it (`showTell`), and home-first-46 mounts it.
@@ -22,7 +24,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { isGlyph } from '$lib/ui/icons.ts';
-  import { addedSaid, countWord } from './first-today.ts';
+  import { addedSaid, countWord, heldSaid, readyRows } from './first-today.ts';
 
   let {
     options,
@@ -43,6 +45,8 @@
     left: (words: readonly string[]) => `Not placed: ${words.join(', ')}`,
     addOne: 'Add it',
     addAll: (n: number) => `Add all ${countWord(n)}`,
+    /* Some wait for what they need: the button names only what goes, never "all" over lines that stay. */
+    addReady: (n: number) => (n === 1 ? 'Add the one that is ready' : `Add the ${countWord(n)} that are ready`),
     notYet: 'Nothing is added until you press.',
     undoOne: 'One Undo takes it back.',
     undoAll: (n: number) => `One Undo takes all ${countWord(n)} back.`,
@@ -55,15 +59,17 @@
 
   const told = $derived(typed.trim() === '' ? null : tellRead(typed, options));
   const rows = $derived(told?.rows ?? []);
-  const blocked = $derived(rows.some((r) => r.missing.length > 0));
+  /* WHAT CAN BE ADDED NOW: an entry that still needs something stays in the preview, saying what, and the rest go. */
+  const ready = $derived(readyRows(rows));
 
   const iconOf = (r: TellRow) => (isGlyph(r.icon) ? r.icon : 'rows');
 
   async function add(e: SubmitEvent) {
     e.preventDefault();
-    if (sending || rows.length === 0 || blocked) return;
+    if (sending || ready.length === 0) return;
     sending = true;
-    const sent = rows.map(({ register, fields }) => ({ register, fields }));
+    const sent = ready;
+    const shown = rows;
     const client = createClient({ base: apiBase() });
     /* THE UNDO IS THE RECORD'S, by the batch the capture answers: `run` offers `undoChange(base, batch)` on the receipt. */
     await run({
@@ -74,7 +80,11 @@
         if (answer.ok) return { ok: true as const, value: answer.value };
         return { ok: false as const, fix: 'refusal' in answer ? answer.refusal.fix : say.raced };
       },
-      said: (value) => addedSaid(value.made, options.lists),
+      /* EACH ENTRY BY WHAT IT IS, read from the fields it was sent with: the capture answers in the order it was sent. */
+      said: (value) =>
+        [addedSaid(value.made.map((m, i) => ({ register: m.register, fields: sent[i]?.fields })), options.lists), heldSaid(shown)]
+          .filter((line) => line !== '')
+          .join('. '),
       settle: () => {
         typed = '';
         void reread();
@@ -104,11 +114,11 @@
           {/each}
         </ul>
         {#if told && told.left.length > 0}<p class="tell-one-quiet">{say.left(told.left)}</p>{/if}
-        <Button weight="primary" type="submit" disabled={sending || blocked}>{rows.length === 1 ? say.addOne : say.addAll(rows.length)}</Button>
+        <Button weight="primary" type="submit" disabled={sending || ready.length === 0}>{ready.length < rows.length && ready.length > 0 ? say.addReady(ready.length) : ready.length <= 1 ? say.addOne : say.addAll(ready.length)}</Button>
       </div>
     {/if}
   </form>
-  <p class="tell-one-quiet">{say.notYet} {rows.length > 1 ? say.undoAll(rows.length) : rows.length === 1 ? say.undoOne : say.undoAny}</p>
+  <p class="tell-one-quiet">{say.notYet} {ready.length > 1 ? say.undoAll(ready.length) : ready.length === 1 ? say.undoOne : say.undoAny}</p>
 </Tile>
 
 <style>

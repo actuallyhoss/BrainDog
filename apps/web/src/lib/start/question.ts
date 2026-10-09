@@ -4,8 +4,10 @@
  * ONE, NEVER TWO (his word of 9 October, over USE-B06's "up to two"): a first run that asks back becomes an interview.
  * So the rules pick the one that changes the most, in this order, and ask nothing when nothing is missing:
  *
- * 1. THE CURRENCY, where an amount was typed with none: an amount is not kept without one (`shape.ts`), and a currency
- *    is never guessed from a place. The choices are the ones the device and the words point at (`currencyChoices`).
+ * 1. THE CURRENCY, where an amount was typed with none and neither the words nor the device gave one: an amount is not
+ *    kept without one (`shape.ts`). A currency is never guessed from a place named in the words, but the one of the
+ *    region whose time the device keeps is the record's where the proposal keeps money (`currencyFor`, `propose.ts`), so
+ *    a shop in Alexandria is not asked. The choices are the ones the device and the words point at (`currencyChoices`).
  * 2. WHERE A SHOP'S ORDERS COME IN, where the build makes a list of orders: messages forwarded, a website or shop app,
  *    or in person. Each answer says what it means, so the person knows what they chose.
  * 3. WHAT TO CALL THEM, where no name was heard: the first entry in People is them (USE-B06).
@@ -51,8 +53,11 @@ export const words = {
   nameQuestion: 'What should I call you?',
 };
 
-/** The list a shop's orders are kept in, as the Shop use case declares it. */
-const ORDERS = 'orders';
+/**
+ * A LIST OF ORDERS, BY THE WORD IT IS CALLED, not by an id this screen would have to know (`web-lists`): the Shop use
+ * case's Orders, or any list a use case calls by that word, is where a shop's orders come in.
+ */
+const ORDERS = /\borders?\b/iu;
 
 /**
  * The one question to ask, or `null` when nothing is missing or it was already asked. `said` is what was typed, for the
@@ -68,11 +73,12 @@ export function oneQuestion(p: Proposal, said = '', env: CurrencyEnv | null = nu
     find,
     only: words.only,
   });
+  /* `p.currency` IS THE WORDS' OR THE DEVICE'S: asked only where neither gave one. */
   if (p.currency === null && p.heard.some((h) => h.loose === true)) {
     const c = env === null ? null : currencyChoices(said, env);
     return ask('currency', firstRun.currencyQuestion, (c?.choices ?? []).map((x) => ({ value: x.code, label: x.name, means: x.why })), c?.suggested ?? null, c?.find ?? null);
   }
-  if (p.places.some((x) => x.kind === 'list' && x.id === ORDERS)) return ask('arrivesBy', words.arrivesQuestion, words.arrives.map((x) => ({ ...x })));
+  if (p.places.some((x) => x.kind === 'list' && ORDERS.test(x.name))) return ask('arrivesBy', words.arrivesQuestion, words.arrives.map((x) => ({ ...x })));
   if (p.name === null) return ask('name', words.nameQuestion, []);
   return null;
 }

@@ -21,6 +21,7 @@
  * evidence where presence is being recorded (a page nobody opens counts only on a record where other pages are opened).
  */
 
+import { pageSpokenFor, signatureOf } from './emergent.ts';
 import type { FigureTest, Grows } from './arrange.ts';
 import { subjectOf } from './automations.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
@@ -189,6 +190,8 @@ export type EntityUse = {
 
 export type Usage = {
   at: string;
+  /** What the pen holds now and what the person dismissed (`emergent.ts` signatures). Absent, nothing is held. */
+  pen?: { held: readonly string[]; dismissed: readonly string[] };
   /** The oldest event or row this record holds, and how many days ago that was. */
   firstWrite: string | null;
   ageDays: number;
@@ -212,11 +215,20 @@ export type Usage = {
   /** The skill names the record holds, or `null` when it has no Skills list. */
   skills: string[] | null;
   /**
+   * The skills the record wrote and nobody has taken over (`managed`), each with the entry it is, the version it was read
+   * at, and its text and its number, so a skill shipped again at a newer `rev` is offered to a record still holding an
+   * older one exactly as shipped. Absent on a reading made before they were read, and then nothing is offered again.
+   */
+  held?: HeldSkill[];
+  /**
    * The people, organisations and projects met often enough or named by enough things to earn a page (`ENTITY_PAGE`),
    * strongest first, from the lists the caller reads. Absent on a reading made before they were read.
    */
   entities?: EntityUse[];
 };
+
+/** A skill the record wrote, as `held` reads it. */
+export type HeldSkill = { at: string; version: number; name: string; rev: number; body: string };
 
 /** A thing Slash noticed, said in one sentence. */
 export type Noticed = { kind: 'grows' | 'agents' | 'unopened' | 'untouched' | 'voice' | 'young' | 'label' | 'skills'; subject: string; text: string };
@@ -239,8 +251,11 @@ export type Offered = {
   modules: readonly string[];
   /** Whether the pack's own pages show what agents are doing, so it is worth offering when agents write here. */
   showsAgents: boolean;
-  /** The skills a use case names for agents working in it, offered once it is on. */
-  skills?: readonly { name: string; trigger: string }[] | undefined;
+  /**
+   * The skills a use case names for agents working in it, or an add-on ships, offered once it is on. One that ships its
+   * text carries `body` and `rev`, and `was`, the texts of the versions before it, oldest first.
+   */
+  skills?: readonly { name: string; trigger: string; what?: string; body?: string; rev?: number; was?: readonly string[] }[] | undefined;
 };
 
 const isAgent = (actor: string): boolean => /^S\d+$/u.test(actor) || actor.startsWith('agent:') || actor === 'slash';
@@ -506,8 +521,33 @@ export function readUsage(
           .all<{ name: string | null }>("SELECT json_extract(fields, '$.name') AS name FROM entry WHERE register = 'skills' AND deleted_at IS NULL")
           .flatMap((r) => (typeof r.name === 'string' ? [r.name] : []))
       : null,
+    held: kernel.register('skills') && reads('skills') ? heldSkills(sql, kernel.nameOf) : [],
     entities,
   };
+}
+
+/**
+ * The skills the record wrote and nobody took over: `managed` and active, with a whole-number `rev` and a text. One
+ * somebody marked as their own (`managed` false) is never offered a newer text, whatever it holds. Each by its spoken
+ * name (`skills#3`), as every other update Slash files names its entry, never by its id.
+ */
+function heldSkills(sql: Sql, nameOf: (id: string) => string): HeldSkill[] {
+  const out: HeldSkill[] = [];
+  for (const row of sql.all<{ id: string; version: number; fields: string }>(
+    "SELECT id, version, fields FROM entry WHERE register = 'skills' AND deleted_at IS NULL AND json_extract(fields, '$.managed') = 1 ORDER BY seq LIMIT ?",
+    SKILLS_WEIGHED_MOST,
+  )) {
+    let f: Record<string, unknown>;
+    try {
+      f = JSON.parse(row.fields) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    if (f.state !== undefined && f.state !== null && f.state !== 'active') continue;
+    if (typeof f.name !== 'string' || typeof f.body !== 'string' || typeof f.rev !== 'number' || !Number.isInteger(f.rev)) continue;
+    out.push({ at: nameOf(row.id), version: row.version, name: f.name, rev: f.rev, body: f.body });
+  }
+  return out;
 }
 
 /** A list that holds people, organisations or projects, and the fields its role names. */
@@ -713,6 +753,9 @@ const relabelled = (list: ListUse, held: ToneSetting, tone: Tone): boolean =>
   list.pack === tone.pack || !Object.hasOwn(MODULE_WORDS, list.id) || held.default !== MODULE_WORDS[list.id]!.name;
 
 function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noticed[]; drafts: SlashDraft[]; quiet: string | null } {
+  /* ONE PLACE AN OFFER (offer-pen-50): a page the pen holds, or one the person dismissed there, is not asked again here. */
+  const penHeld = new Set(usage.pen?.held ?? []);
+  const penGone = new Set(usage.pen?.dismissed ?? []);
   const nowMs = Date.parse(usage.at);
   const noticed: Noticed[] = [];
   const drafts: SlashDraft[] = [];
@@ -724,11 +767,11 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
   for (const l of growing) {
     noticed.push({ kind: 'grows', subject: l.id, text: `${l.name} grew by ${l.added30} in the last thirty days, on ${l.addedDays30} separate days.` });
     /* A LIST THAT GROWS AND NO PAGE SHOWS gets a page of its own, filed beside its pack's pages in the rail. */
-    if (!usage.pages.some((p) => p.registers.includes(l.id))) {
+    if (!usage.pages.some((p) => p.registers.includes(l.id)) && !pageSpokenFor(l.id, penHeld, penGone)) {
       const slug = freeSlug(l.id, usage.pages);
       const section = usage.pages.find((p) => p.pack !== null && p.pack === l.pack)?.title ?? l.name;
       drafts.push({
-        key: `page:${l.id}`,
+        key: signatureOf('page', l.id),
         question: `Give ${l.name} a page of its own? It grew by ${l.added30} in the last thirty days, and no page shows it yet.`,
         body_kind: 'arrange',
         body: {
@@ -934,21 +977,28 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
     }
   }
 
-  /* THE SKILLS A USE CASE NAMES, once it is on and the record keeps skills: each one it does not hold yet is a row for
-     the owner to accept, never one written for them. */
+  /* THE SKILLS A USE CASE NAMES OR AN ADD-ON SHIPS, once it is on and the record keeps skills: each one it does not hold
+     yet is an entry for the owner to accept, never one written for them. ONE THAT SHIPS ITS TEXT is offered with it, and
+     every such skill missing goes in one question, written by the record (`managed`), so a record with agents on is asked
+     once and not once a skill. One a use case only names, with no text, is asked alone, its steps left to be written. */
+  const shipped: SlashDraft[] = [];
   if (usage.skills !== null) {
     const held = new Set(usage.skills);
-    const missing = offered
-      .filter((o) => o.kind === 'usecase' && usage.packs.some((p) => p.id === o.id && p.on))
-      .flatMap((o) => (o.skills ?? []).filter((s) => !held.has(s.name)).map((s) => ({ o, s })));
-    const naming = [...new Set(missing.map(({ o }) => o.title))];
-    if (missing.length > 0)
+    const on = offered.filter((o) => usage.packs.some((p) => p.id === o.id && p.on));
+    const missing = on.flatMap((o) => (o.skills ?? []).filter((s) => !held.has(s.name)).map((s) => ({ o, s })));
+    /* ONE SKILL BY ONE NAME, the first offered, so two add-ons shipping one name are not asked for it twice. */
+    const once = missing.filter(({ s }, i) => missing.findIndex((m) => m.s.name === s.name) === i);
+    /* AN ADD-ON SHIPS what it offers, and is said as one ("The Agents add-on ships"); a use case names them. */
+    const byPack = once.every(({ o }) => o.kind === 'pack');
+    const naming = [...new Set(once.map(({ o }) => (byPack ? shipper(o) : o.title)))];
+    if (once.length > 0)
       noticed.push({
         kind: 'skills',
-        subject: missing.map(({ s }) => s.name).join(','),
-        text: `${joinNames(naming)} ${naming.length === 1 ? 'names' : 'name'} ${missing.length === 1 ? 'a skill' : 'skills'} for agents that you do not have in Skills yet: ${joinNames(missing.map(({ s }) => s.name))}.`,
+        subject: once.map(({ s }) => s.name).join(','),
+        text: `${capital(joinNames(naming))} ${byPack ? (naming.length === 1 ? 'ships' : 'ship') : naming.length === 1 ? 'names' : 'name'} ${once.length === 1 ? 'a skill' : 'skills'} for agents that you do not have in Skills yet: ${joinNames(once.map(({ s }) => s.name))}.`,
       });
-    for (const { o, s } of missing)
+    const written = once.filter(({ s }) => typeof s.body === 'string' && s.body.trim() !== '');
+    for (const { o, s } of once.filter((m) => !written.includes(m)))
       drafts.push({
         key: '',
         question: `Give your agents the skill ${s.name}? ${o.title} names it for ${momentOf(s.trigger)}, and Skills has none by that name yet.`,
@@ -959,13 +1009,54 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
         },
         by: 'rules',
       });
-  }
+    if (written.length > 0) {
+      const from = [...new Set(written.map(({ o }) => shipper(o)))];
+      const one = written.length === 1;
+      shipped.push({
+        key: '',
+        question: `Give your agents ${one ? 'the skill' : 'the skills'} ${joinNames(written.map(({ s }) => s.name))}? ${capital(joinNames(from))} ${from.length === 1 ? 'ships' : 'ship'} ${one ? 'it' : 'them'}, and Skills has ${one ? 'none by that name' : written.length === 2 ? 'neither' : 'none of them'} yet.`,
+        body_kind: 'rowset',
+        body: {
+          register: 'skills',
+          rows: written.map(({ o, s }) => ({
+            name: s.name,
+            trigger: s.trigger,
+            what: s.what ?? `A skill ${o.title} ships for agents working here.`,
+            kind: 'skill',
+            body: s.body!,
+            rev: shippedRev(s.rev),
+            managed: true,
+          })),
+        },
+        by: 'rules',
+      });
+    }
 
-  /* A YOUNG RECORD IS WATCHED, NOT ADVISED. What was noticed is still said; nothing is proposed yet. */
+    /* A NEWER TEXT OF A SKILL THE RECORD WROTE, one question each: offered only while the skill still holds a text that
+       was shipped (an older `rev`, word for word), so a skill somebody edited, or took over, is never written over. */
+    for (const h of usage.held ?? []) {
+      const found = on.flatMap((o) => (o.skills ?? []).map((s) => ({ o, s }))).find(({ s }) => s.name === h.name && typeof s.body === 'string');
+      if (!found || shippedRev(found.s.rev) <= h.rev || h.rev < 1 || (found.s.was ?? [])[h.rev - 1] !== h.body) continue;
+      const { o, s } = found;
+      const rev = shippedRev(s.rev);
+      shipped.push({
+        key: '',
+        question: `Take version ${rev} of the skill ${h.name}? ${capital(shipper(o))} ships a newer text, and yours is still version ${h.rev} as it came.`,
+        body_kind: 'rowset',
+        body: { register: 'skills', rows: [{ at: h.at, version: h.version, patch: { body: s.body!, rev } }] },
+        by: 'rules',
+      });
+    }
+  }
+  drafts.push(...shipped);
+
+  /* A YOUNG RECORD IS WATCHED, NOT ADVISED. What was noticed is still said; nothing is proposed yet, BUT THE SKILLS AN
+     ADD-ON SHIPS, which are the add-on's own and no advice about how the record is used, so a record with agents on is
+     offered them the first night. */
   if (usage.firstWrite === null || usage.ageDays < YOUNG_DAYS)
     return {
       noticed,
-      drafts: [],
+      drafts: keyed(shipped),
       quiet:
         usage.firstWrite === null
           ? 'Nothing has been added yet, so there is nothing to go on.'
@@ -1070,8 +1161,17 @@ export function entityDrafts(usage: Usage): SlashDraft[] {
 /** A skill's moment without what it then does: "when a ticket is opened, to set its priority" is "when a ticket is opened". */
 const momentOf = (trigger: string): string => trigger.split(', to ')[0]!.trim();
 
+/** Who ships a skill, as a sentence says it: "the Agents add-on", or a use case by its title. */
+const shipper = (o: Offered): string => (o.kind === 'pack' ? `the ${o.title} add-on` : o.title);
+const capital = (said: string): string => said.charAt(0).toUpperCase() + said.slice(1);
+
+/** The version a shipped skill is at: its `rev`, or 1 when it says none. */
+const shippedRev = (rev: number | undefined): number => (typeof rev === 'number' && Number.isInteger(rev) && rev >= 1 ? rev : 1);
+
 /** Each draft keyed by what its body is about, the key a filed question is recognised by. */
-const keyed = (drafts: readonly SlashDraft[]): SlashDraft[] => drafts.map((d) => ({ ...d, key: stableKey(d.body) }));
+/* A PEN SIGNATURE IS KEPT (offer-pen-50): its body's why holds a count that changes, so keyed by the body a page Slash
+   was told No about was asked again. */
+const keyed = (drafts: readonly SlashDraft[]): SlashDraft[] => drafts.map((d) => (d.key.startsWith('page:') ? d : { ...d, key: stableKey(d.body) }));
 
 /* ── a model, when one is configured ───────────────────────────────────── */
 
@@ -2057,8 +2157,10 @@ export function stableKey(body: Record<string, unknown>): string {
      question. */
   const update = typeof body.register === 'string' && Array.isArray(body.rows) && body.rows.length === 1 ? (body.rows[0] as { at?: unknown; patch?: unknown }) : undefined;
   const patch = update?.patch !== null && typeof update?.patch === 'object' ? (update.patch as { rev?: unknown; because?: unknown }) : undefined;
-  if (typeof update?.at === 'string' && typeof patch?.rev === 'number' && Array.isArray(patch.because))
-    return `version:${String(body.register)}:${update.at}@${patch.rev}:${patch.because.map(String).sort().join(',')}`;
+  /* AND A SHIPPED SKILL'S NEXT TEXT, which carries no learnings (`noticeWhole`), by the version it makes, so version 3 is
+     not taken for version 2 asked before. */
+  if (typeof update?.at === 'string' && typeof patch?.rev === 'number' && (Array.isArray(patch.because) || patch.because === undefined))
+    return `version:${String(body.register)}:${update.at}@${patch.rev}:${(Array.isArray(patch.because) ? patch.because : []).map(String).sort().join(',')}`;
   /* A ROW SLASH OFFERS is recognised by its list and its title, so a skill declined is not offered again. */
   if (typeof body.register === 'string' && Array.isArray(body.rows))
     return `rows:${body.register}:${body.rows.map((r) => String((r as { name?: unknown; what?: unknown; at?: unknown })?.name ?? (r as { what?: unknown })?.what ?? (r as { at?: unknown })?.at ?? '')).sort().join(',')}`;

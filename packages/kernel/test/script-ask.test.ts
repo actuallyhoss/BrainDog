@@ -153,7 +153,7 @@ test('A GOOD ASK FILES ONE OPTIONS QUESTION with its cause, each answer in the g
     ],
   );
   assert.deepEqual(body.options[1]!.patches[0], { at: 'bills#1', version: r.k.get('bills#1')!.version, patch: { day: '30' } });
-  assert.match(noteOf(r.sql), /wrote one row\. It asked one question, which waits on Decide\./u);
+  assert.match(noteOf(r.sql), /wrote one line\. It asked one question, which waits on Decide\./u);
 });
 
 test('ASKED TWICE IS ASKED ONCE: the second run with the same cause joins the open question', async () => {

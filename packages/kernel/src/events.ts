@@ -21,7 +21,7 @@
  *
  * TWO STRINGS THAT LOOK LIKE KINDS AND ARE NOT. `access.changed` is `access.grant`/`access.revoke`
  * with the levels in `from_v`/`to_v` and the reason in `note`; `blocker` is an `export` event
- * carrying `note: 'failed: <reason>'` plus a suggestion to re-run. And two more: a KEK re-wrap of
+ * carrying `note: 'failed: the copy could not be saved'` (the reason goes to the fault) plus a suggestion to re-run. And two more: a KEK re-wrap of
  * `vault_key` is a `grant.rotate` row with `target_kind = 'vault_key'`, and a write to a `tags` list
  * is `tag`/`untag`, one row per element. There is no forty-first kind.
  */

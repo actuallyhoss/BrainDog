@@ -1,0 +1,18 @@
+{
+  "pick": "today-line",
+  "asks": "The colour of a today line",
+  "from": "EB 1.11 point 6",
+  "options": [
+    {
+      "id": "working",
+      "says": "The working red."
+    },
+    {
+      "id": "ink",
+      "says": "Ink, as it stands.",
+      "live": true
+    }
+  ],
+  "default": "working",
+  "why": "Today is where the eye starts on a timeline, so it takes the working colour."
+}

@@ -58,6 +58,10 @@ function* walk(value: unknown, at: string): Generator<{ at: string; key?: string
   }
 }
 
+/** A script that may reach no host and open no key: its sandbox has no fetch without `egress` (`last_day`). */
+const closedScript = (d: Record<string, unknown>): boolean =>
+  kindOf(d) === 'script' && Array.isArray(d.egress) && d.egress.length === 0 && Array.isArray(d.keys) && d.keys.length === 0;
+
 /** Every way `doc` reaches outside the record, each as a sentence naming where. Nothing, for a document that does not. */
 export function callsOut(doc: Doc): string[] {
   const out: string[] = [];
@@ -65,7 +69,9 @@ export function callsOut(doc: Doc): string[] {
     const kind = kindOf(d);
     const e = egressOf(d);
     if (e !== null) out.push(`${nameOf(d)} calls out: ${e.line}`);
-    if (RUNS.has(kind)) out.push(`${nameOf(d)} is a ${kind}, which runs work that may reach a host`);
+    /* A SCRIPT THAT MAY REACH NO HOST AND OPEN NO KEY is code over the record's own rows (`last_day`): its sandbox has no
+       fetch without `egress`, so it is not a call out. */
+    if (RUNS.has(kind) && !closedScript(d)) out.push(`${nameOf(d)} is a ${kind}, which runs work that may reach a host`);
     if (kind === 'ingest' && FETCHES.has(String(d.channel))) out.push(`${nameOf(d)} fetches by ${String(d.channel)}`);
     if (kind === 'rule')
       for (const w of walk(d, nameOf(d)))
@@ -76,9 +82,11 @@ export function callsOut(doc: Doc): string[] {
   }
   for (const [k, c] of Object.entries((doc.config ?? {}) as Record<string, { type?: string }>))
     if (SECRET_TYPES.has(String(c?.type))) out.push(`the setting ${k} is a key`);
+  /* ITS EMPTY `egress` AND `keys` NAME NOTHING, so they are not read as a host or a key named. */
+  const closedAt = new Set(doc.declarations.filter(closedScript).flatMap((d) => [`${nameOf(d)}.egress`, `${nameOf(d)}.keys`]));
   const everything = [...doc.declarations.map((d) => walk(d, nameOf(d))), walk(doc.config ?? null, 'settings'), walk(doc.seeds ?? null, 'example rows')];
   for (const w of everything.flatMap((each) => [...each])) {
-    if (w.key !== undefined && OPENS.has(w.key)) out.push(`${w.at} names a host or a key`);
+    if (w.key !== undefined && OPENS.has(w.key) && !closedAt.has(w.at)) out.push(`${w.at} names a host or a key`);
     if (w.text !== undefined && ADDRESS.test(w.text)) out.push(`${w.at} says ${JSON.stringify(w.text.slice(0, 80))}`);
   }
   return [...new Set(out)];

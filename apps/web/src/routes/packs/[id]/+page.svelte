@@ -35,6 +35,8 @@
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
   import { currencyChoices } from '$lib/record/currencies.ts';
   import { settingChoices } from './said.ts';
+  import { heldNames, holdName, waitingIn, waitingLine } from './waiting.ts';
+  import { kennelFetch, publishedText } from '$lib/market/publish.ts';
   import {
     UNITS,
     changesOf,
@@ -189,7 +191,29 @@
 
   async function readHeld(s: Source, want: string) {
     const got = await s.packs();
-    if (got.ok && String(page.params.id) === want) installed = got.value.find((p) => p.id === want) ?? null;
+    if (got.ok && String(page.params.id) === want) {
+      installed = got.value.find((p) => p.id === want) ?? null;
+      void readWaiting(got.value, want);
+    }
+  }
+
+  /**
+   * WHAT OF THIS ADD-ON WAITS for the record to hold a list (`when: { holds }`), worked out on read: its own file at the
+   * version installed, laid over the lists the record holds now. BrainDog's own modules say none, so they are not read.
+   * Nothing is drawn while it is read, or when the file cannot be.
+   */
+  let waits = $state<string | null>(null);
+  async function readWaiting(packs: PackState[], want: string) {
+    waits = null;
+    const version = packs.find((p) => p.id === want)?.version;
+    if (!version || firstPartyModules().some((m) => m.id === want)) return;
+    const text = await publishedText(kennelFetch, 'pack', want, version);
+    if (text === null || String(page.params.id) !== want) return;
+    const waiting = await waitingIn(text, await heldNames(packs, REGISTERS));
+    if (String(page.params.id) !== want) return;
+    const titles: Record<string, string> = Object.assign({}, ...firstPartyModules().map((m) => m.titles));
+    for (const [id, list] of Object.entries(REGISTERS)) if (list?.name) titles[id] = list.name;
+    waits = waitingLine(waiting, (hold) => holdName(hold, titles));
   }
 
   /** One press of the switch. Off is undone, never asked, as on /packs: the same call puts it back. */
@@ -339,6 +363,7 @@
         {#if installed?.disabled_at}<span>{copy.packTurnedOff}</span>{/if}
       </p>
       <p class="turn-said" role="status">{turnSaid}</p>
+      {#if waits}<p class="waits">{waits}</p>{/if}
     </div>
 
     {#if entries.length}
@@ -619,6 +644,14 @@
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
+  }
+
+  /* WHAT WAITS IS READ AS A SENTENCE, at body size, under the version: the count and the list it waits for are the words. */
+  .waits {
+    margin: var(--sp-1) 0 0;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 22px;
   }
 
   /* THE FORM KEEPS THE READING MEASURE, not the page: the page runs the window's width with the rest, and a switch

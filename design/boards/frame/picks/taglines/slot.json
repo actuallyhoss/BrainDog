@@ -1,0 +1,17 @@
+{
+  "pick": "taglines",
+  "asks": "Taglines",
+  "from": "RQ-EXP-135",
+  "options": [
+    {
+      "id": "sign-in-and-site",
+      "says": "The slogan stays on sign-in and the site, and nowhere else."
+    },
+    {
+      "id": "nowhere",
+      "says": "No slogan anywhere, sign-in included."
+    }
+  ],
+  "default": "sign-in-and-site",
+  "why": "A slogan helps a stranger once and gets in the way every day after."
+}

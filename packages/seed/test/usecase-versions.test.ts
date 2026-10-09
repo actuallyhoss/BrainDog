@@ -41,7 +41,7 @@ import { dayOf } from '../src/usecases/install.ts';
 /** A day is fixed so that nothing here reads the clock. It changes only the example rows, which are out of the fingerprint. */
 const TODAY = dayOf(NOW);
 
-type Doc = { version?: unknown; declarations?: unknown; config?: unknown; extends?: unknown };
+type Doc = { version?: unknown; declarations?: unknown; config?: unknown; extends?: unknown; adds?: unknown; hands?: unknown };
 
 /**
  * AND WHAT IT LAYS ON ANOTHER PACK'S LIST, when it lays anything. Personal 1.5.0's roles are values on People's `role`
@@ -51,7 +51,7 @@ type Doc = { version?: unknown; declarations?: unknown; config?: unknown; extend
  */
 const fingerprint = (d: Doc): string =>
   createHash('sha256')
-    .update(JSON.stringify({ declarations: d.declarations, config: d.config ?? null, ...(d.extends === undefined ? {} : { extends: d.extends }) }))
+    .update(JSON.stringify({ declarations: d.declarations, config: d.config ?? null, ...(d.extends === undefined ? {} : { extends: d.extends }), ...(d.adds === undefined ? {} : { adds: d.adds }), ...(d.hands === undefined ? {} : { hands: d.hands }) }))
     .digest('hex')
     .slice(0, 16);
 
@@ -75,6 +75,10 @@ const inventory = (doc: Doc): string[] => [
     ...(ext.fields ?? []).map((f) => `extends.${list}.${f.id}`),
     ...Object.entries(ext.values ?? {}).flatMap(([field, values]) => values.map((v) => `extends.${list}.${field}.${v}`)),
   ]),
+  /* AND WHAT IT ADDS TO ANOTHER PACK'S PAGE AND THE LISTS IT HANDS ON (usecase-notes-48), as `adds.<page>.<n>` and
+     `hands.<list>.<to>`. */
+  ...((doc.adds ?? []) as { page?: unknown }[]).map((a, i) => `adds.${String(a.page)}.${i + 1}`),
+  ...Object.entries((doc.hands ?? {}) as Record<string, unknown>).map(([list, to]) => `hands.${list}.${String(to)}`),
 ].sort();
 
 /** The ids out of a recorded `holds`, which is written over several lines so that a person can read it. */
@@ -1406,10 +1410,15 @@ const DECLARED: Record<string, Version> = {
       setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
       setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
       setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+      adds.page.relation.1 adds.page.relation.2 adds.page.relation.3 hands.register.organisations.people
+      metric.project-numbers-7d metric.projects-earning-silent adds.page.portfolio.4
     `,
-    declares: '04647bd190534619',
+    declares: 'a94b1a5c70bac1af',
     history: [
       "`register.datapoints` takes money: a reading holds `amount` in its own currency in place of `value`, which stops being required; the blocks over Numbers read it as their fifth column, Latest numbers shows it, and `poll-setup` says to fill the live feed add-on -> 04647bd190534619",
+      "`page.project` takes portfolio 1.16.0's Where it stands: the typed card only while `project-said` counts one, else a stat of `project-moved-7d` under the same heading -> 0f11bc53c61df212",
+      "What the founder adds to People's page for an organisation (`adds.page.relation.1` to `adds.page.relation.3`) and the list it hands to People (`hands.register.organisations.people`) are fingerprinted with its declarations -> b6f4a0851ab855e1",
+      "`project-numbers-7d` and `projects-earning-silent` are added; Where it stands on `page.project` takes Last worked and Numbers this week; Projects names the earning projects gone silent (`adds.page.portfolio.4`) -> a94b1a5c70bac1af",
     ],
   },
   'team@2.19.0': {
@@ -1433,6 +1442,29 @@ const DECLARED: Record<string, Version> = {
       "`page.agent-work`'s Working now reads the record's `sessions.working`, the runs heard from in the last fifteen minutes, where it read the Agents add-on's clause of today -> baca128c6d799cbb",
     ],
   },
+  /* WHERE A PROJECT STANDS IS SAID FROM WHAT HAPPENED ON IT (portfolio 1.16.0's template, batch 46). 2.19.0 IS RELEASED. */
+  'team@2.20.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles setting.holds_people setting.holds_tasks
+      setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people
+      setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan
+      setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: '358cad7996106324',
+    history: [
+      "`page.project` takes portfolio 1.16.0's Where it stands: the typed card only while `project-said` counts one, else a stat of `project-moved-7d` under the same heading -> 6810be8ff85d154d",
+      "`page.project`'s Where it stands takes Last worked (`project-last-worked`) -> 358cad7996106324",
+    ],
+  },
   'business@1.6.0': {
     holds: `
       page.home-business setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with
@@ -1454,16 +1486,19 @@ const DECLARED: Record<string, Version> = {
       "`page.home-business` is 1.6.0's word for word; the version stepped because shop and store are Shop's words now, so a shop is proposed Shop -> 070472676d3012ef",
     ],
   },
-  /** SHOP IS NEW (use case 6 of the vision): its first entry, Orders, Products and the Orders page. */
+  /** SHOP IS NEW (use case 6 of the vision): its first entry, Orders, Products and the Orders page. Unreleased, so the
+      Orders section, an order's total and the month's count fold into it rather than a 1.0.1. */
   'shop@1.0.0': {
     holds: `
-      metric.orders-due-7d metric.orders-owed page.orders register.orders register.products setting.label_orders
+      metric.orders-30d metric.orders-due-7d metric.orders-owed page.orders register.orders register.products setting.label_orders
       setting.label_people setting.label_products setting.one_orders setting.one_people setting.one_products
       setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_nothing_due
     `,
-    declares: 'a61271223d41a338',
+    declares: '126d3114461cc7fb',
     history: [
       "Shop carries a pack from its first version: `register.orders`, `register.products` and `page.orders`, which draws Due this week and Owed to you only while something is in them -> a61271223d41a338",
+      "Folded into the unreleased 1.0.0 (uc6-shop-49): `page.orders` sits in the Orders section, an order in `register.orders` has a total, `orders-30d` counts the month's orders, and the page's line says the month, the week and who still owes what -> 40d9266cbef11245",
+      "Folded into the unreleased 1.0.0 (uc6-walk-50): `orders-owed` reads an order with a total to owe, so an order with no total is not counted owing -> 126d3114461cc7fb",
     ],
   },
 };

@@ -1,0 +1,17 @@
+{
+  "pick": "wide-rows",
+  "asks": "Tiles of 7 and 5 side by side",
+  "from": "EB 1.11 point 8",
+  "options": [
+    {
+      "id": "eight-four",
+      "says": "Drawn as 8 and 4."
+    },
+    {
+      "id": "six-six",
+      "says": "Drawn as 6 and 6."
+    }
+  ],
+  "default": "eight-four",
+  "why": "Tiles span 3, 4, 6, 8 or 12, and 8 and 4 is the nearest to 7 and 5."
+}

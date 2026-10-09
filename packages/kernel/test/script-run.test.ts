@@ -400,3 +400,18 @@ test('A LOG OVER 8 KB IS CUT AT 8 KB ON THE RECORD SIDE, whatever the host sent,
   assert.equal(kept, `${why}${'a'.repeat(8191 - why.length)}`);
   assert.ok(new TextEncoder().encode(kept).length <= 8 * 1024);
 });
+
+test('A QUIET RUN IS STAMPED AS IT IS WRITTEN AND LEFT OUT OF ACTIVITY (last-day-48); a run that wrote is neither', async () => {
+  const r = await record();
+  finishScript(r.deps, prepared(r), { writes: [], log: '', usage: USAGE });
+  const quiet = () =>
+    r.sql
+      .all<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'pull' AND target = 'declaration:script.gold-rate' ORDER BY rowid")
+      .map((e) => (JSON.parse(e.to_v) as { quiet?: number }).quiet ?? null);
+  assert.deepEqual(quiet(), [1], 'the run that wrote nothing is quiet');
+  const feed = () => (r.k.block({ kind: 'feed', source: 'activity', empty: 'Nothing yet.' }).feed ?? []) as { target?: string | null }[];
+  assert.equal(feed().filter((l) => l.target === 'declaration:script.gold-rate').length, 0, 'a quiet run says no line in Activity');
+  finishScript(r.deps, prepared(r), { writes: [{ op: 'create', register: 'gold_egp', fields: { at: '2026-09-22T12:00', value: 410000 } }], log: '', usage: USAGE });
+  assert.deepEqual(quiet(), [1, null], 'a run that wrote one line is not quiet');
+  assert.equal(feed().filter((l) => l.target === 'declaration:script.gold-rate').length, 1, 'and its run says its line');
+});

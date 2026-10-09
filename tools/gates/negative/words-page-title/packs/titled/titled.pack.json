@@ -1,0 +1,13 @@
+{
+  "id": "titled",
+  "title": "Live feed",
+  "pages": [
+    {
+      "title": "Orders this week.",
+      "blocks": [
+        { "heading": "Latest", "body": "Each poll fills this page.", "empty": "Nothing polled yet." },
+        { "heading": "More to come...", "body": "Set a poll up from a project's page." }
+      ]
+    }
+  ]
+}

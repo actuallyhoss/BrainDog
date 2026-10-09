@@ -47,12 +47,14 @@
   .made-title {
     margin: 0;
     color: var(--ink);
-    font-size: 28px;
+    font-size: var(--t-title);
     font-weight: 600;
     line-height: 1.2;
   }
 
   .made-title:focus {
+    /* focus-ok: the heading takes focus only by script (tabindex -1) as the screen arrives, so a reader is told where
+       it is; nobody tabs to it, and a ring round the title would read as a control. */
     outline: none;
   }
 </style>

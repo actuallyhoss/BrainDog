@@ -27,6 +27,7 @@ import { dayIn } from './finished.ts';
 /** The ten hold signs: the nine of scope 2.2 and `arrived` (PRF-A20). Never the automation signs of `signs-flow.ts`. */
 export const HOLD_SIGNS = [
   'arrivals-filed',
+  'doors-silent',
   'numbers-arrive',
   'model-answers',
   'tools-listed',
@@ -43,6 +44,7 @@ export type HoldSign = (typeof HOLD_SIGNS)[number];
 /** What a person reads for each hold sign: `VITAL_SIGNS`' names, held equal by the test. */
 export const HOLD_NAMES: Readonly<Record<HoldSign, string>> = {
   'arrivals-filed': 'Arrivals file by themselves',
+  'doors-silent': 'Busy doors do not go quiet',
   'numbers-arrive': 'Numbers arrive on schedule',
   'model-answers': 'The model answers',
   'tools-listed': 'Agents get the tool list',
@@ -88,10 +90,9 @@ export function holdDays(sql: Sql, today: string): Hold {
   const marks = new Set<string>();
   const byDay = new Map<string, Map<string, Kept>>();
   for (const r of sql.all<{ sign: string; day: string; state: string; rule: string }>(
-    `SELECT sign, day, state, rule FROM sign_reading WHERE day < ? AND sign IN (${[HAND_SIGN, ...HOLD_SIGNS].map(() => '?').join(', ')})`,
+    `SELECT sign, day, state, rule FROM sign_reading WHERE day < ? AND sign IN (SELECT value FROM json_each(?))`,
     today,
-    HAND_SIGN,
-    ...HOLD_SIGNS,
+    JSON.stringify([HAND_SIGN, ...HOLD_SIGNS]),
   )) {
     if (r.sign === HAND_SIGN) marks.add(r.day);
     else (byDay.get(r.day) ?? byDay.set(r.day, new Map()).get(r.day)!).set(r.sign, { state: r.state, rule: r.rule });

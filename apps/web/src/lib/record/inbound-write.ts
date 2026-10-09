@@ -132,7 +132,7 @@ export const revokeInbound = (base: string, io?: Fetch): Promise<Said> => press(
 export const words = {
   title: 'Mail forwarded to this record',
   /* WHAT IT IS, IN THE ORDER A PERSON NEEDS IT: what they get, what they do with it, and what it costs them. */
-  how: 'A forwarding rule at your mail provider can post messages to this record, and each one arrives as a row in the Inbox. One record takes one address at a time.',
+  how: 'A forwarding rule at your mail provider can post messages to this record, and each one arrives in the Inbox. One record takes one address at a time.',
   /**
    * THE FACT THIS SCREEN CANNOT HIDE. There is no route that reads an address back, because a route that answered
    * one would have to keep the token to answer with. So a screen that drew "your address is ..." would be drawing
@@ -152,5 +152,9 @@ export const words = {
   revoking: 'Stopping',
   revoked: 'This record now takes no forwarded mail. Anything still posted to the old address is refused. Make an address to start again.',
   freshWhy: 'Making an address or stopping one needs a sign-in from the last fifteen minutes, because whoever can change where a record takes its mail can redirect its statements.',
-  unrouted: 'This host does not make forwarding addresses over the web. On a self-host the address is the file inbound.token beside the record: writing it registers one, writing it again replaces it, and deleting it stops forwarded mail.',
+  /* THE FILE'S NAME ON A LINE OF ITS OWN: in the middle of the sentence it read as a name from the code (the printed
+     gate's `dev-name`), and set apart it is the thing a person types. */
+  unrouted: 'This host does not make forwarding addresses over the web. On a self-host the address is a file beside the record, named:',
+  tokenFile: 'inbound.token',
+  unroutedDoes: 'Writing it registers an address, writing it again replaces it, and deleting it stops forwarded mail.',
 } as const;

@@ -24,13 +24,15 @@
  */
 
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { basename, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import type { Refusal, Result } from '@braindog/ports';
+import { isShape } from '@braindog/kernel';
 
-import { inTheClear, isLoopback } from './http.ts';
+import { inTheClear, isLoopback, readHosts, saveHosts, type Held, type HostsFile } from './http.ts';
 import { refuse, type Answer } from './json.ts';
+import * as signIn from './login.ts';
 import { approveOperation, heldLogin } from './login.ts';
 import type { AgentIo } from './skills.ts';
 import { verify, type Verified } from './verify.ts';
@@ -50,7 +52,8 @@ export type BrainfileIo = Pick<AgentIo, 'env' | 'cwd' | 'out' | 'say' | 'answer'
 const BODY_MS = 600_000;
 
 const EXPORT_USAGE =
-  'braindog export takes --redact-grants, --kek <id>, --sections <data,origin,governance>, -o <file.brainl>, --key <pubkey|url> and --host <host>, and nothing else.';
+  'braindog export takes --redact-grants, --kek <id>, --sections <data,origin,governance>, -o <file.brainl>, --key <pubkey|url> and --host <host>, and nothing else. braindog export --shape takes -o and --host.';
+const SHAPE_USAGE = 'braindog export --shape takes -o <file.shape.brainl> and --host <host>, and nothing else.';
 const IMPORT_USAGE =
   'braindog import takes one .brainl file, and --key <pubkey|url> and --host <host>, as in braindog import latest.brainl.';
 
@@ -87,7 +90,7 @@ function hostFor(flag: string | undefined, io: BrainfileIo): { key: string; url:
 }
 
 /** One POST to `/api/<method>`, and its answer as a `Result`, with a host that did not answer as `UNREACHABLE`. */
-async function post(host: { key: string; url: URL }, method: 'export' | 'import', args: object, bearer: string | undefined, io: BrainfileIo): Promise<Sent> {
+async function post(host: { key: string; url: URL }, method: 'export' | 'import' | 'shape', args: object, bearer: string | undefined, io: BrainfileIo): Promise<Sent> {
   /* AN IMPORT WITH NO ANSWER IS NOT KNOWN NOT TO HAVE HAPPENED. The body had left, and a socket that drops after the
      record took it, or a Ctrl+C while it was writing, leaves the record replaced; "nothing was put back" was said here
      until `brainfile.test.ts` pinned it. The export's claim is about this machine, where nothing was written. */
@@ -98,7 +101,7 @@ async function post(host: { key: string; url: URL }, method: 'export' | 'import'
       refusal: {
         code: 'UNREACHABLE',
         fix:
-          method === 'export'
+          method !== 'import'
             ? `${host.key} did not answer, so nothing was exported.`
             : `${host.key} did not answer, so this command cannot say whether the record was put back.`,
       },
@@ -189,6 +192,8 @@ function slugOf(lines: readonly string[]): string | null {
 
 /** `braindog export`, and the exit code: 0 written and checked, 1 refused or not checked, 3 the host did not answer. */
 export async function exportFile(args: string[], io: BrainfileIo): Promise<number> {
+  /* A SHAPE COPY IS ITS OWN PATH (`shapeExport` below): another bearer, another door, and a file with no value in it. */
+  if (args.includes('--shape')) return shapeExport(args.filter((a) => a !== '--shape'), io);
   let values: { host?: string | undefined; 'redact-grants'?: boolean | undefined; kek?: string | undefined; sections?: string | undefined; out?: string | undefined; key?: string | undefined };
   try {
     ({ values } = parseArgs({
@@ -275,6 +280,133 @@ export async function exportFile(args: string[], io: BrainfileIo): Promise<numbe
   return 0;
 }
 
+/* ── the shape copy ─────────────────────────────────────────────────────────────────────────────────────────── */
+
+/** A host's entry in the hosts file, with the shape grant `keepShape` puts beside the login. */
+type Entry = HostsFile['hosts'][string] & { shape?: Held };
+
+/** The device flow for a standing shape grant (`approveShape` in `login.ts`), or `undefined` on a build without it. */
+type ShapeApproval = (
+  raw: string,
+  io: Pick<BrainfileIo, 'say' | 'signal' | 'fetch' | 'now' | 'label'>,
+) => Promise<{ key: string; bearer: string; expires: string; label: string } | number>;
+const approveShape = (signIn as unknown as { approveShape?: ShapeApproval }).approveShape;
+
+/** The shape grant this machine keeps for a host, while it lasts, or `null`. Read only for this host and this reach. */
+function heldShape(file: string, key: string, now: number): Held | null {
+  let held: Held | undefined;
+  try {
+    held = (readHosts(file).hosts[key] as Entry | undefined)?.shape;
+  } catch {
+    return null;
+  }
+  if (typeof held?.value !== 'string' || typeof held.expires !== 'string') return null;
+  return Date.parse(held.expires) > now ? held : null;
+}
+
+/**
+ * Keeps a shape grant under its host, beside the login and never in its place, or drops it with `null`.
+ *
+ * THE FILE IS READ AGAIN JUST BEFORE THE WRITE, as `keepRunner` does, because minutes pass while somebody approves the
+ * six digits and another command may have written it meanwhile.
+ */
+function keepShape(file: string, key: string, shape: Held | null): void {
+  const hosts = readHosts(file);
+  const { shape: _gone, ...rest }: Entry = hosts.hosts[key] ?? {};
+  const next: Entry = shape === null ? rest : { ...rest, shape };
+  hosts.hosts[key] = next;
+  saveHosts(file, hosts);
+}
+
+/**
+ * `braindog export --shape`, and the exit code: 0 written, 1 refused or not a shape, 3 the host did not answer.
+ *
+ * A SHAPE COPY IS THE RECORD WITH EVERY VALUE SCRAMBLED (PRF-A13): the same lists, the same count of entries, the same
+ * length in every value, and not a word anybody typed. The look and the gates open it on a scratch record and see what
+ * a lived record looks like.
+ *
+ * ONE APPROVAL, THEN NONE. Its bearer is a standing grant of reach `shape`, approved once in the app with six digits
+ * and kept in the hosts file beside the login, so the loop on this machine takes a copy with no prompt for ninety days.
+ * It opens `POST /api/shape` and nothing else. A grant the record no longer knows (revoked, or past the operator's
+ * cut-off) is dropped here and asked for again, once.
+ *
+ * THE FILE IS CHECKED BEFORE IT IS KEPT: a host that answered lines without the shape mark gets nothing written, since
+ * a file of real values under a shape file's name is the one mistake this command must not make.
+ */
+export async function shapeExport(args: string[], io: BrainfileIo): Promise<number> {
+  let values: { host?: string | undefined; out?: string | undefined };
+  try {
+    ({ values } = parseArgs({ args, strict: true, options: { host: { type: 'string' }, out: { type: 'string', short: 'o' } } }));
+  } catch {
+    io.say(SHAPE_USAGE);
+    return 1;
+  }
+  const host = hostFor(values.host, io);
+  if (host === null) return 1;
+  const now = io.now ?? Date.now;
+
+  let held = heldShape(io.file, host.key, now());
+  let got: Result<unknown> | null = null;
+  if (held !== null) {
+    got = (await post(host, 'shape', {}, held.value, io)).result;
+    const refusal = got.ok ? null : ((got as { refusal?: Refusal }).refusal ?? null);
+    if (refusal?.code === 'FORBIDDEN' && refusal.at === 'shape') {
+      keepShape(io.file, host.key, null);
+      held = null;
+      got = null;
+    }
+  }
+  if (got === null) {
+    if (approveShape === undefined) {
+      io.say('This braindog cannot ask for a shape grant yet, so no shape copy was taken. Update braindog and run it again.');
+      return 1;
+    }
+    io.say('A shape copy needs a standing grant, approved once in the app with six digits. Nothing in it is a word of the record.');
+    const grant = await approveShape(host.key, io);
+    if (typeof grant === 'number') return grant;
+    keepShape(io.file, host.key, { value: grant.bearer, expires: grant.expires, label: grant.label });
+    got = (await post(host, 'shape', {}, grant.bearer, io)).result;
+  }
+
+  if (!got.ok) return refuse(io, got);
+  const lines = got.value;
+  if (!Array.isArray(lines) || !lines.every((l) => typeof l === 'string')) {
+    io.say(`${host.key} answered with something that is not the lines of a file, so nothing was written.`);
+    return 3;
+  }
+  if (!isShape(lines)) {
+    io.say(`${host.key} answered with a file that does not say it is a shape copy, so nothing was written.`);
+    return 1;
+  }
+
+  const slug = host.url.pathname.replace(/^\/+(?:app\/+)?/, '').split('/')[0] ?? '';
+  const path = resolve(io.cwd, values.out ?? `${SLUG.test(slug) ? slug : 'record'}.shape.brainl`);
+  const shown = relative(io.cwd, path) || path;
+  try {
+    writeFileSync(`${path}.part`, `${lines.join('\n')}\n`, { mode: 0o600 });
+    renameSync(`${path}.part`, path);
+  } catch {
+    io.say(`${shown} could not be written, so the copy was taken and not kept. Run it again with -o naming a folder you can write to.`);
+    return 1;
+  }
+  io.out(`wrote ${shown}: ${lines.length.toLocaleString('en')} lines, every value scrambled`);
+  io.answer?.({ value: { file: path, lines: lines.length, shape: true } });
+  return 0;
+}
+
+/** A file's lines, or none when it cannot be read: the check that follows says so in its own words. */
+function linesOf(path: string): string[] {
+  try {
+    return readFileSync(path, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/);
+  } catch {
+    return [];
+  }
+}
+
+/** The one sentence a shape copy put back is answered with, naming the file by its name and not its folder. */
+const shapeSentence = (file: string): string =>
+  `${basename(file)} is a shape copy, with every word and number in it scrambled, so it opens only on a scratch record and nothing was sent.`;
+
 /** `braindog import <file.brainl>`, and the exit code: 0 put back, 1 refused here or by the record, 3 the host did not answer. */
 export async function importFile(args: string[], io: BrainfileIo): Promise<number> {
   let parsed: { values: { host?: string | undefined; key?: string | undefined }; positionals: string[] };
@@ -289,6 +421,11 @@ export async function importFile(args: string[], io: BrainfileIo): Promise<numbe
     io.say(IMPORT_USAGE);
     return 1;
   }
+  /* A SHAPE COPY NEVER LEAVES THIS MACHINE AS A RECORD (PRF-A13). It reads like any export, and put back it would replace
+     every name and amount with scrambled words that look like his. So it is refused here, off the file's own mark and
+     before the check, a host or an approval, in one sentence that says where it does open. An unreadable file falls
+     through to the check, which says so. */
+  if (isShape(linesOf(resolve(io.cwd, file)))) return refuse(io, { ok: false, refusal: { code: 'IMPORT_SHAPE', fix: shapeSentence(file) } });
   const host = hostFor(parsed.values.host, io);
   if (host === null) return 1;
 

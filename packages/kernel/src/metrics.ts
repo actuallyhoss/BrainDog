@@ -995,6 +995,16 @@ function resolveRelative(
       const kids = (node as Record<string, unknown>)[q];
       if (Array.isArray(kids)) return { ...node, [q]: kids.map((k) => walk(k as Predicate)) } as Predicate;
     }
+    /* AND INSIDE A HOP, against the list it hops to (stands-50): `on after -90d` in a `pointed` reached SQL as the text
+       '-90d' and matched every day. */
+    const hop = (node as { pointed?: { register?: unknown; where?: Predicate } }).pointed;
+    if (hop && typeof hop === 'object' && typeof hop.register === 'string' && hop.where !== undefined) {
+      const there = schema.schemaOf?.(hop.register);
+      if (!there) return node;
+      const inner = resolveRelative(hop.where, there, nowMs);
+      bad.push(...inner.bad);
+      return { pointed: { ...hop, where: inner.predicate } } as Predicate;
+    }
 
     const leaf = node as Record<string, unknown>;
     const field = typeof leaf.field === 'string' ? leaf.field : null;
@@ -1178,7 +1188,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   if (schema)
     for (const f of fields) {
       for (const id of [f.field, f.by].filter((x): x is string => typeof x === 'string'))
-        if (id !== 'id' && !Object.hasOwn(schema.fields, id)) at('FIELD_UNKNOWN', `${register} has no field called ${id}`, 'value');
+        if (id !== 'id' && !Object.hasOwn(schema.fields, id) && !(f.kind === 'age' && isStamped(schema, id))) at('FIELD_UNKNOWN', `${register} has no field called ${id}`, 'value');
       if (!AGGREGATIONS.includes(f.kind as (typeof AGGREGATIONS)[number]))
         at('NOT_IN_THIS_BUILD', `${f.kind} is not an aggregation this build reads`, 'value');
       if (f.lookup && !Object.hasOwn(tablesOf(decl), f.lookup)) at('LOOKUP_UNKNOWN', `there is no factor table called ${f.lookup}`, 'value');
@@ -2032,7 +2042,11 @@ function one(
   /* THE AGE OF THE NEWEST DAY, in whole days to the reading's own day: `{ max: 'on' }` is a day, not an age, and read
      as a number it is twenty thousand. No row, or no day to count from, is no value (money-signs B1). */
   if (kind === 'age') {
-    const v = sql.one<{ v: string | null }>(`SELECT max(json_extract(fields, ?)) AS v FROM entry WHERE ${where}`, jsonPath(field), ...params)?.v ?? null;
+    /* A STAMP THE RECORD WRITES (`created_at`, `updated_at`) IS A COLUMN, not a field (stands-50). */
+    const stamped = isStamped(schema, field);
+    const v =
+      sql.one<{ v: string | null }>(`SELECT max(${stamped ? field : 'json_extract(fields, ?)'}) AS v FROM entry WHERE ${where}`, ...(stamped ? [] : [jsonPath(field)]), ...params)?.v ??
+      null;
     const today = fx?.today ?? null;
     const days = v === null || today === null ? null : Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${String(v).slice(0, 10)}T00:00:00Z`)) / 86_400_000);
     return ok({ value: days === null || Number.isNaN(days) ? null : Math.max(0, days), unit: null, rows, refusals: [] });

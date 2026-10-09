@@ -1,7 +1,7 @@
 {
   "pack": "live-feed",
   "version": "2.0.0",
-  "title": "Live numbers",
+  "title": "Live feed",
   "summary": "Polls stats.example.com every 1h, one request each time, for Monthly recurring revenue, Active users.",
   "changes": "The add-on is now live-feed, the one every feed is filled from. A number can be money, written as an amount and its currency. A number can be dated from the answer, a day or an instant, rather than when the answer arrived. A feed asked in whole days can say the time of day and the zone. An id too long for its poll is refused in a sentence rather than cut short, and past twenty numbers a second poll of the same address is made.",
   "unlisted": true,

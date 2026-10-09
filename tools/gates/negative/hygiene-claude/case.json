@@ -1,0 +1,8 @@
+{
+  "gate": "hygiene",
+  "rule": "a .claude/ folder",
+  "expect": "an agent's settings or notes",
+  "findings": 1,
+  "total": 1,
+  "why": "A NESTED .CLAUDE FOLDER, which the root's `/.claude/` line does not reach. It is also a `*.local.json`, and only the first rule that holds is said, so one line names it."
+}

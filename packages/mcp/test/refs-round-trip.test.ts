@@ -43,9 +43,22 @@ const valueOf = <T>(r: Said): T => {
 /** The rows the fixture reads back: a task on a live project, a task on one about to go, a learning superseding another, and skills#5. */
 type Fixture = { api: Api; doomed: Shaped; onDoomed: Shaped; onKiln: Shaped; first: Shaped; second: Shaped };
 
+/**
+ * PROJECTS AS PORTFOLIO 1.15.0 DECLARED THEM, with no `delete:` rule. 1.16.0 refuses deleting a project anything points
+ * at, and a record from before it can still hold live rows pointing at a deleted project, which is what this reads.
+ */
+async function withoutDeleteRule(kernel: { declarations(): { id: string; version: number; body: string }[]; install(d: never, e: { id: string; version: number }): Promise<{ ok: boolean }> }): Promise<void> {
+  const things = kernel.declarations().find((d) => d.id === 'register.things');
+  assert.ok(things, 'the seed declares no Projects');
+  const { delete: _rule, ...body } = JSON.parse(things.body) as Record<string, unknown>;
+  const out = await kernel.install([{ id: 'register.things', kind: 'register', body }] as never, { id: 'register.things', version: things.version });
+  assert.ok(out.ok, JSON.stringify(out));
+}
+
 async function fixture(): Promise<Fixture> {
   const api = await createRecordApi({ sql: openSqlite(), clock: fixedClock(Date.UTC(2026, 8, 22, 9)) });
   await installSeed(api.kernel);
+  await withoutDeleteRule(api.kernel as never);
   const mcp = tools(api);
   const make = async (register: string, fields: Record<string, unknown>) => valueOf<Shaped>(await mcp.call('create', { register, fields }, agent));
   const doomed = await make('things', { name: 'A project that goes', lane: 'building' });

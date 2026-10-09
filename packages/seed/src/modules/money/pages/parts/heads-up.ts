@@ -59,4 +59,15 @@ export const HEADS_UP: Record<string, unknown>[] = [
     body: 'Bills past their due date: {{overdue}} still to pay.',
     when: { metric: 'overdue', gt: 0 },
   },
+  {
+    /* A CATEGORY MARKED ONE WAY THAT HOLDS MONEY GOING THE OTHER, SINCE money-core 3.16.0 (REC-A13 job 2): an import
+       that filed money coming in under a category marked "Money out" leaves every figure by category wrong in silence.
+       The line says how many and what makes it right, Either way being the category's own word for both
+       (`lists/categories.ts`); drawn only while one is (`categories-against-direction`). */
+    kind: 'note',
+    tone: 'warn',
+    span: 12,
+    body: 'Categories holding money going the other way from how they are marked: {{categories-against-direction}}. Make it either way: in Categories, set Which way to Either way.',
+    when: { metric: 'categories-against-direction', gt: 0 },
+  },
 ];

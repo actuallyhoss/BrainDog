@@ -122,14 +122,14 @@ test('THE AUTOMATION SIGNS never touch the hold: red on every one of them, seven
   assert.equal(holdDays(sql, TODAY).days, 7);
 });
 
-test('THE HOLD SIGNS are the nine of 2.2 and arrived, never an automation sign, named as the closed list names them', () => {
-  assert.equal(HOLD_SIGNS.length, 10);
+test('THE HOLD SIGNS are the nine of 2.2, arrived and doors-silent (review-measure 3.3), never an automation sign, named as the closed list names them', () => {
+  assert.equal(HOLD_SIGNS.length, 11);
   const flow = new Set(SIGNS_FLOW.map((s) => s.sign));
   for (const id of HOLD_SIGNS) {
     assert.ok(!flow.has(id), `${id} is an automation sign`);
     const s = signOf(id);
     if (s !== null) assert.equal(HOLD_NAMES[id], s.name, `the hold names ${id} apart from the closed list`);
   }
-  /* The nine of 2.2 are on the list today; `arrived` joins it with signs-47. */
+  /* The nine of 2.2 and doors-silent are on the list today; `arrived` joins it with signs-47. */
   assert.equal(HOLD_SIGNS.filter((id) => id !== 'arrived').every((id) => VITAL_SIGNS.some((s) => s.sign === id)), true);
 });

@@ -42,7 +42,7 @@ function holding(sql: ReturnType<typeof openSqlite>, needle: string): string[] {
   const found: string[] = [];
   for (const { name } of sql.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'entry_fts_%'"))
     for (const c of sql.all<{ name: string }>(`SELECT name FROM pragma_table_info('${name}')`))
-      if ((sql.one<{ n: number }>(`SELECT count(*) AS n FROM "${name}" WHERE CAST("${c.name}" AS TEXT) LIKE ?`, `%${needle}%`)?.n ?? 0) > 0) found.push(`${name}.${c.name}`);
+      if ((sql.one<{ n: number }>(`SELECT count(*) AS n FROM "${name}" WHERE instr(CAST("${c.name}" AS TEXT), ?) > 0`, needle)?.n ?? 0) > 0) found.push(`${name}.${c.name}`);
   return found;
 }
 

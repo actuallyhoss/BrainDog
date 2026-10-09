@@ -57,10 +57,13 @@ duration    = integer ;                             (* seconds *)
 temporal    = day | instant | relative ;
 day         = digit digit digit digit "-" digit digit "-" digit digit ;
 instant     = rfc3339-utc ;                         (* "Z", millisecond precision *)
-relative    = anchor | offset ;
-anchor      = "today" | "tomorrow" | "yesterday" | "bom" | "eom" | "boy" | "eoy" ;
+relative    = anchor | offset | anchored | spoken ;
+anchor      = "today" | "tomorrow" | "yesterday" | "bow" | "bom" | "eom" | "boy" | "eoy" ;
 offset      = ( "+" | "-" ) digit { digit } unit ;  (* 1–4 digits *)
 unit        = "d" | "w" | "m" ;                     (* day, week, calendar month — clamped *)
+anchored    = period-word ( "+" | "-" ) digit { digit } ( unit | "y" ) ;  (* bom-1m; y only here *)
+period-word = "bow" | "bom" | "eom" | "boy" | "eoy" ;
+spoken      = (* exactly what the printer says for one of the above, §1.4 *) ;
 ```
 
 Nineteen operators, one modifier (`via`), three quantifiers, one reference form (`predicate`). **Counted.** A
@@ -115,6 +118,20 @@ so a compiled query is reproducible and a test can pin the clock.
 | `today` · `tomorrow` · `yesterday` | that calendar day in `ctx.tz` | 00:00:00 of that day in `ctx.tz`, as a UTC instant |
 | `bom` · `eom` · `boy` · `eoy` | first/last day of the current month/year in `ctx.tz` | 00:00:00 of that day, as above |
 | `+30d` · `-1w` · `+2m` | `today` ± the offset; `m` is a calendar month, clamped to the last day | `ctx.now` ± the offset |
+| `bom-1m` · `eom-1m` · `boy-1y` · `bow-1w` | the word's period moved by the offset, then the word: the first and last day of last month, the first day of last year, the Monday of last week | 00:00:00 of that day, as above |
+| `eom+5d` · `bom-2w` · `boy+1m` | the word's day, then the offset counted from it as `+30d` is from today | 00:00:00 of that day, as above |
+
+**A day word carries an offset.** `bom`, `eom`, `bow`, `boy` and `eoy` take `d`, `w`, `m` or `y` after a sign, so
+last month's spending is one sentence: `on at least bom-1m, on before bom`. An offset in the word's own period (a
+month on `bom` or `eom`, a year on `boy` or `eoy`, a week on `bow`; a year on `bom` or `eom` too) moves the period
+first and then takes the word, so `eom-1m` on 30 September is 31 August, never the 30th. Any other offset is counted
+from the word's day. `y` is read only on a word: `+2y` alone is refused, as it always was.
+
+**The printer and the parser are one table** (`daySaid` in `packages/where/src/sentence.ts`). A screen prints
+`bom-1m` as "the start of last month", `bom` as "the start of this month", `bom-3m` as "the start of the month 3
+months ago", `eom+5d` as "5 days after the end of this month" and `+30d` as "30 days from now", and the parser reads
+exactly those phrases back, with or without the leading "the". A phrase the printer would not write for that day
+("the start of the month 1 month ago") is refused, so one day has one spelling.
 
 `h` is not a `where:` unit; it is legal only in `remind:` ([02-DATA-MODEL](02-DATA-MODEL.md) §4). An unknown literal is
 refused at install — `RELATIVE_LITERAL_UNKNOWN`, naming it. An `h` or `m` offset against a `day` field would be
@@ -358,6 +375,37 @@ trigger and step to the capability table, and installs each example. MCP serves 
 `proposals` as `braindog:grammar/<name>`; a rule is `braindog:grammar/automations`, the MCP package's own text.
 A description to Slash carries the page, register, metric and rule grammars in its input as `grammar`
 ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.10).
+
+### 2.6 · `when: { holds }`: a part that waits on what the record holds *(SHL-A08, October 2026)*
+
+A part of an add-on may say it is there only while the record holds certain lists:
+
+```yaml
+- register: clients
+  fields:
+    - { id: name, type: text, required: true }
+    - { id: contact, type: ref, to: people, when: { holds: [people] } }
+```
+
+- **The shape.** `when: { holds: [<name>, …] }`, one key, 1 to 8 names, each once. A name is a list's id (`people`) or a
+  role a list plays (`rates`, `meets`, `org`, [`roles.ts`](../packages/kernel/src/roles.ts)): `meets` is held while some
+  list declares it, or while the record has the list `people`, which plays it by its name. Every name must be held.
+- **Where.** On a declaration (any kind but a rule, whose `when:` is what it fires on), a list's field, its `pairs`
+  clause and its roles (`rates`, `meets`, `org`), a page's block, a block's column or leg, and a figure's leg. A block's
+  other `when:`, a figure's test (`{ metric, gt }`), is a different shape and keeps its meaning: an object with `holds` in
+  it is this one.
+- **Refused.** Any other key beside `holds`, an empty or overlong list, a name that is not an id, a name said twice, a
+  `when:` on a field that is not this shape, and a field that waits while `required` or `required_when` (a field that
+  comes and goes cannot be asked of every entry). The kernel checks it (`holdsFault`, [`declare.ts`](../packages/kernel/src/declare.ts)),
+  and an add-on file is refused at the catalogue's door for it.
+- **Resolved by the plan, never stored.** `resolveWhen` ([`packages/declare/src/when.ts`](../packages/declare/src/when.ts))
+  lays the add-on over what the record holds and the lists the add-on brings, keeps each part whose names are all held
+  with the key taken off, takes the rest out, and returns them as `waiting: [{ at, holds }]`, `at` the part's place
+  (`register.clients.fields[1]`) and `holds` the names not yet held. A list that waits takes its example rows with it.
+  The install stages what the plan said (`settleWhen`), and a part that reaches the install unplanned is refused
+  (`unplannedHolds`), so `pages.ts` never meets the shape.
+- **Said.** The add-on's page reads its file and says "1 part waits for People." A catalogue card's reach carries
+  `waits`, the names any part waits for.
 
 ---
 

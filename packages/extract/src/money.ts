@@ -340,6 +340,54 @@ function symbolAfter(text: string, pos: number, symbols: readonly [string, strin
   return null;
 }
 
+/**
+ * `$`, WHICH THE TABLE CANNOT PLACE AND `declared` MUST NOT FILL (ruling 438, docs/04-PACKS.md "Rulings").
+ *
+ * The table `@braindog/record` wires carries no symbols, and one that does gives `$` to USD and CAD alike, so
+ * `$` was skipped as if it were not there and `declared` filled the gap: `paid $12` on an EGP record read as
+ * EGP 12, a wrong currency with a right-looking figure. A bare `$` is the record's home currency only when
+ * that currency is itself written with `$`; anywhere else the amount is no candidate and a person is asked.
+ * A letter prefix that names the country (`US$`, `C$`, `A$`) is that dollar, when the table holds it.
+ */
+const DOLLAR_PREFIX: Record<string, string> = {
+  US: 'USD', C: 'CAD', CA: 'CAD', A: 'AUD', AU: 'AUD', NZ: 'NZD', HK: 'HKD', S: 'SGD', SG: 'SGD', NT: 'TWD', MX: 'MXN',
+};
+
+/* Which currencies are written with `$` is the runtime's to say (its narrow symbol), never a list typed here. */
+const dollarHomes = new Map<string, boolean>();
+
+/** May a bare `$` be read as `declared`? Only when the home currency is one written with `$`. */
+function dollarIsHome(declared: string | undefined): boolean {
+  if (declared === undefined) return false;
+  let yes = dollarHomes.get(declared);
+  if (yes === undefined) {
+    try {
+      const parts = new Intl.NumberFormat('en', { style: 'currency', currency: declared, currencyDisplay: 'narrowSymbol' }).formatToParts(0);
+      yes = parts.find((p) => p.type === 'currency')?.value === '$';
+    } catch {
+      yes = false;
+    }
+    dollarHomes.set(declared, yes);
+  }
+  return yes;
+}
+
+/** A `$` ending at `pos`: the dollar a capital prefix names, or `null` for a bare one. */
+function dollarBefore(text: string, pos: number, table: CurrencyTable): { code: string | null; at: number } | null {
+  if (text[pos - 1] !== '$') return null;
+  let i = pos - 1;
+  while (i > 0 && isUpper(text[i - 1]) && pos - 1 - i < 2) i -= 1;
+  const code = DOLLAR_PREFIX[text.slice(i, pos - 1)];
+  if (i < pos - 1 && !isLetter(text[i - 1]) && code !== undefined && Object.hasOwn(table, code)) return { code, at: i };
+  return { code: null, at: pos - 1 };
+}
+
+/** A `$` starting at `pos` that ends this figure rather than opening the next one (`12$`, `12 $`). */
+function dollarAfter(text: string, pos: number): { at: number } | null {
+  if (text[pos] !== '$' || startsNumber(text, pos + 1)) return null;
+  return { at: pos + 1 };
+}
+
 /* ── the scan ────────────────────────────────────────────────────────────── */
 
 /**
@@ -373,6 +421,8 @@ export function scanMoney(text: string, table: CurrencyTable, declared?: string)
     let beforeAt = -1;
     let sign = 0;
     let open = false;
+    /* A bare `$` on either side, which `declared` may fill only when home is written with `$` (ruling 438). */
+    let bare = false;
     let j = token.start;
     for (let step = 0; step < 4; step++) {
       while (isSpace(text[j - 1])) j -= 1;
@@ -382,6 +432,15 @@ export function scanMoney(text: string, table: CurrencyTable, declared?: string)
           before = hit.code;
           beforeAt = hit.at;
           j = hit.at;
+          continue;
+        }
+        const dollar = bare ? null : dollarBefore(text, j, table);
+        if (dollar !== null) {
+          if (dollar.code !== null) {
+            before = dollar.code;
+            beforeAt = dollar.at;
+          } else bare = true;
+          j = dollar.at;
           continue;
         }
       }
@@ -424,7 +483,7 @@ export function scanMoney(text: string, table: CurrencyTable, declared?: string)
     if (trailing) k += 1;
 
     if (isSpace(text[k])) k += 1;
-    const afterAt = k;
+    let afterAt = k;
     let afterHit = codeAfter(text, k, table) ?? symbolAfter(text, k, symbols);
     /**
      * TWO AMOUNTS ON ONE LINE, which is what a foreign-exchange row is: `USD 5.00 EGP 245.00`, charged
@@ -449,7 +508,23 @@ export function scanMoney(text: string, table: CurrencyTable, declared?: string)
      * A wrong currency, where the code before the two-amount repair had at least refused.
      */
     if (before !== null && afterHit !== null && beforeAt === claimed) before = null;
-    if (afterHit !== null && before !== null && startsNumber(text, afterHit.at)) afterHit = null;
+    /* A bare `$` in front is this figure's own mark, so a code that opens the next number is the next
+       number's: `$5.00 EGP 245.00` is a dollar amount and an EGP one, never EGP 5. */
+    if (afterHit !== null && (before !== null || bare) && startsNumber(text, afterHit.at)) afterHit = null;
+    if (afterHit === null && before === null && !bare) {
+      const dollar = dollarAfter(text, k);
+      if (dollar !== null) {
+        bare = true;
+        k = dollar.at;
+        /* `12$ EGP`: the code after a trailing `$` still says which currency it was. */
+        const at = isSpace(text[k]) ? k + 1 : k;
+        const code = codeAfter(text, at, table);
+        if (code !== null && !startsNumber(text, code.at)) {
+          afterHit = code;
+          afterAt = at;
+        }
+      }
+    }
     const after = afterHit?.code ?? null;
     if (afterHit !== null) k = afterHit.at;
     const closed = text[k] === ')';
@@ -457,6 +532,10 @@ export function scanMoney(text: string, table: CurrencyTable, declared?: string)
     if (before !== null && after !== null && before !== after) continue;
     if (before === null && afterHit !== null) claimed = afterAt;
 
+    /* A bare `$` beside a written code is that code (`$12 USD`, `$12 EGP`): the code is the one word that
+       names a currency, and an amount with one is never made unsure by a `$` beside it. Beside nothing,
+       the `$` is `declared` only when home is written with `$`. */
+    if (bare && before === null && after === null && !dollarIsHome(declared)) continue;
     const currency = before ?? after ?? declared ?? null;
     if (currency === null || !Object.hasOwn(table, currency)) continue;
 

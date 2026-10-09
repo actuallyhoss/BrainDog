@@ -1,0 +1,17 @@
+{
+  "pick": "more-places",
+  "asks": "Where the other places sit",
+  "from": "EB 1.11 point 2",
+  "options": [
+    {
+      "id": "under-more",
+      "says": "Activity, Inbox, Search, Settings, Add-ons, Automations and Keys sit under More."
+    },
+    {
+      "id": "in-rail",
+      "says": "Each has its own place in the rail."
+    }
+  ],
+  "default": "under-more",
+  "why": "Seven places is the most a rail holds and still reads; the rest are a press away."
+}

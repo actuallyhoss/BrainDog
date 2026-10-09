@@ -1,0 +1,18 @@
+{
+  "pick": "size-14",
+  "asks": "Whether 14 stays inside controls",
+  "from": "EXP-B01",
+  "options": [
+    {
+      "id": "stays",
+      "says": "14 stays inside controls.",
+      "live": true
+    },
+    {
+      "id": "fifteen",
+      "says": "Controls take 15, the body size."
+    }
+  ],
+  "default": "stays",
+  "why": "A control is read as a label, and 14 keeps a button at its height."
+}

@@ -37,6 +37,7 @@ const fill = (seg, value) => ({ [seg]: String(value) });
  *   `/s/[token]` opens a link that names no page, which is the whole of what that route draws while sharing is off.
  * - `{ asks, was }`: fills read from what the record answered (`readRecord`). An address the record has nothing for is
  *   opened once at `was`, the sample it had before, drawn as not found, and named in `unseen`.
+ * `missing: true` marks a fixed sample that names nothing on purpose, so it is drawn as not found too (`missing` below).
  */
 export const SAMPLE_OF = {
   'web:/[id]': { asks: (s) => s.questions.map((id) => fill('[id]', id)), was: [fill('[id]', 'SG5')] },
@@ -54,7 +55,7 @@ export const SAMPLE_OF = {
     was: [{ ...fill('[register]', 'obligations'), ...fill('[seq]', '1') }],
   },
   'web:/t/[track]': { asks: (s) => s.tracks.map((seq) => fill('[track]', seq)), was: [fill('[track]', '2')] },
-  'web:/s/[token]': { fixed: [fill('[token]', 'no-page-yet')] },
+  'web:/s/[token]': { fixed: [fill('[token]', 'no-page-yet')], missing: true },
   'web:/settings/[area]': { fixed: [...AREAS.keys()].map((area) => fill('[area]', area)) },
   'site:/packs/[id]': { fixed: [fill('[id]', 'bank-hsbc-eg')] },
   'site:/legal/[name]': { fixed: [fill('[name]', 'terms')] },
@@ -117,10 +118,12 @@ async function walk(dir, out = []) {
 /**
  * The routes of one SvelteKit app, as addresses, at the record's own ids.
  *
- * Returns `{ routes, unsampled, unseen }`. `unsampled` is a route the table has no sample for, a FAILURE at every call
- * site, since it is the only way "we forgot to sample this" differs from "there is nothing here". `unseen` is an address
- * the record had nothing for, opened at the sample it had before and drawn as not found, which the gate's summary
- * counts as "not seen with data". A caller that ignores either has quietly stopped checking part of the app.
+ * Returns `{ routes, unsampled, unseen, missing }`. `unsampled` is a route the table has no sample for, a FAILURE at every
+ * call site, since it is the only way "we forgot to sample this" differs from "there is nothing here". `unseen` is an
+ * address the record had nothing for, opened at the sample it had before and drawn as not found, which the gate's
+ * summary counts as "not seen with data". A caller that ignores either has quietly stopped checking part of the app.
+ * `missing` is every address drawn as not found ON PURPOSE, `unseen` and the samples marked `missing`: there the host's
+ * not found is the answer asked for (`printed.mjs` `checkScreen`'s `missing`).
  *
  * `record` is `startRecord`'s handle or `recordAt(base)` (`record.mjs`); `null` reads no record and opens every route
  * at its `was`, which is `routesOf` for the gates whose lines have not moved yet. `extra` is added as it is.
@@ -131,6 +134,7 @@ export async function routesFor(appRoot, record = null, { every = false, extra =
   const routes = new Set(extra);
   const unsampled = [];
   const unseen = [];
+  const notFound = [];
 
   for (const dir of await walk(join(appRoot, 'src', 'routes'))) {
     const rel = relative(join(appRoot, 'src', 'routes'), dir).replace(/[\\/]+/g, '/');
@@ -158,10 +162,11 @@ export async function routesFor(appRoot, record = null, { every = false, extra =
       const address = `/${segments.map((s) => (s.startsWith('[') ? encodeURIComponent(f[s]) : s)).join('/')}`;
       routes.add(address);
       if (nothing) unseen.push(address);
+      if (nothing || entry.missing === true) notFound.push(address);
     }
   }
 
-  return { routes: [...routes].sort(), unsampled, unseen };
+  return { routes: [...routes].sort(), unsampled, unseen, missing: notFound };
 }
 
 /** Every route at the samples it had before the record was asked, for `a11y` and `layout` until their lines move. */

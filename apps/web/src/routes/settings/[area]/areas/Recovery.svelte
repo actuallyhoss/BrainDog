@@ -6,7 +6,7 @@
   import { signinFor } from '$lib/at.ts';
   import { page } from '$app/state';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { passkeyRegister, removePasskey, support } from '$lib/auth.ts';
+  import { passkeyRegister, platformLabel, removePasskey, support } from '$lib/auth.ts';
   import { since } from 'braindog-render';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -32,6 +32,9 @@
   const webauthnHere = support();
   let addingKey = $state(false);
   let addSaid = $state<string | null>(null);
+  /* THE NAME IS ASKED BEFORE THE KEY IS MADE (LCH-A04), with the device's own as the default, so a passkey is not made
+     under one name and renamed in Identity afterwards. Left blank, the device's name is used. */
+  let typedName = $state(platformLabel());
   /** Somebody is signed in to a host that offers passkeys, so the list and its button are real. */
   const livePasskeys = $derived(hostAuth?.me && hostAuth.passkey ? hostAuth : null);
   const canAddPasskey = $derived(livePasskeys !== null && webauthnHere.webauthn && webauthnHere.secure);
@@ -47,7 +50,7 @@
     addingKey = true;
     addSaid = null;
     const at = opened();
-    const out = await passkeyRegister();
+    const out = await passkeyRegister(undefined, typedName.trim() || platformLabel());
     closed(true, at);
     addingKey = false;
     if (out.ok) s.liveKeys = [...(s.liveKeys ?? []), out.value];
@@ -122,6 +125,10 @@
       {#if liveKeys.length <= 1}<p class="hint" id="last-key">{copy.lastPasskey}</p>{/if}
     {/if}
     {#if canAddPasskey}
+      <label class="name-label" for="recovery-key-name">{copy.identityPasskeyNameLabel}</label>
+      <span class="field name-field">
+        <input class="field-input" id="recovery-key-name" type="text" autocomplete="off" maxlength="64" bind:value={typedName} disabled={addingKey} />
+      </span>
       <div class="row-actions">
         <Button weight="primary" onclick={addLivePasskey} aria-busy={addingKey}
           ><Icon name="plus" size="s" />{addingKey ? copy.addingPasskey : copy.addPasskey}</Button
@@ -181,6 +188,24 @@
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
+  }
+
+  .name-label {
+    display: block;
+    margin-block: var(--sp-3) var(--sp-1);
+    font-size: var(--t-base);
+  }
+
+  .name-field {
+    display: flex;
+    max-inline-size: 24rem;
+  }
+
+  /* 16px TEXT IN THE INPUT, as Identity's, so a phone never zooms into the field. */
+  .name-field .field-input {
+    flex: 1;
+    min-inline-size: 0;
+    font-size: var(--t-md);
   }
 
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit

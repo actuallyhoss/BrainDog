@@ -412,8 +412,11 @@ test('every travelling table arrives, and not one of them quietly stays behind',
        not audited cannot answer "did anything get out". Counting it here would mean no two exports
        of an unchanged record are the same bytes, because the first one changed the record. */
     const skip = table_name === 'event' ? " WHERE kind <> 'export'" : '';
+    /* AND THE `import` EVENT THE COPY WRITES ON ARRIVING (drill-trip-47) is the copy's own, local like `export`, so
+       it is not one of the rows that travelled. */
+    const landed = table_name === 'event' ? " WHERE kind <> 'import'" : '';
     const before = source.sql.one<{ n: number }>(`SELECT count(*) AS n FROM ${table_name}${skip}`)?.n ?? 0;
-    const after = sql.one<{ n: number }>(`SELECT count(*) AS n FROM ${table_name}`)?.n ?? 0;
+    const after = sql.one<{ n: number }>(`SELECT count(*) AS n FROM ${table_name}${landed}`)?.n ?? 0;
     assert.equal(after, before, `${table_name}: ${before} rows went in and ${after} came out`);
     if (table_name !== 'entry_fts' && table_name !== 'entry_vec' && table_name !== 'record')
       assert.ok(Number(before) > 0, `${table_name} is empty in the fixture, so this proves nothing about it`);

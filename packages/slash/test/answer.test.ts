@@ -119,13 +119,16 @@ test('(3) TEN ANSWERS SENT TOGETHER AT A CAP OF 2 make two model calls, as ten r
     assert.equal(out.filter((o) => codeOf(o) === 'SLASH_BUDGET_SPENT').length, 8);
     assert.equal(inference.seen.length, 2, 'an answer past the cap still called the model');
     assert.equal(slash.status().asks.used, 2);
+    /* AND EACH ASK TURNED AWAY LEAVES ITS ROW UNDER `-` (model-sign-49), which the meter never counts. */
+    const kept = rows().map((r) => [r.kind, r.status, r.code]);
     assert.deepEqual(
-      rows().map((r) => [r.kind, r.status, r.code]),
+      kept.filter((r) => r[1] !== 'refused'),
       [
         ['read', 'ok', null],
         ['read', 'ok', null],
       ],
     );
+    assert.equal(kept.filter((r) => r[1] === 'refused' && r[2] === 'SLASH_BUDGET_SPENT').length, 8);
   } finally {
     sql.close();
   }
@@ -220,7 +223,8 @@ test('(7) NO `call` ROW EVER HOLDS THE FILLED QUESTION OR A FIELD VALUE, on any 
     inference.say(JSON.stringify({ answer: 'about four' }));
     inference.say(new Error('502 from the gateway'));
     /* FIVE ASKS FOR FOUR ROWS, SO THE REFUSED PATH IS STILL WALKED. The `UNREACHABLE` ask is not counted, so the fourth
-       reaches a model and answers, and only the fifth finds three asks spent and writes no row. With four asks, as
+       reaches a model and answers, and only the fifth finds three asks spent and writes its turned-away row under `-`
+       (model-sign-49), which holds no question either. With four asks, as
        before that change, the fourth also reached the model, found nothing queued, and there was no budget refusal. */
     inference.say(JSON.stringify({ answer: 7 }));
     const outs = [];
@@ -228,7 +232,7 @@ test('(7) NO `call` ROW EVER HOLDS THE FILLED QUESTION OR A FIELD VALUE, on any 
     assert.deepEqual(outs, ['ok', 'PROPOSAL_SCHEMA', 'UNREACHABLE', 'ok', 'SLASH_BUDGET_SPENT']);
 
     const all = sql.all('SELECT * FROM slash_call');
-    assert.equal(all.length, 4);
+    assert.equal(all.length, 5);
     const text = JSON.stringify(all);
     for (const leak of [RATE.question, 'Office rent', '500500', 'EGP'])
       assert.ok(!text.includes(leak), `a call row holds ${JSON.stringify(leak)}: ${text}`);

@@ -96,18 +96,26 @@ export type Folded<L> = L & { pass: PassSaid; steps: L[] };
  * The fold, for a walk down the log (newest first): a line `system` wrote inside a kept pass is held, and the held steps
  * are said as one line when the walk leaves the pass, or at the end. One step alone is still one line, so the line a
  * person reads is the same shape whether the night moved one add-on or five.
+ *
+ * A LINE SOMEBODY ELSE WROTE BETWEEN TWO STEPS IS NEVER FOLDED AND NEVER SPLITS THE PASS. The update awaits between its
+ * steps, so a person's edit can land inside the pass's stretch of the log; it used to close the fold there and open a
+ * second one for the same pass, and Activity said the night's update twice. It is held beside the steps and said after
+ * the pass's one line, which keeps the walk newest first.
  */
 export function passFolder<L extends Foldable>(passes: readonly UpdatePass[]): { push: (line: L) => L[]; flush: () => L[] } {
   let held: L[] = [];
+  let aside: L[] = [];
   let open: UpdatePass | null = null;
   const passOf = (line: L): UpdatePass | null =>
     line.actor === 'system' ? (passes.find((p) => line.rowid > p.from && line.rowid <= p.to) ?? null) : null;
   const said = (): L[] => {
     const steps = held;
+    const between = aside;
     const pass = open;
     held = [];
+    aside = [];
     open = null;
-    if (pass === null || steps.length === 0) return [];
+    if (pass === null || steps.length === 0) return between;
     const line: Folded<L> = {
       ...steps[0]!,
       kind: PASS_KIND,
@@ -124,13 +132,17 @@ export function passFolder<L extends Foldable>(passes: readonly UpdatePass[]): {
       pass: { said: passSentence(pass), updated: pass.updated.length, asked: pass.asked.length, steps: steps.length, at: pass.at },
       steps,
     };
-    return [line];
+    return [line, ...between];
   };
   return {
     push(line) {
       const pass = passOf(line);
       if (pass !== null && pass === open) {
         held.push(line);
+        return [];
+      }
+      if (pass === null && open !== null && line.rowid > open.from && line.rowid <= open.to) {
+        aside.push(line);
         return [];
       }
       const out = said();

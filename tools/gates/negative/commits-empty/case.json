@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "an empty root is a skip, not a pass",
+  "expect": "no history to read",
+  "findings": 1,
+  "skip": true,
+  "why": "NO REPOSITORY AND NO LOG.JSON, which is what a mistyped root looks like from inside the gate. A gate that read no commit has not passed, so it exits 3 and names where it looked."
+}

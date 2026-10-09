@@ -232,14 +232,17 @@ re-wraps at start (§5.6) and has no billing.
    - Open the ops record and read last night's `walk` note. No note is a red row: the walk did not run or could not
      write, and `wrangler tail` or Workers Logs says which.
    - Open each saved query of `DEPLOYMENT.md` "Alerts". Each red row opens its runbook.
-   - Read the date of the last `drill` note in the ops record (§5.4). The drill is monthly: a last drill more than 31
-     days old is a red row, and the day's work is §5.4. The walk cannot read this date for you: the Worker holds no
-     age identity and never opens a copy, so the drill is the only thing that does, and its note is the only record
-     that it did.
+   - Read the host's last restore test, which the Directory keeps (§5.4 step 3): Settings > Backups on any record says
+     `This host's last restore test: passed 12 days ago` (`GET /account/drill`, `{ at, pass, records }`), and with
+     `OPS_RECORD` set the ops record holds the same as a `drill <date> · pass · <n> records` note. The drill is monthly:
+     a pass more than 35 days old reads Overdue, a failed one reads failed, and "Never tested" means no drill has ever
+     reported; each is in the fault tone, a red row, and the day's work is §5.4. The walk cannot write this fact for
+     you: the Worker holds no age identity and never opens a copy, so the drill is the only thing that does, and its
+     report is the only record that it did.
    - Once a quarter the same look finds the last `rotation` note (§5.6) and the last erasure drill (§9).
 
 Verify: `walk.done.records` = the records the Directory lists as open; `backups_failed = 0`; `stragglers = 0`;
-`erase_open = 0`; `lapse_failed = 0`; the note is in the ops record; the last `drill` note is at most 31 days old.
+`erase_open = 0`; `lapse_failed = 0`; the note is in the ops record; the host's last drill passed and is at most 35 days old.
 Rollback: none needed, every step is idempotent: the re-wrap is a compare-and-set on `kek_id`, a copy overwrites
 `latest`, an erasure check re-deletes, the ladder sends each notice once (`told`), and a replay counts nothing twice.
 
@@ -339,7 +342,7 @@ Three mechanisms, one contract: nightly, sealed, thirty kept, restorable.
 | Where | Mechanism | Trigger | Keeps |
 |---|---|---|---|
 | Cloud | `.brainl.age` to R2 under `<rec_id>/snapshots/` (03 §5; `apps/worker/src/snapshots.ts`) | the walk, `17 3 * * *` UTC (§5.1) | the 30 newest nightly copies + `latest` |
-| Cloud | the Directory's `.brainl.age` under `directory/snapshots/` | the walk, first | 30 |
+| Cloud | the Directory's `.dirl.age` under `directory/snapshots/` (`apps/worker/src/directory-copy.ts`) | the walk, first | 30 + `latest` |
 | Cloud | PITR history | the platform, continuous (01 §2) | 30 days, reached through a kept copy's bookmark |
 | Self-host | `VACUUM INTO` → `<slug>/snapshots/<time>Z-nightly.brain` with `<id>.brain.sig` beside it, and the Directory to `directory-snapshots/` (33 §6) | `BRAINDOG_BACKUP_AT`, 03:20 UTC by default, caught up on start | 30 nightly, apart from the 30 a person takes |
 
@@ -354,28 +357,47 @@ signature covers the 25 tables the manifest covers, and `verify` reports 25 (§1
 chosen at random once there are customers (§9). It is the only thing that ever opens a Cloud copy, because the Worker
 holds only the recipient.
 
-Precondition: the age identity file on the operator's machine and outside the repository (§8); this repository checked
-out at the deployed sha, or at least at the same kernel migration count, with its dependencies installed.
+Precondition: the age identity where a command can print it (the keychain, or the password manager's command line),
+never a plain file in this repository (§8); `wrangler` signed in as the operator; this repository checked out at the
+deployed sha, or at least at the same kernel migration count, with its dependencies installed; and, to send the
+result, `PROVISION_KEY` in the environment of that one command.
 
-1. Fetch last night's copy:
-   `wrangler r2 object get braindog-blobs/<rec_id>/snapshots/latest.brainl.age --remote --file <tmp>/latest.brainl.age`
-2. Run the drill:
-   `node apps/cli/scripts/restore-drill.mjs <tmp>/latest.brainl.age --identity <age identity file> --key https://brain.dog/app/<slug>/.well-known/braindog-key`.
-   In order, stopping at the first failure, it opens the copy with the identity (printing only the recipient, which must
-   equal `AGE_RECIPIENT`); runs `braindog verify` on it; restores it with `braindog init drill --from` into a throwaway
-   data directory under the OS temp folder, with a root key of its own; asks, for every person on the record, whether
-   the restored Directory and record let them in; exports the restored record and compares its manifest with the
-   copy's, table by table (count and hash), and every list's rows; prints PASS or FAIL; and removes the folder, the
-   plaintext and the record. It writes to no network but the one GET `--key` names.
-3. Copy the last line it prints, `drill <rec_id> · <rows> rows · <bytes> bytes · restore <time>`, into the ops record as
-   a note, with PASS or FAIL in front of it. That note's date is what the morning check reads (§5.1 step 5).
-4. Delete `<tmp>/latest.brainl.age`.
+1. Run the drill. It fetches the night's sealed copies itself, with `wrangler r2 object get --remote` from
+   `braindog-blobs` (`--bucket` names another), into a folder under the OS temp directory that goes when it ends:
+   `node apps/cli/scripts/restore-drill.mjs --record <rec_id> --directory --identity-cmd "<a command that prints the age identity>" --report https://brain.dog`.
+   `--record` is repeatable: the live record first, then the canary and the sample. `--directory` fetches
+   `directory/snapshots/latest.dirl.age`, loads it into an empty Directory in memory, and asks, for every open record it
+   lists, whether that record has an owner who can sign in.
+2. What it does to each record's `<rec_id>/snapshots/latest.brainl.age`, in order, stopping at the first failure:
+   opens it with the identity (printing only the recipient, which must equal `AGE_RECIPIENT`); runs `braindog verify`;
+   restores it with `braindog init drill --from` into a throwaway data directory with a root key of its own; asks, for
+   every person on the record, whether the restored Directory and record let them in; exports the restored record and
+   compares its manifest with the copy's, table by table (count and hash), and every list's rows; then the round trip
+   (`apps/cli/scripts/drill-trip.mjs`): exports twice and compares the bytes, exports with keys left out and counts the
+   sealed tables at zero, reads the export for the local tables and the push addresses, imports into a second fresh
+   record and searches it, and expects the two refusals for a raised version and a changed byte. `--no-round-trip`
+   leaves the round trip out and says so on the verdict line. It prints `PASS` or `FAIL` per copy, then
+   `ALL PASS · <n> copies` or `FAIL · <red> of <n> copies ...`, and removes the folder, the plaintext and the records.
+3. `--report <origin>` posts the counts, and only counts, `{ at, pass, copies, rows, lists, people, records }`, to the
+   operator door `POST /account/ops/drill` with `PROVISION_KEY` as the bearer. The Directory keeps it as the host's
+   last drill; with `OPS_RECORD` set the door also writes the note `drill <date> · pass · <n> records` in the ops
+   record. The line it prints says what became of it: `not sent: no key`, `not sent: no door`, `not sent: the host
+   refused the key`, or `sent to <host>`. Every record's Settings > Backups then reads `This host's last restore test: passed
+   just now` from `GET /account/drill`, the same line for every person, because the fact is the host's.
+4. Monthly, by itself: `node apps/cli/scripts/restore-drill.mjs --print-timer` with the same arguments prints a launchd
+   file (`dog.brain.restore-drill`, the first of the month at 09:17, its log in
+   `~/Library/Logs/braindog-restore-drill.log`). Save it in `~/Library/LaunchAgents/` and `launchctl load` it. It holds
+   no secret: the identity comes from the command it names, and with no `PROVISION_KEY` its log says `not sent: no key`.
 
-Verify: PASS, and the note. A FAIL is an incident on the backups themselves: open §5.11's timeline, try the night
-before with its dated key, and do not deploy a migration until a drill passes.
+A copy fetched by hand still works: `node apps/cli/scripts/restore-drill.mjs <file>.brainl.age --identity <a file
+outside this repository> [--key <pubkey|url>]`, and an already opened `.brainl` needs no identity.
+
+Verify: `ALL PASS`, and Settings > Backups reads `passed` with today's age. A FAIL is an incident on the backups
+themselves: open §5.11's timeline, try the night before with its dated key, and do not deploy a migration until a drill
+passes. "Never tested" on Settings > Backups is true until the first `--report` lands, and stays in the fault tone.
 Rollback: none; a drill touches no live record. On a self-host, `braindog verify <slug>/snapshots/<id>.brain` checks a
 copy against its `.brain.sig`, and the drill script runs unchanged on a `braindog export` of the record, which is a
-`.brainl` and needs no `--identity`.
+`.brainl` and needs no `--identity`. A self-host has no `/account/drill` door, so its Backups area draws no drill line.
 
 ### 5.5 · Restore
 
@@ -406,24 +428,33 @@ Verify: the `restore.pitr` event names the copy and the `before-restore` copy ke
 Rollback: restore the `before-restore` copy from the same list. It is itself a copy, restorable for 30 days.
 
 **(b) From `.brainl.age`, Cloud, into the same record.** `braindog import` always replaces, and the record refuses a
-file that is not its own copy.
+file that is not its own copy (`import` with `replace` in `packages/kernel/src/index.ts`). Into any other record the
+rule is `brainl.ts`'s: an import opens a file only into an empty record and refuses one that holds rows
+(`IMPORT_NOT_EMPTY`), so a copy of another record goes to a fresh one with `init --from`, never over a live one. This is
+the path the drill runs on every copy it opens (`apps/cli/scripts/drill-trip.mjs`, steps 5, 6 and 10): the export put
+back over the record it came from exports again to the same bytes, the same file opens as a fresh record with
+`init --from`, and a second import into that record, no longer empty, is refused.
 
-Precondition: the chosen night fetched and opened on the operator's machine (§5.4 step 1, and the drill has passed on
-it); the owner reachable; the reason logged. The opened `.brainl` comes from `age -d -i <identity> <copy> > <tmp>/night.brainl`
+Precondition: the chosen night fetched with `wrangler r2 object get braindog-blobs/<rec_id>/snapshots/nightly-<date>.brainl.age
+--remote --file <tmp>/night.brainl.age`, and the drill passed on that file (§5.4, the file form); the owner reachable; the reason
+logged. The opened `.brainl` comes from `age -d -i <identity> <copy> > <tmp>/night.brainl`
 where `age` is installed; the drill itself deletes the plaintext it makes.
 
 1. `braindog import <tmp>/night.brainl --host https://brain.dog/app/<slug> --key https://brain.dog/app/<slug>/.well-known/braindog-key`.
    The CLI verifies the file first and sends nothing if it fails. The record answers `NEEDS_BROWSER_SESSION`; the CLI
    asks for an operation grant and the owner approves *import* from their browser (48 §5.2): ten minutes, this command,
    never written.
-2. The record replaces its rows with the file's, rebuilds `entry_fts`, and writes one `import` event (33 §9). It refuses
-   a file without `vault_key` rows or sealed grants when it holds some, because that import would throw every key away.
+2. The record replaces its rows with the file's and rebuilds `entry_fts`. The `export` events the record kept are put
+   back beside the file's rows, and the kernel then writes one `import` event, on a replace as on a merge
+   (RQ-LCH-191, `index.ts`, `import`), so the next export carries that one event past the file it came from. It refuses a file without `vault_key` rows or sealed
+   grants when it holds some, because that import would throw every key away.
 3. Tokens, device grants, observations and jobs did not travel (`local`). The owner re-mints agent tokens and re-enrols
    runners. The vault opens if `vault_key('record')` is wrapped under a key `KEK` still holds (§5.6), or
    passphrase-wrapped and the owner has the passphrase; otherwise §5.7's *lost* script.
 4. Delete `<tmp>/night.brainl`.
 
-Verify: `braindog export -o <tmp>/after.brainl` of the restored record verifies, and the `import` event is present.
+Verify: `braindog export -o <tmp>/after.brainl` of the restored record verifies, and its manifest is the night's,
+table for table.
 Rollback: take the restore point first (`braindog export` before step 1) and import it the same way.
 
 **(b′) A deleted record, from its final copy.** Nothing on Cloud can put a record whose object is gone back under its

@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "a Word-Word: value line",
+  "expect": "Word-Word: value",
+  "findings": 2,
+  "total": 2,
+  "why": "A SIGNED-OFF-BY LINE, the shape of every trailer a harness or a tool appends. A trailer is a line, so it is a body as well: two findings name the commit, and the total holds that nothing else is red."
+}

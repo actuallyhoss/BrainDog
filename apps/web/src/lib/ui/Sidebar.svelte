@@ -28,9 +28,14 @@
   width it is drawn, and `--rail-d` and `--rail-ease` the time and curve the shell slides the work on when it changes.
   Written by CSS alone (`:root:has(...)`), as `--dock-w` is, so nothing has to be cleaned up.
 -->
+<script module lang="ts">
+  /** THE HOLDING PEN'S ROW: how many offers wait. The phone's More sheet says it in the same words (`+layout.svelte`). */
+  export const suggested = (n: number): string => `${n} suggested`;
+</script>
+
 <script lang="ts">
   import { tick, untrack } from 'svelte';
-  import { at, here as inside } from '../at.ts';
+  import { BASE, at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
   import { said } from '../voice.svelte.ts';
@@ -104,7 +109,7 @@
     /* The new-list row under the lists, said only here. */
     newList: 'New list',
     /* THE HOLDING PEN'S ROW: how many offers wait, and Settings, Navigation says what they are. */
-    suggested: (n: number) => `${n} suggested`,
+    suggested,
     /* HOW MANY AGENTS ARE AT IT, the rail's one row about them, and what pressing it opens. */
     working: (n: number) => `${n} working`,
     workingOpen: 'Open Agents',
@@ -309,6 +314,9 @@
       {#if refused}<p class="mi-note">{refused}</p>{/if}
       <hr class="mi-rule" />
       <a class="mi" role="menuitem" href={at('/settings/identity')}><Icon name="settings" size="s" />{copy.recordSettings}</a>
+      <!-- SIGN OUT AT EVERY WIDTH (LCH-A04): the rail's account menu says it as the phone's More does, with auth.ts loaded
+           on the press. A press that did not end the session leaves the page where it is and says so. -->
+      <button type="button" class="mi" role="menuitem" onclick={() => void import('../auth.ts').then((m) => m.signOutAndLeave(`${BASE}/signin`)).then((out) => { if (!out.ok) toasts.push(copy.signOutFailed, { intent: 'warn' }); }, () => toasts.push(copy.signOutFailed, { intent: 'warn' }))}><Icon name="lock" size="s" />{copy.signOut}</button>
     </Menu>
   {/snippet}
 

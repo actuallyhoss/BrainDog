@@ -147,11 +147,12 @@ for (const folder of readdirSync(packsDir, { withFileTypes: true }).filter((d) =
   for (const [id, reason] of Object.entries(yanks)) {
     if (!reason) fail(`packs/${folder}/yanked.json gives ${id} an empty reason.`);
     if (!index.entries.some((e) => e.kind === 'pack' && e.id === id)) fail(`packs/${folder}/yanked.json names ${id}, which is not a pack entry in the index.`);
+    /* A REWORDED REASON IS STAMPED AGAIN AND KEEPS ITS DATE: the yank happened when it happened, and only the words moved. */
     index = {
       ...index,
       entries: index.entries.map((e) =>
         e.kind === 'pack' && e.id === id
-          ? { ...e, versions: e.versions.map((v) => (v.yanked ? v : { ...v, yanked: { reason, at: now.toISOString() } })) }
+          ? { ...e, versions: e.versions.map((v) => (v.yanked?.reason === reason ? v : { ...v, yanked: { reason, at: v.yanked?.at ?? now.toISOString() } })) }
           : e,
       ),
     };

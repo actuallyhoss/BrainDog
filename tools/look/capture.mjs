@@ -60,6 +60,30 @@ export function rawIn(text) {
   return out;
 }
 
+/**
+ * THE SCREENS A SOURCE NAMES ITSELF (`source.screens`, a board's: `tools/look/board.mjs`), in place of a set's. An
+ * entry is a screen as `screensOf` hands one back, `{ key, name, path, why }`, drawn as given (a board's own page), or
+ * a key of the named sets, drawn as the record picks it. A key no set knows is said as missing, never dropped.
+ */
+export async function namedScreens(named, picked, of = screensOf) {
+  const keys = named.filter((n) => typeof n === 'string');
+  const known = new Map();
+  if (keys.length > 0)
+    for (const set of ['six', 'nine']) {
+      const got = await of(set, picked);
+      for (const s of got.screens) known.set(s.key, { screen: s });
+      for (const m of got.missing) if (!known.has(m.key)) known.set(m.key, { missing: m });
+    }
+  const screens = [];
+  const missing = [];
+  for (const n of named) {
+    if (typeof n !== 'string') screens.push(n);
+    else if (known.get(n)?.screen) screens.push(known.get(n).screen);
+    else missing.push(known.get(n)?.missing ?? { key: n, name: n, missing: `The look has no screen called ${n}.` });
+  }
+  return { screens, missing };
+}
+
 /** Is this screen one the source says it cannot draw: by its name, or a settings area by its own word. */
 export function cannotOf(source, screen) {
   const name = screen.name.toLowerCase();
@@ -124,6 +148,9 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
       for (const el of document.querySelectorAll('.rowgroup')) el.style.setProperty('content-visibility', 'visible', 'important');
     })
     .catch(() => {});
+  /* A BOARD'S SKIN (`source.css`), put after the product's own sheets on every picture, so the candidate is the real
+     screen with only the board's change. The context bypasses the app's policy for it, and only when there is one. */
+  if (typeof source.css === 'string' && source.css.trim() !== '') await page.addStyleTag({ content: source.css }).catch((e) => heard.errors.push(`the board's skin was not put on: ${e.message.split('\n')[0]}`));
   await page.waitForTimeout(settleMs);
   const facts = await page
     .evaluate(() => ({
@@ -172,7 +199,7 @@ export default async function capture({ origin, app, set, out, source }) {
   const settleMs = budget('layout').settleMs;
   const ready = readiness('look', timeoutMs, join(ROOT, 'apps', 'web', 'build'));
   const picked = await pick(asker(origin));
-  const { screens, missing } = await screensOf(set, picked);
+  const { screens, missing } = Array.isArray(source.screens) ? await namedScreens(source.screens, picked) : await screensOf(set, picked);
   const cannot = [];
   const drawn = [];
   for (const s of screens) {
@@ -207,7 +234,7 @@ export default async function capture({ origin, app, set, out, source }) {
     for (const theme of THEMES)
       for (const width of source.widths ?? widths()) {
         const phone = width < 600;
-        const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: phone ? 2 : 1, colorScheme: theme, isMobile: phone, hasTouch: phone });
+        const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: phone ? 2 : 1, colorScheme: theme, isMobile: phone, hasTouch: phone, bypassCSP: typeof source.css === 'string' });
         const page = await context.newPage();
         const heard = { errors: [], failed: [] };
         page.on('pageerror', (e) => heard.errors.push(String(e.message ?? e).split('\n')[0]));

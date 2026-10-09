@@ -55,6 +55,8 @@ export type Resolve = (path: string) => string | null | undefined | typeof UNNAM
 export type InlineOptions = {
   resolve?: Resolve;
   now?: number;
+  /** The reader's zone, an IANA name, that "today" is counted in; absent, the browser's own, else UTC (PGS-B04). */
+  zone?: string;
   /**
    * The drawing for a glyph name, as SVG path data in a 24 box, or `null` for none.
    *
@@ -163,7 +165,7 @@ function braced(body: string, opts: InlineOptions): Inline {
       if (arg === UNNAMED) return { type: 'path', path: raw, resolved: null, named: false };
       if (arg === null || arg === undefined)
         return { type: 'path', path: raw, resolved: null };
-      const text = formatTyped(form as TypedForm, arg, opts.now);
+      const text = formatTyped(form as TypedForm, arg, opts.now, opts.zone);
       if (text === null) return { type: 'unresolved', text: raw };
       const link = form === 'date' ? ('day' as const) : form === 'ref' ? ('row' as const) : undefined;
       return { type: 'typed', form: form as TypedForm, arg, text, ...(link ? { link } : {}) };

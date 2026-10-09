@@ -1,0 +1,6 @@
+README.md
+apps/web/static/_headers
+apps/site/static/_headers
+packages/kernel/src/index.ts
+tools/gates/hygiene.mjs
+REPORT.md

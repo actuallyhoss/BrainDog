@@ -112,7 +112,8 @@ test('A SETUP IS ASKED ONLY BY THE OWNER, and never past the month', async () =>
   const out = await spent.s.proposeSetup({ said: SAID, offer: OFFER, today: '2026-11-14' }, OWNER);
   assert.equal(!out.ok && 'refusal' in out ? out.refusal.code : '', 'SLASH_BUDGET_SPENT');
   assert.equal(spent.model.seen.length, 0, 'an ask past the cap never reaches the model');
-  assert.deepEqual(spent.rows(), []);
+  /* NO ASK, BUT ITS ROW (model-sign-49): one turned away under `-`, holding no question. */
+  assert.deepEqual(spent.rows(), [{ kind: 'read', status: 'refused', code: 'SLASH_BUDGET_SPENT', question: null }]);
 });
 
 test('A MODEL THAT DID NOT ANSWER IS A REFUSAL THE FIRST RUN FALLS BACK ON, and the ask is still counted', async () => {

@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "a line naming a tool as an author",
+  "expect": "names a tool or a model as an author",
+  "findings": 1,
+  "total": 1,
+  "why": "HIS OWN WORDS FOR IT, lower case and no colon (W.23), in a short subject, so neither the trailer rule nor the length can be what goes red."
+}

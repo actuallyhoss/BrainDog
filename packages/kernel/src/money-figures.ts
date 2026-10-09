@@ -652,6 +652,9 @@ export function figureLists(
   const out = new Set<string>();
   const add = (d: Pick<MetricDecl, 'source' | 'value' | 'legs'>) => {
     if (d.source.startsWith('register.')) out.add(d.source.slice('register.'.length));
+    /* AND EVERY LIST ITS `where` HOPS INTO (`pointed`, hop-figures-50): a figure over Categories that counts the Ledger
+       entries pointing at them reads the Ledger, so a member who cannot open the Ledger is not drawn it. */
+    for (const list of pointedIn((d as { where?: unknown }).where)) out.add(list);
     const rolled = isRolled(d.value) ? (d.value as unknown as { rolled: unknown }).rolled : null;
     if (rolled !== null && typeof rolled === 'object') {
       const r = rolled as { moves?: { register?: unknown }; checks?: unknown };
@@ -667,6 +670,15 @@ export function figureLists(
   const named = pointsAt && typeof decl.group_by === 'string' && decl.source.startsWith('register.') ? pointsAt(decl.source.slice('register.'.length), decl.group_by) : null;
   if (named) out.add(named);
   return [...out];
+}
+
+/** Every list a predicate hops into (`pointed`), however deep, eight levels at most as `where` reads it. */
+function pointedIn(node: unknown, level = 1): string[] {
+  if (level > 8 || node === null || typeof node !== 'object' || Array.isArray(node)) return [];
+  const n = node as Record<string, unknown>;
+  const hop = n.pointed as { register?: unknown; where?: unknown } | null | undefined;
+  if (hop !== null && typeof hop === 'object' && typeof hop.register === 'string') return [hop.register, ...pointedIn(hop.where, level + 1)];
+  return ['all', 'any', 'none'].flatMap((q) => (Array.isArray(n[q]) ? (n[q] as unknown[]).flatMap((k) => pointedIn(k, level + 1)) : []));
 }
 
 /** The list a ref field of a list points at, or `null` for a field that is not a ref. */

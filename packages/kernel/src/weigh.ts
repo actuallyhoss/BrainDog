@@ -124,7 +124,10 @@ export function costOf(bodyKind: string, body: unknown): Cost {
     /* A RULE THAT WILL ADD ROWS, which is the rowset it writes every time it matches from here on. */
     case 'pattern':
       return 'rows';
+    /* AN OPTION THAT WRITES (`patches`, govern-47) IS A ROWSET ON THE PICK, so it is weighed as rows; one that only says
+       a choice is a call. */
     case 'options':
+      return arr(b.options).some((o) => Array.isArray(obj(o).patches)) ? 'rows' : 'call';
     default:
       return 'call';
   }
@@ -156,6 +159,7 @@ export const COST_SQL = `(CASE
         OR COALESCE(json_array_length(body, '$.rows'), 0) >= ${MANY_ROWS} THEN 'shape'
       ELSE 'rows' END)
     WHEN 'pattern' THEN 'rows'
+    WHEN 'options' THEN (CASE WHEN EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE o.type = 'object' AND json_type(o.value, '$.patches') = 'array') THEN 'rows' ELSE 'call' END)
     ELSE 'call' END)
   ELSE (CASE body_kind WHEN 'rowset' THEN 'rows' WHEN 'change' THEN 'shape' WHEN 'pack' THEN 'shape' WHEN 'settings' THEN 'shape'
     WHEN 'arrange' THEN 'rows' WHEN 'pattern' THEN 'rows' ELSE 'call' END)

@@ -149,23 +149,31 @@ export async function readLog(base: string, me: string | null, io?: Fetch, befor
   if (!out.ok) return { from: 'refused', fix: refusalOf(out).fix };
   const names = new Map<string, string>();
   const events: AuditEvent[] = [];
-  for (const e of out.value.events) {
-    if (!isEventKind(e.kind)) continue;
+  /* THE RECORD'S FOLDED UPDATE PASS (kind `update`, SHL-A21) IS NONE OF THE KERNEL'S KINDS, so it is drawn as the
+     upgrade it is, with every line it wrote under it; any other kind this build does not know is left out as before. */
+  const toLine = (e: EventLine): AuditEvent | null => {
+    const kind = e.pass !== undefined ? 'upgrade' : e.kind;
+    if (!isEventKind(kind)) return null;
     const target = targetOf(e);
     if (target !== undefined && e.title) names.set(target, e.title);
     /* NO ROWID IS NO VERSION. A member held to named lists is sent none, because the gap between two of her lines
        counted what she was not shown, and her newest line's rowid was what the footer called "version 4,192". 0 is what
        "names no event" already means (`markRead`'s `upTo: 0`), and `/audit` draws no version for it. */
     const at = e.rowid ?? 0;
-    events.push({
+    return {
       seq: at,
       at: e.ts,
       by: actorFor(e.actor, me),
-      kind: e.kind,
+      kind,
       ...(target === undefined ? {} : { target }),
       note: moneyInText(e.note ?? (e.register !== null ? noteOf(e.register, e) : '')),
       version: at,
-    });
+      ...(e.pass === undefined ? {} : { pass: e.pass, steps: (e.steps ?? []).flatMap((s) => toLine(s) ?? []) }),
+    };
+  };
+  for (const e of out.value.events) {
+    const line = toLine(e);
+    if (line) events.push(line);
   }
   return { from: 'live', events, names, more: out.value.cursor !== null, cursor: out.value.cursor };
 }

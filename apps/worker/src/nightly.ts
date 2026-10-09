@@ -49,6 +49,7 @@
 import type { Replayed } from '@braindog/host/actions';
 
 import { FINAL_KEPT_MS } from './destroy.ts';
+import type { KennelSign } from './kennel.ts';
 import type { Laddered } from './ladder.ts';
 import type { OpFields } from './oplog.ts';
 import type { RewrapOutcome } from './rewrap.ts';
@@ -77,6 +78,8 @@ export type Walked = {
    * the ones that could not be asked, how many listings the file names, and whether it was written.
    */
   counts?: { records: number; failed: number; listings: number; written: boolean } | undefined;
+  /** The Kennel's four vital signs (`kennelVitals`), there only when the walk was handed `kennel`. */
+  kennel?: readonly KennelSign[] | undefined;
 };
 
 /** How far back a done erasure is checked against the bucket: `53 §5.8` step 4's thirty nights. */
@@ -160,6 +163,12 @@ export type Walk = {
   installed?: ((record: string) => Promise<readonly string[] | null>) | undefined;
   /** The night's tally, records by pack id, written as the Kennel's `counts.json` (`writeCounts`); answers the listings named. */
   counts?: ((held: ReadonlyMap<string, number>) => Promise<number>) | undefined;
+  /**
+   * The Kennel's four vital signs (`kennelVitals` in `kennel.ts`, SHL-B01 job 5), read once after the counts are
+   * written so the counts sign reads tonight's file. ABSENT, NO SIGN IS READ AND THE NOTE SAYS NOTHING ABOUT THE KENNEL,
+   * for the reason `expire` is optional.
+   */
+  kennel?: (() => Promise<readonly KennelSign[]>) | undefined;
   now: () => number;
 };
 
@@ -339,6 +348,17 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
     }
   }
 
+  /* THE KENNEL'S VITAL SIGNS AFTER THE COUNTS, so the counts sign reads the file this night wrote. Each sign already
+     says its own red; a read that throws whole is one line, and the note says the Kennel was not read. */
+  if (o.kennel) {
+    try {
+      out.kennel = await o.kennel();
+    } catch (e) {
+      out.kennel = [{ sign: 'index', ok: false, line: '✗ Kennel: its vital signs could not be read tonight. Needs a look.' }];
+      o.speak?.({ op: 'walk', rec: null, kennel: 'failed', why: reason(e) }, 'error');
+    }
+  }
+
   /* THE LADDER AFTER THE COPIES, so a record deleted tonight had its night's copy first, and ONCE, over the Directory's
      lapsed rows rather than beside each record: the rows are few and the Directory answers them in one call. A ladder
      that throws is a line and a failure, never the end of the walk. */
@@ -424,6 +444,13 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
     done.count_listings = out.counts.listings;
     done.counts_written = out.counts.written;
   }
+  /* THE SIGN OF STRANGERS PUBLISHING IS A MEASURE, NOT A FAULT: it is red until the first add-on by somebody other than
+     BrainDog is listed, and a night is not a problem for it. */
+  const kennelRed = out.kennel?.filter((k) => !k.ok && k.sign !== 'outside').length ?? 0;
+  if (out.kennel) {
+    done.kennel_red = kennelRed;
+    done.kennel_outside = out.kennel.some((k) => k.sign === 'outside' && k.ok);
+  }
   done.ms = out.ms;
   const problem =
     out.failed > 0 ||
@@ -432,7 +459,8 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
     out.expiryFailed > 0 ||
     (out.ladder !== undefined && out.ladder.failed > 0) ||
     (out.replay !== undefined && (out.replay.failed > 0 || out.replay.lost > 0)) ||
-    (out.counts !== undefined && (out.counts.failed > 0 || !out.counts.written));
+    (out.counts !== undefined && (out.counts.failed > 0 || !out.counts.written)) ||
+    kennelRed > 0;
   /* WRITTEN ON EVERY NIGHT, INCLUDING AN EMPTY ONE. A Directory with no records and a Directory
      that answered nothing look identical in a log made only of per-record lines. */
   o.speak?.(done, problem ? 'error' : 'info');
@@ -441,7 +469,7 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
      starts. A note that could not be written is a line, and the night it describes still happened. */
   if (o.note) {
     try {
-      await o.note(summaryOf(out, began));
+      for (const text of notesOf(summaryOf(out, began))) await o.note(text);
     } catch (e) {
       o.speak?.({ op: 'walk', rec: null, note: 'failed', why: reason(e) }, 'error');
     }
@@ -450,12 +478,33 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
 }
 
 /**
- * The night in one line for the operator's record: `walk 2026-09-28 · 12 records · 0 stragglers · 0 failed · 0 open`.
- * `53 §5.1` step 4's words, dated by the walk's own clock.
+ * The night for the operator's record: `walk 2026-09-28 · 12 records · 0 stragglers · 0 failed · 0 open`, `53 §5.1`
+ * step 4's words dated by the walk's own clock, and under it the Kennel's four vital signs one a line when the walk read
+ * them, each with its mark (`kennelVitals`).
  */
 export function summaryOf(walked: Walked, began: number): string {
   const date = new Date(began).toISOString().slice(0, 10);
-  return `walk ${date} · ${String(walked.records)} records · ${String(walked.stragglers)} stragglers · ${String(walked.failed)} failed · ${String(walked.eraseOpen)} open`;
+  const head = `walk ${date} · ${String(walked.records)} records · ${String(walked.stragglers)} stragglers · ${String(walked.failed)} failed · ${String(walked.eraseOpen)} open`;
+  return walked.kennel === undefined || walked.kennel.length === 0 ? head : [head, ...walked.kennel.map((k) => k.line)].join('\n');
+}
+
+/** The most characters one note in the ops record keeps (`opsNote` cuts there, as a `note` event requires). */
+export const NOTE_MOST = 280;
+
+/**
+ * The night's text as the notes it is written in: whole lines, as many to a note as fit in `NOTE_MOST`, so the Kennel's
+ * four signs under the night's line are never cut off at the note's end. A single line longer than a note is cut, with
+ * an ellipsis, rather than lost.
+ */
+export function notesOf(text: string, most = NOTE_MOST): string[] {
+  const notes: string[] = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.length > most ? `${raw.slice(0, most - 1)}…` : raw;
+    const last = notes.length - 1;
+    if (last >= 0 && (notes[last] ?? '').length + 1 + line.length <= most) notes[last] = `${notes[last] ?? ''}\n${line}`;
+    else notes.push(line);
+  }
+  return notes;
 }
 
 /**

@@ -55,16 +55,62 @@ export const OWN = [
   { rule: 'open-braces', find: /\{\s*\}|(?<!\{)\{[A-Za-z_][\w.]*\}(?!\})/u, said: 'prints a pair of braces, a template that was never filled' },
 ];
 
+/** An answer's status, by the protocol's own word for it, as `NOT_FOUND` below is read. */
+const statusOf = (word) => Number(Object.keys(STATUS_CODES).find((code) => STATUS_CODES[code] === word));
+
+/**
+ * THE SELF-HOST'S OWN NO, ASKED FOR ON PURPOSE AND SAID ON THE SCREEN. The browser writes a console line for every answer
+ * that is not ok, whether or not the page asked for it knowing the answer; the gates' record is a self-host, and these
+ * are the answers a self-host gives by design, each a page that says what it means. Matched by status AND path, so the
+ * same status anywhere else is still red, and a held list (`ledger.json` `printed.ALLOWED`): it only shrinks.
+ */
+export const ALLOWED = [
+  {
+    status: 'Not Implemented',
+    path: '/api/snapshots',
+    why: 'A self-host with no folder for copies says so, and Backups says it on the screen (the canary forgives the same answer).',
+  },
+  {
+    status: 'Not Implemented',
+    path: '/api/clearVaultPassphrase',
+    why: "The vault switch asks whether a passphrase is on by taking one off with none (`lockOf`); a record with no key of its own answers that it cannot, and the switch says so.",
+  },
+  {
+    status: 'Not Found',
+    path: '/auth/signup/name',
+    why: 'Sign-up asks the one door a stranger can ask; a self-host has no sign-up, and the page is the closed one with its way to sign in.',
+  },
+];
+
+/** On an address drawn as not found on purpose (`routes.mjs` `missing`), the record's not found is the answer asked for. */
+const MISSING = new Set(['Not Found', 'Unprocessable Entity'].map(statusOf));
+
+/** The status a console line says the browser was answered with, or `null` for any other line. */
+const ANSWERED = /^Failed to load resource: the server responded with a status of (\d+)\b/u;
+
 /**
  * Every fault one settled screen prints, as the sentences this gate says. `where` names the page-run (`/usage @390`).
  *
  * `text` is the words of `#main` and `errors` the page's own, `{ kind: 'uncaught' | 'console', text }`, as `openPage`
- * collects them. Pure, so a test reads it without a browser and `layout` can call it on every page-run.
+ * collects them, and `failed` each answer that was not ok, `{ status, path }`. Pure, so a test reads it without a browser
+ * and `layout` can call it on every page-run.
+ *
+ * A CONSOLE LINE FOR AN ANSWER IS NOT A FINDING ONLY WHEN EVERY ANSWER OF THAT STATUS ON THE SCREEN WAS THE HOST'S OWN NO:
+ * one `ALLOWED` names, or, with `missing` (an address drawn as not found on purpose), the record's not found to an
+ * `/api/` read. One answer of that status that is neither keeps the line red.
  */
-export function checkScreen({ where, text = '', errors = [] }) {
+export function checkScreen({ where, text = '', errors = [], failed = [] }, { missing = false } = {}) {
+  const hostsWord = (f) =>
+    ALLOWED.some((a) => statusOf(a.status) === f.status && f.path.endsWith(a.path)) || (missing && MISSING.has(f.status) && f.path.includes('/api/'));
+  const answered = (status) => {
+    const of = failed.filter((f) => f?.status === status);
+    return of.length > 0 && of.every(hostsWord);
+  };
   const out = [];
   for (const e of errors) {
     const first = String(e?.text ?? '').split('\n')[0];
+    const said = ANSWERED.exec(first);
+    if (e?.kind === 'console' && said && answered(Number(said[1]))) continue;
     if (e?.kind === 'uncaught') out.push(`${where}  threw an uncaught error: ${first}`);
     else if (e?.kind === 'console') out.push(`${where}  wrote an error to the console: ${first}`);
   }
@@ -85,18 +131,22 @@ export async function readScreen(opened, where) {
     .first()
     .innerText({ timeout: budget('ready').settleTimeoutMs })
     .catch(() => '');
-  return { where, text, errors: [...opened.errors] };
+  return { where, text, errors: [...opened.errors], failed: [...(opened.failed ?? [])] };
 }
+
+/** A planted tree's folder of captured screens. Only a planted tree holds one: the repository's own root never does, so
+    it is no input of a push run, and is named here so the walk in `apps/worker/scripts/gates-workflow.test.mjs` does not read it as one. */
+const CAPTURED = 'screens';
 
 /** The faults a planted tree's captured screens print, or `null` when the root holds no `screens/`. */
 function fromCaptures(root) {
   let names;
   try {
-    names = readdirSync(join(root, 'screens')).filter((n) => n.endsWith('.json')).sort();
+    names = readdirSync(join(root, CAPTURED)).filter((n) => n.endsWith('.json')).sort();
   } catch {
     return null;
   }
-  return { screens: names.length, findings: names.flatMap((n) => checkScreen(JSON.parse(readFileSync(join(root, 'screens', n), 'utf8')))) };
+  return { screens: names.length, findings: names.flatMap((n) => checkScreen(JSON.parse(readFileSync(join(root, CAPTURED, n), 'utf8')))) };
 }
 
 /** Not found, by its name: an answer's status is the protocol's word, not a number this gate chose. */
@@ -155,7 +205,7 @@ async function drawn(root) {
     await answers(ORIGIN);
 
     const ready = readiness('printed', budget('ready').settleTimeoutMs, ROOT);
-    const { routes, unsampled, unseen } = await routesFor(join(root, 'apps', 'web'), record);
+    const { routes, unsampled, unseen, missing } = await routesFor(join(root, 'apps', 'web'), record);
     findings.push(...unsampled.map((u) => `${u}, so it was never drawn`));
     const width = Math.min(...budget('a11y').widths);
     browser = await chromium.launch();
@@ -170,7 +220,7 @@ async function drawn(root) {
       try {
         const unmeasured = ready.check(where, route, opened.state);
         if (unmeasured) findings.push(unmeasured);
-        else findings.push(...checkScreen(await readScreen(opened, where)));
+        else findings.push(...checkScreen(await readScreen(opened, where), { missing: missing.includes(route) }));
       } finally {
         await opened.context.close().catch(() => {});
       }

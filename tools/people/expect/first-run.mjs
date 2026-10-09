@@ -5,9 +5,10 @@
  *
  * THE DOORS ARE THE BROWSER'S, NOT THE RECORD'S INSIDES. The rules reading is the web's own (`lib/start/propose.ts` and
  * `question.ts`, imported, as the sign-up page runs them on the device). Everything after it is HTTP to the host: the
- * sign-up under `/auth/signup/*`, with the link read from the mail sink; the build through the web's own `accept`, the
- * press "Make it mine" makes; the card's `capture` and its one Undo; `boot`, which Today is drawn from; and, the clock
- * moved fifteen days, Orders read on three weeks and the pen's offer for her pattern. Nothing reaches into the file.
+ * sign-up under `/auth/signup/*`, with the link read from the mail sink; the build the sign-up page makes, by calling its
+ * own `accepting()` and `/start`'s `accept`; the card's `capture` and its one Undo; `boot`, and Today drawn from it by
+ * Home's own readers; and, the clock moved fifteen days, Orders read on three weeks, the pen's offer for her pattern and
+ * the sentence the Orders page opens on. Nothing reaches into the file.
  *
  * TWO HALVES, AS `loop/scope/area-usecases-b.md` USE-B01 ASKS. `expect.*` are pure: each takes what the walk saw and
  * answers `{ id, pass, saw }`, so the proof area's rig can hand them a snapshot of its own. `walk` is the thin driver
@@ -18,19 +19,26 @@
  * `/auth/token`, and step 4 says "sign-up not walked: self-host". The walk on production waits for his deploy word.
  */
 
-import { firstRun } from '../../../apps/web/src/lib/first-run.ts';
+import { firstRun, NO_AMEND } from '../../../apps/web/src/lib/first-run.ts';
 import { words as signupWords } from '../../../apps/web/src/routes/signup/words.ts';
 import { propose } from '../../../apps/web/src/lib/start/propose.ts';
 import { answer, oneQuestion } from '../../../apps/web/src/lib/start/question.ts';
-import { browserCurrencyEnv, currencyChoices } from '../../../apps/web/src/routes/start/building.ts';
+import { browserCurrencyEnv, zoneCurrency } from '../../../apps/web/src/routes/start/building.ts';
 import { accept } from '../../../apps/web/src/routes/start/accept.ts';
-import { caseOf, keepsCurrency } from '../../../apps/web/src/routes/start/preview.ts';
-import { INSTALL_ORDER } from '../../../apps/web/src/lib/shape.ts';
+import { accepting, nameSent, titleSent } from '../../../apps/web/src/routes/signup/build.ts';
 import { tellRead } from '../../../apps/web/src/lib/tell/read.ts';
-import { countWord, showTell, wantMore } from '../../../apps/web/src/lib/home/first-today.ts';
+import { countWord, readyRows, showTell, wantMore } from '../../../apps/web/src/lib/home/first-today.ts';
+import { MONEY_WEEK, homeDrawn, todayHome } from '../../../apps/web/src/lib/home/default-home.ts';
+import { holdsOf, weekHeld } from '../../../apps/web/src/lib/page/home-arrange.ts';
+import { layoutOf } from '../../../apps/web/src/lib/record/boot-live.ts';
+import { learn } from '../../../apps/web/src/lib/record/remote.ts';
+import { namedResolverOf, pageReader } from '../../../apps/web/src/lib/record/page-live.ts';
+import { symbolText } from '../../../apps/web/src/lib/record/money.ts';
+import { drawnOf } from '../../../apps/web/src/routes/decide/[id]/proposed.ts';
 import { checkout, openOwned, startSignup, verifySignup } from '../../../apps/web/src/lib/signup.ts';
 import { apiBase, BASE } from '../../../apps/web/src/lib/at.ts';
 import { createClient } from '../../../packages/client/src/index.ts';
+import { joined, keepIt as keepOnHosted } from './keep-it.mjs';
 
 export const DAY_MS = 86_400_000;
 
@@ -106,10 +114,18 @@ export const expect = {
     const unlit = p.heard.filter((h) => !Array.isArray(h.at) || person.said.slice(h.at[0], h.at[1]) !== h.phrase);
     if (unlit.length > 0) missing.push(`${unlit.length} heard words not lit where she typed them ("${unlit[0].phrase}")`);
     for (const phrase of want.lit) if (!p.heard.some((h) => h.phrase === phrase)) missing.push(`"${phrase}" not lit`);
+    /* WHAT EACH WHOLE PHRASE BECAME, as the line under it says: "freelance as a designer" is Clients and Invoices. */
+    for (const [phrase, names] of Object.entries(want.became ?? {})) {
+      const line = p.heard.find((h) => h.phrase === phrase);
+      const lacks = line ? names.filter((n) => !new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}\\b`, 'u').test(String(line.became ?? ''))) : [];
+      if (line && lacks.length > 0) missing.push(`"${phrase}" became "${line.became}", not ${names.join(' and ')}`);
+    }
     if (p.title !== want.title) missing.push(`titled ${p.title === null ? 'nothing' : `"${p.title}"`}, not "${want.title}"`);
     const places = p.places.map((x) => x.name);
     if (places[0] !== 'Today') missing.push(`the first place is ${places[0] ?? 'none'}, not Today`);
     for (const name of want.places) if (!places.includes(name)) missing.push(`no ${name} among the places`);
+    const more = places.filter((name) => !want.places.includes(name));
+    if (more.length > 0) missing.push(`${more.join(', ')} among the places, which she never said`);
     if (p.rows.length > 0) missing.push(`${p.rows.length} entries made from the sentence before anything is kept`);
     return missing.length === 0
       ? pass('heard', `${p.heard.length} phrases lit, "${you.phrase}" is you, "${p.title}", places ${places.join(', ')}, no sample entries`)
@@ -152,6 +168,8 @@ export const expect = {
     if (seen.people.length !== 1 || seen.people[0] !== person.name) missing.push(`People holds ${seen.people.length === 0 ? 'nobody' : seen.people.join(', ')}, not her alone`);
     if (seen.examples > 0) missing.push(`${seen.examples} entries tagged example`);
     if (seen.currency !== want.currency) missing.push(`the record's currency is ${seen.currency ?? 'none'}, not ${want.currency}`);
+    /* THE MAILED LINK OPENS THE RECORD UNDER THE NAME SHE WAS SHOWN AT STEP 2 ("Keep it: the name is already hers"). */
+    if (seen.door === 'signup' && seen.title !== person.expect.heard.title) missing.push(`the mailed link opened "${seen.title ?? ''}", not "${person.expect.heard.title}"`);
     if (missing.length > 0) return fail('keep', missing.join('; '));
     const built = `built ${want.lists.join(', ')}, People holds ${person.name} alone, in ${seen.currency}`;
     if (seen.door === 'self-host') return { id: 'keep', pass: null, saw: `sign-up not walked: self-host; opened through the owner door, ${built}` };
@@ -192,7 +210,8 @@ export const expect = {
 
   /**
    * Step 6. Her first Today, from `boot`: the card to tell it one thing gone once she has, the next steps in the order
-   * her answer puts them, a Hide that hides them, and no offer drawn from use on her first day.
+   * her answer puts them, a Hide that hides them, no offer drawn from use on her first day, and the money tile reading
+   * what she was paid (`seen.money`, its cells as `[label, figure]`, `null` where no tile is drawn; `seen.line`, the head).
    */
   today(seen, person) {
     const want = person.expect.today;
@@ -205,14 +224,19 @@ export const expect = {
     if (seen.hiddenSteps.length > 0) missing.push(`Hide left ${seen.hiddenSteps.length} next steps up`);
     for (const id of want.lists) if (!seen.lists.includes(id)) missing.push(`no ${id} in boot`);
     if (seen.offers.length > 0) missing.push(`offered "${seen.offers[0].title}" on her first day`);
+    /* THE MONEY TILE AS HOME DRAWS IT: "In EGP 900", each cell its label and its figure, a whole amount said whole. */
+    const cells = (seen.money ?? []).map(([label, value]) => `${label} ${String(value).replace(/\.0+$/u, '')}`);
+    if (want.money !== undefined && !cells.includes(want.money)) missing.push(seen.money === null ? `no ${MONEY_WEEK} tile, so no "${want.money}"` : `the money tile reads ${cells.length === 0 ? 'nothing' : `"${cells.join('", "')}"`}, not "${want.money}"`);
+    const said = seen.line ? `; Today says "${seen.line}"` : '';
     return missing.length === 0
-      ? pass('today', `the card gone, next steps "${seen.steps.map((s) => (s.kind === 'source' ? s.source.name : s.agent.name)).join('", "')}", Hide hides them, no offer on day 0`)
-      : fail('today', missing.join('; '));
+      ? pass('today', `the card gone, ${cells.length > 0 ? `the money tile reads "${cells.join('", "')}", ` : ''}next steps "${seen.steps.map((s) => (s.kind === 'source' ? s.source.name : s.agent.name)).join('", "')}", Hide hides them, no offer on day 0${said}`)
+      : fail('today', missing.join('; ') + said);
   },
 
   /**
    * Step 7. Later, Slash offers a page for her pattern: nothing on day 13, then on day 15, with Orders read on three
-   * weeks and four orders due this week, the pen holds `week:orders`, saying why in her own list's words.
+   * weeks and four orders due this week, the pen holds `week:orders`, saying why in her own list's words; and the Orders
+   * page opens on its own sentence (`seen.lead`), who still owes and how much among it.
    */
   offer(seen, person) {
     const want = person.expect.offer;
@@ -222,8 +246,11 @@ export const expect = {
     const late = seen.late.find((x) => x.id === want.id);
     if (!late) missing.push(`nothing for Orders on day ${seen.lateDay} (the pen held ${seen.late.map((x) => x.id).join(', ') || 'nothing'}, Orders read on ${seen.weeks} weeks, ${seen.thisWeek} due this week)`);
     else if (!/\S/u.test(late.why ?? '') || /\brows?\b/u.test(late.why)) missing.push(`its why says "${late.why}"`);
+    /* THE ORDERS PAGE'S OWN SENTENCE that day, as its head draws it: "6 orders this month, ..., and Salma still owes EGP 1,350". */
+    if (want.lead !== undefined && !new RegExp(want.lead.match, 'u').test(seen.lead ?? '')) missing.push(`Orders says ${seen.lead ? `"${seen.lead}"` : 'no sentence'}, not "${want.lead.says}"`);
+    const lead = seen.lead ? `; Orders says "${seen.lead}"` : '';
     return missing.length === 0
-      ? pass('offer', `nothing on day ${seen.earlyDay}; on day ${seen.lateDay}, "${late.title}": ${late.why}`)
+      ? pass('offer', `nothing on day ${seen.earlyDay}; on day ${seen.lateDay}, "${late.title}": ${late.why}${lead}`)
       : fail('offer', missing.join('; '));
   },
 };
@@ -293,6 +320,41 @@ async function readOn(client, sentence, today, boot) {
   return tellRead(sentence, { lists, today, currency: boot.currency ?? null, people, accounts });
 }
 
+/**
+ * TODAY AS HOME DRAWS IT (`lib/home/Home.svelte`): the lists' declarations learnt as the tab learns them, the week read
+ * off them, Today's own body answered by the record (`drawnOf`, which writes nothing), then shaped by Home
+ * (`homeDrawn`). Answers the money tile's cells as `[label, figure]`, `null` where no tile is drawn, and the head's line.
+ */
+async function todayOf(t, base, boot) {
+  const shell = layoutOf(boot);
+  const asked = new Map();
+  await Promise.all(shell.lists.map((l) => learn(t.client(base).schema, l.id, asked)));
+  const week = await weekHeld(shell);
+  const holds = holdsOf(shell, undefined, week);
+  const drawn = await drawnOf(todayHome(holds), base, t.io);
+  if (drawn.from !== 'live') return { money: null, line: drawn.from === 'refused' ? `Today was refused: ${drawn.fix}` : null };
+  const shaped = homeDrawn(drawn.blocks, drawn.now, undefined, holds.one, null, week);
+  const tile = shaped.blocks.find((b) => b.heading === MONEY_WEEK && b.drawn !== false);
+  return { money: tile ? (tile.metrics ?? []).map((m) => [m.label, m.value]) : null, line: shaped.sentence?.text ?? null };
+}
+
+/**
+ * A page as its screen draws it (`routes/p/[slug]`, `pageReader`): the sentence its head opens on, or `null`. Each
+ * figure in it is written as the block's renderer writes it (`BlockSlot.svelte` `resolve`: the record's own values,
+ * named, an amount in the head said in the home currency). A figure that names nothing stays a hole, so it shows.
+ */
+async function leadOn(t, base, slug, now, home) {
+  const out = await pageReader(base, t.io, now).read(slug);
+  if (out?.from !== 'live') return null;
+  const lead = out.page.blocks.find((b) => b.kind === 'note' && b.lead === true && b.drawn !== false);
+  if (typeof lead?.body !== 'string' || lead.body.trim() === '') return null;
+  const resolve = namedResolverOf(lead.values, lead.unnamed);
+  return lead.body.trim().replace(/\{\{\s*([^}]+?)\s*\}\}/gu, (hole, path) => {
+    const v = resolve(path);
+    return typeof v === 'string' ? symbolText(v, home, true) : typeof v === 'number' ? String(v) : hole;
+  });
+}
+
 /** The day `ms` falls on, `YYYY-MM-DD`, in UTC as the record keeps it. */
 const dayOf = (ms) => new Date(ms).toISOString().slice(0, 10);
 
@@ -303,11 +365,15 @@ const dayOf = (ms) => new Date(ms).toISOString().slice(0, 10);
  * `makeFree`: spend the link, make the free record with `checkout`, open it with `openOwned`, and reach it under its own
  * name), or, on a host that has no sign-up and says how its owner gets in (`host.owner`), that door. Answers how the
  * record was opened, the tab signed in to it, and the base its calls go to.
+ *
+ * `sent` IS THE NAME THE PAGE SENDS AT THE START (`send` in its +page.svelte: the name heard in her words), never the
+ * title the walk expects, so a record the page opens under the wrong name is red here too. `title` names the record
+ * only at the owner door, as `braindog init` does.
  */
-async function keepIt(host, person, title) {
+async function keepIt(host, person, sent, title) {
   const t = tab(host.origin);
   const refused = (why) => ({ t, door: 'refused', why });
-  const started = await startSignup({ email: person.email, slug: person.slug, name: title, tz: person.zone }, t.web);
+  const started = await startSignup({ email: person.email, slug: person.slug, name: sent, tz: person.zone }, t.web);
   if (started.ok) {
     const link = host.sink ? await host.sink.linkFor(person.email) : null;
     if (!link) return refused('no link reached the mailbox');
@@ -338,17 +404,12 @@ export function notMine(boot, person) {
   return null;
 }
 
-/** One press of the card: what it would show, then what it adds. Rows the screen holds back, and any that lean on one, are not sent. */
+/**
+ * One press of the card: what it would show, then what it adds, picked by the card's own `readyRows` (TellOne.svelte),
+ * never a copy: entries the screen holds back, and any that lean on one, are not sent.
+ */
 async function press(client, preview) {
-  const keep = new Map();
-  const rows = [];
-  preview.rows.forEach((r, i) => {
-    const leans = Object.values(r.fields).some((v) => v !== null && typeof v === 'object' && '$row' in v && !keep.has(v.$row));
-    if (r.missing.length > 0 || leans) return;
-    keep.set(i, rows.length);
-    const fields = Object.fromEntries(Object.entries(r.fields).map(([k, v]) => [k, v !== null && typeof v === 'object' && '$row' in v ? { $row: keep.get(v.$row) } : v]));
-    rows.push({ register: r.register, fields });
-  });
+  const rows = readyRows(preview.rows);
   if (rows.length === 0) return { refused: 'nothing the card could add' };
   const out = await client.capture({ rows });
   return out.ok ? { batch: out.value.batch, made: out.value.made } : { refused: whyOf(out) };
@@ -374,8 +435,10 @@ export async function walk(person, host, say = () => {}) {
   /* 1. Who are you? */
   step(expect.who({ question: firstRun.whoQuestion, chips: firstRun.whoChips ?? [], copy: [...copyOf(signupWords), ...copyOf(firstRun)] }, person));
 
-  /* 2. Her words light up. */
-  const proposal = propose(person.said, { zone: person.zone, locale: person.locale });
+  /* 2. Her words light up, read as the sign-up page reads them (`reading` in its +page.svelte): the zone, the language
+     and the zone's own currency go in with the words. */
+  const reading = async (said) => propose(said, { zone: person.zone, locale: person.locale, currency: zoneCurrency(person.zone) });
+  const proposal = await reading(person.said);
   step(expect.heard({ proposal }, person));
 
   /* 3. One question. */
@@ -384,7 +447,8 @@ export async function walk(person, host, say = () => {}) {
   step(expect.question({ asked, after, again: asked === null ? null : oneQuestion(after, person.said, env) }, person));
 
   /* 4. Keep it, and the build she saw kept. */
-  let opened = await keepIt(host, person, after.title ?? person.name);
+  /* THE NAMES THE PAGE SENDS, from its own helpers (`nameSent`, `titleSent` in signup/build.ts), never a copy. */
+  let opened = await keepIt(host, person, nameSent(proposal), titleSent(after, person.name));
   const client = opened.t.client(opened.base);
   if (opened.door !== 'refused') {
     const why = notMine(valueOf(await client.boot()), person);
@@ -392,25 +456,14 @@ export async function walk(person, host, say = () => {}) {
   }
   let failed = [];
   if (opened.door !== 'refused') {
-    /* THE SIGN-UP PAGE'S OWN BUILD (`routes/signup/+page.svelte` `build`): the use case and the ones beside it, every
-       module either stands on, in install order, and the currency the page's currency step offers first. */
-    const one = caseOf(after.usecase);
-    const beside = one ? after.also.flatMap((id) => caseOf(id) ?? []) : [];
-    const wanted = new Set([...after.modules, ...[one, ...beside].flatMap((c) => c?.modules ?? [])]);
-    const modules = [...new Set([...INSTALL_ORDER, ...wanted])].filter((id) => wanted.has(id));
-    const offered = currencyChoices(person.said, env).suggested ?? null;
-    const made = await accept(client, {
-      sentence: person.said,
-      proposal: after,
-      usecase: one?.usecase ?? null,
-      also: beside.map((b) => b.usecase),
-      modules,
-      currency: modules.some(keepsCurrency) ? (after.currency ?? offered) : null,
-      today: today(),
-      email: person.email,
-      nav: [],
-      locale: person.locale,
-    });
+    /* THE SIGN-UP PAGE'S OWN BUILD, CALLED, NOT COPIED (`routes/signup/build.ts` `accepting`, as its `build` calls it):
+       her sentence kept with nothing changed by hand and her one answer, read again by the same rules, then the one
+       press of `/start`'s `accept()`. A copy here once sent a currency the page never did, and so hid that every record
+       the page made kept none. */
+    const draft = { said: person.said, currency: null, usecase: null };
+    const extra = { amend: NO_AMEND, reply: asked === null ? null : { about: asked.about, value: person.answer } };
+    const asking = await accepting(draft, extra, reading, { device: env, today: today(), email: person.email, nav: [], locale: person.locale });
+    const made = asking === null ? { failed: [{ said: 'nothing was built from her sentence', why: 'accepting() answered nothing to build' }] } : await accept(client, asking);
     failed = made.failed;
   }
   let boot = opened.door === 'refused' ? null : valueOf(await client.boot());
@@ -421,7 +474,9 @@ export async function walk(person, host, say = () => {}) {
     const page = valueOf(await client.list({ register: id, limit: 200 }));
     examples += (page?.rows ?? []).filter((r) => JSON.stringify(r.fields?.tags ?? r.tags ?? []).includes('"example"')).length;
   }
-  step(expect.keep({ door: opened.door, why: opened.why, failed, lists, people: people.map((p) => p.name), examples, currency: boot?.currency ?? null, title: boot?.record?.name }, person));
+  const keptHere = expect.keep({ door: opened.door, why: opened.why, failed, lists, people: people.map((p) => p.name), examples, currency: boot?.currency ?? null, title: boot?.record?.name }, person);
+  /* THE SELF-HOST HAS NO SIGN-UP: the hosted service's own doors, walked in one process (keep-it.mjs), answer for it. */
+  step(keptHere.pass === null ? joined(keptHere, await keepOnHosted(person, { title: after.title ?? person.name })) : keptHere);
   if (!boot) {
     for (const s of STEPS.slice(4)) step(fail(s.id, `not reached: ${opened.door === 'refused' ? opened.why : 'boot was refused'}`));
     return out;
@@ -460,6 +515,7 @@ export async function walk(person, host, say = () => {}) {
         hiddenSteps: bootOk ? wantMore(boot, { ...pref, nextStepsHidden: true }) : [],
         lists: (boot?.registers ?? []).map((r) => r.id),
         offers: (boot?.pen ?? []).filter((x) => x.id.startsWith('week:')),
+        ...(bootOk ? await todayOf(opened.t, opened.base, boot) : { money: null, line: null }),
       },
       person,
     ),
@@ -501,7 +557,8 @@ export async function walk(person, host, say = () => {}) {
   }
   if (day < want.after) await to(want.after);
   const late = valueOf(await client.boot())?.pen ?? [];
-  step(expect.offer({ early, earlyDay: want.before, late, lateDay: want.after, weeks: weeks.size, thisWeek }, person));
+  const lead = await leadOn(opened.t, opened.base, 'orders', host.now, valueOf(await client.boot())?.currency ?? null);
+  step(expect.offer({ early, earlyDay: want.before, late, lateDay: want.after, weeks: weeks.size, thisWeek, lead }, person));
   return out;
 }
 

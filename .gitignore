@@ -9,6 +9,9 @@ build/
 *.brain
 *.brainl
 *.brainl.age
+# A shape copy (`braindog export --shape`) on its own line, so it stays out if `*.brainl` above is ever narrowed to let a
+# fixture in. A copy renamed past both is `tools/gates/no-shape-files.mjs`'s to find.
+*.shape.brainl
 *.sqlite
 _*
 __*
@@ -34,6 +37,9 @@ packages/theme/proof.txt
 # the real one lives. Nothing under it is output: no command produces it and nothing can regenerate
 # it, which is the whole of what line 4 is for.
 !tools/gates/negative/*/apps/*/.svelte-kit/
+# AND THE FAKE BUILDS AND HOSTS OTHER PLANTED TREES READ (PRF-B02 jobs 4 and 6): a build folder, and the _app folder a build and a host serve from. Nothing under them is output either.
+!tools/gates/negative/*/apps/*/build/
+!tools/gates/negative/**/_app/
 
 # A deployment's build, beside production's `build/`: `BRAINDOG_ENV=alpha` writes
 # `apps/web/build-alpha/` (`apps/web/svelte.config.js`), which the Worker's alpha

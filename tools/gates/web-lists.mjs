@@ -207,8 +207,8 @@ export const HELD = {
     why: "the section names the nav orders a day by, the Work row's key and glyph, and the `work` word of the Work screen's address `/?work`.",
   },
   'apps/web/src/lib/nav/rail.ts': {
-    ids: ['agents', 'people', 'work'],
-    why: "the section names the rail orders its places by, and the Work row's key, as `lib/nav.ts` names them.",
+    ids: ['agents', 'orders', 'people', 'work'],
+    why: "the section names the rail orders its places by (a shop's Orders after Decide, uc6-places-47), and the Work row's key, as `lib/nav.ts` names them.",
   },
   'apps/web/src/lib/page/tile-head.ts': {
     ids: ['roadmap'],

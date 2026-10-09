@@ -21,6 +21,13 @@ function chipsOffered(root) {
 const isText = (v) => typeof v === 'string' && v.trim() !== '';
 const isTexts = (v) => Array.isArray(v) && v.length > 0 && v.every(isText);
 const isCount = (v) => Number.isInteger(v) && v > 0;
+const isPattern = (v) => {
+  try {
+    return new RegExp(v, 'u') instanceof RegExp;
+  } catch {
+    return false;
+  }
+};
 
 /** Each field a person file holds, and what it must be. A dotted key is a field inside one. */
 export const FIELDS = {
@@ -29,6 +36,11 @@ export const FIELDS = {
   who: [isText, 'one sentence on who she is'],
   said: [isText, 'what she types at "Who are you?"'],
   chip: [isText, 'the starting point she would tap'],
+  expects: [(v) => isText(v) && /^([a-z][a-z-]*|none)$/u.test(v), 'the use case her words should read as, or none'],
+  standing: [(v) => typeof v === 'boolean', 'whether a standing record uses her every night'],
+  'says.plain': [isText, 'what she types, with a keyword'],
+  'says.hard': [isText, 'what she types, with no keyword'],
+  answers: [(v) => v !== null && typeof v === 'object' && !Array.isArray(v), 'her answers by question kind'],
   answer: [isText, 'her answer to the one question'],
   email: [(v) => isText(v) && /^[^@\s]+@[^@\s]+\.test$/u.test(v), 'an address at a test sink, ending .test'],
   slug: [(v) => isText(v) && /^[a-z0-9][a-z0-9-]{1,40}$/u.test(v), 'the record name she would pick'],
@@ -57,6 +69,16 @@ export const FIELDS = {
   'expect.offer.after': [isCount, 'the day the offer must be there'],
 };
 
+/**
+ * WHAT A PERSON MAY SAY AND NEED NOT: a shop's money tile and its Orders sentence mean nothing for a student. Each is
+ * checked only where the file holds it, and the walk checks it only then.
+ */
+export const MAYBE = {
+  'expect.heard.became': [(v) => v !== null && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(isTexts), 'what each phrase becomes, { phrase: [the places it names] }'],
+  'expect.today.money': [isText, 'the money tile as Today draws it, such as In EGP 900'],
+  'expect.offer.lead': [(v) => isText(v?.says) && isText(v?.match) && isPattern(v.match), "the Orders page's sentence on that day, as { says, match }"],
+};
+
 const at = (obj, key) => key.split('.').reduce((o, k) => (o !== null && typeof o === 'object' ? o[k] : undefined), obj);
 
 /** What is wrong with one person, one sentence each; empty when nothing is. `chips` are the starting points offered. */
@@ -68,10 +90,16 @@ export function checkPerson(person, chips = []) {
     if (v === undefined) out.push(`${key} is missing: ${what}`);
     else if (!ok(v)) out.push(`${key} is not ${what}`);
   }
+  for (const [key, [ok, what]] of Object.entries(MAYBE)) {
+    const v = at(person, key);
+    if (v !== undefined && !ok(v)) out.push(`${key} is not ${what}`);
+  }
   if (out.length > 0) return out;
   if (!person.said.includes(person.name)) out.push(`said does not hold her name, ${person.name}`);
   if (chips.length > 0 && !chips.includes(person.chip)) out.push(`chip "${person.chip}" is not one the first screen offers`);
+  if (person.said !== person.says.plain) out.push('said is not says.plain');
   if (person.expect.heard.places[0] !== 'Today') out.push('expect.heard.places does not start with Today');
+  for (const phrase of Object.keys(person.expect.heard.became ?? {})) if (!person.expect.heard.lit.includes(phrase)) out.push(`expect.heard.became names "${phrase}", which is not lit`);
   if (!person.later.some((l) => l.day === person.expect.offer.after)) out.push(`later holds nothing told on day ${person.expect.offer.after}`);
   if (person.expect.offer.before >= person.expect.offer.after) out.push('expect.offer.before is not before expect.offer.after');
   return out;

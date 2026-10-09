@@ -22,7 +22,7 @@ import { RECURRING_REGISTER } from '../src/modules/money/lists/recurring.ts';
 /* THE SCRIPT IS PLAIN JAVASCRIPT, run in a sandbox as written, so it is imported by its URL and typed here by hand. */
 type Row = { id: string; seq: number; version: number; fields: Record<string, unknown> };
 type Ctx = { input: Record<string, unknown> | null; record: { list: (register: string, where: unknown) => Promise<Row[]> }; update: (id: string, fields: Record<string, unknown>, version: number) => void; log: (line: string) => void };
-type Asked = { ask: { cause: string; question: string; about: string[]; options: { label: string; patches: { id: string; version: number; fields: Record<string, unknown> }[] }[] } };
+type Asked = { ask: { cause: string; question: string; about: string; options: { label: string; patches: { id: string; version: number; fields: Record<string, unknown> }[] }[] } };
 const script = (await import(new URL('../src/modules/money/scripts/last-day.js', import.meta.url).href)) as {
   default: (ctx: Ctx) => Promise<Asked | { filled: number } | null>;
   LAST_DAY_SCRIPT: Record<string, unknown> & { source: string };
@@ -158,7 +158,7 @@ test('a record with three lines on a month end is asked once, in one question, a
   const out = (await script.default(ctxOver(HIS()).ctx)) as Asked;
   assert.equal(out.ask.question, '3 repeating lines fall on the last day of their month. Is each the last day, or that date?');
   assert.equal(out.ask.cause, 'money.last-day');
-  assert.deepEqual(out.ask.about, ['Salary, 30 September', 'Consulting, 28 February', 'Rent from the flat, 30 June']);
+  assert.equal(out.ask.about, 'Salary, 30 September; Consulting, 28 February; Rent from the flat, 30 June');
   assert.deepEqual(out.ask.options.map((o) => o.label), ['The last day', 'That date']);
 
   const one = HIS().filter((r) => r.fields.what !== 'Consulting' && r.fields.what !== 'Rent from the flat');
@@ -195,7 +195,7 @@ test('the script asks a real record what it asks the one held here: its filter r
   for (const r of HIS()) value(k.create('recurring', r.fields, OWNER));
   const rows = value<{ rows: Row[] }>(k.list({ register: 'recurring', where: LISTED as never })).rows;
   const ctx: Ctx = { input: null, record: { list: async () => rows }, update: () => {}, log: () => {} };
-  assert.deepEqual(((await script.default(ctx)) as Asked).ask.about.toSorted(), ['Consulting, 28 February', 'Rent from the flat, 30 June', 'Salary, 30 September']);
+  assert.deepEqual(((await script.default(ctx)) as Asked).ask.about.split('; ').toSorted(), ['Consulting, 28 February', 'Rent from the flat, 30 June', 'Salary, 30 September']);
   assert.ok(!rows.some((r) => r.fields.every === 'weekly' || r.fields.state !== 'live'), 'the filter let a weekly or paused line through');
 });
 

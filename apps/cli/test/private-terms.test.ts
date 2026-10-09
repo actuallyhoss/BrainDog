@@ -152,7 +152,7 @@ test('WHAT COULD NOT BE READ IS SAID, and the rest is still written', async () =
 
 test('A RECORD THAT REFUSES IS SAID AND NOTHING IS WRITTEN, and a flag it does not know is the usage', async () => {
   const t = terminal();
-  const refusing = { ...record(), boot: async () => ({ ok: false, refusal: { code: 'UNAUTHENTICATED', message: 'Sign in first.', fix: 'Run braindog login.' } }) } as unknown as Reader;
+  const refusing = { ...record(), boot: async () => ({ ok: false, refusal: { code: 'UNAUTHORIZED', message: 'Sign in first.', fix: 'Run braindog login.' } }) } as unknown as Reader;
   assert.equal(await privateTermsCommand([], t.io, refusing, HERE), 1);
   assert.equal(existsSync(t.file), false);
   assert.equal(await privateTermsCommand(['--print'], t.io, record(), HERE), 1);

@@ -97,8 +97,11 @@ export const TEAM = {
      2.19.0: Agent work's Working now reads the record's working runs (`sessions.working`, agents 1.9.0), heard from in
      the last fifteen minutes with a helper folded under its run, where its own clause said today and a run quiet for
      hours was drawn as working. A source changed under a block that is already there, so a minor step. 2.18.0 is
-     live. */
-  version: '2.19.0',
+     live.
+     2.20.0: the project page it embeds takes portfolio 1.16.0's Where it stands (the typed card only while
+     `project-said` counts one, else a stat of `project-moved-7d` under the same heading), and Where it stands takes Last
+     worked (`project-last-worked`). 2.19.0 is live. */
+  version: '2.20.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

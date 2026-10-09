@@ -71,6 +71,13 @@ export const VERDICT_REASON_MOST = 500;
  * bounded by `PENDING_MOST` plus what trusted publishers list; this is the ceiling if the operator trusts many.
  */
 export const RECENT_MOST = 5_000;
+/**
+ * The id prefix the Kennel keeps for its own nightly probe (`tools/probe/stranger.mjs`, SHL-B01): a publish whose id
+ * begins with it is refused from any publisher but one the operator trusted with `probe` (`kennel review trust <p>
+ * --probe`), and even from that one only as an add-on whose file says `unlisted: true`, so a probe never reaches a
+ * listing or the count of add-ons from outside.
+ */
+export const PROBE_PREFIX = 'probe-';
 
 const DAY_MS = 86_400_000;
 const ID = /^[a-z][a-z0-9-]{0,62}$/u;
@@ -106,8 +113,11 @@ export type Review = {
   recent: { publisher: string; at: string }[];
 };
 
-/** The publishers the operator trusts to list at once, by `publisherKey`. */
-export type Publishers = { format: typeof KENNEL_FORMAT; trusted: Record<string, { trusted: boolean; at: string }> };
+/**
+ * The publishers the operator trusts to list at once, by `publisherKey`. `probe` marks the one the nightly probe signs
+ * with, which alone may publish under `PROBE_PREFIX`; it is kept only beside `trusted: true`.
+ */
+export type Publishers = { format: typeof KENNEL_FORMAT; trusted: Record<string, { trusted: boolean; at: string; probe?: true }> };
 
 export const emptyReview = (): Review => ({ format: KENNEL_FORMAT, pending: [], refused: [], recent: [] });
 export const emptyPublishers = (): Publishers => ({ format: KENNEL_FORMAT, trusted: {} });
@@ -130,7 +140,9 @@ export function readReview(doc: unknown): Review | null {
 export function readPublishers(doc: unknown): Publishers | null {
   if (!isMap(doc) || doc.format !== KENNEL_FORMAT || !isMap(doc.trusted)) return null;
   const trusted: Publishers['trusted'] = {};
-  for (const [key, v] of Object.entries(doc.trusted)) if (PUBLISHER_KEY.test(key) && isMap(v) && typeof v.trusted === 'boolean' && typeof v.at === 'string') trusted[key] = { trusted: v.trusted, at: v.at };
+  for (const [key, v] of Object.entries(doc.trusted))
+    if (PUBLISHER_KEY.test(key) && isMap(v) && typeof v.trusted === 'boolean' && typeof v.at === 'string')
+      trusted[key] = { trusted: v.trusted, at: v.at, ...(v.trusted && v.probe === true ? { probe: true as const } : {}) };
   return { format: KENNEL_FORMAT, trusted };
 }
 
@@ -139,6 +151,10 @@ const trusted = (publishers: Publishers, p: Pick<Publisher, 'kind' | 'id'>): boo
   const key = publisherKey(p);
   return Object.hasOwn(publishers.trusted, key) && publishers.trusted[key]?.trusted === true;
 };
+
+/** Whether this publisher is the probe's: trusted, and trusted with `probe`. */
+export const probePublisher = (publishers: Publishers, p: Pick<Publisher, 'kind' | 'id'>): boolean =>
+  trusted(publishers, p) && publishers.trusted[publisherKey(p)]?.probe === true;
 
 /** What a host hands `acceptSubmission`. */
 export type KennelState = {
@@ -316,6 +332,15 @@ export async function acceptSubmission(state: KennelState, text: string, identit
   } else publisher = { kind: 'person', id: identity.id, name: nameOf(identity.name, author) };
   if (braindogNamed(author) || braindogNamed(publisher.name))
     return no('PROVIDES_CONFLICT', 'BrainDog is the name BrainDog publishes its own under. Publish this one under your own name.', { at: 'author' });
+  /* THE PROBE'S PREFIX IS HELD ONCE THE PUBLISHER IS KNOWN, from a verified signature or the host's sign-in, so nobody
+     names themselves the probe. A probe that is not unlisted would sit in Browse and in the count of add-ons from
+     outside, which is what its nightly sign measures, so it is refused too. */
+  if (id.startsWith(PROBE_PREFIX)) {
+    if (!probePublisher(state.publishers, publisher))
+      return no('PROVIDES_CONFLICT', `Ids that begin ${PROBE_PREFIX} are kept for the Kennel's own nightly probe. Give this one another id.`, { at: 'id' });
+    if (file.kind !== 'pack' || doc.unlisted !== true)
+      return no('PACK_MALFORMED', `A probe publishes an add-on whose file says unlisted: true, so it is never listed. Add it and publish ${id} again.`, { at: 'unlisted' });
+  }
 
   const statements = await verifiedStatements(state.index.keys);
   if (identity.kind === 'key' && revocationOf(statements, identity.signature.key_id))
@@ -466,10 +491,14 @@ export function waitingFile(review: Review, kind: string, id: string, version: s
   return held === undefined ? null : { pending: held, path: pendingPath(catalogueFile(held.entry.id, held.version.version, held.entry.kind), held.version.checksum) };
 }
 
-/** The trusted publishers with one publisher's standing set, as `POST publisher` asks. */
-export const trustIn = (publishers: Publishers, ask: { publisher: string; trusted: boolean }, now: Date): Publishers => ({
+/**
+ * The trusted publishers with one publisher's standing set, as `POST publisher` asks. THE ASK IS THE WHOLE STANDING:
+ * `probe` holds only when this ask says it, beside `trusted`, so trusting the probe's key again without it takes the
+ * prefix back.
+ */
+export const trustIn = (publishers: Publishers, ask: { publisher: string; trusted: boolean; probe?: boolean | undefined }, now: Date): Publishers => ({
   ...publishers,
-  trusted: { ...publishers.trusted, [ask.publisher]: { trusted: ask.trusted, at: now.toISOString() } },
+  trusted: { ...publishers.trusted, [ask.publisher]: { trusted: ask.trusted, at: now.toISOString(), ...(ask.trusted && ask.probe === true ? { probe: true as const } : {}) } },
 });
 
 /* ── yanking ────────────────────────────────────────────────────────────── */
@@ -665,11 +694,16 @@ export function readVerdict(body: unknown): Result<Verdict> {
   return ok({ ...which.value, verdict: body.verdict, reason, preview: preview.value });
 }
 
-/** `POST publisher`'s body: `{ publisher, trusted }`, the publisher as `key:<key id>` or `person:<person id>`. */
-export function readTrust(body: unknown): Result<{ publisher: string; trusted: boolean }> {
-  if (!isMap(body)) return notObject('publisher', '{ publisher, trusted }');
+/**
+ * `POST publisher`'s body: `{ publisher, trusted, probe? }`, the publisher as `key:<key id>` or `person:<person id>`, and
+ * `probe` when it is the nightly probe's, which alone publishes under `PROBE_PREFIX`.
+ */
+export function readTrust(body: unknown): Result<{ publisher: string; trusted: boolean; probe?: boolean }> {
+  if (!isMap(body)) return notObject('publisher', '{ publisher, trusted, probe? }');
   if (typeof body.publisher !== 'string' || !PUBLISHER_KEY.test(body.publisher))
     return no('VALUE_MALFORMED', 'publisher is key:<key id> or person:<person id>, as the review list names it.', { at: 'publisher' });
   if (typeof body.trusted !== 'boolean') return no('VALUE_MALFORMED', 'trusted is true or false.', { at: 'trusted' });
-  return ok({ publisher: body.publisher, trusted: body.trusted });
+  if (body.probe !== undefined && body.probe !== null && typeof body.probe !== 'boolean') return no('VALUE_MALFORMED', 'probe is true or false, or left out.', { at: 'probe' });
+  if (body.probe === true && !body.trusted) return no('VALUE_MALFORMED', 'Only a trusted publisher is the probe. Send trusted: true with probe.', { at: 'probe' });
+  return ok({ publisher: body.publisher, trusted: body.trusted, ...(body.probe === true ? { probe: true } : {}) });
 }

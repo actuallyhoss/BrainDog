@@ -192,11 +192,11 @@ export function keysInText(sql: Sql): KeyFinding[] | null {
   return [...s.findings].sort((a, b) => ORDER.indexOf(a.in) - ORDER.indexOf(b.in) || a.at - b.at).map(({ in: place, list, number }) => ({ in: place, list, number }));
 }
 
-/** Where a finding is, in words a person reads, and never what it holds. */
+/** Where a finding is, in words a person reads, and never what it holds: "an entry", never "a row" (audit 43-44 #4). */
 export function placeOf(f: KeyFinding): string {
-  const row = f.list === null ? 'a row' : f.number === null ? `a row of ${f.list}` : `${f.list} number ${f.number}`;
+  const entry = f.list === null ? 'an entry' : f.number === null ? `an entry of ${f.list}` : `${f.list} number ${f.number}`;
   if (f.in === 'question') return f.number === null ? 'a question' : `question ${f.number}`;
-  return f.in === 'note' ? (f.list === null ? 'a note' : `a note on ${row}`) : row;
+  return f.in === 'note' ? (f.list === null ? 'a note' : `a note on ${entry}`) : entry;
 }
 
 /** `keys-in-text`: how many places hold a key, by the last walk. Nothing, never nought, before the first pass ends. */

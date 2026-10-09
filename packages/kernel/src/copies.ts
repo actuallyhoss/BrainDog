@@ -38,8 +38,14 @@ export const NIGHT_KIND = 'export.night';
 /** The note a kept copy writes: the copy's name and its size, the shape "snapshot now" has always written. */
 export const keptNote = (id: string, bytes: number): string => `snapshot ${id} ${String(Math.max(0, Math.trunc(bytes)))} bytes`;
 
-/** The note a failed night writes, in his words. A reason with nothing in it still says the night failed. */
-export const failedNote = (why: string): string => `failed: ${why.trim() === '' ? 'no reason given' : why.trim()}`;
+/**
+ * The note a failed night writes, in his words, and always the same words.
+ *
+ * THE REASON NEVER GOES IN THE NOTE. A note is history anyone who reads the record sees, and a thrown error can carry
+ * a bucket's name, an object's key or a host. The reason goes to the fault alone (`raiseFault`, which caps it). The
+ * `failed:` prefix stays, because the self-host's one-note-a-night check matches it (`backup.ts`).
+ */
+export const failedNote = (): string => 'failed: the copy could not be saved';
 
 const KEPT = /^snapshot \S+ (\d+) bytes$/u;
 
@@ -73,8 +79,11 @@ export function copyKept(sql: Sql, lifecycle: Lifecycle, id: string, bytes: numb
   clearFault(sql, NIGHT_FAULT, nowMs);
 }
 
-/** A copy that failed: one `export` event whose note begins `failed:`, and one fault, counted again if already open. */
+/**
+ * A copy that failed: one `export` event whose note begins `failed:`, and one fault, counted again if already open.
+ * `why` reaches the fault and never the note.
+ */
 export function copyFailed(sql: Sql, lifecycle: Lifecycle, why: string, nowMs: number): void {
-  lifecycle('export', 'system', failedNote(why));
+  lifecycle('export', 'system', failedNote());
   raiseFault(sql, NIGHT_FAULT, NIGHT_KIND, why, nowMs);
 }

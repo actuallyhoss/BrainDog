@@ -29,9 +29,10 @@ import { moduleName } from '@braindog/seed/usecases/names';
 
 import { arrangeTurns } from '../arrange.ts';
 import { firstRun } from '../first-run.ts';
-import { BUNDLED, closeOver, heardFor, INSTALL_ORDER, shape, toTurnOn, writable, type Offer, type PackId } from '../shape.ts';
+import { BUNDLED, closeOver, heardFor, INSTALL_ORDER, PROJECTS, shape, toTurnOn, writable, type Offer, type PackId } from '../shape.ts';
 import { hear, heardAt, PEOPLE, type Span } from '../who.ts';
 import type { AskSetup, SetupOffer, SetupReply } from './ask.ts';
+import type { ArrivesBy } from './made.ts';
 import { entryOf, FILLABLE, knownCurrency, listById, listsOf } from './lists.ts';
 
 export type Proposal = {
@@ -46,8 +47,13 @@ export type Proposal = {
    * catalogue pack the sentence was heard asking for.
    */
   modules: string[];
-  /** The currency typed in the sentence, or `null`: never guessed from a place or a word like "pounds". */
+  /**
+   * The record's currency: the one typed in the sentence, else the device's (`ProposeContext.currency`) where a module
+   * proposed keeps money, else `null`. Never guessed from a place named in the words or from a word like "pounds".
+   */
   currency: string | null;
+  /** `device` where `currency` is the device's and no word named it: any currency the person chose outranks it. */
+  currencyBy?: 'device';
   /**
    * Entries the sentence fills completely, written once the modules they belong to are in. `party` is the place in
    * `rows` of the one client an invoice is to ("We bill Fenwick £2,000 a month"), which is written first and linked.
@@ -104,15 +110,16 @@ export type Place = { kind: 'today' | 'module' | 'list'; id: string; name: strin
  */
 export type Answers = { arrivesBy?: ArrivesBy; currency?: string; name?: string };
 
-/** Where a shop's orders come in: forwarded messages, a website or shop app, or in person. */
-export type ArrivesBy = 'messages' | 'app' | 'in-person';
+/** Where a shop's orders come in: forwarded messages, a website or shop app, or in person. One type, `made.ts`'s, which Today's next steps order by. */
+export type { ArrivesBy };
 
 /**
  * Where and how the sentence was typed: the person's time zone, for a day such as "on the 1st", and their language.
  * `catalogue` is any pack beyond the bundled modules the first run may offer, each with the words it is heard in (a
- * Kennel listing's manifest); absent, only the modules this build ships are listened for.
+ * Kennel listing's manifest); absent, only the modules this build ships are listened for. `currency` is the device's,
+ * the one currency of the region whose time it keeps (`zoneCurrency`, `routes/start/building.ts`), or `null`.
  */
-export type ProposeContext = { zone: string | null; locale: string; catalogue?: readonly Offer[] };
+export type ProposeContext = { zone: string | null; locale: string; catalogue?: readonly Offer[]; currency?: string | null };
 
 /**
  * TODAY WHERE THE PERSON IS, for a date the sentence gives as a day of the month. `null` when the zone is not one the
@@ -191,8 +198,8 @@ const plural = (w: string): string =>
  * (`recordNames`). A trade with no name heard is not a name for a record: "a shop" is anybody's.
  */
 export function titleOf(bio: string, name: string | null, rows: readonly { register: string; fields: Record<string, unknown> }[]): string | null {
-  const others = new Set(rows.filter((r) => r.register !== 'things').map((r) => String(r.fields.name ?? '').toLowerCase()));
-  const project = rows.find((r) => r.register === 'things' && typeof r.fields.name === 'string' && !others.has(r.fields.name.toLowerCase()));
+  const others = new Set(rows.filter((r) => r.register !== PROJECTS).map((r) => String(r.fields.name ?? '').toLowerCase()));
+  const project = rows.find((r) => r.register === PROJECTS && typeof r.fields.name === 'string' && !others.has(r.fields.name.toLowerCase()));
   if (project) return String(project.fields.name);
   const m = name === null ? null : TRADE.exec(bio);
   if (!m || name === null) return null;
@@ -208,18 +215,100 @@ export function titleOf(bio: string, name: string | null, rows: readonly { regis
 /** The parts of what a phrase became: "People and Money" is People and Money. */
 const partsOfBecame = (became: string): string[] => became.split(/,\s*|\s+and\s+/u).map((w) => w.trim());
 
+/* ── what a phrase reads as ─────────────────────────────────────────── */
+
+/** The words a phrase reads as that no list declares: a freelancer's People are their Clients, what they bill Invoices. */
+export const heardWords = {
+  /** The currency the record will keep, said after the part that keeps money where the words named none. */
+  inCurrency: (code: string) => `in ${code}`,
+  clients: 'Clients',
+  invoices: 'Invoices',
+};
+
+/* The words that join two things, never the last word of a phrase: "a designer and" is "a designer". */
+const JOIN = '(?:a|an|and|or|the|of|my|our|in|at|for|with|to|but|plus|also)';
+
+/**
+ * PHRASES LIT WHOLE, as the person wrote them, where the reader heard one word inside: "shop" in "a small candle shop",
+ * "freelance" in "freelance as a designer", "owes" in "who owes me". `group` is the part of the match that is lit.
+ * `reads`, where given, is what the phrase becomes once every module it `needs` is proposed, with the lists it renames:
+ * a freelancer's People are their Clients, and what they bill is Invoices, not a list of their own (planner-49's call).
+ */
+type Whole = { re: RegExp; group: number; reads?: { needs: readonly PackId[]; became: readonly string[]; names: Readonly<Record<string, string>> } };
+const WHOLE: readonly Whole[] = [
+  { re: TRADE, group: 1 },
+  {
+    re: new RegExp(`\\bfreelanc(?:e|er|ing)(?:\\s+as\\s+(?:a|an)\\s+(?:(?!${JOIN}\\s)[\\p{L}'’-]+\\s+)?(?!${JOIN}(?![\\p{L}]))[\\p{L}'’-]+)?(?![\\p{L}\\p{N}])`, 'diu'),
+    group: 0,
+    /* THE MODULES THAT SAY THEY ARE FOR A FREELANCER, off their own signals (`BUNDLED`), never named here: People for the
+       clients and the one that keeps invoices. */
+    reads: { needs: BUNDLED.filter((o) => (o.signals ?? []).includes('freelance')).map((o) => o.id), became: [heardWords.clients, heardWords.invoices], names: { [PEOPLE]: heardWords.clients } },
+  },
+  { re: /\b(?:(?:who|what)\s+(?:still\s+)?)?owes?\s+(?:me|us)(?![\p{L}\p{N}])/diu, group: 0 },
+];
+
+/**
+ * EVERY WORD A LINE MAY SAY A USE CASE IN: its title, then the names of the lists it brings, in the person's word where
+ * they renamed one. A line that says any of them is the use case's (`placesOf`, and `amend` in `lib/first-run.ts`).
+ */
+export const caseWords = (u: UseCase, names?: Readonly<Record<string, string>>): string[] => [u.title, ...caseLists(u).map((l) => names?.[l.id] ?? u.labels[l.id] ?? l.name)];
+
+/**
+ * WHAT A PHRASE A USE CASE HEARD READS AS: the one of its lists the phrase names ("orders" is Orders), else every list
+ * it brings ("a small candle shop" is Orders and Products), and the use case's own title only where it brings none.
+ */
+export function caseBecame(u: UseCase, phrase: string): string {
+  const lists = caseWords(u).slice(1);
+  if (lists.length === 0) return u.title;
+  const word = phrase.trim().toLocaleLowerCase();
+  return lists.find((n) => [word, plural(word)].includes(n.toLocaleLowerCase())) ?? firstRun.and(lists);
+}
+
+/** A module keeps money where one of its lists holds no entry without an amount: Money's bills and its ledger. */
+const keepsMoney = (id: string): boolean => listsOf(id).some((l) => l.fields.some((f) => f.type === 'money' && f.required));
+
+/**
+ * THE RECORD'S CURRENCY: the one typed, else the device's (`ProposeContext.currency`) where a module proposed keeps
+ * money, so a shop in Alexandria keeps EGP without a question. `null` where neither gives one, and `null` too where an
+ * amount was typed with none (`loose`): that amount is in a currency only the person knows, so the one question asks
+ * it, with the device's suggested (`question.ts`), rather than the device's being said beside an amount not kept.
+ */
+export function currencyFor(typed: string | null, modules: readonly string[], ctx: Pick<ProposeContext, 'currency'>, loose = false): string | null {
+  if (typed !== null) return typed;
+  const device = ctx.currency?.trim().toUpperCase() ?? '';
+  return !loose && device !== '' && knownCurrency(device) && modules.some(keepsMoney) ? device : null;
+}
+
+/**
+ * A CURRENCY THE WORDS DID NOT NAME IS SAID, after the first line that became a part keeping money ("Money, in EGP"),
+ * else after a freelancer's Invoices, so the person sees what was taken from their device and can change it.
+ */
+function sayCurrency(heard: readonly HeardLine[], modules: readonly string[], code: string | null): HeardLine[] {
+  const money = modules.filter(keepsMoney).map(moduleName);
+  const lineOf = (says: readonly string[]): number => heard.findIndex((h) => h.loose !== true && h.you !== true && partsOfBecame(h.became).some((w) => says.includes(w)));
+  const i = code === null ? -1 : lineOf(money) >= 0 ? lineOf(money) : lineOf([heardWords.invoices]);
+  return heard.map((h, j) => (j === i && code !== null ? { ...h, became: `${h.became}, ${heardWords.inCurrency(code)}` } : h));
+}
+
 /**
  * WHERE THINGS WILL BE KEPT: Today, which every record opens on; then the lists the use cases bring, in the order they
- * declare them; then each part, in the order the sentence turned it on, and last any part that comes only because
- * another stands on it. Each says the phrase that turned it on, read off the lines heard, so a model's reading and the
- * rules' are said the same way. A list the person renamed is said in their word. Nothing is counted: every place starts
- * empty, and the entries the words fill are said under them.
+ * declare them; then each part, in the order the sentence turned it on. Each says the phrase that turned it on, read
+ * off the lines heard, so a model's reading and the rules' are said the same way. A list the person renamed is said in
+ * their word. Nothing is counted: every place starts empty, and the entries the words fill are said under them.
+ *
+ * A PART THAT COMES ONLY BECAUSE ANOTHER STANDS ON IT, with no phrase behind it, is not listed (planner-49's call): Money
+ * brings Projects for what it links to, and a candle shop that said nothing of projects is not shown an empty one. It
+ * is still installed, since the part that stands on it cannot go in without it.
  */
 export function placesOf(p: Pick<Proposal, 'usecase' | 'also' | 'modules' | 'heard' | 'names'>): Place[] {
   const lines = p.heard.filter((h) => h.loose !== true);
   const first = (match: (h: HeardLine) => boolean): HeardLine | null => lines.find(match) ?? null;
   const cases = [p.usecase, ...p.also].flatMap((id) => (id === null ? [] : (useCase(id) ?? [])));
-  const caseLine = (u: UseCase): HeardLine | null => first((h) => h.became === u.title || partsOfBecame(h.became).includes(u.title));
+  /* A USE CASE'S PHRASE IS SAID AS ITS LISTS (`caseBecame`), or as its title where it brings none. */
+  const caseLine = (u: UseCase): HeardLine | null => {
+    const own = caseWords(u, p.names);
+    return first((h) => partsOfBecame(h.became).some((w) => own.includes(w)));
+  };
   const place = (kind: Place['kind'], id: string, name: string, h: HeardLine | null): Place => ({ kind, id, name, phrase: h?.phrase ?? null, at: h?.at ?? null });
 
   const lists = cases.flatMap((u) =>
@@ -237,8 +326,10 @@ export function placesOf(p: Pick<Proposal, 'usecase' | 'also' | 'modules' | 'hea
     const by = said ?? cases.filter((u) => u.modules.includes(id)).map(caseLine).find((h) => h !== null) ?? null;
     return place('module', id, name, by);
   });
+  const leaned = new Set(p.modules.flatMap((id) => closeOver([id]).filter((on) => on !== id)));
+  const shown = parts.filter((x) => x.phrase !== null || !leaned.has(x.id));
   const order = (a: Place, b: Place): number => (a.at?.[0] ?? Number.MAX_SAFE_INTEGER) - (b.at?.[0] ?? Number.MAX_SAFE_INTEGER);
-  return [place('today', 'today', 'Today', null), ...lists, ...parts.sort(order)];
+  return [place('today', 'today', 'Today', null), ...lists, ...shown.sort(order)];
 }
 
 /** What one sentence proposes. `ctx.locale` is carried for the catalogue's reading; these rules read English. */
@@ -262,20 +353,27 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     line: { phrase, became, at: where.bio(at, phrase.length), ...(loose ? { loose } : {}) },
   });
   const phrases = read.declined === null ? read.heard : [];
-  /* A PHRASE THE USE CASE CLAIMS IS THE USE CASE'S, as it is for the modules (`modulesOf`): "a small candle shop" said
-     to Shop is its Orders and Products, where the module lexicon heard Portfolio. */
+  /* A PHRASE THE USE CASE CLAIMS IS THE USE CASE'S, as it is for the modules (`modulesOf`), and it is said as the lists
+     the use case brings (`caseBecame`): "a small candle shop" said to Shop is its Orders and Products, where the module
+     lexicon heard Portfolio. */
   const claimed = u ? claimedBy(u, said) : () => false;
   for (const h of phrases)
-    heard.push(line(h.at, h.text, h.loose ? firstRun.shapeNoCurrency : u && claimed(h) ? u.title : firstRun.and(h.packs.map(moduleName)), h.loose));
-  /* A PHRASE THE USE CASE HEARD COUNTS AS HEARD, where no module's phrase already covers it: "homework" became Student. */
+    heard.push(line(h.at, h.text, h.loose ? firstRun.shapeNoCurrency : u && claimed(h) ? caseBecame(u, h.text) : firstRun.and(h.packs.map(moduleName)), h.loose));
+  /* A PHRASE THE USE CASE HEARD COUNTS AS HEARD, where no module's phrase already covers it: "orders" became Orders. */
   const own = u ? (arranged.ranked.find((r) => r.usecase === u)?.why ?? []) : [];
-  for (const w of own) if (u && !phrases.some((h) => overlaps(h, w))) heard.push(line(w.at, w.text, u.title));
+  for (const w of own) if (u && !phrases.some((h) => overlaps(h, w))) heard.push(line(w.at, w.text, caseBecame(u, w.text)));
   heard.sort((a, b) => a.at - b.at);
-  /* THE TRADE IS LIT WHOLE: "shop" heard inside "a small candle shop" is said as the phrase the person wrote. */
-  const trade = TRADE.exec(said)?.indices?.[1];
-  if (trade) {
-    const inside = heard.filter((h) => h.at >= trade[0] && h.at + h.line.phrase.length <= trade[1]);
-    if (inside.length === 1 && inside[0]) Object.assign(inside[0], line(trade[0], said.slice(trade[0], trade[1]), inside[0].line.became));
+  /* A PHRASE IS LIT WHOLE (`WHOLE`): "shop" heard inside "a small candle shop" is said as the phrase the person wrote,
+     and "freelance" inside "freelance as a designer" as their Clients and Invoices, People then called Clients. */
+  const names: Record<string, string> = {};
+  for (const w of WHOLE) {
+    const span = w.re.exec(said)?.indices?.[w.group];
+    const inside = span ? heard.filter((h) => h.at >= span[0] && h.at + h.line.phrase.length <= span[1]) : [];
+    const one = inside.length === 1 ? inside[0] : undefined;
+    if (!span || !one || one.line.loose === true) continue;
+    const reads = w.reads && w.reads.needs.every((id) => modules.includes(id)) ? w.reads : null;
+    Object.assign(one, line(span[0], said.slice(span[0], span[1]), reads ? firstRun.and(reads.became) : one.line.became));
+    if (reads) Object.assign(names, reads.names);
   }
   /* THE NAME IS THE FIRST LINE, AND IT BECOMES THEM: the first entry in People. It always comes before the rest. */
   const lines: HeardLine[] = [
@@ -306,10 +404,21 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     if (pd && pd.missing.length === 0 && brings !== undefined && modules.includes(brings)) rows.push({ register: pd.register, fields: { ...pd.fields } });
   }
 
-  const out = { name: who.name, usecase: u?.usecase ?? null, also: beside.map((b) => b.usecase), modules, heard: lines };
+  /* THE DEVICE'S CURRENCY WHERE NONE WAS TYPED, said on the line that became Money (`sayCurrency`). */
+  const typed = read.declined === null ? read.currency : null;
+  const currency = currencyFor(typed, modules, ctx, lines.some((h) => h.loose === true));
+  const out = {
+    name: who.name,
+    usecase: u?.usecase ?? null,
+    also: beside.map((b) => b.usecase),
+    modules,
+    heard: typed === null ? sayCurrency(lines, modules, currency) : lines,
+    ...(Object.keys(names).length === 0 ? {} : { names }),
+  };
   return {
     ...out,
-    currency: read.declined === null ? read.currency : null,
+    currency,
+    ...(typed === null && currency !== null ? { currencyBy: 'device' as const } : {}),
     rows,
     title: titleOf(said, who.name, rows),
     places: placesOf(out),
@@ -364,9 +473,10 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
   const named = name !== null && !asked.includes(PEOPLE) ? [...asked, PEOPLE] : asked;
   const modules = closeOver(u ? [...modulesFor(u, named), ...beside.flatMap((b) => b.modules)] : named, offers);
 
+  /* THE RULES' CURRENCY WAS TYPED where it is not the device's; the device's is weighed again over the model's modules. */
+  const ruled = rules.currencyBy === 'device' ? null : rules.currency;
   const code = reply.currency?.toUpperCase() ?? null;
-  const typed = code !== null && knownCurrency(code) && (rules.currency === code || new RegExp(`(^|[^A-Za-z])${code}([^A-Za-z]|$)`, 'iu').test(sentence));
-  const currency = typed ? code : rules.currency;
+  const typed = code !== null && knownCurrency(code) && (ruled === code || new RegExp(`(^|[^A-Za-z])${code}([^A-Za-z]|$)`, 'iu').test(sentence));
 
   /* EACH PHRASE IS LOOKED FOR IN THE SENTENCE AS TYPED, and lit where it was found; the name is not a phrase of the
      model's, it is the first line, which becomes them. */
@@ -377,10 +487,14 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
     .sort((a, b) => a.at - b.at)
     .map(({ phrase, became, at: from }): HeardLine => ({ phrase: sentence.slice(from, from + phrase.length), became, at: [from, from + phrase.length] }));
   const you: HeardLine[] = name === null || nameAt < 0 ? [] : [{ phrase: sentence.slice(nameAt, nameAt + name.length), became: YOU, at: [nameAt, nameAt + name.length], you: true }];
-  const theirs = said.length > 0 ? said : rules.heard.filter((h) => h.you !== true);
+  /* THE RULES' LINES STAND IN WITHOUT THE CURRENCY THEY SAID, which is said again below over the model's modules. */
+  const unsaid = rules.currencyBy !== 'device' || rules.currency === null ? '' : `, ${heardWords.inCurrency(rules.currency)}`;
+  const theirs = said.length > 0 ? said : rules.heard.filter((h) => h.you !== true).map((h) => (unsaid !== '' && h.became.endsWith(unsaid) ? { ...h, became: h.became.slice(0, -unsaid.length) } : h));
   /* AN AMOUNT THE RULES HEARD WITH NO CURRENCY IS STILL SAID, so the one question can ask for it (`question.ts`). */
   const loose = rules.heard.filter((h) => h.loose === true && h.at && !theirs.some((t) => t.at && h.at && t.at[0] < h.at[1] && h.at[0] < t.at[1]));
-  const heard = [...you, ...[...theirs, ...loose].sort((a, b) => (a.at?.[0] ?? 0) - (b.at?.[0] ?? 0))];
+  const lines = [...you, ...[...theirs, ...loose].sort((a, b) => (a.at?.[0] ?? 0) - (b.at?.[0] ?? 0))];
+  const currency = currencyFor(typed ? code : ruled, modules, ctx, lines.some((h) => h.loose === true));
+  const heard = typed || ruled !== null ? lines : sayCurrency(lines, modules, currency);
 
   const rows: Proposal['rows'] = [];
   for (const r of reply.rows.slice(0, 5)) {
@@ -405,11 +519,13 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
        would be refused at the press, and dropping one would break the `party` the others point at by place. */
     modules: rows.length > 0 ? modules : closeOver([...modules, ...rules.rows.flatMap((r) => moduleOfList(r.register)?.id ?? [])], offers),
     heard,
-    ...(Object.keys(names).length === 0 ? {} : { names }),
+    /* THE RULES' NAMES COME WITH THE RULES' LINES, so "freelance as a designer" still reads Clients where it stands in. */
+    ...(Object.keys(names).length > 0 ? { names } : said.length === 0 && rules.names ? { names: rules.names } : {}),
   };
   return {
     ...out,
     currency,
+    ...(!typed && ruled === null && currency !== null ? { currencyBy: 'device' as const } : {}),
     rows: kept,
     title: titleOf(hear(sentence).bio, name, kept),
     places: placesOf(out),

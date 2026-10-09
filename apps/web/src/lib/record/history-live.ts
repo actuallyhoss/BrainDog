@@ -159,11 +159,11 @@ export async function readHistory(base: string, register: string, seq: number, i
  * ONLY THE SIGNATURES, because the lead line counts who and says nothing of what: the lines themselves are the log
  * below it, which `readLog` reads.
  */
-export type Unseen = { from: 'live'; actors: string[]; capped: boolean } | { from: 'refused'; fix: string };
+export type Unseen = { from: 'live'; actors: string[]; capped: boolean; byWho?: unknown } | { from: 'refused'; fix: string };
 
 export async function readUnseen(base: string, io?: Fetch): Promise<Unseen> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.whatsNew();
-  if (out.ok) return { from: 'live', actors: out.value.events.map((e) => e.actor), capped: out.value.sinceCapped };
+  if (out.ok) return { from: 'live', actors: out.value.events.map((e) => e.actor), capped: out.value.sinceCapped, ...(out.value.byWho === undefined ? {} : { byWho: out.value.byWho }) };
   return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'The record changed while it was being read.' };
 }

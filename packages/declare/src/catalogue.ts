@@ -37,6 +37,7 @@ import { credentialKey, credentialValue, NESTED_MOST, nestedPast } from './crede
 import { egressOf, FIRST_PARTY_LISTS, normalise, type Pack, type PackDeclaration, type PackSource } from './index.ts';
 import { CHANGES_MOST, kindUnknownSentence, readChanges, readShared, SHARED_MOST_BYTES, type Shared } from './shared.ts';
 import { MODULE_LISTS, MODULES } from './usecase.ts';
+import { holdsOf, resolveWhen } from './when.ts';
 import {
   isRevocation,
   isRotation,
@@ -54,6 +55,10 @@ import {
   type KeyStatements,
   type Signature,
 } from './signing.ts';
+
+/* WHAT WAITS ON WHAT A RECORD HOLDS, handed out here because this is the door a screen reads an add-on file through, and
+   the package's own index is not this file's to change. */
+export { holdsIn, holdsOf, resolveWhen, settleWhen, type Waiting } from './when.ts';
 
 export {
   AUTHOR_KEY_FORMAT,
@@ -120,6 +125,11 @@ export type Reach = {
   skills: string[];
   /** Every scheduled action that would leave the record, as the plan says it. */
   calls_out: { host: string | null; line: string; key: string | null }[];
+  /**
+   * The lists and roles a part of it waits for (`when: { holds }`, `when.ts`), each once, when any part does. A record
+   * that holds none of them gets the add-on without those parts until it does, and a card says so before the install.
+   */
+  waits?: string[];
 };
 
 export type Bump = 'major' | 'minor' | 'patch';
@@ -301,6 +311,9 @@ export async function readPackFile(input: unknown, source: PackSource = { kind: 
       return no('PROVIDES_CONFLICT', `This add-on declares a list called ${list}, which belongs to BrainDog's ${MODULE_LISTS[owner].name} module. Name the list something else.`, { at: decl.id });
     const fault = validateDeclaration({ id: decl.id, kind: decl.kind, body: decl.body });
     if (fault?.code === 'KIND_UNKNOWN') return { ok: false, refusal: { ...fault, fix: kindUnknownSentence(fault.fix).replace('This setup', 'This add-on'), at: `${decl.id}${fault.at ? `.${fault.at}` : ''}` } };
+    /* A PART THAT WAITS IS READ HERE, as the record will read it: a `when: { holds }` of a shape the plan cannot resolve,
+       or on a field every entry must have, is refused at the door rather than at somebody's install. */
+    if (fault !== null && /(^|\.)when$/u.test(fault.at ?? '') && /wait|holds/u.test(fault.fix)) return { ok: false, refusal: { ...fault, at: `${decl.id}.${fault.at}` } };
   }
   const title = typeof doc.title === 'string' && doc.title.trim() !== '' ? doc.title.trim().slice(0, 80) : doc.pack;
   return ok({ pack: pack.value, doc, title, bytes });
@@ -387,7 +400,19 @@ export function reachOf(file: Shared | PackFile | CatalogueFile): Reach {
       const e = egressOf(d);
       return e ? [{ host: e.host, line: e.line, key: e.key }] : [];
     }),
+    ...waitsOf(s.pack),
   };
+}
+
+/**
+ * What the parts of an add-on wait for, read as a record holding nothing would plan it: every name of every part that
+ * waits, once each, in the order the file says them. The add-on's own lists that wait on nothing are held once it is in,
+ * so a part waiting on one of them waits on nothing. Nothing at all when no part waits, so a reach is what it was.
+ */
+function waitsOf(pack: Pack | null | undefined): { waits?: string[] } {
+  if (!pack) return {};
+  const names = [...new Set(resolveWhen(pack, holdsOf({ declarations: [] }, pack)).waiting.flatMap((w) => w.holds))];
+  return names.length > 0 ? { waits: names } : {};
 }
 
 /** Ingest channels that fetch from somewhere on a schedule, and ones that wait for something to arrive. */

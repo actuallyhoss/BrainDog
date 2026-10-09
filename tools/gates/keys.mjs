@@ -42,7 +42,7 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
+import { APP_BASE, appShell, budget, openPage, readiness } from './lib.mjs';
 import { answers, forward, forwards, startRecord } from './record.mjs';
 
 /* THE PREREQUISITE, FOR THE RUNNER TO CHECK RATHER THAN THIS FILE (`52 §5.1` step 2). Every
@@ -563,22 +563,34 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
          it on every visit (`lib/data/offline.ts`), and from the first reload on the worker makes the request, which
          `page.route` never sees: `arrivals` handed the Inbox two rows and the Inbox drew the record's empty one, so
          every inbox key was pressed on an empty state and read as dead. No key here is about the worker. */
-      const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', bypassCSP: true, serviceWorkers: 'block' });
-      const page = await context.newPage();
+      /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (PRF-B04, `openPage`): the record's clock, the widest width `a11y` audits. */
+      const runs = recipe.runs ?? [recipe];
       /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=keys` swallows every `y` in
          the capture phase before any handler sees it, which is exactly what a binding that was never
-         written looks like from outside. The run must go red naming `copy-id`. */
-      if (process.env.BRAINDOG_GATE_SEED === 'keys')
-        await page.addInitScript(() => {
-          addEventListener('keydown', (e) => e.key === 'y' && e.stopImmediatePropagation(), true);
-        });
+         written looks like from outside. The run must go red naming `copy-id`. On the context before the first
+         load (`openPage`'s `init`): put on the page after it, the first load ran without it. */
+      const init =
+        process.env.BRAINDOG_GATE_SEED === 'keys'
+          ? () => {
+              addEventListener('keydown', (e) => e.key === 'y' && e.stopImmediatePropagation(), true);
+            }
+          : undefined;
+      const opened = await openPage(browser, `http://localhost:${PORT}${APP_BASE}${runs[0].route}`, {
+        width: Math.max(...budget('a11y').widths),
+        record,
+        ready,
+        serviceWorkers: 'block',
+        /* WAITING FOR THE NETWORK TO GO QUIET, as this gate always did: at `domcontentloaded` the grid's rows were still
+           arriving when the key was pressed, so the screen changed on its own and the planted dead `y` read as alive. */
+        waitUntil: 'networkidle',
+        ...(init === undefined ? {} : { init }),
+      });
+      const { context, page } = opened;
       /* One recipe or several: a row that advertises several keys is proved on each of them, and a
          single dead letter fails the row. */
-      const runs = recipe.runs ?? [recipe];
       let alive = 0;
       for (const run of runs) {
-        await page.goto(`http://localhost:${PORT}${APP_BASE}${run.route}`, { waitUntil: 'networkidle' });
-        const unmeasured = ready.check(`${row.id} on ${run.route}`, run.route, await ready.settled(page));
+        const unmeasured = ready.check(`${row.id} on ${run.route}`, run.route, await opened.goto(`http://localhost:${PORT}${APP_BASE}${run.route}`));
         if (unmeasured) {
           unsettled.push(unmeasured);
           process.stdout.write('~');

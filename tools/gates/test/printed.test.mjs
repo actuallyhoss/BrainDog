@@ -77,6 +77,22 @@ test('an uncaught error and a console error are findings, a log line is not, and
   assert.deepEqual(out, [`${WHERE}  threw an uncaught error: TypeError: x is null`, `${WHERE}  wrote an error to the console: Failed to load resource`]);
 });
 
+test("the self-host's own no is not a finding: its status and its path, and only while every answer of that status is one", () => {
+  const line = (n, word) => ({ kind: 'console', text: `Failed to load resource: the server responded with a status of ${n} (${word})` });
+  const notBuilt = line(501, 'Not Implemented');
+  assert.deepEqual(checkScreen({ where: WHERE, text: CLEAN, errors: [notBuilt], failed: [{ status: 501, path: '/api/snapshots' }] }), []);
+  /* THE SAME STATUS ON ANOTHER PATH IS STILL RED, and so is the allowed one beside it. */
+  assert.equal(checkScreen({ where: WHERE, text: CLEAN, errors: [notBuilt], failed: [{ status: 501, path: '/api/snapshots' }, { status: 501, path: '/api/boot' }] }).length, 1);
+  /* NO ANSWER SEEN IS NO EXCUSE: a planted line with nothing it answered stays red. */
+  assert.equal(checkScreen({ where: WHERE, text: CLEAN, errors: [notBuilt] }).length, 1);
+  /* NOT FOUND IS THE ANSWER ONLY ON AN ADDRESS DRAWN AS NOT FOUND ON PURPOSE. */
+  const missing = { where: WHERE, text: CLEAN, errors: [line(422, 'Unprocessable Entity')], failed: [{ status: 422, path: '/api/jobEvents' }] };
+  assert.equal(checkScreen(missing).length, 1);
+  assert.deepEqual(checkScreen(missing, { missing: true }), []);
+  /* AND A SERVER'S FAULT IS NEVER THE HOST'S WORD, missing or not. */
+  assert.equal(checkScreen({ where: WHERE, text: CLEAN, errors: [line(500, 'Internal Server Error')], failed: [{ status: 500, path: '/api/jobEvents' }] }, { missing: true }).length, 1);
+});
+
 /* ── the planted trees, as the self-test runs them ── */
 
 const trees = readdirSync(join(GATES, 'negative')).filter((n) => n.startsWith('printed-'));

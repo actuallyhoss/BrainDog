@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "a message asking CI to skip it",
+  "expect": "asks CI to skip it",
+  "findings": 1,
+  "total": 1,
+  "why": "A [SKIP CI] IN A SHORT SUBJECT, the one way a message could stop GitHub running this gate on the push that carries it."
+}

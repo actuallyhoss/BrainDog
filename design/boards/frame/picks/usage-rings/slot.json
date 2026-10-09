@@ -1,0 +1,18 @@
+{
+  "pick": "usage-rings",
+  "asks": "The usage rings",
+  "from": "RQ-EXP-389",
+  "options": [
+    {
+      "id": "keep",
+      "says": "Amber from 80 percent, and the deeper red only when an allowance is used up.",
+      "live": true
+    },
+    {
+      "id": "reverse",
+      "says": "The working red until an allowance is used up, then the deeper red with the words used up."
+    }
+  ],
+  "default": "keep",
+  "why": "Red is for over, and a ring used up is over; amber before that warns without crying wolf."
+}

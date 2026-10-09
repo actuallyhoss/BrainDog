@@ -1080,14 +1080,14 @@ test('A FIGURE GROUPED BY A REF NAMES EACH PART BY ITS ROW, the record’s own l
   assert.deepEqual(named.cells.slice(0, 2), ['Mara Lindqvist (personal)', 'Orchardline']);
   assert.ok(!named.sent.includes('list'), 'a list was walked for names the record had already said');
 
-  /* AND DRAWN WHOLE, A BAR'S VALUE IS A FIGURE, EXACT IN THE RECORD'S OWN SIGN: E£1,086,213.41, never EGP 1,086,213.41,
-     and never rounded, since it is read against the bars beside it (`money.ts` `figure`). A fraction of zeros is dropped. */
+  /* AND DRAWN WHOLE, A BAR'S VALUE IS A FIGURE, EXACT: EGP 1,086,213.41, as EGP is written everywhere, and never
+     rounded, since it is read against the bars beside it (`money.ts` `figure`). A fraction of zeros is dropped. */
   const { draw } = await import('./blocks.ts');
   const { learnHome } = await import('./api.ts');
   learnHome('EGP');
   try {
     const figures = draw(walked.block).segments.flatMap((s) => (s.type === 'block' ? s.rows.map((r) => r.cells[1]) : []));
-    assert.deepEqual(figures, ['E£1,086,213.41', 'E£120,000', 'E£9,382.59']);
+    assert.deepEqual(figures, ['EGP 1,086,213.41', 'EGP 120,000', 'EGP 9,382.59']);
   } finally {
     learnHome(null);
   }

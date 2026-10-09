@@ -13,7 +13,7 @@
     "questions": { "open": 25, "alike": 17 }
   },
   "days": {
-    "arrivals": { "count": 30, "lastDaysQuiet": 2 },
+    "arrivals": { "count": 30, "lastDaysQuiet": 0 },
     "balances": { "everyDays": 1 },
     "numbers": { "stopDaysBeforeEnd": 0 },
     "runs": { "count": 750, "ends": { "done": 8, "handoff": 2, "abandoned": 0 } },

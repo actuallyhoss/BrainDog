@@ -20,6 +20,9 @@ import type { Json } from './coerce.ts';
 
 type Searchable = { id: string; type: string; search?: boolean; retired?: boolean };
 
+/** The types a title is never indexed by: money and the two dates (ruling 441). */
+const UNSPOKEN: ReadonlySet<string> = new Set(['money', 'day', 'instant']);
+
 /**
  * The text one row is found by: its searchable fields, in declared order, one per line.
  *
@@ -36,15 +39,17 @@ type Searchable = { id: string; type: string; search?: boolean; retired?: boolea
  * this product marks searchable. That register had nothing in the index at all, so every query a
  * personal record was asked answered nothing about its budgets.
  *
- * NO MONEY OR DATE TITLE EXISTS TODAY, which is what makes this rule cheap: the worry about putting
- * digits into a text index is real and it is nobody's case yet. A pack that later titles its rows by
- * an amount gets that amount indexed for that register, which is still the row's own words as the
- * screen says them, and this comment is where to argue it if it ever bites.
+ * EXCEPT A TITLE MADE ONLY OF MONEY OR A DATE, which is left out (ruling 441, docs/04-PACKS.md
+ * "Rulings"). An amount is stored as `{amount, currency}` and a day as an ISO string, so neither is
+ * the row's words as the screen says them: one indexes as "[object Object]" and the other as digits
+ * that match every query typed with a year in it. Such a row is reached by its other searchable
+ * fields, or by the list it lives in. Held by packages/kernel/test/rulings.test.ts.
  */
 export function projectedText(fields: readonly Searchable[], values: Record<string, Json>, title?: string): string {
   const lines: string[] = [];
   for (const f of fields) {
     if ((!f.search && f.id !== title) || f.retired) continue;
+    if (f.id === title && UNSPOKEN.has(f.type)) continue;
     const raw = values[f.id];
     if (raw === undefined || raw === null || raw === '') continue;
     /* NFC HERE TOO, OR THE QUERY COMPOSES AND THE INDEX DOES NOT. `ftsQuery` normalises what was

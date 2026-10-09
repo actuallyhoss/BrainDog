@@ -109,6 +109,10 @@ const GATES = [
      a claim, and those claims went stale unnoticed until this read them. Beside `closed-lists` because that gate
      already holds the spelled-out block-kind counts, and this one reads the digits beside it. */
   ['docs-counts', call(join(here, 'docs-counts.mjs'))],
+  /* AND THE RULINGS PAGE AND ITS TESTS, HELD TOGETHER (SHL-A02): every settled question in docs/04-PACKS.md §9 names the
+     test that holds it, and a todo test says what it waits on. Beside `docs-counts` because both read a document against
+     the code. */
+  ['rulings', call(join(here, 'rulings.mjs'))],
   /* AND WHAT A TELEMETRY POINT MAY CARRY (`08 §5`, `51 §5.18`): one writeDataPoint( under apps/, its Blobs and Doubles labelled by 08 §5's columns, and none of the never-written words. */
   ['telemetry-allowlist', call(join(here, 'telemetry-allowlist.mjs'))],
   /* THE NINETY-NINE REFUSAL CODES, which had no `RefusalCode` type and so no list at all. A code is
@@ -152,6 +156,9 @@ const GATES = [
      root, and a shipped file that imports either draws the sample on a real record. Beside `shell-words` because both
      are a grep over what the core ships for something it must not name. */
   ['no-fixtures', call(join(here, 'no-fixtures.mjs'))],
+  /* AND NO SHAPE COPY OF A RECORD IS KEPT IN THE TREE (PRF-A13): a `.brainl` made by `export --shape`, under any name,
+     is a record's own counts and lengths, and only `--allow-shape` imports one. */
+  ['no-shape-files', call(join(here, 'no-shape-files.mjs'))],
   /* AND WHAT `no-fixtures` CANNOT SEE OF THE SAMPLE (LCH-A06): the demo's setting outside a test, and a string only the
      test fixture holds in the built app. It needs the build, so it runs in `--built`. */
   ['no-sample', call(join(here, 'no-sample.mjs'))],
@@ -173,9 +180,16 @@ const GATES = [
      in a sentence, the long dash) over every copy string the app ships. Beside `em-dash` because it reads the same
      copy for a wider list, and its `page` entries are the page lint's, so a page and the source are judged by one. */
   ['words', call(join(here, 'words.mjs'))],
+  /* AND THE WRITING GUIDE IS THE LIST, PRINTED (EXP-B07 job 5): docs/54-WRITING.md is what words.json makes. */
+  ['words-guide', ['node', [join(here, 'words-guide.mjs'), '--check']]],
   /* AND THE ONE CLOCK (AGT-C02): a run's `last_seen` compared with the time anywhere outside `presence.ts` is the
      rail, Today and Agents saying three numbers again. Today's hits are allowed by count, and the list only shrinks. */
   ['one-clock', call(join(here, 'one-clock.mjs'))],
+  /* AND EVERY COMMIT IS ONE SHORT SENTENCE, BY HIM (WAY-B02): no tool as author, no trailer, no session link, and the
+     history never restarts. The commit-msg hook asks the same rules through it. */
+  ['commits', call(join(here, 'commits.mjs'))],
+  /* AND NOTHING LOCAL IS TRACKED (WAY-B02): an agent's folder, a loop note, a record, a key or a `.local.json`. */
+  ['hygiene', call(join(here, 'hygiene.mjs'))],
   /* AND AN APPLIED MIGRATION IS NEVER EDITED (LCH-C06): each migration's checksum, by the runner's own `checksum`, against
      `packages/kernel/src/migrations/LOCK.json`, and a new one ships with a passing rehearsal's receipt. */
   ['migration-lock', call(join(here, 'migration-lock.mjs'))],
@@ -183,6 +197,9 @@ const GATES = [
      deletes a line of `event` is on one list with its reason, and a seventh is red. Beside `migration-lock` because a
      migration is the one other place the log is reshaped, and that gate holds it. */
   ['audit-append-only', call(join(here, 'audit-append-only.mjs'))],
+  /* AND A DRAWN BOARD SHIPS ONLY WITH HIS YES (EXP-A02): a page, specimen, variant, stand-in or pick changed after his
+     yes needs it again, and a yes that misses a width, a theme or a pick is red. */
+  ['board-yes', call(join(here, 'board-yes.mjs'))],
   /* AND NO AGENT TRANSCRIPT IS READ (AGT-B10, his "transcripts never read"): a hook or package naming transcript_path or opening a client's session folder. */
   ['no-transcript', call(join(here, 'no-transcript.mjs'))],
   /* AND ONE LEDGER FOR EVERY NUMBER A GATE IS HELD TO (PRF-B03): a budget never rises unless the owner is quoted, a debt

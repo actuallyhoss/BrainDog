@@ -63,10 +63,15 @@ test('TEN READS SENT TOGETHER AT A CAP OF 2 make two model calls, and the other 
     assert.equal(inference.seen.length, 2, 'an ask past the cap still called the model');
     assert.equal(slash.status().asks.used, 2);
     /* SETTLED, NOT LEFT HELD. The two admitted asks end as ordinary `read · ok` rows, the same as a read sent alone. */
-    assert.deepEqual(rows(), [
-      { kind: 'read', status: 'ok', code: null },
-      { kind: 'read', status: 'ok', code: null },
-    ]);
+    assert.deepEqual(
+      rows().filter((r) => r.status !== 'refused'),
+      [
+        { kind: 'read', status: 'ok', code: null },
+        { kind: 'read', status: 'ok', code: null },
+      ],
+    );
+    /* AND THE EIGHT TURNED AWAY ARE ROWS OF THEIR OWN (model-sign-49), never asks. */
+    assert.equal(rows().filter((r) => r.status === 'refused' && r.code === 'SLASH_BUDGET_SPENT').length, 8);
   } finally {
     sql.close();
   }
@@ -130,7 +135,9 @@ test('TEN PROPOSES WITH NO ASK_ID SENT TOGETHER AT A CAP OF 2 make the two calls
     const settled = rows();
     assert.equal(settled.filter((r) => r.kind === 'read' && r.status === 'ok').length, 2);
     assert.equal(settled.filter((r) => r.kind === 'propose' && r.status === 'ok').length, 2);
-    assert.equal(settled.length, 4);
+    /* AND THE EIGHT TURNED AWAY, EACH ITS OWN ROW UNDER `-` (model-sign-49). */
+    assert.equal(settled.filter((r) => r.status === 'refused' && r.code === 'SLASH_BUDGET_SPENT').length, 8);
+    assert.equal(settled.length, 12);
   } finally {
     sql.close();
   }

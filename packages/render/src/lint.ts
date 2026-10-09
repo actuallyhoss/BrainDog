@@ -21,6 +21,16 @@
  * - `theirs`: the words are the person's own, a note he wrote. The copy rules (an em dash, the words
  *   row, list item and entity) hold the product's words, not his, and the rules that would flag an
  *   engineer's prose (a commit hash, `user_id` in a sentence) read only the figure slots there.
+ *
+ * AND THREE THE HOST CAN GIVE, for what the drawn words alone cannot say (EXP-B07):
+ * - `heading`: the part is a title or a heading, a name and never a sentence, so a full stop at its end is a finding.
+ * - `buttons`: the words of the buttons the part offers beside its HTML (an answer's actions). A `<button>` drawn in
+ *   the HTML is read without being given.
+ * - `keys`: the keys of the closed lists the part draws (a service's type, `vm`). One printed as itself where its name
+ *   goes is a finding; a key a list names (`domain`, drawn "Domain") never prints as itself.
+ *
+ * THE PRINT RULES OF THE WORDS (EXP-B07 job 3) sit beside the drawing rules. `long-dash` in the scope is `em-dash`
+ * here, the rule that was already the page's; it keeps its name, since the sign and the gates already say it.
  */
 
 import { holeLabel } from './html.ts';
@@ -37,7 +47,13 @@ export type LintRule =
   | 'only-a-dash'
   | 'cut-money'
   | 'em-dash'
-  | 'plain-words';
+  | 'plain-words'
+  | 'system-word'
+  | 'dev-name'
+  | 'bare-key'
+  | 'one-word-button'
+  | 'title-stop'
+  | 'raw-fault';
 
 /** One fault in one part: which rule, which part (its name), and a sentence a person reads. */
 export type LintFinding = { rule: LintRule; part: string; said: string };
@@ -54,6 +70,12 @@ export type LintPart = {
   theirs?: boolean;
   /** The data holds a value for this part, so a dash alone in its place is a finding. */
   hasValue?: boolean;
+  /** A title or a heading: its words are a name, so it never ends in a full stop. */
+  heading?: boolean;
+  /** The words of the buttons the part offers that its HTML does not draw, such as a question's answers. */
+  buttons?: readonly string[];
+  /** The keys of the closed lists the part draws: one printed as itself is a key where its name goes. */
+  keys?: readonly string[];
 };
 
 /** A page: its own drawn HTML (linted as one part under the page's name), its parts, or both. */
@@ -71,6 +93,10 @@ type View = {
   glyphWords: string[];
   /** How many marks for "no value" (`class="missing"`, or a slot that is only a dash). */
   dashes: number;
+  /** The words of each button: a drawn `<button>` that is not a value's place, and the part's own `buttons`. */
+  buttons: string[];
+  /** The words of each title: a drawn `<h1>` to `<h6>`, a button, and the whole part when it is a `heading`. */
+  titles: string[];
   part: LintPart;
 };
 
@@ -95,8 +121,18 @@ const attr = (tag: string, name: string): string | null => {
   return m ? decode(m[1]!) : null;
 };
 
+/* CODE IS NEVER READ, in the words as in the HTML (`<code>` above): a span in backticks (`infer.resolve`), and a
+   type's angle brackets (`Record<string, Pack>`, `Promise<Row[]>`), the brackets with the name before them, nested. */
+const CODE_SPAN = /`[^`\n]+`/g;
+const TYPE_ARGS = /(?<![\w$])[A-Za-z_$][\w$.]*<[^<>\n]*>/g;
+const notCode = (s: string): string => {
+  let t = s.replace(CODE_SPAN, ' ');
+  for (let was = ''; was !== t; ) (was = t), (t = t.replace(TYPE_ARGS, ' '));
+  return t;
+};
+
 function viewOf(part: LintPart): View {
-  const view: View = { lines: [], figures: [], holes: [], glyphWords: [], dashes: 0, part };
+  const view: View = { lines: [], figures: [], holes: [], glyphWords: [], dashes: 0, buttons: [...(part.buttons ?? [])], titles: [], part };
   let html = part.html ?? '';
   /* Lifted whole, in this order: what is never read, then the marked places, each counted once. */
   html = html
@@ -125,8 +161,15 @@ function viewOf(part: LintPart): View {
     return '\n';
   });
   for (const m of html.matchAll(/<(\w+)\b[^>]*\bclass="(?:[^"]*\s)?num(?=[\s"])[^"]*"[^>]*>([^<]*)<\/\1>/gi)) view.figures.push(decode(m[2]!).trim());
-  const visible = decode(html.replace(INLINE_TAG, '').replace(/<[^>]*>/g, '\n'));
-  for (const raw of [...visible.split('\n'), ...(part.text ?? '').split('\n')]) {
+  /* A BUTTON AND A HEADING ARE READ WHERE THEY ARE DRAWN, and stay in the lines for every other rule. A button marked
+     `data-hole` is a bar's bucket drawn as a control (`prop-row`, `split-hole`): it holds a value, not an action. */
+  const words = (inner: string): string => decode(inner.replace(INLINE_TAG, '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+  for (const m of html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/gi)) if (!/\bdata-hole\b/i.test(m[1]!) && words(m[2]!)) view.buttons.push(words(m[2]!));
+  for (const m of html.matchAll(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi)) if (words(m[2]!)) view.titles.push(words(m[2]!));
+  view.titles.push(...view.buttons);
+  if (part.heading) view.titles.push(words(`${html} ${notCode(part.text ?? '')}`));
+  const visible = notCode(decode(html.replace(INLINE_TAG, '').replace(/<[^>]*>/g, '\n')));
+  for (const raw of [...visible.split('\n'), ...notCode(part.text ?? '').split('\n')]) {
     const line = raw.replace(/\s+/g, ' ').trim();
     if (line === '') continue;
     if (DASH_ONLY.test(line)) view.dashes++;
@@ -190,19 +233,96 @@ const CUT_MONEY = [
   new RegExp(`(?:${SYMBOL})\\s?\\d{1,3}(?:,\\d{3})*,\\d{1,2}(?![\\d,])`, 'g'),
 ];
 /**
- * THE WORDS A PERSON NEVER READS ON A PAGE, as `tools/gates/words.json` lists them (its entries marked `page`), each
- * with the name a finding says. One list for the page and for the source the app ships: the words gate goes red, and
- * `lint.test.ts` fails, the day this and the file disagree. Held here rather than imported, because this package is
- * published on its own and the file is not in it.
+ * THE WORDS A PERSON NEVER READS ON A PAGE, as `tools/gates/words.json` lists them (its entries whose `page` names a
+ * rule), each with the name a finding says and the rule that reads it: `plain-words` for the machinery's nouns for a
+ * thing (row, entity), `system-word` for the words of how the app is built (pack, schema, MCP). One list for the page
+ * and for the source the app ships: the words gate goes red, and `lint.test.ts` fails, the day this and the file
+ * disagree. Held here rather than imported, because this package is published on its own and the file is not in it.
  */
-export const PAGE_WORDS: readonly { name: string; shape: string; case?: true }[] = [
-  { name: 'row', shape: '\\brows?\\b' },
-  { name: 'list item', shape: '\\blist items?\\b' },
-  { name: 'entity', shape: '\\bentit(?:y|ies)\\b' },
-  { name: 'credential', shape: '\\bcredentials?\\b' },
-  { name: 'register', shape: "\\b(?:the|a|an|this|that|each|every|your|its|one|no|which|new)\\s+registers?\\b|\\bregister's\\b" },
+export const PAGE_WORDS: readonly { name: string; shape: string; case?: true; rule: 'plain-words' | 'system-word' }[] = [
+  { name: 'row', shape: '\\brows?\\b', rule: 'plain-words' },
+  { name: 'list item', shape: '\\blist items?\\b', rule: 'plain-words' },
+  { name: 'entity', shape: '\\bentit(?:y|ies)\\b', rule: 'plain-words' },
+  { name: 'credential', shape: '\\bcredentials?\\b', rule: 'plain-words' },
+  { name: 'register', shape: "\\b(?:the|a|an|this|that|each|every|your|its|one|no|which|new)\\s+registers?\\b|\\bregister's\\b", rule: 'plain-words' },
+  { name: 'pack', shape: '\\bpacks?\\b(?!,? (?:and|or) (?:send|ship|post))', rule: 'system-word' },
+  { name: 'slug', shape: '\\bslugs?\\b', rule: 'system-word' },
+  { name: 'schema', shape: '\\bschemas?\\b', rule: 'system-word' },
+  { name: 'declaration', shape: '\\bdeclarations?\\b', rule: 'system-word' },
+  { name: 'MCP', shape: '\\bMCP\\b', case: true, rule: 'system-word' },
+  { name: 'snapshot', shape: '\\bsnapshots?\\b', rule: 'system-word' },
+  { name: 'Spark', shape: '\\bSpark\\b', case: true, rule: 'system-word' },
+  { name: 'recommended', shape: '\\brecommended\\b', rule: 'system-word' },
+  { name: "isn't code", shape: "\\bisn['\u2019]t code\\b", rule: 'system-word' },
 ];
-const WORDS = PAGE_WORDS.map((w) => ({ name: w.name, re: new RegExp(w.shape, w.case ? 'gu' : 'giu') }));
+const wordsOf = (rule: string) =>
+  PAGE_WORDS.filter((w) => w.rule === rule).map((w) => ({ name: w.name, re: new RegExp(w.shape, w.case ? 'gu' : 'giu') }));
+const WORDS = wordsOf('plain-words');
+const SYSTEM_WORDS = wordsOf('system-word');
+
+/** The buttons of one word a person may read, as `words.json` lists them (`buttons`): any other button says a verb and its object. */
+export const BUTTON_WORDS: readonly string[] = ['Undo', 'Cancel', 'Done', 'Close', 'Back'];
+
+/*
+ * A NAME FROM THE CODE WHERE A SENTENCE STANDS: `infer.resolve could not be delivered`, `bank-card-used-sms could not
+ * read account` (his Decide, 7 October). Dotted words whose end is not a site's or a file's (`crumb.gg`, `notes.md`), or
+ * three hyphened words with none of English's small words in them (`up-to-date`, `pay-as-you-go` are plain).
+ */
+const DOTTED_NAME = /(?<![\w.@/:-])[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+(?![\w@/-]|\.\w)/g;
+const HYPHENED_NAME = /(?<![\w.@/:-])[a-z][a-z0-9]*(?:-[a-z0-9]+){2,}(?![\w@/-]|\.\w)/g;
+/* The ends of a site's address or a file's name longer than three letters; three or fewer is always one of those. The
+   names kept for examples and tests (`kilnfonts.example`, the seed's sites) are addresses too. */
+const ADDRESS_ENDS = new Set(['json', 'yaml', 'toml', 'html', 'svelte', 'scss', 'docx', 'xlsx', 'pptx', 'jpeg', 'webp', 'heic', 'tiff', 'mjs',
+  'app', 'dev', 'studio', 'store', 'online', 'site', 'cloud', 'games', 'tech', 'info', 'shop', 'blog', 'design', 'agency', 'email',
+  'space', 'world', 'live', 'life', 'media', 'news', 'team', 'tools', 'works', 'zone', 'page', 'link', 'land', 'money', 'finance', 'house',
+  'example', 'test', 'invalid', 'localhost', 'local', 'internal', 'company', 'digital', 'network', 'systems', 'solutions', 'services',
+  'events', 'photo', 'photography', 'software', 'website', 'today', 'club', 'codes', 'social', 'academy', 'health', 'travel',
+  'coffee', 'city', 'london', 'capital', 'ventures', 'partners', 'consulting', 'guru', 'rocks', 'fund', 'farm', 'film', 'music']);
+const SMALL_WORDS = new Set(['a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'by', 'for', 'as', 'and', 'or', 'up', 'out', 'off', 'over', 'you', 'it', 'with', 'from', 'all']);
+const ADDRESS = /\b(?:https?:\/\/|www\.)\S+|\S+@\S+\.\S+/g;
+const devNames = (line: string, glyphs: ReadonlySet<string>): string[] => {
+  const bare = line.replace(ADDRESS, ' ');
+  const dotted = Array.from(bare.matchAll(DOTTED_NAME), (m) => m[0]).filter((d) => {
+    const end = d.slice(d.lastIndexOf('.') + 1);
+    return end.length > 3 && !ADDRESS_ENDS.has(end);
+  });
+  const hyphened = Array.from(bare.matchAll(HYPHENED_NAME), (m) => m[0]).filter((h) => !glyphs.has(h) && !h.split('-').some((w) => SMALL_WORDS.has(w)));
+  return [...dotted, ...hyphened];
+};
+/* A sentence: three words or more. A name standing alone (a skill called `gstack-ceo-review`) is a name, not a sentence. */
+const SENTENCE = (line: string): boolean => line.split(' ').length >= 3;
+
+/* A key of a closed list as it is held: lower case, no space. Its name is drawn in sentence case. */
+const KEY_SHAPED = /^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*$/;
+/* A piece of a line that is the key alone, or the key and its figures: "vm E£547.97 71%". */
+const bareKeys = (line: string, keys: ReadonlySet<string>): string[] =>
+  line
+    .split(/[,;:·|]\s*/)
+    .map((seg) => seg.trim().split(' '))
+    .filter(([head, ...rest]) => head !== undefined && keys.has(head) && rest.every((t) => /\d/.test(t)))
+    .map(([head]) => head!);
+
+/* A title that ends in a full stop: not an ellipsis, which promises more, and not a short form a name ends in (Acme Ltd.). */
+const SHORT_FORMS = new Set(['inc', 'ltd', 'co', 'corp', 'llc', 'plc', 'gmbh', 'jr', 'sr', 'st', 'dr', 'mr', 'mrs', 'ms', 'etc', 'vs', 'no', 'bros']);
+const stops = (title: string): boolean => {
+  const t = title.trimEnd();
+  if (!t.endsWith('.') || t.endsWith('..')) return false;
+  const last = /(\S+)\.$/.exec(t)?.[1] ?? '';
+  return !SHORT_FORMS.has(last.toLowerCase()) && !/^\p{Lu}$/u.test(last);
+};
+
+/* A thrown error's shape on a page, the way the code wrote it for a developer. In his own words only a stack line is
+   read: he may write about a TypeError he fixed. `[object Object]` is a value that never arrived, the printed gate's
+   own word for it (`tools/gates/printed.mjs` OWN), and is not counted twice. */
+const STACK_LINE = /^at\s+(?:[^\s()]+\s+)?\(?(?:[a-z]+:\/\/|\/|node:)?[^\s()]+:\d+:\d+\)?$/;
+const FAULTS = [
+  /\b(?:Type|Reference|Syntax|Range|URI|Eval|Aggregate|Internal)Error\b/,
+  /\bCannot read propert(?:y|ies) of (?:undefined|null)\b/i,
+  /\b(?:undefined|null) is not (?:a function|an object)\b/,
+  /\bis not a function\b/,
+  /\bUnexpected (?:token\b.*\bin JSON|end of JSON input)\b/,
+  /\bFailed to fetch\b/,
+];
 
 type RuleSpec = {
   rule: LintRule;
@@ -305,6 +425,59 @@ const RULES: readonly RuleSpec[] = [
     says: 'A word for the machinery, such as row, entity or credential, where the words should name the thing itself.',
     find: (v) => WORDS.flatMap((w) => all(v.lines, w.re, () => `"${w.name}"`)).map((h, i) => ({ raw: `${i}`, label: h.label })),
     said: (_n, names) => `Says a word for the machinery where it should name the thing${names}.`,
+  },
+  {
+    rule: 'system-word',
+    copy: true,
+    says: 'A word for how the app is built, such as pack, schema or MCP, where a plain word goes.',
+    find: (v) => SYSTEM_WORDS.flatMap((w) => all(v.lines, w.re, () => `"${w.name}"`)).map((h, i) => ({ raw: `${i}`, label: h.label })),
+    said: (_n, names) => `Says a word for how the app is built where a plain word goes${names}.`,
+  },
+  {
+    rule: 'dev-name',
+    copy: false,
+    says: 'A name from the code, such as a dotted or hyphened identifier, where a sentence should say what it is.',
+    /* In his own words, only a sentence that opens on one: a name from the code in the middle of his note is his to write. */
+    find: (v) =>
+      v.lines
+        .filter(SENTENCE)
+        .flatMap((l) => devNames(l, GLYPH_NAMES).filter((d) => !v.part.theirs || l.startsWith(d)))
+        .map((d) => ({ raw: d, label: '' })),
+    said: (n) => many(n, 'Prints a name from the code where a sentence should say what it is.', 'Prints # names from the code where sentences should say what they are.'),
+  },
+  {
+    rule: 'bare-key',
+    copy: false,
+    says: "A value of a closed list printed as its key, such as a service's type, where its name goes.",
+    find: (v) => {
+      const keys = new Set((v.part.keys ?? []).filter((k) => KEY_SHAPED.test(k)));
+      return keys.size === 0 ? [] : v.lines.flatMap((l) => bareKeys(l, keys)).map((k) => ({ raw: k, label: '' }));
+    },
+    said: (n) => many(n, 'Prints a value as its key where its name goes.', 'Prints # values as their keys where their names go.'),
+  },
+  {
+    rule: 'one-word-button',
+    copy: true,
+    says: `A button of one word that is not ${BUTTON_WORDS.slice(0, -1).join(', ')} or ${BUTTON_WORDS.at(-1)}, where a verb and its object say what it does.`,
+    find: (v) => v.buttons.filter((b) => /^\p{L}[\p{L}'’]*$/u.test(b) && !BUTTON_WORDS.includes(b)).map((b) => ({ raw: b, label: `"${b}"` })),
+    said: (n, names) => many(n, `Has a button of one word${names}. Say what it does to what.`, `Has # buttons of one word${names}. Say what each does to what.`),
+  },
+  {
+    rule: 'title-stop',
+    copy: true,
+    says: 'A title, a heading or a button that ends in a full stop, where a name goes and not a sentence.',
+    find: (v) => v.titles.filter(stops).map((t) => ({ raw: t, label: '' })),
+    said: (n) => many(n, 'Ends a title in a full stop.', 'Ends # titles in a full stop.'),
+  },
+  {
+    rule: 'raw-fault',
+    copy: false,
+    says: 'An error from the code, such as TypeError, Cannot read or a stack line, where a sentence should say what went wrong.',
+    find: (v) =>
+      v.lines
+        .filter((l) => STACK_LINE.test(l) || (!v.part.theirs && FAULTS.some((re) => re.test(l))))
+        .map((l) => ({ raw: l, label: '' })),
+    said: (n) => many(n, 'Prints an error from the code where a sentence should say what went wrong.', 'Prints # errors from the code where sentences should say what went wrong.'),
   },
 ];
 

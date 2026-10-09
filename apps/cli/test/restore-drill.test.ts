@@ -486,7 +486,7 @@ test('THE ROUND TRIP RUNS ON THE RESTORED RECORD, each step a line, and a red st
   assert.deepEqual(leftIn(n.temp), [], 'the trip and the drill leave nothing behind');
 });
 
-test('A HEALTHY COPY PASSES THE WHOLE DRILL, round trip and all', { todo: 'a restored Cloud copy exports unsigned, and the kernel writes no import event yet (blocked lines in drill-fetch-48 and drill-trip-47)' }, async (t) => {
+test('A HEALTHY COPY PASSES THE WHOLE DRILL, round trip and all', async (t) => {
   const n = await night(t);
   const out = await drill([n.copy, '--identity', n.key], n.temp, { trip: true });
   assert.equal(out.code, 0, out.stdout);

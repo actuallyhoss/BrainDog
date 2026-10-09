@@ -94,7 +94,8 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
      the fold's Coming up is drawn under. */
   /* AND SINCE portfolio 1.12.0 THE LINE NAMES THEM, which need a push and which are on track, from the rows. */
   const line = overview.blocks.find((b) => (b as { lead?: boolean }).lead === true && b.drawn !== false) as { values?: Record<string, unknown> };
-  const named = (ok: (t: (typeof THINGS)[number]) => boolean) => THINGS.filter((t) => inPlay(t) && ok(t)).map((t) => String(t.name));
+  /* NEWEST MADE FIRST, the order a list that declares none reads in (PGS-B06): the sample's projects in reverse. */
+  const named = (ok: (t: (typeof THINGS)[number]) => boolean) => THINGS.filter((t) => inPlay(t) && ok(t)).map((t) => String(t.name)).reverse();
   const and = (list: string[]) => (list.length < 2 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`);
   assert.deepEqual(line.values, {
     'projects-need-you.names': and(named((t) => t.health === 'at_risk' || t.health === 'off_track')),
@@ -248,12 +249,14 @@ test('PROJECTS OPENS WHAT IT HOLDS WHILE IT IS SHORT, and folds it only past fou
   const looked = under(short, 'Earnings, agents and dates');
   assert.deepEqual(looked.map((b) => [b.heading, b.drawn !== false, b.span]), [
     ['What each one earns', true, 12],
+    /* SINCE portfolio 1.16.0, the line under it: how many of those in play say what they earned. */
+    [undefined, true, 12],
     ['With an agent', true, 6],
     ['Coming up', true, 6],
   ]);
   assert.deepEqual(names(looked[0]!.rows).sort(), THINGS.filter((t) => inPlay(t) && t.revenue !== undefined && t.revenue !== null).map((t) => String(t.name)).sort());
   /* HALF A ROW HOLDS THREE COLUMNS: the project, who holds it and who changed it last. Its next step is on its card. */
-  assert.deepEqual(looked[1]!.columns?.map((c) => c.field), ['name', 'agent', 'changed']);
+  assert.deepEqual(looked[2]!.columns?.map((c) => c.field), ['name', 'agent', 'changed']);
   /* THE PARKED ARE THE TABLE ITSELF, under the tile's heading and none of its own. */
   assert.deepEqual(under(short, 'Parked and finished').map((b) => [b.kind, b.heading, names(b.rows)]), [['table', undefined, ['Tallow']]]);
   /* AND WHAT THE FOLDED HEADINGS HELD IS NOT READ AT ALL: a tile nobody sees costs no query. */
@@ -272,21 +275,23 @@ test('PROJECTS OPENS WHAT IT HOLDS WHILE IT IS SHORT, and folds it only past fou
   }
   assert.deepEqual(under(long, 'Earnings, agents and dates').map((b) => [b.heading, b.drawn !== false, b.span]), [
     ['What each one earns', true, 12],
+    [undefined, true, 12],
     ['With an agent', true, 12],
     ['Coming up', true, 12],
   ]);
   assert.deepEqual(under(long, 'Parked and finished').map((b) => [b.heading, b.rows.length]), [['Not in play', 5]]);
   assert.equal(block(long, 'Parked and finished').matched, 5);
 
-  /* WITH NOTHING UNDER EITHER, NEITHER HEADING IS DRAWN, open or folded, so such a Projects ends on its cards: every
-     project put in play, and none saying what it earns, who holds it or the day it aims for. An open tile has no
-     figure of more than nought to be drawn on; it goes because nothing under it is drawn. */
+  /* WITH NOTHING UNDER EITHER, the parked heading is not drawn, open or folded. SINCE portfolio 1.16.0 the open tile of
+     earnings, agents and dates still is, holding one line: none of the projects in play says what it earned. An open
+     tile has no figure of more than nought to be drawn on; it is drawn because the line under it is. */
   const bare = await seeded();
   for (const n of THINGS.keys()) assert.ok(bare.update('things', `things#${n + 1}`, { lane: 'building', revenue: null, agent: null, aim: null } as never, { actor: 'p_1' }).ok);
   const ends = opened(bare, 'portfolio');
   assert.equal(block(ends, 'In play').rows.length, THINGS.length);
-  for (const heading of ['Earnings, agents and dates', 'Parked and finished'])
-    assert.deepEqual(pair(ends, heading).map((b) => b.drawn), [false, false], `${heading}: a heading over nothing`);
+  assert.deepEqual(pair(ends, 'Parked and finished').map((b) => b.drawn), [false, false], 'Parked and finished: a heading over nothing');
+  assert.deepEqual(pair(ends, 'Earnings, agents and dates').map((b) => b.drawn !== false), [true, false]);
+  assert.deepEqual(under(ends, 'Earnings, agents and dates').filter((b) => b.drawn !== false).map((b) => [b.kind, b.heading]), [['note', undefined]]);
 });
 
 test('A PROJECT PAST THE DAY IT AIMED FOR IS ASKED ABOUT ON DECIDE, once, and nothing is written', async () => {

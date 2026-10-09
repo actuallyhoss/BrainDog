@@ -143,7 +143,9 @@
       "lines": [
         { "at": 2, "on": "2026-10-09", "why": "A flag read in three places is a feature with three doors.", "by": "flags.mjs" }
       ]
-    }
+    },
+    "history.floor": { "kind": "floor", "lines": [ { "at": 1849, "on": "2026-10-09", "why": "The least number of commits reachable from HEAD: the history is rewritten clean, never restarted.", "by": "loop/scope/area-ways-b.md WAY-B02" } ] },
+    "commits.subjectMax": { "kind": "ceiling", "lines": [ { "at": 72, "on": "2026-10-09", "why": "A commit subject is one sentence of at most 72 characters.", "by": "loop/scope/area-ways-b.md WAY-B02" } ] }
   },
   "debts": {
     "bundle.mainJsBrotli": {
@@ -170,7 +172,8 @@
       "owes": "proof",
       "file": "tools/gates/a11y.mjs",
       "lines": [
-        { "at": 25, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+        { "at": 25, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." },
+        { "at": 24, "on": "2026-10-09", "why": "The page-open move (gates-lib-46 #5) took the gate's own context numbers into openPage." }
       ]
     },
     "tools/gates/bundle.mjs": {
@@ -247,14 +250,16 @@
       "owes": "proof",
       "file": "tools/gates/keys.mjs",
       "lines": [
-        { "at": 23, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+        { "at": 23, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." },
+        { "at": 21, "on": "2026-10-09", "why": "The page-open move (gates-lib-46 #6) took the gate's own viewport numbers into openPage." }
       ]
     },
     "tools/gates/layout.mjs": {
       "owes": "proof",
       "file": "tools/gates/layout.mjs",
       "lines": [
-        { "at": 30, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+        { "at": 30, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." },
+        { "at": 29, "on": "2026-10-09", "why": "The page-open move (gates-lib-46 #8) took the gate's own viewport and context numbers into openPage." }
       ]
     },
     "tools/gates/lived.mjs": {
@@ -290,6 +295,13 @@
       "file": "tools/gates/nul-bytes.mjs",
       "lines": [
         { "at": 15, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/no-transcript.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/no-transcript.mjs",
+      "lines": [
+        { "at": 1, "on": "2026-10-09", "why": "The exit 3 of a gate that could not run, written in the gate before it moves to budgets.json." }
       ]
     },
     "tools/gates/one-clock.mjs": {
@@ -433,12 +445,23 @@
       "lines": [
         { "at": 1, "on": "2026-10-09", "why": "Exit 3 for a root with no copy file, the runner's word for a gate that read nothing. No budget holds it." }
       ]
-    }
+    },
+    "tools/gates/board-yes.mjs": { "owes": "proof", "file": "tools/gates/board-yes.mjs", "lines": [ { "at": 6, "on": "2026-10-09", "why": "The four widths a yes must be seen at, 390, 1440, 1512 and 1728, as tools/look/board.mjs draws them; the 8000 bytes read to tell a binary file; and exit 3 for a gate that read nothing." } ] },
+    "tools/gates/commits.mjs": { "owes": "proof", "file": "tools/gates/commits.mjs", "lines": [ { "at": 4, "on": "2026-10-09", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it; and the five fields of one commit as git log prints them, said three times." } ] },
+    "tools/gates/hygiene.mjs": { "owes": "proof", "file": "tools/gates/hygiene.mjs", "lines": [ { "at": 1, "on": "2026-10-09", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it." } ] },
+    "tools/gates/no-shape-files.mjs": { "owes": "proof", "file": "tools/gates/no-shape-files.mjs", "lines": [ { "at": 7, "on": "2026-10-09", "why": "The 4096 bytes of a file's head the mark is looked for in, the 8000 bytes read to tell a binary file, the four lines the mark may sit on, git's 64 MiB listing buffer, and exit 3 for a gate that read nothing." } ] },
+    "tools/gates/rulings.mjs": { "owes": "proof", "file": "tools/gates/rulings.mjs", "lines": [ { "at": 1, "on": "2026-10-09", "why": "The two characters of the section heading's line break the page is sliced past." } ] }
   },
   "held": {
+    "commits.EXEMPT": { "lines": [ { "count": 7, "on": "2026-10-09", "why": "Local commits made before the first push the commits gate guards, each subject past 72 characters; exempt by sha until his word to reword them." } ] },
     "web-lists.HELD": {
       "lines": [
         { "count": 43, "on": "2026-10-09", "why": "Files of the web app that still name a first-party list, each with its ids and why. 43 on the day the ledger began; the brief counted 42." }
+      ]
+    },
+    "printed.ALLOWED": {
+      "lines": [
+        { "count": 3, "on": "2026-10-09", "why": "Answers a self-host gives by design and the page says on screen (no copies folder, no vault key, no sign-up), whose console line is not a fault; matched by status and path." }
       ]
     },
     "shell-words.EXEMPT": {
@@ -506,7 +529,37 @@
         "what": "The subject of its own test, at 1 site.",
         "why": "The test asserts that a code nobody enumerated is still a 422; a real code would delete the assertion.",
         "until": "never: a test fixture"
-      }
+      },
+  {
+   "id": "IMPORT_SHAPE",
+   "what": "An import of a shape copy, refused unless the host started with --allow-shape (PRF-A13), at 2 sites: kernel brainl.ts and the cli's brainfile.ts.",
+   "why": "A real refusal a caller branches on, raised before its row was written: its home is 30 section 6 with REFUSAL_CODES in @braindog/ports and a fixture under fixtures/refusals.",
+   "until": "its 30 section 6 row, ports code and fixture (shape-guard-49's follow-on)"
+  },
+  {
+   "id": "CERT_HAS_EXPIRED",
+   "what": "Node's own TLS error code, in bridge.test.ts's fake fetch failures (bridge-maybe-50).",
+   "why": "Not a BrainDog refusal: the test plants the code Node's fetch puts in an error's cause, to prove a request that never left is never called maybe.",
+   "until": "never: Node's code in a test's fakes"
+  },
+  {
+   "id": "ECONNREFUSED",
+   "what": "Node's own network error code, in bridge.test.ts's fake fetch failures (bridge-maybe-50).",
+   "why": "Not a BrainDog refusal: the code Node's fetch puts in an error's cause, planted by the test.",
+   "until": "never: Node's code in a test's fakes"
+  },
+  {
+   "id": "ECONNRESET",
+   "what": "Node's own network error code, in bridge.test.ts's fake fetch failures (bridge-maybe-50).",
+   "why": "Not a BrainDog refusal: the code Node's fetch puts in an error's cause, planted by the test.",
+   "until": "never: Node's code in a test's fakes"
+  },
+  {
+   "id": "ENOTFOUND",
+   "what": "Node's own DNS error code, in bridge.test.ts's fake fetch failures (bridge-maybe-50).",
+   "why": "Not a BrainDog refusal: the code Node's fetch puts in an error's cause, planted by the test.",
+   "until": "never: Node's code in a test's fakes"
+  }
     ]
   }
 }

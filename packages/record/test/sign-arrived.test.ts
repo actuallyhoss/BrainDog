@@ -91,12 +91,12 @@ test('A NEWER VERSION SEEN AGAIN keeps the night it was first seen behind, and a
 test('AN UPDATE WAITING ON ITS QUESTION past two nights is red; one asked yesterday is not', async () => {
   const { sql, clock, api } = await record();
   install(sql, 'money-book', '1.0.0', 'Money');
-  const ask = (id: string, opened: number) =>
+  const ask = (id: string, askedAt: number) =>
     sql.exec(
       "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'pack', ?, 'open', 'slash', ?)",
       id,
       JSON.stringify({ install: 'money-book', doc: {} }),
-      new Date(opened).toISOString(),
+      new Date(askedAt).toISOString(),
     );
   ask('SG1', clock.now() - DAY);
   assert.equal((await readArrivedSign(api.kernel, { sql }, clock.now())).state, 'none', 'a question alone is not enough to read green');

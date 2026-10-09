@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { FIRST_PARTY_VERSIONS, firstPartyDocument } from '@braindog/seed/packs';
 
 import { createRecordApi, type CallContext, type EventLine, type HistoryPage, type WhatsNew } from '../src/index.ts';
-import { byWhoOf, installedTwice, passKept, passSentence, whoOf, type UpdatePass } from '../src/update-pass.ts';
+import { byWhoOf, installedTwice, passFolder, passKept, passSentence, whoOf, type UpdatePass } from '../src/update-pass.ts';
 import { openSqlite } from '../../kernel/test/sqlite.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, credentialed: true };
@@ -177,4 +177,20 @@ test('WHO YOU ARE, FOUND ON THE SAME NIGHT, IS SAID ON ITS OWN: never as an upda
     for (const st of said.flatMap((l) => l.steps ?? [])) assert.ok(!marked.includes(st.id), 'the mark is folded under the update');
     sql.close();
   }
+});
+
+test("A PERSON'S EDIT BETWEEN TWO STEPS OF A PASS LEAVES IT ONE LINE, with the edit said after it and never folded", () => {
+  const pass: UpdatePass = { from: 10, to: 16, at: '2026-10-09T03:00:00Z', updated: ['Money', 'People'], asked: [] };
+  const line = (rowid: number, actor: string) =>
+    ({ rowid, actor, kind: 'install', target: null, target_kind: null, field: null, register: null, seq: null, title: null, note: null });
+  const fold = passFolder<ReturnType<typeof line>>([pass]);
+  const walked = [line(17, 'pat'), line(16, 'system'), line(15, 'system'), line(14, 'pat'), line(13, 'system'), line(12, 'system'), line(11, 'system'), line(9, 'pat')];
+  const out = [...walked.flatMap((l) => fold.push(l)), ...fold.flush()];
+  assert.deepEqual(
+    out.map((l) => [l.rowid, l.kind]),
+    [[17, 'install'], [16, 'update'], [14, 'install'], [9, 'install']],
+  );
+  const said = out[1] as ReturnType<typeof line> & { steps: { rowid: number }[]; pass: { steps: number } };
+  assert.deepEqual(said.steps.map((s) => s.rowid), [16, 15, 13, 12, 11]);
+  assert.equal(said.pass.steps, 5);
 });

@@ -1,14 +1,17 @@
 /**
  * What the first run says while it builds, held to the proposal it reads (`building.ts`): the parts and why each is on,
- * the progress order, the sentence under the title, the words marked, and the currencies offered with their reasons.
+ * which parts are drawn (only those on), the sentence under the title (never a count), the places the build shows, the words marked, and the currencies offered with their reasons.
  */
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { useCase } from '@braindog/seed/usecases';
+
 import { propose } from '../../lib/start/propose.ts';
 import {
   added,
+  casePart,
   cityOf,
   currencyChoices,
   iconOfBecame,
@@ -18,8 +21,12 @@ import {
   numberWord,
   partIcon,
   partsOf,
+  placeIcon,
+  placesFrom,
   statusOf,
   stepsOf,
+  words,
+  zoneCurrency,
   type CurrencyEnv,
 } from './building.ts';
 
@@ -70,28 +77,31 @@ test('WHY A PART IS ON: a use case, the person, or the answer it waits on', () =
   assert.equal(parts.find((x) => x.id === 'estate')?.state, 'off');
 });
 
-test('THE PROGRESS BAR DRAWS MADE, THEN WAITING, THEN OFF, so its cells sit together', () => {
+test('ONLY THE PARTS THAT ARE ON ARE DRAWN, made then waiting, and nothing is a step behind', () => {
   const parts = partsOf({ offered: OFFERED, modules: ['portfolio', 'money-core', 'agents'], heard: [], rows: [], heldBy: () => null, byHand: new Set(), waiting: 'money-core' });
   const s = stepsOf(parts);
   assert.deepEqual(
     s.order.map((p) => p.id),
-    ['portfolio', 'agents', 'money-core', 'people', 'estate', 'work'],
+    ['portfolio', 'agents', 'money-core'],
   );
+  assert.ok(s.order.every((p) => p.on), 'a part left off is drawn, and reads as a step not yet taken');
   assert.equal(s.done, 2);
   assert.equal(s.current, true);
   assert.equal(stepsOf(partsOf({ offered: OFFERED, modules: ['portfolio'], heard: [], rows: [], heldBy: () => null, byHand: new Set(), waiting: null })).current, false);
 });
 
-test('THE SENTENCE UNDER THE TITLE: the count in words, and only the open question in red', () => {
-  assert.deepEqual(statusOf(4, 6, 'which of pounds and dollars is home'), {
-    before: 'Four of six parts are on. ',
+test('THE SENTENCE UNDER THE TITLE SAYS WHAT WAITS, never a count, and only the open question in red', () => {
+  assert.deepEqual(statusOf(4, 'which of pounds and dollars is home'), {
+    before: '',
     needs: 'One question left',
     after: ': which of pounds and dollars is home.',
   });
-  const done = statusOf(1, 6, null);
+  const done = statusOf(1, null);
   assert.equal(done.needs, '', 'nothing waits, so nothing is red');
-  assert.match(done.before, /^One of six parts is on\. Nothing left to ask/u);
-  assert.match(statusOf(0, 6, null).before, /^Nothing is on yet\./u);
+  assert.match(done.before, /^Nothing left to ask/u);
+  assert.match(statusOf(0, null).before, /^Nothing is on yet\./u);
+  for (const s of [statusOf(4, 'which currency'), done, statusOf(0, null)])
+    assert.doesNotMatch(`${s.before}${s.needs}${s.after}`, /\b(of (two|three|four|five|six|seven|\d+))\b|\d+ of \d+/iu, 'the sentence counts parts');
   assert.equal(numberWord(12), '12');
   assert.equal(numberWord(3, true), 'Three');
 });
@@ -201,4 +211,67 @@ test('A BROWSER WITH NO ZONES STILL ANSWERS FROM ITS LANGUAGE', () => {
   const ask = currencyChoices('', env({ zonesOf: () => null }));
   assert.deepEqual(ask.choices.map((c) => c.code), ['USD']);
   assert.equal(cityOf('America/New_York'), 'New York');
+});
+
+/* ── the build beside the words (use case 6, step 2) ───────────────────── */
+
+const MARIAM = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer. I lose track of orders and who owes me.";
+
+test('THE BUILD IS HEADED BY HER TITLE, AND TODAY IS THE FIRST PLACE, each with its own glyph', () => {
+  const p = propose(MARIAM, ctx);
+  assert.equal(p.title, "Mariam's Candles", 'the build is headed by what the record will be called');
+  const places = placesFrom(p.places, []);
+  assert.equal(places[0]?.kind, 'today', 'Today is not first');
+  assert.equal(placeIcon(places[0]!), 'today');
+  const names = places.map((x) => x.name);
+  for (const want of ['Orders', 'Products']) assert.ok(names.includes(want), `${want} is not among her places: ${names.join(', ')}`);
+  assert.equal(placeIcon({ kind: 'list', id: 'orders' }), 'task', 'Orders wears the glyph its use case declares');
+  assert.equal(placeIcon({ kind: 'module', id: 'money-core' }), partIcon('money-core'));
+  assert.equal(placeIcon({ kind: 'list', id: 'nobody-declares-this' }), 'doc');
+});
+
+test('WITH NO PLACES READ, THE BUILD IS TODAY AND EACH PART THAT IS ON, and never a part left off', () => {
+  const parts = partsOf({ offered: OFFERED, modules: ['people', 'money-core'], heard: [], rows: [], heldBy: () => null, byHand: new Set(), waiting: null });
+  const places = placesFrom(undefined, parts);
+  assert.deepEqual(
+    places.map((x) => x.id),
+    ['today', 'people', 'money-core'],
+  );
+  assert.deepEqual(placesFrom([], parts).map((x) => x.id), ['today', 'people', 'money-core']);
+});
+
+test('THE BUILD SAYS NO COUNT, AND NAMES NO SAMPLE AS HERS', () => {
+  const said = [words.yours, words.asYouType, words.startsEmpty, words.progress(['People', 'Money'], 'Money'), words.progress([], null)];
+  for (const line of said) {
+    assert.doesNotMatch(line, /\d+ of \d+|\bof (two|three|four|five|six)\b/iu, `a count: ${line}`);
+    assert.doesNotMatch(line, /\brows?\b|—/u, `a word a person should not read: ${line}`);
+  }
+  assert.equal(words.startsEmpty, 'Each place starts empty and fills with what you tell it. No sample entries.');
+  assert.equal((words as Record<string, unknown>).parts, undefined, 'the "N of M" words are back');
+});
+
+test('THE ZONE\'S ONE CURRENCY: EGP in Cairo, the euro in Berlin, and none where the zone keeps no region or two', () => {
+  const zones = { codes: Object.keys(NAMES), zonesOf: (r: string) => ZONES[r] ?? null };
+  assert.equal(zoneCurrency('Africa/Cairo', zones), 'EGP');
+  assert.equal(zoneCurrency('Europe/Berlin', zones), 'EUR');
+  assert.equal(zoneCurrency('UTC', zones), null, 'no region keeps UTC');
+  assert.equal(zoneCurrency(null, zones), null);
+  assert.equal(zoneCurrency('  ', zones), null);
+  const two = { codes: ['CUP', 'CUC'], zonesOf: (r: string) => (r === 'CU' ? ['America/Havana'] : null) };
+  assert.equal(zoneCurrency('America/Havana', two), null, 'a region with two currencies gives neither');
+  /* THE BROWSER'S OWN ANSWERS, as the sign-up asks them: her device in Alexandria keeps Cairo time. */
+  assert.equal(zoneCurrency('Africa/Cairo'), 'EGP');
+});
+
+test('HER WORDS AS THE BUILD SAYS THEM: the shop by its lists, Clients for People, Money in her currency', () => {
+  const p = propose(MARIAM, { ...ctx, currency: zoneCurrency('Africa/Cairo') });
+  const shop = useCase('shop');
+  assert.ok(shop);
+  assert.deepEqual(casePart(shop, p.heard, false).why, ['a small candle shop', 'orders'], 'the shop is not lit by the lines that name its lists');
+  const parts = partsOf({ offered: OFFERED, modules: p.modules, heard: p.heard, rows: p.rows, heldBy: () => null, byHand: new Set(), waiting: null, names: p.names });
+  assert.deepEqual(parts.find((x) => x.id === 'people')?.why, ['freelance as a designer'], 'Clients is People in her word');
+  assert.deepEqual(parts.find((x) => x.id === 'money-core')?.why, ['who owes me']);
+  assert.equal(iconOfBecame('Clients and Invoices', p.names), partIcon('people'));
+  assert.equal(iconOfBecame('Money, in EGP'), partIcon('money-core'));
+  assert.equal(iconOfBecame('Orders and Products'), placeIcon({ kind: 'list', id: 'orders' }));
 });

@@ -1,0 +1,12 @@
+# a comment above the guards moves every line number, and nothing is red for it
+node_modules/
+*.brain
+*.brainl
+*.sqlite
+_*
+!apps/*/static/_headers
+/REPORT.md
+/BUILD.md
+/CLAUDE.md
+/.claude/
+tools/gates/*.local.json

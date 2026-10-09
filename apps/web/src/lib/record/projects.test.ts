@@ -71,6 +71,12 @@ for (const slug of ['portfolio', 'kiln', 'marlow-co', 'portage'])
       assert.equal(wb.heading, kb.heading, at);
       assert.deepEqual(kb.refusals, [], `${at}, the record: ${JSON.stringify(kb.refusals)}`);
       assert.deepEqual(wb.refusals, [], `${at}, the demo: ${wb.refusals.join('; ')}`);
+      /* A BLOCK ITS `when` HIDES (portfolio 1.16.0's Where it stands: the card or the stat, never both) is hidden in both
+         engines, and a hidden block reads no figure to compare. */
+      if ((kb as { drawn?: boolean }).drawn === false) {
+        assert.equal((wb as { drawn?: boolean }).drawn, false, `${at}: drawn in the demo and not on the record`);
+        return;
+      }
       if (kb.kind === 'stat') {
         assert.deepEqual(wb.metrics?.map((m) => digits(m.value)), (kb.readings ?? []).map((r) => digits(r.reading?.value)), at);
         return;

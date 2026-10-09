@@ -65,11 +65,13 @@ const LAID: Record<string, Laid> = {
       'adds page.relation after People: Numbers, 30 days',
       'adds page.relation after People: Latest numbers',
       'adds page.relation after People: Send numbers here',
+      'adds page.portfolio after In play: ',
       'hands register.organisations to people',
     ],
-    declares: '78d818356ded7d8a',
+    declares: '092fe0f5bb736b52',
     history: [
       'Recorded at 2.5.0 when what a use case lays was first held to its version; Latest numbers shows a reading\'s Amount beside its Value -> 78d818356ded7d8a',
+      'Projects names the earning projects gone silent, a line with no heading of its own after In play (stands-50) -> 092fe0f5bb736b52',
     ],
   },
 };

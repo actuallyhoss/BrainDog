@@ -196,6 +196,7 @@ test('VALUES: every typed form with a literal draws, and a loose or broken one s
     'money GBP −42.00',
     'money CLF 100.0000',
     'money UYW 12.3456',
+    'money JPY 900,719,925,474,099,312',
     'quantity 1.4 m',
     'quantity −2.5 kg',
     'quantity −1,299',

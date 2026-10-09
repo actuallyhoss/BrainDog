@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "an em dash in the message",
+  "expect": "holds an em dash",
+  "findings": 1,
+  "total": 1,
+  "why": "AN EM DASH AS PUNCTUATION in a short subject, and nothing else wrong with it."
+}

@@ -5,14 +5,23 @@
  *
  * THE WORDS A PERSON MUST NEVER READ ARE A LIST, AND THE LIST IS `words.json` BESIDE THIS FILE. Each entry is a word or
  * a shape (row, credential, register as a noun, an id in a sentence, the long dash), what to say in its place and why.
- * The page lint (`packages/render/src/lint.ts`, `plain-words`) carries the entries marked `page` and is held equal to
- * them below, so the page a person reads and the source the app ships are judged by one list.
+ * The page lint (`packages/render/src/lint.ts`, `plain-words` and `system-word`) carries the entries whose `page` names
+ * one of its rules, and its `one-word-button` the approved `buttons`, held equal to them below, so the page a person
+ * reads and the source the app ships are judged by one list.
  *
  * WHAT IS READ IS WHAT A SCREEN PRINTS: the string values of every copy object the app ships. That is
  * `apps/web/src/lib/copy/*.ts`, `apps/web/src/lib/first-run.ts` and each `apps/web/src/routes/<screen>/words.ts`.
  * Comments are not read, and neither are the parts of a source that are code rather than copy: an object's quoted key,
  * a module's address, a value compared with `===` or matched by `case`, a type's union of literals, an index, and the
  * argument of a method call (`.join(', ')`, `.toLocaleString('en-GB')`). A template is read with each `${…}` as `{}`.
+ *
+ * AND WHAT A DECLARED PAGE PRINTS (EXP-B07 job 2): the `title`, `heading`, `label`, `body` and `empty` of every page the
+ * seed declares (`packages/seed/src`) and every add-on in `packs/` (its `*.pack.json`), read by the same lexer. Only
+ * those five keys are read there, since a declaration's other strings are its ids and sources; and inside them a
+ * figure's `{{path}}` and a link's address are code.
+ *
+ * THE WRITING GUIDE IS THIS LIST, printed: `docs/54-WRITING.md` is made from `words.json` by `words-guide.mjs`, and the
+ * gate's test fails the day the page and the list disagree.
  *
  * TWO RULES ARE SHAPES OF A SENTENCE, NOT WORDS. A title, a heading, a label or a button (a key ending in one of those
  * words) that ends in a full stop; and a value that is the long dash and something else, since a dash alone is the
@@ -237,7 +246,7 @@ export function readList(at = join(here, 'words.json')) {
 
 /** The entries the page lint reads, in the shape `lint.ts` holds them. */
 export const pageWords = (list) =>
-  list.words.filter((w) => w.page).map((w) => ({ name: w.name, shape: w.shape, ...(w.case ? { case: true } : {}) }));
+  list.words.filter((w) => w.page).map((w) => ({ name: w.name, shape: w.shape, ...(w.case ? { case: true } : {}), rule: w.page }));
 
 /** What one string breaks: one finding a rule, each `{ rule, say }`. */
 export function breaks(list, { text, key }) {
@@ -265,6 +274,57 @@ export function copyFiles(root) {
   return files.sort();
 }
 
+/** The keys whose values a declared page prints: a page's or a block's title, heading, label, body and empty text. */
+const PAGE_KEYS = new Set(['title', 'heading', 'label', 'body', 'empty']);
+
+/**
+ * The files that declare pages under `root`, repository-relative: every source of the seed (`packages/seed/src`, its
+ * tests aside) and each add-on's `packs/<name>/<name>.pack.json`. A pack file is JSON, which the lexer reads as it reads
+ * an object in a source: a quoted key and its value.
+ */
+export function pageFiles(root) {
+  const files = [];
+  const walk = (rel) => {
+    let entries;
+    try {
+      entries = readdirSync(join(root, rel), { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries)
+      if (e.isDirectory()) walk(`${rel}/${e.name}`);
+      else if (/\.ts$/.test(e.name) && !/\.(?:test|d)\.ts$/.test(e.name)) files.push(`${rel}/${e.name}`);
+  };
+  walk('packages/seed/src');
+  let packs = [];
+  try {
+    packs = readdirSync(join(root, 'packs'), { withFileTypes: true }).filter((e) => e.isDirectory());
+  } catch {}
+  for (const d of packs)
+    for (const f of readdirSync(join(root, 'packs', d.name))) if (/\.pack\.json$/.test(f)) files.push(`packs/${d.name}/${f}`);
+  return files.sort();
+}
+
+/* A span in backticks and a type's angle brackets, its name before them and nested (`Record<string, Row>`): code, which
+   the page draws as code and the page lint never reads (`notCode` in lint.ts). */
+const CODE_SPAN = /`[^`\n]+`/g;
+const TYPE_ARGS = /(?<![\w$])[A-Za-z_$][\w$.]*<[^<>\n]*>/g;
+const notCode = (s) => {
+  let t = s.replace(CODE_SPAN, ' ');
+  for (let was = ''; was !== t; ) (was = t), (t = t.replace(TYPE_ARGS, ' '));
+  return t;
+};
+
+/**
+ * What a declared page prints from one file: the value of each page key, wherever it sits. A figure's `{{path}}` is read
+ * as `{}`, and a link's address, a span in backticks and a type's angle brackets are dropped, since each is code inside
+ * the copy (`{{bills.rows}}`, `[Bills](/r/bills)`, `` `rows` ``, `Promise<Row>`).
+ */
+export const pageStrings = (source) =>
+  literalsOf(source)
+    .filter((l) => PAGE_KEYS.has(l.key))
+    .map((l) => ({ ...l, text: notCode(l.text.replace(/\{\{[^{}]*\}\}/g, '{}').replace(/\]\([^)\s]*\)/g, ']')) }));
+
 /**
  * Which files are red and which held counts can come down, from each file's count of findings. A file above its held
  * count is red whole, every finding in it printed, since which of them is the new one is not knowable from a count.
@@ -286,41 +346,45 @@ export default async function wordsGate(root = process.env.BRAINDOG_GATE_ROOT ??
   const ROOT = resolve(root);
   const list = readList(listAt);
   const files = copyFiles(ROOT);
+  const pages = pageFiles(ROOT);
   /* A GATE THAT READ NOTHING HAS NOT PASSED. Exit 3 is this directory's word for "could not run". */
-  if (files.length === 0) {
-    console.log(`  words: no copy file (apps/web/src/lib/copy, lib/first-run.ts, routes/*/words.ts) under ${ROOT}, so nothing was read`);
+  if (files.length + pages.length === 0) {
+    console.log(`  words: no copy file (apps/web/src/lib/copy, lib/first-run.ts, routes/*/words.ts) and no declared page (packages/seed/src, packs/*/*.pack.json) under ${ROOT}, so nothing was read`);
     return 3;
   }
   const held = ROOT === REPO ? (list.held ?? {}) : {};
   const findings = [];
   const counts = new Map();
   let strings = 0;
-  for (const rel of files) {
-    const found = literalsOf(readFileSync(join(ROOT, rel), 'utf8'));
+  const read = (rel, found) => {
     strings += found.length;
     for (const lit of found)
       for (const b of breaks(list, lit)) {
         findings.push({ rel, line: lit.line, ...b, text: lit.text });
         counts.set(rel, (counts.get(rel) ?? 0) + 1);
       }
-  }
+  };
+  for (const rel of files) read(rel, literalsOf(readFileSync(join(ROOT, rel), 'utf8')));
+  for (const rel of pages) read(rel, pageStrings(readFileSync(join(ROOT, rel), 'utf8')));
 
-  /* THE PAGE LINT SAYS THE SAME: its plain-words list is this list's page entries, word for word. */
+  /* THE PAGE LINT SAYS THE SAME: its plain-words and system-word lists are this list's page entries, and its one-word
+     buttons this list's buttons, word for word. */
   const lint = await import(pathToFileURL(join(REPO, 'packages/render/src/lint.ts')).href);
-  const drift = JSON.stringify(lint.PAGE_WORDS) !== JSON.stringify(pageWords(list));
+  const drift =
+    JSON.stringify(lint.PAGE_WORDS) !== JSON.stringify(pageWords(list)) || JSON.stringify(lint.BUTTON_WORDS) !== JSON.stringify(list.buttons);
 
   const { over, down } = judge(counts, held);
   const red = findings.filter((f) => over.includes(f.rel));
   const heldNow = Object.keys(held).reduce((s, rel) => s + Math.min(counts.get(rel) ?? 0, held[rel].count), 0);
 
   for (const f of red) console.error(`  ${f.rel}:${f.line}\n      ${f.rule}: "${f.text}". Say ${f.say}.`);
-  if (drift) console.error('  packages/render/src/lint.ts\n      PAGE_WORDS is not the page entries of tools/gates/words.json. Copy them across, word for word.');
+  if (drift) console.error('  packages/render/src/lint.ts\n      PAGE_WORDS or BUTTON_WORDS is not the page entries or the buttons of tools/gates/words.json. Copy them across, word for word.');
   if (down.length) {
     console.log('  words: these held files have fewer findings now. Lower or remove their entries in words.json held:');
     for (const d of down) console.log(`  ${d.rel}: held ${d.held}, now ${d.now}`);
   }
   const many = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
-  const said = `${many(files.length, 'copy file')}, ${many(strings, 'string')}, ${heldNow} held in ${many(Object.keys(held).length, 'file')}`;
+  const said = `${many(files.length, 'copy file')} and ${many(pages.length, 'file')} of declared pages, ${many(strings, 'string')}, ${heldNow} held in ${many(Object.keys(held).length, 'file')}`;
   if (red.length === 0 && !drift) {
     console.log(`  words: 0 words a person must never read, over ${said}`);
   } else {

@@ -57,9 +57,9 @@ export const ANSWER_STALE_DAYS = 7;
 /**
  * A model that did not answer, in the ledger's own words: a `WHERE` clause over `slash_call`.
  *
- * EXPORTED, WITH `LEDGER_ANSWERED`, SO EVERY READING OF THE LEDGER COUNTS ONE WAY. The vital sign `model-answers`
- * (`packages/host/src/sign-model.ts`) judges the same rows Settings does; a host package may not import this one
- * (`46 §5.1`), so it restates the two clauses and its test holds them equal to these.
+ * EXPORTED, WITH `LEDGER_ANSWERED` AND `LEDGER_BUDGET`, SO EVERY READING OF THE LEDGER COUNTS ONE WAY. The vital sign
+ * `model-answers` (`packages/host/src/sign-model.ts`) judges the same rows Settings does; a host package may not import
+ * this one (`46 §5.1`), so it restates the three clauses and its test holds them equal to these.
  */
 export const LEDGER_FAILED = "status = 'error' AND code IN ('UNREACHABLE', 'PULL_REQUEST_REFUSED', 'ANSWER_UNREADABLE')";
 
@@ -68,6 +68,17 @@ export const LEDGER_ANSWERED =
   "model <> '-' AND NOT (" +
   LEDGER_FAILED +
   ") AND (code IS NULL OR code NOT IN ('SLASH_PENDING', 'SPARK_PENDING', 'SLASH_BUDGET_SPENT', 'SPARK_BUDGET_SPENT', 'NOT_IN_THIS_BUILD'))";
+
+/**
+ * An ask turned away because the month's asks were spent: neither an answer nor a failure, and never one of the two above.
+ *
+ * `health` passes it over, since Settings says the month's meter beside it (`asks` in `status`), but the vital sign reads
+ * it as a fact of its own: before this, five answers and then fifty refusals read "answered all 5" there (audit 40-42, 5).
+ * `SPARK_BUDGET_SPENT` is the old name `call.ts`'s migration renames, kept so a ledger not yet migrated counts the same.
+ * UNDER `-` ONLY (`TURNED_AWAY_SQL`): a per-call neuron ceiling refuses under the model's own name (the worker's
+ * `budgetSpent`), and that is one call too large, never the month spent.
+ */
+export const LEDGER_BUDGET = "model = '-' AND code IN ('SLASH_BUDGET_SPENT', 'SPARK_BUDGET_SPENT')";
 
 /**
  * Read the last `HEALTH_DAYS` of Slash's ledger and say how the engine stands.

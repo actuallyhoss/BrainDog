@@ -1,0 +1,14 @@
+{
+  "id": "pack",
+  "title": "Orders",
+  "registers": [{ "id": "packs", "label": "Orders" }],
+  "pages": [
+    {
+      "title": "Orders",
+      "blocks": [
+        { "heading": "Ready to go", "body": "Pack and send each one before Friday.", "source": "packs" },
+        { "heading": "From the pack", "empty": "Nothing waiting." }
+      ]
+    }
+  ]
+}

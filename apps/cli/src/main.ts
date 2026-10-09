@@ -32,7 +32,8 @@ import { automations, scripts } from './automations.ts';
 import { behindLine } from './behind.ts';
 import { serveBridge } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
-import { heldHere, hookEnd, hookStart, parentOf } from './hooks.ts';
+import { HOOK_MS, heldHere, hookEnd, hookStart, parentOf, unreachable } from './hooks.ts';
+import { hookBeat } from './beat.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { byHand, handRun, installProfiles, profilesOf, readReplace, replaceByHand, shellOf, type Replace } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
@@ -92,6 +93,17 @@ function hookScripts(): string {
     "$cli = Join-Path $PSScriptRoot '..\\braindog.mjs'",
     'try {',
     '  $raw = [Console]::In.ReadToEnd()',
+    "  if ($Which -eq 'beat') {",
+    "    $id = '-'",
+    "    $m = [regex]::Match($raw, '\"session_id\"\\s*:\\s*\"([A-Za-z0-9._:-]+)\"')",
+    "    if ($m.Success) { $id = $m.Groups[1].Value -replace '[^A-Za-z0-9_-]', '_' }",
+    "    $stamp = Join-Path (Join-Path $env:USERPROFILE '.braindog\\beats') $id",
+    "    if ((Test-Path -LiteralPath $stamp) -and (Get-Item -LiteralPath $stamp).LastWriteTime -gt (Get-Date).AddMinutes(-5)) { exit 0 }",
+    '    try { $raw | & node $cli hook beat | Out-Null } catch { }',
+    '    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stamp) | Out-Null',
+    "    [System.IO.File]::WriteAllText($stamp, (Get-Date).ToString('o'))",
+    '    exit 0',
+    '  }',
     '  $raw | & node $cli hook $Which',
     '} catch {',
     "  if ($Which -eq 'start') { 'BrainDog could not start; this session works without shared context.' }",
@@ -102,6 +114,15 @@ function hookScripts(): string {
     '#!/bin/sh',
     'which="${1:-start}"',
     'dir=$(dirname "$0")',
+    'if [ "$which" = beat ]; then',
+    '  raw=$(cat)',
+    `  id=$(printf '%s' "$raw" | grep -o '"session_id" *: *"[A-Za-z0-9._:-]*"' | head -n 1 | sed 's/.*"\\([^"]*\\)"$/\\1/; s/[^A-Za-z0-9_-]/_/g')`,
+    '  stamp="${HOME}/.braindog/beats/${id:--}"',
+    `  [ -n "$(find "$stamp" -mmin -5 2>/dev/null)" ] && exit 0`,
+    `  printf '%s' "$raw" | node "$dir/../braindog.mjs" hook beat >/dev/null 2>&1`,
+    '  mkdir -p "${HOME}/.braindog/beats" 2>/dev/null && touch "$stamp" 2>/dev/null',
+    '  exit 0',
+    'fi',
     'if ! node "$dir/../braindog.mjs" hook "$which"; then',
     "  [ \"$which\" = start ] && printf 'BrainDog could not start; this session works without shared context.\\n'",
     'fi',
@@ -147,7 +168,7 @@ const emit = (envelope: unknown): void => writeFileSync(1, `${JSON.stringify(env
 
 const usage = () =>
   [
-    'braindog setup <host> [--dry-run]',
+    'braindog setup <host> [--dry-run | --yes]',
     "  Set this machine up from one record, in order: sign in unless it already is, add the two hooks to Claude Code's settings, register the braindog MCP server, write the tools the record applies everywhere, and sync its skills. One line per step, and it stops at the first that fails.",
     'braindog login <host> [--vault <project|*>]',
     '  Sign this machine in. It prints six digits to approve in the app, and keeps the token in the hosts file.',
@@ -250,7 +271,7 @@ const usage = () =>
     "  The owner approves the one mint in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>] [--local]',
     "  Serve BrainDog to an agent over standard input and output, passing each message to the host's own server. The agent starts it. --local serves the tools this command holds, for seven nights after the bridge.",
-    'braindog hook start|end',
+    'braindog hook start|end|beat',
     '  What Claude Code runs when a session starts and ends, with its event on standard input. Once a day the start hook also says when this command is older than the host needs; it never updates by itself.',
     'braindog install [--apply] [--replace <replace.json>] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>]',
     "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. It also places BrainDog's Agent Skill in each profile's skills/braindog/. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
@@ -544,8 +565,16 @@ function selfhost(command: 'init' | 'serve', args: string[]): void {
  */
 async function hook(args: string[]): Promise<void> {
   const [which, ...more] = args;
-  if ((which !== 'start' && which !== 'end') || more.length > 0) {
-    say('braindog hook takes start or end, and nothing else. Claude Code runs it, with the event on standard input.');
+  /* NINE SECONDS AT MOST, whatever the network does (AGT-B10): the hook ends at HOOK_MS counted from the process's own
+     start (`performance.now()`), inside Claude Code's ten-second timeout. The start hook's own deadline starts later,
+     so on a hung network this fires first and says the one line itself, unless a line was already written. */
+  let said = false;
+  setTimeout(() => {
+    if (which === 'start' && !said) writeFileSync(1, `${unreachable(HOOK_MS)}\n`);
+    process.exit(0);
+  }, Math.max(0, HOOK_MS - performance.now())).unref();
+  if ((which !== 'start' && which !== 'end' && which !== 'beat') || more.length > 0) {
+    say('braindog hook takes start, end or beat, and nothing else. Claude Code runs it, with the event on standard input.');
     return process.exit(0);
   }
   /*
@@ -559,7 +588,10 @@ async function hook(args: string[]): Promise<void> {
      throws, waits at most two seconds and only on the first start of a day, and rides the same one write. */
   const behind = which === 'start' ? await behindLine({ env: process.env }) : null;
   const lapse = [which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null, behind].filter((line): line is string => line !== null).join('\n') || null;
-  const write = (text: string) => writeFileSync(1, `${lapse === null ? '' : `${lapse}\n`}${text}\n`);
+  const write = (text: string) => {
+    said = true;
+    writeFileSync(1, `${lapse === null ? '' : `${lapse}\n`}${text}\n`);
+  };
   try {
     let stdin = '';
     try {
@@ -568,7 +600,7 @@ async function hook(args: string[]): Promise<void> {
       /* No stdin at all is an empty event. */
     }
     const io = { env: process.env, stdin, cwd: process.cwd(), write };
-    await (which === 'start' ? hookStart(io) : hookEnd(io));
+    await (which === 'start' ? hookStart(io) : which === 'beat' ? hookBeat(io) : hookEnd(io));
   } catch {
     /* The error could quote anything, so the start hook says only that it failed. */
     if (which === 'start') write('BrainDog: the start hook failed, so this session works without shared context.');

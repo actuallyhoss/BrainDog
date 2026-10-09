@@ -150,11 +150,11 @@ test('EVERY CHIP, on its own, turns something on or suggests a use case', () => 
 });
 
 test('THE FIRST RUN ASKS WHAT THIS BRAINDOG IS FOR, not what the business is', () => {
-  /* ONE QUESTION, and its four chips are the four people the product is for. */
+  /* ONE QUESTION, and its chips are use case 6's five starting points, each its own use case. */
   const first = [firstRun.whoQuestion, firstRun.whoPlaceholder, ...firstRun.whoChips];
   for (const line of first) assert.doesNotMatch(line, /business/iu, line);
   const kinds = new Set(firstRun.whoChips.map((c) => arrange(c).pick?.usecase).filter(Boolean));
-  assert.ok(kinds.has('student') && kinds.has('founder') && kinds.has('team') && kinds.has('guide'), [...kinds].join(', '));
+  assert.deepEqual([...kinds].sort(), ['business', 'founder', 'shop', 'student', 'team']);
 });
 
 const SENTENCES = [

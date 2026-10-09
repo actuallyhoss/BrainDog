@@ -88,7 +88,7 @@ test('scripts LISTS EVERY INSTALLED SCRIPT, with what it may touch and how its r
   await turn(wrote);
   let now = await gold();
   assert.deepEqual([now.last?.outcome, now.last?.version, now.refused.in_a_row, now.month], ['ok', 1, 0, { runs: 1, ok: 1, refused: 0 }]);
-  assert.match(now.last!.say, /gold-rate ran and wrote one row/);
+  assert.match(now.last!.say, /“Gold rate” ran and wrote one line/);
 
   await turn(refused);
   await turn(refused);

@@ -22,7 +22,9 @@ const gates = join(import.meta.dirname, '..');
 const repo = join(gates, '..', '..');
 const BOOK = JSON.parse(readFileSync(join(gates, 'ledger.json'), 'utf8'));
 const BUDGETS = JSON.parse(readFileSync(join(gates, 'budgets.json'), 'utf8'));
-const FOUR = ['DECLARATION_INVALID', 'INTERNAL', 'NOPE', 'SOMETHING_NOBODY_MAPPED'];
+/* THE NAMED DEVIATIONS: the four the ledger began with, then shape-guard-49's IMPORT_SHAPE (until its 30 §6 row) and
+   the four Node network codes bridge-maybe-50's test plants in a fake fetch's error. */
+const NAMED = ['CERT_HAS_EXPIRED', 'DECLARATION_INVALID', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'IMPORT_SHAPE', 'INTERNAL', 'NOPE', 'SOMETHING_NOBODY_MAPPED'];
 
 /** The walk as the real tree has it: each named deviation raised somewhere. */
 const walk = (...codes) => new Map(codes.map((code) => [code, [`packages/somewhere/${code.toLowerCase()}.ts`]]));
@@ -68,27 +70,27 @@ test('bundle reads mainJsBaseline while budgets.json still holds it, so the dead
   assert.ok(readPaths(source).has('bundle.mainJsNoise'));
 });
 
-test('the ledger names four refusal deviations, each by the code it stands for', () => {
+test('the ledger names its refusal deviations, each by the code it stands for', () => {
   const named = refusalDeviations(BOOK);
   assert.ok(Array.isArray(named), named.message);
-  assert.deepEqual(named.map((d) => d.id).sort(), FOUR);
+  assert.deepEqual(named.map((d) => d.id).sort(), NAMED);
 });
 
-test('the four named codes, raised, are green', () => {
-  assert.deepEqual(outsideTheLedger(walk(...FOUR), refusalDeviations(BOOK)), []);
+test('the named codes, raised, are green', () => {
+  assert.deepEqual(outsideTheLedger(walk(...NAMED), refusalDeviations(BOOK)), []);
 });
 
 test('a fifth code outside the registry is red and names itself with its site', () => {
-  const findings = outsideTheLedger(walk(...FOUR, 'MADE_UP_TODAY'), refusalDeviations(BOOK));
+  const findings = outsideTheLedger(walk(...NAMED, 'MADE_UP_TODAY'), refusalDeviations(BOOK));
   assert.ok(findings.length > 0);
   const named = findings.find((f) => f.includes('`MADE_UP_TODAY`'));
   assert.ok(named, findings.join('\n'));
   assert.match(named, /no named deviation: packages\/somewhere\/made_up_today\.ts/u);
-  assert.ok(!findings.some((f) => FOUR.some((code) => f.includes(`\`${code}\``))), 'only the fifth is named');
+  assert.ok(!findings.some((f) => NAMED.some((code) => f.includes(`\`${code}\``))), 'only the fifth is named');
 });
 
 test('a named deviation nothing raises any more is red until its line leaves the ledger', () => {
-  const findings = outsideTheLedger(walk('DECLARATION_INVALID', 'INTERNAL', 'NOPE'), refusalDeviations(BOOK));
+  const findings = outsideTheLedger(walk(...NAMED.filter((c) => c !== 'SOMETHING_NOBODY_MAPPED')), refusalDeviations(BOOK));
   assert.equal(findings.length, 1);
   assert.match(findings[0], /`SOMETHING_NOBODY_MAPPED` is a named deviation.*Delete its line there/u);
 });
@@ -104,5 +106,5 @@ test('a deviation with no code, or no list at all, is an Error', () => {
 test('refusals is green on the repository, each code outside the registry a named deviation', () => {
   const run = spawnSync(process.execPath, [join(gates, 'refusals.mjs')], { cwd: repo, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
-  assert.match(run.stdout, /each a named deviation in the ledger \(DECLARATION_INVALID, INTERNAL, NOPE, SOMETHING_NOBODY_MAPPED\)/u);
+  assert.match(run.stdout, /each a named deviation in the ledger \(CERT_HAS_EXPIRED, DECLARATION_INVALID, ECONNREFUSED, ECONNRESET, ENOTFOUND, IMPORT_SHAPE, INTERNAL, NOPE, SOMETHING_NOBODY_MAPPED\)/u);
 });

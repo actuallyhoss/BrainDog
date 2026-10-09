@@ -49,11 +49,24 @@ function doSqlite() {
   return { ...sql, exec: held(sql.exec.bind(sql)), all: held(sql.all.bind(sql)), one: held(sql.one.bind(sql)) } as typeof sql;
 }
 
+/**
+ * PROJECTS AS PORTFOLIO 1.15.0 DECLARED THEM, with no `delete:` rule. 1.16.0 refuses deleting a project anything points
+ * at, and a record from before it can still hold live rows pointing at a deleted project, which is what this reads.
+ */
+async function withoutDeleteRule(kernel: { declarations(): { id: string; version: number; body: string }[]; install(d: never, e: { id: string; version: number }): Promise<{ ok: boolean }> }): Promise<void> {
+  const things = kernel.declarations().find((d) => d.id === 'register.things');
+  assert.ok(things, 'the seed declares no Projects');
+  const { delete: _rule, ...body } = JSON.parse(things.body) as Record<string, unknown>;
+  const out = await kernel.install([{ id: 'register.things', kind: 'register', body }] as never, { id: 'register.things', version: things.version });
+  assert.ok(out.ok, JSON.stringify(out));
+}
+
 /** The seeded record behind a surface that counts every method it is asked, by name. */
 async function counted() {
   const sql = doSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 9)) });
   await installSeed(api.kernel);
+  await withoutDeleteRule(api.kernel as never);
   const asked: string[] = [];
   const surface = new Proxy(api, {
     get(target, key, receiver) {

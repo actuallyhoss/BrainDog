@@ -27,9 +27,14 @@
  * this week, read on three different weeks, and no page that groups it by week, is offered a page of its week. It is
  * never made in a record's first `PEN_YOUNG_DAYS` days (ENG-B17: "a fortnight of use is not a habit"), counted from the
  * day the record was made and never from the oldest day its entries say, so an import does not make a record old.
+ *
+ * ONE OFFER A LIST, IN ONE PLACE, THE BEST FEW AT ONCE (USE-B03). `penRanked` keeps one offer a list and drops a list Slash
+ * already asked a page for on Decide; `penFor` shows its first `PEN_SHOWN`. An offer's id is made by `signatureOf` alone,
+ * so Slash's growing list can name the same offer and ask `pageSpokenFor` before it drafts one.
  */
 
 import type { Declaration, Json, Kernel, RegisterDecl } from '@braindog/kernel';
+import { SLASH } from '@braindog/kernel';
 import type { Sql } from '@braindog/ports';
 
 /** One thing the pen offers, and the whole declaration accepting it would write. */
@@ -56,8 +61,13 @@ export type PenItem = {
   draft?: { id: string; kind: string; body: Record<string, Json> };
 };
 
-/** The most items the pen answers, strongest first; the rest wait until one is kept or dismissed (`29 §4` (b) 3). */
+/** The most items the pen ranks, one a list; past it the rest wait until one is kept or dismissed (`29 §4` (b) 3). */
 export const PEN_MOST = 24;
+/**
+ * The most items `boot` shows at once, the best of the ranked pen (USE-B03: "make sure that the braindog experience is
+ * not overwhelming for new users"). The rest wait their turn, and `penRanked` still says how many wait in all.
+ */
+export const PEN_SHOWN = 3;
 /** The most figures a proposed page opens with (`29 §5`, Figures). */
 export const PEN_FIGURES_MOST = 3;
 /** The most columns a proposed page's table draws. */
@@ -66,6 +76,25 @@ export const PEN_COLUMNS_MOST = 6;
 export const PEN_ROWS_DRAWN = 50;
 /** The most dismissals a person's `pen.dismissed` keeps; past it the oldest is let go first. */
 export const PEN_DISMISSED_MOST = 500;
+
+/** What an offer is about: a list's page, its week, a block on a page, or a column on a page's table. */
+export type PenSignatureKind = 'page' | 'week' | 'block' | 'column';
+
+/**
+ * THE ONE MAKER OF AN OFFER'S SIGNATURE, which is its id and what `pen.dismissed` holds, so another rule offering the
+ * same thing (Slash's growing list, `slash.ts` `noticeWhole`) makes the same one and a dismissal holds for both.
+ */
+export const signatureOf = (kind: PenSignatureKind, subject: string): string => `${kind}:${subject}`;
+
+/** The signatures that offer `list` a page of its own: its plain page and its week. */
+export const pageSignatures = (list: string): readonly [string, string] => [signatureOf('page', list), signatureOf('week', list)];
+
+/**
+ * Whether `list` already has a page offered or turned down: one of its `pageSignatures` held by the pen now or in the
+ * person's `pen.dismissed`. Slash asks this before it drafts a page for a list, so one list is offered in one place.
+ */
+export const pageSpokenFor = (list: string, ...signatures: readonly ReadonlySet<string>[]): boolean =>
+  pageSignatures(list).some((s) => signatures.some((held) => held.has(s)));
 
 /**
  * THE FIELD TYPES A PROPOSED TABLE NEVER DRAWS AS A COLUMN. A `secret` is revealed deliberately and audited, never by a
@@ -161,7 +190,7 @@ function pagesOffered(deps: PenDeps): PenItem[] {
 
   const waiting: { id: string; name: string; rows: number; decl: RegisterDecl }[] = [];
   for (const [id, decl] of kernel.registers()) {
-    if (readByAPage.has(id) || dismissed.has(`page:${id}`) || !reads(id)) continue;
+    if (readByAPage.has(id) || dismissed.has(signatureOf('page', id)) || !reads(id)) continue;
     const rows = kernel.count(id);
     if (rows > 0) waiting.push({ id, name: decl.name, rows, decl });
   }
@@ -214,7 +243,7 @@ function pagesOffered(deps: PenDeps): PenItem[] {
     };
     taken.add(slug);
     items.push({
-      id: `page:${list.id}`,
+      id: signatureOf('page', list.id),
       kind: 'page',
       register: list.id,
       title: list.name,
@@ -232,17 +261,106 @@ function pagesOffered(deps: PenDeps): PenItem[] {
 }
 
 /**
- * The holding pen `boot` answers: a week page first, since it is what the person has been doing, then the pages, since a
- * list no page draws is the strongest case there is (`29 §3` T1), then the blocks and columns the record's own pages ask
- * for, strongest first, at most `PEN_MOST` in all.
+ * The whole holding pen, ranked: what `boot` shows the first `PEN_SHOWN` of, and what waits behind them.
  *
- * ONE PAGE OFFER A LIST. A list offered its week is not offered a plain page beside it, so its screen holds one offer.
+ * WHAT IS OFFERED: a week page first, since it is what the person has been doing, then the pages, since a list no page
+ * draws is the strongest case there is (`29 §3` T1), then the blocks and columns the record's own pages ask for,
+ * strongest first.
+ *
+ * ONE OFFER A LIST. A list offered its week is not offered a plain page beside it, and a list offered anything is not
+ * offered a second thing beside it, so its screen holds one offer and the pen never counts one list twice. The first
+ * kept is the strongest, in the order above; the next waits until that one is kept or dismissed.
+ *
+ * ONE PLACE A LIST. A list Slash already asked a page for on Decide, still waiting or turned down there, is not offered
+ * one here (`slashAsked`): the same question in two places is a nag, and an answer in one must hold in the other.
+ *
+ * THE RANK (USE-B03): a list the person opened in the last seven days first, then the list with the newest entry, and
+ * where those tie, the order above. Both are read from the record's store, so without `use` the order above is the rank.
  */
-export function penFor(deps: PenDeps): PenItem[] {
+export function penRanked(deps: PenDeps): PenItem[] {
   const weeks = weeksOffered(deps);
   const weekly = new Set(weeks.map((w) => w.register));
-  const pages = [...weeks, ...pagesOffered(deps).filter((p) => !weekly.has(p.register))].slice(0, PEN_MOST);
-  return [...pages, ...shapesOffered(deps, PEN_MOST - pages.length)];
+  const asked = slashAsked(deps);
+  const offered = [...weeks, ...pagesOffered(deps).filter((p) => !weekly.has(p.register)), ...shapesOffered(deps, PEN_MOST)];
+  const lists = new Set<string>();
+  const one: PenItem[] = [];
+  for (const item of offered) {
+    if (lists.has(item.register) || (item.kind === 'page' && asked.has(item.register))) continue;
+    lists.add(item.register);
+    one.push(item);
+  }
+  return rank(deps, one).slice(0, PEN_MOST);
+}
+
+/** The holding pen `boot` answers: the best `PEN_SHOWN` of `penRanked`, one a list. The rest wait their turn. */
+export function penFor(deps: PenDeps): PenItem[] {
+  return penRanked(deps).slice(0, PEN_SHOWN);
+}
+
+/** How far back "opened lately" looks, in days: a week, counted from today, so a Monday does not forget a Sunday. */
+const OPENED_DAYS = 7;
+
+/**
+ * The items in the rank `penRanked` describes. A STABLE SORT, so items whose lists tie keep the order they were made in.
+ *
+ * OPENED IS A READ OF THE LIST ITSELF OR A RENDER OF A PAGE THAT DRAWS IT (`observation`), the signals `weeksRead` reads.
+ * THE NEWEST ENTRY is the latest `created_at` of a live entry, one grouped read for every list in the pen.
+ */
+function rank(deps: PenDeps, items: readonly PenItem[]): PenItem[] {
+  const { use, pages } = deps;
+  if (!use || items.length < 2) return [...items];
+  const lists = [...new Set(items.map((i) => i.register))];
+  const since = new Date(use.nowMs - (OPENED_DAYS - 1) * DAY_MS).toISOString().slice(0, 10);
+  const seen = use.sql.all<{ kind: string; subject: string }>(
+    "SELECT DISTINCT kind, subject FROM observation WHERE day >= ? AND kind IN ('register.read', 'page.render')",
+    since,
+  );
+  const read = new Set(seen.filter((s) => s.kind === 'register.read').map((s) => s.subject));
+  const rendered = new Set(seen.filter((s) => s.kind === 'page.render').map((s) => s.subject));
+  const opened = new Set(lists.filter((l) => read.has(l) || pages.some((p) => rendered.has(p.slug) && p.registers.includes(l))));
+  const newest = new Map(
+    use.sql
+      .all<{ register: string; at: string | null }>(
+        `SELECT register, MAX(created_at) AS at FROM entry WHERE deleted_at IS NULL AND register IN (${lists.map(() => '?').join(', ')}) GROUP BY register`,
+        ...lists,
+      )
+      .map((r) => [r.register, r.at ?? '']),
+  );
+  const tier = (i: PenItem): number => (opened.has(i.register) ? 0 : 1);
+  const at = (i: PenItem): string => newest.get(i.register) ?? '';
+  return [...items].sort((a, b) => tier(a) - tier(b) || (at(a) === at(b) ? 0 : at(a) > at(b) ? -1 : 1));
+}
+
+/**
+ * The lists Slash already asked a page of its own for: an arrangement it filed (`opened_by` Slash) that adds a page
+ * whose only list is that one, drawn whole, still waiting or turned down (`wont-fix`, `incorrect`). One that was kept made
+ * the page, which the pen sees as a page reading the list; one taken back asks nothing. Slash's people pages draw a list
+ * narrowed to one person (`where`), so they are not a page of the list.
+ */
+function slashAsked(deps: PenDeps): ReadonlySet<string> {
+  const out = new Set<string>();
+  if (!deps.use) return out;
+  const filed = deps.use.sql.all<{ body: string }>(
+    "SELECT body FROM suggestion WHERE opened_by = ? AND body_kind = 'arrange' AND (status <> 'resolved' OR resolved_as IN ('wont-fix', 'incorrect'))",
+    SLASH,
+  );
+  for (const { body } of filed) {
+    let parsed: { pages?: unknown };
+    try {
+      parsed = JSON.parse(body) as typeof parsed;
+    } catch {
+      continue;
+    }
+    for (const page of Array.isArray(parsed.pages) ? parsed.pages : []) {
+      const { was, body: decl } = (page ?? {}) as { was?: unknown; body?: { requires?: unknown; blocks?: unknown } };
+      const requires = decl?.requires;
+      if (was !== null || !Array.isArray(requires) || requires.length !== 1 || typeof requires[0] !== 'string' || !requires[0].startsWith('register.')) continue;
+      const source = requires[0];
+      const blocks = Array.isArray(decl?.blocks) ? (decl.blocks as { source?: unknown; where?: unknown }[]) : [];
+      if (blocks.some((b) => b?.source === source && b.where === undefined)) out.add(source.slice('register.'.length));
+    }
+  }
+  return out;
 }
 
 /* ── the block a list's shape asks for, and the column its people fill ──────────────────────────────────────────── */
@@ -384,7 +502,7 @@ function blocksAskedFor(page: HeldPage, list: string, decl: RegisterDecl, facts:
       out.push({
         kind: 'calendar',
         title: `A calendar of ${decl.name}`,
-        why: `${decl.name} puts a day on its rows in ${labelOf(day)}, and ${page.title} has no calendar of them.`,
+        why: `${decl.name} puts a day on its entries in ${labelOf(day)}, and ${page.title} has no calendar of them.`,
         block: { kind: 'calendar', heading: heading(decl.name), source, columns: [{ field: named.id }, { field: day.id }], empty: empty(`Nothing in ${decl.name} falls in these months.`) },
       });
   }
@@ -436,7 +554,7 @@ function blocksAskedFor(page: HeldPage, list: string, decl: RegisterDecl, facts:
       out.push({
         kind: 'lines',
         title: `${labelOf(number)} over time`,
-        why: `${decl.name} records ${lower(labelOf(number))} with a day on ${together.toLocaleString('en')} rows, and ${page.title} does not draw it over time.`,
+        why: `${decl.name} records ${lower(labelOf(number))} with a day on ${together.toLocaleString('en')} entries, and ${page.title} does not draw it over time.`,
         block: { kind: 'lines', heading: heading(labelOf(number)), source, columns: [{ field: day.id }, { field: number.id }], empty: empty(`Nothing recorded in ${decl.name} yet.`) },
       });
   }
@@ -460,7 +578,7 @@ function columnAskedFor(page: HeldPage, list: string, decl: RegisterDecl, rows: 
 
   let best: { field: Field; filled: number } | null = null;
   for (const field of decl.fields) {
-    if (field.retired === true || NOT_A_COLUMN.has(field.type) || shown.has(field.id) || dismissed.has(`column:${page.slug}:${at}:${field.id}`)) continue;
+    if (field.retired === true || NOT_A_COLUMN.has(field.type) || shown.has(field.id) || dismissed.has(signatureOf('column', `${page.slug}:${at}:${field.id}`))) continue;
     const filled = facts.filled(list, [field.id]);
     if (filled >= rows * PEN_COLUMN_FILLED && (best === null || filled > best.filled)) best = { field, filled };
   }
@@ -473,11 +591,11 @@ function columnAskedFor(page: HeldPage, list: string, decl: RegisterDecl, rows: 
   return {
     rows,
     item: {
-      id: `column:${page.slug}:${at}:${best.field.id}`,
+      id: signatureOf('column', `${page.slug}:${at}:${best.field.id}`),
       kind: 'column',
       register: list,
       title: `${label} on ${page.title}`,
-      why: `${label} is filled on ${share}% of the ${rows.toLocaleString('en')} rows in ${decl.name}, and the table on ${page.title} does not show it.`,
+      why: `${label} is filled on ${share}% of the ${rows.toLocaleString('en')} entries in ${decl.name}, and the table on ${page.title} does not show it.`,
       change: { to: { id: page.id, kind: 'page', body: { ...page.body, blocks } } },
     },
   };
@@ -510,7 +628,7 @@ function shapesOffered(deps: PenDeps, room: number): PenItem[] {
       if (!decl || !reads(list)) continue;
       const rows = facts.rows(list);
       if (rows === 0) continue;
-      const idOf = (kind: string): string => `block:${page.slug}:${kind}:${list}`;
+      const idOf = (kind: string): string => signatureOf('block', `${page.slug}:${kind}:${list}`);
       /* ONE ITEM PER PAGE AND KIND: the first list the page draws that asks for a calendar is the one offered one. */
       for (const asked of blocksAskedFor(page, list, decl, facts, (kind) => spoken.has(kind) || dismissed.has(idOf(kind)))) {
         spoken.add(asked.kind);
@@ -667,7 +785,7 @@ function weeksOffered(deps: PenDeps): PenItem[] {
 
   const offers: Offer[] = [];
   for (const [id, decl] of kernel.registers()) {
-    if (dismissed.has(`week:${id}`) || !reads(id) || kernel.count(id) < PEN_WEEK_FEWEST) continue;
+    if (dismissed.has(signatureOf('week', id)) || !reads(id) || kernel.count(id) < PEN_WEEK_FEWEST) continue;
     const live = decl.fields.filter((f) => f.retired !== true);
     const days = live.filter((f) => f.type === 'day');
     const day =
@@ -738,7 +856,7 @@ function weeksOffered(deps: PenDeps): PenItem[] {
     const draft = { id: `page.${slug}`, kind: 'page', body };
     offers.push({
       rows: n,
-      item: { id: `week:${id}`, kind: 'page', register: id, title, why: `${decl.name} has ${said}. Give them a page of their own?`, change: { to: draft }, list: id, draft },
+      item: { id: signatureOf('week', id), kind: 'page', register: id, title, why: `${decl.name} has ${said}. Give them a page of their own?`, change: { to: draft }, list: id, draft },
     });
   }
   return offers

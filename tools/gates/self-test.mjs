@@ -407,6 +407,7 @@ async function walkRules(gate) {
  */
 export const ELSEWHERE = new Map([
   ['typecheck', () => ['pnpm -r run typecheck', [], { shell: true }]],
+  ['words-guide', () => [process.execPath, [join(here, 'words-guide.mjs'), '--check']]],
   [
     'theme',
     (fixture) => [process.execPath, [join(here, '..', '..', 'packages', 'skin', 'scripts', 'theme.mjs'), '--check', '--tokens', join(fixture, 'tokens.json')]],

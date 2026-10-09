@@ -11,13 +11,13 @@
  */
 
 import { firstPartyModule, moduleOfList } from '@braindog/seed/packs/modules';
-import { MODULE_ORDER } from '@braindog/seed/usecases';
+import { listsOf as caseLists, MODULE_ORDER, USE_CASES } from '@braindog/seed/usecases';
 import { moduleDocument } from '@braindog/seed/usecases/install';
 import { moduleName } from '@braindog/seed/usecases/names';
 
 import { firstRun } from '../../lib/first-run.ts';
 import { shape } from '../../lib/shape.ts';
-import type { Proposal } from '../../lib/start/propose.ts';
+import type { Place, Proposal } from '../../lib/start/propose.ts';
 import { isGlyph, type IconName } from '../../lib/ui/icons.ts';
 import { hear, PEOPLE } from '../../lib/who.ts';
 
@@ -44,10 +44,14 @@ export const words = {
   /** The build tile, before and after a part waits on an answer. */
   building: 'Your BrainDog, building',
   ready: 'Your BrainDog, ready',
-  parts: (on: number, total: number) => `${on} of ${total}`,
-  /** Under the build's progress, before anything was typed. */
+  /** The build beside the words, headed by the record's name, or this before one is heard. */
+  yours: 'Your BrainDog',
+  asYouType: 'builds as you type',
+  /** Under the places: nothing is drawn in them that the person did not say. */
+  startsEmpty: 'Each place starts empty and fills with what you tell it. No sample entries.',
+  /** Under the build, before anything was typed. */
   lightsUp: 'Each part lights up as I hear it.',
-  /** The progress bar's reading line: what is on, and what waits. */
+  /** The build's reading line: what is on, and what waits. */
   onReading: (on: readonly string[], waiting: string | null) =>
     on.length === 0
       ? waiting
@@ -55,15 +59,9 @@ export const words = {
         : ''
       : `${firstRun.and(on)} ${on.length === 1 ? 'is' : 'are'} on${waiting ? `, and ${waiting} waits on your answer` : ''}.`,
   nothingSaved: 'Nothing is saved until you finish.',
-  /** The progress bar read aloud. */
-  progress: (on: readonly string[], waiting: string | null, off: readonly string[]) =>
-    [
-      on.length === 0 ? 'No part is on yet' : `On: ${firstRun.and(on)}`,
-      waiting ? `${waiting} waits on your answer` : '',
-      off.length === 0 ? '' : `off: ${firstRun.and(off)}`,
-    ]
-      .filter((s) => s !== '')
-      .join('; ') + '.',
+  /** The parts that are on, read aloud: never a total, since a part left off is not a step behind. */
+  progress: (on: readonly string[], waiting: string | null) =>
+    [on.length === 0 ? 'No part is on yet' : `On: ${firstRun.and(on)}`, waiting ? `${waiting} waits on your answer` : ''].filter((s) => s !== '').join('; ') + '.',
   /** Why a part is on, as the meta at the right of its tile. */
   fromWords: 'from your words',
   byHand: 'turned on by you',
@@ -207,7 +205,6 @@ export function entryOf(row: Proposal['rows'][number]): Entry {
  * switch; the conversation's "Make it for" choices are how a person changes it.
  */
 export function casePart(u: { usecase: string; title: string; summary: string; pack: Record<string, unknown> | null }, heard: readonly Said[], byHand: boolean): Part {
-  const why = phrasesFor(u.title, heard);
   const raw = u.pack?.declarations;
   const decls: unknown[] = Array.isArray(raw) ? raw : [];
   const lists: string[] = [];
@@ -217,23 +214,32 @@ export function casePart(u: { usecase: string; title: string; summary: string; p
     if (typeof one.rule === 'string' || typeof one.script === 'string' || typeof one.ingest === 'string') continue;
     if (typeof one.register === 'string') lists.push(typeof one.name === 'string' ? one.name : one.register);
   }
+  /* A PHRASE IS THE USE CASE'S where it says its title or one of its lists: "a small candle shop" became Orders and Products. */
+  const why = phrasesFor([u.title, ...lists], heard);
   return { id: `usecase-${u.usecase}`, name: u.title, icon: 'home', on: true, state: why.length === 0 && byHand ? 'hand' : 'heard', held: null, why, entries: [], lists, blurb: u.summary };
 }
 
-/** The glyph for what a phrase became: the part it names first, a use case's home, or Money's for an amount. */
-export function iconOfBecame(became: string): IconName {
+/**
+ * The glyph for what a phrase became: the part it names first, by its name or the person's word for one of its lists
+ * (`names`, Clients for People); a use case's list by its own glyph (Orders); a use case's home; or Money's for an amount.
+ */
+export function iconOfBecame(became: string, names: Readonly<Record<string, string>> = {}): IconName {
   if (became === firstRun.shapeNoCurrency) return 'money';
   const first = became.split(/,\s*|\s+and\s+/u)[0] ?? '';
-  const id = MODULE_ORDER.find((m) => moduleName(m) === first);
-  return id === undefined ? 'home' : partIcon(id);
+  const renamed = Object.entries(names).find(([, word]) => word === first)?.[0];
+  const id = MODULE_ORDER.find((m) => moduleName(m) === first) ?? (renamed === undefined ? undefined : moduleOfList(renamed)?.id);
+  if (id !== undefined) return partIcon(id);
+  const list = USE_CASES.flatMap((u) => caseLists(u).map((l) => [l.id, u.labels[l.id] ?? l.name] as const)).find(([, word]) => word === first)?.[0];
+  return list === undefined ? 'home' : placeIcon({ kind: 'list', id: list });
 }
 
-/** The phrases heard for one part: the ones whose "became" names it. */
-function phrasesFor(name: string, heard: readonly Said[]): string[] {
+/** The phrases heard for one part: the ones whose "became" names it, by any of the words it goes by. */
+function phrasesFor(name: string | readonly string[], heard: readonly Said[]): string[] {
+  const words = typeof name === 'string' ? [name] : name;
   const out: string[] = [];
   for (const h of heard) {
     const became = h.became.split(/,\s*|\s+and\s+/u);
-    if (became.includes(name) && !out.includes(h.phrase)) out.push(h.phrase);
+    if (became.some((w) => words.includes(w)) && !out.includes(h.phrase)) out.push(h.phrase);
   }
   return out;
 }
@@ -251,6 +257,8 @@ export type PartsIn = {
   byHand: ReadonlySet<string>;
   /** The part that waits on the open question, or `null`. */
   waiting: string | null;
+  /** The person's word for a list, by list id (`Proposal.names`): a part is also said by it, Clients for People. */
+  names?: Readonly<Record<string, string>> | undefined;
 };
 
 /** Every part on offer, each with why it is on and what it will hold. */
@@ -259,7 +267,8 @@ export function partsOf(p: PartsIn): Part[] {
     const name = moduleName(id);
     const info = firstPartyModule(id);
     const on = p.modules.includes(id);
-    const why = phrasesFor(name, p.heard);
+    const renamed = Object.entries(p.names ?? {}).flatMap(([list, word]) => (moduleOfList(list)?.id === id ? [word] : []));
+    const why = phrasesFor([name, ...renamed], p.heard);
     const held = p.heldBy(id);
     /* A PART THAT CANNOT BE TURNED OFF SAYS WHO NEEDS IT before why it was heard, so a still switch has its reason. */
     const state: PartState = !on ? 'off' : id === p.waiting ? 'waiting' : held !== null ? 'held' : why.length > 0 ? 'heard' : p.byHand.has(id) ? 'hand' : 'heard';
@@ -270,14 +279,13 @@ export function partsOf(p: PartsIn): Part[] {
 }
 
 /**
- * The parts in the order the progress bar draws them: the ones made first, then the one waiting on an answer, then the
- * ones left off, so the bar's filled cells, its outlined cell and its empty ones each sit together.
+ * The parts that are on, in the order they were heard: the ones made first, then the one waiting on an answer. A part
+ * left off is not drawn, so nothing reads as a step not yet taken, and nothing totals them (USE-B07).
  */
 export function stepsOf(parts: readonly Part[]): { order: Part[]; done: number; current: boolean } {
   const made = parts.filter((p) => p.on && p.state !== 'waiting');
-  const waiting = parts.filter((p) => p.state === 'waiting');
-  const off = parts.filter((p) => !p.on);
-  return { order: [...made, ...waiting, ...off], done: made.length, current: waiting.length > 0 };
+  const waiting = parts.filter((p) => p.on && p.state === 'waiting');
+  return { order: [...made, ...waiting], done: made.length, current: waiting.length > 0 };
 }
 
 /* ── the sentence under the title ─────────────────────────────────────── */
@@ -286,13 +294,40 @@ export function stepsOf(parts: readonly Part[]): { order: Part[]; done: number; 
 export type Sentence = { before: string; needs: string; after: string };
 
 /**
- * "Four of six parts are on. One question left: which of pounds and dollars is home." The phrase that needs him is the
- * open question, and only that; with none, the sentence says there is nothing left to ask.
+ * "One question left: which of pounds and dollars is home." The phrase that needs him is the open question, and only
+ * that; with none, the sentence says there is nothing left to ask, or, with nothing on, how to make something. It says
+ * what waits, never how many parts there are.
  */
-export function statusOf(on: number, total: number, question: string | null): Sentence {
-  const lead = on === 0 ? 'Nothing is on yet.' : `${numberWord(on, true)} of ${numberWord(total)} ${total === 1 ? 'part' : 'parts'} ${on === 1 ? 'is' : 'are'} on.`;
-  if (question) return { before: `${lead} `, needs: 'One question left', after: `: ${question}.` };
-  return { before: on === 0 ? `${lead} ${firstRun.makeSomething}` : `${lead} ${words.noQuestion}`, needs: '', after: '' };
+export function statusOf(on: number, question: string | null): Sentence {
+  if (question) return { before: '', needs: 'One question left', after: `: ${question}.` };
+  return { before: on === 0 ? `Nothing is on yet. ${firstRun.makeSomething}` : words.noQuestion, needs: '', after: '' };
+}
+
+/* ── the places ───────────────────────────────────────────────────────── */
+
+/**
+ * THE GLYPH A PLACE WEARS: Today's own, a part's (`partIcon`), or the one its use case declares on the list, so a
+ * shop's Orders wears the glyph its page will. A list nothing declares a glyph for is a document.
+ */
+export function placeIcon(place: Pick<Place, 'kind' | 'id'>): IconName {
+  if (place.kind === 'today') return 'today';
+  if (place.kind === 'module') return partIcon(place.id);
+  for (const u of USE_CASES) {
+    const raw = u.pack?.declarations;
+    const decl = (Array.isArray(raw) ? raw : []).find((d): d is Record<string, unknown> => typeof d === 'object' && d !== null && (d as { register?: unknown }).register === place.id);
+    if (decl && typeof decl.icon === 'string' && isGlyph(decl.icon)) return decl.icon;
+  }
+  return 'doc';
+}
+
+/**
+ * Where things will be kept, Today first, for a reading that names none (an older one, or before the first word): Today,
+ * then each part that is on. Each starts empty.
+ */
+export function placesFrom(places: readonly Place[] | undefined, parts: readonly Part[]): Place[] {
+  if (places && places.length > 0) return [...places];
+  const today: Place = { kind: 'today', id: 'today', name: 'Today', phrase: null, at: null };
+  return [today, ...stepsOf(parts).order.filter((p) => !p.id.startsWith('usecase-')).map((p): Place => ({ kind: 'module', id: p.id, name: p.name, phrase: p.why[0] ?? null, at: null }))];
 }
 
 /* ── the words, marked ────────────────────────────────────────────────── */
@@ -317,7 +352,9 @@ export function marksIn(sentence: string, heard: readonly Said[], name: string |
     from = at + phrase.length;
   };
   if (name) mark(name, firstRun.heardName(name));
-  for (const h of heard) mark(h.phrase, h.became);
+  /* THE NAME IS ALSO A HEARD LINE (`you`), marked once above: marking it again would light a second saying of the name
+     as `you`, or mark the same words twice. */
+  for (const h of heard) if (h.you !== true) mark(h.phrase, h.became);
   if (from < sentence.length) out.push({ text: sentence.slice(from), became: null });
   return out;
 }
@@ -383,6 +420,42 @@ const SLANG: Readonly<Record<string, string>> = { bucks: 'dollar', buck: 'dollar
 /** The word a currency is called by, from its English name: "Egyptian Pound" is a pound. */
 const wordOf = (english: string): string => (english.trim().split(/\s+/u).at(-1) ?? '').toLowerCase();
 
+/**
+ * The zone as the browser names it, so a zone typed under its newer name (`Asia/Kolkata`) is found among a region's
+ * zones listed under the older one (`Asia/Calcutta`). The zone as given where the browser does not know it.
+ */
+function canonicalZone(zone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en', { timeZone: zone }).resolvedOptions().timeZone;
+  } catch {
+    return zone;
+  }
+}
+
+/**
+ * The currencies of the region whose time this device keeps: each currency whose region lists the zone. A zone in
+ * Europe whose region has no currency of its own is the euro's.
+ */
+function zonedCodes(env: Pick<CurrencyEnv, 'codes' | 'zone' | 'zonesOf'>): Set<string> {
+  const zoned = new Set<string>();
+  if (env.zone === null) return zoned;
+  const names = new Set([env.zone, canonicalZone(env.zone)]);
+  for (const code of env.codes) if (env.zonesOf(code.slice(0, 2))?.some((z) => names.has(z) || names.has(canonicalZone(z)))) zoned.add(code);
+  if (zoned.size === 0 && env.zone.startsWith('Europe/') && env.codes.includes('EUR')) zoned.add('EUR');
+  return zoned;
+}
+
+/**
+ * THE ONE CURRENCY OF THE REGION THE ZONE KEEPS, the fact `currencyChoices` weighs at 2: EGP for `Africa/Cairo`, the
+ * euro for `Europe/Berlin`. `null` for no zone, a zone no region keeps (`UTC`), or a region that keeps two (`America/Havana`),
+ * since a currency is taken from a device only where it is the only one. `env` is the browser's when not handed in.
+ */
+export function zoneCurrency(zone: string | null, env: Pick<CurrencyEnv, 'codes' | 'zonesOf'> = browserCurrencyEnv('en', [], zone)): string | null {
+  if (zone === null || zone.trim() === '') return null;
+  const zoned = zonedCodes({ codes: env.codes, zonesOf: env.zonesOf, zone });
+  return zoned.size === 1 ? ([...zoned][0] ?? null) : null;
+}
+
 /** The city of a time zone, as a person says it: `America/New_York` keeps New York time. */
 export const cityOf = (zone: string): string => (zone.split('/').at(-1) ?? zone).replaceAll('_', ' ');
 
@@ -418,11 +491,7 @@ export function currencyChoices(said: string, env: CurrencyEnv, most = 3): Curre
     for (const c of codes) named.set(c, codes.length);
   }
 
-  const zoned = new Set<string>();
-  if (env.zone !== null) {
-    for (const code of env.codes) if (env.zonesOf(code.slice(0, 2))?.includes(env.zone)) zoned.add(code);
-    if (zoned.size === 0 && env.zone.startsWith('Europe/') && env.codes.includes('EUR')) zoned.add('EUR');
-  }
+  const zoned = zonedCodes(env);
   const spoken = new Set<string>();
   for (const region of env.regions.slice(0, 1)) for (const code of env.codes) if (code.startsWith(region)) spoken.add(code);
 
@@ -517,4 +586,42 @@ export function browserCurrencyEnv(locale: string, languages: readonly string[],
     },
     regionName: (r) => regionNames?.of(r) ?? r,
   };
+}
+
+/* ── the passkey, straight after the link ─────────────────────────────── */
+
+/**
+ * WHAT THIS DEVICE IS CALLED, as the passkey is named (`platformLabel` in `lib/auth.ts`, LCH-A04): "this iPhone", "this
+ * Mac", or Windows Hello by its own name. A device the label cannot tell is "this device".
+ */
+export function deviceWord(label: string): { name: string; it: string } {
+  if (label === '' || label === 'Passkey') return { name: 'this device', it: 'This device' };
+  if (label === 'Windows Hello') return { name: label, it: label };
+  return { name: `this ${label}`, it: `This ${label}` };
+}
+
+/**
+ * The passkey ask, in the words of the device it is made on (use case 6, step 4: "this phone signs you in with its own
+ * lock, with no password to remember"). One press makes it; "Not now" leaves it for Settings.
+ */
+export function passkeyAsk(label: string): { title: string; why: string; press: string; later: string; kept: string } {
+  const d = deviceWord(label);
+  return {
+    title: `Sign in with ${d.name} from now on`,
+    why: `${d.it} signs you in with its own lock, with no password to remember and no email to wait for.`,
+    press: `Use ${d.name}`,
+    later: 'Not now',
+    kept: `Done. ${d.it} signs you in now.`,
+  };
+}
+
+/**
+ * WHETHER THE PASSKEY IS OFFERED: the host offers passkeys, somebody is signed in, this is their first run with none
+ * yet (`firstRun`, `packages/ports/src/auth.ts`), and this page can make one. Anybody else never sees it.
+ */
+export function passkeyOffered(
+  can: { webauthn: boolean; secure: boolean },
+  host: { ok: true; value: { passkey: boolean; me: unknown; firstRun?: boolean | undefined } } | { ok: false },
+): boolean {
+  return can.webauthn && can.secure && host.ok && host.value.passkey && host.value.me !== null && host.value.firstRun === true;
 }

@@ -237,3 +237,16 @@ test('F60: a daily script whose egress is empty fetches nothing, so numbers-arri
   assert.equal((await read([])).state, 'none');
   assert.equal((await read(['https://api.example.test'])).state, 'red');
 });
+
+test('A PROJECT PAGE READS WHAT IS IN ITS WAY (actions.blocking): the paused action, in its sentence, and another project nothing', async () => {
+  const { k, sql, clock } = await withPoll();
+  await k.runActions(answering(said(200, 'balance 120')));
+  clock.advance(2 * HOUR);
+  await k.runActions(answering(said(401, 'no')));
+  const read = (about: string) => k.block({ kind: 'table', source: 'actions.blocking', about, columns: [{ field: 'name' }, { field: 'why' }, { field: 'said' }] } as never);
+  const studio = read('studio');
+  assert.deepEqual(studio.refusals, []);
+  assert.deepEqual(studio.rows?.map((r) => [r.fields.why, r.fields.said]), [['paused', actionsBlocking(sql, clock.now(), 'studio')[0]!.said]]);
+  assert.deepEqual(read('garden').rows, []);
+  sql.close();
+});

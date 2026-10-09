@@ -619,7 +619,7 @@ test('the MCP server sends the run and client from the session file, and a hook 
 
   const stray = await run(['hook', 'begin'], envFor(folder('config'), {}), '');
   assert.equal(stray.code, 0);
-  assert.match(stray.stderr, /^braindog hook takes start or end/);
+  assert.match(stray.stderr, /^braindog hook takes start, end or beat/);
 });
 
 /* ── which run a command is ────────────────────────────────────────────── */
@@ -940,12 +940,17 @@ test('INSTALL IS A DRY RUN BY DEFAULT, and with --apply keeps a copy, keeps othe
   const env = envFor(folder('config'), {});
   const start = hookCommand('start', join(APP, 'hooks'));
   const end = hookCommand('end', join(APP, 'hooks'));
+  const beat = hookCommand('beat', join(APP, 'hooks'));
+  const status = 'Connecting to BrainDog...';
 
   const dry = await run(['install', '--config-dir', profile], env, '');
   assert.equal(dry.code, 0, dry.stderr);
   assert.ok(dry.stdout.startsWith(`braindog install would change ${file}:\n`), dry.stdout);
-  assert.ok(dry.stdout.includes(`  + hooks.SessionStart: ${JSON.stringify({ hooks: [{ type: 'command', command: start, timeout: 20 }] })}`));
-  assert.ok(dry.stdout.includes(`  + hooks.SessionEnd: ${JSON.stringify({ hooks: [{ type: 'command', command: end, timeout: 15 }] })}`));
+  assert.ok(dry.stdout.includes(`  + hooks.SessionStart: ${JSON.stringify({ hooks: [{ type: 'command', command: start, timeout: 10, statusMessage: status }] })}`), dry.stdout);
+  assert.ok(dry.stdout.includes(`  + hooks.SessionEnd: ${JSON.stringify({ hooks: [{ type: 'command', command: end, timeout: 10, statusMessage: status }] })}`), dry.stdout);
+  /* THE BEAT CARRIES NO STATUS LINE: it runs after every tool call, and a line flashing under the agent's work each time
+     is a busier screen (hooks-48's checker). */
+  assert.ok(dry.stdout.includes(`  + hooks.PostToolUse: ${JSON.stringify({ hooks: [{ type: 'command', command: beat, timeout: 10 }] })}`), dry.stdout);
   assert.ok(dry.stdout.split('\n').some((l) => l.startsWith('Nothing was changed. To write it, run this in ') && l.includes(` install --apply --config-dir '${profile}'`)), dry.stdout);
   assert.ok(dry.stdout.includes('claude mcp add --scope user braindog'));
   assert.equal(readFileSync(file, 'utf8'), before, 'the dry run changed the settings');
@@ -961,7 +966,7 @@ test('INSTALL IS A DRY RUN BY DEFAULT, and with --apply keeps a copy, keeps othe
   assert.deepEqual(now.hooks.SessionEnd!.map((g) => g.hooks[0]!.command), [end]);
 
   const again = await run(['install', '--apply', '--config-dir', profile], env, '');
-  assert.ok(again.stdout.startsWith(`${file} already runs both BrainDog hooks. Nothing to change.`));
+  assert.ok(again.stdout.startsWith(`${file} already runs every BrainDog hook. Nothing to change.`));
   assert.deepEqual(readdirSync(profile).sort(), ['settings.json', 'settings.json.bak', 'skills']);
 
   /* A settings file that is not JSON is left alone, and its text is not quoted. */
@@ -997,7 +1002,7 @@ test('INSTALL INTO A SETTINGS FILE THE PERSON NAMES: a project settings.local.js
   /* Both named: the profile folder and the file, each once. */
   const both = await run(['install', '--config-dir', profile, '--settings', file], env, '');
   assert.ok(both.stdout.includes(`braindog install would change ${join(profile, 'settings.json')}, a new file:`), both.stdout);
-  assert.ok(both.stdout.includes(`${file} already runs both BrainDog hooks. Nothing to change.`), both.stdout);
+  assert.ok(both.stdout.includes(`${file} already runs every BrainDog hook. Nothing to change.`), both.stdout);
 
   const wrong = await run(['install', '--apply', '--settings', join(repo, 'settings.yaml')], env, '');
   assert.equal(wrong.code, 1);
@@ -1135,7 +1140,7 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only Tal
   /* `checkout` a folder in no git tree, so the moving-checkout line, which follows the real tree's state, is not owed. */
   const again = installInto(dir, { apply: true, replace: REPLACE, scripts, home, checkout: home });
   assert.deepEqual(again, [
-    `${settings} already runs both BrainDog hooks and no Tallybook hook. Nothing to change.`,
+    `${settings} already runs every BrainDog hook and no Tallybook hook. Nothing to change.`,
     `${claudeJson} registers no Tallybook MCP server. Nothing to change.`,
   ]);
   assert.deepEqual(readdirSync(dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak', 'skills']);

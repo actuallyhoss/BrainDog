@@ -23,14 +23,19 @@ import {
   recordNames,
   SAID_KEY,
   SAID_MOST,
+  saidFromLink,
   saidKept,
   startSignup,
   type Asked,
   type Io,
   type NameSeen,
 } from '../../lib/signup.ts';
+import { readFileSync } from 'node:fs';
+
+import { firstRun } from '../../lib/first-run.ts';
 import { words } from './words.ts';
 import { propose } from '../../lib/start/propose.ts';
+import { oneQuestion, words as asked } from '../../lib/start/question.ts';
 
 const CTX = { zone: 'Europe/London', locale: 'en-GB' };
 
@@ -234,4 +239,88 @@ test('THE INVITATION PAGE IS ONE PLAIN LINE, with no dash and no code to type', 
     assert.doesNotMatch(line, /[\u2013\u2014]/);
     assert.doesNotMatch(line, /\bcode\b/i, 'nobody types a code, so the page does not ask for one');
   }
+});
+
+/* ── use case 6, steps 1 to 4 (his word of 9 October) ───────────────── */
+
+const PAGE = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+const MARIAM = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer. I lose track of orders and who owes me.";
+const plain = (line: string) => {
+  assert.doesNotMatch(line, /[\u2013\u2014]/, `${line} carries a dash`);
+  assert.doesNotMatch(line, /\b(row|entity|list item)\b/i, `${line} names the machinery`);
+};
+
+test('STEP 1: FIVE STARTING POINTS AND THREE PROMISES, "Yours to export or move, any time" among them', () => {
+  assert.deepEqual([...firstRun.whoChips], ['I run a small shop', 'I freelance', "I'm a student", 'I run a few companies', "I'm part of a team"]);
+  assert.equal(words.promises.length, 3);
+  assert.deepEqual([...words.promises], ['Free, with no card', 'Nothing is saved until you keep it', 'Yours to export or move, any time']);
+  for (const line of [...words.promises, words.lede, words.startFrom]) plain(line);
+  assert.match(PAGE, /firstRun\.whoChips/, 'the page draws chips of its own');
+  assert.match(PAGE, /words\.promises/, 'the page draws no promises');
+});
+
+test('STEP 2: HER WORDS ARE LIT FROM WHERE THE READING SAYS THEY ARE, and the press says "That\'s me"', () => {
+  assert.equal(words.next, "That's me");
+  assert.match(PAGE, /litIn\(sentence, read\?\.heard/, 'the marks are not cut from heard[].at');
+  assert.match(PAGE, /words\.you\b/, 'her name is not said as you');
+  assert.match(PAGE, /words\.takeOut/, 'a line cannot be taken out');
+  for (const line of [words.heardTap, words.you, words.becomeInstead, words.takeOut]) plain(line);
+});
+
+test('STEP 3: ONE QUESTION AT MOST, each answer saying what it means, and the line that says it is the only one', () => {
+  const q = oneQuestion(propose(MARIAM, CTX), MARIAM);
+  assert.ok(q, 'Mariam is asked nothing');
+  assert.equal(q.question, asked.arrivesQuestion);
+  assert.equal(q.choices.length, 3);
+  for (const c of q.choices) assert.ok(c.means && c.means.length > 0, `${c.label} does not say what it means`);
+  assert.equal(q.only, 'That is the only question. Everything else came from what you wrote.');
+  /* ONE QUESTION ON SCREEN: the step draws `q`, one object, and nothing under the field asks a second. */
+  assert.equal((PAGE.match(/id="first-q"/g) ?? []).length, 1, 'more than one question is drawn');
+  assert.doesNotMatch(PAGE, /asking && open ===/, 'the old questions under the field are back');
+  /* NOTHING TO ASK IS STRAIGHT ON: a name, no amount and no orders. */
+  assert.equal(oneQuestion(propose("I'm Sami and I run a few companies", CTX), "I'm Sami and I run a few companies"), null);
+});
+
+test('STEP 4: WHAT WAS SAID IS SENT WITH THE START, so the link carries it to another device', async () => {
+  assert.match(PAGE, /startSignup\(\{[^}]*said: draftNow\(\)/, 'the page does not send what was said');
+  const yes = host({ ok: true, value: {} });
+  await startSignup({ email: 'mariam@example.com', slug: 'mariams-candles', said: { said: MARIAM, currency: null, usecase: null } }, yes.io);
+  const sent = yes.sent[0]?.body?.['said'];
+  assert.equal(typeof sent, 'string', 'no said in the start');
+  assert.equal(saidFromLink(sent as string)?.said, MARIAM);
+  assert.equal(words.send, 'Email me a link');
+  assert.equal(words.openHere, 'Open it on this phone. After that, this phone signs you in with its own lock, with no password to remember.');
+  for (const line of [words.openHere, words.openHereWide, words.lockTitle]) plain(line);
+});
+
+test('STEP 4: THE PASSKEY IS OFFERED STRAIGHT AFTER THE LINK, before the build, and the build goes on without it', () => {
+  const verify = PAGE.slice(PAGE.indexOf('async function verify('), PAGE.indexOf('async function lockable('));
+  assert.ok(verify.indexOf("step = 'lock'") > -1, 'the link does not offer the passkey');
+  assert.ok(verify.indexOf("step = 'lock'") < verify.lastIndexOf('makeFree(held)'), 'the build is made before the passkey is offered');
+  assert.match(PAGE, /<PasskeyFirst ondone=\{lockDone\} \/>/, 'nothing goes on past the passkey');
+});
+
+test('THE MAKING STEP HAS NO BAR THAT MOVES FOR EVER (USE-B07)', () => {
+  assert.doesNotMatch(PAGE, /class="bar"|\.bar-fill/);
+});
+
+/* ── closed, and signed in (the checker's two) ───────────────────────── */
+
+test('CLOSED ASKS NOTHING: no field, no question, and the page waits for the host before it says "Who are you?"', () => {
+  const closed = PAGE.slice(PAGE.indexOf("{:else if step === 'closed' || step === 'invite-only'}"), PAGE.indexOf("{:else if step === 'describe'}"));
+  assert.ok(closed.length > 0, 'the closed page is gone');
+  assert.doesNotMatch(closed, /<textarea|<input|first-q|whoQuestion/, 'the closed page asks something');
+  const loading = PAGE.slice(PAGE.indexOf("{#if step === 'loading' || step === 'verifying'}"), PAGE.indexOf("{:else if step === 'unreachable'}"));
+  assert.doesNotMatch(loading, /whoQuestion/, 'the page asks who you are before it knows sign-up is open');
+  const ask = PAGE.slice(PAGE.indexOf('async function ask('), PAGE.indexOf("step = 'describe'", PAGE.indexOf('async function ask(')));
+  assert.match(ask, /mode === 'closed'\) \{\s*step = 'closed';\s*return;/, 'a closed host still reaches the describe step');
+});
+
+test('SIGNED IN, NO EMAIL: the address field and the link are only for somebody not signed in', () => {
+  const keep = PAGE.slice(PAGE.indexOf("{:else if step === 'keep'}"), PAGE.indexOf("{:else if step === 'lock'}"));
+  const field = keep.indexOf('id="up-email"');
+  assert.ok(field > -1, 'the keep step has no email field');
+  assert.ok(keep.lastIndexOf('{#if signedIn === null}', field) > keep.lastIndexOf('{/if}', field), 'the email field is drawn for somebody signed in');
+  assert.match(PAGE, /const ready = \$derived\([^;]*signedIn !== null \|\|/, 'a person signed in still needs an email to go on');
+  assert.match(PAGE, /\{#if signedIn === null && plan === 'free'\}<p class="quiet open-here">/, 'a person signed in is told to open a link');
 });

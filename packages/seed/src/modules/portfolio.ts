@@ -502,6 +502,22 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* HOW LONG SINCE ANYBODY WORKED ON IT, SINCE portfolio 1.16.0 (REC-C16 part a): the days from the newest stamp the record
+     put on a task of the project, made, moved or finished, to the reading's own day. Read off the record's own
+     `updated_at` and never a typed day, so a project nobody describes still says "2 days" or "40 days". A project with no
+     task reads nothing, never nought. Filed with Work beside `project-moved-7d`, by the list it reads. */
+  'project-last-worked': {
+    metric: 'project-last-worked',
+    name: 'Last worked',
+    source: 'register.tasks',
+    where: 'thing is {{it}}',
+    value: { age: 'updated_at' },
+    format: 'days',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   'project-done-7d': {
     metric: 'project-done-7d',
     name: 'Done this week',
@@ -1139,14 +1155,19 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         /* WHERE IT STANDS FROM WHAT HAPPENED ON IT, SINCE portfolio 1.16.0 (REC-C16): drawn while nobody has said, so
            its figures stand alone, which is how a project stays until its owner answers the tidy after an import. What
            was worked on this week, from the day the record stamps each task it writes. What is open is At a glance's
-           first figure straight above, so it is not said twice. */
+           first figure straight above, so it is not said twice. How long since anybody worked on it beside that, from the
+           same stamps (`project-last-worked`), so a project that went quiet a month ago reads "30 days" and not only a
+           nought for this week. A use case that keeps more adds its own cell (founder's numbers this week). */
         kind: 'stat',
         heading: 'Where it stands',
         icon: 'target',
         span: 12,
         area: 'rail',
         key: 'stands-figures',
-        cells: [{ metric: 'project-moved-7d:{{name}}', label: 'Changed this week' }],
+        cells: [
+          { metric: 'project-moved-7d:{{name}}', label: 'Changed this week' },
+          { metric: 'project-last-worked:{{name}}', label: 'Last worked' },
+        ],
         when: { metric: 'project-said:{{name}}', is: 0 },
       },
       {

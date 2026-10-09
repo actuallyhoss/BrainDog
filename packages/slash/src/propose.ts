@@ -326,9 +326,11 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
    * key. `byo` still drafts and proposes on the host's own endpoint, so
    * the host counts it, in `packages/host/src/slash.ts` `slashGuardedEngine`, where the money is seen spent.
    */
-  const spent = (): Refusal | null => {
+  const spent = (kind: 'read' | 'propose' = 'read'): Refusal | null => {
     const s = core.settings();
     if (s.tier !== 'a' || core.asksUsed() < s.ask_cap) return null;
+    /* THE ASK TURNED AWAY LEAVES ITS ROW (`TURNED_AWAY_SQL`, model-sign-49). */
+    core.turnedAway(kind, s.tier);
     return {
       code: 'SLASH_BUDGET_SPENT',
       fix: `Slash is out of asks until ${core.resets().slice(0, 10)}. Add your own key, or wait.`,
@@ -560,7 +562,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     askId?: string,
     inference?: Inference,
   ): Promise<Result<Proposal>> => {
-    const stop = spent();
+    const stop = spent('propose');
     if (stop) return { ok: false, refusal: stop };
 
     const earlier =
@@ -1204,6 +1206,8 @@ export const setups = (core: Core, fallback: Inference): Setups => {
   const spent = (): Refusal | null => {
     const s = core.settings();
     if (s.tier !== 'a' || core.asksUsed() < s.ask_cap) return null;
+    /* THE ASK TURNED AWAY LEAVES ITS ROW (`TURNED_AWAY_SQL`, model-sign-49). */
+    core.turnedAway('read', s.tier);
     return { code: 'SLASH_BUDGET_SPENT', fix: `Slash is out of asks until ${core.resets().slice(0, 10)}. Add your own key, or wait.` };
   };
   const owner = (ctx: CallContext): Refusal | null =>

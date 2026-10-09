@@ -1,0 +1,8 @@
+{
+  "gate": "words",
+  "rule": "a declared page's title that ends in a full stop",
+  "expect": "a title that ends in a full stop",
+  "findings": 1,
+  "total": 1,
+  "why": "THE TITLE IS A NAME, AND THE BODIES AND THE EMPTY TEXT ARE SENTENCES. Only the page's title ends in a full stop and counts; two bodies and an empty text end in one and are right, and a heading ending in an ellipsis is a promise of more."
+}

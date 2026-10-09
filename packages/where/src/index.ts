@@ -48,7 +48,15 @@ export type Scalar = string | number | boolean | Money | Quantity;
 
 export type Leaf = { field: string; via?: string } & Record<string, unknown>;
 export type Group = { all: Node[] } | { any: Node[] } | { none: Node[] };
-export type Node = Group | Leaf;
+/**
+ * A HOP AGAINST THE REF: true of a row when a live row of `register` whose ref field `by` holds this
+ * row's id matches `where`. "Categories with a ledger row going the other way" and "projects with
+ * nothing coming in" are both this shape, and `via` cannot say either: `via` walks a ref FORWARD, from
+ * the row that holds it, and these walk it backwards, from the row it names. The key is `register`, not
+ * `list`, so the kernel's reach check counts the list it reads with no change of its own.
+ */
+export type Pointed = { pointed: { register: string; by: string; where?: Predicate } };
+export type Node = Group | Leaf | Pointed;
 export type Predicate = Node;
 
 /** What the predicate is allowed to name, and what each field can hold. */
@@ -152,6 +160,22 @@ export type Schema = {
    * reason true of every register rather than the one true of this one. Absent means not a series.
    */
   series?: boolean;
+  /**
+   * THE SCHEMA OF ANOTHER REGISTER, WHICH A `pointed` HOP NEEDS TO CHECK THE QUESTION IT ASKS THERE.
+   *
+   * Absent means this compiler reads one register at a time and refuses the hop, as it refuses `via`:
+   * an inner predicate nobody checked is a filter that compiles and matches nothing for ever, which is
+   * the failure this package exists to prevent. `undefined` from the function is a register the record
+   * does not have.
+   *
+   * AND A REGISTER THE READER MAY NOT READ IN FULL, which is the caller's to answer and not this file's.
+   * The hop reads every live entry of the other register: it knows no grant, so a reader who cannot see
+   * that list, or sees it narrowed to some entries, would learn about the entries they cannot see from
+   * which of their own come back. Answering `undefined` refuses the hop as `REGISTER_UNKNOWN`, in the
+   * same words as a list the record lacks, so the refusal does not say the list is there either. A
+   * schema handed to `compile` for a predicate somebody sent is built per reader, never shared.
+   */
+  schemaOf?: (register: string) => Schema | undefined;
 };
 
 export type Compiled = {
@@ -730,8 +754,74 @@ const elementSql = (value: unknown, put: (v: string | number) => string): string
  * the security boundary and not a nicety.
  */
 export function compile(where: Predicate | undefined, schema: Schema): Compiled {
+  return compileAt(where, schema, 1);
+}
+
+/* THE SAME COMPILE, STARTED PART WAY DOWN, which is how a `pointed` hop asks its question of the other
+   register: the inner predicate counts toward `MAX_DEPTH` from where the hop sits, so a hop inside a hop
+   inside a hop is refused as a fourth level and not walked until the stack gives out. */
+function compileAt(where: Predicate | undefined, schema: Schema, start: number): Compiled {
   const bad: Refusal[] = [];
   const params: (string | number)[] = [];
+
+  /**
+   * A HOP AGAINST THE REF, COMPILED AS A SEMI-JOIN ON THE ROW'S OWN `id`.
+   *
+   * The scope asked for a correlated `EXISTS`, and a correlated `EXISTS` has to name the outer row,
+   * which this fragment cannot: the kernel's list reads `FROM entry e` and the figures read a bare
+   * `FROM entry`, so `e.id` breaks one and `entry.id` the other. `id IN (SELECT <by> FROM entry AS hopN
+   * …)` asks the same question with the outer row named by a bare `id`, which resolves to whichever
+   * alias the caller chose. The inner predicate is compiled by this same function against the other
+   * register's schema, and its bare `fields` and `state` resolve to `hopN`, the innermost table.
+   *
+   * THE NULLS ARE KEPT OUT ON PURPOSE. A ledger entry with nothing in `by` would put a NULL in the set,
+   * and `NOT (id IN (…, NULL))` is NULL for every row the set does not hold, so `none: [pointed]`
+   * would have answered nothing at all.
+   *
+   * ONE PARAMETER FOR THE REGISTER, plus whatever the inner predicate binds, and none per row: the set
+   * is the database's to build, which is what keeps a figure over a thousand categories one statement.
+   */
+  const hop = (leaf: Record<string, unknown>, level: number): string => {
+    const no = (code: string, fix: string, allowed?: readonly string[]): string => {
+      bad.push(refuse(code, fix, 'pointed', allowed));
+      return '';
+    };
+    if (Object.keys(leaf).length !== 1)
+      return no('VALUE_MALFORMED', 'pointed is a test of its own. Write the other test beside it, inside an all: group.');
+    if (level > MAX_DEPTH)
+      return no('PREDICATE_TOO_DEEP', `A predicate nests ${MAX_DEPTH} levels deep, and a hop counts as one. Flatten it.`);
+    if (schema.subject === 'inbox_raw')
+      return no('MATCH_OP_UNSUPPORTED', 'pointed asks what points at an entry, and an arrival is not one yet.', ARRIVAL_OPERATORS);
+    const p = leaf.pointed as Record<string, unknown> | null;
+    if (!isNode(p as Node) || typeof p!.register !== 'string' || typeof p!.by !== 'string')
+      return no('VALUE_MALFORMED', 'pointed takes the list to look in as register, the field there that points here as by, and an optional where.');
+    const { register, by, where: asked } = p as { register: string; by: string; where?: Predicate };
+    if (schema.schemaOf === undefined)
+      return no('MATCH_OP_UNSUPPORTED', 'pointed is a hop from another list, and this build reads one register at a time.');
+    const there = schema.schemaOf(register);
+    /* `null` TOO, which is how the kernel's other lookups say "no such list", and an arrival is not a list of entries:
+       its schema would compile against `inbox_raw`'s columns inside a read of `entry`. */
+    if (!there || (there.subject ?? 'entry') !== 'entry') return no('REGISTER_UNKNOWN', `The record has no list called ${register}.`);
+    const refs = Object.keys(there.fields).filter((f) => there.fields[f]!.type === 'ref');
+    const decl = Object.hasOwn(there.fields, by) ? there.fields[by]! : undefined;
+    if (decl === undefined) return no('FIELD_UNKNOWN', `${register} has no field called ${by}.`, refs);
+    if (decl.type !== 'ref' || !IDENT.test(by))
+      return no('MATCH_OP_UNSUPPORTED', `${by} on ${register} is a ${decl.type}, and pointed follows a field that points at one entry.`, refs);
+    if (decl.to !== undefined && decl.to !== schema.register)
+      return no('VALUE_MALFORMED', `${by} on ${register} points at ${decl.to}, so it never holds an entry of ${schema.register}.`, refs);
+    const inner = asked === undefined ? undefined : compileAt(asked, there, level + 1);
+    if (inner?.bad.length) {
+      bad.push(...inner.bad);
+      return '';
+    }
+    const alias = `hop${level}`;
+    const held = `json_extract(${alias}.fields, '${jsonPath(by)}')`;
+    params.push(register, ...(inner?.params ?? []));
+    return (
+      `id IN (SELECT ${held} FROM entry AS ${alias} WHERE ${alias}.register = ? AND ${alias}.deleted_at IS NULL` +
+      ` AND ${held} IS NOT NULL${inner === undefined ? '' : ` AND (${inner.sql})`})`
+    );
+  };
 
   const walk = (node: Node, level: number): string => {
     /* A `where` THAT IS NOT A PREDICATE IS A REFUSAL AND NOT A THROW. `null`, `5` and `[1]` all
@@ -821,6 +911,8 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
       const joined = kids.join(q === 'all' ? ' AND ' : ' OR ');
       return q === 'none' ? `NOT (${joined})` : `(${joined})`;
     }
+
+    if ('pointed' in node) return hop(node as Record<string, unknown>, level);
 
     const leaf = node as Record<string, unknown>;
 
@@ -1384,7 +1476,7 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
     }
   };
 
-  const compiled = where === undefined ? '1 = 1' : walk(where, 1);
+  const compiled = where === undefined ? '1 = 1' : walk(where, start);
 
   /**
    * A REFUSAL ANYWHERE IN THE PREDICATE MATCHES NOTHING, AND NOT JUST A REFUSAL AT THE ROOT.
@@ -1407,6 +1499,15 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
   if (bad.length) return { sql: '0 = 1', params: [], bad };
   return { sql: compiled || '0 = 1', params, bad };
 }
+
+/** Does this predicate hop to another register anywhere? Bounded as `namesColumn` is, below the compile check. */
+const hops = (node: unknown, level = 1): boolean => {
+  if (level > MAX_DEPTH || !isNode(node as Node)) return false;
+  const n = node as Record<string, unknown>;
+  if ('pointed' in n) return true;
+  for (const q of QUANTIFIERS) if (Array.isArray(n[q])) return (n[q] as unknown[]).some((k) => hops(k, level + 1));
+  return false;
+};
 
 /**
  * Does this predicate name one of the record's own five? Asked once, before anything is walked.
@@ -1490,6 +1591,11 @@ export function evaluate(
    * builds is thrown away. A wrong answer about one row, delivered quickly, is not cheaper.
    */
   if (compile(where, schema).bad.length) return false;
+
+  /* A HOP READS OTHER ENTRIES, AND THIS IS HANDED ONE. `pointed` compiles when the schema can name the
+     other register, and a row in memory has no table to look in, so the predicate is refused here as a
+     whole: answering `false` for the hop alone would make `none: [pointed]` true of every row. */
+  if (hops(where)) return false;
 
   /* AND A QUESTION ABOUT A COLUMN NEEDS THE ROW, which is the fourth argument's paragraph above.
      It is asked AFTER the compile check so that a predicate the compiler already refuses answers
@@ -1687,7 +1793,7 @@ const truth = (v: unknown): boolean | null =>
 
 /* ── the sentence form ───────────────────────────────────────────────────── */
 
-export { clausesOf, lookupRef, NO_ROW, parseWhere, quoteValue, resolveDay, unquoted } from './sentence.ts';
+export { clausesOf, daySaid, lookupRef, NO_ROW, parseWhere, quoteValue, resolveDay, unquoted } from './sentence.ts';
 export type { Parsed, RefFound, SentenceDeps } from './sentence.ts';
 
 /* One path into a body a stranger sent — `47 §4.3`'s grammar, read by connect, extract and the

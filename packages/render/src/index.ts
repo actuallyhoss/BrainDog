@@ -225,6 +225,7 @@ export {
   type Tone,
 } from './kinds.ts';
 export { PACK_KIND, isPackKind, kindSpec, type BlockKind, type PackKind } from './kind-spec.ts';
+export { KIND_LINES, REACH_FOR, kindLine, type KindLine } from './kind-lines.ts';
 export {
   MISSING,
   TYPED,

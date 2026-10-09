@@ -432,14 +432,18 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - people 3.3.0: Health, a page of the record's vital signs (PRF-A05 job 5, modules/health.ts): one line from signs-red,
  *   then the signs by state, Needs a look first, and a sign with nothing to read under Not read yet, never Alive. It reads
  *   the kernel's signs source and two built-in figures and no list, so it leans on nothing. A page added, nothing taken
- *   away, so a minor step that reaches a record on its own and asks no question.
+ *   away, so a minor step that reaches a record on its own and asks no question. UNRELEASED, so batch 47 folds in: under
+ *   the first line, how many signs are not read yet, from the built-in `signs-unread` (figures-47), and the green-days
+ *   lines say every watched sign was green, since the hold watches ten signs and not all of them.
  * - money-core 3.16.0, ONE UNRELEASED STEP, everything since 3.15.0 folded into it. Three more signs, once the kernel reads
  *   their words (`age`, `currencies`, `empty`): `ledger-newest-days`, `currencies-held` and `uncategorised-share-30d`
  *   (REC-B01 jobs 2 and 3, `modules/money/figures/signs.ts`), and two more: `statement-oldest-days`, the age of the
  *   oldest balance (`rolled.read: age`, REC-B03), and `nights-missed-30d`, the nights the cash line kept no point, once a
  *   kept line names the lists its figure reads. Paydays (REC-B13): a repeating line gains `day_of_month` (a day 1 to 31,
  *   last, or two, '15, last', labelled "Days of the month") and `weekend` (leave, before, after; default leave), Money
- *   gains `rest_days` (Saturday and Sunday), and the repeating leg names both fields so the walk uses them. A balance's
+ *   gains `rest_days` (Saturday and Sunday), and the repeating leg names both fields so the walk uses them; and
+ *   `script.last_day` (F60, batch 48), once a day and fetching nothing, asks one question for every line whose Next is a
+ *   month's last day on the 28th to the 30th, each answer's patches writing `day_of_month`. A balance's
  *   age is what the bank last said (REC-B03): `cash-as-of` and `balances-stale` read the roll's own day (`rolled.read:
  *   as_of`, `read: stale`) where they read the typed "As of" a bank message never writes; `account-ages` dates each
  *   account by its newest statement, which a book's Accounts cards and Money's Last confirmed tile inside Heads up read
@@ -447,16 +451,32 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   day passed a week, goes. A row's currency comes from its account and stays (REC-B04): the Ledger's `amount` declares
  *   `currency_from: account.balance` and `currency_fixed`, and its `available` and `balance_after`, a balance check's
  *   `balance`, an instalment's `amount` and a repeating line's `amount` declare `currency_from`, so an amount sent with
- *   no code takes its account's. Figures, fields and a setting added and a rule taken away, nothing another pack reads,
+ *   no code takes its account's. Today's money this week (uc6-money-47): `received-7d`, the Ledger's money in over
+ *   seven days, and `settled-in-7d`, bills and invoices paid to you over seven days, each currency on its own. Categories going
+ *   the other way (hop-figures-50, REC-A13 job 2): `categories-against-direction`, live categories marked one way that a Ledger
+ *   entry going the other way points at, read through `where`'s `pointed` hop, with its line under Heads up. Figures,
+ *   a script, fields and a setting added and a rule taken away, nothing another pack reads,
  *   so a minor step. NOT A QUIET ONE: a rule taken away is a loss (`packs/quiet.ts`), so a record on 3.15.0 or before is
  *   asked once in Decide ("take away Cash stale") and gets none of this until it says yes.
+ * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
+ *   declares `delete: refuse_while_referenced`, as Accounts does, so a project a task, a bill, a service or a person names
+ *   is not deleted out from under them, and the refusal names the lists and how many. Under What each one earns, one
+ *   line is always drawn while a project is in play, "N of M projects in play say what they earned in a year", two
+ *   counts and never a sum, so a record where nobody said reads that and not nothing. A project page says where it
+ *   stands from what happened on it while nobody has said: Where it stands is the typed card only while `project-said`
+ *   counts one of health, progress, aim or agent, and otherwise a tile of `project-moved-7d`, the tasks on it written
+ *   this week, read off the day the record stamps them. `project-said` reads Projects and is Portfolio's;
+ *   `project-moved-7d` reads tasks and is filed with Work by the list it reads, which is why Work moves too. PORTFOLIO
+ *   1.15.0 AND WORK 1.17.0 ARE RELEASED, so each is a version of its own. A key on a list, a block and two figures
+ *   added, nothing taken away or retyped, so each is a minor step that reaches a record on its own. The project page
+ *   moves with them, though no pack holds it (`crossPack`).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.15.0',
+  portfolio: '1.16.0',
   people: '3.3.0',
   'money-core': '3.16.0',
   estate: '2.1.0',
-  work: '1.17.0',
+  work: '1.18.0',
 };
 
 type Body = Record<string, unknown>;

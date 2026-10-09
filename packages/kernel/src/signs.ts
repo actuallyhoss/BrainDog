@@ -11,7 +11,8 @@
  * FIVE ARE FILED by the layers that know more, through `fileSignReading`: whether the model answers and whether agents
  * get the tool list (the host), whether the briefing is true (the record), whether pages print clean (the host), whether
  * what shipped has arrived (the record, PRF-A20). Until one is filed it reads `none`. The automation signs and those of
- * what runs by itself join by a spread each (`signs-flow.ts`, `signs-actions.ts`).
+ * what runs by itself join by a spread each (`signs-flow.ts`, `signs-actions.ts`), then the three vitals of SHL-A06
+ * (`signs-vitals.ts`).
  *
  * NONE IS NOT GREEN. A sign with nothing to judge by (no door, no series, no question ever asked, no run this week)
  * says so, and an empty record reads `none` on every sign by construction. Each reader is its own count, written apart
@@ -32,6 +33,7 @@ import { UNVERIFIED } from './ingest.ts';
 import { intervalMs } from './pull.ts';
 import { SIGNS_ACTIONS } from './signs-actions.ts';
 import { SIGNS_FLOW } from './signs-flow.ts';
+import { SIGNS_VITALS } from './signs-vitals.ts';
 
 export type SignState = 'green' | 'red' | 'none';
 
@@ -320,7 +322,8 @@ function seriesName(sql: Sql, series: string): string {
    every point was most of a night's signs read on a record with a few thousand points. */
 const DECLARED = `WITH declared AS MATERIALIZED (SELECT json_extract(body, '$.metric') AS m, json_extract(body, '$.source') AS s
   FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND json_valid(body))`;
-const ARRIVED = 'NOT EXISTS (SELECT 1 FROM declared d WHERE d.m = mp.series AND d.s = mp.source)';
+/* AND NOT WHAT THE NIGHT COUNTS OF THE RECORD ITSELF (`night-counts.ts`, sources night.counts and night.paths): written every night, it can never be late. */
+const ARRIVED = "NOT EXISTS (SELECT 1 FROM declared d WHERE d.m = mp.series AND d.s = mp.source) AND mp.source NOT LIKE 'night.%'";
 
 function readNumbers(sql: Sql, nowMs: number, tz: string): SignReading {
   const feeds = feedsOn(sql);
@@ -525,6 +528,7 @@ export const VITAL_SIGNS: readonly SignReader[] = [
   filed('arrived', 'What shipped has arrived', 'record'),
   ...SIGNS_FLOW,
   ...SIGNS_ACTIONS,
+  ...SIGNS_VITALS,
 ];
 
 /** The sign called `id` on the closed list, or `null`. */

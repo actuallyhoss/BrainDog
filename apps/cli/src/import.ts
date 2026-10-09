@@ -1374,7 +1374,11 @@ export async function applyPlan(
      * the old tool had one, and so an end the old tool later took away stayed on the row and stopped the forecast early. A
      * planned `null` over a field the row does hold still differs, and is the patch that clears it.
      */
-    const differs = (field: string): boolean => stable(found.fields[field] ?? null) !== stable(fields[field] ?? null);
+    /* A RUN CARRIED IN (AGT-C10, `run-carried.ts`): never heard from here and not handed over. Its step is the kernel's to
+       drop, so the step it carried is never patched back, and the day it was last seen is held as `seen_before`. */
+    const carriedRun = row.register === 'session' && typeof found.fields.last_seen !== 'string' && (fields.state ?? found.fields.state) !== 'handoff';
+    const differs = (field: string): boolean =>
+      !(carriedRun && field === 'next') && stable(found.fields[row.register === 'session' && field === 'last_seen' ? 'seen_before' : field] ?? null) !== stable(fields[field] ?? null);
     const patch: Record<string, unknown> = {};
     /* A PERSON OR ORGANISATION ONLY HAS WHAT IT LACKS FILLED, every night, as `meet` treats one: the row may be one this
        import folded into (`resolveRole`), the owner's own keeps the name he gave it whatever the old tool called him,

@@ -94,8 +94,12 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
     .get(REC)!
     .sql.exec('SELECT kind, model, tokens_in, tokens_out, neurons, status, code, question FROM slash_call ORDER BY id')
     .toArray() as { kind: string; model: string; tokens_in: number; tokens_out: number; neurons: number; status: string; code: string | null; question: string }[];
-  assert.equal(rows.length, 3, JSON.stringify(rows));
-  for (const r of rows) {
+  /* AND EACH ASK TURNED AWAY PAST THE CEILING LEAVES ITS ROW UNDER `-` (model-sign-49), never an included call. */
+  const turned = rows.filter((r) => r.model === '-');
+  assert.ok(turned.length > 0 && turned.every((r) => r.status === 'refused' && r.code === 'SLASH_BUDGET_SPENT' && r.neurons === 0), JSON.stringify(turned));
+  const calls = rows.filter((r) => r.model !== '-');
+  assert.equal(calls.length, 3, JSON.stringify(rows));
+  for (const r of calls) {
     assert.deepEqual([r.kind, r.model, r.status, r.code, r.question], ['read', 'glm-5.3-flash', 'ok', null, "Slash's press"]);
     /* PRICED AT THE INCLUDED MODEL'S RATE, the one the package prices the door's asks at, never 0. */
     assert.ok(r.tokens_in > 0 && r.tokens_out > 0, JSON.stringify(r));

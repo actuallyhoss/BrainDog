@@ -1,0 +1,8 @@
+{
+  "gate": "hygiene",
+  "rule": "a guard line taken out of .gitignore",
+  "expect": "no longer holds the line",
+  "findings": 1,
+  "total": 1,
+  "why": "THE LOOP'S LINE DELETED, AND A COMMENT ADDED ABOVE THE REST. The guards are read by their text, so the comment moving every line number is green and the one missing line is the one finding. Nothing tracked is wrong yet: this is the door before anything walks through it."
+}

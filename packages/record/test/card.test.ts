@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { card, CARD_AIM, CARD_MOST, OLDER, TWO_SESSIONS, wordCount, type CardAt } from '../src/card.ts';
+import { card, CARD_AIM, CARD_MOST, OLDER, plainly, TWO_SESSIONS, wordCount, type CardAt } from '../src/card.ts';
 import type { Brief, Context, LiveBrief } from '../src/index.ts';
 
 const NOW = Date.UTC(2026, 9, 9, 9);
@@ -274,4 +274,12 @@ test('A CONTROL CHARACTER IN A RUN NAME never breaks the card into another line'
     assert.equal(said.split('\n').length, 4, `a run name made another line: ${JSON.stringify(said)}`);
     assert.doesNotMatch(said, /[\r\u2028\u2029\x85]/u);
   }
+});
+
+test('AN ID THE CALLER CANNOT READ IS "an entry you cannot see", never a row, and one it can read is its name', () => {
+  const id = '01J9Z3K8QW4V6X2N5R7T0Y1B3C';
+  const said = plainly(`Close ${id} once the proof is back?`, ctx(), true);
+  assert.equal(said, 'Close an entry you cannot see once the proof is back?');
+  assert.doesNotMatch(said, /\brows?\b|\u2014/u);
+  assert.equal(plainly(`Close ${id}?`, ctx(), true, { named: (x) => (x === id ? 'Proof the italic' : null) }), 'Close Proof the italic?');
 });

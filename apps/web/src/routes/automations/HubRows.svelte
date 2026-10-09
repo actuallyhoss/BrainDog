@@ -9,7 +9,8 @@
   ONE SHAPE FOR ALL FOUR because they sit one tab apart, and a failed script and a failed automation should not be two
   different reads.
 
-  THE SECOND LINE IS NEVER CUT. It is the verdict ("Paused. The key is not in the vault.") and an ellipsis took exactly
+  THE SECOND LINE IS NEVER CUT, and the " · " between what it is and the verdict is in its words, not drawn by the style,
+  so a copy and a screen reader read the two apart. It is the verdict ("Paused. The key is not in the vault.") and an ellipsis took exactly
   the part that said what to do, so it wraps; the name gives way instead.
 
   A DOT FOR WHAT NEEDS A LOOK, AND ONLY THAT, leading the sentence that says it, so the dot never stands alone (a
@@ -50,7 +51,7 @@
       <span class="line-title name">{r.name}</span>
     {/if}
     <span class="line-detail meta">
-      {#if r.what}<span class="what">{r.what}</span>{/if}
+      {#if r.what}<span class="what">{r.what}</span>{#if r.said}<span class="sep"> · </span>{/if}{/if}
       {#if r.said}<span class="said" data-dot={r.dot ?? undefined}>{r.said}</span>{/if}
     </span>
   </span>
@@ -116,11 +117,6 @@
     overflow-wrap: anywhere;
     -webkit-line-clamp: unset;
     line-clamp: unset;
-  }
-
-  /* THE DOT BETWEEN THE TWO ONLY WHERE THERE ARE TWO: a row with nothing to say of its last turn ends on what it is. */
-  .what:not(:last-child)::after {
-    content: ' · ';
   }
 
   /* A ROW WITH A SWITCH: the same three columns and the switch as a fourth, at the row's own trailing edge. The row is

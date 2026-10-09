@@ -115,7 +115,7 @@ export const SKILLS: Fields[] = [
   { name: 'review-pr', trigger: 'Before merging a branch, to read the whole diff for mistakes and leftover debugging.', what: 'A review checklist for any repository.', kind: 'skill', project: null, body: REVIEW, rev: 3, because: [4] },
   { name: 'review-pr', trigger: 'Before merging a Kiln branch. It adds the outline and kerning checks to the review.', what: 'The review, with the checks a type family needs.', kind: 'skill', project: 1, body: REVIEW_KILN, rev: 2, because: [1] },
   { name: 'log-handoff', trigger: 'At the end of a run, to leave the next step and what was tried for whoever comes next.', kind: 'command', project: null, body: '# Leave a handoff\n\nBefore the run ends, write the next step, what was tried and did not work, and the commit it stopped on.', rev: 1 },
-  { name: 'reconcile-invoice', trigger: 'When an invoice arrives, to match each line to a service before proposing any change.', kind: 'skill', project: 3, body: '# Reconcile an invoice\n\n1. List the services from the invoice’s provider.\n2. Match each line by renewal date, then by amount.\n3. Propose any change with the rows you read attached.', rev: 4, because: [3, 4] },
+  { name: 'reconcile-invoice', trigger: 'When an invoice arrives, to match each line to a service before proposing any change.', kind: 'skill', project: 3, body: '# Reconcile an invoice\n\n1. List the services from the invoice’s provider.\n2. Match each line by renewal date, then by amount.\n3. Propose any change with the services you read attached.', rev: 4, because: [3, 4] },
   { name: 'chase-invoice', trigger: 'When an invoice is 30 days past its date.', kind: 'skill', project: null, body: '# Chase an invoice\n\nSend a short reminder once an invoice is 30 days past its date.', rev: 2, because: [6], state: 'retired' },
 ];
 
@@ -235,7 +235,7 @@ export type ModuleIngest = IngestDecl & { pack?: string };
  * first-party document and the sample. So every record set up with Money held an English bank alert's wording and a
  * text door for it, whether its owner banked by card, by cash or not at all, and a bank SMS pattern is a use case the shell may
  * not carry. They are `packs/card-alerts` now, a file a record
- * installs when it wants them, as one Egyptian bank's six went to `packs/bank-hsbc-eg` at money-core 1.8.0.
+ * installs when it wants them, as one bank's six wordings went to their own add-on under `packs/` at money-core 1.8.0.
  *
  * THE LIST STAYS, AND EMPTY, because it is still the one road from a module into a record for a pattern that names no
  * bank and no country: `packDocument()` spreads it, `installSeed` installs it with the lists it writes into, and

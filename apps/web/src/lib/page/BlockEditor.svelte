@@ -26,6 +26,8 @@
     countRows,
     draftOf,
     firstFits,
+    whenFits,
+    whenNothing,
     formOf,
     patchOf,
     readList,
@@ -272,11 +274,12 @@
   /* ── save ───────────────────────────────────────────────────────────────── */
 
   const firstOk = $derived(!draft || firstFits(draft.first));
+  const whenOk = $derived(!draft || draft.when === null || whenFits(draft.when));
   const shortOk = $derived(!draft || (draft.shortWhere.trim() === '') === (draft.shortLabel.trim() === ''));
   let saving = $state(false);
 
   async function save() {
-    if (!stored || !draft || saving || !firstOk || !shortOk) return;
+    if (!stored || !draft || saving || !firstOk || !whenOk || !shortOk) return;
     saving = true;
     const patch = patchOf(stored, draft, touched ? { value: whereNow } : undefined);
     const landed = await onsave(patch, width, area === null ? null : column);
@@ -429,7 +432,9 @@
       {:else}
         <label class="label" for="{uid}-when">{blockWords.when}</label>
         <div class="field"><input id="{uid}-when" class="field-input" type="text" bind:value={draft.when} autocomplete="off" /></div>
-        <p class="help">{blockWords.whenHelp}</p>
+        <!-- AND THE ONE TEST A FIGURE WITH NO VALUE MEETS, offered as a choice so nobody has to know its words (PGS-C06). -->
+        <Button weight="quiet" disabled={whenNothing(draft.when) === null} onclick={() => { const said = whenNothing(draft!.when ?? ''); if (said) draft!.when = said; }}>{blockWords.whenNothing}</Button>
+        <p class="help" data-bad={whenOk ? undefined : ''}>{whenOk ? blockWords.whenHelp : blockWords.whenBad}</p>
       {/if}
     </div>
 
@@ -473,7 +478,7 @@
   {#snippet footer()}
     <div class="foot">
       <Button weight="bare" onclick={() => (open = false)}>{blockWords.cancel}</Button>
-      <Button weight="primary" disabled={!draft || saving || !firstOk || !shortOk} onclick={() => void save()}>
+      <Button weight="primary" disabled={!draft || saving || !firstOk || !whenOk || !shortOk} onclick={() => void save()}>
         <Icon name="check" size="s" />{blockWords.save}
       </Button>
     </div>

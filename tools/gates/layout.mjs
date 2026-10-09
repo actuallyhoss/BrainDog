@@ -34,9 +34,10 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { APP_BASE, appShell, budget, readiness, skipDir } from './lib.mjs';
-import { answers, bootWith, forward, forwards, RECORD_PREFS, recordPrefsOf, startRecord, VARIANTS as RECORDS } from './record.mjs';
-import { routesOf } from './routes.mjs';
+import { APP_BASE, appShell, budget, openPage, readiness, skipDir } from './lib.mjs';
+import { checkScreen, readScreen } from './printed.mjs';
+import { answers, forward, forwards, recordAt, recordsAnswer, startRecord, VARIANTS as RECORDS } from './record.mjs';
+import { routesFor, routesOf } from './routes.mjs';
 
 /**
  * WHAT THIS GATE CANNOT RUN WITHOUT, DECLARED SO THE RUNNER DECIDES INSTEAD OF THIS FILE.
@@ -210,7 +211,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
    * is sampled with an id no record has, so the canvas itself was measured only as "not found"; `new`
    * opens it with a trigger card and the sticky bar, which is the page a phone draws wrong first.
    */
-  const { routes: ROUTES, unsampled } = await routesOf(join(root, 'apps', 'web'), [
+  const EXTRA = [
     '/p/estate',
     '/p/work',
     '/p/kiln',
@@ -220,7 +221,13 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     '/automations?tab=scripts',
     '/automations?tab=doors',
     '/automations/new',
-  ]);
+  ];
+  /* AT THE SAMPLES IT HAD BEFORE, ONLY TO REFUSE A ROUTE WITH NO SAMPLE BEFORE A PORT IS TAKEN; the sweep reads them again
+     at the record's own ids once the record is up (`routesFor`, PRF-B04). */
+  let { routes: ROUTES, unsampled } = await routesFor(join(root, 'apps', 'web'), null, { extra: EXTRA });
+  /** The addresses the record had nothing for, drawn as not found: said in the summary, never dropped. */
+  let unseen = [];
+  let missing = [];
   if (unsampled.length) {
     for (const u of unsampled) console.error(`  a route with no sample address: ${u}`);
     return 1;
@@ -352,6 +359,9 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port, and its variants under the same
        handle, so the one `record.close()` below gives all of them back. See `record.mjs`. */
     record = await startRecord(0, { variants: true });
+    /* THE ROUTES AT THE RECORD'S OWN IDS (PRF-B04): an automation and a catalogue entry by a real id, settled, and not
+       measured as not found. */
+    ({ routes: ROUTES, unseen, missing } = await routesFor(join(root, 'apps', 'web'), record, { extra: EXTRA }));
 
     /**
      * WHAT THIS GATE IS ALLOWED TO CALL A MEASUREMENT.
@@ -393,10 +403,12 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
 
     server = createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://x');
-      /* A SHAPE THE RECORD KEEPS, for the passes that draw the top bar and the menu (`SHAPES` below): the page's `boot`
-         carries it as a person's would, by the cookie `prefs` uses for the same thing. */
-      const held = recordPrefsOf(req.headers.cookie);
-      if (held !== null && /^\/+api\/boot$/u.test(url.pathname)) return bootWith(req, res, asking === null ? record.base : record.variants[asking], held);
+      /* THE RECORDS THE SWITCHER LISTS, answered as the host would (`record.mjs` `recordsAnswer`): the self-host answers it
+         401 to the server key, and the switcher's error would be a console error the printed rule reads on every screen. */
+      if (/^\/+account\/records\/?$/u.test(url.pathname)) {
+        res.writeHead(200, { 'content-type': TYPES['.json'] });
+        return res.end(JSON.stringify(recordsAnswer()));
+      }
       if (forwards(url.pathname)) return forward(req, res, asking === null ? record.base : record.variants[asking]);
       const rel = decodeURIComponent(url.pathname).slice(1);
       if (rel.includes('..')) return res.writeHead(400).end();
@@ -649,6 +661,17 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
         });
       });
 
+    /** The record `/api` reaches on this pass, as `openPage` reads it: the gates' own, or the variant the pass names. */
+    const asked = () => (asking === null ? record : recordAt(record.variants[asking]));
+    /**
+     * WHAT A SETTLED SCREEN PRINTS (PRF-B04 job 5, `printed.mjs` `checkScreen`): on every page-run, a raw id, a raw time,
+     * a key, a value that never arrived or a page error is a finding of this gate too. Said once a screen, and only of
+     * a screen that settled.
+     */
+    const printedOn = async (opened, where, planted, route) => {
+      for (const f of checkScreen(await readScreen(opened, where), { missing: missing.includes(route) })) findings.push(mark(planted, f));
+    };
+
     /* UNDER THE SEEDS, ONE WIDTH AND ONE ROUTE, and each seed of the sweep on a page of its own at that width: the
        narrowest of every part, which is the narrowest phone, where the pointer is coarse and the target rule applies.
        Every seed is planted in the first part, as the docked and full-width passes already were, so a later part says
@@ -689,24 +712,19 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
          * including `controls.css`'s; the token is 36.) A gate that only ever emulated a mouse could
          * measure every width this product has and never once see the size a thumb gets.
          */
-        const context = await browser.newContext({
-          viewport: { width, height: L.viewportHeightPx },
-          reducedMotion: 'reduce',
-          hasTouch: width < 640,
-          isMobile: width < 640,
-          bypassCSP: true,
-        });
+        /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (PRF-B04, `openPage`): the record's clock, and a coarse pointer at a
+           phone's width. The mark is taken off after the first load, so every route below is loaded with it gone. */
+        const opened = await openPage(browser, `http://localhost:${PORT}${base}${ROUTES[0]}`, { width, touch: width < 640, record: asked(), ready });
+        const { context, page } = opened;
         if (planted?.id === 'layout-settle') await takeMark(context);
-        const page = await context.newPage();
         process.stdout.write(`    ${String(width).padStart(4)}px ${planted ? `${planted.id} ` : ''}`);
 
         for (const route of ROUTES) {
-          await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
           /* `domcontentloaded` IS WORTH NOTHING ON ITS OWN HERE and never was: `ssr = false`, so the shell
              served off disk is a script tag that imports the client, and `#main` does not exist until it
-             has run. This wait is the only thing between the gate and an empty document, which is why its
-             expiry is a finding and not a `catch`. */
-          const unmeasured = ready.check(`${route} @${width}`, route, await ready.settled(page));
+             has run. The wait for the screen's mark is the only thing between the gate and an empty document, which is
+             why its expiry is a finding and not a `catch`. */
+          const unmeasured = ready.check(`${route} @${width}`, route, await opened.goto(`http://localhost:${PORT}${base}${route}`));
           if (unmeasured) {
             findings.push(mark(planted, unmeasured));
             process.stdout.write('!');
@@ -722,6 +740,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
           checked++;
           process.stdout.write(out.length ? '!' : '.');
           for (const o of out) findings.push(mark(planted, `${route} @${width}  ${o}`));
+          await printedOn(opened, `${route} @${width}`, planted, route);
 
           /* AND THEN THE STATES, at the widths where the rule they break applies. `FLOOR` short of its
              desktops is the phones and the tablet; above them the pointer is fine and a 34px control is the
@@ -742,8 +761,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
               for (const o of after) findings.push(mark(planted, `${route} @${width} (${act.name})  ${o}`));
               /* BACK TO REST, because the acts share one page and the next one must not open its sheet
                  over the last one's. A reload is cheaper to reason about than an undo per act. */
-              await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
-              await ready.settled(page);
+              await opened.goto(`http://localhost:${PORT}${base}${route}`);
               await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
             }
         }
@@ -773,7 +791,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      * the shell gave and not what the page took, so a page capping itself is still the short one.
      *
      * ON ALL THREE SHAPES, because each lays the work out on its own grid and only one of them was ever drawn. A shape
-     * the record keeps rides in on `boot` (`bootWith`), and a pass that asked for the top bar and got the rail says so
+     * the record keeps is kept through its own `setPref` (`openPage`'s `prefs`), and a pass that asked for the top bar and got the rail says so
      * rather than measuring the rail three times.
      *
      * NAMED BY THEIR NAMES, because a red line here is read by somebody deciding which screen to open. The addresses are
@@ -794,23 +812,26 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       { name: 'the top bar', drawn: 'bar', keeps: { 'nav.shape': 'bar' } },
       { name: 'the menu', drawn: 'menu', keeps: { 'nav.shape': 'menu' } },
     ];
-    /** A desktop window drawing one shape. Motion is reduced unless the pass is watching something move. */
-    const contextFor = async (width, shape, reducedMotion = 'reduce') => {
-      const context = await browser.newContext({ viewport: { width, height: L.viewportHeightPx }, reducedMotion, bypassCSP: true });
-      if (shape.keeps !== null)
-        await context.addCookies([{ name: RECORD_PREFS, value: encodeURIComponent(JSON.stringify(shape.keeps)), url: `http://localhost:${PORT}` }]);
-      return context;
-    };
-    /** Opens a screen and waits for it to settle; `false`, with the finding written, when it never did. */
-    const reach = async (page, route, where, planted = null) => {
-      await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
-      const unmeasured = ready.check(where, route, await ready.settled(page));
+    /**
+     * A desktop window drawing one shape, opened at `route` (`openPage`). THE SHAPE IS KEPT BY THE RECORD, through its own
+     * `setPref` as a person's Settings keeps it, and the next window that asks for none hands it back. Motion is reduced
+     * unless the pass is watching something move.
+     */
+    const openFor = (width, shape, route, reducedMotion = 'reduce') =>
+      openPage(browser, `http://localhost:${PORT}${base}${route}`, { width, record: asked(), prefs: shape.keeps ?? {}, reducedMotion, ready });
+    /**
+     * Opens a screen and waits for it to settle; `false`, with the finding written, when it never did. A screen that
+     * settled is read for what it prints (`printedOn`).
+     */
+    const reach = async (opened, route, where, planted = null) => {
+      const unmeasured = ready.check(where, route, await opened.goto(`http://localhost:${PORT}${base}${route}`));
       if (unmeasured) {
         findings.push(mark(planted, unmeasured));
         process.stdout.write('!');
         return false;
       }
-      await page.waitForTimeout(L.settleMs);
+      await opened.page.waitForTimeout(L.settleMs);
+      await printedOn(opened, where, planted, route);
       return true;
     };
     const SPAN = () => {
@@ -863,12 +884,13 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       span.shape === shape.drawn ? null : `asked for ${shape.name} and the shell drew ${span.shape ?? 'no shell'}, so ${shape.name} was not measured`;
     for (const width of fullAt)
       for (const shape of fullSeed ? SHAPES.slice(0, 1) : SHAPES) {
-        const context = await contextFor(width, shape);
-        const page = await context.newPage();
+        const screens = fullSeed ? MAIN_SCREENS.slice(0, 1) : MAIN_SCREENS;
+        const opened = await openFor(width, shape, screens[0].route);
+        const { context, page } = opened;
         process.stdout.write(`    full @${String(width).padStart(4)} ${shape.drawn.padEnd(4)} `);
-        for (const screen of fullSeed ? MAIN_SCREENS.slice(0, 1) : MAIN_SCREENS) {
+        for (const screen of screens) {
           const where = `${screen.name} (${screen.route}) @${width} on ${shape.name}`;
-          if (!(await reach(page, screen.route, `${screen.route} @${width} on ${shape.name} (full width)`, fullSeed))) continue;
+          if (!(await reach(opened, screen.route, `${screen.route} @${width} on ${shape.name} (full width)`, fullSeed))) continue;
           await plant(page, fullSeed);
           const span = await page.evaluate(SPAN);
           checked++;
@@ -976,12 +998,12 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     const dockRuns = seeded ? dockSeeds.map((s) => ({ screen: DOCKED[0], planted: s })) : DOCKED.map((d) => ({ screen: d, planted: null }));
     for (const width of dockAt)
       for (const shape of seeded ? SHAPES.slice(0, 1) : SHAPES) {
-        const context = await contextFor(width, shape, 'no-preference');
-        const page = await context.newPage();
+        const opened = await openFor(width, shape, dockRuns[0]?.screen.route ?? DOCKED[0].route, 'no-preference');
+        const { context, page } = opened;
         process.stdout.write(`    dock @${String(width).padStart(4)} ${shape.drawn.padEnd(4)} `);
         for (const { screen, planted } of dockRuns) {
           const where = `${screen.name} (${screen.route}) @${width} on ${shape.name}, panel open`;
-          if (!(await reach(page, screen.route, `${screen.route} @${width} on ${shape.name} (docked)`, planted))) continue;
+          if (!(await reach(opened, screen.route, `${screen.route} @${width} on ${shape.name} (docked)`, planted))) continue;
           await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
           if (planted?.id === 'layout-dock') await plant(page, planted);
           const watching = page.evaluate(ARRIVAL, L.dockArrivalMs);
@@ -1027,9 +1049,10 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
               if (pairs !== null && span.dock > 0) {
                 /* THE SAME SCREEN, NO PANEL, IN A WINDOW NARROWER BY THE PANEL'S COLUMN. */
                 const alike = width - span.dock;
-                const other = await contextFor(alike, shape);
-                const bare = await other.newPage();
-                if (await reach(bare, screen.route, `${screen.route} @${alike} on ${shape.name} (the panel's room, shut)`, planted)) {
+                const shut = await openFor(alike, shape, screen.route);
+                const other = shut.context;
+                const bare = shut.page;
+                if (await reach(shut, screen.route, `${screen.route} @${alike} on ${shape.name} (the panel's room, shut)`, planted)) {
                   await bare.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
                   const apart = await bare.evaluate(PAIRED);
                   const room = await bare.evaluate(SPAN);
@@ -1079,20 +1102,20 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
            record above: a pass over a forward that still pointed at the first record would be the first record again. */
         if (asking !== null) await answers(`http://localhost:${PORT}`);
         for (const width of variantWidths) {
-          const context = await browser.newContext({
-            viewport: { width, height: L.viewportHeightPx },
-            reducedMotion: 'reduce',
-            hasTouch: width < 640,
-            isMobile: width < 640,
-            bypassCSP: true,
+          /* OPENED AS EVERY PAGE IS (`openPage`), ON THE VARIANT'S OWN CLOCK; the site is drawn on the gates' record's. */
+          const opened = await openPage(browser, `http://localhost:${PORT}${base}${v.routes[0]}`, {
+            width,
+            touch: width < 640,
+            record: asked(),
+            ready,
+            prerendered: v.prerendered === true,
           });
-          const page = await context.newPage();
+          const { context, page } = opened;
           process.stdout.write(`    ${v.name} @${String(width).padStart(4)} `);
           for (const route of v.routes) {
-            await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
             /* THE SAME READINESS, or the variant pass is the half of this gate that can still go green
                over nothing. The site is prerendered and says so in `VARIANTS`. */
-            const unmeasured = ready.check(`${v.name}${route} @${width}`, route, await ready.settled(page, v.prerendered));
+            const unmeasured = ready.check(`${v.name}${route} @${width}`, route, await opened.goto(`http://localhost:${PORT}${base}${route}`));
             if (unmeasured) {
               findings.push(mark(planted, unmeasured));
               process.stdout.write('!');
@@ -1109,6 +1132,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
             checked++;
             process.stdout.write(out.length ? '!' : '.');
             for (const o of out) findings.push(mark(planted, `${v.name}${route} @${width}  ${o}`));
+            await printedOn(opened, `${v.name}${route} @${width}`, planted, route);
           }
           process.stdout.write('\n');
           await context.close();
@@ -1144,6 +1168,8 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      * run that asserted nothing about the thing it is for.
      */
     if (ready.retried()) console.log(`  ${ready.retried()} screen(s) settled only after one reload`);
+    /* NOT SEEN WITH DATA (`routesFor`'s `unseen`): an address the record held nothing for, measured as not found. */
+    if (unseen.length) console.log(`  not seen with data: ${unseen.length} address(es), ${unseen.join(', ')}`);
     const blind = ready.nothingDrawn();
     if (blind) console.error(`  ${blind}`);
 

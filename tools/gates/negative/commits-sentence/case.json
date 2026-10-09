@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "a subject of two sentences",
+  "expect": "more than one sentence",
+  "findings": 1,
+  "total": 1,
+  "why": "TWO SENTENCES IN 35 CHARACTERS, so the length cannot be what goes red."
+}

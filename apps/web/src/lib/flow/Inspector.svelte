@@ -67,6 +67,7 @@
     conditionOf,
     find,
     getAt,
+    learnScripts,
     listFrom,
     listText,
     pairsFrom,
@@ -179,6 +180,7 @@
     void client()
       .scripts()
       .then((out) => {
+        if (out.ok) learnScripts(out.value);
         scripts = out.ok ? out.value.filter((s) => s.runs.rule).map((s) => ({ id: s.script, name: s.title || idWords(s.script) })) : [];
       })
       .catch(() => undefined);

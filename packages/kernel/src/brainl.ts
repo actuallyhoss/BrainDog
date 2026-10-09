@@ -39,6 +39,7 @@ import { FORMAT_VERSION, execScript } from './migrate.ts';
 import { SEAT_SESSION } from './migrations/0028_runs.ts';
 import { SIGNS_KEY } from './signs.ts';
 import { RENAME_SLASH } from './migrations/0016_slash.ts';
+import { isShape } from './shape.ts';
 
 export type Section = 'header' | 'data' | 'origin' | 'governance' | 'local';
 
@@ -62,7 +63,7 @@ export type TableShape = { name: string; section: Section; columns: string[]; pk
  * place it can be asked honestly anyway.
  */
 const LOCAL_ROWS: Readonly<Record<string, string>> = {
-  event: "kind <> 'export'",
+  event: "kind NOT IN ('export', 'import')",
 };
 
 /**
@@ -521,8 +522,28 @@ async function signatureOf(
  */
 export type Checked = { ok: true; pinned: boolean } | { ok: false; refusal: Refusal };
 
-/** The key a file must have been signed by: raw Ed25519 public bytes in base64url, as `03 §4` writes one. */
-export type CheckOptions = { key?: string | undefined };
+/**
+ * `key`: the key a file must have been signed by, raw Ed25519 public bytes in base64url, as `03 §4` writes one.
+ * `shape`: the file may be a shape copy, opened on a scratch record or a self-host started to allow it. A shape copy
+ * carries no signature by design (`shape.ts`), so with this set its signature is not asked for and its manifest still is.
+ */
+export type CheckOptions = { key?: string | undefined; shape?: boolean | undefined };
+
+/**
+ * The refusal for a shape copy put back where it may not go, or `null`.
+ *
+ * A SHAPE COPY IS A RECORD'S STRUCTURE WITH EVERY VALUE SCRAMBLED (PRF-A13), and it opens like any export. Put back over
+ * a real record it would replace every name, amount and note with gibberish that reads as his, which is the one thing a
+ * copy made to share must never do. So an import refuses it unless it was asked for: a scratch record (the look's
+ * `openShape`) or a self-host started with `--allow-shape`. Read off the file's own mark, the same one the gate reads.
+ */
+export function shapeRefusal(lines: readonly string[], allow = false): Refusal | null {
+  if (allow || !isShape(lines)) return null;
+  return {
+    code: 'IMPORT_SHAPE',
+    fix: 'This file is a shape copy, with every word and number in it scrambled, so it opens only on a scratch record and never over a real one. Put back an export of the record instead.',
+  };
+}
 
 /**
  * Does this file still say what it said when it was written?
@@ -536,6 +557,11 @@ export type CheckOptions = { key?: string | undefined };
  * refusal has to be able to name the table so somebody knows what they are looking at.
  */
 export async function checkBrainl(lines: readonly string[], options: CheckOptions = {}): Promise<Checked> {
+  /* A SHAPE COPY NOT ASKED FOR IS REFUSED FIRST, BY NAME. Every reader runs this check before it writes (the record's
+     `import`, a self-host's restore, the app's check of a picked file), and without this line each of them answered a
+     shape copy with `SIGNATURE_INVALID`, which sends a person looking for a key when the file is the wrong kind. */
+  const shaped = shapeRefusal(lines, options.shape === true);
+  if (shaped) return { ok: false, refusal: shaped };
   /* THE FORMAT, FROM LINE ONE. `03 §11`: a file from a newer build is refused rather than read,
      because reading it means writing rows whose columns this build does not know into a record it
      then calls a complete copy. The `dog_meta` check inside the writer finds the same fact later,
@@ -666,6 +692,9 @@ export async function checkBrainl(lines: readonly string[], options: CheckOption
   /* AND THE SIGNATURE LAST, over the manifest every one of those hashes is in. The order is the
      cheap check first: a damaged file names its table, and only a file that is internally consistent
      is worth an Ed25519 verify. */
+  /* A SHAPE COPY ASKED FOR IS NOT SIGNED, and never was: a signature says which record made these bytes, and these are
+     no record's. Asked for or not, its manifest was checked above like any file's. */
+  if (options.shape === true && isShape(lines)) return { ok: true, pinned: false };
   return signatureOf(lines, options.key);
 }
 
@@ -685,12 +714,18 @@ export function importBrainl(
   sql: Sql,
   transaction: <T>(fn: () => T) => T,
   lines: Iterable<string>,
+  { shape = false }: { shape?: boolean } = {},
 ): { ok: true; value: ImportReport } | { ok: false; refusal: Refusal } {
   const shapes = new Map(tables(sql).map((t) => [t.name, t]));
   /* MATERIALISED ONCE. `lines` is an `Iterable`, and a generator read twice is empty the second
      time — so the header scan below would have eaten a streamed file and left the import with
      nothing to read. */
   const all = [...lines];
+  /* A SHAPE COPY IS REFUSED HERE, BEFORE ANYTHING ELSE IS READ, because every import of a file into a record passes
+     through this function and a caller that forgot to ask is the case this exists for. `shape` is the caller saying
+     the record is a scratch one, or a self-host started with `--allow-shape`. */
+  const shaped = shapeRefusal(all, shape);
+  if (shaped) return { ok: false, refusal: shaped };
   /* A file says which record it is by carrying that record's own row, and the tables that name who
      may open it ride on that. */
   const carriesRecord = all.some((l) => l.startsWith('#table record '));

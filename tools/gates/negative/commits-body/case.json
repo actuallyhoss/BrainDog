@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "a body under the subject",
+  "expect": "has a body of 2 line\\(s\\)",
+  "findings": 1,
+  "total": 1,
+  "why": "A BODY OF TWO LINES, his \"stop making overly detailed git commits\" (W.25). The body names no trailer, link or tool, so the body rule is the only one red."
+}

@@ -45,7 +45,7 @@
  * `signs.ts` IS NOT IMPORTED, only its types. It reaches `flow.ts` and `digest.ts`, which import `metrics.ts`, which
  * imports this, and the loop that made broke the kernel's own load (`flow.ts` read a pattern before it was set). So the
  * signs now come in through the reader, `EvalContext.signs`, as the rates come in through `fx`; the kept readings are
- * read here from `sign_reading`, which only `signs.ts` writes, and only its closed list.
+ * read here from `sign_reading`, which `signs.ts` writes for its closed list, and `hold.ts` writes a `hand` row a day for an operator's hand.
  */
 
 import type { Result, Sql } from '@braindog/ports';

@@ -294,7 +294,8 @@ test('THE KERNEL-WRITTEN FIELDS are refused from a person and from a run alike',
 
   /* EACH WITH A VALUE ITS TYPE TAKES, so the refusal is about who writes it and not about the value. */
   const INSTANTS = ['last_seen', 'started', 'stretch_at', 'next_at', 'closed_at', 'seen_before'];
-  for (const key of KERNEL_WRITTEN) {
+  /* last_seen on a create, or on a run never heard from here, is carried as seen_before (run-carried.ts, AGT-C10); runs-imported.test.ts and run-carried.test.ts hold that, and a run heard from here still refuses it. */
+  for (const key of KERNEL_WRITTEN.filter((k) => k !== 'last_seen')) {
     const said = INSTANTS.includes(key) ? iso(NOW) : key === 'wrote' ? 1 : key === 'closed_as' ? 'taken' : 'x';
     for (const out of [
       k.create('session', { doing: 'Another', [key]: said }, { actor: 'p_owner' }),

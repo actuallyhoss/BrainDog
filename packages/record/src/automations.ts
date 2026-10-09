@@ -544,7 +544,10 @@ function idleSaid(sql: Sql, id: string, body: Body): string {
     if (trigger === 'decided') return 'No decision has woken it since it was turned on.';
     return 'Nothing has started it since it was turned on.';
   }
-  const since = sql.one<{ at: string | null }>('SELECT min(created_at) AS at FROM declaration WHERE id = ?', id)?.at ?? '';
+  /* FROM THE LIVE VERSION, the one turned on or edited last: the first one's day would count entries a rule written
+     since never saw, and "since it was turned on" would not be true of them. */
+  const since =
+    sql.one<{ at: string | null }>('SELECT created_at AS at FROM declaration WHERE id = ? AND superseded_at IS NULL ORDER BY version DESC LIMIT 1', id)?.at ?? '';
   const written = isObject(body.on) && isObject(body.on.written) ? body.on.written : null;
   const changed = Array.isArray(written?.op) && !written.op.includes('create');
   const n =
@@ -591,6 +594,20 @@ export function familyOf(body: Body): string | null {
 
 const OPEN = "state IN ('pending', 'running', 'waiting')";
 
+/** How many runs a rule has opened, the whole of them. */
+const runsOf = (sql: Sql, bare: string): number => sql.one<{ n: number }>('SELECT count(*) AS n FROM automation_run WHERE rule = ?', bare)?.n ?? 0;
+
+/**
+ * How many times an inline rule's work landed, from the log: a line it signed on an entry, outside a note, once per entry
+ * per triggering write, since one patch writes a line per field. The same sum migration 34 back-filled `rule_stat` by.
+ */
+const writesOf = (sql: Sql, bare: string): number =>
+  sql.one<{ n: number }>(
+    `SELECT count(*) AS n FROM (SELECT 1 FROM event WHERE actor = ? AND target_kind = 'entry' AND target LIKE 'entry:%' AND kind <> 'note'
+     GROUP BY coalesce(batch, id), target)`,
+    `rule:${bare}`,
+  )?.n ?? 0;
+
 function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: Body } {
   const body = JSON.parse(d.body) as Body;
   const bare = d.id.slice('rule.'.length);
@@ -615,6 +632,15 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
     'SELECT fired, last_at FROM rule_stat WHERE rule = ?',
     typeof body.rule === 'string' && body.rule !== '' ? body.rule : bare,
   );
+  /* A RESTORED OR IMPORTED RECORD HAS NO `rule_stat`, which is `local` and travels in no export (migration 34), while
+     the log it carries still says the rule fired. A rule the log signs is never said to have matched nothing: its count
+     is read from the log as the migration back-filled it, its runs or its writes, and is never under one. */
+  let fired = stat?.fired ?? 0;
+  let last_at = fired > 0 ? (stat?.last_at ?? null) : null;
+  if (fired === 0 && lastFired !== null) {
+    fired = Math.max(1, last ? runsOf(sql, bare) : writesOf(sql, bare));
+    last_at = lastFired;
+  }
   const month = { runs: 0, done: 0, failed: 0, cancelled: 0 };
   for (const r of sql.all<{ state: string; n: number }>(
     'SELECT state, count(*) AS n FROM automation_run WHERE rule = ? AND started_at >= ? GROUP BY state',
@@ -642,9 +668,9 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
       last: last ? { run: last.id, state: last.state, at: last.finished_at ?? last.started_at, say: last.say } : null,
       lastFired,
       month,
-      fired: stat?.fired ?? 0,
-      last_at: stat?.fired ? stat.last_at : null,
-      why_idle: stat?.fired ? null : idleSaid(sql, d.id, body),
+      fired,
+      last_at,
+      why_idle: fired > 0 ? null : idleSaid(sql, d.id, body),
       family: familyOf(body),
     },
   };

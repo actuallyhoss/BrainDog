@@ -41,6 +41,8 @@ export type SeedRegister = {
    * as Money's accounts declare it (`modules/money/lists/accounts.ts`), and held to that list at install (`declare.ts`).
    */
   delete?: 'refuse_while_referenced';
+  /** The order a read that names none comes back in (PGS-B06): one field that sorts, `desc` highest first (`declare.ts`). */
+  order?: { field: string; dir: 'asc' | 'desc' };
 };
 
 export type SeedField = FieldDecl & {

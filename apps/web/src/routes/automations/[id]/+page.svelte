@@ -38,6 +38,7 @@
 <script lang="ts">
   /* A VERSION'S CHANGES ARE THE DIFF KIND'S LINES (`kinds/diff.css`), with this screen's own rules over them. */
   import '@braindog/skin/kinds/diff.css';
+  import { createClient } from '@braindog/client';
   import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
@@ -67,7 +68,7 @@
   import RunView from '$lib/flow/RunView.svelte';
   import Tried from '$lib/flow/Tried.svelte';
   import { FlowDraft } from '$lib/flow/flow.svelte.ts';
-  import { ROOT, callsIn, freshId, sayStart, triggerKind, words } from '$lib/flow/flow.ts';
+  import { ROOT, callsIn, freshId, learnScripts, sayStart, triggerKind, words } from '$lib/flow/flow.ts';
   import {
     diffLines,
     durationOf,
@@ -205,7 +206,7 @@
     }
     /* THE LIST CARRIES NO BODY, so the one is asked for by its id. A record without the read cannot open one it has, and
        says so the same way as an id it does not have. */
-    const one = out.absent ? null : await out.source.automation(want);
+    const [one] = await Promise.all([out.absent ? null : out.source.automation(want), readScriptTitles()]);
     if (!one?.ok || !one.value.body) {
       row = null;
       from = 'missing';
@@ -213,6 +214,15 @@
     }
     take({ ...one.value, acted: rows.find((r) => r.id === one.value.id)?.acted });
     from = 'ready';
+  }
+
+  /* THE SCRIPTS' TITLES BEFORE THE STEPS ARE DRAWN, so a script step names the script as it declares itself
+     (`learnScripts`); a record that cannot answer leaves each step its id in words. */
+  async function readScriptTitles() {
+    const out = await createClient({ base: apiBase() })
+      .scripts()
+      .catch(() => null);
+    if (out?.ok) learnScripts(out.value);
   }
 
   async function readDeclared() {

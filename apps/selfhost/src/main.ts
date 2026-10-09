@@ -578,7 +578,9 @@ async function serve(): Promise<void> {
 
   /* AN EXPLICIT FILE STILL WINS, because every test and every `braindog dev` in this repository
      opens a bare file with no data directory behind it. */
-  const explicit = argv[3] ?? env.BRAINDOG_FILE;
+  /* `--allow-shape` (PRF-A13, shape-guard-49) is the one flag `serve` reads, and it is never a file. */
+  const allowShape = argv.slice(3).includes('--allow-shape');
+  const explicit = argv.slice(3).find((a) => a !== '--allow-shape') ?? env.BRAINDOG_FILE;
   /* AND IT MUST ALREADY BE A RECORD. `openSqlite` CREATES the file, so a mistyped flag —
      `serve --port=9999` — became a fully migrated thirty-one-table record named `--port=9999`,
      served on the port, with every anonymous request its owner. The multi-record refusal below
@@ -653,6 +655,8 @@ async function serve(): Promise<void> {
   const running = await start({
     file,
     port,
+    /* A HOST STARTED TO TAKE A SHAPE COPY BACK, for a developer reading a customer's structure; never the default. */
+    ...(allowShape ? { allowShape: true } : {}),
     token: env.BRAINDOG_TOKEN,
     keys: store,
     ...(env.BRAINDOG_HOST === undefined ? {} : { host: env.BRAINDOG_HOST }),

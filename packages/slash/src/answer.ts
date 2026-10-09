@@ -161,11 +161,14 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
        `propose` (`packages/host/test/slash-guard-answer.test.ts`). It is not guarded here as well, because the host counts
        that tier with its own query over this same table, and a second check here would be a second copy of that count to
        drift from it. The row below carries the settings' tier so the count for its tier sees it. */
-    if (s.tier === 'a' && core.asksUsed() >= s.ask_cap)
+    if (s.tier === 'a' && core.asksUsed() >= s.ask_cap) {
+      /* THE ASK TURNED AWAY LEAVES ITS ROW (`TURNED_AWAY_SQL`, model-sign-49). */
+      core.turnedAway('read', s.tier);
       return no(
         'SLASH_BUDGET_SPENT',
         `rule.${ask.rule} asked Slash at step ${step}, and this month's asks are spent until ${firstOf(core.resets())}. Raise the monthly limit, or wait.`,
       );
+    }
 
     /* NO `await` BETWEEN THE CHECK AND THE HOLD, for `read`'s reason: the hold is what the next ask's count includes, so
        ten answers sent together at a cap of two make two model calls (`test/answer.test.ts`, case 3). */

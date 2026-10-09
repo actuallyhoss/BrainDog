@@ -62,6 +62,11 @@ export type ListQuery = {
    * The kernel cannot know who is asking; the caller that does passes this.
    */
   reads?: (register: string) => boolean;
+  /**
+   * Which lists a `pointed` hop in `where` may go into (where-hop-49). Absent is `reads`. The record passes the lists
+   * the caller reads WHOLE: a hop into one she sees narrowed would count entries her grant keeps from her.
+   */
+  hops?: (register: string) => boolean;
 };
 
 /** One page of a list: the rows, where the next page starts, and how many rows matched in all. */

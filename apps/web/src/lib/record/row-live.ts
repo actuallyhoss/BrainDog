@@ -18,6 +18,7 @@ import { createClient, type ClientOptions } from '@braindog/client';
 import { REGISTERS } from './held.ts';
 import { identitiesOf, seenIn } from './names.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type Names, type RecordRow, type RefMap } from './remote.ts';
+import type { DocValues } from './row-values.ts';
 import type { Entry } from './schema.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
@@ -27,7 +28,23 @@ export type Fetch = NonNullable<ClientOptions['fetch']>;
  * the page draws every field through `display`: without it a live `ref` was drawn as the sample's
  * row of the same number, which is another record's name under this record's field.
  */
-export type Got = { from: 'live'; entry: Entry | null; names: Names; person?: Person; folded?: number } | { from: 'refused'; fix: string };
+export type Got =
+  | { from: 'live'; entry: Entry | null; names: Names; person?: Person; folded?: number; docs?: Docs }
+  | { from: 'refused'; fix: string };
+
+/**
+ * `docs` IS WHAT EACH OF THE ROW'S DOCUMENTS READS, by field (PGS-B03): the values its `{{path}}`s hold with the row as
+ * the entry they sit on, and the paths that name nothing. The record answers it when `get` is asked `values: true`, and
+ * the screen draws each document with `resolverOf` over its own (`row-values.ts`). On every read of a row that is there,
+ * empty where no document holds a path, so a `Got` without it is a write's answer, which carries the row alone.
+ */
+export type Docs = Record<string, DocValues>;
+
+/** The row's documents' values off a `get` answered with `values: true`, empty where it carried none. */
+function docsOf(row: RecordRow | null): Docs {
+  const docs = row === null ? undefined : (row as RecordRow & { docs?: unknown }).docs;
+  return docs !== null && typeof docs === 'object' && !Array.isArray(docs) ? (docs as Docs) : {};
+}
 
 /**
  * WHO A PERSON'S OR AN ORGANISATION'S ROW SAYS THEY ARE, beyond its fields, in words a person reads: where they were
@@ -110,7 +127,11 @@ function missed(out: object): Got {
   return { from: 'refused', fix: (out.refusal as { fix: string }).fix };
 }
 
-export type RowReader = { read(register: string, seq: number): Promise<Got> };
+export type RowReader = {
+  read(register: string, seq: number): Promise<Got>;
+  /** What the row's documents read now, for a screen whose row a write has just answered without them. */
+  docs(register: string, seq: number): Promise<Docs>;
+};
 
 /**
  * A row reader for one tab.
@@ -146,7 +167,9 @@ export function rowReader(base: string, io?: Fetch): RowReader {
       /* A PENDING ROW HAS NO NUMBER THE RECORD COULD HOLD, so nothing is asked: the record holds no row for it, and the
          page draws the tab's own row from `pending` instead. */
       if (!Number.isInteger(seq) || seq < 1) return { from: 'live', entry: null, names: new Map() };
-      const got = await client.get(register, seq);
+      /* WITH THE VALUES ITS DOCUMENTS READ (`values: true`), so a note's `{{blockers.count}}` is answered on this screen
+         as it is on the project page. One read, not a second call per document. */
+      const got = await client.call<unknown>('get', { register, seq, values: true });
       if (!got.ok) return missed(got);
       /* A USE CASE'S OWN LISTS ARE DECLARED BY THE RECORD ALONE, AND THE ROW'S LIST IS LEARNED WHETHER OR NOT THE ROW IS
          THERE. This `learn` used to sit below the line under it, and a missing row therefore left `REGISTERS[register]`
@@ -183,13 +206,21 @@ export function rowReader(base: string, io?: Fetch): RowReader {
         const map = await mapOf(target);
         if (map) refs.set(target, map);
       }
+      const docs = docsOf(row);
       return {
         from: 'live',
         entry: entryOf(register, row, refs),
         names: namesOf(refs),
         ...(parts === null ? {} : { person: personOf(parts, row.fields, refs, register) }),
         ...(kept !== undefined && kept !== null && kept.seq !== seq ? { folded: seq } : {}),
+        docs,
       };
+    },
+
+    async docs(register, seq) {
+      if (!Number.isInteger(seq) || seq < 1) return {};
+      const got = await client.call<unknown>('get', { register, seq, values: true });
+      return got.ok ? docsOf((got.value as RecordRow | null) ?? null) : {};
     },
   };
 
@@ -228,7 +259,7 @@ export function rowReader(base: string, io?: Fetch): RowReader {
       next = idIn(kept.fields[field]);
       if (next !== null) continue;
       if ((kept.deleted_at ?? null) !== null || kept.seq === null) return null;
-      const whole = await client.get(register, kept.seq);
+      const whole = await client.call<unknown>('get', { register, seq: kept.seq, values: true });
       return whole.ok && whole.value !== null ? (whole.value as RecordRow) : null;
     }
     return null;

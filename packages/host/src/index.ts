@@ -190,7 +190,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'schema', group: 'READ+', writes: false, what: 'What one register holds: its fields, their types, and what each may take.',
     takes: { register: 'text' } },
   { name: 'get', group: 'DATA', writes: false, what: 'One row, by the number a person says out loud: tasks#3, or S1.',
-    takes: { register: 'text', seq: 'integer', spoken: 'text' } },
+    takes: { register: 'text', seq: 'integer', spoken: 'text', values: 'json' } },
   { name: 'list', group: 'DATA', writes: false, what: 'Rows of one register, narrowed by a predicate, newest first.',
     /* `cursor` IS `text` AND NOT `json`, and it is the one argument where that matters. A keyset
        cursor is `<when>|<id>`, which is not valid JSON, so it survived the guessing by accident;
@@ -421,6 +421,9 @@ export const UNROUTED = [
   /* The key doors' record half: `vault.ts` calls them after `vaultGrant`, with sealed bytes only. */
   'depositGrant',
   'openForGrant',
+  /* The shape door's record half (PRF-A13): host shape.ts hands it the bearer, and it reads the grant before a row. */
+  'shapeGrant',
+  'shapeExport',
   /* `operationGrant`, `signingKey` AND `restored` ARE INTERNAL TOO AND ARE NOT LISTED YET. `router-groups.mjs`
      refuses a name here that `30 §5`'s INTERNAL row does not carry, and that row has not been amended for them. None of
      the three is in `ROUTES`, and `packages/record/test/file-doors.test.ts` fails if one is added. */

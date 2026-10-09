@@ -47,7 +47,7 @@ import { chromium } from '@playwright/test';
 
 import { copy } from '../../apps/web/src/lib/copy.ts';
 
-import { APP_BASE, appShell } from './lib.mjs';
+import { APP_BASE, appShell, budget, openPage, readiness } from './lib.mjs';
 import { forward, forwards, serverKeyFor, startRecord } from './record.mjs';
 
 /* THE PREREQUISITE, AND THIS IS ONE OF THE TWO GATES THAT PROVED IT HAD TO LEAVE THIS FILE. This
@@ -205,8 +205,11 @@ export default async function passkey(root = join(import.meta.dirname, '..', '..
     }
 
     browser = await chromium.launch();
-    const context = await browser.newContext();
-    const page = await context.newPage();
+    /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (PRF-B04): the record's clock and the page's ready mark. No `record` and
+       no prefs, because the drive stays signed out: `record.setPref` would use the server key and sign the page in. */
+    const ready = readiness('passkey', budget('ready').settleTimeoutMs, ROOT);
+    const opened = await openPage(browser, `${ORIGIN}${APP_BASE}/signin`, { width: Math.max(...budget('a11y').widths), clock: record.now, ready, waitUntil: 'networkidle' });
+    const { context, page } = opened;
     page.setDefaultTimeout(20_000);
     cdp = await context.newCDPSession(page);
     await cdp.send('WebAuthn.enable', { enableUI: false });

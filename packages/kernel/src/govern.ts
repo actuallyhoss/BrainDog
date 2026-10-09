@@ -1895,10 +1895,20 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
     }
     changes += body.rows.length;
   }
+  /* DECLARATIONS (arrange-47): each `{ id, kind, body }`, checked as a change is when the record files it; here only
+     their shape and how many, so an arrangement of only declarations is not refused as changing nothing. */
+  if (body.declarations !== undefined) {
+    if (!Array.isArray(body.declarations) || body.declarations.length > ARRANGE_CEILING)
+      return { code: 'VALUE_MALFORMED', fix: `declarations is a list of at most ${ARRANGE_CEILING}, each {"id":"<kind>.<name>","kind":"<kind>","body":{...}}.`, at: 'body.declarations' };
+    for (const [i, d] of body.declarations.entries())
+      if (!isMap(d) || typeof d.id !== 'string' || typeof d.kind !== 'string' || !isMap(d.body))
+        return { code: 'VALUE_MALFORMED', fix: 'A declaration is {"id":"<kind>.<name>","kind":"<kind>","body":{...}}.', at: `body.declarations[${i}]` };
+    changes += body.declarations.length;
+  }
   if (changes === 0)
     return {
       code: 'REQUIRED_MISSING',
-      fix: 'An arrangement changes something: packs to install, enable or disable, pages, or settings such as the voice.',
+      fix: 'An arrangement changes something: packs to install, enable or disable, pages, settings such as the voice, declarations, or entries.',
       at: 'body',
     };
 
@@ -1923,7 +1933,7 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
  * is what a person reads, and `needs` are the parts it cannot be taken without.
  *
  * THE IDS ARE THE ONES THE RECORD FILES on the body's `parts` (`arrange.ts` `partsOf`): `install:<pack>`,
- * `enable:<pack>`, `disable:<pack>`, `setting:<pack>`, `rows:<list>`, `page:<page>` and `choice:<id>`, so the ids the
+ * `enable:<pack>`, `disable:<pack>`, `setting:<pack>`, `rows:<list>`, `page:<page>`, `declaration:<id>` and `choice:<id>`, so the ids the
  * owner's Decide reads off the question are the ones this accepts. Settings sent with an install fill that install, and
  * are part of it.
  */
@@ -2126,6 +2136,18 @@ function narrowArrangement(body: Record<string, unknown>, keep: ReadonlySet<stri
     );
   }
   if (Array.isArray(body.parts)) set('parts', body.parts.filter((p) => isMap(p) && typeof p.id === 'string' && keep.has(p.id)));
+  /* EACH HALF SAYS ONLY ITS OWN KEYS AND CALLS (arrange-47): a need keeps the parts it names that are kept, and goes
+     when none is; a call goes with its part. */
+  if (Array.isArray(body.needs))
+    set(
+      'needs',
+      body.needs.flatMap((n) => {
+        if (!isMap(n) || !Array.isArray(n.parts)) return [n];
+        const parts = n.parts.filter((p) => typeof p === 'string' && keep.has(p));
+        return parts.length === 0 ? [] : [{ ...n, parts }];
+      }),
+    );
+  if (Array.isArray(body.calls)) set('calls', body.calls.filter((c) => !isMap(c) || typeof c.part !== 'string' || keep.has(c.part)));
   return out;
 }
 
@@ -2147,7 +2169,19 @@ function mergeArrangement(rest: Record<string, unknown>, taken: Record<string, u
     if (ids.length > 0) packs[verb] = ids;
   }
   if (taken.packs !== undefined || rest.packs !== undefined) out.packs = packs;
-  for (const key of ['plan', 'pages', 'settings', 'declarations', 'parts']) set(key, both(key));
+  for (const key of ['plan', 'pages', 'settings', 'declarations', 'parts', 'calls']) set(key, both(key));
+  /* A NEED BY ITS LABEL, with the union of the parts each half named it for. */
+  const needs = new Map<string, Record<string, unknown>>();
+  const loose: unknown[] = [];
+  for (const n of both('needs')) {
+    if (!isMap(n) || typeof n.label !== 'string') {
+      loose.push(n);
+      continue;
+    }
+    const held = needs.get(n.label);
+    needs.set(n.label, held ? { ...held, parts: [...new Set([...textsOf(held.parts), ...textsOf(n.parts)])] } : n);
+  }
+  set('needs', [...needs.values(), ...loose]);
   const first = listOf(taken.rows).length;
   set('rows', [
     ...listOf(taken.rows),
@@ -2558,6 +2592,9 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         allowed: ['wont-fix', 'incorrect'],
       });
     deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = ? WHERE id = ?", verdict.resolved_as, id);
+    /* A PAGE SLASH ASKED FOR AND WAS TOLD NO ABOUT IS DISMISSED IN THE PEN TOO (offer-pen-50): one place an offer, so the
+       holding pen never offers the page Decide just turned down. */
+    if (row.opened_by === SLASH && row.body_kind === 'arrange') penDismissed(deps, actor, slashPageList(row.body), at);
     event(deps, at, actor, 'resolve', `suggestion:${id}`, 'suggestion', verdict.resolved_as, verdict.reason);
     if (verdict.resolved_as === 'incorrect')
       deps.sql.exec(
@@ -3072,3 +3109,50 @@ const parse = (body: string): Record<string, unknown> | null => {
     return null;
   }
 };
+
+/** How many pen dismissals a person keeps, newest last (`PEN_DISMISSED_MOST` in the record's `emergent.ts`). */
+const PEN_DISMISSED_KEPT = 500;
+
+/**
+ * The one list a page Slash asked for is over, or `null`: an arrangement adding exactly one new page that requires one
+ * list and draws it whole (a block on `register.<list>` with no `where`), the page Slash's growing-list notice files.
+ */
+function slashPageList(body: string): string | null {
+  let b: { pages?: unknown } | null = null;
+  try {
+    b = JSON.parse(body) as { pages?: unknown };
+  } catch {
+    return null;
+  }
+  const pages = Array.isArray(b?.pages) ? (b.pages as { was?: unknown; body?: { requires?: unknown; blocks?: unknown } }[]) : [];
+  if (pages.length !== 1) return null;
+  const page = pages[0]!;
+  if (page.was !== undefined && page.was !== null) return null;
+  const requires = Array.isArray(page.body?.requires) ? (page.body!.requires as unknown[]) : [];
+  if (requires.length !== 1 || typeof requires[0] !== 'string' || !requires[0].startsWith('register.')) return null;
+  const list = requires[0].slice('register.'.length);
+  const blocks = Array.isArray(page.body?.blocks) ? (page.body!.blocks as { source?: unknown; where?: unknown }[]) : [];
+  return blocks.some((x) => x?.source === `register.${list}` && x.where === undefined) ? list : null;
+}
+
+/** Add `page:<list>` to a person's `pen.dismissed`, newest last, keeping the last `PEN_DISMISSED_KEPT`. */
+function penDismissed(deps: Pick<GovernDeps, 'sql'>, person: string, list: string | null, at: string): void {
+  if (list === null) return;
+  const held = deps.sql.one<{ value: string }>("SELECT value FROM pref WHERE person_id = ? AND key = 'pen.dismissed'", person)?.value;
+  let gone: string[] = [];
+  try {
+    const was = held === undefined ? [] : (JSON.parse(held) as unknown);
+    gone = Array.isArray(was) ? was.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    gone = [];
+  }
+  const signature = `page:${list}`;
+  if (gone.includes(signature)) return;
+  deps.sql.exec(
+    `INSERT INTO pref (person_id, key, value, updated_at) VALUES (?, 'pen.dismissed', ?, ?)
+     ON CONFLICT (person_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    person,
+    JSON.stringify([...gone, signature].slice(-PEN_DISMISSED_KEPT)),
+    at,
+  );
+}

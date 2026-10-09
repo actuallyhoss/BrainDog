@@ -141,7 +141,9 @@
      account says they moved, without waiting for the members to be read again. */
   let named = $state<string | null>(null);
   let movedTo = $state<string | null>(null);
-  const myName = $derived(named ?? mine?.name ?? null);
+  /* A NAME THAT IS THE ID IS NO NAME: `personOf` falls back to the person's id so a list line is called something, and
+     this area printed "p_self" under the face. The area says it holds no name instead, and offers to add one. */
+  const myName = $derived(named ?? (mine && mine.name !== mine.id ? mine.name : null));
   const myEmail = $derived(movedTo ?? signedInEmail ?? mine?.email ?? null);
   /* THE FACE IS A LETTER OF THE NAME, or of the address before there is a name, and never of an id. */
   const faceName = $derived(myName ?? myEmail ?? copy.you);

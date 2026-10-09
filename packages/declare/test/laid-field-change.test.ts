@@ -35,8 +35,8 @@ const refusal = (r: unknown): Refusal => {
   return x.refusal!;
 };
 
-const BRIEF = new URL('../../../packs/project-brief/project-brief.pack.json', import.meta.url);
-/** project-brief as it ships, at `version`, with `change` made to the fields it lays on Projects. */
+const BRIEF = new URL('../../../apps/web/static/catalogue/packs/project-brief/1.2.1.pack.json', import.meta.url);
+/** project-brief 1.2.1 as the catalogue serves it, at `version`, with `change` made to the fields it lays on Projects. */
 const brief = (version = '1.0.0', change: (fields: Field[]) => Field[] = (f) => f): Brief => {
   const doc = JSON.parse(readFileSync(BRIEF, 'utf8')) as Brief;
   const things = doc.extends['register.things']!;

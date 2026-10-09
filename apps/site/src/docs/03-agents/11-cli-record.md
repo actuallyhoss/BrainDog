@@ -65,9 +65,9 @@ Each part of `sections` is a place in the export, such as `items` or `book.accou
 Word | What it does
 text | Carried as it is written
 day | The date, kept as a day
-money | An amount and its currency, from the field `currency` names or the one currency `in` says. Two currencies are never added together
-link | Points at a thing in another part of the same export, named by `to`. One that is not there arrives without the link, and the report says so
-one of | Turns the export's word into your list's through `values`. A word it has not got is offered to the list, and carried as `else` until you accept it
+money | An amount and its currency, from the field "currency" names or the one currency "in" says. Two currencies are never added together
+link | Points at a thing in another part of the same export, named by "to". One that is not there arrives without the link, and the report says so
+one of | Turns the export's word into your list's through "values". A word it has not got is offered to the list, and carried as "else" until you accept it
 ```
 
 Running it again finds each thing by its key and updates it, so nothing arrives twice, and a thing you deleted here stays deleted. Every part of the export the map does not read is named in the report, such as "Not read: holdings, 14 items." Add `--strict` and an import that leaves anything unread writes nothing, so you know the map is finished.

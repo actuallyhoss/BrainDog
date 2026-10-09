@@ -237,7 +237,13 @@ test('EVERY --record IS REHEARSED ON ITS OWN COPY, AND A PASS WRITES A RECEIPT O
   assert.ok(!Number.isNaN(Date.parse(got.rehearsed.at)), 'the receipt has its date');
   assert.equal(got.checksum, await checksum(l.last.sql), 'the receipt is for the text that ran');
   assert.equal(got.applied, false);
-  for (const [file, entry] of Object.entries(l.lock)) if (file !== l.name) assert.deepEqual(after[file], entry, `${file} changed`);
+  /* ANOTHER MIGRATION NOT YET APPLIED gets its receipt too (0036 and 0037 shipped together), and one applied is left
+     as it was. */
+  for (const [file, entry] of Object.entries(l.lock)) {
+    if (file === l.name) continue;
+    if (entry.applied === false) assert.deepEqual({ ...after[file], rehearsed: { ...after[file]?.rehearsed, at: '' } }, { ...entry, rehearsed: { at: '', records: 2, rows: 10, pass: true } }, `${file} has no receipt`);
+    else assert.deepEqual(after[file], entry, `${file} changed`);
+  }
   /* THE LOCK IS TRACKED, SO IT HOLDS COUNTS AND NOTHING OF A RECORD: not its id, its name, its address or a row. */
   for (const word of [REC, OWNER, 'The Studio', 'the-studio', 'Kiln', 'ada@example.com']) assert.ok(!text.includes(word), `the lock holds ${word}`);
   /* AND IT IS WRITTEN AS THE GATE WRITES IT, one line per migration, though it was handed one long line. */

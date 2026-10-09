@@ -1,0 +1,8 @@
+{
+  "gate": "board-yes",
+  "rule": "a board's own page edited after his yes",
+  "expect": "was edited after his yes",
+  "findings": 1,
+  "total": 1,
+  "why": "THE GOVERNED FILE IS AS HE SAW IT, so the one finding is the board: its page.dog no longer has the hash his yes names, and a board changed after its yes is not the board he said yes to. Every other part of the yes is whole, so a count above one says the gate found something that is not there."
+}

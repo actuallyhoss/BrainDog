@@ -621,6 +621,9 @@ export type AuditEvent = {
   target?: string;
   note: string;
   version: number;
+  /** On the one line a pass of BrainDog's own update is said as (SHL-A21): its sentence and counts, and the lines it wrote. */
+  pass?: { said: string; updated: number; asked: number; steps: number; at: string };
+  steps?: AuditEvent[];
 };
 
 export type PackInfo = {

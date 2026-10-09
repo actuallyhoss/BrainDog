@@ -203,19 +203,36 @@ test('A PUBLISHED DECLARATION STAYS WHOLE, WITH ITS IDS AND STATES ON EVERY ENTR
   sql.close();
 });
 
-test('ITS MANIFEST MATCHES IT, SO THE ONE THING A CHECK REFUSES IS THE MISSING SIGNATURE, AND IT OPENS', async () => {
+test('A SHAPE COPY CHECKS ONLY WHEN ASKED FOR (shape-guard-49): refused IMPORT_SHAPE otherwise, its manifest matches, AND IT OPENS', async () => {
   const { sql, lines } = await filled();
   const shaped = await shapeBrainl(lines, { key: KEY, now: NOW });
-  const checked = await checkBrainl(shaped);
-  assert.equal(checked.ok, false);
-  assert.equal(!checked.ok && checked.refusal.code, 'SIGNATURE_INVALID');
+  const refused = await checkBrainl(shaped);
+  assert.equal(!refused.ok && refused.refusal.code, 'IMPORT_SHAPE');
+  const checked = await checkBrainl(shaped, { shape: true });
+  assert.ok(checked.ok, JSON.stringify(checked));
 
   const fresh = openSqlite();
   await openRecord(fresh, fixedClock(NOW), {});
-  const opened = importBrainl(fresh, (fn) => fn(), shaped);
+  const opened = importBrainl(fresh, (fn) => fn(), shaped, { shape: true });
   assert.ok(opened.ok, JSON.stringify(opened));
   assert.equal(fresh.one<{ n: number }>('SELECT count(*) AS n FROM entry')?.n, 3);
   assert.equal(fresh.one<{ value: string }>("SELECT value FROM dog_meta WHERE key = 'shape'")?.value, 'true');
   fresh.close();
+  sql.close();
+});
+
+test('A KEY PASTED INTO A NOTE IS NOT KEPT: a hex token and a long mix of letters and digits leave nothing of themselves', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW), { sign: testSigner() });
+  assert.ok((await k.install([OBLIGATIONS])).ok);
+  const hex = 'a3f9c2e8b1d4f6a7c9e2b5d8f1a4c7e0b3d6f9a2';
+  const mixed = 'k7f3a9q2z8x1';
+  const made = k.create('obligations', { what: `Rent key ${hex} and ${mixed}`, party: 'Zorbex', amount: { amount: 100, currency: 'EGP' }, due: '2026-09-30', state: 'open' }, { actor: 'p_1' });
+  assert.ok(made.ok, JSON.stringify(made));
+  const lines = (await k.export()) as { ok: true; value: string[] };
+  const shaped = (await shapeBrainl(lines.value, { key: KEY, now: NOW })).join('\n');
+  assert.ok(!shaped.includes(hex), 'the hex token came through whole');
+  assert.ok(!shaped.includes(mixed), 'the long mixed token came through whole');
+  for (const piece of ['7f3a9', 'c9e2b5', 'q2z8x1']) assert.ok(!shaped.includes(piece), `${piece} came through`);
   sql.close();
 });

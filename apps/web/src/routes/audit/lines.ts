@@ -185,7 +185,8 @@ export type ByWho = { you: number; people: number; agents: number; rules: number
 export function byWhoOf(v: unknown): ByWho | null {
   if (v === null || typeof v !== 'object') return null;
   const o = v as Record<string, unknown>;
-  const keys = ['you', 'people', 'agents', 'rules', 'record'] as const;
+  /* THE KEYS OFF A COUNT OF NOTHING, so the five are said once, as the type says them. */
+  const keys = Object.keys({ you: 0, people: 0, agents: 0, rules: 0, record: 0 } satisfies ByWho) as (keyof ByWho)[];
   return keys.every((k) => Number.isSafeInteger(o[k]) && (o[k] as number) >= 0)
     ? { you: o.you as number, people: o.people as number, agents: o.agents as number, rules: o.rules as number, record: o.record as number }
     : null;

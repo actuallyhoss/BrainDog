@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "a history under its floor",
+  "expect": "rewritten clean, never restarted",
+  "findings": 1,
+  "total": 1,
+  "why": "TWELVE COMMITS AND ONE GOOD ONE IN RANGE, his \"no fresh start though\" (HD.24): a history squashed to a new root keeps every message clean and is red only here, by its count."
+}

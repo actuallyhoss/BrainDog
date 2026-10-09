@@ -81,6 +81,7 @@ import { httpStatus } from './index.ts';
 import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK, UNDERSTAND_ASK } from './model-jobs.ts';
 import { slashBaseUrlOf, slashKeySave } from './slash.ts';
 import { VAULT_HEADERS } from './vault.ts';
+import { turnedAway } from './slash-turned-away.ts';
 
 /**
  * The methods of `Slash` these doors call, over whatever context the host resolves a session to.
@@ -686,7 +687,9 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
       /* ON HIS OWN KEY THE PRESS IS LISTED AND NOT CAPPED, as every ask there is (`capped: false`), and nothing of this
          host's is spent, so the row is priced 0 and named for the model his key is asked for. */
       const own = asks.capped === false;
-      if (!own && asks.used >= asks.cap)
+      if (!own && asks.used >= asks.cap) {
+        /* THE ASK TURNED AWAY LEAVES ITS ROW (`slash-turned-away.ts`, model-sign-49). */
+        turnedAway(deps.sql, new Date(deps.clock.now()).toISOString(), 'read', typeof status?.tier === 'string' ? status.tier : 'a');
         return {
           ok: false,
           refusal: {
@@ -694,6 +697,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
             fix: `This month's Slash asks are spent until ${typeof asks.resets === 'string' ? asks.resets.slice(0, 10) : 'next month'}.`,
           },
         };
+      }
       /* THE TIER THE ENGINE READS AND NOT THE ONE THE ROW HOLDS. Where a host does not run a stored tier the package reads it
          as `a` (`SlashOptions.tiers`), and a row written under the stored one would sit outside the count `status()` is. */
       const tier = typeof status?.tier === 'string' ? status.tier : 'a';
@@ -758,7 +762,9 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
       const since = monthStart(deps.clock.now());
       /* UNDERSTANDING IS HELD TO ITS OWN TEN AND TO THE WORK'S MONTH IT IS COUNTED IN, both. */
       const understanding = ask === 'understand' ? meter.understand : undefined;
-      if (meter.spent(since) >= meter.cap || (understanding !== undefined && understanding.spent(since) >= understanding.cap))
+      if (meter.spent(since) >= meter.cap || (understanding !== undefined && understanding.spent(since) >= understanding.cap)) {
+        /* THE ASK TURNED AWAY LEAVES ITS ROW (`slash-turned-away.ts`, model-sign-49). */
+        turnedAway(deps.sql, new Date(deps.clock.now()).toISOString(), 'pattern', typeof status?.tier === 'string' ? status.tier : 'a');
         return {
           ok: false,
           refusal: {
@@ -771,6 +777,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
                   : `This month's background Slash asks are spent until ${monthResets(deps.clock.now())}.`,
           },
         };
+      }
       const tier = typeof status?.tier === 'string' ? status.tier : 'a';
       const model = typeof status?.model === 'string' && status.model !== '' ? status.model : deps.model;
       const id = mint();

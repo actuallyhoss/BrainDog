@@ -14,6 +14,7 @@ import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.t
 import { NOW, firstPartyManifest } from '../src/index.ts';
 import { updateFirstParty, type QuietPort } from '../src/packs/quiet.ts';
 import { alongside, arrange, modulesFor, useCase } from '../src/usecases/index.ts';
+import { SHOP } from '../src/usecases/shop.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 
 const TODAY = dayOf(NOW);
@@ -56,9 +57,10 @@ async function put(k: Kernel, doc: unknown): Promise<void> {
 const held = (k: Kernel): string[] => (k.declarations() as { id: string; kind: string }[]).filter((d) => d.kind === 'register').map((d) => d.id.slice('register.'.length));
 
 /** A record made the way onboarding makes one: People for the person, each module in order, then each use case's pack. */
-async function made(ids: readonly string[], examples: boolean): Promise<{ k: Kernel; sql: NodeSql }> {
+async function made(ids: readonly string[], examples: boolean): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  const clock = fixedClock(NOW);
+  const k = await openRecord(sql, clock);
   const cases = ids.map((id) => useCase(id)!);
   const modules = [...new Set(cases.flatMap((u) => modulesFor(u, ['people'])))];
   for (const m of modules) {
@@ -70,7 +72,7 @@ async function made(ids: readonly string[], examples: boolean): Promise<{ k: Ker
     const carried = carriedDocument(u, TODAY, MARIAM, { examples });
     if (carried) await put(k, carried);
   }
-  return { k, sql };
+  return { k, sql, clock };
 }
 
 type Row = { fields: Record<string, unknown> };
@@ -98,15 +100,73 @@ test('THE ORDERS PAGE DRAWS NOTHING ON A NEW SHOP, and each tile once an order i
   assert.deepEqual(blocks.flatMap((b) => b.rows ?? []), []);
   /* THE PAGE'S ONE LINE SAYS NOTHING: every clause's figure is nought, and a clause at nought is left out. */
   const line = blocks.find((b) => b.kind === 'note') as (Drawn & { values?: Record<string, number> }) | undefined;
-  assert.deepEqual(line?.values, { 'orders-due-7d': 0, 'orders-owed': 0 });
+  assert.deepEqual(line?.values, { 'orders-30d': 0, 'orders-due-7d': 0 });
 
-  /* ONE ORDER NOBODY HAS PAID FOR, due in two days: it is due this week and owed. */
-  value(k.create('orders', { what: '3 vanilla jars', how_many: 3, due: dayOf(Date.parse(`${TODAY}T00:00:00Z`) + 2 * 86_400_000) }, { actor: 'p_owner' }));
+  /* ONE ORDER NOBODY HAS PAID FOR, with a total, due in two days: it is due this week and owed. */
+  value(k.create('orders', { what: '3 vanilla jars', how_many: 3, due: dayOf(Date.parse(`${TODAY}T00:00:00Z`) + 2 * 86_400_000), total: { amount: 135_000, currency: 'EGP' } }, { actor: 'p_owner' }));
   const after = value<{ blocks: Drawn[] }>(k.page('orders')).blocks;
   for (const b of after) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   const drawn = after.filter((b) => b.drawn !== false && b.heading !== undefined);
   assert.deepEqual(drawn.map((b) => b.heading), ['Due this week', 'Owed to you']);
   for (const b of drawn) assert.deepEqual(b.rows?.map((r) => r.fields.what), ['3 vanilla jars'], b.heading);
+  sql.close();
+});
+
+/* ── step 7: the Orders page, in the Orders section, and its one line ──── */
+
+type Line = Drawn & { values?: Record<string, unknown>; unnamed?: string[] };
+const DAY = 86_400_000;
+const lineOf = (k: Kernel): Line => value<{ blocks: Line[] }>(k.page('orders')).blocks.find((b) => b.kind === 'note')!;
+const daysOn = (n: number): string => dayOf(Date.parse(`${TODAY}T00:00:00Z`) + n * DAY);
+
+test('THE ORDERS PAGE SITS IN THE ORDERS SECTION, the word in her bar', () => {
+  const page = (SHOP.pack.declarations as { page?: string; nav?: { section?: string } }[]).find((d) => d.page === 'orders');
+  assert.deepEqual(page?.nav, { section: 'Orders', order: 10 });
+});
+
+test('THE LEAD SAYS THE MONTH, THE WEEK AND WHO STILL OWES, and the owed clause has nothing to say once she is paid', async () => {
+  const { k, sql, clock } = await made(['shop'], false);
+  const body = (SHOP.pack.declarations as { page?: string; blocks?: { kind: string; body?: string }[] }[]).find((d) => d.page === 'orders')!.blocks!.find((b) => b.kind === 'note')!.body;
+  assert.equal(body, '{{orders-30d}} order(s) this month, {{orders-due-7d}} to ship this week, and {{orders-owed.first_who}} still owes {{orders-owed.first_total}}');
+  /* EVERY HOLE NAMES SOMETHING: a typo would be printed as the author's words, never dropped as a nought. */
+  assert.deepEqual(lineOf(k).unnamed ?? [], []);
+
+  const salma = value<{ id: string }>(k.create('people', { name: 'Salma' }, { actor: 'p_owner' }));
+  const jars = value<{ id: string }>(
+    k.create('orders', { what: '3 vanilla jars', who: salma.id, how_many: 3, due: daysOn(2), total: { amount: 135_000, currency: 'EGP' } }, { actor: 'p_owner' }),
+  );
+  value(k.create('orders', { what: 'A gift box', due: daysOn(20), total: { amount: 40_000, currency: 'EGP' }, paid: { amount: 40_000, currency: 'EGP' }, state: 'paid' }, { actor: 'p_owner' }));
+  const owed = lineOf(k);
+  assert.deepEqual(owed.refusals ?? [], []);
+  /* TWO ORDERS THIS MONTH, ONE TO SHIP, AND SALMA'S TOTAL: the amount in its own currency, never a bare number. */
+  assert.equal(owed.values?.['orders-30d'], 2);
+  assert.equal(owed.values?.['orders-due-7d'], 1);
+  assert.deepEqual(owed.values?.['orders-owed.first_total'], { amount: 135_000, currency: 'EGP' });
+
+  /* PAID, NOTHING IS OWED: the owed clause reads nothing and goes, and the month still counts both orders. */
+  value(k.update('orders', jars.id, { state: 'paid', paid: { amount: 135_000, currency: 'EGP' } }, { actor: 'p_owner' }));
+  const paid = lineOf(k);
+  assert.ok(!Object.hasOwn(paid.values ?? {}, 'orders-owed.first_total'), JSON.stringify(paid.values));
+  assert.ok(!Object.hasOwn(paid.values ?? {}, 'orders-owed.first_who'), JSON.stringify(paid.values));
+  assert.equal(paid.values?.['orders-30d'], 2);
+  assert.equal(paid.values?.['orders-due-7d'], 0);
+
+  /* FIFTEEN DAYS ON THEY ARE STILL THIS MONTH'S; A MONTH ON, NOT. */
+  clock.advance(15 * DAY);
+  assert.equal(lineOf(k).values?.['orders-30d'], 2);
+  clock.advance(16 * DAY);
+  assert.equal(lineOf(k).values?.['orders-30d'], 0);
+  sql.close();
+});
+
+/* THE OWED CLAUSE NAMES THE PERSON: `who` points at People, and `first_<field>` reads only a field a reader may be shown
+   as it is, never a ref (pages.ts `rowsValue`). Until the kernel says a ref's name, this clause reads nothing and the
+   lead leaves it out; the line that makes it say "Salma" is blocked to pages.ts's owner. */
+test('THE OWED CLAUSE SAYS WHO OWES BY NAME', async () => {
+  const { k, sql } = await made(['shop'], false);
+  const salma = value<{ id: string }>(k.create('people', { name: 'Salma' }, { actor: 'p_owner' }));
+  value(k.create('orders', { what: '3 vanilla jars', who: salma.id, due: daysOn(2), total: { amount: 135_000, currency: 'EGP' } }, { actor: 'p_owner' }));
+  assert.equal(lineOf(k).values?.['orders-owed.first_who'], 'Salma');
   sql.close();
 });
 

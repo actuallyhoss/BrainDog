@@ -59,10 +59,23 @@ import { scanKeys } from './key-scan.ts';
 import { carriedIn } from './run-carried.ts';
 import { markHand } from './hold.ts';
 import { countLists, deadPaths } from './night-counts.ts';
+import { actionsBlocking } from './signs-actions.ts';
 import { DOOR_KINDS, DOOR_WINDOW_DAYS, doorMarks as readDoorMarks, markDoor, sweepDoorMarks, type DoorMark, type DoorSigns } from './door.ts';
 import { openFaults, type Fault } from './fault.ts';
 import { copyFacts, copyFailed, copyKept, type CopyFacts } from './copies.ts';
-import { drop as dropHandoff, expire as expireHandoffs, openHandoffs, take as takeHandoff, type HandoffPlace, type HandoffWrite, type OpenHandoff, type Taken } from './handoff.ts';
+import {
+  drop as dropHandoff,
+  expire as expireHandoffs,
+  inPlace,
+  openHandoffs,
+  runPlace,
+  take as takeHandoff,
+  type HandoffPlace,
+  type HandoffWrite,
+  type OpenHandoff,
+  type RunRow,
+  type Taken,
+} from './handoff.ts';
 import { checkBrainl, exportBrainl, importBrainl, signBrainl, tables as fileTables, type ImportReport, type Section, type Signer } from './brainl.ts';
 import {
   drainSchedule,
@@ -306,6 +319,8 @@ export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
 export { KERNEL_WRITTEN, REVIVED, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
 /* THE RECORD'S VITAL SIGNS (`signs.ts`): the closed list, and what a sign and a reading are. */
 export { VITAL_SIGNS, quietSign, type SignReading, type VitalSign } from './signs.ts';
+/* WHAT IS IN A PROJECT'S WAY (`signs-actions.ts`, REC-C09): its paused, failing or late actions, for a page source. */
+export { SIGNS_ACTIONS, actionsBlocking, type ActionBlocking } from './signs-actions.ts';
 export { DOOR_KINDS, type DoorMark, type DoorSigns } from './door.ts';
 /* A HANDOFF THAT CLOSES (`handoff.ts`, AGT-C05): the open steps in a place, and taken, dropped or expired. */
 export {
@@ -328,7 +343,7 @@ export { SAID, clearFault, openFaults, raiseFault, type Fault } from './fault.ts
 /* THE RECORD'S COPIES AS THREE FACTS, and the night's two writes (`copies.ts`, LCH-C03). */
 export { NIGHT_FAULT, NIGHT_KIND, copyFacts, copyFailed, copyKept, failedNote, keptNote, type CopyFacts, type Lifecycle } from './copies.ts';
 /* `canon` IS ALSO MIGRATE'S NAME (a script written one way), so a value written one way is `canonValue` out here. */
-export { CAUSE, canon as canonValue, causeFault, causeOf, noop, sha256 } from './cause.ts';
+export { CAUSE, MOOT_GONE, MOOT_HELD, canon as canonValue, causeFault, causeOf, moot, mootWhy, noop, recheck, sha256 } from './cause.ts';
 /* THE RECORD'S OWN NAME RULE (`api/person-name.ts`), so the Worker refuses at provision what a rename would refuse. */
 export { PERSON_NAME_SUPPORT, personNameOf, placeholderName } from './api/person-name.ts';
 /* THE ONE CLOCK (`presence.ts`): every reader that asks whether a run is working, quiet or gone asks here. */
@@ -399,7 +414,7 @@ export { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 /* THE COST BAND, exported because `/decide` computes it in the browser off the same raw rows: it
    reads `governance` directly rather than through `governance.open`, and two rankings of one queue
    that disagreed would be worse than no ranking at all. */
-export { COSTS, MANY_ROWS, costOf, costRank, worseCost, type Cost } from './weigh.ts';
+export { COSTS, MANY_ROWS, WAITS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, waitOf, waitParams, waitRank, waitRows, worseCost, type Cost, type Wait } from './weigh.ts';
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
 export { clockOf, isMoneyFormat, verdictOf } from './metrics.ts';
 export { readDeclaredSigns, vitalOf } from './metrics.ts';
@@ -441,7 +456,7 @@ export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
 export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
 /* An arrangement's parts (govern-parts-43), by their ids and needs; `partsOf` is fx.ts's name here, so it goes out as arrangePartsOf. */
-export { ARRANGING, BODY_KINDS, GOVERNANCE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, ladderFault, partsOf as arrangePartsOf, pressedOnly } from './govern.ts';
+export { ARRANGING, BODY_KINDS, GOVERNANCE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, ladderFault, partsOf as arrangePartsOf, pressedOnly, rememberedLine, uniteArrangements } from './govern.ts';
 /* THE LADDER OF TRUST'S NAMES (`change-kind.ts`): what kind of change a write or a question is, and which rung an agent
    stands on for it, so the record, the web and the CLI read one table of kinds rather than each keeping a copy. Its
    `agentOf` goes out as `ladderAgentOf`, since `session.ts`'s `agentOf` (the kind of agent a run is) already has the name. */
@@ -492,7 +507,7 @@ export type {
   PostJobEventArgs,
   Posted,
 } from './jobs.ts';
-export type { ArrangePart, Arranging, Decision, Decided, Filed, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
+export type { ArrangePart, Arranging, Decision, Decided, Filed, Proposal, Remembered, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 /* `exponentOf` IS EXPORTED SO THE RECORD'S CURRENCY TABLE IS NOT A SECOND EXPONENT READER. It is
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, fileAsSecond, patternReport, resolve as extractOutcome, senderOf, shapeOf, tailCause } from './ingest.ts';
@@ -744,6 +759,8 @@ export type RegisterDecl = {
   steps?: StepsDecl;
   /** How two rows are the two legs of one transfer, found by the write path and marked on both (`pairs.ts`). */
   pairs?: PairsDecl;
+  /** The order a read that names none comes back in (PGS-B06): one field of this list that sorts, no `dir` lowest first, as `declare.ts` admits it. */
+  order?: { field: string; dir?: 'asc' | 'desc' };
   /** A list a record-wide "Adds only" does not reach, as Keys and People are by their roles (`20 §1`). */
   owner_only?: true;
   /** Who holds a row: a link to the person it is handed to, a text field naming the agent, and a state it moves
@@ -1117,6 +1134,8 @@ export type RecordOptions = {
    * whose marks named another build is behind. The kernel cannot know its host's build. Absent, `behind` says nothing.
    */
   build?: string | null;
+  /** A self-host started with --allow-shape: its import takes a shape copy (PRF-A13). Absent is no. */
+  allowShape?: boolean | undefined;
 };
 
 /**
@@ -1318,6 +1337,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /* Bound here because `export`'s own parameter is called `opts` too, and a signer read off the
      wrong one is a file that silently goes out unsigned. */
   const signer = opts.sign;
+  /* A SHAPE COPY IS PUT BACK ONLY ON A HOST STARTED TO TAKE ONE (shape-guard-49, `checkBrainl`'s `IMPORT_SHAPE`). */
+  const allowShape = opts.allowShape === true;
   let depth = 0;
 
   /** The active declarations, parsed once. Rebuilt when a declaration changes and never otherwise. */
@@ -1694,6 +1715,21 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   });
 
   /**
+   * A LIST AS A FIGURE OR A READ MAY HOP FROM IT (`pointed`, where-hop-49, hop-figures-50): `schemaOf` with a way into
+   * the lists it points at. `reads` holds a hop to the lists the reader may read whole: a list it may not open, or
+   * sees narrowed, answers `undefined`, which `where` refuses in the words of a list that is not there, so the hop
+   * says nothing of what it holds. NOT ON THE SHARED `schemaOf`, which rules and the record's other reads compile
+   * against: a rule is evaluated in memory, where a hop always answers false, so it is refused at install instead.
+   */
+  const hopSchemaOf = (register: string, reads?: (register: string) => boolean): Schema | undefined =>
+    registers.has(register) && (reads?.(register) ?? true) ? { ...schemaOf(register), schemaOf: (r: string) => hopSchemaOf(r, reads) } : undefined;
+  /** The list a reader asked about, whole, with its hops held to what `reads` lets through. */
+  const readerSchemaOf =
+    (reads?: (register: string) => boolean) =>
+    (register: string): Schema | null =>
+      registers.has(register) ? { ...schemaOf(register), schemaOf: (r: string) => hopSchemaOf(r, reads) } : null;
+
+  /**
    * A rule or a metric whose predicate cannot be read, refused at INSTALL.
    *
    * A RULE THAT CANNOT BE READ FIRES ON NOTHING, deliberately — the other direction, firing on
@@ -1869,7 +1905,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   function unreadable(batch: readonly Declaration[]): Refusal | null {
-    const shape = (register: string): Schema | null => {
+    const shape0 = (register: string): Schema | null => {
       const arriving = batch.find((d) => d.kind === 'register' && (d.body as { id?: unknown }).id === register);
       if (arriving) {
         /* WITH `tags` for `schemaOf`'s reason, so a rule over `tags has late` installs beside the list it reads. */
@@ -1904,6 +1940,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         };
       }
       return registers.has(register) ? schemaOf(register) : null;
+    };
+    /* A FIGURE OR A PAGE MAY HOP INTO ANOTHER LIST (`pointed`, where-hop-49 and hop-figures-50), into one installed or
+       one arriving in this batch, and reach reads the list it hops to (`figureLists`, `registersOf`). A RULE MAY NOT:
+       `flow.ts` evaluates a rule's condition in memory, where a hop always answers false, so a rule's hop would
+       install and then never fire. Rules are read against `shape0`, which has no hop, and are refused at install. */
+    const shape = (register: string): Schema | null => {
+      const got = shape0(register);
+      return got ? { ...got, schemaOf: (r: string) => shape(r) ?? undefined } : null;
     };
 
     for (const decl of batch) {
@@ -2029,7 +2073,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          own existence stays the lint's to say, so an unknown one is skipped here rather than refused twice. */
       if (decl.kind === 'rule' && typeof register !== 'string' && where !== undefined) {
         const subject = subjectOf(body as FlowDecl);
-        const schema = subject === null ? null : shape(subject);
+        const schema = subject === null ? null : shape0(subject);
         if (schema) {
           const bad = unreadWhere(decl.id, where, schema, batch);
           if (bad) return bad;
@@ -2037,7 +2081,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }
 
       if (decl.kind === 'rule' && Array.isArray(body.steps)) {
-        const bad = unreadIf(decl.id, body as FlowDecl, shape, batch);
+        const bad = unreadIf(decl.id, body as FlowDecl, shape0, batch);
         if (bad) return bad;
       }
 
@@ -2068,7 +2112,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          block, so a rule with no `when` — which is a legal rule, meaning "every row" — installed
          with no bound, no `once_per`, three axes and a target register nobody has. */
       if (where !== undefined) {
-        const bad = unreadWhere(decl.id, where, schema, batch);
+        const bad = unreadWhere(decl.id, where, decl.kind === 'rule' ? (shape0(register) ?? schema) : schema, batch);
         if (bad) return bad;
       }
 
@@ -2098,7 +2142,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }
 
       if (decl.kind === 'rule') {
-        const bad = undeclarable(decl.id, body as unknown as RuleDecl, shape);
+        const bad = undeclarable(decl.id, body as unknown as RuleDecl, shape0);
         if (bad) return bad;
       }
     }
@@ -2986,8 +3030,15 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (barred) return barred;
     if (!registers.has(q.register))
       return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
+    /* A LIST'S OWN ORDER WHEN THE READ NAMES NONE (PGS-B06), so the sorted path below sorts and pages by it and its
+       cursor comes back to a read that names no order too. The Ledger by its day, newest first, where it came back by
+       last change and opened on 13 July. */
+    const own = registers.get(q.register)!.order;
+    if (!q.order?.length && own !== undefined) q = { ...q, order: [{ field: own.field, dir: own.dir ?? 'asc' }] };
 
-    const schema = schemaOf(q.register);
+    /* A HOP FROM A READ GOES ONLY WHERE THE READER MAY READ (`hopSchemaOf`): the record's `reads` says no to a list
+       its caller may not open or sees narrowed. A declared page's read passes no `reads`; reach checked its lists. */
+    const schema = readerSchemaOf(q.hops ?? q.reads)(q.register)!;
     const said = predicateOf(q.where, schema, q.reads === undefined ? evalContext() : { ...evalContext(), reads: q.reads });
     if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
 
@@ -3030,7 +3081,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * this branch used to write by hand. It also gets the register's mirrored state right, which
      * a name spelt here could not: one shipped register calls that field `lane`.
      */
-    let sort = 'ORDER BY updated_at DESC, id DESC';
+    /* NEWEST MADE FIRST, A LIST THAT DECLARES NO ORDER (PGS-B06), where it was last changed first and an edit moved
+       an entry to the top. */
+    let sort = 'ORDER BY created_at DESC, id DESC';
     /**
      * COERCED AT THE EDGE, LIKE `limit` AND `cursor` ABOVE, and it was not.
      *
@@ -3074,7 +3127,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
            as drift. */
         return no(
           'VALUE_MALFORMED',
-          'That cursor pages by when a row last changed, so it cannot page a sorted list. Start the sorted list from its first page.',
+          'That cursor pages the list newest made first, so it cannot page a sorted list. Start the sorted list from its first page.',
           { at: 'cursor' },
         );
       const parts: string[] = [];
@@ -3175,7 +3228,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         )
       : at
       ? sql.all<Record<string, unknown>>(
-          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) AND (updated_at < ? OR (updated_at = ? AND id < ?)) ${sort} LIMIT ?`,
+          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) AND (created_at < ? OR (created_at = ? AND id < ?)) ${sort} LIMIT ?`,
           q.register,
           ...c.params,
           at,
@@ -3214,7 +3267,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
               sql.one<Record<string, Param>>(`SELECT ${keys.map((k, i) => `${k.expr} AS k${i}`).join(', ')} FROM entry WHERE id = ?`, last.id) ?? {},
             ),
           )
-        : `${last.updated_at}|${last.id}`;
+        : `${last.created_at}|${last.id}`;
     return ok({ rows, matched, cursor: paging });
   }
 
@@ -4509,6 +4562,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * changed and no pack named.
    */
   function bookkeeping(e: Pick<EventLine, 'actor' | 'kind' | 'target' | 'field' | 'ts' | 'to'> & { from?: Json | null }): boolean {
+    /* A SCRIPT'S QUIET RUN (`script-run.ts` stamps `quiet`): it wrote nothing, asked nothing and stopped nothing, so a
+       script that runs every night adds no line to a feed on a quiet one. Its history keeps it. */
+    if (e.kind === 'pull' && e.target?.startsWith('declaration:script.') && e.to !== null && typeof e.to === 'object' && !Array.isArray(e.to) && e.to.quiet === 1) return true;
     const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
     if (id === null) return false;
     const listOf = (): string | null => sql.one<{ register: string }>('SELECT register FROM entry WHERE id = ?', id)?.register ?? null;
@@ -5566,7 +5622,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        (`test/metrics-live-local-day.test.ts`). A record with no identity yet has no zone and reads UTC,
        as it did. */
     tz: recordIdentity(sql)?.tz,
-    schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
+    /* WITH THE HOP (`hopSchemaOf`), for a declared figure's `pointed`: reach holds the figure to every list it hops to
+       (`figureLists` in `money-figures.ts`). A rule compiles against the shared `schemaOf` it is handed, with none. */
+    schemaOf: (register) => hopSchemaOf(register) ?? null,
     /* A ref is written by NAME in a sentence — `thing is Kiln` — because that is what a person says.
        The title field is the register's own, so the lookup is one indexed read per name.
 
@@ -5758,6 +5816,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),
       body_kind: kind,
       ...(does ? { does } : {}),
+      ...(kind === 'pack' || kind === 'settings' || kind === 'arrange' ? { arranged: body } : {}),
+      /* HOW LONG IT CAN WAIT, read in the queue's own query (`whole`), never once a question. */
+      ...(r.wait === 'soon' || r.wait === 'old' || r.wait === 'new' ? { waits: r.wait } : {}),
       ...(candidates.length > 0 ? { candidates } : {}),
       ...(Array.isArray(body.rows) ? { held: body.rows.length } : {}),
       /* WHAT IT IS ABOUT, AS ONE KEY, and how many open questions share it (AGT-C07 d), read in the page's own query
@@ -5895,6 +5956,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* THE STEPS RUNS LEFT AND NOBODY TOOK, in one project or on the whole record (`openSteps`, AGT-C05), so a
        `handoffs.open` block draws them on Agents. Without this line the block refuses as not in this build. */
     handoffs: (project) => openSteps(sql, clock.now(), project),
+    blocking: (project) => actionsBlocking(sql, clock.now(), project, recordTz()),
     /* `into` GOES THROUGH, so a walk opened from one book walks in the book's own currency. Dropped here, the page asked
        for the book's currency and this host walked the home one, drawn once per currency instead. */
     runway: (opening, legs, horizon, only, into) => {
@@ -6073,7 +6135,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             ? []
             : sql
                 .all<Record<string, unknown>>(
-                  `SELECT id, body_kind, body, opened_by, opened_at, drafted_by, kind, cause, ${ALIKE_SQL} AS alike FROM suggestion s WHERE id IN (SELECT value FROM json_each(?))`,
+                  `SELECT id, body_kind, body, opened_by, opened_at, drafted_by, kind, cause, ${ALIKE_SQL} AS alike, ${WAIT_SQL} AS wait FROM suggestion s WHERE id IN (SELECT value FROM json_each(?))`,
+                  ...waitParams(nowMs),
                   JSON.stringify(ids),
                 )
                 .map((r) => [String(r.id), r]),
@@ -6900,7 +6963,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /**
    * A lifecycle event, not about a row: the api's `lifecycle`, and the night's copy kept or failed (`copies.ts`).
    */
-  function lifecycleEvent(kind: 'export' | 'restore.pitr', actor: string, note: string, to?: string): string {
+  function lifecycleEvent(kind: 'export' | 'import' | 'restore.pitr', actor: string, note: string, to?: string): string {
     slashMayWrite(actor, kind);
     const id = mint();
     sql.exec(
@@ -7611,7 +7674,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        list them, and the record's door made up for it with a second `list` and a refusal of its own
        (`test/metric-reads.test.ts`). Handed `reads`, a ref into a list she cannot read names no row, as it does there. */
     metric: (decl: MetricDecl, o: { reads?: (register: string) => boolean } = {}): Result<Reading> =>
-      evaluateMetric(sql, liveTarget(sql, decl, evalContext()), o.reads === undefined ? evalContext() : { ...evalContext(), reads: o.reads }),
+      evaluateMetric(
+        sql,
+        liveTarget(sql, decl, evalContext()),
+        /* AND A HOP IN IT HELD TO WHAT SHE READS (`readerSchemaOf`), as `list` holds one. */
+        o.reads === undefined ? evalContext() : { ...evalContext(), reads: o.reads, schemaOf: readerSchemaOf(o.reads) },
+      ),
 
     /* ── pages ──────────────────────────────────────────────────── */
 
@@ -8013,14 +8081,18 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           .map((r) => JSON.parse(r.body) as ActionDecl),
       ),
 
+    /** How many entries hold each value of one field, in one query (PGS-B06): the page tally, for the record's `countBy`. */
+    countBy: (q: { register: string; field: string; where?: Predicate | undefined }) => pageDeps().tally!(q),
+
     /** One block, without a page around it — what a `draw` tool hands an agent. `inbox` is the reader's reach, so a
         one-block preview tells a `signs` block in the kernel's quiet words to a key the inbox does not reach. */
-    block: (decl: PageBlock, opts: { walk?: number | 'last'; inbox?: boolean } = {}): BlockResult =>
+    block: (decl: PageBlock, opts: { walk?: number | 'last'; inbox?: boolean; here?: Entry } = {}): BlockResult =>
       readBlock(
         {
           ...pageDeps(),
           ...(opts.walk === undefined ? {} : { walk: opts.walk }),
           ...(opts.inbox === undefined ? {} : { reader: { hold: (b: BlockResult) => b, inbox: opts.inbox } }),
+          ...(opts.here === undefined ? {} : { here: opts.here }),
         },
         decl,
       ),
@@ -8684,7 +8756,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const { title, ...asked } = p;
         const out = openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), asked, drafted);
         /* A JOINING RUN IS NOT TITLED after somebody else's question. */
-        if (out.ok && !out.value.joined) nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w, typeof title === 'string' ? title : undefined);
+        if (out.ok && !out.value.joined && out.value.answered === undefined) nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w, typeof title === 'string' ? title : undefined);
         return out;
       }),
 
@@ -9033,8 +9105,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * `before` RUNS ONCE THE FILE HAS PASSED, and before anything is cleared: a host's `before-restore` copy is taken there,
      * so a damaged file or another record's file takes no copy, and the copy is of the record as it was.
      *
-     * NO EVENT IS WRITTEN FOR THE REPLACE. The next export of the record must be the file it came from, manifest for
-     * manifest, because that round trip is the only proof the import is complete, and an event would be one row more.
+     * ONE `import` EVENT IS WRITTEN, AND IT STAYS ON THIS MACHINE (`brainl.ts` `LOCAL_ROWS`, as an export's does). The
+     * next export of the record must be the file it came from, manifest for manifest, because that round trip is the
+     * only proof the import is complete, so the event is never one row more in a file.
      */
     async import(lines: Iterable<string>, opts: { replace?: boolean; before?: () => Promise<unknown>; by?: string } = {}) {
       /* The one destructive path that was not gated. `migrate.ts` says in bold that the refusal is
@@ -9049,16 +9122,17 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          generator read twice is empty the second time, so it is materialised here — once, for both
          readers. */
       const all = [...lines];
-      const sound = await checkBrainl(all);
+      const sound = await checkBrainl(all, { shape: allowShape });
       if (!sound.ok) return sound;
 
       if (opts.replace !== true) {
-        const out = importBrainl(sql, transaction, all);
+        const out = importBrainl(sql, transaction, all, { shape: allowShape });
         if (out.ok) {
           await renameDeclarations(sql);
           reload();
           rebuildFts();
           transaction(() => rebuildKeys(sql, instant(clock.now())));
+          transaction(() => lifecycleEvent('import', 'system', `import ${out.value.rows} rows`));
         }
         return out;
       }
@@ -9117,7 +9191,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             t.where === undefined ? [] : [{ t, rows: sql.all<Record<string, Param>>(`SELECT ${t.columns.join(', ')} FROM ${t.name} WHERE NOT (${t.where})`) }],
           );
           for (const t of shapes) sql.exec(`DELETE FROM ${t.name}`);
-          const done = importBrainl(sql, transaction, all);
+          const done = importBrainl(sql, transaction, all, { shape: allowShape });
           if (!done.ok) {
             refusal = done.refusal;
             throw REPLACE_REFUSED;
@@ -9138,6 +9212,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* A RECORD REPLACED FROM A FILE IS A HAND ON IT (`hold.ts`, PRF-A18), marked after the import so the night it
          brought back does not overwrite the mark. */
       transaction(() => markHand(sql, 'The record was replaced from a file.', opts.by ?? 'an operator', clock.now(), recordTz()));
+      transaction(() => lifecycleEvent('import', 'system', `import ${out!.value.rows} rows`));
       return out;
     },
 
@@ -9216,7 +9291,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      *
      * NOT ABOUT A ROW, so no target: the record as a whole is what was copied or put back.
      */
-    lifecycle(kind: 'export' | 'restore.pitr', actor: string, note: string, to?: string): string {
+    lifecycle(kind: 'export' | 'import' | 'restore.pitr', actor: string, note: string, to?: string): string {
       /* A RESTORE IS A HAND ON THE RECORD (`hold.ts`, PRF-A18): the hold's run of green days ends on the day of it. */
       if (kind === 'restore.pitr') return transaction(() => (markHand(sql, 'The record was put back to an earlier time.', actor, clock.now(), recordTz()), lifecycleEvent(kind, actor, note, to)));
       return lifecycleEvent(kind, actor, note, to);
@@ -10013,7 +10088,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return attempt(sql, transaction, () => {
         const taker = runFor(w, 'opened: took a step');
         if (!taker.ok) return taker;
-        return takeHandoff(sql, { id: taker.value.run.id, spoken: taker.value.spoken }, said, clock.now(), handoffWrite);
+        /* A RUN TAKES ONLY A STEP LEFT IN ITS OWN PLACE (handoff-guard-49), its project or its repository, as
+           `openHandoffs` offers it: by its name alone it could take a step it was never shown. */
+        const at = runPlace(taker.value.run);
+        return takeHandoff(sql, { id: taker.value.run.id, spoken: taker.value.spoken }, said, clock.now(), handoffWrite, (run: RunRow) => inPlace(at, run));
       });
     },
     /**
@@ -10028,7 +10106,18 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return attempt(sql, transaction, () => {
         const theirs = foreignRun<{ left: string; next: string }>(w);
         if (theirs) return theirs;
-        return dropHandoff(sql, signedBy(w), said, typeof why === 'string' ? why : '', clock.now(), handoffWrite);
+        /* AN AGENT DROPS ONLY A STEP IN ITS OWN PLACE, read off its run as a take reads it (its repository from the run,
+           and the hint only for a run that has none); a person has no place and drops any step. */
+        const located = w.principal?.kind === 'token' ? locateRun(w) : null;
+        const repoOf = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
+        const may = located
+          ? (run: RunRow) =>
+              inPlace(
+                { project: located.project?.spoken ?? null, repo: (located.found ? repoOf(byId(located.found.id)?.fields.repo) : null) ?? w.session?.repo ?? null },
+                run,
+              )
+          : undefined;
+        return dropHandoff(sql, signedBy(w), said, typeof why === 'string' ? why : '', clock.now(), handoffWrite, may);
       });
     },
     findRun,

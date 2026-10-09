@@ -1,0 +1,7 @@
+#dogl 1
+#shape: true
+#table dog_meta key,value
+["format","1"]
+["shape","true"]
+#table entry id,register,seq,fields
+["01ZZZZZZZZZZZZZZZZZZZZZZZZ","rgmloe",1,"{\"what\":\"Xvco mzhb\"}"]

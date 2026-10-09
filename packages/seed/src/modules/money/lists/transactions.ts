@@ -26,6 +26,10 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
   state: 'state',
   done: ['cleared', 'void'],
   pack: 'money-core',
+  /* NEWEST DAY FIRST, SINCE money-core 3.16.0 (PGS-B06). A list that names no order came back by last change, so an
+     import that touched July's rows last opened the Ledger on 13 July with December under it. `on` is the day the money
+     moved, the field a person reads the Ledger by; the kernel breaks a tie by the row's id. */
+  order: { field: 'on', dir: 'desc' },
   /**
    * THE TWO LEGS OF A TRANSFER ARE FOUND BY THE RECORD (`packages/kernel/src/pairs.ts`, `02 §5`): the same amount in the
    * same currency, one leg out and one in, two different accounts, within four days. Both are marked `transfer` and

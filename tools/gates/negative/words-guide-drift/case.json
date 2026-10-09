@@ -1,0 +1,7 @@
+{
+  "gate": "words-guide",
+  "rule": "a writing guide that is not what the words list makes",
+  "expect": "is not what tools/gates/words.json makes",
+  "findings": 1,
+  "why": "THE GUIDE LOST A LINE BY HAND: docs/54-WRITING.md here is the page words.json makes with one table line taken out, which is the drift a guide kept by hand would show."
+}

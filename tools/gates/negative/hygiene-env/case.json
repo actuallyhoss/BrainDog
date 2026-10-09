@@ -1,0 +1,8 @@
+{
+  "gate": "hygiene",
+  "rule": "an environment file",
+  "expect": "an environment file",
+  "findings": 1,
+  "total": 1,
+  "why": "AN ENVIRONMENT FILE IN AN APP, where a key is most likely to sit."
+}

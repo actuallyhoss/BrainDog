@@ -429,6 +429,10 @@ class Shaper {
    */
   name(part: string): string {
     if (this.keep.has(part)) return part;
+    /* A LONG TOKEN OF LETTERS AND DIGITS MIXED IS A KEY OR A HANDLE, never a word of the product's: every run of it is
+       made up, the short ones too, so `7f3a9` at the end of a key's id leaves nothing of itself behind (shape-route-46). */
+    if (part.length >= 8 && /[a-z]/.test(part) && /\d/.test(part))
+      return part.replace(/[a-z]+/g, (run) => this.s.word(run)).replace(/\d+/g, (run) => this.s.digits(run));
     return part
       .replace(/[a-z]+/g, (run) => (run.length <= 2 ? run : this.s.word(run)))
       .replace(/\d{3,}/g, (run) => this.s.digits(run));
@@ -441,6 +445,9 @@ class Shaper {
       if (ulid) return this.s.ulid(ulid);
       const t = token ?? all;
       if (isCurrencyCode(t)) return t;
+      /* A HEX KEY PASTED INTO A NOTE is hex of its length, as it is in a key's place (shape-route-46's checker: a 40-hex
+         token came out of `prose` whole). */
+      if (Scrambler.hexLike(t)) return this.s.hex(t);
       if (/^[a-z][a-z0-9_]*$/.test(t) && (mode !== 'strict' || /[_\d]/.test(t))) return this.name(t);
       return t
         .replace(/\p{L}[\p{L}\p{M}]*/gu, (w) => this.s.word(w))

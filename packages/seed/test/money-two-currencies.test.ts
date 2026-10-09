@@ -107,6 +107,7 @@ function write(k: Kernel, side: Side, kiln: { book: string; thing: string; categ
   make('obligations', { what: `Invoice in ${side.word}`, direction: 'owed_to_me', amount: at(4_000), due: day(7), state: 'open', thing: kiln.thing });
   make('obligations', { what: `Late invoice in ${side.word}`, direction: 'owed_to_me', amount: at(1_500), due: day(-4), state: 'open', chased: day(-1), thing: kiln.thing });
   make('obligations', { what: `Paid invoice in ${side.word}`, direction: 'owed_to_me', amount: at(900), due: day(-40), settled: day(-30), state: 'paid' });
+  make('obligations', { what: `Invoice paid this week in ${side.word}`, direction: 'owed_to_me', amount: at(700), due: day(-3), settled: day(-2), state: 'paid' });
   make('recurring', { what: `Rent in ${side.word}`, direction: 'out', amount: at(40_000), every: 'monthly', next_due: day(6), state: 'live', category: kiln.category });
   make('recurring', { what: `Retainer in ${side.word}`, direction: 'in', amount: at(7_000), every: 'monthly', next_due: day(12), state: 'live' });
   make('installments', { what: `Laptop in ${side.word}`, plan: `Laptop in ${side.word}`, direction: 'out', amount: at(1_200), due: day(8), state: 'open' });

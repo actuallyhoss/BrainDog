@@ -45,7 +45,15 @@ export type PageLintDeps = {
    * would turn the sign red over a page that prints the time in words.
    */
   typesOf?: TypesOf;
+  /**
+   * The values of each closed field of a list that have no name of their own, by field. The web draws a named value by
+   * its name and an unnamed one as its key, so a cell holding one prints a key where a name goes (`bare-key`).
+   */
+  keysOf?: KeysOf;
 };
+
+/** The unnamed values of each closed field of one list, or `null` for a list the record does not declare. */
+export type KeysOf = (register: string) => Readonly<Record<string, readonly string[]>> | null;
 
 /**
  * One round's answer: every finding, how many pages were read, and how many the budget left unread; how many rows were
@@ -167,8 +175,12 @@ const NOT_CELLS = new Set(['stat', 'lines', 'progress', 'series', 'inputs', 'cap
 /** The roles a column draws from beside the row, not from its text: where it applies, a ring, a trend, the next step. */
 const NOT_TEXT = new Set(['scope', 'ring', 'trend', 'next']);
 
-/** The two rules a cell is read by: what the web prints raw from a row is a time or an id, never a placeholder. */
-const CELL_RULES = new Set<LintRule>(['raw-instant', 'raw-id']);
+/**
+ * The rules a cell is read by: what the web prints raw from a row (a time, an id, a fault's own words, a closed list's
+ * key), and a name from the code a sentence opens on, as a Decide question's text can. Never a placeholder: the rest of
+ * what a cell holds is his to write.
+ */
+const CELL_RULES = new Set<LintRule>(['raw-instant', 'raw-id', 'dev-name', 'bare-key', 'raw-fault']);
 
 /** A whole ULID, which the web draws as nothing in a column no list declares (`undeclared` in `api.ts`). */
 const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
@@ -182,7 +194,7 @@ export type BlockCells = { parts: LintPart[]; read: number; unread: number };
  * column's type is the answer's own (`types`, which a computed source answers) or else the list's declaration; a cell
  * of a type `DRAWN_BY_TYPE` names is not read. The words in a cell are his, so `theirs` holds: the copy rules are his.
  */
-export function blockCells(b: BlockResult, name: string | null, typesOf?: TypesOf): BlockCells {
+export function blockCells(b: BlockResult, name: string | null, typesOf?: TypesOf, keysOf?: KeysOf): BlockCells {
   const rows = b.rows ?? [];
   const cols = (b.columns ?? []).filter((c) => typeof c.field === 'string' && c.field !== '' && !NOT_TEXT.has(c.as ?? ''));
   if (NOT_CELLS.has(b.kind) || rows.length === 0 || cols.length === 0) return { parts: [], read: 0, unread: 0 };
@@ -210,7 +222,9 @@ export function blockCells(b: BlockResult, name: string | null, typesOf?: TypesO
     if (texts.length === 0) continue;
     const words = figureWords(c.field);
     const label = c.label?.trim() || words.charAt(0).toUpperCase() + words.slice(1);
-    parts.push({ name: name === null || name === label ? label : `${name}, ${label}`, text: texts.join('\n'), theirs: true });
+    /* THE KEYS OF A CLOSED FIELD WITH NO NAME, so a cell that prints one as itself is a key where a name goes. */
+    const keys = typeof b.source === 'string' ? keysOf?.(b.source)?.[c.field] : undefined;
+    parts.push({ name: name === null || name === label ? label : `${name}, ${label}`, text: texts.join('\n'), theirs: true, ...(keys?.length ? { keys } : {}) });
   }
   return { parts, read: read.length, unread: rows.length - read.length };
 }
@@ -225,7 +239,7 @@ export type PageRead = { cells: number; cut: { part: string; read: number; held:
  * named by its heading with its figures filled, or by the page's title where it has none; a cell's part adds its column.
  * `read`, when given, is told how many cells were read and which blocks held more rows than were.
  */
-export function lintAnswer(page: PageResult, waiting: number | null, typesOf?: TypesOf, read?: PageRead): PageFinding[] {
+export function lintAnswer(page: PageResult, waiting: number | null, typesOf?: TypesOf, read?: PageRead, keysOf?: KeysOf): PageFinding[] {
   const title = page.title;
   const out: PageFinding[] = [];
   for (const b of page.blocks) {
@@ -241,8 +255,8 @@ export function lintAnswer(page: PageResult, waiting: number | null, typesOf?: T
     if (b.empty && b.matched === 0 && (b.rows ?? []).length === 0) parts.push({ name, html: drawn(b.empty, b.values) });
     const found: LintFinding[] = parts.flatMap((p) => lintPart(p));
     /* AND ITS CELLS, which the web draws from the rows: a time or an id a cell prints raw is on the page as surely as a
-       note's. Only those two rules read a cell; anything else a cell holds is his to write. */
-    const cells = blockCells(b, b.heading ? name : null, typesOf);
+       note's. Only `CELL_RULES` read a cell; anything else a cell holds is his to write. */
+    const cells = blockCells(b, b.heading ? name : null, typesOf, keysOf);
     found.push(...cells.parts.flatMap((p) => lintPart(p)).filter((f) => CELL_RULES.has(f.rule)));
     if (read) {
       read.cells += cells.read;
@@ -290,7 +304,7 @@ export function lintRound(deps: PageLintDeps): PageLintRound {
       const answer = deps.page(p.slug);
       if (answer.ok) title = answer.value.title;
       const pageRead: PageRead = { cells: 0, cut: [] };
-      found = answer.ok ? lintAnswer(answer.value, waiting, deps.typesOf, pageRead) : [{ page: title, part: title, rule: 'no-draw', said: NO_DRAW }];
+      found = answer.ok ? lintAnswer(answer.value, waiting, deps.typesOf, pageRead, deps.keysOf) : [{ page: title, part: title, rule: 'no-draw', said: NO_DRAW }];
       cells += pageRead.cells;
       cut.push(...pageRead.cut.map((c) => ({ page: title, ...c })));
     } catch {

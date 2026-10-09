@@ -21,8 +21,9 @@
  */
 
 import { clausesOf, resolveDay } from '@braindog/where';
+import { MISSING, exponentOf, money } from 'braindog-render';
 
-import type { PageBlock } from '../record/schema.ts';
+import type { FieldDecl, PageBlock, RegisterDecl } from '../record/schema.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import { bare, emptyHidden, says } from '../page/home.ts';
 import { lists } from '../copy/lists.ts';
@@ -31,6 +32,7 @@ import { dayGroups, lateLines, type WithRows } from './home-rows.ts';
 import { words } from './words.ts';
 /* THE LIST A TASK IS KEPT IN, named once for every work screen (`lib/work/list.ts`), never again here. */
 import { TASKS } from '../work/list.ts';
+import { daysBetween, dueSaid } from '../work/board.ts';
 
 /** The headings a use case's voice may say its own way, with the house line each falls back to. */
 export type HomeVoice = {
@@ -57,6 +59,16 @@ const HOUSE: HomeVoice = {
 
 /** Today's lead note as `todayHome` declares it: words with no figure in them, which the rules never rewrite. */
 export const TODAY_LEAD = words.nothingNow;
+
+/** Today's line while it opens on the card to tell it one real thing (use case 6, step 5). */
+export const TELL_LINE = 'Tell it one real thing, and watch where it goes.';
+
+/**
+ * HOW MUCH A FIRST TODAY HOLDS: what one sentence becomes at most (`tell/read.ts` makes eight entries at most). The next
+ * steps (`WantMore`) are a first Today's, so a record that holds more than this by hand is not offered them, and a
+ * record kept for months reads its Today as it did.
+ */
+export const FIRST_TODAY_MOST = 8;
 
 /** How far ahead "Coming up" looks, in days. */
 export const COMING_UP_DAYS = 14;
@@ -87,6 +99,11 @@ export type Holds = {
    * typed into is named by. The house word when left out.
    */
   one?: string;
+  /**
+   * WHAT THIS RECORD'S WEEK IS MADE OF, where it keeps a list of things that fall due for somebody (`weekOf`): Today then
+   * opens on what is due this week and the money that came in. Absent where it keeps none, and Today is as it was.
+   */
+  week?: Week | undefined;
 };
 
 /** The fewest days a figure's line is drawn from (DIRECTION §39: a chart has at least three points, else the tile shows the number). */
@@ -105,6 +122,112 @@ export type HomeBody = { page: string; title: string; layout: { rail: number; st
    so they are spread in rather than written as properties the type would refuse. */
 const RAIL = { area: 'rail' } as const;
 const TILES = { tiles: true } as const;
+
+/* ── a record's week ───────────────────────────────────────────────────── */
+
+/** A list's declaration, as `weekOf` reads it. */
+export type WeekDecl = Pick<RegisterDecl, 'id' | 'name' | 'one' | 'title' | 'fields' | 'state' | 'done'>;
+
+/**
+ * WHAT A RECORD'S WEEK IS MADE OF, where it keeps a list of things that fall due for somebody: a shop's orders, each
+ * someone's, due on a day, done once it is (`weekOf`). Today then opens on what is due this week and the money that
+ * came in (use case 6, step 6; planner-45, the onboarding target).
+ *
+ * `due` is that list, with its day, who each is for, what it is, the clause that leaves out the done ones, and the
+ * amount an entry says was paid on it (`paid`, or `null` where the list keeps none), which only names who paid.
+ *
+ * WHAT CAME IN IS NOT READ HERE. It was a table over the ledger's `way is in`, which counted a transfer between her own
+ * accounts and never saw a payment kept as a paid invoice, so a shop with no account read "Nothing came in" on the
+ * week Nadia paid EGP 900. It is Money's own two figures now (`weekMoney`), the same on every record.
+ */
+export type Week = {
+  due: { register: string; name: string; one: string; day: string; who: string; what: string; open: string | null; paid: string | null };
+};
+
+const live = (f: FieldDecl): boolean => f.retired !== true;
+/** A field whose id or label says `re`. */
+const saysOf = (f: FieldDecl, re: RegExp): boolean => re.test(f.id) || re.test(f.label ?? '');
+
+/**
+ * THE WEEK THIS RECORD KEEPS, read off its lists' declarations, or `undefined` where it keeps none. NEVER BY A LIST'S
+ * NAME (§27): the list is the one whose entries are somebody's (a link to the list that plays `meets`, People), fall due
+ * on a day (a `deadline` day), and are done once they are (`done`), and that does not owe a required amount (a bill
+ * owes one, and Late already says a bill). The tasks are Today's own blocks and are never it.
+ */
+export function weekOf(decls: readonly WeekDecl[], people: string | null): Week | undefined {
+  if (people === null) return undefined;
+  const due = decls.find(
+    (d) =>
+      d.id !== TASKS &&
+      d.id !== people &&
+      (d.done?.length ?? 0) > 0 &&
+      !d.fields.some((f) => live(f) && f.type === 'money' && f.required) &&
+      d.fields.some((f) => live(f) && f.type === 'day' && f.deadline) &&
+      d.fields.some((f) => live(f) && f.type === 'ref' && f.to === people),
+  );
+  if (!due) return undefined;
+  const day = due.fields.find((f) => live(f) && f.type === 'day' && f.deadline)!;
+  const who = due.fields.find((f) => live(f) && f.type === 'ref' && f.to === people)!;
+  /* ONE CLAUSE FOR EACH DONE STATE, all of them holding: the grammar reads no "is not a or b". */
+  const open = due.state && due.done?.length ? due.done.map((s) => `${due.state} is not ${s}`).join(', ') : null;
+  /* ONLY A FIELD THAT SAYS IT WAS PAID: an order's total is what it comes to, never what came in. */
+  const paid = due.fields.find((f) => live(f) && f.type === 'money' && saysOf(f, /paid/i));
+  return { due: { register: due.id, name: due.name, one: due.one, day: day.id, who: who.id, what: due.title, open, paid: paid?.id ?? null } };
+}
+
+/** What falls due this week and is not done: late ones too, since late is still due. As the shop's own figure counts it. */
+const dueWhere = (w: Week): string => `${w.due.open ? `${w.due.open}, ` : ''}${w.due.day} before +8d`;
+
+/* ── the week's money ──────────────────────────────────────────────────── */
+
+/**
+ * WHAT CAME IN THIS WEEK, IN MONEY'S OWN TWO FIGURES (money-core 3.16.0), side by side and never added:
+ * - `settled-in-7d`, what was owed to you and was marked paid in the seven days: the payment a shop with no account
+ *   keeps as a paid invoice ("Nadia paid 900 on InstaPay"), and an invoice paid into an account and reconciled;
+ * - `received-7d`, the ledger's money in over the same days, leaving out transfers between her own accounts and anything
+ *   reconciled to an invoice, which the first already counts.
+ * Each is one amount per currency unless a home currency and its rates say otherwise, so EGP 900 and USD 40 never read 940.
+ */
+export const WEEK_IN = ['settled-in-7d', 'received-7d'] as const;
+/** What is still owed to you, beside what came in. */
+export const OWED = 'owed-to-you';
+
+/** The money tile's own words, Home's and no other screen's. */
+export const MONEY_WEEK = 'Money this week';
+export const IN = 'In';
+export const OWED_TO_YOU = 'Owed to you';
+
+/** Any figure at all: a `when:` that asks only that the record has the figure (`home-arrange.ts` `whileHeld`). */
+const ANY = -Number.MAX_SAFE_INTEGER;
+
+/**
+ * THE WEEK'S MONEY TILE, drawn only where the record has Money's week figures: a record on an older Money, or with none,
+ * reads no tile rather than three that cannot be read. A cell that reads nothing is left out by Home (`weekMoneyDrawn`),
+ * so a week with nothing paid never says "In 0".
+ */
+export const weekMoney = (): PageBlock => ({
+  kind: 'stat',
+  heading: MONEY_WEEK,
+  icon: 'wallet',
+  cells: [...WEEK_IN.map((metric) => ({ metric, label: IN })), { metric: OWED, label: OWED_TO_YOU }],
+  when: { metric: WEEK_IN[0], gte: ANY },
+});
+
+/** The two blocks a record's week opens Today on: its own words, naming its list ("Orders due this week"). */
+function weekBlocks(w: Week): PageBlock[] {
+  const due: PageBlock = {
+    kind: 'table',
+    heading: `${w.due.name} due this week`,
+    icon: 'calendar',
+    source: `register.${w.due.register}`,
+    where: dueWhere(w),
+    columns: [{ field: w.due.who }, { field: w.due.what }, { field: w.due.day }],
+    order: [{ field: w.due.day, dir: 'asc' }],
+    limit: 8,
+    empty: `No ${w.due.one.toLowerCase()} is due this week.`,
+  } as PageBlock;
+  return [due, weekMoney()];
+}
 
 /**
  * TODAY'S BODY, in the words of the voice that speaks. In reading order: the page's line, the line a task is typed
@@ -180,6 +303,9 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       { kind: 'note', lead: true, body: TODAY_LEAD },
       /* THE LINE A TASK IS TYPED INTO, with the light syntax ("tomorrow !urgent #Kiln") the page reader reads. */
       ...(holds.tasks && holds.adds ? [{ kind: 'capture', heading: captureHeading(holds.one), icon: 'plus', register: TASKS } as PageBlock] : []),
+      /* THE RECORD'S WEEK FIRST, where it keeps one: what is due this week and what came in. Late, what needs you and
+         who is working keep their order after them. */
+      ...(holds.week ? weekBlocks(holds.week) : []),
       /* ANSWERED WHERE THEY ARE SHOWN: the page's writes are on, so a queue draws `QueueAnswer`. */
       { kind: 'queue', heading: voice.needsYou, icon: 'ask', source: 'governance.open', limit: NEEDS_YOU_LIMIT, empty: voice.nothingWaiting, ...TILES },
       ...(holds.tasks ? work : [lateMoney]),
@@ -385,6 +511,9 @@ export function slashLineOf(drawn: HomeDrawn, today: boolean): unknown {
  *
  * THE LINE A TASK IS TYPED INTO GOES TO THE HEAD, beside the page's name, as the page's line does under it.
  *
+ * WHERE THE RECORD KEEPS A WEEK (`week`, handed in only for Today's own body), what is due this week is drawn once, and
+ * the line says what is due and what came in (`weekSentence`), counted from those two blocks.
+ *
  * A FIGURE'S LINE STARTS AT THE FIRST DAY THE RECORD KEPT, and is a line only from three days up (`linesKept`).
  *
  * WHAT CHANGED IS ONLY WHAT IS NEW, and A BLOCK WITH NOTHING TO SHOW IS NOT DRAWN: an empty list on the page everybody
@@ -403,7 +532,14 @@ export function slashLineOf(drawn: HomeDrawn, today: boolean): unknown {
  */
 export type HomeWaits = { questions: number; inbox: number | null; working: number; seqs: readonly (number | null)[] };
 
-export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: HomeVoice = HOUSE, one?: string, waits?: HomeWaits | null): HomeDrawn {
+export function homeDrawn(
+  blocks: readonly LiveBlock[],
+  now: number,
+  voice: HomeVoice = HOUSE,
+  one?: string,
+  waits?: HomeWaits | null,
+  week?: Week,
+): HomeDrawn {
   const today = dayOf(now);
   let lead: string | null = null;
   let capture: LiveBlock | null = null;
@@ -430,6 +566,12 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
     if (b.kind === 'capture' && capture === null) {
       capture = b;
       shaped.push({ ...b, drawn: false });
+      continue;
+    }
+    /* WHAT IS DUE THIS WEEK IS DRAWN ONCE: its entries are not drawn again in Late or in what comes up. */
+    if (week && isWeekDue(b, week) && aligned(b)) {
+      for (const e of b.entries) drawn.add(`${week.due.register}#${e.seq}`);
+      shaped.push(b);
       continue;
     }
     if (isTodo(b) && aligned(b)) {
@@ -460,6 +602,11 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
       shaped.push(at.length === b.entries.length ? b : pick(b, at, undefined, at.length));
       continue;
     }
+    /* THE WEEK'S MONEY SAYS ONLY WHAT IT HOLDS, on Today's own body and on a home kept from it alike. */
+    if (isWeekMoney(b)) {
+      shaped.push(weekMoneyDrawn(b));
+      continue;
+    }
     shaped.push(linesKept(newOnly(b)));
   }
   const kept = shaped.map((b) => (b.drawn && hollow(b) ? { ...b, drawn: false } : b));
@@ -478,7 +625,118 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
   for (const [n, b] of out.entries())
     if (b.drawn && !says(b) && isDue(b) && b.kind === 'timeline' && aligned(b) && !(b as WithRows).homeRows)
       out[n] = { ...b, homeRows: { kind: 'days', days: dayGroups(b, today) } } as WithRows;
-  return { blocks: out, lead, capture, sentence: sentenceFrom(shaped, today, waits ?? null), slash };
+  const house = sentenceFrom(shaped, today, waits ?? null);
+  return { blocks: out, lead, capture, sentence: week ? weekSentence(shaped, today, week, house) : house, slash };
+}
+
+/* ── the week's line ───────────────────────────────────────────────────── */
+
+/** The week's due block, by its list and its own heading, as `weekBlocks` wrote it. */
+const isWeekDue = (b: LiveBlock, w: Week): boolean =>
+  b.kind === 'table' && listOf(b) === w.due.register && b.heading === `${w.due.name} due this week`;
+
+/** The week's money tile, by its figures, on Today's own body and on one kept from it alike. */
+const isWeekMoney = (b: LiveBlock): boolean => b.kind === 'stat' && (b.metrics ?? []).some((m) => (WEEK_IN as readonly string[]).includes(m.id));
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const OPENING = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+/** A count that opens a sentence, spelled to ten, so no sentence starts on a figure. */
+const opening = (n: number): string => OPENING[n] ?? n.toLocaleString('en-GB');
+
+/** A day this week as a sentence says it: "today", "tomorrow", "Friday", and the short day past the week. */
+function dueNamed(day: string, today: string): string {
+  const n = daysBetween(today, day);
+  if (n === 0) return 'today';
+  if (n === 1) return 'tomorrow';
+  if (n > 1 && n < 7) return WEEKDAYS[new Date(`${day}T00:00:00Z`).getUTCDay()]!;
+  return `on ${dueSaid(day, today)}`;
+}
+
+/** An amount as a sentence says it: "EGP 900", and the minor units only where there are some. Never a float. */
+export function amountSpoken(minor: number, currency: string): string {
+  const exp = exponentOf(currency);
+  const whole = minor % 10 ** exp === 0;
+  const body = (minor / 10 ** exp).toLocaleString('en-GB', { minimumFractionDigits: whole ? 0 : exp, maximumFractionDigits: exp });
+  return `${currency.toUpperCase()} ${body}`;
+}
+
+const isMoney = (v: unknown): v is { amount: number; currency: string } =>
+  typeof v === 'object' && v !== null && Number.isSafeInteger((v as { amount?: unknown }).amount) && typeof (v as { currency?: unknown }).currency === 'string';
+
+/** "A, B and C". */
+const andOf = (items: readonly string[]): string => (items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`);
+
+/**
+ * A FIGURE THE TILE DREW AS NOUGHT: `EGP 0.00`, or a bare `0` where no currency was said. The record answers a sum over
+ * nothing as 0 (uc6-money-47), and the cell is the only place left that says so.
+ */
+const nought = (value: string): boolean => /^(?:[A-Z]{3} )?[−-]?0(?:[.,]0+)?$/u.test(value.trim());
+
+/** An amount as the tile wrote it ("EGP 900.00 · USD 40.00", the dot between spaces of either kind), as a sentence says it: "EGP 900 and USD 40". */
+const spokenOf = (value: string): string => andOf(value.split(/\s*·\s*/u).map((v) => v.trim().replace(/\.0+$/u, '')));
+
+/**
+ * THE WEEK'S MONEY TILE AS HOME DRAWS IT: a cell that reads nought is left out, so a week with nothing paid never says
+ * "In 0" and nothing owed is not a figure, and a tile left with none is not drawn. Every other figure is as it came.
+ */
+function weekMoneyDrawn(b: LiveBlock): LiveBlock {
+  const metrics = (b.metrics ?? []).filter((m) => !(([...WEEK_IN, OWED] as string[]).includes(m.id) && nought(m.value)));
+  if (metrics.length === b.metrics?.length) return b;
+  return metrics.length === 0 ? { ...b, metrics, drawn: false } : { ...b, metrics };
+}
+
+/**
+ * WHAT CAME IN, AS THE LINE SAYS IT, read off the tile so the two cannot disagree. One In figure is said by who paid
+ * where exactly one entry due this week was paid that very amount ("Nadia paid EGP 900."), else as the amount
+ * ("EGP 900 came in this week."). Both halves are said side by side, never added: they are two figures.
+ */
+function weekInSaid(blocks: readonly LiveBlock[], due: LiveBlock | undefined, w: Week): string | null {
+  const tile = blocks.find((b) => b.drawn && !says(b) && isWeekMoney(b));
+  const came = (tile?.metrics ?? []).filter((m) => (WEEK_IN as readonly string[]).includes(m.id) && !nought(m.value) && m.value !== MISSING);
+  if (came.length === 0) return null;
+  const said = andOf(came.map((m) => spokenOf(m.value)));
+  const paid = w.due.paid;
+  if (came.length === 1 && paid !== null && due && aligned(due)) {
+    const at = due.entries.flatMap((e, n) => {
+      const p = (e.fields as Record<string, unknown>)[paid];
+      return isMoney(p) && money(p.amount, p.currency) === came[0]!.value ? [n] : [];
+    });
+    const col = due.columns.findIndex((c) => c.field === w.due.who);
+    const who = at.length === 1 && col >= 0 ? (due.rows[at[0]!]?.cells[col] ?? '').trim() : '';
+    if (who) return `${who} paid ${said}.`;
+  }
+  return `${said} came in this week.`;
+}
+
+/**
+ * THE WEEK'S LINE, counted from what the two blocks drew: "One order is due Friday. Nadia paid EGP 900." What is late
+ * leads, in red with its word. What came in is read off the money tile (`weekInSaid`): by who paid where that is plain,
+ * else as the amounts, side by side, never added. Something else waiting (a question) is still said after it, as the
+ * house line says it. With nothing due and nothing in, the house line stands.
+ */
+function weekSentence(blocks: readonly LiveBlock[], today: string, w: Week, house: Sentence | null): Sentence | null {
+  const parts: string[] = [];
+  let needs = '';
+  const due = blocks.find((b) => b.drawn && !says(b) && isWeekDue(b, w));
+  const days = (due?.entries ?? []).map((e) => (e.fields as Record<string, unknown>)[w.due.day]).filter((d): d is string => typeof d === 'string' && DAY.test(d)).map((d) => d.slice(0, 10)).sort();
+  const total = due ? Math.max(due.total, due.entries.length) : 0;
+  if (total > 0) {
+    const one = w.due.one.toLowerCase();
+    const many = w.due.name.toLowerCase();
+    const late = days.filter((d) => d < today).length;
+    const next = days.find((d) => d >= today);
+    if (late > 0) {
+      needs = late === 1 ? `One ${one} is late` : `${opening(late)} ${many} are late`;
+      const rest = total - late;
+      parts.push(`${needs}.${rest === 0 ? '' : rest === 1 ? ' One more is due this week.' : ` ${opening(rest)} more are due this week.`}`);
+    } else if (total === 1) parts.push(`One ${one} is due${next ? ` ${dueNamed(next, today)}` : ' this week'}.`);
+    else parts.push(`${opening(total)} ${many} are due this week${next ? `, the first ${dueNamed(next, today)}` : ''}.`);
+  }
+  const came = weekInSaid(blocks, due, w);
+  if (came) parts.push(came);
+  if (parts.length === 0) return house;
+  const own = parts.join(' ');
+  return house && house.needs ? { text: `${own} ${house.text}`, needs: needs || house.needs } : { text: own, needs };
 }
 
 /** Each house line Today's body writes that a voice may say its own way, by its key. */

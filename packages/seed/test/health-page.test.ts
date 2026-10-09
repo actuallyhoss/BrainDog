@@ -119,9 +119,9 @@ test('HOW LONG IT HAS HELD is said from green-days in whole words, and not at al
     drawn(read([GREEN], { 'signs-red': 0, 'green-days': days })).filter((b) => b.kind === 'note' && !b.lead).map((b) => String((b as { body?: unknown }).body));
   assert.deepEqual(lines(null), []);
   assert.deepEqual(lines(0), []);
-  assert.deepEqual(lines(1), ['Nothing was red yesterday.']);
+  assert.deepEqual(lines(1), ['Every watched sign was green yesterday.']);
   assert.equal(lines(4).length, 1);
-  assert.match(lines(4)[0]!, /^Nothing has been red for (\{\{green-days\}\}|4) days, up to yesterday\.$/u);
+  assert.match(lines(4)[0]!, /^Every watched sign has been green for (\{\{green-days\}\}|4) days, up to yesterday\.$/u);
   /* ONLY A LEAD NOTE HAS ITS `(s)` SETTLED (`page-live.ts` `leadOf`): anywhere else it is drawn as written. */
   for (const b of BLOCKS) if (b.kind === 'note' && b.lead !== true) assert.doesNotMatch(String(b.body), /\(s\)/u, String(b.body));
 });
@@ -153,4 +153,14 @@ test('THE WORDS ARE PLAIN: no em dash, no id, and never row, item or entity', ()
     assert.doesNotMatch(w, /\b(rows?|items?|entit(y|ies))\b/iu, w);
     assert.doesNotMatch(w, /[a-z]+#\d|\b[0-9A-HJKMNP-TV-Z]{26}\b/u, w);
   }
+});
+
+test('HOW MANY SIGNS ARE NOT READ YET is said from signs-unread, and not at all at nought or unread', () => {
+  const lines = (n: number | null): string[] =>
+    drawn(read([GREEN, NONE], { 'signs-red': 0, 'signs-unread': n })).filter((b) => b.kind === 'note' && !b.lead).map((b) => String((b as { body?: unknown }).body));
+  assert.deepEqual(lines(null), []);
+  assert.deepEqual(lines(0), []);
+  assert.deepEqual(lines(1), ['One sign has not been read yet.']);
+  assert.equal(lines(3).length, 1);
+  assert.match(lines(3)[0]!, /^(\{\{signs-unread\}\}|3) signs have not been read yet\.$/u);
 });

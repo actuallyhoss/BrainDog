@@ -38,7 +38,7 @@ import { pathToFileURL } from 'node:url';
 
 import { start } from '../../apps/selfhost/src/server.ts';
 import { httpStatus } from '../../packages/host/src/index.ts';
-import { NOW, installSeed } from '../../packages/seed/src/index.ts';
+import { NOW, ORDER, ROWS, declarations, forWrite, ingestDeclarations, installSeed, metricDeclarations, pageDeclarations } from '../../packages/seed/src/index.ts';
 
 import { budget } from './lib.mjs';
 /* THE LIVED RECORD (PRF-A07, `lived.mjs`), the gates' second record, built by living in it rather than seeded. PRF-B06
@@ -104,6 +104,32 @@ async function decideRenewals(kernel) {
   }
 }
 
+/** How many entries a `fresh` record holds: a few put in by hand, more than none and fewer than a kept record's. */
+export const FRESH_ENTRIES = 2;
+
+/**
+ * THE SEED'S LISTS AND PAGES WITH NOTHING IN THEM BUT A FEW ENTRIES, for a gate that measures a first Today (`fresh`).
+ *
+ * WHY A SECOND RECORD AND NOT THE SEED. Today offers its next steps and the card to tell it one real thing only on a
+ * first Today (`apps/web/src/lib/home/Home.svelte`, `addedByHand` at most `FIRST_TODAY_MOST`), and the gates' record is
+ * a record kept for months, so a preference that orders or hides those steps drew nothing either way there. Each entry
+ * is the seed's own first row of a list, written as a person writes one; a row that points at another list's row is
+ * refused here and the next list is tried.
+ */
+async function freshen(kernel) {
+  const installed = await kernel.install([...declarations(), ...pageDeclarations(), ...metricDeclarations(), ...ingestDeclarations()]);
+  if (!installed.ok) return installed;
+  let made = 0;
+  for (const register of ORDER) {
+    if (made >= FRESH_ENTRIES) break;
+    if (register === 'people' || register === 'session') continue;
+    const first = ROWS[register]?.[0];
+    if (first === undefined) continue;
+    if (kernel.create(register, forWrite(register, first), { actor: 'p_self' }).ok) made++;
+  }
+  return made === FRESH_ENTRIES ? { ok: true } : { ok: false, refusal: { fix: `only ${made} of ${FRESH_ENTRIES} entries went in` } };
+}
+
 /**
  * Every gate record's name, which `startRecord` gives it before the seed goes in.
  *
@@ -142,6 +168,8 @@ async function connect(port, key) {
  *
  * `pollMs: 0` because nothing is ever delivered from a gate's record, and a ticker is a timer.
  *
+ * `fresh` MAKES IT A FIRST TODAY instead of the seed: the seed's lists and pages and a few entries (`freshen`).
+ *
  * `open` IS FOR THE COMMAND LINE: `vite dev` proxies `/api` to it directly and cannot add a bearer, so that
  * record is the open self-host it always was, at the origin the dev server serves the app from.
  *
@@ -150,7 +178,7 @@ async function connect(port, key) {
  * call and not from a second one in the gate: `test/handles.test.mjs` holds every gate to closing what it opened in the
  * `finally` of the `try` it opened it in, and four records under one handle are one close.
  */
-export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false } = {}) {
+export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false } = {}) {
   if (variant !== undefined && !VARIANTS.some((v) => v.name === variant)) throw new Error(`there is no record variant called ${variant}`);
   const key = open ? undefined : randomBytes(32).toString('base64url');
   const running = await start({
@@ -175,7 +203,8 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
   try {
     const named = running.api.kernel.createRecord(IDENTITY);
     if (!named.ok) throw new Error(`the gate's record could not be named: ${named.refusal?.fix ?? 'no reason given'}`);
-    const seeded = await installSeed(running.api.kernel);
+    /* `fresh` IS A FIRST TODAY: the seed's lists and pages, and a few entries put in by hand (`freshen`). */
+    const seeded = fresh ? await freshen(running.api.kernel) : await installSeed(running.api.kernel);
     if (!seeded.ok) throw new Error(`the gate's record could not take the seed: ${seeded.refusal?.fix ?? 'no reason given'}`);
     /* ONE PERSON, SO THE KEY IS A WAY IN. Sign-in offers the server key only where the Directory holds exactly one
        person, so without an owner /signin would draw a self-host nobody ran `init --owner` on. */
@@ -302,8 +331,8 @@ export async function ask(base, name, args = {}) {
 /**
  * Keep one of the person's own settings through the record's `setPref`, with the gate's key. `null` takes it away.
  *
- * THE COMMENT THAT MADE `bootWith` WAS WRONG. It said the record refuses `setPref` from a key, so the gate's server
- * wrote the preferences into `boot` itself. The record refuses a token (`packages/record/src/index.ts` `setPref`), and
+ * A GATE ONCE WROTE THE PREFERENCES INTO `boot` ITSELF, on a comment that said the record refuses `setPref` from a key;
+ * that writer is gone (PRF-B04). The record refuses a token (`packages/record/src/index.ts` `setPref`), and
  * the gate's key is the self-host's server key, which speaks as the owner, a person (`apps/selfhost/src/server.ts`
  * `owner`): asked on 9 October, `setPref nav.shape bar` with this key answered `ok: true`. So a page reads what the
  * record keeps, through the door a person's own Settings writes through, and no answer is written by a gate.
@@ -411,48 +440,6 @@ export async function answers(origin) {
     .catch(() => null);
   if (said?.ok !== true || !Array.isArray(said.value?.registers) || said.value.registers.length === 0)
     throw new Error(`${origin}/api/boot is not the gate's record answering, so every screen would draw the refusal that says so.`);
-}
-
-/**
- * The cookie that carries what the record keeps for the person from the browser to a gate's own server, which hands it to
- * the page inside `boot` (`bootWith`). Only a gate's server reads it, and the record never sees it.
- *
- * HERE AND NOT IN `prefs.mjs`, which wrote it first, because `layout` draws the shell's other two shapes with it too, and
- * a gate another file imports is a library to `run.mjs` and would stop being run.
- *
- * GOING, WITH `recordPrefsOf` AND `bootWith` (PRF-B04). They rest on the wrong comment `setPref` above corrects: a gate
- * keeps a preference with `openPage`'s `prefs`, which writes it through the record's own door. They stay exported only
- * while `prefs.mjs` and `layout.mjs` still import them; the unit's jobs 4 and 5 move those two, and then all three go.
- */
-export const RECORD_PREFS = 'bd_gate_record';
-
-/** What the gate says the record keeps for the person, from the request's cookie, or `null` when it says nothing. */
-export function recordPrefsOf(cookie) {
-  const raw = new RegExp(`(?:^|;\\s*)${RECORD_PREFS}=([^;]*)`).exec(cookie ?? '')?.[1];
-  if (raw === undefined) return null;
-  try {
-    const out = JSON.parse(decodeURIComponent(raw));
-    return out && typeof out === 'object' && !Array.isArray(out) ? out : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The record's own `boot`, with `me.prefs` set to what the gate says the record keeps.
- *
- * THE REST IS THE RECORD'S ANSWER, UNTOUCHED, read with the gate's key as `forward` reads it, so the page draws exactly
- * the screen it draws for a person whose record holds these preferences.
- */
-export async function bootWith(req, res, base, held) {
-  const key = serverKeyFor(base);
-  const said = await fetch(new URL(req.url ?? '/', base), { headers: key === undefined ? {} : { authorization: `Bearer ${key}` } })
-    .then((r) => r.json())
-    .catch(() => null);
-  if (said?.ok === true && said.value && typeof said.value === 'object') said.value.me = { ...(said.value.me ?? {}), prefs: held };
-  const answer = said ?? { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: "The gate's record did not answer its boot." } };
-  res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-  res.end(JSON.stringify(answer));
 }
 
 /* THE COMMAND LINE: one open record on a fixed port, for `vite dev` and `vite preview` to proxy to. Its

@@ -70,6 +70,58 @@ const numbers = (where: string | null, when?: Record<string, unknown>): Record<s
 });
 
 /**
+ * THE TEMPLATE'S WHERE IT STANDS FIGURES WITH THE NUMBERS THIS WEEK AFTER THEM, SINCE 2.5.0 (REC-C16 part b): a founder's
+ * project says "2 changed this week, last worked 2 days ago, 6 numbers this week" while nobody has said where it stands.
+ * The template keeps no Numbers, so the cell is this use case's, laid on the block by its key.
+ */
+const withNumbersThisWeek = (blocks: readonly Record<string, unknown>[]): Record<string, unknown>[] =>
+  blocks.map((b) =>
+    b.key === 'stands-figures' && Array.isArray(b.cells)
+      ? { ...b, cells: [...(b.cells as Record<string, unknown>[]), { metric: 'project-numbers-7d:{{name}}', label: 'Numbers this week' }] }
+      : b,
+  );
+
+/**
+ * AN EARNING PROJECT THAT WENT SILENT, SINCE 2.5.0 (REC-C08 step 9): marked Earning, with no cleared money in on the
+ * Ledger and no number sent in 90 days. The after-an-import skill reads it to propose a lane (`agents-skills.ts`), and
+ * Projects names them. A count of projects and never a sum, so no two currencies meet in it.
+ *
+ * TWO HOPS BACKWARDS ALONG `thing` (`pointed` in `packages/where`), from the project to the Ledger entries and the numbers
+ * that name it. HERE AND NOT IN PORTFOLIO, because Portfolio needs no other list (`first-party.test.ts`, `portfolio: []`),
+ * and a hop into a list the record does not keep is refused; a founder keeps all three (`HOLDS`).
+ *
+ * ONE `none` AT THE TOP, AND THE LANE INSIDE IT AS ITS OPPOSITE: not (another lane, or money in, or a number) is Earning
+ * with neither. A predicate nests three groups deep and a hop counts as one, so an `all` round a `none` would leave the
+ * hops' own `all` a fourth and be refused.
+ *
+ * NOT A TRANSFER, as Received, 7 days is not (`modules/money/figures/spending.ts`): money moved between his own
+ * accounts and filed to the project is not money the project made.
+ */
+const SILENT = {
+  metric: 'projects-earning-silent',
+  name: 'Earning, silent 90 days',
+  source: 'register.things',
+  where: {
+    none: [
+      { field: 'lane', not: 'earning' },
+      {
+        pointed: {
+          register: 'transactions',
+          by: 'thing',
+          where: { all: [{ field: 'state', is: 'cleared' }, { field: 'direction', is: 'in' }, { field: 'transfer', is: false }, { field: 'on', after: '-90d' }] },
+        },
+      },
+      { pointed: { register: 'datapoints', by: 'thing', where: { all: [{ field: 'at', after: '-90d' }, { field: 'source', not: 'example' }] } } },
+    ],
+  },
+  value: { count: 'id' },
+  format: 'int',
+  target: { lte: 0 },
+  window: '90d',
+  compare: 'none',
+};
+
+/**
  * A project template's blocks with `added` put in before its boxed section, More about it (work 1.15.0), so what a use
  * case adds to the page stands on the board and is not taken into that tile, which holds every block after it up to
  * the next section. At the end where the template has no box.
@@ -272,7 +324,11 @@ export const FOUNDER = {
      2.5.0: Numbers takes money. A reading may hold `amount`, integer minor units and its currency, in place of its
      decimal `value`, which stops being required; the blocks over Numbers read it as their fifth column and the project
      moves to the sixth; Latest numbers shows it beside Value; and `poll-setup` says to fill the live feed add-on. A
-     field added, one made optional and columns added, so a minor step. 2.4.0 is live. */
+     field added, one made optional and columns added, so a minor step. 2.4.0 is live. Folded into the same unreleased
+     2.5.0 (REC-C16 part b, REC-C08 step 9): `project-numbers-7d`, the numbers a project sent this week, as the last
+     figure of Where it stands on `page.project`; and `projects-earning-silent`, a project marked Earning with no cleared
+     money in and no number in 90 days, named on Projects in a line under In play. Two figures, a cell and a block laid
+     on another pack's page added, nothing taken away. */
   version: '2.5.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
@@ -367,6 +423,10 @@ export const FOUNDER = {
       counted('datapoints-7d', 'Numbers reported, 7 days', 'register.datapoints', 'at after -7d, source is not example'),
       counted('datapoints-reported', 'Numbers reported', 'register.datapoints', 'source is not example'),
       counted('lapsing-30d', 'Lapsing within 30 days', 'register.services', LAPSING_SOON),
+      /* THE NUMBERS ONE PROJECT SENT THIS WEEK, SINCE 2.5.0 (REC-C16 part b), the example left out: the third thing a
+         project page's Where it stands says while nobody has said, beside what changed and when it was last worked. */
+      counted('project-numbers-7d', 'Numbers this week', 'register.datapoints', 'thing is {{it}}, at after -7d, source is not example'),
+      SILENT,
       {
         /* HOME, AS THIS USE CASE ANSWERS IT: the money across every organisation and
            the numbers the projects sent, in place of the house figures. No `nav`, because Home is on the rail
@@ -547,7 +607,7 @@ export const FOUNDER = {
            every block after it up to the next section, so under it the numbers would be a part of that tile and not the
            project's own figures, and the key would sit under the tile, a screen away from the numbers it sends. */
         blocks: beforeMore(
-          projectTemplate(HOLDS).blocks as Record<string, unknown>[],
+          withNumbersThisWeek(projectTemplate(HOLDS).blocks as Record<string, unknown>[]),
           numbers('thing is {{name}}'),
           /* IN THE MAIN COLUMN UNDER THE PROJECT'S NUMBERS, and the one place on the page the key is drawn: More about
              the project draws the scheduled actions alone (`BlockSlot.svelte`). */
@@ -587,6 +647,20 @@ export const FOUNDER = {
       /* `panel: reporting` NAMES THE KEY AND THE POLL FORM the app draws under this section (`panel-of.ts`), so a person
          or Slash renaming the heading keeps them. */
       { page: 'page.relation', after: 'People', block: { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' } },
+      /* WHICH EARNING PROJECTS WENT SILENT, ON PROJECTS, SINCE 2.5.0 (REC-C08 step 9), by name and under the cards in play:
+         drawn only while one has, so a record whose earning projects all took money or sent a number says nothing. LAST, so
+         the blocks laid before it keep their places. */
+      {
+        page: 'page.portfolio',
+        after: 'In play',
+        block: {
+          kind: 'note',
+          span: 12,
+          key: 'earning-silent',
+          when: { metric: 'projects-earning-silent', gt: 0 },
+          body: '{{projects-earning-silent.names}}: marked Earning, but no money in and no number sent in 90 days',
+        },
+      },
     ],
   },
 };

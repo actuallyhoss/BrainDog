@@ -195,8 +195,10 @@ test('sizeOf reads a count, a list, a map, a set or an object, and nothing else'
   assert.equal(sizeOf('six'), undefined);
 });
 
-test("refusals' four deviations are named, and a deviation missing its reason or written twice is red", () => {
-  assert.deepEqual(BOOK.deviations.refusals.map((d) => d.id).sort(), ['DECLARATION_INVALID', 'INTERNAL', 'NOPE', 'SOMETHING_NOBODY_MAPPED']);
+test("refusals' deviations are named, and a deviation missing its reason or written twice is red", () => {
+  assert.deepEqual(BOOK.deviations.refusals.map((d) => d.id).sort(), [
+    'CERT_HAS_EXPIRED', 'DECLARATION_INVALID', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'IMPORT_SHAPE', 'INTERNAL', 'NOPE', 'SOMETHING_NOBODY_MAPPED',
+  ]);
   const { book, budgets } = fresh();
   book.deviations.refusals[0].why = '';
   book.deviations.refusals.push({ ...book.deviations.refusals[1] });

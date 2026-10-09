@@ -8,7 +8,7 @@
   /* Lane F: backups and putting a copy back. */
   import { backUpNow, downloadSnapshot, readSnapshots, restoreSnapshot } from '$lib/record/settings-write.ts';
   import { readBoot, rereadBoot } from '$lib/record/boot-live.ts';
-  import { copiesOf, copyLine, type CopyFacts } from './copies.ts';
+  import { copiesOf, copyLine, drillLine, readDrill, type CopyFacts, type DrillFacts } from './copies.ts';
   import type { Snapshot as KeptCopy } from '@braindog/client';
   /* Bytes as a person reads them: `braindog-render`'s, and it is imported rather than written here
      because it was written here, as `(bytes / 1e6).toFixed(1)`, and printed **"0.2 MB"** for all four
@@ -127,6 +127,19 @@
     untrack(() => void readBoot(apiBase()).then((b) => (facts = b.from === 'live' ? copiesOf(b.boot) : null)));
   });
 
+  /**
+   * THIS HOST'S LAST RESTORE TEST BESIDE IT (LCH-C04), from `GET /account/drill`: "passed 12 days ago", or "Never
+   * tested" in the deeper red with the words, never the colour alone. The host's fact, so the same on every record. A
+   * self-host has no such door and answers 404, and that draws no line, as does a host that could not be read. A host
+   * whose `boot` says it is a self-host is not asked at all, so its console carries no 404 for a door it never had.
+   */
+  let drill = $state<DrillFacts | null>(null);
+  const drillSaid = $derived(drill ? drillLine(drill, Date.now()) : null);
+  $effect(() => {
+    if (shell.host === 'self-host') return;
+    untrack(() => void readDrill(fetch).then((d) => (drill = d)));
+  });
+
   async function readCopies() {
     const at = opened();
     const out = await readSnapshots(apiBase());
@@ -209,6 +222,16 @@
       <span>{lastCopy.text}</span>
     </p>
   {/if}
+  {@render drillLineOf()}
+{/snippet}
+
+{#snippet drillLineOf()}
+  {#if drillSaid}
+    <p class="last-copy drill" data-late={drillSaid.fault ? '' : undefined}>
+      {#if drillSaid.mark}<span class="late-word">{drillSaid.mark}</span>{/if}
+      <span>{drillSaid.text}</span>
+    </p>
+  {/if}
 {/snippet}
 
 {#snippet backUpButton()}
@@ -251,6 +274,8 @@
     <!-- NOT ON THIS HOST YET, AS A ROW, with the record's own sentence as its line and the one way
          out that does exist on every host, the export, as its action. NO LINE OVER IT: "First copy tonight" over a
          host that keeps no copies is a promise the next row takes back. -->
+    <!-- THE RESTORE TEST IS THE HOST'S, and true whether or not this record's copies can be listed here. -->
+    {@render drillLineOf()}
     <div role="status">
       <StateRow icon="archive" title={words.notHereYet} line={copiesSaid} action={anOwner ? exportInstead : undefined} />
     </div>

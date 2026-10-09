@@ -246,7 +246,7 @@ export const partsText = (parts: readonly Part[]): string => parts.map((p) => mo
  * `EGP 35% · USD 40%`, because a ratio of pounds to pounds is not an amount of pounds.
  */
 export const partsShown = (shape: string | undefined, parts: readonly Part[]): string =>
-  !shape || shape.startsWith('money.') ? partsText(parts) : parts.map((p) => `${p.currency} ${format(shape, p.amount)}`).join(' · ');
+  !shape || shape === 'money' || shape.startsWith('money.') ? partsText(parts) : parts.map((p) => `${p.currency} ${format(shape, p.amount)}`).join(' · ');
 
 const WINDOW = /^(\d{1,4})([dwm])$/;
 
@@ -687,7 +687,10 @@ export function leadOf(template: string, read: (path: string) => string | null |
         return `${figure}${between} ${single ? word : `${word}s`}${forms ? `${gap ?? ' '}${single ? forms[0] : forms[1]}` : ''}`;
       },
     )
-    .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
+    .replace(/([A-Za-z]+)\(s\)/gu, '$1s')
+    /* A LEAD WHOSE OPENING CLAUSE DROPPED starts on the next one's "and" (uc6-shop-49): "and Salma still owes EGP 1,350"
+       says "Salma still owes EGP 1,350". */
+    .replace(/^and\s+/u, '');
 }
 
 /** A figure as `resolverOf` writes it, `0`, `0.0`, `0%` or `GBP 0.00`, one part or several joined by ` · `. */

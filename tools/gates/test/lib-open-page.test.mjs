@@ -38,11 +38,15 @@ function fakeBrowser(log, { gotoThrows = false } = {}) {
       handlers.pageerror?.(new Error('boom'));
       handlers.console?.({ type: () => 'error', text: () => 'Failed to load resource' });
       handlers.console?.({ type: () => 'log', text: () => 'hello' });
+      handlers.response?.({ ok: () => false, status: () => 404, url: () => 'http://localhost:1/app/api/get?register=jobs' });
+      handlers.response?.({ ok: () => true, status: () => 200, url: () => 'http://localhost:1/app/api/boot' });
     },
   };
   const context = {
     clock: { setFixedTime: async (t) => log.push(['clock', t]) },
     newPage: async () => (log.push(['newPage']), page),
+    addCookies: async (c) => log.push(['cookies', c]),
+    addInitScript: async () => log.push(['init']),
     close: async () => log.push(['close']),
   };
   return { newContext: async (o) => (log.push(['newContext', o]), context) };
@@ -95,6 +99,33 @@ test('scheme, height and the wait are carried as given', () => {
   assert.equal(plan.prerendered, true);
 });
 
+test("the device's cookies and a worker block are carried as given, and left out when not given", () => {
+  const plan = pagePlan(URL_, { width: 1440, clock: NOW, cookies: { bd_pref: '%7B%7D' }, serviceWorkers: 'block' });
+  assert.deepEqual(plan.cookies, [{ name: 'bd_pref', value: '%7B%7D', url: 'http://localhost:1' }]);
+  assert.equal(plan.context.serviceWorkers, 'block');
+  const bare = pagePlan(URL_, { width: 1440, clock: NOW });
+  assert.deepEqual(bare.cookies, []);
+  assert.equal('serviceWorkers' in bare.context, false);
+});
+
+test('the cookies are on the context before the page exists', async () => {
+  const log = [];
+  const opened = await openPage(fakeBrowser(log), URL_, { width: 390, clock: NOW, cookies: { bd_pref: 'x' }, ready: ready(log) });
+  const at = (name) => log.findIndex((l) => l[0] === name);
+  assert.ok(at('cookies') >= 0 && at('cookies') < at('newPage'));
+  assert.equal(opened.state, 'ready');
+});
+
+test('an init script is on the context before the page exists, so the first load runs it', async () => {
+  const log = [];
+  await openPage(fakeBrowser(log), URL_, { width: 390, clock: NOW, init: () => {}, ready: ready(log) });
+  const at = (name) => log.findIndex((l) => l[0] === name);
+  assert.ok(at('init') >= 0 && at('init') < at('newPage') && at('newPage') < at('goto'));
+  const bare = [];
+  await openPage(fakeBrowser(bare), URL_, { width: 390, clock: NOW, ready: ready(bare) });
+  assert.equal(bare.some((l) => l[0] === 'init'), false);
+});
+
 test('openPage keeps the settings, pins the clock, then loads and waits, in that order', async () => {
   const log = [];
   const opened = await openPage(fakeBrowser(log), URL_, { width: 390, record: fakeRecord(log), prefs: { 'nav.shape': 'menu', 'look.scheme': null }, ready: ready(log) });
@@ -129,6 +160,7 @@ test('the page errors are collected, console errors only, and a second load star
   ]);
   assert.equal(await opened.goto('http://localhost:1/app/usage'), 'ready');
   assert.equal(opened.errors.length, 2, 'the second load collected its own two, not four');
+  assert.deepEqual(opened.failed, [{ status: 404, path: '/app/api/get' }], 'only an answer that was not ok, by its path, once a load');
 });
 
 test('clock: null leaves the page unpinned', async () => {
@@ -180,6 +212,8 @@ test('the record names the ids, and what it has nothing for is said, not invente
     assert.ok(routes.includes(r), `${r} is not among ${routes.join(' ')}`);
   assert.equal(routes.includes('/automations/SG5'), false, 'an automation is opened by its own id');
   assert.deepEqual(unseen.sort(), ['/jobs/j_none', '/scripts/no-script', '/t/2']);
+  /* AND WHAT IS DRAWN AS NOT FOUND ON PURPOSE: the unseen, and the shared link that names no page. */
+  assert.deepEqual((await routesFor(WEB, record)).missing.sort(), ['/jobs/j_none', '/s/no-page-yet', '/scripts/no-script', '/t/2']);
   assert.ok(!routes.includes('/p/kiln'), 'one page unless every page is asked for');
   assert.ok((await routesFor(WEB, record, { every: true })).routes.includes('/p/kiln'));
 });

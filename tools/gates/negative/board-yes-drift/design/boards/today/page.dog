@@ -1,0 +1,8 @@
+page: today_board
+title: Today
+requires: [register.session]
+
+blocks:
+  - kind: note
+    span: 12
+    body: The day, in one heavy hero card.

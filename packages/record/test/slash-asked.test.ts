@@ -231,6 +231,8 @@ test('WHAT THE OWNER TYPED REACHES THE MODEL AS `asked`, on a record two days ol
 test('A DESCRIPTION FILES ONLY WHAT THE MODEL DRAFTED FROM IT: a model that fails leaves Decide as it was, where a plain press falls to the rules', async () => {
   const failing: SlashModel = { name: 'test model', draft: async () => { throw new Error('upstream 503'); } };
   const { api, sql } = await record(failing, 20, undefined, true);
+  /* THE PEN OFF, so the growing list's page is Slash's to ask (offer-pen-50: with it on, the pen holds the offer). */
+  value(await api.setPref({ key: 'pen.suggest', value: false }, OWNER));
   const described = value<Filed>(await api.slashPropose({ asked: DESCRIBED }, OWNER));
   assert.deepEqual(described.filed, []);
   assert.deepEqual(described.dropped, ['The model did not answer, so nothing was drafted from what you described.']);
@@ -373,7 +375,9 @@ test("THROUGH THE PACKAGE'S OWN LEDGER: at ask_cap 0 no description is asked, at
     for (let i = 0; i < 5; i++) outs.push(value<Filed>(await api.slashPropose({ asked: DESCRIBED }, OWNER)));
     assert.equal(heard.length, cap, `five descriptions at ask_cap ${cap} made ${heard.length} model calls`);
     assert.equal(engine.status().asks.used, cap);
-    assert.deepEqual(own.all<{ status: string }>('SELECT status FROM slash_call').map((r) => r.status), cap === 0 ? [] : ['ok']);
+    /* THE CALLS, and each ask turned away past the cap as its own row under `-` (model-sign-49), never counted. */
+    assert.deepEqual(own.all<{ status: string }>("SELECT status FROM slash_call WHERE model <> '-'").map((r) => r.status), cap === 0 ? [] : ['ok']);
+    assert.equal(own.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE model = '-' AND code = 'SLASH_BUDGET_SPENT'")?.n, 5 - cap);
     for (const out of outs.slice(cap)) assert.ok(out.dropped.some((d) => d.endsWith('Nothing was drafted from what you described.')), JSON.stringify(out.dropped));
     sql.close();
     own.close();

@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "a tool as the author",
+  "expect": "a tool, and every commit is his alone",
+  "findings": 1,
+  "total": 1,
+  "why": "A TOOL'S IDENTITY AS THE AUTHOR, said as a tool and not only as a stranger, so the line names what to fix."
+}

@@ -103,6 +103,11 @@ export type Core = {
   /** Give a held ask back when no model was called. A row already settled by `account` is left alone. */
   release(id: string): void;
   /**
+   * One ask turned away because the month's asks are spent (`turnedAway`, model-sign-49): its own row, so the vital sign
+   * can say the month is spent. Never counted as an ask (`asksUsed` passes over `-`).
+   */
+  turnedAway(kind: 'read' | 'propose', tier: Tier): void;
+  /**
    * Write the row, or settle one this ledger minted: a hold from `reserve`, or an id from `mint` settled once already.
    * A row already held under an id this ledger did not mint is refused with a throw and never replaced.
    */
@@ -183,6 +188,18 @@ export const DDL: readonly string[] = [
    )`,
   'CREATE INDEX IF NOT EXISTS slash_call_meter ON slash_call(tier, kind, ts)',
 ];
+
+/**
+ * AN ASK TURNED AWAY BECAUSE THE MONTH'S ASKS ARE SPENT LEAVES ONE ROW (model-sign-49, audit 40-42 finding 5): model `-`,
+ * `refused`, `SLASH_BUDGET_SPENT`. Before this every month-cap refusal returned before any row was written, so the vital
+ * sign `model-answers` read five answers and then fifty capped asks as "answered all 5", and fifty capped asks alone as
+ * "No one asked". Under `-` it is never an ask the meter counts (`asksUsed`, the host's `drafted` and the worker's
+ * ceiling all pass over `-`), and a per-call neuron-ceiling refusal, written under the model's own name, is never read as
+ * the month spent (`LEDGER_BUDGET`). The host restates this insert (`packages/host/src/slash-turned-away.ts`) because it
+ * may not import this package (`46 §5.1`); its test holds the two to one shape.
+ */
+export const TURNED_AWAY_SQL =
+  "INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code) VALUES (?, ?, ?, ?, '-', 0, 0, 0, 0, 'refused', 'SLASH_BUDGET_SPENT')";
 
 /** The ledger's columns, named once so a carried row lands column for column. */
 const CALL_COLUMNS = 'id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, predicate, read, filed';
@@ -495,6 +512,9 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
     release: (id) => {
       minted.delete(id);
       sql.exec("DELETE FROM slash_call WHERE id = ? AND code = 'SLASH_PENDING'", id);
+    },
+    turnedAway: (kind, tier) => {
+      sql.exec(TURNED_AWAY_SQL, ulid(clock.now()), now(), kind, tier);
     },
     account,
     run,

@@ -340,6 +340,8 @@ const QUIETEST_FIRST: Body[] = [
  * fingerprint released under each. Money-core 3.15.0's one figure, `ledger-rows-7d`, and 3.16.0's three signs are taken
  * off as well.
  */
+/** And the two halves of Today's money this week (uc6-money-47), folded into the same unreleased 3.16.0. */
+const WEEK_IN = new Set(['received-7d', 'settled-in-7d']);
 const SIGNS_ADDED = new Set(['ledger-rows-7d', 'ledger-newest-days', 'currencies-held', 'uncategorised-share-30d', 'statement-oldest-days', 'nights-missed-30d']);
 
 /**
@@ -426,6 +428,21 @@ const withoutAges = (doc: Body): Body => {
  * takes the rule away, which is a loss a record is asked about once (`TAKING CASH STALE AWAY IS ASKED`), and those tests
  * measure the pages, not that question.
  */
+/**
+ * AND 3.16.0'S CATEGORIES GOING THE OTHER WAY (hop-figures-50) AND THE LEDGER'S OWN ORDER (list-order-50), folded into
+ * the same unreleased step: `categories-against-direction` and its line under Heads up go, and the Ledger declares no order.
+ */
+const withoutDirection = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[])
+    .filter((d) => d.metric !== 'categories-against-direction')
+    .map((d) => {
+      if (d.register === 'transactions' && d.order !== undefined) return (({ order: _order, ...rest }) => rest)(d);
+      if (Array.isArray(d.blocks))
+        return { ...d, blocks: (d.blocks as Body[]).filter((b) => (b.when as Body | undefined)?.metric !== 'categories-against-direction') };
+      return d;
+    }),
+});
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
@@ -433,10 +450,10 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(raw));
+      const doc = withoutPaydays(withoutAges(withoutDirection(raw)));
       return {
       ...doc,
-      declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric))).map((d) =>
+      declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day').map((d) =>
         d.register === 'accounts' && Array.isArray(d.fields)
           ? { ...d, fields: (d.fields as Body[]).map((f) => (f.id === 'last4' ? { ...f, label: 'Last four digits' } : f)) }
           : d,
@@ -444,11 +461,29 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
       };
     },
   },
+  /* A PROJECT OTHERS POINT AT COULD BE DELETED, PROJECTS DID NOT COUNT WHO SAYS WHAT THEY EARNED, AND NOTHING COUNTED
+     WHETHER A PROJECT WAS DESCRIBED (portfolio 1.16.0 comes off first). */
+  portfolio: {
+    version: '1.15.0',
+    released: '982f163d9d8ab76f',
+    undo: (raw) =>
+      withPage(
+        {
+          ...raw,
+          declarations: (raw.declarations as Body[]).map((d) => (d.register === 'things' ? (({ delete: _rule, ...rest }) => rest)(d) : d)),
+        },
+        'portfolio',
+        (now) => now.filter((b) => b.key !== 'open-earns-said' && b.key !== 'earns-said'),
+        (d) => d.metric !== 'project-said',
+      ),
+  },
   /* A CARD NAMED ITS PROJECT, where it says its day and who holds it. A record without Projects had no third column. */
+  /* AND WORK 1.18.0'S COUNT OF WHAT WAS WORKED ON A PROJECT THIS WEEK comes off first. */
   work: {
     version: '1.16.0',
     released: 'b27c59050f32684d',
-    undo: (doc) => {
+    undo: (raw) => {
+      const doc = { ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.metric !== 'project-moved-7d' && d.metric !== 'project-last-worked') };
       const linked = (doc.declarations as Body[]).some((d) => d.register === 'tasks' && (d.fields as Body[]).some((f) => f.id === 'thing'));
       return withPage(doc, 'work-board', (now) =>
         now.map((b) => (b.kind === 'board' ? { ...b, columns: [{ field: 'state' }, { field: 'what' }, ...(linked ? [{ field: 'thing' }] : [])] } : b)),
@@ -558,7 +593,7 @@ const BEFORE: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '1.14.0',
     released: '51a2d8569a7b35e3',
     undo: (doc) =>
-      withPage(doc, 'portfolio', (now) => {
+      withPage(latestUndone('portfolio', doc), 'portfolio', (now) => {
         const out: Body[] = [];
         let open = false;
         for (const b of now) {
@@ -648,13 +683,22 @@ const DONE_BY_WEEK: Body = {
  * with no line asked for (`trend`).
  */
 const projectBefore = (doc: Body, id: string): Body =>
-  withPage(workingBefore(numbersBefore(doc, id), id), 'project', (now) =>
+  withPage(workingBefore(numbersBefore(standsBefore(doc), id), id), 'project', (now) =>
     now.flatMap((b) => {
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
       if (b.heading !== 'At a glance') return [b];
       const cells = (b.cells as Body[]).flatMap((c) => (c.metric !== 'project-done-7d:{{name}}' ? [c] : id === 'founder' ? [] : [(({ trend: _trend, ...cell }) => cell)(c)]));
       return [{ ...b, cells }];
     }),
+  );
+
+/**
+ * AND WHERE IT STANDS AS IT WAS BEFORE portfolio 1.16.0: the typed card on every project, said or not, and no figures
+ * under the same heading. Undone with the changes before it, so the version before is still the one released.
+ */
+const standsBefore = (doc: Body): Body =>
+  withPage(doc, 'project', (now) =>
+    now.flatMap((b) => (b.key === 'stands-figures' ? [] : b.heading === 'Where it stands' ? [(({ when: _when, ...card }) => card)(b)] : [b])),
   );
 
 /** The clause the Agents add-on wrote for a run at work until agents 1.9.0: active and heard from today. */
@@ -691,7 +735,8 @@ const numbersBefore = (doc: Body, id: string): Body =>
     ? doc
     : {
         ...doc,
-        declarations: (doc.declarations as Body[]).map((d) =>
+        ...(Array.isArray(doc.adds) ? { adds: (doc.adds as Body[]).filter((a) => (a.block as Body | undefined)?.key !== 'earning-silent') } : {}),
+        declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'project-numbers-7d' && d.metric !== 'projects-earning-silent').map((d) =>
           d.register === 'datapoints'
             ? { ...d, fields: (d.fields as Body[]).flatMap((f) => (f.id === 'amount' ? [] : f.id === 'value' ? [{ ...f, required: true }] : [f])) }
             : (dropAmount(d) as Body),
@@ -727,7 +772,7 @@ test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and go
     const next = value<Pack>(await normalise(now, { kind: 'local' }));
     const diff = await plan(next, stateOf(k, sql));
     assert.deepEqual(losses(diff), [], `${id}: nothing would be lost`);
-    assert.deepEqual([diff.adds.length, diff.retires.length, diff.conflicts.length], [0, 0, 0], `${id}: only a page changed`);
+    assert.deepEqual([diff.adds.length, diff.retires.length, diff.conflicts.length], [id === 'founder' ? 2 : 0, 0, 0], `${id}: only a page changed`);
     value(await install(next, diff, hostFor(k), diff.planHash));
     assert.equal(k.packs().find((p) => p.id === pack)?.version, u.version);
     const held = (k.declarations() as { id: string; body: unknown }[]).find((d) => d.id === 'page.project')!;
@@ -760,6 +805,7 @@ test('THE BOARD’S CARDS AND PEOPLE SHOWN ONCE GO IN ON THEIR OWN over the vers
   assert.deepEqual(
     steps.filter((s) => s.from !== s.to),
     [
+      { pack: 'portfolio', from: '1.15.0', to: FIRST_PARTY_VERSIONS.portfolio, did: 'updated' },
       { pack: 'people', from: '3.1.0', to: FIRST_PARTY_VERSIONS.people, did: 'updated' },
       { pack: 'money-core', from: '3.13.0', to: FIRST_PARTY_VERSIONS['money-core'], did: 'updated' },
       { pack: 'work', from: '1.16.0', to: FIRST_PARTY_VERSIONS.work, did: 'updated' },

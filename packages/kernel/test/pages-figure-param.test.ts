@@ -102,7 +102,7 @@ test('the split names the figure’s list, so a reader who may not open Costs is
 
 /* A PROJECT PAGE WRITTEN WITH THE PARAMETER, filled from each project's row. It installs once kernel declare.ts `SOURCE`
    reads `metric.<id>:<param>` (a line blocked to where-when-46's file); until then the install refuses the source. */
-test('a project page split by metric.project-cost:{{name}} draws each project’s own parts', { todo: 'declare.ts SOURCE accepts metric.<id>:<param>' }, async () => {
+test('a project page split by metric.project-cost:{{name}} draws each project’s own parts', async () => {
   const page: Declaration = {
     id: 'page.project',
     kind: 'page',

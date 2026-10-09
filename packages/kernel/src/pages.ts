@@ -27,6 +27,7 @@ import type { ActionRow } from './actions.ts';
 import { BLOCK_READS, FILTER_TYPES, blockKeyOf, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
 import { applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
 import { HANDOFFS_OPEN, builtInFigure, type OpenStep } from './built-in-figures.ts';
+import type { ActionBlocking } from './signs-actions.ts';
 import { KEEP, markDrawn, type Why } from './drawn.ts';
 import { kindModule } from './kinds/index.ts';
 import { fileLists } from './kinds/gallery.ts';
@@ -46,7 +47,7 @@ import { isQuiet, presenceOf, WORKING_MS } from './presence.ts';
 import { SESSION_PREFIX, agentOf } from './session.ts';
 import { quietSign, type SignState, type VitalSign } from './signs.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
-import { COSTS, type Cost } from './weigh.ts';
+import { COSTS, type Cost, type Wait } from './weigh.ts';
 import { MEASURES_MOST, MEASURE_BUCKETS, measureBucket, measureLines, measureSeries, measureWindow, readableZone, type MeasureLatest, type MeasureSeries, type RawReading } from './measures.ts';
 import { localDays } from './measures.ts';
 
@@ -504,6 +505,10 @@ export type QueueQuestion = {
    */
   body_kind?: string;
   does?: string;
+  /** The body of a `pack`, `settings` or `arrange` proposal, so a card says the arrangement in its own summary (web `card.ts` `arrangementOf`, REC-A07 step 3) without opening its page. */
+  arranged?: Record<string, unknown>;
+  /** How long it can wait (`weigh.ts` `WAIT_SQL`, AGT-C08): `soon`, `old` or `new`, read in the queue's own query. */
+  waits?: Wait;
   /**
    * On a question about who may be one person or organisation (`people.ts`'s cluster question): each name it is about,
    * by the handle beside it, with where they were seen and which is kept, so the queue draws the merge card itself.
@@ -715,6 +720,11 @@ export type PageDeps = {
    */
   handoffs?: (project: string | null) => readonly OpenStep[];
   /**
+   * One project's scheduled actions that are paused, stopped as failed, or late, each in one sentence (`signs-actions.ts`
+   * `actionsBlocking`, REC-C09): what is in the project's way besides its blockers. An `actions.blocking` block reads them.
+   */
+  blocking?: (project: string) => readonly ActionBlocking[];
+  /**
    * Who opened a key last and when: the newest `grant.read` event on the grant a key's row points at, or `null` when
    * nobody has. `runs_on` asks it with the grant's id and answers only who and when, never the grant.
    */
@@ -856,10 +866,13 @@ export type ListsBeside = {
   metrics?: () => readonly MetricDecl[];
 };
 
+/** The source a block names for one project's actions in its way (REC-C09). */
+export const ACTIONS_BLOCKING = 'actions.blocking';
+
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
 const COMPUTED = new Set([
   'forecast.runway', 'activity', 'sessions.live', 'sessions.working', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'runs_on',
-  'deadlines', 'figures.home', 'signs', HANDOFFS_OPEN,
+  'deadlines', 'figures.home', 'signs', HANDOFFS_OPEN, ACTIONS_BLOCKING,
 ]);
 
 /** The name `registersOf` gives a read across the whole record, which no register id can be. */
@@ -874,7 +887,7 @@ export const WHOLE_RECORD = '*';
  * may open every list that holds a deadline may be shown them all, and naming `*` would hold them back from anybody
  * whose access is the lists themselves rather than the whole record.
  */
-const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs']);
+const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', ACTIONS_BLOCKING, 'governance.open', 'governance.later', 'governance.decided', 'signs']);
 
 /**
  * The kinds that ADD THEIR ROWS UP, whose `limit:` cuts the GROUPS they draw and never the rows they read.
@@ -2148,6 +2161,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.source === 'actions') return actionsBlock(deps, block, base, also);
   if (block.source === 'signs') return signsBlock(deps, block, base, also);
   if (block.source === HANDOFFS_OPEN) return handoffsBlock(deps, block, base, also);
+  if (block.source === ACTIONS_BLOCKING) return blockingBlock(deps, block, base, also);
   if (block.source === 'governance.open') return openBlock(deps, block, base, also);
   if (block.source === 'governance.later') return laterBlock(deps, block, base, also);
   if (block.source === 'governance.decided') return decidedBlock(deps, block, base, also);
@@ -3316,7 +3330,8 @@ export const SEED_ACTOR = 'p_seed';
  */
 export function byOf(actor: string): FeedBy {
   if (/^S\d+$/.test(actor) || actor.startsWith('agent:') || actor === 'slash') return 'agent';
-  if (actor.startsWith('rule:') || actor.startsWith('ingest:') || actor === 'system' || actor === SEED_ACTOR) return 'rule';
+  /* A SCRIPT'S RUN (`script:<id>@v<n>`) is a mechanism's, as a rule's is, never the person's. */
+  if (actor.startsWith('rule:') || actor.startsWith('ingest:') || actor.startsWith('script:') || actor === 'system' || actor === SEED_ACTOR) return 'rule';
   return 'you';
 }
 
@@ -3976,6 +3991,62 @@ function handoffsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   const rows = kept.slice(0, limit);
   return { ...base, rows, matched: kept.length, types: typesOf(HANDOFFS), ...projectsOf(deps, rows) };
+}
+
+/* ── what is in a project's way ───────────────────────────────────────────── */
+
+/**
+ * What an `actions.blocking` block's `where` and columns may name: one action in a project's way. `name` is the action
+ * as a person reads it, `why` paused, failed or late, `since` when it last ran well, `status` the provider's last answer
+ * and `said` its one sentence.
+ */
+const BLOCKING: Schema = {
+  register: ACTIONS_BLOCKING,
+  fields: {
+    name: { type: 'text' },
+    why: { type: 'enum', values: ['paused', 'failed', 'late'] },
+    since: { type: 'instant' },
+    status: { type: 'int' },
+    said: { type: 'text' },
+  },
+};
+
+/**
+ * One project's scheduled actions that are paused, failing or late, in the order the record lists its actions: the
+ * project `about:` names by its row. THE SAME READ AS THE SIGN'S (`actionsBlocking`), so a project page never says an
+ * action is in its way that Health does not, nor leaves out one it does. `order:` is refused, as for the steps left.
+ */
+function blockingBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (!deps.blocking) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what is in a project\'s way onto a page yet.', at: 'source' }) };
+  if (block.order?.length)
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'actions.blocking comes in the order the record lists its actions, so it takes no order:.', at: 'order' }) };
+  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(BLOCKING.fields, f));
+  if (unknown.length)
+    return { ...base, refusals: also({ code: 'FIELD_UNKNOWN', fix: `An action in the way has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(BLOCKING.fields) }) };
+  /* THE PROJECT AS AN ACTION NAMES IT: its row (things#1), its row id, or the words its declaration holds. */
+  const about = typeof block.about === 'string' ? block.about.trim() : '';
+  if (about === '')
+    return { ...base, refusals: also({ code: 'VALUE_MALFORMED', fix: 'about: names the project, such as things#1: an action in the way is one project\'s.', at: 'about' }) };
+  const said = predicateOf(block.where, BLOCKING, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  const kept = deps
+    .blocking(about)
+    .map(
+      (a): Entry => ({
+        id: a.action,
+        register: ACTIONS_BLOCKING,
+        seq: null,
+        fields: { name: a.name, why: a.why, since: a.since, status: a.status, said: a.said },
+        state: a.why,
+        version: 1,
+        created_at: a.since ?? '',
+        updated_at: a.since ?? '',
+        deleted_at: null,
+      }),
+    )
+    .filter((r) => evaluate(said.predicate, r.fields, BLOCKING, r));
+  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
+  return { ...base, rows: kept.slice(0, limit), matched: kept.length, types: typesOf(BLOCKING) };
 }
 
 /* ── the runs working now ────────────────────────────────────────────────── */
@@ -4909,8 +4980,12 @@ function rowsValue(deps: PageDeps, decl: MetricDecl, part: RowPart, field?: stri
   const schema = deps.schemaOf(register);
   const title = deps.titleOf(register);
   if (!schema || !title) return undefined;
-  /* A FIELD OF THE FIRST ROW is one its list declares and a reader may be shown: never a document, a ref or a secret. */
-  if (field !== undefined && !(Object.hasOwn(schema.fields, field) && FIGURES.has(schema.fields[field]!.type))) return undefined;
+  /* A FIELD OF THE FIRST ROW is one its list declares and a reader may be shown: never a document or a secret. A REF
+     IS SAID BY THE NAME OF THE ENTRY IT POINTS AT (uc6-shop-49), so "Salma still owes EGP 1,350" names Salma, and only
+     to a reader of the list it points at. */
+  const spec = field === undefined ? undefined : schema.fields[field];
+  const isRef = spec?.type === 'ref' && typeof spec.to === 'string' && spec.to !== '';
+  if (field !== undefined && !(spec !== undefined && (FIGURES.has(spec.type) || isRef))) return undefined;
   const said = predicateOf(decl.where, schema, deps.ctx);
   if (said.bad.length) return undefined;
   const by = dayFieldOf(said.predicate, schema);
@@ -4928,7 +5003,16 @@ function rowsValue(deps: PageDeps, decl: MetricDecl, part: RowPart, field?: stri
   /* `first_<field>` IS THE SAME ROW AS `first`, so the name and the amount in "Salma still owes EGP 1,350" are one row's. */
   if (field !== undefined) {
     const row = lead ?? rows[0]!;
-    return Object.hasOwn(row.fields, field) ? figure(row.fields[field]) : undefined;
+    if (!Object.hasOwn(row.fields, field)) return undefined;
+    const value = row.fields[field];
+    if (!isRef) return figure(value);
+    const to = spec!.to!;
+    if (typeof value !== 'string' || (deps.ctx.reads !== undefined && !deps.ctx.reads(to))) return undefined;
+    const t = deps.titleOf(to);
+    if (!t) return undefined;
+    const hit = deps.list({ register: to, where: { field: 'id', is: value }, limit: 1 });
+    const name = hit.ok ? hit.value.rows[0]?.fields[t] : undefined;
+    return typeof name === 'string' && name.trim() !== '' ? name : undefined;
   }
   if (part === 'since') {
     const day = by === null ? undefined : (lead ?? rows[0]!).fields[by];

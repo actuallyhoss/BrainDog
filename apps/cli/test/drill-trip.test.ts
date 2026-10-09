@@ -160,7 +160,7 @@ test('A HEALTHY COPY GOES ROUND: the same bytes, the keys and the local tables l
   assertCountsOnly(trip);
 });
 
-test('THE WHOLE TRIP PASSES on a healthy copy', { todo: 'the kernel writes no import event yet (RQ-LCH-191); a blocked line names the change' }, async () => {
+test('THE WHOLE TRIP PASSES on a healthy copy', async () => {
   const trip = await roundTrip(copyOf('whole'), { main: MAIN });
   assert.ok(trip.pass, trip.steps.filter((s) => !s.pass).map((s) => `${s.name}: ${s.said}`).join('\n'));
 });

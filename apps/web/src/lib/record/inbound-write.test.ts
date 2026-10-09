@@ -114,7 +114,7 @@ test('A HOST WITH NO MINT DOOR SAYS SO, and does not read as a record that said 
      answered 404 would teach the reader that forwarding is broken rather than that it is spelled differently. */
   const { io } = host(() => json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
   assert.deepEqual(await mintInbound(BASE, io), { kind: 'unrouted' });
-  assert.match(words.unrouted, /inbound\.token/u, 'it does not say where the self-host keeps it');
+  assert.equal(words.tokenFile, 'inbound.token', 'it does not say where the self-host keeps it');
 });
 
 test('NO SIGN-IN IS signin, and a host that answered nothing a record says is a record not reached', async () => {

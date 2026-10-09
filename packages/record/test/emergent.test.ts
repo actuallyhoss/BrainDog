@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import type { Declaration } from '@braindog/kernel';
 
 import { createRecordApi, type Boot, type CallContext, type PenItem } from '../src/index.ts';
-import { PEN_DISMISSED_MOST, PEN_MOST } from '../src/emergent.ts';
+import { PEN_DISMISSED_MOST, PEN_MOST, PEN_SHOWN, penRanked } from '../src/emergent.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, installSeed } from '../../seed/src/index.ts';
 
@@ -207,7 +207,9 @@ test('OVER EVERY LIST THE SEED INSTALLS, each page offered passes the lint accep
     .map(([id]) => id);
   assert.ok(offered.length > 0, 'the seed filled no list');
 
-  const { pen } = await bootOf(api, owner);
+  /* BOOT SHOWS THE BEST `PEN_SHOWN`, AND THE RANKED PEN BEHIND IT HOLDS EVERY LIST, so the lint is asked of each. */
+  assert.equal((await bootOf(api, owner)).pen.length, Math.min(PEN_SHOWN, offered.length), 'boot showed more than the pen shows at once');
+  const pen = penRanked({ kernel: api.kernel, reads: () => true, pages: api.kernel.pages(), dismissed: new Set(), use: { sql, nowMs: NOW } });
   assert.equal(pen.length, Math.min(PEN_MOST, offered.length), 'a list the seed fills was not offered, or its page was refused by the lint');
   for (const item of pen) {
     assert.ok(offered.includes(item.register), `${item.register} was offered and holds nothing a page could draw`);
@@ -216,5 +218,55 @@ test('OVER EVERY LIST THE SEED INSTALLS, each page offered passes the lint accep
     for (const block of item.change.to.body.blocks as unknown as { columns?: { field: string }[] }[])
       for (const column of block.columns ?? []) assert.ok(!notDrawn.has(fields.get(column.field) ?? ''), `${item.id} draws ${column.field}`);
   }
+  sql.close();
+});
+
+const DAY = 86_400_000;
+const named = (id: string, name: string): Declaration => reg(id, name, 'name', [{ id: 'name', type: 'text', required: true }]);
+
+test('THE PEN SHOWS ITS BEST PEN_SHOWN: a list opened in the last seven days first, then the newest entry, the rest waiting', async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock });
+  const lists = [named('anvils', 'Anvils'), named('barrels', 'Barrels'), named('crates', 'Crates'), named('drums', 'Drums'), named('easels', 'Easels')];
+  value(await api.kernel.install(lists));
+  /* ANVILS HOLDS THE MOST AND IS THE OLDEST, Easels the fewest and the newest, so strength alone would say the opposite. */
+  for (const [at, [list, many]] of ([['anvils', 6], ['barrels', 5], ['crates', 1], ['drums', 1], ['easels', 1]] as const).entries()) {
+    clock.set(NOW - (5 - at) * DAY);
+    for (let i = 0; i < many; i++) value(api.kernel.create(list, { name: `${list} ${i + 1}` }, { actor: 'p_1' }));
+  }
+  /* BARRELS WAS OPENED TEN DAYS AGO, which is not lately. */
+  clock.set(NOW - 10 * DAY);
+  value(api.kernel.observe([{ kind: 'register.read', subject: 'barrels' }]));
+  clock.set(NOW);
+  const deps = () => ({ kernel: api.kernel, reads: () => true, pages: api.kernel.pages(), dismissed: new Set<string>(), use: { sql, nowMs: NOW } });
+
+  assert.deepEqual((await bootOf(api, owner)).pen.map((i) => i.id), ['page:easels', 'page:drums', 'page:crates'], 'the newest entries were not shown first');
+  assert.equal((await bootOf(api, owner)).pen.length, PEN_SHOWN);
+  assert.deepEqual(penRanked(deps()).map((i) => i.id), ['page:easels', 'page:drums', 'page:crates', 'page:barrels', 'page:anvils'], 'the offers past the shown ones were dropped, not kept waiting');
+
+  /* OPENED TODAY, Anvils goes first, though it is the oldest. */
+  value(api.kernel.observe([{ kind: 'register.read', subject: 'anvils' }]));
+  assert.deepEqual((await bootOf(api, owner)).pen.map((i) => i.id), ['page:anvils', 'page:easels', 'page:drums']);
+
+  /* KEPT OR DISMISSED, THE NEXT TAKES ITS TURN. */
+  value(await api.setPref({ key: 'pen.dismissed', value: ['page:anvils'] }, owner));
+  assert.deepEqual((await bootOf(api, owner)).pen.map((i) => i.id), ['page:easels', 'page:drums', 'page:crates']);
+  sql.close();
+});
+
+test('ONE OFFER A LIST: a list two pages draw without a calendar is offered one calendar, never one on each page', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const table = { kind: 'table', source: 'register.parts', columns: [{ field: 'name', label: 'Name' }], empty: 'No parts yet.' };
+  const pageOf = (slug: string, title: string): Declaration => ({ id: `page.${slug}`, kind: 'page', body: { page: slug, title, blocks: [table] } }) as never;
+  value(await api.kernel.install([PARTS, pageOf('stores', 'Stores'), pageOf('workshop', 'Workshop')]));
+  for (const [i, name] of ['Bolt', 'Nut', 'Washer'].entries()) value(api.kernel.create('parts', { name, bought: `2026-09-0${i + 1}` }, { actor: 'p_1' }));
+
+  const pen = penRanked({ kernel: api.kernel, reads: () => true, pages: api.kernel.pages(), dismissed: new Set(), use: { sql, nowMs: NOW } });
+  const forParts = pen.filter((i) => i.register === 'parts');
+  assert.equal(forParts.length, 1, `Parts was offered twice: ${JSON.stringify(pen.map((i) => i.id))}`);
+  assert.equal(forParts[0]!.id, 'block:stores:calendar:parts', 'the first page in the record was not the one offered the calendar');
+  assert.equal(forParts[0]!.why, 'Parts puts a day on its entries in Bought, and Stores has no calendar of them.');
   sql.close();
 });

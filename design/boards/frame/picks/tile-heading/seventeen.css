@@ -1,0 +1,7 @@
+/* A tile's heading at 17, semibold, the group size: the app's heading row (`BlockSlot.svelte`, whose own rule this
+   outranks) and the renderer's. */
+header.block-bar > .block-name,
+.block-head {
+  font-size: var(--t-group);
+  font-weight: 600;
+}

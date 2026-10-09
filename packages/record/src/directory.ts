@@ -916,6 +916,39 @@ export type InviteAnswers = {
 
 type InviteStored = { code_hash: string; note: string; made_at: number; ends_at: number | null; spent_at: number | null; held_until: number | null; made: string | null };
 
+/**
+ * The host's last restore drill (LCH-C04): when it ran, whether it passed, and its counts. COUNTS ONLY, never a name,
+ * an address or a record's id, because every record's Backups area reads it as "This host's last restore test".
+ *
+ * A FACT ABOUT THE HOST, NOT ABOUT ONE RECORD (the scope's critic): only the operator holds the key that opens a copy,
+ * so the Directory keeps the last drill and no record keeps its own. ONE ROW OF `dir_meta`, key `drill`, so no table
+ * and no migration; the Directory's copy carries it, and a restore of an older copy brings back that copy's drill,
+ * which was true of it.
+ */
+export type HostDrill = { at: string; pass: boolean; copies: number; rows: number; lists: number; people: number; records: number | null };
+
+/** The drill's two asks, as one RPC: `put` keeps the newest (the Worker's operator door), `read` answers it or `null`. */
+export type DrillCall = { op: 'put'; drill: HostDrill } | { op: 'read' };
+
+const drillCount = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+
+/** A stored drill read back, or `null` for none or for one this build cannot read: an old shape is no drill, never a throw. */
+function drillOf(text: string | undefined): HostDrill | null {
+  if (text === undefined) return null;
+  let v: unknown;
+  try {
+    v = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof v !== 'object' || v === null) return null;
+  const d = v as Record<string, unknown>;
+  if (typeof d['at'] !== 'string' || typeof d['pass'] !== 'boolean') return null;
+  if (![d['copies'], d['rows'], d['lists'], d['people']].every(drillCount)) return null;
+  if (d['records'] !== null && !drillCount(d['records'])) return null;
+  return { at: d['at'], pass: d['pass'], copies: d['copies'] as number, rows: d['rows'] as number, lists: d['lists'] as number, people: d['people'] as number, records: d['records'] as number | null };
+}
+
 const INVITE_COLUMNS = `i.code_hash AS code_hash, i.note AS note, i.made_at AS made_at, i.ends_at AS ends_at, i.spent_at AS spent_at,
   i.held_until AS held_until, (SELECT p.email FROM dir_person p WHERE p.id = i.person) AS made`;
 
@@ -2320,6 +2353,19 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
         for (const hash of hashes) sql.exec('INSERT INTO dir_invite (code_hash, note, made_at, ends_at) VALUES (?, ?, ?, ?)', hash, note, now, ends_at);
       });
       return ok({ codes, ends_at }) as InviteAnswers[C['flow']];
+    },
+
+    /**
+     * The host's last restore drill (`HostDrill`): `put` by the Worker's operator door only, after it has read the body
+     * (`drill-door.ts`), and `read` for every signed-in person's Backups area. The newest put wins: the host keeps
+     * the last drill, not one per record and not a history.
+     */
+    drill: {
+      put: (d: HostDrill): void => {
+        const kept: HostDrill = { at: d.at, pass: d.pass, copies: d.copies, rows: d.rows, lists: d.lists, people: d.people, records: d.records };
+        sql.exec("INSERT INTO dir_meta (key, value) VALUES ('drill', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", JSON.stringify(kept));
+      },
+      read: (): HostDrill | null => drillOf(sql.one<{ value: string }>("SELECT value FROM dir_meta WHERE key = 'drill'")?.value),
     },
   };
 }

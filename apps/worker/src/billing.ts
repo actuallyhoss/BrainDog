@@ -190,15 +190,35 @@ async function priceRefused(stripe: Stripe, plan: HostedPlan, price: string): Pr
   const amount = got.body['unit_amount'];
   const currency = typeof got.body['currency'] === 'string' ? got.body['currency'].toUpperCase() : '';
   const cents = PLAN_TABLE[HOSTED_PLANS[plan].directory].cents.month;
-  if (currency === CURRENCY && amount === cents) return null;
+  /* AND HOW OFTEN, AND WHETHER IT IS SOLD AT ALL (audit 43-44 #6): the same amount once a year, every three months or
+     once is not the monthly figure every screen shows, and an archived price makes a session Stripe will not charge. */
+  const recurring = got.body['recurring'];
+  const every = typeof recurring === 'object' && recurring !== null ? (recurring as Record<string, unknown>) : null;
+  const interval = typeof every?.['interval'] === 'string' ? every['interval'] : null;
+  const count = every?.['interval_count'];
+  const monthly = interval === 'month' && count === 1;
+  const active = got.body['active'] === true;
+  if (currency === CURRENCY && amount === cents && monthly && active) return null;
   op({ op: 'billing', door: 'checkout', ok: false, why: 'price_differs' }, 'error');
+  const figure = typeof amount === 'number' && Number.isSafeInteger(amount) && amount >= 0 ? centsAsPrice(amount) : null;
+  /* AN ARCHIVED PRICE IS ITS OWN SENTENCE: "until the two agree" is wrong of one whose figure may already agree. */
+  if (currency === CURRENCY && figure !== null && !active)
+    return no('NOT_IN_THIS_BUILD', `${name} is ${planPrice(plan)} here and Stripe's price for it, ${figure} ${howOften(interval, count)}, is archived, so no payment page opens until it is on sale again.`, { at: 'plan' });
   const charged =
     currency !== CURRENCY
       ? `Stripe's price for it is in ${currency === '' ? 'no currency' : currency}`
-      : typeof amount === 'number' && Number.isSafeInteger(amount) && amount >= 0
-        ? `Stripe charges ${centsAsPrice(amount)} a month`
-        : "Stripe's price for it has no one amount";
+      : figure === null
+        ? "Stripe's price for it has no one amount"
+        : `Stripe charges ${figure} ${howOften(interval, count)}`;
   return no('NOT_IN_THIS_BUILD', `${name} is ${planPrice(plan)} here and ${charged}, so no payment page opens until the two agree.`, { at: 'plan' });
+}
+
+/** How often a Stripe price charges, in words: `a month`, `every 3 months`, `every year`, or `once` where it does not recur. */
+function howOften(interval: string | null, count: unknown): string {
+  if (interval === null) return 'once';
+  const n = typeof count === 'number' && Number.isSafeInteger(count) && count > 0 ? count : 1;
+  if (n === 1) return interval === 'month' ? 'a month' : `every ${interval.slice(0, 12)}`;
+  return `every ${String(n)} ${interval.slice(0, 12)}s`;
 }
 
 /** The plan a body asked to pay for: `cloud` when it named none. Free is never paid for, so it is refused here by name. */

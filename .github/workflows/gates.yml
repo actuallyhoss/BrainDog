@@ -81,6 +81,8 @@ on:
       - 'tools/gates/layout.mjs'
       - 'tools/gates/a11y.mjs'
       - 'tools/gates/lib.mjs'
+      # What a screen may not print (`layout` reads each screen through it).
+      - 'tools/gates/printed.mjs'
       # The record the gates draw can be built from a real record's shape (`lived.mjs`, PRF-A07), and the self-host the
       # gates start reads the command line's surface.
       - 'tools/gates/lived.mjs'

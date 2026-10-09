@@ -1,0 +1,71 @@
+page: board_specimen
+title: Specimen
+icon: home
+requires: [register.session]
+
+blocks:
+  - kind: note
+    span: 12
+    body: "{{questions-open}} question(s) are waiting on you, and {{signs-red}} vital sign(s) read late"
+    lead: true
+  - kind: stat
+    heading: Questions
+    span: 3
+    cells: [questions-open]
+    icon: ask
+  - kind: stat
+    heading: Next steps
+    span: 3
+    cells: [handoffs-open]
+    icon: session
+  - kind: stat
+    heading: Working now
+    span: 3
+    cells: [runs-working]
+    icon: agent
+  - kind: stat
+    heading: Vital signs
+    span: 3
+    cells: [signs-red]
+    icon: pulse
+  - kind: stat
+    heading: What you have
+    span: 8
+    source: figures.home
+    icon: wallet
+    lead: true
+  - kind: queue
+    heading: Needs your call
+    span: 4
+    source: governance.open
+    limit: 1
+    empty: Nothing needs your call.
+    icon: ask
+    lead: true
+  - kind: bar
+    heading: Every month, by category
+    span: 6
+    source: metric.every-month-by-category
+    empty: Nothing goes out every month yet.
+    icon: chart
+  - kind: table
+    heading: Every month
+    span: 6
+    source: register.recurring
+    columns: [name, category, amount]
+    limit: 6
+    empty: Nothing goes out every month yet.
+    icon: calendar-clock
+  - kind: feed
+    heading: What changed
+    span: 4
+    source: activity
+    empty: Nothing has changed yet.
+    first: 4
+    icon: history
+  - kind: capture
+    heading: Add a task
+    span: 8
+    register: register.tasks
+    empty: There is no list of tasks yet.
+    icon: list

@@ -1,0 +1,8 @@
+{
+  "gate": "hygiene",
+  "rule": "a *.local.json file",
+  "expect": "a local file",
+  "findings": 1,
+  "total": 1,
+  "why": "THE PRIVATE WORD LIST ITSELF, tracked: the one file whose whole point is that the repository never holds it."
+}

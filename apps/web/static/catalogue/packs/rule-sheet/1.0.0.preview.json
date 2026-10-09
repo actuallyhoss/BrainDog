@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "made_at": "2026-10-09T01:51:31.441Z",
+  "made_at": "2026-10-09T16:22:30.780Z",
   "pages": [
     {
       "blocks": [
         {
-          "body": "Each line below names one rule of a value written in text, then shows the value itself, so a reader can check the two agree.\n\n## Values read from the record\n\nA figure by its name: {{open-tasks}} tasks are open.\n\nHow far that figure moved: {{open-tasks.change}}.\n\nThe first task that figure counts: {{open-tasks.first}}.\n\nHow many tasks the record holds, a count and never the tasks themselves: {{tasks.count}}. How many of them are open: {{tasks.open}}.\n\nA field of one task, named by its list and number: {{tasks#1.what}}.\n\nA long field is never pulled into text, so the notes of that task show a dash: {{tasks#1.note}}.\n\nA name that points at nothing is shown as written, marked: {{no-such-figure}}.\n\nA value inside backticks is left exactly as typed: `{{open-tasks}}`.\n\n## Typed values\n\nA day ahead, with how far off it is: {{date:2030-12-24}}.\n\nA day behind, with no link: {{day:2020-04-10}}.\n\nThe time left to a day: {{until:2030-01-01}}. The time left to the first task's due day: {{until:tasks#1.by}}.\n\nThe time since a day: {{ago:2020-01-01}}.\n\nMoney in minor units with its currency: {{money:129900 EGP}}. Money below nought: {{money:-4200 GBP}}.\n\nA currency with four decimals: {{money:1000000 CLF}} and {{money:123456 UYW}}.\n\nA number with its unit: {{quantity:1.4 m}}. A quantity below nought: {{quantity:-2.5 kg}}. A whole number below nought: {{quantity:-1299}}.\n\nA percentage: {{pct:-46.3}}. A percentage written loosely stays as typed, marked: {{pct:12 %}}.\n\nA task named by reference: {{ref:tasks#1}}.\n\nA typed value that does not parse stays as typed, marked: {{money:12.50 GBP}} and {{date:2026-13-45}}.\n\n## Icons and evidence\n\nAn icon set inside a sentence: {{icon:rocket}} launched.\n\nChecked once against a source: {verified} and {verified: the bank statement}.\n\nWorked out from other facts: {inferred} and {inferred: two invoices}.\n\nA careful guess: {estimate} and {estimate: last quarter's pace}.\n\nNot known yet, something to find out: {unknown} and {unknown: nobody has asked}.",
+          "body": "Each line below names one rule of a value written in text, then shows the value itself, so a reader can check the two agree.\n\n## Values read from the record\n\nA figure by its name: {{open-tasks}} tasks are open.\n\nHow far that figure moved: {{open-tasks.change}}.\n\nThe first task that figure counts: {{open-tasks.first}}.\n\nHow many tasks the record holds, a count and never the tasks themselves: {{tasks.count}}. How many of them are open: {{tasks.open}}.\n\nA field of one task, named by its list and number: {{tasks#1.what}}.\n\nA long field is never pulled into text, so the notes of that task show a dash: {{tasks#1.note}}.\n\nA name that points at nothing is shown as written, marked: {{no-such-figure}}.\n\nA value inside backticks is left exactly as typed: `{{open-tasks}}`.\n\n## Typed values\n\nA day ahead, with how far off it is: {{date:2030-12-24}}.\n\nA day behind, with no link: {{day:2020-04-10}}.\n\nThe time left to a day: {{until:2030-01-01}}. The time left to the first task's due day: {{until:tasks#1.by}}.\n\nThe time since a day: {{ago:2020-01-01}}.\n\nMoney in minor units with its currency: {{money:129900 EGP}}. Money below nought: {{money:-4200 GBP}}.\n\nA currency with four decimals: {{money:1000000 CLF}} and {{money:123456 UYW}}.\n\nAn amount longer than sixteen digits keeps every digit: {{money:900719925474099312 JPY}}.\n\nA number with its unit: {{quantity:1.4 m}}. A quantity below nought: {{quantity:-2.5 kg}}. A whole number below nought: {{quantity:-1299}}.\n\nA percentage: {{pct:-46.3}}. A percentage written loosely stays as typed, marked: {{pct:12 %}}.\n\nA task named by reference: {{ref:tasks#1}}.\n\nA typed value that does not parse stays as typed, marked: {{money:12.50 GBP}} and {{date:2026-13-45}}.\n\n## Icons and evidence\n\nAn icon set inside a sentence: {{icon:rocket}} launched.\n\nChecked once against a source: {verified} and {verified: the bank statement}.\n\nWorked out from other facts: {inferred} and {inferred: two invoices}.\n\nA careful guess: {estimate} and {estimate: last quarter's pace}.\n\nNot known yet, something to find out: {unknown} and {unknown: nobody has asked}.",
           "document": true,
           "heading": "Values in text",
           "kind": "note",
@@ -38,7 +38,8 @@
         "register.tasks"
       ],
       "title": "Values",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-values",
         "basis": "r0wh6eni",
@@ -82,7 +83,7 @@
           "key": "k1y3bmeh",
           "rows": [
             {
-              "id": "01M4F5QFKH0VQFKH0HA6EDD0Y7",
+              "id": "01M4GQJA3W7TN8DE580XEGW241",
               "register": "tasks",
               "seq": 1,
               "fields": {
@@ -98,8 +99,8 @@
               },
               "state": "review",
               "version": 1,
-              "created_at": "2026-10-09T01:51:31.441Z",
-              "updated_at": "2026-10-09T01:51:31.441Z",
+              "created_at": "2026-10-09T16:22:30.780Z",
+              "updated_at": "2026-10-09T16:22:30.780Z",
               "deleted_at": null
             }
           ],
@@ -158,7 +159,8 @@
         "register.tasks"
       ],
       "title": "Blocks",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-blocks",
         "basis": "r0v52hdx",
@@ -194,8 +196,8 @@
               },
               "state": null,
               "version": 0,
-              "created_at": "2026-10-09T01:51:31.441Z",
-              "updated_at": "2026-10-09T01:51:31.441Z",
+              "created_at": "2026-10-09T16:22:30.780Z",
+              "updated_at": "2026-10-09T16:22:30.780Z",
               "deleted_at": null
             }
           ],
@@ -235,8 +237,8 @@
               },
               "state": null,
               "version": 0,
-              "created_at": "2026-10-09T01:51:31.441Z",
-              "updated_at": "2026-10-09T01:51:31.441Z",
+              "created_at": "2026-10-09T16:22:30.780Z",
+              "updated_at": "2026-10-09T16:22:30.780Z",
               "deleted_at": null
             }
           ],
@@ -286,7 +288,8 @@
         "register.tasks"
       ],
       "title": "Counts",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-counts",
         "basis": "r0rau2nj",
@@ -336,7 +339,7 @@
           "key": "k0a3jefh",
           "rows": [
             {
-              "id": "01M4F5QFKH0VQFKH0HA6EDD0Y7",
+              "id": "01M4GQJA3W7TN8DE580XEGW241",
               "register": "tasks",
               "seq": 1,
               "fields": {
@@ -352,8 +355,8 @@
               },
               "state": "review",
               "version": 1,
-              "created_at": "2026-10-09T01:51:31.441Z",
-              "updated_at": "2026-10-09T01:51:31.441Z",
+              "created_at": "2026-10-09T16:22:30.780Z",
+              "updated_at": "2026-10-09T16:22:30.780Z",
               "deleted_at": null
             }
           ],
@@ -381,8 +384,8 @@
               },
               "state": null,
               "version": 0,
-              "created_at": "2026-10-09T01:51:31.441Z",
-              "updated_at": "2026-10-09T01:51:31.441Z",
+              "created_at": "2026-10-09T16:22:30.780Z",
+              "updated_at": "2026-10-09T16:22:30.780Z",
               "deleted_at": null
             }
           ],
@@ -535,7 +538,8 @@
         "register.tasks"
       ],
       "title": "Layout",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-layout",
         "basis": "r1q4hhcp",
@@ -571,7 +575,8 @@
       },
       "page": "rule-sheet-tab-5",
       "title": "Tab 5",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-tab-5",
         "basis": "r0wh6eni",
@@ -599,7 +604,8 @@
       },
       "page": "rule-sheet-tab-6",
       "title": "Tab 6",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-tab-6",
         "basis": "r0wh6eni",
@@ -627,7 +633,8 @@
       },
       "page": "rule-sheet-tab-7",
       "title": "Tab 7",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-tab-7",
         "basis": "r0wh6eni",
@@ -655,7 +662,8 @@
       },
       "page": "rule-sheet-tab-8",
       "title": "Tab 8",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-tab-8",
         "basis": "r0wh6eni",
@@ -683,7 +691,8 @@
       },
       "page": "rule-sheet-tab-9",
       "title": "Tab 9",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-tab-9",
         "basis": "r0wh6eni",
@@ -711,7 +720,8 @@
       },
       "page": "rule-sheet-tab-10",
       "title": "Tab 10",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-tab-10",
         "basis": "r0wh6eni",
@@ -739,7 +749,8 @@
       },
       "page": "rule-sheet-tab-11",
       "title": "Tab 11",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-tab-11",
         "basis": "r0wh6eni",
@@ -767,7 +778,8 @@
       },
       "page": "rule-sheet-tab-12",
       "title": "Tab 12",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-tab-12",
         "basis": "r0wh6eni",
@@ -795,7 +807,8 @@
       },
       "page": "rule-sheet-tab-13",
       "title": "Tab 13",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-tab-13",
         "basis": "r0wh6eni",
@@ -823,7 +836,8 @@
       },
       "page": "rule-sheet-tab-14",
       "title": "Tab 14",
-      "read_at": "2026-10-09T01:51:31.441Z",
+      "read_at": "2026-10-09T16:22:30.780Z",
+      "zone": "UTC",
       "look": {
         "look": "rule-sheet-tab-14",
         "basis": "r0wh6eni",

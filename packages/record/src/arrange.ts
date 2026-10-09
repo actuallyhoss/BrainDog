@@ -23,6 +23,8 @@ import { conflictFault, installFault, installOrder, labelsOf, laterVersion, pack
 import { KEYS_REACH_ALL, approvalLines, configReads, configValue, egressChanged, egressOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
 import { normaliseChecked } from './theme-check.ts';
+import { retireMarks, takersFor } from './arrange-retires.ts';
+import { notesKept, type KeptRow } from './arrange-keeps.ts';
 
 /**
  * The record `plannedState` leaves, as `kernel.lint` reads one: each body parsed, and the pack that put it there.
@@ -81,7 +83,7 @@ export type CatalogueEntry = {
    */
   carry?: (io: CarryIo, from: string) => Promise<number>;
   /** The skills a use case names for agents working in it, which Slash offers once it is on. */
-  skills?: readonly { name: string; trigger: string }[] | undefined;
+  skills?: readonly { name: string; trigger: string; what?: string; body?: string; rev?: number; was?: readonly string[] }[] | undefined;
   /**
    * WHAT A USE CASE GROWS INTO, and when: once every figure test holds, Slash asks on Decide to install these packs beside it
    * (`slash.ts` `growsDrafts`). A guide whose idea stage is over grows into Projects and Work. Nothing is taken away.
@@ -646,6 +648,10 @@ export function arranger(d: ArrangeDeps) {
 
   /** Each pack planned in order, each against the record as the ones before it would leave it. Nothing is written. */
   async function planAll(asked: readonly string[], docs: ReadonlyMap<string, Body>, given: ReadonlyMap<string, Body> = new Map()): Promise<Result<Planned>> {
+    /* THE LIVE DOORS AN UPDATE WOULD RETIRE, and the add-ons that take one over, joined as their own steps (retires-48). */
+    const takers = await takersFor(d, asked, docs);
+    asked = [...asked, ...takers.adds];
+    docs = new Map([...docs, ...takers.docs]);
     const base = d.installed();
     /* IN THE ORDER THAT INSTALLS, and not the order asked. The owner can only accept an arrangement, and `base` 2.0.0
        named before the `leaf` 1.1.0 that takes it was filed and refused `PACK_REQUIRED` at the accept, telling him to
@@ -664,7 +670,7 @@ export function arranger(d: ArrangeDeps) {
       if (!read.ok) return read;
       const pack = read.value;
       /* THE SETTINGS SENT FOR IT FILL THE INSTALL, so what reads them is planned, approved and written with them. */
-      const diff = await plan(pack, state, { settings: given.get(id) });
+      const diff = await plan(pack, state, { settings: given.get(id), live: takers.live });
       const unheld = unresolvedFault(diff);
       if (unheld) return { ok: false, refusal: unheld };
       const clash = diff.conflicts[0];
@@ -714,7 +720,7 @@ export function arranger(d: ArrangeDeps) {
           : {
               retires: diff.retires.map((x) => {
                 const to = x.to === undefined ? undefined : (entryOf(x.to)?.title ?? shelfTitles.get(x.to));
-                return { id: x.id, rows: x.rows, ...(x.to === undefined ? {} : { to: x.to }), ...(to === undefined ? {} : { to_name: to }) };
+                return { id: x.id, rows: x.rows, ...(x.to === undefined ? {} : { to: x.to }), ...(to === undefined ? {} : { to_name: to }), ...retireMarks(x, takers) };
               }),
             }),
         /* WHAT IT LEAVES AS THE OWNER CHANGED IT, so Decide says the update's version of it is not taken. */
@@ -1216,7 +1222,7 @@ export function arranger(d: ArrangeDeps) {
 
     const rows: Body[] = [];
     if (body.rows !== undefined) {
-      const checked = rowsOf(body.rows);
+      const checked = rowsOf(body.rows, planned.value.state);
       if (!checked.ok) return checked;
       rows.push(...checked.value);
     }
@@ -1233,6 +1239,17 @@ export function arranger(d: ArrangeDeps) {
     /* WHAT IT NEEDS IS THE RECORD'S TO SAY, from what it calls out, with the parts that need each; a `needs` the proposer
        sent is not read. */
     const needs = needsByPart(approve, lines);
+    /* A NOTE REWRITTEN MAY NOT LOSE ITS WORDS (skills-49, `arrange-keeps.ts`): what it lifted out has to land somewhere in
+       the same arrangement, a field the patch writes or a new entry that points at it. `rows[i]` is `body.rows[i]`. */
+    const typesOf = (register: string) => new Map((listShape(register, planned.value.state)?.fields ?? []).map((f) => [f.id, f.type]));
+    const lost = notesKept(
+      rows as KeptRow[],
+      typesOf,
+      (r, at) =>
+        Object.entries(r.fields ?? {}).some(([id, v]) => typesOf(r.register).get(id) === 'ref' && typeof v === 'string' && kernel.get(v)?.id === kernel.get(at)?.id),
+      (r) => entryWords(r.register, r.before ?? {}),
+    );
+    if (lost) return refuse('VALUE_MALFORMED', lost.fix, `body.rows[${lost.at}]`);
     const parts = partsOf({ planned: planned.value, sent: sh.sent, enable, disable, settings, pages, rows, choices: choices.value, names, declarations: declared.value.filed });
     return ok({
       ...(typeof body.usecase === 'string' ? { usecase: body.usecase } : {}),
@@ -1335,7 +1352,29 @@ export function arranger(d: ArrangeDeps) {
    * `checkUpdates`), and filed with `before`, the entry's fields now, so Decide says what it changes from. A version gone
    * stale refuses the whole question, naming the entry by its title.
    */
-  function rowsOf(raw: unknown): Result<Body[]> {
+  /**
+   * A list as it will stand once this arrangement's add-ons are in (skills-49): its planned declaration where the plan
+   * changes or brings it, else the live one, so an arrangement that installs Project brief may also fill the fields it
+   * lays on Projects. A list neither holds is `null`.
+   */
+  type ListShape = { name: string; title: string; fields: readonly { id: string; type: string; to?: string | undefined }[] };
+  const listShape = (id: string, state?: Installed): ListShape | null => {
+    const live = kernel.register(id);
+    const row = state?.declarations.find((d) => d.id === `register.${id}`);
+    if (!row) return live ? { name: live.name, title: live.title, fields: live.fields } : null;
+    try {
+      const b = JSON.parse(row.body) as { name?: unknown; title?: unknown; fields?: unknown };
+      return {
+        name: typeof b.name === 'string' ? b.name : (live?.name ?? id),
+        title: typeof b.title === 'string' ? b.title : (live?.title ?? ''),
+        fields: Array.isArray(b.fields) ? (b.fields as ListShape['fields']).filter((f) => f !== null && typeof f === 'object' && typeof f.id === 'string') : (live?.fields ?? []),
+      };
+    } catch {
+      return live ? { name: live.name, title: live.title, fields: live.fields } : null;
+    }
+  };
+
+  function rowsOf(raw: unknown, state?: Installed): Result<Body[]> {
     if (!Array.isArray(raw))
       return refuse('VALUE_MALFORMED', 'rows is a list, each {"register":"<id>","fields":{...}} to add, or {"register":"<id>","at":"<id>","version":<n>,"patch":{...}} to change one.', 'body.rows');
     const out: Body[] = [];
@@ -1343,13 +1382,13 @@ export function arranger(d: ArrangeDeps) {
     for (const [i, r] of raw.entries()) {
       const at = `body.rows[${i}]`;
       if (isMap(r) && typeof r.register === 'string' && ('at' in r || 'patch' in r)) {
-        const one = patchOf(r, at, named);
+        const one = patchOf(r, at, named, state);
         if (!one.ok) return one;
         out.push(one.value);
         continue;
       }
       if (!isMap(r) || typeof r.register !== 'string' || !isMap(r.fields)) return refuse('VALUE_MALFORMED', 'A row is {"register":"<id>","fields":{...}}.', at);
-      const decl = kernel.register(r.register);
+      const decl = listShape(r.register, state);
       if (!decl) return refuse('REGISTER_UNKNOWN', `There is no list called ${r.register} here.`, `${at}.register`);
       const fields = new Map(decl.fields.map((f) => [f.id, f]));
       for (const id of Object.keys(r.fields))
@@ -1380,9 +1419,9 @@ export function arranger(d: ArrangeDeps) {
     refuse('VERSION_STALE', `${words[0]!.toUpperCase()}${words.slice(1)} changed after this was read, so none of it is taken. Read it again and propose with what it says now.`, at);
 
   /** One patch row, checked as a rowset's update is, with the entry's fields now as `before`. */
-  function patchOf(r: Body, at: string, named: Set<string>): Result<Body> {
+  function patchOf(r: Body, at: string, named: Set<string>, state?: Installed): Result<Body> {
     const register = String(r.register);
-    const decl = kernel.register(register);
+    const decl = listShape(register, state);
     if (!decl) return refuse('REGISTER_UNKNOWN', `There is no list called ${register} here.`, `${at}.register`);
     const extra = Object.keys(r).find((key) => !['register', 'at', 'version', 'patch', 'before'].includes(key));
     if (extra !== undefined) return refuse('FIELD_UNKNOWN', 'A change to an entry carries register, at, version and patch, and nothing beside them.', `${at}.${extra}`);

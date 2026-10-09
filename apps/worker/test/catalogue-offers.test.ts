@@ -87,5 +87,6 @@ test('only the two catalogue shapes are read from the assets, and the shell is n
 
 test('the record on the Worker is handed the offers, from its assets binding', () => {
   const source = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
-  assert.match(source, /catalogueOffers: workerCatalogueOffers\(this\.env\.ASSETS\)/u);
+  assert.match(source, /catalogueOffers: workerCatalogueOffers\(this\.env\.ASSETS, this\.env\.BLOBS\)/u);
+  assert.match(source, /catalogueShelf: workerCatalogueShelf\(this\.env\.ASSETS, this\.env\.BLOBS\)/u);
 });

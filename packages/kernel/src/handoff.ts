@@ -85,6 +85,28 @@ function placeSql(t: string, place: HandoffPlace): { where: string; params: stri
 }
 
 /**
+ * Whether a run stands in a place, by the rule `placeSql` holds it to in SQL: the project when the place names one, or
+ * with none on the run the repository. A caller who is nowhere holds no run. `take` and `drop` ask it through `may`, so
+ * a key placed in one project cannot close another project's step.
+ */
+export function inPlace(place: HandoffPlace, run: { fields: Record<string, Json> }): boolean {
+  const project = text(place.project);
+  const repo = text(place.repo);
+  const p = run.fields.project;
+  const r = run.fields.repo;
+  /* No project as `coalesce(p, '') = ''` reads it: absent, null or empty, never some other value that is not text. */
+  if (project && repo) return p === project || ((p === undefined || p === null || p === '') && r === repo);
+  if (project) return p === project;
+  if (repo) return r === repo;
+  return false;
+}
+
+/** The place a run stands in, read from its own fields, for a taker's `may`: `(run) => inPlace(runPlace(taker), run)`. */
+export function runPlace(run: { fields: Record<string, Json> }): HandoffPlace {
+  return { project: text(run.fields.project), repo: text(run.fields.repo) };
+}
+
+/**
  * When a step was left, on one alias: `next_at`, else (a run from before that field) when it was last heard from, else
  * its last change.
  */
@@ -103,8 +125,8 @@ export function openHandoffs(sql: Sql, place: HandoffPlace, self: string | null,
   const h = placeSql('h', place);
   const l = placeSql('l', place);
   if (!h || !l) return [];
-  const rows = sql.all<{ id: string; seq: number | null; fields: string; left_at: string; passed: number }>(
-    `SELECT h.id, h.seq, h.fields, ${leftAt('h')} AS left_at,
+  const rows = sql.all<{ id: string; seq: number | null; fields: string; left_at: string; updated_at: string; passed: number }>(
+    `SELECT h.id, h.seq, h.fields, ${leftAt('h')} AS left_at, h.updated_at,
        EXISTS (SELECT 1 FROM entry l WHERE l.register = ? AND l.deleted_at IS NULL AND l.id <> h.id
          AND l.state IN ('done', 'handoff', 'abandoned')
          AND coalesce(json_extract(l.fields, '$.parent'), '') = ''
@@ -123,8 +145,13 @@ export function openHandoffs(sql: Sql, place: HandoffPlace, self: string | null,
   );
   return rows.map((row) => {
     const fields = JSON.parse(row.fields) as Record<string, Json>;
+    /* A time that does not parse reads as old, never as just now: such a step would otherwise be `next` for good. Its
+       age is then since its last change, and never under seven days. */
     const at = Date.parse(row.left_at);
-    const age = Number.isFinite(at) ? Math.max(0, nowMs - at) : 0;
+    const changed = Date.parse(row.updated_at);
+    const age = Number.isFinite(at)
+      ? Math.max(0, nowMs - at)
+      : Math.max(EARLIER_MS, Number.isFinite(changed) ? nowMs - changed : 0);
     return {
       id: row.id,
       spoken: spokenOf(row.seq),
@@ -139,7 +166,15 @@ export function openHandoffs(sql: Sql, place: HandoffPlace, self: string | null,
   });
 }
 
-type RunRow = { id: string; seq: number | null; state: string | null; fields: Record<string, Json> };
+/** A run as `take` and `drop` read it, and as their `may` is asked about it. */
+export type RunRow = { id: string; seq: number | null; state: string | null; fields: Record<string, Json> };
+
+/**
+ * The refusal for a run that is not there, and for one the caller may not touch: the same words, so a key learns
+ * nothing of a run outside its place.
+ */
+const unknownRun = (left: string): Result<never> =>
+  no<never>('ROW_UNKNOWN', `There is no run called ${left.trim()} here. Name one of the open steps.`, { at: 'left' });
 
 /** A run by its spoken name (`S12`) or its id, live or finished, or null. */
 function runOf(sql: Sql, left: string): RunRow | null {
@@ -193,6 +228,9 @@ const UNDO = Symbol('undo');
  * THE FIRST WINS. The read of the run in `handoff` and the move out of it are one transaction, and SQLite runs one
  * writer at a time, so of two agents taking one step the first closes it and the second finds it done and is answered
  * who took it, by name, and when. A taker's own step is not its to take: a resumed session carries on with it.
+ *
+ * `may` says which runs the taker may reach (`inPlace` on its own place): one outside it is answered as one that is
+ * not there. Without it every run is in reach, as for the record's own callers.
  */
 export function take(
   sql: Sql,
@@ -200,12 +238,13 @@ export function take(
   left: string,
   nowMs: number,
   write: HandoffWrite,
+  may?: (run: RunRow) => boolean,
 ): Result<Taken> {
   let failed: Result<never> | null = null;
   try {
     return sql.transactionSync((): Result<Taken> => {
       const run = runOf(sql, left);
-      if (!run) return no('ROW_UNKNOWN', `There is no run called ${left.trim()} here. Name one of the open steps.`, { at: 'left' });
+      if (!run || (may && !may(run))) return unknownRun(left);
       const name = spokenOf(run.seq);
       if (run.id === taker.id) return no('FORBIDDEN', `${name} is your own run. Carry on with its step; there is nothing to take.`, { at: 'left' });
       if (run.state !== 'handoff') return no('TRANSITION_ILLEGAL', notOpenSaying(run, nowMs), { at: 'left' });
@@ -233,15 +272,24 @@ export function take(
 /**
  * `by` closes the step `left` left without taking it, saying why: the run is done, `closed_as: dropped`, and the reason
  * is the line's note. A reason is required, because a step closed with none leaves its history asking what happened.
- * An agent drops a step that is no longer true; a person drops one from the app.
+ * An agent drops a step that is no longer true; a person drops one from the app. `may` holds an agent to its place, as
+ * in `take`.
  */
-export function drop(sql: Sql, by: string, left: string, why: string, nowMs: number, write: HandoffWrite): Result<{ left: string; next: string }> {
+export function drop(
+  sql: Sql,
+  by: string,
+  left: string,
+  why: string,
+  nowMs: number,
+  write: HandoffWrite,
+  may?: (run: RunRow) => boolean,
+): Result<{ left: string; next: string }> {
   const reason = why.trim();
   if (reason === '')
     return no('REQUIRED_MISSING', 'Say in a few words why this step is dropped, so whoever reads its history knows.', { at: 'why' });
   return sql.transactionSync((): Result<{ left: string; next: string }> => {
     const run = runOf(sql, left);
-    if (!run) return no('ROW_UNKNOWN', `There is no run called ${left.trim()} here. Name one of the open steps.`, { at: 'left' });
+    if (!run || (may && !may(run))) return unknownRun(left);
     if (run.state !== 'handoff') return no('TRANSITION_ILLEGAL', notOpenSaying(run, nowMs), { at: 'left' });
     const closed = write(run.id, { state: 'done', stamp: { closed_as: 'dropped', closed_at: iso(nowMs) }, note: reason, actor: by });
     if (!closed.ok) return closed;
@@ -252,13 +300,15 @@ export function drop(sql: Sql, by: string, left: string, why: string, nowMs: num
 /**
  * The hourly sweep's part: every step left over thirty days ago and still open is closed, `closed_as: expired`, with
  * the note "Nobody took this step in thirty days.", signed by `system`, oldest first and `limit` an hour. Its words
- * stay on the run. Answers how many closed.
+ * stay on the run. Answers how many closed. A step whose left time does not parse is aged from its last change, since
+ * `julianday` of a bad time is NULL and would keep it open for good.
  */
 export function expire(sql: Sql, nowMs: number, write: HandoffWrite, limit = 100): number {
+  const at = `coalesce(julianday(${leftAt('h')}), julianday(h.updated_at))`;
   const old = sql.all<{ id: string }>(
     `SELECT h.id FROM entry h WHERE h.register = ? AND h.deleted_at IS NULL AND h.state = 'handoff'
-       AND julianday(${leftAt('h')}) < julianday(?)
-     ORDER BY julianday(${leftAt('h')}), h.seq LIMIT ?`,
+       AND ${at} < julianday(?)
+     ORDER BY ${at}, h.seq LIMIT ?`,
     SESSION,
     iso(nowMs - EXPIRE_MS),
     Math.max(0, Math.floor(limit)),

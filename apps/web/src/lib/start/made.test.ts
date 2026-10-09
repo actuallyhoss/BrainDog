@@ -16,10 +16,9 @@ test('ONE AGENT AND ONE SOURCE, the agent first, each saying what it would find'
   const offers = madeOffers(of('portfolio', 'people', 'money-core'));
   assert.deepEqual(Object.keys(offers), ['agent', 'source'], 'the agent comes before the source');
   assert.equal(offers.agent.name, firstRun.agentName);
-  for (const o of [offers.agent, offers.source]) {
-    assert.match(o.finds, /would find/u, `${o.name} does not say what it would find`);
-    assert.doesNotMatch(o.finds, /—/u, 'no em dash in copy a person reads');
-  }
+  assert.match(offers.agent.finds, /^It sees your /u, 'the agent says what it sees here');
+  assert.match(offers.source.finds, /^Forward them here, and Money fills itself/u, 'the bank says what forwarding does');
+  for (const o of [offers.agent, offers.source]) assert.doesNotMatch(`${o.name} ${o.finds}`, /—|\brow\b/u, 'no em dash or "row" in copy a person reads');
 });
 
 test('WHAT THE AGENT WOULD FIND IS WHAT THIS BRAINDOG KEEPS, and nothing it does not', () => {
@@ -27,6 +26,18 @@ test('WHAT THE AGENT WOULD FIND IS WHAT THIS BRAINDOG KEEPS, and nothing it does
   assert.equal(madeOffers(of('work')).agent.finds, firstRun.agentFinds([firstRun.agentTasks]));
   assert.doesNotMatch(madeOffers(of('money-core')).agent.finds, /projects|people/u, 'a Money-only BrainDog has no projects to find');
   assert.equal(madeOffers([]).agent.finds, firstRun.agentFinds([]));
+});
+
+test('A SHOP\'S AGENT SEES ITS ORDERS AND CLIENTS by the names the record gives them, never projects it does not keep', () => {
+  const shop = ['people', 'orders', 'products', ...of('money-core')];
+  /* NAMED BY THE RECORD, as Home has them: the people are her clients (use case 6, step 2). */
+  const named = shop.map((id) => ({ id, name: id === 'people' ? 'Clients' : id === 'orders' ? 'Orders' : id === 'products' ? 'Products' : 'Money' }));
+  assert.equal(madeOffers(named).agent.finds, 'It sees your orders and clients before it starts, and leaves what it did when it stops.');
+  /* BY ID ALONE, as a caller with no names hands them: the shop's own list by the use case's name, the people by the house word. */
+  assert.equal(madeOffers(shop).agent.finds, 'It sees your orders and the people you work with before it starts, and leaves what it did when it stops.');
+  /* A PRODUCT IS NOBODY'S, so the agent's line does not list it; and no id is ever said. */
+  assert.doesNotMatch(madeOffers(named).agent.finds, /products|projects|tasks/u);
+  assert.equal(madeOffers([{ id: 'zz_01HX', name: '' }]).agent.finds, firstRun.agentFinds([]), 'a list with no name is never said by its id');
 });
 
 test('THE SOURCE IS THE ONE WHOSE FINDS LAND HERE: a bank where money is kept, mail where people are, else a file', () => {
@@ -75,4 +86,12 @@ test('THE NEXT STEPS KEEP THE FIRST RUN\'S ORDER, and work that arrives by messa
   assert.deepEqual(kinds(fileOnly), ['mail', 'agent']);
   assert.equal(fileOnly[0]?.kind === 'source' && fileOnly[0].source.href, '/settings/ingest');
   assert.deepEqual(kinds(madeSteps(of('portfolio'))), ['agent', 'file'], 'without the answer a file is still a file');
+});
+
+test("HER FIRST TODAY'S NEXT STEPS, AS THE VISION ORDERS THEM: her orders come by messages, so the bank's texts lead, then Claude Code", () => {
+  const steps = madeSteps([{ id: 'people', name: 'Clients' }, { id: 'orders', name: 'Orders' }, ...of('money-core')], 'messages');
+  assert.deepEqual(steps.map((s) => (s.kind === 'agent' ? 'agent' : s.source.kind)), ['bank', 'agent']);
+  const [bank, agent] = steps;
+  assert.equal(bank?.kind === 'source' && bank.source.name, "Your bank's texts");
+  assert.equal(agent?.kind === 'agent' && agent.agent.finds, 'It sees your orders and clients before it starts, and leaves what it did when it stops.');
 });

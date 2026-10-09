@@ -1,0 +1,19 @@
+{
+  "pick": "red",
+  "asks": "What the deeper red marks",
+  "shown": "specimen",
+  "from": "EXP-A02",
+  "options": [
+    {
+      "id": "late-over-error",
+      "says": "Late, needs you, over, below zero and an error, each with its mark or its word.",
+      "live": true
+    },
+    {
+      "id": "late-only",
+      "says": "Late and needs you only. Over, below zero and an error say so in words, in ink."
+    }
+  ],
+  "default": "late-over-error",
+  "why": "DIRECTION 42 gives late and needs you the deeper red with a mark or a word, and an overspend, a balance below zero and an error are the same kind of trouble."
+}

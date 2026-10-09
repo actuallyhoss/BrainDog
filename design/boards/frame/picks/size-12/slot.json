@@ -1,0 +1,19 @@
+{
+  "pick": "size-12",
+  "asks": "Whether 12 stays for chart axes and key caps",
+  "shown": "specimen",
+  "from": "EXP-B01",
+  "options": [
+    {
+      "id": "stays",
+      "says": "12 stays for chart axes and key caps, and nowhere else.",
+      "live": true
+    },
+    {
+      "id": "thirteen",
+      "says": "Axes and key caps go up to 13."
+    }
+  ],
+  "default": "stays",
+  "why": "Axes and key caps are read at a glance, never as text."
+}

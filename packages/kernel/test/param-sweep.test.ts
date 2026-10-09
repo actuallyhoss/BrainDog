@@ -180,7 +180,7 @@ test('referenced: a list with 250 fields pointing here still keeps the row one o
   const refused = referencedBy(parts as never, 'accounts', cash.id);
   assert.ok(refused, 'a row that a live row points at was let go');
   assert.match(JSON.stringify(refused), /Moves/);
-  assert.match(JSON.stringify(refused), /1 row\b/);
+  assert.match(JSON.stringify(refused), /1 entry\b/);
   assert.ok(db.most() <= 5, `the count bound ${db.most()} parameters for ${MANY} fields`);
   sql.close();
 });

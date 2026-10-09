@@ -45,6 +45,7 @@ import { methods as engine } from './engine.ts';
 import { methods as pagesCensus } from './pages-census.ts';
 import { methods as capture } from './capture.ts';
 import { methods as shape } from './shape.ts';
+import { methods as countBy } from './count-by.ts';
 /* END METHODS */
 
 /**
@@ -141,6 +142,7 @@ export function methods(deps: RecordDeps) {
     ...pagesCensus(deps),
     ...capture(deps),
     ...shape(deps),
+    ...countBy(deps),
     /* END METHODS */
   };
 }

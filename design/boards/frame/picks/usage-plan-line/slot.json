@@ -1,0 +1,18 @@
+{
+  "pick": "usage-plan-line",
+  "asks": "The plan line on Usage",
+  "from": "RQ-EXP-389",
+  "options": [
+    {
+      "id": "keep",
+      "says": "The plan line stays off Usage.",
+      "live": true
+    },
+    {
+      "id": "reverse",
+      "says": "The plan line comes back under the rings."
+    }
+  ],
+  "default": "keep",
+  "why": "The plan is named once, in Settings, so Usage shows what is used."
+}

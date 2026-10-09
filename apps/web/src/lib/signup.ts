@@ -27,6 +27,7 @@
  */
 
 import { playedBy } from './start/parts.ts';
+import type { Reply } from './first-run.ts';
 
 /** The world the calls reach, so a test needs no socket. */
 export type Io = { fetch: (url: string, init: RequestInit) => Promise<Response> };
@@ -289,8 +290,20 @@ const SAID_MS = 26 * 60 * 60 * 1000;
 /** The longest sentence kept, as the host keeps it (2,000 characters). */
 export const SAID_MOST = 2000;
 
-/** What was said, the currency chosen for it and the use case picked by hand, kept across the mail. */
-export type Draft = { said: string; currency: string | null; usecase: string | null };
+/**
+ * What was said, the currency chosen for it and the use case picked by hand, kept across the mail.
+ *
+ * WITH THE ANSWER TO THE ONE QUESTION (`reply`), so an answer given before the mail is not asked again on the phone the
+ * link is opened on. Left out (or `null`) when nothing was asked or nothing answered.
+ */
+export type Draft = { said: string; currency: string | null; usecase: string | null; reply?: Reply | null };
+
+/** The one question's answer, read back off something kept, or `null` when it is not one. */
+function replyOf(v: unknown): Reply | null {
+  if (!isObj(v)) return null;
+  const { about, value } = v;
+  return (about === 'arrivesBy' || about === 'currency' || about === 'name') && (typeof value === 'string' || value === null) ? { about, value } : null;
+}
 
 /**
  * Keep the sentence across the mail, or forget it (`null`). Storage may be off, and then the record asks again.
@@ -303,7 +316,7 @@ export function keepSaid(storage: Pick<Storage, 'setItem' | 'removeItem'> | null
   if (draft === null) fromLink = null;
   try {
     if (draft === null || draft.said.trim() === '') storage?.removeItem(SAID_KEY);
-    else storage?.setItem(SAID_KEY, JSON.stringify({ said: draft.said.slice(0, SAID_MOST), currency: draft.currency, usecase: draft.usecase, at: now }));
+    else storage?.setItem(SAID_KEY, JSON.stringify({ said: draft.said.slice(0, SAID_MOST), currency: draft.currency, usecase: draft.usecase, ...(draft.reply ? { reply: draft.reply } : {}), at: now }));
   } catch {
     /* Storage off: the new record's /start asks "Who are you?" again, which is the whole of the cost. */
   }
@@ -344,7 +357,13 @@ function keptHere(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | unde
     }
     return null;
   }
-  return { said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase) };
+  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase) }, v.reply);
+}
+
+/** A draft with its answer when one was kept, and without the key at all when none was. */
+function withReply(draft: Draft, kept: unknown): Draft {
+  const reply = replyOf(kept);
+  return reply ? { ...draft, reply } : draft;
 }
 
 /** The most of what was said that rides in the mailed link, packed: the host's own limit (`SAID_IN_LINK`). */
@@ -375,7 +394,12 @@ let fromLink: Draft | null = null;
 export function saidForLink(draft: Draft | null | undefined): string | null {
   if (!draft) return null;
   const pack = (said: string): string =>
-    JSON.stringify({ said, ...(draft.currency ? { currency: draft.currency } : {}), ...(draft.usecase ? { usecase: draft.usecase } : {}) });
+    JSON.stringify({
+      said,
+      ...(draft.currency ? { currency: draft.currency } : {}),
+      ...(draft.usecase ? { usecase: draft.usecase } : {}),
+      ...(draft.reply ? { reply: draft.reply } : {}),
+    });
   let words = draft.said.trim();
   if (pack(words).length > SAID_LINK_MOST) {
     /* THE LONGEST START THAT FITS PACKED, found by halves, since a quote or a line break grows when packed. */
@@ -406,7 +430,7 @@ export function saidFromLink(packed: string | null): Draft | null {
     return null;
   }
   if (!isObj(v) || typeof v.said !== 'string' || v.said.trim() === '') return null;
-  return { said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase) };
+  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase) }, v.reply);
 }
 
 /**

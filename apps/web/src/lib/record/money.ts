@@ -259,30 +259,14 @@ const written = (currency: string, currencyDisplay: 'symbol' | 'narrowSymbol'): 
  * display alone gave `E£` for EGP, where English writes `EGP`, as it writes `CHF` and `KWD`, and the contract for
  * money on a screen says a currency with no symbol keeps its code first. A
  * currency that does have one is drawn with its narrow form, `$` rather than `CA$`, because the code after every
- * figure that is not in the home currency already says which dollar it is. A HEADLINE IS THE ONE EXCEPTION, and only
- * for the record's own currency (`headlineSignOf`).
+ * figure that is not in the home currency already says which dollar it is. A HEADLINE TOO: "EGP 1,350", as every
+ * other place writes it (his word, 9 October), never "E£1,350".
  */
 export function symbolOf(currency: string): string | null {
   try {
     if (written(currency, 'symbol')?.toUpperCase() === currency.toUpperCase()) return null;
     const narrow = written(currency, 'narrowSymbol');
     return narrow && narrow.toUpperCase() !== currency.toUpperCase() ? narrow : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * THE SIGN A HEADLINE WRITES THE RECORD'S OWN CURRENCY WITH WHERE ENGLISH HAS NONE: `E£` for the Egyptian pound, as a
- * price is written in Cairo. A figure standing on its own is read at a glance, and "EGP 1,086,213.41" over the founder's
- * Today read as a line of a bank statement (DIRECTION §37). Only the record's own currency, since any other is said by
- * its code anyway, and only a sign the figures are read back by (`£` with at most two capitals before it, as
- * `braindog-render` parses one), so a narrow form that is letters (`kr`, `R`) keeps the code. `null` where there is none.
- */
-export function headlineSignOf(currency: string): string | null {
-  try {
-    const narrow = written(currency, 'narrowSymbol');
-    return narrow && /^[A-Z]{0,2}\p{Sc}$/u.test(narrow) ? narrow : null;
   } catch {
     return null;
   }
@@ -319,16 +303,15 @@ export type Drawn = { lead: string; whole: string; fraction: string; iso: string
 const WRITTEN = /^([A-Z]{3}) (−?)([\d,]+)(\.\d+)?$/u;
 
 /**
- * `headline` IS A TILE'S FIGURE, OR THE PAGE'S ONE LINE: the record's own currency is written by its sign where English
- * has only a code (`headlineSignOf`), and an amount of ten thousand or more is in whole units (`wholeUnits`). `figure`
- * takes the sign and keeps the amount exact, for a bar's value or any figure read against others. `true` is `headline`.
+ * `headline` IS A TILE'S FIGURE, OR THE PAGE'S ONE LINE: an amount of ten thousand or more is in whole units
+ * (`wholeUnits`). `figure` keeps the amount exact, for a bar's value or any figure read against others. `true` is
+ * `headline`. A currency English writes by its code keeps its code in both, as it does everywhere ("EGP 1,350").
  */
 export function drawn(text: string, home: string | null, setting: boolean | 'headline' | 'figure' = false): Drawn | null {
   const m = WRITTEN.exec(text);
   if (!m) return null;
   const [, currency, minus, whole, fraction] = m as unknown as [string, string, string, string, string | undefined];
-  const standing = setting !== false;
-  const symbol = symbolOf(currency) ?? (standing && currency === home ? headlineSignOf(currency) : null);
+  const symbol = symbolOf(currency);
   const amount = setting === true || setting === 'headline' ? wholeUnits(whole, fraction ?? '') : { whole, fraction: fraction ?? '' };
   return {
     lead: symbol === null ? `${currency} ${minus}` : `${minus}${symbol}`,
@@ -342,8 +325,8 @@ export function drawn(text: string, home: string | null, setting: boolean | 'hea
  * How a figure is set where it stands: `exact` in a ledger or a table, every minor unit shown, since that is where
  * amounts are compared; `sentence` in words a person reads, a note, a question, a line of the feed, where a fraction
  * of all zeros says nothing ("£39", "−£9,190"); `figure`, a value standing alone that is still read against others, a
- * bar's or a split's, in the record's own sign and exact ("E£58,185.54"); and `headline`, a tile's figure or the page's
- * one line, in the record's own sign and in whole units from ten thousand up ("E£1,086,213").
+ * bar's or a split's, exact ("£58,185.54"); and `headline`, a tile's figure or the page's one line, in whole units from
+ * ten thousand up ("£1,086,213", "EGP 1,086,213").
  */
 export type Setting = 'exact' | 'sentence' | 'figure' | 'headline';
 
@@ -357,7 +340,7 @@ export type Setting = 'exact' | 'sentence' | 'figure' | 'headline';
  * A FRACTION OF ALL ZEROS IS DROPPED OUTSIDE A LEDGER: "£33,850" and "EGP 58,185", because ".00" in a sentence is width
  * a phone does not have and says nothing a round figure does not. A fraction that is not all zeros is part of the figure
  * and stays. A HEADLINE OF TEN THOUSAND OR MORE IS WHOLE UNITS (DIRECTION §37): "EGP 1,086,213.41" over Today is
- * "E£1,086,213", in the record's own sign and with the piastres gone; "£999.50" stays "£999.50", since a smaller
+ * "EGP 1,086,213", with the piastres gone; "£999.50" stays "£999.50", since a smaller
  * amount rounded is a different amount (research audit M6). A bar asks for `figure`, which is never rounded. `true` is
  * `headline` and `false` is `sentence`, as the callers that predate the settings pass them; a table cell asks for `exact`.
  */

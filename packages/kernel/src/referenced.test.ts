@@ -77,7 +77,7 @@ test('A ROW LIVE ROWS POINT AT IS KEPT, naming each list and counting each row o
   assert.ok(refusal, 'a referenced row was free to go');
   assert.equal(refusal.code, 'DELETE_WHILE_REFERENCED');
   assert.equal(refusal.at, 'delete');
-  assert.match(refusal.fix, /^3 rows still point at this row \(2 in Transactions and 1 in Budgets\)/u);
+  assert.match(refusal.fix, /^3 entries still point at this one \(2 in Transactions and 1 in Budgets\)/u);
   assert.ok(/[.?!]$/u.test(refusal.fix), refusal.fix);
   sql.close();
 });
@@ -91,7 +91,7 @@ test('ONE LIST IS SAID PLAINLY, and a row that names itself does not keep itself
 
   value(k.update('accounts', `accounts#${pot.seq}`, { within: `accounts#${parent.seq}` }, PERSON));
   const refusal = referencedBy(parts, 'accounts', parent.id);
-  assert.equal(refusal?.fix, '1 row in Accounts still points at this row, so it cannot be deleted: point that row elsewhere or delete it first.');
+  assert.equal(refusal?.fix, '1 entry in Accounts still points at this one, so it cannot be deleted: point that entry elsewhere or delete it first.');
   sql.close();
 });
 
@@ -104,7 +104,7 @@ test('ONCE THE ROWS POINTING AT IT ARE GONE, THE ROW MAY GO', async () => {
   assert.ok(referencedBy(parts, 'accounts', current.id));
 
   remove('transactions', rent.seq);
-  assert.match(referencedBy(parts, 'accounts', current.id)?.fix ?? '', /^1 row in Budgets still points/u);
+  assert.match(referencedBy(parts, 'accounts', current.id)?.fix ?? '', /^1 entry in Budgets still points/u);
   remove('budgets', monthly.seq);
   assert.equal(referencedBy(parts, 'accounts', current.id), null);
   sql.close();
@@ -121,7 +121,7 @@ test('A LIST THE WRITER CANNOT READ STILL KEEPS THE ROW, and is never named or c
   /* SHE READS BUDGETS AND NOT TRANSACTIONS: the one list she can open is named, and the rest is only "more". */
   const some = referencedBy(parts, 'accounts', current.id, (register) => register !== 'transactions');
   assert.equal(some?.code, 'DELETE_WHILE_REFERENCED');
-  assert.match(some?.fix ?? '', /^Rows still point at this row \(1 in Budgets and more you cannot open\)/u);
+  assert.match(some?.fix ?? '', /^Entries still point at this one \(1 in Budgets and more you cannot open\)/u);
   assert.doesNotMatch(some?.fix ?? '', /Transactions|3 rows|2 in/u);
 
   /* AND SHE READS NEITHER: the row is still kept, and the sentence names nothing. */

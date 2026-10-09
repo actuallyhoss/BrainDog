@@ -1,0 +1,17 @@
+{
+  "pick": "account-button",
+  "asks": "Where the account button sits",
+  "from": "EB 1.11 point 1",
+  "options": [
+    {
+      "id": "rail-foot",
+      "says": "At the foot of the rail."
+    },
+    {
+      "id": "rail-head",
+      "says": "At the head of the rail, beside the name."
+    }
+  ],
+  "default": "rail-foot",
+  "why": "The top bar is gone, and the foot of the rail is where an account is looked for."
+}

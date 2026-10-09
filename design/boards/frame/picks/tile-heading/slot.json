@@ -1,0 +1,19 @@
+{
+  "pick": "tile-heading",
+  "asks": "A tile's heading",
+  "shown": "specimen",
+  "from": "EXP-B01",
+  "options": [
+    {
+      "id": "fifteen",
+      "says": "15, semibold.",
+      "live": true
+    },
+    {
+      "id": "seventeen",
+      "says": "17, semibold."
+    }
+  ],
+  "default": "fifteen",
+  "why": "The tile heading names the tile and the figure leads, so the heading stays at the body size."
+}

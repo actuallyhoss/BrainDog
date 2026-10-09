@@ -1,11 +1,17 @@
 <!--
   Sign-up, for a stranger: say who you are, watch the BrainDog build, then keep it with one email (DIRECTION §37).
 
-  DESCRIBE FIRST. "Who are you?", one field and the first run's four chips. As it is typed, the rules read it on this
-  device (`proposeFirst` with no model, `lib/start/propose.ts`), and the BrainDog builds beside it with /start's own parts
-  and its pages by name (`../start/Building.svelte`). No model and no record are asked before there is an account, so
-  nothing typed here leaves the device until the person keeps it. The one question the words cannot answer (which
-  currency, or what it is closest to) is asked under the field when Continue is pressed, as /start asks it.
+  USE CASE 6, STEPS 1 TO 4 (his word of 9 October, `loop/progress/planner-45.md`, "The onboarding target").
+
+  1. DESCRIBE. "Who are you?", one field, the first run's five chips and three promises under them. As it is typed, the
+     rules read it on this device (`proposeFirst` with no model, `lib/start/propose.ts`): Turnstile is not keyed, so no
+     model reads a stranger's words yet (USE-B05), and nothing typed leaves the device until the person keeps it.
+  2. HER WORDS LIGHT UP. The words heard are marked in the field itself, where each line says it sits (`heard[].at`,
+     `litIn`), under "What I heard": her name as "you", then each phrase and what it became. A line is pressed to change
+     what it became or take it out (`amend`), and the BrainDog builds beside it (`../start/Building.svelte`). "That's me".
+  3. ONE QUESTION, at most: the one `oneQuestion` picks, its answers each with what it means, and "That is the only
+     question". With none to ask it goes straight on; with nothing placed at all, it asks what it is closest to.
+  4. KEEP IT. The title with Change (`NameField`), the places, one email, "Email me a link", and where to open it.
 
   THEN ONE EMAIL. The record's name is chosen from what was heard, the business first, then the person, then the
   address (`lib/signup.ts` `recordNames`, `chooseName`, trying `-2` to `-9`), and said as one quiet line with Change.
@@ -15,7 +21,10 @@
   because the link opens a new tab. Spending it makes the free record (`checkout` with `plan: 'free'`), opens it, and
   writes the build into it with `/start`'s own `accept()`, here, with no jump to a second screen to answer again; then
   the record's `/start#made` offers one agent and one source before Home. A link opened on another device has no
-  sentence, and its `/start` asks the question there.
+  sentence but the one the link carries (`said`, read back by `arrivalOf`). BEFORE THE BUILD, the passkey is offered
+  (`../start/PasskeyFirst.svelte`), and a passkey made or "Not now" goes on to the build. What was changed by hand and the
+  answer wait beside the sentence on this device (`keepAmend`), laid over the second reading so the build is what the
+  screen showed.
 
   ON `?plan=cloud` OR `?plan=plus` the link leads to Stripe's page on that plan instead (`NoRecord`), and the build is
   written once the payment has made the record (`#paid`). `#cancelled` is the payment step again. Free leads (§35).
@@ -39,9 +48,9 @@
   import { dayOf } from '@braindog/seed/usecases/install';
   import { moduleName } from '@braindog/seed/usecases/names';
   import { apiBase, at, BASE } from '$lib/at.ts';
-  import { methods, type Who } from '$lib/auth.ts';
+  import { methods, support, type Who } from '$lib/auth.ts';
   import { copy } from '$lib/copy.ts';
-  import { firstRun } from '$lib/first-run.ts';
+  import { amendKept, keepAmend, litIn, NO_AMEND, firstRun, type Amend, type Reply } from '$lib/first-run.ts';
   import * as pref from '$lib/pref.ts';
   import { INSTALL_ORDER } from '$lib/shape.ts';
   import {
@@ -72,19 +81,23 @@
     type Held,
     type Plan,
   } from '$lib/signup.ts';
-  import { proposeFirst, type Proposal } from '$lib/start/propose.ts';
+  import { placesOf, proposeFirst, type HeardLine, type Proposal } from '$lib/start/propose.ts';
+  import { answer, oneQuestion } from '$lib/start/question.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
   import { withChip } from '$lib/who.ts';
-  import { browserCurrencyEnv, casePart, currencyChoices, partsOf, type CurrencyEnv } from '../start/building.ts';
-  import { caseOf, keepsCurrency, pagesOf } from '../start/preview.ts';
+  import { browserCurrencyEnv, casePart, partsOf, passkeyOffered, zoneCurrency, type CurrencyEnv } from '../start/building.ts';
+  import { caseOf, keepsCurrency } from '../start/preview.ts';
   import Building from '../start/Building.svelte';
   import Currency from '../start/Currency.svelte';
   import Frame from '../start/Frame.svelte';
   import NoRecord from '../start/NoRecord.svelte';
+  import PasskeyFirst from '../start/PasskeyFirst.svelte';
   import type { Accepting } from '../start/accept.ts';
+  import { accepting, nameSent, picked, replyOf, settle, titleSent } from './build.ts';
   import NameField from './NameField.svelte';
   import { words } from './words.ts';
 
@@ -94,9 +107,11 @@
     | 'closed'
     | 'invite-only'
     | 'describe'
+    | 'question'
     | 'keep'
     | 'sent'
     | 'verifying'
+    | 'lock'
     | 'link-failed'
     | 'making'
     | 'made-partly'
@@ -220,11 +235,16 @@
   let live = $state.raw<Proposal | null>(null);
   /** The use case the person picked by hand, which stands over the one the words point at. */
   let chosen = $state<string | null>(null);
-  let currency = $state<string | null>(null);
-  /** Whether Continue was pressed with a question open, which is when the question is drawn under the field. */
-  let asking = $state(false);
+  /** What the person changed in "What I heard" (`amend`), and the line open to change, by its phrase. */
+  let amends = $state.raw<Amend>(NO_AMEND);
+  let opened = $state<string | null>(null);
+  let nameDraft = $state('');
+  /** The answer to the one question once given or skipped, and the one tapped or typed before Continue. */
+  let reply = $state.raw<Reply | null>(null);
+  let pick = $state<string | null>(null);
 
-  const reading = (s: string): Promise<Proposal> => proposeFirst(s, { zone: here, locale }, null);
+  /* THE DEVICE'S CURRENCY GOES IN WITH THE WORDS, so a shop in Cairo keeps EGP without being asked (`zoneCurrency`). */
+  const reading = (s: string): Promise<Proposal> => proposeFirst(s, { zone: here, locale, currency: zoneCurrency(here) }, null);
 
   $effect(() => {
     const s = sentence;
@@ -239,6 +259,16 @@
     }, 140);
     return () => clearTimeout(wait);
   });
+
+  /* THE CURRENCIES THIS DEVICE POINTS AT, for the one question when it is the currency. */
+  let device: CurrencyEnv | null = null;
+  const deviceOf = (): CurrencyEnv => (device ??= browserCurrencyEnv(locale, typeof navigator === 'undefined' ? [] : [...(navigator.languages ?? [])], here));
+  const base = $derived(live === null ? null : settle(live, amends, null, sentence));
+  const read = $derived(base === null ? null : reply === null ? base : answer(base, reply.about, reply.value, sentence));
+  /** The one question it could not guess (`oneQuestion`), or none. */
+  const q = $derived(base === null ? null : oneQuestion(base, sentence, deviceOf()));
+  /** The sentence cut at the very words heard, for the marks under the field. */
+  const lit = $derived(litIn(sentence, read?.heard ?? []));
 
   function chip(c: string) {
     sentence = withChip(sentence, c);
@@ -255,65 +285,110 @@
     void next();
   }
 
-  const usecase = $derived(chosen ?? live?.usecase ?? null);
-  const u = $derived(caseOf(usecase));
-  /* THE USE CASES BESIDE IT belong to the reading they were heard with, so picking another use case leaves them out. */
-  const also = $derived(live && usecase === live.usecase ? live.also.flatMap((id) => caseOf(id) ?? []) : []);
-  const cases = $derived(u ? [u, ...also] : []);
+  /* THE MARKS SCROLL WITH THE WORDS, since they sit under the field rather than in it. */
+  let marks = $state<HTMLElement | undefined>(undefined);
+  function scrolled() {
+    if (marks && field) marks.scrollTop = field.scrollTop;
+  }
+
+  /* THE USE CASES AND MODULES THE BUILD WILL MAKE, chosen by the build's own `picked`, so the screen cannot drift from it. */
+  const choice = $derived(picked(read, chosen));
+  const u = $derived(choice.one);
+  const cases = $derived(u ? [u, ...choice.beside] : []);
+  const modules = $derived(choice.modules);
   /** Every part on offer, in install order, then any the words or a use case brought beyond them. */
-  const offered = $derived([...new Set([...INSTALL_ORDER, ...(live?.modules ?? []), ...cases.flatMap((c) => c.modules)])]);
-  const modules = $derived(offered.filter((id) => (live?.modules ?? []).includes(id) || cases.some((c) => c.modules.includes(id))));
+  const offered = $derived([...new Set([...INSTALL_ORDER, ...modules])]);
   const heldBy = (id: string): string | null => cases.find((c) => c.modules.includes(id))?.title ?? null;
 
-  /* THE CURRENCY IS ASKED ONLY WHEN MONEY IS KEPT AND THE SENTENCE TYPED NONE, as on /start. */
+  /* THE CURRENCY IS THE ONE TYPED OR THE ONE ANSWERED, never guessed (`oneQuestion` asks it where an amount has none). */
   const money = $derived(modules.find(keepsCurrency) ?? null);
-  const asksCurrency = $derived(money !== null && (live?.currency ?? null) === null);
-  let device: CurrencyEnv | null = null;
-  const deviceOf = (): CurrencyEnv => (device ??= browserCurrencyEnv(locale, typeof navigator === 'undefined' ? [] : [...(navigator.languages ?? [])], here));
-  const currencyAsk = $derived(asksCurrency ? currencyChoices(sentence, deviceOf()) : null);
   const placed = $derived(u !== null || modules.length > 0);
 
   const parts = $derived([
-    ...cases.map((c) => casePart(c, live?.heard ?? [], chosen !== null)),
+    ...cases.map((c) => casePart(c, read?.heard ?? [], chosen !== null)),
     ...partsOf({
       offered,
       modules,
-      heard: live?.heard ?? [],
-      rows: live?.rows ?? [],
+      heard: read?.heard ?? [],
+      rows: read?.rows ?? [],
+      names: read?.names,
       heldBy,
       byHand: new Set(),
-      waiting: asksCurrency && currency === null ? money : null,
+      waiting: q?.about === 'currency' && reply === null ? money : null,
     }),
   ]);
-  const rail = $derived(pagesOf(cases, modules));
+  /* WHERE THINGS WILL BE KEPT, with a use case picked by hand in place of the one heard. */
+  const places = $derived(read === null ? undefined : chosen === null ? read.places : placesOf({ ...read, usecase: chosen, also: [] }));
 
-  /** What stops Continue: nothing said, the currency, or nothing placed. */
-  const open = $derived(sentence.trim() === '' ? 'empty' : asksCurrency && currency === null ? 'currency' : !placed ? 'closest' : null);
+  /** What is asked before keeping: the one question, or what it is closest to where nothing was placed. */
+  const asks = $derived(sentence.trim() === '' ? null : q !== null ? 'one' : !placed ? 'closest' : null);
+  /** Whether that is already answered: the reply is to this very question, or a use case was picked. */
+  const answered = $derived(asks === 'one' ? reply !== null && reply.about === q?.about : asks === 'closest' ? chosen !== null : true);
 
+  /* "THAT'S ME": read again now, so a press straight after the last key acts on every word; then the one question, or
+     straight on to keep. */
   async function next(): Promise<void> {
     if (sentence.trim() === '') {
       field?.focus();
       return;
     }
-    /* READ AGAIN NOW, so a press straight after the last key acts on every word of it. */
     live = await reading(sentence);
+    opened = null;
     await tick();
-    if (open !== null) {
-      asking = true;
+    if (!answered) {
+      pick = asks === 'one' ? (q?.suggested ?? null) : null;
+      step = 'question';
       await tick();
       document.getElementById('first-q')?.focus();
       return;
     }
-    asking = false;
+    await keep();
+  }
+
+  async function keep(): Promise<void> {
     step = 'keep';
     said = null;
     await tick();
     (signedIn ? document.getElementById('keep-h') : document.getElementById('up-email'))?.focus();
   }
 
+  /* THE ANSWER, OR SKIPPED (`null`): a value on the reading, written nowhere until the build. */
+  function answerIt(value: string | null): void {
+    if (asks === 'one' && q !== null) reply = { about: q.about, value: value === null || value.trim() === '' ? null : value.trim() };
+    void keep();
+  }
+
   function pickCase(id: string) {
     chosen = chosen === id ? null : id;
   }
+
+  /* ── a line heard, changed by hand ─────────────────────────────────────── */
+
+  const lineOf = (h: HeardLine): string => (h.you === true ? `you:${h.phrase}` : h.phrase);
+
+  function openLine(h: HeardLine): void {
+    opened = opened === lineOf(h) ? null : lineOf(h);
+    if (h.you === true) nameDraft = read?.name ?? h.phrase;
+  }
+
+  function takeOut(h: HeardLine): void {
+    amends = h.you === true ? { ...amends, name: null } : { ...amends, out: [...amends.out, h.phrase] };
+    opened = null;
+  }
+
+  function turnInto(h: HeardLine, pack: string): void {
+    amends = { ...amends, out: amends.out.filter((x) => x !== h.phrase), to: { ...amends.to, [h.phrase]: pack } };
+    opened = null;
+  }
+
+  function rename(): void {
+    const n = nameDraft.trim();
+    amends = { ...amends, name: n === '' ? null : n };
+    opened = null;
+  }
+
+  /** What a line can become instead: every part on offer but the ones it already became. */
+  const insteadOf = (h: HeardLine): string[] => INSTALL_ORDER.filter((id) => !h.became.split(/,\s*|\s+and\s+/u).includes(moduleName(id)));
 
   /* THE SENTENCE AGAIN, AS A FIELD. The name chosen from it is chosen again from what it says next. */
   function edit() {
@@ -338,7 +413,7 @@
    * THE NAMES TO TRY: the business and the person heard; where neither was, the address's own name, which is why the
    * address being typed asks again (a pause after the last key), and only then.
    */
-  const heardBases = $derived(recordNames(namesHeard(live ?? { name: null, rows: [] }), ''));
+  const heardBases = $derived(recordNames(namesHeard(read ?? { name: null, rows: [] }), ''));
   const bases = $derived(heardBases.length > 0 ? heardBases : recordNames({ person: null, business: null }, email));
 
   $effect(() => {
@@ -390,8 +465,11 @@
     const draft = saidKept(localStore());
     if (draft) {
       sentence = draft.said;
-      currency = draft.currency;
       chosen = draft.usecase;
+      /* AND WHAT WAS CHANGED AND ANSWERED, where this device kept it; a currency answered also rides in the link. */
+      const kept = amendKept(localStore(), draft.said);
+      amends = kept.amend;
+      reply = replyOf(draft, kept);
     }
     /* THIS TAB'S PLAN FIRST, then the one kept across the mail; a link opened anywhere else is Free. */
     const lasting = kept?.plan ?? planKept(localStore());
@@ -445,17 +523,25 @@
   const ready = $derived(slug !== '' && free && !busy && !naming && (signedIn !== null || (email.trim() !== '' && (siteKey === null || human !== null))));
 
   /** The sentence as it is kept across the mail. */
-  const draftNow = (): Draft => ({ said: sentence.trim(), currency: money === null ? null : currency, usecase: chosen });
+  const draftNow = (): Draft => ({ said: sentence.trim(), currency: money === null ? null : (read?.currency ?? null), usecase: chosen, reply });
+
+  /** The sentence kept across the mail, and beside it what was changed by hand and answered. */
+  function keepAll(): void {
+    keepSaid(localStore(), draftNow());
+    keepAmend(localStore(), { said: sentence, amend: amends, reply });
+  }
 
   async function send(e: SubmitEvent): Promise<void> {
     e.preventDefault();
     /* ONE PRESS, ONE MAIL: a second press while the first is out does nothing. */
     if (!ready) return;
-    const person = live?.name ?? '';
+    /* HER NAME AT THE START, AND THE RECORD'S WHEN IT IS MADE (`nameSent`, `titleSent`): the record opens as the name she
+       was shown, "Mariam's Candles", and she is Mariam. */
+    const person = nameSent(read);
     if (signedIn !== null) {
       /* NO MAIL TO WAIT ON: kept now, because a paid plan leaves for Stripe's page and comes back to a new page load. */
-      keepSaid(localStore(), draftNow());
-      held = { slug, name: person || null, tz: zone(), plan };
+      keepAll();
+      held = { slug, name: titleSent(read, person || null), tz: zone(), plan };
       hold(globalThis.sessionStorage, held);
       if (plan === 'free') void makeFree(held);
       else step = 'pay';
@@ -463,16 +549,17 @@
     }
     busy = true;
     said = null;
-    const out = await startSignup({ email, slug, name: person, tz: zone(), turnstile: human, code: codeKept(tabStore()) });
+    /* WHAT WAS SAID RIDES IN THE LINK (`said`), so a link opened on another device builds the same BrainDog. */
+    const out = await startSignup({ email, slug, name: person, tz: zone(), turnstile: human, code: codeKept(tabStore()), said: draftNow() });
     busy = false;
     if (out.ok) {
       sentTo = email.trim();
       /* THE CODE IS HELD BY THE PROOF JUST MAILED, so this tab has no more use for it. */
       keepCode(tabStore(), null);
       /* KEPT ONLY ONCE THE HOST SAID YES, so a refused address leaves nobody's words on this device. */
-      keepSaid(localStore(), draftNow());
+      keepAll();
       /* KEPT NOW AS WELL AS IN THE PROOF, so a proof opened in this tab still finds the name if the mail was slow. */
-      hold(globalThis.sessionStorage, { slug, name: person.trim() || null, tz: zone(), plan });
+      hold(globalThis.sessionStorage, { slug, name: titleSent(read, person.trim() || null), tz: zone(), plan });
       keepPlan(localStore(), plan);
       step = 'sent';
       await tick();
@@ -500,11 +587,41 @@
       step = 'link-failed';
       return;
     }
-    held = { slug: out.value.slug, name: out.value.name, tz: out.value.tz, plan };
+    /* THE RECORD IS MADE UNDER THE NAME SHE WAS SHOWN, read again from the sentence the link carried while the page's own
+       reading of it may not be back yet. */
+    const shown = read ?? (sentence.trim() === '' ? null : settle(await reading(sentence), amends, null, sentence));
+    held = { slug: out.value.slug, name: titleSent(shown, out.value.name), tz: out.value.tz, plan };
     hold(globalThis.sessionStorage, held);
-    if (plan === 'free') void makeFree(held);
-    else step = 'pay';
+    if (plan !== 'free') {
+      step = 'pay';
+      return;
+    }
+    /* THE PASSKEY AT ONCE, BEFORE THE BUILD (use case 6, step 4): this device's own lock is the next sign-in, offered
+       while the link is still in hand, and its "Not now" goes on without it. Where it cannot help, straight on. */
+    if (await lockable()) {
+      step = 'lock';
+      await tick();
+      document.getElementById('lock-h')?.focus();
+      return;
+    }
+    void makeFree(held);
   }
+
+  /**
+   * Whether the passkey would help, by `PasskeyFirst`'s own rule (`passkeyOffered`): asked here first so a person it
+   * would not help never sees the step at all.
+   */
+  async function lockable(): Promise<boolean> {
+    const can = support();
+    return can.webauthn && can.secure && passkeyOffered(can, await methods());
+  }
+
+  function lockDone(): void {
+    if (step === 'lock' && held !== null) void makeFree(held);
+  }
+
+  /** Whether this is a phone, for "Open it on this phone". */
+  const onPhone = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
   /** Storage the made record no longer needs, in this tab and across the mail. */
   function forget(): void {
@@ -515,6 +632,7 @@
     }
     keepPlan(localStore(), null);
     keepSaid(localStore(), null);
+    keepAmend(localStore(), null);
   }
 
   /** The line under "Making your BrainDog": which stage it is at. */
@@ -569,32 +687,25 @@
    */
   async function build(name: string, fallback: string): Promise<void> {
     const draft = saidKept(localStore()) ?? (sentence.trim() === '' ? null : draftNow());
-    const p = draft ? await reading(draft.said) : null;
-    const one = p ? caseOf(draft?.usecase ?? p.usecase) : null;
-    const beside = one && p && one.usecase === p.usecase ? p.also.flatMap((id) => caseOf(id) ?? []) : [];
-    const asked = p ? new Set([...p.modules, ...[one, ...beside].flatMap((c) => c?.modules ?? [])]) : new Set<string>();
-    /* IN /start's ORDER, install order first, so the record is made in the order /start would have made it. */
-    const kept = [...new Set([...INSTALL_ORDER, ...asked])].filter((id) => asked.has(id));
-    if (!draft || !p || (one === null && kept.length === 0)) {
+    const signed = draft ? await methods() : null;
+    /* READ AGAIN, WITH WHAT WAS CHANGED AND ANSWERED LAID OVER IT, so the build is the one the screen showed (`accepting`). */
+    const asked = draft
+      ? await accepting(draft, amendKept(localStore(), draft.said), reading, {
+          device: deviceOf(),
+          today: dayOf(Date.now()),
+          email: signed?.ok ? (signed.value.me?.email ?? null) : null,
+          nav: pref.read().nav ?? [],
+          locale,
+        })
+      : null;
+    if (asked === null) {
       forget();
       location.assign(at(draft ? `${BASE}/${name}/start` : fallback));
       return;
     }
-    stage = words.makingParts([...(one ? [one.title] : []), ...kept.map(moduleName)].slice(0, 4));
-    const keepsMoney = kept.some(keepsCurrency);
-    const signed = await methods();
-    await write(name, {
-      sentence: draft.said,
-      proposal: p,
-      usecase: one?.usecase ?? null,
-      also: beside.map((b) => b.usecase),
-      modules: kept,
-      currency: keepsMoney ? (p.currency ?? draft.currency) : null,
-      today: dayOf(Date.now()),
-      email: signed.ok ? (signed.value.me?.email ?? null) : null,
-      nav: pref.read().nav ?? [],
-      locale,
-    });
+    const one = caseOf(asked.usecase);
+    stage = words.makingParts([...(one ? [one.title] : []), ...asked.modules.map(moduleName)].slice(0, 4));
+    await write(name, asked);
   }
 
   /**
@@ -685,7 +796,10 @@
 
   /** Whether the build stands beside the words: while describing and keeping, and while what was said is being made. */
   const showBuild = $derived(
-    step === 'describe' || step === 'keep' || ((step === 'sent' || step === 'verifying' || step === 'making' || step === 'waiting') && sentence.trim() !== ''),
+    step === 'describe' ||
+      step === 'question' ||
+      step === 'keep' ||
+      ((step === 'sent' || step === 'verifying' || step === 'lock' || step === 'making' || step === 'waiting') && sentence.trim() !== ''),
   );
 
   /* THIS SCREEN'S FIRST DRAW IS ITS STEP, whichever it is, once the host has answered or the address has said. */
@@ -697,7 +811,7 @@
 <svelte:head><title>{titleOf(words.title)}</title></svelte:head>
 
 {#snippet signInLink()}
-  {#if step === 'describe' || step === 'keep'}
+  {#if step === 'describe' || step === 'question' || step === 'keep'}
     <a class="link" href={at('/signin')}>{words.haveOne}</a>
   {/if}
 {/snippet}
@@ -713,7 +827,9 @@
   <div class="board" data-paired={showBuild ? '' : undefined}>
     <div class="talk">
       {#if step === 'loading' || step === 'verifying'}
-        <h1 class="title">{step === 'verifying' ? words.making : firstRun.whoQuestion}</h1>
+        <!-- NOTHING IS ASKED BEFORE THE HOST SAYS SIGN-UP IS OPEN: the page's name, never "Who are you?", which a closed
+             host would take straight back. -->
+        <h1 class="title">{step === 'verifying' ? words.making : words.title}</h1>
         <p class="quiet" role="status">{step === 'verifying' ? copy.signupVerifying : copy.checkingWays}</p>
       {:else if step === 'unreachable'}
         <Empty kind="error" title={copy.unreachableTitle} body={copy.unreachableWhy}>
@@ -733,59 +849,140 @@
             void next();
           }}
         >
-          <textarea
-            class="prompt"
-            rows="4"
-            autocomplete="off"
-            maxlength="2000"
-            aria-labelledby="who-h"
-            placeholder={firstRun.whoPlaceholder}
-            bind:this={field}
-            bind:value={sentence}
-            onkeydown={enter}
-          ></textarea>
-          <div class="chips" role="group" aria-label={firstRun.whoChipsLabel}>
-            {#each firstRun.whoChips as c (c)}
-              <!-- A mouse press keeps focus in the field, so the caret stays where the words are going. -->
-              <Button size="sm" onmousedown={(e: MouseEvent) => e.preventDefault()} onclick={() => chip(c)}>{c}</Button>
-            {/each}
+          <!-- HER WORDS LIGHT UP AS SHE TYPES: the marks sit under the field, cut where each line heard says it is. -->
+          <div class="lit-field">
+            <!-- ONE LINE OF MARKUP: any space between these tags would be drawn, and the marks would drift off the words. -->
+            <div class="lit" aria-hidden="true" bind:this={marks}>{#each lit as r, i (i)}{#if r.became}<mark>{r.text}</mark>{:else}{r.text}{/if}{/each}{'\n'}</div>
+            <textarea
+              class="prompt"
+              rows="4"
+              autocomplete="off"
+              maxlength="2000"
+              aria-labelledby="who-h"
+              placeholder={firstRun.whoPlaceholder}
+              bind:this={field}
+              bind:value={sentence}
+              onkeydown={enter}
+              onscroll={scrolled}
+            ></textarea>
           </div>
 
-          <!-- THE ONE QUESTION THE WORDS CANNOT ANSWER, drawn once Continue was pressed with it open. -->
-          {#if asking && open === 'currency'}
-            <section class="question" aria-labelledby="first-q">
-              <h2 class="question-h" id="first-q" tabindex="-1">{firstRun.currencyQuestion}</h2>
-              <Currency bind:value={currency} {locale} choices={currencyAsk?.choices ?? []} suggested={currencyAsk?.suggested ?? null} find={currencyAsk?.find ?? null} />
-            </section>
-          {:else if asking && (open === 'closest' || (chosen !== null && !live?.usecase))}
-            <section class="question" aria-labelledby="first-q">
-              <h2 class="question-h" id="first-q" tabindex="-1">{words.closest}</h2>
-              <p class="quiet">{words.closestWhy}</p>
-              <div class="chips" role="group" aria-label={firstRun.mineFor}>
-                {#each USE_CASES as one (one.usecase)}
-                  <Button weight="quiet" aria-pressed={chosen === one.usecase} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
-                {/each}
+          {#if sentence.trim() === ''}
+            <p class="quiet" id="chips-h">{words.startFrom}</p>
+            <div class="chips" role="group" aria-labelledby="chips-h">
+              {#each firstRun.whoChips as c (c)}
+                <!-- A mouse press keeps focus in the field, so the caret stays where the words are going. -->
+                <Button size="sm" onmousedown={(e: MouseEvent) => e.preventDefault()} onclick={() => chip(c)}>{c}</Button>
+              {/each}
+            </div>
+          {/if}
+
+          {#if read !== null && read.heard.length > 0}
+            <section class="tile heard" aria-labelledby="heard-h">
+              <div class="tile-head">
+                <h2 class="tile-h" id="heard-h">{firstRun.heardTitle}</h2>
+                <span class="quiet">{words.heardTap}</span>
               </div>
+              <ul class="lines">
+                {#each read.heard as h, i (i)}
+                  <li>
+                    <button type="button" class="line" aria-expanded={opened === lineOf(h)} onclick={() => openLine(h)}>
+                      <span class="line-said">{h.you === true ? (read.name ?? h.phrase) : h.phrase}</span>
+                      <span class="line-became">{h.you === true ? words.you : h.became}</span>
+                    </button>
+                    {#if opened === lineOf(h)}
+                      <div class="line-edit">
+                        {#if h.you === true}
+                          <label class="field-label" for="up-you">{words.nameLabel}</label>
+                          <span class="field"><input id="up-you" class="field-input" type="text" autocomplete="name" maxlength="60" bind:value={nameDraft} /></span>
+                          <div class="chips">
+                            <Button weight="primary" onclick={rename}>{words.keepLine}</Button>
+                            <Button weight="quiet" onclick={() => takeOut(h)}>{words.takeOut}</Button>
+                          </div>
+                        {:else}
+                          <p class="quiet">{words.becomeInstead}</p>
+                          <div class="chips" role="group" aria-label={words.becomeInstead}>
+                            {#each insteadOf(h) as id (id)}
+                              <Button size="sm" weight="quiet" onclick={() => turnInto(h, id)}>{moduleName(id)}</Button>
+                            {/each}
+                          </div>
+                          <div class="chips"><Button weight="quiet" onclick={() => takeOut(h)}>{words.takeOut}</Button></div>
+                        {/if}
+                      </div>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
             </section>
           {/if}
 
-          <div class="go">
+          <div class="go sticky">
             <Button weight="primary" type="submit" kbd={sentence.trim() === '' ? undefined : '↵'}>{words.next}</Button>
           </div>
         </form>
+
+        <ul class="promises">
+          {#each words.promises as line, i (line)}
+            {#if i > 0 || plan === 'free'}<li><Icon name="check" size="s" />{line}</li>{/if}
+          {/each}
+        </ul>
+      {:else if step === 'question'}
+        <button type="button" class="link plain back" onclick={edit}>{words.back}</button>
+        <h1 class="title" id="first-q" tabindex="-1">{words.questionTitle}</h1>
+        {#if asks === 'one' && q !== null}
+          <p class="lede" id="first-q-ask">{q.question}</p>
+          {#if q.about === 'currency'}
+            <Currency bind:value={pick} {locale} choices={q.choices.map((c) => ({ code: c.value, name: c.label, why: c.means ?? '' }))} suggested={q.suggested} find={q.find} />
+          {:else if q.about === 'name'}
+            <span class="field field-lg"><input class="field-input" type="text" autocomplete="name" maxlength="60" aria-labelledby="first-q-ask" bind:value={pick} /></span>
+          {:else}
+            <div class="opts" role="radiogroup" aria-labelledby="first-q-ask">
+              {#each q.choices as c (c.value)}
+                <button type="button" class="opt" role="radio" aria-checked={pick === c.value} onclick={() => (pick = c.value)}>
+                  <span class="opt-name">{#if pick === c.value}<Icon name="check" size="s" />{/if}{c.label}</span>
+                  {#if c.means}<span class="opt-means">{c.means}</span>{/if}
+                </button>
+              {/each}
+            </div>
+          {/if}
+          <p class="quiet">{q.only}</p>
+          <div class="go sticky">
+            <Button weight="primary" disabled={pick === null || pick.trim() === ''} onclick={() => answerIt(pick)}>{words.questionNext}</Button>
+            <Button weight="bare" onclick={() => answerIt(null)}>{words.questionSkip}</Button>
+          </div>
+        {:else}
+          <p class="lede">{words.closest}</p>
+          <p class="quiet">{words.closestWhy}</p>
+          <div class="chips" role="group" aria-label={firstRun.mineFor}>
+            {#each USE_CASES as one (one.usecase)}
+              <Button weight="quiet" aria-pressed={chosen === one.usecase} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
+            {/each}
+          </div>
+          <div class="go sticky"><Button weight="primary" disabled={chosen === null} onclick={() => void keep()}>{words.questionNext}</Button></div>
+        {/if}
       {:else if step === 'keep'}
         <h1 class="title" id="keep-h" tabindex="-1">{words.keepTitle}</h1>
         {@render saidLine()}
-        <p class="lede">{signedIn ? (plan === 'free' ? words.keepSignedIn : words.keepSignedInPaid) : plan === 'free' ? words.keepLede : words.keepLedePaid}</p>
+        {#if signedIn || plan !== 'free'}
+          <p class="lede">{signedIn ? (plan === 'free' ? words.keepSignedIn : words.keepSignedInPaid) : words.keepLedePaid}</p>
+        {/if}
         <form class="form" onsubmit={send}>
-          {#if nameByHand}
-            <NameField bind:value={slug} bind:free id="up-name" />
-          {:else if naming || slug !== ''}
-            <p class="called" role="status">
-              {#if naming}{words.calledFinding}{:else}{words.calledLine(slug)}
-                <button type="button" class="link plain" onclick={changeName}>{words.change}</button>{/if}
-            </p>
-          {/if}
+          <!-- THE TITLE AND ITS PLACES, as one tile: what will be kept, under the name it will have. -->
+          <section class="tile">
+            {#if nameByHand}
+              <NameField bind:value={slug} bind:free id="up-name" />
+            {:else if naming || read?.title || slug !== ''}
+              <div class="tile-head">
+                <h2 class="tile-h" aria-live="polite">{naming ? words.calledFinding : (read?.title ?? slug)}</h2>
+                {#if !naming && slug !== ''}<button type="button" class="link plain" onclick={changeName}>{words.change}</button>{/if}
+              </div>
+            {/if}
+            {#if places && places.length > 0}
+              <ul class="places">
+                {#each places as pl (`${pl.kind}:${pl.id}`)}<li>{pl.name}</li>{/each}
+              </ul>
+            {/if}
+          </section>
 
           {#if signedIn === null}
             <div class="row">
@@ -818,7 +1015,12 @@
               {signedIn ? words.makeNow : busy ? words.sending : words.send}
             </Button>
           </div>
+          {#if signedIn === null && plan === 'free'}<p class="quiet open-here">{onPhone ? words.openHere : words.openHereWide}</p>{/if}
         </form>
+      {:else if step === 'lock'}
+        <h1 class="title" id="lock-h" tabindex="-1">{words.lockTitle}</h1>
+        <!-- ITS ONE PRESS IS THE STEP'S PRIMARY, and "Not now" or a passkey made goes on to the build (`ondone`). -->
+        <PasskeyFirst ondone={lockDone} />
       {:else if step === 'sent'}
         <h1 class="title" id="sent-h" tabindex="-1">{copy.signupCheckMail}</h1>
         <p class="lede">{copy.signupMailSent(sentTo)}</p>
@@ -831,7 +1033,6 @@
       {:else if step === 'making'}
         <h1 class="title">{words.making}</h1>
         <p class="lede" role="status">{stage}</p>
-        <span class="bar" aria-hidden="true"><span class="bar-fill"></span></span>
       {:else if step === 'made-partly'}
         <h1 class="title">{words.madeTitle}</h1>
         <p class="lede" role="status">{missed.length > 0 ? words.madePartly : words.madeUnreached}</p>
@@ -876,7 +1077,7 @@
 
     {#if showBuild}
       <aside class="build" aria-label={firstRun.mineTitle}>
-        <Building {parts} heard={live?.heard ?? []} {rail} {locale} />
+        <Building {parts} title={read?.title ?? null} {places} {locale} />
       </aside>
     {/if}
   </div>
@@ -942,8 +1143,7 @@
     overflow-wrap: anywhere;
   }
 
-  .title:focus,
-  .question-h:focus {
+  .title:focus {
     /* focus-ok: `tabindex="-1"` moves focus here for a screen reader when the step changes; it is never in the tab order. */
     outline: none;
   }
@@ -973,22 +1173,201 @@
 
   /* THE ONE FIELD, at the size of a sentence rather than a form row, 16px so a phone does not zoom it. */
   .prompt {
+    position: relative;
+    display: block;
     inline-size: 100%;
     box-sizing: border-box;
     padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
+    background: transparent;
     border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-md);
     line-height: var(--lh-body);
+    /* A field takes the browser's own tracking, not the body's, and the marks under it take the body's: the same here,
+       or every word drifts a little further from its mark. The gutter is kept on both, so a scrollbar wraps neither. */
+    letter-spacing: inherit;
+    scrollbar-gutter: stable;
     resize: vertical;
     scroll-margin-block: var(--sp-6) var(--sp-9);
   }
 
   .prompt::placeholder {
     color: var(--dim);
+  }
+
+  /* THE FIELD AND ITS MARKS: the marks are the same words in the same box under a clear field, so the words heard
+     light up where they are typed. Same padding, size, line and wrapping as the field, or the marks drift. */
+  .lit-field {
+    position: relative;
+    background: var(--s1);
+    border-radius: var(--r-md);
+  }
+
+  .lit {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    padding: var(--sp-3) var(--sp-4);
+    color: transparent;
+    font-size: var(--t-md);
+    line-height: var(--lh-body);
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    scrollbar-gutter: stable;
+    pointer-events: none;
+  }
+
+  .lit mark {
+    border-radius: 4px;
+    background: var(--action-tint-1);
+    color: transparent;
+  }
+
+  /* A TILE: flat, opaque, no border, no shadow, radius 16 (DIRECTION §39). */
+  .tile {
+    display: grid;
+    gap: var(--sp-3);
+    padding: var(--tile-pad);
+    border-radius: var(--tile-r);
+    background: var(--tile);
+  }
+
+  .tile-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-2);
+  }
+
+  .tile-h {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-group);
+    font-weight: 600;
+    line-height: 24px;
+  }
+
+  .lines,
+  .places,
+  .promises {
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* A LINE HEARD: her words on the left, what they became on the right, the whole line one press. */
+  .line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-1) var(--sp-3);
+    inline-size: 100%;
+    min-block-size: var(--tap);
+    padding: var(--sp-2) var(--sp-3);
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-base);
+    line-height: var(--lh-body);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .line[aria-expanded='true'] {
+    background: var(--selected);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .line:hover {
+      background: var(--selected);
+    }
+  }
+
+  .line-said {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .line-became {
+    color: var(--action-text);
+    font-weight: 500;
+  }
+
+  .line-edit {
+    display: grid;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  }
+
+  .places {
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: var(--lh-body);
+  }
+
+  .promises li {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: var(--lh-body);
+  }
+
+  /* THE ANSWERS: full-width rectangles, each its name and what choosing it means; the chosen one in the accent's tint
+     and with a tick, never the colour alone. */
+  .opts {
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .opt {
+    display: grid;
+    gap: 2px;
+    inline-size: 100%;
+    min-block-size: var(--tap);
+    padding: var(--sp-3) var(--sp-4);
+    border: 0;
+    border-radius: 8px;
+    background: var(--tile);
+    color: var(--ink);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .opt[aria-checked='true'] {
+    background: var(--action-tint-1);
+  }
+
+  .opt-name {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--t-md);
+    font-weight: 500;
+  }
+
+  .opt-means {
+    color: var(--ink2);
+    font-size: var(--t-base);
+  }
+
+  .back {
+    align-self: flex-start;
+  }
+
+  .open-here {
+    text-align: center;
   }
 
   .chips {
@@ -999,22 +1378,6 @@
 
   .chips :global(.btn[aria-pressed='true']) {
     background: var(--selected);
-  }
-
-  .question {
-    display: grid;
-    gap: var(--sp-3);
-    padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
-    animation: build-in var(--d-swap) var(--ease-out) both;
-  }
-
-  .question-h {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-group);
-    font-weight: 600;
-    line-height: 24px;
   }
 
   /* THE SENTENCE ONCE KEPT: one line in the field's own fill, which a press opens again for editing. */
@@ -1051,17 +1414,6 @@
   .said-edit {
     color: var(--dim);
     font-size: var(--t-sm);
-  }
-
-  .called {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
   }
 
   .row {
@@ -1134,37 +1486,6 @@
     cursor: pointer;
   }
 
-  /* MAKING IT: one quiet bar that moves, never a spinner, under the stage it is at. */
-  .bar {
-    position: relative;
-    display: block;
-    inline-size: 100%;
-    max-inline-size: 20rem;
-    block-size: 4px;
-    margin-block-start: var(--sp-2);
-    overflow: hidden;
-    border-radius: var(--r-pill);
-    background: var(--s1);
-  }
-
-  .bar-fill {
-    position: absolute;
-    inset-block: 0;
-    inline-size: 40%;
-    border-radius: inherit;
-    background: var(--ink);
-    animation: bar-move 1.4s var(--ease-standard) infinite;
-  }
-
-  @keyframes bar-move {
-    from {
-      inset-inline-start: -40%;
-    }
-    to {
-      inset-inline-start: 100%;
-    }
-  }
-
   .missed {
     display: grid;
     gap: var(--sp-1);
@@ -1176,14 +1497,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .build,
-    .question {
+    .build {
       animation: none;
-    }
-
-    .bar-fill {
-      animation: none;
-      inset-inline-start: 0;
     }
   }
 

@@ -1,0 +1,8 @@
+{
+  "gate": "hygiene",
+  "rule": "an agent's directions file",
+  "expect": "an agent's directions",
+  "findings": 1,
+  "total": 1,
+  "why": "THE ROOT INSTRUCTION FILE, where his private notes and every agent's directions live."
+}

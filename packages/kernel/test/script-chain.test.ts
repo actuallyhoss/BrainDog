@@ -211,8 +211,8 @@ test(`A CHAIN NOTHING IN THE DATA ENDS stops at the stated bound: ${BOUND + 1} r
      and wrote one row." and the tenth row sat there with nothing anywhere saying why no rule ran on it. */
   const said = sql.all<{ note: string }>("SELECT note FROM event WHERE kind = 'pull' AND target = 'declaration:script.spawn' ORDER BY rowid").map((e) => e.note);
   assert.equal(said.length, BOUND + 1);
-  assert.deepEqual(said.slice(0, -1), said.slice(0, -1).map(() => 'spawn ran and wrote one row.'));
-  assert.match(said.at(-1)!, new RegExp(`^spawn ran and wrote one row\\. Its writes started no rule\\.spawn on items#${BOUND + 2}: that run would be at depth ${BOUND + 1} `));
+  assert.deepEqual(said.slice(0, -1), said.slice(0, -1).map(() => 'spawn ran and wrote one line.'));
+  assert.match(said.at(-1)!, new RegExp(`^spawn ran and wrote one line\\. Its writes started no rule\\.spawn on items#${BOUND + 2}: that run would be at depth ${BOUND + 1} `));
   assert.match(said.at(-1)!, /A person's own write starts it again\.$/);
   assert.ok(said.at(-1)!.length <= 280, 'the line is cut at 280 characters');
   sql.close();

@@ -51,6 +51,7 @@ import {
   slashOwnModel,
   slashRecord,
   slashSamplesOf,
+  turnedAway,
   type SlashHostDeps,
   type SlashInference,
 } from '@braindog/host/slash';
@@ -788,15 +789,18 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, asks: 
   const made = (): number => callsMade(deps);
   const spent = (): boolean => !onOwnKey(deps.sql) && made() >= asks;
   const until = (): string => monthOf(deps.clock.now(), 1);
-  const refused = <T>(): Result<T> =>
-    no('SLASH_BUDGET_SPENT', `Slash has asked this host's model as often as one record may in a month, so it is out of asks until ${until().slice(0, 10)}.`);
+  const refused = <T>(kind: 'read' | 'propose' | 'pattern' = 'read'): Result<T> => {
+    /* THE ASK TURNED AWAY LEAVES ITS ROW (`@braindog/host/slash` `turnedAway`, model-sign-49). */
+    turnedAway(deps.sql, new Date(deps.clock.now()).toISOString(), kind, 'a');
+    return no('SLASH_BUDGET_SPENT', `Slash has asked this host's model as often as one record may in a month, so it is out of asks until ${until().slice(0, 10)}.`);
+  };
 
   const capped = Object.create(engine) as Slash;
   capped.read = (question, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.read(question, ctx, inference));
   capped.propose = (question, ctx, byok, askId, inference) =>
-    spent() ? Promise.resolve(refused()) : engine.propose(question, ctx, byok, askId, inference);
-  capped.proposePattern = (samples, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposePattern(samples, ctx, inference));
-  capped.draftPattern = (samples) => (spent() ? Promise.resolve(refused()) : engine.draftPattern(samples));
+    spent() ? Promise.resolve(refused('propose')) : engine.propose(question, ctx, byok, askId, inference);
+  capped.proposePattern = (samples, ctx, inference) => (spent() ? Promise.resolve(refused('pattern')) : engine.proposePattern(samples, ctx, inference));
+  capped.draftPattern = (samples) => (spent() ? Promise.resolve(refused('pattern')) : engine.draftPattern(samples));
   capped.digestProse = (digest) => (spent() ? Promise.resolve(ok({ text: '' })) : engine.digestProse(digest));
   capped.proposeSetup = (ask, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposeSetup(ask, ctx, inference));
   capped.proposeMapping = (ask, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposeMapping(ask, ctx, inference));
@@ -804,6 +808,7 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, asks: 
      `UNREACHABLE` is one `serveAsks` acks `done`, so the run stops here and the ladder does not ask again. */
   capped.answer = (ask, inference) => {
     if (!spent()) return engine.answer(ask, inference);
+    turnedAway(deps.sql, new Date(deps.clock.now()).toISOString(), 'read', 'a');
     const next = new Date(until());
     return Promise.resolve(
       no(

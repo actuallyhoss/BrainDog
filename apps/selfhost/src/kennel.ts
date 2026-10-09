@@ -31,6 +31,12 @@ import type { Answer } from './catalogue.ts';
 export const KENNEL_KEEP_MS = 600_000;
 /** How long one read of the public Kennel may take before this host answers without it. */
 export const KENNEL_WAIT_MS = 5_000;
+/**
+ * How long an index or counts read that the public Kennel did not answer is not asked again: a minute. The install
+ * shelf and Slash's offers read the index on every ask, so a host with no network would otherwise wait out
+ * `KENNEL_WAIT_MS` each time.
+ */
+export const KENNEL_MISS_MS = 60_000;
 /** The most an index or a counts file read from the public Kennel may weigh. */
 export const KENNEL_INDEX_MOST_BYTES = 8 * 1_048_576;
 /** The most a file or a preview read from the public Kennel may weigh: a preview draws every page, so more than a file's cap. */
@@ -116,6 +122,8 @@ async function fetched(deps: KennelDeps, url: string, most: number): Promise<str
 const kept = new Map<string, { at: number; text: string }>();
 /* AND WHAT IS BEING ASKED, so a burst of readers after the ten minutes waits on one read rather than making one each. */
 const asking = new Map<string, Promise<string | null>>();
+/* AND WHAT DID NOT ANSWER, by when, so a host off the network waits once a minute, not once a read. */
+const missed = new Map<string, number>();
 
 /**
  * A kept read: fresh for `KENNEL_KEEP_MS`, then asked again, and the last good answer when the Kennel does not answer.
@@ -126,13 +134,19 @@ const asking = new Map<string, Promise<string | null>>();
 async function keptText(deps: KennelDeps, url: string, reads: (text: string) => boolean): Promise<string | null> {
   const was = kept.get(url);
   if (was !== undefined && deps.now() - was.at < KENNEL_KEEP_MS) return was.text;
+  const miss = missed.get(url);
+  if (miss !== undefined && deps.now() - miss < KENNEL_MISS_MS) return was?.text ?? null;
   let pending = asking.get(url);
   if (pending === undefined) {
     pending = fetched(deps, url, KENNEL_INDEX_MOST_BYTES).finally(() => asking.delete(url));
     asking.set(url, pending);
   }
   const text = await pending;
-  if (text === null || !reads(text)) return was?.text ?? null;
+  if (text === null || !reads(text)) {
+    missed.set(url, deps.now());
+    return was?.text ?? null;
+  }
+  missed.delete(url);
   kept.set(url, { at: deps.now(), text });
   return text;
 }
@@ -174,6 +188,48 @@ function countsIn(text: string | null): string | null {
   }
 }
 
+/* ── the two reads, for the doors and for installs ─────────────────────── */
+
+/** The folder's index and the public Kennel's merged, the folder's first (`mergeIndexes`), every entry kept. */
+async function mergedIndex(folder: string | undefined, base: string | null, deps: KennelDeps): Promise<CatalogueIndex> {
+  const theirs = base === null ? null : catalogueIn(await keptText(deps, `${base}index.json`, (text) => catalogueIn(text) !== null));
+  return mergeIndexes(catalogueIn(local(folder, 'index.json')), theirs);
+}
+
+/** A published file or preview by a path matched whole: the folder's, then the public Kennel's, or `null`. */
+async function fileFrom(folder: string | undefined, base: string | null, deps: KennelDeps, path: string): Promise<string | null> {
+  return local(folder, path) ?? (base === null ? null : await fetched(deps, `${base}${path}`, KENNEL_FILE_MOST_BYTES));
+}
+
+/** What `kennelReader` answers: the merged index, and a file by its catalogue path. */
+export type KennelReader = { index(): Promise<CatalogueIndex>; file(path: string): Promise<string | null> };
+
+/**
+ * The Kennel read the way this host installs from it, the self-host's side of the Worker's `kennelReader`
+ * (`apps/worker/src/kennel.ts`): THE SAME TWO READS THE DOORS ABOVE MAKE, so what a record installs by id is what
+ * `GET index.json` and `GET packs/...` serve here. The folder's `unlisted` entries are kept for install by id; the
+ * public Kennel lists none, so one of its unlisted add-ons is not found from a self-host.
+ *
+ * `BRAINDOG_KENNEL` IS READ AT EACH CALL, as a request reads it. Off, or not answering with nothing kept, and the
+ * folder answers alone. The caller holds every path to the two shapes a catalogue lists.
+ */
+export function kennelReader(folder: string | undefined, deps?: KennelDeps): KennelReader {
+  const bound = (): { d: KennelDeps; base: string | null } => {
+    const d = deps ?? fromEnv();
+    return { d, base: kennelBase(d.kennel) };
+  };
+  return {
+    index: () => {
+      const { d, base } = bound();
+      return mergedIndex(folder, base, d);
+    },
+    file: (path) => {
+      const { d, base } = bound();
+      return fileFrom(folder, base, d, path);
+    },
+  };
+}
+
 /* ── answers ────────────────────────────────────────────────────────────── */
 
 const BASE_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'x-content-type-options': 'nosniff' } as const;
@@ -204,10 +260,9 @@ export async function kennelAnswer(method: string, pathname: string, folder: str
   }
   switch (asked.ask) {
     case 'index': {
-      const theirs = base === null ? null : catalogueIn(await keptText(deps, `${base}index.json`, (text) => catalogueIn(text) !== null));
       /* THE INDEX LEAVES OUT AN `unlisted` ENTRY, as the Worker's does (`apps/worker/src/kennel.ts`): its files still
          answer by exact path. */
-      const merged = mergeIndexes(catalogueIn(local(folder, 'index.json')), theirs);
+      const merged = await mergedIndex(folder, base, deps);
       return { status: 200, headers: READ, body: JSON.stringify({ ...merged, entries: listedEntries(merged) }) };
     }
     case 'counts': {
@@ -216,7 +271,7 @@ export async function kennelAnswer(method: string, pathname: string, folder: str
     }
     case 'file':
     case 'preview': {
-      const text = local(folder, asked.path) ?? (base === null ? null : await fetched(deps, `${base}${asked.path}`, KENNEL_FILE_MOST_BYTES));
+      const text = await fileFrom(folder, base, deps, asked.path);
       if (text === null)
         return refused(404, 'ROUTE_UNKNOWN', `This BrainDog holds no ${asked.path}, and ${base === null ? 'it reads no Kennel' : 'the Kennel did not answer for it'}.`, {
           'access-control-allow-origin': '*',

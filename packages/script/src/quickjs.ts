@@ -107,12 +107,14 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
   let cpu = 0;
   let stop: ScriptRefusal | null = null;
   let done = false;
+  /* THE ONE QUESTION A RUN MAY ASK (script-ask-47): `ask` on what its function returns, handed on unread. */
+  let ask: unknown;
 
   const answer = (refused: ScriptRefusal | null): ScriptAnswer => {
     done = true;
     usage.wall_ms = Math.round(clock() - started);
     usage.cpu_ms = Math.round(cpu);
-    return refused === null ? { writes, log, usage } : { refused, log, usage };
+    return refused === null ? { writes, log, usage, ...(ask === undefined || ask === null ? {} : { ask }) } : { refused, log, usage };
   };
 
   const limits = checkDecl(decl);
@@ -482,7 +484,10 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
       const message = inVm(() => errorText(vm, thrown));
       return answer(stop ?? overBudget() ?? fromError(message));
     }
+    /* INSIDE inVm, BECAUSE DUMPING CAN RUN GETTERS; the overBudget check right after still covers what it costs. */
+    const value: unknown = inVm(() => vm.dump(outcome.value));
     outcome.value.dispose();
+    ask = value !== null && typeof value === 'object' ? (value as { ask?: unknown }).ask : undefined;
     /* THE LAST CHECK, FOR TIME NO OTHER CHECK FELL INSIDE. `JSON.stringify` of two 3 MB strings is
        one native call in the engine: no interrupt during it, no host function after it, and the
        run answered clean at `cpu_ms: 111` against a limit of 5. */

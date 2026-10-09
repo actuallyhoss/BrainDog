@@ -197,7 +197,7 @@ for (const key of [new Uint8Array(32).fill(7), new Uint8Array(32).map((_, i) => 
     /* And it still opens: every checked column holds a value its table allows. */
     const fresh = openSqlite();
     await openRecord(fresh, fixedClock(NOW), {});
-    const opened = importBrainl(fresh, (fn) => fn(), shaped);
+    const opened = importBrainl(fresh, (fn) => fn(), shaped, { shape: true });
     assert.ok(opened.ok, JSON.stringify(opened));
     fresh.close();
     sql.close();

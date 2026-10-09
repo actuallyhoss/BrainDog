@@ -173,6 +173,7 @@ test('AND THE RESOURCES GO THE SAME WAY, more quietly, which is the half of this
     'braindog:grammar/metric',
     'braindog:grammar/proposals',
     'braindog:grammar/ingest',
+    'braindog:grammar/kinds',
   ]);
   sql.close();
 });

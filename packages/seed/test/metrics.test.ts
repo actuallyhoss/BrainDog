@@ -120,7 +120,7 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
    * nothing between the seed and this line decides which rows count except `evaluate`.
    */
   const held = (k.list({ register, limit: 1000 }) as { ok: true; value: { rows: Entry[] } }).value.rows;
-  const rows = held.filter((e) => evaluate(said.predicate, e.fields, schema));
+  const rows = held.filter((e) => evaluate(said.predicate, e.fields, schema, e as unknown as Record<string, unknown>));
 
   const v = decl.value as Record<string, unknown>;
   if ('rolled' in v) return rolledByHand(k, v.rolled as Rolled, rows);
@@ -149,7 +149,8 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
     return { value: new Set(rows.flatMap((e) => { const m = e.fields[field] as { currency?: string } | null | undefined; return m?.currency ? [m.currency] : []; })).size, unit: null };
   }
   if ('age' in v) {
-    const days = rows.map((e) => e.fields[v.age as string]).filter((d): d is string => typeof d === 'string').map((d) => d.slice(0, 10)).sort();
+    const stamped = v.age === 'created_at' || v.age === 'updated_at';
+    const days = rows.map((e) => (stamped ? (e as unknown as Record<string, unknown>)[v.age as string] : e.fields[v.age as string])).filter((d): d is string => typeof d === 'string').map((d) => d.slice(0, 10)).sort();
     const newest = days.at(-1);
     const today = new Date(NOW).toISOString().slice(0, 10);
     return { value: newest === undefined ? null : Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${newest}T00:00:00Z`)) / 86_400_000)), unit: null };

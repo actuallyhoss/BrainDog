@@ -103,9 +103,9 @@ test('THE LINES HOLD NO VALUE: no word the record holds, its name, its owner or 
   const text = copy.value.join('\n').toLowerCase();
 
   /* THE CHECK SEES THEM WHEN THEY ARE THERE: the plain export holds every one, so a pass below is not a blind one. */
-  const plain = await r.api.export({}, r.owner);
-  if (!plain.ok) return assert.fail(JSON.stringify(plain));
-  const held = (plain.value as string[]).join('\n').toLowerCase();
+  const full = await r.api.export({}, r.owner);
+  if (!full.ok) return assert.fail(JSON.stringify(full));
+  const held = (full.value as string[]).join('\n').toLowerCase();
 
   for (const word of [...HIS, 'Holdings', 'Met ', 'ada@example.com', 'The Studio', 'the-studio']) {
     assert.ok(held.includes(word.toLowerCase()), `the plain export does not hold ${word}, so the check below proves nothing`);

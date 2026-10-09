@@ -1,6 +1,6 @@
 /**
  * The night's copy and the last export, as Settings says them (LCH-C03): `boot`'s `copies` to the one line over the
- * Backups list and the one line in Export.
+ * Backups list and the one line in Export. And this host's last restore test beside the copy line (LCH-C04), at the end.
  *
  * THE FACTS ARE THE RECORD'S, AND LOCAL: `last_copy_at`, `last_copy_bytes` and `last_export_at`, read from the newest
  * `export` events (`packages/kernel/src/copies.ts`, `copyFacts`) and sent on `boot` as `copies`. Each may be `null`.
@@ -70,4 +70,58 @@ export function copyLine(facts: CopyFacts, now: number): CopyLine {
 /** The Export line: "Last exported: 3 days ago", or "Never exported". */
 export function exportLine(facts: CopyFacts, now: number): string {
   return facts.last_export_at === null ? copy.exportedNever : copy.exportedLast(ago(facts.last_export_at, now));
+}
+
+/**
+ * THIS HOST'S LAST RESTORE TEST (LCH-C04 job 4), from `GET /account/drill`: `{ at, pass, records }`, or `{ at: null }`
+ * before the first. A FACT ABOUT THE HOST AND NOT THE RECORD (the scope's critic): only the operator holds the key that
+ * opens the copies, so every record on the host reads the same line, and nothing here is drawn for one record alone.
+ */
+export type DrillFacts = { at: string; pass: boolean; records: number } | { at: null };
+
+/** Past this, the last pass is overdue: the drill runs monthly, and the vital sign asks for one under 35 days. */
+export const DRILL_DUE_MS = 35 * 24 * 3_600_000;
+
+/** The answer's `value`, or `null` where it is not the door's shape, so a wrong answer draws no line rather than a wrong one. */
+export function drillOf(value: unknown): DrillFacts | null {
+  if (value === null || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  if (v.at === null) return { at: null };
+  const at = instant(v.at);
+  if (at === null || typeof v.pass !== 'boolean') return null;
+  const records = typeof v.records === 'number' && Number.isInteger(v.records) && v.records >= 0 ? v.records : 0;
+  return { at, pass: v.pass, records };
+}
+
+/**
+ * Read the door. `null` IS NO LINE: a self-host has no such door and answers 404, a host where nobody signs in or a
+ * session that ended answers 401, and a host that could not be reached says nothing. Only the door's own answer draws.
+ * The door is at the root, under no record's slug, because the fact is the host's.
+ */
+export async function readDrill(io: typeof fetch, base = ''): Promise<DrillFacts | null> {
+  let res: Response;
+  try {
+    res = await io(`${base}/account/drill`, { headers: { accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store' });
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+  const said: unknown = await res.json().catch(() => undefined);
+  if (said === null || typeof said !== 'object' || (said as { ok?: unknown }).ok !== true) return null;
+  return drillOf((said as { value?: unknown }).value);
+}
+
+/**
+ * The drill line: the sentence, whether it is a fault, and the word that marks it beside the deeper red. A test never
+ * run is a fault, and stays one until the operator runs the first; so is a failed test, and a pass past 35 days.
+ */
+export type DrillLine = { text: string; fault: boolean; mark: string | null };
+
+/** "This host's last restore test: passed 12 days ago", "...: failed 3 days ago", or "Never tested". */
+export function drillLine(drill: DrillFacts, now: number): DrillLine {
+  if (drill.at === null) return { text: copy.drillNeverSaid, fault: true, mark: copy.drillNever };
+  const when = ago(drill.at, now);
+  if (!drill.pass) return { text: copy.drillFailed(when), fault: true, mark: null };
+  const overdue = now - Date.parse(drill.at) > DRILL_DUE_MS;
+  return { text: copy.drillPassed(when), fault: overdue, mark: overdue ? copy.drillOverdue : null };
 }

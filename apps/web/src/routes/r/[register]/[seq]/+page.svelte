@@ -67,7 +67,8 @@
   import JsonBox from '$lib/ui/JsonBox.svelte';
   import { ownsRecord, type Me } from '../../../settings/levels.ts';
   import { readHistory, readNames, type Told } from '$lib/record/history-live.ts';
-  import { rowReader, type Got, type RowReader } from '$lib/record/row-live.ts';
+  import { rowReader, type Docs, type Got, type RowReader } from '$lib/record/row-live.ts';
+  import { resolverOf, shownOf } from '$lib/record/row-values.ts';
   import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
   import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
   import type { Entry, FieldDecl, Fields } from '$lib/record/schema.ts';
@@ -783,9 +784,27 @@
   /* A CHART'S VALUES, BY THE FIGURE'S RULE: a bar and a sparkline's point say what they are, where the tile's figure is a headline. */
   const figureSaid = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), 'figure');
 
-  /* EVERY VALUE IN A ROW'S PROSE IS A HOLE UNTIL PAGES READ THEM. The sample's own values answered them off the
-     row, and pressing one said what would have happened; neither has a record behind it. */
-  const resolve = (): null => null;
+  /* WHAT EACH DOCUMENT'S `{{path}}`s READ, the record's answer with the row as the entry they sit on (PGS-B03), so a
+     project's note prints its stage and how many things are in its way, as the project page does. A read hands them with
+     the row; a write answers the row alone, and a changed field changes what a note says, so they are asked again, and
+     the ones in hand stay drawn until the new ones land rather than flash a dash. */
+  let docs = $state<Docs | undefined>(undefined);
+  $effect(() => {
+    const g = got;
+    if (g?.from !== 'live' || !g.entry) {
+      docs = undefined;
+      return;
+    }
+    if (g.docs) {
+      docs = g.docs;
+      return;
+    }
+    const asked = askedFor;
+    reader ??= rowReader(apiBase());
+    void reader.docs(id, seq).then((d) => {
+      if (askedFor === asked && got === g) docs = d;
+    });
+  });
   /** A link the host cannot resolve is plain text, never a dead anchor (36 §13 D16). */
 
   const link = (spoken: string) => {
@@ -882,8 +901,9 @@
            followed by a second, relative reading of the same day. -->
       {daySaid(String(value), clock)}
     {:else if id === 'session' && f.id === 'project' && spokenRow(value, names)}
-      <!-- A RUN'S PROJECT IS HELD AS A SPOKEN ID. It reads as the project, and opens it. -->
-      <a href={at(spokenRow(value, names)!.href)}>{spokenRow(value, names)!.label}</a>
+      <!-- A RUN'S PROJECT IS HELD AS A SPOKEN ID. It reads as the project, and opens it, with the same thumb's target as
+           any other fact that opens a row (`.ref-link`): bare, it was 61 by 23 under a thumb. -->
+      <a class="ref-link" href={at(spokenRow(value, names)!.href)}>{spokenRow(value, names)!.label}</a>
     {:else if f.type === 'ref' && namedRef(f.to, value)}
       <!-- A ROW THIS ONE POINTS AT OPENS ITS PAGE, said by its name: who an invoice is for is one press from them. -->
       <a class="ref-link" href={at(namedRef(f.to, value)!.href ?? "")}>{namedRef(f.to, value)!.name}</a>
@@ -1214,7 +1234,7 @@
                 <!-- `hole` IS WHAT MAKES A HOLE PRESSABLE. Without it the renderer draws a marked span rather than a
                      `<button>` nobody wrote a handler for. No `dayHref`: there is no calendar in this build. A value the
                      record cannot answer is not pressable: nobody can supply a declared figure from this screen. -->
-                <Document src={String(row.fields[f.id])} opts={{ resolve, link, now: clock, href: at }} />
+                <Document src={shownOf(docs?.[f.id], String(row.fields[f.id]))} opts={{ resolve: resolverOf(docs?.[f.id], String(row.fields[f.id])), link, now: clock, href: at }} />
               {/if}
             </article>
           </Tile>

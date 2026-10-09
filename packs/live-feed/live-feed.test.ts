@@ -1,5 +1,5 @@
 /**
- * Live numbers, polled, as a pack file: one JSON address, a key named by its label in the vault, and which number in
+ * A live feed, polled, as a pack file: one JSON address, a key named by its label in the vault, and which number in
  * the answer is which measure.
  *
  * WHY A FILE AND NOT A BUILDER IN CODE. The seed's old `pollPack` built the same declaration in code, and it required
@@ -73,14 +73,22 @@ test('the file reads clean as an add-on somebody opens from disk, and says what 
 });
 
 test('the file as it ships, with its marks taken off, is its own example filled, but for its name', () => {
-  /* THE FILE IS `live-feed`, THE ONE EVERY FEED IS FILLED FROM, and kept off every listing: a fill is `feed-<id>`,
-     named for its host, and listed nowhere either, since a person's feeds are never in the catalogue. */
+  /* THE FILE IS `live-feed`, THE ONE EVERY FEED IS FILLED FROM, titled "Live feed", and kept off every listing: listed,
+     the template would install as it ships and poll stats.example.com. A fill is `feed-<id>`, named for its host, and
+     listed nowhere either, since a person's feeds are never in the catalogue. */
   const { fill: _marks, unlisted, changes, ...shipped } = template();
   assert.equal(unlisted, true);
   assert.equal(typeof changes, 'string');
   const filled = fillFeed(template(), EXAMPLE);
   assert.deepEqual([filled.pack, filled.title, 'unlisted' in filled, 'changes' in filled], ['feed-example', 'Numbers from stats.example.com', false, false]);
-  assert.equal(JSON.stringify(shipped), JSON.stringify({ ...filled, pack: 'live-feed', title: 'Live numbers' }));
+  assert.equal(JSON.stringify(shipped), JSON.stringify({ ...filled, pack: 'live-feed', title: 'Live feed' }));
+});
+
+test('THE WITHDRAWN EXAMPLE SAYS WHERE A POLL IS SET UP NOW: the form on a project\'s page, not Settings', () => {
+  const yanked = JSON.parse(readFileSync(new URL('./yanked.json', import.meta.url), 'utf8')) as Record<string, string>;
+  assert.deepEqual(Object.keys(yanked), ['feed-example']);
+  assert.match(yanked['feed-example']!, /project's page, under Send numbers here/u);
+  assert.doesNotMatch(yanked['feed-example']!, /Settings|\u2014/u);
 });
 
 test('IT REQUIRES NO PACK BY NAME, and names no host but the example', () => {

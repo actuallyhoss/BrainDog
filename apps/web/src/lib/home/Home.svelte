@@ -158,7 +158,7 @@
      Today reads as it did. Gone for good once hidden (`nextStepsHidden`). */
   const steps = $derived.by(() => {
     if (!first || prefs.nextStepsHidden === true || added > FIRST_TODAY_MOST) return [];
-    return told ? madeSteps(kept.registers.map((r) => r.id), prefs.arrivesBy) : wantMore(kept, prefs);
+    return told ? madeSteps(kept.registers, prefs.arrivesBy) : wantMore(kept, prefs);
   });
 
   /**

@@ -463,10 +463,15 @@ export function readiness(gate, timeoutMs, root) {
  *
  * `height` is `layout.viewportHeightPx` unless a gate says otherwise. `touch` is a phone: a coarse pointer and the
  * mobile viewport together, because a gate that emulated only a mouse never measured the size a thumb gets.
+ * `serviceWorkers` is handed to the context as it is (`'block'` or `'allow'`), and left out when not given.
+ *
+ * `cookies` IS THE DEVICE'S OWN, name to value, put on the context for the page's origin before the page exists: the
+ * first-paint copy a browser already holds (`bd_pref`), which is what `prefs` measures beside what the record keeps.
+ * Never what the record keeps, which goes through `prefs`.
  */
 export function pagePlan(
   url,
-  { width, height, record, prefs = {}, clock, scheme, touch = false, reducedMotion = 'reduce', waitUntil = 'domcontentloaded', prerendered = false } = {},
+  { width, height, record, prefs = {}, clock, scheme, touch = false, reducedMotion = 'reduce', waitUntil = 'domcontentloaded', prerendered = false, serviceWorkers, cookies = {} } = {},
 ) {
   if (!Number.isInteger(width) || width <= 0) throw new Error(`openPage ${url}: width is a whole number of pixels, and was ${String(width)}.`);
   /* `record.now` is `null` for a base `record.mjs` did not start, and that is no clock, not `clock: null`: only the call
@@ -488,9 +493,13 @@ export function pagePlan(
          a gate can run in the page, not what the page is. */
       bypassCSP: true,
       ...(scheme === undefined ? {} : { colorScheme: scheme }),
+      /* `serviceWorkers: 'block'` FOR A GATE WHOSE PAGE MUST MAKE ITS OWN REQUESTS (`keys`): the read copy's worker
+         answers `/api` from its own fetch, which `page.route` never sees. */
+      ...(serviceWorkers === undefined ? {} : { serviceWorkers }),
     },
     clock: at === null ? null : new Date(at).getTime(),
     prefs: keeps,
+    cookies: Object.entries(cookies ?? {}).map(([name, value]) => ({ name, value: String(value), url: new URL(url).origin })),
     waitUntil,
     prerendered,
   };
@@ -528,11 +537,14 @@ async function keepPrefs(record, prefs) {
  *   const opened = await openPage(browser, `${origin}${APP_BASE}/today`, { width: 390, touch: true, record, ready });
  *   // opened.state: what the screen settled into (`ready.settled`), `null` when it never did, which is a finding
  *   // opened.errors: `{ kind: 'uncaught' | 'console', text }`, for this load only; `printed.mjs` reads them
+ *   // opened.failed: `{ status, path }` of each answer that was not ok, for this load only, so a console line the
+ *   //   browser writes for one can be told apart as the host's answer (`printed.mjs` `hostsWord`)
  *   // opened.goto(url): the next address in the same page, its errors collected afresh; resolves to its state
  *   // opened.context: the caller's to close, in the `finally` of the `try` it opened it in
  *
  * `ready` IS REQUIRED. It is the gate's `readiness(...)`, and a page opened without waiting for its mark is the idiom
- * that ended in `.catch(() => {})` and measured an empty document. The rest is `pagePlan`'s.
+ * that ended in `.catch(() => {})` and measured an empty document. `init` is a script run before the page's own on
+ * every load (`context.addInitScript`). The rest is `pagePlan`'s.
  *
  * THE CLOCK IS PINNED ON THE CONTEXT BEFORE THE PAGE EXISTS (`clock.setFixedTime`), so the first script that reads the
  * date reads the record's. Timers still run, so a screen that settles on a timer still settles.
@@ -547,19 +559,28 @@ export async function openPage(browser, url, options = {}) {
   const context = await browser.newContext(plan.context);
   try {
     if (plan.clock !== null) await context.clock.setFixedTime(plan.clock);
+    if (plan.cookies.length > 0) await context.addCookies(plan.cookies);
+    /* A SCRIPT BEFORE THE PAGE'S OWN (`init`), on the context, so it is in the first document and every one after.
+       Added to a page after its first load it misses that load, and `keys`'s planted swallowed key went unseen. */
+    if (options.init !== undefined) await context.addInitScript(options.init);
     const page = await context.newPage();
     const errors = [];
+    const failed = [];
     page.on('pageerror', (e) => errors.push({ kind: 'uncaught', text: e instanceof Error ? e.message : String(e) }));
     page.on('console', (m) => {
       if (m.type() === 'error') errors.push({ kind: 'console', text: m.text() });
     });
+    page.on('response', (r) => {
+      if (!r.ok()) failed.push({ status: r.status(), path: new URL(r.url()).pathname });
+    });
     const goto = async (to) => {
       errors.length = 0;
+      failed.length = 0;
       await page.goto(to, { waitUntil: plan.waitUntil });
       return ready.settled(page, plan.prerendered);
     };
     const state = await goto(url);
-    return { context, page, state, errors, plan, goto };
+    return { context, page, state, errors, failed, plan, goto };
   } catch (e) {
     await context.close().catch(() => {});
     throw e;

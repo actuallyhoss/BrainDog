@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "a link in the message",
+  "expect": "holds a URL",
+  "findings": 1,
+  "total": 1,
+  "why": "A LINK IN A SUBJECT OF THE RIGHT LENGTH, the shape of the session link a harness asks for."
+}

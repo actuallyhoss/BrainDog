@@ -1,0 +1,8 @@
+{
+  "gate": "hygiene",
+  "rule": "a record file",
+  "expect": "a record or a database",
+  "findings": 1,
+  "total": 1,
+  "why": "A RECORD, someone's whole life in one file."
+}

@@ -35,6 +35,7 @@ import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
+import { rememberedLine, type Remembered } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
 import type { ViewRow } from '@braindog/kernel';
@@ -201,7 +202,7 @@ import { methods } from './methods/index.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
 import { quietSign } from './methods/signs.ts';
 import { methods as jobMethods } from './jobs.ts';
-import { PEN_DISMISSED_MOST, penFor, type PenItem } from './emergent.ts';
+import { PEN_DISMISSED_MOST, penFor, penRanked, signatureOf, type PenItem } from './emergent.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
 import { rerank } from './rerank.ts';
@@ -209,6 +210,7 @@ import { aboutOf, ladder, type Caller, type Gate } from './ladder.ts';
 import { OLDER, card as cardOf } from './card.ts';
 import { alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
 import { byWhoOf, passesOf, passFolder, passKept, type ByWho, type UpdatePass } from './update-pass.ts';
+import { docValues } from './row-values.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_ASKED_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
@@ -1041,7 +1043,7 @@ export type Boot = {
    */
   counts: { decide: number; inbox: number | null; decided: number; arrived: number | null };
   /**
-   * The holding pen: what this record would add if somebody asked, strongest first and at most `PEN_MOST`
+   * The holding pen: what this record would add if somebody asked, ranked, one offer a list, at most `PEN_SHOWN` (`penRanked` holds the rest)
    * (`emergent.ts`). Placed by nobody: each item carries the whole declaration accepting it would write.
    *
    * THE OWNER'S AND A WHOLE-RECORD READER'S, and empty for anybody else, because an item is a page over a list and a
@@ -1573,6 +1575,8 @@ export type RecordDeps = {
    * `Pick` so the record's own sentences about a step can read it.
    */
   answersSlash?: boolean | undefined;
+  /** A self-host started with `--allow-shape`: its import takes a shape copy (PRF-A13), passed to the kernel's `RecordOptions.allowShape`. Absent is no. */
+  allowShape?: boolean | undefined;
   /**
    * What signs an exported `.brain`, when this host holds the record's signing key.
    *
@@ -1821,6 +1825,7 @@ export async function createRecordApi(deps: RecordDeps) {
   const opened = await openRecord(deps.sql, deps.clock, {
     ...(deps.delivers === undefined ? {} : { delivers: deps.delivers }),
     ...(deps.answersSlash === undefined ? {} : { answersSlash: deps.answersSlash }),
+    ...(deps.allowShape === undefined ? {} : { allowShape: deps.allowShape }),
     ...(deps.sign === undefined ? {} : { sign: deps.sign }),
     /* THE BUILD THIS HOST RUNS, so the door's `behind` can say a session that named another build is behind. */
     ...(deps.build?.app ? { build: deps.build.app } : {}),
@@ -2444,6 +2449,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           .map((d) => d.id),
       ]),
     ],
+    /* AND WHICH DOORS HOLD A LIVE ADDRESS NOW (retires-48): a webhook door with a token. An arrival long ago is `used`
+       and is not live, so an update retiring a door asks about an add-on taking it over only for these and the doors
+       that filed in the last thirty days (`arrange-retires.ts` `liveIngests`). */
+    addressed: kernel.declarations().filter((d) => d.kind === 'ingest' && heldDigest(d.id.slice('ingest.'.length)) !== undefined).map((d) => d.id),
     /* HOW A FIGURE'S WORDS READ, so the plan can name the ones a widening would move (`declare`'s `misreads`), with
        `where`'s own parser, as the kernel's `stranded` reads the same sentence. Without it `misreads` was empty on every
        real plan, and `declare`'s install refusal over one never fired outside its tests (`test/plan-widen-record.test.ts`).
@@ -2505,6 +2514,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const titled = (e: CatalogueEntry) => (e.title === e.id ? e.id.charAt(0).toUpperCase() + e.id.slice(1) : e.title);
     const partial = ctx !== undefined && !readsEveryList(ctx);
     const usage = readUsage(sql, kernel, clock.now(), new Map(catalogue.map((e) => [e.id, titled(e)])), speakingNow(kernel), ctx === undefined ? undefined : readsOf(ctx));
+    /* WHAT THE PEN HOLDS AND WHAT THE OWNER DISMISSED THERE (offer-pen-50), so Slash never asks on Decide for a page the
+       pen offers or was told No about: one place an offer. Every offer the pen RANKS, not only the three it shows, or
+       Slash took over the ones waiting their turn (its checker). */
+    /* THE PERSON PRESSING, or for the daily look with nobody asking, the record's owner. */
+    const asker = ctx === undefined ? null : ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : null;
+    const ownerId = asker ?? kernel.members().find((m) => m.level === 'owner' && m.suspended_at === null)?.person_id ?? null;
+    const ownerPrefs = ownerId === null ? {} : kernel.prefsOf(ownerId);
+    const goneRaw = ownerPrefs['pen.dismissed'];
+    const gone = Array.isArray(goneRaw) ? goneRaw.filter((x): x is string => typeof x === 'string') : [];
+    /* A PEN THE OWNER TURNED OFF HOLDS NOTHING (`pen.suggest`, as `boot` reads it), so Slash asks on Decide instead. */
+    const penOn = ownerId !== null && ownerPrefs['pen.suggest'] !== false;
+    usage.pen = {
+      held: penOn ? penRanked({ kernel, reads: () => true, pages: kernel.pages(), dismissed: new Set(gone), use: { sql, nowMs: clock.now() } }).map((i) => i.id) : [],
+      dismissed: gone,
+    };
     const busy = usage.agents.length > 0;
     const offered: Offered[] = catalogue.map((e) => {
       let shows = false;
@@ -2530,7 +2554,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       SLASH,
     )) {
       try {
-        asked.set(stableKey(JSON.parse(row.body) as Record<string, unknown>), { id: row.id, status: row.status });
+        const body = JSON.parse(row.body) as Record<string, unknown>;
+        asked.set(stableKey(body), { id: row.id, status: row.status });
+        /* AND A PAGE SLASH ASKED FOR BY ITS PEN SIGNATURE (offer-pen-50, `keyed`): its why holds a count that changes, so
+           by its body alone a page told No was asked again. */
+        const list = row.opened_by === SLASH ? pageAskedFor(body) : null;
+        if (list !== null) asked.set(signatureOf('page', list), { id: row.id, status: row.status });
       } catch {
         /* a body that will not parse asks nothing */
       }
@@ -6132,6 +6161,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * What `propose` answers when the person already answered this cause (govern-47's `remembered`): `filedAs`'s answer,
+   * plus `said`, the kernel's `rememberedLine`, so the agent passes on what was said and how to ask again.
+   */
+  const answeredAs = <T extends { id: string; answered?: unknown }>(ctx: CallContext, out: Result<T>): Result<T> => {
+    const named = filedAs(ctx, out);
+    if (!named.ok) return named;
+    const a = named.value.answered as Partial<Remembered> | undefined;
+    const whole = a !== undefined && typeof a.said === 'string' && typeof a.reason === 'string' && typeof a.at === 'string';
+    return whole ? ok({ ...named.value, said: rememberedLine(a as Remembered) }) : named;
+  };
+
+  /**
    * Whether an agent's `change` is one the additive rule may answer: an `add`, from a key, about a list that key
    * reaches. The gate then decides whether its fields are loose enough (`additiveFault`), so this only says who may be
    * answered by rule at all.
@@ -7755,7 +7796,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * the caller cannot read the one that does, so the two cannot be told apart. `SG` and `D` are
      * governance's, which the sentence says, because they are the ones an agent reaches for.
      */
-    async get(args: { register?: string; seq?: number; spoken?: string }, ctx: CallContext): Promise<Result<Entry | null>> {
+    async get(args: { register?: string; seq?: number; spoken?: string; values?: boolean }, ctx: CallContext): Promise<Result<Entry | null>> {
       /* NOTHING ASKED IS NOT A ROW THAT IS NOT THERE. `get({})` answered 200 null, and `get()` threw. */
       if (args?.spoken === undefined && args?.register === undefined && args?.seq === undefined)
         return no('REQUIRED_MISSING', 'Name the row, spoken as S1 or tasks#3, or as a register and a seq.', { at: 'spoken' });
@@ -7774,17 +7815,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               { at: 'spoken' },
             );
           const owned = kernel.get(said) ?? folded(said);
-          return readFrom(ctx, ok(owned && rowAdmitted(ctx, owner.id, owned.seq) ? owned : null));
+          {
+            const out = readFrom(ctx, ok(owned && rowAdmitted(ctx, owner.id, owned.seq) ? owned : null));
+            return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
+          }
         }
         const row = kernel.get(said) ?? folded(said);
-        return readFrom(ctx, ok(row && !readable(ctx, row.register) && rowAdmitted(ctx, row.register, row.seq) ? row : null));
+        {
+          const out = readFrom(ctx, ok(row && !readable(ctx, row.register) && rowAdmitted(ctx, row.register, row.seq) ? row : null));
+          return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
+        }
       }
       const missing = named(args, true);
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop };
       const row = kernel.get({ register: args.register as string, seq: args.seq as number });
-      return readFrom(ctx, ok(row && rowAdmitted(ctx, args.register as string, row.seq) ? row : null));
+      {
+        const out = readFrom(ctx, ok(row && rowAdmitted(ctx, args.register as string, row.seq) ? row : null));
+        return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
+      }
     },
 
     async list(
@@ -7867,7 +7917,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A REF INTO A LIST THE CALLER CANNOT READ NAMES NO ROW, WHETHER OR NOT THE ROW EXISTS. The kernel
          resolves refs and only this layer knows who is asking, so without `reads` a member invited to
          Jobs alone read `ok 0` for a hidden client that exists and `REF_UNKNOWN` for one that does not. */
-      return readFrom(ctx, kernel.list({ ...args, reads: (register) => readable(ctx, register) === null }, whereFor(ctx.wheres, args.register)));
+      /* A SWITCHED-OFF ADD-ON'S LIST IS REFUSED NAMING THE ADD-ON (ruling 298), as a write to it is, not "There is no
+         register called tasks", which sends a person looking for a list that is only asleep. */
+      return offRegister(
+        args.register,
+        readFrom(
+          ctx,
+          kernel.list(
+            {
+              ...args,
+              reads: (register) => readable(ctx, register) === null,
+              /* A HOP GOES ONLY INTO A LIST SHE READS WHOLE (where-hop-49): one her grant narrows would be counted whole. */
+              hops: (register) => readable(ctx, register) === null && whereFor(ctx.wheres, register) === undefined,
+            },
+            whereFor(ctx.wheres, args.register),
+          ),
+        ),
+      );
     },
 
     /**
@@ -8320,6 +8386,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         typesOf: (register) => {
           const s = kernel.schemaOf(register);
           return s ? Object.fromEntries(Object.entries(s.fields).map(([k, f]) => [k, f.type])) : null;
+        },
+        /* EACH CLOSED FIELD'S VALUES THAT HAVE NO NAME: the web draws a named value by its name, and only an unnamed one
+           (`vm`) prints as its key, so only those are a key where a name goes. */
+        keysOf: (register) => {
+          const s = kernel.schemaOf(register);
+          return s
+            ? Object.fromEntries(
+                Object.entries(s.fields)
+                  .filter(([, f]) => f.type === 'enum')
+                  .map(([k, f]) => [k, (f.values ?? []).filter((v) => !f.labels?.[v])]),
+              )
+            : null;
         },
         now: () => Date.now(),
       });
@@ -9696,14 +9774,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (args?.body_kind === 'pack' || args?.body_kind === 'settings' || args?.body_kind === 'arrange') {
         const body = args.body as Record<string, unknown> | undefined;
         if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
-          /* ROWS IN AN ARRANGEMENT ARE SLASH'S PLAN, formed from what the owner said (`slashForm`). Anybody else proposes rows
-             as a rowset, which is held to the lists the caller reaches. */
-          if (args.body_kind === 'arrange' && body.rows !== undefined)
-            return no('FIELD_UNKNOWN', 'An arrangement you propose carries no rows. Propose rows as body_kind rowset, one list at a time.', { at: 'body.rows' });
+          /* ROWS IN AN ARRANGEMENT ARE HELD TO THE LISTS THE CALLER REACHES (arrange-47), each as a rowset's register is,
+             so an agent can file the scope's four-part question and never a row about a list it cannot see. */
+          if (args.body_kind === 'arrange' && Array.isArray(body.rows))
+            for (const [i, r] of body.rows.entries()) {
+              const stop = guard(ctx, 'propose', r !== null && typeof r === 'object' && typeof (r as { register?: unknown }).register === 'string' ? (r as { register: string }).register : undefined);
+              if (stop) return { ok: false as const, refusal: { ...stop, at: `body.rows[${i}]` } };
+            }
           const filed = await arrangement.prepare(args.body_kind, body);
           if (!filed.ok) return filed;
           const opened = kernel.propose({ ...args, body: filed.value }, writerOf(ctx));
           const asked = opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened;
+          /* ANSWERED FROM MEMORY (govern-47): the person already said, so nothing is decided again here. */
+          if (asked.ok && asked.value.answered !== undefined) return tail(answeredAs(ctx, asked));
           return tail(asked.ok && asked.value.joined === true ? joinedAs(ctx, asked) : filedAs(ctx, asked));
         }
       }
@@ -9715,6 +9798,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A JOINED QUESTION IS ANSWERED AS A FILED ONE IS (AGT-C07): its name, its card's facts, and the sentence the agent
          passes on, since an open question already holds this cause (`cause`, the filer's or derived) and nothing new was
          asked. Never landed by this caller's rung or by rule: it is waiting on the person for whoever asked it first. */
+      /* A QUESTION ANSWERED FROM MEMORY (govern-47's `remembered`) files nothing, so the ladder and the rules have nothing
+         to decide: the old answer is passed on as it is. */
+      if (filed.ok && filed.value.answered !== undefined) return answeredAs(ctx, filed);
       if (filed.ok && filed.value.joined === true) return joinedAs(ctx, filed);
       if (filed.ok && args?.body_kind === 'rowset') {
         /* ROWS ITS RUNG LETS THROUGH ARE ACCEPTED BY THE LADDER AND LAND NOW, with the Undo every decision has. */
@@ -10864,7 +10950,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AND WHAT IT WAS IS KEPT FIRST, as `restore` keeps it, when this host keeps copies: the kernel takes it once the file
          has passed and before anything is cleared, so a file that is refused leaves no copy behind. */
       const before = args.replace === true && snapshots ? () => snapshots.take('before-restore') : undefined;
-      return tail(await kernel.import(args.lines, { replace: args.replace === true, ...(before === undefined ? {} : { before }) }));
+      /* AND WHO PUT IT BACK, so the hand mark names them and not 'an operator'. */
+      return tail(await kernel.import(args.lines, { replace: args.replace === true, by: ctx.principal.id, ...(before === undefined ? {} : { before }) }));
     },
 
     /* ── ADMIN: BACKUPS, ERASURE AND DELETION ──────────── */
@@ -11822,3 +11909,11 @@ function idNumber(id: string): number {
 }
 
 export type RecordApi = Awaited<ReturnType<typeof createRecordApi>>;
+
+/** The one list a page Slash asked for draws whole, or `null`: one new page requiring one list (`slash.ts` growing lists). */
+function pageAskedFor(body: Record<string, unknown>): string | null {
+  const pages = Array.isArray(body.pages) ? (body.pages as { was?: unknown; body?: { requires?: unknown } }[]) : [];
+  if (pages.length !== 1 || (pages[0]!.was !== undefined && pages[0]!.was !== null)) return null;
+  const requires = Array.isArray(pages[0]!.body?.requires) ? (pages[0]!.body!.requires as unknown[]) : [];
+  return requires.length === 1 && typeof requires[0] === 'string' && requires[0].startsWith('register.') ? requires[0].slice('register.'.length) : null;
+}

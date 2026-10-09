@@ -11,7 +11,8 @@ import assert from 'node:assert/strict';
 
 import { USE_CASES } from '@braindog/seed/usecases';
 
-import { firstRun } from './first-run.ts';
+import { amend, amendKept, AMEND_KEY, keepAmend, litIn, NO_AMEND, firstRun } from './first-run.ts';
+import { moduleName } from '@braindog/seed/usecases/names';
 import { propose, type Proposal } from './start/propose.ts';
 
 const CTX = { zone: 'Europe/London', locale: 'en-GB' };
@@ -30,8 +31,9 @@ test('ONE SENTENCE GIVES THE WHOLE PROPOSAL: the name, the use case, the modules
   }
 });
 
-test('EACH OF THE FOUR CHIPS PROPOSES ITS OWN PERSON: a student, a founder, a team and somebody starting something', () => {
-  const want = ['student', 'founder', 'team', 'guide'];
+test('EACH OF THE FIVE CHIPS PROPOSES ITS OWN PERSON: a shop, a freelancer, a student, a founder and a team (use case 6)', () => {
+  const want = ['shop', 'business', 'student', 'founder', 'team'];
+  assert.equal(firstRun.whoChips.length, 5);
   firstRun.whoChips.forEach((chip, i) => assert.equal(said(chip).usecase, want[i], chip));
 });
 
@@ -101,4 +103,67 @@ test('THE SENTENCES FOR A ROW KEPT IN THE TAB ARE GONE WITH THE SAMPLE THAT KEPT
     assert.equal(key in words, false, `firstRun.${key} is still here`);
   const module: Record<string, unknown> = await import('./first-run.ts');
   assert.equal('keptNothingCause' in module, false, 'the cause picker is still exported');
+});
+
+/* ── what was heard, lit and changed by hand (use case 6, step 2) ─────── */
+
+const MARIAM = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer. I lose track of orders and who owes me.";
+
+test('HER WORDS LIGHT UP WHERE SHE TYPED THEM: every lit run is a phrase heard, and the runs give back the sentence', () => {
+  const p = said(MARIAM);
+  const runs = litIn(MARIAM, p.heard);
+  assert.equal(runs.map((r) => r.text).join(''), MARIAM, 'the runs lose or add words');
+  const lit = runs.filter((r) => r.became !== null).map((r) => r.text);
+  assert.ok(lit.includes('Mariam'), 'her name is not lit');
+  assert.ok(lit.includes('a small candle shop'), 'the trade is not lit whole');
+  assert.ok(lit.includes('orders'), 'orders is not lit');
+  /* A READING A BEAT BEHIND THE TYPING LIGHTS NOTHING IT CANNOT FIND WHERE IT SAYS. */
+  const typed = `So, ${MARIAM}`;
+  assert.ok(litIn(typed, p.heard).every((r) => r.became === null), 'a stale span lit the wrong words');
+  assert.deepEqual(litIn('', p.heard), []);
+});
+
+test('A LINE TAKEN OUT TAKES ITS PARTS WITH IT, and one turned into another part brings that part', () => {
+  const p = said(MARIAM);
+  const ctx = { nameOf: moduleName, caseTitle: 'Shop' };
+  assert.deepEqual(amend(p, NO_AMEND, ctx).modules, p.modules, 'no change changed the parts');
+  /* HER PHRASES ARE READ WHOLE (uc6-heard-49): "freelance as a designer" and "who owes me", each one line. */
+  const out = amend(p, { out: ['freelance as a designer'], to: {} }, ctx);
+  assert.ok(!out.heard.some((h) => h.phrase === 'freelance as a designer'), 'the line is still heard');
+  assert.ok(out.modules.includes('money-core'), 'Money went, though "who owes me" still says it');
+  assert.ok(!amend(p, { out: ['freelance as a designer', 'who owes me'], to: {} }, ctx).modules.includes('money-core'), 'Money stayed with nothing saying it');
+  assert.ok(out.modules.includes('people'), 'People went, though her name still says it');
+  const both = amend(p, { out: ['a small candle shop', 'orders'], to: {} }, ctx);
+  assert.equal(both.usecase, null, 'the shop stayed with no line saying it');
+  const moved = amend(p, { out: [], to: { 'who owes me': 'work' } }, ctx);
+  assert.ok(moved.modules.includes('work'), 'the part it became is not brought');
+  assert.equal(moved.heard.find((h) => h.phrase === 'who owes me')?.became, moduleName('work'));
+});
+
+test('HER NAME CHANGED IS HER NAME, and in the title; taken out, she is nobody yet', () => {
+  const p = said(MARIAM);
+  const ctx = { nameOf: moduleName, caseTitle: 'Shop' };
+  const renamed = amend(p, { out: [], to: {}, name: 'Mimi' }, ctx);
+  assert.equal(renamed.name, 'Mimi');
+  assert.equal(renamed.title, "Mimi's Candles");
+  const gone = amend(p, { out: [], to: {}, name: null }, ctx);
+  assert.equal(gone.name, null);
+  assert.ok(!gone.heard.some((h) => h.you === true), 'the you line is still there');
+});
+
+test('WHAT WAS CHANGED AND ANSWERED WAITS FOR THE SAME SENTENCE ONLY, and storage that throws keeps nothing', () => {
+  const box = new Map<string, string>();
+  const store = { getItem: (k: string) => box.get(k) ?? null, setItem: (k: string, v: string) => void box.set(k, v), removeItem: (k: string) => void box.delete(k) };
+  keepAmend(store, { said: MARIAM, amend: { out: ['owes'], to: { freelance: 'work' }, name: 'Mimi' }, reply: { about: 'arrivesBy', value: 'messages' } });
+  const back = amendKept(store, `${MARIAM}  `);
+  assert.deepEqual(back.amend, { out: ['owes'], to: { freelance: 'work' }, name: 'Mimi' });
+  assert.deepEqual(back.reply, { about: 'arrivesBy', value: 'messages' });
+  assert.deepEqual(amendKept(store, 'Another sentence'), { amend: NO_AMEND, reply: null });
+  box.set(AMEND_KEY, '{"said":1');
+  assert.deepEqual(amendKept(store, MARIAM), { amend: NO_AMEND, reply: null });
+  keepAmend(store, null);
+  assert.equal(box.has(AMEND_KEY), false);
+  const broken = { getItem: () => { throw new Error('off'); }, setItem: () => { throw new Error('off'); }, removeItem: () => { throw new Error('off'); } };
+  keepAmend(broken, { said: MARIAM, amend: NO_AMEND, reply: null });
+  assert.deepEqual(amendKept(broken, MARIAM), { amend: NO_AMEND, reply: null });
 });

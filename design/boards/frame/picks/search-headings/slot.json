@@ -1,0 +1,18 @@
+{
+  "pick": "search-headings",
+  "asks": "Headings on Search",
+  "from": "RQ-EXP-389",
+  "options": [
+    {
+      "id": "keep",
+      "says": "Results sit under a heading for each kind of thing.",
+      "live": true
+    },
+    {
+      "id": "reverse",
+      "says": "One list, each result naming its kind."
+    }
+  ],
+  "default": "keep",
+  "why": "A heading for each kind lets a long answer be read by its kinds."
+}

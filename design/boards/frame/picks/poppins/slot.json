@@ -1,0 +1,18 @@
+{
+  "pick": "poppins",
+  "asks": "Poppins",
+  "from": "EXP-B01",
+  "options": [
+    {
+      "id": "leaves",
+      "says": "Poppins leaves the app and stays in the mark and on the site."
+    },
+    {
+      "id": "stays",
+      "says": "Poppins stays declared in the app.",
+      "live": true
+    }
+  ],
+  "default": "leaves",
+  "why": "One face in the app is Geist; Poppins is the mark's."
+}

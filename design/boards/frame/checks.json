@@ -1,0 +1,20 @@
+{
+  "board": "frame",
+  "title": "The frame",
+  "screens": [],
+  "source": "lived",
+  "checks": [
+    { "id": "one-board", "says": "Every block is a tile: flat, opaque, no border, no shadow, radius 16, on one flat board colour. Nothing floats on the board but the header.", "by": "eye" },
+    { "id": "flat-rail", "says": "The rail is the board's flat left column, the same colour as the board, with the chosen place as a tile-coloured fill.", "by": "eye" },
+    { "id": "page-header", "says": "The header is the page's name at 28px and one headline sentence at 17px, with no card around it.", "by": "eye" },
+    { "id": "red-accent", "says": "One red working accent for selection, primary buttons, links and charts. Late and needs-you take the deeper red with a mark or a word, never the colour alone.", "by": "gate:colour-grep" },
+    { "id": "rectangles", "says": "Buttons are rectangles with radius 8. Pills only for counts. No dashed chips.", "by": "gate:css-rules" },
+    { "id": "lists-in-tiles", "says": "Every list sits inside a tile, and a tile holds no tile.", "by": "eye" },
+    { "id": "grid", "says": "Tiles sit on a grid of 12 columns and span 3, 4, 6, 8 or 12, one gap apart, full width with fluid gutters.", "by": "gate:layout" },
+    { "id": "type", "says": "Geist at 13, 15, 17, 22 and 28 only, weights 400, 500 and 600, body text 15px or more, tabular figures for money.", "by": "gate:css-rules" },
+    { "id": "charts", "says": "A chart is drawn only when it has three points and says something; otherwise the tile shows the number.", "by": "eye" },
+    { "id": "words", "says": "Names, never ids: no raw id, handle, file path, raw time or placeholder in anything a person reads, and no em dash.", "by": "gate:em-dash" },
+    { "id": "phone", "says": "At 390 the same board is one column with 12px side gutters, the header at 22px, a flat bottom bar and nothing sideways.", "by": "gate:layout" },
+    { "id": "no-template-look", "says": "No glass, gradients, glows, two-tone headings, chip clouds or feature-card grids. Fewer things on screen, not more.", "by": "eye" }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "gate": "commits",
+  "rule": "an author who is not the root commit's",
+  "expect": "every commit is Ada Lane",
+  "findings": 1,
+  "total": 1,
+  "why": "A SECOND PERSON, a good message otherwise. The root commit's author is in log.json, as git would give it."
+}

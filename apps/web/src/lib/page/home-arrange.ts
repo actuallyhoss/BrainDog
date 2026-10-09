@@ -27,7 +27,7 @@
 
 import { createClient } from '@braindog/client';
 import { copy } from '../copy.ts';
-import type { Holds, HomeVoice } from '../home/default-home.ts';
+import type { Holds, HomeVoice, Week } from '../home/default-home.ts';
 import type { Shell } from '../record/boot-live.ts';
 import { REGISTERS } from '../record/held.ts';
 import { may } from '../record/may.ts';
@@ -60,13 +60,29 @@ export function keptAs(slug: string, pages: readonly string[]): Kept | null {
  * typed into ("Add a job" on a record that calls its tasks jobs). The word the record's labels give the list, else its
  * declared singular, else its name made singular, as a list's own screen says it. `heard` is the record's labels, the
  * ones this tab heard by default.
+ *
+ * AND THE RECORD'S WEEK, where it keeps one (`weekOf`), which the caller reads off the lists' declarations it has learnt
+ * (`weekHeld`). Home hands it in for Today's own body; the arrange mode hands it in too, or Today kept by a first Done
+ * lost "Orders due this week" and the week's money on the day it was arranged (B46.8).
  */
-export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Labels = labels()): Holds {
+export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Labels = labels(), week?: Week): Holds {
   const list = shell.lists.find((l) => l.id === TASKS);
   const tasks = list !== undefined;
   const bare = REGISTERS[TASKS] ?? (list ? { id: TASKS, name: list.name, one: singularOf(list.name) } : undefined);
   const one = tasks && bare ? relabel(bare, heard).one : undefined;
-  return { tasks, adds: tasks && may(shell, 'append', TASKS), money: shell.pages.includes('money'), ...(one ? { one } : {}) };
+  return { tasks, adds: tasks && may(shell, 'append', TASKS), money: shell.pages.includes('money'), ...(one ? { one } : {}), ...(week ? { week } : {}) };
+}
+
+/**
+ * THE WEEK THIS RECORD KEEPS, read as Home reads it: off the declarations this tab has learnt of the record's lists, and
+ * the list that plays `meets`. Both builders load only when asked, so a screen that never arranges Today loads neither.
+ */
+export async function weekHeld(shell: Pick<Shell, 'lists'>): Promise<Week | undefined> {
+  const [{ weekOf }, { playedBy }] = await Promise.all([import('../home/default-home.ts'), import('../start/parts.ts')]);
+  return weekOf(
+    shell.lists.flatMap((l) => (REGISTERS[l.id] ? [REGISTERS[l.id]!] : [])),
+    playedBy('meets'),
+  );
 }
 
 /** Today's headings in the voice that speaks, as Home asks for them. */
@@ -152,12 +168,13 @@ export function whileHeld(body: PageBody): PageBody {
  * TODAY IS BUILT FOR THE RECORD, NOT FOR THE ARRANGER: in the house's words, with the line a task is typed into wherever
  * the record keeps tasks and with the cash tile whether or not Money is on yet, each drawn for whoever may see it (the
  * header of this file). What the record keeps (`holds.tasks`) still decides the work blocks, because a block over a list
- * the record does not hold is a page the record refuses.
+ * the record does not hold is a page the record refuses. And the record's week (`holds.week`), which is the record's and
+ * not the arranger's: a kept Today opens on what is due and what came in as the one it was kept from did.
  */
 export async function previewedBody(slug: string, holds: Holds): Promise<PageBody | null> {
   if (slug === 'today') {
     const { todayHome } = await import('../home/default-home.ts');
-    return whileHeld(plainBody(todayHome({ tasks: holds.tasks, adds: holds.tasks, money: true }, HOUSE_VOICE)));
+    return whileHeld(plainBody(todayHome({ tasks: holds.tasks, adds: holds.tasks, money: true, ...(holds.week ? { week: holds.week } : {}) }, HOUSE_VOICE)));
   }
   if (slug === 'decide') return plainBody((await import('../../routes/decide/views.ts')).decideHome());
   return null;

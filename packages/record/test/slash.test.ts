@@ -104,6 +104,9 @@ type Filed = { by: string; filed: { id: string; question: string; by: string }[]
 /** A record four months old: Work used by an agent, a Logbook filled by hand with no page, Notes left alone. */
 async function used(options: { model?: SlashModel; catalogue?: CatalogueEntry[] } = {}) {
   const r = await record(options);
+  /* THE PEN TURNED OFF, so Slash's growing-list page is Slash's to ask: with the pen on, the pen holds Logbook's page
+     and Slash steps aside (offer-pen-50, `emergent-conflict.test.ts`). */
+  value(await r.api.setPref({ key: 'pen.suggest', value: false }, owner));
   for (const id of ['work', 'notes', 'log', 'diary']) await r.install({ install: id });
   for (const n of [80, 60, 40]) {
     r.day(n);

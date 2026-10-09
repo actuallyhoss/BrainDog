@@ -12,15 +12,22 @@ import assert from 'node:assert/strict';
 
 import { validateDeclaration } from '@braindog/kernel';
 
-import { ARGS, blankStep, draftOf, faultsOf, sayStep, type Arg } from './flow.ts';
+import { ARGS, blankStep, draftOf, faultsOf, learnScripts, sayStep, type Arg } from './flow.ts';
 
 const scriptAs = (): Arg | undefined => ARGS.script.find((a) => a.path.join('.') === 'script.as');
 
 test('a script step says it keeps the id of its queued run, not an answer', () => {
   const said = sayStep({ script: { id: 'tidy', as: 'job' } });
-  assert.equal(said, 'Run the script tidy, keeping the id of its queued run as job');
+  assert.equal(said, 'Run the script Tidy, keeping the id of its queued run as job');
   assert.doesNotMatch(said, /answer/u);
-  assert.equal(sayStep({ script: { id: 'tidy' } }), 'Run the script tidy');
+  assert.equal(sayStep({ script: { id: 'tidy' } }), 'Run the script Tidy');
+});
+
+/* THE SCREENS PRINTED "Run the script close_follow_ups", a key where a name goes (the printed gate, batch 50). */
+test('a script step names the script by the title it declares, and by its id in words before the record says it', () => {
+  assert.equal(sayStep({ script: { id: 'close_follow_ups' } }), 'Run the script Close follow ups');
+  learnScripts([{ script: 'close_follow_ups', title: 'Close the follow-ups' }]);
+  assert.equal(sayStep({ script: { id: 'close_follow_ups', as: 'closing' } }), 'Run the script Close the follow-ups, keeping the id of its queued run as closing');
 });
 
 test('the inspector names the field as the id of the queued run, with no answer in it', () => {

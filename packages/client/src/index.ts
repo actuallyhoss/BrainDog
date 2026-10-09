@@ -232,7 +232,14 @@ export type EventLine = {
   title: string | null;
   /** On a `decide` line, the question it settled (`SG4`): the `resolve` beside it targets `suggestion:<settles>`. */
   settles?: string;
+  /** On the one line a pass of BrainDog's own update is said as (kind `update`, SHL-A21): its sentence and counts. */
+  pass?: { said: string; updated: number; asked: number; steps: number; at: string };
+  /** Every line that pass wrote, newest first. */
+  steps?: EventLine[];
 };
+
+/** Who wrote the lines a read answers: the record is BrainDog itself, never an agent or a person. */
+export type ByWho = { you: number; people: number; agents: number; rules: number; record: number };
 
 /**
  * Where a page of the log stops, or what a read mark reaches. A rowid for a caller who reads the whole record, and an
@@ -241,10 +248,10 @@ export type EventLine = {
 export type Cursor = number | string;
 
 /** `whatsNew`: newest first, at most sixty. `upTo` is what `markRead` takes to mark all of them read. */
-export type WhatsNew = { events: EventLine[]; upTo: Cursor | null; sinceCapped: boolean };
+export type WhatsNew = { events: EventLine[]; upTo: Cursor | null; sinceCapped: boolean; byWho?: ByWho };
 
 /** `recentHistory`: one page, newest first, and the cursor for the page below it. */
-export type HistoryPage = { events: EventLine[]; cursor: Cursor | null };
+export type HistoryPage = { events: EventLine[]; cursor: Cursor | null; byWho?: ByWho };
 
 /** One arrival no rule filed, as `inbox` sends it. See `InboxLine` in `@braindog/kernel`. */
 export type InboxLine = {

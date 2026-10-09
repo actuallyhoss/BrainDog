@@ -38,6 +38,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord } from '@braindog/kernel';
+import { openKeyStore, recordKeys, unwrap } from '../../selfhost/src/keys.ts';
 
 const RECORD_FILE = 'record.brain';
 
@@ -228,6 +229,45 @@ function readRestored(file) {
   }
 }
 
+/**
+ * A SIGNING KEY OF THE DRILL'S OWN, when the restored record holds none this data directory's root key can open
+ * (drill-fetch-48). A Cloud copy carries either no signing row or one wrapped under the Worker's KEK, so `braindog export`
+ * refused every restored Cloud copy with "This file carries no signature" and the drill could never pass. Only the
+ * signing row is replaced, in the drill's throwaway copy; the Cloud's key stays with the Cloud. Answers the new key's
+ * kek id, or `null` when the copy's own signing key already opens here and nothing was changed.
+ */
+async function ownSigning(file, data) {
+  const kekFile = join(data, 'kek');
+  if (!existsSync(kekFile)) return null;
+  const db = new DatabaseSync(file);
+  try {
+    const record = db.prepare('SELECT id FROM record WHERE singleton = 1').get()?.id;
+    if (typeof record !== 'string') return null;
+    const store = await openKeyStore(kekFile);
+    const row = db.prepare("SELECT wrapped, nonce, kek_id, wrapped_by FROM vault_key WHERE purpose = 'signing'").get();
+    if (row !== undefined && row.wrapped_by === 'kek' && typeof row.kek_id === 'string') {
+      const opened = await unwrap(store, record, 'signing', { wrapped: new Uint8Array(row.wrapped), nonce: new Uint8Array(row.nonce), kek_id: row.kek_id, wrapped_by: 'kek' }).catch(() => null);
+      if (opened !== null) {
+        opened.fill(0);
+        return null;
+      }
+    }
+    const { signing } = await recordKeys(store, record);
+    db.exec('BEGIN');
+    try {
+      db.prepare("DELETE FROM vault_key WHERE purpose = 'signing'").run();
+      db.prepare("INSERT INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id, salt, rewrapped_at) VALUES ('signing', ?, ?, 'kek', ?, NULL, NULL)").run(signing.wrapped, signing.nonce, signing.kek_id);
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+    return signing.kek_id;
+  } finally {
+    db.close();
+  }
+}
+
 /** A copy with its first line's format raised by one. */
 const raised = (text) => text.replace(/^#dogl (\d+)/, (_, n) => `#dogl ${Number(n) + 1}`);
 
@@ -284,6 +324,8 @@ export async function roundTrip(data, { main }) {
   let host = null;
   try {
     const before = readRestored(restored);
+    const own = await ownSigning(restored, data);
+    if (own !== null) before.kek = own;
     host = await serve(main, data, env);
     if (host.exited !== null) {
       step('the restored record', false, `braindog serve would not serve it (exit ${host.exited})`);
@@ -307,7 +349,7 @@ export async function roundTrip(data, { main }) {
       'the same bytes twice',
       two.status === 0 && differ === 0,
       differ === 0
-        ? `two exports, ${lineCount(first.length, 'byte', 'bytes')} each, the same${first.equals(second) ? '' : ' but for the time the signature carries'}`
+        ? `two exports, ${lineCount(first.length, 'byte', 'bytes')} each, the same${first.equals(second) ? '' : ' but for the time the signature carries'}${own === null ? '' : "; signed with a key of the drill's own, the Cloud's stays with the Cloud"}`
         : `two exports of ${first.length.toLocaleString('en')} and ${second.length.toLocaleString('en')} bytes differ from byte ${differ.toLocaleString('en')}`,
     );
     const text = first.toString('utf8').replace(/^﻿/, '');

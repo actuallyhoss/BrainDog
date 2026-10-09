@@ -797,6 +797,11 @@ type Usage = {
   actor?: string;
   /** A `call`'s answer, as the provider sent it, for the run to keep (`keptAnswer`). Absent on every other run. */
   answer?: { status: number; body: string } | undefined;
+  /**
+   * A script's run that wrote, asked and stopped nothing (last-day-48), written on the line as `quiet: 1` when it is
+   * made, so a feed leaves it out (`bookkeeping` in index.ts) and the log is never rewritten to say so.
+   */
+  quiet?: true;
 };
 
 /**
@@ -880,6 +885,7 @@ export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: U
       scope,
       usage: counted,
       ...(usage.answer === undefined ? {} : { answer: keptAnswer(usage.answer) }),
+      ...(usage.quiet ? { quiet: 1 } : {}),
     }),
     say.slice(0, 280),
   );

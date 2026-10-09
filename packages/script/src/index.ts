@@ -211,7 +211,7 @@ export type ScriptRefusal = {
  * It carries NO writes, ever. A half-run that left half a ledger is the thing this shape prevents.
  */
 export type ScriptAnswer =
-  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage }
+  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage; ask?: unknown }
   | { refused: ScriptRefusal; log: string; usage: ScriptUsage };
 
 /* ── The header, checked before the sandbox starts ────────────────────────────────────────────── */

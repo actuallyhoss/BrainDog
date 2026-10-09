@@ -25,7 +25,7 @@ import { INSTRUCTIONS, VERSIONS } from '@braindog/mcp/rpc';
 import { openKeyStore, recordKeys } from '../../selfhost/src/keys.ts';
 import { start } from '../../selfhost/src/server.ts';
 import { cacheFile, readDoorCache, writeDoorCache } from '../src/bridge-cache.ts';
-import { serveBridge, type BridgeIo } from '../src/bridge.ts';
+import { mayHaveLeft, readTools, serveBridge, UNREACHABLE_MAYBE, type BridgeIo } from '../src/bridge.ts';
 import type { Target } from '../src/http.ts';
 import { UNREACHABLE_FIX } from '../src/surface.ts';
 
@@ -313,6 +313,74 @@ test('A 503 REFUSES THE CALL ONCE, and a cancelled request is never answered', a
   await b.end();
   assert.ok(!b.lines.some((l) => l.id === 'slow'), 'a cancelled request was answered');
   assert.ok(!w.sent.some((x) => x.body.method === 'notifications/cancelled'), 'the cancel went to the host, which holds no session to cancel in');
+});
+
+/*
+ * A WRITE THAT MAY HAVE LANDED SAYS SO (audit 40-42, finding 9). Before this a timed-out `log` answered "could not be
+ * reached", the agent logged it again, and the record held the line twice. RED FIRST: with `away` given `false` in
+ * place of `got.maybe` in `forward`, the timed-out log answers the old sentence and the first test goes red; with
+ * `mayHaveLeft` answering true always, the refused log answers the new one and the second goes red.
+ */
+test('A TIMED-OUT LOG MAY HAVE BEEN RECORDED, so it says read before sending again; a timed-out read keeps the old sentence', async (t) => {
+  const s = await stack(t);
+  /* THE HOST TAKES THE CALL AND NEVER ANSWERS, as a host that wrote and then stalled would. */
+  const w = watched((one, real, signal) => {
+    if (one.body.method !== 'tools/call') return real();
+    return new Promise<Response>((_, no) => signal.addEventListener('abort', () => no(signal.reason)));
+  });
+  const b = bridge({ key: s.base, base: s.base, token: s.serverKey }, s.dir, w.fetch, { ms: 1_000 });
+  await b.ask('initialize', HELLO);
+  await b.ask('tools/list');
+  const logged = await b.ask('tools/call', { name: 'log', arguments: { text: 'Fired the kiln' } }, 'log');
+  assert.equal(logged.result?.isError, true);
+  assert.deepEqual(logged.result?.structuredContent, { code: 'UNREACHABLE', fix: UNREACHABLE_MAYBE });
+  assert.equal(w.sent.filter((x) => x.body.id === 'log').length, 1, 'a log was sent twice');
+  const read = await b.ask('tools/call', { name: 'list', arguments: { register: 'things' } }, 'read');
+  assert.deepEqual(read.result?.structuredContent, { code: 'UNREACHABLE', fix: UNREACHABLE_FIX });
+  await b.end();
+  assert.ok(!UNREACHABLE_MAYBE.includes('\u2014') && !/\brow\b/.test(UNREACHABLE_MAYBE), UNREACHABLE_MAYBE);
+});
+
+test('A LOG TO A HOST THAT REFUSED THE CONNECTION never left, so it keeps "could not be reached"', async (t) => {
+  const s = await stack(t);
+  const target = { key: s.base, base: s.base, token: s.serverKey };
+  await s.close();
+  const b = bridge(target, mkdtempSync(join(s.dir, 'empty-')), globalThis.fetch);
+  await b.ask('initialize', HELLO);
+  const logged = await b.ask('tools/call', { name: 'log', arguments: { text: 'Fired the kiln' } });
+  assert.equal(logged.result?.isError, true);
+  assert.ok(textOf(logged).includes(UNREACHABLE_FIX), textOf(logged));
+  assert.ok(!textOf(logged).includes(UNREACHABLE_MAYBE), textOf(logged));
+  await b.end();
+  /* A KEY NO HEADER CAN CARRY throws before anything is sent, which is a request that never left too. */
+  let sent = 0;
+  const counted: typeof globalThis.fetch = async () => {
+    sent += 1;
+    throw new TypeError('fetch failed');
+  };
+  const c = bridge({ ...target, token: 'bad\nkey' }, mkdtempSync(join(s.dir, 'empty-')), counted);
+  await c.ask('initialize', HELLO);
+  const unsent = await c.ask('tools/call', { name: 'log', arguments: { text: 'Fired the kiln' } });
+  assert.equal(sent, 0, 'a request with a key no header can carry was sent');
+  assert.ok(textOf(unsent).includes(UNREACHABLE_FIX), textOf(unsent));
+  await c.end();
+});
+
+test('WHAT MAY HAVE LEFT: a timeout, a reset and an error with no code may have; a refused or unknown host never did', () => {
+  const refused = new TypeError('fetch failed', { cause: Object.assign(new Error('connect'), { code: 'ECONNREFUSED' }) });
+  const both = new TypeError('fetch failed', { cause: Object.assign(new AggregateError([Object.assign(new Error('a'), { code: 'ECONNREFUSED' })]), {}) });
+  assert.equal(mayHaveLeft(refused), false);
+  assert.equal(mayHaveLeft(both), false);
+  assert.equal(mayHaveLeft(new TypeError('fetch failed', { cause: Object.assign(new Error('dns'), { code: 'ENOTFOUND' }) })), false);
+  assert.equal(mayHaveLeft(new TypeError('fetch failed', { cause: Object.assign(new Error('tls'), { code: 'CERT_HAS_EXPIRED' }) })), false);
+  assert.equal(mayHaveLeft(new TypeError('fetch failed', { cause: Object.assign(new Error('reset'), { code: 'ECONNRESET' }) })), true);
+  assert.equal(mayHaveLeft(new TypeError('fetch failed')), true);
+  /* A TIMEOUT throws the signal's own reason, which names no connection, so it may have landed. */
+  assert.equal(mayHaveLeft(new DOMException('The operation was aborted due to timeout', 'TimeoutError')), true);
+  /* THE HOST'S LIST DECIDES what reads, and a tool it does not list goes by this command's own. */
+  const reads = readTools({ tools: [{ name: 'list', annotations: { readOnlyHint: true } }, { name: 'get', annotations: { destructiveHint: false } }] });
+  assert.ok(reads.has('list') && !reads.has('get') && !reads.has('log'));
+  assert.ok(readTools(undefined).has('search') && !readTools(undefined).has('create'));
 });
 
 test('A HOST BACK AFTER THE START WAS SERVED FROM THE MACHINE: one list-changed line, so the app lists the live tools', async (t) => {

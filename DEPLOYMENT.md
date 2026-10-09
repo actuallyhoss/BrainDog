@@ -313,9 +313,13 @@ goes like this.
 1. Add the required reviewer to the `production` environment ("The reviewer" above), so no merge
    deploys without a press.
 2. Run the restore drill against last night's copy of the live record, so "restore from last night"
-   below is known to work: `node apps/cli/scripts/restore-drill.mjs <night.brainl.age> --identity <file>`,
-   with the identity file kept outside this repository. After that it is monthly, and the morning
-   check reports the last one's date (53 §5.1, §5.4).
+   below is known to work: `node apps/cli/scripts/restore-drill.mjs --record <rec_id> --directory
+   --identity-cmd "<a command that prints the age identity>" --report https://brain.dog`, with
+   `PROVISION_KEY` in that command's environment. It fetches the sealed copies with wrangler, opens and
+   restores them in a temp folder, and posts the counts to `/account/ops/drill`, where the Directory
+   keeps the host's last drill. After that it is monthly (`--print-timer` prints the launchd file),
+   and every record's Settings > Backups reads "This host's last restore test", or "Never tested"
+   until the first report lands (53 §5.1, §5.4).
 3. Optionally, the canary record and `SMOKE_TOKEN` above.
 
 **Every push:**
@@ -407,7 +411,10 @@ three months.
   secret is `STRIPE_WEBHOOK_SECRET`. One per mode and per environment.
 - **The restore drill and the KEK rotation are a person's.** The Worker holds no age identity, so
   nothing but the monthly drill ever opens a production copy, and the walk cannot know when that
-  last happened; the date lives in the ops record's `drill` note (53 §5.1 step 5, §5.4).
+  last happened. The drill tells the host itself: `--report` posts its counts to `/account/ops/drill`,
+  the Directory keeps the last one, `GET /account/drill` answers it to anyone signed in, and Settings >
+  Backups draws it; with `OPS_RECORD` set it is also a `drill` note in the ops record (53 §5.1 step 5,
+  §5.4). Until the first report every record reads "Never tested", in the fault tone.
 - **`MAIL_FROM` and `SUPPORT_ADDRESS` are read and not yet set.** Both fall back as the table above
   says. Setting them is two lines in `env.production.vars`, and `SUPPORT_ADDRESS` needs a mailbox, or
   an Email Routing rule to one, before it is named in every letter.

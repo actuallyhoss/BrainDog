@@ -41,10 +41,10 @@ test('MARIAM KEEPS IT: the link carries her sentence, opens "Mariam\'s Candles",
   assert.equal(c.blobs.held.size, 0);
 });
 
-/* THE PAGE SENDS THE NAME IT HEARD (`routes/signup/+page.svelte` `send`: `name: read.name`), and the free record is
-   named with it, so her record opens as "Mariam" while the keep tile showed "Mariam's Candles". Red until the page
-   sends the title it showed; the walk above sends the title to prove every other door. */
-test('THE PAGE\'S OWN NAME opens "Mariam\'s Candles"', { todo: 'the sign-up page sends read.name, so the record is named "Mariam"' }, async () => {
+/* THE PAGE SENDS HER NAME AT THE START AND THE TITLE SHE WAS SHOWN WHEN THE RECORD IS MADE (`nameSent`, `titleSent` in
+   `routes/signup/build.ts`), so the Directory knows her as Mariam and her record opens as "Mariam's Candles", the name
+   the keep tile showed (uc6-walk-50). */
+test('THE PAGE\'S OWN NAME opens "Mariam\'s Candles"', async () => {
   const r = await keepIt(MARIAM);
   assert.equal(r.seen.name, TITLE, r.saw);
 });
