@@ -380,7 +380,7 @@ export function readiness(gate, timeoutMs, root) {
      * pages that make no call, so it has nothing to settle and is measured on the pre-contract signal
      * for ever. It is a statement about that root, not a way to opt a screen out.
      */
-    async settled(page, prerendered = false) {
+    async settled(page, prerendered = false, afresh = () => {}) {
       const live = contract && !prerendered;
       const sel = live ? `main#main[${SCREEN}]` : `main#main[${SCREEN}], #main *`;
       const once = async () => {
@@ -396,6 +396,11 @@ export function readiness(gate, timeoutMs, root) {
          nothing and, on a loaded runner, lost the screen it had. */
       const meant = state === 'refused' && [...MAY_REFUSE].some((r) => new URL(page.url()).pathname.endsWith(r));
       if (state === null || (state === 'refused' && live && !meant)) {
+        /* AND WHAT THE FIRST LOOK SAID IS GONE WITH IT (`afresh`, `openPage`'s errors and failed answers). On a hosted
+           runner a first look can lose its own modules (`Failed to fetch dynamically imported module`) and never settle;
+           the reload draws the screen, and `layout`'s printed rule then read the dead document's errors as the screen's
+           own: eleven routes over the two parts of run 37987998125, one for each screen that settled only on a reload. */
+        afresh();
         const again = await page.reload().then(once, () => null);
         if (again !== null && again !== 'refused') retried++;
         /* THE SECOND LOOK IS THE ANSWER, even when it is none: the page was reloaded, so the first look describes a
@@ -573,11 +578,28 @@ export async function openPage(browser, url, options = {}) {
     page.on('response', (r) => {
       if (!r.ok()) failed.push({ status: r.status(), path: new URL(r.url()).pathname });
     });
-    const goto = async (to) => {
+    const afresh = () => {
       errors.length = 0;
       failed.length = 0;
-      await page.goto(to, { waitUntil: plan.waitUntil });
-      return ready.settled(page, plan.prerendered);
+    };
+    const goto = async (to) => {
+      afresh();
+      /* A LOAD THAT NEVER GOES QUIET IS A FIRST LOOK THAT FAILED, NOT A GATE THAT DIES. `a11y` waits for `networkidle`,
+         and on a hosted runner a load can hang on one request for Playwright's thirty seconds: the throw ended the whole
+         gate (`a11y threw rather than reporting`, run 37987998125), and under `self-test` it ended the seeded run before
+         it named a seed. So it is `settled`'s rule, one more look before it is a finding: the address is opened again,
+         afresh, and a second load that never goes quiet is `null`, a page never settled, said by name. Any other failure
+         to navigate is still thrown. */
+      const timedOut = (e) => {
+        if (e?.name !== 'TimeoutError') throw e;
+        return true;
+      };
+      const open = () => page.goto(to, { waitUntil: plan.waitUntil }).then(() => false, timedOut);
+      if (await open()) {
+        afresh();
+        if (await open()) return null;
+      }
+      return ready.settled(page, plan.prerendered, afresh);
     };
     const state = await goto(url);
     return { context, page, state, errors, failed, plan, goto };

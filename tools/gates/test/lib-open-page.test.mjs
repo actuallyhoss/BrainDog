@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { AREAS } from '../../../apps/web/src/routes/settings/[area]/place.ts';
-import { budget, openPage, pagePlan } from '../lib.mjs';
+import { budget, openPage, pagePlan, readiness } from '../lib.mjs';
 import { clockOf, recordAt, startRecord } from '../record.mjs';
 import { routesFor, routesOf } from '../routes.mjs';
 
@@ -28,13 +28,18 @@ function fakeRecord(log) {
 }
 
 /** A stand-in browser, context and page that write down what was asked of them. */
-function fakeBrowser(log, { gotoThrows = false } = {}) {
+function fakeBrowser(log, { gotoThrows = false, timeouts = 0 } = {}) {
   const handlers = {};
+  let quiet = 0;
   const page = {
     on: (name, fn) => (handlers[name] = fn),
     goto: async (to, opts) => {
       log.push(['goto', to, opts.waitUntil]);
       if (gotoThrows) throw new Error('net::ERR_CONNECTION_REFUSED');
+      if (quiet++ < timeouts) {
+        handlers.pageerror?.(new Error('Failed to fetch dynamically imported module'));
+        throw Object.assign(new Error('page.goto: Timeout 30000ms exceeded.'), { name: 'TimeoutError' });
+      }
       handlers.pageerror?.(new Error('boom'));
       handlers.console?.({ type: () => 'error', text: () => 'Failed to load resource' });
       handlers.console?.({ type: () => 'log', text: () => 'hello' });
@@ -179,6 +184,44 @@ test('a load that throws hands the context back', async () => {
   const log = [];
   await assert.rejects(openPage(fakeBrowser(log, { gotoThrows: true }), URL_, { width: 390, record: fakeRecord(log), ready: ready(log) }), /ERR_CONNECTION_REFUSED/);
   assert.equal(log.at(-1)[0], 'close');
+});
+
+test('a load that never goes quiet is opened once more, afresh, and not thrown', async () => {
+  const log = [];
+  const opened = await openPage(fakeBrowser(log, { timeouts: 1 }), URL_, { width: 390, clock: NOW, waitUntil: 'networkidle', ready: ready(log) });
+  assert.deepEqual(log.filter((l) => l[0] === 'goto' || l[0] === 'settled').map((l) => l[0]), ['goto', 'goto', 'settled']);
+  assert.equal(opened.state, 'ready');
+  assert.equal(opened.errors.some((e) => /dynamically imported/.test(e.text)), false, 'the dead first load said nothing about the screen');
+});
+
+test('a load that never goes quiet twice is a page never settled, null, and the gate goes on', async () => {
+  const log = [];
+  const opened = await openPage(fakeBrowser(log, { timeouts: 2 }), URL_, { width: 390, clock: NOW, waitUntil: 'networkidle', ready: ready(log) });
+  assert.equal(opened.state, null);
+  assert.equal(log.some((l) => l[0] === 'settled'), false);
+});
+
+test("a screen settled on its second look reports that look's errors, not the first's", async () => {
+  /* `readiness` itself, over a page that draws nothing on its first look and draws on the reload. */
+  const errors = [{ kind: 'uncaught', text: 'Failed to fetch dynamically imported module' }];
+  const failed = [{ status: 404, path: '/app/_app/immutable/nodes/0.js' }];
+  let looks = 0;
+  const page = {
+    waitForSelector: async () => (looks++ === 0 ? Promise.reject(new Error('timeout')) : {}),
+    evaluate: async () => undefined,
+    reload: async () => {},
+    url: () => URL_,
+  };
+  const ready = readiness('t', 10, join(import.meta.dirname, 'no-such-build'));
+  const state = await ready.settled(page, false, () => {
+    errors.length = 0;
+    failed.length = 0;
+  });
+  assert.equal(looks, 2);
+  assert.notEqual(state, null);
+  assert.equal(ready.retried(), 1);
+  assert.deepEqual(errors, [], 'what the reloaded document said went with it');
+  assert.deepEqual(failed, []);
 });
 
 /* ── the addresses it is given, and the record it reads (jobs 2 and 3) ── */

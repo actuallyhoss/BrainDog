@@ -309,6 +309,14 @@ const BROWSER = [
    Set by `main`, so importing this file walks nothing. */
 let buildUnmet = null;
 
+/** The last lines a browser gate said, indented: its findings are at the bottom, under a row of progress dots per pass. */
+const tail = (lines) =>
+  lines
+    .filter((l) => l.trim())
+    .slice(-8)
+    .map((l) => `      ${l.trim()}`)
+    .join('\n');
+
 function seededBrowser({ gate, seed, names, blind, red }) {
   /* SKIPPED WHEN THE BUILD CANNOT BE MEASURED, like the gate itself, AND WRITTEN DOWN. This returned
      without touching either counter, so the five browser negatives could every one of them be
@@ -331,14 +339,7 @@ function seededBrowser({ gate, seed, names, blind, red }) {
     failed.push(gate);
   } else if (unnamed.length) {
     console.error(`  ${gate}: went red but never named ${unnamed.join(' or ')}, so this run says nothing about the rule. What it did say:`);
-    console.error(
-      said
-        .split('\n')
-        .filter((l) => l.trim())
-        .slice(-8)
-        .map((l) => `      ${l}`)
-        .join('\n'),
-    );
+    console.error(tail(said.split('\n')));
     failed.push(gate);
   } else {
     ran++;
@@ -380,8 +381,11 @@ async function walkRules(gate) {
     encoding: 'utf8',
     env: { ...process.env, BRAINDOG_GATE_SEED: RULES.map((rule) => rule.id).join(',') },
   });
-  const lines = `${r.stdout}${r.stderr}`.split('\n').filter((l) => l.trim());
+  const lines = `${r.stdout ?? ''}${r.stderr ?? ''}${r.error ? `\n${r.error.message}` : ''}`.split('\n').filter((l) => l.trim());
   const tagged = lines.some((l) => RULES.some((rule) => l.includes(`[${rule.id}]`)));
+  /* WHAT AN UNTAGGED RUN SAID, ONCE, and only when a rule went unnamed: a gate that died before it named any seed (`a11y`
+     in run 37987998560) printed nothing here, and its four rules read as four rules that passed their faults. */
+  let told = tagged;
   for (const rule of RULES) {
     const said = tagged ? lines.filter((l) => l.includes(`[${rule.id}]`)) : lines;
     const skipped = said.find((l) => l.includes(`[${rule.id}] not run:`));
@@ -389,9 +393,19 @@ async function walkRules(gate) {
     if (skipped) {
       console.log(`  ${rule.id}: ${skipped.trim().slice(`[${rule.id}] `.length)}`);
       notRun.push(rule.id);
-    } else if (r.status === 0 || unnamed.length) {
-      console.error(`  ${rule.id}: PASSED ${rule.seed}, or went red without naming ${unnamed.join(' or ') || 'it'}.`);
+    } else if (r.status === 0) {
+      /* THE THREE OUTCOMES `BROWSER` ABOVE SPELLS OUT, and this said the first two in one sentence: a run that went red
+         for another reason, or died, was reported as `PASSED`, which sends a reader into a rule that was fine. */
+      console.error(`  ${rule.id}: PASSED ${rule.seed}. ${gate} exited 0 with the fault planted.`);
+      failed.push(rule.id);
+    } else if (unnamed.length) {
+      console.error(`  ${rule.id}: went red but never named ${unnamed.join(' or ')}, so this run says nothing about ${rule.seed}.`);
       if (tagged) console.error(said.map((l) => `      ${l.trim()}`).join('\n'));
+      else if (!told) {
+        told = true;
+        console.error(`      ${gate} exited ${r.status ?? r.signal ?? 'without a status'}, and the last of what it said:`);
+        console.error(tail(lines));
+      }
       failed.push(rule.id);
     } else {
       ran++;
