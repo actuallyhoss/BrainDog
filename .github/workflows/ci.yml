@@ -85,7 +85,8 @@ jobs:
     # minutes, and the split set 25 for each leg: a leg holds part of what the single job ran in
     # 19 min 13 s, so a leg has room to grow by a workflow of tests, and 25 is still far short of the
     # six hours the ceiling exists to stop.
-    timeout-minutes: 25
+    # 10 October: raised to 45 after batches 35 to 50 landed together and this leg ran past its old ceiling.
+    timeout-minutes: 45
     strategy:
       # A RED LEG DOES NOT CANCEL THE OTHER THREE. Each answers for a different part of the tree, and
       # a run that stops at the first red names one problem when there are four, which costs four
@@ -162,7 +163,8 @@ jobs:
     # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     # No run of this job on its own has been measured yet. It is a leg's ceiling, for a hang.
-    timeout-minutes: 25
+    # 10 October: raised to 45 after batches 35 to 50 landed together and this leg ran past its old ceiling.
+    timeout-minutes: 45
     steps:
       # THE WHOLE HISTORY, because `commits` holds a floor on how many commits HEAD reaches (WAY-B02) and reads the
       # pushed range: a shallow checkout reaches one commit and the floor is red.
@@ -205,7 +207,8 @@ jobs:
     # why the ceiling moved from 15 to 20: a ceiling for a hang, not a budget. The two dry runs
     # have not been measured in this job yet, nor have the site's tests and the runner's tests, which
     # take about ten seconds together at a desk.
-    timeout-minutes: 20
+    # 10 October: raised to 45 after batches 35 to 50 landed together and this leg ran past its old ceiling.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
