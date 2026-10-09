@@ -106,7 +106,8 @@ test('dark.md is what the theme makes now, and every colour for words reads on t
 
 // The reference kit is a local file under loop/, which is never pushed, so a checkout without it skips this one.
 const KIT = 'loop/KIT-REFERENCE.md';
-test("each of our sizes stands beside the kit's, both read from their files", { skip: !existsSync(join(ROOT, KIT)) && 'the reference kit is a local file' }, () => {
+const kitAway = existsSync(join(ROOT, KIT)) ? false : 'the reference kit is a local file, never pushed';
+test("each of our sizes stands beside the kit's, both read from their files", { skip: kitAway }, () => {
   const got = measuresOf(read('packages/skin/tokens.css'), read(KIT));
   for (const m of got) assert.ok(m.ours !== null && m.kit !== null, `${m.name}: ours ${m.ours}, the kit's ${m.kit}`);
   assert.deepEqual(measuresOf('--rail: 240px;', ''), [{ name: 'Rail width', ours: 240, kit: null }, ...got.slice(1).map((m) => ({ ...m, ours: null, kit: null }))]);
