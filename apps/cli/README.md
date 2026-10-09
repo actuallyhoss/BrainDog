@@ -38,7 +38,7 @@ To remove it, delete the `.braindog` folder in your home folder and the PATH lin
 
 `pnpm --filter braindog-cli build` runs `scripts/bundle.mjs`, which bundles `src/main.ts` and everything it imports
 into `dist/braindog.mjs` with esbuild, stamps it with its build (the date and the commit, which `braindog --version`
-prints first), and writes `dist/braindog.mjs.sha256` beside it. Every deploy of `master` builds it that way and
+prints first), and writes `dist/braindog.mjs.sha256` beside it, and `dist/braindog.mjs.build`, the one line `braindog update` reads. Every deploy of `master` builds it that way and
 publishes both at `https://brain.dog/cli/`, next to the two install scripts, whose sources are in
 `apps/site/static/cli/`.
 

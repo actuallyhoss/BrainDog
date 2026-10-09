@@ -182,3 +182,17 @@ test('A STALE COUNT WITH NO WINDOW IS REFUSED AT INSTALL, in one sentence, and s
   assert.ok(!asked.ok);
   sql.close();
 });
+
+test('THE OLDEST DAY IS DRAWN AS A DAY AND ONLY IT IS: read as_of takes format day, and an age or the money never does', async () => {
+  const { k, sql } = await record();
+  const install = (id: string, extra: Record<string, unknown>, format: string) =>
+    k.install([{ id: `metric.${id}`, kind: 'metric', body: figure(id, extra, format, { home: 1, sellable: true }) } as never]);
+  const asMoney = await install('as-of-money', { read: 'as_of' }, 'money');
+  assert.ok(!asMoney.ok);
+  assert.match(JSON.stringify(asMoney), /so its format is day/u);
+  assert.ok(!(await install('age-day', { read: 'age' }, 'day')).ok);
+  assert.ok(!(await install('cash-day', {}, 'day')).ok);
+  const fine = await install('as-of-day', { read: 'as_of' }, 'day');
+  assert.ok(fine.ok, JSON.stringify(fine));
+  sql.close();
+});

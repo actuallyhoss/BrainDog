@@ -284,6 +284,16 @@ test('THE RECORD’S OWN CARD IS PRINTED AS IT CAME, scrubbed of control charact
   assert.ok(briefing(attached({ ...full(), card: 7 } as unknown as Context), AT, undefined).startsWith('BrainDog · run S47 · project BrainDog'));
 });
 
+test('A COMPACTION PRINTS THE RECORD’S card_next, scrubbed as the card is; null from it is no step, and without it the card’s Next line', () => {
+  const card = ['BrainDog · run S47 · project BrainDog', 'Next     Cut page answers to block summaries. (S45)', 'More     call context'].join('\n');
+  const next = 'Next     Cut page answers\u001b[2J to block summaries. (S45) · 12 commits since';
+  assert.equal(nextLine(attached({ ...full(), card, card_next: next } as Context), 12), 'Next     Cut page answers [2J to block summaries. (S45) · 12 commits since');
+  assert.equal(nextLine(attached({ ...full(), card, card_next: null } as Context), 12), null, 'the record says there is no step');
+  assert.equal(nextLine(attached({ ...full(), card } as Context), 12), 'Next     Cut page answers to block summaries. (S45)');
+  /* The record's card is the whole card: nothing this command would compose is added, whatever moved. */
+  assert.equal(briefing(attached({ ...full(), card, card_next: next } as Context), AT, 12), card);
+});
+
 test('words are cut at a word, an em dash becomes a comma, and the ages read as the card says them', () => {
   assert.equal(words('Close a task the moment it is done \u2014 and say how you know.', 200), 'Close a task the moment it is done, and say how you know.');
   assert.equal(words('A range of 10\u201320 stays.', 40), 'A range of 10\u201320 stays.');

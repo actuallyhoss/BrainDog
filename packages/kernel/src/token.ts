@@ -240,6 +240,73 @@ export type TokenDeps = {
   validFrom?: string | undefined;
 };
 
+/**
+ * Where a host keeps the plan's count of agents (LCH-A08): one row of a small table the host makes, `host_meta`, under
+ * `plan.agents`. Not a kernel table, so no `dog_section` row names it and no `.brain` carries it: a record exported from
+ * Cloud and opened on a self-host brings no cap with it.
+ *
+ * ABSENT IS NO CAP. A self-host never writes it, and neither does a hosted record billing has not yet told its plan.
+ * A value that cannot be read is no cap either, since a host's mistake should not stop an owner connecting their tools.
+ */
+export const AGENTS_KEY = 'plan.agents';
+
+/** The plan's count, its name as a person reads it, and the plan above it, or `null` on the top one. */
+export type AgentCap = { agents: number; plan: string; next: string | null };
+
+/** The cap a host wrote, or `null` for none. */
+export function agentCap(sql: Sql): AgentCap | null {
+  if (!sql.one("SELECT 1 AS hit FROM sqlite_master WHERE type = 'table' AND name = 'host_meta'")) return null;
+  const said = sql.one<{ value: string }>('SELECT value FROM host_meta WHERE key = ?', AGENTS_KEY)?.value;
+  if (said === undefined) return null;
+  try {
+    const v = JSON.parse(said) as Partial<AgentCap> | null;
+    if (Number.isSafeInteger(v?.agents) && v!.agents! >= 0 && typeof v!.plan === 'string' && (v!.next === null || typeof v!.next === 'string'))
+      return { agents: v!.agents!, plan: v!.plan, next: v!.next };
+  } catch {
+    /* not JSON: no cap, as above */
+  }
+  return null;
+}
+
+/** A job's bearer is labelled `job:` and its job's id (`jobs.ts`). */
+const JOB_LABEL = 'job:';
+
+/**
+ * How many agent keys the record holds live: not revoked, not past their life, not ended by the operator's cut-off.
+ *
+ * TWO KINDS OF KEY ARE NOT AGENTS. A job's bearer is the enrolled machine's, minted for one run and revoked by its label
+ * when the run ends, so it is left out while its job is claimed and a record at its count can still run its work. A
+ * report key (`report:`, made by the record's `createReportKey` alone) sends rows to one list and reads nothing. A
+ * self-host's server key and a share link are not keys of this table at all.
+ */
+export function liveAgents(deps: Pick<TokenDeps, 'sql' | 'nowMs' | 'validFrom'>): number {
+  const jobs = deps.sql.one("SELECT 1 AS hit FROM sqlite_master WHERE type = 'table' AND name = 'job'") !== undefined;
+  return deps.sql
+    .all<{ created_at: string }>(
+      `SELECT t.created_at AS created_at FROM token t
+       WHERE t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > ?)
+         AND (t.label IS NULL OR substr(t.label, 1, 7) <> 'report:')
+         ${jobs ? `AND NOT EXISTS (SELECT 1 FROM job j WHERE t.label = '${JOB_LABEL}' || j.id AND j.status = 'claimed')` : ''}`,
+      instant(deps.nowMs),
+    )
+    .filter((t) => !endedByCutOff(deps.validFrom, t.created_at)).length;
+}
+
+/** Whether a mint is a run's bearer: labelled for a job a machine has just claimed, which holds no live bearer yet. */
+function jobBearer(sql: Sql, label: string | undefined): boolean {
+  if (typeof label !== 'string' || !label.startsWith(JOB_LABEL)) return false;
+  if (!sql.one("SELECT 1 AS hit FROM sqlite_master WHERE type = 'table' AND name = 'job'")) return false;
+  return (
+    sql.one("SELECT 1 AS hit FROM job WHERE id = ? AND status = 'claimed'", label.slice(JOB_LABEL.length)) !== undefined &&
+    sql.one('SELECT 1 AS hit FROM token WHERE label = ? AND revoked_at IS NULL', label) === undefined
+  );
+}
+
+/** The sentence a mint past the count is refused with, naming the plan and the way on. */
+export const agentsFull = (cap: AgentCap): string =>
+  `${cap.plan} connects ${cap.agents} agent${cap.agents === 1 ? '' : 's'}. ` +
+  (cap.next === null ? 'Revoke one in Settings to connect another.' : `Move this record to ${cap.next} in Settings to connect more.`);
+
 export type Minted = { id: string; bearer: string; scope: Scope; reach: TokenReach[]; expires_at: string };
 
 /** What minting takes. `reach` is left out, or empty, for a token that opens nothing beyond its scope. */
@@ -315,6 +382,13 @@ export async function createToken(
   const record = deps.recordId();
   if (!record)
     return no<Minted>('OUT_OF_BOUNDS', 'This record has no id yet, and a bearer carries the record it is for.', { at: 'record' });
+
+  /* THE PLAN'S COUNT OF AGENTS, read where every key is minted: by hand, at the CLI's login, through an app's connect
+     screen. A record at or over it mints none, and one moved down keeps every key it holds; nothing here revokes. A run's
+     bearer is the machine's and passes, and so does a report key, which the record alone makes. */
+  const cap = agentCap(deps.sql);
+  const exempt = jobBearer(deps.sql, args.label) || (typeof args.label === 'string' && args.label.startsWith('report:'));
+  if (cap !== null && !exempt && liveAgents(deps) >= cap.agents) return no<Minted>('FORBIDDEN', agentsFull(cap), { at: 'plan' });
 
   /* THIRTY-TWO BYTES. The secret is the whole of the security of this path, and a shorter one is a
      number somebody can walk through faster than the lockout can count. */

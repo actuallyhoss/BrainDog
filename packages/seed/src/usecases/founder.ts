@@ -39,8 +39,13 @@ const HOLDS = ['things', 'people', 'accounts', 'obligations', 'transactions', 's
  * said. The record reads the first four and passes over a fifth (`readBlockAsWritten` in `packages/kernel/src/pages.ts`),
  * so until it groups by it the column changes nothing a record draws, and no version has to move when it does: today
  * two projects sending Sign-ups still draw one line between them.
+ *
+ * THE FIFTH IS THE READING AS MONEY, SINCE 2.5.0, and the project moved to the sixth. The record reads a block's fifth
+ * column as `amount`, integer minor units with the reading's own currency, in place of `value` (`measures.ts`
+ * `moneyOf`), and refuses a fifth that is not a money field, so the project there had the install refuse every block
+ * over Numbers. A reading in another currency is a line of its own, never added to this one.
  */
-const NUMBER_COLUMNS = [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }, { field: 'thing' }];
+const NUMBER_COLUMNS = [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }, { field: 'amount' }, { field: 'thing' }];
 
 /**
  * THE NUMBERS, ONCE, for the dashboard, an organisation and a project: the example left out, and thirty days against
@@ -262,8 +267,13 @@ export const FOUNDER = {
      2.4.0: `page.home-founder` says how many agents work now in a line, from the record's `runs-working`, and its
      Working now table reads the record's working runs (`sessions.working`, agents 1.9.0), heard from in the last
      fifteen minutes, where its own clause said today and a run quiet for hours was listed as at work. A block added
-     and a source changed, so a minor step. 2.3.0 is live. */
-  version: '2.4.0',
+     and a source changed, so a minor step. 2.3.0 is live.
+
+     2.5.0: Numbers takes money. A reading may hold `amount`, integer minor units and its currency, in place of its
+     decimal `value`, which stops being required; the blocks over Numbers read it as their fifth column and the project
+     moves to the sixth; Latest numbers shows it beside Value; and `poll-setup` says to fill the live feed add-on. A
+     field added, one made optional and columns added, so a minor step. 2.4.0 is live. */
+  version: '2.5.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -298,7 +308,7 @@ export const FOUNDER = {
   },
   skills: [
     { name: 'datapoint-reporter', trigger: 'when a project ships a number worth watching, to post it as a datapoint' },
-    { name: 'poll-setup', trigger: 'when a project has an API that answers a number, to declare a poll for it' },
+    { name: 'poll-setup', trigger: 'when a project has an API that answers a number, to fill the live feed add-on for it' },
   ],
   pack: {
     pack: 'usecase-founder',
@@ -316,7 +326,10 @@ export const FOUNDER = {
         mobile: ['name', 'value', 'at'],
         fields: [
           { id: 'name', label: 'Measure', type: 'text', required: true, index: true, search: true },
-          { id: 'value', label: 'Value', type: 'decimal', required: true },
+          /* A NUMBER OR AN AMOUNT, SINCE 2.5.0: money is written as `amount`, integer minor units and its currency,
+             and leaves `value` empty, so a feed of revenue never has the record guess a currency from a unit of text. */
+          { id: 'value', label: 'Value', type: 'decimal' },
+          { id: 'amount', label: 'Amount', type: 'money' },
           { id: 'unit', label: 'Unit', type: 'text' },
           { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
           { id: 'organisation', label: 'Organisation', type: 'ref', to: 'organisations', index: true },
@@ -488,6 +501,7 @@ export const FOUNDER = {
             columns: [
               { field: 'name', label: 'Measure', width: 'minmax(16ch,1fr)' },
               { field: 'value', label: 'Value', width: '14ch', align: 'end' },
+              { field: 'amount', label: 'Amount', width: '14ch', align: 'end' },
               { field: 'unit', label: 'Unit', width: '8ch' },
               { field: 'organisation', label: 'Organisation', width: 'minmax(10ch,18ch)' },
               { field: 'source', label: 'Source', width: '11ch' },
@@ -562,6 +576,7 @@ export const FOUNDER = {
           columns: [
             { field: 'name', label: 'Measure', width: 'minmax(16ch,1fr)' },
             { field: 'value', label: 'Value', width: '14ch', align: 'end' },
+            { field: 'amount', label: 'Amount', width: '14ch', align: 'end' },
             { field: 'unit', label: 'Unit', width: '8ch' },
             { field: 'at', label: 'When', width: '12ch', align: 'end' },
           ],

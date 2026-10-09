@@ -57,8 +57,14 @@ jobs:
     # job-level `if`. `CLOUDFLARE_ACCOUNT_ID` and `DEPLOY_HOST` are set in the same sitting as the
     # token, so they stand in for it; a token missing while both variables exist still fails at the
     # step, loudly, which is correct.
+    #
+    # AND ONLY A PUSH TO THIS REPOSITORY'S OWN master. ci.yml also runs on `pull_request`, so a fork's pull request from
+    # a branch named master finished ci with head_branch master and matched `branches: [master]` above: without these
+    # two lines its code would be deployed with the production token.
     if: >-
       github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+      && github.event.workflow_run.event == 'push'
       && vars.CLOUDFLARE_ACCOUNT_ID != ''
       && vars.DEPLOY_HOST != ''
 
@@ -140,6 +146,23 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+
+      # AND KEPT FOR `after-deploy.yml`, which runs after this job has ended and can learn what was live only from an
+      # artefact: the three names `rollback.mjs record` wrote, and nothing else.
+      - name: Keep what was live for the lane
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/live-before"
+          printf 'APP_PREVIOUS=%s\nSITE_PREVIOUS=%s\nLIVE_SHA=%s\n' "$APP_PREVIOUS" "$SITE_PREVIOUS" "$LIVE_SHA" > "$RUNNER_TEMP/live-before/live-before.env"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: live-before
+          path: ${{ runner.temp }}/live-before/live-before.env
+          retention-days: 7
 
       # `51`'s `assets` CARRIES `apps/web/build` INTO THE WORKER VERSION, so this one command ships
       # the shell and the code as one thing. That is what lets step 6 compare a live byte against a

@@ -33,6 +33,10 @@
  * line read these by name. AND `rates-age-days` (REC-B02): how old the newest exchange rate is, so a page can say the
  * rates stopped before a converted figure quietly goes stale. All three say nothing, never nought, with nothing to read.
  *
+ * AND `handoffs-open`, HOW MANY NEXT STEPS WAIT TO BE TAKEN (AGT-C05): the runs waiting in `handoff` with a step left,
+ * read by `handoff.ts`'s `openHandoffs`, the read the briefing hands a new session its step from, so the Agents page
+ * and the card count the same steps. With `about` filled, one project's.
+ *
  * `signs.ts` IS NOT IMPORTED, only its types. It reaches `flow.ts` and `digest.ts`, which import `metrics.ts`, which
  * imports this, and the loop that made broke the kernel's own load (`flow.ts` read a pattern before it was set). So the
  * signs now come in through the reader, `EvalContext.signs`, as the rates come in through `fx`; the kept readings are
@@ -42,8 +46,10 @@
 import type { Result, Sql } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 
+import { openHandoffs, type OpenHandoff } from './handoff.ts';
 import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
 import { workingRuns } from './presence.ts';
+import { SESSION } from './session.ts';
 import { intervalMs } from './pull.ts';
 
 /** The source a built-in figure over the open questions reads, the same word a `queue` block's source is. */
@@ -87,6 +93,80 @@ const RUNS_WORKING: MetricDecl = {
   compare: 'none',
   format: 'int',
 };
+
+/* ── the steps left for the next run (AGT-C05) ─────────────────────────── */
+
+/** The source the open steps are read from, the same word the page source over the same steps is. */
+export const HANDOFFS_OPEN = 'handoffs.open';
+
+/** A figure over the open steps, and the project it counts when `about` is filled: a project row's spoken id. */
+export type HandoffsDecl = MetricDecl & { about?: string | undefined };
+
+/**
+ * How many next steps wait to be taken. NO TARGET: a step left is how one run hands work to the next, neither good nor
+ * bad, so the figure is never met and never missed. A step nobody takes closes by itself at thirty days.
+ */
+const HANDOFFS: HandoffsDecl = {
+  metric: 'handoffs-open',
+  name: 'Next steps waiting to be taken',
+  source: HANDOFFS_OPEN,
+  value: { count: 'id' },
+  window: '30d',
+  compare: 'none',
+  format: 'int',
+  about: PARAM,
+};
+
+/**
+ * One open step with the place it was left (the project's spoken id, else the repository) and the client its run said it
+ * was, so a page calls the run "Claude Code" as the run's own name does and not only "Claude".
+ */
+export type OpenStep = OpenHandoff & { project: string | null; repo: string | null; client: string | null };
+
+/**
+ * The open steps in one project (`project`, a spoken id as a run holds it), or with none every open step on the record,
+ * newest first, each marked `next` or `earlier` by `openHandoffs` in the place it was left.
+ *
+ * THE WHOLE RECORD IS EACH PLACE IN TURN, because whether a step was passed over is asked of the runs in its own place:
+ * every place a waiting run was left in is read once, a project first and its repository only for a run in none.
+ */
+export function openSteps(sql: Sql, nowMs: number, project?: string | null): OpenStep[] {
+  if (typeof project === 'string' && project !== '' && project !== PARAM) return clientsOf(sql, openHandoffs(sql, { project }, null, nowMs).map((h) => ({ ...h, project, repo: null })));
+  const places = sql.all<{ project: string | null; repo: string | null }>(
+    `SELECT DISTINCT nullif(json_extract(fields, '$.project'), '') AS project,
+       CASE WHEN coalesce(json_extract(fields, '$.project'), '') = '' THEN nullif(json_extract(fields, '$.repo'), '') END AS repo
+     FROM entry WHERE register = ? AND deleted_at IS NULL AND state = 'handoff'`,
+    SESSION,
+  );
+  const seen = new Set<string>();
+  const out: Omit<OpenStep, 'client'>[] = [];
+  for (const place of places)
+    for (const h of openHandoffs(sql, place.project ? { project: place.project } : { repo: place.repo }, null, nowMs))
+      if (!seen.has(h.id)) {
+        seen.add(h.id);
+        out.push({ ...h, project: place.project, repo: place.project ? null : place.repo });
+      }
+  return clientsOf(sql, out.sort((a, b) => Date.parse(b.left_at) - Date.parse(a.left_at) || (a.spoken < b.spoken ? 1 : -1)));
+}
+
+/** Each step with its run's client, in one read over the runs that left them. */
+function clientsOf(sql: Sql, steps: Omit<OpenStep, 'client'>[]): OpenStep[] {
+  if (steps.length === 0) return [];
+  const rows = sql.all<{ id: string; client: string | null }>(
+    `SELECT id, json_extract(fields, '$.client') AS client FROM entry WHERE register = ? AND id IN (${steps.map(() => '?').join(', ')})`,
+    SESSION,
+    ...steps.map((s) => s.id),
+  );
+  const client = new Map(rows.map((r) => [r.id, typeof r.client === 'string' && r.client !== '' ? r.client : null]));
+  return steps.map((s) => ({ ...s, client: client.get(s.id) ?? null }));
+}
+
+/** How many next steps wait, on the record or in the one project `about` names. Always now, as the briefing reads them. */
+export function readHandoffsOpen(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl?: MetricDecl): Result<Reading> {
+  const about = (decl as HandoffsDecl | undefined)?.about;
+  const n = openSteps(sql, ctx.nowMs, typeof about === 'string' ? about : null).length;
+  return ok({ value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: null, refusals: [] });
+}
 
 /* ── the signs of a living record (REC-A01) ────────────────────────────── */
 
@@ -179,6 +259,7 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'signs-red': SIGNS_RED,
   'green-days': GREEN_DAYS,
   'rates-age-days': RATES_AGE_DAYS,
+  'handoffs-open': HANDOFFS,
 };
 
 /** The built-in figure called `id`, or `null`; never one `Object.prototype` lends. */

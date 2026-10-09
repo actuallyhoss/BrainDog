@@ -1,0 +1,7 @@
+{
+  "gate": "colour-grep",
+  "rule": "a named colour after a colour property",
+  "expect": "colour literal",
+  "findings": 1,
+  "why": "THE FOURTH NOTATION, and the plainest: `color: red`. The gate knew hex, `rgb()` and `oklch()`, so the two real scrims in this repository (`color-mix(in srgb, black …)`, at two strengths six per cent apart) had never been seen. ONE finding, and the fixture carries two decoys beside it: `content: 'gold'` and a grid area called `tan`. `tan`, `linen`, `plum` and `gold` are CSS colour names and ordinary English, so the rule is the PROPERTY plus the name, and a count of one is what proves the distinction rather than asserting it."
+}

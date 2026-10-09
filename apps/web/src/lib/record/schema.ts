@@ -878,7 +878,7 @@ export type Source = {
  * and `tools/gates/closed-lists.mjs` says in its own header that the `as const` half of that
  * comparison "is not here yet".
  */
-export const REACHES = ['login', 'runner', 'export', 'import', 'pack', 'token'] as const;
+export const REACHES = ['login', 'runner', 'export', 'import', 'pack', 'token', 'vault', 'shape'] as const;
 export type Reach = (typeof REACHES)[number];
 
 /**

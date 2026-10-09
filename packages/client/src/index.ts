@@ -161,7 +161,7 @@ export type Boot = {
    * THE SHELL'S ONE ROUND TRIP (EXP-D03), each absent from a host older than shape 2, which a reader then asks the way it
    * asked before: `waits` from `counts`, `working` from `sessions`, the voice from the add-ons, and Slash from `version`.
    */
-  /** Which shape the answer is: 2 since the five fields below joined it. Absent from an older host. */
+  /** Which shape the answer is: 2 since the five fields below joined it, 3 since `copies`. Absent from an older host. */
   shape?: number;
   /**
    * What waits on the caller, counted once by the record (`waiting()`): open questions, how many are late and how many
@@ -177,7 +177,16 @@ export type Boot = {
   voice?: BootVoice;
   /** Whether a model is behind Slash on this host, as `version` says it. */
   slash?: boolean;
+  /**
+   * The record's copies as three facts (LCH-C03, shape 3): when the last nightly copy was kept and its size in bytes, and
+   * when a person last exported it, each `null` until there is one. Sent only to a caller who may take a copy, so absent
+   * for anybody else and from an older host.
+   */
+  copies?: BootCopies;
 };
+
+/** What `boot` says about the record's copies. See `CopyFacts` in `@braindog/kernel`. */
+export type BootCopies = { last_copy_at: string | null; last_copy_bytes: number | null; last_export_at: string | null };
 
 /** What waits on a person, as `boot` says it (`waits`). */
 export type BootWaits = { questions: number; late: number; hard: number; inbox: number | null; working: number };
@@ -298,14 +307,73 @@ export type Context = {
   session: { spoken: string; state: string | null } | null;
   project: { spoken: string; name: string; mark: string | null; hue: number | null; how: 'remote' | 'folder' | 'repo' } | null;
   ambiguous: string[];
-  handoff: { from: string; age_s: number; next: string; tried: string[]; head: string | null } | null;
+  /**
+   * The step another run left open here (`openHandoffs`, marked `next`). `agent` is the kind of agent that left it,
+   * `left_at` when, and `earlier` how many more steps are open here besides. Those three are absent from a host older
+   * than the briefing that sends them (AGT-C05).
+   */
+  handoff: {
+    from: string;
+    agent?: string | null;
+    left_at?: string;
+    age_s: number;
+    next: string;
+    tried: string[];
+    head: string | null;
+    earlier?: number;
+  } | null;
   live: { same_repo: LiveBrief[]; elsewhere: LiveBrief[] };
+  /** Who else is working in the caller's tree now, or `null` when nobody is. Absent from an older host. */
+  also_here?: AlsoHere | null;
+  /**
+   * The Next slot as lines with no label: the open step with its writer, age and commits since, the step a working run
+   * took, or "Nothing was handed over" with the last run here. Empty where no run ended before; absent from an older host.
+   */
+  next_lines?: string[];
   waiting: { id: string; question: string }[];
   registers: { id: string; name: string; rows: Brief[]; inherited: Brief[]; truncated: boolean }[];
+  /** The people linked here, most recently in touch first. A current host sends each as a `PersonBrief`. */
   people: Brief[];
+  /** How many people past the record's own are linked here, sent only when there are more than `people` holds. */
+  people_total?: number;
+  /** The record's own person by every key they are known by (`kind:value`), or `null`. Absent from an older host. */
+  self?: { keys: string[] } | null;
+  /** The organisations of this project by name, the linked ones first. Absent from an older host. */
+  organisations?: OrgBrief[];
   faded: number;
+  /**
+   * The record's vital signs that are red now, each by its name with its one sentence, so a session starts knowing what
+   * is broken. Empty for a caller narrower than the whole record; absent from an older host.
+   */
+  signs?: { name: string; said: string }[];
   next: string;
+  /**
+   * The briefing as one card, at most 150 words, and its Next line alone for a compaction (`card.ts` in
+   * `@braindog/record`), with the calling command's build and whether it is older than the host's oldest. Optional, so an
+   * older host that sends none of them still types.
+   */
+  card?: string;
+  card_next?: string | null;
+  build?: { cli: string | null; behind: boolean } | null;
 };
+
+/** Who else works in the caller's tree, as `context` says it. See `AlsoHere` in `@braindog/record`. */
+export type AlsoHere = {
+  /** The one warning, said once however many there are. */
+  warning: string;
+  /** The few heard from last, by name, each with what it says it is doing. */
+  runs: { name: string; doing: string | null }[];
+  /** How many more are working here past those. */
+  more: number;
+  /** The two lines as the card prints them: the warning, then "Also here: ...". */
+  lines: [string, string];
+};
+
+/** A person linked to the project, as `context` names them. See `PersonBrief` in `@braindog/record`. */
+export type PersonBrief = Brief & { name: string; role: string | null; org: string | null; in_touch: string | null; self: boolean };
+
+/** An organisation of the project, by name; `linked` is true for the project's own. See `OrgBrief` in `@braindog/record`. */
+export type OrgBrief = { spoken: string; name: string; kind: string | null; linked: boolean };
 
 /** Another run that is live now, as `context` shows it. */
 export type LiveBrief = {
@@ -409,7 +477,7 @@ export type Version = {
 export type DeviceRow = {
   handle: string;
   status: 'pending' | 'approved' | 'active' | 'expired' | 'denied' | 'revoked';
-  reach: 'login' | 'runner' | 'export' | 'import' | 'pack' | 'token' | 'vault';
+  reach: 'login' | 'runner' | 'export' | 'import' | 'pack' | 'token' | 'vault' | 'shape';
   scope: string | null;
   label: string | null;
   ua: string | null;
@@ -1410,16 +1478,27 @@ export function createClient(options: ClientOptions) {
       branch?: string;
       head?: string;
     }) => call<Attached>('attach', args as Record<string, unknown>),
-    handoff: (args: {
-      next?: string;
-      tried?: string;
-      note?: string;
-      doing?: string;
-      state?: string;
-      branch?: string;
-      head?: string;
-      session?: string;
-    }) => call<unknown>('handoff', args as Record<string, unknown>),
+    /**
+     * Hand the run's step on, or TAKE OR DROP ANOTHER RUN'S STEP (AGT-C05), each of those a call of its own naming the run
+     * that left the step (`S12`). `take` is an agent's: its run picks the step up and the run that left it is done; the
+     * second of two takers is refused with who took it and when. `drop` closes a step that is no longer true, and `why`
+     * says why in words (a drop with none is refused), by an agent or by a person from the app.
+     */
+    handoff: (
+      args:
+        | {
+            next?: string;
+            tried?: string;
+            note?: string;
+            doing?: string;
+            state?: string;
+            branch?: string;
+            head?: string;
+            session?: string;
+          }
+        | { take: string }
+        | { drop: string; why: string },
+    ) => call<unknown>('handoff', args as Record<string, unknown>),
     sessionsLive: () => call<LiveRun[]>('sessionsLive'),
     /** Where the caller stands: its run, its project, the last handoff, who is live, and what applies. */
     context: () => call<Context>('context'),

@@ -214,9 +214,11 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'recentHistory', group: 'READ+', writes: false, what: 'Every change to this record, newest first, a page at a time, held to what you may see.',
     takes: { limit: 'integer' } },
   /* `state` IS DECLARED BECAUSE THE RECORD TAKES IT. It was missing, so the table told a reader the inbox answered only
-     what waits on a person, when `?state=skipped` and `?state=all` already reached the record as undeclared text. */
+     what waits on a person, when `?state=skipped` and `?state=all` already reached the record as undeclared text.
+     `repeats` IS JSON, as `includeDeleted` on list is: undeclared, `?repeats=true` reached the record as the text "true",
+     which it refuses, so the Inbox's "Held as repeats" read always came back empty. */
   { name: 'inbox', group: 'READ+', writes: false, what: 'What arrived and no rule filed, newest first, a page at a time, in one state or all of them, with a count for each. An owner reads it, and so does a token for the whole record that its owner gave the inbox reach. No other token does.',
-    takes: { state: 'text', cursor: 'integer', limit: 'integer' } },
+    takes: { state: 'text', cursor: 'integer', limit: 'integer', repeats: 'json' } },
   { name: 'search', group: 'DATA', writes: false, what: 'Rows whose text matches, across every register you can see, best first.',
     takes: { q: 'text', limit: 'integer' } },
   { name: 'version', group: 'READ+', writes: false, what: "The record's version, to tell whether anything you may see has changed. An owner who reads every list gets the newest event's rowid and may ask what changed since; anybody else gets a number that is only equal or not, never larger or smaller." },

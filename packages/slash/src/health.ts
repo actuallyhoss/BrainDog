@@ -51,22 +51,32 @@ export const FAILS_DOWN = 3;
 
 const DAY = 86_400_000;
 
-/** A model that did not answer, in the ledger's own words. */
-const FAILED = "status = 'error' AND code IN ('UNREACHABLE', 'PULL_REQUEST_REFUSED', 'ANSWER_UNREADABLE')";
+/** An answer older than this, with a failure in the last day, is not an engine that answers: it is one that stopped. */
+export const ANSWER_STALE_DAYS = 7;
+
+/**
+ * A model that did not answer, in the ledger's own words: a `WHERE` clause over `slash_call`.
+ *
+ * EXPORTED, WITH `LEDGER_ANSWERED`, SO EVERY READING OF THE LEDGER COUNTS ONE WAY. The vital sign `model-answers`
+ * (`packages/host/src/sign-model.ts`) judges the same rows Settings does; a host package may not import this one
+ * (`46 §5.1`), so it restates the two clauses and its test holds them equal to these.
+ */
+export const LEDGER_FAILED = "status = 'error' AND code IN ('UNREACHABLE', 'PULL_REQUEST_REFUSED', 'ANSWER_UNREADABLE')";
 
 /** A model that answered: reached (named, not `-`), not a failure, and not a hold, a budget refusal or a build without it. */
-const ANSWERED =
+export const LEDGER_ANSWERED =
   "model <> '-' AND NOT (" +
-  FAILED +
+  LEDGER_FAILED +
   ") AND (code IS NULL OR code NOT IN ('SLASH_PENDING', 'SPARK_PENDING', 'SLASH_BUDGET_SPENT', 'SPARK_BUDGET_SPENT', 'NOT_IN_THIS_BUILD'))";
 
 /**
  * Read the last `HEALTH_DAYS` of Slash's ledger and say how the engine stands.
  *
  * `off` FIRST, because a host with no model has nothing to report. Then the owner's own key, where the host says it will
- * not open or the newest failure is the provider turning the key away. Then the ledger: no row is `never_asked`; three or
- * more failures after the last answer, the newest under a day old, is `not_answering`, and so is a window with failures
- * and no answer at all; anything else is `answering`. Failures older than a day with an answer before them read as
+ * not open or the newest failure is the provider turning the key away. Then the ledger: no row is `never_asked`; a
+ * failure under a day old after the last answer is `not_answering` when there are three or more of them, or when that
+ * answer is older than `ANSWER_STALE_DAYS`, and so is a window with failures and no answer at all; anything else is
+ * `answering`. Failures older than a day with an answer before them read as
  * `answering`, since `last_ok` is still true and nobody has asked since.
  */
 export function health(sql: Sql, clock: Clock, facts: EngineFacts): EngineHealth {
@@ -77,12 +87,12 @@ export function health(sql: Sql, clock: Clock, facts: EngineFacts): EngineHealth
      looking at Settings, and `openStore` is the engine's to run on its first ask. */
   const ledger = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'")?.n ?? 0;
   const lastOk =
-    ledger === 0 ? null : (sql.one<{ ts: string | null }>(`SELECT MAX(ts) AS ts FROM slash_call WHERE ts >= ? AND ${ANSWERED}`, from)?.ts ?? null);
+    ledger === 0 ? null : (sql.one<{ ts: string | null }>(`SELECT MAX(ts) AS ts FROM slash_call WHERE ts >= ? AND ${LEDGER_ANSWERED}`, from)?.ts ?? null);
   const fails =
     ledger === 0
       ? { n: 0, first: null, newest: null }
       : (sql.one<{ n: number; first: string | null; newest: string | null }>(
-          `SELECT COUNT(*) AS n, MIN(ts) AS first, MAX(ts) AS newest FROM slash_call WHERE ts >= ? AND ts > ? AND ${FAILED}`,
+          `SELECT COUNT(*) AS n, MIN(ts) AS first, MAX(ts) AS newest FROM slash_call WHERE ts >= ? AND ts > ? AND ${LEDGER_FAILED}`,
           from,
           lastOk ?? '',
         ) ?? { n: 0, first: null, newest: null });
@@ -91,7 +101,7 @@ export function health(sql: Sql, clock: Clock, facts: EngineFacts): EngineHealth
     const keyRefused =
       fails.newest !== null &&
       sql.one<{ n: number }>(
-        `SELECT COUNT(*) AS n FROM slash_call WHERE ts = ? AND tier <> 'a' AND code = 'PULL_REQUEST_REFUSED' AND ${FAILED}`,
+        `SELECT COUNT(*) AS n FROM slash_call WHERE ts = ? AND tier <> 'a' AND code = 'PULL_REQUEST_REFUSED' AND ${LEDGER_FAILED}`,
         fails.newest,
       )?.n !== 0;
     if (facts.key_open === false || keyRefused) return { state: 'key_closed', last_ok: lastOk, since: fails.first };
@@ -100,7 +110,11 @@ export function health(sql: Sql, clock: Clock, facts: EngineFacts): EngineHealth
   if (lastOk === null && fails.n === 0) return { state: 'never_asked', last_ok: null, since: null };
   if (lastOk === null) return { state: 'not_answering', last_ok: null, since: fails.first };
   const fresh = fails.newest !== null && now - Date.parse(fails.newest) < DAY;
-  if (fails.n >= FAILS_DOWN && fresh) return { state: 'not_answering', last_ok: lastOk, since: fails.first };
+  /* A RECENT ANSWER EARNS THE BLIP ITS TWO FREE FAILURES; AN OLD ONE DOES NOT. Two fresh failures after an answer twenty
+     days old read "answered 20 days ago" while the model was failing, so past `ANSWER_STALE_DAYS` one fresh failure is
+     enough. */
+  const stale = now - Date.parse(lastOk) > ANSWER_STALE_DAYS * DAY;
+  if (fresh && (fails.n >= FAILS_DOWN || stale)) return { state: 'not_answering', last_ok: lastOk, since: fails.first };
   return { state: 'answering', last_ok: lastOk, since: null };
 }
 

@@ -1,0 +1,8 @@
+{
+  "gate": "telemetry-allowlist",
+  "rule": "a second place that writes a point under a register's name",
+  "expect": "carries register",
+  "findings": 2,
+  "total": 3,
+  "why": "A SECOND PLACE THAT WRITES A POINT, CARRYING A REGISTER'S NAME, beside a correct one. Check 1 names both calls and check 3 names the seed for `register`, so the seed is named twice and the total is three. The seed's tuple is well formed, which proves the gate reads what goes into a tuple and not only its labels."
+}

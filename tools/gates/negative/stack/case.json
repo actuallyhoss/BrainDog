@@ -1,0 +1,6 @@
+{
+  "gate": "stack",
+  "rule": "a word the stack bans, in a package",
+  "expect": "finding\\(s\\)",
+  "findings": 1
+}

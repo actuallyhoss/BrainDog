@@ -1,0 +1,16 @@
+code:   CURRENCY_FIXED
+via:    write
+raises: packages/kernel/src/coerce.ts
+at:     amount
+fix:    A row keeps its currency, so delete this row and add it again in the other currency.
+declare: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "amount", "type": "money", "currency_fixed": true }
+    ]
+  }
+rows: [
+    { "what": "Invoice 41", "amount": { "amount": 4100, "currency": "USD" } }
+  ]
+write: { "register": "obligations", "seq": 1, "patch": { "amount": { "amount": 4100, "currency": "EGP" } } }

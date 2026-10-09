@@ -31,7 +31,8 @@ import { test } from 'node:test';
 import { pushes, siteBinding, siteConfig, wranglerConfig } from './provision-check.mjs';
 import { unflipped } from './flip-fixture.mjs';
 import { UNBOUND, boundSite } from './site-fixture.mjs';
-import { canary, checks, judge, migrationCount } from './smoke.mjs';
+import { FIRST_DRAW } from '../../web/src/lib/record/first-draw.ts';
+import smoke, { argsFor, canary, checks, judge, migrationCount, readCheck, refusals } from './smoke.mjs';
 
 const html = { 'content-type': 'text/html; charset=utf-8' };
 const json = { 'content-type': 'application/json' };
@@ -261,4 +262,131 @@ test('without both SMOKE_TOKEN and SMOKE_SLUG no check opens a record', () => {
     const list = checks(staged('B2'), name, BOTH_BOUND);
     assert.ok(list.every((c) => !c.canary && !/\/app\/[^/]+\/api\//.test(c.url)), `${name}: an unsigned check reaches a record's API`);
   }
+});
+
+/* THE SIGNED-IN HALF, RUN WHOLE AGAINST A STUB (LCH-C02). The stub answers the unsigned checks with whichever answer
+   each one's own judge passes, so these tests say only what the canary's questions do. */
+const TOKEN = 'rec_ops.s3cret';
+const NOWHERE = 'nobody-0011223344556677';
+const GOOD = [
+  answer(200, html, '<!doctype html>'),
+  answer(401, json, '{"code":"AUTH_REQUIRED"}'),
+  answer(200, json, JSON.stringify({ ok: true, kernel: migrationCount() })),
+  answer(308, { location: 'https://brain.dog/app/r/x' }),
+  answer(404, json, '{"code":"INGEST_UNKNOWN"}'),
+];
+const HELD = {
+  boot: { registers: [{ id: 'session', count: 1 }, { id: 'tasks', count: 3 }] },
+  packs: [{ id: 'off', disabled_at: '2026-01-01' }, { id: 'money', disabled_at: null }],
+  pages: [{ slug: 'home', title: 'Home', about: null }],
+  list: { rows: [{ seq: 3, fields: {} }], cursor: null },
+};
+
+/** A stub host: `faults` maps a method to the answer it gives instead, `held` what the canary holds. */
+function host({ faults = {}, held = HELD, stranger = null, elsewhere = null } = {}) {
+  const sent = [];
+  const unsigned = checks(staged('B2'), 'production', BOTH_BOUND);
+  const io = async (url, init) => {
+    const u = new URL(url);
+    const bearer = init.headers?.authorization ?? null;
+    sent.push({ method: init.method, url, bearer, body: init.body });
+    const at = u.pathname.match(/^\/app\/([a-z0-9-]+)\/api\/(\w+)$/);
+    if (!at) {
+      const check = unsigned.find((c) => c.url === url && c.method === init.method);
+      assert.ok(check, `asked ${init.method} ${url}, which no check names`);
+      const good = GOOD.find((a) => judge(check, a) === null);
+      return new Response(good.status === 308 ? null : good.text, { status: good.status, headers: good.headers });
+    }
+    const [, slug, method] = at;
+    /* IN THE HOST'S OWN ENVELOPE, `{ ok, value }` and `{ ok: false, refusal }`, as `packages/client` reads it: a stub
+       answering bare bodies passed while the real host's answers named nothing for the reads after the bare four. */
+    const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: json });
+    const refuse = (status, code, fix) => reply(status, { ok: false, refusal: { code, fix } });
+    if (slug !== 'ops') return elsewhere ?? refuse(404, 'RECORD_UNKNOWN', `There is no record called ${slug}.`);
+    if (bearer !== `Bearer ${TOKEN}`) return stranger ?? refuse(401, 'AUTH_REQUIRED', 'Sign in.');
+    if (faults[method]) return faults[method]();
+    return reply(200, { ok: true, value: held[method] ?? {} });
+  };
+  return { sent, io };
+}
+
+const run = async (opts = {}, signedIn = { token: TOKEN, slug: 'ops' }) => {
+  const lines = [];
+  const { sent, io } = host(opts);
+  const code = await smoke('production', staged('B2'), BOTH_BOUND, signedIn, { fetch: io, log: (l) => lines.push(l), nowhere: NOWHERE });
+  return { code, lines, sent, out: lines.join('\n') };
+};
+
+test('the canary is opened as a first draw opens it, every read of the list asked with the token, and none of it printed', async () => {
+  const { code, out, sent } = await run();
+  assert.equal(code, 0, out);
+  const signed = sent.filter((s) => s.url.includes('/app/ops/api/'));
+  for (const read of FIRST_DRAW) assert.ok(signed.some((s) => new URL(s.url).pathname === `/app/ops/api/${read.method}` && s.bearer), read.method);
+  assert.ok(sent.some((s) => s.url === 'https://brain.dog/app/ops/api/version' && s.bearer === null), 'version is not asked without the bearer');
+  assert.ok(sent.some((s) => s.url === `https://brain.dog/app/${NOWHERE}/api/boot` && s.bearer === `Bearer ${TOKEN}`));
+  /* WHAT EACH IS ABOUT IS READ FROM THE BARE ANSWERS: the first list holding rows, the add-on switched on, the first page. */
+  assert.ok(sent.some((s) => s.url === 'https://brain.dog/app/ops/api/list?register=tasks&limit=1'));
+  assert.ok(sent.some((s) => s.url === 'https://brain.dog/app/ops/api/packConfig?id=money'));
+  assert.ok(sent.some((s) => s.url === 'https://brain.dog/app/ops/api/page?slug=home'));
+  assert.ok(sent.some((s) => s.url === 'https://brain.dog/app/ops/api/get?register=tasks&seq=3'));
+  const preview = sent.find((s) => s.url.endsWith('/api/previewPage'));
+  assert.equal(preview.method, 'POST');
+  assert.equal(JSON.parse(preview.body).body.blocks[0].source, 'register.tasks');
+  assert.ok(!out.includes('s3cret'), 'the token is printed');
+  assert.match(out, /\/account\/usage is not asked/);
+  assert.doesNotMatch(out, /Bearer /, 'a bearer is printed');
+});
+
+test('a first-draw read that answers 500 turns the step red by itself, and the line says which screen breaks', async () => {
+  const { code, out } = await run({ faults: { pages: () => new Response('{"code":"INTERNAL"}', { status: 500, headers: json }) } });
+  assert.equal(code, 1);
+  assert.match(out, /WRONG {2}GET https:\/\/brain\.dog\/app\/ops\/api\/pages[\s\S]*answered 500: Home, finding/);
+  /* AND A READ NAMED FROM IT IS SAID, NOT GUESSED. */
+  assert.match(out, /skip {3}page: the canary has no page/);
+});
+
+test('version told to a stranger is red', async () => {
+  const { code, out } = await run({ stranger: new Response('{"version":9}', { status: 200, headers: json }) });
+  assert.equal(code, 1);
+  assert.match(out, /told to a stranger/);
+});
+
+test('the token at a second name must be refused, naming nothing of the canary', async () => {
+  const opened = await run({ elsewhere: new Response('{"registers":[]}', { status: 200, headers: json }) });
+  assert.equal(opened.code, 1);
+  assert.match(opened.out, /opened a record it was not minted for/);
+  const named = await run({ elsewhere: new Response('{"code":"FORBIDDEN","fix":"This token is for ops."}', { status: 403, headers: json }) });
+  assert.equal(named.code, 1);
+  assert.match(named.out, /names the canary's record/);
+  const broke = await run({ elsewhere: new Response('oops', { status: 500 }) });
+  assert.equal(broke.code, 1);
+});
+
+test('a canary that holds nothing to name skips those reads and says so, which is not a fault', async () => {
+  const { code, out } = await run({ held: { boot: { registers: [{ id: 'session', count: 0 }] }, packs: [], pages: [] } });
+  assert.equal(code, 0, out);
+  for (const m of ['schema', 'list', 'previewPage']) assert.match(out, new RegExp(`skip {3}${m}: the canary holds no list`));
+  assert.match(out, /skip {3}packConfig: the canary has no add-on/);
+  assert.match(out, /skip {3}get: the canary has no row to open/);
+});
+
+test('without the token nothing signed in is asked, and one line says the half was skipped', async () => {
+  const { code, out, sent } = await run({}, {});
+  assert.equal(code, 0, out);
+  assert.ok(sent.every((s) => !s.url.includes('/app/ops/') && !s.bearer));
+  assert.match(out, /the signed-in half is skipped/);
+});
+
+test('the pure parts: names, the second name, and how a read is sent', () => {
+  assert.throws(() => refusals(staged('B2'), 'production', 'ops', 'ops'), /second name/);
+  assert.throws(() => refusals(staged('B2'), 'production', 'ops', '../x'), /second name/);
+  const [version, elsewhere] = refusals(staged('B2'), 'production', 'ops', NOWHERE, TOKEN);
+  assert.equal(version.canary, undefined);
+  assert.equal(elsewhere.canary, true);
+  assert.equal(judge(elsewhere, answer(404, json, `{"fix":"There is no record called ${NOWHERE}."}`)), null);
+  assert.deepEqual(argsFor({ method: 'schema', ask: 'list' }, { boot: HELD.boot }), { args: { register: 'tasks' } });
+  assert.ok(argsFor({ method: 'x', ask: 'other' }, {}).skip);
+  const post = readCheck(staged('B2'), 'production', 'ops', { method: 'previewPage', ask: 'body', post: true, by: 'Home' }, { body: { page: 'p' } });
+  assert.equal(post.url, 'https://brain.dog/app/ops/api/previewPage');
+  assert.equal(post.body, '{"body":{"page":"p"}}');
 });

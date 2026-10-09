@@ -1,0 +1,6 @@
+{
+  "gate": "css-rules",
+  "rule": "an identifier at a size that is not its own",
+  "expect": "two roles colliding",
+  "findings": 1
+}

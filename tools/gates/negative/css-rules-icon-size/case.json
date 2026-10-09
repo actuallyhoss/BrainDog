@@ -1,0 +1,7 @@
+{
+  "gate": "css-rules",
+  "rule": "an icon size that is not one of the four names",
+  "expect": "not a number",
+  "findings": 2,
+  "why": "ROW 7 HAS TWO HALVES (an `<Icon size=…>` outside the four names, and a literal `width`/`height` on an `<svg>`) and one fixture carries both, so a count of two is what proves neither half is riding on the other's finding."
+}

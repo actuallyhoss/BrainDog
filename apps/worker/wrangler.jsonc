@@ -412,7 +412,11 @@
            three an hour from one address until the secret half, `TURNSTILE_SECRET` (named at the end of this file),
            is set; `/healthz` says so in its `launch` sentence. */
         "TURNSTILE_SITE_KEY": "",
-        /* THE OPERATOR'S CANARY RECORD, a `rec_...` id. Empty, and the nightly walk writes its summary nowhere. */
+        /* THE OPERATOR'S CANARY RECORD, a `rec_...` id. Empty, and the nightly walk writes its summary nowhere and
+           `deploy.yml`'s sandbox smoke says it was skipped. EMPTY ON PURPOSE UNTIL HIS CANARY SITTING (PRF-A09, the
+           ten minutes in `loop/scope/area-proof-a.md` section 5, item 1): `tools/canary/enrol.mjs`, run by him, makes
+           the record `ops` through the public sign-up and prints the one line that fills this. The loop never fills
+           it by hand, since a record it named would be a canary nobody enrolled. */
         "OPS_RECORD": ""
       },
 
@@ -621,7 +625,9 @@
         "SIGNUP": "open",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET, as alpha's comment says. */
         "TURNSTILE_SITE_KEY": "",
-        /* THE OPERATOR'S CANARY RECORD, as alpha's comment says. */
+        /* THE OPERATOR'S CANARY RECORD, as alpha's comment says, and empty until the same sitting: the line
+           `tools/canary/enrol.mjs` prints goes here, in the commit after his sitting, and from then the sandbox smoke
+           and `after-deploy.yml` both run on it. */
         "OPS_RECORD": ""
       },
 

@@ -804,12 +804,12 @@ exists (§10).
 
 | Boundary | Rule |
 |---|---|
-| Secrets in CI | two, and no more: `CLOUDFLARE_API_TOKEN` (deploy-scoped, environment `production`, `deploy.yml` only) and the npm OIDC identity (`id-token: write`, `release.yml` only). No npm token, no classic token, no long-lived anything (12 §8; 31 §6) |
-| Workflow permissions | every workflow declares `permissions:`; the default is `contents: read`; `gate1.yml` adds `issues: read`; `release.yml`'s app job adds `contents: write` to create the release; `codeql.yml` adds `security-events: write`, which is the only way an analysis reports. Nothing else has `write` but the OIDC id-token. *An earlier draft of this row said "nothing has `write` but the OIDC id-token" and was written before either workflow existed; a release that cannot create a release and an analysis that cannot file an alert are not tighter, they are inert.* |
+| Secrets in CI | four, and no more: `CLOUDFLARE_API_TOKEN` (deploy-scoped, environment `production`, in `deploy.yml` and in `after-deploy.yml` for its rollback alone), the npm OIDC identity (`id-token: write`, `release.yml` only), and the canary's two, `SMOKE_TOKEN` (a `propose` token on the record `ops`) and `CANARY_PASSKEY` (that record's one passkey), both in environment `production`, beside the variable `SMOKE_SLUG`. **Why the canary's two are allowed:** after a deploy nothing else opens a record or signs in as a person does, and both reach only `ops`, a free-plan record of invented data that the lane puts back each week, so a leak of either exposes nobody's work. He makes them in his ten-minute sitting with `tools/canary/enrol.mjs`, which hands each to `gh secret set` unprinted; no agent mints, types or pastes one. Once `SMOKE_SLUG` is set, a missing one is red, never a skip (`after-deploy-workflow.test.mjs`). No npm token, no classic token, no long-lived anything else (12 §8; 31 §6) |
+| Workflow permissions | every workflow declares `permissions:`; the default is `contents: read`; `gate1.yml` adds `issues: read`; `release.yml`'s app job adds `contents: write` to create the release; `codeql.yml` adds `security-events: write`, which is the only way an analysis reports; `after-deploy.yml` adds `actions: read` (the deploy's `live-before`), `issues: write` (the finding a red look opens) and `statuses: write` ("proven" or "not proven" on the deployed commit). Nothing else has `write` but the OIDC id-token. *An earlier draft of this row said "nothing has `write` but the OIDC id-token" and was written before either workflow existed; a release that cannot create a release and an analysis that cannot file an alert are not tighter, they are inert.* |
 | Actions | six, pinned to a major: `actions/checkout@v4`, `pnpm/action-setup@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4`, `actions/cache@v4`, and `github/codeql-action/*@v3` as one publisher. `wrangler` and `playwright` run from the lockfile, never from a marketplace action. **A major tag is mutable**, so a compromised publisher reaches this repository without a commit in it; `renovate.json5` sets `pinDigests`, which rewrites each to a 40-character sha with the tag in a trailing comment and then maintains it — the only pinning that is both safe and current. *An earlier draft said four and named a cache action in none of the five workflows it specified.* |
 | Installs | `pnpm install --frozen-lockfile` in every job; `minimumReleaseAge: 1440` and `linkWorkspacePackages: false` in `pnpm-workspace.yaml` (31 §3) — a package under 24 h old never installs, a typo'd internal name fails loudly |
 | The deploy | `deploy-parity` runs after every `wrangler deploy`, in the same job, and a red parity fails the deploy run — a green deploy serving a stale asset has happened three times before (30 §14) |
-| What a gate may read | the repository, `build/`, and the live host named by `DEPLOY_HOST`. No gate reads a secret; `deploy-parity` fetches unauthenticated routes only |
+| What a gate may read | the repository, `build/`, and the live host named by `DEPLOY_HOST`. One gate reads a secret: `signin-live` loads `CANARY_PASSKEY` into a virtual authenticator and prints none of it; without it, it runs on a fresh self-host and says "self-host only". `deploy-parity` fetches unauthenticated routes only |
 | What a test may hold | fixtures are synthetic: no real payee, credential, email or amount; `clean-room` walks `fixtures/**` too. `secret-grep` does NOT: it loops over `packages` and `apps` only, and its own comment claims `packages/fixtures/**` is in scope, which is a directory this tree has never had. The refusal corpus at `fixtures/refusals/` is therefore unscanned by that gate, and the fix belongs in `secret-grep.mjs` rather than here |
 | Logs | a gate's line carries a path, a count, a hash, a code — never a field value or a body (35 §2). `deploy-parity` prints hashes, not HTML |
 | Provenance | npm provenance is automatic under trusted publishing; `release.yml` step 8 verifies the version landed, and a consumer may verify the attestation against this repository and `release.yml` |
@@ -831,6 +831,19 @@ thing being analysed is a shell string assembled by a YAML template at run time.
 *The three rows above were amended in the revision that added this workflow rather than after it,
 because a specification that contradicts the tree is worse than one that is silent: the next reader
 cannot tell which of the two is the mistake.*
+
+### 8.2 · A seventh workflow: the lane after a deploy
+
+`after-deploy.yml` runs when `deploy.yml` ends green on master (PRF-A09). It runs one step for each file
+in `tools/canary/lane.d/`, in name order, against the canary record `ops` on `brain.dog`: the signed-in
+smoke, `signin-live`, the look with the canary's session, and the `signs` route. A red smoke or sign-in
+starts the rollback `deploy.yml` already has (`rollback.mjs decide`, then `wrangler rollback`); a red look
+opens a finding; and the deployed commit is marked "proven" or "not proven". It is its own file because it
+holds the canary's two secrets and `issues: write`, and neither belongs on the file that deploys. Its
+first step after the checkout refuses a commit that is not on this repository's master, so a fork's
+branch named master, or a branch run by hand, never reaches those secrets. **Until
+his sitting there is no canary:** every step runs on a fresh self-host in the job, says "self-host only",
+and the commit is "not proven", because a missing canary is never green.
 
 ---
 

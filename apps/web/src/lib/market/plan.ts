@@ -200,7 +200,7 @@ function diffPart(d: Body, name: (id: string) => string): { part: Part; stops: s
       ...section('page-adds', words.pageAdds, list(d.page_adds).filter((p) => !isMap(p.refusal)).map((p) => row(name(`page.${text(p.page)}`), text(p.line) || null))),
       ...section('settings', words.settings, list(d.config).map((c) => {
         const value = typeof c.value === 'string' || typeof c.value === 'number' || typeof c.value === 'boolean' ? String(c.value) : JSON.stringify(c.value ?? null);
-        return row(text(c.key).replace(/_/gu, ' '), c.from === 'kept' ? words.settingKept(value) : c.from === 'default' ? words.settingDefault(value) : words.settingNone);
+        return row(text(c.key).replace(/_/gu, ' '), c.from === 'kept' || c.from === 'given' ? words.settingKept(value) : c.from === 'default' ? words.settingDefault(value) : words.settingNone);
       })),
       ...section('examples', words.examples, count(seeds.count) === 0 ? [] : [row(words.examplesLine(count(seeds.count)), seedRows.map((r) => `${name(`register.${text(r.register)}`)} ${words.examplesIn(count(r.rows))}`).join(', ') || null)]),
       ...section('spawns', words.spawns, list(d.spawns).map((s) => row(name(`rule.${text(s.rule)}`), words.spawnLine(name(`register.${text(s.register)}`), count(s.bound), text(s.when))))),

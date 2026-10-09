@@ -43,6 +43,8 @@ import type { PageFilter } from '@braindog/kernel';
 import {
   ANSWER_KEYS,
   CAUSE,
+  NIGHT_FAULT,
+  clearFault,
   canonValue,
   sha256,
   fill,
@@ -80,6 +82,10 @@ import {
   type Verdict,
   type SessionHints,
   type WriteContext,
+  HANDOFF_STATES,
+  type OpenHandoff,
+  type Taken,
+  type CopyFacts,
   PEOPLE,
   type Approved,
   type Arrival,
@@ -132,7 +138,7 @@ import {
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
-import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
+import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf } from './arrange.ts';
 import { LATE_DAYS, isWorking, presenceOf, waiting as waitingOf, type Presence, type WaitingNow } from './waiting.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
@@ -199,6 +205,8 @@ import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
 import { rerank } from './rerank.ts';
 import { aboutOf, ladder, type Caller, type Gate } from './ladder.ts';
+import { OLDER, card as cardOf } from './card.ts';
+import { alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_ASKED_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
@@ -215,6 +223,8 @@ export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
 export { LATE_DAYS, isWorking, lateAt, nothingWaits, presenceOf, waiting, type Presence, type WaitingNow, type WaitingQuestion, type WaitingReader, type WaitingRun } from './waiting.ts';
 export { headlineAgrees, type Disagrees } from './headlines.ts';
 export { fileRecordSigns, readBriefingSign, readToolsSign, type RecordSignsDeps } from './signs.ts';
+export { CARD_AIM, CARD_MOST, OLDER, TWO_SESSIONS, card, type Card, type CardAt } from './card.ts';
+export { ALSO_HERE_MOST, STEP_DAYS, TREE_WARNING, alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
 export { lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_MS, TEMPLATE_ALL, type AnswerRule, type PageFinding, type PageLintRound, type PagesCleanReading } from './page-lint.ts';
 export {
   HEADLINE_ASKS_DAY,
@@ -579,12 +589,13 @@ const PREFIX = RUN.seq_prefix;
 const LIVE = (RUN.fields.find((f) => f.id === RUN.state)?.values ?? []).filter((v) => !RUN.done.includes(v));
 /**
  * THE STATES `handoff` WRITES, AND NO OTHER: resting (`idle`), leaving a step for the next run (`handoff`) and finished
- * (`done`). One constant, which the agent door's tool reads for its own words, so the two never list different states.
+ * (`done`). The kernel's one constant (`handoff.ts`), passed on, which the agent door's tool reads for its own words, so
+ * the record, the kernel and the door never list different states.
  *
  * `active` IS NOT ONE. A run is active because it writes; asked for by name it opened a run only to be refused, or
  * revived a finished one with no work in it. `abandoned` is the sweep's word for a run that went silent, never a run's own.
  */
-export const HANDOFF_STATES = ['idle', 'handoff', 'done'] as const;
+export { HANDOFF_STATES };
 
 /** What `handoff` says when it is asked to set `active`. */
 export const HANDOFF_ACTIVE = 'A run is active when it writes. Leave state out.';
@@ -600,7 +611,7 @@ const REVIVED: readonly string[] = KERNEL_REVIVED;
 const POSITION = ['agent', 'host', 'repo', 'remote', 'cwd', 'branch', 'head', 'doing'] as const;
 /** Why `attach` was called: the hook that fired, or the command line. */
 export const SOURCES = ['startup', 'resume', 'clear', 'compact', 'cli'] as const;
-const HANDOFF = ['next', 'tried', 'note', 'doing', 'state', 'branch', 'head', 'session'] as const;
+const HANDOFF = ['next', 'tried', 'note', 'doing', 'state', 'branch', 'head', 'session', 'take', 'drop', 'why'] as const;
 const MEET = ['name', 'email', 'handle', 'keys', 'kind', 'org', 'domain', 'role', 'where', 'source', 'untrusted'] as const;
 /** The kinds `meet` tells apart. A person is never folded into an organisation, nor one into the other. */
 const MEET_KINDS = ['person', 'organisation'] as const;
@@ -1103,10 +1114,17 @@ export type Boot = {
   voice: BootVoice;
   /** Whether a model is behind Slash on this host, as `version` says it (`Build.slash`), so the app need not ask. */
   slash: boolean;
+  /**
+   * THE RECORD'S COPIES AS THREE FACTS (`copyFacts`, LCH-C03): when the last nightly copy was kept and its size, and when
+   * a person last exported it, each `null` until there is one ("First copy tonight", "Never exported"). Read from the
+   * record's own `export` events, which never travel in a copy. Only to a caller who may take a copy (`admin`), as
+   * Settings > Backups and Export are; absent for anybody else.
+   */
+  copies?: CopyFacts;
 };
 
-/** The shape `boot` answers in: 2 since `waits`, `lateDays`, `working`, `voice` and `slash` joined it. */
-export const BOOT_SHAPE = 2;
+/** The shape `boot` answers in: 2 since `waits`, `lateDays`, `working`, `voice` and `slash` joined it; 3 since `copies`. */
+export const BOOT_SHAPE = 3;
 
 /** The most working runs `boot` sends. The rail says how many, so past this it says the ceiling. */
 export const WORKING_MOST = 50;
@@ -1196,7 +1214,10 @@ export type LiveRun = Entry & {
   age_s: number;
   /** Seconds it has been going: to now while it works, and frozen at the last time it was heard from once it stopped. */
   ran_s: number;
-  /** Its repository is the one the caller said it is in: two runs in one working tree overwrite each other. */
+  /**
+   * It works in the caller's tree (`sameTree`): the same machine and repository, and neither works for the other. Two
+   * runs in one working tree overwrite each other.
+   */
   same_repo: boolean;
   /** Where the run stands for a person (`presenceOf`): working, quiet, or left a step for the next run. */
   presence: Presence;
@@ -1343,10 +1364,35 @@ export type Context = {
   project: { spoken: string; name: string; mark: string | null; hue: number | null; how: 'remote' | 'folder' | 'repo' } | null;
   /** Projects that matched at the same strength, which leaves the caller global. */
   ambiguous: string[];
-  /** The newest other run in this project, or this repository, that left a next step. */
-  handoff: { from: string; age_s: number; next: string; tried: string[]; head: string | null } | null;
-  /** The other runs that are live now. `stale` is worked out at 45 minutes. */
+  /**
+   * The step another run left open here that a starting session is handed (`openHandoffs`, marked `next`): who left it,
+   * the kind of agent, when, and how many more steps are open here besides (`earlier`), each of them older than seven
+   * days or passed over since. `null` when none is under a week old and still waiting. The three the briefing added in
+   * AGT-C05 are optional on the type only, so a context drawn by hand (a test, a card) still reads; `briefing` sends all.
+   */
+  handoff: {
+    from: string;
+    agent?: string | null;
+    left_at?: string;
+    age_s: number;
+    next: string;
+    tried: string[];
+    head: string | null;
+    earlier?: number;
+  } | null;
+  /** The other runs that are live now. `stale` is worked out at 45 minutes. `same_repo` is the same tree (`sameTree`). */
   live: { same_repo: LiveBrief[]; elsewhere: LiveBrief[] };
+  /**
+   * Who else is working in the caller's tree now (`alsoHere`): the warning once, the three heard from last by name with
+   * what each says it is doing, and how many more. `null` when nobody is. Optional on the type only, as the five below
+   * are: `briefing` always sends them, and `card()` reads a context before its card is drawn.
+   */
+  also_here?: AlsoHere | null;
+  /**
+   * The Next slot as lines with no label (`nextLines`): the open step with its writer, age and commits since, or the step
+   * a working run took, or "Nothing was handed over" with the last run here. Empty on a place no run ended in before.
+   */
+  next_lines?: string[];
   /** Open suggestions, newest first, each with the question a person answers. */
   waiting: { id: string; question: string }[];
   /** Every register with a scope field the caller may read: the project's open rows, then the global ones nearer-wins leaves. */
@@ -1376,6 +1422,18 @@ export type Context = {
   signs: { name: string; said: string }[];
   /** One sentence: what to call next. */
   next: string;
+  /**
+   * THE CARD AN AGENT STARTS FROM (`card.ts`, AGT-B07), composed here so the start hook, `context` and `braindog context`
+   * print one text: about 120 words, never past 150. `card_next` is its Next line alone, for a session that just
+   * compacted, or `null` with no step.
+   */
+  card?: string;
+  card_next?: string | null;
+  /**
+   * The calling command's build (its `x-braindog-cli`, else what its key last said) and whether it is older than the
+   * oldest the door still works with (`Build.min_cli`). `null` for a caller that is no key.
+   */
+  build?: { cli: string | null; behind: boolean } | null;
 };
 
 /**
@@ -1583,6 +1641,8 @@ export type RecordDeps = {
    * `catalogueDrafts`). Slash asks about each on Decide through the same `prepare`; absent, it asks about none.
    */
   catalogueOffers?: ((held: readonly { id: string; version: string; on: boolean }[]) => Promise<readonly CatalogueOffer[]>) | undefined;
+  /** The host's whole catalogue, for the arranger (`catalogue-offers.ts` `shelfFromCatalogue`). Absent, only `catalogue` is offered. */
+  catalogueShelf?: CatalogueShelf | undefined;
   /**
    * A draft script run now in the host's sandbox, writing nothing (`@braindog/host/script-try`). Absent, `scriptTry` refuses `NOT_IN_THIS_BUILD`.
    * `owner` is whether the vault's own gate would open for this caller, and the host opens a key only on it; `stale` is
@@ -1788,7 +1848,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'catalogueOffers' | 'tryScript' | 'answersSlash' | 'directory' | 'validFrom'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'answersSlash' | 'directory' | 'validFrom'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /* THE LADDER OF TRUST, the record's half (`ladder.ts`): what an agent's write does at the rung it stands on. */
   const trust = ladder({ sql, kernel, now: () => clock.now() });
@@ -2411,6 +2471,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     catalogue: deps.catalogue ?? [],
     installed: () => installedState(),
     host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
+    shelf: deps.catalogueShelf,
   });
 
   /** The caller's own read of each list, which is all of the record Slash is handed for her (`readUsage`). */
@@ -4157,7 +4218,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ...(Array.isArray(b.from)
       ? (b.from as unknown[]).flatMap((leg) => (leg !== null && typeof leg === 'object' && typeof (leg as { register?: unknown }).register === 'string' ? [(leg as { register: string }).register] : []))
       : []),
-    ...(b.source === 'sessions.live' || b.source === 'sessions.working' || b.working === true ? [SESSION] : []),
+    ...(b.source === 'sessions.live' || b.source === 'sessions.working' || b.source === 'handoffs.open' || b.working === true ? [SESSION] : []),
     ...besideReads(b),
   ];
 
@@ -5341,7 +5402,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     });
     if (!rows.ok) return [];
     const now = clock.now();
-    const repo = ctx.session?.repo;
+    /* THE SAME TREE, NOT THE SAME FOLDER NAME (`sameTree`, AGT-B08): the same machine and repository, and neither run
+       working for the other. "Same repo" was the folder's name on any machine, so a session on the laptop was warned
+       about one on the desktop in a folder of the same name, and about its own helpers. The caller is read from its
+       hints, its spoken name included, so its own run and its helpers are never in its tree. */
+    const self: TreeRun | null = ctx.session === undefined ? null : { spoken: ctx.session.spoken, fields: ctx.session as Record<string, JsonValue> };
     return rows.value.rows
       .filter((row) => !isStale(row, now))
       .map((row) => ({
@@ -5351,7 +5416,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         quiet: isQuiet(row, now),
         age_s: ageOf(row),
         ran_s: runAge(row, now),
-        same_repo: repo !== undefined && row.fields.repo === repo,
+        same_repo: self !== null && sameTree(self, row),
         presence: presenceOf(row, now),
       }));
   };
@@ -6752,6 +6817,105 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * How many commits HEAD moved since the handoff, as the start hook counts them and sends them (`x-braindog-ahead`): a
+   * whole number from 0 to 9,999, or nothing. Read for the Next line alone, never stored.
+   */
+  const aheadOf = (hints: SessionHints): number | null => {
+    const said = (hints as { ahead?: unknown }).ahead;
+    const n = typeof said === 'number' ? said : typeof said === 'string' && /^\d{1,4}$/.test(said.trim()) ? Number(said.trim()) : Number.NaN;
+    return Number.isInteger(n) && n >= 0 && n <= 9_999 ? n : null;
+  };
+
+  /**
+   * What the Next lines say beside the open step (`nextLines`): the step itself; else a step taken here that its taker is
+   * still working on, "Claude Code (S815) took this 3 min ago"; else the newest run here that ended, so a session starts
+   * knowing where the last one stopped. `here` is the briefing's place; the caller's own run is never any of them. With
+   * only older steps open, it says nothing: "Nothing was handed over" would not be true, and they are counted elsewhere.
+   */
+  const stepOf = (here: unknown, open: OpenHandoff[], others: LiveRun[], own: Entry | null, ahead: number | null): [LeftStep | null, LastHere | null] => {
+    const first = open.find((h) => h.mark === 'next');
+    if (first) {
+      const by: TreeRun = { spoken: first.spoken, fields: first.agent === null ? {} : { agent: first.agent } };
+      return [{ by, step: first.next, at: first.left_at, tried: first.tried, commits: ahead, mine: false }, null];
+    }
+    if (open.length > 0) return [null, null];
+    const newest = (also: Predicate[], order: string) => {
+      const got = kernel.list({
+        register: SESSION,
+        where: { all: [here, ...also] } as Predicate,
+        order: [{ field: order, dir: 'desc' }, { field: 'updated_at', dir: 'desc' }],
+        limit: 2,
+      });
+      return got.ok ? got.value.rows.find((row) => row.id !== own?.id) : undefined;
+    };
+    const took = newest([{ field: 'closed_as', is: 'taken' } as Predicate], 'closed_at');
+    const taker = took ? others.find((r) => r.spoken === text(took.fields.taken_by) && r.presence === 'working') : undefined;
+    if (took && taker && typeof took.fields.next === 'string') {
+      const at = text(took.fields.next_at) ?? text(took.fields.last_seen) ?? took.updated_at;
+      const step: LeftStep = { by: { spoken: `${PREFIX}${String(took.seq)}`, fields: took.fields }, step: took.fields.next, at, taken: { by: taker, at: text(took.fields.closed_at) ?? took.updated_at } };
+      return [step, null];
+    }
+    const ended = newest([{ field: RUN.state, in: ['done', 'abandoned'] } as Predicate], 'last_seen');
+    if (!ended) return [null, null];
+    return [null, { by: { spoken: `${PREFIX}${String(ended.seq)}`, fields: ended.fields }, at: text(ended.fields.closed_at) ?? text(ended.fields.last_seen) ?? ended.updated_at, head: text(ended.fields.head) }];
+  };
+
+  /** Whom the questions wait on, by name: the record's own person (`self` on the list `meet` writes), to a caller who reads that row. */
+  const deciderOf = (ctx: CallContext): string | null => {
+    const meets = kernel.meetsList();
+    const self = (meets?.fields as Record<string, string | undefined> | undefined)?.self;
+    const decl = meets ? kernel.register(meets.register) : undefined;
+    if (!meets || !decl || self === undefined || readable(ctx, meets.register)) return null;
+    const got = kernel.list({ register: meets.register, where: { field: self, is: true } as Predicate, limit: 5 });
+    const row = got.ok ? got.value.rows.find((r) => rowAdmitted(ctx, meets.register, r.seq)) : undefined;
+    return row ? text(row.fields[decl.title]) : null;
+  };
+
+  /** How many questions wait on this caller in all, by the rule `waitsFor` counts with: `context` sends only the newest. */
+  const questionsFor = (ctx: CallContext): number => {
+    const open = kernel.openSuggestions();
+    return open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0;
+  };
+
+  /**
+   * THE CONTEXT WITH ITS CARD (`card.ts`, AGT-B07), so the start hook, `context` and `braindog context` print one text
+   * made here by one set of rules, whatever build of the command sits on the machine. `build` says which command called
+   * (its `x-braindog-cli` on this call, else what its key last said) and whether it is older than the oldest the door
+   * still works with (`Build.min_cli`), which is the card's last line when it is.
+   */
+  const carded = (ctx: CallContext, told: Context, at: { agent: string | null; host: string | null; branch: string | null; ahead: number | null }): Context => {
+    const key = ctx.principal.kind === 'token' ? ctx.principal.id : null;
+    const said = (ctx.session as { cli?: unknown } | undefined)?.cli;
+    const cli =
+      typeof said === 'string' && said.trim() !== ''
+        ? said.trim()
+        : key === null
+          ? null
+          : (sql.one<{ last_build: string | null }>('SELECT last_build FROM token WHERE id = ?', key)?.last_build ?? null);
+    const drawn = cardOf(
+      told,
+      {
+        run: told.session?.spoken ?? null,
+        ...at,
+        build: cli,
+        min_cli: build?.min_cli ?? null,
+        decider: deciderOf(ctx),
+        waiting: questionsFor(ctx),
+        /* A ROW A QUESTION NAMES BY ID OR BY A HANDLE THE CONTEXT DID NOT SEND, by its name, as governance says it, and
+           only when the caller may read its list. */
+        named: (s) => {
+          const row = kernel.get(s);
+          return row !== null && readable(ctx, row.register) === null ? kernel.titleOfRow(row.id) : null;
+        },
+      },
+      clock.now(),
+    );
+    /* BEHIND IS THE UPDATE LINE ITSELF, never the sentence anywhere: a step or a sign a run wrote may quote it. */
+    const behind = drawn.card.split('\n').some((line) => line.startsWith('Update ') && line.endsWith(OLDER));
+    return { ...told, card: drawn.card, card_next: drawn.next, build: key === null ? null : { cli, behind } };
+  };
+
+  /**
    * Where the caller stands, in one read of each thing. It never
    * writes and never opens a run, and every part is held to what the caller may read.
    *
@@ -6796,34 +6960,38 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       : repo
         ? { field: 'repo', is: repo }
         : null;
-    /* A RUN SOMEBODY HEARD FROM FIRST, BY WHEN; THEN, OF THE RUNS NOBODY HEARD FROM, ONE WAITING TO BE PICKED UP; THEN
-       THE ONE RECORDED LATEST. Ordered by `last_seen` alone, several imported runs in one repository (none has it) tied,
-       the tie fell to the kernel's `id DESC`, and the handoff was whichever run the import wrote last: an `abandoned`
-       run's step was handed over ahead of the run in `handoff` written before it, and a step a later import had
-       replaced on one run lost to the other's (`test/imported-handoff.test.ts`). The state is preferred only among runs
-       nobody heard from, because `handoff({ next })` leaves an active run active and nothing moves a `handoff` run on
-       once it is picked up: preferred over every run, an imported step months old outranked one left five minutes ago.
-       `updated_at` is the time the import recorded; the register holds no time a run ended, and the import writes none.
-       Each read is two rows at most, because the caller's own run is the only one set aside. */
-    const leftBy = (also: Predicate[]) => {
-      const got = kernel.list({
-        register: SESSION,
-        where: { all: [here, { field: 'next', present: true }, ...also] } as Predicate,
-        order: [{ field: 'last_seen', dir: 'desc' }, { field: 'updated_at', dir: 'desc' }],
-        limit: 2,
-      });
-      return got.ok ? got.value.rows.find((row) => row.id !== run?.id) : undefined;
-    };
-    const other =
-      runs && here
-        ? (leftBy([{ field: 'last_seen', present: true } as Predicate]) ??
-          leftBy([{ field: RUN.state, is: 'handoff' } as Predicate]) ??
-          leftBy([]))
-        : undefined;
-    const handoff: Context['handoff'] = other
-      ? { from: `${PREFIX}${String(other.seq)}`, age_s: ageOf(other), next: String(other.fields.next), tried: listOf(other.fields.tried), head: text(other.fields.head) }
+    /* THE STEP LEFT HERE IS AN OBJECT THAT CLOSES (`openHandoffs`, AGT-C05). Of the runs here waiting in `handoff`, the
+       caller's own set aside, the newest under seven days old that no later run passed over is the one handed over, and
+       the rest are counted as `earlier`. It replaced three reads that handed over the newest step here in any state and
+       at any age, so on the owner's record a starting session was told to begin a batch that had shipped hours before. A
+       run still working has handed nothing over yet, and a finished run's step is its history, not anybody's next step. */
+    const open: OpenHandoff[] = (() => {
+      if (!runs || !here) return [];
+      const got = kernel.openHandoffs({ project: project?.spoken ?? null, repo: repo ?? null }, run?.id ?? null);
+      return got.ok ? got.value.handoffs : [];
+    })();
+    const first = open.find((h) => h.mark === 'next');
+    const handoff: Context['handoff'] = first
+      ? { from: first.spoken, agent: first.agent, left_at: first.left_at, age_s: first.age_s, next: first.next, tried: first.tried, head: first.head, earlier: open.length - 1 }
       : null;
-    const others = runs ? live({ ...ctx, session: { ...hints, ...(repo === undefined ? {} : { repo }) } }).filter((r) => r.id !== run?.id) : [];
+    /* THE CALLER AS ITS TREE READS IT: its hints, else where its run was, and its run's name, so neither its own run nor
+       its helpers are ever "also here" (`sameTree`). */
+    const placed = (key: 'host' | 'remote' | 'parent'): Partial<SessionHints> => {
+      const value = hints[key] ?? text(run?.fields[key]) ?? undefined;
+      return value === undefined ? {} : { [key]: value };
+    };
+    const tree: SessionHints = {
+      ...hints,
+      ...(repo === undefined ? {} : { repo }),
+      ...placed('host'),
+      ...placed('remote'),
+      ...placed('parent'),
+      ...(run ? { spoken: `${PREFIX}${String(run.seq)}` } : {}),
+    };
+    const others = runs ? live({ ...ctx, session: tree }).filter((r) => r.id !== run?.id) : [];
+    const nowMs = clock.now();
+    const also_here = runs ? alsoHere(others, { spoken: tree.spoken, fields: tree as Record<string, JsonValue> }, nowMs) : null;
+    const next_lines = runs && here ? nextLines(...stepOf(here, open, others, run, aheadOf(hints)), nowMs) : [];
     const liveBrief = (r: LiveRun): LiveBrief => ({
       spoken: r.spoken,
       state: r.state,
@@ -6912,21 +7080,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       });
     }
 
+    /* THE MANNERS EVERY CLIENT IS TOLD, whatever it was built with (AGT-C05): say what you are doing once you know it,
+       take the step if it is yours to do, and leave one next step before you stop. */
     const next =
       token && !run
-        ? 'Your first write opens a session; before you stop, call handoff with the one next step.'
+        ? 'Your first write opens a session; say what you are doing once you know it, and before you stop, call handoff with the one next step.'
         : handoff
-          ? `Start from the handoff ${handoff.from} left, and call handoff with your own next step before you stop.`
+          ? `Start from the step ${runName({ spoken: handoff.from, fields: first?.agent ? { agent: first.agent } : {} })} left: take it with handoff take ${handoff.from} if it is yours to do, or drop it with a reason if it is no longer true. Say what you are doing, and call handoff with your own next step before you stop.`
           : fading
             ? 'When a learning shown here held, set its confirmed_on to today with update, and call handoff before you stop.'
-            : 'Work from what is open here, and call handoff with the one next step before you stop.';
+            : 'Work from what is open here, say what you are doing once you know it, and call handoff with the one next step before you stop.';
 
-    return {
+    const told: Context = {
       session: run ? { spoken: `${PREFIX}${String(run.seq)}`, state: run.state } : null,
       project,
       ambiguous: project || !holder || readable(ctx, holder.id) ? [] : resolved.ambiguous,
       handoff,
       live: { same_repo: others.filter((r) => r.same_repo).map(liveBrief), elsewhere: others.filter((r) => !r.same_repo).map(liveBrief) },
+      also_here,
+      next_lines,
       waiting: waitingFor(ctx).slice(0, ASKED).map(({ id, question }) => ({ id, question })),
       registers,
       /* IN TOUCH LATEST FIRST, and the kernel's newest-changed order among people with the same day or none. */
@@ -6942,6 +7114,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       signs: redSigns(ctx),
       next,
     };
+    return carded(ctx, told, {
+      agent: text(run?.fields.agent) ?? hints.agent ?? null,
+      host: tree.host ?? null,
+      branch: hints.branch ?? text(run?.fields.branch) ?? null,
+      ahead: aheadOf(hints),
+    });
   };
 
   /**
@@ -7445,6 +7623,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           /* ONLY WHEN THE BUILD NAMES ONE: a key set to `undefined` still reads as `'host' in boot`, which is a host
              that said something. */
           ...(build?.host === undefined ? {} : { host: build.host }),
+          ...(admin(ctx) === null ? { copies: kernel.copyFacts() } : {}),
         };
         return [answered, themeInstalled()] as const;
       });
@@ -8037,6 +8216,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const decl = kernel.metricDecl('questions-open');
           const read = decl ? kernel.metric(decl) : null;
           return read?.ok ? read.value.value : null;
+        },
+        /* EACH DECLARED LIST'S FIELD TYPES, so the lint reads the cells of every table and card over one, and not only
+           the blocks whose answer carries `types` (the computed sources). */
+        typesOf: (register) => {
+          const s = kernel.schemaOf(register);
+          return s ? Object.fromEntries(Object.entries(s.fields).map(([k, f]) => [k, f.type])) : null;
         },
         now: () => Date.now(),
       });
@@ -9059,15 +9244,48 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * person's, from the app: an agent that could name one could rewrite another run's handoff.
      */
     async handoff(
-      args: { next?: string; tried?: string; note?: string; doing?: string; state?: string; branch?: string; head?: string; session?: string },
+      args: {
+        next?: string;
+        tried?: string;
+        note?: string;
+        doing?: string;
+        state?: string;
+        branch?: string;
+        head?: string;
+        session?: string;
+        take?: string;
+        drop?: string;
+        why?: string;
+      },
       ctx: CallContext,
-    ): Promise<Result<Entry>> {
+    ): Promise<Result<Entry | Taken | { left: string; next: string }>> {
       const token = ctx.principal.kind === 'token';
       const stop = guard(ctx, 'propose', token ? undefined : SESSION);
       if (stop) return { ok: false, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
       const wrong = stray(said, HANDOFF);
       if (wrong) return { ok: false, refusal: wrong };
+      /* TAKE AND DROP CLOSE ANOTHER RUN'S STEP (AGT-C05), and each is a call of its own. `take` is an agent's: its run
+         picks the step up, the run that left it is done, and the second of two agents racing for one step is refused in
+         the kernel's sentence, who took it and when, passed on unchanged. `drop` closes a step that is no longer true,
+         with the reason in words, by an agent or by a person from the app. */
+      if (said.take !== undefined || said.drop !== undefined) {
+        const rest = Object.keys(said).filter((key) => said[key] !== undefined && !['take', 'drop', 'why'].includes(key));
+        if (said.take !== undefined && said.drop !== undefined)
+          return no('VALUE_MALFORMED', 'Take a step or drop one, not both in one call.', { at: 'drop' });
+        if (rest.length > 0)
+          return no('VALUE_MALFORMED', `take and drop are a call of their own: send ${rest.join(', ')} in another handoff.`, { at: rest[0]! });
+        if (said.take !== undefined) {
+          if (said.why !== undefined) return no('VALUE_MALFORMED', 'why is the reason a step is dropped, and goes with drop.', { at: 'why' });
+          if (!token) return no('FORBIDDEN', 'A step is work for a run, so only an agent takes one. Drop it with a reason instead.', { at: 'take' });
+          if (typeof said.take !== 'string') return no('VALUE_MALFORMED', `take names the run that left the step, such as ${PREFIX}12.`, { at: 'take' });
+          return tail(kernel.takeHandoff(writerOf(ctx), said.take));
+        }
+        if (typeof said.drop !== 'string') return no('VALUE_MALFORMED', `drop names the run that left the step, such as ${PREFIX}12.`, { at: 'drop' });
+        if (said.why !== undefined && typeof said.why !== 'string') return no('VALUE_MALFORMED', 'why is a few words saying why the step is dropped.', { at: 'why' });
+        return tail(kernel.dropHandoff(writerOf(ctx), said.drop, typeof said.why === 'string' ? said.why : ''));
+      }
+      if (said.why !== undefined) return no('VALUE_MALFORMED', 'why is the reason a step is dropped, and goes with drop.', { at: 'why' });
       if (token && said.session !== undefined)
         return no('FORBIDDEN', 'A token hands off its own run, so it names none. A person names a run from the app.', { at: 'session' });
       if (!token && typeof said.session !== 'string')
@@ -10558,6 +10776,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('VALUE_MALFORMED', 'A label is one short lower-case word, such as nightly or final.', { at: 'label' });
       const taken = await snapshots.take(label);
       kernel.lifecycle('export', actorOf(ctx), `snapshot ${taken.id} ${taken.bytes} bytes`);
+      /* A COPY TAKEN NOW ENDS A FAILED NIGHT'S FAULT, so a person's "snapshot now" is the answer to it, and the fault does
+         not stand until the next good nightly copy. */
+      clearFault(sql, NIGHT_FAULT, clock.now());
       return tail(ok(taken));
     },
 

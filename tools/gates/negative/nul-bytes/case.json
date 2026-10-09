@@ -1,0 +1,7 @@
+{
+  "gate": "nul-bytes",
+  "rule": "a raw NUL byte in a string",
+  "expect": "a raw NUL at offset",
+  "findings": 1,
+  "why": "THE RAW BYTE SCAN. The fixture is `Buffer.from`-built rather than typed, because a NUL byte does not survive being typed through an editing tool, the same reason the gate's own header insists on it for anyone seeding a case here. One finding: a NUL sitting inside a string literal, the shape of both real defects this gate was written for."
+}

@@ -60,7 +60,7 @@ test('A PEOPLE UPDATE SAYS WHICH CHOICE IT TAKES OFF STAYS, and why, with the ro
   const kept = appearing(out).filter((a) => a.kind === 'Kept');
   assert.deepEqual(
     kept.map((a) => a.title),
-    ['People keeps the choice Registrar for Role, which this update takes off, because it holds 1 item that may use it.'],
+    ['People keeps the choice Registrar for Role, which this update takes off, because it holds 1 entry that may use it.'],
   );
   assert.doesNotMatch(JSON.stringify(out), /role\.|register\./u);
 });
@@ -73,7 +73,7 @@ test('THE OWNER’S WORDS FOR A CHOICE ARE USED, and several choices and rows ar
   );
   assert.deepEqual(
     appearing(out).filter((a) => a.kind === 'Kept').map((a) => a.title),
-    ['Contacts keeps 2 choices, Agency and Project partner, for Role, which this update takes off, because it holds 4 items that may use them.'],
+    ['Contacts keeps 2 choices, Agency and Project partner, for Role, which this update takes off, because it holds 4 entries that may use them.'],
   );
 });
 
@@ -86,20 +86,20 @@ test('A CHOICE KEPT FOR THE ROWS THAT HOLD IT SAYS HOW MANY OF THE LIST’S ROWS
       .filter((a) => a.kind === 'Kept')
       .map((a) => a.title);
   assert.deepEqual(stays({ values: ['role.registrar'], rows: 2, holding: { 'role.registrar': 1 } }), [
-    'People keeps the choice Registrar for Role, which this update takes off, because 1 of its 2 items holds it.',
+    'People keeps the choice Registrar for Role, which this update takes off, because 1 of its 2 entries holds it.',
   ]);
   assert.deepEqual(stays({ values: ['role.registrar'], rows: 1, holding: { 'role.registrar': 1 } }), [
-    'People keeps the choice Registrar for Role, which this update takes off, because its one item holds it.',
+    'People keeps the choice Registrar for Role, which this update takes off, because its one entry holds it.',
   ]);
   assert.deepEqual(
     stays(
       { values: ['role.registrar', 'role.collaborator'], rows: 5, holding: { 'role.registrar': 1, 'role.collaborator': 2 } },
       { 'people.role.registrar': 'Agency', 'people.role.collaborator': 'Project partner', people: 'Contacts' },
     ),
-    ['Contacts keeps 2 choices, Agency and Project partner, for Role, which this update takes off, because 3 of its 5 items hold one of them.'],
+    ['Contacts keeps 2 choices, Agency and Project partner, for Role, which this update takes off, because 3 of its 5 entries hold one of them.'],
   );
   assert.deepEqual(stays({ values: ['role.registrar', 'role.collaborator'], rows: 3, holding: { 'role.registrar': 1, 'role.collaborator': 2 } }), [
-    'People keeps 2 choices, Registrar and Collaborator, for Role, which this update takes off, because all 3 of its items hold one of them.',
+    'People keeps 2 choices, Registrar and Collaborator, for Role, which this update takes off, because all 3 of its entries hold one of them.',
   ]);
 });
 
@@ -113,16 +113,16 @@ test('A CHOICE KEPT FOR A ROW IN THE BIN SAYS SO, apart from the live rows that 
       .filter((a) => a.kind === 'Kept')
       .map((a) => a.title);
   assert.deepEqual(stays({ values: ['role.registrar'], rows: 0, holding: { 'role.registrar': 1 }, binned: { 'role.registrar': 1 } }), [
-    'People keeps the choice Registrar for Role, which this update takes off, because a deleted item holds it, and that item could not be restored without it.',
+    'People keeps the choice Registrar for Role, which this update takes off, because a deleted entry holds it, and that entry could not be restored without it.',
   ]);
   assert.deepEqual(stays({ values: ['role.registrar'], rows: 1, holding: { 'role.registrar': 1 }, binned: { 'role.registrar': 1 } }), [
-    'People keeps the choice Registrar for Role, which this update takes off, because a deleted item holds it, and that item could not be restored without it.',
+    'People keeps the choice Registrar for Role, which this update takes off, because a deleted entry holds it, and that entry could not be restored without it.',
   ]);
   assert.deepEqual(stays({ values: ['role.registrar'], rows: 3, holding: { 'role.registrar': 3 }, binned: { 'role.registrar': 2 } }), [
-    'People keeps the choice Registrar for Role, which this update takes off, because 1 of its 3 items holds it, and 2 deleted items do too.',
+    'People keeps the choice Registrar for Role, which this update takes off, because 1 of its 3 entries holds it, and 2 deleted entries do too.',
   ]);
   assert.deepEqual(stays({ values: ['role.registrar', 'role.collaborator'], rows: 2, holding: { 'role.registrar': 3, 'role.collaborator': 1 }, binned: { 'role.registrar': 1 } }), [
-    'People keeps 2 choices, Registrar and Collaborator, for Role, which this update takes off, because all 2 of its items hold one of them, and 1 deleted item does too.',
+    'People keeps 2 choices, Registrar and Collaborator, for Role, which this update takes off, because all 2 of its entries hold one of them, and 1 deleted entry does too.',
   ]);
 });
 

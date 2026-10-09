@@ -4,7 +4,7 @@
  *
  *   BrainDog · run S731 · Claude Code on MacBook · project BrainDog · branch main
  *   Next     Cut page answers to block summaries. (S729, Claude Code, 5h ago, check before acting)
- *   Waiting  2 on Sam: Update the prism tool to match this Mac? · ...
+ *   Waiting  2 on Mara: Update the prism tool to match this Mac? · ...
  *   Learned  Money is minor units plus currency. Never add two currencies.
  *   More     3 dead ends · 5 learnings · 4 keys by name · call context
  *
@@ -75,6 +75,11 @@ export type CardAt = {
   waiting?: number | null | undefined;
   /** Things the caller adds to More, such as what the start hook's skills sync did. */
   more?: string[] | undefined;
+  /**
+   * A row by its handle or its id, as its name, when the caller may read it; `null` otherwise. A question's words may
+   * hold a bare id or a handle whose row the context did not send, and those print as the row's name, never as an id.
+   */
+  named?: ((handleOrId: string) => string | null) | undefined;
 };
 
 /** The card, its `Next` line alone for a session that just compacted (`null` when there is no step), and its size. */
@@ -177,17 +182,21 @@ const rowsOf = (c: Context, id: string): Brief[] => {
  * tools#8 to how fly-prism is set up in ~/.claude.json on Maras-MacBook-Pro.local?". A handoff's step keeps its
  * paths and handles, which the next run needs; only the machine's network name goes from it.
  */
-export function plainly(said: string, c: Context, all: boolean): string {
+export function plainly(said: string, c: Context, all: boolean, at?: CardAt): string {
   const out = said.replace(NETWORK, (network) => machineOf(network));
   if (!all) return out;
   return out
+    .replace(ROW_ID, (id) => at?.named?.(id) ?? 'a row you cannot see')
     .replace(PATH, (path) => path.replace(/[\\/]+$/u, '').split(/[\\/]/u).at(-1) || 'a folder')
     .replace(HANDLE, (handle, list: string) => {
       const row = c.registers.flatMap((r) => [...r.rows, ...r.inherited]).find((b) => b.spoken === handle);
       const said = row ? words(wordsOf(row), 40) : '';
-      return said || `one of ${register(c, list)?.name ?? list.replace(/_/gu, ' ')}`;
+      return said || at?.named?.(handle) || `one of ${register(c, list)?.name ?? list.replace(/_/gu, ' ')}`;
     });
 }
+
+/** A row's id as the kernel mints it, a ULID: 26 characters of Crockford's base 32. */
+const ROW_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/gu;
 
 /** The apps a run's `agent` names, as a person says them. `other` is nobody in particular, so it is no name at all. */
 const APPS: Record<string, string> = { claude: 'Claude Code', 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor' };
@@ -306,7 +315,7 @@ function nextSlot(c: Context, at: CardAt, own: string | null): { slot: Slot | nu
   const handed = handedTo(c, at.agent ?? null);
   const step = handoffItem(c, at, own);
   const shown = handed.slice(0, step === null ? PER_SLOT : PER_SLOT - 1);
-  const items = [...shown.map((row) => `${words(plainly(wordsOf(row), c, true), 60)} (${clip(row.spoken, 24)}, handed to you)`), ...(step === null ? [] : [step])];
+  const items = [...shown.map((row) => `${words(plainly(wordsOf(row), c, true, at), 60)} (${clip(row.spoken, 24)}, handed to you)`), ...(step === null ? [] : [step])];
   if (items.length === 0) return { slot: null, handedLeft: 0 };
   return { slot: { label: 'Next', lead: '', items, tail: none, least: 1, lastStays: step !== null, kept: true }, handedLeft: handed.length - shown.length };
 }
@@ -377,7 +386,7 @@ function waitingSlot(c: Context, at: CardAt): Slot | null {
   return {
     label: 'Waiting',
     lead: `${String(total)} on ${at.decider && oneLine(at.decider) ? words(at.decider, 40) : 'the owner'}: `,
-    items: asks.slice(0, PER_SLOT).map((a) => `${askedAs(plainly(a.question, c, true))}${a.count > 1 ? ` (${String(a.count)} like this)` : ''}`),
+    items: asks.slice(0, PER_SLOT).map((a) => `${askedAs(plainly(a.question, c, true, at))}${a.count > 1 ? ` (${String(a.count)} like this)` : ''}`),
     tail: none,
     least: 1,
   };
@@ -408,7 +417,7 @@ function bearing(c: Context): { skill: string; learnings: number } | null {
 /** Learned and More: the two newest lessons still standing, then what is there on demand, three at most. */
 function learnedAndMore(c: Context, at: CardAt, handedLeft: number): Slot[] {
   const lessons = rowsOf(c, 'learnings').filter((row) => row.state === null || row.state === 'active');
-  const learned = lessons.map((row) => words(plainly(wordsOf(row, 'lesson'), c, true), 120)).filter(Boolean).slice(0, LEARNED);
+  const learned = lessons.map((row) => words(plainly(wordsOf(row, 'lesson'), c, true, at), 120)).filter(Boolean).slice(0, LEARNED);
   const more: string[] = [];
   const tried = c.handoff?.tried.length ?? 0;
   if (tried > 0) more.push(count(tried, 'dead end'));

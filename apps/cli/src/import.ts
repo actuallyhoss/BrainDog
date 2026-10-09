@@ -43,7 +43,7 @@ import { no, ok, refused, type Result } from '@braindog/ports';
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
 import { pollPack } from '@braindog/seed/usecases/founder-poll';
 
-import { TOOLS, folderCatalogue, holdsKey, isRef, loadAdapter, packFrom, type CatalogueRead, type ImportMap, type Offer, type Plan, type PlannedRow, type Settled, type Skipped } from './adapter.ts';
+import { TOOLS, folderCatalogue, gatherAsks, holdsKey, isRef, loadAdapter, loadMap, packFrom, type CatalogueRead, type ImportMap, type Offer, type Plan, type PlannedRow, type Settled, type Skipped } from './adapter.ts';
 import { knownKeys } from './catalogue.ts';
 import { keysOfRow, meeter, metOf, sameName, type Meeting } from './people.ts';
 import type { AgentIo } from './skills.ts';
@@ -53,10 +53,10 @@ import { cliBuild } from './position.ts';
 import { createClient } from '@braindog/client';
 
 const USAGE =
-  'braindog import takes <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder or address>] [--host <host>] [--dry-run], or <adapter> <export.json> --draft-setup, or <adapter> --since <day or last>. The adapter is a pack in packs/ by its id, or the path of an adapter module.';
+  'braindog import takes <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder or address>] [--host <host>] [--dry-run] [--strict], or --map <map.json> <export.json> when the map has sections, or <adapter> <export.json> --draft-setup, or <adapter> --since <day or last>. The adapter is a pack in packs/ by its id, or the path of an adapter module.';
 
 /** The options only an adapter import takes, which is how `main.ts` tells one from putting a .brainl file back. */
-export const ADAPTER_OPTIONS = ['setup', 'map', 'catalogue', 'dry-run', 'draft-setup', 'since', 'bin-emptied'] as const;
+export const ADAPTER_OPTIONS = ['setup', 'map', 'catalogue', 'dry-run', 'draft-setup', 'since', 'bin-emptied', 'strict'] as const;
 
 /**
  * Whether a line after `braindog import` is an adapter import rather than a .brainl put back: two words before any
@@ -81,6 +81,63 @@ export function isAdapterImport(args: string[]): boolean {
 /** The largest export this reads: the first one it read is about 108 KB of document and an audit of up to 100,000 lines. */
 export const IMPORT_MOST_BYTES = 64 * 1024 * 1024;
 
+/** A section of the export nothing read, by its path, and how many items it holds. */
+export type Unread = { section: string; items: number };
+
+const isPlain = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
+const sizeOf = (v: unknown): number | null => (Array.isArray(v) ? v.length : isPlain(v) ? Object.keys(v).length : null);
+
+/**
+ * THE EXPORT, HANDED TO THE ADAPTER THROUGH A READER THAT NOTES EVERY PATH IT IS ASKED FOR, two names deep, so the report
+ * can say what no adapter touched. Before this the importer printed the adapter's own list of what it left, and a
+ * section the adapter never opened was in no list at all: fourteen holdings stayed out of his record for a week with
+ * nothing said.
+ *
+ * A SECTION is a name at the top holding a list or an object, or, inside an object at the top that was opened, a name
+ * holding one. Plain values (the day it was saved, a version) are not sections and are never said. Reading a list or an
+ * object counts as reading all of it: an adapter that copies a section whole has read it.
+ */
+export function watched(exp: Record<string, unknown>): { value: Record<string, unknown>; unread: () => Unread[] } {
+  const touched = new Set<string>();
+  const inner = new Map<string, Record<string, unknown>>();
+  const proxy = (target: Record<string, unknown>, at: string | null): Record<string, unknown> =>
+    new Proxy(target, {
+      get(t, name, receiver) {
+        const v: unknown = Reflect.get(t, name, receiver);
+        if (typeof name !== 'string' || !Object.hasOwn(t, name)) return v;
+        const path = at === null ? name : `${at}.${name}`;
+        touched.add(path);
+        if (at !== null || !isPlain(v)) return v;
+        let p = inner.get(name);
+        if (p === undefined) inner.set(name, (p = proxy(v, name)));
+        return p;
+      },
+    });
+  return {
+    value: proxy(exp, null),
+    unread: () => {
+      const out: Unread[] = [];
+      for (const [name, v] of Object.entries(exp)) {
+        const items = sizeOf(v);
+        if (items === null || items === 0) continue;
+        if (!touched.has(name)) {
+          out.push({ section: name, items });
+          continue;
+        }
+        if (!isPlain(v)) continue;
+        for (const [sub, w] of Object.entries(v)) {
+          const n = sizeOf(w);
+          if (n !== null && n > 0 && !touched.has(`${name}.${sub}`)) out.push({ section: `${name}.${sub}`, items: n });
+        }
+      }
+      return out;
+    },
+  };
+}
+
+/** The lines that end a report: one for each section nothing read. */
+export const unreadSaid = (unread: readonly Unread[]): string[] => unread.map((u) => `Not read: ${u.section}, ${u.items === 1 ? 'one item' : `${String(u.items)} items`}.`);
+
 type Row = { id: string; seq: number | null; version: number; fields: Record<string, unknown>; deleted_at?: string | null };
 
 /** The part of the client an import uses, so a test can hand it a record of its own. */
@@ -100,7 +157,7 @@ export type Door = {
   create: (args: { register: string; fields: Record<string, unknown>; note?: string }) => Promise<Result<unknown>>;
   update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) => Promise<Result<unknown>>;
   governance: (args: { register?: string; status?: string; limit?: number; cursor?: string }) => Promise<Result<unknown>>;
-  propose: (args: { question: string; body_kind: 'options' | 'pack' | 'change'; body: Record<string, unknown> }) => Promise<Result<unknown>>;
+  propose: (args: { question: string; body_kind: 'options' | 'pack' | 'change' | 'settings'; body: Record<string, unknown> }) => Promise<Result<unknown>>;
   /**
    * `meet`, which a new person or organisation goes through before it is created (`resolveRole` in `applyPlan`), so the
    * record matches it by key to who it already knows. OPTIONAL: a door without it creates the row as before, after the
@@ -113,6 +170,12 @@ export type Door = {
    * it answers with its own refusal, which lands under "Refused by the record" like any other.
    */
   packs?: () => Promise<Result<{ id: string; version: string | null; disabled_at?: string | null }[]>>;
+  /**
+   * The pack on this record that keeps a home currency, and the one it holds (`null` when none is set), or `null` when no
+   * pack here keeps one. Read only when the planned money is in more than one currency (`Report.home`). OPTIONAL like
+   * `packs`: a door without it asks nothing about a home currency.
+   */
+  home?: () => Promise<Result<{ pack: string; currency: string | null } | null>>;
 };
 
 /**
@@ -222,6 +285,17 @@ export type Report = {
   unfiled?: Unfiled[];
   /** What happened to each planned row, by its key: the report lists the kinds the mapping names one by one. */
   outcomes: Record<string, 'added' | 'updated' | 'unchanged' | 'refused' | 'deleted'>;
+  /**
+   * Each section of the export nothing read (`Unread`), said last. Set by `importCommand`, which handed the adapter the
+   * export; optional for a plan applied by itself, which was read by nobody this file watched.
+   */
+  unread?: Unread[];
+  /**
+   * The currencies the planned money is in, when there is more than one, and what was done about this record having no
+   * home currency (`Home`): asked on Decide, asked before, or nothing on this record keeps one. Absent when one currency
+   * or none was planned, or the record has a home currency already.
+   */
+  home?: { currencies: string[]; asked: 'asked' | 'before' | 'nowhere' | 'refused'; proposed: string | null };
   plan: Plan;
   /** What the report is said in (`Words`). Optional for a report written by hand, which is then said by the plan's ids. */
   words?: Words;
@@ -431,6 +505,14 @@ async function readDecide(door: Door): Promise<Result<Decide>> {
         /* WHICH OF THOSE NOBODY HAS ANSWERED HERE, so a question the old tool has settled since can be said as still
            waiting on Decide: see `Settled`. */
         if (typeof s.body.from === 'string' && s.status === 'open') open.add(s.body.from);
+        /* AND EVERY PART OF A QUESTION FILED AS ONE (`gatherAsks`), by its own key, so a part is asked once whichever
+           question it rode in. */
+        if (Array.isArray(s.body.parts))
+          for (const part of s.body.parts)
+            if (isObj(part) && typeof part.from === 'string') {
+              asked.add(part.from);
+              if (s.status === 'open') open.add(part.from);
+            }
         if (typeof s.body.install === 'string') installs.add(s.body.install);
         /* A VALUE PROPOSED BY ANYBODY, IN ANY STATE. An open one is waiting on him, and one he turned down is an answer:
            proposing it again every night is asking a question he has already answered. The record stores an addition as
@@ -861,6 +943,57 @@ export async function applyPlan(
       }),
     };
     report.plan = plan;
+  }
+
+  /**
+   * MONEY IN MORE THAN ONE CURRENCY, AND NO HOME CURRENCY TO ADD IT UP IN, IS ASKED ONCE, BEFORE ANY ROW IS WRITTEN.
+   *
+   * Each amount is written in its own currency and nothing here adds two together. But a record with none set draws a
+   * total of amounts in two currencies as two figures side by side, and the question of which one is home is his. So
+   * the import files one change to the setting of the pack that keeps it, proposing the currency most of the planned
+   * amounts are in, and he accepts it or turns it down. Asked under the plan's key, so a second night never asks again,
+   * answered or not. A record where no pack keeps a home currency is told so, and nothing is asked.
+   */
+  {
+    const by = new Map<string, number>();
+    for (const row of plan.rows)
+      for (const v of Object.values(row.fields))
+        if (isObj(v) && Number.isSafeInteger(v.amount) && typeof v.currency === 'string') by.set(v.currency, (by.get(v.currency) ?? 0) + 1);
+    const read = by.size > 1 && door.home ? await door.home() : null;
+    if (read !== null && !read.ok && unreachable(read)) throw new Unreachable();
+    const kept = read?.ok === true ? read.value : undefined;
+    /* A DOOR THAT CANNOT SAY (no `home`) ASKS NOTHING, as `Door.home` says. */
+    if (read !== null && kept?.currency == null) {
+      const currencies = [...by.keys()].sort();
+      const proposed = [...by].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]![0];
+      const key = `${plan.key}home-currency`;
+      const home: NonNullable<Report['home']> = { currencies, asked: 'nowhere', proposed: null };
+      report.home = home;
+      if (kept === null) {
+        /* NO PACK HERE KEEPS ONE: there is nothing to set, and the line says so. */
+      } else if (read !== null && !read.ok) {
+        home.asked = 'refused';
+        report.refused.push({ label: 'Which currency this record adds money up in', register: 'Decide', fix: fixOf(read) });
+      } else if (kept !== undefined) {
+        const decided = await readDecideOnce();
+        home.proposed = proposed;
+        if (decided === null) home.asked = 'refused';
+        else if (decided.asked.has(key)) home.asked = 'before';
+        else if (o.dryRun) home.asked = 'asked';
+        else {
+          const done = await door.propose({
+            question: `Add up your money in ${proposed}? This import holds amounts in ${and(currencies)}, and this BrainDog has no home currency yet. Each amount stays in its own currency either way.`,
+            body_kind: 'settings',
+            body: { pack: kept.pack, values: { home_currency: proposed }, from: key },
+          });
+          if (!done.ok) {
+            if (unreachable(done)) throw new Unreachable();
+            home.asked = 'refused';
+            report.refused.push({ label: 'Which currency this record adds money up in', register: 'Decide', fix: fixOf(done) });
+          } else home.asked = 'asked';
+        }
+      }
+    }
   }
 
   let retiring = (plan.retire ?? []).filter((r) => !absent.includes(r.register) && !absent.includes(r.replaces));
@@ -1436,11 +1569,11 @@ export async function applyPlan(
   const asked = decide?.asked ?? new Set<string>();
   const installs = decide?.installs ?? new Set<string>();
   if (decide !== null && plan.asks.length > 0) {
-    for (const ask of plan.asks) {
-      if (asked.has(ask.key)) {
-        report.alreadyAsked++;
-        continue;
-      }
+    /* MANY ASKS, ONE QUESTION (`gatherAsks`): the parts already asked are counted before, and the rest of a group go as
+       one question, so ten rules are one question with ten parts. */
+    const gathered = gatherAsks(plan.asks, asked);
+    report.alreadyAsked += gathered.before;
+    for (const ask of gathered.asks) {
       if (o.dryRun) {
         report.asked++;
         questions.push({ label: ask.label, question: ask.question });
@@ -1617,6 +1750,7 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
   if (report.missing.length > 0) {
     const need = [...new Set(report.missing.map((r) => words.map.targets.providedBy[r] ?? r))];
     lines.push(`This BrainDog has no ${and(report.missing.map(name))} lists, so nothing was written. Install ${and(need)} on this BrainDog first, then run the import again.`);
+    if ((report.unread ?? []).length > 0) lines.push('', ...unreadSaid(report.unread ?? []));
     return lines;
   }
   const verb = o.dryRun ? 'would be ' : '';
@@ -1626,6 +1760,14 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
     lines.push(`${name(register)}: ${String(t.added)} ${verb}added, ${String(t.updated)} ${verb}updated, ${String(t.unchanged)} unchanged.`);
   }
   if (plan.asks.length > 0) lines.push(`Decide: ${String(report.asked)} ${o.dryRun ? 'would be asked' : 'asked'}, ${String(report.alreadyAsked)} asked before.`);
+  if (report.home) {
+    const { currencies, asked, proposed } = report.home;
+    const holds = `This import holds money in ${and(currencies)}, and this BrainDog has no home currency to add it up in.`;
+    if (asked === 'asked') lines.push(`${holds} ${o.dryRun ? `Adding it up in ${String(proposed)} would be asked on Decide` : `Adding it up in ${String(proposed)} is asked on Decide`}; each amount keeps its own currency either way.`);
+    else if (asked === 'before') lines.push(`${holds} Which one to add it up in was asked on Decide before.`);
+    else if (asked === 'refused') lines.push(`${holds} It could not be asked, for the reason under Refused by the record.`);
+    else lines.push(`${holds} Nothing on this BrainDog keeps one, so each amount keeps its own currency and none are added together.`);
+  }
   if (plan.polls.length > 0)
     lines.push(`Polls: ${String(report.polls.filed)} ${o.dryRun ? 'would be filed' : 'filed'} on Decide for you to approve, ${String(report.polls.before)} filed before.`);
   if (report.banks) {
@@ -1715,6 +1857,8 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
       `This BrainDog still holds ${report.examples === 1 ? 'one example row' : `${String(report.examples)} example rows`} from setting up, beside your own. Open Home and press Clear the examples: it deletes only the examples nobody has changed.`,
     );
   lines.push('', 'No key value was read or sent. Keys are indexed by what they open; move a value with braindog keys put.');
+  /* AND IT ENDS WITH WHAT IT DID NOT READ, a line a section, so a part of the export nothing carried is never silent. */
+  if ((report.unread ?? []).length > 0) lines.push('', ...unreadSaid(report.unread ?? []));
   return lines;
 }
 
@@ -2091,6 +2235,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     'draft-setup'?: boolean | undefined;
     since?: string | undefined;
     'bin-emptied'?: boolean | undefined;
+    strict?: boolean | undefined;
   };
   let positionals: string[];
   try {
@@ -2107,18 +2252,24 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
         'draft-setup': { type: 'boolean' },
         since: { type: 'string' },
         'bin-emptied': { type: 'boolean' },
+        strict: { type: 'boolean' },
       },
     }));
   } catch {
     io.say(USAGE);
     return 1;
   }
-  const [spec, file, ...more] = positionals;
-  if (!spec || more.length > 0 || (values.since === undefined && !file) || (values.since !== undefined && file)) {
+  /* A MAP WITH SECTIONS IS AN ADAPTER OF ITS OWN (`mapAdapter`): `--map <map.json> <export.json>`, the export the one
+     word on the line, needs no module. */
+  const mapOnly = values.map !== undefined && positionals.length === (values.since === undefined ? 1 : 0);
+  const [spec, file, ...more] = mapOnly ? ['', ...positionals] : positionals;
+  if ((!mapOnly && !spec) || more.length > 0 || (values.since === undefined && !file) || (values.since !== undefined && file)) {
     io.say(USAGE);
     return 1;
   }
-  const loaded = await loadAdapter(spec, { cwd: io.cwd, map: values.map });
+  /** How the line named what reads the export, for a sentence that tells him what to type next. */
+  const line = mapOnly ? `--map ${String(values.map)}` : String(spec);
+  const loaded = mapOnly ? loadMap(String(values.map), io.cwd) : await loadAdapter(String(spec), { cwd: io.cwd, map: values.map });
   if (!loaded.ok) {
     io.say(loaded.fix);
     return 1;
@@ -2211,7 +2362,10 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     }
     setup = got.value;
   }
-  const planned = ask(`plan ${file}`, () => adapter.plan(read.value, { today, ...(setup === undefined ? {} : { setup }), map: map.raw, tools: TOOLS }));
+  /* THE EXPORT GOES TO THE ADAPTER THROUGH A READER THAT NOTES WHAT IT IS ASKED FOR (`watched`), and only from here:
+     `read` above made the value, and what it looked at to check the file is not reading a section. */
+  const watch = watched(read.value);
+  const planned = ask(`plan ${file}`, () => adapter.plan(watch.value, { today, ...(setup === undefined ? {} : { setup }), map: map.raw, tools: TOOLS }));
   if (!planned.ok) return 1;
   const plan: Plan = planned.value;
   const fault = planFault(plan, adapter.key);
@@ -2221,10 +2375,20 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
   }
   /* WHAT IT OFFERS AND WHAT IT SAYS IS SETTLED ARE ASKED HERE, BEFORE THE HOST IS, so a throw from either stops the run
      with nothing sent, as a throw from `plan` does. */
-  const offering = ask(`say which packs ${file} offers`, () => adapter.offers?.(read.value, map.raw) ?? []);
+  const offering = ask(`say which packs ${file} offers`, () => adapter.offers?.(watch.value, map.raw) ?? []);
   if (!offering.ok) return 1;
-  const settling = ask(`say which questions ${file} has settled`, () => adapter.settled?.(read.value) ?? []);
+  const settling = ask(`say which questions ${file} has settled`, () => adapter.settled?.(watch.value) ?? []);
   if (!settling.ok) return 1;
+  /* WHAT NOTHING READ, KNOWN BEFORE THE HOST IS ASKED ANYTHING, so `--strict` refuses with nothing read from the record or
+     sent to it: an import that leaves part of the export behind is one he asked to be told about first. */
+  const unread = watch.unread();
+  if (values.strict === true && unread.length > 0) {
+    for (const line of unreadSaid(unread)) io.say(line);
+    io.say(
+      `With --strict, an import that leaves part of ${file} unread writes nothing. Name ${unread.length === 1 ? 'that section' : 'those sections'} in the map, or run it without --strict to carry the rest.`,
+    );
+    return 1;
+  }
   /* A ROW HOLDING A VALUE SHAPED LIKE A KEY IS NEVER SENT, WHOEVER PLANNED IT. The planner this file used to hold left
      such a row out itself; an adapter somebody else wrote may not, and the write is refused row by row in `writeOne`. */
 
@@ -2285,6 +2449,30 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     propose: (a) => client.call('propose', a),
     meet: (a) => client.call('meet', a),
     packs: () => client.packs(),
+    /* THE PACK THAT KEEPS A HOME CURRENCY IS WHICHEVER DECLARES THE SETTING, read the way the record reads it
+       (`homeCurrency` in `packages/kernel/src/declare.ts`): no pack is named here, so a record set up any way answers. */
+    home: async () => {
+      const listed = await client.packs();
+      if (!listed.ok) return listed;
+      /* IN THE RECORD'S ORDER, BY ID, AND THE FIRST ONE SET WINS: a pack that declares the setting and holds nothing does
+         not hide another that holds one, as it does not in `homeCurrency`. */
+      let unset: { pack: string; currency: null } | null = null;
+      for (const p of [...listed.value].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+        if (p.disabled_at != null) continue;
+        const read = await client.packConfig({ id: p.id });
+        if (!read.ok) {
+          if (unreachable(read)) return read;
+          continue;
+        }
+        const got = isObj(read.value) ? read.value : {};
+        if (!isObj(got.config) || !Object.hasOwn(got.config, 'home_currency')) continue;
+        const v = isObj(got.values) ? got.values.home_currency : undefined;
+        const code = typeof v === 'string' ? v.trim().toUpperCase() : '';
+        if (/^[A-Z]{3}$/u.test(code)) return ok({ pack: p.id, currency: code });
+        unset ??= { pack: p.id, currency: null };
+      }
+      return ok(unset);
+    },
   };
   /* THE CATALOGUE THE OFFERS ARE RESOLVED IN: a folder or an address named with `--catalogue`, else the host's own. */
   const named = values.catalogue;
@@ -2345,7 +2533,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
       const got = progress.report;
       if (!dryRun && got !== null && got.missing.length === 0 && (wroteAny(got) || (got.binned ?? []).length > 0)) {
         remember(got, true);
-        io.say(`What it did before it stopped is remembered, and braindog import ${spec} --since last says it.`);
+        io.say(`What it did before it stopped is remembered, and braindog import ${line} --since last says it.`);
       }
       return 3;
     }
@@ -2368,6 +2556,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     }
     throw e;
   }
+  report.unread = unread;
   for (const line of said(report, { dryRun: values['dry-run'] === true, file })) io.out(line);
   /**
    * AND ONCE ITS LAST WRITE HAS ANSWERED, THE RUN IS ENDED `done`, named by the export it carried.

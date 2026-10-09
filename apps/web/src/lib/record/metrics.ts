@@ -17,7 +17,7 @@
 
 import type { Bucket, FxRead, Group, Part, Rate, TargetIn } from '@braindog/kernel';
 import { clausesOf, quoteValue } from '@braindog/where';
-import { day as longDay, integer, money, shortDay } from 'braindog-render';
+import { UNNAMED, day as longDay, integer, money, shortDay } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { REGISTERS } from './held.ts';
@@ -594,7 +594,7 @@ export function withParam(decl: MetricDecl, it: string): MetricDecl {
  * names that cannot be read is the em dash, as it is everywhere else, and `(s)` after a number is the
  * one plural the sentence needs: `1 account`, `2 accounts`.
  */
-export function noteOf(template: string, said: (id: string) => string | null): string {
+export function noteOf(template: string, said: (id: string) => string | null | typeof UNNAMED): string {
   /* A CLAUSE THAT ONLY SAYS NOUGHT IS LEFT OUT. "0 with an agent, 0 kept for later" under a new record's Open tasks is
      two things to read that say nothing; a clause whose every figure is 0 goes, and a note with none left is empty.
      The template's own commas are the clauses, split before a figure like 1,200 is written in. */
@@ -603,9 +603,14 @@ export function noteOf(template: string, said: (id: string) => string | null): s
     const ids = [...clause.matchAll(FIGURE)].map((m) => m[1]!);
     return ids.length === 0 || ids.some((id) => said(id) !== '0');
   });
+  /* A PATH THAT NAMES NOTHING (`UNNAMED`) IS THE AUTHOR'S OWN WORDS, printed as written, never the dash a figure that
+     could not be read gets: the dash would say a figure is missing where the author's typo is. */
   return kept
     .join(', ')
-    .replace(/\{\{\s*([a-z][a-z0-9_-]*)\s*\}\}/gu, (_, id: string) => said(id) ?? '—')
+    .replace(/\{\{\s*([a-z][a-z0-9_-]*)\s*\}\}/gu, (_, id: string) => {
+      const v = said(id);
+      return v === UNNAMED ? id : (v ?? '—');
+    })
     .replace(/(^|[^\d.,])(\d[\d,]*) ([A-Za-z]+)\(s\)/gu, (_, lead: string, n: string, word: string) => `${lead}${n} ${n === '1' ? word : `${word}s`}`)
     .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
 }
@@ -644,10 +649,18 @@ const HOLE = /\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*)\s*\}\}/gu;
  * figure's remembered value a window ago (`+8%`, `−8%`) and leaves out when it has no such point, so these same two
  * rules drop its clause: an unread change takes the clause with it, and `0%` is nought.
  */
-export function leadOf(template: string, said: (path: string) => string | null): string {
+export function leadOf(template: string, read: (path: string) => string | null | undefined | typeof UNNAMED): string {
+  /* A PATH THAT NAMES NOTHING (`UNNAMED`) KEEPS ITS CLAUSE: the renderer prints the author's words for it, so it is no
+     figure that failed to read and no nought. Everywhere else here it reads as no words. */
+  const said = (path: string): string | null => {
+    const v = read(path);
+    return v === UNNAMED ? '' : (v ?? null);
+  };
   const kept = template.split(/,\s+/u).filter((clause) => {
-    const figures = [...clause.matchAll(HOLE)].map((m) => said(m[1]!));
-    if (figures.length === 0) return true;
+    const holes = [...clause.matchAll(HOLE)].map((m) => m[1]!);
+    if (holes.length === 0) return true;
+    if (holes.some((h) => read(h) === UNNAMED)) return true;
+    const figures = holes.map((h) => said(h));
     if (figures.some((f) => f === null)) return false;
     return figures.some((f) => f !== null && !nought(f));
   });

@@ -1,0 +1,7 @@
+{
+  "gate": "guards",
+  "rule": "an ADMIN route guarded too low",
+  "expect": "routed as ADMIN and is guarded by guard\\(\\)",
+  "findings": 1,
+  "why": "THE REAL DEFECT, KEPT VERBATIM. `members` was routed ADMIN and guarded `guard(ctx, 'read')`, and thirteen of the fourteen ADMIN routes called `admin`. The fixture holds that one line beside three correct methods, so a count of one is what proves the gate distinguishes them rather than reporting every route it reads."
+}

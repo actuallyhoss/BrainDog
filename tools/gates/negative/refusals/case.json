@@ -1,0 +1,8 @@
+{
+  "gate": "refusals",
+  "rule": "a refusal code missing from REFUSAL_CODES",
+  "expect": "and REFUSAL_CODES does not",
+  "findings": 1,
+  "total": 2,
+  "why": "ONE LINE NAMES THE CODE, and the fixture drops exactly one. The gate reports two findings for it (the missing code, and the family whose size no longer matches) and only the first can name it, because the second is about a count. `findings` here is *lines that name the seeded token*, not *findings the gate made*, and conflating them is how a fixture ends up asserting a number that means something else.\n\nTWO IN TOTAL, the missing code and its family's size, and the second number is the one a rename breaks. Renaming the assistant's family in the gate and not in this fixture's `30 §6` copy made the gate print 22 findings here (no Slash family, no SLASH array, and every one of the family's codes unaccounted for) while this case still read \"red on its seeded violation\", because WOULD_ORPHAN was still named on exactly one line. Measured, September 25th."
+}

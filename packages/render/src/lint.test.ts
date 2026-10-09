@@ -44,7 +44,9 @@ test('placeholder: a bar\'s hole bucket prints its amount and is not one, even d
 });
 
 test('braces: a chips figure printed as written, braces and all', () => {
-  const html = draw('```chips\nmoney | {{revenue.monthly}} | monthly, trailing\nclock | {{effortDays}}d | to build as sized\n```');
+  /* THE PAGE AS IT WAS DRAWN ON 7 OCTOBER: `toHTML` no longer prints a chip's braces, so the fixture is the old drawing. */
+  const html = '<div class="inline"><span class="pill"><span class="pill-figure num">{{revenue.monthly}}</span><span class="pill-word">monthly, trailing</span></span><span class="pill"><span class="pill-figure num">{{effortDays}}d</span><span class="pill-word">to build as sized</span></span></div>';
+  assert.doesNotMatch(draw('```chips\nmoney | {{revenue.monthly}} | monthly, trailing\n```'), /\{\{/u, 'a drawn chip never prints braces');
   assert.equal(red(lintHtml(html), 'braces').said, 'Prints 2 figures in braces instead of their values: monthly, effort days.');
   assert.deepEqual(lintHtml(draw('```chips\nmoney | £4,200 | monthly, trailing\n```')), []);
 });

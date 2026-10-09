@@ -129,3 +129,12 @@ test('ARRANGING STILL DRAWS EVERY BLOCK, but one whose when said no', () => {
   /* AND THE RECORD'S FLAG IS READ AS IT CAME: judging the marked answer again changes nothing. */
   assert.deepEqual(whys(emptyHidden(marked, true)), whys(marked));
 });
+
+/* A BLOCK DRAWN FROM ITS OWN WRITTEN-OUT CELLS holds them (rule-sheet-pack, batch 40): Layout's three-wide ring of
+   `authored: [{ cells: ['Done', '3', '5'] }]` read no row and was answered empty, so it never showed. */
+test('A BLOCK WRITTEN OUT IN THE PAGE HOLDS WHAT ITS AUTHOR WROTE, and one with no cells written is still empty', () => {
+  const written = { ...block({ kind: 'ring' }), authored: [{ cells: ['Done', '3', '5'] }] } as BlockResult;
+  const bareRing = { ...block({ kind: 'ring' }), authored: [] } as BlockResult;
+  const lead = { ...block({ kind: 'note' }), body: 'Lead' } as BlockResult;
+  assert.deepEqual(whys(markDrawn([lead, written, bareRing])), ['drawn', 'drawn', 'empty']);
+});

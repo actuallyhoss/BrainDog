@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { SIGNUP_UNCHECKED } from '@braindog/record/directory';
 
-import { billingMode, botCheckKeyed, launchState, signupMode, type LaunchEnv } from '../src/launch.ts';
+import { SIGNUP_STOPPED, STOPPING, billingMode, botCheckKeyed, launchDetail, launchState, signupMode, type LaunchEnv } from '../src/launch.ts';
 
 /* WHAT `signUp()` NEEDS BEFORE THE SWITCH IS ASKED, all present: a 32-character session key, an address that gives a
    cookie, a sending address and the mail binding. Every test of a mode starts here, and the last tests take one away. */
@@ -34,9 +34,9 @@ test('OPEN WITH NO BOT CHECK STAYS OPEN, and never falls back to invite', () => 
   assert.equal(botCheckKeyed({ TURNSTILE_SECRET: 's' }), true);
 });
 
-test('THE WHY SAYS PLAINLY THAT THE BOT CHECK IS NOT KEYED and sign-ups from one address are limited until it is', () => {
+test("THE OWNER'S WHY SAYS PLAINLY THAT THE BOT CHECK IS NOT KEYED and sign-ups from one address are limited until it is", () => {
   assert.equal(SIGNUP_UNCHECKED.most, 3, 'the sentence below names three');
-  const open = launchState({ ...READY, SIGNUP: 'open', BILLING: '' });
+  const open = launchDetail({ ...READY, SIGNUP: 'open', BILLING: '' });
   assert.deepEqual(open, {
     signup: 'open',
     botCheck: false,
@@ -47,20 +47,22 @@ test('THE WHY SAYS PLAINLY THAT THE BOT CHECK IS NOT KEYED and sign-ups from one
     ],
   });
   /* KEYED, THE SENTENCE GOES, and the strikes are today's. */
-  const keyed = launchState({ ...READY, SIGNUP: 'open', TURNSTILE_SECRET: 's', TURNSTILE_SITE_KEY: 'k', BILLING: 'live' });
+  const keyed = launchDetail({ ...READY, SIGNUP: 'open', TURNSTILE_SECRET: 's', TURNSTILE_SITE_KEY: 'k', BILLING: 'live' });
   assert.deepEqual(keyed, { signup: 'open', botCheck: true, billing: 'live', why: [] });
+  /* BILLING OFF IS NEVER AN EMPTY WHY FOR THE OWNER, which is every host today: a live charge is a separate word of his. */
+  assert.ok(launchDetail({ ...READY, SIGNUP: 'open', TURNSTILE_SECRET: 's', TURNSTILE_SITE_KEY: 'k' }).why.length > 0);
   /* A SECRET WITH NO SITE KEY IS A PAGE THAT CANNOT PASS: said, and closed, because every sign-up is then refused. */
-  const unpassable = launchState({ ...READY, SIGNUP: 'open', TURNSTILE_SECRET: 's' });
-  assert.match(unpassable.why.join(' '), /no site key/);
+  const unpassable = launchDetail({ ...READY, SIGNUP: 'open', TURNSTILE_SECRET: 's' });
+  assert.deepEqual(unpassable.why.filter((w) => !w.startsWith('Billing')), [STOPPING.siteKey]);
   assert.equal(unpassable.signup, 'closed');
 });
 
 test('CLOSED AND BY INVITATION SAY SO; the limit sentence is for a door that is not closed', () => {
-  const closed = launchState({});
+  const closed = launchDetail({});
   assert.equal(closed.signup, 'closed');
   assert.ok(closed.why.includes('Sign-up is closed, so nobody new can make an account.'));
   assert.ok(!closed.why.some((w) => w.includes('bot check')), 'a closed door needs no limit sentence');
-  const invite = launchState({ ...READY, SIGNUP: 'invite', BILLING: 'test' });
+  const invite = launchDetail({ ...READY, SIGNUP: 'invite', BILLING: 'test' });
   assert.equal(invite.signup, 'invite');
   assert.ok(invite.why.includes('Sign-up is by invitation, so a new address needs a code.'));
   assert.ok(invite.why.some((w) => w.startsWith('The bot check is not keyed')));
@@ -87,7 +89,8 @@ test('BOTH ENVIRONMENTS SAY open: production on his word, and alpha so the walk 
 });
 
 /* AUDIT 34, FINDING 2: `/healthz` said `open` on a host where `signUp()` refused everybody or no letter went. Each of the
-   four is taken away alone, on an open switch and on an invite one, and each is a sentence and `closed`. */
+   four is taken away alone, on an open switch and on an invite one, and each is `closed`, with its sentence for the owner
+   and the one stopped sentence for a stranger. */
 const STOPS: [keyof LaunchEnv, string][] = [
   ['SESSION_SECRET', 'The session key is missing or shorter than 32 characters, so every sign-up is refused.'],
   ['PUBLIC_HOST', 'This host has no public address set, so it cannot give a new person a session and every sign-up is refused.'],
@@ -100,9 +103,10 @@ for (const [key, sentence] of STOPS)
     for (const switched of ['open', 'invite']) {
       const env: LaunchEnv = { ...READY, SIGNUP: switched };
       delete env[key];
-      const state = launchState(env);
+      const state = launchDetail(env);
       assert.equal(state.signup, 'closed', `${switched} without ${key}`);
       assert.deepEqual(state.why.filter((w) => !w.startsWith('Billing')), [sentence], `${switched} without ${key}`);
+      assert.deepEqual(launchState(env), { ...state, why: [SIGNUP_STOPPED] }, `${switched} without ${key}, as a stranger reads it`);
     }
   });
 
@@ -114,11 +118,33 @@ test('A SESSION KEY OF 31 CHARACTERS IS NO KEY, as `signUp()` counts it, and an 
 });
 
 test('ALL FOUR MISSING IS FOUR SENTENCES, and a closed switch needs none of them', () => {
-  const bare = launchState({ SIGNUP: 'open' });
+  const bare = launchDetail({ SIGNUP: 'open' });
   assert.equal(bare.signup, 'closed');
   assert.deepEqual(
     bare.why.filter((w) => !w.startsWith('Billing')),
     STOPS.map(([, sentence]) => sentence),
   );
-  assert.deepEqual(launchState({}).why, ['Sign-up is closed, so nobody new can make an account.', 'Billing is off, so every new record is on Free.']);
+  assert.deepEqual(launchDetail({}).why, ['Sign-up is closed, so nobody new can make an account.', 'Billing is off, so every new record is on Free.']);
+});
+
+test('THE EXPORTED STOPPING IS WHAT stops SAYS: the four above, and the bot check with no site key', () => {
+  assert.deepEqual(Object.values(STOPPING), [...STOPS.map(([, sentence]) => sentence), STOPPING.siteKey]);
+});
+
+/* AUDIT 36-37, FINDING 12: `/healthz` answers anybody, and it carried which setting was missing and the exact strike
+   limit. A stranger reads whether he can sign up, and when he cannot, or only with a code, one sentence why. */
+test('WHAT /healthz TELLS A STRANGER: open says nothing more, and anything else is one sentence', () => {
+  const unkeyed = launchState({ ...READY, SIGNUP: 'open' });
+  assert.deepEqual(unkeyed, { signup: 'open', botCheck: false, billing: 'off', why: [] });
+  assert.deepEqual(launchState({}).why, ['Sign-up is closed, so nobody new can make an account.']);
+  assert.deepEqual(launchState({ ...READY, SIGNUP: 'invite', BILLING: 'test' }).why, ['Sign-up is by invitation, so a new address needs a code.']);
+  assert.deepEqual(launchState({ SIGNUP: 'open' }).why, [SIGNUP_STOPPED]);
+  assert.deepEqual(launchState({ ...READY, SIGNUP: 'open', TURNSTILE_SECRET: 's' }).why, [SIGNUP_STOPPED]);
+  const envs: LaunchEnv[] = [{}, { SIGNUP: 'open' }, { ...READY, SIGNUP: 'open' }, { ...READY, SIGNUP: 'invite' }, { ...READY, SIGNUP: 'open', TURNSTILE_SECRET: 's' }];
+  for (const env of envs) {
+    const said = launchState(env).why.join(' ');
+    assert.doesNotMatch(said, /\d|session key|public address|send mail|site key|bot check|Billing/u, said);
+    for (const w of Object.values(STOPPING)) assert.ok(!said.includes(w), said);
+    assert.doesNotMatch(said, /\u2014/u);
+  }
 });

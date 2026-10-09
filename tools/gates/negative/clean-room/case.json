@@ -1,0 +1,6 @@
+{
+  "gate": "clean-room",
+  "rule": "the predecessor's own names in a source file",
+  "expect": "contains",
+  "findings": 1
+}

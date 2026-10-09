@@ -28,7 +28,7 @@ import { fixOf, no, ok } from '@braindog/ports';
 import { KERNEL_FIELDS, compile, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
-import { GOVERNANCE_OPEN, RECORD_RATES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING, readOpenQuestions, readRatesAge, readRunsWorking, readSign, readVitals } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_RATES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING, readHandoffsOpen, readOpenQuestions, readRatesAge, readRunsWorking, readSign, readVitals } from './built-in-figures.ts';
 import { isCurrencyCode } from './coerce.ts';
 import type { Leg } from './forecast.ts';
 import type { VitalSign } from './signs.ts';
@@ -1010,6 +1010,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   if (decl.source === RECORD_SIGNS) return readSign(sql, ctx, decl);
   /* AND HOW MANY AGENTS ARE WORKING NOW, by the one clock (`presence.ts`). */
   if (decl.source === SESSIONS_WORKING) return readRunsWorking(sql, ctx);
+  if (decl.source === HANDOFFS_OPEN) return readHandoffsOpen(sql, ctx, decl);
   /* AND THE RECORD'S HEALTH OVER ITS VITAL SIGNS, `signs-red` and `green-days` (PRF-A05), and how old its newest
      exchange rate is, `rates-age-days` (REC-B02). Each answers no value, never nought, with nothing to read. */
   if (decl.source === RECORD_VITALS) return readVitals(sql, ctx, decl);
@@ -1601,16 +1602,29 @@ export type DeclaredSign = { sign: string; name: string; state: 'green' | 'red' 
  *
  * RED WHEN THE READING MISSES ITS TARGET, and only then: a reading that could not be judged (no value, a currency with
  * no rate, a refusal) is `none`, never green, so a sum over nothing does not pass for want of a number. A count of none is
- * a number and is judged.
- * `hold` is always false: the hold's clock watches the record's own closed list (`signs.ts`), and a sign a pack declares
- * is shown beside them, not counted with them.
+ * a number and is judged: `lte: 0` over a list that exists and holds nothing is green, because nothing is the answer.
+ *
+ * A READING THAT COULD NOT BE TAKEN SAYS SO (audit 36-37, finding 9). `null` is the figure refused whole (its list is
+ * gone, or its source is one this build does not read), and refusals on a reading are a part of it that could not be
+ * read. Either is `none`, and its sentence says the figure could not be read, never "nothing to judge by yet", which
+ * is a quiet list's sentence and would have him wait for rows that cannot come. Its number is not shown, since a 0 from
+ * a list that is not there is not a count. `hold` is always false: the hold's clock watches the record's own closed list
+ * (`signs.ts`), and a sign a pack declares is shown beside them, not counted with them.
  */
 export function vitalOf(decl: Pick<MetricDecl, 'metric' | 'name' | 'vital' | 'target'>, reading: Pick<Reading, 'value' | 'met' | 'refusals'> | null): DeclaredSign | null {
   if (decl.vital !== true || decl.target === undefined) return null;
-  const judged = reading !== null && reading.refusals.length === 0 && reading.value !== null ? reading.met : null;
+  const unread = reading === null || reading.refusals.length > 0;
+  const judged = !unread && reading.value !== null ? reading.met : null;
   const state = judged === false ? 'red' : judged === true ? 'green' : 'none';
-  const said = state === 'red' ? `${decl.name} misses its target.` : state === 'green' ? `${decl.name} meets its target.` : `${decl.name} has nothing to judge by yet.`;
-  return { sign: decl.metric, name: decl.name, state, value: reading?.value ?? null, said, hold: false };
+  const said =
+    state === 'red'
+      ? `${decl.name} misses its target.`
+      : state === 'green'
+        ? `${decl.name} meets its target.`
+        : unread
+          ? `${decl.name} could not be read, so it is not judged.`
+          : `${decl.name} has nothing to judge by yet.`;
+  return { sign: decl.metric, name: decl.name, state, value: unread ? null : reading.value, said, hold: false };
 }
 
 /**

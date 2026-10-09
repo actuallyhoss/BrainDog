@@ -1,0 +1,7 @@
+{
+  "gate": "secret-grep",
+  "rule": "an agent's key in a log, beside its exempt sender",
+  "expect": "a plaintext reaches a log",
+  "findings": 1,
+  "why": "THE FIFTH: an agent's key in `apps/cli/src/keys.ts`, sent from `depositOne`, the file's recorded exemption, and encoded to bytes that reach a log. One finding proves both halves: the exemption covers that function and nothing else, and a value is followed into a name that is not `plaintext`."
+}

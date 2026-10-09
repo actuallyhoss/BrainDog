@@ -40,7 +40,8 @@ const KEPT = 24;
  *   - a rowset: its list, and each row's target (or, for a new row, the row itself) with its values, sorted;
  *   - a change: the declaration it is filed under and what it adds (`to`);
  *   - a pack: the verb and the pack, `install#work`, which is the command line's own cause for that question;
- *   - options: the question's words folded and the option ids, sorted, so it needs `question`;
+ *   - options: the question's words folded, the option ids sorted, and what it is `about` and who it is put `to` when it
+ *     says, so it needs `question`;
  *   - a pattern, settings or an arrangement: the whole body, as it is asked.
  *
  * What the record works out for itself (`egress`, `approve`, a `from_version`) and the cause a body may carry are left
@@ -63,7 +64,13 @@ export function causeOf(kind: string, body: Record<string, unknown>, question?: 
   if (kind === 'options') {
     if (typeof question !== 'string' || !Array.isArray(body.options)) return null;
     const ids = body.options.map((o) => (isMap(o) && typeof o.id === 'string' ? o.id : '')).sort();
-    return `options#${hash(canon([fold(question), ids]))}`;
+    /* WHAT IT IS ABOUT AND WHO IT IS PUT TO ARE PART OF THE ASK: "Approve this?" about two things, or to two members, is
+       two questions, and joining the second away left its agent believing it was filed. Only when present, so an ask
+       with neither derives the cause it always did; a cause already stored keeps its old hash, which is harmless, since
+       a later ask with `about` or `to` files beside it once and is joined from then on. */
+    const asked: unknown[] = [fold(question), ids];
+    if (body.about !== undefined || body.to !== undefined) asked.push({ about: body.about, to: body.to });
+    return `options#${hash(canon(asked))}`;
   }
   if (kind === 'pattern' || kind === 'settings' || kind === 'arrange') {
     const { cause: _c, egress: _e, approve: _a, ...asked } = body;

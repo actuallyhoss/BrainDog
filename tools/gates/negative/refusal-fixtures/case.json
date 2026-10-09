@@ -1,0 +1,8 @@
+{
+  "gate": "refusal-fixtures",
+  "rule": "a refusal code with no fixture",
+  "expect": "and has no fixture",
+  "findings": 1,
+  "total": 1,
+  "why": "TWO CODES NAMED IN ONE SOURCE FILE AND ONE OF THEM FIXTURED, and the seeded violation is the second, which is the rule that matters, because a code the tree already hands to callers with no fixture is the enumeration rotting in the direction that costs something. The file names two codes on purpose: a gate counting fixtures rather than finding gaps would report zero or two here, and only \"one\" is the right answer."
+}

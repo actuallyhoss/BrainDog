@@ -19,7 +19,7 @@
 import type { Clock, Param, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
 import { clash, fixOf, no, ok, refused } from '@braindog/ports';
 
-import { coerce, isAbsent, instant, measure, parseSpoken, range, type FieldDecl, type Json } from './coerce.ts';
+import { coerce, currencyFixed, isAbsent, instant, measure, parseSpoken, range, type FieldDecl, type Json } from './coerce.ts';
 import { attempt } from './tx.ts';
 import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
@@ -57,6 +57,8 @@ import { runsDataSteps } from './migrations/0028_runs.ts';
 import { SIGNS_KEY, fileSignReading, nextSignsDue, readSigns, runSignsNight, type SignReading, type VitalSign } from './signs.ts';
 import { DOOR_KINDS, DOOR_WINDOW_DAYS, doorMarks as readDoorMarks, markDoor, sweepDoorMarks, type DoorMark, type DoorSigns } from './door.ts';
 import { openFaults, type Fault } from './fault.ts';
+import { copyFacts, copyFailed, copyKept, type CopyFacts } from './copies.ts';
+import { drop as dropHandoff, expire as expireHandoffs, openHandoffs, take as takeHandoff, type HandoffPlace, type HandoffWrite, type OpenHandoff, type Taken } from './handoff.ts';
 import { checkBrainl, exportBrainl, importBrainl, signBrainl, tables as fileTables, type ImportReport, type Section, type Signer } from './brainl.ts';
 import {
   drainSchedule,
@@ -129,7 +131,7 @@ import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
 import { COST_SQL, COSTS, costOf, costRank, type Cost } from './weigh.ts';
-import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
+import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
@@ -232,7 +234,7 @@ import { slashMayWrite } from './slash.ts';
 import { answeredOnly, askOwnRows, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
-import { builtInFigure } from './built-in-figures.ts';
+import { builtInFigure, openSteps } from './built-in-figures.ts';
 import { workingRuns } from './presence.ts';
 import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, type UndoApplied, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
@@ -266,12 +268,14 @@ import {
   deviceStart,
   deviceSweep,
   operationGrant,
+  shapeGrant,
   vaultGrant,
   type Approved,
   type DeviceCode,
   type DeviceRow,
   type Exchanged,
   type OperationGrant,
+  type ShapeGrant,
   type VaultGrant,
   type Waiting,
 } from './device.ts';
@@ -292,12 +296,32 @@ import { extensions } from './api/index.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
+export { SHAPE_MARK, Scrambler, isShape, shapeBrainl, type Published, type ShapeOptions } from './shape.ts';
 export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
 export { KERNEL_WRITTEN, REVIVED, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
 /* THE RECORD'S VITAL SIGNS (`signs.ts`): the closed list, and what a sign and a reading are. */
 export { VITAL_SIGNS, type SignReading, type VitalSign } from './signs.ts';
 export { DOOR_KINDS, type DoorMark, type DoorSigns } from './door.ts';
+/* A HANDOFF THAT CLOSES (`handoff.ts`, AGT-C05): the open steps in a place, and taken, dropped or expired. */
+export {
+  EARLIER_MS,
+  EXPIRE_MS,
+  EXPIRED_NOTE,
+  HANDOFF_STATES,
+  drop as dropHandoff,
+  expire as expireHandoffs,
+  notOpenSaying,
+  openHandoffs,
+  take as takeHandoff,
+  type HandoffChange,
+  type HandoffPlace,
+  type HandoffWrite,
+  type OpenHandoff,
+  type Taken,
+} from './handoff.ts';
 export { SAID, clearFault, openFaults, raiseFault, type Fault } from './fault.ts';
+/* THE RECORD'S COPIES AS THREE FACTS, and the night's two writes (`copies.ts`, LCH-C03). */
+export { NIGHT_FAULT, NIGHT_KIND, copyFacts, copyFailed, copyKept, failedNote, keptNote, type CopyFacts, type Lifecycle } from './copies.ts';
 /* `canon` IS ALSO MIGRATE'S NAME (a script written one way), so a value written one way is `canonValue` out here. */
 export { CAUSE, canon as canonValue, causeFault, causeOf, noop, sha256 } from './cause.ts';
 /* THE RECORD'S OWN NAME RULE (`api/person-name.ts`), so the Worker refuses at provision what a rename would refuse. */
@@ -317,7 +341,8 @@ export {
   type RunRow,
   type WorkingRun,
 } from './presence.ts';
-export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type VaultGrant, type Waiting } from './device.ts';
+export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type ShapeGrant, type VaultGrant, type Waiting } from './device.ts';
+export { shapeGrant };
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
 export { placeOnce, projectSuggestions, suggestProjects, remoteKey, SUGGEST_AFTER, type ProjectSuggestion, type SeenRun, type Candidate } from './scope.ts';
@@ -374,6 +399,7 @@ export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largest
 export { clockOf, isMoneyFormat, verdictOf } from './metrics.ts';
 export { readDeclaredSigns, vitalOf } from './metrics.ts';
 export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
+export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
 export { ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
 export type { Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
@@ -432,6 +458,7 @@ export type { IdentitySaid, KeyInput, KeyKind } from './identity-keys.ts';
 export { nameKey, noteMention } from './entities.ts';
 export { CEILING, CLIENT_KINDS, SCOPES, ceilingOf, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
 export { cutOffReadable, endedByCutOff, isBuild } from './token.ts';
+export { AGENTS_KEY, agentCap, agentsFull, liveAgents, type AgentCap } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
 export type { Member } from './members.ts';
@@ -3538,6 +3565,22 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             return row && (!row.deleted_at || holds(row.id)) ? row.id : null;
           },
           deleted: (reg: string, seq: number) => !hidden(reg) && look.deleted(reg, seq),
+          /* A BARE AMOUNT TAKES ITS ACCOUNT'S CODE (`currency_from`, REC-B04): the link this write sends, else the one
+             the row holds, read as the writer may read it. A list she cannot read gives nothing, as `refId` does. */
+          currencyOf: (): string | null => {
+            const field = known.get(key);
+            const [link, target] = String(field?.currency_from ?? '').split('.');
+            if (!link || !target) return null;
+            /* A FIXED CODE THE ROW ALREADY HOLDS IS THE ONE IT KEEPS: a dollar row on a pound account, its number
+               corrected with no code, was refused `CURRENCY_FIXED` for the account's code the write never sent. */
+            const own = field?.currency_fixed === true ? (current?.fields[key] as { currency?: unknown } | undefined)?.currency : undefined;
+            if (typeof own === 'string') return own;
+            const named = patch[link] !== undefined ? patch[link] : current?.fields[link];
+            const row = typeof named === 'string' ? get(named) : null;
+            if (!row || hidden(row.register)) return null;
+            const money = row.fields[target] as { currency?: unknown } | undefined;
+            return typeof money?.currency === 'string' ? money.currency : null;
+          },
         };
       };
 
@@ -3624,6 +3667,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           JSON.stringify(current.fields[key]) !== JSON.stringify(out.value)
         )
           return no<Entry>('IMMUTABLE_FIELD', `${key} is set once and cannot be changed.`, { at: key });
+        /* THE CODE IS LOCKED AND THE NUMBER IS NOT (`currency_fixed`, REC-B04): an amount corrected stays in its currency. */
+        const fixed = current ? currencyFixed(field, current.fields[key], out.value, key) : null;
+        if (fixed) return { ok: false, refusal: fixed };
         /* Compared the way `immutable` is, so re-sending the value a row already holds is no change. */
         if (
           field.by === 'decide' &&
@@ -5533,6 +5579,25 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     signs: () => readSigns(sql, clock.now(), recordTz()),
   });
 
+  /**
+   * THE BUILT-IN SIGNS AND THE RECORD'S OWN, every figure declared `vital: true` read as a sign (`readDeclaredSigns`), so
+   * a declared sign over a source it could not read shows as `none` on the page and through `signs`. Nothing had called
+   * it, and a declared vital was never listed. `signs-red` still counts the built-in signs alone: a declared figure is
+   * read through `evalContext`, and that would read itself.
+   */
+  const everySign = (): VitalSign[] => {
+    const ctx = evalContext();
+    const decls = sql
+      .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
+      .map((r) => liveTarget(sql, JSON.parse(r.body) as MetricDecl, ctx));
+    const built = readSigns(sql, clock.now(), recordTz());
+    const taken = new Set(built.map((s) => s.sign));
+    const own = readDeclaredSigns(sql, decls, ctx)
+      .filter((d) => !taken.has(d.sign))
+      .map((d): VitalSign => ({ sign: d.sign, name: d.name, state: d.state, value: d.value, said: d.said, facts: [], days: [] }));
+    return [...built, ...own];
+  };
+
   /** What the page layer reads through. It runs queries it did not write, so it takes callbacks. */
   /**
    * The lists a block reads beside its source, for `registersOf`: the steps under a card grid's `as: next` and `as: ring`,
@@ -5765,7 +5830,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     },
     /* THE RECORD'S VITAL SIGNS, as the record's `signs` reads them (`signs.ts`), so a page block with `source: signs`
        draws them (PRF-A05). Without this line the block refuses as not in this build. */
-    signs: () => readSigns(sql, clock.now(), recordTz()),
+    signs: () => everySign(),
+    /* THE STEPS RUNS LEFT AND NOBODY TOOK, in one project or on the whole record (`openSteps`, AGT-C05), so a
+       `handoffs.open` block draws them on Agents. Without this line the block refuses as not in this build. */
+    handoffs: (project) => openSteps(sql, clock.now(), project),
     /* `into` GOES THROUGH, so a walk opened from one book walks in the book's own currency. Dropped here, the page asked
        for the book's currency and this host walked the home one, drawn once per currency instead. */
     runway: (opening, legs, horizon, only, into) => {
@@ -5799,9 +5867,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const scoped = scopeFieldOf(fields);
       const pointing = fields.filter(aims);
       const thing = projects === null ? undefined : aims(scoped) ? scoped : pointing.length === 1 ? pointing[0] : undefined;
-      const cols = `${at} AS at, ${fieldSqlIn(schema, q.value)} AS value, ${q.name ? fieldSqlIn(schema, q.name) : 'NULL'} AS name, ${q.unit ? fieldSqlIn(schema, q.unit) : 'NULL'} AS unit, ${thing ? fieldSqlIn(schema, thing.id) : 'NULL'} AS thing`;
+      /* AND THE READING AS MONEY when the block names a money field (REC-C03): minor units and a code, which `measures.ts`
+         reads in place of `value`, so a reading of USD 48.15 is never drawn as 4815. THE WHOLE VALUE, read as text:
+         `fieldSqlIn` on a money field reads its number alone (the path a sort uses), and a number with no code is the
+         very misreading this stops. */
+      const amount = q.amount ? fieldSqlIn(schema, q.amount, 'text') : 'NULL';
+      const cols = `${at} AS at, ${fieldSqlIn(schema, q.value)} AS value, ${amount} AS amount, ${q.name ? fieldSqlIn(schema, q.name) : 'NULL'} AS name, ${q.unit ? fieldSqlIn(schema, q.unit) : 'NULL'} AS unit, ${thing ? fieldSqlIn(schema, thing.id) : 'NULL'} AS thing`;
       const from = `FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`;
-      type Read = { at: unknown; value: unknown; name: unknown; unit: unknown; thing: unknown };
+      type Read = { at: unknown; value: unknown; amount: unknown; name: unknown; unit: unknown; thing: unknown };
       const titles = new Map<string, string | null>();
       /* THE PROJECT BY ITS NAME, never its id: a reading of a project with no title is of no project a person can name.
          ITS ID STILL KEEPS IT APART (`project`, never drawn): two untitled projects' "Orders" were one line through both
@@ -5814,7 +5887,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       };
       const readings = sql.all<Read>(`SELECT ${cols} ${from} AND ${at} >= ?`, q.register, ...c.params, q.since).map(named);
       const latest = sql
-        .all<Read>(`SELECT at, value, name, unit, thing FROM (SELECT ${cols}, max(${at}) AS newest ${from} AND ${at} < ? GROUP BY name, thing)`, q.register, ...c.params, q.since)
+        .all<Read>(`SELECT at, value, amount, name, unit, thing FROM (SELECT ${cols}, max(${at}) AS newest ${from} AND ${at} < ? GROUP BY name, thing)`, q.register, ...c.params, q.since)
         .map(named);
       return ok({ readings, latest });
     },
@@ -6751,8 +6824,40 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * record cannot do this, instead of looking like it is trying.
    */
   /**
-   * The hourly sweep: soft-deleted rows past thirty days, and runs not heard from in twelve hours.
-   * The `purge` schedule row and the `purge` method both run this one function.
+   * A lifecycle event, not about a row: the api's `lifecycle`, and the night's copy kept or failed (`copies.ts`).
+   */
+  function lifecycleEvent(kind: 'export' | 'restore.pitr', actor: string, note: string, to?: string): string {
+    slashMayWrite(actor, kind);
+    const id = mint();
+    sql.exec(
+      'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)',
+      id,
+      instant(clock.now()),
+      actor,
+      kind,
+      to === undefined ? null : jcs(to),
+      note.slice(0, 280),
+    );
+    return id;
+  }
+
+  /**
+   * One close of a handoff (`handoff.ts`) through the write path, as the sweep's `move` is: the move, the fields only
+   * the record writes, and the line's note, signed by whoever closed it. The sweep and `takeHandoff`/`dropHandoff`
+   * all write through this one function, so the three closes are the same `state` event.
+   */
+  function handoffWrite(...[id, c]: Parameters<HandoffWrite>): ReturnType<HandoffWrite> {
+    return writing(SESSION, id, c.state ? { state: c.state } : {}, {
+      actor: c.actor,
+      cascade: false,
+      stamp: c.stamp,
+      ...(c.note === null ? {} : { note: c.note }),
+    });
+  }
+
+  /**
+   * The hourly sweep: soft-deleted rows past thirty days, runs not heard from in twelve hours, and steps nobody took in
+   * thirty days. The `purge` schedule row and the `purge` method both run this one function.
    *
    * A RUN WRITTEN OFF KEEPS ITS LINE IN ITS HISTORY AND IN THE LOG, and no feed shows it (`bookkeeping`): the sweep is
    * the record keeping its books, and its lines were three quarters of the owner's Activity.
@@ -6769,6 +6874,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         (id, to, note) => writing(SESSION, id, { state: to }, { actor: 'system', cascade: false, note }).ok,
       ),
     );
+    /* A STEP NOBODY TOOK IN THIRTY DAYS is closed in the same hour, its words kept on the run (`handoff.ts`). */
+    transaction(() => expireHandoffs(sql, clock.now(), handoffWrite));
     /* A DEVICE GRANT past its time, or silent for fourteen days, is let go in the same hour. */
     transaction(() => deviceSweep(tokenDeps()));
     /* A JOB NOBODY TOOK IN A DAY, OR ONE WHOSE MACHINE STOPPED ANSWERING, is let go in the same hour (`jobs.ts`). */
@@ -8426,6 +8533,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** A vault bearer, checked. INTERNAL. */
     vaultGrant: (bearer: string, validFrom?: string): Promise<Result<VaultGrant>> => vaultGrant({ ...tokenDeps(), validFrom }, bearer),
+    /** A shape bearer, checked and not spent: who approved it and until when. INTERNAL. */
+    shapeGrant: (bearer: string, validFrom?: string): Promise<Result<ShapeGrant>> => shapeGrant({ ...tokenDeps(), validFrom }, bearer),
 
     /** An operation bearer, checked and spent: the one ADMIN method it opens and who approved it. INTERNAL. */
     operationGrant: (bearer: string, validFrom?: string): Promise<Result<OperationGrant>> => operationGrant({ ...tokenDeps(), validFrom }, bearer),
@@ -8995,19 +9104,19 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * NOT ABOUT A ROW, so no target: the record as a whole is what was copied or put back.
      */
     lifecycle(kind: 'export' | 'restore.pitr', actor: string, note: string, to?: string): string {
-      slashMayWrite(actor, kind);
-      const id = mint();
-      sql.exec(
-        'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)',
-        id,
-        instant(clock.now()),
-        actor,
-        kind,
-        to === undefined ? null : jcs(to),
-        note.slice(0, 280),
-      );
-      return id;
+      return lifecycleEvent(kind, actor, note, to);
     },
+
+    /**
+     * The record's copies as three facts (LCH-C03, `copies.ts`): when the last copy was kept and its size, and when
+     * the record was last exported, each `null` before the first. Reads only, from the local `export` events
+     * `lifecycle` writes, so the record's `boot` carries them for Settings.
+     */
+    copyFacts: (): CopyFacts => copyFacts(sql),
+    /** Tonight's copy kept: its `export` event with its name and size, and a failed night's fault cleared. */
+    copyKept: (id: string, bytes: number): void => transaction(() => copyKept(sql, lifecycleEvent, id, bytes, clock.now())),
+    /** Tonight's copy failed: one `export` event whose note begins `failed:`, and one fault, counted again if open. */
+    copyFailed: (why: string): void => transaction(() => copyFailed(sql, lifecycleEvent, why, clock.now())),
 
     /**
      * Install declarations, then rebuild the cache.
@@ -9664,7 +9773,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     signs: (): Result<{ signs: VitalSign[] }> => {
       const barred = schemaRefusal(state);
       if (barred) return barred;
-      return ok({ signs: readSigns(sql, clock.now(), recordTz()) });
+      return ok({ signs: everySign() });
     },
     /**
      * One reading of a sign the record layer or the host owns, filed for today. Refuses an id outside the list and a
@@ -9751,6 +9860,48 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const opener = sql.one<{ opened_by: string }>('SELECT opened_by FROM suggestion WHERE id = ?', id)?.opened_by;
         const mine = token === null || (opener !== undefined && tokenOfRun(sql, opener) === token);
         return withdrawSuggestion(sql, governDeps(), id, mine ? signedBy(w) : `token:${token}`, clock.now());
+      });
+    },
+    /**
+     * The steps left open in a place, newest first, each `next` or `earlier`, the caller's own run (`self`, its id)
+     * left out (`handoff.ts`). Reads only. What a starting session is handed, and what Agents lists.
+     */
+    openHandoffs: (place: HandoffPlace, self: string | null = null): Result<{ handoffs: OpenHandoff[] }> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      return ok({ handoffs: openHandoffs(sql, place ?? {}, self, clock.now()) });
+    },
+    /**
+     * The caller's run picks up the step `left` left (its spoken name, `S12`). Only an agent's key takes, since a step is
+     * work for a run; a person is refused, and so is a key naming a run another key opened. The first of two takers
+     * wins and the second is told who took it and when (`handoff.ts`). Signed as `propose` signs: by the taker's run.
+     * A REFUSAL LEAVES NOTHING BEHIND (`attempt`): not the run opened to sign it, nor a take's first write when its second
+     * failed, which `take`'s own transaction cannot undo from inside this one.
+     */
+    takeHandoff: (w: WriteContext, left: string): Result<Taken> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      const said = typeof left === 'string' ? left.trim() : '';
+      if (said === '') return no('REQUIRED_MISSING', 'Say which step to take, by the run that left it.', { at: 'left' });
+      return attempt(sql, transaction, () => {
+        const taker = runFor(w, 'opened: took a step');
+        if (!taker.ok) return taker;
+        return takeHandoff(sql, { id: taker.value.run.id, spoken: taker.value.spoken }, said, clock.now(), handoffWrite);
+      });
+    },
+    /**
+     * Close the step `left` left without taking it, saying `why` in words (`handoff.ts`). An agent drops a step that is
+     * no longer true, signed by its run as `propose` signs; a person drops one from the app, signed as themselves.
+     */
+    dropHandoff: (w: WriteContext, left: string, why: string): Result<{ left: string; next: string }> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      const said = typeof left === 'string' ? left.trim() : '';
+      if (said === '') return no('REQUIRED_MISSING', 'Say which step to drop, by the run that left it.', { at: 'left' });
+      return attempt(sql, transaction, () => {
+        const theirs = foreignRun<{ left: string; next: string }>(w);
+        if (theirs) return theirs;
+        return dropHandoff(sql, signedBy(w), said, typeof why === 'string' ? why : '', clock.now(), handoffWrite);
       });
     },
     findRun,

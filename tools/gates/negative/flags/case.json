@@ -1,0 +1,7 @@
+{
+  "gate": "flags",
+  "rule": "a flag declared and never read",
+  "expect": "a branch nobody takes",
+  "findings": 1,
+  "why": "ONE, and the fixture holds two flags so the count means something: one declared and never read, one declared and read. A gate that reported both would be counting flags rather than finding dead ones."
+}

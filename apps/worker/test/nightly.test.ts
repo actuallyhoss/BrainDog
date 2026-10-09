@@ -11,8 +11,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { openRecord } from '@braindog/kernel';
 import { createDirectory } from '@braindog/record/directory';
 
+import { NIGHT_FAULT, copyFacts, copyFailed, copyKept } from '../../../packages/kernel/src/copies.ts';
+import { openFaults } from '../../../packages/kernel/src/fault.ts';
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 import { FINAL_KEPT_DAYS, FINAL_KEPT_MS, expireFinal } from '../src/destroy.ts';
 import { ERASE_CHECK_MS, fleetFailure, nightlyWalk, reconcileErase, type EraseRow } from '../src/nightly.ts';
@@ -311,4 +314,69 @@ test('THE NIGHT IS ONE NOTE IN THE OPS RECORD, AND A NOTE THAT FAILS IS A LINE A
   assert.equal(out.backups, 1);
   assert.equal(lines.at(-1)?.fields.note, 'failed');
   assert.equal(lines.at(-1)?.level, 'error');
+});
+
+/**
+ * One record, real, told by the walk the way the object tells it: `kept` and `failed` over the kernel's `copyKept` and
+ * `copyFailed`, as `Record$.nightCopy` wires them. `refuse` is the copy the bucket will not take tonight.
+ */
+async function told(refuse: () => boolean) {
+  const clock = fixedClock(Date.UTC(2026, 9, 9, 3));
+  const sql = openSqlite();
+  const k = await openRecord(sql, clock);
+  const life = (kind: 'export', actor: string, note: string) => k.lifecycle(kind, actor, note);
+  const night = () =>
+    nightlyWalk({
+      records: () => Promise.resolve({ ids: ['rec_0000'] }),
+      snapshot: () => (refuse() ? Promise.reject(new Error('the bucket said no')) : Promise.resolve({ key: 'rec_0000/snapshots/2026-10-09', bytes: 2048, rows: 3 })),
+      kept: (_record, copy) => Promise.resolve(copyKept(sql, life, copy.key.split('/').at(-1)!, copy.bytes, clock.now())),
+      failed: (_record, why) => Promise.resolve(copyFailed(sql, life, why, clock.now())),
+      now: () => clock.now(),
+    });
+  const failedNotes = () => sql.all<{ note: string }>("SELECT note FROM event WHERE kind = 'export' AND note LIKE 'failed:%'").map((r) => r.note);
+  return { clock, sql, night, failedNotes };
+}
+
+test('A FORCED FAILURE LEAVES ONE FAILED NOTE AND ONE FAULT, and the same reason the next night adds no second fault', async () => {
+  // LCH-C03's done-when, on the walk: before, a failed copy was a log line and the record learnt nothing.
+  const { clock, sql, night, failedNotes } = await told(() => true);
+  await night();
+  assert.deepEqual(failedNotes(), ['failed: the bucket said no']);
+  assert.equal(openFaults(sql).length, 1);
+  assert.equal(openFaults(sql)[0]!.cause, NIGHT_FAULT);
+  assert.equal(copyFacts(sql).last_copy_at, null);
+
+  clock.advance(86_400_000);
+  await night();
+  const faults = openFaults(sql);
+  assert.equal(faults.length, 1);
+  assert.equal(faults[0]!.count, 2);
+});
+
+test('A COPY KEPT IS TOLD WITH ITS SIZE, AND IT CLEARS LAST NIGHT\'S FAULT', async () => {
+  let refuse = true;
+  const { clock, sql, night } = await told(() => refuse);
+  await night();
+  refuse = false;
+  clock.advance(86_400_000);
+  const out = await night();
+  assert.equal(out.backups, 1);
+  assert.deepEqual(copyFacts(sql), { last_copy_at: new Date(clock.now()).toISOString(), last_copy_bytes: 2048, last_export_at: null });
+  assert.equal(openFaults(sql).length, 0);
+});
+
+test('A RECORD THAT CANNOT BE TOLD IS A LINE, and the walk carries on', async () => {
+  const { lines, speak } = heard();
+  const out = await nightlyWalk({
+    records: () => Promise.resolve({ ids: ids(2) }),
+    snapshot: () => Promise.reject(new Error('the bucket said no')),
+    failed: (record) => (record === 'rec_0000' ? Promise.reject(new Error('the object is gone')) : Promise.resolve()),
+    speak,
+    now: () => 0,
+  });
+  assert.equal(out.failed, 2);
+  const per = lines.filter((l) => l.fields.op === 'walk');
+  assert.equal(per[0]!.fields.told, false);
+  assert.equal(per[0]!.fields.told_why, 'the object is gone');
+  assert.equal(per[1]!.fields.told, true);
 });

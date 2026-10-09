@@ -58,6 +58,21 @@ test('OPTIONS ARE THE QUESTION’S WORDS FOLDED AND THE OPTION IDS, and need the
   assert.equal(fold('Ça  va, Wren?'), 'ca va wren');
 });
 
+test('OPTIONS ABOUT TWO THINGS, OR PUT TO TWO MEMBERS, ARE TWO QUESTIONS, and the same thing asked again is one', () => {
+  const yes = { options: [{ id: 'yes', label: 'Yes', because: 'x' }, { id: 'no', label: 'No', because: 'y' }] };
+  const ask = (more: Record<string, unknown>) => causeOf('options', { ...yes, ...more }, 'Approve this?');
+  /* Same words and ids: before this both derived one cause, and the second ask was joined away and never filed. */
+  assert.notEqual(ask({ about: 'parts#2' }), ask({ about: 'parts#3' }));
+  assert.notEqual(ask({ to: 'p_wren' }), ask({ to: 'p_sami' }));
+  assert.notEqual(ask({ about: 'parts#2' }), ask({}));
+  assert.notEqual(ask({ about: 'parts#2' }), ask({ to: 'parts#2' }));
+  /* The same thing to the same member, whatever the labels say, still joins. */
+  assert.equal(ask({ about: 'parts#2', to: 'p_wren' }), causeOf('options', { options: [...yes.options].reverse(), about: 'parts#2', to: 'p_wren' }, 'approve THIS'));
+  /* An ask with neither derives the cause it always did, so an open question filed before this is still joined. */
+  assert.equal(ask({}), causeOf('options', yes, 'Approve this?'));
+  assert.match(ask({ about: 'parts#2' })!, /^options#[0-9a-f]{24}$/);
+});
+
 test('THE REST ARE THE WHOLE BODY AS ASKED, and a kind nobody knows derives none', () => {
   assert.equal(causeOf('settings', { pack: 'work', values: { a: 1 } }), causeOf('settings', { values: { a: 1 }, pack: 'work', cause: 'x' }));
   assert.equal(causeOf('query', {}), null);

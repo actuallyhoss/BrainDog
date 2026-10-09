@@ -57,6 +57,7 @@ import { ESTATE_AUTOMATIONS, estateTargetConfig } from './modules/estate.ts';
 import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
 import { ORGANISATIONS, PEOPLE, PEOPLE_AUTOMATIONS, PEOPLE_METRICS, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
 import { RUNS, TASKS, TRACKS, UPDATES, WORK_AUTOMATIONS, WORK_METRICS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
+import { HEALTH_PAGES } from './modules/health.ts';
 
 /* ── registers ────────────────────────────────────────────────────────────── */
 
@@ -169,7 +170,7 @@ export const METRICS: Record<string, SeedMetric> = { ...MONEY_METRICS, ...ESTATE
 
 /* ── the pages it ships with ────────────────────────────────────── */
 
-export const PAGES: Record<string, SeedPage> = { ...MONEY_PAGES, ...ESTATE_PAGES, ...PORTFOLIO_PAGES, ...WORK_PAGES, ...PEOPLE_PAGES };
+export const PAGES: Record<string, SeedPage> = { ...MONEY_PAGES, ...ESTATE_PAGES, ...PORTFOLIO_PAGES, ...WORK_PAGES, ...PEOPLE_PAGES, ...HEALTH_PAGES };
 
 /* ── installing it ────────────────────────────────────────────────────────── */
 

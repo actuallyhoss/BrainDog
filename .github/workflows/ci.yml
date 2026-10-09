@@ -299,6 +299,8 @@ jobs:
       # AND THE LOOK'S OWN TESTS, FOR THE SAME REASON: `tools/look` is no workspace either, so no leg
       # reaches `tools/look/test`, nor the tests beside its files. They build nothing and need no build; by glob, as above.
       - run: node --test tools/look/test/*.test.mjs tools/look/*.test.mjs
+      # AND THE CANARY'S (PRF-A09): `tools/canary` is no workspace either.
+      - run: node --test tools/canary/test/*.test.mjs
       # AND THE WATCH'S (LCH-C01): `tools/watch` is no workspace either, and its test is run by nothing else.
       - run: node --test tools/watch/*.test.mjs
       # AND THE DOOR CHECK'S RUNNER (`tools/door-check`), on every push and not only the nightly.

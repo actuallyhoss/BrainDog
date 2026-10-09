@@ -1,0 +1,7 @@
+{
+  "gate": "orphan-tests",
+  "rule": "a skip that gives no reason",
+  "expect": "which gives no reason",
+  "findings": 1,
+  "why": "A TEST FILE NOTHING RUNS, AND A SKIP THAT GIVES NO REASON: `orphan-tests`' two findings, one fixture each. AND AUDIT 35'S FOUR BLIND SPOTS, each a seed of its own that the gate passed before. `orphan-tests` seeds three names, a test beside its source, a `.spec.ts` and a `-test.mjs`, and keeps a program called `pack-test.ts` as its decoy. `-empty` seeds a helper named as a test that registers none. `-if` seeds a step and a job under `if: false` and a workspace whose script no workflow runs, beside a `--filter`, the root's `pnpm test` and a condition that may be true. Each count is of lines naming `seeded`, so losing any one rule turns its fixture's count wrong."
+}

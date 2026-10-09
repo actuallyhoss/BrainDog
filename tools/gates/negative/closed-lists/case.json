@@ -1,0 +1,7 @@
+{
+  "gate": "closed-lists",
+  "rule": "a closed list wider in the migration than the document",
+  "expect": "the migration admits",
+  "findings": 1,
+  "total": 1
+}

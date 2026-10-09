@@ -361,7 +361,7 @@
 
 </script>
 
-{#snippet healthLine()}{#each health ?? [] as part}{#if part.href}<a href={at(part.href)} data-needs={part.needs ? '' : undefined}>{part.text}</a>{:else if part.needs}<span data-needs>{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
+{#snippet healthLine()}{#each health ?? [] as part}{#if part.href}<a class="tap" href={at(part.href)} data-needs={part.needs ? '' : undefined}>{part.text}</a>{:else if part.needs}<span data-needs>{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
 
 <!-- WHAT CAN BE DONE ABOUT AN OPEN FAULT, under the sentence: Try again on the one it names, and for the owner the whole
      list. A rectangle each; the list is in a tile, and a refusal is the record's own sentence. -->

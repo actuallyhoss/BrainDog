@@ -1,0 +1,6 @@
+{
+  "gate": "css-rules",
+  "rule": "a rule for a class nothing emits",
+  "expect": "rename left the rule behind",
+  "findings": 1
+}

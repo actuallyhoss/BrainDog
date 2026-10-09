@@ -104,7 +104,7 @@ test('A VALUE THAT IS NOT A BUILD IS DROPPED, and the build already kept stays',
   const { sql, deps } = await record();
   const minted = value<{ id: string; bearer: string }>(await createToken(deps, 'p_owner', { scope: 'write', label: 'laptop' }));
   value(await verifyToken(deps, minted.bearer, 'mcp', BUILD));
-  for (const bad of ['', 'latest', '2026.10.09', '2026.10.09+XYZ1234', '2026.10.09+1a2b3c', '/Users/sam/bin', 'host.local', `${BUILD} `, 'bd_live.secret', 'dev+zzzzzzz']) {
+  for (const bad of ['', 'latest', '2026.10.09', '2026.10.09+XYZ1234', '2026.10.09+1a2b3c', '/Users/mara/bin', 'host.local', `${BUILD} `, 'bd_live.secret', 'dev+zzzzzzz']) {
     assert.equal(isBuild(bad), false, `${JSON.stringify(bad)} read as a build`);
     value(await verifyToken(deps, minted.bearer, 'mcp', bad));
     assert.equal(stored(sql, minted.id)?.last_build, BUILD, `${JSON.stringify(bad)} replaced the build`);

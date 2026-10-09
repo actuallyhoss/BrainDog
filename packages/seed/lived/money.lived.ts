@@ -35,6 +35,7 @@ export type LivedApi = {
   installPack(args: { doc: unknown; source: { kind: 'local' }; planHash: string; approve?: readonly string[] }, as: As): Promise<Said>;
   setPackConfig(args: { id: string; values: Record<string, unknown> }, as: As): Promise<Said>;
   create(args: { register: string; fields: Record<string, unknown> }, as: As): Promise<Said>;
+  update(args: { register: string; seq: number; patch: Record<string, unknown> }, as: As): Promise<Said>;
   metric(args: { metric: string }, as: As): Promise<Said>;
 };
 
@@ -77,6 +78,73 @@ const SIGNS_FRESH: Read[] = [
   { figure: 'ledger-newest-days', want: 'nothing: there is no row to be old', holds: (v) => v === null },
   { figure: 'uncategorised-share-30d', want: 'nothing or 0: there is no row to lack a category', holds: nothingYet },
   { figure: 'currencies-held', want: '2: the accounts are kept in pounds and dollars', holds: is(2) },
+  { figure: 'statement-oldest-days', want: '0: both balances were stated today', holds: is(0) },
+  { figure: 'nights-missed-30d', want: 'nothing: the cash line has kept no night yet', holds: (v) => v === null },
+];
+
+/** The day `days` from the record's today, as `2026-09-03`. */
+const dayFrom = (today: string, days: number): string => new Date(Date.parse(`${today}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+/** The Egyptian account each record's later steps file against, kept by the step that adds it. */
+const egpAccount = new WeakMap<Lived, string>();
+const accountOf = (lived: Lived): string => {
+  const id = egpAccount.get(lived);
+  if (id === undefined) throw new Error('Money, lived, has no account in Egyptian pounds yet: add it first');
+  return id;
+};
+/** A row the record kept, as its write answers it. */
+type Kept = { id: string; seq: number; fields: Record<string, unknown> };
+
+/**
+ * A BALANCE'S AGE IS THE BANK'S LAST WORD, AND A ROW'S CURRENCY IS ITS ACCOUNT'S (REC-B03, REC-B04, money-core 3.16.0).
+ * An account typed thirty days ago is named old; a bank message that prints its balance after a movement makes it
+ * today's without touching the typed day. A Ledger amount written with no code takes the account's, and a row's code
+ * never changes once kept.
+ */
+const AGES_AND_CURRENCY: Step[] = [
+  {
+    say: 'add an account in Egyptian pounds, last typed thirty days ago',
+    act: async (lived) => {
+      const fields = { name: 'Cairo account', kind: 'bank', liquid: true, balance: { amount: 1_000_000, currency: 'EGP' }, as_of: dayFrom(lived.today, -30) };
+      egpAccount.set(lived, (said(await lived.api.create({ register: 'accounts', fields }, lived.as), 'add an account in Egyptian pounds') as Kept).id);
+    },
+    reads: [
+      { figure: 'balances-stale', want: '1: the Cairo account was last confirmed a month ago', holds: is(1) },
+      { figure: 'statement-oldest-days', want: '30: the oldest balance is a month old', holds: is(30) },
+    ],
+  },
+  {
+    say: 'file a bank message that prints the balance after a payment',
+    act: async (lived) => {
+      const fields = { on: lived.today, what: 'Card payment', direction: 'out', amount: { amount: 5_000, currency: 'EGP' }, balance_after: { amount: 995_000, currency: 'EGP' }, account: accountOf(lived), state: 'cleared' };
+      said(await lived.api.create({ register: 'transactions', fields }, lived.as), 'file a bank message');
+    },
+    reads: [
+      { figure: 'balances-stale', want: '0: the bank said the Cairo balance today', holds: is(0) },
+      { figure: 'statement-oldest-days', want: '0: every balance was confirmed today', holds: is(0) },
+    ],
+  },
+  {
+    say: 'write a payment with an amount and no currency',
+    act: async (lived) => {
+      const fields = { on: lived.today, what: 'Groceries', direction: 'out', amount: { amount: 97_999 }, account: accountOf(lived), state: 'cleared' };
+      const kept = said(await lived.api.create({ register: 'transactions', fields }, lived.as), 'write a payment with no currency') as Kept;
+      const amount = kept.fields.amount as { currency?: string } | undefined;
+      if (amount?.currency !== 'EGP') throw new Error(`Money, lived, kept a payment with no currency in ${amount?.currency ?? 'none'}, not the account's Egyptian pounds`);
+    },
+    reads: [{ figure: 'ledger-rows-7d', want: '2: the bank message and the payment', holds: is(2) }],
+  },
+  {
+    say: "write a payment in dollars, then try to change it to Egyptian pounds",
+    act: async (lived) => {
+      const fields = { on: lived.today, what: 'Software', direction: 'out', amount: { amount: 2_000, currency: 'USD' }, account: accountOf(lived), state: 'cleared' };
+      const kept = said(await lived.api.create({ register: 'transactions', fields }, lived.as), 'write a payment in dollars') as Kept;
+      if ((kept.fields.amount as { currency?: string }).currency !== 'USD') throw new Error('Money, lived, did not keep a payment in dollars as written');
+      const moved = await lived.api.update({ register: 'transactions', seq: kept.seq, patch: { amount: { amount: 2_000, currency: 'EGP' } } }, lived.as);
+      if (moved.ok || moved.refusal?.code !== 'CURRENCY_FIXED') throw new Error(`Money, lived, let a payment change its currency (${moved.ok ? 'kept' : moved.refusal?.code})`);
+    },
+    reads: [{ figure: 'ledger-rows-7d', want: '3: the dollar payment is kept beside the other two', holds: is(3) }],
+  },
 ];
 
 export const MONEY_LIVED: Step[] = [
@@ -106,6 +174,7 @@ export const MONEY_LIVED: Step[] = [
     reads: [{ figure: 'currencies-held', want: '2: pounds and dollars', holds: is(2) }],
   },
   { say: 'read the signs', act: async () => {}, reads: SIGNS_FRESH },
+  ...AGES_AND_CURRENCY,
 ];
 
 /** Every step in order, and every figure read after each, as heard. */

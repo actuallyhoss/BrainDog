@@ -414,6 +414,23 @@ export async function movedSince(cwd: string, from: string | null, head: string 
 }
 
 /**
+ * THE RECORD'S CARD, DRAWN AGAIN WITH THE COMMITS SINCE THE HANDOFF (AGT-B07). The attach answers before anything here
+ * knows which commit the handoff named, so when the record drew a card and HEAD has moved since that commit, the
+ * context is read once more with `x-braindog-ahead` and its Next line can say "12 commits since". It is a read and not an
+ * attach, so it opens nothing; one that fails, runs out of time or comes back without a card leaves the attach's card.
+ * A host that draws no card is not asked again, because this command composes that card and counts the commits itself.
+ */
+export async function aheadCard(c: Context | undefined, moved: Moved, read: () => Promise<Awaited<ReturnType<Client['context']>>>): Promise<Context | undefined> {
+  if (c === undefined || cardOf(c) === null || typeof moved !== 'number' || moved < 1) return c;
+  try {
+    const again = await read();
+    return again.ok && cardOf(again.value) !== null ? again.value : c;
+  } catch {
+    return c;
+  }
+}
+
+/**
  * SessionStart: attach to the run, keep the session file, and say as much of the card as the session lacks.
  *
  * BY CLAUDE CODE'S `source`, because each one leaves the model holding something different:
@@ -507,21 +524,26 @@ export async function hookStart(io: Io): Promise<void> {
     if (soon && before.host === to.key && before.spoken === run.spoken) return;
 
     const moved = await movedSince(event.cwd, run.context?.handoff?.head ?? null, at.head);
+    const named = { spoken: run.spoken, ...mine };
+    const left = () => Math.max(1, Math.min(NAME_MS, began + ms - Date.now()));
+    const told = await aheadCard(run.context, moved, () =>
+      clientFor(to, async () => sessionHeaders(at, 'claude', named, { env: io.env, parent, ahead: moved }), AbortSignal.timeout(left())).context(),
+    );
+    const shown = told === undefined || told === run.context ? run : { ...run, context: told };
     if (event.source === 'compact') {
-      const line = nextLine(run, moved);
+      const line = nextLine(shown, moved);
       if (line !== null) io.write(line);
       return;
     }
-    const named = { spoken: run.spoken, ...mine };
     /* Only a session that begins syncs: a compaction or a clear is the same session going on (plan §4.3 step 6). */
     const [more, decides] = await Promise.all([
       run.context !== undefined && (event.source === 'startup' || event.source === 'resume') ? startWork(io, to, at, run.context, named, began + ms) : [],
       asksWaiting(run.context)
-        ? whoDecides(clientFor(to, async () => sessionHeaders(at, 'claude', named, { env: io.env }), AbortSignal.timeout(Math.max(1, Math.min(NAME_MS, began + ms - Date.now())))))
+        ? whoDecides(clientFor(to, async () => sessionHeaders(at, 'claude', named, { env: io.env }), AbortSignal.timeout(left())))
         : null,
     ]);
     const where: Where = { repo: at.repo, host: at.host, device, agent: 'Claude Code' };
-    io.write(briefing(run, where, moved, { more, ...decides }));
+    io.write(briefing(shown, where, moved, { more, ...decides }));
   } finally {
     /* THE HOOK'S OWN TIME, from the process's start to the card printed, kept for the next hook of this session to send
        beside the call it makes anyway (`owedMark`). Written last, so it counts the sync, the scan and the card. */

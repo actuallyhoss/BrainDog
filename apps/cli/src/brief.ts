@@ -215,9 +215,13 @@ export const firstLine = (run: string, place: string, at: Where): string => ['Br
  * slot's label is the card's own layout, and stays.
  */
 export function cardOf(c: Context | undefined): string[] | null {
-  const card = c === undefined ? undefined : (c as { card?: unknown }).card;
-  if (typeof card !== 'string' || !card.trim()) return null;
-  const lines = card
+  return scrubbed(c === undefined ? undefined : (c as { card?: unknown }).card);
+}
+
+/** A text the record drew, as lines with every control and format character gone and a slot's layout kept; else `null`. */
+function scrubbed(text: unknown): string[] | null {
+  if (typeof text !== 'string' || !text.trim()) return null;
+  const lines = text
     .split(/\r?\n/u)
     .map((line) => {
       const slot = /^(\S+)( {2,})(\S.*)$/u.exec(line);
@@ -486,11 +490,18 @@ export function briefing(attached: Attached, at: Where, moved: Moved, o: Pick<Ca
 /**
  * The Next line alone, for a session that just compacted: the step it is on, without what it already read. `null` when
  * there is no step, and then the hook prints nothing.
+ *
+ * THE RECORD'S `card_next` WHEN IT DREW A CARD (AGT-B07): its Next line alone, scrubbed as the card is, and `null` from
+ * it means there is no step. Only a record that drew a card without one has its card's Next line looked for.
  */
 export function nextLine(attached: Attached, moved: Moved): string | null {
   const c = attached.context;
   const card = cardOf(c);
   if (card) {
+    const said = (c as { card_next?: unknown }).card_next;
+    if (said === null) return null;
+    const next = scrubbed(said);
+    if (next) return fitLines(next);
     const line = card.find((l) => /^Next\s/u.test(l));
     return line === undefined ? null : cutLine(line, MAX_CHARS);
   }

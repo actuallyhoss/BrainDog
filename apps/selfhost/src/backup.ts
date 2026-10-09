@@ -21,6 +21,7 @@
 import { chmodSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { copyFailed, copyKept } from '@braindog/kernel';
 import type { Sql } from '@braindog/ports';
 
 import { fileSnapshots, isNightly, KEEP } from './snapshots.ts';
@@ -62,7 +63,7 @@ export function nightlyBackups(o: {
   at?: string;
   /** How often to ask. `0` never asks on its own; `check` still works. */
   tickMs?: number;
-  /** The log line, `export`, as a copy from the app writes it. */
+  /** The log line, `export`, as a copy from the app writes it, or `failed: <reason>` for a night that did not copy. */
   logged?: (note: string) => void;
   say?: (line: string) => void;
   /** The Directory, through the connection the server holds, and its file; copies go in `directory-snapshots/` beside it. */
@@ -72,6 +73,20 @@ export function nightlyBackups(o: {
   if (minutes === null) throw new Error(`${String(o.at)} is not a time of day. Write it as HH:MM in UTC, such as 03:20, or off.`);
   const copies = fileSnapshots(o.sql, o.file, o.now);
   let busy = false;
+  /* THE SAME EVENT AND THE SAME FACTS AS THE CLOUD'S (LCH-C03, RQ-LCH-273): a copy kept is `snapshot <id> <bytes> bytes`,
+     a copy that failed is `failed: <reason>` and one fault, through the kernel's `copyKept` and `copyFailed`, so Settings
+     reads a self-host's copies with the same `copyFacts`. */
+  const lifecycle = (_kind: 'export', _actor: string, note: string): void => o.logged?.(note);
+  /* ONE FAILED NOTE A NIGHT, NOT ONE EVERY TEN MINUTES. A copy that cannot be written is tried again on every tick until
+     the next one falls due, and the night it failed is one night: a note already written since it fell due is enough,
+     and the fault it raised is still open. */
+  const told = (why: string, since: string): void => {
+    const already = o.sql.one<{ n: number }>(
+      "SELECT count(*) AS n FROM event WHERE target IS NULL AND kind = 'export' AND note LIKE 'failed:%' AND ts >= ?",
+      since,
+    );
+    if (Number(already?.n ?? 0) === 0) copyFailed(o.sql, lifecycle, why, o.now());
+  };
 
   const check = async (): Promise<string | null> => {
     if (busy) return null;
@@ -81,8 +96,11 @@ export function nightlyBackups(o: {
       const kept = await copies.list();
       let taken: string | null = null;
       if (!kept.some((c) => isNightly(c.id) && c.at >= since)) {
-        const copy = await copies.take('nightly');
-        o.logged?.(`snapshot ${copy.id} ${String(copy.bytes)} bytes`);
+        const copy = await copies.take('nightly').catch((e: unknown) => {
+          told(e instanceof Error ? e.message : String(e), since);
+          throw e;
+        });
+        copyKept(o.sql, lifecycle, copy.id, copy.bytes, o.now());
         o.say?.(`braindog · nightly copy ${copy.id} · ${String(copy.bytes)} bytes`);
         taken = copy.id;
       }

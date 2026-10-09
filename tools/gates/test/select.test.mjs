@@ -36,7 +36,8 @@ const listed = (args) => {
 };
 
 /** Which needs a web build meets, as `NEEDS` in `run.mjs` says. A need added there is added here. */
-const MET_BY_A_BUILD = { 'web-build': true, builds: true, host: false };
+/* `proof` IS A LIVE PROOF RECORD (`rule-sheet`), which no build meets, as `host` is a live host. */
+const MET_BY_A_BUILD = { 'web-build': true, builds: true, host: false, proof: false };
 
 /** A gate's declared needs, read from its file the way the runner reads a script's. */
 function needsOf(name) {
@@ -46,7 +47,7 @@ function needsOf(name) {
   return m === null ? [] : [...m[1].matchAll(/'([a-z-]+)'/gu)].map((n) => n[1]);
 }
 
-test('each selection is exactly the gates whose needs match, and together they are every gate but the live-host ones', () => {
+test('each selection is exactly the gates whose needs match, and together they are every gate but the live-host and proof ones', () => {
   const all = listed([]);
   const unbuilt = listed(['--unbuilt']);
   const built = listed(['--built']);
@@ -58,7 +59,7 @@ test('each selection is exactly the gates whose needs match, and together they a
   assert.deepEqual(built, wantBuilt);
   assert.deepEqual(unbuilt.filter((name) => built.includes(name)), [], 'a gate is in both jobs');
   const neither = all.filter((name) => !unbuilt.includes(name) && !built.includes(name));
-  for (const name of neither) assert.ok(needsOf(name).includes('host'), `${name} is in neither job and needs no live host`);
+  for (const name of neither) assert.ok(needsOf(name).some((n) => n === 'host' || n === 'proof'), `${name} is in neither job and needs no live host or proof record`);
   assert.deepEqual(listed(['--unbuilt', '--built']), all.filter((name) => !neither.includes(name)));
 });
 

@@ -17,7 +17,7 @@ import { createRecordApi } from '@braindog/record';
 import { ASK_CAP_DEFAULT, ASK_CAP_FREE } from '@braindog/slash';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
-import { PLAN_ASK_CAP, slashPlanMoved, workerSlashDoor } from '../src/slash.ts';
+import { PLAN_AGENTS, PLAN_ASK_CAP, slashPlanMoved, workerSlashDoor } from '../src/slash.ts';
 
 const OWNER = { principal: { kind: 'person' as const, id: 'p_owner', level: 'owner' as const } };
 const T0 = Date.UTC(2026, 9, 2, 9);
@@ -137,4 +137,21 @@ test('ON A WORKER WITH NO INCLUDED MODEL THE FIRST RUN WAITS FOR HIS OWN KEY, in
   assert.equal((await engine.proposeMapping({}, OWNER)).refusal?.code, 'NOT_IN_THIS_BUILD');
   sql.close();
   own.close();
+});
+
+test("THE PLAN MOVES THE COUNT OF AGENT KEYS, whether or not Slash was ever asked, and a self-host has none", async () => {
+  /* A MIGRATED RECORD WITH NO SLASH STORE, as most are: the count is written all the same (`planAgents`), because the
+     first key is minted long before anybody asks Slash anything. */
+  const sql = openSqlite();
+  await createRecordApi({ sql, clock: fixedClock(T0) });
+  const held = (): string | null => sql.one<{ value: string }>('SELECT value FROM host_meta WHERE key = ?', PLAN_AGENTS)?.value ?? null;
+  await slashPlanMoved(sql, 'free');
+  assert.equal(held(), JSON.stringify({ agents: 3, plan: 'Free', next: 'Cloud' }));
+  await slashPlanMoved(sql, 'hosted');
+  assert.equal(held(), JSON.stringify({ agents: 15, plan: 'Cloud', next: 'Cloud Plus' }));
+  await slashPlanMoved(sql, 'plus');
+  assert.equal(held(), JSON.stringify({ agents: 75, plan: 'Cloud Plus', next: null }));
+  await slashPlanMoved(sql, 'selfhost');
+  assert.equal(held(), null, 'a self-host keeps no count');
+  sql.close();
 });

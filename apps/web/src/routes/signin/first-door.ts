@@ -16,7 +16,7 @@
  *
  * THE SENTENCES ARE HERE AND THEY BELONG IN `lib/copy.ts`. `50 §3` puts every sentence in one file so
  * the no-over-explaining rule is reviewable in one pass, and `tools/gates/dead-copy.mjs` reads that
- * file and `lib/first-run.ts` and no other. This run could not write either of them. Moving these two
+ * file and `lib/first-run.ts` and no other. This run could not write either of them. Moving these three
  * keys into `copy.ts` is the repair, and nothing else has to change with them.
  */
 
@@ -52,7 +52,19 @@ export const actable = (ways: Ways | null): Ways | null => (ways && (ways.passke
  * for by pressing the button. `out` is the one note that means a person was here a moment ago.
  */
 export const noDoorYet = (it: Methods, ways: Ways | null, note: Note): boolean =>
-  it.me === null && it.firstRun === true && ways === null && note !== 'out';
+  it.me === null && it.firstRun === true && it.magic !== 'down' && ways === null && note !== 'out';
+
+/**
+ * Whether the record's way in is a letter and the letter cannot go: a first run with no passkey, on a host whose mail is
+ * down (audit 36-37, finding 8).
+ *
+ * NOT `noDoorYet`, AND THAT WAS THE DEAD END. `waysOf` counts `magic: 'down'` as no way, so a stranger who had just
+ * signed up got the same empty `Ways` as a record nobody has claimed, and read "Open the link you were given when the
+ * record was set up". Nobody gave him a link: his way in is the letter, and what is true is that mail is not going out.
+ * The page swallows the browser note here for the reason it does under `noDoorYet`, and prints `firstDoor.mailDown`.
+ */
+export const mailHeld = (it: Methods, ways: Ways | null, note: Note): boolean =>
+  it.me === null && it.firstRun === true && it.magic === 'down' && ways === null && note !== 'out';
 
 /* THE DEMO PILL IS GONE, AND SO IS THE REASON IT WAS KEPT. The second finding on this screen was that
  * the pill never read `methods.demo`, and measuring showed it did not need to: a 401 at the bare `/app`
@@ -62,10 +74,12 @@ export const noDoorYet = (it: Methods, ways: Ways | null, note: Note): boolean =
  * on the first run the claim link sentence is the one way in there is. `methods.demo` went with it.
  */
 
-/** The two sentences for `noDoorYet`. See the header: these belong in `lib/copy.ts`. */
+/** The sentences for `noDoorYet` and `mailHeld`. See the header: these belong in `lib/copy.ts`. */
 export const firstDoor = {
   title: 'This record has no passkey yet.',
   /* WHAT HE CAN DO, AND IT IS THE ONLY THING HE CAN DO. The claim link is handed to whoever
      provisioned the record and is never mailed (`33 §4`), so it is in a terminal and not an inbox. */
   why: 'Open the link you were given when the record was set up. You can add a passkey once you are in.',
+  /* FOR `mailHeld`, IN PLACE OF `copy.mailDown`, which says "Use a passkey" to somebody who has none yet. */
+  mailDown: 'Mail is not going out right now, so your sign-in link cannot be sent. Try again in a few minutes.',
 } as const;

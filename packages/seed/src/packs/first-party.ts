@@ -429,14 +429,31 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   seven days, with a target of at least one so a Ledger that stopped reads as missing its mark (REC-B01 job 3,
  *   `modules/money/figures/signs.ts`). The other three signs the unit names wait for words the kernel does not read yet,
  *   and come in a later step. One figure added, no list or field, so a minor step that reaches a record on its own.
- * - money-core 3.16.0: three more signs, once the kernel reads their words (`age`, `currencies`, `empty`):
- *   `ledger-newest-days`, `currencies-held` and `uncategorised-share-30d` (REC-B01 jobs 2 and 3,
- *   `modules/money/figures/signs.ts`). Three figures added, no list or field, so a minor step that reaches a record on its
- *   own. `nights-missed-30d` waits on a series naming its figure's lists.
+ * - people 3.3.0: Health, a page of the record's vital signs (PRF-A05 job 5, modules/health.ts): one line from signs-red,
+ *   then the signs by state, Needs a look first, and a sign with nothing to read under Not read yet, never Alive. It reads
+ *   the kernel's signs source and two built-in figures and no list, so it leans on nothing. A page added, nothing taken
+ *   away, so a minor step that reaches a record on its own and asks no question.
+ * - money-core 3.16.0, ONE UNRELEASED STEP, everything since 3.15.0 folded into it. Three more signs, once the kernel reads
+ *   their words (`age`, `currencies`, `empty`): `ledger-newest-days`, `currencies-held` and `uncategorised-share-30d`
+ *   (REC-B01 jobs 2 and 3, `modules/money/figures/signs.ts`), and two more: `statement-oldest-days`, the age of the
+ *   oldest balance (`rolled.read: age`, REC-B03), and `nights-missed-30d`, the nights the cash line kept no point, once a
+ *   kept line names the lists its figure reads. Paydays (REC-B13): a repeating line gains `day_of_month` (a day 1 to 31,
+ *   last, or two, '15, last', labelled "Days of the month") and `weekend` (leave, before, after; default leave), Money
+ *   gains `rest_days` (Saturday and Sunday), and the repeating leg names both fields so the walk uses them. A balance's
+ *   age is what the bank last said (REC-B03): `cash-as-of` and `balances-stale` read the roll's own day (`rolled.read:
+ *   as_of`, `read: stale`) where they read the typed "As of" a bank message never writes; `account-ages` dates each
+ *   account by its newest statement, which a book's Accounts cards and Money's Last confirmed tile inside Heads up read
+ *   through `stale: { figure }` (`modules/money/pages/parts/ages.ts`); and `rule.cash-stale`, a note each time a typed
+ *   day passed a week, goes. A row's currency comes from its account and stays (REC-B04): the Ledger's `amount` declares
+ *   `currency_from: account.balance` and `currency_fixed`, and its `available` and `balance_after`, a balance check's
+ *   `balance`, an instalment's `amount` and a repeating line's `amount` declare `currency_from`, so an amount sent with
+ *   no code takes its account's. Figures, fields and a setting added and a rule taken away, nothing another pack reads,
+ *   so a minor step. NOT A QUIET ONE: a rule taken away is a loss (`packs/quiet.ts`), so a record on 3.15.0 or before is
+ *   asked once in Decide ("take away Cash stale") and gets none of this until it says yes.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.15.0',
-  people: '3.2.0',
+  people: '3.3.0',
   'money-core': '3.16.0',
   estate: '2.1.0',
   work: '1.17.0',

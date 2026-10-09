@@ -1,0 +1,7 @@
+{
+  "gate": "router-groups",
+  "rule": "an INTERNAL method routed from a routes file",
+  "expect": "INTERNAL is the host's own surface|puts it in INTERNAL",
+  "findings": 2,
+  "why": "AND AN INTERNAL METHOD ROUTED FROM A FILE UNDER `routes/`, which a gate reading only `index.ts` never sees."
+}

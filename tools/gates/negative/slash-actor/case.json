@@ -1,0 +1,8 @@
+{
+  "gate": "slash-actor",
+  "rule": "a writer that bypasses Slash's one check",
+  "expect": "slash wrote \\w+, in the seed record",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE BYPASS, AND THE FIXTURE'S KERNEL IS OTHERWISE HONEST: three of its four writers call `slashMayWrite`, and the fourth appends the event itself. That is `slash.ts`'s own \"a sixth writer would be a sixth call\" written as a tree. One finding, because the other three still refuse and the query returns exactly the row the bypass wrote.\n\nAND ONE IN TOTAL, WHICH IT WAS NOT. From September 11th (`d92523ec`) to the 25th this fixture's `log` took a bare actor where the gate passes `{ actor }`, so the note offer died in SQLite and the gate printed a second finding, a crash, on every run. This case stayed green through it, because one line still named the bypass. `total` makes that second line a failure."
+}

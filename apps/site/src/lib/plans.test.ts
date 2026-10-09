@@ -1,8 +1,10 @@
 /**
  * The plans the site prices, held to the code that sells them and the code that meters them.
  *
- * WHY THIS TEST. `plans.ts` is where the owner changes a price or an
- * allowance, and three other files act on the same figures: the checkout sells `HOSTED_PLANS` and makes Free as
+ * WHY THIS TEST. Every figure of a plan is `PLAN_TABLE`'s (`packages/record/src/plans.ts`, LCH-A08), and `plans.ts`
+ * holds its three sold rows as `TABLE` until the site declares `@braindog/record`. The first check is every field of
+ * every row against the table, with a planted fault beside it so the comparison is seen to fail. Three other files
+ * act on the same figures: the checkout sells `HOSTED_PLANS` and makes Free as
  * `FREE_PLAN` in `apps/worker/src/billing.ts`, the Directory holds a record to `ALLOWANCE` in
  * `packages/record/src/directory.ts`, and Slash starts a record at `ASK_CAP_DEFAULT` (Free's at `ASK_CAP_FREE`) in
  * `packages/slash/src/types.ts`. A figure moved in one and not the others is a page that promises
@@ -18,7 +20,7 @@ import assert from 'node:assert/strict';
 
 import { site } from './copy.ts';
 import { home } from './copy/home.ts';
-import { PACKS, PAID, PLANS, type Allowance } from './plans.ts';
+import { PACKS, PAID, PLANS, TABLE, type Allowance } from './plans.ts';
 
 const REPO = new URL('../../../../', import.meta.url);
 
@@ -38,11 +40,44 @@ const { ASK_CAP_DEFAULT, ASK_CAP_FREE } = (await import(new URL('packages/slash/
   ASK_CAP_FREE: number;
 };
 
+const { PLAN_TABLE, tableDiffers } = (await import(new URL('packages/record/src/plans.ts', REPO).href)) as {
+  PLAN_TABLE: { [plan: string]: { agents: number | null; credits: number | null } };
+  tableDiffers: (copy: Readonly<Record<string, unknown>>, table?: Readonly<Record<string, unknown>>) => string[];
+};
+
+/** The table's rows the site sells or gives away: a self-host is no card on the pricing page. */
+const sold = { free: PLAN_TABLE.free, hosted: PLAN_TABLE.hosted, plus: PLAN_TABLE.plus };
+
 const HOUR_MS = 3_600_000;
 const GB = 1_000_000_000;
 
 /** The Directory plan each of the site's plans is metered under, from billing.ts. */
 const meteredAs = (id: string): string => (id === 'free' ? FREE_PLAN.directory : (HOSTED_PLANS[id]?.directory ?? ''));
+
+test("every field of every plan the site draws is PLAN_TABLE's", () => {
+  assert.deepEqual(tableDiffers(TABLE, sold), [], 'apps/site/src/lib/plans.ts says a figure packages/record/src/plans.ts does not');
+});
+
+test('a figure moved in the site\'s copy of the table fails, naming the plan and the meter', () => {
+  /* THE PLANTED FAULT: the roadmap's old 60,000 runs on Cloud Plus, the very figure LCH-A08 found in two places. */
+  const moved = structuredClone(TABLE);
+  moved.plus.allowance.runs = 60_000;
+  assert.deepEqual(tableDiffers(moved, sold), ['plus.allowance.runs: is 60000, the table says 75000']);
+  const agents = structuredClone(TABLE);
+  agents.free.agents = 4;
+  assert.deepEqual(tableDiffers(agents, sold), ['free.agents: is 4, the table says 3']);
+});
+
+test("each card's agents and credits are its row's in PLAN_TABLE", () => {
+  const row = { free: 'free', cloud: 'hosted', plus: 'plus' } as const;
+  for (const plan of PLANS) {
+    const held = PLAN_TABLE[row[plan.id]]!;
+    assert.equal(plan.allowance.agents, held.agents, `${plan.name}: the site says ${plan.allowance.agents} agents, the table holds ${held.agents}`);
+    assert.equal(plan.allowance.credits, held.credits, `${plan.name}: the site says ${plan.allowance.credits} credits, the table holds ${held.credits}`);
+    const line = site.pricing.plans[plan.id].points.find((p) => /agents/.test(p));
+    assert.ok(line?.includes(String(held.agents)), `${plan.name}'s card says no "${held.agents} agents" line`);
+  }
+});
 
 test('Free is the first plan, and the site sells nothing for it', () => {
   assert.equal(PLANS[0]?.id, 'free', 'plans.ts draws a paid plan before Free, and Free leads (DIRECTION §35)');

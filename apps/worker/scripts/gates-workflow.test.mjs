@@ -131,7 +131,8 @@ test('a push to master runs layout and a11y alone, and every other trigger runs 
   const fullRun = /- if: github\.event_name != 'push'\n\s+run: (.+)/.exec(code);
   assert.ok(pushRun && fullRun, 'gates.yml does not split the push run from the full run');
   assert.equal(pushRun[1], 'pnpm gates -- --only layout,a11y --shard ${{ matrix.part }}/${{ strategy.job-total }}');
-  assert.equal(fullRun[1], 'pnpm gates -- --allow-skip deploy-parity --shard ${{ matrix.part }}/${{ strategy.job-total }}');
+  /* AND rule-sheet, WHICH READS A PROOF RECORD THE INTERNET SERVES, as deploy-parity reads the live host (batch 40). */
+  assert.equal(fullRun[1], 'pnpm gates -- --allow-skip deploy-parity,rule-sheet --shard ${{ matrix.part }}/${{ strategy.job-total }}');
 
   const build = code.indexOf('pnpm --filter @braindog/web build');
   const site = code.indexOf('pnpm --filter @braindog/site build');

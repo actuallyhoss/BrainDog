@@ -238,7 +238,6 @@ export const ALLOWED = {
   'packages/kernel/src/people.ts': 4,
   'packages/kernel/src/scope.ts': 1,
   'packages/kernel/src/session.ts': 2,
-  'packages/kernel/src/signs-flow.ts': 1,
   'packages/kernel/src/undo.ts': 1,
   'packages/kernel/test/change-kind.test.ts': 3,
   'packages/kernel/test/entities.test.ts': 8,

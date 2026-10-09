@@ -1,0 +1,7 @@
+{
+  "gate": "stack",
+  "rule": "a regular expression under packages/extract",
+  "expect": "compiles nothing",
+  "findings": 2,
+  "why": "THE ONE SCOPED RULE, AND BOTH HALVES OF IT. `43 §8` bans regular expressions under `packages/extract` and nowhere else, so the fixture seeds three: a literal and a constructor inside that package, which must be named, and a literal in another package, which must not. Two findings rather than three is the assertion: a count of three would mean the gate had quietly become a repository-wide ban, and a count of one would mean it knew the slash form and not `new RegExp(source)`, which is the spelling somebody reaches for next."
+}

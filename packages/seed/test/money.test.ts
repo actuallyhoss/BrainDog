@@ -700,6 +700,10 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
        each a note with no heading of its own under one boxed section. */
     'Heads up',
     undefined,
+    /* SINCE money-core 3.16.0, under the old balance's line: which account, by its last confirmed day, and the box to
+       say what one holds today. */
+    'Last confirmed',
+    'What it holds today',
     undefined,
     undefined,
     /* WHAT COMES IN AND GOES OUT IS OPEN, ONE TILE, SINCE money-core 3.11.0, and what already happened is folded under

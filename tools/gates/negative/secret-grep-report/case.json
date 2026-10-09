@@ -1,0 +1,7 @@
+{
+  "gate": "secret-grep",
+  "rule": "a report key's answer in a log",
+  "expect": "a report key or an opened action key reaches a log",
+  "findings": 1,
+  "why": "THE SEVENTH, EIGHTH AND NINTH: the two keys September 17th added, which no name above matched. A report key's answer logged whole beside its id logged alone; an opened action key under a name on no list, beside a sentence that says \"opened\"; and `secret` in an error message, beside a bearer handed to `digest(`. One finding each proves the gate follows where the value came from and reads code, not prose."
+}

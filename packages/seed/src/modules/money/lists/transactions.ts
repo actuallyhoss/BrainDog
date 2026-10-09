@@ -120,8 +120,18 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
       index: true,
       required: true,
     },
-    { id: 'amount', type: 'money', required: true },
-    { ...AVAILABLE },
+    /**
+     * A ROW'S CURRENCY COMES FROM ITS ACCOUNT, AND STAYS, SINCE money-core 3.16.0 (REC-B04). "`currency` from the
+     * account" and "a transaction's currency" among the things that never change (the owner's words). An amount written
+     * with no code takes the code of its account's balance (`currency_from`), so a bank text or an agent that sends
+     * 97999 on an account kept in EGP files EGP 979.99, and an account with no balance to give refuses it in one
+     * sentence. An amount sent with its own code is kept as written. Once held, the code is never changed by a write
+     * (`currency_fixed`, refused as `CURRENCY_FIXED`): a row in the wrong currency is deleted and added again.
+     */
+    { id: 'amount', type: 'money', required: true, currency_from: 'account.balance', currency_fixed: true },
+    /* WHAT THE BANK SAID WAS LEFT, AND THE BALANCE AFTER BELOW, TAKE THE ACCOUNT'S CODE when none is printed, as the
+       amount does, but may be corrected: neither is the row's own money. */
+    { ...AVAILABLE, currency_from: 'account.balance' },
     /**
      * WHAT THE BANK SAID THE ACCOUNT HELD AFTER THIS MOVED, SINCE money-core 3.0.0: the balance a statement line or a
      * bank message prints beside a movement. Not `available`, which is a card's limit left, not what an account holds.
@@ -130,7 +140,7 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
      * it held, and a movement that says the balance after it is one of those statements, so a bank pack that reads it
      * keeps the figure true without anybody typing a balance. Optional, because most ways a row arrives never say.
      */
-    { id: 'balance_after', label: 'Balance after', type: 'money' },
+    { id: 'balance_after', label: 'Balance after', type: 'money', currency_from: 'account.balance' },
     /* REQUIRED, because a movement with no account is a number nobody can reconcile. */
     { id: 'account', type: 'ref', to: 'accounts', index: true, required: true },
     { id: 'category', type: 'ref', to: 'categories', index: true },

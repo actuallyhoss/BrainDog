@@ -1,0 +1,7 @@
+{
+  "gate": "dead-copy",
+  "rule": "a sentence reached only through a spread",
+  "expect": "nobody reads",
+  "findings": 1,
+  "why": "AND THE AGGREGATE: `copy` types nothing and spreads an area file, so the seeded sentence is found only by following the spread to the file that types it. A gate reading only the aggregate finds no key and passes."
+}

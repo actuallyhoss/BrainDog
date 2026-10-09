@@ -23,7 +23,7 @@
 
 import { SPARKLINE_POINT, TONES, sectionTone, type KindSpec } from './kinds.ts';
 import { kindSpec } from './kind-spec.ts';
-import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
+import { cellNamesNothing, inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, trendOf, type RunCell, type RunFace } from './cards.ts';
@@ -214,7 +214,11 @@ function renderInline(nodes: Inline[], opts: RenderOptions): string {
         case 'link':
           return `<a href="${escape(hrefFor(opts, n.href))}">${renderInline(n.body, opts)}</a>`;
         case 'path':
-          // A path that names nothing renders as the path, marked, and it is an AFFORDANCE: an
+          /* A PATH THAT NAMES NOTHING IS THE AUTHOR'S TEXT, DOTTED, like any token that was not one: no value will
+             ever come, so it is no hole and has no dash (P.252). Only prose reaches here with one; a chip, a tile and
+             a bar leave such a figure out (`drawnRows`). */
+          if (n.named === false) return `<span class="unresolved">${escape(n.path)}</span>`;
+          // A path with no value renders as the path, marked, and it is an AFFORDANCE: an
           // unknown is a hole, and a hole is a task somebody has to close (05 §7.5).
           if (n.resolved !== null) return `<span class="figure num">${escape(n.resolved)}</span>`;
           return opts.hole
@@ -317,6 +321,11 @@ const toneGlyph = (tone?: string): string => {
  * that one sits in a closed fold. A hash of what the block says keeps the output the same for the same input; the
  * count within one `toHTML` call parts two blocks that say the same thing. `svelte/Split.svelte` and
  * `svelte/p/Ring.svelte` take theirs from `$props.id()`, which the parity test reads past.
+ *
+ * TWO CALLS STILL SHARE ONE, since the same input draws the same page (a host caches it), and the count starts again
+ * with each call. So the paint names the late red after the pattern (`lateFill`): where the first pattern with that id
+ * sits in a closed fold, or is gone, the part is painted flat in `--chart-late` instead of not at all (audit 35, 9).
+ * With no stylesheet the fallback is the ink, as the pattern's is: an undefined variable would void the whole paint.
  */
 const LATE = 'bad';
 let lateSeen: Map<string, number> | null = null;
@@ -331,6 +340,9 @@ function lateId(b: Block): string {
   lateSeen.set(base, n + 1);
   return n ? `${base}-${n}` : base;
 }
+
+/** The paint of a late part: its pattern, and the late red where the pattern cannot be reached. */
+const lateFill = (prop: 'fill' | 'stroke', id: string): string => `${prop}:url(#${id}) var(--chart-late, currentColor)`;
 
 /** The stripes, one tile `w` by `h` in the drawing's own units: a diagonal band on the late red at 30%. */
 const latePattern = (id: string, w: number, h: number): string =>
@@ -395,6 +407,15 @@ function numbersFold(kind: string, heads: readonly string[], rows: readonly (rea
 /** Whether the host asked this block to keep the parts with no value, each as a dash (`empty: keep`). */
 export const keepsNought = (b: Block, o: RenderOptions): boolean => o.empty?.(b) === EMPTY_KEEP;
 
+/** Whether any path in a run has no value, at any depth. */
+const holed = (nodes: readonly Inline[]): boolean => nodes.some((n) => (n.type === 'path' ? n.resolved === null : 'body' in n ? holed(n.body) : false));
+
+/** Whether a chip's figure, read as drawn, says something: not blank, not the dash, and holding no path with no value. */
+const readsSomething = (cell: string | undefined, o: RenderOptions): boolean => {
+  const nodes = inline(cell ?? '', o);
+  return !holed(nodes) && !unvalued(plain(nodes));
+};
+
 /** The grid kinds with a drawer of their own, which this rule does not read: a card, a day and a picture are not figures. */
 const OWN_GRID = new Set(['cards', 'heat', 'gallery', 'board']);
 
@@ -403,16 +424,28 @@ const OWN_GRID = new Set(['cards', 'heat', 'gallery', 'board']);
  *
  * A CHIP NEEDS ITS FIGURE AND ITS WORD, a `spec` row and a figure cell their value (`unvalued`): the one that has none
  * is not drawn. Where the block keeps its noughts every row is drawn as it was, and a chip still needs both cells
- * written, since a chip with no word is a rebus whatever the author asked (05 §7.4). Every other block draws every row.
+ * written, since a chip with no word is a rebus whatever the author asked (05 §7.4). A chip, a figure cell and a bar whose
+ * figure holds a path that names nothing (`UNNAMED`) are left out, kept noughts or not. Every other block draws every row.
  */
 export function drawnRows(b: Block, o: RenderOptions): { row: Row; at: number }[] {
   const all = b.rows.map((row, at) => ({ row, at }));
   const keep = keepsNought(b, o);
   const primitive = kindSpec(b.kind, o.kinds)?.primitive;
+  /* A FIGURE THAT NAMES NOTHING (`UNNAMED`) IS LEFT OUT of a chip, a tile and a bar, nought-keeping or not: it is no
+     nought, it is a path no figure of the record answers to, and in prose it is the author's text, dotted. */
+  const named = ({ row: r }: { row: Row }) => !cellNamesNothing(r.cells[1], o);
   if (primitive === 'inline')
-    return all.filter(({ row: r }) => (keep ? (r.cells[1] ?? '') !== '' && (r.cells[2] ?? '') !== '' : !unvalued(r.cells[1]) && !unvalued(r.cells[2])));
-  if (keep) return all;
-  if ((primitive === 'grid' && !OWN_GRID.has(b.kind)) || (primitive === 'rows' && b.kind !== 'inputs')) return all.filter(({ row: r }) => !unvalued(r.cells[1]));
+    /* THE CHIP'S FIGURE IS READ, as the bar's is: it was printed as typed, and nine chips on his record drew braces. A
+       chip whose figure reads to nothing (an empty cell, the dash, a path with no value, `{{effortDays}}d` with none)
+       is dropped: a chip is a figure and a word, and a hole is neither. */
+    return all.filter((e) =>
+      keep ? (e.row.cells[1] ?? '') !== '' && (e.row.cells[2] ?? '') !== '' && named(e) : named(e) && readsSomething(e.row.cells[1], o) && !unvalued(e.row.cells[2]),
+    );
+  const figures = (primitive === 'grid' && !OWN_GRID.has(b.kind)) || b.kind === 'bar';
+  if (keep) return figures ? all.filter(named) : all;
+  if (primitive === 'grid' && !OWN_GRID.has(b.kind)) return all.filter((e) => named(e) && !unvalued(e.row.cells[1]));
+  if (b.kind === 'bar') return all.filter(named);
+  if (primitive === 'rows' && b.kind !== 'inputs') return all.filter(({ row: r }) => !unvalued(r.cells[1]));
   return all;
 }
 
@@ -549,8 +582,9 @@ function proportional(b: Block, o: RenderOptions): string {
     return `<div class="prop"><div class="prop-row"${toneAttrs(r.tone)}>${cell('prop-label', r.cells[0], o)}<span class="prop-track" style="--magnitude:${magnitude(m)}"></span><span class="prop-value num">${drawn(r.cells[1])}</span><span class="prop-note num">of ${drawn(r.cells[2])}</span>${toneGlyph(r.tone)}</div></div>`;
   }
   const scale = Math.max(0, ...b.rows.filter((r) => !r.hole).map(numeric).filter(Number.isFinite));
-  const body = b.rows
-    .map((r) => {
+  /* A BAR WHOSE FIGURE NAMES NOTHING IS LEFT OUT (`drawnRows`); one with no value yet keeps its dash and its hole. */
+  const body = drawnRows(b, o)
+    .map(({ row: r }) => {
       const v = numeric(r);
       /* A NEGATIVE VALUE LOSES ITS BAR, like a value that is not a number. The scale has one
          side, so the only bar it could draw for a credit is a bar of length zero, and a bar at zero
@@ -576,11 +610,12 @@ function inlinePrimitive(b: Block, o: RenderOptions): string {
   // A chips row needs a number AND a word, or it is dropped: an icon alone is a rebus, and a colour
   // alone is unreadable to a tenth of readers. The columns do not move (05 §7.4).
   // A chip whose figure is the dash a reader prints for null is dropped as well (`drawnRows`): his notes drew chips
-  // that were a name and a dash.
+  // that were a name and a dash. The figure is read through the inline reader, as the bar's is, so `{{tasks.open}}`
+  // prints the count and never its braces.
   const body = drawnRows(b, o)
     .map(
       ({ row: r }) =>
-        `<span class="pill"${toneAttrs(r.tone)}><span class="pill-glyph" data-glyph="${escape(r.cells[0] ?? '')}" aria-hidden="true">${slotArt(r.cells[0] ?? '', o)}</span><span class="pill-figure num">${escape(r.cells[1] ?? '')}</span><span class="pill-word">${escape(valueWord(r.cells[2] ?? ''))}</span>${toneGlyph(r.tone)}</span>`,
+        `<span class="pill"${toneAttrs(r.tone)}><span class="pill-glyph" data-glyph="${escape(r.cells[0] ?? '')}" aria-hidden="true">${slotArt(r.cells[0] ?? '', o)}</span><span class="pill-figure num">${renderInline(inline(r.cells[1] ?? '', o), o)}</span><span class="pill-word">${escape(valueWord(r.cells[2] ?? ''))}</span>${toneGlyph(r.tone)}</span>`,
     )
     .join('');
   return `<div class="inline">${body}</div>`;
@@ -813,7 +848,7 @@ function split(b: Block, o: RenderOptions): string {
       )}">${late ? latePattern(late, 10, 60) : ''}${plan.parts
         .map(
           (p) =>
-            `<rect class="split-seg" data-step="${p.step}"${toneAttrs(rows[p.at]!.tone)}${rows[p.at]!.tone === LATE ? ` style="fill:url(#${late})"` : ''} x="${p.x}" y="0" width="${p.width}" height="100"></rect>`,
+            `<rect class="split-seg" data-step="${p.step}"${toneAttrs(rows[p.at]!.tone)}${rows[p.at]!.tone === LATE ? ` style="${lateFill('fill', late)}"` : ''} x="${p.x}" y="0" width="${p.width}" height="100"></rect>`,
         )
         .join('')}${plan.cuts ? `<path class="split-cut" d="${plan.cuts}" vector-effect="non-scaling-stroke"></path>` : ''}</svg>`;
   const legend = rows.length
@@ -973,8 +1008,9 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
       const name = L.name >= 0 ? `<h3 class="cards-title">${r.cells[L.name] ? drawn(r, L.name) : MISSING}</h3>` : '';
       const when = L.when >= 0 && r.cells[L.when] ? `<span class="cards-when">${drawn(r, L.when)}</span>` : '';
 
+      /* A CARD'S FIGURE THAT NAMES NOTHING IS LEFT OUT, as a tile's is (`drawnRows`): the card keeps its name and facts. */
       const figure =
-        L.figure >= 0
+        L.figure >= 0 && !cellNamesNothing(r.cells[L.figure], o)
           ? `<span class="cards-figure"><span class="cards-value num">${r.cells[L.figure] ? amount(headlineFigure(r.cells[L.figure]!), o) : MISSING}</span>${labelled(L.figure)}</span>`
           : '';
       const t = L.trend >= 0 ? trendOf(said(r, L.trend)) : null;
@@ -1555,7 +1591,7 @@ function ring(b: Block, o: RenderOptions): string {
         .map((a) =>
           circle(
             'ring-arc',
-            ` data-step="${a.step}"${toneAttrs(a.tone)}${paint(RING_PAINT.arc)}${a.tone === LATE ? ` style="stroke:url(#${late})"` : ''} stroke-opacity="${RING_STEP_OPACITY[a.step]}" stroke-dasharray="${a.dash}" stroke-dashoffset="${a.offset}" transform="rotate(-90 18 18)"`,
+            ` data-step="${a.step}"${toneAttrs(a.tone)}${paint(RING_PAINT.arc)}${a.tone === LATE ? ` style="${lateFill('stroke', late)}"` : ''} stroke-opacity="${RING_STEP_OPACITY[a.step]}" stroke-dasharray="${a.dash}" stroke-dashoffset="${a.offset}" transform="rotate(-90 18 18)"`,
           ),
         )
         .join('')}</svg>${plan.centre ? `<span class="ring-figure num" aria-hidden="true">${escape(plan.centre)}</span>` : ''}</div>`

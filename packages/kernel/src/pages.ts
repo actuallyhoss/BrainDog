@@ -26,7 +26,7 @@ import { unquoted } from '@braindog/where';
 import type { ActionRow } from './actions.ts';
 import { BLOCK_READS, FILTER_TYPES, blockKeyOf, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
 import { applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
-import { builtInFigure } from './built-in-figures.ts';
+import { HANDOFFS_OPEN, builtInFigure, type OpenStep } from './built-in-figures.ts';
 import { KEEP, markDrawn, type Why } from './drawn.ts';
 import { kindModule } from './kinds/index.ts';
 import { fileLists } from './kinds/gallery.ts';
@@ -38,12 +38,12 @@ import type { Part, Rate } from './fx.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, wordsOf, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { HORIZON_CAP, runway, type Horizon, type Leg, type Only, type Runway } from './forecast.ts';
-import { figureLists, type PointsAt } from './money-figures.ts';
+import { figureLists, isRolled, type PointsAt, type Rolled } from './money-figures.ts';
 import { withAdds, type PageAddition } from './page-adds.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isBucket } from './buckets.ts';
 import { isQuiet, presenceOf, WORKING_MS } from './presence.ts';
-import { SESSION_PREFIX } from './session.ts';
+import { SESSION_PREFIX, agentOf } from './session.ts';
 import type { SignState, VitalSign } from './signs.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost } from './weigh.ts';
@@ -194,8 +194,12 @@ export type PageBlock = {
   hours?: number;
   /** A `note`'s: its body is a whole document, drawn with the blocks written in it, such as a project's `{{note}}`. */
   document?: boolean;
-  /** A `cards` block's: a row whose day in `field` is older than `after` is drawn as out of date. */
-  stale?: { field: string; after: string };
+  /**
+   * A `cards` block's: a row whose day in `field` is older than `after` is drawn as out of date. With `figure`, the day
+   * is the one that figure's group for the card says (`staleDaysOf`), written into `field` in the answer, so a book's
+   * account card is dated by the bank's last word on it and not by the day somebody typed.
+   */
+  stale?: { field: string; after: string; figure?: string };
   /**
    * A `ring` over a register's: the rows its dial is set against, as a sentence over the same list. Without it the
    * whole is every row the block's scope admits, the page's project when it inherits and the list otherwise, and the
@@ -334,7 +338,10 @@ export type BlockResult = PageBlock & {
    * written out), `null` where the record holds none (`kinds/gallery.ts`).
    */
   files?: (StoredFile | null)[];
-  /** An `inputs` block's: the type of each field it draws, by field id, which a host picks its control by. */
+  /**
+   * An `inputs` block's: the type of each field it draws, by field id, which a host picks its control by. And a computed
+   * source's, by field (`typesOf`), which a host draws each cell by, where no list declares the field: `instant`, `run`.
+   */
   types?: Record<string, string>;
   /**
    * And the record's home currency, or `null` when it has none, which a bare figure typed into an empty money box is
@@ -409,6 +416,12 @@ export type BlockResult = PageBlock & {
    * holds a value for, by the path as written. A path it holds nothing for is absent, and draws `—`.
    */
   values?: Record<string, Json>;
+  /**
+   * Every `{{path}}` of the block that names nothing the record has: no figure, list, row, field or value of a list's
+   * state. A host draws each as the author wrote it, marked, and leaves it out of a chip, a tile or a bar, where a path
+   * that names something and holds nothing keeps its `—`. Absent when every path names something.
+   */
+  unnamed?: string[];
   /**
    * The pack that added this block to a page another pack declares (`page-adds.ts`), absent on the page's own blocks. A
    * host says where the block came from with it, and leaves it out of an arrangement it saves, because the page's own
@@ -670,6 +683,12 @@ export type PageDeps = {
    */
   signs?: () => readonly VitalSign[];
   /**
+   * The next steps runs left and nobody has taken, newest first, each marked `next` or `earlier`: in one project (its
+   * spoken id, as a run holds it) or, with `null`, on the whole record (`openSteps` in `built-in-figures.ts`, over
+   * `handoff.ts`'s `openHandoffs`). A `handoffs.open` block reads them.
+   */
+  handoffs?: (project: string | null) => readonly OpenStep[];
+  /**
    * Who opened a key last and when: the newest `grant.read` event on the grant a key's row points at, or `null` when
    * nobody has. `runs_on` asks it with the grant's id and answers only who and when, never the grant.
    */
@@ -712,6 +731,8 @@ export type PageDeps = {
     value: string;
     name?: string;
     unit?: string;
+    /** A money field each reading may hold in place of `value`: minor units and a currency, read whole (REC-C03). */
+    amount?: string;
     since: string;
   }) => Result<{ readings: RawReading[]; latest: RawReading[] }>;
   /** A series' daily points from one day to another, both included, oldest first (`metric_point`). */
@@ -797,7 +818,7 @@ export type ListsBeside = {
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
 const COMPUTED = new Set([
   'forecast.runway', 'activity', 'sessions.live', 'sessions.working', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'runs_on',
-  'deadlines', 'figures.home', 'signs',
+  'deadlines', 'figures.home', 'signs', HANDOFFS_OPEN,
 ]);
 
 /** The name `registersOf` gives a read across the whole record, which no register id can be. */
@@ -1196,7 +1217,7 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
       const folded: BlockResult = { ...shorn(b), rows: [], matched: 0, refusals: [], drawn: false, why: 'when' };
       return added === undefined ? folded : { ...folded, added };
     }
-    const read = readBlock(filters ? narrowed(deps, b, filters.clauses) : deps, b);
+    const read = rowNamed(deps, found.row, readBlock(filters ? narrowed(deps, b, filters.clauses) : deps, b));
     if (b !== null && typeof b === 'object' && b.kind === 'section' && read.drawn === false) hiding.add(area);
     const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
     const drawn = astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
@@ -1843,8 +1864,9 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
 
   /* THE PAGE'S LIVE FIGURES ARE THE RECORD'S TO SAY, so the host does not answer them from a copy of
      its own. Only for a block that draws: a figure in a block that is not on the page is not read. */
-  const values = valuesOf(deps, block);
+  const { values, unnamed } = valuesOf(deps, block);
   if (values) base.values = values;
+  if (unnamed) base.unnamed = unnamed;
 
   /* THE PAGE WORDS THE INSTALL CHECKS ARE CHECKED AGAIN HERE, for a page installed under an earlier build, in the
      install's own sentences (`kinds/words.ts`): a section's host panel, a path's short view and a roadmap's columns.
@@ -2076,6 +2098,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.source === 'sessions.working') return workingBlock(deps, block, base, also);
   if (block.source === 'actions') return actionsBlock(deps, block, base, also);
   if (block.source === 'signs') return signsBlock(deps, block, base, also);
+  if (block.source === HANDOFFS_OPEN) return handoffsBlock(deps, block, base, also);
   if (block.source === 'governance.open') return openBlock(deps, block, base, also);
   if (block.source === 'governance.later') return laterBlock(deps, block, base, also);
   if (block.source === 'governance.decided') return decidedBlock(deps, block, base, also);
@@ -2098,14 +2121,21 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.kind === 'diff') return diffBlock(deps, block, register, schema, base, also);
 
   /* OUT OF DATE IS A DAY AND A WINDOW, checked here because the host draws it from both. */
+  let staleDays: { field: string; days: StaleDays } | null = null;
   if (block.stale !== undefined) {
-    const s = block.stale as { field?: unknown; after?: unknown } | null;
+    const s = block.stale as { field?: unknown; after?: unknown; figure?: unknown } | null;
     const type = s && typeof s.field === 'string' && Object.hasOwn(schema.fields, s.field) ? schema.fields[s.field]?.type : undefined;
     if (!s || (type !== 'day' && type !== 'instant') || typeof s.after !== 'string' || windowMs(s.after) === null)
       return {
         ...base,
         refusals: also({ code: 'DECLARATION_INVALID', fix: `stale: names a day field on ${register} and a window, such as { field: as_of, after: 7d }.`, at: 'stale' }),
       };
+    /* AND THE DAY MAY BE A FIGURE'S, each card's group's, read once for the block. */
+    if (s.figure !== undefined) {
+      const days = staleDaysOf(deps, register, s.figure);
+      if ('code' in days) return { ...base, refusals: also(days) };
+      staleDays = { field: s.field as string, days };
+    }
   }
 
   /* A CARD'S GROUP IS A LINK FIELD OF THIS LIST, checked here where the list is in hand, as the install checks it. */
@@ -2125,18 +2155,26 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      series a measure over the period and the one before, bucketed by the record's local day or week (`measures.ts`).
      A year of hourly polls is a few hundred numbers on the wire rather than every reading. */
   if ((block.kind === 'stat' || block.kind === 'lines') && deps.readings && (block.columns?.length ?? 0) >= 2) {
-    const [when, val, name, unit] = (block.columns ?? []).map((c) => c.field);
-    const missing = [when, val, name, unit].filter((f): f is string => f !== undefined && !Object.hasOwn(schema.fields, f));
+    /* THE FIFTH COLUMN IS THE READING AS MONEY (REC-C03): integer minor units with the reading's own currency, read in
+       place of `value` where a row holds it (`measures.ts` `moneyOf`), so "Monthly revenue" of USD 48.15 is never the
+       decimal 4,815 with a unit of text. A reading in another currency is a line of its own, never added to this one. */
+    const [when, val, name, unit, amount] = (block.columns ?? []).map((c) => c.field);
+    const missing = [when, val, name, unit, amount].filter((f): f is string => f !== undefined && !Object.hasOwn(schema.fields, f));
     if (missing.length)
       return {
         ...base,
         refusals: also({ code: 'FIELD_UNKNOWN', fix: `${register} has no field called ${missing.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) }),
       };
+    if (amount !== undefined && schema.fields[amount]?.type !== 'money')
+      return {
+        ...base,
+        refusals: also({ code: 'DECLARATION_INVALID', fix: `The fifth column is each reading as money, and ${amount} on ${register} is not a money field. Name a money field there, or leave it off.`, at: 'columns' }),
+      };
     if (block.bucket !== undefined && !(MEASURE_BUCKETS as readonly unknown[]).includes(block.bucket))
       return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: `bucket: is ${MEASURE_BUCKETS.join(' or ')}.`, at: 'bucket' }) };
     const tz = readableZone(deps.tz);
     const window = measureWindow(deps.ctx.nowMs, block.back, measureBucket(block.bucket), tz);
-    const read = deps.readings({ register, where: said.predicate, when: when!, value: val!, ...(name ? { name } : {}), ...(unit ? { unit } : {}), since: window.since });
+    const read = deps.readings({ register, where: said.predicate, when: when!, value: val!, ...(name ? { name } : {}), ...(unit ? { unit } : {}), ...(amount ? { amount } : {}), since: window.since });
     if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
     /* `limit:` IS HOW MANY MEASURES, at most the twelve a block is ever handed, so Today can draw the four that moved. */
     const most = typeof block.limit === 'number' && Number.isFinite(block.limit) ? Math.min(MEASURES_MOST, Math.max(0, Math.floor(block.limit))) : MEASURES_MOST;
@@ -2324,7 +2362,8 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   const ranged = block.kind === 'progress' && block.range === true ? rangeFault(block, register, schema, read) : null;
   if (ranged) return { ...base, refusals: also(ranged) };
   /* EACH GROUPED CARD SAYS ITS GROUP (`groupedRows`). */
-  const rows = grouping ? groupedRows(deps, read, grouping) : read;
+  const grouped = grouping ? groupedRows(deps, read, grouping) : read;
+  const rows = staleDays ? datedRows(grouped, staleDays.field, staleDays.days) : grouped;
   const marks = path ? rows.map((r) => r.fields[path.done] === true) : null;
   /* A PATH'S NEXT STEP IS ITS FIRST OPEN STEP IN THE ORDER ITS LIST DECLARES, not the first open one drawn. Under
      `order: rank desc` a path drew S3, S2, S1 and marked S2 as next while the card over the same steps said S1. So it
@@ -2379,6 +2418,48 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     ...(grouping ? { fold: typeof block.fold === 'number' ? block.fold : CARD_FOLD } : {}),
     ...inShort,
   };
+}
+
+/** Each card's day by the value of the field its figure groups by, as `staleDaysOf` reads them. */
+type StaleDays = { by: string; days: ReadonlyMap<string, string> };
+
+/**
+ * The day a figure says for each of its groups, for a card's `stale:`: a figure that rolls this list's balances forward
+ * (`value: { rolled }` over `register.<this list>`) with `read: as_of` and a `group_by`, so each group's value is the
+ * oldest day its accounts were last confirmed on, held as whole days since 1970 (`readRolled`). A card finds its day by
+ * its own value of that field.
+ *
+ * THE TYPED DAY IS NOT THE AGE. A bank message writes a balance on a Ledger row and never the account's typed "As of",
+ * so every account on the owner's record read out of date and would go on reading it after messages filed (REC-B03). A
+ * group with no confirmed day says none, and the card keeps the day its row holds.
+ */
+function staleDaysOf(deps: PageDeps, register: string, figure: unknown): StaleDays | Refusal {
+  const wrong = (why: string): Refusal => ({
+    code: 'DECLARATION_INVALID',
+    fix: `stale: figure: reads each card's day from a figure that rolls ${register}'s balances by account, with read: as_of and group_by. ${why}`,
+    at: 'stale',
+  });
+  if (typeof figure !== 'string' || figure === '') return wrong('Name the figure, such as figure: account-ages.');
+  const decl = deps.metric(figure);
+  if (!decl) return wrong(`There is no figure called ${figure}.`);
+  const rolled = isRolled(decl.value) ? (decl.value as unknown as { rolled: Rolled }).rolled : null;
+  if (!rolled || rolled.read !== 'as_of' || decl.source !== `register.${register}` || decl.group_by === undefined)
+    return wrong(`${decl.name} is not one.`);
+  const read = deps.read(decl);
+  if (!read.ok) return refused(read) ? read.refusal : wrong(`${decl.name} could not be read.`);
+  const days = new Map<string, string>();
+  for (const g of read.value.groups ?? [])
+    if (typeof g.value === 'number' && Number.isFinite(g.value)) days.set(g.key, new Date(g.value * 86_400_000).toISOString().slice(0, 10));
+  return { by: decl.group_by, days };
+}
+
+/** Each card with its group's day written into the `stale:` field, where the figure says one; the stored rows untouched. */
+function datedRows(rows: readonly PageRow[], field: string, days: StaleDays): PageRow[] {
+  return rows.map((r) => {
+    const key = r.fields[days.by];
+    const day = typeof key === 'string' || typeof key === 'number' ? days.days.get(String(key)) : undefined;
+    return day === undefined ? r : { ...r, fields: { ...r.fields, [field]: day } };
+  });
 }
 
 /**
@@ -3773,6 +3854,71 @@ function signsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (
   return { ...base, rows: kept.slice(0, limit), matched: kept.length };
 }
 
+/* ── the next steps left to take ─────────────────────────────────────────── */
+
+/**
+ * What a `handoffs.open` block's `where` and columns may name: one row a step left. `run` is the run that left it, a
+ * handle a host draws as `agent` and links by, never alone; `next` is the step in the run's words; `left_at` when.
+ * `mark` is `next` for the one a new session is handed and `earlier` for the rest, older than a week or passed over.
+ */
+const HANDOFFS: Schema = {
+  register: HANDOFFS_OPEN,
+  fields: {
+    run: { type: 'text' },
+    agent: { type: 'text' },
+    next: { type: 'text' },
+    left_at: { type: 'instant' },
+    mark: { type: 'enum', values: ['next', 'earlier'] },
+  },
+};
+
+/**
+ * One step as a row, keyed by the run that left it. `project` rides on the row for `projectsOf`, which says the
+ * project's name, and is no field a column may name: it is a spoken id, and a person reads the name.
+ */
+function stepEntry(h: OpenStep): Entry {
+  return {
+    id: h.id,
+    register: SESSION,
+    seq: null,
+    fields: { run: h.spoken, agent: agentOf({ agent: h.agent ?? undefined, client: h.client ?? undefined }).name, next: h.next, left_at: h.left_at, mark: h.mark, project: h.project },
+    state: 'handoff',
+    version: 1,
+    created_at: h.left_at,
+    updated_at: h.left_at,
+    deleted_at: null,
+  };
+}
+
+/**
+ * The next steps runs left and nobody has taken, newest first: one project's, when `about:` names its row, else the
+ * whole record's, each with the project it was left in.
+ *
+ * THE SAME READ AS THE BRIEFING'S (`openHandoffs`), so the Agents page never lists a step the card would not offer, nor
+ * leaves out one it would. Newest first is the read's order, so `order:` is refused; `where: mark is next` keeps the
+ * steps a new session would be handed.
+ */
+function handoffsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (!deps.handoffs) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read the steps runs left onto a page yet.', at: 'source' }) };
+  if (block.order?.length)
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'handoffs.open comes the newest step first, so it takes no order:. Use where: mark is next for the ones to take now.', at: 'order' }) };
+  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(HANDOFFS.fields, f));
+  if (unknown.length)
+    return { ...base, refusals: also({ code: 'FIELD_UNKNOWN', fix: `A step left has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(HANDOFFS.fields) }) };
+  const about = block.about === undefined ? null : typeof block.about === 'string' ? SPOKEN.exec(block.about) : null;
+  if (block.about !== undefined && !about)
+    return { ...base, refusals: also({ code: 'VALUE_MALFORMED', fix: 'about: names the project by its row, such as things#1, or is left off for every project.', at: 'about' }) };
+  const said = predicateOf(block.where, HANDOFFS, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  const kept = deps
+    .handoffs(about ? String(block.about) : null)
+    .map(stepEntry)
+    .filter((r) => evaluate(said.predicate, r.fields, HANDOFFS, r));
+  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
+  const rows = kept.slice(0, limit);
+  return { ...base, rows, matched: kept.length, types: typesOf(HANDOFFS), ...projectsOf(deps, rows) };
+}
+
 /* ── the runs working now ────────────────────────────────────────────────── */
 
 /**
@@ -3902,11 +4048,32 @@ const RUNS_ON: Schema = {
     state: { type: 'text' },
     detail: { type: 'text' },
     used_by: { type: 'text' },
+    used_agent: { type: 'text' },
     used_at: { type: 'instant' },
     spoken: { type: 'text' },
     quiet: { type: 'text' },
   },
 };
+
+/**
+ * The type a host reads a computed source's field as, by field, where it is not the type the source's `where` reads.
+ *
+ * A RUN IS A HANDLE, `S731`, which `where: used_by is S731` compares as words, and which a person is never shown alone: a
+ * host draws a `run` as the agent's name and the day, from the fields beside it, and links to the run. So `used_by`
+ * stays text to the grammar and is answered as a run to the host.
+ */
+const HOST_TYPES: Readonly<Record<string, Readonly<Record<string, string>>>> = { runs_on: { used_by: 'run' }, [HANDOFFS_OPEN]: { run: 'run' } };
+
+/**
+ * A computed source's fields' types, for a host to draw a cell by when no list declares the field: an instant through
+ * how long ago, a run as its agent's name. Without them a project page printed `2026-10-06T19:07:01.610Z` and `S731`
+ * under "Tools and servers", because the browser knows the lists' fields and no computed source's.
+ */
+function typesOf(schema: Schema): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [field, spec] of Object.entries(schema.fields)) out[field] = HOST_TYPES[schema.register]?.[field] ?? spec.type;
+  return out;
+}
 
 /**
  * The lists `runs_on` reads, in the order it draws them, each with what one of its rows is called there and the field
@@ -3983,6 +4150,19 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
     const y = String(b.fields.name ?? '');
     return x < y ? -1 : x > y ? 1 : 0;
   };
+  /* THE AGENT A RUN IS, read once a run and called as the run's own name calls it (`agentOf` in `session.ts`), so a cell
+     says "Claude Code" beside the run's handle and never the handle alone. A run the caller may not read, or one gone,
+     names no agent, and the host draws the day by itself. */
+  const agents = new Map<string, string | null>();
+  const agentNamed = (run: string | null): string | null => {
+    if (run === null) return null;
+    if (!agents.has(run)) {
+      const found = deps.list({ register: SESSION, where: { field: 'seq', is: Number(run.slice(SESSION_PREFIX.length)) }, limit: 1 });
+      const fields = found.ok ? found.value.rows[0]?.fields : undefined;
+      agents.set(run, fields ? agentOf({ agent: scalar(fields.agent) ?? undefined, client: scalar(fields.client) ?? undefined }).name : null);
+    }
+    return agents.get(run)!;
+  };
   const own: Entry[] = [];
   const everywhere: Entry[] = [];
   for (const list of RUNS_ON_LISTS) {
@@ -4003,6 +4183,7 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
           state: r.state,
           detail: scalar(r.fields[list.detail]),
           used_by: used.by,
+          used_agent: agentNamed(used.by),
           used_at: used.at,
           spoken: r.seq === null ? r.id : `${list.register}#${r.seq}`,
           quiet: scope === 'global' ? 'global' : null,
@@ -4021,7 +4202,7 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
     if (scope === null) continue;
     acts[scope].push({
       ...actionEntry(a),
-      fields: { kind: 'action', name: a.ingest, scope, state: a.state, detail: a.next, used_by: null, used_at: null, spoken: a.ingest, quiet: scope === 'global' ? 'global' : null },
+      fields: { kind: 'action', name: a.ingest, scope, state: a.state, detail: a.next, used_by: null, used_agent: null, used_at: null, spoken: a.ingest, quiet: scope === 'global' ? 'global' : null },
     });
   }
   const all = [...own, ...acts.project.sort(byName), ...everywhere, ...acts.global.sort(byName)];
@@ -4037,6 +4218,7 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
     ...base,
     rows,
     matched: kept.length,
+    types: typesOf(RUNS_ON),
     scopes: rows.map((r) => (r.fields.scope === 'project' ? name : null)),
     scope_marks: rows.map((r) => (r.fields.scope === 'project' ? mark : null)),
   };
@@ -4335,9 +4517,9 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
        agent on it. `sessionsLive` refuses somebody without `read` on `session`, and the block on the same page
        handed that person each run's repo, what it was doing and its token id. */
     const runs = block.source === 'sessions.live' || block.source === 'sessions.working';
-    if (runs || block.working === true) named.add(SESSION);
+    if (runs || block.working === true || block.source === HANDOFFS_OPEN) named.add(SESSION);
     /* A LIVE RUN IS NAMED BY ITS PROJECT'S TITLE (`projectsOf`), a row of the list that declares `scopes:`. */
-    const projects = runs ? beside?.projects?.() : null;
+    const projects = runs || block.source === HANDOFFS_OPEN ? beside?.projects?.() : null;
     if (projects) named.add(projects);
     /* A CARD'S NEXT STEP AND ITS RING READ EVERY LIST OF STEPS UNDER THE CARDS, all of them, because `ringsOf` tallies
        each and `stepsHolding` refuses a field none of them has with every one's name and fields in `allowed`. */
@@ -4369,6 +4551,8 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
        label and an action's host are held back from a member who may not read all of them, as `actions` holds them. */
     if (block.source === 'runs_on') {
       for (const list of RUNS_ON_LISTS) named.add(list.register);
+      /* AND THE RUNS, whose agent is said beside each run's handle. */
+      named.add(SESSION);
       const about = typeof block.about === 'string' ? SPOKEN.exec(block.about) : null;
       if (about) named.add(about[1]!);
       named.add(WHOLE_RECORD);
@@ -4390,6 +4574,9 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       addFigure(at < 0 ? block.opening.metric : block.opening.metric.slice(0, at));
     }
     if (typeof block.late === 'string') addFigure(block.late);
+    /* A CARD DATED BY A FIGURE READS THAT FIGURE'S LISTS: the moves and checks its balances are rolled over. */
+    const staleBy = block.stale !== null && typeof block.stale === 'object' ? (block.stale as { figure?: unknown }).figure : undefined;
+    if (typeof staleBy === 'string') addFigure(staleBy);
     /* AND THE FIGURE A PROGRESS BLOCK SETS ITS ROWS AGAINST, which `spentOf` reads whole into `readings`. Unnamed, a
        budget over Budgets with `spent:` a figure of Payroll drew a member invited to Budgets the Payroll total to the unit. */
     for (const figure of [block.spent, block.toward]) if (typeof figure === 'string') addFigure(figure);
@@ -4699,14 +4886,74 @@ function changeOf(deps: PageDeps, decl: MetricDecl): Json | undefined {
   return pct > 0 ? `+${pct}%` : pct < 0 ? `−${-pct}%` : '0%';
 }
 
-/** Every path in a block the record holds a value for, or `undefined` when there are none. */
-function valuesOf(deps: PageDeps, block: PageBlock): Record<string, Json> | undefined {
+/**
+ * A template page's block with every `{{field}}` of its row taken out of `unnamed`: `fill` writes each field the row
+ * holds and leaves the hole where it holds nothing, and that hole is "a field on this row" (`05 §7.1`) with no value, so
+ * it draws its dash. Marked unnamed, a project with no note printed `{{note}}` as the author's typo.
+ */
+function rowNamed(deps: PageDeps, row: Entry | undefined, read: BlockResult): BlockResult {
+  if (!row || !read.unnamed) return read;
+  const schema = deps.schemaOf(row.register);
+  if (!schema) return read;
+  const left = read.unnamed.filter((path) => !Object.hasOwn(schema.fields, path));
+  if (left.length === read.unnamed.length) return read;
+  const { unnamed: _all, ...rest } = read;
+  return left.length ? { ...rest, unnamed: left } : rest;
+}
+
+/**
+ * Every path in a block the record holds a value for, and every path that names nothing at all, each `undefined` when
+ * there are none.
+ *
+ * TWO DIFFERENT SILENCES. A path the record knows and holds no value for draws `—`: Cash now with no balance yet. A path
+ * that names no figure, list, row, field or value is the author's words and not a question, `{{portfolio.revnue}}`, and
+ * a host draws it as written and marked (`unnamed`), never as a dash that reads like a number still to come. Before
+ * this the two answered the same, so 48 paths on the owner's record drew a dash for a typo. Only a path with no value is
+ * asked whether it names anything, so a block whose paths all hold values costs no read more than it did.
+ */
+function valuesOf(deps: PageDeps, block: PageBlock): { values?: Record<string, Json>; unnamed?: string[] } {
   const out: Record<string, Json> = {};
+  const unnamed: string[] = [];
   for (const path of pathsOf(block)) {
     const v = valueAt(deps, path);
     if (v !== undefined) out[path] = v;
+    else if (!namedAt(deps, path)) unnamed.push(path);
   }
-  return Object.keys(out).length ? out : undefined;
+  return { ...(Object.keys(out).length ? { values: out } : {}), ...(unnamed.length ? { unnamed } : {}) };
+}
+
+/** A figure by its id, declared or built in, as `registersOf` finds one. */
+const figureNamed = (deps: PageDeps, id: string): boolean => (deps.metric(id) ?? builtInFigure(id)) !== null;
+
+/** Whether `state` is one of the values a list's state field holds, which `<list>.<state>` counts. */
+function stateNamed(deps: PageDeps, register: string, state: string): boolean {
+  const schema = LIST_ID.test(register) ? deps.schemaOf(register) : null;
+  const field = schema?.state;
+  const spec = schema && field !== undefined && Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
+  return spec?.type === 'enum' && (spec.values ?? []).includes(state);
+}
+
+/**
+ * Whether a path names something the record has, whatever it holds now: a figure (declared or built in), a list (its
+ * count, or a value of its state), or a row's field. A row is asked for only when the list and the field are known, so
+ * `tasks#999.title` is a row nobody has, and `tasks#3.title` with no title is named and draws its dash.
+ *
+ * A READ THE CALLER MAY NOT MAKE IS NAMED, never unnamed: whether a list's row exists is not told to somebody who cannot
+ * open it, and the path draws the dash it drew before.
+ */
+function namedAt(deps: PageDeps, path: string): boolean {
+  const parsed = pathOf(path);
+  if (!parsed) return false;
+  if ('metric' in parsed) return figureNamed(deps, parsed.metric);
+  if ('change' in parsed) return figureNamed(deps, parsed.change) || stateNamed(deps, parsed.change, 'change');
+  if ('rowsOf' in parsed) return figureNamed(deps, parsed.rowsOf) || stateNamed(deps, parsed.rowsOf, parsed.part);
+  if ('state' in parsed) return stateNamed(deps, parsed.register, parsed.state);
+  const schema = deps.schemaOf(parsed.register);
+  if (!schema) return false;
+  if ('count' in parsed) return true;
+  if (!Object.hasOwn(schema.fields, parsed.field)) return false;
+  const listed = deps.list({ register: parsed.register, where: { field: 'seq', is: parsed.seq }, limit: 1 });
+  return !listed.ok || listed.value.rows.length > 0;
 }
 
 /**

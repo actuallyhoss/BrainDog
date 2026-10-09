@@ -1,0 +1,8 @@
+{
+  "gate": "secret-grep",
+  "rule": "a key written out beside its one exempt writer",
+  "expect": "a plaintext reaches standard output",
+  "findings": 1,
+  "total": 1,
+  "why": "THE TENTH: the one function that may print a key. `headersOne` writes a key read back to standard output for Claude Code's `headersHelper`, which is its recorded exemption, and a second function in the same file writes the same key there too. One finding, and one in all, proves the exemption covers that function and nothing beside it."
+}

@@ -152,9 +152,10 @@ test('NUMBERS THIS WEEK ARE THE WEEK’S, six at most and each about its project
   assert.deepEqual(drawnWeek.measures?.map((m) => m.name), ['Installs']);
   assert.equal(drawnWeek.measures?.[0]?.now.length, 7, 'the week is seven days');
 
-  /* WHAT THE BLOCK SAYS OF ITSELF: a week, six lines at most, and the project as the fifth field. */
+  /* WHAT THE BLOCK SAYS OF ITSELF: a week, six lines at most, the reading as money fifth (founder 2.5.0) and the project
+     after it. */
   const declared = (useCase('founder')!.pack?.declarations as { page?: string; blocks?: Record<string, unknown>[] }[]).find((d) => d.page === 'home-founder')!.blocks!.find((b) => b.heading === 'Numbers this week')!;
-  assert.deepEqual([declared.back, declared.limit, (declared.columns as { field: string }[]).map((c) => c.field)], [7, 6, ['at', 'value', 'name', 'unit', 'thing']]);
+  assert.deepEqual([declared.back, declared.limit, (declared.columns as { field: string }[]).map((c) => c.field)], [7, 6, ['at', 'value', 'name', 'unit', 'amount', 'thing']]);
 });
 
 test('LAPSING IS WHAT LAPSES WITHIN THIRTY DAYS OF TODAY, and not a name somebody chose to let go next year', async () => {

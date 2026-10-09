@@ -71,7 +71,7 @@ test('A LATE PART IS STRIPED AS WELL AS RED (DIRECTION §42): it is filled with 
   const html = toHTML(parse('```split | Owed\nPaid | 600\nOverdue | 300 | 3 invoices | bad\nDue soon | 100 |  | warn\n```'));
   const id = /<pattern class="late-hatch" id="([^"]+)" patternUnits="userSpaceOnUse" width="10" height="60">/u.exec(html)?.[1];
   assert.ok(id, 'a late part drew no pattern');
-  assert.match(html, new RegExp(`<rect class="split-seg" data-step="1" data-intent="bad" style="fill:url\\(#${id}\\)" x="600"`, 'u'));
+  assert.match(html, new RegExp(`<rect class="split-seg" data-step="1" data-intent="bad" style="fill:url\\(#${id}\\) var\\(--chart-late, currentColor\\)" x="600"`, 'u'));
   assert.match(html, /<path class="late-stripe" d="M0 0H5L0 30ZM10 0V30L5 60H0Z" fill="currentColor">/u, 'the pattern is a stripe, not a wash');
   assert.equal(html.match(/url\(#/gu)?.length, 1, 'only the late part is striped');
   assert.ok(html.indexOf('<pattern') < html.indexOf('<rect class="split-seg"'), 'the pattern is drawn before the part that paints from it');

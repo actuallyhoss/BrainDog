@@ -22,7 +22,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -35,352 +35,134 @@ export const needs = ['builds'];
 const here = dirname(fileURLToPath(import.meta.url));
 const negatives = join(here, 'negative');
 
+/** What a `case.json` may say, and nothing else. */
+const CASE_KEYS = new Set(['gate', 'rule', 'expect', 'findings', 'total', 'skip', 'why']);
+
 /**
- * Each gate, the fixture it runs against, and how to point it there.
+ * Each planted tree says, in its own `case.json`, which gate it is for and what that gate must say.
  *
- * `cwd` IS THE HANDLE for the gates that walk `process.cwd()`; `argv` for those that take a root.
+ *   { "gate": "colour-grep", "rule": "an eight-digit hex colour", "expect": "colour literal",
+ *     "findings": 1, "total": 1, "skip": true, "why": "..." }
+ *
+ * `gate` is the gate as `run.mjs` registers it, and the tree is pointed at it with `cwd` and
+ * `BRAINDOG_GATE_ROOT`. `rule` is the rule inside that gate the tree proves, in plain words, and is
+ * what the line for the tree prints. `expect` is a pattern the red line must hold, matched without
+ * regard to case. `findings` is how many lines name the tree's `expect.txt`; `total`, when given, is
+ * the whole of what the gate reports; `skip` asks for exit 3 over a root that holds nothing. `why`
+ * is the reason the tree is shaped the way it is, which is where the comments of the old list went.
+ *
+ * THE LIST USED TO LIVE HERE, AND IT COULD NOT SEE A GATE WITH NOTHING IN IT. Eighty-three rows in
+ * this file and eighty-three trees beside it, and a check that every tree had a row; nothing asked
+ * whether every gate had a tree, so `passkey`, `theme`, `deploy-parity` and `typecheck` had none and
+ * the run was green (PRF-B02). The case now travels with its tree, so a tree cannot be added without
+ * one and a gate is covered by the trees that name it.
+ *
  * Nothing here monkey-patches a gate: a gate that needed a special mode to be testable would be a
  * gate whose tested behaviour is not the shipped one.
  */
-const CASES = [
-  { gate: 'clean-room', expect: /contains/, findings: 1 },
-  { gate: 'colour-grep', run: 'colour-grep', expect: /colour literal/, findings: 1 },
-  { gate: 'colour-grep-hex8', run: 'colour-grep', expect: /colour literal/, findings: 1 },
-  { gate: 'colour-grep-oklch', run: 'colour-grep', expect: /colour literal/, findings: 1 },
-  /* THE FOURTH NOTATION, and the plainest: `color: red`. The gate knew hex, `rgb()` and `oklch()`,
-     so the two real scrims in this repository (`color-mix(in srgb, black …)`, at two strengths six
-     per cent apart) had never been seen. ONE finding, and the fixture carries two decoys beside
-     it: `content: 'gold'` and a grid area called `tan`. `tan`, `linen`, `plum` and `gold` are CSS
-     colour names and ordinary English, so the rule is the PROPERTY plus the name, and a count of
-     one is what proves the distinction rather than asserting it. */
-  { gate: 'colour-grep-named', run: 'colour-grep', expect: /colour literal/, findings: 1 },
-  /* `css-rules` CLAIMS ELEVEN OF `52 §5.2`'s TWELVE ROWS (row 12 is skipped; see the gate's own
-     header) plus the two rules the table does not number, and this is where the finding that started
-     this work landed: the gate seeded TWO cases for TWELVE-ish rules, so one working rule
-     (`unknown-property`, below) made every other one look alive, including the four that had never
-     fired once. One fixture per rule now, each one
-     crafted so it trips EXACTLY the rule under test and nothing else. A fixture that also fires
-     `unknown-property` on an incidental `var()` would assert a count that means something else. */
-  { gate: 'css-rules-colour', run: 'css-rules', expect: /never a colour/, findings: 1 },
-  { gate: 'css-rules-font-size', run: 'css-rules', expect: /escapes the type scale/, findings: 1 },
-  { gate: 'css-rules', expect: /resolves to nothing/, findings: 1 },
-  { gate: 'css-rules-outline', run: 'css-rules', expect: /focus-ok/, findings: 1 },
-  { gate: 'css-rules-physical', run: 'css-rules', expect: /breaks under dir="rtl"/, findings: 1 },
-  { gate: 'css-rules-zindex', run: 'css-rules', expect: /a fight the next literal wins/, findings: 1 },
-  /* ROW 7 HAS TWO HALVES (an `<Icon size=…>` outside the four names, and a literal `width`/`height`
-     on an `<svg>`) and one fixture carries both, so a count of two is what proves neither half is
-     riding on the other's finding. */
-  { gate: 'css-rules-icon-size', run: 'css-rules', expect: /not a number/, findings: 2 },
-  { gate: 'css-rules-identifier-size', run: 'css-rules', expect: /two roles colliding/, findings: 1 },
-  { gate: 'css-rules-icon-color', run: 'css-rules', expect: /currentColor only/, findings: 1 },
-  { gate: 'css-rules-unemitted-class', run: 'css-rules', expect: /rename left the rule behind/, findings: 1 },
-  /* TWO FIXTURES AND ONE SENTENCE, because the rule has two halves and a count of one proves each.
-     Both trees carry the line *"A seeded sentence — in prose, outside any fence."* in a README, and
-     the only difference between them is `private` in the manifest. `em-dash` is private and its one
-     finding is in the source, which says the README was forgiven; `em-dash-readme` is published and
-     its one finding is the README, which says the same sentence is read when a stranger can reach
-     it. Seeding both halves in one tree would have made the total two and `named()` one, which is
-     how this pair was born.
+export function readCases(dir, registered) {
+  const cases = [];
+  const refused = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const tree = entry.name;
+    const at = join(dir, tree, 'case.json');
+    if (!existsSync(at)) {
+      refused.push(`negative/${tree}/ is planted and has no case.json, so nothing says which gate it is for.`);
+      continue;
+    }
+    let c;
+    try {
+      c = JSON.parse(readFileSync(at, 'utf8'));
+    } catch (cause) {
+      refused.push(`negative/${tree}/case.json does not read as JSON: ${cause.message}`);
+      continue;
+    }
+    /* A WORD SPELT WRONG IS A CHECK DROPPED, not a refusal, unless it is refused here: `totl` would leave the count
+       unasked and the tree as green as before. */
+    const stray = c && typeof c === 'object' ? Object.keys(c).filter((k) => !CASE_KEYS.has(k)) : [];
+    if (stray.length) {
+      refused.push(`negative/${tree}/case.json says ${stray.join(', ')}, which a case does not have, so whatever it meant is not checked.`);
+      continue;
+    }
+    if (c.skip !== undefined && typeof c.skip !== 'boolean') {
+      refused.push(`negative/${tree}/case.json says skip is ${JSON.stringify(c.skip)}, and it is true or left out.`);
+      continue;
+    }
+    if (typeof c?.gate !== 'string' || !c.gate) {
+      refused.push(`negative/${tree}/case.json names no gate.`);
+      continue;
+    }
+    if (!registered.has(c.gate)) {
+      refused.push(`negative/${tree}/case.json names ${c.gate}, and run.mjs registers no gate by that name.`);
+      continue;
+    }
+    if (typeof c.rule !== 'string' || !c.rule.trim()) {
+      refused.push(`negative/${tree}/case.json says no rule, so its line could not say what was proved.`);
+      continue;
+    }
+    if (!Number.isInteger(c.findings) || c.findings < 1 || (c.total !== undefined && !Number.isInteger(c.total))) {
+      refused.push(`negative/${tree}/case.json counts no findings, and a planted fault is at least one.`);
+      continue;
+    }
+    let expect;
+    try {
+      expect = new RegExp(c.expect, 'iu');
+    } catch {
+      refused.push(`negative/${tree}/case.json expects a pattern that does not compile: ${c.expect}`);
+      continue;
+    }
+    cases.push({ tree, gate: c.gate, rule: c.rule, expect, findings: c.findings, total: c.total, skip: c.skip === true });
+  }
+  return { cases, refused };
+}
 
-     THE DECOYS ARE THE OTHER HALF OF EACH COUNT. Every one of them holds an em dash spaced on both
-     sides, the exact shape the gate refuses, and is forgiven only for where it sits: a block
-     comment, a line comment and two SQL column annotations inside a schema literal in the source;
-     a fenced code block, an inline code span and an HTML comment in the README. A bare glyph and a
-     heading rule sit there too, unspaced. An exemption that stops working takes the count above
-     one rather than leaving it green, which is the only way an exemption gets tested at all. */
-  { gate: 'em-dash', expect: /used as punctuation/, findings: 1 },
-  { gate: 'em-dash-readme', run: 'em-dash', expect: /used as punctuation/, findings: 1 },
-  { gate: 'css-rules-media-beaten', run: 'css-rules', expect: /wins on source order/, findings: 1 },
-  { gate: 'css-rules-faint', run: 'css-rules', expect: /not below 24px/, findings: 1 },
-  { gate: 'css-rules-ellipsis', run: 'css-rules', expect: /does nothing on a flex/, findings: 1 },
-  { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
-  /* AND THE OTHER HALF OF THAT RULE: a `fetch(` the gate must NOT name. `37 §2.2`'s `Http` port
-     declares a method called `fetch`, and the rule matched the signature exactly as it matches a
-     call, so the gate that stops a package reaching the network reported the port that exists so
-     none of them does. The fixture holds both in one file and asserts a count of one, because a
-     gate that went red here would look identical to a gate that got it right. */
-  { gate: 'stack-signature', run: 'stack', expect: /calls fetch/, findings: 1 },
-  /* THE ONE SCOPED RULE, AND BOTH HALVES OF IT. `43 §8` bans regular expressions under
-     `packages/extract` and nowhere else, so the fixture seeds three: a literal and a constructor
-     inside that package, which must be named, and a literal in another package, which must not.
-     Two findings rather than three is the assertion: a count of three would mean the gate had
-     quietly become a repository-wide ban, and a count of one would mean it knew the slash form and
-     not `new RegExp(source)`, which is the spelling somebody reaches for next. */
-  { gate: 'stack-regexp', run: 'stack', expect: /compiles nothing/, findings: 2 },
-  /* THE RAW BYTE SCAN. The fixture is `Buffer.from`-built rather than typed, because a NUL byte
-     does not survive being typed through an editing tool, the same reason the gate's own header
-     insists on it for anyone seeding a case here. One finding: a NUL sitting inside a string
-     literal, the shape of both real defects this gate was written for. */
-  { gate: 'nul-bytes', expect: /a raw NUL at offset/, findings: 1 },
+/**
+ * The names `run.mjs` registers, read as text out of its `GATES` table.
+ *
+ * AS TEXT AND NOT BY `import()`, for the reason `run.mjs` reads `needs` as text: importing the runner
+ * runs every gate. One entry a line, `['name', ...]`, which is the shape every entry has today; a
+ * table that came back empty is a refusal, never a pass over no gates.
+ */
+export function registeredGates(text) {
+  const start = text.indexOf('const GATES = [');
+  const end = text.indexOf('\n];', start);
+  if (start < 0 || end < 0) return new Set();
+  return new Set([...text.slice(start, end).matchAll(/^\s*\['([a-z][a-z0-9-]*)',/gmu)].map((m) => m[1]));
+}
 
-  /* AND THE CLASS THAT SHIPPED MORE OFTEN THAN NUL DID. The gate read 0x00 alone for months while
-     its own header described the general defect, and widening it to every C0 control turned up
-     nine bytes the tree had been carrying, three of them a word-boundary escape that had lost its
-     backslash. One seeded case per class is not the standard here, but one seeded case for the
-     ONLY class a gate used to see would leave the whole widening untested, which is the state this
-     fixture is here to end. */
-  { gate: 'nul-bytes-backspace', run: 'nul-bytes', expect: /a raw BACKSPACE at offset/, findings: 1 },
+/**
+ * EVERY GATE HAS A PLANTED FAULT, AND THESE ARE THE ONES THAT DO NOT YET. The list may only shrink.
+ *
+ * A name here is a gate that goes red on nothing the self-test has ever planted, said out loud on
+ * every run rather than read green. A name that gains a tree or a browser negative is a failure until
+ * it comes off, so the list cannot hold a gate that no longer needs it; and
+ * `test/self-test-cases.test.mjs` holds it to today's six, so a gate added tomorrow cannot join it.
+ */
+export const GAPS = new Map([
+  ['typecheck', 'one type error in negative/typecheck/ comes with PRF-B02 job 4'],
+  ['theme', 'a token file one value off, read by theme.mjs --tokens, comes with PRF-B02 job 5'],
+  ['passkey', 'a seed that takes the virtual authenticator away comes with PRF-B02 job 4'],
+  ['deploy-parity', 'a local host that names another build comes with PRF-B02 job 6'],
+  ['rule-sheet', "batch 40's rule sheet on a proof record has no tree yet"],
+  ['signin-live', "batch 43's planted tree: a self-host whose sign-in refuses the passkey"],
+]);
 
-  /* A TEST FILE NOTHING RUNS, AND A SKIP THAT GIVES NO REASON: `orphan-tests`' two findings, one fixture each.
-     AND AUDIT 35'S FOUR BLIND SPOTS, each a seed of its own that the gate passed before. `orphan-tests` seeds three
-     names, a test beside its source, a `.spec.ts` and a `-test.mjs`, and keeps a program called `pack-test.ts` as its
-     decoy. `-empty` seeds a helper named as a test that registers none. `-if` seeds a step and a job under `if: false`
-     and a workspace whose script no workflow runs, beside a `--filter`, the root's `pnpm test` and a condition that may
-     be true. Each count is of lines naming `seeded`, so losing any one rule turns its fixture's count wrong. */
-  { gate: 'orphan-tests', expect: /is run by nothing/, findings: 3 },
-  { gate: 'orphan-tests-skip', run: 'orphan-tests', expect: /which gives no reason/, findings: 1 },
-  { gate: 'orphan-tests-empty', run: 'orphan-tests', expect: /registers no test/, findings: 1 },
-  { gate: 'orphan-tests-if', run: 'orphan-tests', expect: /no workflow runs that script|under `if: false`/, findings: 3 },
+/**
+ * ONLY THE SELF-TEST ITSELF IS EXCUSED, and this is why: its planted fault is every other gate's. A
+ * case that ran it would run it again from inside itself, every browser negative with it, and prove
+ * nothing a red line below does not already prove.
+ */
+export const EXCUSED = new Set(['self-test']);
 
-  /* THE FOUR HALVES OF `graph`, ONE FIXTURE EACH. A gate with three checks and one fixture is a
-     gate with one check under test and two that have never been asked to fire, and this one's
-     three are independent: a cycle is found in the manifests, an undeclared import in the source,
-     and a relative escape in a specifier that resolves outside its own package.
+/** Which registered gates have no planted fault, and which gaps no longer are. */
+export function uncovered(registered, covered) {
+  const missing = [...registered].filter((g) => !covered.has(g) && !EXCUSED.has(g) && !GAPS.has(g));
+  const closed = [...GAPS.keys()].filter((g) => covered.has(g));
+  const open = [...GAPS.keys()].filter((g) => !covered.has(g));
+  return { missing, closed, open };
+}
 
-     EACH FIXTURE CARRIES ITS OWN `docs/31-STACK.md`, because the gate reads the order out of the
-     document rather than holding a copy of it. A fixture without one has no order at all, every
-     package in it is unranked, and all four would go red for the same wrong reason.
-
-     `graph-cycle` names its seeded file TWICE on purpose: a cycle inside a total order always
-     contains an edge that points up it, so the same manifest line is reported by the cycle check
-     and by the direction check. Two findings is the honest number. */
-  /* AND `expect` IS ANCHORED ON THE RULE'S VOCABULARY, NOT ON ITS PUNCTUATION. This pattern read
-     the word `cycle` followed by an em dash, and a sweep of those over the other gate files turned
-     `graph`'s finding into `cycle: kernel → where → kernel. where → kernel closes it`, which the
-     pattern could no longer match. Two words the rule cannot be stated without survive a reformat; a dash between them
-     does not.
-
-     THE FAILURE MODE HERE IS ALREADY THE SAFE ONE, which is why this is a better pattern rather
-     than a new mechanism. A stale `expect` lands on the branch below that prints "went red with a
-     sentence this test does not recognise" and pushes the gate onto `failed`, so the run is red
-     and the gate is named. Nothing goes quiet: the cost of rewording a finding is a false red
-     against this table, which is the direction a test of tests should fail in. */
-  { gate: 'graph-cycle', run: 'graph', expect: /\bcycle\b.*\bcloses it\b/u, findings: 2 },
-  { gate: 'graph-direction', run: 'graph', expect: /points up the order/, findings: 1 },
-  { gate: 'graph-undeclared', run: 'graph', expect: /undeclared import/, findings: 1 },
-  { gate: 'graph-escape', run: 'graph', expect: /cross-package relative import/, findings: 1 },
-  { gate: 'secret-grep', expect: /reaches a log/, findings: 1 },
-  /* THE SAME LEAK UNDER THE NAME THE CODE USES. `52 §6`'s example is `console.log(plaintext)` and no
-     file here has ever held a variable called that; the key hierarchy calls its secrets `plain`,
-     `dek`, `kek`, `root` and `pkcs8`. One fixture per vocabulary, so widening the pattern is a thing
-     that can be proved rather than asserted. */
-  { gate: 'secret-grep-dek', run: 'secret-grep', expect: /reaches a log/, findings: 1 },
-  /* THE THIRD SINK, AND THE ONE THIS GATE'S OWN MESSAGE NAMES FIRST: *"a credential never goes in
-     the record."* One finding, not two: the fixture holds a real leak and an innocent call whose
-     SQL merely contains the words `root`, `wrapped_by` and `kek`, because eight calls in the real
-     tree are that shape and a gate red on all of them is a gate switched off. */
-  { gate: 'secret-grep-record', run: 'secret-grep', expect: /reaches the record/, findings: 1 },
-  /* THE FOURTH: a session id in a log. The same fixture posts the server key to its own host, which is the
-     one transmission sign-in's four names exist for, so a count of one proves the gate tells them apart. */
-  { gate: 'secret-grep-wire', run: 'secret-grep', expect: /sign-in secret reaches a log/, findings: 1 },
-  /* THE FIFTH: an agent's key in `apps/cli/src/keys.ts`, sent from `depositOne`, the file's recorded exemption, and
-     encoded to bytes that reach a log. One finding proves both halves: the exemption covers that function and
-     nothing else, and a value is followed into a name that is not `plaintext`. */
-  { gate: 'secret-grep-vault', run: 'secret-grep', expect: /a plaintext reaches a log/, findings: 1 },
-  /* THE SIXTH: a key that comes back from a call. `const got = await getOne(…)` names no branded value, so
-     `process.stdout.write(got.value)` was green until a same-file function whose return type names the brand was
-     followed. The fixture also logs the answer of a deposit, a call whose return type does not, so one finding
-     proves the gate follows only a return typed as plaintext. */
-  { gate: 'secret-grep-return', run: 'secret-grep', expect: /a plaintext reaches standard output/, findings: 1 },
-  /* THE SEVENTH, EIGHTH AND NINTH: the two keys September 17th added, which no name above matched. A report key's
-     answer logged whole beside its id logged alone; an opened action key under a name on no list, beside a sentence
-     that says "opened"; and `secret` in an error message, beside a bearer handed to `digest(`. One finding each proves
-     the gate follows where the value came from and reads code, not prose. */
-  { gate: 'secret-grep-report', run: 'secret-grep', expect: /a report key or an opened action key reaches a log/, findings: 1 },
-  { gate: 'secret-grep-opened', run: 'secret-grep', expect: /a report key or an opened action key reaches a log/, findings: 1 },
-  { gate: 'secret-grep-held', run: 'secret-grep', expect: /a report key or an opened action key reaches an error message/, findings: 1 },
-  /* THE TENTH: the one function that may print a key. `headersOne` writes a key read back to standard output for
-     Claude Code's `headersHelper`, which is its recorded exemption, and a second function in the same file writes the
-     same key there too. One finding, and one in all, proves the exemption covers that function and nothing beside it. */
-  { gate: 'secret-grep-headers', run: 'secret-grep', expect: /a plaintext reaches standard output/, findings: 1, total: 1 },
-  /* THREE, because a kind in one source and not the other three is three statements about the same
-     drift, and which three is the repair. A count of one would pass a gate that compared two. */
-  { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },
-  { gate: 'router-groups', expect: /INTERNAL is the host's own surface|puts it in INTERNAL/, findings: 2 },
-  /* THE ACCOUNT TABLE, which reads the session cookie and nothing else. The fixture holds a correct row beside the
-     seeded one, so a count of one proves the gate reads each row rather than going red on the table. */
-  { gate: 'router-groups-account', run: 'router-groups', expect: /an account route reads the session cookie/, findings: 1 },
-  /* THE REAL DEFECT, KEPT VERBATIM. `members` was routed ADMIN and guarded `guard(ctx, 'read')`, and
-     thirteen of the fourteen ADMIN routes called `admin`. The fixture holds that one line beside
-     three correct methods, so a count of one is what proves the gate distinguishes them rather than
-     reporting every route it reads. */
-  { gate: 'guards', expect: /routed as ADMIN and is guarded by guard\(\)/, findings: 1 },
-  /* THE OTHER DIRECTION, AND THE ONE THAT IS SILENT IN REVIEW. `guards` had a single fixture, a
-     method routed ADMIN and guarded `guard()`, so the gate was proved to catch a ceiling that is too
-     LOW. A ceiling that is too high reads as care: `create` routed DATA and guarded `admin(ctx)`
-     refuses every token and takes the eight MCP tools with it, and nothing had ever asked this gate
-     to notice. The fixture's other five methods put DATA and `READ+` under both `guard` and
-     `scoped`, so one finding is an assertion that those two groups share one list rather than an
-     assertion that the gate went red about something. */
-  { gate: 'guards-data', run: 'guards', expect: /routed as DATA and is guarded by admin\(\)/, findings: 1 },
-  /* AND THE ONE ROUTE A KEY OUTSIDE ANY BROWSER CALLS AS OFTEN AS IT LIKES: `report` spending no budget, and the number
-     the record enforces moved away from `budgets.json`'s `report.rowsPerMinute`. One each, so both halves are proved. */
-  { gate: 'guards-report', run: 'guards', expect: /spends no reportBudget/, findings: 1 },
-  { gate: 'guards-report-budget', run: 'guards', expect: /report.rowsPerMinute is/, findings: 1 },
-  /* AND THE HALF OF THE SURFACE WRITTEN IN ITS OWN FILES: a row under `packages/host/src/routes/` and its method under
-     `packages/record/src/methods/`, where `triage` is routed DATA and guarded `admin(ctx)`. A gate that read only the
-     two index files would find no row to check and pass. */
-  { gate: 'guards-methods', run: 'guards', expect: /routed as DATA and is guarded by admin\(\)/, findings: 1 },
-  /* AND ONE METHOD NAME WRITTEN IN TWO OF THE RECORD'S FILES, which the record's spread keeps one of without a word. */
-  { gate: 'guards-twice', run: 'guards', expect: /keeps only one of them/, findings: 1 },
-  /* AND AN INTERNAL METHOD ROUTED FROM A FILE UNDER `routes/`, which a gate reading only `index.ts` never sees. */
-  { gate: 'router-groups-routes', run: 'router-groups', expect: /INTERNAL is the host's own surface|puts it in INTERNAL/, findings: 2 },
-  { gate: 'closed-lists', expect: /the migration admits/, findings: 1, total: 1 },
-  /* AND THE OTHER HALF OF THAT GATE: a `CHECK` a later migration widened, over a document that
-     never says which migration did it. `30 §1` is migration 0001 verbatim and cannot be corrected
-     to the running schema, so this is the only thing standing between a member the database
-     enforces and nobody being able to learn it exists by reading. */
-  { gate: 'closed-lists-widened', run: 'closed-lists', expect: /widened outbox\.kind/, findings: 1, total: 1 },
-  /* THE LIST, NOT THE COUNT. The fixture swaps `lookup` for `regex` and leaves the ten at ten, so
-     every check that counts agrees and the vocabulary a declaration may use to read a stranger's
-     message has quietly gained a member nobody reviewed. That is the whole argument for reading a
-     closed list rather than counting it, and it is the one the render kinds table lost first. */
-  { gate: 'closed-lists-extractors', run: 'closed-lists', expect: /not the same list in the same order/, findings: 1, total: 1 },
-  /* ONE FALSE COUNT BESIDE TRUE ONES AND A QUALIFIED ONE (`Three CSS gates`), so a total of one proves the gate reads the
-     code's tables rather than refusing every number, and leaves a count of some of a list alone. */
-  { gate: 'docs-counts', expect: /and the code holds/, findings: 1, total: 1 },
-  /* A SECOND PLACE THAT WRITES A POINT, CARRYING A REGISTER'S NAME, beside a correct one. Check 1 names both calls and check 3 names the seed for `register`, so the seed is named twice and the total is three. The seed's tuple is well formed, which proves the gate reads what goes into a tuple and not only its labels. */
-  { gate: 'telemetry-allowlist', expect: /carries register/, findings: 2, total: 3 },
-  /* THE SHELL CHECK, WHICH READS EVERY `apps/*\/src/app.html` IN THE WORKSPACE. It is in `bundle`
-     because that gate already reads a built shell, and until now it read only the built one, only
-     for `apps/web`, and only when there was a build. The source form needs neither, and it reaches
-     `apps/site`, which nothing in this suite had ever read a line of. The fixture spells the body
-     placeholder twice and the head placeholder once, so a count of one is what proves the gate
-     reports the placeholder that is wrong rather than every placeholder it finds. */
-  { gate: 'bundle-shell', run: 'bundle', expect: /a shell the build cannot substitute/, findings: 1 },
-  /* AND THE OTHER END OF THE SAME GATE: a manifest naming a chunk the build did not emit. Every
-     byte `bundle` reports is read by name out of that manifest, and the read had nothing between
-     it and the disk, so the gate died with a Node stack trace and `run.mjs` reported it red with
-     no sentence in it. The fixture names one chunk and does not put it there, and one finding is
-     what proves the gate names the file rather than counting the manifest.
-
-     ITS TREE IS SHAPED BY A GUARD UPSTREAM OF THE ONE UNDER TEST, which is about mtimes rather
-     than contents and is the only reason this fixture looks odd. The shell lives under
-     `apps/site/src/` and there is no `apps/web/src/` at all, because a checkout writes
-     `.svelte-kit/` before `src/` and a source file newer than the manifest makes the gate skip as
-     stale before it reads a chunk.
-
-     AND THERE IS NO `packages/` HERE, WHICH IS A SECOND THING THIS FIXTURE NOW PROVES. It used to
-     carry a `packages/seeded/` holding nothing but a manifest, because the staleness walk read
-     `packages/` with a bare `readdir` and died on a tree without one. `85c44aa7` gave that walk the
-     `.catch` its sibling over `apps/` has always had, so the decoy came out: if the guard is ever
-     removed again, this fixture goes red with an ENOENT stack where its sentence should be. One
-     violation is still seeded and one finding is still asserted; the absent directory is a property
-     of the tree rather than a second violation. */
-  { gate: 'bundle-missing-chunk', run: 'bundle', expect: /\bmanifest\b.*\bdid not emit\b/, findings: 1 },
-  /* ONE LINE NAMES THE CODE, and the fixture drops exactly one. The gate reports two findings for
-     it (the missing code, and the family whose size no longer matches) and only the first can
-     name it, because the second is about a count. `findings` here is *lines that name the seeded
-     token*, not *findings the gate made*, and conflating them is how a fixture ends up asserting a
-     number that means something else. */
-  /* ONE BYPASS, AND THE FIXTURE'S KERNEL IS OTHERWISE HONEST: three of its four writers call
-     `slashMayWrite`, and the fourth appends the event itself. That is `slash.ts`'s own "a sixth
-     writer would be a sixth call" written as a tree. One finding, because the other three still
-     refuse and the query returns exactly the row the bypass wrote.
-
-     AND ONE IN TOTAL, WHICH IT WAS NOT. From September 11th (`d92523ec`) to the 25th this
-     fixture's `log` took a bare actor where the gate passes `{ actor }`, so the note offer died in
-     SQLite and the gate printed a second finding, a crash, on every run. This case stayed green
-     through it, because one line still named the bypass. `total` makes that second line a failure. */
-  { gate: 'slash-actor', expect: /slash wrote \w+, in the seed record/, findings: 1, total: 1 },
-
-  /* TWO IN TOTAL, the missing code and its family's size, and the second number is the one a rename
-     breaks. Renaming the assistant's family in the gate and not in this fixture's `30 §6` copy made
-     the gate print 22 findings here (no Slash family, no SLASH array, and every one of the family's
-     codes unaccounted for) while this case still read "red on its seeded violation", because
-     WOULD_ORPHAN was still named on exactly one line. Measured, September 25th. */
-  { gate: 'refusals', expect: /and REFUSAL_CODES does not/, findings: 1, total: 2 },
-
-  /* TWO CODES NAMED IN ONE SOURCE FILE AND ONE OF THEM FIXTURED, and the seeded violation is the
-     second, which is the rule that matters, because a code the tree already hands to callers with
-     no fixture is the enumeration rotting in the direction that costs something. The file names two
-     codes on purpose: a gate counting fixtures rather than finding gaps would report zero or two
-     here, and only "one" is the right answer. */
-  { gate: 'refusal-fixtures', expect: /and has no fixture/, findings: 1, total: 1 },
-  /* `derived:` SAYS A CODE IS READ OFF AN ENVELOPE, and the one thing it must never become is a way
-     to quieten a fixture that never needed it. So the tree seeded for it claims the key on a code
-     whose own site constructs it, which is the branch that keeps the key narrow. The other four
-     branches are proved by mutation in the gate's own header. */
-  { gate: 'refusal-fixtures-derived', run: 'refusal-fixtures', expect: /derived from .*itself/, findings: 1, total: 1 },
-  /* ONE, and the fixture holds two flags so the count means something: one declared and never
-     read, one declared and read. A gate that reported both would be counting flags rather than
-     finding dead ones. */
-  { gate: 'flags', expect: /a branch nobody takes/, findings: 1 },
-  { gate: 'no-declarations-in-kernel', expect: /declaration written in the kernel/, findings: 1 },
-  /* TEN, each a place the gate once did not look or a shape it once did not read: a host in the kernel,
-     a word split over two parts, `api.goldapi.io` in a grammar, `api.mercury.com` in an app script,
-     `EGP` in `packages/seed` and `payrollRun` in `apps/web`, the last two once exempted whole. Measured
-     against the gate before it read those places: it named the first five, and said `packages/seed` was an
-     exemption holding nothing, which is a sixth finding this case did not seed. `total` is what turns
-     that sixth line into a failure rather than a pass that happened to count five. */
-  { gate: 'shell-words', expect: /a use case named in the core/, findings: 10, total: 10 },
-  { gate: 'no-fixtures', expect: /imports the test fixtures/, findings: 1, total: 1 },
-  { gate: 'no-fixtures-places', run: 'no-fixtures', expect: /imports the seed's root/, findings: 1, total: 1 },
-  { gate: 'no-fixtures-installer', run: 'no-fixtures', expect: /calls the seed's installer/, findings: 3, total: 3 },
-  /* THREE, ONE OF EACH SHAPE: a list id as a string, a link into a list written as a template with a hole, and a currency
-     code after `??`. Beside them sit a test, a `fixtures/` file, a currency table, markup classes, comments, a regular
-     expression and a time zone after `||`, each spelled like one of the three, and `total` says none of them was read. */
-  { gate: 'web-lists', expect: /names the first-party list/, findings: 3, total: 3 },
-  /* THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both (or neither)
-     is a gate that is counting keys rather than finding dead ones. */
-  { gate: 'dead-copy', expect: /nobody reads/, findings: 1 },
-
-  /* AND THE SHAPE `dead-copy` COULD NOT SEE: a sentence whose only renderer is a module nothing
-     imports. It cost a real one: `copy.alpha`, the word that tells the alpha deployment apart from
-     the real record, named only by a component that had never been mounted. A grep over source said
-     it was rendered. */
-  { gate: 'dead-copy-orphan', run: 'dead-copy', expect: /nobody reads/, findings: 1 },
-
-  /* AND THE AGGREGATE: `copy` types nothing and spreads an area file, so the seeded sentence is found only
-     by following the spread to the file that types it. A gate reading only the aggregate finds no key and passes. */
-  { gate: 'dead-copy-spread', run: 'dead-copy', expect: /nobody reads/, findings: 1 },
-
-  /* `packs/`, THE THIRD WORKSPACE ROOT, ONE FIXTURE PER TEXT GATE THAT READS IT. Each tree holds a
-     violation under `packs/` and nothing a gate reading only `packages` and `apps` could find, so
-     dropping `packs` from a gate's list turns its case red here. That is the defect an audit
-     found: all four text gates had the pair written in, and read green over four shipped
-     packs they had never opened. `tools/gates/test/packs-read.test.mjs` proves the same four under
-     `node --test`; this is the copy `run.mjs` runs, so it cannot be skipped by a run that does not
-     reach the unit tests. Measured on 24 September by deleting `packs` from each gate's list in a
-     scratch copy: `em-dash-packs` went red with exit 3 (nothing read), `secret-grep-packs` and
-     `graph-packs` each passed their seeded violation.
-
-     THE DECOYS ARE THE PACK'S TEST, which sits beside the file it ships rather than under `test/`.
-     `em-dash` and `graph` must leave it alone and it carries the same sentence and the same climb as
-     the seeded file, so `packs/seeded/` named twice is the gate reading the test. `secret-grep` reads
-     tests on purpose, so its decoy is a line logging the key's label beside the one logging its value.
-
-     NO `shell-words-packs`, AND THAT IS THE GATE'S DECISION RATHER THAN A GAP. Its words are the use
-     cases the core must not name, and a pack is where a use case belongs, so it leaves `packs` out on
-     purpose (its `WORKSPACES` header) and `packs-read.test.mjs` pins the pair: a use-case word in a
-     pack stays green, the same word in `packages/kernel` goes red. A negative here would be a fixture
-     asserting the opposite of the rule. */
-  { gate: 'em-dash-packs', run: 'em-dash', expect: /used as punctuation/, findings: 1 },
-  { gate: 'secret-grep-packs', run: 'secret-grep', expect: /a plaintext reaches a log/, findings: 1 },
-  { gate: 'graph-packs', run: 'graph', expect: /cross-package relative import/, findings: 1 },
-
-  /* AN EMPTY ROOT, ONE PER TEXT GATE, AND THE ANSWER IS A SKIP. Each fixture holds nothing but its
-     `expect.txt`, so no `packages/`, `apps/` or `packs/` at all, which is what a mistyped
-     `BRAINDOG_GATE_ROOT` looks like from inside a gate. An audit measured the
-     three on such a tree: `em-dash` exited 3, `graph` exited 3 without saying where it had looked, and
-     `secret-grep` exited 0, "0 plaintexts reach a sink, over 0 files", which `run.mjs` counts as a
-     pass. A gate that read nothing has not passed, and a gate that read nothing somewhere it does not
-     name leaves the reader to guess which root was wrong.
-
-     `skip: true` ASKS FOR EXIT 3 EXACTLY, not only for red. Exit 1 here would be a finding over a
-     tree that holds no file, which is a different defect wearing the same colour. The seeded name is
-     the fixture's own directory, so "named once" is the skip line saying which root it read. */
-  { gate: 'em-dash-empty', run: 'em-dash', skip: true, expect: /no prose was read/, findings: 1 },
-  { gate: 'secret-grep-empty', run: 'secret-grep', skip: true, expect: /no file was read/, findings: 1 },
-  { gate: 'graph-empty', run: 'graph', skip: true, expect: /nothing was checked/, findings: 1 },
-
-  /* THIS BATCH'S THREE NEW GATES, one seed each and nothing else red beside it. `one-clock`: a reader working out a
-     run's state from `last_seen` and the clock. `no-sample`: the test fixture's words in the built app. `public-clean`:
-     a changelog at the root, which is the site's. */
-  { gate: 'one-clock', expect: /compares a run's last_seen with the clock/, findings: 1, total: 1 },
-  { gate: 'no-sample', expect: /a string of the test fixture/, findings: 1, total: 1 },
-  { gate: 'public-clean', expect: /the changelog is the site's/, findings: 1, total: 1 },
-];
 
 /** How many lines of a gate's output name the seeded file. One per seeded violation. */
 const named = (said, seeded) => said.split('\n').filter((l) => l.includes(seeded)).length;
@@ -402,8 +184,8 @@ const reported = (said) => {
 };
 
 /**
- * THE SENTENCE IS THE WORDS AND NOT THEIR CAPITALISATION, so every `expect` above is matched
- * case-insensitively.
+ * THE SENTENCE IS THE WORDS AND NOT THEIR CAPITALISATION, so every `expect` in a `case.json` is
+ * matched case-insensitively (`readCases` compiles it so, and this holds any other pattern to it).
  *
  * TWICE IN TWO DAYS A REWORDING HAS UNHOOKED ONE OF THESE, and both times for a reason that had
  * nothing to do with the rule under test. `graph`'s cycle finding lost the em dash the pattern was
@@ -528,8 +310,9 @@ const BROWSER = [
    fixed since the build goes red for the old reason, and a fixture the build predates goes red for
    none. The walk and the sentence are `run.mjs`'s own, from `lib.mjs`, so the two cannot disagree
    about which build is current. A variant list it cannot read is the same refusal rather than a
-   stack trace, because one unreadable fact must not end the run before the fixture cases report. */
-const buildUnmet = await webBuildUnmet(join(here, '..', '..')).catch((cause) => cause.message);
+   stack trace, because one unreadable fact must not end the run before the fixture cases report.
+   Set by `main`, so importing this file walks nothing. */
+let buildUnmet = null;
 
 function seededBrowser({ gate, seed, names, blind, red }) {
   /* SKIPPED WHEN THE BUILD CANNOT BE MEASURED, like the gate itself, AND WRITTEN DOWN. This returned
@@ -571,15 +354,10 @@ function seededBrowser({ gate, seed, names, blind, red }) {
 
 let ran = 0;
 
-for (const { gate, expect, findings, total, run, skip } of CASES) {
-  const fixture = join(negatives, gate);
-  if (!existsSync(fixture)) {
-    console.error(`  ${gate}: no negative fixture at tools/gates/negative/${gate}/`);
-    failed.push(gate);
-    continue;
-  }
-
-  const r = spawnSync(process.execPath, [join(here, `${run ?? gate}.mjs`)], {
+/** One planted tree, run against the gate its `case.json` names. */
+function planted({ tree, gate, rule, expect, findings, total, skip }) {
+  const fixture = join(negatives, tree);
+  const r = spawnSync(process.execPath, [join(here, `${gate}.mjs`)], {
     cwd: fixture,
     encoding: 'utf8',
     env: { ...process.env, BRAINDOG_GATE_ROOT: fixture },
@@ -592,20 +370,20 @@ for (const { gate, expect, findings, total, run, skip } of CASES) {
   if (r.status === 0) {
     console.error(
       skip
-        ? `  ${gate}: PASSED a root with nothing in it. A mistyped root would read green.`
-        : `  ${gate}: PASSED its own seeded violation. It is checking nothing.`,
+        ? `  ${tree}: PASSED a root with nothing in it. A mistyped root would read green.`
+        : `  ${tree}: PASSED its own seeded violation. It is checking nothing.`,
     );
-    failed.push(gate);
+    failed.push(tree);
   } else if (skip && r.status !== 3) {
-    console.error(`  ${gate}: exited ${r.status} over a root with nothing in it, and a gate that read nothing exits 3.`);
+    console.error(`  ${tree}: exited ${r.status} over a root with nothing in it, and a gate that read nothing exits 3.`);
     console.error(said.split('\n').slice(0, 6).map((l) => `      ${l}`).join('\n'));
-    failed.push(gate);
+    failed.push(tree);
   } else if (!said.includes(seeded)) {
-    console.error(`  ${gate}: went red but never named ${seeded}.`);
+    console.error(`  ${tree}: went red but never named ${seeded}.`);
     console.error(said.split('\n').slice(0, 6).map((l) => `      ${l}`).join('\n'));
-    failed.push(gate);
+    failed.push(tree);
   } else if (!recognises(expect).test(said)) {
-    console.error(`  ${gate}: went red with a sentence this test does not recognise. What it did say:`);
+    console.error(`  ${tree}: went red with a sentence this test does not recognise. What it did say:`);
     console.error(
       said
         .split('\n')
@@ -614,20 +392,20 @@ for (const { gate, expect, findings, total, run, skip } of CASES) {
         .map((l) => `      ${l}`)
         .join('\n'),
     );
-    failed.push(gate);
+    failed.push(tree);
   } else if (named(said, seeded) !== findings) {
     /* THE COUNT, NOT ONLY THE COLOUR. The colour-grep fixture used to carry three forms in one
        file and this only asserted that the gate went red, so reverting any two of the three
        fixes still left the third firing, and the negative could not tell which of them was doing
        the work. A fixture that proves "something here is caught" is not a fixture; it has to
        prove that THIS is caught, which means one violation per fixture and the count asserted. */
-    console.error(`  ${gate}: named ${seeded} on ${named(said, seeded)} line(s), and the fixture seeds ${findings}.`);
-    failed.push(gate);
+    console.error(`  ${tree}: named ${seeded} on ${named(said, seeded)} line(s), and the fixture seeds ${findings}.`);
+    failed.push(tree);
   } else if (total !== undefined && reported(said) !== total) {
     /* AND NOTHING ELSE BESIDE IT, where a case says how many findings the whole run makes. The
        count above is of lines naming the seed, so a gate that also goes red about the fixture's
        own scaffolding still passes it. */
-    console.error(`  ${gate}: red with ${reported(said) ?? 'an uncounted number of'} finding(s), and the fixture accounts for ${total}. What it said:`);
+    console.error(`  ${tree}: red with ${reported(said) ?? 'an uncounted number of'} finding(s), and the fixture accounts for ${total}. What it said:`);
     console.error(
       said
         .split('\n')
@@ -636,22 +414,37 @@ for (const { gate, expect, findings, total, run, skip } of CASES) {
         .map((l) => `      ${l}`)
         .join('\n'),
     );
-    failed.push(gate);
+    failed.push(tree);
   } else {
     ran++;
-    console.log(skip ? `  ${gate}: a skip over an empty root, naming ${seeded}` : `  ${gate}: red on its seeded violation, naming ${seeded}`);
+    const what = tree === gate ? gate : `${gate} (${tree})`;
+    console.log(skip ? `  ${what}: ${rule}, naming ${seeded}` : `  ${what}: red on ${rule}, naming ${seeded}`);
   }
 }
 
-for (const b of BROWSER) seededBrowser(b);
-
-/* AND EVERY FIXTURE IS CLAIMED. A directory under `negative/` that no case runs is a violation
-   nobody is seeding, which is the same silence this file exists to break. */
-for (const name of readdirSync(negatives, { withFileTypes: true }))
-  if (name.isDirectory() && !CASES.some((c) => c.gate === name.name)) {
-    console.error(`  negative/${name.name}/ is seeded and no case runs it.`);
-    failed.push(name.name);
+/**
+ * EVERY REGISTERED GATE HAS A PLANTED FAULT, the rule the old list could not state. A gate with no
+ * tree, no browser negative and no place on `GAPS` is red here and named; a gap that has gained one
+ * is red too, until it comes off the list.
+ */
+function everyGateHasACase(registered, cases) {
+  const covered = new Set([...cases.map((c) => c.gate), ...BROWSER.map((b) => b.gate)]);
+  const { missing, closed, open } = uncovered(registered, covered);
+  for (const g of missing) {
+    console.error(`  ${g}: registered in run.mjs with no planted fault. A gate that has never failed may not work.`);
+    failed.push(g);
   }
+  for (const g of closed) {
+    console.error(`  ${g}: has a planted fault now and is still on GAPS. Take it off; the list only shrinks.`);
+    failed.push(g);
+  }
+  if (!missing.length && !closed.length) {
+    ran++;
+    const planted = [...registered].filter((g) => covered.has(g)).length;
+    console.log(`  every gate has a case: ${planted} of ${registered.size} registered gates planted, self-test excused, the rest named below`);
+  }
+  for (const g of open) console.log(`  ${g}: no planted fault yet; ${GAPS.get(g)}`);
+}
 
 /**
  * AND EVERY NUMBER IN `budgets.json` IS READ BY SOMETHING.
@@ -662,25 +455,51 @@ for (const name of readdirSync(negatives, { withFileTypes: true }))
  * the gate goes on measuring against whatever it holds instead. That is strictly worse than no
  * budget at all, because a missing one is visible and a dead one is not.
  *
- * IT GREPS FOR `.key` RATHER THAN PARSING. A gate reads its section into a one-letter binding, so
- * the use is `B.mainJsBrotli` and the name is unambiguous across this directory: no other file
- * here has a property by any of these names. A parser would be more precise and would also be a
- * second thing that can be wrong.
+ * THE WHOLE PATH, NOT ITS LAST WORD. This compared `.port` against every source here, so four port
+ * keys (`keys`, `prefs`, `layout`, `a11y`) passed on `server.address().port` while every browser gate
+ * asked the system for a free port and read none of them (PRF-B02). A key is read now when a file
+ * names its section and reads the key off that section: `budget('S').key`, a binding
+ * `const X = budget('S')` and then `X.key`, or `const { key } = budget('S')`.
+ *
+ * IT GREPS RATHER THAN PARSING. A parser would be more precise and would also be a second thing that
+ * can be wrong. `tools/look/` is read with this directory, because `look.widths` is its section.
  */
-function budgetsAreRead() {
-  const sources = readdirSync(here)
-    .filter((f) => f.endsWith('.mjs') && f !== 'lib.mjs' && f !== 'self-test.mjs')
-    .map((f) => readFileSync(join(here, f), 'utf8'))
-    .join(String.fromCharCode(10));
+export function readPaths(source) {
+  const read = new Set();
+  for (const m of source.matchAll(/budget\(\s*'([\w]+)'\s*\)\.(\w+)/gu)) read.add(`${m[1]}.${m[2]}`);
+  for (const m of source.matchAll(/\b(?:const|let)\s+\{([^}]*)\}\s*=\s*budget\(\s*'(\w+)'\s*\)/gu))
+    for (const name of m[1].split(',')) {
+      const key = name.split(':')[0].trim();
+      if (key) read.add(`${m[2]}.${key}`);
+    }
+  for (const m of source.matchAll(/\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*budget\(\s*'(\w+)'\s*\)/gu))
+    for (const use of source.matchAll(new RegExp(`(?<![\\w$.])${m[1].replace(/\$/gu, '\\$')}\\.(\\w+)`, 'gu'))) read.add(`${m[2]}.${use[1]}`);
+  return read;
+}
 
-  const dead = keyPaths().filter((path) => !sources.includes(`.${path.split('.')[1]}`));
+export const deadKeys = (paths, sources) => {
+  const read = new Set(sources.flatMap((s) => [...readPaths(s)]));
+  return paths.filter((path) => !read.has(path));
+};
+
+function budgetsAreRead() {
+  const dirs = [here, join(here, '..', 'look')];
+  const sources = dirs
+    .filter((d) => existsSync(d))
+    .flatMap((d) =>
+      readdirSync(d)
+        .filter((f) => f.endsWith('.mjs') && f !== 'lib.mjs' && f !== 'self-test.mjs')
+        .map((f) => readFileSync(join(d, f), 'utf8')),
+    );
+
+  const dead = deadKeys(keyPaths(), sources);
   if (dead.length) {
     console.error(`  budgets: ${dead.length} key(s) no gate reads: ${dead.join(', ')}.`);
     failed.push('budgets');
     return;
   }
   ran++;
-  console.log(`  budgets: all ${keyPaths().length} numbers are read by a gate`);
+  console.log(`  budgets: all ${keyPaths().length} numbers are read by a gate, each by its whole path`);
 }
 
 /**
@@ -755,43 +574,70 @@ function noSilentPass() {
   console.log(`  silent-pass: none of ${FILES.length} gate files exits 0 on purpose`);
 }
 
-budgetsAreRead();
-noSilentPass();
 
-/**
- * AND THE ANSWER IS ONE CLAIM, so it may not be made from part of the evidence.
- *
- * `ran` USED TO BE PRINTED WITH NO DENOMINATOR. The five browser negatives need `apps/web/build`,
- * and without one they returned from `seededBrowser` counting towards neither `ran` nor `failed`.
- * A checkout with no build therefore printed `self-test: 56 negatives caught by the gate seeded for
- * it.` and exited 0, and 56 is a comfortable number: nothing in that sentence says the five gates
- * that guard the rendered product were never asked. The number that shrank was the only symptom,
- * and a reader has to know 61 by heart to see it.
- *
- * A FINDING BEATS A SKIP, which is why `failed` is tested first. A run that caught a dead gate has
- * an answer and it is red, whether or not five others were reachable.
- *
- * EXIT 3 AND NOT 0 FOR THE REST, and this is the one gate in the directory where the choice is not
- * close. Every other gate reports a list of independent findings, so one input missing costs one
- * check and the rest of the output still means what it says. This file reports a single verdict
- * about the whole suite: *every gate catches the violation seeded for it*. That sentence is true
- * or it is unproven, and five gates unasked make it unproven. Passing it off as a pass would be
- * this file committing, about itself, the exact defect it was written to catch in others.
- *
- * AND THE SKIP LANDS WHERE IT SHOULD. `run.mjs` reads 3 as a skip and never as a pass, and CI
- * builds before it runs the gates, so in CI this is red and the missing build is the finding. On a
- * fresh clone it is a skip, which is the honest word for a question nobody could put.
- */
-if (failed.length) {
-  console.log(`\n  self-test: ${failed.length} gate(s) do not: ${[...new Set(failed)].join(', ')}.\n`);
-  process.exitCode = 1;
-} else if (notRun.length) {
-  const asked = ran + notRun.length;
-  console.log(
-    `\n  self-test: ${ran} of ${asked} negatives caught, and ${notRun.length} not run for want of ` +
-      `a current apps/web/build: ${notRun.join(', ')}. \`pnpm --filter @braindog/web build\`, then ask again.\n`,
-  );
-  process.exit(3);
-} else {
-  console.log(`\n  self-test: ${ran} negative${ran === 1 ? '' : 's'} caught by the gate seeded for it.\n`);
+async function main() {
+  buildUnmet = await webBuildUnmet(join(here, '..', '..')).catch((cause) => cause.message);
+
+  const registered = registeredGates(readFileSync(join(here, 'run.mjs'), 'utf8'));
+  if (!registered.size) {
+    console.error('  run.mjs: no GATES table could be read, so no gate can be asked for its planted fault.');
+    failed.push('run.mjs');
+  }
+
+  /* AND EVERY TREE IS CLAIMED, by its own case.json. A tree that says nothing, or names a gate nobody
+     runs, is a violation nobody is seeding, which is the same silence this file exists to break. */
+  const { cases, refused } = readCases(negatives, registered);
+  for (const line of refused) {
+    console.error(`  ${line}`);
+    failed.push(line.split('/')[1]);
+  }
+
+  for (const c of cases) planted(c);
+  for (const b of BROWSER) seededBrowser(b);
+  everyGateHasACase(registered, cases);
+
+  budgetsAreRead();
+  noSilentPass();
+
+  /**
+   * AND THE ANSWER IS ONE CLAIM, so it may not be made from part of the evidence.
+   *
+   * `ran` USED TO BE PRINTED WITH NO DENOMINATOR. The five browser negatives need `apps/web/build`,
+   * and without one they returned from `seededBrowser` counting towards neither `ran` nor `failed`.
+   * A checkout with no build therefore printed `self-test: 56 negatives caught by the gate seeded for
+   * it.` and exited 0, and 56 is a comfortable number: nothing in that sentence says the five gates
+   * that guard the rendered product were never asked. The number that shrank was the only symptom,
+   * and a reader has to know 61 by heart to see it.
+   *
+   * A FINDING BEATS A SKIP, which is why `failed` is tested first. A run that caught a dead gate has
+   * an answer and it is red, whether or not five others were reachable.
+   *
+   * EXIT 3 AND NOT 0 FOR THE REST, and this is the one gate in the directory where the choice is not
+   * close. Every other gate reports a list of independent findings, so one input missing costs one
+   * check and the rest of the output still means what it says. This file reports a single verdict
+   * about the whole suite: *every gate catches the violation seeded for it*. That sentence is true
+   * or it is unproven, and five gates unasked make it unproven. Passing it off as a pass would be
+   * this file committing, about itself, the exact defect it was written to catch in others.
+   *
+   * AND THE SKIP LANDS WHERE IT SHOULD. `run.mjs` reads 3 as a skip and never as a pass, and CI
+   * builds before it runs the gates, so in CI this is red and the missing build is the finding. On a
+   * fresh clone it is a skip, which is the honest word for a question nobody could put.
+   */
+  if (failed.length) {
+    console.log(`\n  self-test: ${new Set(failed).size} gate(s) do not: ${[...new Set(failed)].join(', ')}.\n`);
+    process.exitCode = 1;
+  } else if (notRun.length) {
+    const asked = ran + notRun.length;
+    console.log(
+      `\n  self-test: ${ran} of ${asked} negatives caught, and ${notRun.length} not run for want of ` +
+        `a current apps/web/build: ${notRun.join(', ')}. \`pnpm --filter @braindog/web build\`, then ask again.\n`,
+    );
+    process.exit(3);
+  } else {
+    console.log(`\n  self-test: ${ran} negative${ran === 1 ? '' : 's'} caught by the gate seeded for it.\n`);
+  }
 }
+
+/* RUN WHEN RUN, NOT WHEN IMPORTED, so `test/self-test-cases.test.mjs` can ask the reader and the key
+   check without spawning eighty gates. `run.mjs` spawns this file, so nothing it does changes. */
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) await main();

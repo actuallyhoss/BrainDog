@@ -1,0 +1,6 @@
+{
+  "gate": "secret-grep",
+  "rule": "a plaintext in a log",
+  "expect": "reaches a log",
+  "findings": 1
+}

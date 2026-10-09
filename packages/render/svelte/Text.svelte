@@ -40,7 +40,9 @@
   {:else if node.type === 'em'}<em><Self nodes={node.body} {opts} /></em>
   {:else if node.type === 'link'}<a href={hrefFor(opts, node.href)}><Self nodes={node.body} {opts} /></a>
   {:else if node.type === 'path'}
-    {#if node.resolved === null}
+    <!-- A path that names nothing is the author's text, dotted: no value will come, so no hole and no dash. -->
+    {#if node.named === false}<span class="unresolved">{node.path}</span>
+    {:else if node.resolved === null}
       <!-- A hole is a task, not a value: an unknown never participates in a scale, never sorts
            among the knowns, and is always the affordance that fixes it (05 §7.5). -->
       {#if opts.hole}

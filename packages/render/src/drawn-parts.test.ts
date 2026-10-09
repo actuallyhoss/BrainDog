@@ -34,7 +34,7 @@ test('A STAT DRAWS ITS FIGURES THAT HOLD A VALUE, each at its place in the block
 });
 
 test('A SPEC ROW AND A CHIP WITH NO VALUE ARE LEFT OUT, and so is a chip with no word', () => {
-  const spec = page('```spec\nKeeping it alive: tamsin.me | — | \nDomain | tamsin.me | \n```');
+  const spec = page('```spec\nKeeping it alive: quietcart.example | — | \nDomain | quietcart.example | \n```');
   assert.deepEqual(drawnRows(spec, {}).map(({ row }) => row.cells[0]), ['Domain']);
   const chips = page('```chips\ndot | — | status\ndot | 2 | — \ndot | 3 | open\n```');
   assert.deepEqual(drawnRows(chips, {}).map(({ row }) => row.cells[2]), ['open']);

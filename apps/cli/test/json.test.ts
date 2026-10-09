@@ -214,7 +214,7 @@ test('THE SIX COMMANDS §4.5 EXCLUDES DO NOT QUIETLY ACCEPT THE FLAG', async (t)
   const mcp = await ran(['mcp', '--json'], h.env, h.dir);
   assert.equal(mcp.code, 1);
   assert.equal(mcp.stdout, '');
-  assert.match(mcp.stderr, /braindog mcp takes --agent and --host/);
+  assert.match(mcp.stderr, /braindog mcp takes --agent, --host and --local/);
 
   /* `keys exec` and `run` hand stdout to the command they start, so the flag is refused by the verb's
      own option list and the label is not echoed back on the way. */

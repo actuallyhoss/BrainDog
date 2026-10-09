@@ -1,0 +1,7 @@
+{
+  "gate": "css-rules",
+  "rule": "a var() that resolves to nothing",
+  "expect": "resolves to nothing",
+  "findings": 1,
+  "why": "`css-rules` CLAIMS ELEVEN OF `52 §5.2`'s TWELVE ROWS (row 12 is skipped; see the gate's own header) plus the two rules the table does not number, and this is where the finding that started this work landed: the gate seeded TWO cases for TWELVE-ish rules, so one working rule (`unknown-property`, below) made every other one look alive, including the four that had never fired once. One fixture per rule now, each one crafted so it trips EXACTLY the rule under test and nothing else. A fixture that also fires `unknown-property` on an incidental `var()` would assert a count that means something else."
+}

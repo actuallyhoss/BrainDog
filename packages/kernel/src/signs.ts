@@ -215,15 +215,16 @@ function readArrivals(sql: Sql, nowMs: number, tz: string): SignReading {
   for (const [list, channels] of fed) {
     const { name, one } = listWords(sql, list);
     const newest = sql.one<{ at: string | null }>('SELECT max(created_at) AS at FROM entry WHERE register = ? AND deleted_at IS NULL', list)?.at ?? null;
-    /* A MESSAGE FILED COUNTS FOR THE LIST ITS PATTERN WROTE INTO; one still waiting holds every list at its door behind. */
-    const marks = [...channels].map(() => '?').join(', ');
-    const names = [...(by.get(list) ?? [])];
-    const filedBy = names.length === 0 ? '0' : `EXISTS (SELECT 1 FROM ingest_receipt x WHERE x.raw_id = r.id AND x.ingest_id IN (${names.map(() => '?').join(', ')}))`;
+    /* A MESSAGE FILED COUNTS FOR THE LIST ITS PATTERN WROTE INTO; one still waiting holds every list at its door behind.
+       THE PATTERNS AND THE DOORS GO IN AS ONE JSON LIST EACH, read by `json_each`, never a `?` apiece: a Durable Object
+       refuses a statement with more than 100 bound values, and a list fed by a hundred patterns threw the night's whole
+       read of signs (audit 36-37, finding 10). An empty list of patterns matches nothing, as `IN ()` would. */
     const came = sql.one<{ at: string | null }>(
       `SELECT max(r.ts) AS at FROM inbox_raw r
-       WHERE ((r.state = 'matched' AND ${filedBy}) OR (r.state IN ('untriaged', 'review', 'proposed') AND r.channel IN (${marks}))) AND ${VOUCHED}`,
-      ...names,
-      ...channels,
+       WHERE ((r.state = 'matched' AND EXISTS (SELECT 1 FROM ingest_receipt x WHERE x.raw_id = r.id AND x.ingest_id IN (SELECT value FROM json_each(?))))
+         OR (r.state IN ('untriaged', 'review', 'proposed') AND r.channel IN (SELECT value FROM json_each(?)))) AND ${VOUCHED}`,
+      JSON.stringify([...(by.get(list) ?? [])]),
+      JSON.stringify([...channels]),
       UNVERIFIED,
     )?.at ?? null;
     const has = newest === null ? `${name} has no ${one} yet` : `The newest ${one} in ${name} is from ${dateSaid(newest, tz, nowMs)}`;

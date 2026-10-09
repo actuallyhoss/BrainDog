@@ -1,0 +1,23 @@
+{
+  "saved": "2026-09-24T20:00:00.000Z",
+  "version": 3,
+  "items": [
+    { "id": "a1", "what": "Renew the workshop lease", "due": "2026-10-01", "who": "p1" },
+    { "id": "a2", "what": "Send the October invoices", "due": "2026-10-03", "who": "p9" },
+    { "id": "a3", "what": "Book the kiln service", "due": "2026-10-07T09:30:00Z" }
+  ],
+  "people": [{ "id": "p1", "name": "Mona Fathy" }],
+  "book": {
+    "opened": "2025-01-04",
+    "accounts": [
+      { "id": "c1", "name": "Studio cash", "type": "Cash", "balance": "1250.50", "cur": "EGP", "on": "2026-09-24" },
+      { "id": "c2", "name": "Dollar card", "type": "Credit", "balance": "80", "cur": "usd", "on": "2026-09-24" }
+    ]
+  },
+  "shelf": [
+    { "id": "s1", "glaze": "Celadon" },
+    { "id": "s2", "glaze": "Tenmoku" },
+    { "id": "s3", "glaze": "Shino" },
+    { "id": "s4", "glaze": "Ash" }
+  ]
+}

@@ -1391,6 +1391,27 @@ const DECLARED: Record<string, Version> = {
       "`page.home-founder` says how many agents work now in a line from the record's `runs-working`, and its Working now table reads `sessions.working`, the runs heard from in the last fifteen minutes -> 19b0de6a3f7ea988",
     ],
   },
+  /* MONEY IN NUMBERS: a reading may be an amount in its own currency, and the blocks over Numbers read it fifth. */
+  'founder@2.5.0': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported metric.due-this-week
+      metric.lapsing-30d metric.organisations-held page.dashboard page.home-founder page.project register.datapoints
+      setting.label_accounts setting.label_books setting.label_categories setting.label_datapoints
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories setting.one_datapoints
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: '04647bd190534619',
+    history: [
+      "`register.datapoints` takes money: a reading holds `amount` in its own currency in place of `value`, which stops being required; the blocks over Numbers read it as their fifth column, Latest numbers shows it, and `poll-setup` says to fill the live feed add-on -> 04647bd190534619",
+    ],
+  },
   'team@2.19.0': {
     holds: `
       metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight

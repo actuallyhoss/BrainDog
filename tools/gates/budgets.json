@@ -14,14 +14,6 @@
     "uiFaceBytes": 46080,
     "displayFaceBytes": 10240
   },
-  "keys": {
-    "//": "19 §4: the sheet documents the bindings by reading them, so it cannot drift from what is bound. Its own port, beside the other browser gates.",
-    "port": 4184
-  },
-  "prefs": {
-    "//": "A preference that changes nothing is a control that lies (25 §1's `series` class). Its own port, so it can run beside the other browser gates without fighting for one.",
-    "port": 4183
-  },
   "layout": {
     "//": "13 §8, 22 §10. The widths a page is drawn at, and what counts as overflowing.",
     "//floorWidths": "Real sizes, on top of both sides of every breakpoint. 320 is the narrowest phone still in use, 360 and 390 the phones most people hold (390 is the phone `a11y` audits and every batch is looked at on), 768 a common tablet. 1512 and 1728 are the two widths DIRECTION 37 judges every batch at, the default scaling of a 14-inch and a 16-inch MacBook Pro, and both are past the widest breakpoint, so without them the sweep never drew the desktop at the size it is read. `layout.mjs` runs no acts at either, and its variant pass takes them in place of the breakpoint desktop it used to add rather than beside it.",
@@ -48,8 +40,7 @@
     "widthTolerancePx": 1,
     "settleMs": 60,
     "//readyTimeoutMs": "GONE, and it is `ready.settleTimeoutMs` below. It was this gate's private name for a wait all four browser gates make, and the other three spelt the number as a bare literal 5000 in the script, which is the thing lib.mjs opens by forbidding. One wait, one number, one section, and the same expiry rule for every gate that opens a page.",
-    "findingsShown": 40,
-    "port": 5189
+    "findingsShown": 40
   },
   "a11y": {
     "//": "13 §9. Both schemes at both ends, because half of a contrast failure is invisible in one.",
@@ -57,8 +48,7 @@
     "widths": [
       1512,
       390
-    ],
-    "port": 5186
+    ]
   },
   "look": {
     "//": "`tools/look/capture.mjs`, the real screens of a record (`loop/scope/area-proof-a.md` 2.4, PRF-A02). Its height is `layout.viewportHeightPx` and its wait `ready.settleTimeoutMs`, so a look and a gate agree on what drawn means.",

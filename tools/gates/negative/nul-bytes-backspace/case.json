@@ -1,0 +1,7 @@
+{
+  "gate": "nul-bytes",
+  "rule": "a raw backspace byte",
+  "expect": "a raw BACKSPACE at offset",
+  "findings": 1,
+  "why": "AND THE CLASS THAT SHIPPED MORE OFTEN THAN NUL DID. The gate read 0x00 alone for months while its own header described the general defect, and widening it to every C0 control turned up nine bytes the tree had been carrying, three of them a word-boundary escape that had lost its backslash. One seeded case per class is not the standard here, but one seeded case for the ONLY class a gate used to see would leave the whole widening untested, which is the state this fixture is here to end."
+}

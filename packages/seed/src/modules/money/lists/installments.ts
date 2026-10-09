@@ -31,7 +31,9 @@ export const INSTALLMENTS_REGISTER: MoneyRegister = {
       index: true,
       required: true,
     },
-    { id: 'amount', type: 'money', required: true },
+    /* THE ACCOUNT'S CURRENCY WHEN NONE IS SAID, SINCE money-core 3.16.0 (REC-B04). A part with no account and no code is
+       refused in one sentence; a part sent with its own code is kept as written. */
+    { id: 'amount', type: 'money', required: true, currency_from: 'account.balance' },
     { id: 'due', type: 'day', index: true, deadline: true, required: true, remind: ['-7d', '0d'] },
     { id: 'state', label: 'Status', type: 'enum', values: ['open', 'paid', 'cancelled'], default: 'open', index: true, required: true },
     { id: 'settled', label: 'Paid on', type: 'day' },

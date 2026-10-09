@@ -205,7 +205,7 @@ export {
   type Knobs,
   type Scenario,
 } from './forecast.ts';
-export { inline, text, magnitudeOfCell, safeHref, type Inline, type InlineOptions, type Resolve } from './inline.ts';
+export { UNNAMED, cellNamesNothing, inline, magnitudeOfCell, namesNothing, safeHref, text, type Inline, type InlineOptions, type Resolve } from './inline.ts';
 export {
   KINDS,
   PRIMITIVES,

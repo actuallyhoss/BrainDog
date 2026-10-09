@@ -20,7 +20,7 @@ import { join } from 'node:path';
 
 import { CATALOGUE_INDEX } from '@braindog/declare/catalogue';
 import type { CatalogueOffer } from '@braindog/record';
-import { offersFromCatalogue } from '@braindog/record/catalogue-offers';
+import { offersFromCatalogue, shelfFromCatalogue } from '@braindog/record/catalogue-offers';
 
 const PREFIX = '/app/catalogue/';
 const INDEX = /^\/app\/catalogue\/index\.json$/u;
@@ -69,6 +69,20 @@ export function catalogueFolder(named: string | undefined, shell: string | undef
 /** Newer versions of what a record holds, from the same folder, for Slash to ask about (`@braindog/record/catalogue-offers`). */
 export function catalogueOffersFrom(dir: string): (held: readonly { id: string; version: string; on: boolean }[]) => Promise<CatalogueOffer[]> {
   return offersFromCatalogue((path) => {
+    try {
+      return readFileSync(join(dir, ...path.split('/')), 'utf8');
+    } catch {
+      return null;
+    }
+  });
+}
+
+/**
+ * The whole catalogue in the same folder, for the arranger to install from (`catalogue-offers.ts` `shelfFromCatalogue`).
+ * The record's deps take it once `RecordDeps.catalogueShelf` is declared; until then nothing hands it in.
+ */
+export function catalogueShelfFrom(dir: string) {
+  return shelfFromCatalogue((path) => {
     try {
       return readFileSync(join(dir, ...path.split('/')), 'utf8');
     } catch {

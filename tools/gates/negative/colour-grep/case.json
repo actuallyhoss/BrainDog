@@ -1,0 +1,6 @@
+{
+  "gate": "colour-grep",
+  "rule": "a hex colour literal outside the tokens",
+  "expect": "colour literal",
+  "findings": 1
+}

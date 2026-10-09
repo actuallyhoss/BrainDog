@@ -164,6 +164,8 @@ export type SessionHints = {
   head?: string | undefined;
   /** `S42`: the run a subagent works for, which places the subagent's run where its parent is when nothing else does. */
   parent?: string | undefined;
+  /** Commits HEAD moved since the last handoff here, `12`, for the briefing's card. The run register declares no such field. */
+  ahead?: string | undefined;
 };
 
 /**

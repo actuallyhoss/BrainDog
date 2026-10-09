@@ -10,7 +10,7 @@
  * reply that is not JSON is a file that is not there, and only the two shapes a catalogue lists are ever asked for.
  */
 
-import { offersFromCatalogue, type CatalogueReader } from '@braindog/record/catalogue-offers';
+import { offersFromCatalogue, shelfFromCatalogue, type CatalogueReader } from '@braindog/record/catalogue-offers';
 
 /** The part of the assets binding read here, so a test hands in a folder. */
 export type Assets = { fetch(request: Request): Promise<Response> };
@@ -46,3 +46,6 @@ export function assetsReader(assets: Assets): CatalogueReader {
 
 /** Slash's catalogue offers on the Worker, or none when no assets are bound. */
 export const workerCatalogueOffers = (assets: Assets | undefined) => (assets === undefined ? undefined : offersFromCatalogue(assetsReader(assets)));
+
+/** The whole catalogue on the Worker, for the arranger, or none when no assets are bound. Handed in once `RecordDeps.catalogueShelf` is declared. */
+export const workerCatalogueShelf = (assets: Assets | undefined) => (assets === undefined ? undefined : shelfFromCatalogue(assetsReader(assets)));

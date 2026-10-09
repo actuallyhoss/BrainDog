@@ -1,0 +1,7 @@
+{
+  "gate": "dead-copy",
+  "rule": "a sentence rendered only by a module nothing imports",
+  "expect": "nobody reads",
+  "findings": 1,
+  "why": "AND THE SHAPE `dead-copy` COULD NOT SEE: a sentence whose only renderer is a module nothing imports. It cost a real one: `copy.alpha`, the word that tells the alpha deployment apart from the real record, named only by a component that had never been mounted. A grep over source said it was rendered."
+}

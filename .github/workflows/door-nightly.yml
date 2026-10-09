@@ -56,7 +56,9 @@ jobs:
     # AFTER A DEPLOY ONLY WHEN IT DEPLOYED: `workflow_run` fires on a failed deploy too.
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # THREE CHECKS ONE AFTER ANOTHER, each allowed twenty minutes (the runs scenario, the manners count and the door),
+    # so a slow night is not cut before any line is printed.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,6 +73,7 @@ jobs:
           DOOR_HOST: ${{ inputs.host || 'https://brain.dog' }}
           DOOR_RECORD: ${{ inputs.record || vars.DOOR_RECORD }}
           DOOR_TOKEN: ${{ secrets.DOOR_TOKEN }}
+          DOOR_TOKEN_2: ${{ secrets.DOOR_TOKEN_2 }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node tools/door-check/run.mjs --report report.json
       - name: Keep the report

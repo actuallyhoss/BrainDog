@@ -1,0 +1,6 @@
+{
+  "gate": "css-rules",
+  "rule": "an ellipsis on a flex box",
+  "expect": "does nothing on a flex",
+  "findings": 1
+}

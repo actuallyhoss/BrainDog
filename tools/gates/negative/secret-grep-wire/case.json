@@ -1,0 +1,7 @@
+{
+  "gate": "secret-grep",
+  "rule": "a sign-in secret in a log",
+  "expect": "sign-in secret reaches a log",
+  "findings": 1,
+  "why": "THE FOURTH: a session id in a log. The same fixture posts the server key to its own host, which is the one transmission sign-in's four names exist for, so a count of one proves the gate tells them apart."
+}

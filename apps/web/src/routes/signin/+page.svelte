@@ -37,7 +37,7 @@
   import { copy } from '$lib/copy.ts';
   import { forget } from '$lib/record/boot-live.ts';
   import { googleStart, googleWhy, onwardOf, stateOf, type GoogleWhy, type How, type Shelf, type Step, type Ways } from '$lib/signin.ts';
-  import { actable, firstDoor, noDoorYet } from './first-door.ts';
+  import { actable, firstDoor, mailHeld, noDoorYet } from './first-door.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -115,18 +115,20 @@
    * says somebody just did. See `first-door.ts`.
    */
   const noDoor = $derived(view.name === 'signed-out' && host !== null && noDoorYet(host, doors, view.note));
+  /** A first run whose way in is a letter that cannot go out now: the mail-down line, never the claim link one. */
+  const noMail = $derived(view.name === 'signed-out' && host !== null && mailHeld(host, doors, view.note));
 
   /** Whether a way in other than a passkey is drawn, so a sentence never points at one that is not there. */
   const otherWays = (ways: Ways | null): boolean => ways !== null && (ways.magic || ways.key);
   /** How many ways in are drawn: after one is refused, "another" is only true when there is more than one. */
   const wayCount = (ways: Ways | null): number => (ways ? [ways.passkey, ways.magic, ways.key].filter(Boolean).length : 0);
 
-  /* `noDoor` TAKES THE NOTE AWAY, and that is the repair. `stateOf` says `unsupported` whenever no
+  /* `noDoor` AND `noMail` TAKE THE NOTE AWAY, and that is the repair. `stateOf` says `unsupported` whenever no
      way can act, and on the first run it said so about a browser that was working perfectly. The
-     only note it can swallow is that one: `noDoorYet` refuses `out`, so the confirmation somebody
+     only note they can swallow is that one: both refuse `out`, so the confirmation somebody
      gets for pressing Sign out still arrives on a record that holds no passkey. */
   const note = $derived(
-    view.name !== 'signed-out' || noDoor
+    view.name !== 'signed-out' || noDoor || noMail
       ? null
       : view.note === 'cancelled'
         ? copy.passkeyCancelled
@@ -417,7 +419,7 @@
       {/if}
 
       {#if note}<p class="status" role="status">{note}</p>{/if}
-      {#if host?.magic === 'down' && !noDoor && (doors || view.name === 'signed-out')}<p class="status" role="status">{copy.mailDown}</p>{/if}
+      {#if host?.magic === 'down' && !noDoor && (doors || view.name === 'signed-out')}<p class="status" role="status">{noMail ? firstDoor.mailDown : copy.mailDown}</p>{/if}
       {#if fromGoogle && doors}<p class="status" role="status">{copy.googleSaid[fromGoogle]}</p>{/if}
 
       <!-- ONE BLOCK FOR EVERY STATE THAT OFFERS A WAY IN, so moving between signed out, asking and

@@ -59,7 +59,20 @@ export type PlannedRow = {
  * One thing to file on Decide. `options` is a question with at least two answers; `change` is a declaration to install
  * once the owner accepts it, such as a rule. `body.from` is the key, which is how a later run knows it was filed.
  */
-export type PlannedAsk = { key: string; label: string; question: string; body: Obj; kind?: 'options' | 'change' };
+export type PlannedAsk = {
+  key: string;
+  label: string;
+  question: string;
+  body: Obj;
+  kind?: 'options' | 'change';
+  /**
+   * THE ONE QUESTION THIS ASK IS A PART OF, so ten rules are one question with ten parts and not ten questions (the
+   * import that filed 57 rules filed 57). Asks naming the same `group.key` are filed together by `gatherAsks`: their
+   * declarations in one change, each part kept by its own key and label in `body.parts`. An ask that cannot ride in a
+   * bundle (a choice, or a change to one field) is filed alone, as it was.
+   */
+  group?: { key: string; label: string; question: string };
+};
 
 export type Skipped = { reason: string; items: string[] };
 
@@ -145,7 +158,49 @@ export type ImportMap = {
   usecase: string | null;
   listed: { heading: string; kinds: Record<string, string> } | null;
   raw: Obj;
+  /**
+   * THE MAPPING AS DATA (`Section`): each path of the export, the list it fills, its key and each field's move. A map
+   * that has them needs no module, `braindog import --map <map.json> <export.json>` (`mapAdapter`). Absent on a map
+   * that only names lists, which a module beside it still reads. `source` is what the report calls the tool, `key` the
+   * prefix of every key it plans, and `taken` the path of the day the export was taken, when it says.
+   */
+  sections?: Section[];
+  source?: string;
+  key?: string;
+  taken?: string;
 };
+
+/**
+ * THE FIVE WORDS A VALUE MOVES BY. `text` is carried as it is written; `day` is the first ten characters of a date;
+ * `money` is an amount and its currency, written in minor units (`minor` when the export already holds them, and never
+ * two currencies added); `link` points at a row of another section of the same export, by that row's key; `one of`
+ * turns the export's word into the list's through `values`, and a word the table has not got is proposed to the list,
+ * carried as `else` until it lands.
+ */
+export const MOVES = ['text', 'money', 'day', 'link', 'one of'] as const;
+export type Move = (typeof MOVES)[number];
+
+export type SectionField = {
+  from: string;
+  as: Move;
+  /** `money`: the field of the item holding its currency, or `in`, the one currency the whole section is in. */
+  currency?: string;
+  in?: string;
+  minor?: boolean;
+  /** `link`: the path of the section the value is a key of. */
+  to?: string;
+  /** `one of`: the export's word to the list's, and what a word not in the table is carried as. */
+  values?: Record<string, string>;
+  else?: string;
+};
+
+/**
+ * ONE PATH OF AN EXPORT, AS A MAP SAYS IT MOVES. `path` is one or two names (`items`, `book.accounts`); what sits there
+ * is a list of items, or an object of items by their key. `key` is the item's field naming it (or `$key`, the name it
+ * sits under), `label` the field the report names it by, and `kind` the word between the prefix and the item's key
+ * (the path's last name when the map says none), so a second import finds it again.
+ */
+export type Section = { path: string; register: string; key: string; label: string; kind: string; fields: Record<string, SectionField> };
 
 export type Adapter = {
   /** What the report calls the tool the export came from. */
@@ -189,8 +244,14 @@ export function readMap(text: string, where: string): { ok: true; value: ImportM
   } catch {
     return { ok: false, fix: `${where} is not JSON.` };
   }
-  if (!isObj(raw) || !isObj(raw.targets)) return { ok: false, fix: `${where} holds no targets, and an import needs the lists it writes to, in order.` };
-  const t = raw.targets;
+  if (!isObj(raw)) return { ok: false, fix: `${where} holds no targets, and an import needs the lists it writes to, in order.` };
+  /* SECTIONS ARE READ FIRST, because a map that has them may leave `targets` out: the lists are then written in the
+     order the sections name them, each called by its section's `name`. */
+  const read = readSections(raw, where);
+  if (!read.ok) return read;
+  const sections = read.value;
+  if (!isObj(raw.targets) && sections === null) return { ok: false, fix: `${where} holds no targets, and an import needs the lists it writes to, in order.` };
+  const t: Obj = isObj(raw.targets) ? raw.targets : targetsOf(raw.sections as Obj);
   if (!texts(t.order) || t.order.length === 0) return { ok: false, fix: `targets.order in ${where} is the list of lists the import writes, in the order it writes them.` };
   if (t.optional !== undefined && !texts(t.optional)) return { ok: false, fix: `targets.optional in ${where} is a list of list ids.` };
   if (t.providedBy !== undefined && !words(t.providedBy)) return { ok: false, fix: `targets.providedBy in ${where} maps a list id to what installs it.` };
@@ -208,15 +269,104 @@ export function readMap(text: string, where: string): { ok: true; value: ImportM
   if (listed !== undefined && !(isObj(listed) && typeof listed.heading === 'string' && words(listed.kinds)))
     return { ok: false, fix: `listed in ${where} is a heading and the kinds of key the report lists one by one.` };
   if (holdsKey(raw)) return { ok: false, fix: `${where} holds something shaped like a key. A mapping names lists and words, never a key.` };
+  const outside = (sections ?? []).find((x) => !order.includes(x.register));
+  if (outside) return { ok: false, fix: `sections.${outside.path} in ${where} fills ${outside.register}, which targets.order does not write.` };
+  if (sections !== null) {
+    if (typeof raw.source !== 'string' || raw.source.trim() === '') return { ok: false, fix: `source in ${where} is what the report calls the tool the export came from, such as Tallybook.` };
+    if (raw.key !== undefined && !(typeof raw.key === 'string' && /^[a-z0-9-]+:$/u.test(raw.key)))
+      return { ok: false, fix: `key in ${where} is the word everything imported is found again by, in small letters and ending in a colon, such as tallybook:.` };
+    if (raw.taken !== undefined && typeof raw.taken !== 'string') return { ok: false, fix: `taken in ${where} is the path of the day the export was taken, such as saved.` };
+  }
   return {
     ok: true,
     value: {
-      targets: { order, optional: (t.optional as string[] | undefined) ?? [], providedBy: (t.providedBy as Record<string, string> | undefined) ?? {}, names: t.names },
+      targets: { order, optional: (t.optional as string[] | undefined) ?? [], providedBy: (t.providedBy as Record<string, string> | undefined) ?? {}, names: t.names as Record<string, string> },
       usecase: typeof raw.usecase === 'string' ? raw.usecase : null,
       listed: isObj(listed) ? { heading: String(listed.heading), kinds: listed.kinds as Record<string, string> } : null,
       raw,
+      ...(sections === null
+        ? {}
+        : {
+            sections,
+            source: String(raw.source).trim(),
+            key: typeof raw.key === 'string' ? raw.key : keyFrom(String(raw.source)),
+            ...(typeof raw.taken === 'string' ? { taken: raw.taken } : {}),
+          }),
     },
   };
+}
+
+/** The prefix a map's rows are found again by when it names none: its tool's name in small letters. */
+const keyFrom = (source: string): string => `${source.toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-|-$/gu, '') || 'import'}:`;
+
+/** A path of one or two names, as a section and a link name one. */
+const PATH = /^[^.\s]+(?:\.[^.\s]+)?$/u;
+
+/** The lists a map with sections and no `targets` writes: in the order its sections name them, each by its `name`. */
+function targetsOf(sections: Obj): Obj {
+  const order: string[] = [];
+  const names: Record<string, string> = {};
+  for (const s of Object.values(sections))
+    if (isObj(s) && typeof s.register === 'string') {
+      if (!order.includes(s.register)) order.push(s.register);
+      if (typeof s.name === 'string' && !Object.hasOwn(names, s.register)) names[s.register] = s.name;
+    }
+  return { order, names };
+}
+
+/** One field's move, a bare name being `text` from that name; or the sentence saying what is wrong with it. */
+function readField(v: unknown, at: string): { ok: true; value: SectionField } | { ok: false; fix: string } {
+  if (typeof v === 'string' && v !== '') return { ok: true, value: { from: v, as: 'text' } };
+  if (!isObj(v) || typeof v.from !== 'string' || v.from === '') return { ok: false, fix: `${at} names the export's field it comes from, as "due" or {"from":"due","as":"day"}.` };
+  const as = v.as ?? 'text';
+  if (typeof as !== 'string' || !(MOVES as readonly string[]).includes(as)) return { ok: false, fix: `${at}.as is one of ${MOVES.join(', ')}.` };
+  const f: SectionField = { from: v.from, as: as as Move };
+  if (as === 'money') {
+    if (typeof v.currency === 'string' && v.currency !== '') f.currency = v.currency;
+    else if (typeof v.in === 'string' && /^[A-Z]{3}$/u.test(v.in)) f.in = v.in;
+    else return { ok: false, fix: `${at} is money, so it names the field holding each amount's currency ("currency":"cur") or the one currency they are all in ("in":"USD").` };
+    if (v.minor !== undefined && typeof v.minor !== 'boolean') return { ok: false, fix: `${at}.minor is true when the export already holds whole minor units, such as 4800 for 48.00.` };
+    if (v.minor === true) f.minor = true;
+  }
+  if (as === 'link') {
+    if (typeof v.to !== 'string' || !PATH.test(v.to)) return { ok: false, fix: `${at} is a link, so "to" names the section of the export its value is a key of.` };
+    f.to = v.to;
+  }
+  if (as === 'one of') {
+    if (!words(v.values)) return { ok: false, fix: `${at} is one of a list's words, so "values" turns each word of the export into the list's own.` };
+    f.values = v.values;
+    if (v.else !== undefined && typeof v.else !== 'string') return { ok: false, fix: `${at}.else is the list's word a value carries until its own is added.` };
+    if (typeof v.else === 'string') f.else = v.else;
+  }
+  return { ok: true, value: f };
+}
+
+/** A map's `sections`, read, or `null` when it has none; or the sentence saying what is wrong with them. */
+function readSections(raw: Obj, where: string): { ok: true; value: Section[] | null } | { ok: false; fix: string } {
+  if (raw.sections === undefined) return { ok: true, value: null };
+  if (!isObj(raw.sections) || Object.keys(raw.sections).length === 0)
+    return { ok: false, fix: `sections in ${where} maps each path of the export to the list it fills, such as {"items":{"register":"tasks","key":"id","label":"what","fields":{"what":"what"}}}.` };
+  const out: Section[] = [];
+  for (const [path, s] of Object.entries(raw.sections)) {
+    const at = `sections.${path} in ${where}`;
+    if (!PATH.test(path)) return { ok: false, fix: `${at} is a path of one or two names, such as items or book.accounts.` };
+    if (!isObj(s) || typeof s.register !== 'string' || s.register === '') return { ok: false, fix: `${at} names the list it fills ("register").` };
+    if (typeof s.key !== 'string' || s.key === '') return { ok: false, fix: `${at} names the field each item is found again by ("key"), or $key for the name it sits under.` };
+    if (s.label !== undefined && typeof s.label !== 'string') return { ok: false, fix: `${at}.label is the field the report names each item by.` };
+    if (s.kind !== undefined && !(typeof s.kind === 'string' && /^[a-z0-9-]+$/u.test(s.kind))) return { ok: false, fix: `${at}.kind is one word in small letters.` };
+    if (!isObj(s.fields) || Object.keys(s.fields).length === 0) return { ok: false, fix: `${at} moves at least one field ("fields").` };
+    const fields: Record<string, SectionField> = {};
+    for (const [field, v] of Object.entries(s.fields)) {
+      const got = readField(v, `${at}, field ${field}`);
+      if (!got.ok) return got;
+      fields[field] = got.value;
+    }
+    out.push({ path, register: s.register, key: s.key, label: typeof s.label === 'string' ? s.label : s.key, kind: typeof s.kind === 'string' ? s.kind : (path.split('.').at(-1) ?? path).toLowerCase(), fields });
+  }
+  for (const s of out)
+    for (const [field, f] of Object.entries(s.fields))
+      if (f.as === 'link' && !out.some((x) => x.path === f.to)) return { ok: false, fix: `sections.${s.path} in ${where} links ${field} to ${String(f.to)}, which no section reads.` };
+  return { ok: true, value: out };
 }
 
 /** A catalogue's refusal as its sentence. */
@@ -331,4 +481,213 @@ export async function packFrom(catalogue: CatalogueRead, id: string, index?: Pro
   const trusted = await trustVersion(entry, chosen.version, held.value, got.value.keys, known);
   if (!trusted.ok) return { ok: false, fix: trusted.fix.replace(/.$/u, '') };
   return { ok: true, doc: read.value.file.doc as Obj, version: chosen.version };
+}
+
+/**
+ * AN AMOUNT AS WHOLE MINOR UNITS OF ITS CURRENCY, or `null` when it is not one. Read from its written digits and never
+ * by multiplying a float, so 0.29 is 29 and not 28.999999999999996; an amount with more decimals than its currency has
+ * is not rounded, it is refused, because a rounded amount is a different amount.
+ */
+function minorOf(v: unknown, exponent: number, minor: boolean): number | null {
+  if (minor) {
+    const n = typeof v === 'number' ? v : typeof v === 'string' && /^-?\d+$/u.test(v.trim()) ? Number(v.trim()) : NaN;
+    return Number.isSafeInteger(n) ? n : null;
+  }
+  const text = typeof v === 'number' && Number.isFinite(v) ? String(v) : typeof v === 'string' ? v.trim() : '';
+  const m = /^(-?)(\d+)(?:\.(\d+))?$/u.exec(text);
+  if (!m) return null;
+  const frac = (m[3] ?? '').replace(/0+$/u, '');
+  if (frac.length > exponent) return null;
+  const n = Number(`${m[2]!}${frac.padEnd(exponent, '0')}`);
+  return Number.isSafeInteger(n) ? (m[1] === '-' && n !== 0 ? -n : n) : null;
+}
+
+/** What sits at a path of one or two names. Read name by name, so the export's reader notes each one it was asked for. */
+const atPath = (exp: Obj, path: string): unknown => path.split('.').reduce<unknown>((v, name) => (isObj(v) ? v[name] : undefined), exp);
+
+/** The items of a section, each with the name it sits under when the section is an object of items. */
+const itemsAt = (v: unknown): [string | null, unknown][] => (Array.isArray(v) ? v.map((x): [string | null, unknown] => [null, x]) : isObj(v) ? Object.entries(v) : []);
+
+const idOf = (item: Obj, name: string | null, key: string): string | null => {
+  const v = key === '$key' ? name : item[key];
+  return typeof v === 'string' && v.trim() !== '' ? v.trim() : typeof v === 'number' && Number.isFinite(v) ? String(v) : null;
+};
+
+/**
+ * THE ROWS A MAP'S SECTIONS MAKE OF AN EXPORT, with what was left out and why. Everything here is what the map says and
+ * nothing is one tool's, which is the point: a person writes twenty lines of map and no module.
+ */
+export function planSections(exp: Obj, map: ImportMap, tools: Tools): { rows: PlannedRow[]; skipped: Skipped[]; changed: string[] } {
+  const prefix = map.key ?? 'import:';
+  const sections = map.sections ?? [];
+  const left = new Map<string, string[]>();
+  const leave = (reason: string, item: string) => left.set(reason, [...(left.get(reason) ?? []), item]);
+  const changed: string[] = [];
+  /* EVERY SECTION'S KEYS FIRST, so a link to an item the export does not hold is known before the row is planned. */
+  const keys = new Map<string, Set<string>>();
+  for (const s of sections) {
+    const got = new Set<string>();
+    for (const [name, item] of itemsAt(atPath(exp, s.path))) {
+      const id = isObj(item) ? idOf(item, name, s.key) : null;
+      if (id !== null) got.add(id);
+    }
+    keys.set(s.path, got);
+  }
+  const kindOf = (path: string) => sections.find((s) => s.path === path)?.kind ?? path;
+  const rows: PlannedRow[] = [];
+  const seen = new Set<string>();
+  for (const s of sections) {
+    for (const [name, item] of itemsAt(atPath(exp, s.path))) {
+      if (!isObj(item)) {
+        leave(`Not an item in ${s.path}`, name ?? String(item));
+        continue;
+      }
+      const id = idOf(item, name, s.key);
+      const label = typeof item[s.label] === 'string' && String(item[s.label]).trim() !== '' ? String(item[s.label]).trim() : (id ?? s.path);
+      if (id === null) {
+        leave(`No ${s.key} to find it again by, in ${s.path}`, label);
+        continue;
+      }
+      const key = `${prefix}${s.kind}:${id}`;
+      if (seen.has(key)) {
+        leave(`In ${s.path} twice, so only the first was carried`, label);
+        continue;
+      }
+      seen.add(key);
+      const fields: Obj = {};
+      const own: Obj = {};
+      for (const [field, f] of Object.entries(s.fields)) {
+        const v = item[f.from];
+        if (v === undefined || v === null || v === '') continue;
+        if (f.as === 'text') {
+          if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') fields[field] = String(v);
+          else leave(`${f.from} is not text, so it was not carried`, label);
+        } else if (f.as === 'day') {
+          const day = typeof v === 'string' ? /^\d{4}-\d{2}-\d{2}/u.exec(v.trim())?.[0] : undefined;
+          if (day) fields[field] = day;
+          else leave(`${f.from} is not a day, so it was not carried`, label);
+        } else if (f.as === 'money') {
+          const code = f.in ?? (typeof item[f.currency ?? ''] === 'string' ? String(item[f.currency ?? '']).trim().toUpperCase() : '');
+          const amount = /^[A-Z]{3}$/u.test(code) ? minorOf(v, tools.exponentOf(code), f.minor === true) : null;
+          if (amount === null) leave(`${f.from} is not an amount in a currency, so it was not carried`, label);
+          else fields[field] = { amount, currency: code };
+        } else if (f.as === 'link') {
+          const to = typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '';
+          if (keys.get(f.to ?? '')?.has(to)) fields[field] = { $ref: `${prefix}${kindOf(f.to ?? '')}:${to}` } satisfies Ref;
+          else changed.push(`${label} arrived without its ${field}, because ${f.to ?? ''} in the export holds nothing called ${to}.`);
+        } else {
+          const word = typeof v === 'string' ? v.trim() : String(v);
+          /* OWN WORDS ONLY: an export word such as "constructor" is not the table's. */
+          const mapped = f.values !== undefined && Object.hasOwn(f.values, word) ? f.values[word] : undefined;
+          if (mapped !== undefined) fields[field] = mapped;
+          else {
+            own[field] = word;
+            if (f.else !== undefined) fields[field] = f.else;
+          }
+        }
+      }
+      rows.push({ register: s.register, key, label, fields, ...(Object.keys(own).length > 0 ? { own } : {}) });
+    }
+  }
+  return { rows, skipped: [...left].map(([reason, items]) => ({ reason, items })), changed };
+}
+
+/**
+ * THE ADAPTER A MAP WITH SECTIONS IS, so `braindog import --map <map.json> <export.json>` needs no module. The export is
+ * one JSON object; the map says which of its paths become which rows. A module stays for what a map cannot say.
+ */
+export function mapAdapter(map: ImportMap): Adapter {
+  const key = map.key ?? 'import:';
+  return {
+    source: map.source ?? 'the export',
+    key,
+    read: (text) => {
+      let value: unknown;
+      try {
+        value = JSON.parse(text);
+      } catch {
+        return { ok: false, fix: 'The export is not JSON.' };
+      }
+      return isObj(value) ? { ok: true, value } : { ok: false, fix: 'An export a map reads is one JSON object, with its sections inside it.' };
+    },
+    plan: (exp, o) => {
+      const got = planSections(exp, map, o.tools);
+      const taken = map.taken === undefined ? undefined : atPath(exp, map.taken);
+      return { key, taken: typeof taken === 'string' ? taken : null, rev: null, rows: got.rows, asks: [], polls: [], skipped: got.skipped, changed: got.changed };
+    },
+  };
+}
+
+/** A map file read as an adapter of its own, or the sentence saying why it cannot be one. */
+export function loadMap(file: string, cwd: string): { ok: true; adapter: Adapter; map: ImportMap } | { ok: false; fix: string } {
+  let text: string;
+  try {
+    text = readFileSync(resolve(cwd, file), 'utf8');
+  } catch {
+    return { ok: false, fix: `${file} could not be read.` };
+  }
+  const map = readMap(text, file);
+  if (!map.ok) return map;
+  if (map.value.sections === undefined) return { ok: false, fix: `${file} names no sections, so it needs an adapter beside it: braindog import <adapter> <export.json> --map ${file}.` };
+  return { ok: true, adapter: mapAdapter(map.value), map: map.value };
+}
+
+/** Whether a change's `to` can ride in a bundle: one declaration, or a bundle already. A change to one field cannot. */
+const bundles = (to: unknown): boolean => isObj(to) && (Array.isArray(to.declarations) || (typeof to.id === 'string' && typeof to.kind === 'string'));
+
+/**
+ * THE QUESTIONS A PLAN FILES, MANY ASKS MADE ONE. `asked` is every key Decide already holds, a part's own key among them
+ * (`body.parts`), so a part asked on an earlier night is not asked again whichever question it rode in, and `before`
+ * counts the questions they were, a group once. Asks of one `group` that are changes become one change installing every part's declarations, in the
+ * order the plan gave them, its parts listed by key and label so each can be read, and left out, on its own. A group
+ * left with one ask is filed as that ask, under its own key. Everything else is filed as it came.
+ */
+export function gatherAsks(asks: readonly PlannedAsk[], asked: ReadonlySet<string>): { asks: PlannedAsk[]; before: number } {
+  let before = 0;
+  const out: PlannedAsk[] = [];
+  const groups = new Map<string, PlannedAsk[]>();
+  /* A QUESTION ASKED BEFORE IS COUNTED ONCE, however many of its parts it held. */
+  const counted = new Set<string>();
+  for (const ask of asks) {
+    if (asked.has(ask.key)) {
+      const one = ask.group === undefined ? null : ask.group.key;
+      if (one === null || !counted.has(one)) before++;
+      if (one !== null) counted.add(one);
+      continue;
+    }
+    if (ask.group === undefined || (ask.kind ?? 'options') !== 'change' || !bundles(ask.body.to)) {
+      out.push(ask);
+      continue;
+    }
+    const held = groups.get(ask.group.key);
+    if (held) held.push(ask);
+    else {
+      groups.set(ask.group.key, [ask]);
+      /* ITS PLACE AMONG THE OTHER QUESTIONS IS ITS FIRST PART'S, filled in below. */
+      out.push(ask);
+    }
+  }
+  return {
+    before,
+    asks: out.map((ask) => {
+      const parts = ask.group === undefined ? undefined : groups.get(ask.group.key);
+      if (parts === undefined || parts[0] !== ask || parts.length < 2) return ask;
+      const group = ask.group!;
+      const declarations = parts.flatMap((p) => {
+        const to = p.body.to as Obj;
+        return Array.isArray(to.declarations) ? (to.declarations as unknown[]) : [to];
+      });
+      /* THE RECORD FILES A BUNDLE UNDER ONE OF THE IDS IT INSTALLS (`namesFault`), so a first part that named none, or
+         one the bundle does not hold, is filed under the bundle's first declaration. */
+      const ids = declarations.map((d) => (isObj(d) && typeof d.id === 'string' ? d.id : null));
+      const named = typeof ask.body.declaration_id === 'string' && ids.includes(ask.body.declaration_id) ? ask.body.declaration_id : ids.find((id) => id !== null);
+      return {
+        key: group.key,
+        label: group.label,
+        question: group.question,
+        kind: 'change',
+        body: { declaration_id: named ?? null, to: { declarations }, from: group.key, parts: parts.map((p) => ({ from: p.key, label: p.label, question: p.question })) },
+      };
+    }),
+  };
 }

@@ -205,8 +205,10 @@ async function settingsOf(): Promise<PackConfig> {
   const values = Object.fromEntries(Object.entries(config).map(([k, d]) => [k, d.default ?? null]));
   return { id: 'money-core', version: '1.0.0', config, values: { ...values, home_currency: 'GBP' } };
 }
+/* A LIST'S LINES ARE THE ADD-ON PAGE'S, kept out of `changesOf` (`routes/packs/[id]/+page.svelte`, `pending`), as Money's
+   `rest_days` is since money-core 3.16.0, so the drafts here are the ones the page hands it. */
 const draftsOf = (s: PackConfig): Record<string, Draft> =>
-  Object.fromEntries(Object.entries(s.config).map(([k, d]) => [k, draftOf(d, s.values[k])]));
+  Object.fromEntries(Object.entries(s.config).flatMap(([k, d]) => ((d.type as string) === 'list' ? [] : [[k, draftOf(d, s.values[k])]])));
 
 /* ONE SETTING OF EACH OTHER TYPE, for the controls a first-party pack does not use yet. */
 const EVERY_TYPE: PackConfig = {
@@ -389,7 +391,9 @@ test("MONEY'S SUMS ARE TYPED IN THE HOME CURRENCY once one is chosen, and one st
   assert.equal(currencyOf(money, 'most_out_30d'), 'EGP');
   assert.equal(currencyOf(sterling, 'most_out_30d'), 'GBP', 'a record whose home is sterling types its sums in sterling');
   assert.equal(currencyOf(EVERY_TYPE, 'late_fee'), 'GBP', 'an add-on with no home currency types a sum in its own');
-  const drafts = Object.fromEntries(Object.entries(money.config).map(([k, d]) => [k, draftOf(d, money.values[k], currencyOf(money, k))]));
+  const drafts = Object.fromEntries(
+    Object.entries(money.config).flatMap(([k, d]) => ((d.type as string) === 'list' ? [] : [[k, draftOf(d, money.values[k], currencyOf(money, k))]])),
+  );
   assert.equal(drafts.most_out_30d?.text, '', 'a sterling sum is not drawn as pounds');
   assert.equal(heldElsewhere(money, 'most_out_30d'), 'GBP 50,000.00', 'what holds until then is said in the box');
   assert.equal(heldElsewhere(sterling, 'most_out_30d'), null);

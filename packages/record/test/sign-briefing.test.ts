@@ -82,15 +82,19 @@ test('GREEN: the step handed is the newest, the queue is the questions open, and
   assert.doesNotMatch([s.said, ...s.facts].join(' '), /github\.com|\/Users\//u, 'a repository by its name, never its address');
 });
 
-test('RED THROUGH PUBLIC VERBS: the newest step in a repository is ten days old', async () => {
-  const { api, clock, left, deps } = await record();
+test('A STEP TEN DAYS OLD IS NOT HANDED (AGT-C05), so the briefing is true without it, and one that hands a step that old is red', async () => {
+  const { sql, api, clock, left, deps } = await record();
   await left('kiln', 'Kerning pass', 'Kern the lowercase pairs');
+  const real = (await deps.briefing('kiln'))!;
+  const old = await readBriefingSign({ sql, briefing: () => ({ ...real, handoff: { ...real.handoff!, age_s: 10 * 86_400 } }) }, clock.now());
+  assert.equal(old.state, 'red');
+  assert.equal(old.said, 'The briefing for kiln hands a step 10 days old.');
+  assert.equal(old.value, 1);
   clock.advance(10 * DAY);
   await fileRecordSigns(api.kernel, deps, clock.now());
   const s = await briefingSign(api);
-  assert.equal(s.state, 'red');
-  assert.equal(s.said, 'The briefing for kiln hands a step 10 days old.');
-  assert.equal(s.value, 1);
+  assert.equal(s.state, 'green', `${s.said} ${s.facts.join(' | ')}`);
+  assert.ok(s.facts.includes('kiln: no run left a step, and none is handed.'), s.facts.join(' | '));
 });
 
 test('RED: a briefing that hands a step from a run the record does not hold', async () => {
@@ -128,7 +132,8 @@ test('RED: the questions it says wait are not the questions open, and a run name
     assert.ok(api.kernel.propose({ question, body_kind: 'options', body: { ...OPTIONS, about: question } } as never, 'slash').ok);
   const then = (await deps.briefing('kiln'))!;
   assert.equal(then.waiting.length, 2);
-  assert.equal(then.live.same_repo.length, 1);
+  /* THE SYSTEM BRIEFING SENDS ONLY { repo } AND NAMES NO MACHINE, so no run shares its tree (`sameTree`): live, wherever it is. */
+  assert.equal([...then.live.same_repo, ...then.live.elsewhere].length, 2);
   clock.advance(3 * 60 * MIN);
   const r = await readBriefingSign({ sql, briefing: () => ({ ...then, waiting: then.waiting.slice(0, 1) }) }, clock.now());
   assert.equal(r.state, 'red');
@@ -147,12 +152,10 @@ test('A REPOSITORY IS SAID BY ITS NAME', () => {
 test('A RUN IS SAID BY WHAT IT DID, with no path, address or key in it', async () => {
   const { left, clock, deps } = await record();
   await left('kiln', 'Fix /Users/ada/kiln/src/glyphs.ts for ada@kiln.example', 'Kern the lowercase pairs');
-  clock.advance(10 * DAY);
-  const r = await readBriefingSign(deps, clock.now());
-  assert.equal(r.state, 'red');
+  clock.advance(2 * DAY);
   const real = (await deps.briefing('kiln'))!;
   const none = await readBriefingSign({ sql: deps.sql, briefing: () => ({ ...real, handoff: null, live: { same_repo: [], elsewhere: [] } }) }, clock.now());
-  assert.match(none.said, /though "Fix for someone at kiln\.example" left one 10 days ago/u);
+  assert.match(none.said, /though "Fix for someone at kiln\.example" left one 2 days ago/u);
   assert.doesNotMatch(none.said, /\/Users|glyphs\.ts|ada@/u);
 });
 

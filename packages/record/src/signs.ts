@@ -15,7 +15,7 @@
  * A READING NAMES THINGS: a repository by its name, a run by what it was doing, a client by its name. Never an id.
  */
 
-import type { SignReading } from '@braindog/kernel';
+import { openHandoffs, type SignReading } from '@braindog/kernel';
 import type { Result, Sql } from '@braindog/ports';
 
 import type { Context } from './index.ts';
@@ -122,23 +122,14 @@ function newestRepos(sql: Sql): string[] {
 }
 
 /**
- * The run whose step a session standing here should be handed, read from the table: of the runs here that left a step,
- * one somebody heard from, newest heard; else one waiting to be picked up; else the newest written. Here is the project
- * the briefing placed the caller on (with the runs that name only this repository), or the repository alone.
+ * The run whose step a session standing here should be handed: the newest step the kernel marks `next` here
+ * (`openHandoffs`, AGT-C05), the one the briefing hands, so a step a done run left, or one older than the kernel hands
+ * over, is not expected. Here is the project the briefing placed the caller on, or the repository alone.
  */
-function expectedHandoff(sql: Sql, repo: string, project: string | null): RunRow | null {
-  const here = project === null ? "json_extract(fields, '$.repo') = ?" : `(json_extract(fields, '$.project') = ? OR (coalesce(json_extract(fields, '$.project'), '') = '' AND json_extract(fields, '$.repo') = ?))`;
-  const args = project === null ? [repo] : [project, repo];
-  const runs = sql.all<RunRow>(
-    `SELECT ${RUN_COLUMNS} FROM entry WHERE register = 'session' AND deleted_at IS NULL AND trim(coalesce(json_extract(fields, '$.next'), '')) <> '' AND ${here}`,
-    ...args,
-  );
-  const newest = (rows: RunRow[], by: (r: RunRow) => number) => rows.sort((a, b) => by(b) - by(a) || b.seq - a.seq)[0] ?? null;
-  return (
-    newest(runs.filter((r) => r.last_seen !== null), (r) => Date.parse(r.last_seen!)) ??
-    newest(runs.filter((r) => r.state === 'handoff'), (r) => Date.parse(r.updated_at)) ??
-    newest(runs, (r) => Date.parse(r.updated_at))
-  );
+function expectedHandoff(sql: Sql, repo: string, project: string | null, nowMs: number): RunRow | null {
+  const open = openHandoffs(sql, { project, repo }, null, nowMs).find((h) => h.mark === 'next');
+  const seq = open === undefined ? null : seqOf(open.spoken);
+  return seq === null ? null : runBySeq(sql, seq);
 }
 
 /** A run by its number, deleted or not. */
@@ -167,7 +158,7 @@ function isOpenQuestion(sql: Sql, said: string, nowMs: number): boolean {
 function checkBriefing(sql: Sql, repo: string, b: Context, nowMs: number): { wrong: string[]; fine: string } {
   const name = repoName(repo);
   const wrong: string[] = [];
-  const want = expectedHandoff(sql, repo, b.project?.spoken ?? null);
+  const want = expectedHandoff(sql, repo, b.project?.spoken ?? null, nowMs);
   const got = b.handoff;
   const gotRow = got === null ? null : ((n) => (n === null ? null : runBySeq(sql, n)))(seqOf(got.from));
   if (got !== null && (gotRow === null || gotRow.deleted_at !== null)) wrong.push(`The briefing for ${name} hands a step no run on the record left.`);
@@ -176,7 +167,7 @@ function checkBriefing(sql: Sql, repo: string, b: Context, nowMs: number): { wro
   else if (got !== null && want !== null && gotRow!.seq !== want.seq)
     wrong.push(`The briefing for ${name} hands the step ${runSaid(gotRow!.doing)} left, ${ago(Math.abs(heard(want) - heard(gotRow!)))} before the newest, from ${runSaid(want.doing)}.`);
   else if (got !== null && want !== null && got.next.trim() !== String(want.next ?? '').trim()) wrong.push(`The briefing for ${name} hands a step its run did not leave.`);
-  if (want !== null && nowMs - heard(want) > BRIEFING_HANDOFF_DAYS * DAY) wrong.push(`The briefing for ${name} hands a step ${ago(nowMs - heard(want))} old.`);
+  if (got !== null && got.age_s > BRIEFING_HANDOFF_DAYS * 86_400) wrong.push(`The briefing for ${name} hands a step ${ago(got.age_s * 1000)} old.`);
 
   const open = openQuestions(sql, nowMs);
   const shown = Math.min(open, BRIEFING_WAITING_MOST);

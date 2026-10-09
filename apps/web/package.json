@@ -16,6 +16,7 @@
     "@braindog/declare": "workspace:*",
     "@braindog/dog": "workspace:*",
     "@braindog/kernel": "workspace:*",
+    "@braindog/pack-rates-poll": "workspace:*",
     "@braindog/seed": "workspace:*",
     "@braindog/theme": "workspace:*",
     "@braindog/where": "workspace:*",

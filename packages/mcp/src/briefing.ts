@@ -19,6 +19,9 @@
  * learnings are listed; every other list that says where its rows apply, keys and skills and tools among them, is a
  * count and the rows of this project only, because "what applies everywhere" is the same forty rows every session.
  *
+ * THE CARD IS THE RECORD'S NOW (`packages/record/src/card.ts`, AGT-B07): `context` sends `card`, and this prints it, then
+ * the open work and the habits. The card composed here is only for a context that carries none, a test's or an old host's.
+ *
  * PURE, as `brief.ts` is: the tools in `index.ts` read the record, and this decides what is said.
  */
 
@@ -408,11 +411,16 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
 
   let said = card.join('\n');
   if (said.length > CARD_MOST) said = said.slice(0, CARD_MOST).replace(/\n[^\n]*$/u, '');
+  /* THE RECORD'S OWN CARD WHEN IT SENT ONE (`card.ts`, AGT-B07), printed as it came, so the start hook, `context` and
+     `braindog context` say one text made by one set of rules. It already says the runs in this tree and the red signs,
+     so the lines below leave those out. The card composed above is for a record that sends none. */
+  const told = text(c.card);
+  if (told !== null) said = told;
 
   /* ── what follows the card ─────────────────────────────────────────────── */
 
   const lines: string[] = [];
-  for (const r of here) {
+  for (const r of told === null ? here : []) {
     const as = agentOf(r.agent, true);
     const same = text(mine.agent) === null || r.agent === mine.agent;
     lines.push(
@@ -431,7 +439,7 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
   /* THE RED SIGNS, each by name with its own sentence, so an agent starting work sees what the record says is wrong with
      itself (C07-f). The record has already held back what this key may not read (`quietSign`). */
   const signs = (Array.isArray(c.signs) ? c.signs : []).filter(isObject).filter((s) => typeof s.name === 'string' && typeof s.said === 'string');
-  for (const s of signs.slice(0, 3)) lines.push(`Red on this record: ${String(s.name)}. ${String(s.said)}`);
+  for (const s of told === null ? signs.slice(0, 3) : []) lines.push(`Red on this record: ${String(s.name)}. ${String(s.said)}`);
   for (const g of groups) {
     if (g.kind !== 'work') continue;
     const rows = [...g.rows, ...g.inherited];
@@ -449,6 +457,10 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
 
   const value: Record<string, unknown> = {
     card: said,
+    /* NO NULL IN A BRIEF ANSWER (`answer-hygiene.test.ts`): a card with no Next line sends no `card_next`, and a build
+       whose command never said itself sends only whether it is behind. */
+    ...(told !== null && text(c.card_next) ? { card_next: c.card_next } : {}),
+    ...(told !== null && isObject(c.build) ? { build: { ...(text(c.build.cli) ? { cli: c.build.cli } : {}), behind: c.build.behind === true } } : {}),
     ...(b.home ? { home: b.home.slug } : {}),
     ...(session ? { session: { spoken: session.spoken, ...(text(session.state) ? { state: session.state } : {}), ...(runner ? { as: runner } : {}) } } : {}),
     ...(project ? { project: { spoken: project.spoken, name: project.name, ...(text(project.how) ? { how: project.how } : {}) } } : {}),

@@ -1,0 +1,6 @@
+{
+  "gate": "css-rules",
+  "rule": "a media query beaten on source order",
+  "expect": "wins on source order",
+  "findings": 1
+}

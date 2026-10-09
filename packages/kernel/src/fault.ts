@@ -118,11 +118,65 @@ export function clearFault(sql: Sql, cause: string, nowMs: number): boolean {
   );
 }
 
-/** The faults open now, the one that failed last first. */
+/** One fault as a query answers it, before its family is read from its cause. */
+type FaultRow = { cause: string; kind: string; said: string; count: number; first_at: string; last_at: string; error: string };
+
+/**
+ * The outbox kinds that died with no line in `fault`, one per kind (audit 36-37, finding 2).
+ *
+ * MIGRATION 30 CLOSED THE OLD DEAD-JOB QUESTIONS AND RAISED NOTHING IN THEIR PLACE, so the jobs behind them were in no
+ * list at all until the next full eight-rung death, a day later or never. So a kind that has `dead` jobs and has never
+ * had a fault row reads as a fault from the outbox itself: same cause, same sentence, the dead jobs counted, their
+ * times the first and last. No raw error, because the outbox keeps none.
+ *
+ * ONLY THE DEATHS SINCE THE KIND LAST WORKED. A job of the kind created after a dead one and done is the outbox's way
+ * of saying the kind works again, as `clearFault` says it for the table: a mail that died in March under a dozen sent
+ * since is history, not a fault. `retryFault` queueing the newest dead job again is therefore what clears it, once
+ * that job is done. A job a run was waiting on is left out, because its death ended its run instead (`deadLetter`).
+ *
+ * NO FAULT ROW AT ALL, NOT NO OPEN ONE. Once a kind has a row the table is the truth, and a cleared row over old dead
+ * jobs must stay cleared. One query for every kind, never one a job.
+ */
+const UNFILED_OUTBOX = `
+  WITH worked AS (SELECT kind, MAX(created) AS at FROM outbox
+    WHERE state = 'done' AND kind IN (SELECT kind FROM outbox WHERE state = 'dead') GROUP BY kind)
+  SELECT 'outbox#' || o.kind AS cause, o.kind AS kind, COUNT(*) AS count, MIN(o.created) AS first_at, MAX(o.created) AS last_at
+  FROM outbox o LEFT JOIN worked w ON w.kind = o.kind
+  WHERE o.state = 'dead' AND (w.at IS NULL OR o.created > w.at)
+    AND NOT EXISTS (SELECT 1 FROM fault f WHERE f.cause = 'outbox#' || o.kind)
+    AND NOT (o.kind IN ('infer.ask', 'pull.fetch') AND CASE WHEN json_valid(o.payload)
+      THEN json_type(o.payload, '$.run') = 'text' AND json_type(o.payload, '$.step') IN ('integer', 'real') ELSE 0 END)
+  GROUP BY o.kind`;
+
+/**
+ * The schedule kinds with `failed` rows and no line in `fault`, one per kind, for the same reason. A failed schedule
+ * row never runs again until it is retried, so every one is still not working however old: counted, its due times the
+ * first and last. `retryFault` puts the newest back, and it leaves this list when no row of the kind is failed.
+ */
+const UNFILED_SCHEDULE = `
+  SELECT 'schedule#' || s.kind AS cause, s.kind AS kind, COUNT(*) AS count, MIN(s.due_at) AS first_at, MAX(s.due_at) AS last_at
+  FROM schedule s
+  WHERE s.state = 'failed' AND NOT EXISTS (SELECT 1 FROM fault f WHERE f.cause = 'schedule#' || s.kind)
+  GROUP BY s.kind`;
+
+/**
+ * The faults open now, the one that failed last first: the open rows of `fault`, and the dead outbox kinds and failed
+ * schedule kinds that never had one (`UNFILED_OUTBOX`, `UNFILED_SCHEDULE`), in the same shape. A record whose ledger has
+ * no outbox or schedule (a test's bare database) reads the table alone.
+ */
 export function openFaults(sql: Sql): Fault[] {
-  return sql
-    .all<{ cause: string; kind: string; said: string; count: number; first_at: string; last_at: string; error: string }>(
-      'SELECT cause, kind, said, count, first_at, last_at, error FROM fault WHERE cleared_at IS NULL ORDER BY last_at DESC, cause',
-    )
+  const rows = sql.all<FaultRow>(
+    'SELECT cause, kind, said, count, first_at, last_at, error FROM fault WHERE cleared_at IS NULL',
+  );
+  const has = new Set(
+    sql.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('outbox', 'schedule')").map((r) => r.name),
+  );
+  for (const [table, query] of [['outbox', UNFILED_OUTBOX], ['schedule', UNFILED_SCHEDULE]] as const) {
+    if (!has.has(table)) continue;
+    for (const r of sql.all<Omit<FaultRow, 'said' | 'error'>>(query))
+      rows.push({ ...r, count: Number(r.count), said: saidOf(r.cause), error: '' });
+  }
+  return rows
+    .sort((a, b) => (a.last_at === b.last_at ? (a.cause < b.cause ? -1 : a.cause > b.cause ? 1 : 0) : a.last_at < b.last_at ? 1 : -1))
     .map((r) => ({ ...r, kind: r.kind || kindOf(r.cause), family: familyOf(r.cause) }));
 }

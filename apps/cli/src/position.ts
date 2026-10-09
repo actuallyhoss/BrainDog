@@ -114,6 +114,7 @@ const GRAMMAR: Record<string, RegExp> = {
   'x-braindog-client-name': printable(128),
   'x-braindog-client-version': printable(64),
   'x-braindog-cli': BUILD,
+  'x-braindog-ahead': /^(?:0|[1-9][0-9]{0,3})$/,
 };
 
 type Env = Record<string, string | undefined>;
@@ -138,7 +139,14 @@ export type Parent = { spoken: string; cwd: string | null; repo: string | null; 
  * What else a call says about who makes it: the process's environment, the client's own name and version, and the run
  * it works for when it is a subagent. `build` is the command's own (`cliBuild`) unless a caller says another, as a test does.
  */
-export type Said = { env?: Env | undefined; client?: ClientInfo | undefined; parent?: Parent | null | undefined; build?: string | undefined };
+export type Said = { env?: Env | undefined; client?: ClientInfo | undefined; parent?: Parent | null | undefined; build?: string | undefined; ahead?: number | null | undefined };
+
+/**
+ * Commits HEAD moved since the handoff, as `x-braindog-ahead` carries them: a whole number from 0 to 9,999, a count past
+ * that said as 9,999, and nothing at all for a count git could not make. The record reads it for the card's Next line.
+ */
+export const aheadHeader = (moved: number | null | undefined): string | undefined =>
+  typeof moved === 'number' && Number.isInteger(moved) && moved >= 0 ? String(Math.min(moved, 9_999)) : undefined;
 
 /**
  * The headers a position becomes. A value outside its grammar is dropped, as the host would drop it,
@@ -170,6 +178,7 @@ export function sessionHeaders(p: Position, agent?: Agent, run?: { spoken?: stri
     'x-braindog-client-name': said.client?.name?.trim(),
     'x-braindog-client-version': said.client?.version?.trim(),
     'x-braindog-cli': said.build ?? cliBuild(),
+    'x-braindog-ahead': aheadHeader(said.ahead),
   };
   const out: Record<string, string> = {};
   for (const [name, value] of Object.entries(values)) if (value && GRAMMAR[name]!.test(value)) out[name] = value;

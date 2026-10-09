@@ -100,8 +100,10 @@ function envFor(extra: Record<string, string>, config = join(scratch, 'empty')):
   return { ...env, ...extra };
 }
 
+/* THE SERVER THIS COMMAND COMPOSES, `--local`, for the seven nights it stays beside the bridge (AGT-A03): signed in,
+   `braindog mcp` relays to the host's own `POST /mcp`, which `bridge.test.ts` holds against a real self-host. */
 function launch(extra: Record<string, string>, options: { args?: string[]; config?: string } = {}) {
-  const child = spawn(process.execPath, ['src/main.ts', ...(options.args ?? ['mcp', '--agent', 'claude'])], {
+  const child = spawn(process.execPath, ['src/main.ts', ...(options.args ?? ['mcp', '--agent', 'claude', '--local'])], {
     cwd: APP,
     env: envFor(extra, options.config),
   });
@@ -635,7 +637,7 @@ test('A STARTUP FAILURE IS ONE LINE ON STDERR, nothing on stdout, and exit 1', a
     [{}, {}, /^No BrainDog host is set\./],
     [{}, { config: expired }, /^The login to https:\/\/a\.example expired on 2020-01-01\. Run braindog login https:\/\/a\.example\.$/],
     [{ BRAINDOG_HOST: 'http://a.example', BRAINDOG_TOKEN: TOKEN }, {}, /^http:\/\/a\.example is http, not https\./],
-    [{ BRAINDOG_HOST: 'https://a.example' }, { args: ['mcp', TOKEN] }, /^braindog mcp takes --agent and --host, and nothing else\./],
+    [{ BRAINDOG_HOST: 'https://a.example' }, { args: ['mcp', TOKEN] }, /^braindog mcp takes --agent, --host and --local, and nothing else\./],
     [{ BRAINDOG_HOST: 'https://a.example' }, { args: ['mcp', '--agent', 'robot'] }, /^--agent is one of claude, codex, cursor, other\.$/],
   ];
   for (const [env, options, pattern] of cases) {

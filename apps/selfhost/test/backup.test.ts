@@ -15,6 +15,7 @@ import { lastDue, minutesOf, nightlyBackups } from '../src/backup.ts';
 import { KEEP } from '../src/snapshots.ts';
 import { openSqlite, start } from '../src/server.ts';
 import { createDirectory } from '@braindog/record/directory';
+import { NIGHT_FAULT, openFaults } from '@braindog/kernel';
 
 const OBLIGATIONS = {
   id: 'register.obligations',
@@ -184,5 +185,60 @@ test('THE DIRECTORY IS COPIED WITH THE NIGHTLY COPY, into <data>/directory-snaps
     nightly.stop();
     await running.close();
     rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('A NIGHT THAT FAILED IS TOLD AS THE CLOUD TELLS IT: one failed note and one fault a night, and a copy kept clears it', async () => {
+  // RQ-LCH-273: the self-host writes the same `export` event and reads the same three facts as the Cloud (LCH-C03).
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-nightly-told-'));
+  const file = join(dir, 'record.sqlite');
+  let now = Date.parse('2026-09-17T08:00:00Z');
+  const running = await start({ file, port: 0, pollMs: 0, now: () => now });
+  let refuse = true;
+  const refusing = new Proxy(running.sql, {
+    get: (target, key) =>
+      key === 'exec'
+        ? (text: string, ...args: unknown[]) => {
+            if (refuse && /^VACUUM INTO/u.test(text)) throw new Error('disk I/O error');
+            return (target.exec as (t: string, ...a: unknown[]) => unknown)(text, ...args);
+          }
+        : Reflect.get(target, key),
+  });
+  const k = running.api.kernel;
+  const nightly = nightlyBackups({ sql: refusing, file, now: () => now, at: '03:20', tickMs: 0, logged: (note) => k.lifecycle('export', 'system', note) });
+  const failedNotes = () => running.sql.all<{ note: string }>("SELECT note FROM event WHERE kind = 'export' AND note LIKE 'failed:%'").map((r) => r.note);
+  try {
+    /* A record made today has had no copy: three nulls, and no fault. */
+    assert.deepEqual(k.copyFacts(), { last_copy_at: null, last_copy_bytes: null, last_export_at: null });
+    assert.equal(openFaults(running.sql).length, 0);
+
+    /* Tried at the hour and again ten minutes later: one night, one note, one fault. */
+    assert.equal(await nightly.look(), null);
+    now += 600_000;
+    assert.equal(await nightly.look(), null);
+    assert.deepEqual(failedNotes(), ['failed: disk I/O error']);
+    assert.equal(openFaults(running.sql).length, 1);
+    assert.equal(openFaults(running.sql)[0]!.cause, NIGHT_FAULT);
+    assert.equal(k.copyFacts().last_copy_at, null);
+
+    /* The next night fails the same way: a second note, and still the one fault. */
+    now += 86_400_000;
+    assert.equal(await nightly.look(), null);
+    assert.equal(failedNotes().length, 2);
+    assert.equal(openFaults(running.sql).length, 1);
+
+    /* The disk is freed: the copy is kept, Settings reads its time and size, and the fault is cleared. */
+    refuse = false;
+    now += 600_000;
+    const id = await nightly.check();
+    assert.ok(id !== null);
+    const facts = k.copyFacts();
+    assert.equal(facts.last_copy_at, new Date(now).toISOString());
+    assert.ok((facts.last_copy_bytes ?? 0) > 0);
+    assert.equal(openFaults(running.sql).length, 0);
+  } finally {
+    nightly.stop();
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
   }
 });

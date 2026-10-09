@@ -1,0 +1,7 @@
+{
+  "gate": "em-dash",
+  "rule": "an em dash as punctuation in source",
+  "expect": "used as punctuation",
+  "findings": 1,
+  "why": "TWO FIXTURES AND ONE SENTENCE, because the rule has two halves and a count of one proves each. Both trees carry the line *\"A seeded sentence — in prose, outside any fence.\"* in a README, and the only difference between them is `private` in the manifest. `em-dash` is private and its one finding is in the source, which says the README was forgiven; `em-dash-readme` is published and its one finding is the README, which says the same sentence is read when a stranger can reach it. Seeding both halves in one tree would have made the total two and `named()` one, which is how this pair was born.\n\nTHE DECOYS ARE THE OTHER HALF OF EACH COUNT. Every one of them holds an em dash spaced on both sides, the exact shape the gate refuses, and is forgiven only for where it sits: a block comment, a line comment and two SQL column annotations inside a schema literal in the source; a fenced code block, an inline code span and an HTML comment in the README. A bare glyph and a heading rule sit there too, unspaced. An exemption that stops working takes the count above one rather than leaving it green, which is the only way an exemption gets tested at all."
+}

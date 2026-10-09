@@ -208,12 +208,12 @@ test('usecase install <id>: files a pack proposal for a use case on offer, as an
   const h = await setup(t);
   assert.equal(await usecase(['install', 'student'], h.io), 0, h.said.join('\n'));
   const proposed = () => h.seen.filter((s) => s.method === 'propose');
-  assert.deepEqual(proposed()[0]?.args, { question: 'Set this BrainDog up for Student?', body_kind: 'pack', body: { install: 'usecase-student' } });
+  assert.deepEqual(proposed()[0]?.args, { question: 'Set this BrainDog up for Student?', body_kind: 'pack', body: { install: 'usecase-student' }, cause: 'install#usecase-student' });
   assert.equal(h.out.at(-1), `Asked the owner to set this BrainDog up for Student. Nothing is installed until they accept it: ${h.io.env.BRAINDOG_HOST}/decide/SG3`);
 
   /* BY ITS PACK ID TOO, and one on at an older version is asked as its update. */
   assert.equal(await usecase(['install', 'usecase-team'], h.io), 0, h.said.join('\n'));
-  assert.deepEqual(proposed()[1]?.args, { question: 'Update Team from 1.0.0 to 1.1.0?', body_kind: 'pack', body: { install: 'usecase-team' } });
+  assert.deepEqual(proposed()[1]?.args, { question: 'Update Team from 1.0.0 to 1.1.0?', body_kind: 'pack', body: { install: 'usecase-team' }, cause: 'install#usecase-team' });
 
   /* ONE ALREADY ON, ONE NOT OFFERED, AND A MODULE ARE REFUSED, AND NOTHING IS PROPOSED. */
   assert.equal(await usecase(['install', 'personal'], h.io), 1);

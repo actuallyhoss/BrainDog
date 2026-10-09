@@ -72,8 +72,20 @@ async function stubHost(
     projects?: { repos?: string[]; folders?: string[] }[];
     joined?: string | null;
     endSays?: string;
+    head?: string;
   } = {},
 ) {
+  /* WITH `head`, the handoff names that commit and the record's card says the commits since it, as `x-braindog-ahead`
+     told it, on the Next line and in `card_next`, as a record does (`packages/record/src/card.ts`). */
+  const since = (ahead: unknown) => (typeof ahead === 'string' ? ` · ${ahead} commits since` : '');
+  const carded = (ahead: unknown) =>
+    card === undefined
+      ? CONTEXT
+      : {
+          ...CONTEXT,
+          ...(o.head === undefined ? {} : { handoff: { ...CONTEXT.handoff, head: o.head }, card_next: `Next     Kern the lowercase pairs.${since(ahead)}` }),
+          card: card.replace(/^(Next .*)$/mu, `$1${since(ahead)}`),
+        };
   const seen: Seen[] = [];
   const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -91,14 +103,14 @@ async function stubHost(
       };
       const row = { id: 'e_7', seq: 7, state: 'active', version: 2, fields: {} };
       if (method === 'attach')
-        return answer({ ok: true, value: { session: row, spoken: 'S7', resumed: body.source !== 'startup', project: 'things#1', context: card === undefined ? CONTEXT : { ...CONTEXT, card } } });
+        return answer({ ok: true, value: { session: row, spoken: 'S7', resumed: body.source !== 'startup', project: 'things#1', context: carded(undefined) } });
       if (method === 'handoff') return answer({ ok: true, value: { ...row, state: body.state } });
       if (method === 'end' && o.endSays !== undefined) {
         res.writeHead(o.endSays === 'ROUTE_UNKNOWN' ? 404 : o.endSays === 'NOT_IN_THIS_BUILD' ? 501 : 403, { 'content-type': 'application/json' });
         return res.end(JSON.stringify({ ok: false, refusal: { code: o.endSays, fix: 'This host does not end runs.' } }));
       }
       if (method === 'end') return answer({ ok: true, value: { run: 'S7', state: 'done', changed: true } });
-      if (method === 'context') return answer({ ok: true, value: CONTEXT });
+      if (method === 'context') return answer({ ok: true, value: carded(req.headers['x-braindog-ahead']) });
       if (method === 'heard') return answer({ ok: true, value: { marked: true } });
       /* With `projects`, a Projects list declaring `scopes:` and a People list declaring `meets:` with its self part. */
       const registers = o.projects === undefined ? [] : [{ id: 'things', name: 'Projects', count: o.projects.length }, { id: 'people', name: 'People', count: 1 }];
@@ -278,6 +290,38 @@ test('THE RECORD’S OWN CARD IS PRINTED AS IT CAME, and a compaction prints onl
   const cwd = folder('kiln');
   assert.equal((await run(['hook', 'start'], env, event(cwd, { session_id: 'claude-run-9', source: 'startup' }))).stdout, `${card}\n`);
   assert.equal((await run(['hook', 'start'], env, event(cwd, { session_id: 'claude-run-9', source: 'compact' }))).stdout, 'Next     Kern the lowercase pairs. (S6, Claude Code, 10m ago)\n');
+});
+
+test('THE COMMITS SINCE THE HANDOFF GO TO THE RECORD after the attach, as x-braindog-ahead, and its card and card_next say them', async (t) => {
+  const repo = repository(folder('kiln-ahead'));
+  const from = repo.commit();
+  repo.commit();
+  repo.commit();
+  const card = 'BrainDog · run S7 · project Kiln · Claude Code on MacBook\nNext     Kern the lowercase pairs.\nMore     call context';
+  const host = await stubHost(t, false, true, card, { head: from });
+  const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+
+  const start = await run(['hook', 'start'], env, event(repo.dir, { session_id: 'claude-run-11', source: 'startup' }), repo.dir);
+  assert.equal(start.code, 0, start.stderr);
+  assert.match(start.stdout, /^Next {5}Kern the lowercase pairs\. · 2 commits since$/mu);
+  /* The attach cannot say it, because the handoff's commit is in its answer; one read after it does, as the same run. */
+  assert.equal(host.seen.find((s) => s.method === 'attach')?.headers['x-braindog-ahead'], undefined);
+  const reads = host.seen.filter((s) => s.method === 'context');
+  assert.deepEqual(
+    reads.map((s) => [s.headers['x-braindog-ahead'], s.headers['x-braindog-session']]),
+    [['2', 'S7']],
+  );
+
+  /* A compaction prints the record's card_next, which says them too. */
+  const compact = await run(['hook', 'start'], env, event(repo.dir, { session_id: 'claude-run-11', source: 'compact' }), repo.dir);
+  assert.equal(compact.stdout, 'Next     Kern the lowercase pairs. · 2 commits since\n');
+
+  /* HEAD where the handoff left it: nothing moved, so nothing more is asked. */
+  const still = repository(folder('kiln-still'));
+  const here = await stubHost(t, false, true, card, { head: still.commit() });
+  const quiet = await run(['hook', 'start'], { ...env, BRAINDOG_HOST: here.base }, event(still.dir, { session_id: 'claude-run-12', source: 'startup' }), still.dir);
+  assert.equal(quiet.stdout, `${card}\n`);
+  assert.equal(here.seen.filter((s) => s.method === 'context').length, 0);
 });
 
 test('THE START HOOK’S OWN TIME RIDES THE NEXT CALL of the same session, as a hook mark against its run, and is sent once', async (t) => {

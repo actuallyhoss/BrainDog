@@ -180,14 +180,14 @@ function readRows(kind: string, spec: KindSpec, body: string[]): { rows: Row[]; 
         : takeTone(all, { ...spec, cells: head ?? spec.cells });
     const width = head ?? (spec.header ? cells.length : spec.cells);
     if (cells.length > width)
-      return { rows, over: `${cells.length} columns where ${kind} takes ${width}: "${line.trim()}"` };
+      return { rows, over: `A ${kind} line has ${cells.length} columns where ${kind} takes ${width}: "${line.trim()}"` };
 
     rows.push({ cells, ...(tone ? { tone } : {}), ...(hole ? { hole } : {}), ...(done === undefined ? {} : { done }) });
   }
 
   // Rows over a cap degrade under DIALECT_ARITY. There is no DIALECT_ROWS code (36 §13 D9).
   if (spec.rows && rows.length > spec.rows)
-    return { rows, over: `${rows.length} rows where ${kind} takes ${spec.rows}` };
+    return { rows, over: `A ${kind} has ${rows.length} lines where a ${kind} takes ${spec.rows}` };
 
   return { rows };
 }
@@ -403,7 +403,8 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
       out.push({
         type: 'degraded',
         code: 'DIALECT_ARITY',
-        fix: `A ${kind} row has ${over}. The block is shown as you wrote it.`,
+        /* NEVER "row" IN WORDS A PERSON READS (the house rules): a stat said "A stat row has 7 rows". */
+        fix: `${over}. The block is shown as you wrote it.`,
         raw,
         info,
         start,

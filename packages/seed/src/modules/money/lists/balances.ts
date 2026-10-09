@@ -21,7 +21,9 @@ export const BALANCES_REGISTER: MoneyRegister = {
   pack: 'money-core',
   fields: [
     { id: 'account', type: 'ref', to: 'accounts', index: true, required: true },
-    { id: 'balance', type: 'money', required: true },
+    /* IN THE ACCOUNT'S OWN CURRENCY WHEN NONE IS SAID, SINCE money-core 3.16.0 (REC-B04): "What it holds today" on Money
+       takes a number, and the account it names gives the code. */
+    { id: 'balance', type: 'money', required: true, currency_from: 'account.balance' },
     { id: 'as_of', label: 'As of', type: 'day', index: true, required: true },
     /* WHAT SAID IT: a statement, a bank's message, a count. The title, because a list of checks is read by where each
        came from. */

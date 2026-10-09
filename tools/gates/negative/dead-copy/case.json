@@ -1,0 +1,7 @@
+{
+  "gate": "dead-copy",
+  "rule": "a sentence nobody renders",
+  "expect": "nobody reads",
+  "findings": 1,
+  "why": "THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both (or neither) is a gate that is counting keys rather than finding dead ones."
+}

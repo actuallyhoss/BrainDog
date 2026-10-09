@@ -300,7 +300,8 @@ apps/cli/
 Six source files in the first design, counted. The agent path adds `position.ts`, `stdio.ts` and `surface.ts`
 for `mcp`; `hooks.ts` (the two hooks and the session file), `brief.ts` (the briefing) and `install.ts` for the
 hooks; `keys.ts` for the key doors; `skills.ts` and `tools.ts` for the sync, the scan and the write; and
-`hooks/braindog-hook.ps1` and `hooks/braindog-hook.sh`, the shims Claude Code runs. Published artefact: `dist/braindog.mjs`, one file, with `dist/braindog.mjs.sha256` beside it, built by
+`hooks/braindog-hook.ps1` and `hooks/braindog-hook.sh`, the shims Claude Code runs. Published artefact: `dist/braindog.mjs`, one file, with `dist/braindog.mjs.sha256` and `dist/braindog.mjs.build` (the one
+line `braindog update` reads, §5.17) beside it, built by
 `scripts/bundle.mjs` (`pnpm --filter braindog-cli build`): esbuild with `src/main.ts --bundle --platform=node
 --format=esm --target=node24 --define:__BUILD__="<yyyy.mm.dd>+<sha7>" --outfile=dist/braindog.mjs`, keeping the
 entry's own hashbang in place of a banner, the build taken from `BRAINDOG_BUILD` or else the UTC date and
@@ -813,6 +814,20 @@ write it. `keys headers <credentials#n | label> --as <Header>`:
    `secret-grep-headers` holds it to that.
 
 If owner item 3 takes the command back, `tools write` leaves the header out again and says so.
+
+### 5.17 · `braindog update [--check]` (`update.ts`)
+
+The command keeps itself current, and only when it is typed: the start hook says it is behind and never runs this.
+
+1. From a checkout (build `dev+0000000`) it refuses in one sentence: a checkout is updated with git.
+2. Reads `<base>/braindog.mjs.build` (base `https://brain.dog/cli`), one line holding the build that is out. `--check`
+   says whether this command is that build, or behind it, and stops. The same build already installed is said, and
+   nothing is downloaded.
+3. Downloads `<base>/braindog.mjs` to `braindog.new.mjs` beside the installed file, and refuses unless its SHA-256 is
+   the one in `<base>/braindog.mjs.sha256` and its own `--version`, asked under this Node, is the build read in 2.
+4. Copies the installed file to `braindog.mjs.prev` and renames the download over it, one atomic rename, so the
+   installed name always holds a whole command. Any failure deletes the download and leaves the installed file.
+5. Runs `install --apply` to place the Agent Skill and hooks again, and says the old and new builds.
 
 ---
 

@@ -12,9 +12,9 @@ import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import watch, { STOPPING, allowedCommits, hostInput, namesOf } from './launch.mjs';
+import watch, { allowedCommits, hostInput, namesOf, reasonsBeside } from './launch.mjs';
 import { wranglerConfig } from '../../apps/worker/scripts/provision-check.mjs';
-import { launchState } from '../../apps/worker/src/launch.ts';
+import { SIGNUP_STOPPED, STOPPING, launchDetail, launchState } from '../../apps/worker/src/launch.ts';
 
 const NOW = Date.parse('2026-10-09T12:00:00Z');
 const HOUR = 3_600_000;
@@ -23,6 +23,8 @@ const API = 'https://api.github.test';
 const NAMES = { host: 'brain.example.test', legacy: ['app.brain.example.test'], signup: 'open' };
 const GITHUB = { api: API, repo: 'owner/repo', token: 'stub', runId: '99' };
 const LIVE = 'abc1234';
+/** What `signUp()` needs before the switch is asked, all present (`READY` in `apps/worker/test/launch.test.ts`). */
+const READY_ENV = { SESSION_SECRET: 's'.repeat(32), PUBLIC_HOST: 'brain.example.test', AUTH_MAIL_FROM: 'a@brain.example.test', EMAIL: {} };
 
 /* WHAT THE STUB ANSWERS, by the URL the watch meant. A function is called with the request; `'hang'` never answers. */
 let routes = {};
@@ -43,8 +45,8 @@ const healthz = (over = {}) =>
   json({
     ok: true,
     app: `2026.10.09+${LIVE}`,
-    launch: { signup: 'open', botCheck: false, billing: 'off', why: ['Billing is off, so every new record is on Free.'] },
-    night: { at: iso(NOW - 3 * HOUR), records: 3, backups: 3, backups_failed: 0, directory: 'ok', ran: true },
+    launch: { signup: 'open', botCheck: false, billing: 'off', why: [] },
+    night: { at: iso(NOW - 3 * HOUR), reached: true, backups_failed: 0, directory: 'ok', ran: true },
     ...over,
   });
 const deploys = (runs) => json({ workflow_runs: runs });
@@ -84,8 +86,8 @@ test('EVERY MISS IS PRINTED, NEVER THE FIRST ONLY, each with what came back, and
     'http://brain.example.test/': { status: 200, body: 'plain' },
     'https://brain.example.test/.well-known/security.txt': { status: 404 },
     'https://brain.example.test/healthz': healthz({
-      night: { at: iso(NOW - 30 * HOUR), records: 3, backups: 3, backups_failed: 0, directory: 'ok', ran: false },
-      launch: { signup: 'closed', botCheck: false, billing: 'off', why: ['Mail is not connected, so nobody gets the letter that finishes a sign-up.'] },
+      night: { at: iso(NOW - 30 * HOUR), reached: true, backups_failed: 0, directory: 'ok', ran: false },
+      launch: { signup: 'closed', botCheck: false, billing: 'off', why: [SIGNUP_STOPPED] },
     }),
   });
   assert.equal(code, 1);
@@ -94,7 +96,7 @@ test('EVERY MISS IS PRINTED, NEVER THE FIRST ONLY, each with what came back, and
   assert.ok(lines.includes('           answered 404'));
   assert.ok(lines.includes('           the last night closed 30 hours ago'));
   assert.ok(lines.includes('           /healthz says sign-up is closed'));
-  assert.ok(lines.includes('           why: Mail is not connected, so nobody gets the letter that finishes a sign-up.'), 'the why went unprinted');
+  assert.ok(lines.includes(`           why: ${SIGNUP_STOPPED}`), 'the why went unprinted');
   assert.equal(lines.at(-1), '  watch: brain.example.test, 4 missed');
 });
 
@@ -157,7 +159,7 @@ test('QUESTION 5: an old name answering 5xx or not at all is a miss; a 404 still
 
 test('QUESTION 6: a copy that failed, a night not told, and a build older than the watch are misses', async () => {
   const night = (n) => ({ 'https://brain.example.test/healthz': healthz({ night: n }) });
-  const failed = await run(night({ at: iso(NOW - HOUR), records: 3, backups: 2, backups_failed: 1, directory: 'ok', ran: false }));
+  const failed = await run(night({ at: iso(NOW - HOUR), reached: true, backups_failed: 1, directory: 'ok', ran: false }));
   assert.ok(failed.lines.includes("           1 of last night's copies failed"), failed.lines.join('\n'));
   assert.ok((await run(night(null))).lines.includes('           no night has been told yet, or the Directory did not answer'));
   const older = await run({ 'https://brain.example.test/healthz': json({ ok: true, launch: { signup: 'open', why: [] } }) });
@@ -173,25 +175,40 @@ test('QUESTION 7: sign-up must be what wrangler.jsonc switches it to, and a /hea
 });
 
 test('QUESTION 7: open beside a reason that stops sign-up is a miss, as a build from before the fix answered', async () => {
-  const refused = 'The bot check has its secret and no site key, so the sign-up page cannot pass it and every sign-up is refused.';
+  const refused = STOPPING.siteKey;
   const { code, misses, lines } = await run({
     'https://brain.example.test/healthz': healthz({ launch: { signup: 'open', botCheck: true, billing: 'off', why: [refused, 'Billing is off, so every new record is on Free.'] } }),
   });
   assert.equal(code, 1);
   assert.deepEqual(misses.map((l) => l.trim().split(/\s+/)[1]), ['7'], lines.join('\n'));
-  assert.ok(lines.includes('           /healthz says sign-up is open, and a reason below says nobody can finish it'), lines.join('\n'));
+  assert.ok(lines.includes('           /healthz says sign-up is open, and gives a reason below that it is not'), lines.join('\n'));
   assert.ok(lines.includes(`           why: ${refused}`));
 });
 
-test("STOPPING IS HELD TO launch.ts: every reason that closes an open switch matches it, and no other reason does", () => {
-  const ready = { SESSION_SECRET: 's'.repeat(32), PUBLIC_HOST: 'brain.example.test', AUTH_MAIL_FROM: 'a@brain.example.test', EMAIL: {} };
-  const calm = [{}, { ...ready, SIGNUP: 'open' }, { ...ready, SIGNUP: 'invite', BILLING: 'test' }, { ...ready, SIGNUP: 'open', TURNSTILE_SECRET: 's', TURNSTILE_SITE_KEY: 'k', BILLING: 'live' }];
-  for (const env of calm) for (const w of launchState(env).why) assert.doesNotMatch(w, STOPPING);
-  const stopped = [...Object.keys(ready).map((k) => ({ ...ready, SIGNUP: 'open', [k]: undefined })), { ...ready, SIGNUP: 'open', TURNSTILE_SECRET: 's' }];
-  for (const env of stopped) {
+/* AUDIT 36-37, FINDING 12: THE WATCH IS HELD TO launch.ts'S EXPORTED STOPPING, and to a sentence nobody has written yet.
+   The regex this replaced let a stop sentence through that did not end on its two phrases; the last case is one. */
+test('QUESTION 7 MISSES EVERY STOPPING SENTENCE BESIDE open OR invite, AND A NEW ONE', async () => {
+  const novel = 'The letter service refuses this host, so sign-up waits.';
+  for (const signup of ['open', 'invite'])
+    for (const w of [...Object.values(STOPPING), novel]) {
+      const why = signup === 'invite' ? [launchState({ ...READY_ENV, SIGNUP: 'invite' }).why[0], w] : [w];
+      const { misses, lines } = await run({ 'https://brain.example.test/healthz': healthz({ launch: { signup, botCheck: false, billing: 'off', why } }) }, { names: { ...NAMES, signup } });
+      assert.deepEqual(misses.map((l) => l.trim().split(/\s+/)[1]), ['7'], `${signup} beside: ${w}\n${lines.join('\n')}`);
+    }
+});
+
+/* WHAT launch.ts ANSWERS TODAY PASSES: every calm host's public why fits beside its mode, and every stopped one is closed. */
+test("QUESTION 7'S COUNT IS HELD TO launch.ts: a calm host passes it, and every stopped one is closed", () => {
+  const calm = [{ ...READY_ENV, SIGNUP: 'open' }, { ...READY_ENV, SIGNUP: 'invite', BILLING: 'test' }, { ...READY_ENV, SIGNUP: 'open', TURNSTILE_SECRET: 's', TURNSTILE_SITE_KEY: 'k', BILLING: 'live' }];
+  for (const env of calm) {
     const state = launchState(env);
-    assert.equal(state.signup, 'closed');
-    assert.equal(state.why.filter((w) => STOPPING.test(w)).length, 1, state.why.join(' | '));
+    assert.ok(state.why.length <= reasonsBeside(state.signup), state.why.join(' | '));
+  }
+  const stopped = [...Object.keys(READY_ENV).map((k) => ({ ...READY_ENV, SIGNUP: 'open', [k]: undefined })), { ...READY_ENV, SIGNUP: 'open', TURNSTILE_SECRET: 's' }];
+  for (const env of stopped) {
+    assert.equal(launchState(env).signup, 'closed');
+    assert.deepEqual(launchState(env).why, [SIGNUP_STOPPED]);
+    assert.equal(launchDetail(env).why.filter((w) => Object.values(STOPPING).includes(w)).length, 1, launchDetail(env).why.join(' | '));
   }
 });
 

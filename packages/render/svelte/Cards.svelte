@@ -33,7 +33,7 @@
   } from '../src/index.ts';
   /* From the module and not the root, which does not export it: the word is this drawer's and `html.ts`'s alone. */
   import { CARDS_NEXT, RUN_OPEN, isDimmed, markGlyphOf, runFaceOf, runMarkOf, type RunCell, type RunFace } from '../src/cards.ts';
-  import { glyphPath, glyphWaits } from '../src/inline.ts';
+  import { cellNamesNothing, glyphPath, glyphWaits } from '../src/inline.ts';
   import { hueOf } from '../src/cards.ts';
   import { pictureSrc } from '../src/gallery.ts';
   import { hrefFor } from '../src/html.ts';
@@ -149,6 +149,8 @@
       {@const face = L.nameIsWho ? initialOf(said(r, L.name)) : null}
       {@const nameMark = L.nameIsWho ? markFor(said(r, L.name)) : null}
       <!-- A CARD'S FIGURE IS A TILE'S, said short as `amount(headlineFigure(...))` in the mirror says it: `£18,400`. -->
+      <!-- A figure that names nothing is left out, as `toHTML` leaves it (`cellNamesNothing`): the card keeps the rest. -->
+      {@const shows = L.figure >= 0 && !cellNamesNothing(r.cells[L.figure], opts)}
       {@const short = L.figure >= 0 ? headlineFigure(r.cells[L.figure] ?? '') : ''}
       {@const symbol = L.figure >= 0 ? symbolFigure(short) : null}
       {@const coded = L.figure >= 0 ? leadingCode(short) : null}
@@ -191,9 +193,9 @@
         </div>
         <!-- The reply is the line under the head, and an empty one draws nothing, as in `toHTML`. -->
         {#if L.reply >= 0 && r.cells[L.reply]}<p class="cards-reply"><Text nodes={nodes(r, L.reply)} {opts} /></p>{/if}
-        {#if L.figure >= 0 || t || (L.ring >= 0 && r.cells[L.ring])}
+        {#if shows || t || (L.ring >= 0 && r.cells[L.ring])}
           <div class="cards-body">
-            {#if L.figure >= 0}
+            {#if shows}
               <span class="cards-figure"
                 ><span class="cards-value num"
                   >{#if !r.cells[L.figure]}{MISSING}{:else if symbol}{symbol}{:else if coded}{coded.sign}<span class="amount-code">{coded.currency}</span>

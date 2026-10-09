@@ -1,5 +1,7 @@
 /** Heads up: what needs a look, under the walk. */
 
+import { AGES } from './ages.ts';
+
 export const HEADS_UP: Record<string, unknown>[] = [
   {
     /* WHAT NEEDS A LOOK, AS ONE TILE OF THREE LINES, SINCE money-core 3.5.0: a balance more than a week old, money
@@ -23,13 +25,18 @@ export const HEADS_UP: Record<string, unknown>[] = [
     /* A BALANCE MORE THAN A WEEK OLD IS SAID ON THE PAGE THAT READS IT, SINCE money-core 3.3.0. The accounts were
        cards that marked it (`stale:`), and Cash now cut by account carries no day; every figure here starts from
        these balances, so an old one is the one thing about them that needs the person. The day is the oldest, the
-       one Cash now's own note says. NO HEADING OF ITS OWN SINCE money-core 3.5.0: it is a line of Heads up. */
+       one Cash now's own note says. NO HEADING OF ITS OWN SINCE money-core 3.5.0: it is a line of Heads up.
+
+       THE DAY THE BANK LAST SAID IT, SINCE money-core 3.16.0 (REC-B03), and it was the typed "As of", which a bank
+       message never writes: both figures read the roll's own day now (`read: as_of`, `read: stale`). The tile under it
+       says which account, by name, and the box beside that takes what one holds today (`ages.ts`). */
     kind: 'note',
     tone: 'warn',
     span: 12,
-    body: "The oldest balance in Cash now is from {{cash-as-of}}. Update it so this page starts from today's money.",
+    body: "The oldest balance in Cash now was last confirmed on {{cash-as-of}}. Say what an account holds today and this page starts from today's money.",
     when: { metric: 'balances-stale', gt: 0 },
   },
+  ...AGES,
   {
     /* NOTES THAT DRAW ONLY WHEN THEY ARE TRUE, and say what is late, never what the law says about it: a page
        everybody's Money draws does not speak for one country's courts. IN A FINANCE PAGE'S WORDS, SINCE money-core

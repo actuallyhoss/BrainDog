@@ -25,21 +25,21 @@ import { toHTML } from './html.ts';
 
 test('A GLYPH IS THE MARK, by its own name', () => {
   assert.equal(markOf('rocket', 'Kiln'), 'rocket');
-  assert.equal(markOf('music', 'Encore'), 'music');
-  assert.equal(markGlyphOf(markOf('music', 'Encore')), 'music');
+  assert.equal(markOf('music', 'Lanternfish'), 'music');
+  assert.equal(markGlyphOf(markOf('music', 'Lanternfish')), 'music');
 });
 
 test('AN ALIAS IS THE MARK, drawn as the glyph it stands for: cake is the gift', () => {
   assert.equal(canonical('cake'), 'gift');
   assert.equal(markOf('cake', 'Crumb.gg'), 'gift');
-  assert.equal(markOf('shop', 'Tamsin'), 'store');
+  assert.equal(markOf('shop', 'Quietcart'), 'store');
   assert.equal(markOf('site', 'Studio site'), 'globe');
   assert.equal(markOf('cube', 'Quartz'), 'box');
 });
 
 test("A PICTURE'S NAME WITH A CAPITAL IS STILL THE PICTURE, never its first letter", () => {
   assert.equal(markOf('Cake', 'Crumb.gg'), 'gift');
-  assert.equal(markOf('Music', 'Encore'), 'music');
+  assert.equal(markOf('Music', 'Lanternfish'), 'music');
   assert.equal(markOf('Close', 'Crumb.gg'), 'B');
   assert.equal(markOf(' Pencil '), null);
 });
@@ -132,7 +132,7 @@ const marks = (html: string): string[] =>
     m[0].replace(/\s+/gu, ' '),
   );
 
-const CARDS = '```cards\ntitle | mark: Picture\nCrumb.gg | cake\nBrainDog | paw\nEncore | music\nKiln | close\nStudio | Kiln\n```';
+const CARDS = '```cards\ntitle | mark: Picture\nCrumb.gg | cake\nBrainDog | paw\nLanternfish | music\nKiln | close\nStudio | Kiln\n```';
 
 test("BOTH DRAWERS DRAW THE SAME MARKS: the picture where it names one, else the title's letter", () => {
   /* A card grid is a page's block, never one written in a note's fence, so it is read as a page reads it. */

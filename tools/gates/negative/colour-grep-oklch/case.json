@@ -1,0 +1,6 @@
+{
+  "gate": "colour-grep",
+  "rule": "an oklch colour literal",
+  "expect": "colour literal",
+  "findings": 1
+}

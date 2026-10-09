@@ -114,6 +114,16 @@ export type Walk = {
   /** One record's copy. Throwing is how it reports a failure, and the reason is the sentence. */
   snapshot: (record: string) => Promise<{ key: string; bytes: number; rows: number }>;
   /**
+   * The record told its copy was kept, so its own Settings can say when and how large (`copyKept` in the kernel, LCH-C03).
+   * ABSENT, THE RECORD IS NOT TOLD, for the reason `expire` is optional.
+   */
+  kept?: ((record: string, copy: { key: string; bytes: number }) => Promise<void>) | undefined;
+  /**
+   * The record told its copy failed, and why: one `export` event whose note begins `failed:`, and one fault, counted
+   * again rather than opened twice when the same night fails the same way tomorrow (`copyFailed`). Never a question.
+   */
+  failed?: ((record: string, why: string) => Promise<void>) | undefined;
+  /**
    * The walk's own lines, one object each: `op()` in the Worker, collected in a test. `error` is a line that is a
    * problem, which Workers Logs files apart from the rest.
    */
@@ -242,6 +252,8 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
       }
     }
     const copying = o.now();
+    /* WHAT THE NIGHT CAME TO FOR THIS RECORD: the copy kept, or the reason it was not. */
+    let told: { key: string; bytes: number } | string;
     try {
       const kept = await o.snapshot(record);
       out.backups++;
@@ -249,6 +261,7 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
       line.rows = kept.rows;
       line.bytes = kept.bytes;
       line.backup_ms = o.now() - copying;
+      told = { key: kept.key, bytes: kept.bytes };
     } catch (e) {
       out.failed++;
       bad = true;
@@ -256,7 +269,24 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
          business; an error line that quoted a byte of it would have published it to wherever
          logs go. `deliver.ts` makes the same decision for the same reason. */
       line.backup = 'failed';
-      line.why = reason(e);
+      told = reason(e);
+      line.why = told;
+    }
+    /* AND THE RECORD IS TOLD, so a night that failed reaches the person whose copy it was and not only the tail. Told
+       after the copy and never before, so the telling is never in the copy; a record that could not be told is a line,
+       and costs nobody else a thing. */
+    const onKept = o.kept;
+    const onFailed = o.failed;
+    if (typeof told === 'string' ? onFailed : onKept) {
+      try {
+        if (typeof told === 'string') await onFailed?.(record, told);
+        else await onKept?.(record, told);
+        line.told = true;
+      } catch (e) {
+        bad = true;
+        line.told = false;
+        line.told_why = reason(e);
+      }
     }
     /* AN ERASURE CHECK THAT COULD NOT RUN COUNTS AS ONE OPEN. `erase_open = 0` is the morning's proof that every
        erased object is gone, and a record that could not be asked has not proved it. */

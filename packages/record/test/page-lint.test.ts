@@ -64,21 +64,23 @@ const sign = (api: Awaited<ReturnType<typeof createRecordApi>>) => {
   return s;
 };
 
-test('A NOTE THAT PRINTS FOUR RAW THINGS IS FOUR FINDINGS, named by page and part, and the sign reads red', async () => {
+test('A NOTE THAT PRINTS THREE RAW THINGS IS THREE FINDINGS, named by page and part, and the sign reads red', async () => {
   const { sql, api } = await record(RAW);
   const ran = await api.lintTick();
-  assert.deepEqual(ran, { ran: true, state: 'red', findings: 4, pages: 1 });
+  /* THE CHIP WHOSE FIGURE HAS NO ANSWER IS DROPPED BY THE RENDERER NOW (PGS-B02, html.ts `drawnRows`), so its braces are
+     never printed and are no finding: three, where his 7 October note counted four. */
+  assert.deepEqual(ran, { ran: true, state: 'red', findings: 3, pages: 1 });
   const s = sign(api);
   assert.equal(s.state, 'red');
-  assert.equal(s.value, 4);
+  assert.equal(s.value, 3);
   assert.equal(s.said, '1 page prints something raw: Kiln.');
   assert.deepEqual(
     s.facts.map((f) => f.split(':')[0]),
-    ['Kiln, Notes', 'Kiln, Notes', 'Kiln, Notes', 'Kiln, Notes'],
+    ['Kiln, Notes', 'Kiln, Notes', 'Kiln, Notes'],
     'each finding names the page and the part',
   );
   const facts = s.facts.join('\n');
-  for (const said of ['placeholder', 'braces', 'an id where a name goes', 'a raw time']) assert.match(facts, new RegExp(said));
+  for (const said of ['placeholder', 'an id where a name goes', 'a raw time']) assert.match(facts, new RegExp(said));
   /* NOTHING RAW IN THE FINDINGS THEMSELVES: no handle, no instant, no braces, no slug. */
   assert.doesNotMatch(`${s.said}\n${facts}`, /S731|2026-10-07T|\{\{|kiln\b|—/);
   /* ONCE A DAY: the same day's tick does not read again. */
@@ -91,7 +93,7 @@ test('A CLEAN RECORD READS GREEN', async () => {
   assert.deepEqual(await api.lintTick(), { ran: true, state: 'green', findings: 0, pages: 1 });
   const s = sign(api);
   assert.equal(s.state, 'green');
-  assert.equal(s.said, 'The one page read prints clean.');
+  assert.equal(s.said, 'The one page read prints clean: headings and notes.');
   sql.close();
 });
 
@@ -103,8 +105,8 @@ test('A TEMPLATE PAST TWENTY-FOUR PAGES IS READ AT ITS NEWEST, OLDEST AND MIDDLE
 });
 
 test('NOTHING TO READ IS NOTHING TO JUDGE BY, and a round the budget cut says so', () => {
-  assert.equal(pagesCleanReading({ findings: [], pages: 0, unread: 0, withFindings: [] }).state, 'none');
-  assert.equal(pagesCleanReading({ findings: [], pages: 3, unread: 2, withFindings: [] }).said, 'All 3 pages read print clean. 2 more were not reached in this round.');
+  assert.equal(pagesCleanReading({ findings: [], pages: 0, unread: 0, withFindings: [], cells: 0, cut: [] }).state, 'none');
+  assert.equal(pagesCleanReading({ findings: [], pages: 3, unread: 2, withFindings: [], cells: 0, cut: [] }).said, 'All 3 pages read print clean: headings and notes. 2 more were not reached in this round.');
 });
 
 test('A PAGE THAT WILL NOT DRAW IS A FINDING, refused or thrown, and the round reads on', () => {
@@ -134,4 +136,103 @@ test("A PART IS NAMED IN PLAIN WORDS: a heading's apostrophe is never printed as
   const found = lintAnswer(page, null);
   assert.ok(found.length > 0);
   assert.equal(found[0]!.part, "Kiln's notes");
+});
+
+/* ── a table's cells (audit 36-37, finding 1) ───────────────────────────── */
+
+const RAW_AT = '2026-10-06T19:07:01.610Z';
+const tools = (rows: Record<string, unknown>[], extra: Record<string, unknown> = {}) =>
+  ({
+    page: 'kiln',
+    title: 'Kiln',
+    blocks: [
+      {
+        kind: 'table',
+        heading: 'Tools and servers',
+        source: 'tools',
+        columns: [{ field: 'name' }, { field: 'seen', label: 'Last seen' }],
+        rows: rows.map((fields, i) => ({ id: `t${i}`, register: 'tools', seq: i + 1, fields })),
+        matched: rows.length,
+        ...extra,
+      },
+    ],
+  }) as unknown as PageResult;
+
+const roundOf = (answer: PageResult, typesOf?: (register: string) => Record<string, string> | null) =>
+  lintRound({
+    pages: () => [{ slug: 'kiln', title: 'Kiln', template: null, about: null }],
+    page: () => ({ ok: true, value: answer }),
+    questionsOpen: () => 0,
+    now: () => 0,
+    ...(typesOf ? { typesOf } : {}),
+  });
+
+test('A RAW TIME IN A TABLE CELL TURNS THE ROUND RED, named by the column; the same time in an instant column does not', () => {
+  const answer = tools([{ name: 'Wrangler', seen: RAW_AT }]);
+  const red = roundOf(answer, () => ({ name: 'text', seen: 'text' }));
+  assert.deepEqual(red.findings.map((f) => [f.page, f.part, f.rule]), [['Kiln', 'Tools and servers, Last seen', 'raw-instant']]);
+  const r = pagesCleanReading(red);
+  assert.equal(r.state, 'red');
+  assert.equal(r.facts[0], 'Kiln, Tools and servers, Last seen: Prints a raw time where a date in words goes.');
+  assert.doesNotMatch(`${r.said}\n${r.facts.join('\n')}`, /2026-10-06T|\btools\b|\brows?\b|—/);
+
+  /* THE WEB SAYS AN INSTANT IN WORDS (`since()`), so a column typed as one prints nothing raw. */
+  const typed = roundOf(answer, () => ({ name: 'text', seen: 'instant' }));
+  assert.deepEqual(typed.findings, []);
+  assert.equal(typed.cells, 1);
+  const g = pagesCleanReading(typed);
+  assert.equal(g.state, 'green');
+  assert.equal(g.said, 'The one page read prints clean: headings, notes and table cells.');
+});
+
+test("A COMPUTED SOURCE IS TYPED BY ITS ANSWER: a run's handle in a text column is a finding, in a run column it is not", () => {
+  const runsOn = (used_by: string) =>
+    ({
+      page: 'braindog',
+      title: 'BrainDog',
+      blocks: [{ kind: 'table', heading: 'Tools and servers', source: 'runs_on', columns: [{ field: 'name' }, { field: 'used_by' }], rows: [{ id: 'x', register: 'runs_on', seq: null, fields: { name: 'Wrangler', used_by: 'S731' } }], matched: 1, types: { name: 'text', used_by } }],
+    }) as unknown as PageResult;
+  /* NO DECLARATIONS ARE ASKED: the answer's own types are enough, and `used_by` with no label is said in words. */
+  assert.deepEqual(lintAnswer(runsOn('text'), null).map((f) => [f.part, f.rule]), [['Tools and servers, Used by', 'raw-id']]);
+  assert.deepEqual(lintAnswer(runsOn('run'), null), []);
+});
+
+test('A CELL WHOSE TYPE IS NOT KNOWN IS NOT READ, and the sign then names only what it read', () => {
+  const round = roundOf(tools([{ name: 'Wrangler', seen: RAW_AT }]));
+  assert.deepEqual(round.findings, []);
+  assert.equal(round.cells, 0);
+  assert.equal(pagesCleanReading(round).said, 'The one page read prints clean: headings and notes.');
+  /* A WHOLE ULID IN A COLUMN NO LIST DECLARES IS DRAWN AS NOTHING by the web, so it is not a finding; in a text column it prints. */
+  const id = tools([{ name: 'Wrangler', seen: '01JZ8QK3F7R2M9V4XN6TCB5HAD' }]);
+  assert.deepEqual(roundOf(id, () => ({ name: 'text' })).findings, []);
+  assert.deepEqual(roundOf(id, () => ({ name: 'text', seen: 'text' })).findings.map((f) => f.rule), ['raw-id']);
+});
+
+test('SIXTY ROWS ARE READ FIFTY, and the facts say the rest were not', () => {
+  const rows = Array.from({ length: 60 }, (_, i) => ({ name: `Tool ${i + 1}`, seen: i === 55 ? RAW_AT : 'Friday' }));
+  const round = roundOf(tools(rows), () => ({ name: 'text', seen: 'text' }));
+  /* THE RAW TIME IS IN THE FIFTY-SIXTH, past what was read: not found, and said as not read. */
+  assert.deepEqual(round.findings, []);
+  assert.equal(round.cells, 50);
+  assert.deepEqual(round.cut, [{ page: 'Kiln', part: 'Tools and servers', read: 50, held: 60 }]);
+  const r = pagesCleanReading(round);
+  assert.equal(r.state, 'green');
+  assert.deepEqual(r.facts, ['Kiln, Tools and servers: only the first 50 of 60 were read.']);
+  /* AND ON A RED ROUND THE CUT STILL HAS ITS LINE beside the findings. */
+  const red = pagesCleanReading(roundOf(tools(rows.map((x, i) => (i < 10 ? { ...x, seen: RAW_AT } : x))), () => ({ name: 'text', seen: 'text' })));
+  assert.equal(red.state, 'red');
+  assert.equal(red.facts.at(-1), 'Kiln, Tools and servers: only the first 50 of 60 were read.');
+});
+
+test("A RUN'S PROJECT IS DRAWN BY ITS NAME, so its spoken id in the cell is no finding; a secret is drawn as dots", () => {
+  const runs = (fields: Record<string, unknown>) =>
+    ({
+      page: 'kiln',
+      title: 'Kiln',
+      blocks: [{ kind: 'table', heading: 'Runs', source: 'session', columns: [{ field: 'title' }, { field: 'project' }, { field: 'token' }], rows: [{ id: 'r', register: 'session', seq: 1, fields }], matched: 1 }],
+    }) as unknown as PageResult;
+  const types = () => ({ title: 'text', project: 'text', token: 'secret' });
+  assert.deepEqual(lintAnswer(runs({ title: 'Ledger sync', project: 'projects#7', token: '01JZ8QK3F7R2M9V4XN6TCB5HAD' }), null, types), []);
+  /* AND THE SAME SPOKEN ID IN ANY OTHER TEXT CELL STILL PRINTS RAW. */
+  assert.deepEqual(lintAnswer(runs({ title: 'projects#7' }), null, types).map((f) => [f.part, f.rule]), [['Runs, Title', 'raw-id']]);
 });

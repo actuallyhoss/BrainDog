@@ -165,6 +165,21 @@ test('a weekend can be moved to the working day either side', () => {
   assert.equal(new Date(next).toISOString().slice(0, 10), '2026-01-05');
 });
 
+/* THE RECORD'S OWN REST DAYS (paydays-kernel, batch 40): the walk moved a payday off Friday and Saturday in Cairo while
+   the reminders still held Saturday and Sunday for everyone, so the two said different days for one bill. */
+test('a rest day is the record’s own: Friday and Saturday move a Friday to Thursday, and Sunday is a working day', () => {
+  const friday = Date.UTC(2026, 9, 30, 12);
+  const sunday = Date.UTC(2026, 10, 1, 12);
+  const cairo = new Set([5, 6]);
+  const on = (at: number, workday: 'previous' | 'next') => new Date(expandRepeat(at, { freq: 'week', count: 1, workday }, at, 400, cairo)[0]!).toISOString().slice(0, 10);
+  assert.equal(on(friday, 'previous'), '2026-10-29');
+  assert.equal(on(friday, 'next'), '2026-11-01');
+  assert.equal(on(sunday, 'previous'), '2026-11-01');
+  /* NO REST DAYS, OR NOTHING BUT, MOVES NOTHING. */
+  assert.equal(new Date(expandRepeat(friday, { freq: 'week', count: 1, workday: 'previous' }, friday, 400, new Set())[0]!).toISOString().slice(0, 10), '2026-10-30');
+  assert.equal(new Date(expandRepeat(friday, { freq: 'week', count: 1, workday: 'previous' }, friday, 400, new Set([0, 1, 2, 3, 4, 5, 6]))[0]!).toISOString().slice(0, 10), '2026-10-30');
+});
+
 test('a repeating field derives a reminder per occurrence', async () => {
   const { k, sql } = await record();
   value(k.create('services', { name: 'Hosting', renews: day(10) }, { actor: 'p_1' }));

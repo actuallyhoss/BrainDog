@@ -58,7 +58,7 @@ test('A STORED CODE DOES NOT CHANGE: CURRENCY_FIXED, and the number stays free',
   const out = currencyFixed(AMOUNT, stored, { amount: 2000, currency: 'EGP' });
   assert.equal(out?.code, 'CURRENCY_FIXED');
   assert.equal(out?.fix, CURRENCY_FIXED_SENTENCE);
-  assert.equal(out?.fix, "A row's currency does not change. Delete this row and add it again in the other currency.");
+  assert.equal(out?.fix, "A row keeps its currency, so delete this row and add it again in the other currency.");
   assert.equal(out?.at, 'amount');
   assert.deepEqual(out?.allowed, ['USD']);
   assert.equal(currencyFixed(AMOUNT, stored, { amount: 2500, currency: 'USD' }), null, 'a corrected number is a write');

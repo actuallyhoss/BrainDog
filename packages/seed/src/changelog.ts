@@ -66,6 +66,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '3.3.0', notes: 'Health is a page of its own: each check this record runs on itself, by name, with what it last found. Anything that needs a look comes first, said in words and marked, and a check with nothing to go on yet says Not read yet.' },
     {
       version: '3.2.0',
       notes:
@@ -102,7 +103,8 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   'money-core': [
     {
       version: '3.16.0',
-      notes: 'Money says three more things about how it is kept: how old the newest Ledger row is, how many currencies the accounts are in, and how much money out has no category.',
+      notes:
+        "Money says more about how it is kept: how old the newest money on the Ledger and the oldest balance are, how many currencies the accounts are in, how much money out has no category, and how many nights the cash line missed. How old a balance is now comes from the last thing that said it: a bank message, a balance check or the account itself, not only the day somebody typed. When one is more than a week old, Heads up shows each account's last confirmed day, and a book's account cards are dated the same way. The note an account got each week its typed day was old is gone, as Heads up says it now. A repeating payment can say which days of the month it lands on, such as the 15th and the last day, and whether a payment due on a rest day moves to the working day before or after. Rest days start as Saturday and Sunday. An amount added with no currency takes its account's, and money on the Ledger never changes currency once it is kept.",
     },
     {
       version: '3.15.0',

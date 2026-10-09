@@ -19,8 +19,15 @@ import { no, ok } from '@braindog/ports';
 import { instant } from './migrate.ts';
 import { DEFAULT_DAYS, createToken, endedByCutOff, revokeToken, type TokenDeps } from './token.ts';
 
-/** `device_grant.reach`, as migration 4's CHECK has it. */
-export const REACHES = ['login', 'runner', 'export', 'import', 'pack', 'token', 'vault'] as const;
+/**
+ * `device_grant.reach`, as migration 33's CHECK has it.
+ *
+ * `shape` IS A STANDING GRANT FOR SHAPE COPIES (PRF-A13): approved once with six digits, it lives as a runner's does and
+ * is not spent on use, so the loop on the owner's machine takes a scrambled copy of the record with no prompt. It opens
+ * that and nothing else: its bearer is held on this table alone, so `verifyToken` never finds it, and `vaultGrant`,
+ * `operationGrant` and the runner's check each match their own reach. `shapeGrant` is its one reader.
+ */
+export const REACHES = ['login', 'runner', 'export', 'import', 'pack', 'token', 'vault', 'shape'] as const;
 export type Reach = (typeof REACHES)[number];
 
 export type DeviceStatus = 'pending' | 'approved' | 'active' | 'expired' | 'denied' | 'revoked';
@@ -81,6 +88,8 @@ export type DeviceRow = {
 };
 
 export type VaultGrant = { handle: string; scope: string; person: string; expires: string };
+/** A shape grant, checked: whose approval it carries and until when. It names no scope, since it reads one thing. */
+export type ShapeGrant = { handle: string; person: string; expires: string };
 
 /** An operation bearer, checked and spent: which reach, the method it opens, and the person who approved it. */
 export type OperationGrant = { handle: string; reach: 'export' | 'import' | 'pack' | 'token'; method: Operation; person: string };
@@ -154,6 +163,10 @@ export async function deviceStart(
   const label = typeof args.label === 'string' ? args.label.trim() : '';
   if (label === '') return no('REQUIRED_MISSING', 'Name the device, so the person approving it knows what is asking.', { at: 'label' });
   if (label.length > 120) return no('OUT_OF_BOUNDS', 'A device label is at most 120 characters.', { at: 'label' });
+  /* `report:` AND `job:` NAME THE RECORD'S OWN KEYS (`createReportKey`, `claimJob`), which the plan's count passes, and a
+     login's label becomes its key's: a device named like one would connect an agent past the count. */
+  if (label.startsWith('report:') || label.startsWith('job:'))
+    return no('VALUE_MALFORMED', 'A device name cannot begin report: or job:, which name keys the record makes itself. Choose another name.', { at: 'label' });
 
   const reach = args.reach as Reach;
   const scope = args.scope ?? null;
@@ -368,6 +381,35 @@ export async function vaultGrant(deps: TokenDeps, bearer: string): Promise<Resul
 
   deps.sql.exec('UPDATE device_grant SET last_used = ? WHERE id = ?', instant(deps.nowMs), row.id);
   return ok({ handle: await handleOf(deps, row.id), scope: row.scope, person: row.approved_by, expires: row.expires });
+}
+
+/**
+ * A shape-grant bearer, checked. INTERNAL: the host calls it before it takes a shape copy (`shape.ts`), and a shape copy
+ * is the one thing it lets the caller have.
+ *
+ * STANDING, NOT SPENT. Unlike an operation grant it is read again and again for its ninety days, and each read writes
+ * `last_used`, so the sweep's fourteen silent days count from the last copy taken. The same one sentence for every way it
+ * fails, as `vaultGrant` gives it: another record, another reach, past its life, an approver since suspended, or approved
+ * before the operator's cut-off.
+ */
+export async function shapeGrant(deps: TokenDeps, bearer: string): Promise<Result<ShapeGrant>> {
+  const cut = typeof bearer === 'string' ? bearer.indexOf('.') : -1;
+  const record = cut < 0 ? '' : bearer.slice(0, cut);
+  const secret = cut < 0 ? '' : bearer.slice(cut + 1);
+  const wrong = no<ShapeGrant>('FORBIDDEN', 'That shape grant is not one this record knows.', { at: 'shape' });
+  if (!record || !secret || record !== deps.recordId()) return wrong;
+
+  const row = deps.sql.one<{ id: string; approved_by: string | null; approved_at: string | null; expires: string; suspended_at: string | null }>(
+    `SELECT d.id AS id, d.approved_by AS approved_by, d.approved_at AS approved_at, d.expires AS expires, p.suspended_at AS suspended_at
+     FROM device_grant d LEFT JOIN person p ON p.id = d.approved_by
+     WHERE d.token_hash = ? AND d.reach = 'shape' AND d.status = 'active'`,
+    await deps.digest(secret),
+  );
+  if (!row || !row.approved_by || row.suspended_at || row.expires <= instant(deps.nowMs)) return wrong;
+  if (endedByCutOff(deps.validFrom, row.approved_at)) return wrong;
+
+  deps.sql.exec('UPDATE device_grant SET last_used = ? WHERE id = ?', instant(deps.nowMs), row.id);
+  return ok({ handle: await handleOf(deps, row.id), person: row.approved_by, expires: row.expires });
 }
 
 /**

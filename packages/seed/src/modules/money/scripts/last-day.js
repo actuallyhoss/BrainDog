@@ -83,7 +83,7 @@ export default async function run(ctx) {
  */
 export const LAST_DAY_SCRIPT = {
   script: 'last_day',
-  title: 'Ask whether a payday on a month end is the last day or that date',
+  title: 'Ask whether a payment on a month end is the last day or that date',
   pack: 'money-core',
   runs: { every: '1d', rule: true },
   egress: [],

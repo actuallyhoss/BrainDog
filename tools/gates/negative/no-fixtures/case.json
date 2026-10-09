@@ -1,0 +1,7 @@
+{
+  "gate": "no-fixtures",
+  "rule": "shipped code that imports the test fixtures",
+  "expect": "imports the test fixtures",
+  "findings": 1,
+  "total": 1
+}

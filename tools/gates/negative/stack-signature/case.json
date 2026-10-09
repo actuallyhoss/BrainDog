@@ -1,0 +1,7 @@
+{
+  "gate": "stack",
+  "rule": "a fetch call, beside a port method called fetch",
+  "expect": "calls fetch",
+  "findings": 1,
+  "why": "AND THE OTHER HALF OF THAT RULE: a `fetch(` the gate must NOT name. `37 §2.2`'s `Http` port declares a method called `fetch`, and the rule matched the signature exactly as it matches a call, so the gate that stops a package reaching the network reported the port that exists so none of them does. The fixture holds both in one file and asserts a count of one, because a gate that went red here would look identical to a gate that got it right."
+}

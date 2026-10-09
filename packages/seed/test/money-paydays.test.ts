@@ -76,7 +76,7 @@ const line = (what: string, next_due: string, more: Record<string, unknown> = {}
 
 test('a repeating line takes its days and its rest-day rule, Money starts on Saturday and Sunday, and the leg names both', async () => {
   const fields = RECURRING_REGISTER.fields as { id: string; type: string; values?: string[]; default?: unknown; max?: number }[];
-  assert.deepEqual(fields.find((f) => f.id === 'day_of_month'), { id: 'day_of_month', label: 'Days of the month, after Next', type: 'text', max: 12 });
+  assert.deepEqual(fields.find((f) => f.id === 'day_of_month'), { id: 'day_of_month', label: 'Days of the month', type: 'text', max: 12 });
   const weekend = fields.find((f) => f.id === 'weekend');
   assert.deepEqual([weekend?.type, weekend?.values, weekend?.default], ['enum', ['leave', 'before', 'after'], 'leave']);
   assert.match(String(RECURRING_REGISTER.holds), /Next is the next payment, and the days of the month every one after it/u);

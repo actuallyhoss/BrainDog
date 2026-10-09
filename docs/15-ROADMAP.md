@@ -418,13 +418,18 @@ without changing them. That is the test for whether something belongs in this li
 > **And what connectors cost is metered, from the first run (2026-09-15, [ADR-069](16-DECISIONS.md)).**
 > Every scheduled fetch, call and poll is counted per record in the Directory, outside the record: runs,
 > requests, bytes, run time and failures, by day, project and action. A record's allowance is its
-> plan's, in `ALLOWANCE` (`packages/record/src/directory.ts`): on Cloud 15,000 runs, 150,000 requests,
-> 1 GB fetched and 50 hours of run time a month, and on Cloud Plus 60,000 runs, 600,000 requests, 5 GB
-> and 200 hours, the owner's defaults until he says otherwise. At the limit an action waits for the next
-> month and says so in one sentence, and an automation's run that has not started waits with it. A
-> self-host is counted and never limited. Changing an allowance is `ALLOWANCE` and the pricing page's
-> figures (`apps/site/src/lib/plans.ts`), which `plans.test.ts` holds to it. The price does not change
-> with use, and the month-24 case above assumes no overage.
+> plan's, in `PLAN_TABLE` (`packages/record/src/plans.ts`, which the Directory's `ALLOWANCE` reads): on
+> Free 1,000 runs, 10,000 requests, 0.1 GB fetched and 5 hours of run time a month, with 20 Slash
+> credits and 3 agents, at $0; on Cloud 15,000 runs, 150,000 requests, 1 GB and 50 hours, with 80
+> credits and 15 agents, at $12 a month; and on Cloud Plus five times Cloud, 75,000 runs, 750,000
+> requests, 5 GB and 250 hours, with 400 credits and 75 agents, at $29 a month. No plan is sold by the
+> year. These are the owner's figures and the defaults taken for him (DIRECTION §42), his to change with
+> a word. At the limit an action waits for the next month and says so in one sentence, and an
+> automation's run that has not started waits with it. A self-host is counted and never limited.
+> Changing a figure starts in `PLAN_TABLE`, and the site's copy of its rows (`apps/site/src/lib/plans.ts`),
+> this paragraph and ADR-071 change with it in the same change, or `plans.test.ts` and
+> `packages/record/test/plans-docs.test.ts` go red. The
+> price does not change with use, and the month-24 case above assumes no overage.
 
 | Scope | Shape | Why it is additive |
 |---|---|---|

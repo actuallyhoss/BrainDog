@@ -18,6 +18,7 @@
 <script lang="ts">
   import { inline, magnitudeOfCell, text, trendOf, SPARKLINE_POINT, TREND, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { barFigure } from '../../src/format.ts';
+  import { drawnRows } from '../../src/html.ts';
   import Text from '../Text.svelte';
   import Trend from '../Trend.svelte';
   import Split from '../Split.svelte';
@@ -129,7 +130,7 @@
         <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
       {/if}
     {/snippet}
-    {#each block.rows as row}
+    {#each drawnRows(block, opts).map(({ row: r }) => r) as row}
       {@const v = numeric(row)}
       {@const drawable = Number.isFinite(v) && v >= 0 && !row.hole && scale > 0}
       <!-- A HOLE ROW IS A CONTROL ONLY WHERE THE HOST CAN ACT ON IT. It was a `<button>` with no

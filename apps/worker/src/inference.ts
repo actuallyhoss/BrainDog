@@ -74,8 +74,10 @@ const refuse = <T>(code: 'NOT_IN_THIS_BUILD' | 'PROPOSAL_SCHEMA' | 'SLASH_BUDGET
 export const modelMissing = <T>(model: string, why: Missing, raw = ''): Result<T> =>
   no<T>('NOT_IN_THIS_BUILD', `No model answered for '${model}': ${why}. The repair is a deploy of a host that serves it, not an edit.`, {
     at: 'model',
-    /* THE PROVIDER'S OWN WORDS, SCRUBBED AND CUT (`scrubRaw`), as `detail`: a screen folds it under Details, and the
-       Worker's hook (`includedInference`) writes it in the operator's log line. Absent where nothing was thrown. */
+    /* THE PROVIDER'S OWN WORDS, SCRUBBED AND CUT (`scrubRaw`), as `detail`, FOR THE OPERATOR ALONE: the Worker's hook
+       (`includedInference`) writes it in the operator's log line, and no route serialises a refusal's `detail` to a
+       member or a stranger (`test/inference-detail.test.ts` holds that reader as the only one). Absent where nothing
+       was thrown. */
     ...(raw === '' ? {} : { detail: raw }),
   });
 

@@ -1,0 +1,6 @@
+{
+  "gate": "colour-grep",
+  "rule": "an eight-digit hex colour",
+  "expect": "colour literal",
+  "findings": 1
+}

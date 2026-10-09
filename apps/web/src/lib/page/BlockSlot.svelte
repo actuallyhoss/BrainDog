@@ -35,7 +35,7 @@
   import { joinsWithOr, registerHref } from '$lib/record/where.ts';
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
-  import { fileAt, resolverOf, type LiveBlock, type Walked } from '$lib/record/page-live.ts';
+  import { fileAt, namedResolverOf, type LiveBlock, type Walked } from '$lib/record/page-live.ts';
   import { glyphSet, glyphSetNow, isGlyph, pathOf } from '$lib/ui/icons.ts';
   import { agentKindOf, liveOf } from '../ui/face.ts';
   import { AGENT_MARKS, isMarked } from '$lib/ui/agent-marks.ts';
@@ -171,7 +171,12 @@
   const filed = $derived(fileAt(block));
 
   const opts = $derived({
-    resolve: (path: string) => said(resolverOf(block.values)(path)),
+    /* A PATH THAT NAMES NOTHING OF THE RECORD IS ANSWERED `UNNAMED` (the kernel's `unnamed`), never a dash: the author's
+       words in prose, and no figure in a chip, a tile or a bar. */
+    resolve: (path: string) => {
+      const v = namedResolverOf(block.values, block.unnamed)(path);
+      return typeof v === 'string' || v === null || v === undefined ? said(v ?? null) : v;
+    },
     now,
     /* A forecast's knobs and its readout: arithmetic over the walk already on the page, kept in memory. */
     scenario: true,
@@ -199,7 +204,10 @@
        `Cards.svelte` draws the run's glyph in the `who` cell instead of a plain initial. */
     ...((block.source === 'sessions.live' || block.source === 'sessions.working') && block.entries
       ? { runs: block.entries.map((e, n) => ({ run: `S${e.seq}`, agent: typeof e.fields.agent === 'string' ? e.fields.agent : null, live: liveOf(e.fields.state, block.quiet?.[n] === true) })) }
-      : {}),
+      : block.runFaces
+        ? /* AND ON A CARD WHOSE `who` THE BLOCK ANSWERED AS A RUN (`page-live.ts` `runFaces`): what a project runs on. */
+          { runs: block.runFaces }
+        : {}),
     /* A PICTURE IS SERVED BY THE RECORD THE PAGE IS ON: a gallery tile's or a card's file, found in what the
        block already holds (`fileAt`) and placed under this record's address. A file the block does not hold answers
        nothing, and the tile draws its caption. */
@@ -430,7 +438,7 @@
 {:else if block.kind === 'table' && !block.answer && walkTables(block)}
   <!-- A TABLE OVER A WALK DRAWN ONCE PER CURRENCY: each currency's rows under its code, and why, once. -->
   {#each walkTables(block) ?? [] as part}
-    {#each part.said as segment}{#if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}{/each}
+    {#each part.said as segment}{#if segment.type === 'markdown'}<div class="document"><Markdown {segment} {opts} /></div>{/if}{/each}
     {#if part.table}<Table columns={part.table.columns} rows={part.table.rows} total={part.table.total} label={headingText} href={inApp} />{/if}
   {/each}
 {:else if block.kind === 'table' && !block.answer}
@@ -500,7 +508,7 @@
           {@const fix = w.saidOf(r)}
           {#if fix}<p class="block-said" role="status" data-intent="bad">{r.cells[1]}: {fix}</p>{/if}
         {/each}
-      {/if}{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}
+      {/if}{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} {opts} /></div>{/if}
     {/if}
   {/each}
 {/if}

@@ -336,6 +336,19 @@ Four rules, learned by the predecessor over a month of real use:
    set apart.
 4. **Code spans are lifted first**, so a literal `{{…}}` from another system survives in backticks.
 
+**The answer says which paths name nothing.** A page's answer lists them per block as `unnamed`, and the renderer is
+handed `UNNAMED` for each, so rule 1's path is printed as the author's words in prose and left out of a chip, a tile, a
+card or a bar, while a path that names a field this row holds nothing in is still the dash. A computed source's answer
+also carries its columns' `types` (`run` and `instant` among them, as on `runs_on`'s *Last used by* and *Last used*), so
+a host draws a run as its agent and a day, never a handle or a raw time. *Amended October 9th 2026 (PGS-B02).*
+
+**A reading's fifth column is money.** On a `stat` or `lines` over readings the columns are `[when, value, name, unit,
+amount]`; the fifth names a money field, and a reading that holds one is drawn as that amount in its currency, never
+as a bare decimal, and two currencies are never added. **`handoffs.open`** is a computed source of the next steps runs
+left and nobody has taken, newest first, as rows `run, agent, next, left_at, mark` (`mark` is `next` or `earlier`); it
+takes `about:` for one project and no `order:`. A card's **`stale: { field, after, figure }`** dates each card by a
+rolled figure's group ([06-PAGES](06-PAGES.md) §1.1).
+
 ### 7.2 · Typed interpolations — eight, and two of them link
 
 `{{path}}` asks the record what a figure is *now*. These render a value **the author wrote** as the

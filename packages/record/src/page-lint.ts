@@ -39,10 +39,26 @@ export type PageLintDeps = {
   /** How many questions wait on the person (`questions-open`), or `null` when it cannot be read. */
   questionsOpen: () => number | null;
   now: () => number;
+  /**
+   * The field types of the list a block is over, so a cell drawn by its type is not read as raw text. Absent, a block's
+   * cells are read only where its answer types them (`types`), since an instant column of a declared list read as text
+   * would turn the sign red over a page that prints the time in words.
+   */
+  typesOf?: TypesOf;
 };
 
-/** One round's answer: every finding, how many pages were read, and how many the budget left unread. */
-export type PageLintRound = { findings: PageFinding[]; pages: number; unread: number; withFindings: string[] };
+/**
+ * One round's answer: every finding, how many pages were read, and how many the budget left unread; how many rows were
+ * read for their cells, and each block on a page whose rows were more than `CELLS_ROWS`.
+ */
+export type PageLintRound = {
+  findings: PageFinding[];
+  pages: number;
+  unread: number;
+  withFindings: string[];
+  cells: number;
+  cut: { page: string; part: string; read: number; held: number }[];
+};
 
 /**
  * A TEMPLATE'S PAGES ARE ALL READ UP TO THIS MANY, and past it three: the newest row's, the oldest's and the middle one by
@@ -130,11 +146,86 @@ function answerFindings(b: BlockResult, part: string, waiting: number | null): O
   return out;
 }
 
+/* ── a block's cells ────────────────────────────────────────────────────── */
+
+/** How many of a block's rows one round reads for their cells. A block holding more says so in the sign's facts. */
+export const CELLS_ROWS = 50;
+
+/** A field's type by the field's id, for the list a block is over, or `null` for a source no list declares. */
+export type TypesOf = (register: string) => Readonly<Record<string, string>> | null;
+
+/**
+ * THE TYPES A CELL IS DRAWN BY, NEVER PRINTED AS IT IS HELD: an instant through `since()`, a run by its agent's name and
+ * day, a link by the row's name, money, numbers and days by their formatters, a secret as dots (`display` in the web's `api.ts`). A cell
+ * of any other type, or of no declared type, prints its text as it is, so its text is what this reads.
+ */
+const DRAWN_BY_TYPE = new Set(['instant', 'day', 'run', 'ref', 'money', 'int', 'decimal', 'duration', 'bool', 'file', 'secret']);
+
+/** The kinds whose columns are axes, figures or controls rather than cells a person reads as text. */
+const NOT_CELLS = new Set(['stat', 'lines', 'progress', 'series', 'inputs', 'capture', 'bridge', 'forecast', 'diff', 'note']);
+
+/** The roles a column draws from beside the row, not from its text: where it applies, a ring, a trend, the next step. */
+const NOT_TEXT = new Set(['scope', 'ring', 'trend', 'next']);
+
+/** The two rules a cell is read by: what the web prints raw from a row is a time or an id, never a placeholder. */
+const CELL_RULES = new Set<LintRule>(['raw-instant', 'raw-id']);
+
+/** A whole ULID, which the web draws as nothing in a column no list declares (`undeclared` in `api.ts`). */
+const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
+
+/** What one block's cells come to: each column's text as one part, how many rows were read, and how many were not. */
+export type BlockCells = { parts: LintPart[]; read: number; unread: number };
+
+/**
+ * The text cells of one drawn block, a part a column named by the block's heading and the column's label (the label
+ * alone under no heading, where the page's title already names it), from at most `CELLS_ROWS` rows. A
+ * column's type is the answer's own (`types`, which a computed source answers) or else the list's declaration; a cell
+ * of a type `DRAWN_BY_TYPE` names is not read. The words in a cell are his, so `theirs` holds: the copy rules are his.
+ */
+export function blockCells(b: BlockResult, name: string | null, typesOf?: TypesOf): BlockCells {
+  const rows = b.rows ?? [];
+  const cols = (b.columns ?? []).filter((c) => typeof c.field === 'string' && c.field !== '' && !NOT_TEXT.has(c.as ?? ''));
+  if (NOT_CELLS.has(b.kind) || rows.length === 0 || cols.length === 0) return { parts: [], read: 0, unread: 0 };
+  /* WITH NO DECLARATIONS TO ASK AND NO TYPES ON THE ANSWER, A CELL'S TYPE IS NOT KNOWN, and a time the web says in words
+     would read here as raw: the block is not read rather than read wrong. */
+  if (!typesOf && !b.types) return { parts: [], read: 0, unread: 0 };
+  const declared = typeof b.source === 'string' && typesOf ? typesOf(b.source) : null;
+  const read = rows.slice(0, CELLS_ROWS);
+  const parts: LintPart[] = [];
+  for (const c of cols) {
+    const type = b.types?.[c.field] ?? declared?.[c.field];
+    if (type !== undefined && DRAWN_BY_TYPE.has(type)) continue;
+    const texts: string[] = [];
+    for (const r of read) {
+      const v = r.fields?.[c.field];
+      for (const t of Array.isArray(v) ? v : [v]) {
+        if (typeof t !== 'string' || t.trim() === '') continue;
+        /* A WHOLE ULID IN A COLUMN NO LIST DECLARES IS DRAWN AS NOTHING, so it prints nothing to find. */
+        if (type === undefined && ROW_ID.test(t)) continue;
+        /* A RUN'S PROJECT IS HELD AS ITS SPOKEN ID AND DRAWN AS THE PROJECT'S NAME (`display` in `api.ts`), never as `projects#7`. */
+        if (r.register === 'session' && c.field === 'project') continue;
+        texts.push(t);
+      }
+    }
+    if (texts.length === 0) continue;
+    const words = figureWords(c.field);
+    const label = c.label?.trim() || words.charAt(0).toUpperCase() + words.slice(1);
+    parts.push({ name: name === null || name === label ? label : `${name}, ${label}`, text: texts.join('\n'), theirs: true });
+  }
+  return { parts, read: read.length, unread: rows.length - read.length };
+}
+
+/* ── a page ─────────────────────────────────────────────────────────────── */
+
+/** What a page's answer was read for, beside its findings: how many cells, and each block whose rows were cut. */
+export type PageRead = { cells: number; cut: { part: string; read: number; held: number }[] };
+
 /**
  * One page's findings, drawn from its answer. A block a `when:` left undrawn is not read: nobody sees it. A part is
- * named by its heading with its figures filled, or by the page's title where it has none.
+ * named by its heading with its figures filled, or by the page's title where it has none; a cell's part adds its column.
+ * `read`, when given, is told how many cells were read and which blocks held more rows than were.
  */
-export function lintAnswer(page: PageResult, waiting: number | null): PageFinding[] {
+export function lintAnswer(page: PageResult, waiting: number | null, typesOf?: TypesOf, read?: PageRead): PageFinding[] {
   const title = page.title;
   const out: PageFinding[] = [];
   for (const b of page.blocks) {
@@ -149,11 +240,19 @@ export function lintAnswer(page: PageResult, waiting: number | null): PageFindin
       parts.push({ name, html: drawn(body, b.values), theirs: b.document === true });
     if (b.empty && b.matched === 0 && (b.rows ?? []).length === 0) parts.push({ name, html: drawn(b.empty, b.values) });
     const found: LintFinding[] = parts.flatMap((p) => lintPart(p));
+    /* AND ITS CELLS, which the web draws from the rows: a time or an id a cell prints raw is on the page as surely as a
+       note's. Only those two rules read a cell; anything else a cell holds is his to write. */
+    const cells = blockCells(b, b.heading ? name : null, typesOf);
+    found.push(...cells.parts.flatMap((p) => lintPart(p)).filter((f) => CELL_RULES.has(f.rule)));
+    if (read) {
+      read.cells += cells.read;
+      if (cells.unread > 0) read.cut.push({ part: name, read: cells.read, held: cells.read + cells.unread });
+    }
     /* ONE FINDING A RULE A PART, as render counts: the heading and the body are one part to the person reading. */
     const seen = new Set<string>();
     for (const f of [...found, ...answerFindings(b, name, waiting)]) {
-      if (seen.has(f.rule)) continue;
-      seen.add(f.rule);
+      if (seen.has(`${f.part}\n${f.rule}`)) continue;
+      seen.add(`${f.part}\n${f.rule}`);
       out.push({ page: title, part: f.part, rule: f.rule, said: f.said });
     }
   }
@@ -180,6 +279,8 @@ export function lintRound(deps: PageLintDeps): PageLintRound {
   const findings: PageFinding[] = [];
   const withFindings: string[] = [];
   let read = 0;
+  let cells = 0;
+  const cut: PageLintRound['cut'] = [];
   for (const p of order) {
     if (read > 0 && deps.now() - start > ROUND_MS) break;
     read++;
@@ -188,19 +289,22 @@ export function lintRound(deps: PageLintDeps): PageLintRound {
     try {
       const answer = deps.page(p.slug);
       if (answer.ok) title = answer.value.title;
-      found = answer.ok ? lintAnswer(answer.value, waiting) : [{ page: title, part: title, rule: 'no-draw', said: NO_DRAW }];
+      const pageRead: PageRead = { cells: 0, cut: [] };
+      found = answer.ok ? lintAnswer(answer.value, waiting, deps.typesOf, pageRead) : [{ page: title, part: title, rule: 'no-draw', said: NO_DRAW }];
+      cells += pageRead.cells;
+      cut.push(...pageRead.cut.map((c) => ({ page: title, ...c })));
     } catch {
       found = [{ page: title, part: title, rule: 'no-draw', said: NO_DRAW }];
     }
     if (found.length > 0) withFindings.push(title);
     findings.push(...found);
   }
-  return { findings, pages: read, unread: order.length - read, withFindings };
+  return { findings, pages: read, unread: order.length - read, withFindings, cells, cut };
 }
 
 /* ── the sign ───────────────────────────────────────────────────────────── */
 
-/** A reading of `pages-clean` as the kernel files it (`SignReading`): its six facts are the first six findings. */
+/** A reading of `pages-clean` as the kernel files it (`SignReading`): its six facts are the first findings, then any cut. */
 export type PagesCleanReading = { state: 'green' | 'red' | 'none'; value: number | null; said: string; facts: string[] };
 
 const FACTS_MOST = 6;
@@ -213,18 +317,24 @@ const fit = (s: string, most: number): string => (s.length <= most ? s : `${s.sl
  * A round as the sign `pages-clean`: red while any finding stands, green when every page read was clean, and nothing to
  * judge by when there was no page to read. The findings ride in the facts, one a line with the page and the part named,
  * so no table is needed to keep them: the sign's own row is the newest round.
+ *
+ * THE GREEN SENTENCE SAYS WHAT WAS READ, never more: "print clean" over cells nobody read was the sign going green on a
+ * page that printed a raw time in a table. Cells are named only when a round read some, and a block whose rows were
+ * more than `CELLS_ROWS` says so in the facts, after the findings and never in place of all of them.
  */
 export function pagesCleanReading(round: PageLintRound): PagesCleanReading {
   const unread = round.unread > 0 ? ` ${integer(round.unread)} more ${round.unread === 1 ? 'was' : 'were'} not reached in this round.` : '';
   if (round.pages === 0) return { state: 'none', value: null, said: 'There is no page to read yet.', facts: [] };
+  const cut = round.cut.map((c) => fit(`${c.part === c.page ? c.page : `${c.page}, ${c.part}`}: only the first ${integer(c.read)} of ${integer(c.held)} were read.`, FACT_MOST));
   if (round.findings.length === 0) {
     const read = round.pages === 1 ? 'The one page read prints' : `All ${integer(round.pages)} pages read print`;
-    return { state: 'green', value: 0, said: fit(`${read} clean.${unread}`, SAID_MOST), facts: [] };
+    const what = round.cells > 0 ? 'headings, notes and table cells' : 'headings and notes';
+    return { state: 'green', value: 0, said: fit(`${read} clean: ${what}.${unread}`, SAID_MOST), facts: cut.slice(0, FACTS_MOST) };
   }
   const n = round.withFindings.length;
   const head = n === 1 ? `1 page prints something raw${listed(round.withFindings)}.` : `${integer(n)} pages print something raw${listed(round.withFindings)}.`;
-  const facts = round.findings
-    .slice(0, FACTS_MOST)
+  const found = round.findings
+    .slice(0, FACTS_MOST - Math.min(cut.length, 1))
     .map((f) => fit(f.part === f.page ? `${f.page}: ${f.said}` : `${f.page}, ${f.part}: ${f.said}`, FACT_MOST));
-  return { state: 'red', value: round.findings.length, said: fit(`${head}${unread}`, SAID_MOST), facts };
+  return { state: 'red', value: round.findings.length, said: fit(`${head}${unread}`, SAID_MOST), facts: [...found, ...cut].slice(0, FACTS_MOST) };
 }

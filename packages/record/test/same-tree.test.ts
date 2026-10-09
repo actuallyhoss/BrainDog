@@ -17,7 +17,7 @@ const NOW = Date.UTC(2026, 9, 9, 12);
 const MIN = 60_000;
 const at = (msAgo: number): string => new Date(NOW - msAgo).toISOString();
 
-const HERE = { host: 'dev-mac', repo: 'braindog', remote: 'github.com/sam/braindog' };
+const HERE = { host: 'dev-mac', repo: 'braindog', remote: 'github.com/mara/braindog' };
 
 /** A run `seq`, working in the tree `HERE` and heard from `ago` ms before now unless `more` says otherwise. */
 const run = (seq: number, more: Record<string, Json> = {}, state = 'active', ago = MIN): TreeRun => ({

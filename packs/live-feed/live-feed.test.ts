@@ -31,9 +31,8 @@ import { validateDeclaration } from '../../packages/kernel/src/index.ts';
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { firstPartyDocument } from '../../packages/seed/src/index.ts';
-import { pollPack } from '../../packages/seed/src/usecases/founder-poll.ts';
 
-import { FEED_MEASURES_MOST, fillFeed, type FeedSpec } from './fill.ts';
+import { FEED_MEASURES_MOST, FEED_NAME_MOST, fillFeed, type FeedSpec } from './fill.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 const NOW = Date.UTC(2026, 8, 25, 9);
@@ -69,13 +68,19 @@ const EXAMPLE: FeedSpec = {
 
 test('the file reads clean as an add-on somebody opens from disk, and says what a person fills', async () => {
   const file = said<{ pack: { manifest: { pack: string } }; doc: { fill?: Record<string, unknown> } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.equal(file.pack.manifest.pack, 'feed-example');
-  assert.deepEqual(Object.keys(file.doc.fill ?? {}), ['id', 'url', 'every', 'grant', 'project', 'organisation', 'measures']);
+  assert.equal(file.pack.manifest.pack, 'live-feed');
+  assert.deepEqual(Object.keys(file.doc.fill ?? {}), ['id', 'url', 'every', 'at', 'tz', 'grant', 'project', 'organisation', 'measures']);
 });
 
-test('the file as it ships, with its marks taken off, is its own example filled', () => {
-  const { fill: _marks, ...shipped } = template();
-  assert.equal(JSON.stringify(shipped), JSON.stringify(fillFeed(template(), EXAMPLE)));
+test('the file as it ships, with its marks taken off, is its own example filled, but for its name', () => {
+  /* THE FILE IS `live-feed`, THE ONE EVERY FEED IS FILLED FROM, and kept off every listing: a fill is `feed-<id>`,
+     named for its host, and listed nowhere either, since a person's feeds are never in the catalogue. */
+  const { fill: _marks, unlisted, changes, ...shipped } = template();
+  assert.equal(unlisted, true);
+  assert.equal(typeof changes, 'string');
+  const filled = fillFeed(template(), EXAMPLE);
+  assert.deepEqual([filled.pack, filled.title, 'unlisted' in filled, 'changes' in filled], ['feed-example', 'Numbers from stats.example.com', false, false]);
+  assert.equal(JSON.stringify(shipped), JSON.stringify({ ...filled, pack: 'live-feed', title: 'Live numbers' }));
 });
 
 test('IT REQUIRES NO PACK BY NAME, and names no host but the example', () => {
@@ -86,12 +91,12 @@ test('IT REQUIRES NO PACK BY NAME, and names no host but the example', () => {
 });
 
 /**
- * THE DECLARATION IS THE ONE THE IMPORT FILES TODAY, BUT FOR ITS NAME. The setup file's `polls` are `PollSpec`s, which
- * `apps/cli/src/import.ts` hands to `pollPack`, so a spec that fills this file and builds the same poll there is the
- * proof that moving the import onto this file changes what is polled in nothing but the ingest's name and the pack's.
- * The spec is a synthetic setup file's poll, with a project and a key.
+ * THE DECLARATION IS THE ONE THE IMPORT FILED BEFORE, BUT FOR ITS NAME. The setup file's `polls` were built in code by
+ * `pollPack` (`packages/seed/src/usecases/founder-poll.ts`), which goes now that the form and the importer fill this
+ * file. So the poll it built for a synthetic setup file's poll, with a project and a key, is written out here, and a
+ * spec that names no date and no money still fills it to the letter: moving onto this file changes nothing polled.
  */
-test('A SETUP FILE’S POLL FILLS IT AS IT STANDS, and the poll is the one the builder in the seed makes', () => {
+test('A SETUP FILE’S POLL FILLS IT AS IT STANDS, and the poll is the one the old builder in the seed made', () => {
   const setup: FeedSpec = {
     id: 'lanternly',
     url: 'https://stats.lanternly.example/api/numbers',
@@ -104,13 +109,25 @@ test('A SETUP FILE’S POLL FILLS IT AS IT STANDS, and the poll is the one the b
       { name: 'Subscribers, Lanternly', path: 'data.subscribers', type: 'int' },
     ],
   };
+  const stamp = { thing: { value: 'things#1' }, organisation: { value: 'organisations#1' }, source: { value: 'polled' }, at: { arrived: true } };
   const filled = fillFeed(template(), setup);
-  const built = pollPack(setup) as Record<string, unknown>;
-  const { ingest: mine, ...ours } = pollOf(filled);
-  const { ingest: theirs, ...seeds } = pollOf(built);
-  assert.deepEqual(ours, seeds);
-  assert.deepEqual([filled.pack, mine, theirs], ['feed-lanternly', 'feed_lanternly', 'poll_lanternly']);
-  assert.equal(filled.summary, built.summary);
+  assert.equal(JSON.stringify(filled.declarations), JSON.stringify([
+    {
+      ingest: 'feed_lanternly',
+      channel: 'poll',
+      url: 'https://stats.lanternly.example/api/numbers',
+      every: '1h',
+      grant: 'lanternly-stats',
+      project: 'things#1',
+      map: [
+        { name: { value: 'Monthly revenue, Lanternly' }, value: { path: 'data.mrr', type: 'decimal' }, unit: { value: 'USD' }, ...stamp },
+        { name: { value: 'Subscribers, Lanternly' }, value: { path: 'data.subscribers', type: 'int' }, ...stamp },
+      ],
+      writes: { register: 'datapoints' },
+    },
+  ]));
+  assert.equal(filled.pack, 'feed-lanternly');
+  assert.equal(filled.summary, 'Polls stats.lanternly.example every 1h, one request each time, for Monthly revenue, Lanternly, Subscribers, Lanternly.');
 });
 
 /* ── what the fill refuses ────────────────────────────────────────────────────────────────────── */
@@ -124,10 +141,67 @@ test('A FEED THAT COULD NEVER WRITE A READING IS NOT FILLED, so nobody is asked 
   refused({ measures: [{ name: '  ', path: 'data.mrr' }] }, /a name and a path/);
   refused({ measures: [{ name: 'Revenue', path: '' }] }, /a name and a path/);
   refused({ measures: [{ name: 'Revenue', path: 'data.a' }, { name: 'Revenue ', path: 'data.b' }] }, /Revenue is named twice/);
-  refused({ measures: Array.from({ length: FEED_MEASURES_MOST + 1 }, (_, i) => ({ name: `m${i}`, path: `data.m${i}` })) }, new RegExp(`${FEED_MEASURES_MOST} measures at most`, 'u'));
+  refused({ measures: [{ name: 'Revenue', path: 'data.a', at: { path: ' ', as: 'day' } }] }, /Revenue is dated from the answer and names no path/);
+  refused({ measures: [{ name: 'Revenue', path: 'data.a', at: { path: 'data.on', as: 'week' as never } }] }, /a day or as an instant/);
+  refused({ measures: [{ name: 'Revenue', path: 'data.a', money: { currency: 'dollars' } }] }, /names its currency in three letters/);
+  refused({ measures: [{ name: 'Revenue', path: 'data.a', money: { currency: 'USD' }, type: 'int' }] }, /money, .* takes no type/);
+  refused({ measures: [{ name: 'Revenue', path: 'data.a', money: { currency: 'USD' }, unit: 'EUR' }] }, /money in USD and says its unit is EUR/);
+  /* A TIME OF DAY IS THE POLL'S, and the record refuses each of these at install, after the owner approved. */
+  refused({ at: '07:00' }, /every 1h has no time of day.*every 1d, 2d or 1w/);
+  refused({ every: '1d', at: '7am' }, /7am is not a time of day/);
+  refused({ every: '1d', tz: 'Africa/Cairo' }, /a zone with no time of day/);
+  refused({ every: '1d', at: '07:00', tz: 'Mars/Olympus' }, /Mars\/Olympus is not a time zone/);
   /* A key label round spaces is the label; an empty one is no key, which is a public address. */
   assert.equal(pollOf(fillFeed(template(), { ...EXAMPLE, grant: '  Stats  ' })).grant, 'Stats');
   assert.equal('grant' in pollOf(fillFeed(template(), { ...EXAMPLE, grant: ' ' })), false);
+});
+
+/** `n` measures, each its own number in the answer. */
+const many = (n: number): FeedSpec['measures'] => Array.from({ length: n }, (_, i) => ({ name: `m${i}`, path: `data.m${i}` }));
+
+test('AN ID TOO LONG FOR ITS POLL IS REFUSED IN A SENTENCE THAT SAYS THE LIMIT, never cut short', () => {
+  /* BEFORE 2.0.0 IT WAS CUT TO 32 WITHOUT A WORD, so two long ids that began alike named one poll. `feed_` and 27
+     characters is the most a poll's name holds; with a second poll, `_2` takes two more. */
+  const longest = 'a'.repeat(FEED_NAME_MOST - 'feed_'.length);
+  assert.equal(pollOf(fillFeed(template(), { ...EXAMPLE, id: longest })).ingest, `feed_${longest}`);
+  assert.throws(() => fillFeed(template(), { ...EXAMPLE, id: `${longest}b` }), /is 28 characters, and a feed's id is 27 at most, because its poll's name is 32 at most/);
+  assert.throws(() => fillFeed(template(), { ...EXAMPLE, id: 'a'.repeat(33) }), /is 33 characters, and a feed's id is 27 at most/);
+  assert.throws(
+    () => fillFeed(template(), { ...EXAMPLE, id: longest, measures: many(FEED_MEASURES_MOST + 1) }),
+    /is 27 characters, and a feed's id is 25 at most with 2 polls/,
+  );
+});
+
+test('PAST TWENTY MEASURES A SECOND POLL ASKS THE SAME ADDRESS, and the summary says it is 2 requests each time', () => {
+  const doc = fillFeed(template(), { ...EXAMPLE, id: 'kiln-stats', measures: many(FEED_MEASURES_MOST + 1) });
+  const polls = doc.declarations as Poll[];
+  assert.deepEqual(polls.map((p) => [p.ingest, p.url, p.every, p.grant, p.map.length]), [
+    ['feed_kiln_stats', EXAMPLE.url, '1h', EXAMPLE.grant, FEED_MEASURES_MOST],
+    ['feed_kiln_stats_2', EXAMPLE.url, '1h', EXAMPLE.grant, 1],
+  ]);
+  assert.match(String(doc.summary), /^Polls stats\.example\.com every 1h, 2 requests each time, for m0, /u);
+  assert.match(String(fillFeed(template(), EXAMPLE).summary), /^Polls stats\.example\.com every 1h, one request each time, for /u);
+});
+
+test('A DATED MEASURE READS ITS DATE FROM THE ANSWER, money is written as an amount, and a whole-day feed keeps its time', () => {
+  const doc = fillFeed(template(), {
+    ...EXAMPLE,
+    every: '1d',
+    at: '07:00',
+    tz: 'Africa/Cairo',
+    measures: [
+      { name: 'Plays', path: 'days[-1].count', type: 'int', at: { path: 'days[-1].day', as: 'day' } },
+      { name: 'Takings', path: 'data.takings', money: { currency: 'usd', minor: true } },
+      { name: 'Refunds', path: 'data.refunds', money: { currency: 'EUR' }, unit: 'eur', at: { path: 'data.as_of', as: 'instant' } },
+    ],
+  });
+  const poll = pollOf(doc);
+  assert.deepEqual([poll.every, poll.at, poll.tz], ['1d', '07:00', 'Africa/Cairo']);
+  const [plays, takings, refunds] = poll.map;
+  assert.deepEqual([plays!.value, plays!.at], [{ path: 'days[-1].count', type: 'int' }, { path: 'days[-1].day', type: 'day' }]);
+  assert.deepEqual([takings!.amount, 'value' in takings!, takings!.at], [{ path: 'data.takings', type: 'money', currency: 'USD', minor: true }, false, { arrived: true }]);
+  assert.deepEqual([refunds!.amount, refunds!.unit, refunds!.at], [{ path: 'data.refunds', type: 'money', currency: 'EUR' }, { value: 'eur' }, { path: 'data.as_of', type: 'instant' }]);
+  assert.equal(doc.summary, 'Polls stats.example.com every 1d at 07:00 Africa/Cairo, one request each time, for Plays, Takings, Refunds.');
 });
 
 test('AND THE MOST IT FILLS IS THE RECORD’S NUMBER, asked of the record rather than copied from it', async () => {
@@ -179,6 +253,24 @@ const DIARY = {
   ],
 };
 
+/**
+ * The same list as it is once a reading may be money (REC-C03): an optional `amount`, and a `value` no longer required,
+ * so a reading that is money carries no decimal beside it.
+ */
+const MONEY_DIARY = {
+  ...DIARY,
+  pack: 'numbers-diary-money',
+  declarations: [
+    {
+      ...DIARY.declarations[0]!,
+      fields: [
+        ...DIARY.declarations[0]!.fields.map((f) => (f.id === 'value' ? { id: 'value', label: 'Value', type: 'decimal' } : f)),
+        { id: 'amount', label: 'Amount', type: 'money' },
+      ],
+    },
+  ],
+};
+
 const KEY = 'feed-key-5b1e';
 const LABEL = 'Example stats (read only)';
 
@@ -186,20 +278,20 @@ const LABEL = 'Example stats (read only)';
  * The address, standing in for a project's stats endpoint: 401 unless the request carries the key as a bearer,
  * and the numbers when it does. It remembers the header each request carried, so a test can say what was sent.
  */
-function address() {
+function address(body = '{"data":{"mrr":4310.5,"users":128}}') {
   const seen: (string | null)[] = [];
   const send = async (_url: URL, init: RequestInit): Promise<Response> => {
     const auth = new Headers(init.headers).get('authorization');
     seen.push(auth);
     return auth === `Bearer ${KEY}`
-      ? new Response('{"data":{"mrr":4310.5,"users":128}}', { status: 200, headers: { 'content-type': 'application/json' } })
+      ? new Response(body, { status: 200, headers: { 'content-type': 'application/json' } })
       : new Response('{"error":"unauthorized"}', { status: 401 });
   };
   return { send, seen };
 }
 
 /** A record holding Portfolio, one project, and the invented readings list, with the vault holding `LABEL` when asked. */
-async function recordWith(o: { vault: boolean; readings?: boolean }) {
+async function recordWith(o: { vault: boolean; readings?: boolean; money?: boolean }) {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const plan = async (doc: unknown) => said<{ diff: { planHash: string; approve: string[] } }>(await api.planPack({ doc, source: { kind: 'local' } } as never, owner)).diff;
@@ -209,7 +301,7 @@ async function recordWith(o: { vault: boolean; readings?: boolean }) {
     return (await api.installPack({ doc, source: { kind: 'local' }, planHash: p.value!.diff.planHash, approve: p.value!.diff.approve } as never, owner)) as Out;
   };
   said(await put(firstPartyDocument('portfolio', { seeds: [] })));
-  if (o.readings !== false) said(await put(DIARY));
+  if (o.readings !== false) said(await put(o.money === true ? MONEY_DIARY : DIARY));
   said(api.kernel.create('things', { name: 'Kiln', lane: 'earning' }, { actor: 'p_1' }));
   if (o.vault)
     assert.ok(
@@ -309,5 +401,83 @@ test('ON A RECORD WITH NO DATAPOINTS LIST THE FEED IS REFUSED, NAMING THE LIST',
   assert.equal(put.ok, false, 'a feed installed on a record with nowhere for a reading to go');
   assert.equal(put.refusal?.code, 'REGISTER_UNRESOLVED');
   assert.match(put.refusal?.fix ?? '', /points at the datapoints list/);
+  r.sql.close();
+});
+
+/* ── 2.0.0 on a record: dated, money, and a second poll ───────────────────────────────────────── */
+
+/** Every reading the record kept, by name: its value, its amount, when it is dated, and the list it came in. */
+const kept = (sql: Awaited<ReturnType<typeof recordWith>>['sql']) =>
+  sql.all<{ name: string; value: number | null; amount: string | null; at: string }>(
+    `SELECT json_extract(fields, '$.name') AS name, json_extract(fields, '$.value') AS value,
+            json_extract(fields, '$.amount') AS amount, json_extract(fields, '$.at') AS at
+     FROM entry WHERE register = 'datapoints' AND deleted_at IS NULL ORDER BY name`,
+  );
+
+test('ON A RECORD, A DATED MEASURE CARRIES THE ANSWER’S DAY and an undated one the moment it arrived', async () => {
+  const r = await recordWith({ vault: true });
+  const doc = fillFeed(template(), {
+    ...EXAMPLE,
+    ...PROJECT,
+    every: '1d',
+    measures: [
+      { name: 'Plays', path: 'days[-1].count', type: 'int', at: { path: 'days[-1].day', as: 'day' } },
+      { name: 'Active users', path: 'data.users', type: 'int' },
+    ],
+  });
+  said(await r.put(doc));
+  const net = address('{"data":{"users":128},"days":[{"day":"2026-09-19","count":7},{"day":"2026-09-20","count":11}]}');
+  const out = await r.run(net.send, async () => KEY);
+  assert.deepEqual({ ran: out.ran, ok: out.ok }, { ran: 1, ok: 1 });
+  const rows = kept(r.sql);
+  assert.deepEqual(rows.map((x) => [x.name, x.value]), [['Active users', 128], ['Plays', 11]]);
+  assert.equal(rows[1]!.at.slice(0, 10), '2026-09-20', 'the day counted is the answer’s, not the day it was asked');
+  assert.notEqual(rows[0]!.at.slice(0, 10), '2026-09-20');
+  r.sql.close();
+});
+
+test('ON A RECORD, A MONEY MEASURE IS WRITTEN AS AN AMOUNT IN MINOR UNITS, from cents or from whole units', async () => {
+  const r = await recordWith({ vault: true, money: true });
+  const doc = fillFeed(template(), {
+    ...EXAMPLE,
+    ...PROJECT,
+    measures: [
+      { name: 'Takings', path: 'data.cents', money: { currency: 'USD', minor: true } },
+      { name: 'Monthly recurring revenue', path: 'data.mrr', money: { currency: 'USD' } },
+    ],
+  });
+  said(await r.put(doc));
+  const out = await r.run(address('{"data":{"cents":431050,"mrr":4310.5}}').send, async () => KEY);
+  assert.deepEqual({ ran: out.ran, ok: out.ok }, { ran: 1, ok: 1 });
+  assert.deepEqual(
+    kept(r.sql).map((x) => [x.name, x.value, JSON.parse(x.amount ?? 'null')]),
+    [
+      ['Monthly recurring revenue', null, { amount: 431050, currency: 'USD' }],
+      ['Takings', null, { amount: 431050, currency: 'USD' }],
+    ],
+  );
+  assert.ok(kept(r.sql).every((x) => Number.isInteger(JSON.parse(x.amount ?? 'null')?.amount)), 'an amount is whole minor units');
+  r.sql.close();
+});
+
+test('ON A RECORD, TWENTY-ONE MEASURES ARE TWO POLLS OF ONE ADDRESS, two requests and twenty-one readings an interval', async () => {
+  const r = await recordWith({ vault: true });
+  const doc = fillFeed(template(), { ...EXAMPLE, ...PROJECT, measures: many(FEED_MEASURES_MOST + 1) });
+  const approve = (await r.plan(doc)).approve;
+  assert.equal(approve.filter((line) => line.startsWith('CALLS OUT stats.example.com · every 1h')).length, 2, approve.join('\n'));
+  said(await r.put(doc));
+  const answer = JSON.stringify({ data: Object.fromEntries(Array.from({ length: FEED_MEASURES_MOST + 1 }, (_, i) => [`m${i}`, i])) });
+  const net = address(answer);
+  const out = await r.run(net.send, async () => KEY);
+  assert.deepEqual({ ran: out.ran, ok: out.ok, sent: net.seen.length }, { ran: 2, ok: 2, sent: 2 });
+  assert.equal(kept(r.sql).length, FEED_MEASURES_MOST + 1);
+  r.sql.close();
+});
+
+test('ON A RECORD, A WHOLE-DAY FEED WITH A TIME OF DAY AND A ZONE INSTALLS, so the record takes the time and the zone the fill wrote', async () => {
+  const r = await recordWith({ vault: true });
+  const doc = fillFeed(template(), { ...EXAMPLE, ...PROJECT, every: '1d', at: '07:00', tz: 'Africa/Cairo' });
+  said(await r.put(doc));
+  assert.deepEqual([pollOf(doc).at, pollOf(doc).tz], ['07:00', 'Africa/Cairo']);
   r.sql.close();
 });

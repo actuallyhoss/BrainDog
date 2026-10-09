@@ -16,9 +16,10 @@
  *   4. `/.well-known/security.txt` is 200 and its `Expires` is more than 30 days away. Red until LCH-C12, correctly.
  *   5. Each name of `LEGACY_HOSTS` answers at all: any status under 500.
  *   6. `/healthz`'s `night` ran: its `at` under 26 hours old and `backups_failed` 0 (`apps/worker/src/health.ts`).
- *   7. `/healthz`'s `launch.signup` is what `SIGNUP` switches it to. The Worker says `closed` with a `why` for each thing
- *      that stops a stranger signing up (`apps/worker/src/launch.ts`), so `open` in the config and `closed` here is a
- *      sign-up that is switched on and does not work, and every `why` is printed under the miss.
+ *   7. `/healthz`'s `launch.signup` is what `SIGNUP` switches it to. The Worker says `closed` whenever anything stops a
+ *      stranger signing up (`apps/worker/src/launch.ts`), so `open` in the config and `closed` here is a sign-up that is
+ *      switched on and does not work, and its one `why` is printed under the miss. `open` beside any `why` at all, or
+ *      `invite` beside more than one, is a miss too: see `reasonsBeside`.
  *
  * THE NAMES COME FROM `apps/worker/wrangler.jsonc`, AS `smoke.mjs` READS THEM: `PUBLIC_HOST`, `LEGACY_HOSTS` and
  * `SIGNUP` are what the Worker was deployed with, so the watch asks the names the deploy claimed.
@@ -49,10 +50,15 @@ export const NIGHT_MS = 26 * 60 * 60 * 1000;
 export const EXPIRES_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
- * What every `why` that stops a stranger signing up ends on (`stops` in `apps/worker/src/launch.ts`): a refusal for
- * everybody, or a letter that never comes. No other `why` says either; `launch.test.mjs` holds the two files together.
+ * How many sentences `/healthz` may carry beside a sign-up that is not closed: none beside `open`, the one that says a
+ * code is needed beside `invite` (`launchState` in `apps/worker/src/launch.ts`, audit 36-37, finding 12).
+ *
+ * A COUNT, NOT THE SENTENCES. This used to be a regex copy of the stopping sentences, so a new one it did not match
+ * passed. Importing `STOPPING` from `launch.ts` would not run here: the watch runs with no install (`watch.yml`), and
+ * `launch.ts` imports two workspace packages. A count needs neither and lets no new sentence through, whatever it says;
+ * `launch.test.mjs` holds it to every sentence of the exported `STOPPING`.
  */
-export const STOPPING = /every sign-up is refused|finishes a sign-up/;
+export const reasonsBeside = (signup) => (signup === 'open' ? 0 : signup === 'invite' ? 1 : Infinity);
 
 /** `SIGNUP` as the Worker reads it (`signupMode` in `apps/worker/src/launch.ts`): open, invite, or closed. */
 const modeOf = (said) => {
@@ -214,7 +220,7 @@ export async function questions({ names, github = {}, ask = fetch, now = Date.no
     night && Number.isFinite(age) ? `${ageWords(age)} ago${night.reached === false ? ', no record reached' : ''}` : '',
   );
 
-  /* NOT OPEN WHILE A WHY SAYS IT CANNOT WORK: a build from before `stops` said `open` beside "every sign-up is refused". */
+  /* NOT OPEN WHILE A WHY SAYS ANYTHING MORE: a build from before `stops` said `open` beside "every sign-up is refused". */
   const launch = said?.launch;
   const why = Array.isArray(launch?.why) ? launch.why.map(String) : [];
   say(
@@ -223,7 +229,7 @@ export async function questions({ names, github = {}, ask = fetch, now = Date.no
     !said ? '/healthz gave nothing to read'
     : !launch ? '/healthz carries no launch'
     : launch.signup !== signup ? `/healthz says sign-up is ${launch.signup}`
-    : launch.signup !== 'closed' && why.some((w) => STOPPING.test(w)) ? `/healthz says sign-up is ${launch.signup}, and a reason below says nobody can finish it`
+    : why.length > reasonsBeside(launch.signup) ? `/healthz says sign-up is ${launch.signup}, and gives a reason below that it is not`
     : null,
     launch?.signup ?? '',
     why,

@@ -1,0 +1,7 @@
+{
+  "gate": "guards",
+  "rule": "a DATA route guarded too high, in its own files",
+  "expect": "routed as DATA and is guarded by admin\\(\\)",
+  "findings": 1,
+  "why": "AND THE HALF OF THE SURFACE WRITTEN IN ITS OWN FILES: a row under `packages/host/src/routes/` and its method under `packages/record/src/methods/`, where `triage` is routed DATA and guarded `admin(ctx)`. A gate that read only the two index files would find no row to check and pass."
+}

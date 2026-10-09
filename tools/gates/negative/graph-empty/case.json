@@ -1,0 +1,8 @@
+{
+  "gate": "graph",
+  "rule": "an empty root is a skip, not a pass",
+  "expect": "nothing was checked",
+  "findings": 1,
+  "skip": true,
+  "why": "AN EMPTY ROOT, ONE PER TEXT GATE, AND THE ANSWER IS A SKIP. Each fixture holds nothing but its `expect.txt`, so no `packages/`, `apps/` or `packs/` at all, which is what a mistyped `BRAINDOG_GATE_ROOT` looks like from inside a gate. An audit measured the three on such a tree: `em-dash` exited 3, `graph` exited 3 without saying where it had looked, and `secret-grep` exited 0, \"0 plaintexts reach a sink, over 0 files\", which `run.mjs` counts as a pass. A gate that read nothing has not passed, and a gate that read nothing somewhere it does not name leaves the reader to guess which root was wrong.\n\n`skip: true` ASKS FOR EXIT 3 EXACTLY, not only for red. Exit 1 here would be a finding over a tree that holds no file, which is a different defect wearing the same colour. The seeded name is the fixture's own directory, so \"named once\" is the skip line saying which root it read."
+}

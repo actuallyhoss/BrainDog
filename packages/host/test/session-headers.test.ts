@@ -28,3 +28,14 @@ test('A BAD BUILD IS DROPPED, and the call keeps its other hints', () => {
   }
   assert.deepEqual(hintsOf({ cli: 20261009 }), {});
 });
+
+/* COMMITS SINCE THE HANDOFF (record-card, batch 40): `x-braindog-ahead` reaches the record as the count it was sent, for
+   the card's "12 commits since", and anything but a whole number from 0 to 9,999 is dropped. */
+test('THE COUNT OF COMMITS SINCE THE HANDOFF IS KEPT AS SENT, and anything else is dropped', () => {
+  const ahead = (n: string) => sessionOf(new Headers({ 'x-braindog-ahead': n })).ahead;
+  assert.equal(HINTS.ahead.header, 'x-braindog-ahead');
+  assert.equal(ahead('0'), '0');
+  assert.equal(ahead('12'), '12');
+  assert.equal(ahead('9999'), '9999');
+  for (const bad of ['10000', '-1', '012', '1.5', 'twelve', '', '+5', '1e3', '0x1f', '12a']) assert.equal(ahead(bad), undefined, bad);
+});

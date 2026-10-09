@@ -1,0 +1,8 @@
+{
+  "gate": "shell-words",
+  "rule": "a use case named in the core",
+  "expect": "a use case named in the core",
+  "findings": 10,
+  "total": 10,
+  "why": "TEN, each a place the gate once did not look or a shape it once did not read: a host in the kernel, a word split over two parts, `api.goldapi.io` in a grammar, `api.mercury.com` in an app script, `EGP` in `packages/seed` and `payrollRun` in `apps/web`, the last two once exempted whole. Measured against the gate before it read those places: it named the first five, and said `packages/seed` was an exemption holding nothing, which is a sixth finding this case did not seed. `total` is what turns that sixth line into a failure rather than a pass that happened to count five."
+}

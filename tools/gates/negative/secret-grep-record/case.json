@@ -1,0 +1,7 @@
+{
+  "gate": "secret-grep",
+  "rule": "a secret written to the record",
+  "expect": "reaches the record",
+  "findings": 1,
+  "why": "THE THIRD SINK, AND THE ONE THIS GATE'S OWN MESSAGE NAMES FIRST: *\"a credential never goes in the record.\"* One finding, not two: the fixture holds a real leak and an innocent call whose SQL merely contains the words `root`, `wrapped_by` and `kek`, because eight calls in the real tree are that shape and a gate red on all of them is a gate switched off."
+}

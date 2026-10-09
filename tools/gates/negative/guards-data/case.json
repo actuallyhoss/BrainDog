@@ -1,0 +1,7 @@
+{
+  "gate": "guards",
+  "rule": "a DATA route guarded too high",
+  "expect": "routed as DATA and is guarded by admin\\(\\)",
+  "findings": 1,
+  "why": "THE OTHER DIRECTION, AND THE ONE THAT IS SILENT IN REVIEW. `guards` had a single fixture, a method routed ADMIN and guarded `guard()`, so the gate was proved to catch a ceiling that is too LOW. A ceiling that is too high reads as care: `create` routed DATA and guarded `admin(ctx)` refuses every token and takes the eight MCP tools with it, and nothing had ever asked this gate to notice. The fixture's other five methods put DATA and `READ+` under both `guard` and `scoped`, so one finding is an assertion that those two groups share one list rather than an assertion that the gate went red about something."
+}

@@ -90,7 +90,7 @@ test('A ROWSET NAMING ROWS THE OPEN ONE LACKS ADDS THEM TO IT, and one asking so
   assert.deepEqual({ ...wider }, { id: first.id, joined: true, widened: 1 });
   const body = JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', first.id)!.body) as { rows: { at: string }[] };
   assert.deepEqual(body.rows.map((r) => r.at), ['tasks#1', 'tasks#2']);
-  assert.equal(sql.one<{ note: string }>("SELECT note FROM event WHERE target = ? AND kind = 'note'", `suggestion:${first.id}`)?.note, 'One more row was asked about the same way, and added to this question.');
+  assert.equal(sql.one<{ note: string }>("SELECT note FROM event WHERE target = ? AND kind = 'note'", `suggestion:${first.id}`)?.note, 'Asked the same of one more thing, and added it to this question.');
   /* The widened question is now exactly what was asked, so asking it again joins it. */
   assert.deepEqual({ ...value<Filed>(k.propose(done('tasks#2', 'tasks#1'), CLAUDE)) }, { id: first.id, joined: true });
 
@@ -105,7 +105,7 @@ test('A ROWSET THAT CHANGES NOTHING IS REFUSED in one sentence, and nothing is f
   const { k, sql } = await record();
   const out = refusal(k.propose({ question: 'Keep it open?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ at: 'tasks#1', version: 1, patch: { state: 'open', name: 'Ship' } }] } }, CLAUDE));
   assert.deepEqual([out.code, out.fix], ['ALREADY_KNOWN', NOTHING_TO_DECIDE]);
-  assert.equal(NOTHING_TO_DECIDE, 'Every row already holds this. Nothing to decide.');
+  assert.equal(NOTHING_TO_DECIDE, 'Everything this asks for is already so. Nothing to decide.');
   assert.deepEqual(open(sql), []);
 });
 

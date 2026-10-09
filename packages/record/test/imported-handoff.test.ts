@@ -149,34 +149,38 @@ test('among imported runs, the one waiting to be picked up is the handoff, not t
   sql.close();
 });
 
-/* AND WITH NONE WAITING, THE ONE THE IMPORT RECORDED LATEST. A row's `id` says when it was first written, and a later
-   import that changed a run's next step moves its `updated_at` and not its `id`, so `id DESC` handed over the step of
-   the run written second although the first had been changed an hour after it. */
-test('among imported runs none of which waits, the one the import changed latest is the handoff', async () => {
+/* AND WITH NONE WAITING, NOTHING IS HANDED OVER (AGT-C05). A finished run's step is its history: handing over the newest
+   step here in any state sent a starting session after work that had shipped. So the handoff is null, and Next says
+   where the last run here stopped instead: the one the import changed latest, since none of them was heard from. */
+test('among imported runs none of which waits, nothing is handed over and Next names the one changed latest', async () => {
   const { api, sql, clock, write, ask } = await seeded();
-  const moved = await write('S41', { state: 'done', next: 'Kern the lowercase pairs' });
+  const moved = await write('S41', { state: 'done', next: 'Kern the lowercase pairs', head: '5a57ba2' });
   await write('S42', { state: 'done', next: 'Ship the specimen page' });
   clock.advance(60 * MIN);
   value(await api.update({ register: 'session', seq: moved.seq!, patch: { next: 'Kern the figures' } }, agent({})));
   clock.advance(MIN);
   const { here } = await ask();
-  assert.equal(here.handoff?.from, `S${String(moved.seq)}`, `the handoff was ${JSON.stringify(here.handoff)}`);
-  assert.equal(here.handoff?.next, 'Kern the figures');
+  assert.equal(here.handoff, null, `a finished run's step was handed over: ${JSON.stringify(here.handoff)}`);
+  assert.deepEqual(here.next_lines, [`Nothing was handed over. Last here: Claude (S${String(moved.seq)}), 1 min ago, at 5a57ba2.`]);
   sql.close();
 });
 
-/* A RUN SOMEBODY HEARD FROM STILL COMES FIRST. `handoff({ next })` with no state leaves an active run active, and nothing
-   moves a `handoff` run on once it is picked up, so preferring the state over every run would hand a months-old imported
-   step to an agent whose colleague left one five minutes ago. The preference is held to runs nobody heard from. */
-test('a run heard from that left a next step outranks an imported run waiting to be picked up', async () => {
+/* A RUN STILL WORKING HAS HANDED NOTHING OVER. `handoff({ next })` with no state leaves the run active: the step is open
+   only once the run waits in `handoff` (`openHandoffs`). Then the newer step leads, and the imported one is counted. */
+test('a working run that wrote a next step hands it over only once it waits, and then it leads', async () => {
   const { api, sql, clock, write, ask } = await seeded();
-  await write('S41', { state: 'handoff', next: 'Kern the lowercase pairs' });
+  const imported = await write('S41', { state: 'handoff', next: 'Kern the lowercase pairs' });
   const first = agent({ host: 'forge-mbp', repo: 'probe-repo', agent: 'claude', client_id: 'c-0' });
   value<Attached>(await api.attach({ source: 'startup', client_id: 'c-0' }, first));
   const left = value<Entry>(await api.handoff({ next: 'Run the proofing script' }, first));
   clock.advance(5 * MIN);
+  const working = (await ask()).here;
+  assert.equal(working.handoff?.from, `S${String(imported.seq)}`, `the handoff was ${JSON.stringify(working.handoff)}`);
+  value(await api.handoff({ state: 'handoff' }, first));
+  clock.advance(MIN);
   const { here } = await ask();
   assert.equal(here.handoff?.from, `S${String(left.seq)}`, `the handoff was ${JSON.stringify(here.handoff)}`);
   assert.equal(here.handoff?.next, 'Run the proofing script');
+  assert.equal(here.handoff?.earlier, 1, 'the imported step still open here is not counted');
   sql.close();
 });

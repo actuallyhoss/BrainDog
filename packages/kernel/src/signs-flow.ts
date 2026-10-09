@@ -2,8 +2,8 @@
  * The signs of scripts and automations (SHL-D01): seven readings in the shape `signs.ts` sets (PRF-A01), joined to its
  * closed list with one import and one spread.
  *
- * WHY THIS EXISTS. A paused script showed on `/scripts` only, and on `sam` the hub read "76 automations run by
- * themselves, and none failed this month" over a month that held one run. Nothing read either daily. These read the
+ * WHY THIS EXISTS. A paused script showed on `/scripts` only, and on the owner's record the hub read "76 automations
+ * run by themselves, and none failed this month" over a month that held one run. Nothing read either daily. These read the
  * record's own rows (the script and rule declarations, the runs `meter` signs, `automation_run` and its steps) and say
  * what they find with names, never ids, on every record alike (DIRECTION §27).
  *
@@ -12,7 +12,9 @@
  *
  * `automations-idle` NEVER READS RED. PRF-A01 has three states and no amber, and a rule that waits for rows that do not
  * arrive yet is not a fault of the rule. It reads green with its count in its sentence and facts, so the number is
- * there to read without the sign going red for good on a record whose arrivals are broken elsewhere.
+ * there to read without the sign going red for good on a record whose arrivals are broken elsewhere. THE SENTENCE LEADS
+ * WITH THAT COUNT, "70 of 76 automations have never run", because a green sign is read as "all fine" past its first
+ * words, and on the owner's record the first words were "Of 76 automations switched on" (audit 36-37, finding 9).
  *
  * ONLY TYPES COME FROM `signs.ts`. It spreads `SIGNS_FLOW` into `VITAL_SIGNS` at load, so a value imported back from it
  * would be read before it exists whenever this file is the one loaded first.
@@ -248,7 +250,7 @@ function readIdle(sql: Sql, nowMs: number): SignReading {
   const said =
     idle.length === 0
       ? `Every automation switched on more than ${IDLE_AFTER_DAYS} days ago has run.`
-      : `Of ${count(on.length, 'automation')} switched on, ${idle.length} ${idle.length === 1 ? 'has' : 'have'} never run, ${IDLE_AFTER_DAYS} days or more after going in.`;
+      : `${idle.length} of ${count(on.length, 'automation')} switched on ${idle.length === 1 ? 'has' : 'have'} never run, ${IDLE_AFTER_DAYS} days or more after going in.`;
   return reading('green', idle.length, said, facts);
 }
 

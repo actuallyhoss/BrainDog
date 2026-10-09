@@ -189,7 +189,7 @@ export default async function capture({ origin, app, set, out, source }) {
       set,
       seen: source.seen,
       pressable: source.pressable,
-      widths: widths(),
+      widths: source.widths ?? widths(),
       themes: THEMES,
       height,
       waitedFor: 'the screen said it settled (data-screen on main), nothing in main is aria-busy, and the fonts have loaded',
@@ -205,7 +205,7 @@ export default async function capture({ origin, app, set, out, source }) {
   const browser = await chromium.launch();
   try {
     for (const theme of THEMES)
-      for (const width of widths()) {
+      for (const width of source.widths ?? widths()) {
         const phone = width < 600;
         const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: phone ? 2 : 1, colorScheme: theme, isMobile: phone, hasTouch: phone });
         const page = await context.newPage();

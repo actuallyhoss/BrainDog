@@ -1,0 +1,6 @@
+{
+  "gate": "css-rules",
+  "rule": "faint text below 24px",
+  "expect": "not below 24px",
+  "findings": 1
+}

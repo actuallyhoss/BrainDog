@@ -10,13 +10,19 @@
   since, then Put back sends the plan that was read, by its hash, so a write that slipped in between is never undone
   blind. The record's sentence is the receipt; the page is read again and the plan with it.
 
+  WHAT THE RUN LEFT COMES FIRST (AGT-C05): the next step it handed on, when, and what became of it ("Taken by Claude
+  Code, 2h later"), read off the run's own row (`api.ts` `stepLeft`). A step nobody has taken yet can be closed here,
+  with a reason, through the record's `handoff` `drop`.
+
   A LIST WITHOUT A BOX under the section's own heading ("What it did"), with no second heading of its own, and no red:
   putting a run back is a choice, not an alarm. A HOST PANEL (`panel-of.ts`), drawn by `BlockSlot.svelte` only on a page
   drawn for a run, and imported by it alone.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { createClient } from '@braindog/client';
   import { apiBase } from '$lib/at.ts';
+  import { runWho, stepLeft, type StepLeft } from '$lib/record/api.ts';
   import { undoApply, undoPlan, type UndoPlan } from '$lib/record/undo-write.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -67,6 +73,67 @@
 
   const said = $derived(plan ? runLines(plan.steps) : { lines: [], more: null });
 
+  /* ── the step it left ──────────────────────────────────────────────────── */
+
+  let step = $state.raw<StepLeft | null>(null);
+  let closing = $state(false);
+  let why = $state('');
+  let shutting = $state(false);
+
+  const stepSaid = {
+    heading: 'Left this next step',
+    close: 'Close this step',
+    why: 'Why it is no longer needed',
+    keep: 'Keep it',
+    shut: 'Close it',
+    closed: 'Step closed.',
+  } as const;
+
+  /** A run's row by its handle, `S42`, as `{ state, fields }`, or `null` where this reader may not open it. */
+  async function runRow(handle: string): Promise<{ state: unknown; fields: Record<string, unknown> } | null> {
+    const seq = Number(/^S([1-9][0-9]*)$/u.exec(handle)?.[1]);
+    if (!Number.isInteger(seq)) return null;
+    const out = await createClient({ base: apiBase() }).get('session', seq);
+    const row = out.ok && typeof out.value === 'object' && out.value !== null ? (out.value as { state?: unknown; fields?: unknown }) : null;
+    return row && typeof row.fields === 'object' && row.fields !== null ? { state: row.state, fields: row.fields as Record<string, unknown> } : null;
+  }
+
+  async function readStep(handle: string) {
+    const row = await runRow(handle);
+    if (handle !== run) return;
+    if (!row) return void (step = null);
+    /* WHO TOOK IT, BY NAME: the taker's own row, read once, and never its handle. */
+    const by = typeof row.fields.taken_by === 'string' ? await runRow(row.fields.taken_by) : null;
+    if (handle !== run) return;
+    step = stepLeft(row.fields, row.state, Date.now(), by ? runWho(by.fields) : null);
+  }
+
+  $effect(() => {
+    const handle = run;
+    untrack(() => {
+      step = null;
+      closing = false;
+      why = '';
+      void readStep(handle);
+    });
+  });
+
+  async function closeStep() {
+    const reason = why.trim();
+    if (reason === '' || shutting) return;
+    shutting = true;
+    try {
+      const out = await createClient({ base: apiBase() }).call<unknown>('handoff', { drop: run, why: reason });
+      if (out.ok) {
+        toasts.push(stepSaid.closed, { intent: 'good' });
+        closing = false;
+        await readStep(run);
+      } else toasts.push('refusal' in out ? out.refusal.fix : stepSaid.close, { intent: 'warn' });
+    } finally {
+      shutting = false;
+    }
+  }
+
   async function putBack() {
     const read = plan;
     if (!read || busy) return;
@@ -86,6 +153,26 @@
 </script>
 
 <section class="run" aria-label={runWords.heading} aria-busy={from === 'reading'}>
+  {#if step}
+    <div class="run-step" role="group" aria-label={stepSaid.heading}>
+      <p class="run-meta">{step.left ?? stepSaid.heading}</p>
+      <p class="run-next">{step.next}</p>
+      {#if step.fate}<p class="run-said" role="status">{step.fate}.</p>{/if}
+      {#if step.open}
+        {#if closing}
+          <form class="run-do" onsubmit={(e) => (e.preventDefault(), void closeStep())}>
+            <label class="run-why"
+              ><span class="run-meta">{stepSaid.why}</span><input class="run-input" type="text" bind:value={why} autocomplete="off" enterkeyhint="done" /></label
+            >
+            <Button size="sm" onclick={() => (closing = false)}>{stepSaid.keep}</Button>
+            <Button size="sm" weight="primary" type="submit" disabled={shutting || why.trim() === ''}>{stepSaid.shut}</Button>
+          </form>
+        {:else}
+          <div class="run-do"><Button size="sm" onclick={() => (closing = true)}>{stepSaid.close}</Button></div>
+        {/if}
+      {/if}
+    </div>
+  {/if}
   {#if from === 'reading'}
     <Waiting rows={3} />
   {:else if from === 'refused'}
@@ -115,6 +202,46 @@
     gap: var(--sp-2);
     min-inline-size: 0;
     padding-block-start: var(--sp-2);
+  }
+
+  /* THE STEP IT LEFT, above what it did: a 13px line saying when, the step at the body size, then what became of it. */
+  .run-step {
+    display: grid;
+    gap: var(--sp-1);
+    padding-block-end: var(--sp-2);
+    border-block-end: 1px solid var(--line-soft);
+  }
+
+  .run-meta {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .run-next {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+
+  .run-why {
+    display: grid;
+    flex: 1 1 100%;
+    gap: var(--sp-1);
+  }
+
+  /* A RECTANGLE, as every field is (DIRECTION §39): radius 8, the field's flat fill, no border of its own. */
+  .run-input {
+    min-block-size: 36px;
+    padding-inline: var(--sp-2);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--field);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-base);
   }
 
   .run-lines {

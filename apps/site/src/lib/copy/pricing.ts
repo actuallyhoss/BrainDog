@@ -3,11 +3,14 @@
  * and those figures live in `plans.ts`, not here: this file holds only the sentences said about them.
  */
 
-import type { Allowance } from '../plans.ts';
+import { plan, type Allowance, type Plan } from '../plans.ts';
 import { home } from './home.ts';
 
 /** A figure a month, grouped the way every figure on the site is. */
 const aMonth = (n: number): string => `${n.toLocaleString('en-US')} a month`;
+
+/* A card's agents line, from the plan's own figure (`agents` in `PLAN_TABLE`): what a record may hold live at once. */
+const agentsOn = (id: Plan['id']): string => `Connect up to ${plan(id).allowance.agents.toLocaleString('en-US')} agents`;
 
 export const pricing = {
   /**
@@ -127,17 +130,17 @@ export const pricing = {
       free: {
         cta: 'Start for free',
         // Nothing in the app is gated by plan; backups are `apps/worker/src/snapshots.ts`; export is Settings' one file.
-        points: ['Every part of the app', 'Nightly backups, last 30 kept', 'Export everything, any time'],
+        points: ['Every part of the app', 'Nightly backups, last 30 kept', 'Export everything, any time', agentsOn('free')],
       },
       cloud: {
         cta: 'Choose Cloud',
         // `dir_member` has no limit per record; the switch and the cancel are `billing.ts`' portal.
-        points: ['Colleagues, as many as you like', 'Change or cancel any time'],
+        points: ['Colleagues, as many as you like', 'Change or cancel any time', agentsOn('cloud')],
       },
       plus: {
         cta: 'Choose Cloud Plus',
         // Five times is every figure in `ALLOWANCE.plus` over `ALLOWANCE.hosted`, held by `plans.test.ts`.
-        points: ['Five times the Cloud allowance', 'Colleagues, as many as you like'],
+        points: ['Five times the Cloud allowance', 'Colleagues, as many as you like', agentsOn('plus')],
       },
     },
     /* What the Free card sums up of its allowance, under the price. */
@@ -162,6 +165,8 @@ export const pricing = {
     usage: [
       // One ask is one credit however many passes it takes, and background work has `BACKGROUND_ASKS_MONTH` of its own (`packages/slash/src/types.ts`).
       { key: 'credits', name: 'Slash credits', said: 'One for each question or draft. Background work never spends them.', amount: aMonth },
+      // `agents` in `PLAN_TABLE`: agent keys a record holds live, so a figure at once and not a month. A self-host's server key and a share link are not agents.
+      { key: 'agents', name: 'Agents', said: 'Claude, Codex or any app that speaks MCP, connected at the same time.', amount: (n: number) => `${n.toLocaleString('en-US')} at once` },
       // A scheduled action's run and an automation's `rule:` run count (`COUNTED_ONLY` in `directory.ts`).
       { key: 'runs', name: 'Automation and script runs', said: 'Each time a pull, an automation or a script runs.', amount: aMonth },
       // What a run fetches is metered as requests; a delivery the outbox sends is `COUNTED_ONLY` and never limited.
@@ -199,7 +204,7 @@ export const pricing = {
       {
         // The upgrade is checkout with the record (`billing.ts`), and the allowance follows the plan.
         q: 'When would I pay?',
-        a: 'When you want colleagues in the record, or more Slash and automations than Free includes. Upgrade from Settings and the larger allowance applies straight away.',
+        a: 'When you want colleagues in the record, or more Slash, automations or agents than Free includes. Upgrade from Settings and the larger allowance applies straight away.',
       },
       {
         // A scheduled pull and an automation count; an arrival or a delivery is `COUNTED_ONLY` in `directory.ts`.

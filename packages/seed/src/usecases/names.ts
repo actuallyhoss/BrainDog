@@ -43,6 +43,8 @@ export const moduleName = (id: string): string => {
  */
 export const RULE_NAMES: Readonly<Record<string, string>> = {
   'invoice-late': 'Chase late payments',
+  /* TAKEN AWAY AT money-core 3.16.0 AND STILL NAMED: a record that has not said yes to the update still holds it, and its
+     runs and the question about taking it away name it. */
   'cash-stale': 'Keep balances current',
   'project-past-aim': 'Ask about a missed day',
   'txn-categorise': 'Categorise what cleared',

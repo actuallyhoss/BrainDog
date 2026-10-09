@@ -29,6 +29,8 @@ import { FORMAT_VERSION, KERNEL_MIGRATION } from '@braindog/kernel';
 import { PRIMITIVES_VERSION } from 'braindog-render';
 
 import { automations, scripts } from './automations.ts';
+import { behindLine } from './behind.ts';
+import { serveBridge } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
 import { heldHere, hookEnd, hookStart, parentOf } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
@@ -226,21 +228,25 @@ const usage = () =>
     'braindog import <file.brainl> [--key <pubkey|url>] [--host <host>]',
     "  Check the file here, then put the record back from it, in place of everything it holds now. The record takes only its own copy.",
     '  Both ask the owner to approve the one operation in the app, with six digits, unless BRAINDOG_TOKEN is the self-host\'s server key.',
-    'braindog import <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder|address>] [--host <host>] [--dry-run] | --draft-setup | --since <day|last>',
+    'braindog import <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder|address>] [--host <host>] [--dry-run] [--strict] | --draft-setup | --since <day|last>',
     "  Move another tool's export into this BrainDog through its adapter: a pack id such as one in packs/, or the path of a module. Running it again updates what it added, and no key value is ever read.",
+    'braindog import --map <map.json> <export.json> [--host <host>] [--dry-run] [--strict]',
+    "  The same with no adapter: the map file says which list each part of the export goes to. --strict refuses the whole file when any part of it would not be read.",
     'braindog people harvest [--since <day>] [--whole-history] [--dry-run] [--host <host>]',
     "  Meet everybody with two or more commits in the repositories your projects list, by remote or folder, grouped by address, each with the project they worked in, at most 200 a run. Only commits since a repository joined its project count, and --whole-history counts every one. Repositories no project lists, bots, machines, coding agents and your own commits are left out, and nobody is met until People says which person is you. With --dry-run it prints who it would meet and sends nothing.",
-    'braindog signs [--json] [--host <host>]',
-    "  Say your record's vital signs now: whether arrivals are filed, numbers arrive, questions pile up on one cause, how old the oldest open question is, and whether runs end as they should. One read: it opens no run.",
+    'braindog signs [--json] [--strict] [--host <host>]',
+    "  Say your record's vital signs now: whether arrivals are filed, numbers arrive, questions pile up on one cause, how old the oldest open question is, and whether runs end as they should. One read: it opens no run. A red sign still exits 0; --strict exits 2 on any red, for scripts.",
     'braindog understand --dry-run [--host <host>]',
     '  Say what your record would link and ask if it read what it already holds now: how many payments, runs and services of each kind, the first of those links, and its questions for Decide. It changes nothing.',
+    'braindog feed propose <file> [--host <host>]',
+    '  Ask on Decide for each live feed your setup file lists, built by the live feed add-on: where it calls and how often. Nothing is installed until you say yes there.',
     'braindog token create [--name <name>] [--scope <read|propose|write>] [--days <n>] [--inbox] [--host <host>]',
     "  Mint a token for an agent and print it once. It reads unless --scope names more, and with --inbox it may also read the money inbox.",
     "  The owner approves the one mint in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
-    'braindog mcp [--agent claude|codex|cursor|other] [--host <host>]',
-    '  Serve BrainDog to an agent over standard input and output. The agent starts it.',
+    'braindog mcp [--agent claude|codex|cursor|other] [--host <host>] [--local]',
+    "  Serve BrainDog to an agent over standard input and output, passing each message to the host's own server. The agent starts it. --local serves the tools this command holds, for seven nights after the bridge.",
     'braindog hook start|end',
-    '  What Claude Code runs when a session starts and ends, with its event on standard input.',
+    '  What Claude Code runs when a session starts and ends, with its event on standard input. Once a day the start hook also says when this command is older than the host needs; it never updates by itself.',
     'braindog install [--apply] [--replace <replace.json>] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>]',
     "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. It also places BrainDog's Agent Skill in each profile's skills/braindog/. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
     'braindog verify <file> [--key <pubkey|url>]',
@@ -267,12 +273,12 @@ const usage = () =>
   ].join('\n');
 
 async function mcp(args: string[]): Promise<void> {
-  let values: { host?: string | undefined; agent?: string | undefined };
+  let values: { host?: string | undefined; agent?: string | undefined; local?: boolean | undefined };
   try {
-    ({ values } = parseArgs({ args, options: { host: { type: 'string' }, agent: { type: 'string' } }, strict: true }));
+    ({ values } = parseArgs({ args, options: { host: { type: 'string' }, agent: { type: 'string' }, local: { type: 'boolean' } }, strict: true }));
   } catch {
     /* parseArgs quotes what it could not read, and that could be a token somebody passed by mistake. */
-    return stop('braindog mcp takes --agent and --host, and nothing else. A token is never an argument.');
+    return stop('braindog mcp takes --agent, --host and --local, and nothing else. A token is never an argument.');
   }
   const { agent } = values;
   if (agent !== undefined && !isAgent(agent)) return stop(`--agent is one of ${AGENTS.join(', ')}.`);
@@ -316,10 +322,22 @@ async function mcp(args: string[]): Promise<void> {
   let hello: ClientInfo = {};
   const headers = async () =>
     sessionHeaders(await where, agent, heldHere(process.env, cwd, to.key, Date.now(), server), { env: process.env, client: hello, parent: parentOf(process.env, to.key) });
-  const surface = await surfaceOver((ctx) => clientFor(to, headers, ctx.signal));
 
   /* A closed stdout means nobody is left to read the answers. */
   process.stdout.on('error', () => process.exit(0));
+
+  /* SIGNED IN, THE SERVER IS THE HOST'S (`bridge.ts`, AGT-A03): each line goes to its `POST /mcp` with the same session
+     headers, read per request, so a deploy reaches an open session. `--local` keeps the server this command composes
+     for seven nights after the bridge ships, and then goes. A sign-in that ends mid-session is the bridge's to say. */
+  if (values.local !== true) {
+    await serveBridge({ input: process.stdin, output: process.stdout, say: (l) => process.stderr.write(`${l}\n`) }, to, async (client) =>
+      sessionHeaders(await where, agent, heldHere(process.env, cwd, to.key, Date.now(), server), { env: process.env, client, parent: parentOf(process.env, to.key) }),
+    );
+    process.exitCode = 0;
+    setTimeout(() => process.exit(0), 1_000).unref();
+    return;
+  }
+  const surface = await surfaceOver((ctx) => clientFor(to, headers, ctx.signal));
   const ms = budgetOf(process.env);
   /* `to.base` IS THE HOST'S ORIGIN, where it serves the app, so a filed `propose` carries its `decide` link there. */
   await serveStdio(surface, () => ({ signal: AbortSignal.timeout(ms) }), process.stdin, process.stdout, to.base, (said) => {
@@ -397,7 +415,7 @@ async function keysCommand(args: string[]): Promise<void> {
  * the same `AgentIo`, so swapping where `out` goes is the whole of the flag: not one line in a command
  * body asks whether it was given.
  */
-async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'kennel' | 'import' | 'context' | 'session' | 'automations' | 'scripts' | 'verify' | 'people' | 'understand' | 'signs', args: string[]): Promise<void> {
+async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'kennel' | 'import' | 'context' | 'session' | 'automations' | 'scripts' | 'verify' | 'people' | 'understand' | 'signs' | 'feed', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
@@ -415,7 +433,7 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pa
      `import { DatabaseSync } from 'node:sqlite'`, and a static import at the top of this file would load
      it, and Node's `ExperimentalWarning`, before every command this CLI runs, not only these four. */
   const code =
-    which === 'signs' ? await signsCommand(args, io) : which === 'people' ? await peopleCommand(args, io) : which === 'understand' ? await understandCommand(args, io) : which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await (await import('./import.ts')).importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await (await import('./usecase.ts')).usecase(args, io) : which === 'pack' ? await (await import('./catalogue.ts')).pack(args, io) : which === 'kennel' ? await (await import('./kennel.ts')).kennel(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : which === 'verify' ? await verify(args, io) : await pageCommand(args, io);
+    which === 'feed' ? await (await import('./feed.ts')).feedCommand(args, io) : which === 'signs' ? await signsCommand(args, io) : which === 'people' ? await peopleCommand(args, io) : which === 'understand' ? await understandCommand(args, io) : which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await (await import('./import.ts')).importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await (await import('./usecase.ts')).usecase(args, io) : which === 'pack' ? await (await import('./catalogue.ts')).pack(args, io) : which === 'kennel' ? await (await import('./kennel.ts')).kennel(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : which === 'verify' ? await verify(args, io) : await pageCommand(args, io);
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
@@ -532,7 +550,10 @@ async function hook(args: string[]): Promise<void> {
    * the lines after it follow in a fixed order; and it rides the one write `hookStart` makes, the failure line's
    * included, so a quiet resume that writes nothing says nothing of it either.
    */
-  const lapse = which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null;
+  /* AND ONCE A DAY, WHEN THIS COMMAND IS OLDER THAN THE HOST NEEDS, a line saying so under it (`behind.ts`): it never
+     throws, waits at most two seconds and only on the first start of a day, and rides the same one write. */
+  const behind = which === 'start' ? await behindLine({ env: process.env }) : null;
+  const lapse = [which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null, behind].filter((line): line is string => line !== null).join('\n') || null;
   const write = (text: string) => writeFileSync(1, `${lapse === null ? '' : `${lapse}\n`}${text}\n`);
   try {
     let stdin = '';
@@ -680,7 +701,7 @@ try {
   /* AN ADAPTER IMPORT TAKES TWO WORDS OR AN OPTION OF ITS OWN, and any other `import` is a .brainl put back
      (`isAdapterImport`). Asked of the whole line rather than of a position, because both take `--host <h>` anywhere. */
   else if (command === 'import' && !(await import('./import.ts')).isAdapterImport(args)) await brainfileCommand('import', args);
-  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'kennel' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify' || command === 'people' || command === 'understand' || command === 'signs') await agentCommand(command, args);
+  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'kennel' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify' || command === 'people' || command === 'understand' || command === 'signs' || command === 'feed') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);
   /* THE FILE IT REPLACES IS THIS ONE: in the bundle every module is the one file, and from a checkout `build()` says

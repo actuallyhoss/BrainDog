@@ -1,0 +1,8 @@
+{
+  "gate": "no-sample",
+  "rule": "the test fixture in the built app",
+  "expect": "a string of the test fixture",
+  "findings": 1,
+  "total": 1,
+  "why": "THIS BATCH'S THREE NEW GATES, one seed each and nothing else red beside it. `one-clock`: a reader working out a run's state from `last_seen` and the clock. `no-sample`: the test fixture's words in the built app. `public-clean`: a changelog at the root, which is the site's."
+}

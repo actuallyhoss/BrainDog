@@ -306,7 +306,7 @@ export type Proposal = { question: string; body_kind: BodyKind; body: Record<str
 export type Filed = { id: string; joined?: true; widened?: number };
 
 /** The one sentence a rowset that would change nothing is refused with. */
-export const NOTHING_TO_DECIDE = 'Every row already holds this. Nothing to decide.';
+export const NOTHING_TO_DECIDE = 'Everything this asks for is already so. Nothing to decide.';
 
 /** At most this many rows in one `rowset`. Past it, it is an import and wants a different verb. */
 const MAX_ROWS = 200;
@@ -479,11 +479,20 @@ function heldFields(deps: GovernDeps, register: string, at: string): Record<stri
  * A ROWSET THAT NAMES ROWS THE OPEN ONE LACKS ADDS THEM TO IT, when both causes are derived, they are about one list,
  * share at least one row asked for word for word, and ask nothing different of any row both name. A cause its filer
  * set is never widened or widened into: the filer said what the question is about, and this would be guessing.
+ *
+ * A JOIN IS WRITTEN DOWN, as one note on the question by the agent that joined (`JOINED`), so the question is known to
+ * be shared: `withdraw` reads it and keeps the question open for the owner. Before this nothing was written, and the
+ * opener taking its question back took the joiner's with it. The opener asking again, or a later run of its key, is
+ * the same agent and writes nothing; an agent joining twice writes once.
  */
 function askedAlready(deps: GovernDeps, by: string, p: Proposal, body: Record<string, unknown>, cause: string | null): Filed | null {
   if (cause !== null) {
-    const held = deps.sql.one<{ id: string }>("SELECT id FROM suggestion WHERE status = 'open' AND cause = ?", cause);
-    if (held) return { id: held.id, joined: true };
+    const held = deps.sql.one<{ id: string; opened_by: string }>("SELECT id, opened_by FROM suggestion WHERE status = 'open' AND cause = ?", cause);
+    if (held) {
+      if (!sameAgent(deps.sql, held.opened_by, by) && joinersOf(deps.sql, held.id).every((j) => !sameAgent(deps.sql, j, by)))
+        event(deps, instant(deps.nowMs), by, 'note', `suggestion:${held.id}`, 'suggestion', JOINED, 'Asked the same thing too, and joined this question instead of asking again.');
+      return { id: held.id, joined: true };
+    }
   }
   if (p.body_kind !== 'rowset' || p.cause !== undefined || cause === null) return null;
 
@@ -509,8 +518,8 @@ function askedAlready(deps: GovernDeps, by: string, p: Proposal, body: Record<st
     if (widerCause !== null && deps.sql.one('SELECT 1 AS y FROM suggestion WHERE status = ? AND cause = ? AND id <> ?', 'open', widerCause, q.id)) continue;
     const kind = stampOf(kindsOfProposal('rowset', wider, recordReader(deps.sql, q.opened_by)));
     deps.sql.exec('UPDATE suggestion SET body = ?, cause = ?, kind = ? WHERE id = ?', JSON.stringify(wider), widerCause, kind, q.id);
-    const more = lacking.length === 1 ? 'One more row was' : `${lacking.length} more rows were`;
-    event(deps, instant(deps.nowMs), by, 'note', `suggestion:${q.id}`, 'suggestion', String(lacking.length), `${more} asked about the same way, and added to this question.`);
+    const more = lacking.length === 1 ? 'one more thing, and added it' : `${lacking.length} more things, and added them`;
+    event(deps, instant(deps.nowMs), by, 'note', `suggestion:${q.id}`, 'suggestion', String(lacking.length), `Asked the same of ${more} to this question.`);
     return { id: q.id, joined: true, widened: lacking.length };
   }
   return null;
@@ -534,6 +543,10 @@ const RUN_ID = /^S([1-9]\d*)$/u;
  * answering it, and answering is the owner's. A question already answered or merged is not withdrawn;
  * one put off is still open, and is.
  *
+ * NOT ONCE ANOTHER AGENT HAS JOINED IT. A question another agent asked too is that agent's ask as well, and taking it
+ * back would close an ask nobody took back: it stays open for the owner, and the opener is told so. With no join it is
+ * withdrawn as before.
+ *
  * IT CLOSES AS `withdrawn`, which is neither a yes nor a no: no decision is written, the ladder does not count it
  * against the agent as it counts `incorrect`, and the line in history says who took it back.
  */
@@ -545,10 +558,37 @@ export function withdraw(sql: Sql, deps: Pick<GovernDeps, 'mint'>, id: string, b
     return no<Out>('TRANSITION_ILLEGAL', `${id} is already closed as ${row.resolved_as ?? row.status}, so there is nothing to take back.`, { at: 'id' });
   if (!mayWithdraw(sql, row.opened_by, by))
     return no<Out>('FORBIDDEN', `${id} was asked by another agent, so only that agent can take it back. Otherwise it waits for the owner's answer.`, { at: 'id' });
+  if (joinersOf(sql, id).some((j) => !sameAgent(sql, row.opened_by, j) && !sameAgent(sql, by, j)))
+    return no<Out>('FORBIDDEN', 'Another agent asked the same thing, so it stays open for the owner.', { at: 'id' });
   const at = instant(nowMs);
   sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'withdrawn' WHERE id = ? AND status = 'open'", id);
   event({ sql, mint: deps.mint }, at, by, 'resolve', `suggestion:${id}`, 'suggestion', 'withdrawn', 'Taken back by the agent that asked it.');
   return ok({ id, state: 'withdrawn' });
+}
+
+/** What a join note holds in `to_v`, so a join is told from any other note on the question. */
+const JOINED = 'joined';
+
+/**
+ * Who joined a question: each actor of a join note, or of a widening note (whose `to_v` is the count of rows it added,
+ * so a widening is a join too). Other notes on a question, such as an answer the door could not carry out, are not.
+ */
+function joinersOf(sql: Sql, id: string): string[] {
+  return sql
+    .all<{ actor: string }>(
+      "SELECT DISTINCT actor FROM event WHERE kind = 'note' AND target = ? AND (to_v = ? OR to_v GLOB '[1-9]*') ORDER BY actor",
+      `suggestion:${id}`,
+      JOINED,
+    )
+    .map((r) => r.actor);
+}
+
+/** Whether two actors are one agent: the same actor, or two runs of the same key. */
+function sameAgent(sql: Sql, a: string, b: string): boolean {
+  if (a === b) return true;
+  if (!RUN_ID.test(a) || !RUN_ID.test(b)) return false;
+  const key = tokenOfRun(sql, a);
+  return key !== null && tokenOfRun(sql, b) === key;
 }
 
 /** Whether `by` is the run that opened a question, or a later run of the same key. */

@@ -1,0 +1,7 @@
+{
+  "gate": "guards",
+  "rule": "a report route that spends no budget",
+  "expect": "spends no reportBudget",
+  "findings": 1,
+  "why": "AND THE ONE ROUTE A KEY OUTSIDE ANY BROWSER CALLS AS OFTEN AS IT LIKES: `report` spending no budget, and the number the record enforces moved away from `budgets.json`'s `report.rowsPerMinute`. One each, so both halves are proved."
+}

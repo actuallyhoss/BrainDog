@@ -32,7 +32,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
-  import { areaOf, boardRail, boxesOf, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, slotOf, snapped, splitAreas, sticks, widened, type Run } from './layout.ts';
+  import { areaOf, boxesOf, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, railDrawn, slotOf, snapped, splitAreas, sticks, widened, type Run } from './layout.ts';
   import { arranged, emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
@@ -312,9 +312,12 @@
    */
   const runsOf = (list: Laid[]): Run<Laid>[] => (arranging ? [{ box: false, items: list }] : boxesOf(list, (x) => x.block));
 
-  /** Whether each column draws anything: a column whose every block said no to `when:` is not drawn, as an empty one is not. */
-  const mainShown = $derived(mainRest.some((x) => x.block.drawn));
-  const railShown = $derived(railRest.some((x) => x.block.drawn));
+  /**
+   * HOW WIDE EACH COLUMN IS DRAWN, `0` for one not drawn: a column whose every block said no to `when:` is not drawn, as
+   * an empty one is not, and the other takes the board (`layout.ts` `railDrawn`, which the rule sheet's Layout page holds).
+   */
+  const columns = $derived(railDrawn(layout, [...mainRest, ...railRest].map((x) => ({ area: x.slot.area, drawn: x.block.drawn }))));
+  const railShown = $derived(columns.rail > 0);
 
   /* THE PAGE'S OWN ELEMENT, declared before the effects that read it: a `$effect.pre` runs while the component is
      still being set up, and reading a `let` the script has not reached yet is a TDZ error that blanks the page. */
@@ -1042,7 +1045,7 @@
     <div
       class="area"
       data-area="main"
-      style="--area-span:{railShown ? boardRail(layout).main : COLUMNS}"
+      style="--area-span:{columns.main}"
       role={arranging ? 'list' : undefined}
       aria-label={arranging ? copy.mainColumn : undefined}
     >
@@ -1056,7 +1059,7 @@
     <div
       class="area"
       data-area="rail"
-      style="--area-span:{mainShown ? boardRail(layout).rail : COLUMNS}"
+      style="--area-span:{columns.rail}"
       data-sticky={stuck ? '' : undefined}
       role={arranging ? 'list' : undefined}
       aria-label={arranging ? copy.sideRail : undefined}

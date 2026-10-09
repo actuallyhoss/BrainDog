@@ -1,0 +1,6 @@
+{
+  "gate": "router-groups",
+  "rule": "a host method routed outside INTERNAL",
+  "expect": "INTERNAL is the host's own surface|puts it in INTERNAL",
+  "findings": 2
+}

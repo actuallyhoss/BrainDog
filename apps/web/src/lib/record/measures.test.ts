@@ -38,6 +38,16 @@ test('one reading a day, the last; the period and the one before; newest measure
   assert.equal(periodOf(90), 90);
 });
 
+/* THE FIFTH COLUMN IS THE MONEY SLOT (money-readings, batch 40): the web read four columns and never passed `amount`, so a
+   block worked out here ignored a reading kept as money though the kernel reads it. */
+test('a reading kept as money is read from the fifth column, in major units and its own currency', () => {
+  const rows = [{ fields: { name: 'Revenue', at: day(17), value: null, unit: '', amount: { amount: 412_550, currency: 'GBP' } } }];
+  const [revenue] = measuresOf(rows, [...FIELDS, 'amount'], NOW, 7, 'Numbers', { tz: 'UTC' });
+  assert.equal(revenue!.unit, 'GBP');
+  assert.equal(revenue!.now.at(-1), 4125.5);
+  assert.deepEqual(measuresOf(rows, FIELDS, NOW, 7, 'Numbers', { tz: 'UTC' }).flatMap((m) => m.now.filter((v) => v !== null)), [], 'four columns leave the money unread');
+});
+
 test('a tile says the newest figure, the change against the period before, and draws the period as its line', () => {
   const rows = [point('Revenue', 4200, day(17), 'GBP'), point('Revenue', 3900, day(10), 'GBP')];
   const [m] = measuresOf(rows, FIELDS, NOW, 7, 'Numbers', { tz: 'UTC' });

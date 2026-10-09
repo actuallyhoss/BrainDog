@@ -503,6 +503,16 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
     if (fault) return bad('DECLARATION_INVALID', `${id}: ${fault}.`, 'value');
     if (body.bucket !== undefined)
       return bad('DECLARATION_INVALID', `${id} is grouped by a field of its accounts, never cut into buckets of days.`, 'bucket');
+    /* THE OLDEST DAY IS HELD AS A NUMBER OF DAYS SINCE 1970, as a walk's zero_on is, so it is drawn as a day and nothing
+       else is: as money it reads as twenty thousand of a currency, and money or a count drawn as a day is 1970. */
+    const reads = (body.value as { rolled: Rolled }).rolled.read;
+    if ((reads === 'as_of') !== (body.format === 'day'))
+      return bad(
+        'DECLARATION_INVALID',
+        reads === 'as_of' ? `${id} names the day its oldest balance was stated, so its format is day.` : `${id} adds up money or counts, and only the day a balance was stated (read: as_of) has format: day.`,
+        'format',
+        reads === 'as_of' ? ['day'] : undefined,
+      );
   }
 
   /* A FIGURE OVER THE WALK AHEAD reads the legs it names, and nothing a list-reading figure writes. */
@@ -867,10 +877,11 @@ const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
    stands ready. `runs_on` is a project's keys, tools, skills and actions; `deadlines` is every row due soon and
    `figures.home` the figures that ask a place on Home. `governance.later` is what was put off, soonest back first, and
    `governance.decided` what was answered, latest first. `sessions.working` is the runs working now, helpers folded under
-   the run that started them, by the one clock in `presence.ts`. */
+   the run that started them, by the one clock in `presence.ts`. `signs` is every sign the record reads, red first.
+   `handoffs.open` is the next steps runs left and nobody has taken, newest first. */
 const COMPUTED_SOURCES = [
   'forecast.runway', 'activity', 'sessions.live', 'sessions.working', 'actions', 'governance.open', 'governance.later',
-  'governance.decided', 'runs_on', 'deadlines', 'figures.home',
+  'governance.decided', 'runs_on', 'deadlines', 'figures.home', 'signs', 'handoffs.open',
 ] as const;
 
 /** A metric id as a page says it: `project-owed:Kiln` is one document read about one project. */
@@ -2777,6 +2788,17 @@ function actionFault(decl: Declaration, channel: 'call' | 'poll', installed?: Kn
        nowhere changes nothing anybody can see. */
     if (typeof body.writes?.register !== 'string')
       return bad('DECLARATION_INVALID', `${id} is a poll and writes to no register, so a changed answer would reach no rule.`, 'writes.register');
+    /* EVERY FIELD IT MAPS IS ONE THE REGISTER HAS, checked when the record can see the register. A money measure on a
+       Numbers list with no `amount` installed, ran `ok` and "the answer changed", and wrote no reading at all. */
+    const shape = installed?.get(`register.${body.writes.register}`);
+    const map = (decl.body as { map?: unknown }).map;
+    if (shape !== undefined && map !== null && typeof map === 'object') {
+      const fields = new Set(((Array.isArray(shape.fields) ? shape.fields : []) as { id?: unknown }[]).map((f) => f?.id));
+      for (const [i, entry] of (Array.isArray(map) ? map : [map]).entries())
+        for (const key of entry !== null && typeof entry === 'object' ? Object.keys(entry) : [])
+          if (!fields.has(key))
+            return bad('FIELD_UNKNOWN', `${id} maps ${key}, and ${body.writes.register} has no field called ${key}.`, Array.isArray(map) ? `map[${i}].${key}` : `map.${key}`);
+    }
     return null;
   }
 
@@ -6611,3 +6633,15 @@ export function writePackConfig(
     said: `Saved ${listed(changed)} for ${id}. ${changed.length === 1 ? 'It is' : 'They are'} read the next time ${id} is planned and installed.`,
   });
 }
+
+/**
+ * EVERY VALUE THE GRAMMAR ITSELF NAMES, joined from the lists above: a format, a bucket, a tone, a channel, a card's
+ * role, a computed source and the rest. A word here is the product's and never a person's, so a shape copy keeps it
+ * (`shape.ts`): scrambled, `format: days` in his own declaration read as no format, and the look on the scratch record
+ * refused the figure.
+ */
+export const GRAMMAR_VALUES: readonly string[] = [
+  ...CHANNELS, ...FORMATS, ...COMPARE, ...BUCKETS, ...CARD_ROLES, ...TONES, ...COMPUTED_SOURCES, ...LOOK_LISTS,
+  ...CHANNELS_IN, ...SIGNED_KINDS, ...ACTION_PLACEHOLDERS, ...TIME_FORMATS, ...CALL_TRIGGERS, ...ANCHORS,
+  ...FETCH_FORMATS, ...REPEAT_READ, ...HAND_PARTS, ...WIDEN, ...SAME,
+];

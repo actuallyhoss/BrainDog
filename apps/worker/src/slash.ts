@@ -60,6 +60,7 @@ import { slashAskDoor, type SlashAskDoor } from '@braindog/host';
 import type { SlashAnswer } from '@braindog/host/slash-answers';
 import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SlashModel } from '@braindog/record';
+import { PLANS, PLAN_TABLE, type Plan } from '@braindog/record/plans';
 import type { Slash } from '@braindog/slash';
 
 import { keyOpener } from './actions.ts';
@@ -584,6 +585,7 @@ const planCapOf = (sql: Sql): number | null => {
  * Worker load it only once an engine is being built.
  */
 const planMoved = (slash: Pick<typeof import('@braindog/slash'), 'ASK_CAP_FREE' | 'ASK_CAP_DEFAULT'>, sql: Sql, plan: string): void => {
+  planAgents(sql, plan);
   if (!slashStored(sql)) return;
   const held = planCapOf(sql);
   sql.transactionSync(() => {
@@ -601,13 +603,50 @@ const planMoved = (slash: Pick<typeof import('@braindog/slash'), 'ASK_CAP_FREE' 
   });
 };
 
+/* ── the plan's agents ─────────────────────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Where the record's kernel reads the plan's count of agents (`AGENTS_KEY` in `packages/kernel/src/token.ts`): one row of
+ * `host_meta`, a table of this host's that no `.brain` carries, so a record taken to a self-host leaves its cap behind.
+ * The kernel names the same table and key; `token-agents.test.ts` writes the row as this does.
+ */
+export const PLAN_AGENTS = 'plan.agents';
+
+/** The plan a record moves up to from each, for the refusal's way on: Free to Cloud, Cloud to Cloud Plus, none above. */
+const NEXT_PLAN: Readonly<Record<Plan, Plan | null>> = { free: 'hosted', hosted: 'plus', plus: null, selfhost: null };
+
+/**
+ * A record's count of agent keys, moved with its plan (LCH-A08): `PLAN_TABLE`'s `agents`, its name and the plan above it,
+ * which `createToken` reads where every key is minted. A plan with no count, or one this table does not know, takes the
+ * row away, and absent is no cap.
+ *
+ * WRITTEN WHETHER OR NOT SLASH HAS BEEN ASKED, unlike the asks above: the count holds at the first key, and a record
+ * that never asked Slash still mints keys. Nothing is revoked by a move down; the kernel only stops the next mint.
+ */
+export function planAgents(sql: Sql, plan: string): void {
+  const known = (PLANS as readonly string[]).includes(plan) ? (plan as Plan) : null;
+  sql.exec('CREATE TABLE IF NOT EXISTS host_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+  if (known === null || PLAN_TABLE[known].agents === null) {
+    sql.exec('DELETE FROM host_meta WHERE key = ?', PLAN_AGENTS);
+    return;
+  }
+  const next = NEXT_PLAN[known];
+  sql.exec(
+    'INSERT INTO host_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
+    PLAN_AGENTS,
+    JSON.stringify({ agents: PLAN_TABLE[known].agents, plan: PLAN_TABLE[known].name, next: next === null ? null : PLAN_TABLE[next].name }),
+  );
+}
+
 /**
  * The record's plan has moved: billing put it on Free, or it was paid for (`Record$.planMoved` in `index.ts`).
  *
- * NOTHING TO DO WHERE SLASH HAS NOT BEEN ASKED, and the package is not loaded for it: the store is made on the first
- * build, which reads the plan itself. Where it has, the package was already loaded to make it.
+ * THE COUNT OF AGENTS MOVES FIRST, ALWAYS (`planAgents`). The asks have nothing to move where Slash has not been asked,
+ * and the package is not loaded for them: the store is made on the first build, which reads the plan itself. Where it
+ * has, the package was already loaded to make it.
  */
 export async function slashPlanMoved(sql: Sql, plan: string): Promise<void> {
+  planAgents(sql, plan);
   if (!slashStored(sql)) return;
   planMoved(await import('@braindog/slash'), sql, plan);
 }

@@ -98,4 +98,18 @@
   a.capture-where:focus-visible {
     color: var(--ink);
   }
+
+  /* AND UNDER A THUMB THE DOOR IS A 44px TARGET, though its words are one line: `.tap`'s invisible box grown round it,
+     so the line keeps its look (Money's "Add to balances" under Last confirmed measured 110x19). */
+  @media (pointer: coarse) {
+    a.capture-where {
+      position: relative;
+    }
+
+    a.capture-where::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
+    }
+  }
 }

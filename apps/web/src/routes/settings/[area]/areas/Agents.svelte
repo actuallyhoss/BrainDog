@@ -153,7 +153,7 @@
     scope: { read: 'can read', propose: 'can propose', write: 'can write' } as Record<string, string>,
     /* A GRANT THAT IS NOT A KEY'S SCOPE says what it may do in its own two words, and the sentence under its name says
        for how long; a one-time grant is "once", which is the whole of what makes it one. */
-    grant: { login: 'can sign in', runner: 'can run work', vault: 'can open keys', vaultAll: 'can open keys' } as Record<string, string>,
+    grant: { login: 'can sign in', runner: 'can run work', vault: 'can open keys', vaultAll: 'can open keys', shape: 'can take scrambled copies' } as Record<string, string>,
     once: 'once',
     report: 'sends numbers',
     allAtWork: 'all at work now',

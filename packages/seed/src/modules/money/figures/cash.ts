@@ -130,12 +130,19 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /**
+   * THE OLDEST DAY A BALANCE IN CASH NOW WAS LAST CONFIRMED, SINCE money-core 3.16.0 (REC-B03), AND IT WAS THE OLDEST
+   * TYPED "As of" (`min: as_of`). A bank message writes a balance after on a Ledger row and never the account's typed
+   * day, so on the owner's record every account read out of date and went on reading it after messages filed. Now the
+   * day is read off the same statements Cash now restarts from (`rolled.read: as_of`): the account's own, a balance
+   * check, or a movement that printed the balance after it. Held as whole days since 1970, so its format is a day.
+   */
   'cash-as-of': {
     metric: 'cash-as-of',
     name: 'Oldest balance',
     source: 'register.accounts',
     where: 'liquid is true',
-    value: { min: 'as_of' },
+    value: { rolled: { ...ROLLED.rolled, read: 'as_of' } },
     format: 'day',
     target: { gte: 0 },
     window: '30d',
@@ -143,17 +150,37 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
   },
 
   /**
-   * HOW MANY OF CASH NOW'S BALANCES ARE MORE THAN A WEEK OLD, SINCE money-core 3.3.0: the week `cash-stale` tells about,
-   * over the accounts Cash now reads. What the Money page's "Out of date" note is drawn under (`when:`).
+   * HOW MANY OF CASH NOW'S BALANCES ARE MORE THAN A WEEK OLD, SINCE money-core 3.3.0: what the Money page's Heads up line
+   * and its Last confirmed tile are drawn under (`when:`). READ OFF THE ROLL SINCE money-core 3.16.0 (`read: stale`), as
+   * `cash-as-of` is, where it counted typed days (`as_of before -7d`). An account no statement ever confirmed counts, so
+   * it is never quietly fresh.
    */
   'balances-stale': {
     metric: 'balances-stale',
     name: 'Balances over a week old',
     source: 'register.accounts',
-    where: 'liquid is true, as_of before -7d',
-    value: { count: 'id' },
+    where: 'liquid is true',
+    value: { rolled: { ...ROLLED.rolled, read: 'stale', after: '7d' } },
     format: 'int',
     target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * EACH ACCOUNT'S LAST CONFIRMED DAY, SINCE money-core 3.16.0 (REC-B03): the same roll grouped by the name the account
+   * is called, one day a group. It is what an account card's `stale: { figure }` reads (`staleDaysOf` in
+   * `packages/kernel/src/pages.ts`), so a card is dated by the bank's last word on it and not by the day somebody typed.
+   * Every account and not only cash: a book's cards and Money's Last confirmed tile both find their day here.
+   */
+  'account-ages': {
+    metric: 'account-ages',
+    name: 'Last confirmed, by account',
+    source: 'register.accounts',
+    value: { rolled: { ...ROLLED.rolled, read: 'as_of' } },
+    group_by: 'name',
+    format: 'day',
+    target: { gte: 0 },
     window: '30d',
     compare: 'none',
   },

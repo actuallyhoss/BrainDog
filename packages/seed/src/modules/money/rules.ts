@@ -20,26 +20,11 @@ export const MONEY_RULES: Record<string, SeedRule> = {
     then: [{ suggest: { question: '{{what}} was due {{ago:due}}, {{money:amount}}. Chase it?', options: ['Chase it', 'Not yet'] } }],
     once_per: ['entry', 'due'],
   },
-  /**
-   * A BALANCE MORE THAN A WEEK OLD IS TOLD, SINCE money-core 3.1.0, AND IT WAS A QUESTION IN DECIDE.
-   *
-   * The question's only useful answer was typing a number, which Decide has no box for: "Update it" closed the question
-   * and left the balance as old as it was. The number is typed where the account is, and the Money page already says a
-   * balance is out of date (its "Out of date" note over `balances-stale` since 3.3.0, and a book's Accounts cards,
-   * `stale:`). So this tells instead of asking: a notification that is not urgent is a note on the account signed by the
-   * rule and nothing else (`packages/kernel/src/rules.ts`), which History reads, once for each day a balance was set
-   * (`once_per`). NO DIGEST READS
-   * IT: a digest reads the lists and figures its declaration names (`sectionsOf` in `packages/kernel/src/digest.ts`),
-   * and money-core declares none.
-   */
-  'cash-stale': {
-    rule: 'cash-stale',
-    pack: 'money-core',
-    register: 'accounts',
-    when: 'as_of before -7d',
-    then: [{ notify: { say: 'The balance of {{name}} was last set {{ago:as_of}}.' } }],
-    once_per: ['entry', 'as_of'],
-  },
+  /* A BALANCE MORE THAN A WEEK OLD WAS TOLD BY `cash-stale`, FROM money-core 3.1.0 TO 3.15.0, a note on the account each
+     time its typed "As of" passed a week. It read the typed day, which a bank message never writes, so on the owner's
+     record it told of every account and would have gone on telling after messages filed. It goes at money-core 3.16.0
+     (REC-B03): Money's Heads up names how old the oldest balance is from the roll's own day (`cash-as-of`), its Last
+     confirmed tile dates each account by its newest statement (`account-ages`), and `statement-oldest-days` is the sign. */
   /**
    * THE ONE RULE HERE THAT ACTS, and it acts because there is nothing to decide.
    *

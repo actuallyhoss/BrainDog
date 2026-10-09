@@ -1316,6 +1316,7 @@ test('NO FOURTH LIST: nothing outside two named places decides for itself what a
   const MANY = 20;
   const LIST_ALLOWED = new Map([
     ['apps/web/test/measures-currency.test.ts', 'the drawing test, which asserts on a spread of codes on purpose'],
+    ['packs/stripe/stripe.test.ts', "Stripe's own page of zero-decimal, three-decimal and special units, each held against the script's table"],
   ]);
 
   const TENDER = new Set(Intl.supportedValuesOf('currency'));

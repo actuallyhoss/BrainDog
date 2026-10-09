@@ -149,8 +149,12 @@ function readAll(k: Kernel): Map<string, Read> {
 
 const isMoney = (f: Figure): boolean => f.format === 'money' || (f.format ?? '').startsWith('money.');
 
-/** A figure that reads money and answers something else: how many days it lasts, or the day it runs out. */
-const readsMoney = (f: Figure): boolean => /"(walk|rolled)"/.test(JSON.stringify(f.value ?? null));
+/**
+ * A figure that reads money and answers something else: how many days it lasts, or the day it runs out. A rolled figure
+ * that reads an age (`rolled.read`, money-core 3.16.0) reads the balances' days and never their money.
+ */
+const readsMoney = (f: Figure): boolean =>
+  /"(walk|rolled)"/.test(JSON.stringify(f.value ?? null)) && (f.value as { rolled?: { read?: unknown } } | null)?.rolled?.read === undefined;
 
 /* ── what a right answer is ───────────────────────────────────────────── */
 

@@ -200,12 +200,19 @@ const GATES = [
      checks the gate it lands on, presses the count and checks it reaches Decide. Its own ephemeral
      port, for the reason `passkey` has one. */
   ['queue', call(join(here, 'queue.mjs'))],
+  /* AND THE SAME SIGN-IN ON THE HOST THAT WAS DEPLOYED, with the canary's own passkey (PRF-A09). Here there is no
+     CANARY_PASSKEY, so it runs on a fresh self-host and says "self-host only"; `after-deploy.yml` runs it against
+     the deployed host. Its own ephemeral port, for the reason `passkey` has one. */
+  ['signin-live', call(join(here, 'signin-live.mjs'))],
   /* AFTER EVERYTHING, BECAUSE IT IS THE ONLY ONE THAT MEASURES SOMETHING OUTSIDE THIS REPOSITORY
      (52 §3; 51 §5.17). The thirty above ask whether the tree is right; this asks whether the
      tree is what the internet is serving, which is a question only `deploy.yml` is in a position to
      ask. Everywhere else it exits 3 and is named in `--allow-skip`. It is last for the same
      reason `layout` and `a11y` are: a run that fails earlier should not have deployed. */
   ['deploy-parity', call(join(here, 'deploy-parity.mjs'))],
+  /* THE RULE SHEET ON A PROOF RECORD (PGS-B01): every rule of a block, a value and a layout, read at 390 and 1440. Last,
+     beside deploy-parity, because it too reads what the internet serves. */
+  ['rule-sheet', call(join(here, 'rule-sheet.mjs'))],
 ];
 
 /**
@@ -330,6 +337,15 @@ const NEEDS = {
     what: 'the builds it reads, each found and named by the gate itself',
     how: 'pnpm --filter @braindog/web build && pnpm --filter @braindog/site build',
     built: true,
+  },
+  /* A PROOF RECORD, the second prerequisite that is not a file: `rule-sheet` reads the pages of a record made through the
+     public sign-up with Rule sheet installed, which only the proof area has after a deploy. The app is at `/app` on every
+     host, and which record opens is the signed-in state's, so the address names no record. */
+  proof: {
+    unmet: () => (process.env.PROOF_RECORD ? null : 'PROOF_RECORD is not set'),
+    what: "PROOF_RECORD naming a proof record's app address with Rule sheet installed, and PROOF_STATE the signed-in browser state the proof harness saved",
+    how: 'PROOF_RECORD=<https://host/app> PROOF_STATE=<file> node tools/gates/run.mjs --only rule-sheet',
+    built: false,
   },
 };
 
@@ -595,7 +611,7 @@ if (costed.length) {
  * process, and the process ending hands all of it back; a called one that throws would take this
  * runner and every gate after it down with it, so the call is wrapped and a throw is that gate's
  * failure. A handle is the part no wrapper can fix from out here: a server left on
- * `budgets.json`'s `layout.port` is the next gate failing to bind, and a browser left running is a
+ * a port is the next gate failing to bind, and a browser left running is a
  * runner that never exits. So each of those gates closes what it opened on every path out of itself,
  * including its early returns, and each one's header says so where somebody editing it will read it.
  *

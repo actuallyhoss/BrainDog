@@ -141,8 +141,18 @@ const HELD = {
     why: 'block kinds called `agents` and `steps`, which are not the lists.',
   },
   'apps/web/src/lib/copy/decide.ts': {
-    ids: ['choices', 'things'],
-    why: 'the plural words of two counted sentences, "Drawn from 3 things that came in" and "adds 2 choices", which are English and not the lists.',
+    ids: ['choices', 'things', 'updates'],
+    why: 'the plural words of three counted sentences, "Drawn from 3 things that came in", "adds 2 choices" and an arrangement\'s "2 updates", which are English and not the lists.',
+  },
+  /* AN ARRANGEMENT'S PARTS (arranged-needs, batch 40): what the owner is asked to pick is the `choices` part, drawn under
+     "Your choices", and never Ask Slash's list. */
+  'apps/web/src/routes/decide/[id]/arranged.ts': {
+    ids: ['choices'],
+    why: "the `choices` part of an arrangement, the questions it asks the owner to pick an answer to, which is not the list.",
+  },
+  'apps/web/src/routes/decide/[id]/Arranged.svelte': {
+    ids: ['choices'],
+    why: "the `choices` part of an arrangement, drawn and folded by that name, which is not the list.",
   },
   'apps/web/src/lib/record/block-edit.ts': {
     ids: ['agents', 'steps'],

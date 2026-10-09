@@ -553,8 +553,14 @@ export default function graph(
    * nothing is the hole the next edge walks through. Only while both ends are in the tree, so a seeded
    * fixture without them has nothing to say about it.
    */
-  /* EMPTY SINCE the rates form was made a preset of the new-action sheet, so `apps/web` names no pack. */
-  const PACK_EDGES_HELD = {};
+  /* BACK SINCE the rates form became a preset of the new-action sheet (`apps/web/src/lib/record/action-draft.ts`), which
+     reached the pack by a relative path the edge check could not see: a declared dependency it can. */
+  const PACK_EDGES_HELD = {
+    'web pack-rates-poll':
+      "the new-action sheet's rates preset fills `packs/rates-poll/rates-poll.pack.json` with the pack's `fillRates`, as the rates form did (M3 B7).",
+    'cli pack-live-feed':
+      "`braindog feed propose` builds each feed in a person's setup file with the add-on's own `fillFeed` over `packs/live-feed/live-feed.pack.json` (REC-C01).",
+  };
   const held = new Set();
 
   for (const e of [...edges.values()].sort((a, b) => `${a.from}${a.to}`.localeCompare(`${b.from}${b.to}`))) {

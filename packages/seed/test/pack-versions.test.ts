@@ -1384,28 +1384,31 @@ const DECLARED: Record<string, Version> = {
   },
   'money-core@3.16.0': {
     holds: `
-      metric.arriving-30d metric.balances-stale metric.book-cash metric.book-spent-month metric.books-held metric.cash-accounts
+      metric.account-ages metric.arriving-30d metric.balances-stale metric.book-cash metric.book-spent-month metric.books-held metric.cash-accounts
       metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-now metric.chasing metric.days-late-in metric.due-30d
       metric.currencies-held
       metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.in-30d
       metric.in-by-month metric.in-due-by-month metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d
-      metric.ledger-newest-days metric.ledger-rows-7d
+      metric.ledger-newest-days metric.ledger-rows-7d metric.nights-missed-30d
       metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
       metric.owed-to-you metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
       metric.project-out-month metric.project-owed metric.received-30d metric.runs-out-on metric.runway-days metric.spent-30d
-      metric.spent-by-category-month metric.txn-uncategorised metric.uncategorised-share-30d
+      metric.spent-by-category-month metric.statement-oldest-days metric.txn-uncategorised metric.uncategorised-share-30d
       page.money page.money-book
       register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
       register.recurring register.snapshots register.transactions
-      rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
+      rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
       rule.recurring-stopped rule.txn-categorise
       setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
-      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '1fdf9a3fd619ac95',
+    declares: 'a8ac310c2f6ef805',
     history: [
       "Three more signs are declared, read by the kernel's new words: `ledger-newest-days` (age of the newest cleared row), `currencies-held` (currencies of the accounts' balances) and `uncategorised-share-30d` (money out with no category, 30 days) -> 1fdf9a3fd619ac95",
+      "Folded into the unreleased 3.16.0 (batch 40): paydays (`recurring.day_of_month`, `recurring.weekend`, the `rest_days` setting and the leg naming both), `statement-oldest-days` (`rolled.read: age`) and `nights-missed-30d` (`series.cash-now`, once a kept line names its figure's lists) -> 978bc6c517e65459",
+      "Then batch 42's step, first written as 3.17.0: a balance's age is the bank's last word (REC-B03): `cash-as-of` and `balances-stale` read the roll (`read: as_of`, `read: stale`), `account-ages` dates each account for the cards' `stale: { figure }`, `page.money` gains Last confirmed in Heads up, `page.money-book`'s cards read it, and `rule.cash-stale` goes; a row's currency comes from its account (REC-B04): `currency_from` on the Ledger's `amount`, `available` and `balance_after`, a balance check's `balance` and an instalment's `amount`, and `currency_fixed` on the Ledger's `amount` -> 2a1dd29a7593062b",
+      "Folded into the one unreleased 3.16.0 (integrate 41-42): 3.17.0 above is no version of its own; a repeating line's `amount` declares `currency_from`, `day_of_month` is labelled Days of the month, and Money requires `register.balances` and draws What it holds today under Last confirmed -> a8ac310c2f6ef805",
     ],
   },
   'work@1.17.0': {
@@ -1435,6 +1438,19 @@ const DECLARED: Record<string, Version> = {
     declares: '5efd4fdc89f4f515',
     history: [
       "`page.people` draws each person once, on Everyone's cards with the day they were last in touch: the two tables over them, Gone quiet and Last in touch, are gone, and `people-in-touch-90d` stays declared and draws nothing -> 5efd4fdc89f4f515",
+    ],
+  },
+  'people@3.3.0': {
+    holds: `
+      metric.organisations-count metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-in-touch-90d
+      metric.people-quiet
+      page.health page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: 'd3d856a65e4d2519',
+    history: [
+      "`page.health` is added: the record's vital signs by state, from the kernel's signs source and the figures signs-red and green-days -> d3d856a65e4d2519",
     ],
   },
 };

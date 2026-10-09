@@ -12,12 +12,16 @@
  * - `uncategorised-share-30d`, of 30 days' money out the share with no category: `{ empty: 'category' }` per every row,
  *   both halves over the one `where`.
  *
- * `nights-missed-30d` (`series.cash-now` read as `{ count: 'missing' }`) WAITS: the kernel reads it, but `figureLists`
- * (`money-figures.ts`) names no list for a `series.` source, so a member invited to one list would be shown how many
- * nights the cash line missed, a line over lists she cannot read. It comes once a series names its figure's lists.
+ * TWO MORE IN THE SAME 3.16.0, which was never released:
+ * - `statement-oldest-days`, how many days old the oldest liquid account's balance is, read from the newest statement
+ *   each account restarts from (`rolled.read: 'age'`, REC-B03), so a bank message's balance after counts.
+ * - `nights-missed-30d`, of the last 30 nights how many kept no point on the cash line (`series.cash-now` read as
+ *   `{ count: 'missing' }`). It waited until `figureLists` (`money-figures.ts`) named the lists Cash now reads for its
+ *   line, so a member who may not see Cash now is not shown how many nights it missed either.
  */
 
 import type { SeedMetric } from '../../base.ts';
+import { ROLLED } from '../legs.ts';
 
 export const SIGNS_FIGURES: Record<string, SeedMetric> = {
   /**
@@ -78,6 +82,36 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
     value: { ratio: { of: { empty: 'category' }, per: { count: 'id' } } },
     format: 'pct',
     target: { lte: 0.2 },
+    window: '30d',
+    compare: 'none',
+  },
+  /**
+   * HOW MANY DAYS OLD THE OLDEST BALANCE IS, over the accounts Cash now adds up. A week or less is kept; an account no
+   * statement ever confirmed reads nothing, never nought, as it has no day to be old from.
+   */
+  'statement-oldest-days': {
+    metric: 'statement-oldest-days',
+    name: 'Oldest balance',
+    source: 'register.accounts',
+    where: 'liquid is true',
+    value: { rolled: { ...ROLLED.rolled, read: 'age' } },
+    format: 'days',
+    target: { lte: 7 },
+    window: '30d',
+    compare: 'none',
+  },
+  /**
+   * OF THE LAST 30 NIGHTS, HOW MANY KEPT NO POINT OF CASH NOW. Two or fewer is kept; a line not begun reads nothing.
+   * `pack` NAMES ITS HOME, as a walk's figures do: a kept line names no list, so the split would leave it in no pack.
+   */
+  'nights-missed-30d': {
+    metric: 'nights-missed-30d',
+    pack: 'money-core',
+    name: 'Nights the cash line missed',
+    source: 'series.cash-now',
+    value: { count: 'missing' },
+    format: 'int',
+    target: { lte: 2 },
     window: '30d',
     compare: 'none',
   },

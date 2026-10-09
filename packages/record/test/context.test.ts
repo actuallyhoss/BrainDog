@@ -193,7 +193,16 @@ test('CONTEXT OVER THE SEED: the run, Kiln, the last handoff, who is live, what 
   assert.equal(typeof here.project?.mark, 'string', 'Kiln has a mark in the seed');
   assert.deepEqual(here.ambiguous, []);
 
-  assert.deepEqual(here.handoff, { from: before.spoken, age_s: 600, next: 'Kern the lowercase pairs', tried: ['Auto-kerning read as uneven'], head: 'a1b2c3d' });
+  assert.deepEqual(here.handoff, {
+    from: before.spoken,
+    agent: 'claude',
+    left_at: iso(NOW + 5 * MIN),
+    age_s: 600,
+    next: 'Kern the lowercase pairs',
+    tried: ['Auto-kerning read as uneven'],
+    head: 'a1b2c3d',
+    earlier: 0,
+  });
   const spokenOf = (list: { spoken: string }[]) => list.map((r) => r.spoken);
   assert.ok(spokenOf(here.live.same_repo).includes(beside.spoken), 'a run beside this one is missing');
   assert.ok(!spokenOf(here.live.same_repo).includes(attached.spoken), 'the caller is listed as someone else');
@@ -216,7 +225,20 @@ test('CONTEXT OVER THE SEED: the run, Kiln, the last handoff, who is live, what 
     [mine(learnings.rows, 'lesson', lessons).map((r) => r.lesson), mine(learnings.inherited, 'lesson', lessons).length, here.faded],
     [['Export the variable font last.'], 0, 1],
   );
-  assert.match(here.next, new RegExp(`handoff ${before.spoken} left`));
+  assert.match(here.next, new RegExp(`step Claude \\(${before.spoken}\\) left: take it with handoff take ${before.spoken}`));
+
+  /* THE SAME TREE, AND THE CARD MADE FROM ALL OF IT (AGT-B07, AGT-B08): the run beside this one is named once under the
+     warning, the step leads Next, and the caller, a key whose command said no build, is not called behind. */
+  assert.deepEqual(here.also_here?.runs.map((r) => r.name), [`Claude (${beside.spoken})`]);
+  assert.equal(here.also_here?.lines[0], 'Two sessions in one working tree overwrite each other. Coordinate or stop.');
+  assert.match(here.next_lines?.[0] ?? '', new RegExp(`^Kern the lowercase pairs\\. Left by Claude \\(${before.spoken}\\) 10 min ago\\. Check before acting\\.$`));
+  assert.equal(here.next_lines?.[1], 'Tried: Auto-kerning read as uneven');
+  const card = here.card ?? assert.fail('context sent no card');
+  assert.match(card.split('\n')[0]!, new RegExp(`^BrainDog · run ${attached.spoken} · .+ · project Kiln`));
+  assert.ok(card.includes('Two sessions in one working tree overwrite each other.'), card);
+  assert.ok(here.card_next?.startsWith('Next') && here.card_next.includes('Kern the lowercase pairs'), String(here.card_next));
+  assert.ok(card.split(/\s+/u).length <= 150, card);
+  assert.deepEqual(here.build, { cli: null, behind: false });
 
   assert.deepEqual(here.people.map((p) => [p.spoken, p.scope]), [[`people#${String(person.seq)}`, 'project']]);
   assert.ok(!here.registers.some((r) => r.id === 'people' || r.id === 'things' || r.id === 'session'));

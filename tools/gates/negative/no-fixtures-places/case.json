@@ -1,0 +1,7 @@
+{
+  "gate": "no-fixtures",
+  "rule": "shipped code that imports the seed's root",
+  "expect": "imports the seed's root",
+  "findings": 1,
+  "total": 1
+}

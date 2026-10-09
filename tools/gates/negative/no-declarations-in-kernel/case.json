@@ -1,0 +1,6 @@
+{
+  "gate": "no-declarations-in-kernel",
+  "rule": "a declaration written in the kernel",
+  "expect": "declaration written in the kernel",
+  "findings": 1
+}

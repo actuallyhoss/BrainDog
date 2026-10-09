@@ -1,0 +1,8 @@
+{
+  "gate": "web-lists",
+  "rule": "the web app naming a first-party list",
+  "expect": "names the first-party list",
+  "findings": 3,
+  "total": 3,
+  "why": "THREE, ONE OF EACH SHAPE: a list id as a string, a link into a list written as a template with a hole, and a currency code after `??`. Beside them sit a test, a `fixtures/` file, a currency table, markup classes, comments, a regular expression and a time zone after `||`, each spelled like one of the three, and `total` says none of them was read."
+}

@@ -16,9 +16,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { validateDeclaration } from '@braindog/kernel';
-import { fillRates, ratesSpecFor } from '../../../../../packs/rates-poll/fill.ts';
+import { fillRates, ratesSpecFor } from '@braindog/pack-rates-poll/fill';
 
-import { RATES_CURRENCIES_MOST } from '../../../../../packs/rates-poll/fill.ts';
+import { RATES_CURRENCIES_MOST } from '@braindog/pack-rates-poll/fill';
 import { actionWords, blankDraft, declarationOf, presetOf, ratesPreset, type ActionDraft } from './action-draft.ts';
 
 const FILE = (): Record<string, unknown> =>

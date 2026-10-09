@@ -20,6 +20,7 @@ import type { Sql } from '@braindog/ports';
 
 import type { Json } from './coerce.ts';
 import { clearFault, raiseFault } from './fault.ts';
+import { restDaysOf } from './forecast.ts';
 import { backoffMs, type AckDeps } from './outbox.ts';
 import { ABANDON_MS } from './presence.ts';
 import { SESSION, isHelper, leftFreshStep } from './session.ts';
@@ -143,7 +144,7 @@ export function atMs(value: string): number | null {
  * useful thing to hold is the next one — the walk is re-derived on every write of the row, so a
  * horizon costs nothing and an unbounded expansion costs everything.
  */
-export function expandRepeat(anchor: number, repeat: Repeat, now: number, horizonDays = 400): number[] {
+export function expandRepeat(anchor: number, repeat: Repeat, now: number, horizonDays = 400, rest: ReadonlySet<number> = WEEKEND): number[] {
   const interval = Math.max(1, Math.floor(repeat.interval ?? 1));
   const until = repeat.until ? atMs(repeat.until) : null;
   const limit = now + horizonDays * DAY_MS;
@@ -188,7 +189,7 @@ export function expandRepeat(anchor: number, repeat: Repeat, now: number, horizo
     if (at > limit) break;
     if (until !== null && at > until) break;
 
-    out.push(shiftWorkday(at, repeat.workday));
+    out.push(shiftWorkday(at, repeat.workday, rest));
   }
   return out;
 }
@@ -219,13 +220,21 @@ function skipPast(anchor: number, repeat: Repeat, now: number): number {
   return Math.max(0, Math.floor((months - 1) / step));
 }
 
-/** A weekend moved to the Friday before or the Monday after, when the declaration asks. */
-function shiftWorkday(at: number, how: Repeat['workday']): number {
-  if (!how) return at;
-  const day = new Date(at).getUTCDay();
-  if (day !== 0 && day !== 6) return at;
-  if (how === 'previous') return at - (day === 0 ? 2 : 1) * DAY_MS;
-  return at + (day === 0 ? 1 : 2) * DAY_MS;
+/** Saturday and Sunday, the rest days a record has until somebody says otherwise (`forecast.ts` `REST_DEFAULT`). */
+const WEEKEND: ReadonlySet<number> = new Set([6, 0]);
+
+/**
+ * A rest day moved to the working day before or after, when the declaration asks.
+ *
+ * THE RECORD'S OWN REST DAYS, AS THE WALK'S PAYDAYS KEEP THEM (`restDaysOf` and `shifted` in `forecast.ts`): in Cairo
+ * the weekend is Friday and Saturday, and a reminder that held Saturday and Sunday for everyone moved a Friday bill to
+ * nowhere and a Sunday one to Friday, a rest day. A week of nothing but rest days has no working day, and the day stays.
+ */
+function shiftWorkday(at: number, how: Repeat['workday'], rest: ReadonlySet<number> = WEEKEND): number {
+  if (!how || rest.size === 0 || rest.size >= 7) return at;
+  let out = at;
+  while (rest.has(new Date(out).getUTCDay())) out += how === 'previous' ? -DAY_MS : DAY_MS;
+  return out;
 }
 
 export type Reminder = { key: string; dueAt: string; payload: string };
@@ -241,6 +250,7 @@ export function remindersFor(
   entry: { id: string; register: string; fields: Record<string, Json>; deleted: boolean },
   field: Remindable,
   now: number,
+  rest: ReadonlySet<number> = WEEKEND,
 ): Reminder[] {
   if (entry.deleted || (!field.remind && !field.repeat)) return [];
   const raw = entry.fields[field.id];
@@ -248,7 +258,7 @@ export function remindersFor(
   const anchor = atMs(raw);
   if (anchor === null) return [];
 
-  const occurrences = field.repeat ? expandRepeat(anchor, field.repeat, now) : [anchor];
+  const occurrences = field.repeat ? expandRepeat(anchor, field.repeat, now, 400, rest) : [anchor];
   const offsets = field.remind?.length ? field.remind : ['0d'];
 
   const out: Reminder[] = [];
@@ -296,7 +306,10 @@ export function reschedule(
       `${entry.id}:${field.id};`,
     );
 
-    for (const r of remindersFor(entry, field, now)) {
+    /* THE REST DAYS ARE READ ONLY FOR A REPEAT THAT MOVES OFF THEM, and from the pack rows each time, as the walk reads
+       them, so a change on Money's settings holds at the row's next write. */
+    const rest = field.repeat?.workday ? new Set(restDaysOf(sql)) : WEEKEND;
+    for (const r of remindersFor(entry, field, now, rest)) {
       sql.exec(
         "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES (?, ?, 'reminder', ?, ?, 'pending', 0) ON CONFLICT (kind, key) DO NOTHING",
         mint(),

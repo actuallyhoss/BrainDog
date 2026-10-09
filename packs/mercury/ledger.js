@@ -1,14 +1,35 @@
 /**
- * Mercury's transactions, every hour, into Money's ledger: one row a transaction, kept in step as it clears.
+ * Mercury, every hour: each account's balance into Money's accounts, then its transactions into the ledger, one row a
+ * transaction, kept in step as it clears.
  *
- * WHY A SCRIPT AND NOT A SECOND PULL. Mercury says which way money moved by the sign of `amount` and nothing else, and
- * a pull's `map:` cannot read a sign (`mercury.test.ts`, "A TRANSACTIONS PULL WRITES NOTHING", measured). The
+ * WHY A SCRIPT AND NOT A PULL. Mercury says which way money moved by the sign of `amount` and nothing else, and a
+ * pull's `map:` cannot read a sign (`mercury.test.ts`, "A TRANSACTIONS PULL WRITES NOTHING", measured). The
  * transactions also live under each account's own id, `/api/v1/account/<id>/transactions`, which a pull's fixed path
  * cannot follow. A script asks for the accounts, then for each one's transactions.
  *
- * WHICH ACCOUNT. The balances pull in this same pack writes one `accounts` row a Mercury account, named as Mercury
- * names it, and a transaction's `account` is that row. An account the record does not hold yet is said in the log and
- * skipped, and its transactions arrive the hour after the balances pull has written it.
+ * THE BALANCES ARE THIS SCRIPT'S TOO, SINCE 1.2.0, and run first. Before it a pull beside this script wrote them, found
+ * an account again by its name only, and wrote one beside every account a person had typed under another name, so the
+ * company's cash counted twice. The pull is gone: one key path, one order, balances then transactions.
+ *
+ * AN ACCOUNT IS FOUND BY MERCURY'S OWN ID, in `mercury_account`, a field this pack lays on Accounts, and never by its
+ * name. A person may rename the row and it is still Mercury's. Every read and write of an account goes by it. A held
+ * account's balance and day move each hour; its name, whether it counts as cash and its book (once filed) are a
+ * person's and are left alone. An account Mercury stops listing keeps its last balance, since an answer that left one
+ * out is not one that closed it.
+ *
+ * FIRST CONTACT, FOR A MERCURY ACCOUNT NO ROW HOLDS THE ID OF. The candidates are the live bank accounts that no feed
+ * keeps (no `mercury_account`, no `stripe_kind`), in the same currency, whose name, case folded, is Mercury's name or
+ * nickname for it. Exactly one is adopted, and only when no other Mercury account met this hour names it too: the id
+ * is written on it, its balance moves to Mercury's, and its name, its cash and its book are kept. So a row the 1.1.0
+ * pull wrote, under Mercury's name, is adopted the first hour and nothing is written twice. None or several: the account is written as its own row, and when the record holds any bank account
+ * in that currency that no feed keeps, which could be the same money under another name, that row does not count as
+ * cash and carries the note "Not yet matched to an account you typed", and the log says how many. A person answers by
+ * saying which row it is, or that it is new; one who sets it to count as cash has answered, and the note goes. A record
+ * that holds no such account cannot count the money twice, so there the row counts as cash from the first hour.
+ *
+ * THE CURRENCY IS MERCURY'S FOR THE ACCOUNT: its `currency` when it names one, and otherwise dollars, the only
+ * currency a Mercury account has held. Mercury's amounts are in whole units with decimals, and are moved to the
+ * currency's minor units, cents for dollars, as integers. A transaction takes its account's currency.
  *
  * ONE ROW A TRANSACTION, FOUND AGAIN BY MERCURY'S OWN ID. The id goes in `mercury_id`, a field this pack lays on the
  * ledger, and every hour re-reads the last thirty days: a transaction already held is updated in place, never
@@ -41,15 +62,15 @@
  * day and amount, so a person can void the spare. The log says how many were taken. A void row is not the same money,
  * because voiding took it out of the figures, so it is never taken.
  *
- * EVERY ROW IN ONE BOOK, WHEN THE PACK IS TOLD WHICH. The `book` setting files each transaction this script
- * writes, and each Mercury account the balances pull wrote, in that book of money-core's. The book is the one thing
- * past the bank's facts this script adds to a row it already holds, and only to a row in no book yet, because a person
- * may have moved a row on purpose. Left at 0 the setting files nothing.
+ * EVERY ROW IN ONE BOOK, WHEN THE PACK IS TOLD WHICH. The `book` setting files each account and transaction this
+ * script writes in that book of money-core's. The book is the one thing past the bank's facts this script adds to a row
+ * it already holds, and only to a row in no book yet, because a person may have moved a row on purpose. Left at 0 the
+ * setting files nothing.
  *
  * THE KEY IS THE `grant` SETTING, the label of a key in the vault and never the key itself, read from `ctx.config` on
- * every run. The pack declares the same setting as the key this script and the balances pull send, so both ask with
- * one key. A key Mercury refuses stops the run with a sentence, and the record pauses a script after three refused
- * runs.
+ * every run. The pack declares the same setting as the key this script sends. A key Mercury refuses stops the run with
+ * a sentence and writes nothing, so the last balances and transactions stand as they were, and the record pauses a
+ * script after three refused runs.
  */
 
 const API = "https://api.mercury.com";
@@ -72,6 +93,34 @@ const WRITES = 1000;
    the run whole, so an account past it is said and not asked about. */
 const FETCHES = 12;
 const STATES = { pending: 'pending', sent: 'cleared', cancelled: 'void', failed: 'void' };
+/* THE NOTE ON AN ACCOUNT FIRST CONTACT COULD NOT PAIR WITH ONE A PERSON TYPED, which is why it does not count as cash. */
+export const NOT_MATCHED = 'Not yet matched to an account you typed';
+/* THE FIELDS A FEED MARKS ITS OWN ACCOUNTS BY. An account carrying one is that feed's, never a candidate here. */
+const FEED_MARKS = ['mercury_account', 'stripe_kind'];
+/**
+ * THE CURRENCIES WHOSE MINOR UNIT IS NOT A HUNDREDTH, with the decimals the record keeps (`EXPONENT` in
+ * `packages/kernel/src/ingest.ts`). Mercury sends whole units with decimals, so an amount is multiplied by ten to these
+ * and rounded, and a currency not named here takes two.
+ */
+const DECIMALS = {
+  BIF: 0, CLP: 0, DJF: 0, GNF: 0, ISK: 0, JPY: 0, KMF: 0, KRW: 0, PYG: 0, RWF: 0, UGX: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0,
+  BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3,
+};
+const decimalsOf = (currency) => DECIMALS[currency] ?? 2;
+
+/** An amount Mercury sends in whole units, in the record's minor units for `currency`, an integer. */
+export const minorOf = (amount, currency) => Math.round(Number(amount) * 10 ** decimalsOf(currency));
+
+/** The currency Mercury gives for an account: its `currency` when it is a three-letter code, and else dollars. */
+export const currencyOf = (account) => {
+  const said = typeof account?.currency === 'string' ? account.currency.trim() : '';
+  return /^[A-Za-z]{3}$/.test(said) ? said.toUpperCase() : 'USD';
+};
+
+/** A name as first contact compares it: spaces trimmed and run together, case folded. */
+export const fold = (name) => (typeof name === 'string' ? name.trim().replace(/\s+/g, ' ').toLowerCase() : '');
+
+const unmarked = (row) => FEED_MARKS.every((f) => row.fields[f] === undefined || row.fields[f] === null || row.fields[f] === '');
 /* THE BOOK THIS PACK FILES ITS ROWS IN: the `book` setting, the number of a row of money-core's `books` (books#2), so
    the company's Mercury money sits on the company's book page and not in the household's. Anything but a whole number
    above 0 files nothing. */
@@ -91,8 +140,8 @@ async function ask(ctx, path) {
   const key = keyOf(ctx.config);
   const r = await ctx.fetch(API + path, { key });
   if (r.status === 401)
-    throw new Error(`Mercury refused the key labelled "${key}" (401) at ${path}, so nothing was written. Put a working read-only token in the vault under that label.`);
-  if (!r.ok) throw new Error(`Mercury answered ${r.status} at ${path}, so nothing was written this hour.`);
+    throw new Error(`Mercury refused the key labelled "${key}" (401), so nothing was written. Put a working read-only token in the vault under that label.`);
+  if (!r.ok) throw new Error(`Mercury answered ${r.status}, so nothing was written this hour.`);
   return r.json();
 }
 
@@ -106,12 +155,20 @@ const chunks = (list, size = PAGE) => {
 const dayFrom = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
 
 /**
- * An amount as a person reads it in the log, grouped, with its currency after it. The ledger holds cents, the two
- * decimals `ledgerOf` multiplied Mercury's dollars by, so the same two are put back here.
+ * An amount as a person reads it in the log, grouped, with its currency after it. The ledger holds minor units, the
+ * decimals `minorOf` multiplied Mercury's amount by, so the same decimals are put back here.
  */
 const shown = (money) => {
-  const whole = String(Math.floor(money.amount / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${whole}.${String(money.amount % 100).padStart(2, '0')} ${money.currency}`;
+  const places = decimalsOf(money.currency);
+  const unit = 10 ** places;
+  const whole = String(Math.floor(money.amount / unit)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return places === 0 ? `${whole} ${money.currency}` : `${whole}.${String(money.amount % unit).padStart(places, '0')} ${money.currency}`;
+};
+
+/** A few names in a sentence: "A" and "B", or "A", "B" and "C". */
+const namesOf = (names) => {
+  const quoted = names.map((n) => `"${n}"`);
+  return quoted.length < 2 ? quoted.join('') : `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}`;
 };
 
 /**
@@ -147,8 +204,11 @@ function patchOf(row, fields) {
   return patch;
 }
 
-/** A Mercury transaction as the ledger's fields, or `null` for a status this pack has not heard of. */
-export function ledgerOf(t, account) {
+/**
+ * A Mercury transaction as the ledger's fields, in its account's currency, or `null` for a status this pack has not
+ * heard of.
+ */
+export function ledgerOf(t, account, currency = 'USD') {
   const state = STATES[t.status];
   if (state === undefined) return null;
   const payee = typeof t.counterpartyName === 'string' ? t.counterpartyName.trim() : '';
@@ -156,7 +216,7 @@ export function ledgerOf(t, account) {
     what: String(t.counterpartyName || t.counterpartyNickname || t.bankDescription || 'Mercury'),
     on: String(t.postedAt || t.createdAt).slice(0, 10),
     direction: t.amount < 0 ? 'out' : 'in',
-    amount: { amount: Math.round(Math.abs(t.amount) * 100), currency: 'USD' },
+    amount: { amount: minorOf(Math.abs(t.amount), currency), currency },
     account,
     state,
     ...(payee === '' ? {} : { counterparty_text: payee }),
@@ -164,33 +224,123 @@ export function ledgerOf(t, account) {
   };
 }
 
+/**
+ * The balances: each Mercury account kept on the row that holds its id, or met for the first time and adopted or
+ * written. Answers the record's id of each account's row, by Mercury's id, for the rows that stood before this run, and
+ * how many writes it queued. An account written this run has no id until the run ends, so it is not in the answer.
+ */
+async function keepAccounts(ctx, accounts, inBook, bookFor) {
+  const today = ctx.now().slice(0, 10);
+  const held = new Map();
+  for (const chunk of chunks(accounts.map((a) => a.id)))
+    for (const r of (await ctx.record.list('accounts', { field: 'mercury_account', in: chunk })).sort((x, y) => x.seq - y.seq)) {
+      const id = String(r.fields.mercury_account);
+      const first = held.get(id);
+      if (first === undefined) held.set(id, r);
+      else ctx.log(`"${r.fields.name}" is a second account for the same Mercury account as "${first.fields.name}", so it is left as it is: delete it if it is the same money.`);
+    }
+
+  /* THE BANK ACCOUNTS NO FEED KEEPS, read once and only when an account is met for the first time. A full answer may
+     leave one out, which is said; a row written then does not count as cash, so it is never counted twice. */
+  const loose = [];
+  if (accounts.some((a) => !held.has(a.id))) {
+    const rows = await ctx.record.list('accounts', { all: [{ field: 'kind', is: 'bank' }, { field: 'mercury_account', empty: true }] });
+    if (rows.length >= PAGE) ctx.log(`The record holds ${PAGE} bank accounts or more, so a Mercury account may have been compared with only some of them.`);
+    for (const r of rows.sort((x, y) => x.seq - y.seq)) if (unmarked(r)) loose.push(r);
+  }
+
+  /* A TYPED ACCOUNT TWO NEW MERCURY ACCOUNTS BOTH NAME COULD BE EITHER ONE'S MONEY, so neither takes it: taking it for
+     the first one listed would be a guess at which, the pairing the scope warns joins the wrong two. */
+  const namesFor = (a) => new Set([fold(a.name), fold(a.nickname)].filter((n) => n !== ''));
+  const fresh = accounts.filter((a) => !held.has(a.id));
+  const shared = new Set(
+    loose.filter((r) => fresh.filter((a) => currencyOf(a) === r.fields.balance?.currency && namesFor(a).has(fold(r.fields.name))).length > 1).map((r) => r.id),
+  );
+  const said = new Set();
+
+  const rowOf = new Map();
+  const claimed = new Set();
+  let writes = 0;
+  let unmatched = 0;
+  for (const a of accounts) {
+    const currency = currencyOf(a);
+    const balance = { amount: minorOf(a.currentBalance, currency), currency };
+    const row = held.get(a.id);
+    if (row !== undefined) {
+      rowOf.set(a.id, row.id);
+      const was = row.fields.balance;
+      const moved = was === null || typeof was !== 'object' || was.amount !== balance.amount || was.currency !== balance.currency || row.fields.as_of !== today;
+      /* A PERSON WHO SETS IT TO COUNT AS CASH HAS SAID IT IS NEW, so the note that asked is taken off. */
+      const answered = row.fields.mercury_note === NOT_MATCHED && row.fields.liquid === true;
+      const patch = { ...(moved ? { balance, as_of: today } : {}), ...(answered ? { mercury_note: null } : {}), ...bookFor(row) };
+      if (Object.keys(patch).length === 0) continue;
+      ctx.update(`accounts#${row.seq}`, patch, row.version);
+      writes += 1;
+      continue;
+    }
+    const names = namesFor(a);
+    const same = loose.filter((r) => !claimed.has(r.id) && r.fields.balance?.currency === currency);
+    const named = same.filter((r) => names.has(fold(r.fields.name)));
+    if (named.length === 1 && shared.has(named[0].id)) {
+      if (!said.has(named[0].id)) ctx.log(`"${named[0].fields.name}" could be more than one Mercury account of that name, so none was taken.`);
+      said.add(named[0].id);
+    } else if (named.length === 1) {
+      const typed = named[0];
+      claimed.add(typed.id);
+      rowOf.set(a.id, typed.id);
+      ctx.update(`accounts#${typed.seq}`, { mercury_account: a.id, balance, as_of: today, ...bookFor(typed) }, typed.version);
+      writes += 1;
+      ctx.log(`Took over "${typed.fields.name}": it is "${a.name}" at Mercury, kept from Mercury every hour from now on, so the money counts once.`);
+      continue;
+    }
+    if (named.length > 1) ctx.log(`${namesOf(named.map((r) => String(r.fields.name)))} could each be "${a.name}" at Mercury, so none was taken.`);
+    /* A BANK ACCOUNT NO FEED KEEPS, IN THIS CURRENCY, COULD BE THE SAME MONEY under a name of its own, so the row waits
+       for a person to say which, and counts for nothing until they do. */
+    const doubt = same.length > 0;
+    if (doubt) unmatched += 1;
+    ctx.write('accounts', {
+      name: String(a.name),
+      kind: 'bank',
+      balance,
+      as_of: today,
+      liquid: !doubt,
+      mercury_account: a.id,
+      ...(doubt ? { mercury_note: NOT_MATCHED } : {}),
+      ...inBook,
+    });
+    writes += 1;
+  }
+  if (unmatched > 0)
+    ctx.log(
+      `${unmatched} Mercury ${unmatched === 1 ? 'account is' : 'accounts are'} not yet matched to an account you typed, so ${unmatched === 1 ? 'it does' : 'they do'} not count as cash until you say which ${unmatched === 1 ? 'one it is' : 'ones they are'}, or that ${unmatched === 1 ? 'it is' : 'they are'} new.`,
+    );
+  return { rowOf, writes };
+}
+
 export default async function run(ctx) {
   const inBook = bookOf(ctx.config);
   /** The book to add to a row the record already holds: the setting's, when the row is in no book yet, and else none. */
   const bookFor = (row) => (row.fields.book === undefined || row.fields.book === null ? inBook : {});
-  const { accounts = [] } = await ask(ctx, '/api/v1/accounts');
-  const names = [...new Set(accounts.map((a) => String(a.name)))];
-  const rows = new Map();
-  let writes = 0;
-  for (const chunk of chunks(names))
-    for (const r of await ctx.record.list('accounts', { field: 'name', in: chunk })) {
-      rows.set(String(r.fields.name), r.id);
-      /* THE BALANCES PULL WRITES THE ACCOUNT AND CANNOT FILE IT, because a pull's map has no way to leave a field out
-         when the setting names no book. So the account is filed here, once, the first hour it is in no book. */
-      const file = bookFor(r);
-      if (Object.keys(file).length > 0) {
-        ctx.update(`accounts#${r.seq}`, file, r.version);
-        writes += 1;
-      }
-    }
+  const answered = await ask(ctx, '/api/v1/accounts');
+  /* ONE ENTRY A MERCURY ID, its id a string, so a repeated account is one account and not two rows. */
+  const accounts = [];
+  const ids = new Set();
+  for (const a of answered.accounts ?? []) {
+    const id = String(a.id);
+    if (ids.has(id)) continue;
+    ids.add(id);
+    accounts.push({ ...a, id });
+  }
+  const kept = await keepAccounts(ctx, accounts, inBook, bookFor);
+  let writes = kept.writes;
 
   const start = new Date(Date.parse(ctx.now()) - DAYS * DAY_MS).toISOString().slice(0, 10);
   const seen = [];
   let fetched = 1;
   for (const a of accounts) {
-    const account = rows.get(String(a.name));
+    const account = kept.rowOf.get(a.id);
     if (account === undefined) {
-      ctx.log(`${a.name} is not in accounts yet, so its transactions wait until the balances pull has written it.`);
+      ctx.log(`"${a.name}" is new to the record this hour, so its transactions arrive next hour, once its account is written.`);
       continue;
     }
     if (fetched >= FETCHES) {
@@ -203,8 +353,8 @@ export default async function run(ctx) {
     if (typeof page.total === 'number' && page.total > listed.length)
       ctx.log(`${a.name} has ${page.total} transactions since ${start}, and the first ${listed.length} were read.`);
     for (const t of listed) {
-      const fields = ledgerOf(t, account);
-      if (fields === null) ctx.log(`Mercury says ${t.id} is ${JSON.stringify(t.status)}, which this pack does not know, so it is left out.`);
+      const fields = ledgerOf(t, account, currencyOf(a));
+      if (fields === null) ctx.log(`Mercury calls a transaction of ${String(t.postedAt || t.createdAt).slice(0, 10)} on "${a.name}" ${JSON.stringify(t.status)}, which this pack does not know, so it is left out.`);
       else seen.push({ fields, category: typeof t.mercuryCategory === 'string' ? t.mercuryCategory : null });
     }
   }
@@ -222,7 +372,7 @@ export default async function run(ctx) {
   const unheld = [...new Set(seen.filter((s) => !held.has(s.fields.mercury_id) && s.fields.state !== 'void').map((s) => s.fields.mercury_id))];
   for (const chunk of chunks(unheld, GONE)) {
     const rows = await ctx.record.list('transactions', { field: 'mercury_id', in: chunk }, { includeDeleted: true });
-    if (rows.length >= PAGE) ctx.log(`${chunk.length} Mercury transactions have ${rows.length} rows or more between them, so a deleted one may be missed and written again.`);
+    if (rows.length >= PAGE) ctx.log(`The record answered ${rows.length} entries or more for ${chunk.length} Mercury transactions, so one a person deleted may be missed and written again.`);
     for (const r of rows) if (r.deleted_at !== null && r.deleted_at !== undefined) gone.add(String(r.fields.mercury_id));
   }
 
@@ -262,7 +412,7 @@ export default async function run(ctx) {
       }
       if (twins.length > 1)
         ctx.log(
-          `${twins.length} rows typed in by hand could be Mercury's ${shown(fields.amount)} ${fields.direction === 'in' ? 'in' : 'out'} on ${fields.on}, so none was taken and it is written as its own row: void the one that is the same money.`,
+          `${twins.length} transactions typed in by hand could be Mercury's ${shown(fields.amount)} ${fields.direction === 'in' ? 'in' : 'out'} on ${fields.on}, so none was taken and Mercury's is written as well: void the one that is the same money.`,
         );
       const c = category === null ? undefined : categories.get(category);
       const fits = c !== undefined && (c.fields.direction === 'both' || c.fields.direction === fields.direction);
@@ -276,7 +426,7 @@ export default async function run(ctx) {
     writes += 1;
   }
   if (taken > 0)
-    ctx.log(`${taken} ${taken === 1 ? 'row' : 'rows'} typed in by hand ${taken === 1 ? 'was' : 'were'} the same money as a Mercury transaction, so ${taken === 1 ? 'it carries' : 'each carries'} it now and nothing was written twice.`);
+    ctx.log(`${taken} ${taken === 1 ? 'transaction' : 'transactions'} typed in by hand ${taken === 1 ? 'was' : 'were'} the same money as a Mercury transaction, so ${taken === 1 ? 'it carries' : 'each carries'} it now and nothing was written twice.`);
   if (deleted > 0)
-    ctx.log(`${deleted} Mercury ${deleted === 1 ? 'transaction' : 'transactions'} whose row a person deleted ${deleted === 1 ? 'was' : 'were'} left out, as deleted.`);
+    ctx.log(`${deleted} Mercury ${deleted === 1 ? 'transaction' : 'transactions'} that a person deleted ${deleted === 1 ? 'was' : 'were'} left out, as deleted.`);
 }

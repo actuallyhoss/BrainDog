@@ -25,7 +25,10 @@ test('every first-party module has a name, and a use case pack is named as its u
 });
 
 test('every rule the seed declares has a name, and no name is left over', () => {
-  assert.deepEqual(Object.keys(RULE_NAMES).sort(), Object.keys(RULES).sort());
+  /* AND THE RULES TAKEN AWAY, which a record that has not updated still holds: cash-stale, since money-core 3.16.0. */
+  const GONE = ['cash-stale'];
+  assert.deepEqual(Object.keys(RULE_NAMES).sort(), [...Object.keys(RULES), ...GONE].sort());
+  for (const id of GONE) assert.ok(!Object.hasOwn(RULES, id), `${id} is declared again, so it is not gone`);
   assert.equal(ruleName('rule.invoice-late'), 'Chase late payments');
   assert.equal(ruleName('cash-stale'), 'Keep balances current');
   assert.equal(ruleName('renewal'), null);

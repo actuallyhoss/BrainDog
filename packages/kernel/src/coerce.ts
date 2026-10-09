@@ -511,7 +511,7 @@ export const NO_CURRENCY_TO_GIVE = 'This amount has no currency, and its account
 
 /** The sentence a later write gets when it would change a `currency_fixed` field's code. */
 export const CURRENCY_FIXED_SENTENCE =
-  "A row's currency does not change. Delete this row and add it again in the other currency.";
+  "A row keeps its currency, so delete this row and add it again in the other currency.";
 
 /**
  * `CURRENCY_FIXED` when a write would change the code a `currency_fixed` field already holds, or `null`.

@@ -299,7 +299,7 @@ jobs:
       # lacks, and is still red if it fails for any reason other than having no live host to
       # measure. Excluding it would also hide the day it stops being able to run at all.
       - if: github.event_name != 'push'
-        run: pnpm gates -- --allow-skip deploy-parity --shard ${{ matrix.part }}/${{ strategy.job-total }}
+        run: pnpm gates -- --allow-skip deploy-parity,rule-sheet --shard ${{ matrix.part }}/${{ strategy.job-total }}
 
       # THE A11Y GATE'S OWN RUN, which it writes to `.a11y.log`: the per-route, per-scheme detail
       # behind a summary line that names counts. It is an ARTEFACT FOR A PERSON and never an

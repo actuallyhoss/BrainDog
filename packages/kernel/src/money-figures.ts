@@ -25,7 +25,7 @@ import { no, ok } from '@braindog/ports';
 import { compile, jsonPath, type Schema } from '@braindog/where';
 
 import { GROUP_CAP } from './buckets.ts';
-import { GOVERNANCE_OPEN, RECORD_SIGNS, SESSIONS_WORKING } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_SIGNS, SESSIONS_WORKING } from './built-in-figures.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { across, type Amount, type Part } from './fx.ts';
 import type { Entry } from './index.ts';
@@ -612,7 +612,7 @@ function empty(decl: MetricDecl, why: string, rates: EvalRates, today: string): 
  */
 export function figureLists(
   decl: Pick<MetricDecl, 'source' | 'value' | 'legs' | 'opening' | 'group_by'>,
-  figure?: (id: string) => Pick<MetricDecl, 'source' | 'value' | 'legs'> | null,
+  figure?: (id: string) => Pick<MetricDecl, 'source' | 'value' | 'legs' | 'opening' | 'group_by'> | null,
   pointsAt?: PointsAt,
 ): string[] {
   /* THE COUNT OF OPEN QUESTIONS (`built-in-figures.ts`) READS THE WHOLE RECORD, as the queue over the same source does,
@@ -624,6 +624,14 @@ export function figureLists(
   if (decl.source === RECORD_SIGNS) return ['*'];
   /* THE COUNT OF RUNS WORKING NOW READS THE RUNS, so it is named by Session, as a page over `sessions.working` is. */
   if (decl.source === SESSIONS_WORKING) return ['session'];
+  if (decl.source === HANDOFFS_OPEN) return ['session'];
+  /* A KEPT LINE (`series.<figure>`) IS READ BY WHOEVER READS ITS FIGURE: how many nights Cash now missed says something
+     about the lists Cash now reads, so it names them. A line of a figure this record does not hold, or a line of a line,
+     names the whole record, so nobody held to part of it is shown it. */
+  if (decl.source.startsWith('series.')) {
+    const of = figure?.(decl.source.slice('series.'.length)) ?? null;
+    return of === null || of.source.startsWith('series.') ? ['*'] : figureLists(of, figure, pointsAt);
+  }
   const out = new Set<string>();
   const add = (d: Pick<MetricDecl, 'source' | 'value' | 'legs'>) => {
     if (d.source.startsWith('register.')) out.add(d.source.slice('register.'.length));

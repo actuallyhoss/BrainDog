@@ -1,0 +1,7 @@
+{
+  "gate": "event-kinds",
+  "rule": "an event kind in one source and not the others",
+  "expect": "and migration 0001 does not",
+  "findings": 3,
+  "why": "THREE, because a kind in one source and not the other three is three statements about the same drift, and which three is the repair. A count of one would pass a gate that compared two."
+}

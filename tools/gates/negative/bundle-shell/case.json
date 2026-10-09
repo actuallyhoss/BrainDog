@@ -1,0 +1,7 @@
+{
+  "gate": "bundle",
+  "rule": "a shell placeholder the build cannot substitute",
+  "expect": "a shell the build cannot substitute",
+  "findings": 1,
+  "why": "THE SHELL CHECK, WHICH READS EVERY `apps/*\\/src/app.html` IN THE WORKSPACE. It is in `bundle` because that gate already reads a built shell, and until now it read only the built one, only for `apps/web`, and only when there was a build. The source form needs neither, and it reaches `apps/site`, which nothing in this suite had ever read a line of. The fixture spells the body placeholder twice and the head placeholder once, so a count of one is what proves the gate reports the placeholder that is wrong rather than every placeholder it finds."
+}

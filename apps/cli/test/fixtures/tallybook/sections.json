@@ -1,0 +1,29 @@
+{
+  "source": "Tallybook",
+  "key": "tallybook:",
+  "taken": "saved",
+  "sections": {
+    "people": { "register": "people", "name": "People", "key": "id", "label": "name", "kind": "person", "fields": { "name": "name" } },
+    "book.accounts": {
+      "register": "accounts",
+      "name": "Accounts",
+      "key": "id",
+      "label": "name",
+      "kind": "account",
+      "fields": {
+        "name": "name",
+        "kind": { "from": "type", "as": "one of", "values": { "Cash": "cash", "Bank": "bank", "Credit": "card" } },
+        "balance": { "from": "balance", "as": "money", "currency": "cur" },
+        "as_of": { "from": "on", "as": "day" }
+      }
+    },
+    "items": {
+      "register": "tasks",
+      "name": "Tasks",
+      "key": "id",
+      "label": "what",
+      "kind": "item",
+      "fields": { "what": "what", "by": { "from": "due", "as": "day" }, "owner": { "from": "who", "as": "link", "to": "people" } }
+    }
+  }
+}

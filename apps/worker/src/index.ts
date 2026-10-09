@@ -62,7 +62,7 @@ import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type 
 import { slashErasing, slashPlanMoved } from './slash.ts';
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
 import { workerModelJobs } from './slash-jobs.ts';
-import { workerCatalogueOffers } from './catalogue.ts';
+import { workerCatalogueOffers, workerCatalogueShelf } from './catalogue.ts';
 import { serveKennel, servesKennel, writeCounts } from './kennel.ts';
 /* MAIL ON THE CLOUD: Email Routing's messages into the same door as a forwarder's post. */
 import { fileKeeper, takeMail } from './email.ts';
@@ -598,8 +598,6 @@ export class Record$ extends DurableObject<Env> {
    * door's `GET /api/slash/health` both answer it. Set in `#open` beside `#answers`, from the same `slashModel`.
    */
   #engineHealth: (() => Promise<EngineHealthRead>) | undefined;
-  /** The provider's words from the last model call that failed, for the `model-answers` sign to quote. */
-  #lastModelFail: { raw: string; at: number } | null = null;
 
   /** The scripts running from this object's alarm, and the rules each is held to (`script.ts`). */
   #scripts = new ScriptRuns();
@@ -845,6 +843,7 @@ export class Record$ extends DurableObject<Env> {
         catalogue: CATALOGUE,
         /* NEWER VERSIONS IN THE CATALOGUE BUNDLED WITH THE SHELL, for Slash to ask about on Decide, as a self-host's folder gives. */
         catalogueOffers: workerCatalogueOffers(this.env.ASSETS),
+        catalogueShelf: workerCatalogueShelf(this.env.ASSETS),
         /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
         ...(copies === undefined ? {} : { snapshots: copies }),
@@ -964,7 +963,7 @@ export class Record$ extends DurableObject<Env> {
     /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from this object's Slash ledger. A later filing the same day
        replaces the earlier one, so each alarm may file it; the provider's last words ride along from `#modelFailed`. */
     try {
-      fileModelSign(api.kernel, guardedSql(this.ctx.storage), Date.now(), { lastFail: this.#lastModelFail });
+      fileModelSign(api.kernel, guardedSql(this.ctx.storage), Date.now());
     } catch (e) {
       console.error('signs:', e instanceof Error ? e.message : String(e));
     }
@@ -1022,7 +1021,6 @@ export class Record$ extends DurableObject<Env> {
       },
       'error',
     );
-    if (fail.raw) this.#lastModelFail = { raw: fail.raw, at: Date.now() };
     if (fail.whose === 'owner' || (fail.why === 'schema' && fail.streak < SCHEMA_STREAK)) return;
     this.ctx.waitUntil(opsAlert(this.env, { op: 'model', rec, model: fail.model, why: fail.why }, alertClaim(this.env)));
   }
@@ -1325,6 +1323,23 @@ export class Record$ extends DurableObject<Env> {
       text.slice(0, 280),
     );
     return true;
+  }
+
+  /**
+   * The nightly walk telling this record what its copy came to (LCH-C03): kept, with the copy's name and size, or failed,
+   * with the reason (`copyKept` and `copyFailed` in the kernel). Both write a local `export` event, which no copy carries,
+   * so telling after the dump leaves tomorrow's bytes as they were. A failure is one fault, counted again on the next
+   * failed night rather than opened twice, and never a question. A LAPSED RECORD IS TOLD AS ANY OTHER: its copy is kept.
+   *
+   * IT THROWS RATHER THAN ANSWERS `false`, as `lapseDelete` does, so the walk's line carries the reason.
+   */
+  async nightCopy(outcome: { kept: { key: string; bytes: number } } | { failed: string }): Promise<void> {
+    if (this.#gone) throw new Error(DELETED.fix);
+    const api = await this.#record();
+    if (api.kernel.refused() || !api.kernel.identity()) throw new Error('This build cannot open the record, so it was not told about its copy.');
+    /* THE COPY'S OWN NAME, the last part of its key: the record's prefix is this record, and a path is not a name. */
+    if ('kept' in outcome) api.kernel.copyKept(outcome.kept.key.split('/').at(-1) ?? outcome.kept.key, outcome.kept.bytes);
+    else api.kernel.copyFailed(outcome.failed);
   }
 
   /**
@@ -2829,6 +2844,10 @@ async function nightly(env: Env): Promise<void> {
   const walked = await nightlyWalk({
     records: async (cursor) => directory.listRecords(cursor),
     snapshot: async (record) => copies.take(record, await stub(record).dump(at)),
+    /* AND THE RECORD TOLD WHAT ITS COPY CAME TO, so its Settings can say when and how large, and a failed night reaches
+       the person whose copy it was as one fault (LCH-C03). */
+    kept: async (record, copy) => stub(record).nightCopy({ kept: copy }),
+    failed: async (record, why) => stub(record).nightCopy({ failed: why }),
     /* THE KEYS BEFORE THE COPY, so tonight's copy holds them under tonight's root key (`rewrap.ts`). */
     rewrap: (record) => rewrapRecord(env, record),
     /* THE ERASURES AGAINST THE BUCKET ITSELF: every `done` one from the last thirty days whose object is still there is

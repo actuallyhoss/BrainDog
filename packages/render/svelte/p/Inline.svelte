@@ -12,11 +12,12 @@
 -->
 <script lang="ts">
   import { TONES, valueWord, type Block, type RenderOptions } from '../../src/index.ts';
-  import { glyphPath } from '../../src/inline.ts';
+  import { glyphPath, inline } from '../../src/inline.ts';
   import { drawnRows, emptied } from '../../src/html.ts';
+  import Text from '../Text.svelte';
 
-  // `opts` is read for one thing, the glyph's drawing: a chip is a glyph, a figure and a word, and
-  // none of the three may contain an inline run.
+  // `opts` is read for the glyph's drawing and the figure: a chip is a glyph, a figure and a word, and the figure is
+  // read through the inline reader as a bar's is, so `{{tasks.open}}` prints the count and never its braces.
   let { block, opts = {} }: { block: Block; opts?: RenderOptions | undefined } = $props();
 
   // A chip whose figure is the dash a reader prints for null is dropped as well (`drawnRows`), as `toHTML` drops it.
@@ -42,7 +43,7 @@
             stroke-linejoin="round"><path {d} /></svg
           >{/if}</span
       >
-      <span class="pill-figure num">{row.cells[1]}</span>
+      <span class="pill-figure num"><Text nodes={inline(row.cells[1] ?? '', opts)} {opts} /></span>
       <span class="pill-word">{valueWord(row.cells[2] ?? '')}</span>
       {#if row.tone}
         <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>

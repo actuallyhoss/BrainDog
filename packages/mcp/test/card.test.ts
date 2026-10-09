@@ -1,8 +1,10 @@
 /**
  * The card `context` opens with, held to its shape and its size.
  *
- * FIVE SLOTS, IN ONE ORDER, EACH LEFT OUT WHEN IT HAS NOTHING: who and where, then `Next`, `Waiting`, `Learned` and
- * `More`. At most three things a slot and 1,500 characters in all, every line cut at a word. A step is checked before
+ * THE SLOTS IN ONE ORDER, EACH LEFT OUT WHEN IT HAS NOTHING: who and where, then `Also`, `Next`, `Signs`, `Waiting`,
+ * `Learned`, `More` and `Update`, the record's order (`packages/record/src/card.ts`). No Who slot: the critic cut it, and
+ * `context` prints the record's card, which has none. The cases over a context built here hold the card this package
+ * still composes for a context that carries none. At most three things a slot and 1,500 characters in all, every line cut at a word. A step is checked before
  * it is acted on when it is a day old or another run left it; questions that read the same once their ids are set
  * aside are one; the two newest learnings are the ones said; the machine is said as a person names it.
  *
@@ -26,7 +28,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { tokenBudget } from './tokens.ts';
 
 const NOW = Date.UTC(2026, 8, 22, 9);
-const LABELS = ['Next', 'Waiting', 'Who', 'Learned', 'More'] as const;
+const LABELS = ['Also', 'Next', 'Signs', 'Waiting', 'Learned', 'More', 'Update'] as const;
 const HOUR = 3_600;
 
 /** The card's lines after the header, as `[label, body]`, each held to the column the labels make. */
@@ -183,18 +185,44 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   const { card: said } = result.structuredContent;
   assert.ok(text.startsWith(said), 'the text does not open with the card');
   const slots = shaped(said);
-  assert.equal(said.split('\n')[0], 'BrainDog · run S6 · project Kiln · Claude Code on MacBook');
+  assert.equal(said.split('\n')[0], 'BrainDog · run S6 · Claude Code on MacBook · project Kiln');
   assert.doesNotMatch(text, /Studio-MacBook/u, 'the machine was said by its own name');
-  assert.match(slots.get('Next') ?? '', /check before acting\)$/u, "another run's step a fortnight old was not marked to check");
-  assert.match(slots.get('Waiting') ?? '', /: bank-card-used-sms could not read account out of this one\. [^·]*\(2 alike\) · /u);
+  /* THE CARD IS THE RECORD'S (AGT-B07), whose rules its own tests hold: a step left more than a week ago is not handed
+     over, so the seed's fortnight-old one is no Next, and the question asked twice by one run is said once. */
+  assert.equal(slots.get('Next'), undefined, `a step a fortnight old was handed over: ${slots.get('Next') ?? ''}`);
+  const waiting = slots.get('Waiting') ?? '';
+  assert.match(waiting, /^\d+ on [^:]+: bank-card-used-sms could not read account out of this one\. · /u);
+  assert.equal(waiting.split('bank-card-used-sms').length, 2, `one question was said twice: ${waiting}`);
   assert.match(slots.get('Learned') ?? '', /^Lesson 49 of the card test\. · Lesson 48 of the card test\.$/u);
 
   /* A KEPT LIST IS A COUNT AND THIS PROJECT'S ROWS: the forty keys that apply everywhere are a number, not forty lines,
      and the number says it is a floor where the record stopped counting them. */
   const keys = result.structuredContent.registers.find((r) => r.id === 'credentials') as { rows: unknown[]; everywhere?: number; more?: boolean } | undefined;
   assert.ok(keys && (keys.everywhere ?? 0) >= 20 && keys.more === true && keys.rows.length <= 10, JSON.stringify(keys));
-  assert.match(slots.get('More') ?? '', /^\d+\+ learnings, .*\b\d+\+ keys by name\b/u);
+  assert.match(slots.get('More') ?? '', /^\d+\+ learnings · \d+\+ keys by name\b/u);
   assert.doesNotMatch(text, /Deploy key \d+/u, 'a key that applies everywhere was listed by name');
   assert.doesNotMatch(text, /tool-\d+/u, 'a tool was listed as work');
   sql.close();
+});
+
+test('A CONTEXT THAT SENDS THE RECORD\'S CARD IS PRINTED THAT CARD ALONE, never beside the card composed here', () => {
+  const recordCard = 'BrainDog · run S6 · Claude Code on MacBook · project Kiln\nNext     Kern the lowercase pairs (S5, 1h ago, check before acting)';
+  const context = {
+    card: recordCard,
+    card_next: 'Kern the lowercase pairs',
+    session: run,
+    project: { spoken: 'things#1', name: 'Kiln' },
+    handoff: step('S5', HOUR),
+    waiting: [{ id: 'SG69', question: 'Does Kiln licence per seat?' }],
+    live: { same_repo: [{ spoken: 'S5', agent: 'claude', age_s: 60 }] },
+    signs: [{ name: 'Backups', said: 'The last copy is a week old.' }],
+  };
+  const out = briefed({ context, look, mine: { agent: 'claude' }, home: null });
+  assert.equal(out.card, recordCard);
+  assert.ok(out.text.startsWith(`${recordCard}\n`) || out.text === recordCard, out.text);
+  const after = out.text.slice(recordCard.length);
+  assert.equal(out.text.split('BrainDog · ').length, 2, `two cards were printed: ${out.text}`);
+  assert.doesNotMatch(after, /^(Next|Waiting|Who|Learned|More|Signs|Also)\s/mu, `a slot of the composed card followed the record's: ${after}`);
+  assert.doesNotMatch(after, /Two sessions|Red on this record|Sign off instances/u, `the card's own lines were said again: ${after}`);
+  assert.equal(out.value.card_next, 'Kern the lowercase pairs');
 });

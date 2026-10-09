@@ -1573,9 +1573,10 @@ against the allowance, because the record cannot see the Directory; overage char
 provider exists.
 
 **Would reverse it:** a price per run rather than per record, which would move the allowance from the plan
-to an invoice line; or the owner choosing a different allowance, which changes `ALLOWANCE`
-(`packages/record/src/directory.ts`, one row per plan: hosted and plus) and the pricing page's figures in
-`apps/site/src/lib/plans.ts`, which `plans.test.ts` holds to it.
+to an invoice line; or the owner choosing a different allowance, which changes `PLAN_TABLE`
+(`packages/record/src/plans.ts`, whose rows the Directory's `ALLOWANCE` reads), with the site's copy of its
+rows in `apps/site/src/lib/plans.ts` and ADR-071's figures in the same change, each held to it by a test
+([ADR-071](#adr-071--one-table-of-plans-and-every-figure-is-read-from-it)).
 
 ---
 
@@ -1622,6 +1623,44 @@ not been checked. It does not block the rename.
 
 **Would reverse it:** the owner's word again, or a live registration in class 9 or 42 by somebody
 who enforces.
+
+---
+
+## ADR-071 · One table of plans, and every figure is read from it
+
+**Decided.** Every figure of every plan is one row of `PLAN_TABLE` in `packages/record/src/plans.ts`
+(LCH-A08, 9 October 2026). Money is whole cents of one currency, USD. The figures:
+
+| Plan | Price | Runs | Requests | Data | Script time | Slash credits | Agents | People |
+|---|---|---|---|---|---|---|---|---|
+| Free | $0 | 1,000 | 10,000 | 0.1 GB | 5 hours | 20 | 3 | 1 |
+| Cloud | $12 a month | 15,000 | 150,000 | 1 GB | 50 hours | 80 | 15 | any number |
+| Cloud Plus | $29 a month | 75,000 | 750,000 | 5 GB | 250 hours | 400 | 75 | any number |
+
+Every figure is a month's except agents, which is how many agent keys a record may hold live at once. A
+self-host is counted and never limited. No plan is sold by the year. Credit packs are 100 credits for $5
+and 500 for $20, and usage past the allowance is $1 per 5,000 runs, $1 per 50,000 requests, $0.50 a GB and
+$1 per 10 hours, under a cap the owner sets; neither is sold by any checkout yet, and billing stays off or
+in test mode until the owner sits for a live charge.
+
+The Directory's `ALLOWANCE` and `PLANS` read the table, the checkout takes its names and prices from it
+(`apps/worker/src/billing.ts`), and the site's cards are made from it (`apps/site/src/lib/plans.ts`, held by
+`plans.test.ts` with a planted fault). This ADR and [15-ROADMAP](15-ROADMAP.md) say the same figures, and
+`packages/record/test/plans-docs.test.ts` reads both against the table.
+
+**Why.** The same figures lived in four files, and Cloud Plus was 75,000 runs in the code and 60,000 in the
+roadmap. Cloud, the packs and extra usage are the owner's (26 September); Free's figures are the default taken
+for him on 2 October (DIRECTION §35). Cloud Plus at five times
+Cloud on every figure, agents at 3, 15 and 75, and no yearly price are the defaults taken for him on
+8 October (DIRECTION §42).
+
+**Rejected:** the roadmap's 60,000 runs for Cloud Plus, because its card says five times Cloud and the code
+already held that; a yearly price, until he names one; a second table on the site, because a figure typed
+twice is a figure that drifts. Until the site declares `@braindog/record`, its `TABLE` is the three sold
+rows whole, and `plans.test.ts` refuses any field of it that differs from the table.
+
+**Would reverse it:** the owner's word on any figure, which changes the table's row, the site's copy of it
+and the two documents in the same change, or `plans.test.ts` and `plans-docs.test.ts` go red.
 
 ---
 

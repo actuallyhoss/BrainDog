@@ -10,7 +10,8 @@
     "./webauthn": "./src/webauthn.ts",
     "./catalogue-offers": "./src/catalogue-offers.ts",
     "./automations": "./src/automations.ts",
-    "./oauth": "./src/oauth.ts"
+    "./oauth": "./src/oauth.ts",
+    "./card": "./src/card.ts"
   },
   "dependencies": {
     "@braindog/declare": "workspace:*",

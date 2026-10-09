@@ -9,7 +9,8 @@
  * OPEN STAYS OPEN WITHOUT THE BOT CHECK, and is narrower until it has one. The scope first had `open` fall back to
  * `invite` while `TURNSTILE_SECRET` was unset; his word was to open now, so instead the Directory is told on every
  * `start` whether the check ran, and the two sign-up strikes take `SIGNUP_UNCHECKED` until it does
- * (`packages/record/src/identity.ts`). `launchState` says so in a sentence, and `/healthz` carries it.
+ * (`packages/record/src/identity.ts`). `launchDetail` says so in a sentence for the owner; `/healthz` carries `launchState`,
+ * which tells a stranger only whether he can sign up.
  *
  * ITS OWN FILE, FREE OF `cloudflare:`, for the reason `health.ts` is: `index.ts` cannot be loaded by `node --test`, and
  * this is read by `/healthz`, by sign-up, by the billing list and by a test.
@@ -79,41 +80,78 @@ export const SIGNUP_CLOSED = 'Sign-up is not open on this BrainDog yet.';
 /**
  * What stops a switched-on sign-up from working, one sentence each, in the order `signUp()` meets them. Each test is the
  * one the door itself makes (`index.ts` `signUp`, the Directory's `magic`), so this and the door cannot disagree.
+ *
+ * EXPORTED, AND THE ONLY COPY. The outside watch (`tools/watch/launch.mjs`) used to find these with a regex of its own, so
+ * a sixth sentence that did not match it passed; `launch.test.mjs` now holds the watch to every sentence here.
  */
+export const STOPPING = {
+  session: 'The session key is missing or shorter than 32 characters, so every sign-up is refused.',
+  host: 'This host has no public address set, so it cannot give a new person a session and every sign-up is refused.',
+  from: 'No address to send mail from is set, so nobody gets the letter that finishes a sign-up.',
+  mail: 'Mail is not connected, so nobody gets the letter that finishes a sign-up.',
+  siteKey: 'The bot check has its secret and no site key, so the sign-up page cannot pass it and every sign-up is refused.',
+} as const;
+
+/**
+ * The one sentence a stranger reads for any of `STOPPING`. Which setting is missing, and the exact strike limit, are the
+ * owner's to read (`launchDetail`), not every passer-by's: `/healthz` answers anybody.
+ */
+export const SIGNUP_STOPPED = 'Sign-up is switched on but cannot be finished here yet, so nobody new can make an account.';
+
+/** The sentence for a switch that is off. */
+const SWITCHED_OFF = 'Sign-up is closed, so nobody new can make an account.';
+
+/** The sentence for a switch that says `invite`. */
+const BY_INVITE = 'Sign-up is by invitation, so a new address needs a code.';
+
 function stops(env: LaunchEnv): string[] {
   const out: string[] = [];
-  if ((env.SESSION_SECRET ?? '').length < 32)
-    out.push('The session key is missing or shorter than 32 characters, so every sign-up is refused.');
-  if (cookieMode(`https://${env.PUBLIC_HOST ?? ''}`) === null)
-    out.push('This host has no public address set, so it cannot give a new person a session and every sign-up is refused.');
-  if (!env.AUTH_MAIL_FROM) out.push('No address to send mail from is set, so nobody gets the letter that finishes a sign-up.');
-  if (!env.EMAIL) out.push('Mail is not connected, so nobody gets the letter that finishes a sign-up.');
-  if (botCheckKeyed(env) && (env.TURNSTILE_SITE_KEY ?? '').trim() === '')
-    out.push('The bot check has its secret and no site key, so the sign-up page cannot pass it and every sign-up is refused.');
+  if ((env.SESSION_SECRET ?? '').length < 32) out.push(STOPPING.session);
+  if (cookieMode(`https://${env.PUBLIC_HOST ?? ''}`) === null) out.push(STOPPING.host);
+  if (!env.AUTH_MAIL_FROM) out.push(STOPPING.from);
+  if (!env.EMAIL) out.push(STOPPING.mail);
+  if (botCheckKeyed(env) && (env.TURNSTILE_SITE_KEY ?? '').trim() === '') out.push(STOPPING.siteKey);
   return out;
 }
 
 /**
- * The launch as one answer, with a plain sentence for each thing that is not yet as it will be. An empty `why` is a host
- * that is fully open: sign-up open, the bot check keyed, billing live.
+ * The launch as the owner reads it, with a plain sentence for each thing that is not yet as it will be: each setting
+ * that stops sign-up, the exact strike limit while the bot check is not keyed, and billing's mode. NEVER EMPTY WHILE
+ * BILLING IS OFF OR IN TEST, which his word keeps it (DIRECTION §42: a live charge is a separate word), so an empty `why`
+ * here is not something this host reaches today.
  *
- * `signup` IS WHAT A STRANGER MEETS, NOT ONLY WHAT `SIGNUP` SAYS. A switch that is on while anything in `stops` holds is
- * `closed`, with the stopping sentences as its why, so `open` here always means a stranger can finish signing up and
- * the outside watch (`tools/watch/launch.mjs`) can hold production to it.
+ * `signup` IS WHAT A STRANGER MEETS, NOT ONLY WHAT `SIGNUP` SAYS. A switch that is on while anything in `STOPPING` holds
+ * is `closed`, so `open` here always means a stranger can finish signing up and the outside watch can hold production
+ * to it.
  */
-export function launchState(env: LaunchEnv): LaunchState {
+export function launchDetail(env: LaunchEnv): LaunchState {
   const switched = signupMode(env);
   const stopped = switched === 'closed' ? [] : stops(env);
   const signup: SignupMode = stopped.length > 0 ? 'closed' : switched;
   const botCheck = botCheckKeyed(env);
   const billing = billingMode(env);
   const why: string[] = [];
-  if (switched === 'closed') why.push('Sign-up is closed, so nobody new can make an account.');
+  if (switched === 'closed') why.push(SWITCHED_OFF);
   why.push(...stopped);
-  if (signup === 'invite') why.push('Sign-up is by invitation, so a new address needs a code.');
+  if (signup === 'invite') why.push(BY_INVITE);
   if (signup !== 'closed' && !botCheck)
     why.push(`The bot check is not keyed, so sign-ups from one address are limited to ${limitWords()} until it is.`);
   if (billing === 'off') why.push('Billing is off, so every new record is on Free.');
   if (billing === 'test') why.push('Billing is in test mode, so no card is charged.');
   return { signup, botCheck, billing, why };
+}
+
+/**
+ * The launch as `/healthz` answers it to anybody (audit 36-37, finding 12): whether a stranger can sign up, and when he
+ * cannot, or only with a code, why in one sentence. AN EMPTY `why` IS A SIGN-UP THAT IS OPEN AND WORKS; nothing else is.
+ * The settings that are missing and the strike limit stay in `launchDetail`, for the owner's signs.
+ */
+export function launchState(env: LaunchEnv): LaunchState {
+  const full = launchDetail(env);
+  const one =
+    signupMode(env) === 'closed' ? SWITCHED_OFF
+    : full.signup === 'closed' ? SIGNUP_STOPPED
+    : full.signup === 'invite' ? BY_INVITE
+    : null;
+  return { ...full, why: one === null ? [] : [one] };
 }

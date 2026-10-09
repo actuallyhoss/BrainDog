@@ -26,6 +26,11 @@ export type SessionHints = {
   parent?: string | undefined;
   /** The command line's own build, `2026.10.09+abc1234`, as every call it makes says it (AGT-B01). */
   cli?: string | undefined;
+  /**
+   * How many commits HEAD moved since the last handoff here, `12`, as the start hook counts them: a whole number from 0
+   * to 9,999, kept as the text it was sent and read as a number by the briefing's card (`card.ts` `CardAt.ahead`).
+   */
+  ahead?: string | undefined;
 };
 
 type Key = keyof SessionHints;
@@ -55,6 +60,9 @@ export const HINTS: Readonly<Record<Key, { header: string; grammar: RegExp }>> =
   parent: { header: 'x-braindog-parent', grammar: /^S[1-9][0-9]*$/ },
   /* THE COMMAND'S BUILD, a date or `dev` and a commit, so the record can say which sessions run a command that is behind. */
   cli: { header: 'x-braindog-cli', grammar: /^(?:[0-9]{4}\.[0-9]{2}\.[0-9]{2}|dev)\+[0-9a-f]{7,40}$/ },
+  /* COMMITS SINCE THE HANDOFF, so the card can say "12 commits since" beside a step left before them. No leading zero,
+     so one count has one spelling. */
+  ahead: { header: 'x-braindog-ahead', grammar: /^(?:0|[1-9][0-9]{0,3})$/ },
 };
 
 const KEYS = Object.keys(HINTS) as Key[];

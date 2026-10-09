@@ -1,0 +1,8 @@
+{
+  "gate": "refusal-fixtures",
+  "rule": "a derived refusal code built at its own site",
+  "expect": "derived from .*itself",
+  "findings": 1,
+  "total": 1,
+  "why": "`derived:` SAYS A CODE IS READ OFF AN ENVELOPE, and the one thing it must never become is a way to quieten a fixture that never needed it. So the tree seeded for it claims the key on a code whose own site constructs it, which is the branch that keeps the key narrow. The other four branches are proved by mutation in the gate's own header."
+}

@@ -259,10 +259,10 @@ test('A LONG SIGN OR QUESTION GIVES WORDS BEFORE THE HANDOFF DOES: past 150 the 
 
 test('FORTY QUESTIONS WAITING still make a card of 150 words or fewer, with the count of all of them', () => {
   const waiting = Array.from({ length: 40 }, (_, i) => ({ id: `SG${String(i)}`, question: `Question ${String(i)} on the ${['bank', 'mail', 'deploy', 'kiln'][i % 4]!} pattern: ${'why it keeps failing on the server, '.repeat(i % 5)}accept it or fix it?` }));
-  const drawn = card(ctx({ session: run, waiting, handoff: step('S5', HOUR) }), { decider: 'Sam', waiting: 40, build: '2026.10.01+1a2b3c4', min_cli: '2026.10.07' }, NOW);
+  const drawn = card(ctx({ session: run, waiting, handoff: step('S5', HOUR) }), { decider: 'Mara', waiting: 40, build: '2026.10.01+1a2b3c4', min_cli: '2026.10.07' }, NOW);
   const slots = shaped(drawn.card);
   assert.ok(drawn.words <= CARD_MOST);
-  assert.match(slots.get('Waiting') ?? '', /^40 on Sam: /u);
+  assert.match(slots.get('Waiting') ?? '', /^40 on Mara: /u);
   assert.ok(slots.has('Next') && slots.has('Update'));
 });
 

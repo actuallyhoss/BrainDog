@@ -209,14 +209,16 @@ export default async function ruleSheet(root = join(import.meta.dirname, '..', '
   }
 
   const { chromium } = await import('@playwright/test');
+  /* OPENED INSIDE THE TRY WHOSE FINALLY CLOSES IT (`handles.test.mjs`), so a throw anywhere after the launch hands the
+     browser back, and the `let` is for the finally, which closes whatever exists at the moment of the throw. */
   let browser;
   try {
-    browser = await chromium.launch();
-  } catch (e) {
-    console.error(`  rule-sheet: no browser to open the record with. ${e.message.split('\n')[0]}`);
-    return 1;
-  }
-  try {
+    try {
+      browser = await chromium.launch();
+    } catch (e) {
+      console.error(`  rule-sheet: no browser to open the record with. ${e.message.split('\n')[0]}`);
+      return 1;
+    }
     const results = await sweep(rules, base, opener(browser, state));
     for (const r of results) console.log(`  ${r.line}`);
     const wrong = results.filter((r) => !r.ok);
@@ -224,7 +226,7 @@ export default async function ruleSheet(root = join(import.meta.dirname, '..', '
     for (const r of wrong) console.error(`  not true: ${r.rule.page}: ${r.rule.rule}`);
     return wrong.length ? 1 : undefined;
   } finally {
-    await browser.close();
+    await browser?.close();
   }
 }
 

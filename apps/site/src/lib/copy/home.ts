@@ -80,12 +80,12 @@ export const home = {
             id: 'ask',
             label: 'Ask',
             prompt: 'What do I owe in the next two weeks?',
-            lead: '£910.99, across four bills.',
+            lead: '$910.99, across four bills.',
             rows: [
-              ['Streaming subscription', '£10.99', 'In 2 days'],
-              ['Phone contract', '£18.00', 'In 3 days'],
-              ['Rent', '£850.00', 'In 6 days'],
-              ['Gym membership', '£32.00', 'In 12 days'],
+              ['Streaming subscription', '$10.99', 'In 2 days'],
+              ['Phone contract', '$18.00', 'In 3 days'],
+              ['Rent', '$850.00', 'In 6 days'],
+              ['Gym membership', '$32.00', 'In 12 days'],
             ],
             source: 'From Bills',
           },
@@ -95,7 +95,7 @@ export const home = {
             prompt: 'Make me a page for the Lisbon trip',
             lead: 'A new page, Trip to Lisbon, with three blocks:',
             rows: [
-              ['A figure', '£420.00 of £900.00 put by', ''],
+              ['A figure', '$420.00 of $900.00 put by', ''],
               ['A list', 'Everything put by for the trip', ''],
               ['A chart', 'What was put by, month by month', ''],
             ],
@@ -107,8 +107,8 @@ export const home = {
             prompt: 'This morning',
             lead: 'Rent is due in 6 days, and pay day is in 10.',
             rows: [
-              ['Current account', '£1,240.56', 'Today'],
-              ['Rent', '£850.00', 'In 6 days'],
+              ['Current account', '$1,240.56', 'Today'],
+              ['Rent', '$850.00', 'In 6 days'],
             ],
             source: 'Your current account covers it',
           },
@@ -141,9 +141,9 @@ export const home = {
         'After three of a kind, Slash suggests how to file them. Say yes and the rest file themselves, with no credits spent.',
       steps: ['Arrives', 'Learned once', 'Filed'],
       arrivals: [
-        { from: 'Card alert', text: 'You paid £32.00 to PUREGYM on 3 Oct.' },
-        { from: 'Card alert', text: 'You paid £18.00 to VODAFONE on 4 Oct.' },
-        { from: 'Card alert', text: 'You paid £64.20 to TESCO STORES on 5 Oct.' },
+        { from: 'Card alert', text: 'You paid $32.00 to PUREGYM on 3 Oct.' },
+        { from: 'Card alert', text: 'You paid $18.00 to VODAFONE on 4 Oct.' },
+        { from: 'Card alert', text: 'You paid $64.20 to TESCO STORES on 5 Oct.' },
       ],
       pattern: {
         name: 'Card alerts',
@@ -158,9 +158,9 @@ export const home = {
       list: 'Spending',
       columns: ['What', 'Amount', 'On'],
       rows: [
-        ['Puregym', '£32.00', '3 Oct'],
-        ['Vodafone', '£18.00', '4 Oct'],
-        ['Tesco Stores', '£64.20', '5 Oct'],
+        ['Puregym', '$32.00', '3 Oct'],
+        ['Vodafone', '$18.00', '4 Oct'],
+        ['Tesco Stores', '$64.20', '5 Oct'],
       ],
     },
 

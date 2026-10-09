@@ -20,8 +20,15 @@ export type Inline =
   | { type: 'strong'; body: Inline[] }
   | { type: 'em'; body: Inline[] }
   | { type: 'link'; href: string; body: Inline[] }
-  /** A live figure. `resolved` is null when the record holds no value; the renderer draws an em dash. */
-  | { type: 'path'; path: string; resolved: string | null }
+  /**
+   * A live figure. `resolved` is null when the record holds no value; the renderer draws an em dash.
+   *
+   * `named: false` IS A PATH THAT NAMES NOTHING (`UNNAMED`): no figure, list, row or field of the record answers to
+   * it, so there is no value to wait for and no hole to fill. In prose it is the author's text, dotted, as any token
+   * that was not one; as the figure of a chip, a tile or a bar it is left out. Absent on every path that names
+   * something, so a named path with no value keeps its dash.
+   */
+  | { type: 'path'; path: string; resolved: string | null; named?: false }
   | { type: 'typed'; form: TypedForm; arg: string; text: string; link?: 'day' | 'row' }
   | { type: 'evidence'; kind: 'verified' | 'inferred' | 'estimate' | 'unknown'; source?: string }
   /**
@@ -33,7 +40,17 @@ export type Inline =
   /** Anything that looked like a token and was not. Drawn as the author's text, dotted. */
   | { type: 'unresolved'; text: string };
 
-export type Resolve = (path: string) => string | null | undefined;
+/**
+ * What a resolver answers for a path that names nothing of the record (the kernel's `unnamed`), as against `null`
+ * for a path that names something with no value yet. Two answers because they are two faults: his pages drew 48
+ * "Open tasks —" for paths that will never hold a value, the same word and dash as a figure still to come.
+ *
+ * `Symbol.for`, so a host holding a second copy of this package (the built one beside the source) answers the
+ * same constant.
+ */
+export const UNNAMED: unique symbol = Symbol.for('braindog-render.unnamed');
+
+export type Resolve = (path: string) => string | null | undefined | typeof UNNAMED;
 
 export type InlineOptions = {
   resolve?: Resolve;
@@ -143,6 +160,7 @@ function braced(body: string, opts: InlineOptions): Inline {
       // `register#digits` shape is the literal; a bare name is still a path.
       const isPath = /^[A-Za-z]/.test(raw) && !(form === 'ref' && /^[a-z][a-z0-9_]*#\d+$/.test(raw));
       const arg = isPath ? (opts.resolve?.(raw) ?? null) : raw;
+      if (arg === UNNAMED) return { type: 'path', path: raw, resolved: null, named: false };
       if (arg === null || arg === undefined)
         return { type: 'path', path: raw, resolved: null };
       const text = formatTyped(form as TypedForm, arg, opts.now);
@@ -154,6 +172,7 @@ function braced(body: string, opts: InlineOptions): Inline {
   const path = body.trim();
   if (!PATH.test(path)) return { type: 'unresolved', text: path };
   const value = opts.resolve?.(path);
+  if (value === UNNAMED) return { type: 'path', path, resolved: null, named: false };
   return { type: 'path', path, resolved: value === undefined || value === null ? null : value };
 }
 
@@ -342,8 +361,23 @@ export function inline(text: string, opts: InlineOptions = {}): Inline[] {
  * length of the bar beside it are the same number. Both renderers call this, for the reason the
  * bar's own comment already gives: two copies of the reading gave two answers for one cell.
  */
-export const magnitudeOfCell = (cell: string, opts: InlineOptions = {}): number =>
-  magnitudeOf(text(inline(cell, opts)));
+export const magnitudeOfCell = (cell: string, opts: InlineOptions = {}): number => {
+  const nodes = inline(cell, opts);
+  /* A PATH THAT NAMES NOTHING IS NO NUMBER, whatever digits its own name holds: `q3.revenue2025` is not 2025. */
+  return namesNothing(nodes) ? Number.NaN : magnitudeOf(text(nodes));
+};
+
+/**
+ * Whether a run holds a path that names nothing (`UNNAMED`), at any depth. A figure that does is left out of a chip,
+ * a tile and a bar in both drawers (`drawnRows` in `html.ts`), since half a figure read off a path that will never
+ * answer is not a figure.
+ */
+export const namesNothing = (nodes: readonly Inline[]): boolean =>
+  nodes.some((n) => (n.type === 'path' ? n.named === false : 'body' in n ? namesNothing(n.body) : false));
+
+/** `namesNothing` for a cell as the author typed it. */
+export const cellNamesNothing = (cell: string | undefined, opts: InlineOptions = {}): boolean =>
+  cell !== undefined && cell.includes('{{') && namesNothing(inline(cell, opts));
 
 /** The plain-text projection, for an accessible name, a title, or an export. */
 export function text(nodes: Inline[]): string {
@@ -358,7 +392,8 @@ export function text(nodes: Inline[]): string {
         case 'link':
           return text(n.body);
         case 'path':
-          return n.resolved ?? MISSING;
+          /* The author's text for a path that names nothing, as it is drawn: there is no value to be missing. */
+          return n.named === false ? n.path : (n.resolved ?? MISSING);
         case 'typed':
           return n.text;
         case 'evidence':

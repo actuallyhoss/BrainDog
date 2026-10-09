@@ -1,0 +1,8 @@
+{
+  "gate": "closed-lists",
+  "rule": "a CHECK widened by a later migration the document never names",
+  "expect": "widened outbox\\.kind",
+  "findings": 1,
+  "total": 1,
+  "why": "AND THE OTHER HALF OF THAT GATE: a `CHECK` a later migration widened, over a document that never says which migration did it. `30 §1` is migration 0001 verbatim and cannot be corrected to the running schema, so this is the only thing standing between a member the database enforces and nobody being able to learn it exists by reading."
+}

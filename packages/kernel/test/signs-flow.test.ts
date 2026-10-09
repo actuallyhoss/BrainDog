@@ -240,7 +240,7 @@ test('AUTOMATIONS IDLE: counted after fourteen days, never red however many, and
   const idle = sign(r.sql, 'automations-idle', NOW + 15 * DAY);
   assert.equal(idle.state, 'green', 'idle is a count and never red');
   assert.equal(idle.value, 5, 'the five that never ran, not the one that ran nor the one switched off');
-  assert.equal(idle.said, 'Of 6 automations switched on, 5 have never run, 14 days or more after going in.');
+  assert.equal(idle.said, '5 of 6 automations switched on have never run, 14 days or more after going in.');
   assert.deepEqual(idle.facts, ['6 automations are switched on, and 5 of them have never run.', 'Never run: Wait 1, Wait 2, Wait 3 and 2 more.']);
   noIds(idle);
   /* NOTHING SWITCHED ON is nothing to judge by. */

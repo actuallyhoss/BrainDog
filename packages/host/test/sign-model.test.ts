@@ -1,7 +1,8 @@
 /**
  * `model-answers` (PRF-A05 job 1): filed by the host from Slash's ledger and the dead model jobs, read back through the
- * kernel's own `signs`. A green week, a red week whose newest ask failed, a red week of a dead job quoting the
- * provider's words scrubbed, the 9-in-10 line, a hold in flight counted as nothing, and an empty ledger reading none.
+ * kernel's own `signs`. A green week, a red week whose newest ask failed, a red week of a dead job saying the fault's
+ * own sentence and never its error, the 9-in-10 line, a hold in flight and a spent month counted as nothing, the same
+ * count Settings reads, the other dead work in the facts, and an empty ledger reading none.
  */
 
 import { test } from 'node:test';
@@ -10,7 +11,8 @@ import assert from 'node:assert/strict';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { ok } from '@braindog/ports';
 
-import { fileModelSign, readModelSign, wordsOf, type ModelFault, type ModelSignKernel } from '../src/sign-model.ts';
+import { fileModelSign, LEDGER_ANSWERED, LEDGER_FAILED, readModelSign, type ModelFault, type ModelSignKernel } from '../src/sign-model.ts';
+import * as slashHealth from '../../slash/src/health.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 9, 12);
@@ -71,7 +73,7 @@ test('GREEN: every ask of the week answered, a refused draft counts as an answer
   ask(sql, 30, 'refused', 'PROPOSAL_UNCITED');
   ask(sql, 1, 'error', 'SLASH_PENDING');
   ask(sql, 3, 'ok', null, '-');
-  ask(sql, 8 * 24, 'error', 'INTERNAL');
+  ask(sql, 8 * 24, 'error', 'UNREACHABLE');
   assert.ok(fileModelSign(k, sql, NOW).ok);
   const s = signOf(k);
   assert.equal(s.state, 'green', s.said);
@@ -84,11 +86,12 @@ test('RED: the newest ask failed, and the reading says how many and when the mod
   const { sql, k } = await fresh();
   for (const h of [30, 50, 70, 90, 110, 130, 150, 160, 165]) ask(sql, h, 'ok');
   ask(sql, 2, 'error', 'UNREACHABLE');
-  assert.ok(fileModelSign(k, sql, NOW, { lastFail: { raw: "No model answered for '@cf/meta/llama-3.1-8b': 5007 model unavailable at api.cloudflare.com", at: NOW - 2 * HOUR } }).ok);
+  const raw = "No model answered for '@cf/meta/llama-3.1-8b': 5007 model unavailable, api_key: sk-live-abcdef123456";
+  assert.ok(fileModelSign(k, sql, NOW, { lastFail: { raw, at: NOW - 2 * HOUR } }).ok);
   const s = signOf(k);
   assert.equal(s.state, 'red', 'nine of ten is not below nine in ten, but the newest failed');
-  assert.match(s.said, /^The model did not answer 1 of 10 asks this week\. The last error: /u);
-  assert.match(s.said, /model unavailable at the provider/u);
+  assert.equal(s.said, 'The model did not answer 1 of 10 asks this week.');
+  assert.doesNotMatch([s.said, ...s.facts].join(' '), /5007|unavailable|sk-live|api_key/u, 'the host\'s last failure is never quoted');
   assert.doesNotMatch([s.said, ...s.facts].join(' '), NO_ID);
   assert.ok(s.facts.some((f) => /last answered on 8 October/u.test(f)), s.facts.join(' | '));
   assert.doesNotMatch(s.said, /UNREACHABLE/u, 'a code is not a sentence');
@@ -97,55 +100,52 @@ test('RED: the newest ask failed, and the reading says how many and when the mod
 test('THE 9-IN-10 LINE: 8 of 10 is red with the newest answered, 9 of 10 is green, 4 asks are too few to judge by share', async () => {
   const { sql, k } = await fresh();
   for (const h of [1, 10, 20, 30, 40, 50, 60, 70]) ask(sql, h, 'ok');
-  ask(sql, 80, 'error', 'INTERNAL');
-  ask(sql, 90, 'error', 'INTERNAL');
+  ask(sql, 80, 'error', 'UNREACHABLE');
+  ask(sql, 90, 'error', 'UNREACHABLE');
   assert.equal(readModelSign(k, sql, NOW).state, 'red');
   sql.exec("UPDATE slash_call SET status = 'ok' WHERE ts = ?", new Date(NOW - 80 * HOUR).toISOString());
   assert.equal(readModelSign(k, sql, NOW).state, 'green');
 
   const few = await fresh();
   for (const h of [1, 10]) ask(few.sql, h, 'ok');
-  for (const h of [20, 30]) ask(few.sql, h, 'error', 'INTERNAL');
+  for (const h of [20, 30]) ask(few.sql, h, 'error', 'UNREACHABLE');
   assert.equal(readModelSign(few.k, few.sql, NOW).state, 'green', 'two of four with the newest answered');
 });
 
-test('RED: a dead model job with no ask at all, quoting the kept error scrubbed of keys, ids and hosts', async () => {
+test('RED: a dead model job with no ask at all says the fault\'s own sentence, and never its kept error', async () => {
   const { sql, k } = await fresh();
-  const dead: ModelFault = {
+  const at = new Date(NOW - 5 * HOUR).toISOString();
+  /* THE KERNEL'S FAULT AS IT IS KEPT, its error and all: the sign must read past the error, not scrub it. */
+  const dead = {
     kind: 'infer.resolve',
     said: 'BrainDog could not check for people who are here twice. It tries again tonight.',
-    last_at: new Date(NOW - 5 * HOUR).toISOString(),
+    last_at: at,
     error: "No model answered for '@cf/meta/llama-3.1-8b': the provider did not answer (api_key: sk-live-abcdef123456 at gateway.ai.cloudflare.com/v1/acct/run)",
   };
-  const notify: ModelFault = { kind: 'notify.email', said: 'BrainDog could not send a letter.', last_at: dead.last_at, error: 'smtp down' };
-  assert.ok(fileModelSign(withFaults(k, [notify, dead]), sql, NOW).ok);
+  const notify = { kind: 'notify.email', said: 'BrainDog could not send a notification. It tries again when the next one is due.', last_at: at, error: 'smtp down' };
+  const faults: ModelFault[] = [notify, dead];
+  assert.ok(fileModelSign(withFaults(k, faults), sql, NOW).ok);
   const s = signOf(k);
   assert.equal(s.state, 'red');
-  assert.match(s.said, /^A model job stopped after every retry\. The last error: /u);
-  assert.match(s.said, /the provider did not answer/u);
-  assert.doesNotMatch(s.said, /sk-live|abcdef123456|cloudflare\.com|\/v1\//u);
-  assert.doesNotMatch([s.said, ...s.facts].join(' '), NO_ID);
-  assert.ok(s.facts.includes(dead.said));
-  assert.ok(!s.facts.includes(notify.said), 'a letter is not a model job');
-  assert.doesNotMatch(s.said, /—/u);
+  assert.equal(s.said, `A model job stopped after every retry. ${dead.said}`);
+  const read = [s.said, ...s.facts].join(' ');
+  assert.doesNotMatch(read, /sk-live|abcdef123456|cloudflare|\/v1\/|api_key|provider did not answer|smtp/u);
+  assert.doesNotMatch(read, NO_ID);
+  assert.ok(!s.facts.includes(dead.said), 'the sentence the reading ends on is not said again in the facts');
+  assert.ok(s.facts.includes(notify.said), 'the other dead work is said in the facts, in its own sentence');
+  assert.doesNotMatch(read, /—/u);
 });
 
 test('RED: asks in the last day and none answered, even with the week above the line', () => {
   const sql = openSqlite();
   ledger(sql);
   for (let h = 30; h < 160; h += 10) ask(sql, h, 'ok');
-  ask(sql, 3, 'error', 'INTERNAL');
-  ask(sql, 2, 'error', 'INTERNAL');
+  ask(sql, 3, 'error', 'UNREACHABLE');
+  ask(sql, 2, 'error', 'UNREACHABLE');
   const kernel: ModelSignKernel = { signRead: () => ok({ sign: 'model-answers', day: '2026-10-09' }) };
   const r = readModelSign(kernel, sql, NOW);
   assert.equal(r.state, 'red');
-  assert.equal(r.said, 'The model did not answer 2 of 15 asks this week. The provider gave no reason that could be kept.');
-});
-
-test('THE WORDS: nothing left of a key is null, and a long sentence is cut', () => {
-  assert.equal(wordsOf('sk-live-abcdefghijklmnop1234'), null);
-  assert.equal(wordsOf('Rate limited — try again in 30s'), 'Rate limited, try again in 30s');
-  assert.ok((wordsOf('word '.repeat(80)) ?? '').length <= 140);
+  assert.equal(r.said, 'The model did not answer 2 of 15 asks this week.');
 });
 
 test('THROUGH THE KERNEL’S OWN FAULTS: a dead resolve job raised on the record turns the sign red, and clearing it turns it back', async () => {
@@ -153,17 +153,60 @@ test('THROUGH THE KERNEL’S OWN FAULTS: a dead resolve job raised on the record
   const { sql, k } = await fresh();
   for (const h of [2, 20, 50, 90, 140]) ask(sql, h, 'ok');
   assert.equal(readModelSign(k, sql, NOW).state, 'green');
-  raiseFault(sql, 'outbox#infer.resolve', 'infer.resolve', 'the provider did not answer', NOW - HOUR);
+  raiseFault(sql, 'outbox#infer.resolve', 'infer.resolve', 'the provider did not answer, token=abc123def456', NOW - HOUR);
   const r = readModelSign(k, sql, NOW);
   assert.equal(r.state, 'red', r.said);
-  assert.equal(r.said, 'The model answered 5 of 5 asks this week, but a model job stopped after every retry. The last error: the provider did not answer.');
+  assert.equal(
+    r.said,
+    'The model answered 5 of 5 asks this week, but a model job stopped after every retry. BrainDog could not check for people who are here twice. It tries again tonight.',
+  );
+  assert.doesNotMatch([r.said, ...(r.facts ?? [])].join(' '), /token|abc123|provider did not answer/u);
   clearFault(sql, 'outbox#infer.resolve', NOW);
   assert.equal(readModelSign(k, sql, NOW).state, 'green');
 });
 
-test('THE WORDS: a JSON answer gives its message, and an address, a port, a handle or an emptied request id is not quoted', () => {
-  assert.equal(wordsOf('{"errors":[{"message":"Authentication error","code":10000}],"success":false}'), 'Authentication error');
-  assert.equal(wordsOf('fetch failed: connect ECONNREFUSED 10.0.0.5:443'), 'fetch failed: connect ECONNREFUSED the provider');
-  assert.equal(wordsOf('Capacity temporarily exceeded, please try again. (request 01J9ZQ4M2X8K7P3R5T6V8W9Y0A)'), 'Capacity temporarily exceeded, please try again.');
-  assert.doesNotMatch(wordsOf('tools#8 failed: model overloaded') ?? '', /tools#8/u);
+test('ONE COUNT: the two clauses are Slash health\'s own, character for character', () => {
+  assert.equal(LEDGER_ANSWERED, slashHealth.LEDGER_ANSWERED);
+  assert.equal(LEDGER_FAILED, slashHealth.LEDGER_FAILED);
+});
+
+test('AT THE 600 CAP SETTINGS AND THE SIGN AGREE: a spent month, a build without the model and a hold are no asks', async () => {
+  const { sql, k } = await fresh();
+  const clock = { now: () => NOW };
+  for (const h of [30, 60, 90, 120, 150]) ask(sql, h, 'ok');
+  ask(sql, 40, 'error', 'PROPOSAL_SCHEMA');
+  /* THE NIGHT AT THE CAP: every ask after the 600th refused before anything was sent, under the model's name. */
+  for (let h = 1; h <= 20; h++) ask(sql, h, 'error', 'SLASH_BUDGET_SPENT');
+  ask(sql, 2, 'error', 'NOT_IN_THIS_BUILD');
+  ask(sql, 1, 'error', 'SLASH_PENDING');
+  const r = readModelSign(k, sql, NOW);
+  const h = slashHealth.health(sql, clock, { model: true });
+  assert.equal(r.state, 'green', r.said);
+  assert.equal(r.said, 'The model answered all 6 asks this week.');
+  assert.equal(h.state, 'answering');
+  assert.equal(Date.parse(h.last_ok!), NOW - 30 * HOUR, 'Settings\' last answer is the sign\'s');
+  assert.ok((r.facts ?? []).some((f) => /last answered on 8 October/u.test(f)), (r.facts ?? []).join(' | '));
+
+  /* AND THEY TURN TOGETHER: three fresh failures after the last answer are red here and not answering there. */
+  for (const m of [3, 2, 1]) ask(sql, m / 10, 'error', 'UNREACHABLE');
+  assert.equal(readModelSign(k, sql, NOW).state, 'red');
+  assert.equal(slashHealth.health(sql, clock, { model: true }).state, 'not_answering');
+});
+
+test('THE OTHER DEAD WORK, by its kind in words: in the facts of a green week and of a quiet one, never turning it red', async () => {
+  const { raiseFault } = await import('../../kernel/src/fault.ts');
+  const { SAID } = await import('../../kernel/src/fault.ts');
+  const { sql, k } = await fresh();
+  raiseFault(sql, 'outbox#export.copy', 'export.copy', 'R2 put failed: secret=hunter2hunter2', NOW - 10 * 24 * HOUR);
+  const quiet = readModelSign(k, sql, NOW);
+  assert.equal(quiet.state, 'none');
+  assert.deepEqual(quiet.facts, [SAID.export], 'an open fault is still dead after the week');
+  for (const h of [2, 20, 50]) ask(sql, h, 'ok');
+  raiseFault(sql, 'outbox#notify.email', 'notify.email', 'smtp 550', NOW - HOUR);
+  raiseFault(sql, 'outbox#notify.push', 'notify.push', 'push 410', NOW - HOUR);
+  const r = readModelSign(k, sql, NOW);
+  assert.equal(r.state, 'green', r.said);
+  assert.ok((r.facts ?? []).includes(SAID.notify) && (r.facts ?? []).includes(SAID.export), (r.facts ?? []).join(' | '));
+  assert.equal((r.facts ?? []).filter((f) => f === SAID.notify).length, 1, 'two causes of one kind are one sentence');
+  assert.doesNotMatch((r.facts ?? []).join(' '), /hunter2|smtp|550|R2/u);
 });

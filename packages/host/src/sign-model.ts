@@ -12,19 +12,26 @@
  * a model job is dead, or when the last day held asks and none was answered. `none` when there was no ask in the week
  * and no model job is dead: a record nobody asked is not a green one.
  *
- * WHAT COUNTS. A row that called a model (`model <> '-'`, the rule `call.ts` meters by). A hold still in flight
- * (`SLASH_PENDING`) is neither answered nor failed. An answer the engine's own checks refused (`refused`) was an answer:
- * the model spoke. `error` is a call that came back with nothing usable.
+ * WHAT COUNTS, AND IT IS SETTINGS' COUNT. A row is an ask when Slash's own health reads it as an answer or a failure
+ * (`packages/slash/src/health.ts`, `LEDGER_ANSWERED` and `LEDGER_FAILED`), and nothing else is: a hold still in flight, a
+ * month's asks spent, a build without the model and a call that needed none say nothing about the model. Before this the
+ * sign counted every `error` as a failure, so at his 600-ask cap the night's budget refusals read red here while
+ * Settings read "answered an hour ago" over the same ledger. An answer the engine's own checks refused, or one that broke
+ * its schema, was still the model speaking.
  *
- * THE WORDS ARE THE PROVIDER'S, SCRUBBED. The sentence quotes the newest dead model job's kept error, or the words the host
- * kept of its last failure (`lastFail`), with keys, addresses, links, model ids, hosts and paths taken out. A code is
- * never quoted: it is not a sentence.
+ * NO PROVIDER'S WORDS, ONLY THE FAULT'S OWN SENTENCE. A dead job's kept error and the host's last failure can carry a
+ * provider's words about a key, which is why `faults` (`packages/record/src/methods/faults.ts`) holds the error back
+ * from everybody but a self-host's owner, and a sign is read by anyone who reads signs. So the reading quotes the
+ * fault's fixed `said`, a plain sentence from the kernel's table (`fault.ts` `SAID`), and the operator reads the
+ * provider's words in the Worker's log line, where they always were.
+ *
+ * AND THE OTHER WORK THAT STOPPED. A dead job that is not a model's (a notification, a pull, a copy, a script) does not
+ * turn this sign red, since it is not the model, but it is said in the facts in its own sentence, because no other sign
+ * reads faults and a fault nobody reads is the dead job disappearing.
  */
 
 import type { SignReading } from '@braindog/kernel';
 import type { Result, Sql } from '@braindog/ports';
-
-import { scrubbed } from './understand.ts';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -39,14 +46,24 @@ export const MODEL_ASKS_LEAST = 5;
 export const MODEL_ANSWERED_TENTHS = 9;
 /** The last day: asks in it and none answered is red. */
 export const MODEL_DAY_MS = DAY;
-/** How much of the provider's words a reading quotes. */
-const WORDS_MOST = 140;
+/** How many of the other dead jobs' sentences the facts carry. */
+const OTHER_MOST = 2;
 
-/** The one code a hold in flight carries (`packages/slash/src/call.ts` `reserve`). */
-const PENDING = 'SLASH_PENDING';
+/* ── the ledger's two clauses, Slash's own ───────────────────────────────────────────────────────────────────────────── */
 
-/** A fault as the kernel's `faults()` answers one (`packages/kernel/src/fault.ts`), read structurally. */
-export type ModelFault = { kind: string; said: string; last_at: string; error: string };
+/**
+ * `LEDGER_FAILED` and `LEDGER_ANSWERED` of `packages/slash/src/health.ts`, RESTATED BECAUSE THIS PACKAGE MAY NOT IMPORT
+ * THAT ONE (`46 §5.1`, and `graph` refuses a relative import across the line). The definition is Slash's; these two
+ * strings are held equal to it, character for character, by `test/sign-model.test.ts`, so a change there goes red here.
+ */
+export const LEDGER_FAILED = "status = 'error' AND code IN ('UNREACHABLE', 'PULL_REQUEST_REFUSED', 'ANSWER_UNREADABLE')";
+export const LEDGER_ANSWERED =
+  "model <> '-' AND NOT (" +
+  LEDGER_FAILED +
+  ") AND (code IS NULL OR code NOT IN ('SLASH_PENDING', 'SPARK_PENDING', 'SLASH_BUDGET_SPENT', 'SPARK_BUDGET_SPENT', 'NOT_IN_THIS_BUILD'))";
+
+/** A fault as the kernel's `faults()` answers one (`packages/kernel/src/fault.ts`), read structurally. Its `error` is never read. */
+export type ModelFault = { kind: string; said: string; last_at: string };
 
 /** What this needs of the kernel: the verb that files, and where the record has it, the open faults. */
 export type ModelSignKernel = {
@@ -55,7 +72,12 @@ export type ModelSignKernel = {
   identity?: () => { tz?: string | null } | null | undefined;
 };
 
-/** The provider's words the host kept of its newest failure, where it keeps any (the Worker's `onFail`). */
+/**
+ * What a host may hand beside the ledger.
+ *
+ * @deprecated `lastFail` is accepted so a host that still passes it compiles, and it is never read: the provider's words
+ * are the operator's log line, not a sign (the header's second rule).
+ */
 export type ModelSignMore = { lastFail?: { raw: string; at: number } | null };
 
 /** `n thing` or `n things`. */
@@ -70,94 +92,60 @@ function dateSaid(ms: number, tz: string): string {
   }
 }
 
-/**
- * The provider's words as a person may read them, or `null`. Keys, addresses and links go (`scrubbed`); then a model's
- * id (`'@cf/meta/llama-3.1-8b'`, `gpt-4o-mini`), a host name, a path and a long id each go, since a reading names
- * things and never ids.
- */
-export function wordsOf(raw: string): string | null {
-  /* A KEY BY ITS SHAPE FIRST, as the Worker's `scrubRaw` cuts one: a bearer, the prefixes providers mint, a named key's
-     value and a long run of key characters. Then the record's own check on what is left (`scrubbed`). */
-  /* A PROVIDER THAT ANSWERS IN JSON says its sentence in a `message`: that is the words, not the braces around it. */
-  const said = /"message"\s*:\s*"((?:[^"\\]|\\.){3,})"/u.exec(raw)?.[1] ?? raw;
-  const cut = said
-    .replace(/\b(bearer|basic)\s+\S+/giu, '')
-    .replace(/\b(?:sk|pk|rk)[-_][\w-]{6,}|\b(?:ghp|gho|ghu|ghs|ghr|github_pat|glpat|xox[abprse]|cfut|cfat|AIza)[\w-]{6,}|\b(?:AKIA|ASIA)[A-Z0-9]{12,}/gu, '')
-    .replace(/(["']?)\b[\w-]*(?:key|token|secret|password|authorization)[\w-]*\1\s*[:=]\s*("(?:[^"\\]|\\.)*"|'[^']*'|[^\s,;})&]+)/giu, '')
-    .replace(/[A-Za-z0-9_\-+/=]{32,}/gu, '')
-    .replace(/\(\s*\)|\[\s*\]/gu, '');
-  const first = scrubbed(cut, 400);
-  if (first === null) return null;
-  const plain = first
-    .replace(/\[link\]/gu, 'the provider')
-    .replace(/(["'`])[\w.-]*[/@:][\w./@:-]*\1/gu, 'the model')
-    .replace(/@[\w-]+\/[\w./:-]+/gu, 'the model')
-    .replace(/\b(?:gpt|claude|llama|mistral|gemma|qwen|deepseek)[\w.:-]*/giu, 'the model')
-    .replace(/(?:\/[\w.-]+){2,}/gu, '')
-    .replace(/\b(?:[a-z0-9-]+\.)+(?:com|net|org|io|ai|dev|app|dog|cloud|workers)\b/giu, 'the provider')
-    .replace(/\b[0-9A-HJKMNP-TV-Z]{26}\b/gu, '')
-    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/giu, '')
-    .replace(/\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b|\[[0-9a-f:]+\](?::\d+)?/giu, 'the provider')
-    .replace(/\b[\w-]+#\d+\b/gu, '')
-    .replace(/\(\s*(?:request|trace|ref)?\s*(?:id)?\s*[:=]?\s*\)|\[\s*\]/giu, '')
-    .replace(/—/gu, ',')
-    .replace(/\s+([,.:;])/gu, '$1')
-    .replace(/\s+/gu, ' ')
-    .trim();
-  if (plain === '' || /^[\W_]*$/u.test(plain)) return null;
-  return plain.length > WORDS_MOST ? `${plain.slice(0, WORDS_MOST - 1).trimEnd()}…` : plain;
-}
+/** One ask of the week as the sign reads it: `ok` is 1 where Slash's health reads an answer. */
+type Ask = { ts: string; ok: number };
 
-/** One ask of the week as the sign reads it. */
-type Ask = { ts: string; status: string };
-
-/** The asks of the window that called a model and are not in flight, newest first. `[]` where Slash never ran. */
+/** The asks of the window, Slash's health's way, newest first. `[]` where Slash never ran. */
 function asksOf(sql: Sql, sinceMs: number): Ask[] {
   if (sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'") === undefined) return [];
   return sql.all<Ask>(
-    "SELECT ts, status FROM slash_call WHERE model <> '-' AND (code IS NULL OR code <> ?) AND ts >= ? ORDER BY ts DESC, rowid DESC",
-    PENDING,
+    `SELECT ts, CASE WHEN ${LEDGER_ANSWERED} THEN 1 ELSE 0 END AS ok FROM slash_call
+     WHERE ts >= ? AND ((${LEDGER_ANSWERED}) OR (${LEDGER_FAILED})) ORDER BY ts DESC, rowid DESC`,
     new Date(sinceMs).toISOString(),
   );
 }
 
-/** The record's open model faults (`infer.*`), newest first. None where the kernel has no `faults()`. */
-function deadJobsOf(kernel: ModelSignKernel): ModelFault[] {
-  if (typeof kernel.faults !== 'function') return [];
+/** The record's open faults, newest first: the model's (`infer.*`) and the rest. None where the kernel has no `faults()`. */
+function faultsOf(kernel: ModelSignKernel): { model: ModelFault[]; other: ModelFault[] } {
+  if (typeof kernel.faults !== 'function') return { model: [], other: [] };
   const got = kernel.faults();
-  if (!got.ok) return [];
-  return got.value.faults.filter((f) => f.kind.startsWith('infer.')).sort((a, b) => b.last_at.localeCompare(a.last_at));
+  if (!got.ok) return { model: [], other: [] };
+  const all = [...got.value.faults].sort((a, b) => b.last_at.localeCompare(a.last_at));
+  return { model: all.filter((f) => f.kind.startsWith('infer.')), other: all.filter((f) => !f.kind.startsWith('infer.')) };
 }
 
-const answered = (a: Ask): boolean => a.status !== 'error';
+/** Each sentence once: two causes of one kind read the same words. */
+const sentences = (faults: readonly ModelFault[]): string[] => [...new Set(faults.map((f) => f.said.slice(0, 200)))];
+
+const answered = (a: Ask): boolean => a.ok === 1;
 
 /**
- * Read the week's asks and the dead model jobs, and judge them by 2.2's rule. Pure over its inputs, so a test reads the
- * same reading the night files.
+ * Read the week's asks and the open faults, and judge them by 2.2's rule. Pure over its inputs, so a test reads the
+ * same reading the night files. `_more` is not read (`ModelSignMore`).
  */
-export function readModelSign(kernel: ModelSignKernel, sql: Sql, nowMs: number, more: ModelSignMore = {}): SignReading {
+export function readModelSign(kernel: ModelSignKernel, sql: Sql, nowMs: number, _more: ModelSignMore = {}): SignReading {
   const tz = (typeof kernel.identity === 'function' ? kernel.identity()?.tz : null) || 'UTC';
   const since = nowMs - MODEL_WINDOW_DAYS * DAY;
   const asks = asksOf(sql, since);
-  const dead = deadJobsOf(kernel).filter((f) => Date.parse(f.last_at) >= since || f.last_at === '');
-  if (asks.length === 0 && dead.length === 0) return { state: 'none', value: null, said: 'No one asked the model anything this week.', facts: [] };
+  const faults = faultsOf(kernel);
+  const dead = faults.model.filter((f) => Date.parse(f.last_at) >= since || f.last_at === '');
+  /* THE OTHER WORK, OPEN AS LONG AS ITS FAULT IS: a dead copy or notification is still dead after the week. */
+  const other = sentences(faults.other).slice(0, OTHER_MOST);
+  if (asks.length === 0 && dead.length === 0) return { state: 'none', value: null, said: 'No one asked the model anything this week.', facts: other };
 
   const yes = asks.filter(answered).length;
   const no = asks.length - yes;
   const newest = asks[0];
   const dayAsks = asks.filter((a) => Date.parse(a.ts) >= nowMs - MODEL_DAY_MS);
   const lastOk = asks.find(answered);
+  const deadSaid = sentences(dead);
 
   const facts: string[] = [];
   if (asks.length > 0) facts.push(`${count(asks.length, 'ask')} this week, ${yes} answered.`);
   if (lastOk !== undefined) facts.push(`The model last answered on ${dateSaid(Date.parse(lastOk.ts), tz)}.`);
   else if (asks.length > 0) facts.push('The model has not answered once this week.');
-  for (const f of dead.slice(0, 2)) facts.push(f.said.slice(0, 200));
-
-  /* THE WORDS: the newest dead job's, else the host's last failure inside the window. */
-  const kept = dead.map((f) => f.error).find((e) => e !== '') ?? (more.lastFail && more.lastFail.at >= since ? more.lastFail.raw : '');
-  const words = kept === '' ? null : wordsOf(kept);
-  const last = words === null ? 'The provider gave no reason that could be kept.' : `The last error: ${words}${/[.!?…]$/u.test(words) ? '' : '.'}`;
+  /* THE NEWEST DEAD JOB'S SENTENCE IS THE READING'S OWN LAST WORDS (below), so the facts carry the next one, not it twice. */
+  facts.push(...deadSaid.slice(1, 3), ...other);
 
   const red =
     (newest !== undefined && !answered(newest)) ||
@@ -174,7 +162,9 @@ export function readModelSign(kernel: ModelSignKernel, sql: Sql, nowMs: number, 
       : no === 0
         ? `The model answered ${yes} of ${count(asks.length, 'ask')} this week, but ${dead.length === 1 ? 'a model job' : `${dead.length} model jobs`} stopped after every retry.`
         : `The model did not answer ${no} of ${count(asks.length, 'ask')} this week.`;
-  return { state: 'red', value: yes, said: `${head} ${last}`.slice(0, 280), facts: facts.slice(0, 6) };
+  /* THE NEWEST DEAD MODEL JOB'S OWN SENTENCE, which says what was not done and when it is tried again. Never its error. */
+  const said = deadSaid[0] === undefined ? head : `${head} ${deadSaid[0]}`;
+  return { state: 'red', value: yes, said: said.slice(0, 280), facts: facts.slice(0, 6) };
 }
 
 /**

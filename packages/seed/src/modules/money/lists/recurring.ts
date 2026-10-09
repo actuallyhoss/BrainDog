@@ -35,7 +35,9 @@ export const RECURRING_REGISTER: MoneyRegister = {
       index: true,
       required: true,
     },
-    { id: 'amount', type: 'money', required: true, qualifies: 'every' },
+    /* THE ACCOUNT'S CURRENCY WHEN NONE IS SAID, SINCE money-core 3.16.0 (REC-B04): a line with an account takes the
+       code of that account's balance, as the Ledger's amount does. */
+    { id: 'amount', type: 'money', required: true, qualifies: 'every', currency_from: 'account.balance' },
     /* THE VALUES ARE `LOOKUPS.per_month`'S AND THE WALK'S. A frequency the factor table does not know is
        counted at nothing a month by every figure that reads this list, which is a silent zero, and one the walk does
        not know moves once and is said. So a value goes into this list, the table and `CASH_LEGS` together. */
@@ -54,14 +56,17 @@ export const RECURRING_REGISTER: MoneyRegister = {
        and the 15th; and a line on the 30th typed in September walked to 31 October, read as "the end of the month".
        `last` is each month's own last day, and `30` is the 30th, or the end of a shorter month.
 
-       "NEXT" WINS FOR THE NEXT PAYMENT AND THIS FIELD FOR EVERY ONE AFTER IT, which the label says on the form: a line
+       "NEXT" WINS FOR THE NEXT PAYMENT AND THIS FIELD FOR EVERY ONE AFTER IT, which the list's own description says: a line
        whose two disagree moves first on the day somebody wrote, and then on its days (`days` in the walk,
        `packages/kernel/src/forecast.ts`). Empty walks as it did, and twice a month falls back to the 1st and the 15th.
 
        TEXT AND CHECKED TWICE, because a field has no pattern of its own: `max` holds it to a few characters, and the walk
        reads it with the one grammar (`daysOf`) and says each line it could not read, which then walks by how often alone.
-       Not indexed, for the same reason `book` is not. */
-    { id: 'day_of_month', label: 'Days of the month, after Next', type: 'text', max: 12 },
+       Not indexed, for the same reason `book` is not.
+
+       THE LABEL HAS NO COMMA, because a person filters by the name the screen shows (`days of the month is 15`), and a
+       comma in a name is a second clause to the grammar (`pages-read.test.ts`). */
+    { id: 'day_of_month', label: 'Days of the month', type: 'text', max: 12 },
     /* WHAT HAPPENS TO A DAY THAT FALLS ON A REST DAY (Money's `rest_days`, Saturday and Sunday until somebody says
        otherwise): kept, or moved to the working day before or after. `leave` is the default because it is a line as
        imported: nothing moves until a person says it does. */

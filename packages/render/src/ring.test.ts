@@ -138,7 +138,7 @@ test('A LATE ARC IS STRIPED AS WELL AS RED (DIRECTION §42): it is stroked with 
   const html = toHTML(parse('```ring | Week\nDeep work | 12\nInvoices | 6 | | bad\n```'));
   const id = /<pattern class="late-hatch" id="([^"]+)" patternUnits="userSpaceOnUse" width="4" height="4">/u.exec(html)?.[1];
   assert.ok(id, 'a late arc drew no pattern');
-  assert.match(html, new RegExp(`<circle class="ring-arc" data-step="1" data-intent="bad"[^>]* style="stroke:url\\(#${id}\\)"`, 'u'));
+  assert.match(html, new RegExp(`<circle class="ring-arc" data-step="1" data-intent="bad"[^>]* style="stroke:url\\(#${id}\\) var\\(--chart-late, currentColor\\)"`, 'u'));
   assert.match(html, /<path class="late-stripe" d="M0 0H2L0 2ZM4 0V2L2 4H0Z" fill="currentColor">/u, 'the pattern is a stripe, not a wash');
   assert.equal(html.match(/url\(#/gu)?.length, 1, 'only the late arc is striped');
   /* A dial with nothing late carries no pattern, and a progress ring that is late is striped too. */

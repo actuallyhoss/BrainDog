@@ -1,0 +1,8 @@
+{
+  "gate": "docs-counts",
+  "rule": "a count in the documents the code does not hold",
+  "expect": "and the code holds",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE FALSE COUNT BESIDE TRUE ONES AND A QUALIFIED ONE (`Three CSS gates`), so a total of one proves the gate reads the code's tables rather than refusing every number, and leaves a count of some of a list alone."
+}

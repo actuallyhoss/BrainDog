@@ -268,6 +268,8 @@ with every seed inside the same batch · no identifier reaches the kernel withou
 | `repeat` | `{ freq, interval?: 1–99, byday?: [MO TU WE TH FR SA SU], bymonthday?: [−31…31 ≠ 0], until?: day, count?: 1–999, workday? }` | `day`/`instant` only | — | `freq ∈ daily weekly monthly yearly` · `workday ∈ previous next none` |
 | `note` | text ≤ 280 | no | — | — |
 | `scope` | `{ widen?, same? }` on a `ref`, or `{ links? }` on a `list<ref>`, whose target is the register declaring `scopes`; one per register | no | global; `widen: any`, `same: both` | `widen ∈ any person` · `same ∈ both nearer` · `links ∈ true` |
+| `currency_from` | `'<link>.<field>'`: a `ref` of this register and a `money` field of the register it points at. An amount written with no code takes that field's code on the linked row, and is `VALUE_MALFORMED` when there is none to give. `DECLARATION_INVALID` on another type, a link that is not a `ref`, or a target that is not `money` | `money` only | none | — |
+| `currency_fixed` | `true`: once a row holds a code, a write that would change it is `CURRENCY_FIXED`; the amount stays free | `money` only | `false` | — |
 
 `band.edges.length + 1 === values.length`, else `BAND_EDGES_MISMATCH`. Every field id named by `search title mobile
 key pairs identity scopes derive required_when transitions.requires` is declared on this register, else `FIELD_UNKNOWN`.

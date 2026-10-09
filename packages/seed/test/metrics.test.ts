@@ -264,6 +264,9 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
     /* NOR OF A FIGURE OVER A KEPT LINE (`series.<figure>`, money-core 3.16.0's `nights-missed-30d`): it counts the days its
        line has no point, which `kernel/test/metrics-series-gaps.test.ts` holds. */
     if (decl.source.startsWith('series.')) continue;
+    /* NOR OF A ROLLED FIGURE THAT READS AN AGE (`rolled.read`, money-core 3.16.0's `statement-oldest-days`): it answers how
+       old the balances are, not what they hold, which `kernel/test/money-figures-ages.test.ts` holds. */
+    if ((decl.value as { rolled?: { read?: unknown } }).rolled?.read !== undefined) continue;
     /* A FIGURE READ ONCE PER BOOK has no book to be read about: the sample keeps none (money-core 3.1.0's `books`). */
     if (JSON.stringify(decl).includes('book is {{it}}')) continue;
     const params = JSON.stringify(decl).includes('{{it}}') ? THINGS.map((t) => String(t.name)) : [null];

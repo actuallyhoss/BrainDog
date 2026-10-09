@@ -771,14 +771,84 @@
     },
     {
       "kind": "pack",
+      "id": "live-feed",
+      "title": "Live numbers",
+      "summary": "Polls stats.example.com every 1h, one request each time, for Monthly recurring revenue, Active users.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "2.0.0",
+      "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "d102893d763468131761c8f35c15a9ea52fb5a7cf2fdb898e4caafcd430f0d96",
+          "bytes": 3504,
+          "published_at": "2026-10-09T01:51:31.441Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "stats.example.com",
+                "line": "CALLS OUT stats.example.com · every 1h · grant \"Example stats (read only)\"",
+                "key": "Example stats (read only)"
+              }
+            ]
+          },
+          "notes": "The add-on is now live-feed, the one every feed is filled from. A number can be money, written as an amount and its currency. A number can be dated from the answer, a day or an instant, rather than when the answer arrived. A feed asked in whole days can say the time of day and the zone. An id too long for its poll is refused in a sentence rather than cut short, and past twenty numbers a second poll of the same address is made."
+        }
+      ],
+      "categories": [
+        "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "unlisted": true
+    },
+    {
+      "kind": "pack",
       "id": "mercury",
       "title": "Mercury",
       "summary": "Reads the balance of every Mercury account from api.mercury.com, once an hour or as often as its setting says, into Money's accounts, and its last thirty days of transactions into the ledger.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "f85e197780c988e510bf21efe477d383555bae46ec4206ff5602d640d236801f",
+          "bytes": 29425,
+          "published_at": "2026-10-09T01:51:31.441Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its vault entry opens",
+                "key": "Mercury (read only)"
+              }
+            ]
+          },
+          "notes": "Mercury money counts once. Each Mercury account is kept on the account you already typed for it when the names match, keeping your name for it, and one it cannot match waits for you to say which it is instead of counting as cash a second time."
+        },
         {
           "version": "1.1.0",
           "checksum": "ced1b0ee9219d93b04dbc61e0d52f69936cd8b416fd63d7f519ed4dd75b497a4",
@@ -1136,8 +1206,31 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.0",
+      "latest": "2.1.0",
       "versions": [
+        {
+          "version": "2.1.0",
+          "checksum": "8e5a888a1eb1e79371b3a8b7c74322c0e12b9396f14972d47809e28f1c2d7f5b",
+          "bytes": 14926,
+          "published_at": "2026-10-09T01:51:31.441Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [
+              "Revenue bands"
+            ],
+            "pages": [
+              "Revenue bands"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "A project's numbers may now arrive as money, an amount and its currency, and the bands count it as it is, beside the older numbers that carry a currency as their unit."
+        },
         {
           "version": "2.0.0",
           "checksum": "6bd4824cdc85b36cfbe5a3c5ac67e6d8b926be7d793fc15cf294b097d5731899",
@@ -1500,6 +1593,64 @@
     },
     {
       "kind": "pack",
+      "id": "rule-sheet",
+      "title": "Rule sheet",
+      "summary": "Fourteen pages that draw every rule of a value, a block and a layout on your own record, so a check can read each rule where a person sees it.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "08bd05ea297f3172e8fc35d6a37c5524a3de9f420129fc47a02d982626f0329c",
+          "bytes": 15768,
+          "published_at": "2026-10-09T01:51:31.441Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "work",
+              "portfolio"
+            ],
+            "lists": [],
+            "pages": [
+              "Values",
+              "Blocks",
+              "Counts",
+              "Layout",
+              "Tab 5",
+              "Tab 6",
+              "Tab 7",
+              "Tab 8",
+              "Tab 9",
+              "Tab 10",
+              "Tab 11",
+              "Tab 12",
+              "Tab 13",
+              "Tab 14",
+              "Counts on {{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version: Values, Blocks, Counts, Layout and ten short pages, in one section drawn as tabs.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "templates",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
       "id": "standup",
       "title": "Standup",
       "summary": "One message every morning about the work: what moved since yesterday, what is blocked, and what agents finished. A morning with none of the three sends nothing.",
@@ -1545,8 +1696,33 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.3.0",
+      "latest": "1.4.0",
       "versions": [
+        {
+          "version": "1.4.0",
+          "checksum": "d84538fd2fba6a9a7acf078cfc4555b3214fee652ed1e94e838bd89a1f270e3e",
+          "bytes": 20062,
+          "published_at": "2026-10-09T01:51:31.441Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.stripe.com",
+                "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its vault entry opens",
+                "key": "stripe"
+              }
+            ]
+          },
+          "notes": "Stripe money counts once. A Stripe balance you typed in yourself is taken over instead of counted a second time, the Stripe accounts keep their place when you rename them, the key and the book can be changed on this page, and currencies Stripe counts differently, such as ISK, read right."
+        },
         {
           "version": "1.3.0",
           "checksum": "a3d105bebcbbc0131a1a2c801a467fb8a649bf9805da2d2b4d329db33afaf322",

@@ -15,6 +15,7 @@
     "@braindog/dog": "workspace:*",
     "@braindog/kernel": "workspace:*",
     "@braindog/mcp": "workspace:*",
+    "@braindog/pack-live-feed": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/seed": "workspace:*",
     "braindog-render": "workspace:*",

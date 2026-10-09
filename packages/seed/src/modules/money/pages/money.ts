@@ -63,7 +63,7 @@ export const MONEY_PAGE: SeedPage = {
   title: 'Money',
   nav: { section: 'Money', order: 10 },
   icon: 'money',
-  requires: ['register.accounts', 'register.obligations', 'register.transactions', 'register.recurring', 'register.installments', 'register.categories', 'register.books'],
+  requires: ['register.accounts', 'register.obligations', 'register.transactions', 'register.recurring', 'register.installments', 'register.categories', 'register.books', 'register.balances'],
   pack: 'money-core',
   /* A SIDE COLUMN, SINCE money-core 3.11.0, so a figure and the accounts under it stand beside the walk as one column
      of short tiles, and not as one tall tile stretched to the chart's height. A record with no account draws nothing

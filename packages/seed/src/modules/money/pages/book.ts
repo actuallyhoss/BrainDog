@@ -1,6 +1,7 @@
 /** A book's page: Money's own layout over the rows filed in one book. */
 
 import type { SeedPage } from '../../base.ts';
+import { CONFIRMED_COLUMN, CONFIRMED_STALE } from './parts/ages.ts';
 import { BOOK_LEGS, DUE_30D, MOVED_COLUMNS } from './shared.ts';
 
 /**
@@ -67,11 +68,13 @@ export const MONEY_BOOK_PAGE: SeedPage = {
         { field: 'name', as: 'title' },
         { field: 'balance', as: 'figure' },
         { field: 'kind', label: 'Type', as: 'fact' },
-        { field: 'as_of', label: 'As of', as: 'when' },
+        CONFIRMED_COLUMN,
       ],
       order: [{ field: 'seq', dir: 'asc' }],
-      /* A BALANCE OLDER THAN A WEEK IS SAID TO BE OUT OF DATE (25 §9). */
-      stale: { field: 'as_of', after: '7d' },
+      /* A BALANCE OLDER THAN A WEEK IS SAID TO BE OUT OF DATE (25 §9). DATED BY THE BANK'S LAST WORD SINCE money-core
+         3.16.0 (REC-B03), the day `account-ages` says for the card's account, where it was the typed "As of" a bank
+         message never writes (`parts/ages.ts`). */
+      stale: CONFIRMED_STALE,
       empty: 'No account is in {{name}} yet. Add one here and it is filed in this book.',
     },
     {

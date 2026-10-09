@@ -7,6 +7,9 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { words as levelWords } from '../../levels.ts';
   import { exportFile, type ExportKind } from '$lib/record/settings-write.ts';
+  import { readBoot, rereadBoot } from '$lib/record/boot-live.ts';
+  import { untrack } from 'svelte';
+  import { copiesOf, exportLine, type CopyFacts } from './copies.ts';
   import { checkBrainl } from '@braindog/kernel';
   import { TONES } from 'braindog-render';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -24,6 +27,16 @@
 
   /* ── the record as a file, where there is a record to take it from ── */
   let exporting = $state<ExportKind | null>(null);
+
+  /**
+   * WHEN THE RECORD WAS LAST TAKEN AWAY, from `boot`'s `copies` (LCH-C03): "Last exported: 3 days ago" or "Never
+   * exported". The layout's `boot`, so arriving asks nothing; a host older than the field draws no line.
+   */
+  let facts = $state<CopyFacts | null>(null);
+  const lastExport = $derived(facts ? exportLine(facts, Date.now()) : null);
+  $effect(() => {
+    untrack(() => void readBoot(apiBase()).then((b) => (facts = b.from === 'live' ? copiesOf(b.boot) : null)));
+  });
 
   /** A record hands the browser a `.brainl` file, and a host that refuses says why in its own words. */
   async function takeCopy(kind: ExportKind) {
@@ -44,6 +57,8 @@
     a.click();
     URL.revokeObjectURL(url);
     toasts.push(copy.exported(out.value.name), { intent: 'good' });
+    /* AN EXPORT TAKEN IS THE LAST ONE, so the line reads it from the record's own `boot`. */
+    void rereadBoot(apiBase()).then((b) => (facts = b.from === 'live' ? copiesOf(b.boot) : facts));
   }
 
   /* ── checking a file: the import's own check, run here, and nothing sent anywhere ── */
@@ -141,6 +156,7 @@
        `.dogl` until the record gave the name up: `.dog` is a PAGE's source now, one page to
        a file, which is what somebody means when they open the source of a page. The three
        layers are unchanged; only the name on the container moved. -->
+  {#if lastExport}<p class="last-export">{lastExport}</p>{/if}
   <p class="hint">{copy.exportWhat}</p>
   <!--
     AND THE COPY IS THE OWNER'S TO TAKE, WHILE THE CHECK IS ANYBODY'S.
@@ -222,6 +238,14 @@
 </Section>
 
 <style>
+  /* WHEN IT WAS LAST TAKEN, the first line in the tile, at body size. */
+  .last-export {
+    margin: 0 0 var(--sp-2);
+    color: var(--ink);
+    font-size: var(--t-row);
+    line-height: var(--lh-body);
+  }
+
   .file-pick {
     display: none;
   }

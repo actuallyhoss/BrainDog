@@ -1,0 +1,7 @@
+{
+  "gate": "guards",
+  "rule": "one method name in two of the record's files",
+  "expect": "keeps only one of them",
+  "findings": 1,
+  "why": "AND ONE METHOD NAME WRITTEN IN TWO OF THE RECORD'S FILES, which the record's spread keeps one of without a word."
+}

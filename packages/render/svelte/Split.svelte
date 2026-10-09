@@ -56,7 +56,7 @@
       {/if}
       {#each plan.parts as p}
         {@const tone = rows[p.at]?.tone}
-        <rect class="split-seg" data-step={p.step} data-intent={tone} style={tone === 'bad' ? `fill:url(#${late})` : undefined} x={p.x} y="0" width={p.width} height="100"
+        <rect class="split-seg" data-step={p.step} data-intent={tone} style={tone === 'bad' ? `fill:url(#${late}) var(--chart-late, currentColor)` : undefined} x={p.x} y="0" width={p.width} height="100"
         ></rect>
       {/each}
       {#if plan.cuts}<path class="split-cut" d={plan.cuts} vector-effect="non-scaling-stroke"></path>{/if}

@@ -23,8 +23,9 @@ import { parseArgs } from 'node:util';
 
 import { briefingOf, cardOf, firstLine, fitLines, live, placeOf, type Where } from './brief.ts';
 import { clip } from './clip.ts';
-import { asCaller, asksWaiting, deviceName, movedSince, whoDecides, withoutRun } from './hooks.ts';
-import { hostSessionOf, positionOf } from './position.ts';
+import { aheadCard, asCaller, asksWaiting, deviceName, movedSince, whoDecides, withoutRun } from './hooks.ts';
+import { budgetOf, clientFor } from './http.ts';
+import { aheadHeader, hostSessionOf, positionOf } from './position.ts';
 import { connect, type AgentIo } from './skills.ts';
 
 const USAGE = 'braindog context takes --host and nothing else.';
@@ -57,28 +58,35 @@ export async function context(args: string[], io: AgentIo): Promise<number> {
   }
 
   const caller = asCaller(io);
-  let at = await connect(host, caller.io);
+  let asked: AgentIo = caller.io;
+  let at = await connect(host, asked);
   if (typeof at === 'number') return at;
   const ran = at.context.session;
   if (caller.remembered() && ran !== null && !live(ran.state)) {
-    const again = await connect(host, { ...io, headers: async (named) => withoutRun(await io.headers(named)) });
+    asked = { ...io, headers: async (named) => withoutRun(await io.headers(named)) };
+    const again = await connect(host, asked);
     if (typeof again === 'number') return again;
     at = again;
   }
 
-  const c = at.context;
+  /* THE CARD THE START HOOK PRINTS, with the commits since the handoff: the record's is read once more with
+     `x-braindog-ahead` when HEAD has moved (`aheadCard`), under the same headers as the read before it. */
+  const here = await positionOf(io.cwd);
+  const moved = await movedSince(io.cwd, at.context.handoff?.head ?? null, here.head);
+  const to = at.to;
+  const ahead = aheadHeader(moved);
+  const c =
+    (await aheadCard(at.context, moved, async () => {
+      const headers = await asked.headers(to.key);
+      return clientFor(to, async () => (ahead === undefined ? headers : { ...headers, 'x-braindog-ahead': ahead }), AbortSignal.timeout(budgetOf(io.env))).context();
+    })) ?? at.context;
   const record = cardOf(c);
-  const [here, device, decides] = await Promise.all([
-    positionOf(io.cwd),
-    record === null ? (io.device ?? deviceName(io.env, at.to.key)) : '',
-    asksWaiting(c) ? whoDecides(at.client) : null,
-  ]);
+  const [device, decides] = await Promise.all([record === null ? (io.device ?? deviceName(io.env, at.to.key)) : '', asksWaiting(c) ? whoDecides(at.client) : null]);
   const claude = inClaudeCode(io.env);
   let text: string;
   if (record !== null) text = fitLines(record);
   else {
     const where: Where = { repo: here.repo, host: here.host, device, agent: claude ? 'Claude Code' : null };
-    const moved = await movedSince(io.cwd, c.handoff?.head ?? null, here.head);
     text = briefingOf(headline(c.session, where, placeOf(c)), c, moved, { agent: claude ? 'claude' : null, ...decides });
   }
   for (const line of text.split('\n')) io.out(line);

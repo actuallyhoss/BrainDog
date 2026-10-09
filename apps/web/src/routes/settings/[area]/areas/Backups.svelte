@@ -7,6 +7,8 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   /* Lane F: backups and putting a copy back. */
   import { backUpNow, downloadSnapshot, readSnapshots, restoreSnapshot } from '$lib/record/settings-write.ts';
+  import { readBoot, rereadBoot } from '$lib/record/boot-live.ts';
+  import { copiesOf, copyLine, type CopyFacts } from './copies.ts';
   import type { Snapshot as KeptCopy } from '@braindog/client';
   /* Bytes as a person reads them: `braindog-render`'s, and it is imported rather than written here
      because it was written here, as `(bytes / 1e6).toFixed(1)`, and printed **"0.2 MB"** for all four
@@ -113,6 +115,18 @@
     untrack(() => void readCopies());
   });
 
+  /**
+   * THE NIGHT'S COPY IN ONE LINE OVER THE LIST (LCH-C03), from `boot`'s `copies`: its age and size, "First copy
+   * tonight" on a record with none yet, and past 26 hours the deeper red with the word Late, never the colour alone.
+   * `boot` is the one the layout already asked, so arriving here asks nothing more; a host older than the field draws
+   * no line.
+   */
+  let facts = $state<CopyFacts | null>(null);
+  const lastCopy = $derived(facts ? copyLine(facts, Date.now()) : null);
+  $effect(() => {
+    untrack(() => void readBoot(apiBase()).then((b) => (facts = b.from === 'live' ? copiesOf(b.boot) : null)));
+  });
+
   async function readCopies() {
     const at = opened();
     const out = await readSnapshots(apiBase());
@@ -132,6 +146,8 @@
     if (out.ok) {
       toasts.push(copy.backedUp(out.value.id), { intent: 'good' });
       await readCopies();
+      /* A COPY TAKEN BY HAND IS A COPY, so the line over the list reads it, from the record's own `boot`. */
+      void rereadBoot(apiBase()).then((b) => (facts = b.from === 'live' ? copiesOf(b.boot) : facts));
     } else toasts.push(out.fix, { intent: 'warn' });
   }
 
@@ -186,6 +202,15 @@
   AT THE RIGHT OF THE FIRST GROUP'S HEADING, where a group's own verb goes, so it stays one press away
   whether the record has kept thirty copies or none.
 -->
+{#snippet lastCopyLine()}
+  {#if lastCopy}
+    <p class="last-copy" data-late={lastCopy.late ? '' : undefined}>
+      {#if lastCopy.late}<span class="late-word">{copy.copiesLate}</span>{/if}
+      <span>{lastCopy.text}</span>
+    </p>
+  {/if}
+{/snippet}
+
 {#snippet backUpButton()}
   {#if anOwner && copiesFrom === 'live'}
     <Button weight="primary" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
@@ -224,7 +249,8 @@
 {#if copiesFrom === 'refused'}
   <Section title={copy.kept}>
     <!-- NOT ON THIS HOST YET, AS A ROW, with the record's own sentence as its line and the one way
-         out that does exist on every host, the export, as its action. -->
+         out that does exist on every host, the export, as its action. NO LINE OVER IT: "First copy tonight" over a
+         host that keeps no copies is a promise the next row takes back. -->
     <div role="status">
       <StateRow icon="archive" title={words.notHereYet} line={copiesSaid} action={anOwner ? exportInstead : undefined} />
     </div>
@@ -237,6 +263,7 @@
   <!-- "The 30 newest are kept" IS A SENTENCE ABOUT A LIST THAT HAS SOME. On a record whose
        first backup has not run it describes a policy over nothing, above nothing. -->
   <Section title={copy.kept} aside={backUpButton}>
+    {@render lastCopyLine()}
     <Empty kind="no-data-yet" title={copy.noSnapshots} body={copy.noSnapshotsWhy} />
   </Section>
 {:else}
@@ -285,7 +312,7 @@
   {#each months as month, i (`${month.key}:${i}`)}
     {@const kept = month.lines.filter((line) => line.failed === null).length}
     {#if i === 0}
-      <Section title={month.label} count={kept} aside={backUpButton}>{@render monthRows(month.lines)}</Section>
+      <Section title={month.label} count={kept} aside={backUpButton}>{@render lastCopyLine()}{@render monthRows(month.lines)}</Section>
     {:else}
       <Section title={month.label} count={kept}>{@render monthRows(month.lines)}</Section>
     {/if}
@@ -353,6 +380,26 @@
 </Section>
 
 <style>
+  /* THE NIGHT'S COPY, the first line in the tile over the copies, at body size. */
+  .last-copy {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+    color: var(--ink);
+    font-size: var(--t-row);
+    line-height: var(--lh-body);
+  }
+
+  /* LATE IS A WORD AS WELL AS A COLOUR: the deeper red of late, and the word Late before the sentence. */
+  .last-copy[data-late] {
+    color: var(--danger-text);
+  }
+
+  .late-word {
+    font-weight: 600;
+  }
+
   /* A FAILED NIGHT'S REASON IS A SENTENCE, and beside the date on a phone it squeezed the date onto
      two lines. It takes its own line under the facts there instead. */
   @media (width < 640px) {

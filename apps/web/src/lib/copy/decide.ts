@@ -226,19 +226,19 @@ export const decide = {
      its rows hold it". A deleted row is a reason of its own, because the choice going would make its restore refused. */
   arrangeStays: (name: string, field: string, values: readonly string[], rows: number, holding: number | null = null, binned = 0) => {
     const it = values.length === 1 ? 'it' : 'one of them';
-    const deleted = binned === 1 ? 'a deleted item holds' : `${binned} deleted items hold`;
+    const deleted = binned === 1 ? 'a deleted entry holds' : `${binned} deleted entries hold`;
     const why =
       holding === null
-        ? `it holds ${rows} ${rows === 1 ? 'item' : 'items'} that may use ${values.length === 1 ? 'it' : 'them'}`
+        ? `it holds ${rows} ${rows === 1 ? 'entry' : 'entries'} that may use ${values.length === 1 ? 'it' : 'them'}`
         : holding === 0 && binned > 0
-          ? `${deleted} ${it}, and ${binned === 1 ? 'that item' : 'those items'} could not be restored without ${values.length === 1 ? 'it' : 'them'}`
+          ? `${deleted} ${it}, and ${binned === 1 ? 'that entry' : 'those entries'} could not be restored without ${values.length === 1 ? 'it' : 'them'}`
           : `${
               holding >= rows
                 ? rows === 1
-                  ? `its one item holds ${it}`
-                  : `all ${rows} of its items hold ${it}`
-                : `${holding} of its ${rows} items ${holding === 1 ? 'holds' : 'hold'} ${it}`
-            }${binned === 0 ? '' : `, and ${binned === 1 ? '1 deleted item does' : `${binned} deleted items do`} too`}`;
+                  ? `its one entry holds ${it}`
+                  : `all ${rows} of its entries hold ${it}`
+                : `${holding} of its ${rows} entries ${holding === 1 ? 'holds' : 'hold'} ${it}`
+            }${binned === 0 ? '' : `, and ${binned === 1 ? '1 deleted entry does' : `${binned} deleted entries do`} too`}`;
     return `${name} keeps ${values.length === 1 ? `the choice ${values[0]}` : `${values.length} choices, ${list([...values])},`} for ${field}, which this update takes off, because ${why}.`;
   },
   /* WHAT A PACK LAYS ON A LIST ANOTHER PACK OWNS: Personal's roles on People. Named apart from what it adds, because the

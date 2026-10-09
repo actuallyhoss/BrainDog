@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { readPackFile } from '../../packages/declare/src/catalogue.ts';
-import { openRecord, type Declaration } from '../../packages/kernel/src/index.ts';
+import { exponentOf, fillConfig, openRecord, type Declaration } from '../../packages/kernel/src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../packages/kernel/test/sqlite.ts';
 import { fixOf } from '../../packages/ports/src/index.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
@@ -35,8 +35,21 @@ import { REGISTERS, firstPartyDocument } from '../../packages/seed/src/index.ts'
 const HERE = new URL('./', import.meta.url);
 const SOURCE = readFileSync(new URL('stripe.js', HERE), 'utf8');
 const TEXT = readFileSync(new URL('stripe.pack.json', HERE), 'utf8');
-const PACK = JSON.parse(TEXT) as { pack: string; declarations: Record<string, unknown>[]; extends?: Record<string, unknown> };
-const SCRIPT = PACK.declarations.find((d) => typeof d.script === 'string') as {
+const PACK = JSON.parse(TEXT) as { pack: string; declarations: Record<string, unknown>[]; extends?: Record<string, unknown>; config: Record<string, { default: Json }> };
+
+/** Each setting's default, read from the file, so a test never holds a second copy of what the file says. */
+const DEFAULTS: Record<string, Json> = Object.fromEntries(Object.entries(PACK.config).map(([k, c]) => [k, c.default]));
+
+/** What `ctx.config` holds for a run: the settings' defaults and whatever `set` changes. */
+const configOf = (set: Record<string, Json> = {}): Json => ({ ...DEFAULTS, ...set });
+
+/**
+ * The script's declaration as a record stores it, every `{{config:<key>}}` filled through the kernel's own
+ * `fillConfig`, which is what a plan does before it installs. `RAW` is the file as it ships.
+ */
+const scriptOf = (set: Record<string, Json> = {}) =>
+  (fillConfig(PACK.declarations as unknown as Json, { ...DEFAULTS, ...set }) as unknown as Record<string, unknown>[]).find((d) => typeof d.script === 'string') as Script;
+type Script = {
   script: string;
   runs: Record<string, unknown>;
   egress: string[];
@@ -46,6 +59,8 @@ const SCRIPT = PACK.declarations.find((d) => typeof d.script === 'string') as {
   limits?: Record<string, number>;
   source: string;
 };
+const RAW = PACK.declarations.find((d) => typeof d.script === 'string') as Script;
+const SCRIPT = scriptOf();
 
 const NOW = '2026-09-25T09:00:00.000Z';
 const TODAY = NOW.slice(0, 10);
@@ -170,22 +185,38 @@ const accountsIn = (sql: Pick<NodeSql, 'all'>): [string, number, string][] =>
 
 /* ── The pack ──────────────────────────────────────────────────────────────────────────────────── */
 
-test('THE PACK CARRIES stripe.js AS ITS SOURCE, byte for byte, and asks for one host, one key and one list', async () => {
-  assert.equal(SCRIPT.source, SOURCE, 'stripe.pack.json and stripe.js disagree; copy stripe.js into the source');
-  assert.deepEqual(SCRIPT.runs, { every: '1h' });
-  assert.deepEqual(SCRIPT.egress, [API]);
+test('THE PACK CARRIES stripe.js AS ITS SOURCE, byte for byte, and asks for one host, the key its setting names, and two lists', async () => {
+  assert.equal(RAW.source, SOURCE, 'stripe.pack.json and stripe.js disagree; copy stripe.js into the source');
+  assert.deepEqual(RAW.runs, { every: '1h' });
+  assert.deepEqual(RAW.egress, [API]);
+  /* THE KEY IS THE `grant` SETTING (1.4.0), filled at install, `stripe` unless a person sets another. The source reads
+     the same setting from `ctx.config`, so the key it asks with is the key it declares. */
+  assert.deepEqual(RAW.keys, ['{{config:grant}}']);
   assert.deepEqual(SCRIPT.keys, ['stripe']);
-  assert.deepEqual(SCRIPT.reads, ['accounts']);
-  assert.deepEqual(SCRIPT.writes, ['accounts']);
+  assert.deepEqual(scriptOf({ grant: 'Ops' }).keys, ['Ops']);
+  assert.ok(SOURCE.includes('keyOf(ctx.config)') && SOURCE.includes('bookOf(ctx.config)'), 'stripe.js no longer reads its key and its book from its settings');
+  assert.equal(SOURCE.includes('{{config:'), false, 'a setting is written into the source again, where a change to it does nothing');
+  /* BOOKS, TO KNOW THE BOOK THE SETTING NAMES BY THE ID THE RECORD HOLDS, so a row in another book is moved. */
+  assert.deepEqual(RAW.reads, ['accounts', 'books']);
+  assert.deepEqual(RAW.writes, ['accounts']);
   /* THE BALANCE, THE PAYOUTS IN TRANSIT AND THE PAYOUTS PENDING, and not one request more, which the first run below
      counts. */
-  assert.deepEqual(SCRIPT.limits, { fetches: 3 });
+  assert.deepEqual(RAW.limits, { fetches: 3 });
   /* money-core 3.1.0 AND NOT EARLIER: 3.0.0's walk brings a payout in on the day it lands (`accounts.arrives`), and
      3.1.0 has the `books` the `book` setting (1.2.0) files each row in. */
   const doc = JSON.parse(TEXT) as { version: string; requires: { packs: Record<string, string> }; config: Record<string, unknown> };
-  assert.equal(doc.version, '1.3.0');
+  assert.equal(doc.version, '1.4.0');
   assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.1.0 <4.0.0' });
-  assert.deepEqual(Object.keys(doc.config), ['book']);
+  assert.deepEqual(Object.keys(doc.config), ['grant', 'book']);
+  assert.deepEqual([DEFAULTS.grant, DEFAULTS.book], ['stripe', 0]);
+  /* THE FIELD THE PACK FINDS ITS ROWS BY, laid on Accounts, with words a person reads for each kind. */
+  const laid = (PACK.extends?.['register.accounts'] as { fields: { id: string; type: string; values?: string[]; labels?: Record<string, string> }[] }).fields;
+  const kind = laid.find((f) => f.id === 'stripe_kind');
+  assert.deepEqual([kind?.type, kind?.values, kind?.labels], ['enum', ['available', 'pending', 'in_transit'], { available: 'Available', pending: 'Pending', in_transit: 'In transit' }]);
+  /* A CHANGES LINE A PERSON READS: plain words, no dash, no id. */
+  const changes = (doc as unknown as { changes: string }).changes;
+  assert.match(changes, /counts once/);
+  assert.equal(/\u2014|books#|\brows?\b/.test(changes), false, changes);
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'stripe');
@@ -195,13 +226,41 @@ test('THE PACK CARRIES stripe.js AS ITS SOURCE, byte for byte, and asks for one 
 
 type Row = { id: string; register: string; seq: number; fields: Record<string, Json>; version: number; updated_at: string };
 
-/** A host double that answers Stripe's two addresses, records every request, and lists `accounts` by name prefix. */
-function stripeHost(answers: { balance: unknown; payouts: unknown; status?: number }, accounts: Row[] = []): CtxHost & { asked: HostRequest[]; filters: Json[] } {
+/**
+ * The leaves of a predicate tree the script writes, read as the record reads them: `in`, `is`, `empty` and a `starts`
+ * that folds case. Enough to tell a script that asked for the right rows from one that asked for everything.
+ */
+function holds(row: Row, where: Json): boolean {
+  if (where === null) return true;
+  const w = where as Record<string, Json>;
+  if (Array.isArray(w.all)) return w.all.every((x) => holds(row, x));
+  const value = row.fields[String(w.field)];
+  if ('in' in w) return (w.in as Json[]).includes(value ?? null);
+  if ('is' in w) return value === w.is;
+  if ('empty' in w) return value === undefined || value === null || value === '';
+  if ('starts' in w) return typeof value === 'string' && value.toLowerCase().startsWith(String(w.starts).toLowerCase());
+  throw new Error(`the double does not read ${JSON.stringify(where)}`);
+}
+
+/** The books a host double holds, by the number a setting names. */
+const BOOKS: Record<string, Json> = { 'books#2': { id: '01K5BOOK000000000000000002', register: 'books', seq: 2, fields: { name: 'Quartz' }, version: 1 } };
+
+/**
+ * A host double that answers Stripe's two addresses, records every request, lists `accounts` by the filter the script
+ * sends, and gets a book by its number.
+ */
+function stripeHost(
+  answers: { balance: unknown; payouts: unknown; status?: number },
+  accounts: Row[] = [],
+  set: Record<string, Json> = {},
+): CtxHost & { asked: HostRequest[]; filters: Json[]; got: string[] } {
   const asked: HostRequest[] = [];
   const filters: Json[] = [];
+  const got: string[] = [];
   return {
     asked,
     filters,
+    got,
     fetch: async (request) => {
       asked.push(request);
       const url = new URL(request.url);
@@ -210,37 +269,59 @@ function stripeHost(answers: { balance: unknown; payouts: unknown; status?: numb
     },
     list: async (register, where) => {
       filters.push(where);
-      /* THE PREFIX IS APPLIED HERE AS THE RECORD WOULD, so a script that asked for everything and a script that asked
-         for the right thing do not look alike. What the script does with a row the prefix lets through is its own. */
-      const starts = (where as { starts?: string } | null)?.starts;
-      return register === 'accounts' ? (accounts.filter((a) => starts === undefined || String(a.fields.name).startsWith(starts)) as unknown as Json[]) : [];
+      return register === 'accounts' ? (accounts.filter((a) => holds(a, where)) as unknown as Json[]) : [];
+    },
+    get: async (spoken) => {
+      got.push(spoken);
+      return BOOKS[spoken] ?? null;
     },
     now: () => NOW,
     tz: 'UTC',
     input: null,
+    config: configOf(set),
   };
 }
 
-const declOf = (): ScriptDecl => ({
-  id: SCRIPT.script,
-  version: 1,
-  egress: SCRIPT.egress,
-  keys: SCRIPT.keys,
-  reads: SCRIPT.reads,
-  writes: SCRIPT.writes,
-  ...(SCRIPT.limits === undefined ? {} : { limits: SCRIPT.limits }),
-  source: SCRIPT.source,
-});
+/* THE TWO LISTS A RUN ASKS FOR: the pack's own rows by `stripe_kind`, and the ones not marked yet that could be a
+   Stripe balance. Never a list by a name the pack wrote. */
+const OWN = { field: 'stripe_kind', in: ['available', 'pending', 'in_transit'] };
+const LOOSE = { all: [{ field: 'name', starts: 'Stripe' }, { field: 'stripe_kind', empty: true }, { field: 'kind', is: 'bank' }] };
+
+const declOf = (set: Record<string, Json> = {}): ScriptDecl => {
+  const script = scriptOf(set);
+  return {
+    id: script.script,
+    version: 1,
+    egress: script.egress,
+    keys: script.keys,
+    reads: script.reads,
+    writes: script.writes,
+    ...(script.limits === undefined ? {} : { limits: script.limits }),
+    source: script.source,
+  };
+};
 
 const writesOf = (a: ScriptAnswer): ScriptWrite[] => {
   assert.ok('writes' in a, `the run was refused: ${JSON.stringify(a)}`);
   return a.writes;
 };
 
-const created = (name: string, amount: number, currency: string, liquid: boolean, arrives?: string): ScriptWrite => ({
+/** The `stripe_kind` a new row's name says. */
+const kindOf = (name: string): string => (name.includes('payout in transit') ? 'in_transit' : name.includes('pending') ? 'pending' : 'available');
+
+const created = (name: string, amount: number, currency: string, liquid: boolean, arrives?: string, book?: string): ScriptWrite => ({
   op: 'create',
   register: 'accounts',
-  fields: { name, kind: 'bank', balance: { amount, currency }, as_of: TODAY, liquid, ...(arrives === undefined ? {} : { arrives }) },
+  fields: {
+    name,
+    kind: 'bank',
+    balance: { amount, currency },
+    as_of: TODAY,
+    liquid,
+    ...(arrives === undefined ? {} : { arrives }),
+    stripe_kind: kindOf(name),
+    ...(book === undefined ? {} : { book }),
+  },
 });
 
 test('ONE ROW A KIND AND A CURRENCY, AND ONE PAYOUT ROW A CURRENCY: the payouts summed, dated by the soonest to land', async () => {
@@ -273,12 +354,13 @@ test('ONE ROW A KIND AND A CURRENCY, AND ONE PAYOUT ROW A CURRENCY: the payouts 
     ],
   );
   assert.equal(h.asked.length, SCRIPT.limits?.fetches);
-  assert.deepEqual(h.filters, [{ field: 'name', starts: 'Stripe' }]);
+  assert.deepEqual(h.filters, [OWN, LOOSE]);
+  assert.deepEqual(h.got, [], 'a book was read with the book setting at 0');
 });
 
-/** A row this pack wrote on an earlier hour. */
+/** An account a person typed, with no `stripe_kind`: by hand, or by this pack before 1.4.0. */
 let minted = 0;
-const held = (name: string, amount: number, currency: string, as_of = '2026-09-24', extra: Record<string, Json> = {}): Row => {
+const typed = (name: string, amount: number, currency: string, as_of = '2026-09-24', extra: Record<string, Json> = {}): Row => {
   minted += 1;
   return {
     id: `01K5STRIPE${String(minted).padStart(16, '0')}`,
@@ -290,13 +372,17 @@ const held = (name: string, amount: number, currency: string, as_of = '2026-09-2
   };
 };
 
+/** A row this pack wrote on an earlier hour, marked with the `stripe_kind` its name says. */
+const held = (name: string, amount: number, currency: string, as_of = '2026-09-24', extra: Record<string, Json> = {}): Row =>
+  typed(name, amount, currency, as_of, { stripe_kind: kindOf(name), ...extra });
+
 test('THE NEXT HOUR UPDATES IN PLACE: a payout that landed goes to zero, an unmoved row is left alone, and a person’s own Stripe account is not touched', async () => {
   const usd = held('Stripe available USD', 1_842_050, 'USD', TODAY);
   const eur = held('Stripe available EUR', 30_000, 'EUR');
   const transit = held('Stripe payout in transit USD', 200_000, 'USD', '2026-09-24', { arrives: '2026-09-25' });
   /* A ROW A PERSON KEEPS UNDER A NAME THAT STARTS THE SAME WAY. The prefix lets it through, and only the exact names
      this pack writes are the pack's, so it is neither zeroed nor rewritten. */
-  const theirs = held('Stripe reserve (kept by hand)', 1_000_000, 'USD');
+  const theirs = typed('Stripe reserve (kept by hand)', 1_000_000, 'USD');
   const settled = { ...BALANCE, pending: [] };
   const a = await runInQuickJs(declOf(), stripeHost({ balance: settled, payouts: { ...ON_ITS_WAY, data: [] } }, [usd, eur, transit, theirs]));
   assert.deepEqual(writesOf(a), [
@@ -320,21 +406,21 @@ test('A STRIPE BALANCE TYPED IN BY HAND BEFORE THE PACK IS TAKEN OVER ON THE FIR
   /* "Stripe" WITH ITS CURRENCY ONLY IN ITS BALANCE, AND "Stripe EUR" WITH IT IN ITS NAME, both typed a week ago. The
      first run renames each to the available row of its currency and sets it from Stripe, where it used to write that
      row beside it, so Cash now counted the dollars twice. */
-  const dollars = held('Stripe', 1_800_000, 'USD', '2026-09-18');
-  const euros = held('Stripe EUR', 30_000, 'EUR', '2026-09-18');
-  const theirs = held('Stripe reserve', 1_000_000, 'USD');
+  const dollars = typed('Stripe', 1_800_000, 'USD', '2026-09-18');
+  const euros = typed('Stripe EUR', 30_000, 'EUR', '2026-09-18');
+  const theirs = typed('Stripe reserve', 1_000_000, 'USD');
   const a = await runInQuickJs(declOf(), stripeHost({ balance: BALANCE, payouts: ON_ITS_WAY }, [dollars, euros, theirs]));
   assert.deepEqual(writesOf(a), [
     {
       op: 'update',
       spoken: `accounts#${dollars.seq}`,
-      patch: { name: 'Stripe available USD', kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, liquid: true },
+      patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, liquid: true },
       version: 3,
     },
     {
       op: 'update',
       spoken: `accounts#${euros.seq}`,
-      patch: { name: 'Stripe available EUR', kind: 'bank', balance: { amount: 31_000, currency: 'EUR' }, as_of: TODAY, liquid: true },
+      patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 31_000, currency: 'EUR' }, as_of: TODAY, liquid: true },
       version: 3,
     },
     /* AND NO AVAILABLE ROW IS WRITTEN BESIDE THEM. "Stripe reserve" is in no write. */
@@ -343,15 +429,17 @@ test('A STRIPE BALANCE TYPED IN BY HAND BEFORE THE PACK IS TAKEN OVER ON THE FIR
     created('Stripe pending EUR', 0, 'EUR', false),
     created('Stripe pending USD', 250_000, 'USD', false),
   ]);
-  assert.match(a.log, /"Stripe" was typed in before this pack, so it is now "Stripe available USD"/);
-  assert.match(a.log, /"Stripe EUR" was typed in before this pack, so it is now "Stripe available EUR"/);
+  /* MARKED, NOT RENAMED, SINCE 1.4.0: the pack finds it by `stripe_kind` from now on, so the name a person gave it
+     stays. */
+  assert.match(a.log, /Took over "Stripe": it holds the Stripe balance in USD/);
+  assert.match(a.log, /Took over "Stripe EUR": it holds the Stripe balance in EUR/);
 });
 
 test('A HAND ROW BESIDE ONE THE PACK ALREADY KEEPS IS LEFT AS IT IS AND SAID, so the pack never takes a row over twice', async () => {
   /* THE PACK'S OWN ROW WINS: it is Stripe's figure already, and a second rename would be two rows under one name. */
   const ours = held('Stripe available USD', 1_842_050, 'USD', TODAY);
-  const typed = held('Stripe USD', 1_800_000, 'USD', '2026-09-18');
-  const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [] }, payouts: { ...ON_ITS_WAY, data: [] } }, [ours, typed]));
+  const hand = typed('Stripe USD', 1_800_000, 'USD', '2026-09-18');
+  const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [] }, payouts: { ...ON_ITS_WAY, data: [] } }, [ours, hand]));
   assert.deepEqual(writesOf(a), []);
   assert.match(a.log, /"Stripe USD" was typed in by hand and "Stripe available USD" is already kept from Stripe, so both count/);
 });
@@ -363,6 +451,177 @@ test('A KEY STRIPE REFUSES STOPS THE RUN WITH A SENTENCE AND WRITES NOTHING, whi
      runs in a row and pauses the script, which is the pull's 401 pause said by the only means a script has. */
   assert.equal(a.refused.code, null);
   assert.match(a.refused.why, /Stripe refused the key labelled "stripe" \(401\)/);
+});
+
+/* ── The settings, read on every run (1.4.0) ───────────────────────────────────────────────────── */
+
+test('THE KEY IS THE ONE ITS SETTING NAMES, read on every run, and nothing is asked with none set', async () => {
+  /* A LABEL THE OWNER SET, filled into the declaration's `keys` at install and read by the source from `ctx.config`, so
+     the key the script asks with is the key it declares. Before 1.4.0 the label was "stripe" in the source itself. */
+  const h = stripeHost({ balance: { available: [], pending: [] }, payouts: { data: [] } }, [], { grant: 'Quartz Stripe' });
+  const a = await runInQuickJs(declOf({ grant: 'Quartz Stripe' }), h);
+  assert.ok('writes' in a, JSON.stringify(a));
+  assert.ok(h.asked.length === 3 && h.asked.every((r) => r.key === 'Quartz Stripe'), JSON.stringify(h.asked));
+
+  const none = stripeHost({ balance: BALANCE, payouts: ON_ITS_WAY }, [], { grant: '  ' });
+  const refused = await runInQuickJs(declOf(), none);
+  assert.ok('refused' in refused, JSON.stringify(refused));
+  assert.match(refused.refused.why, /No key is set, so Stripe was not asked/);
+  assert.equal(none.asked.length, 0);
+});
+
+test('THE BOOK IS THE ONE ITS SETTING NAMES ON THIS RUN: new rows are filed in it, and a row in another book moves to it', async () => {
+  /* BEFORE 1.4.0 THE BOOK WAS WRITTEN INTO THE SOURCE AT INSTALL, so a changed setting did nothing, and a row already
+     in a book was never moved. Now the run reads the setting, asks the record for that book, and moves a row that is
+     elsewhere. A row already in it is left alone. */
+  const elsewhere = held('Stripe available USD', 1_842_050, 'USD', TODAY, { book: '01K5BOOK000000000000000001' });
+  const there = held('Stripe available EUR', 31_000, 'EUR', TODAY, { book: '01K5BOOK000000000000000002' });
+  const h = stripeHost({ balance: { available: BALANCE.available, pending: [{ amount: 250_000, currency: 'usd' }] }, payouts: { data: [] } }, [elsewhere, there], { book: 2 });
+  const a = await runInQuickJs(declOf({ book: 2 }), h);
+  assert.deepEqual(h.got, ['books#2']);
+  assert.deepEqual(writesOf(a), [
+    { op: 'update', spoken: `accounts#${elsewhere.seq}`, patch: { balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, book: 'books#2' }, version: 3 },
+    created('Stripe pending USD', 250_000, 'USD', false, undefined, 'books#2'),
+  ]);
+
+  /* A BOOK THAT IS GONE FILES NOTHING AND SAYS SO, in words, and the balances are still kept. */
+  const gone = stripeHost({ balance: { available: [{ amount: 100, currency: 'usd' }], pending: [] }, payouts: { data: [] } }, [], { book: 9 });
+  const b = await runInQuickJs(declOf({ book: 9 }), gone);
+  assert.deepEqual(writesOf(b), [created('Stripe available USD', 100, 'USD', true)]);
+  assert.match(b.log, /Book 9 is not in Books, so the Stripe accounts were not filed/);
+});
+
+test('A ROW IS FOUND BY ITS KIND AND CURRENCY, NOT ITS NAME: one a person renamed is still kept, and nothing is written beside it', async () => {
+  const renamed = held('Quartz on Stripe', 1_800_000, 'USD', '2026-09-24', { stripe_kind: 'available' });
+  const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [] }, payouts: { data: [] } }, [renamed]));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `accounts#${renamed.seq}`, patch: { balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY }, version: 3 }]);
+});
+
+test('A SECOND ROW AT ONE ADDRESS IS SAID AND LEFT, and the oldest is the one kept', async () => {
+  const first = held('Stripe available USD', 1_800_000, 'USD');
+  const copy = held('Stripe available USD (copy)', 1_800_000, 'USD', '2026-09-24', { stripe_kind: 'available' });
+  const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [] }, payouts: { data: [] } }, [copy, first]));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `accounts#${first.seq}`, patch: { balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY }, version: 3 }]);
+  assert.match(a.log, /"Stripe available USD \(copy\)" is a second Stripe account for the same money as "Stripe available USD"/);
+});
+
+test('THE ROWS THIS PACK WROTE BEFORE 1.4.0 ARE MARKED ON THE FIRST RUN, by the names it wrote, so an upgrade writes nothing twice', async () => {
+  /* NO `stripe_kind`, BECAUSE 1.3.0 HAD NONE TO WRITE. Each is marked with the kind its name says, once, and is found
+     by the mark from then on. A name a person changed after 1.3.0 is not one the pack wrote, and is left. */
+  const usd = typed('Stripe available USD', 1_842_050, 'USD', TODAY);
+  const pending = typed('Stripe pending USD', 250_000, 'USD', TODAY, { liquid: false });
+  const transit = typed('Stripe payout in transit USD', 200_000, 'USD', TODAY, { liquid: false, arrives: '2026-09-26' });
+  const payouts = { data: ON_ITS_WAY.data.filter((p) => p.currency === 'usd') };
+  const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [{ amount: 250_000, currency: 'usd' }] }, payouts }, [usd, pending, transit]));
+  assert.deepEqual(writesOf(a), [
+    { op: 'update', spoken: `accounts#${usd.seq}`, patch: { balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, stripe_kind: 'available' }, version: 3 },
+    { op: 'update', spoken: `accounts#${transit.seq}`, patch: { balance: { amount: 200_000, currency: 'USD' }, as_of: TODAY, arrives: '2026-09-26', stripe_kind: 'in_transit' }, version: 3 },
+    { op: 'update', spoken: `accounts#${pending.seq}`, patch: { balance: { amount: 250_000, currency: 'USD' }, as_of: TODAY, stripe_kind: 'pending' }, version: 3 },
+  ]);
+});
+
+/* ── Take-over (1.4.0) ─────────────────────────────────────────────────────────────────────────── */
+
+test('HIS CASE: "Stripe available" in dollars, filed in a book, is taken over and kept in that book, and cash holds Stripe once', async () => {
+  /* THE NAME ON HIS RECORD (the dump's `accounts.json`). 1.3.0 took over "Stripe" and "Stripe USD" only, so this one
+     stood beside a new "Stripe available USD" and Cash now held the dollars twice. With the book setting at 0 it stays
+     in the book he filed it in. */
+  const his = typed('Stripe available', 1_800_000, 'USD', '2026-09-18', { book: '01K5BOOK000000000000000002' });
+  const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [{ amount: 250_000, currency: 'usd' }] }, payouts: { data: [ON_ITS_WAY.data[0]] } }, [his]));
+  assert.deepEqual(writesOf(a), [
+    { op: 'update', spoken: `accounts#${his.seq}`, patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, liquid: true }, version: 3 },
+    created('Stripe payout in transit USD', 120_000, 'USD', false, '2026-09-28'),
+    created('Stripe pending USD', 250_000, 'USD', false),
+  ]);
+  /* ONE AVAILABLE ACCOUNT IN DOLLARS, AND IT IS HIS: no write names a second. */
+  const available = writesOf(a).filter((w) => w.op === 'create' && (w.fields as Record<string, Json>).stripe_kind === 'available');
+  assert.deepEqual(available, []);
+  assert.match(a.log, /Took over "Stripe available"/);
+});
+
+test('TWO ACCOUNTS THAT COULD BE THE STRIPE BALANCE: nothing is written, and the run ends naming both', async () => {
+  /* NOT GUESSED BETWEEN. Taking the wrong one would set a balance a person keeps for something else; taking both would
+     count Stripe twice. The run is refused, which shows on Scripts and trips `feeds-behind` until one is renamed. */
+  const one = typed('Stripe', 1_800_000, 'USD', '2026-09-18');
+  const two = typed('stripe balance', 1_790_000, 'USD', '2026-09-19');
+  const h = stripeHost({ balance: BALANCE, payouts: ON_ITS_WAY }, [one, two]);
+  const a = await runInQuickJs(declOf(), h);
+  assert.ok('refused' in a, JSON.stringify(a));
+  /* THE SANDBOX SAYS WHOSE ERROR IT IS FIRST ("stripe threw: "); the sentence is the script's. */
+  assert.ok(a.refused.why.endsWith(': Two accounts could be the Stripe balance: "Stripe" and "stripe balance". Rename one.'), a.refused.why);
+  /* NO ID, NO DASH AND NO "row" IN WHAT A PERSON READS. */
+  assert.equal(/—|#|\brows?\b/.test(a.refused.why), false);
+
+  /* RENAMED, THE NEXT RUN TAKES THE ONE LEFT. */
+  const kept = { ...two, fields: { ...two.fields, name: 'Savings (not Stripe)' } };
+  const b = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [] }, payouts: { data: [] } }, [one, kept]));
+  assert.deepEqual(writesOf(b), [
+    { op: 'update', spoken: `accounts#${one.seq}`, patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, liquid: true }, version: 3 },
+  ]);
+});
+
+test('WHICH NAMES ARE A TYPED STRIPE BALANCE: "stripe", at most one of "available" or "balance", at most one currency code, any case', async () => {
+  /* EACH IN A CURRENCY OF ITS OWN, so no two are in doubt and each is either taken or left. */
+  const names: [string, string, boolean][] = [
+    ['STRIPE', 'USD', true],
+    ['Stripe balance EUR', 'EUR', true],
+    ['stripe GBP available', 'GBP', true],
+    ['Stripe available balance', 'CAD', false],
+    ['Stripe reserve', 'AUD', false],
+    ['Stripe USD EUR', 'CHF', false],
+    ['Stripey', 'NZD', false],
+  ];
+  const rows = names.map(([name, currency]) => typed(name, 100, currency));
+  const balance = { available: names.map(([, currency]) => ({ amount: 500, currency: currency.toLowerCase() })), pending: [] };
+  const a = await runInQuickJs(declOf(), stripeHost({ balance, payouts: { data: [] } }, rows));
+  const took = writesOf(a).filter((w) => w.op === 'update').map((w) => rows.find((r) => `accounts#${r.seq}` === w.spoken)?.fields.name);
+  assert.deepEqual(took, names.filter(([, , yes]) => yes).map(([name]) => name));
+  /* A CARD IS NOT A STRIPE BALANCE, whatever it is called: only a bank account is asked about. */
+  assert.equal(holds(typed('Stripe', 1, 'USD', TODAY, { kind: 'card' }), LOOSE), false);
+});
+
+/* ── Stripe's special units (1.4.0) ────────────────────────────────────────────────────────────── */
+
+/**
+ * EACH CURRENCY STRIPE'S PAGE OF CURRENCIES NAMES AS ZERO-DECIMAL, THREE-DECIMAL OR A SPECIAL CASE: what Stripe sends
+ * for one amount, what the record must keep, and the decimals the record keeps it in. Written out here, not read from
+ * the script, so a change to the script's table fails a line of its own.
+ */
+const SPECIAL: [string, number, number, number][] = [
+  /* Zero-decimal: 500 is 500 units. */
+  ['BIF', 500, 500, 0], ['CLP', 500, 500, 0], ['DJF', 500, 500, 0], ['GNF', 500, 500, 0], ['JPY', 500, 500, 0],
+  ['KMF', 500, 500, 0], ['KRW', 500, 500, 0], ['PYG', 500, 500, 0], ['RWF', 500, 500, 0], ['VND', 500, 500, 0],
+  ['VUV', 500, 500, 0], ['XAF', 500, 500, 0], ['XOF', 500, 500, 0], ['XPF', 500, 500, 0],
+  /* Zero-decimal at Stripe and kept in hundredths by the record: 500 ariary is 50000. */
+  ['MGA', 500, 50_000, 2],
+  /* Three-decimal: thousandths on both sides, the last digit 0 as Stripe asks. */
+  ['BHD', 1_230, 1_230, 3], ['JOD', 1_230, 1_230, 3], ['KWD', 1_230, 1_230, 3], ['OMR', 1_230, 1_230, 3], ['TND', 1_230, 1_230, 3],
+  /* Special cases. ISK and UGX: hundredths "for backward compatibility", always ending 00, kept whole: 500 is 5. */
+  ['ISK', 500, 5, 0], ['UGX', 500, 5, 0],
+  /* HUF and TWD: paid out whole, but the API sends hundredths, as the record keeps them. */
+  ['HUF', 1_045, 1_045, 2], ['TWD', 80_045, 80_045, 2],
+];
+
+for (const [currency, sent, kept, decimals] of SPECIAL)
+  test(`STRIPE'S UNIT FOR ${currency}: ${sent} from Stripe is ${kept} in the record`, async () => {
+    /* THE RECORD'S DECIMALS ARE THE KERNEL'S, so the two tables cannot drift apart without this line going red. */
+    assert.equal(exponentOf(currency), decimals, `the record keeps ${currency} in ${exponentOf(currency)} decimals`);
+    const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: sent, currency: currency.toLowerCase() }], pending: [] }, payouts: { data: [] } }));
+    assert.deepEqual(writesOf(a), [created(`Stripe available ${currency}`, kept, currency, true)]);
+  });
+
+test('EVERY CURRENCY IN THE SCRIPT\'S TABLE HAS A LINE ABOVE, and one it does not name passes through', async () => {
+  const table = /export const UNITS = \{([^}]*)\}/.exec(SOURCE)?.[1] ?? '';
+  const named = [...table.matchAll(/([A-Z]{3}):/g)].map((m) => m[1]).sort();
+  assert.deepEqual(named, SPECIAL.map(([c]) => c).sort());
+  const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_234, currency: 'egp' }], pending: [] }, payouts: { data: [] } }));
+  assert.deepEqual(writesOf(a), [created('Stripe available EGP', 1_234, 'EGP', true)]);
+});
+
+test('A PAYOUT IN A SPECIAL UNIT IS MOVED AS THE BALANCE IS: ISK on its way is whole krónur', async () => {
+  const isk = { data: [payout('po_isk', 1_500_000, 'isk', '2026-09-27')] };
+  const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [], pending: [] }, payouts: isk }));
+  assert.deepEqual(writesOf(a), [created('Stripe payout in transit ISK', 15_000, 'ISK', false, '2026-09-27')]);
 });
 
 /* ── The whole path ────────────────────────────────────────────────────────────────────────────── */
@@ -419,13 +678,20 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, the key opened for
     );
     const laid = (await api.planPack({ doc: PACK, source: { kind: 'local' } } as never, owner)) as { ok: boolean; value?: { diff: { extends: { id: string; adds: string[]; refusal?: unknown }[] } } };
     assert.ok(laid.ok, fixOf(laid as never));
-    assert.deepEqual(laid.value?.diff.extends, [{ id: 'register.accounts', adds: [] }], 'the pack laid a second arrives over money-core\'s');
+    /* `stripe_kind` AND NOTHING ELSE: the field the pack finds its rows by (1.4.0), and no second arrives over
+       money-core's. */
+    assert.deepEqual(
+      laid.value?.diff.extends.map((e) => ({ id: e.id, adds: e.adds })),
+      [{ id: 'register.accounts', adds: ['stripe_kind'] }],
+      'the pack laid a second arrives over money-core\'s, or not its kind',
+    );
     const approve = await put(PACK);
     /* THE LINE THE OWNER APPROVES NAMES THE HOST AND THE KEY. */
     assert.equal(approve[0], 'CALLS OUT api.stripe.com · every 1h · key "stripe" to api.stripe.com');
-    /* AND IT SAYS WHAT THE SCRIPT COULD CARRY OUT. It reads accounts only to find its own rows, and the host still
+    /* AND IT SAYS WHAT THE SCRIPT COULD CARRY OUT. It reads accounts to find its own rows and books to know the one
+       its setting names (1.4.0), and the host still
        tells the owner that what it reads may leave for Stripe, which is true of any script with a read and a fetch. */
-    assert.ok(approve.includes('stripe reads accounts and may send what it reads to api.stripe.com.'), JSON.stringify(approve));
+    assert.ok(approve.includes('stripe reads accounts and books and may send what it reads to api.stripe.com.'), JSON.stringify(approve));
     assert.ok(api.kernel.register('accounts')?.fields.some((f) => f.id === 'arrives'), 'accounts lost arrives when the pack installed');
 
     const due = () => running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script' AND key = ?", new Date(Date.now() - 1_000).toISOString(), SCRIPT.script);

@@ -83,7 +83,7 @@ export function figureOf(value: number, unit: string): string {
 /**
  * Every measure the rows hold, each over its period and the period before, as the record works them out.
  *
- * `fields` is the block's columns: when, value, name, unit. Ordered by the newest reading first, so the measure a
+ * `fields` is the block's columns: when, value, name, unit, and the money slot. Ordered by the newest reading first, so the measure a
  * project sent last leads, and two measures with the same newest moment by name.
  */
 export function measuresOf(
@@ -94,9 +94,17 @@ export function measuresOf(
   fallback: string,
   opts: { bucket?: unknown; tz?: string } = {},
 ): Measure[] {
-  const [when, val, name, unit] = fields;
+  const [when, val, name, unit, amount] = fields;
   if (!when || !val) return [];
-  const readings = rows.map((r) => ({ at: r.fields[when], value: r.fields[val], name: name ? r.fields[name] : undefined, unit: unit ? r.fields[unit] : undefined }));
+  /* THE FIFTH COLUMN IS THE MONEY SLOT, as the kernel reads a block's (`measures.ts` `RawReading.amount`): a reading in
+     money is read in place of its value, in its own currency. */
+  const readings = rows.map((r) => ({
+    at: r.fields[when],
+    value: r.fields[val],
+    ...(amount ? { amount: r.fields[amount] } : {}),
+    name: name ? r.fields[name] : undefined,
+    unit: unit ? r.fields[unit] : undefined,
+  }));
   return measureSeries(readings, { nowMs, back, bucket: opts.bucket, tz: opts.tz ?? readerZone(), fallback, most: CHARTS_MOST });
 }
 

@@ -323,6 +323,7 @@ export const account = {
     token: 'make one more key, once, in the next ten minutes',
     vault: 'open the keys of one project, for thirty days',
     vaultAll: 'open the keys that belong to no project, for seven days',
+    shape: 'take copies of this record with every word scrambled, and read nothing else, for ninety days',
   } as Record<string, string>,
 
   /* The code entry: the `verification_uri` every device flow prints. */
@@ -831,4 +832,15 @@ export const account = {
   closeDone: 'Your account is closed. We mailed you to say every session has ended.',
   closeLeave: 'Done',
   closeUnreached: 'Your account could not be closed just now. Try again in a minute.',
+
+  /* SETTINGS > BACKUPS AND EXPORT: THE NIGHT'S COPY AND THE LAST EXPORT (LCH-C03), drawn by `areas/copies.ts`. */
+  copiesLastSized: (when: string, size: string) => `Last copy: ${when}, ${size}`,
+  copiesLast: (when: string) => `Last copy: ${when}`,
+  copiesFirst: 'First copy tonight',
+  copiesLate: 'Late',
+  copiesJustNow: 'just now',
+  copiesYesterday: 'yesterday',
+  copiesAgo: (n: number, unit: 'minute' | 'hour' | 'day') => `${n} ${unit}${n === 1 ? '' : 's'} ago`,
+  exportedLast: (when: string) => `Last exported: ${when}`,
+  exportedNever: 'Never exported',
 } as const;

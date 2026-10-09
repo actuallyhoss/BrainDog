@@ -82,7 +82,8 @@ const blocksOf = (page: Record<string, unknown>): Block[] => (page.blocks as Blo
  * `money` page draws `governance.open`, `deadlines` and `activity` beside the walk. A source the kernel does not name
  * is refused there, so one missing from here is still a failure.
  */
-const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'runs_on', 'deadlines', 'figures.home']);
+/* `signs` SINCE people 3.3.0's Health page: each vital sign with its state and sentence. */
+const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'runs_on', 'deadlines', 'figures.home', 'signs']);
 
 /**
  * The figures the record computes rather than declares.

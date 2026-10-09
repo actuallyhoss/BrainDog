@@ -3,7 +3,7 @@
  * export. DIRECTION §35: an empty or unused part is not drawn; §37: one empty line a page.
  *
  * MOVED FROM THE BROWSER (`apps/web/src/lib/page/home.ts`). The rule was the screen's alone, so an agent reading
- * `/p/tamsin` through the record saw "Where it stands" over a dash and chips that were a name and a dash, blocks the app
+ * `/p/quietcart` through the record saw "Where it stands" over a dash and chips that were a name and a dash, blocks the app
  * hid. The record's answer now says it: each block it leaves out is `drawn: false` with `why`, and a host draws what
  * the record drew (`markDrawn`, around the assembled blocks in `pages.ts`).
  *
@@ -42,6 +42,8 @@ export type Drawable = {
   cannot?: unknown;
   answer?: unknown;
   entries?: unknown;
+  /** The cells a block's author wrote out in the page itself, `[{ cells: ['Done', '3', '5'] }]`, which it is drawn from. */
+  authored?: unknown;
   matched?: unknown;
   total?: unknown;
   metrics?: unknown;
@@ -165,6 +167,8 @@ export function holdsNothing(b: Drawable): boolean {
   return (
     b.rows.length === 0 &&
     none(b.entries) &&
+    /* WRITTEN OUT IN THE PAGE, a ring of three numbers holds them: answered empty, Layout's ring never showed. */
+    none(b.authored) &&
     matchedCount(b) === 0 &&
     (typeof b.total !== 'number' || b.total === 0) &&
     figuresOf(b).every(idle) &&

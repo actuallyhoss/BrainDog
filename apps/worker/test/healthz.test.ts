@@ -26,7 +26,7 @@ import assert from 'node:assert/strict';
 import { FORMAT_VERSION, KERNEL_MIGRATION } from '@braindog/kernel';
 
 import { PRIMITIVES_VERSION } from '../../../packages/render/src/kinds.ts';
-import { launchState } from '../src/launch.ts';
+import { SIGNUP_STOPPED, launchState } from '../src/launch.ts';
 import { bundled } from './bundled-worker.ts';
 
 /* `53 §13 #9`'s TUPLE, EACH FROM THE MODULE THAT OWNS IT, so a build that moved one and not this door goes red here. */
@@ -124,15 +124,12 @@ test('A BROWSER ON THE OLD HOST IS ANSWERED WHERE IT STANDS, not sent to /app/he
   assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234', ...TUPLE, launch: LAUNCH, night: null });
 });
 
-test('HEALTH CARRIES THE LAUNCH: open, no bot check, and the sentence that says sign-ups from one address are limited', async () => {
+test('HEALTH CARRIES THE LAUNCH: open, no bot check, and nothing more for a stranger', async () => {
   const out = (await (await ask('/healthz')).json()) as { launch: { signup: string; botCheck: boolean; billing: string; why: string[] } };
   assert.equal(out.launch.signup, 'open');
   assert.equal(out.launch.botCheck, false);
   assert.equal(out.launch.billing, 'off');
-  assert.ok(
-    out.launch.why.includes('The bot check is not keyed, so sign-ups from one address are limited to 3 an hour until it is.'),
-    out.launch.why.join(' | '),
-  );
+  assert.deepEqual(out.launch.why, [], "an open door that works tells a stranger nothing more; the strike limit is the owner's (launchDetail)");
   /* ONLY WHETHER THE SECRET IS SET IS READ: its value never reaches the answer. */
   const keyed = await ask('/healthz', { vars: { TURNSTILE_SECRET: '0x-a-secret-value', TURNSTILE_SITE_KEY: '0x-site' } });
   const text = await keyed.text();
@@ -150,11 +147,12 @@ const STOPPED: [string, unknown, RegExp][] = [
 ];
 
 for (const [key, value, sentence] of STOPPED)
-  test(`WITHOUT ${key}, /healthz SAYS SIGN-UP IS closed, AND WHY`, async () => {
+  test(`WITHOUT ${key}, /healthz SAYS SIGN-UP IS closed, IN ONE SENTENCE`, async () => {
     const out = (await (await ask('/healthz', { vars: { [key]: value } })).json()) as { ok: boolean; launch: { signup: string; why: string[] } };
     assert.equal(out.ok, true, 'a sign-up that cannot work is a fact beside the liveness, never a failed probe');
     assert.equal(out.launch.signup, 'closed', out.launch.why.join(' | '));
-    assert.equal(out.launch.why.filter((w) => sentence.test(w)).length, 1, out.launch.why.join(' | '));
+    assert.deepEqual(out.launch.why, [SIGNUP_STOPPED], out.launch.why.join(' | '));
+    assert.ok(!out.launch.why.some((w) => sentence.test(w)), "which setting is missing is the owner's, not a stranger's");
     assert.ok(!out.launch.why.some((w) => w.startsWith('The bot check is not keyed')), 'a closed door needs no limit sentence');
   });
 

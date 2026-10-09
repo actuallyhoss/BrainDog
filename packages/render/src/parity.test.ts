@@ -22,6 +22,7 @@ import type { Component } from 'svelte';
 
 import { parse, type Block as BlockSegment } from './parse.ts';
 import { toHTML } from './html.ts';
+import { UNNAMED } from './inline.ts';
 
 registerHooks({
   load(url, context, next) {
@@ -60,8 +61,13 @@ function lateIds(html: string): string {
   const ids = [...html.matchAll(/<pattern [^>]*id="([^"]+)"/gu)].map((m) => m[1]!);
   assert.equal(new Set(ids).size, ids.length, `a pattern id is used twice: ${ids.join(', ')}`);
   for (const [, ref] of html.matchAll(/url\(#([^)]+)\)/gu)) assert.ok(ids.includes(ref!), `url(#${ref}) names no pattern`);
-  return ids.reduce((h, id, i) => h.replaceAll(`"${id}"`, `"late${i}"`).replaceAll(`#${id})`, `#late${i})`), html);
+  /* THE MIRROR'S PAINT NAMES THE LATE RED AFTER ITS PATTERN (`lateFill`), because its ids repeat across two calls; the
+     app's `$props.id()` never repeats, so the two are one paint with or without it, and the tree is read without it. */
+  return ids.reduce((h, id, i) => h.replaceAll(`"${id}"`, `"late${i}"`).replaceAll(`#${id})`, `#late${i})`), html).replaceAll(LATE_FALLBACK, '');
 }
+
+/** What `lateFill` in `html.ts` writes after a late part's `url(#…)`. */
+const LATE_FALLBACK = ' var(--chart-late, currentColor)';
 
 /** The markup as a browser would build it: no comments, no whitespace between tags, attributes in one order. */
 function tree(html: string): string {
@@ -931,3 +937,36 @@ test('A CARD\'S MARK THAT NAMES A PICTURE IS THE PICTURE IN BOTH RENDERERS, and 
     assert.deepEqual(marks, [[' data-glyph="gift"', 'icon' in opts ? 'svg' : ''], ['', 'K'], ['', 'L']], html);
   }
 });
+
+/* ── what a page prints (PGS-B02): a chip's figure is read, and a path that names nothing is not a hole ──── */
+
+/** The record a page reads: `tasks.open` holds 7, `cash.due` names a figure with no value yet, and nothing else is named. */
+const VALUES: Record<string, string | null> = { 'tasks.open': '7', 'cash.due': null };
+const READS = { ...NO_LINE, resolve: (path: string) => (Object.hasOwn(VALUES, path) ? VALUES[path]! : UNNAMED) };
+
+/** Whether `svelte/p/Proportional.svelte` draws a bar's rows through `drawnRows`, as `toHTML` does. */
+const BARS_DRAWN = readFileSync(new URL('../svelte/p/Proportional.svelte', import.meta.url), 'utf8').includes('drawnRows');
+
+const PRINTS: Record<string, { src: string; has: readonly string[]; not: readonly string[]; todo?: string | false }> = {
+  'chip whose figure is a path': { src: '```chips\ndot | {{tasks.open}} | open tasks\n```', has: ['>7<', 'open tasks'], not: ['{{', 'tasks.open'] },
+  'chip whose figure names nothing': { src: '```chips\ndot | {{tasks.late}} | late\ndot | {{tasks.open}} | open\n```', has: ['>7<', '>open<'], not: ['late', '{{'] },
+  'chip whose figure has no value yet': { src: '```chips\ndot | {{cash.due}} | due\ndot | {{tasks.open}} | open\n```', has: ['>open<'], not: ['due', '—'] },
+  'stat whose figure names nothing': { src: '```stat\nLate | {{tasks.late}} | \nOpen | {{tasks.open}} | \n```', has: ['Open', '>7<'], not: ['Late', 'tasks.late'] },
+  'card whose figure names nothing': { src: '```cards\ntitle: Project | figure: Open\nCrumb.gg | {{tasks.late}}\n```', has: ['Crumb.gg'], not: ['tasks.late', 'cards-figure'] },
+  'sentence with a path that names nothing': { src: '```note\nOpen: {{tasks.open}}, late: {{tasks.late}}, due: {{cash.due}}.\n```', has: ['>7<', '<span class="unresolved">tasks.late</span>', 'class="hole"', '—'], not: ['{{'] },
+  'bar whose figure names nothing': {
+    src: '```bar\nOpen | {{tasks.open}} | \nLate | {{tasks.late}} | \n```',
+    has: ['Open', '>7<'],
+    not: ['Late', 'tasks.late'],
+    todo: BARS_DRAWN ? false : 'svelte/p/Proportional.svelte draws a bar through drawnRows',
+  },
+};
+
+for (const [name, { src, has, not, todo }] of Object.entries(PRINTS)) {
+  test(`A ${name.toUpperCase()} PRINTS THE SAME IN BOTH RENDERERS, and never the author's braces`, { todo: todo ?? false }, () => {
+    const [svelte, html] = both(page(src), READS);
+    assert.equal(svelte, html);
+    for (const h of has) assert.ok(html.includes(h), `${h} was not drawn: ${html}`);
+    for (const n of not) assert.ok(!html.includes(n), `${n} was drawn: ${html}`);
+  });
+}

@@ -1,0 +1,295 @@
+name: after-deploy
+
+# THE LANE AFTER A DEPLOY (PRF-A09). `deploy.yml` proves the bytes landed (Parity) and that every door answers the
+# right Worker (Smoke); nothing there opens a record as a person does, signs in, or looks at a screen. This runs when
+# the deploy ends and asks those of production, on the canary record `ops`.
+#
+# ONE STEP FOR EACH FILE IN `tools/canary/lane.d/`, IN NAME ORDER, so a later unit adds a step by adding a file and
+# never by editing this one. GitHub cannot draw steps from a folder, so the lane is one step that runs each file as its
+# own process in its own log group, says each one's verdict, and keeps going after a red, so one run says everything
+# that is wrong. A file is run as `node <file>`: exit 0 is green, 3 is a skip (the gates' convention), anything else
+# red. What a red does is the file's own declaration, `export const onRed = 'rollback';` or `'finding'`, read off its
+# text as `run.mjs` reads `needs`; a file that declares nothing is read by its name, `smoke` or `signin` in it being a
+# rollback and anything else a finding.
+#
+# A RED SMOKE OR SIGN-IN STARTS THE ROLLBACK THAT EXISTS: `rollback.mjs decide`, then the same two `wrangler rollback`
+# lines `deploy.yml` has. The decision still holds wherever putting the old version back would break more (a kernel
+# migration, a Durable Object class, the Directory's version), and says why. It needs what was live before the deploy,
+# which only `deploy.yml` could write down; it keeps that as the artefact `live-before`, and without it every red here
+# holds rather than guesses. A RED LOOK OPENS A FINDING (one open issue, commented on by each later red) and the
+# deploy is marked "not proven" on its commit.
+#
+# UNTIL HIS SITTING THERE IS NO CANARY (`loop/scope/area-proof-a.md` section 5, item 1). Every step then runs against a
+# fresh self-host in this job and says "self-host only", and the commit is marked "not proven" on brain.dog: a missing
+# canary is never green. ONCE `SMOKE_SLUG` IS SET, A MISSING SECRET IS RED, not a skip: the canary exists, and a lane
+# that quietly fell back to the self-host would read as proof it is not.
+#
+# NEVER ON A PULL REQUEST. It runs off `deploy`'s completion, which runs off `ci` on master, and the job refuses a run
+# whose head is in another repository, and its first step refuses a commit that is not on this repository's master,
+# so neither a fork's branch named master nor a branch run by hand reaches the secrets below.
+
+on:
+  workflow_run:
+    workflows: [deploy]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+
+# `actions: read` to fetch the deploy's `live-before`; `issues: write` for the finding; `statuses: write` for the
+# "proven" or "not proven" mark on the deployed commit. Nothing here writes code.
+permissions:
+  contents: read
+  actions: read
+  issues: write
+  statuses: write
+
+# ONE AT A TIME AND NEVER CANCELLED, for `deploy.yml`'s reason: a cancelled lane is a rollback cut in half.
+concurrency:
+  group: after-deploy
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lane:
+    # ONLY AFTER A DEPLOY THAT RAN AND WENT GREEN, FROM THIS REPOSITORY. A red deploy has already rolled back or held;
+    # a deploy skipped for want of its variables deployed nothing, and the same two variables say so here.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+      && vars.CLOUDFLARE_ACCOUNT_ID != ''
+      && vars.DEPLOY_HOST != '')
+    # WHERE THE CANARY'S SECRETS AND THE DEPLOY TOKEN LIVE, as for `deploy.yml`.
+    environment: production
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    timeout-minutes: 45
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOYED: ${{ github.event.workflow_run.head_sha || github.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    steps:
+      # AT THE COMMIT THE DEPLOY RAN FROM, with the whole history, because a rollback diffs what was live against it.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+
+      # ONLY MASTER'S OWN COMMITS RUN WITH THE CANARY'S SECRETS. `branches: [master]` matches a fork's branch named
+      # master too, and a run started by hand can name any branch; both are refused here, before the setup action or
+      # any lane file from the checkout runs. Read off history, not off the event, so no field an event carries is
+      # trusted for it.
+      - name: Only master's own commits
+        id: origin
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/master; then
+            echo "::error::This commit is not on master in this repository, so the lane does not run with the canary's secrets."
+            exit 1
+          fi
+
+      # BEFORE ANYTHING IS BUILT: whether the canary is set, and if it is, whether all of it is. A missing secret is
+      # red here, in one sentence naming it, rather than four lane steps each failing for the same reason.
+      - name: Whether the canary is set
+        id: canary
+        run: |
+          if [ -z "$SMOKE_SLUG" ]; then
+            echo "canary=self-host" >> "$GITHUB_OUTPUT"
+            echo "self-host only: SMOKE_SLUG is not set, so there is no canary yet and every step runs against a fresh self-host in this job. brain.dog is not proven until the canary's sitting."
+            exit 0
+          fi
+          missing=""
+          [ -n "$SMOKE_TOKEN" ] || missing="$missing SMOKE_TOKEN"
+          [ -n "$CANARY_PASSKEY" ] || missing="$missing CANARY_PASSKEY"
+          if [ -n "$missing" ]; then
+            echo "::error::SMOKE_SLUG names the canary $SMOKE_SLUG, and these are not set:$missing. The canary exists, so this is red and not a skip: set them again from the sitting."
+            exit 1
+          fi
+          echo "canary=live" >> "$GITHUB_OUTPUT"
+          echo "The lane asks the canary $SMOKE_SLUG on $DEPLOY_HOST."
+        env:
+          SMOKE_SLUG: ${{ vars.SMOKE_SLUG }}
+          SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN }}
+          CANARY_PASSKEY: ${{ secrets.CANARY_PASSKEY }}
+
+      - uses: ./.github/actions/setup
+
+      # WHAT WAS LIVE BEFORE THE DEPLOY, AS `deploy.yml` RECORDED IT, and the build live now. `continue-on-error`
+      # because a lane is not refused for want of a rollback: whatever cannot be learned stays empty, and a red
+      # step below then holds instead of guessing, which is `rollback.mjs`'s own rule.
+      - name: Fetch what was live before the deploy
+        if: github.event_name == 'workflow_run'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: live-before
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/live-before
+
+      # ONLY THE THREE NAMES, EACH A PLAIN VALUE, reach `$GITHUB_ENV`, so the artefact cannot set anything else. The
+      # deployed sha is read from the live build itself, which is the commit serving now whatever master did since.
+      - name: Read what was live
+        run: |
+          file="$RUNNER_TEMP/live-before/live-before.env"
+          if [ -f "$file" ]; then
+            grep -E '^(APP_PREVIOUS|SITE_PREVIOUS|LIVE_SHA)=[A-Za-z0-9._-]*$' "$file" >> "$GITHUB_ENV" || true
+            echo "What was live before the deploy is known, so a red smoke or sign-in can be undone."
+          else
+            echo "The deploy kept no record of what was live before it, so a red smoke or sign-in here holds rather than rolls back."
+          fi
+          serving=$(node --input-type=module -e "const { liveSha } = await import('./apps/worker/scripts/rollback.mjs'); console.log((await liveSha(process.env.DEPLOY_HOST)) ?? '')")
+          if [[ "$serving" =~ ^[0-9a-f]{7,40}$ ]]; then echo "DEPLOYED_SHA=$serving" >> "$GITHUB_ENV"; fi
+
+      # THE SELF-HOST'S APP, AND THE BROWSER THE SIGN-IN AND THE LOOK DRIVE. Built every time, because until the
+      # sitting every step needs it, and after it the self-host half of `signin-live` is how a broken build is told
+      # apart from a broken host.
+      - name: Build the shell
+        run: pnpm --filter ./apps/web build
+
+      - name: Install the browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: The lane
+        id: lane
+        run: |
+          mkdir -p "$LANE_OUT"
+          node --input-type=module <<'JS'
+          import { spawnSync } from 'node:child_process';
+          import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+          import { join } from 'node:path';
+          const DIR = 'tools/canary/lane.d';
+          const keep = (file, text) => { if (file) appendFileSync(file, text); };
+          const files = existsSync(DIR) ? readdirSync(DIR).filter((name) => /\.m?js$/.test(name)).sort() : [];
+          if (files.length === 0) {
+            console.log(`::error::${DIR} holds no step, so nothing after this deploy was checked.`);
+            keep(process.env.GITHUB_OUTPUT, 'rollback=false\nfinding=\nunproven=the lane holds no step\n');
+            process.exit(1);
+          }
+          const ON_RED = /^export const onRed = '(rollback|finding)';$/m;
+          const red = { rollback: [], finding: [] };
+          const unproven = [];
+          const lines = [];
+          for (const name of files) {
+            const file = join(DIR, name);
+            const onRed = ON_RED.exec(readFileSync(file, 'utf8'))?.[1] ?? (/smoke|sign-?in/i.test(name) ? 'rollback' : 'finding');
+            console.log(`::group::${name}`);
+            const run = spawnSync(process.execPath, [file], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 15 * 60_000 });
+            process.stdout.write(run.stdout ?? '');
+            process.stderr.write(run.stderr ?? '');
+            console.log('::endgroup::');
+            const said = `${run.stdout ?? ''}${run.stderr ?? ''}`;
+            const verdict = run.status === 0 ? 'green' : run.status === 3 ? 'skipped' : 'red';
+            if (verdict === 'red') red[onRed].push(name);
+            if (verdict === 'skipped') unproven.push(`${name} skipped`);
+            else if (/self-host only/i.test(said)) unproven.push(`${name} self-host only`);
+            lines.push(`${name}  ${verdict}${verdict === 'red' ? (onRed === 'rollback' ? ', which starts the rollback' : ', which opens a finding') : ''}${/self-host only/i.test(said) ? ', self-host only' : ''}`);
+          }
+          console.log('');
+          for (const line of lines) console.log(`  ${line}`);
+          keep(process.env.GITHUB_STEP_SUMMARY, `### The lane after the deploy\n\n${lines.map((line) => `- ${line}`).join('\n')}\n\n`);
+          keep(process.env.GITHUB_OUTPUT, `rollback=${red.rollback.length > 0}\nfinding=${red.finding.join(', ')}\nunproven=${unproven.join(', ')}\n`);
+          if (red.rollback.length + red.finding.length > 0) process.exit(1);
+          JS
+        env:
+          CANARY: ${{ steps.canary.outputs.canary }}
+          SMOKE_SLUG: ${{ vars.SMOKE_SLUG }}
+          SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN }}
+          CANARY_PASSKEY: ${{ secrets.CANARY_PASSKEY }}
+          LANE_OUT: ${{ runner.temp }}/lane
+          # THE CANARY'S SESSION, which `signin-live` keeps and the look reads. Outside `LANE_OUT`, so the sheet's
+          # artefact never carries it, and removed the moment the lane is done.
+          CANARY_SESSION: ${{ runner.temp }}/canary-session.json
+
+      - name: Forget the canary's session
+        if: always()
+        run: rm -f "$RUNNER_TEMP/canary-session.json"
+
+      # THE CANARY'S SHEET HANGS ON THE RUN, whatever the lane said, since the canary's data is invented and the sheet
+      # is how an agent sees the screens at 390 and 1512 after each deploy.
+      - name: Keep the canary's sheet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-sheet
+          path: ${{ runner.temp }}/lane
+          if-no-files-found: ignore
+          retention-days: 30
+
+      # A RED SMOKE OR SIGN-IN, THE ROLLBACK THAT EXISTS. `FAILED_AT` is `smoke` for both, because `rollback.mjs` knows
+      # two places a deploy goes red and this is the later one: the site is deployed by now, so the site goes back too.
+      # Never on a run started by hand, which follows no deploy and has nothing recorded to put back.
+      - name: Decide whether to roll back
+        id: rollback
+        if: failure() && github.event_name == 'workflow_run' && steps.lane.outputs.rollback == 'true'
+        run: HEAD_SHA="${DEPLOYED_SHA:-$DEPLOYED}" node apps/worker/scripts/rollback.mjs decide
+        env:
+          FAILED_AT: smoke
+
+      - name: Roll the app back
+        if: failure() && steps.rollback.outputs.app != ''
+        run: |
+          echo "Rolling the app back to $VERSION"
+          cd apps/worker && pnpm exec wrangler rollback "$VERSION" --env production --message "Rolled back by after-deploy.yml after a red smoke or sign-in" --yes
+        env:
+          VERSION: ${{ steps.rollback.outputs.app }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Roll the site back
+        if: failure() && steps.rollback.outputs.site != ''
+        run: |
+          echo "Rolling the site back to $VERSION"
+          cd apps/site && pnpm exec wrangler rollback "$VERSION" --env production --message "Rolled back by after-deploy.yml after a red smoke or sign-in" --yes
+        env:
+          VERSION: ${{ steps.rollback.outputs.site }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      # A RED LOOK OPENS A FINDING: one open issue under one title, and each later red look a comment on it, so a look
+      # that stays red is one finding with a history rather than an issue per deploy.
+      - name: Open a finding
+        if: failure() && steps.lane.outputs.finding != ''
+        run: |
+          title="The look after a deploy went red"
+          body="After the deploy of $DEPLOYED, these steps of the lane went red: $FINDING. The run, with the canary's sheet kept on it: $RUN_URL"
+          open=$(gh issue list --repo "$REPO" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then gh issue comment "$open" --repo "$REPO" --body "$body"; else gh issue create --repo "$REPO" --title "$title" --body "$body"; fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          FINDING: ${{ steps.lane.outputs.finding }}
+
+      # AND THE DEPLOY'S MARK, ON ITS COMMIT, WHATEVER HAPPENED ABOVE. Proven only when the canary is set, every lane
+      # step ran on it and every one was green; anything else is "not proven" and says why, and a status of that kind
+      # is red on the commit, because a missing canary is never green.
+      - name: Mark the deploy
+        if: always() && !cancelled()
+        run: |
+          if [ "$GUARD" = "success" ] && [ "$CANARY" = "live" ] && [ "$LANE" = "success" ] && [ -z "$UNPROVEN" ]; then
+            state=success
+            said="Proven on $DEPLOY_HOST: every step of the lane passed on the canary."
+          else
+            state=failure
+            if [ "$ORIGIN" != "success" ]; then why="this commit is not on master, so the lane did not run"
+            elif [ "$GUARD" != "success" ]; then why="the canary is named and a secret of it is missing"
+            elif [ "$UNPROVEN" = "the lane holds no step" ]; then why="the lane holds no step, so nothing was checked"
+            elif [ "$LANE" != "success" ] && [ "$LANE" != "failure" ]; then why="the lane did not run"
+            elif [ "$LANE" != "success" ]; then why="a step of the lane went red"
+            elif [ "$CANARY" != "live" ]; then why="self-host only, there is no canary yet"
+            else why="$UNPROVEN"; fi
+            said="Not proven on $DEPLOY_HOST: $why."
+          fi
+          echo "$said"
+          echo "### $said" >> "$GITHUB_STEP_SUMMARY"
+          gh api "repos/$REPO/statuses/$DEPLOYED" -f state="$state" -f context="after-deploy" -f description="${said:0:140}" -f target_url="$RUN_URL" > /dev/null
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ORIGIN: ${{ steps.origin.outcome }}
+          GUARD: ${{ steps.canary.outcome }}
+          CANARY: ${{ steps.canary.outputs.canary }}
+          LANE: ${{ steps.lane.outcome }}
+          UNPROVEN: ${{ steps.lane.outputs.unproven }}

@@ -1,0 +1,7 @@
+{
+  "gate": "secret-grep",
+  "rule": "a key that comes back from a call, written out",
+  "expect": "a plaintext reaches standard output",
+  "findings": 1,
+  "why": "THE SIXTH: a key that comes back from a call. `const got = await getOne(…)` names no branded value, so `process.stdout.write(got.value)` was green until a same-file function whose return type names the brand was followed. The fixture also logs the answer of a deposit, a call whose return type does not, so one finding proves the gate follows only a return typed as plaintext."
+}

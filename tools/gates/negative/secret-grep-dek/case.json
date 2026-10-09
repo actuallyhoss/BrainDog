@@ -1,0 +1,7 @@
+{
+  "gate": "secret-grep",
+  "rule": "a data key in a log, under the name the code uses",
+  "expect": "reaches a log",
+  "findings": 1,
+  "why": "THE SAME LEAK UNDER THE NAME THE CODE USES. `52 §6`'s example is `console.log(plaintext)` and no file here has ever held a variable called that; the key hierarchy calls its secrets `plain`, `dek`, `kek`, `root` and `pkcs8`. One fixture per vocabulary, so widening the pattern is a thing that can be proved rather than asserted."
+}

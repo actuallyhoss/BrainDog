@@ -8,7 +8,7 @@
  *
  * EVERY FIGURE IS FICTIONAL AND AGREES WITH EVERY OTHER, dated as the drawing is (Monday 28 September
  * 2026). The Website area's 3 of 6 is the path's "three of six sections drafted"; the hosting range
- * is the two options on the decision over a year (GBP 6.00 and GBP 19.00 a month); and 26 October,
+ * is the two options on the decision over a year (USD 6.00 and USD 19.00 a month); and 26 October,
  * the planned launch, is a Monday, which is what the note and its second opinion are about.
  */
 import type { Example } from './types.ts';
@@ -35,8 +35,8 @@ Launch | 1/5 | Open the waitlist | Planner
 
 ~~~queue | A decision
 q | h1 | Planner | yesterday | Where should the landing page live? | Both fit the budget. They differ in how much you look after yourself. | call
-opt | h1 | managed | A managed host | Updates and backups are done for you | true | figure:GBP 19.00 a month
-opt | h1 | own | Your own server | Cheaper, and you keep it patched yourself | | figure:GBP 6.00 a month
+opt | h1 | managed | A managed host | Updates and backups are done for you | true | figure:USD 19.00 a month
+opt | h1 | own | Your own server | Cheaper, and you keep it patched yourself | | figure:USD 6.00 a month
 ~~~
 
 ~~~steps path | The path
@@ -53,10 +53,10 @@ Launch on the Monday, so the whole week is there to fix what launch shows | Seco
 ~~~
 
 ~~~progress range | Budget
-Name and domain | GBP 64.00 | GBP 50.00 | GBP 120.00
-Design | GBP 350.00 | GBP 300.00 | GBP 600.00
-Hosting, the first year | GBP 0.00 | GBP 72.00 | GBP 228.00
-Launch ads | GBP 0.00 | GBP 200.00 | GBP 400.00
+Name and domain | USD 64.00 | USD 50.00 | USD 120.00
+Design | USD 350.00 | USD 300.00 | USD 600.00
+Hosting, the first year | USD 0.00 | USD 72.00 | USD 228.00
+Launch ads | USD 0.00 | USD 200.00 | USD 400.00
 ~~~`,
       layout: [
         { at: 0, cols: 12 },
@@ -67,7 +67,7 @@ Launch ads | GBP 0.00 | GBP 200.00 | GBP 400.00
         { at: 5, cols: 6 },
       ],
       reads: {
-        5: 'GBP 414.00 spent so far, and nothing has gone over its range.',
+        5: 'USD 414.00 spent so far, and nothing has gone over its range.',
       },
     },
     {
@@ -76,8 +76,8 @@ Launch ads | GBP 0.00 | GBP 200.00 | GBP 400.00
       glyph: 'decide',
       src: `~~~queue | Waiting on you
 q | h1 | Planner | yesterday | Where should the landing page live? | Both fit the budget. They differ in how much you look after yourself. | call
-opt | h1 | managed | A managed host | Updates and backups are done for you | true | figure:GBP 19.00 a month
-opt | h1 | own | Your own server | Cheaper, and you keep it patched yourself | | figure:GBP 6.00 a month
+opt | h1 | managed | A managed host | Updates and backups are done for you | true | figure:USD 19.00 a month
+opt | h1 | own | Your own server | Cheaper, and you keep it patched yourself | | figure:USD 6.00 a month
 q | h2 | Researcher | 2h ago | Move the launch to Tuesday 27 Oct? | The newsletter goes out on Tuesdays, and a launch the same morning reaches twice the readers. | call
 opt | h2 | accept | Accept | Launch moves to Tuesday 27 Oct, and the path follows | true
 opt | h2 | reject | Reject | Launch stays on Monday 26 Oct |
@@ -88,7 +88,7 @@ opt | h2 | reject | Reject | Launch stays on Monday 26 Oct |
       title: 'Inbox',
       glyph: 'inbox',
       src: `~~~timeline | Arrived and filed
-Today 11:20 | Invoice from the designer, GBP 350.00 | Filed to Budget, Design | good
+Today 11:20 | Invoice from the designer, USD 350.00 | Filed to Budget, Design | good
 Sat 26 Sep | Domain renewal reminder | Filed to Tasks, due next September
 Fri 25 Sep | Three name ideas from a friend | Filed to Brand
 ~~~`,

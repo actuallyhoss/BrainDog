@@ -1,0 +1,7 @@
+{
+  "gate": "router-groups",
+  "rule": "an account route that reads more than the session cookie",
+  "expect": "an account route reads the session cookie",
+  "findings": 1,
+  "why": "THE ACCOUNT TABLE, which reads the session cookie and nothing else. The fixture holds a correct row beside the seeded one, so a count of one proves the gate reads each row rather than going red on the table."
+}

@@ -94,6 +94,7 @@
  */
 
 import { codeOf, conflicted, refused, type Refusal, type Result } from '@braindog/ports';
+import type { HANDOFF_STATES as RecordHandoffStates } from '@braindog/record';
 
 import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
 import { ANSWERED_GRAMMAR, AUTOMATION_GRAMMAR } from './automations.ts';
@@ -131,7 +132,7 @@ import {
   type Shaped,
 } from './brief.ts';
 import { briefed, handlesIn } from './briefing.ts';
-import { actorWords, bare, callOf, clip, closest, counted, cursorIn, cursorOut, grouped, moneyIn, runnerOf } from './words.ts';
+import { actorWords, agentOf, bare, callOf, clip, closest, counted, cursorIn, cursorOut, grouped, moneyIn, runnerOf } from './words.ts';
 
 type Answer<T = unknown> = Promise<Result<T>>;
 type Args = Record<string, unknown>;
@@ -331,6 +332,16 @@ export type Tool = {
 };
 
 const str = (description: string) => ({ type: 'string', description });
+
+/**
+ * The states a run hands itself into, the kernel's `HANDOFF_STATES` (`packages/kernel/src/handoff.ts`) as the record
+ * passes it on. Written here and held to it by type, because this package's tool list is also the command's, which does
+ * not load the record; `handoff-tool.test.ts` holds the two equal at run time too.
+ */
+const HANDOFF_STATES = ['idle', 'handoff', 'done'] as const;
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const handoffStatesHeld: Same<typeof HANDOFF_STATES, typeof RecordHandoffStates> = true;
+void handoffStatesHeld;
 const int = (description: string) => ({ type: 'integer', description });
 /**
  * `required` is left out when empty: in every tool that has none, it is tokens that say nothing.
@@ -382,7 +393,9 @@ export const TOOLS: readonly Tool[] = [
     name: 'schema',
     title: 'See the fields',
     description: 'One register\'s fields, their types and what each may take.',
-    input: obj({ register: str('A register id from record_index.'), format: FORMAT }, ['register']),
+    /* `register` IS SAID BY NAME, as on `list` and `create`: where the ids are is `record_index`'s own description, and
+       the twelve tokens went to `handoff`'s take and drop (AGT-C05). */
+    input: obj({ register: { type: 'string' }, format: FORMAT }, ['register']),
     writes: false,
   },
   {
@@ -398,7 +411,9 @@ export const TOOLS: readonly Tool[] = [
        the instructions were cut to the three rules every call needs. */
     description: 'One row or figure, by its spoken id. Two currencies are never added.',
     input: obj(
-      { spoken: str('register#number, a prefixed id such as S42, a row id from a ref field, or a figure from record_index.'), format: FORMAT },
+      /* SHORTER BY TEN TOKENS FOR `handoff`'s take and drop (AGT-C05): "from record_index" is what that tool's own
+         description says of its figures, and a ref field's value is a row id by what it is. */
+      { spoken: str('register#number, an id such as S42 or a ref field holds, or a figure.'), format: FORMAT },
       ['spoken'],
     ),
     writes: false,
@@ -460,7 +475,9 @@ export const TOOLS: readonly Tool[] = [
     /* A CURSOR NOW, AND TWENTY BY DEFAULT. It took a limit alone, up to the record's 200 and 50 when asked for none, so
        the default read on the owner's record was 13 KB with 70 row ids in it, and a session that wanted the page below
        had no way to ask. Paged as `list` is, the closing line says what is left and the call that reads it. */
-    input: obj({ limit: int('1 to 100. Default 20.'), cursor: { type: 'string' }, everything: { type: 'boolean' }, format: FORMAT }),
+    /* ITS LIMIT IS `list`'s, 1 to 100 and 20 by default, and no longer said here: the eight tokens went to `handoff`'s take
+       and drop (AGT-C05), and an answer at the cap still says what is left and the call that reads it. */
+    input: obj({ limit: { type: 'integer' }, cursor: { type: 'string' }, everything: { type: 'boolean' }, format: FORMAT }),
     writes: false,
   },
   {
@@ -472,7 +489,8 @@ export const TOOLS: readonly Tool[] = [
       register: { enum: ['suggestion', 'decision', 'prediction'] },
       id: str('One by its SG or D number.'),
       status: { enum: ['open', 'resolved', 'all'] },
-      limit: int('1 to 100. Default 20.'),
+      /* `list`'s limit, said there and not again here, as `activity`'s: its tokens went to `handoff`'s take and drop. */
+      limit: { type: 'integer' },
       cursor: { type: 'string' },
       format: FORMAT,
     }),
@@ -480,7 +498,8 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'propose',
-    title: 'Suggest a change for the owner',
+    /* "ASK THE OWNER TO DECIDE", five tokens shorter than "Suggest a change for the owner", for `handoff`'s take and drop. */
+    title: 'Ask the owner to decide',
     /* WHEN TO REACH FOR IT IS THE INSTRUCTIONS' SECOND RULE, and was said again here: "an agent never decides, lay out
        options with propose" and "to change something you may not change yourself, propose it" were the two clauses
        this description carried, in the same payload, a line apart. Where the person decides is said once, here. */
@@ -517,13 +536,18 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'create',
     title: 'Add something',
-    description: 'Add a row to a register; it answers its number.',
+    description: 'Add a row; it answers its number.',
     /* MONEY IS SAID WHERE IT IS WRITTEN. The instructions carried it as their second rule, read on every call; it
        matters on the two calls that write a value, and a brief answer now says every amount as a person reads it. */
     input: obj(
       {
         register: { type: 'string' },
-        fields: { type: 'object', description: 'Field ids to values. Money is an amount in minor units and its currency: GBP 2 decimals, JPY 0, KWD 3.' },
+        /* AND WHERE A CURRENCY COMES FROM (REC-B04): an amount on a field that names its account may leave the code out
+           and takes the account's, and a row's code is kept for good, refused as CURRENCY_FIXED when a write changes it. */
+        fields: {
+          type: 'object',
+          description: "Field ids to values. Money is an amount in minor units and its currency: GBP 2 decimals, JPY 0, KWD 3. A ledger amount may omit currency and take its account's for good (CURRENCY_FIXED).",
+        },
         note: { type: 'string' },
       },
       ['register', 'fields'],
@@ -554,7 +578,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'log',
     title: 'Add a note',
-    description: 'Append one note to a row, changing nothing about it.',
+    description: 'Append one note to a row, changing nothing else.',
     /* A NOTE ABOUT NOTHING IN PARTICULAR IS ONE CALL. It needed a row, so an agent first
        asked `context` for its session's id, or wrote something to open one, and then logged on it: two calls for what
        a log tool elsewhere does in one. Left out, the note goes on the caller's own session, and `log` in `tools`
@@ -570,19 +594,24 @@ export const TOOLS: readonly Tool[] = [
     title: 'Leave the next step',
     /* THE HANDOFF MANNERS ARE SAID HERE, once, beside the tool they are about: they were the instructions' sixth rule,
        read on every call of every tool. Each field's own rule stays beside the field. */
-    description: "Keep your run's handoff true: doing once you know the task, next before you stop, each dead end in tried.",
+    /* TAKE AND DROP ARE A CALL OF THEIR OWN (AGT-C05), on a step another run left: `take` picks it up, and the second of
+       two sessions racing for it is told in the record's words who has it; `drop` closes one that is no longer true. */
+    description: "Keep your run's handoff true: doing once you know the task, next before you stop, each dead end in tried (it and note append). take or drop a run's step alone; drop with why.",
     input: obj({
       next: str('One concrete step.'),
-      tried: str('Appends.'),
-      note: str('Appends.'),
+      tried: { type: 'string' },
+      note: { type: 'string' },
       /* `doing`, the kernel's own field: `title` is a reserved field id, and the record refuses it. */
       doing: str('A few words, verb first.'),
       /* AN ENUM ALONE, as every other in this list: its `type` paid for `meet`'s `keys` saying its items are text, which
-         a client that checks arrays (Gemini's) refuses a tool list without. */
+         a client that checks arrays (Gemini's) refuses a tool list without. The states are the kernel's (`HANDOFF_STATES`). */
       state: {
-        enum: ['idle', 'handoff', 'done'],
-        description: 'handoff asks another run to take it on; done clears next.',
+        enum: [...HANDOFF_STATES],
+        description: 'handoff passes it on; done clears next.',
       },
+      take: { type: 'string' },
+      drop: { type: 'string' },
+      why: { type: 'string' },
     }),
     writes: true,
   },
@@ -610,7 +639,7 @@ export const TOOLS: readonly Tool[] = [
        one on its own, and an agent's own run, `session in <repo>`, is what the record does believe. An agent that wrote
        its own run for what it read in a mail would be lending the mail its trust. */
     description:
-      'A person or organisation in the work, matched by email, handle or key. A name alone is only noted. Mail, commits and the web are not believed alone: say where honestly. Your own run is session in <repo>.',
+      'A person or organisation, matched by email, handle or key. A name alone is only noted. Mail, commits and the web are not believed alone: say where honestly. Your own run is session in <repo>.',
     input: obj(
       {
         name: { type: 'string' },
@@ -1863,6 +1892,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     /**
      * THE CARD, AND THE BRIEFING CUT TO WHAT BEARS ON THIS CALLER (`briefing.ts`). The record's own answer measured
      * 16.6 KB on the owner's record, three quarters of it keys and skills that apply everywhere.
+     *
+     * THE CARD IS THE RECORD'S (`c.card`, AGT-B07), printed as it came, then the open work and the habits: the start hook
+     * and `braindog context` print the same card, so a session is never told two things by two builds.
      */
     context: async (_args, ctx, turn) => {
       if (!surface.context) return { result: unbuilt('context', 'Call record_index for the registers, then list what is open.') };
@@ -2317,7 +2349,18 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     handoff: async (args, ctx, turn) => {
       if (!surface.handoff) return { result: unbuilt('handoff', 'Log the next step on the task you are working on instead.') };
       const out = await surface.handoff(args, ctx);
+      /* A REFUSAL NAMES THE FIELD THE CALLER SENT: the kernel says `left`, the run whose step it is, and this tool calls
+         that field `take` or `drop`. */
+      if (!out.ok && 'refusal' in out && out.refusal.at === 'left' && (args.take !== undefined || args.drop !== undefined))
+        return { result: await failed({ ...out, refusal: { ...out.refusal, at: args.take !== undefined ? 'take' : 'drop' } }, ctx, turn) };
       if (!out.ok) return { result: await failed(out, ctx, turn) };
+      /* A STEP TAKEN OR DROPPED (AGT-C05) answers the run that left it and its words, not a run's row: said as what now
+         happens to it. The second of two sessions racing for one step was refused above, in the record's sentence. */
+      if (isObject(out.value) && typeof out.value.left === 'string' && typeof out.value.next === 'string' && !isEntry(out.value)) {
+        const step = out.value as { left: string; next: string; agent?: string | null };
+        const value = bare(step);
+        return { result: { ok: true, value }, say: () => stepSaid(step, args.take !== undefined) };
+      }
       if (!isEntry(out.value)) return { result: { ok: true, value: bare(out.value) } };
       const row = await entryOut(out.value, ctx, turn);
       return { result: { ok: true, value: row }, say: () => handoffBrief(row as Shaped) };
@@ -2896,6 +2939,19 @@ function said(result: Result<unknown>, text?: string): Said {
  */
 const objectOf = (value: unknown): Record<string, unknown> =>
   isObject(value) ? value : Array.isArray(value) ? { rows: value } : { value: value ?? 'none' };
+
+/**
+ * What `handoff` says of a step it took or dropped: whose step, in its words, and what follows. The run that left it is
+ * named by its app with its handle beside it, as the briefing's Next line names it.
+ */
+export function stepSaid(step: { left: string; next: string; agent?: string | null }, took: boolean): string {
+  const app = agentOf(step.agent ?? undefined, true);
+  const whose = app === agentOf(undefined, true) ? step.left : `${app} (${step.left})`;
+  const words = step.next.trim() === '' ? 'a step with no words' : clip(step.next.trim(), 160);
+  return took
+    ? `You took the step ${whose} left: ${words}. It is yours now; call handoff with your own next step before you stop.`
+    : `Dropped the step ${whose} left: ${words}. Nobody is handed it now.`;
+}
 
 /** The tools whose arguments go to the record whole, which names a key its method does not take in its own sentence. */
 const PASSED_WHOLE: ReadonlySet<string> = new Set(['propose', 'handoff', 'meet', 'triage']);

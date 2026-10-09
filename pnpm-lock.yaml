@@ -44,6 +44,9 @@ importers:
       '@braindog/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
+      '@braindog/pack-live-feed':
+        specifier: workspace:*
+        version: link:../../packs/live-feed
       '@braindog/ports':
         specifier: workspace:*
         version: link:../../packages/ports
@@ -145,6 +148,9 @@ importers:
       '@braindog/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
+      '@braindog/pack-rates-poll':
+        specifier: workspace:*
+        version: link:../../packs/rates-poll
       '@braindog/seed':
         specifier: workspace:*
         version: link:../../packages/seed

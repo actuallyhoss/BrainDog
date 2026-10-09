@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { core, openStore } from '../src/call.ts';
+import { ANSWER_STALE_DAYS } from '../src/health.ts';
 import { createSlash, engineHealth, engineSaid, FAILS_DOWN, type EngineHealth } from '../src/index.ts';
 import { canned, fakeRecord, fixedClock, NOW, OWNER, openSqlite } from './double.ts';
 
@@ -156,3 +157,31 @@ test('A REAL LEDGER: three asks to a model that throws, written by the engine it
 function DAYS(n: number): number {
   return n * 24 * HOUR;
 }
+
+test('AN ANSWER 20 DAYS OLD AND TWO FRESH FAILURES IS not_answering: a stale answer earns no blip (audit 36-37, 7)', () => {
+  const { sql, row } = ledger();
+  row(NOW - DAYS(20), 'ok', null);
+  row(NOW - 3 * HOUR, 'error', 'UNREACHABLE');
+  row(NOW - HOUR, 'error', 'UNREACHABLE');
+  const h = engineHealth(sql, fixedClock(NOW), MODEL);
+  assert.deepEqual(h, { state: 'not_answering', last_ok: at(NOW - DAYS(20)), since: at(NOW - 3 * HOUR) });
+  assert.match(engineSaid(h, NOW).text, /^Slash's model has not answered since /u);
+  assert.doesNotMatch(engineSaid(h, NOW).text, /20 days ago/u);
+
+  /* ONE FRESH FAILURE IS ENOUGH past the line, and none older than a day is: nobody asked since, so the answer stands. */
+  const one = ledger();
+  one.row(NOW - DAYS(ANSWER_STALE_DAYS) - HOUR, 'ok', null);
+  one.row(NOW - HOUR, 'error', 'ANSWER_UNREADABLE');
+  assert.equal(engineHealth(one.sql, fixedClock(NOW), MODEL).state, 'not_answering');
+  const old = ledger();
+  old.row(NOW - DAYS(20), 'ok', null);
+  old.row(NOW - DAYS(2), 'error', 'UNREACHABLE');
+  assert.equal(engineHealth(old.sql, fixedClock(NOW), MODEL).state, 'answering');
+
+  /* AND A RECENT ANSWER KEEPS FAILS_DOWN: two fresh failures six days after it are still the blip the retry mends. */
+  const recent = ledger();
+  recent.row(NOW - DAYS(6), 'ok', null);
+  recent.row(NOW - 2 * HOUR, 'error', 'UNREACHABLE');
+  recent.row(NOW - HOUR, 'error', 'UNREACHABLE');
+  assert.equal(engineHealth(recent.sql, fixedClock(NOW), MODEL).state, 'answering');
+});

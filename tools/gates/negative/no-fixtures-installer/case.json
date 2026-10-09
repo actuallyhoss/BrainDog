@@ -1,0 +1,7 @@
+{
+  "gate": "no-fixtures",
+  "rule": "shipped code that calls the seed's installer",
+  "expect": "calls the seed's installer",
+  "findings": 3,
+  "total": 3
+}

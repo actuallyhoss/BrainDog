@@ -44,8 +44,15 @@
  * `mercury` 1.1.0 KEEPS THE PAYEE. Each transaction carries `counterpartyName` in `counterparty_text`, the field
  * money-core 3.10.0 declares on its ledger, so the floor moves to 3.10.0 and the pack lays only `mercury_id`, and the
  * record can resolve the payee to one organisation by its key. The two tests after "ONE ROW TYPED BY HAND" hold it, and the whole path holds the record's own field taking it.
+ *
+ * `mercury` 1.2.0 KEEPS THE ACCOUNTS IT FINDS. The balances pull is gone and the script writes the balances before the
+ * transactions, finding each account by Mercury's own id in `mercury_account`. The pull found an account by its name
+ * only, so on a record whose typed company accounts were named for people or for a bank's welcome line it wrote one
+ * beside each, and company cash counted twice. First contact adopts the one typed account of the same currency whose
+ * folded name is Mercury's name or nickname, and writes any other as an account that does not count as cash, noted,
+ * while a typed account could be the same money. The tests under "the accounts, kept by Mercury's id" hold it, and
+ * `both-feeds.test.ts` holds Mercury and Stripe on one record with either key refused.
  */
-
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -53,7 +60,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { readPackFile } from '../../packages/declare/src/catalogue.ts';
-import { configReads, fillConfig, openRecord, type Declaration, type Kernel } from '../../packages/kernel/src/index.ts';
+import { configReads, fillConfig, openRecord } from '../../packages/kernel/src/index.ts';
 import { fixOf } from '../../packages/ports/src/index.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../packages/kernel/test/sqlite.ts';
@@ -70,7 +77,6 @@ const template = (): Record<string, unknown> => JSON.parse(readFileSync(PACK_FIL
 
 /** Some of the pack's settings, as a person sets them on its page. What is not named keeps its default. */
 type Settings = { grant?: string; every?: string; book?: number };
-type Pull = Record<string, unknown> & { every: string; fetch: Record<string, unknown> & { base: string; auth: Record<string, unknown>; schedule: Record<string, unknown> } };
 type Script = Record<string, unknown> & { script: string; runs: { every: string }; egress: string[]; keys: string[]; reads: string[]; writes: string[]; limits?: Record<string, number>; source: string };
 
 const scriptOf = (doc: Record<string, unknown>): Script => (doc.declarations as Record<string, unknown>[]).find((d) => typeof d.script === 'string') as Script;
@@ -94,16 +100,6 @@ function settled(file: Record<string, unknown>, set: Settings = {}): Record<stri
 
 /** What `ctx.config` holds for a run of the ledger: the settings' defaults and whatever `set` changes. */
 const configOf = (set: Settings = {}): Json => ({ ...defaults(template()), ...set });
-
-type Ingest = Record<string, unknown> & { ingest: string };
-
-/** The pack's one declaration, with whatever a test wants taken off it. */
-const declOf = (over: Record<string, unknown> = {}, drop: string[] = []): Ingest => {
-  const doc = settled(template()) as { declarations: Ingest[] };
-  const body = { ...doc.declarations[0]!, ...over };
-  for (const key of drop) delete body[key];
-  return body;
-};
 
 /* ── where the pack lives ─────────────────────────────────────────────────────────────────────── */
 
@@ -144,20 +140,19 @@ test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
 
 /* ── nothing moved but the settings ───────────────────────────────────────────────────────────── */
 
-test('THE KEY AND THE CLOCK ARE READ WHERE THE PULL AND THE LEDGER READ THEM, AND NOWHERE ELSE', () => {
-  /* BOTH INTERVALS, BECAUSE TWO SCHEDULERS READ THEM. The record arms the pull off the top-level `every` and
-     `@braindog/connect` computes the next slot off `fetch.schedule.every`; a file carrying two different numbers fires
-     on a cadence nothing else agrees with. The ledger runs on the same clock and declares the same key, which its
-     source reads from `ctx.config`, because a source cannot read its own declaration. */
+test('THE KEY AND THE CLOCK ARE READ WHERE THE SCRIPT READS THEM, AND NOWHERE ELSE', () => {
+  /* ONE DECLARATION SINCE 1.2.0, the script, where a pull beside it read the same two settings. It runs on the
+     `every` clock and declares the `grant` key, which its source reads from `ctx.config`, because a source cannot read
+     its own declaration. */
   const reads = (template().declarations as Record<string, unknown>[]).flatMap((d, i) => configReads(d).map((r) => `${i}.${r.at} ${r.key}${r.whole ? '' : ' in text'}`));
-  assert.deepEqual(reads, ['0.every every', '0.fetch.auth.grant grant', '0.fetch.schedule.every every', '1.runs.every every', '1.keys[0] grant']);
+  assert.deepEqual(reads, ['0.runs.every every', '0.keys[0] grant']);
   const source = readFileSync(new URL('./ledger.js', import.meta.url), 'utf8');
   assert.ok(source.includes('keyOf(ctx.config)') && source.includes('bookOf(ctx.config)'), 'ledger.js no longer reads its key and its book from its settings');
 });
 
 /**
- * Each set of settings, with what the file says once a record has filled it: the pull's two intervals and its key,
- * and the ledger's clock and key. The name of each declaration and the host are the file's whatever is set.
+ * Each set of settings, with what the file says once a record has filled it: the script's clock and key. The name of
+ * the script and the host are the file's whatever is set.
  *
  * WRITTEN OUT AND NOT RECOMPUTED, because a table computed from the settings agrees with them by construction.
  */
@@ -167,22 +162,14 @@ for (const [name, set, want] of [
 ] as const satisfies readonly (readonly [string, Settings, readonly [string, string]])[])
   test(`SET, THE FILE CHANGES WHERE THE SETTINGS SAY AND NOWHERE ELSE: ${name}`, async () => {
     const filled = settled(template(), set);
-    const pull = (filled.declarations as Pull[])[0]!;
     const script = scriptOf(filled);
     const [every, grant] = want;
-    assert.deepEqual(
-      [pull.ingest, pull.every, pull.fetch.schedule.every, pull.fetch.base, pull.fetch.auth],
-      ['mercury', every, every, 'https://api.mercury.com', { kind: 'bearer', grant }],
-    );
     assert.deepEqual([script.script, script.runs.every, script.egress, script.keys], ['mercury_ledger', every, ['https://api.mercury.com'], [grant]]);
 
     /* AND EVERYTHING THE SETTINGS DO NOT NAME IS THE FILE'S, key order included: the version, the range on Money, the
-       path, the map, the dedupe key, the source. */
+       fields it lays, the source. */
     const blanked = (doc: Record<string, unknown>): string => {
       const d = structuredClone(doc);
-      const p = (d.declarations as Pull[])[0]!;
-      p.every = p.fetch.schedule.every = '';
-      p.fetch.auth.grant = '';
       const s = scriptOf(d);
       s.runs.every = '';
       s.keys = [];
@@ -195,15 +182,15 @@ for (const [name, set, want] of [
  * A vault entry as a row: a label and the host it opens, and no bytes, because a test's `openKey` is the key store.
  *
  * NEEDED SINCE THE LEDGER: install refuses a script whose key is not in the vault ("Add the key called ... to the
- * vault, then install."), where the pull alone installed without one and was refused on its first run instead.
+ * vault, then install.").
  *
- * SEALED UNDER 'connector' AND NOT THE DEFAULT: this key is opened by the mercury pull's own scheduled run, a
- * `pull.fetch` job, never by a person at a screen. `sealed_under` defaults to `'record'`
+ * SEALED UNDER 'connector' AND NOT THE DEFAULT: this key is opened by the ledger script's own scheduled run, never
+ * by a person at a screen. `sealed_under` defaults to `'record'`
  * (`packages/kernel/src/migrations/0010_grant_sealed_under.ts`), which is right for a key a person deposits to use
  * themselves, but `runnerCannotOpen` (`packages/kernel/src/actions.ts`) refuses to approve a call out with a
  * record-sealed key and `sealedGrant` (`packages/kernel/src/vault.ts`) refuses to open one at run time, both with
  * "was added for you to use, not for a connector". Leaving this row at the default made every test below fail that
- * check instead of exercising the pull, so it is sealed the way a real connector key would be.
+ * check instead of exercising the script, so it is sealed the way a real connector key would be.
  */
 const grantFor = (sql: Pick<NodeSql, 'exec'>, label: string): void =>
   sql.exec(
@@ -240,50 +227,29 @@ const LEDGER_LINES = [
   'Keys are not kept per project yet, so any action in this record can send any key it names.',
 ];
 
+
 test('INSTALLED THROUGH THE RECORD’S OWN DOOR, once the key is in the vault and the owner approves the call out and the ledger script', async () => {
   const { sql, plan, put, close } = await withMoney();
   /* THE FILE AS IT SHIPS, settings and all: the record's door fills them with their defaults. */
   const doc = template();
-  /* NOT BEFORE THE KEY IS IN THE VAULT. The pull alone installed without one and was refused on its first run; a
-     script naming a key is refused at install, so since the ledger the key goes in first. */
+  /* NOT BEFORE THE KEY IS IN THE VAULT: a script naming a key is refused at install. */
   const early = await put(doc, true);
   assert.equal(early.ok, false, 'installed with no key in the vault');
   assert.equal(fixOf(early as never), 'Add the key called "Mercury (read only)" to the vault, then install.');
   grantFor(sql, 'Mercury (read only)');
-  const approve = (await plan(doc)).approve;
-  assert.ok(approve[0]!.startsWith('CALLS OUT api.mercury.com · every 1h · '), approve[0]);
-  assert.deepEqual(approve.slice(1), LEDGER_LINES);
+  /* THE SCRIPT'S LINES AND NOTHING ELSE. Before 1.2.0 a line for the balances pull came first, and it read that the
+     pull sent no key while every run sent one; with the pull gone, every line he approves names the key it sends. */
+  assert.deepEqual((await plan(doc)).approve, LEDGER_LINES);
   assert.equal((await put(doc, false)).ok, false, 'never without approval');
   assert.ok((await put(doc, true)).ok);
   close();
 });
 
-test(
-  'AND THE LINE HE APPROVES NAMES THE KEY THE PULL SENDS',
-  {
-    todo: 'egressOf in packages/kernel/src/actions.ts reads the key from a top-level grant, which a pull does not have: its key is fetch.auth.grant, so this plan reads grant "none" for a pull that sends a bearer key every hour',
-  },
-  async () => {
-    /* MEASURED WHILE MOVING THIS PACK, AND NOT THIS PACK'S TO REPAIR. The line printed is
-       `CALLS OUT api.mercury.com · every 1h · grant "none"`, so the owner approving a bank pull reads that it sends
-       no key while every run sends one. Since the ledger the script's own line below it names the same key, which
-       makes the pull's line read as a contradiction rather than a promise. */
-    const { sql, plan, close } = await withMoney();
-    grantFor(sql, 'Mercury (read only)');
-    const doc = template();
-    assert.deepEqual((await plan(doc)).approve, ['CALLS OUT api.mercury.com · every 1h · grant "Mercury (read only)"', ...LEDGER_LINES]);
-    close();
-  },
-);
-
 /**
- * One Mercury account, as `/api/v1/accounts` answers it.
- *
- * THE FIELDS ARE THE ONES THE DECLARATION READS PLUS THE ONES IT DELIBERATELY DOES NOT, because a
- * fixture holding only what is mapped cannot show that `createdAt` is not `as_of` and that
- * Mercury's own `kind` is not this record's.
+ * One Mercury account, as `/api/v1/accounts` answers it. `currentBalance` is the balance kept; `createdAt` and
+ * Mercury's own `kind` ride along and are neither the day of the balance nor this record's kind.
  */
-const account = (name: string, balance: number) => ({
+const account = (name: string, balance: number, extra: Record<string, unknown> = {}) => ({
   id: `acc_${name.length}${balance}`,
   name,
   nickname: null,
@@ -293,178 +259,19 @@ const account = (name: string, balance: number) => ({
   currentBalance: balance,
   availableBalance: balance,
   createdAt: '2024-02-11T10:04:00Z',
+  ...extra,
 });
 
-const body = (requestId: string, ...accounts: ReturnType<typeof account>[]): string => JSON.stringify({ requestId, accounts });
-
-async function record(decl: Ingest): Promise<{ k: Kernel; sql: NodeSql; decl: Ingest }> {
-  const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
-  assert.ok(k.createRecord({ id: ID, slug: 'kiln', name: 'Kiln', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
-
-  const decls: Declaration[] = [
-    { id: 'register.accounts', kind: 'register', body: REGISTERS.accounts as never },
-    /* register.accounts.book (money-core 3.1.0) points at books, so this minimal install carries books too. */
-    { id: 'register.books', kind: 'register', body: REGISTERS.books as never },
-    { id: `ingest.${decl.ingest}`, kind: 'ingest', body: decl as never },
-  ];
-  const put = await k.install(decls);
-  assert.ok(put.ok, fixOf(put));
-  return { k, sql, decl };
-}
-
-/**
- * One run of the connector: the page read by the record's own extractor, then written.
- *
- * THE EXTRACTOR IS THE RECORD'S AND NOT A STUB, which is the whole reason this test is here rather
- * than in `@braindog/connect`: what turns Mercury's JSON into an `accounts` row is
- * `kernel.extract`, and a stub that agreed with the declaration would be a test of the fixture.
- */
-function run(k: Kernel, sql: NodeSql, decl: Ingest, n: number, page: string): { wrote: number; kept: number } {
-  const outbox = `ob_${n}`;
-  sql.exec(
-    `INSERT INTO outbox (id, created, kind, payload, state, leased_until, attempts)
-     VALUES (?, ?, 'pull.fetch', ?, 'leased', ?, 1)`,
-    outbox,
-    new Date(NOW).toISOString(),
-    JSON.stringify({ ingest: decl.ingest }),
-    new Date(NOW + 300_000).toISOString(),
-  );
-  const got = k.extract(decl as never, { ts: new Date(NOW).toISOString(), body: page });
-  const out = k.applyPage({
-    outbox,
-    n,
-    raw: { sha256: `${n}`.padStart(64, 'f'), headers: { 'content-type': 'application/json' }, bytes: page.length, body: null, state: 'matched' },
-    rows: got.rows,
-    cursor: { watermark: null },
-  });
-  assert.ok(out.ok, fixOf(out));
-  return out.value;
-}
-
-const balances = (sql: NodeSql): [string, number][] =>
-  sql
-    .all<{ name: string; amount: number }>(
-      `SELECT json_extract(fields, '$.name') AS name, json_extract(fields, '$.balance.amount') AS amount
-       FROM entry WHERE register = 'accounts' AND deleted_at IS NULL ORDER BY name`,
-    )
-    .map((r) => [r.name, r.amount]);
-
-/**
- * The four fields the declaration STATES rather than reads, as they land.
- *
- * WITHOUT THIS QUERY THE FIXTURE PROVED NOTHING. `account()` above carries `createdAt` and Mercury's
- * own `kind` so that a reader can see they are not `as_of` and not this record's `kind`, and until
- * these rows were asserted, replacing `as_of: { arrived: true }` with `{ path: 'createdAt' }`, or
- * `kind: 'bank'` with `'card'`, or the currency with `EUR`, left every test in this file green.
- * `liquid` reads back as SQLite's `1` because a bool is stored as an integer.
- */
-const stated = (sql: NodeSql): [string, string, string, string, number][] =>
-  sql
-    .all<{ name: string; currency: string; as_of: string; kind: string; liquid: number }>(
-      `SELECT json_extract(fields, '$.name') AS name, json_extract(fields, '$.balance.currency') AS currency,
-              json_extract(fields, '$.as_of') AS as_of, json_extract(fields, '$.kind') AS kind,
-              json_extract(fields, '$.liquid') AS liquid
-       FROM entry WHERE register = 'accounts' AND deleted_at IS NULL ORDER BY name`,
-    )
-    .map((r) => [r.name, r.currency, r.as_of, r.kind, r.liquid]);
-
-const OPS = account('Mercury Checking ••4417', 18_420.5);
-const RESERVE = account('Mercury Savings ••9002', 250_000);
-
-/* ── the red ─────────────────────────────────────────────────────────────────────────────────── */
-
-test('WITHOUT A KEY THE SECOND HOUR WRITES THE COMPANY A SECOND SET OF ACCOUNTS', async () => {
-  /* THIS IS THE FAILURE THE PACK EXISTS TO PREVENT, measured rather than described. `existingRow`
-     answers `undefined` for a declaration that names nothing to match on, which `07 §3` calls
-     `on_conflict: new` by construction, so every hour is a fresh pair of rows and the Money page
-     adds them all up. Two hours is four accounts and twice the cash. */
-  const { k, sql, decl } = await record(declOf({}, ['dedupe', 'on_conflict']));
-  assert.deepEqual(run(k, sql, decl, 1, body('req_a', OPS, RESERVE)), { wrote: 2, kept: 0 });
-  assert.deepEqual(run(k, sql, decl, 2, body('req_b', OPS, RESERVE)), { wrote: 2, kept: 0 });
-  assert.equal(balances(sql).length, 4);
-  sql.close();
-});
-
-/* ── the green ───────────────────────────────────────────────────────────────────────────────── */
-
-test('THE PACK AS SHIPPED WRITES ONE ROW AN ACCOUNT, however many times the hour runs', async () => {
-  const { k, sql, decl } = await record(declOf());
-  assert.deepEqual(run(k, sql, decl, 1, body('req_a', OPS, RESERVE)), { wrote: 2, kept: 0 });
-
-  /* THE SAME TWO ACCOUNTS, DIFFERENT BYTES. `update` rewrites the row it found rather than skipping
-     it, so the count is `wrote` again and the register still holds two. */
-  assert.deepEqual(run(k, sql, decl, 2, body('req_b', OPS, RESERVE)), { wrote: 2, kept: 0 });
-  assert.deepEqual(balances(sql), [
-    ['Mercury Checking ••4417', 1_842_050],
-    ['Mercury Savings ••9002', 25_000_000],
-  ]);
-
-  /* AND THE DATE IS THE HOUR THE ANSWER ARRIVED, not the day the account was opened. The fixture's
-     `createdAt` is 2024-02-11 and the record's clock is 2026-09-20, so a map that read the wrong one
-     would date every balance two years and seven months ago and the Money page would call all of
-     them stale. */
-  assert.deepEqual(stated(sql), [
-    ['Mercury Checking ••4417', 'USD', '2026-09-20', 'bank', 1],
-    ['Mercury Savings ••9002', 'USD', '2026-09-20', 'bank', 1],
-  ]);
-  sql.close();
-});
-
-test('A BALANCE THAT MOVED MOVES THE ROW, and does not arrive beside the figure it replaces', async () => {
-  const { k, sql, decl } = await record(declOf());
-  assert.deepEqual(run(k, sql, decl, 1, body('req_a', OPS, RESERVE)), { wrote: 2, kept: 0 });
-
-  /* A WIRE WENT OUT. Mercury restates the same account with a smaller balance, and the register has
-     to hold one account with today's figure rather than two accounts with yesterday's and today's.
-     `on_conflict: 'update'` is the whole of that, and `skip` would have kept the stale one. */
-  const spent = account('Mercury Checking ••4417', 11_920.5);
-  assert.deepEqual(run(k, sql, decl, 2, body('req_c', spent, RESERVE)), { wrote: 2, kept: 0 });
-  assert.deepEqual(balances(sql), [
-    ['Mercury Checking ••4417', 1_192_050],
-    ['Mercury Savings ••9002', 25_000_000],
-  ]);
-  sql.close();
-});
-
-test('AN ACCOUNT THAT WAS CLOSED IS NOT DELETED, because a pull that stopped mentioning a row is not a pull that closed it', async () => {
-  /* SAID RATHER THAN LEFT TO BE FOUND. A connector writes and updates; nothing in `applyPage`
-     retires a row the provider stopped sending, and `25 §…`'s partial-refresh rule is the reason:
-     an outage that answers with two accounts instead of three must not empty the third. So a
-     closed Mercury account keeps its last balance until a person retires it. */
-  const { k, sql, decl } = await record(declOf());
-  run(k, sql, decl, 1, body('req_a', OPS, RESERVE));
-  run(k, sql, decl, 2, body('req_b', OPS));
-  assert.equal(balances(sql).length, 2);
-  sql.close();
-});
-
-test('TWO ACCOUNTS UNDER ONE NAME BECOME ONE ROW, which is the price of keying on a name', async () => {
-  /* THE PRICE OF KEYING ON A NAME, measured here because it is the one way this
-     pack can be wrong without anybody seeing it. `name` is a field a person edits in Mercury, so two
-     accounts can end up carrying one name, and then `existingRow` finds the first row for the second
-     account and `on_conflict: 'update'` writes over it: the register holds one account, the company's
-     cash is short by the balance of the other, and the run reports two rows written, which is what a
-     working hour looks like in the meter.
-
-     THE REPAIR IS NOT AVAILABLE HERE. The honest key is Mercury's own `id`, and `accounts` declares
-     exactly five fields (`packages/seed/src/modules/money.ts`: `name`, `kind`, `balance`, `as_of`,
-     `liquid`), none of which can hold a provider's identifier. So this is a measurement of what the
-     register costs rather than a bug in the declaration, and the day `accounts` grows a field for a
-     provider's own id, this test is what says why it wanted one. */
-  const { k, sql, decl } = await record(declOf());
-  const renamed = account('Mercury Operating', 250);
-  assert.deepEqual(run(k, sql, decl, 1, body('req_a', account('Mercury Operating', 10_000), renamed)), { wrote: 2, kept: 0 });
-  assert.deepEqual(balances(sql), [['Mercury Operating', 25_000]]);
-  sql.close();
-});
+const OPS = account('Mercury Checking ••4417', 18_420.5, { id: 'acc_ops' });
+const RESERVE = account('Mercury Savings ••9002', 250_000, { id: 'acc_res' });
 
 /* ── what the pack says, before anything runs ────────────────────────────────────────────────── */
 
-test('THE PACK NAMES A KEY AND CARRIES NONE, and both intervals agree', () => {
+test('THE PACK NAMES A KEY AND CARRIES NONE, and lays the field it finds an account by', () => {
   const doc = settled(template()) as {
     pack: string;
     requires: { packs: Record<string, string> };
+    extends: Record<string, { fields: Record<string, unknown>[] }>;
     declarations: Record<string, unknown>[];
   };
   assert.equal(doc.pack, 'mercury');
@@ -475,21 +282,14 @@ test('THE PACK NAMES A KEY AND CARRIES NONE, and both intervals agree', () => {
      ledger declares the `counterparty_text` the script writes. */
   assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.10.0 <4.0.0' });
 
-  const decl = doc.declarations[0] as {
-    ingest: string; every: string; dedupe: string[]; on_conflict: string;
-    fetch: { base: string; path: string; auth: Record<string, string>; schedule: { every: string } };
-    writes: { register: string };
-  };
-  assert.equal(decl.ingest, 'mercury');
-  assert.equal(decl.fetch.base, 'https://api.mercury.com');
-  assert.equal(decl.fetch.path, '/api/v1/accounts');
-  assert.deepEqual(decl.fetch.auth, { kind: 'bearer', grant: 'Mercury (read only)' });
-  assert.equal(decl.writes.register, 'accounts');
-  assert.deepEqual(decl.dedupe, ['name']);
-  assert.equal(decl.on_conflict, 'update');
-
-  /* THE TWO INTERVALS ARE READ BY TWO DIFFERENT SCHEDULERS, so they have to be the same number. */
-  assert.equal(decl.every, decl.fetch.schedule.every);
+  /* THE PULL IS GONE (1.2.0): one script, one key path, balances then transactions. */
+  assert.deepEqual(doc.declarations.map((d) => (typeof d.script === 'string' ? `script ${d.script}` : `other ${String(d.ingest ?? '')}`)), ['script mercury_ledger']);
+  /* MERCURY'S OWN ID ON EACH ACCOUNT, indexed because every run reads the accounts by it, and the note an account it
+     could not match carries. */
+  assert.deepEqual(doc.extends['register.accounts']?.fields, [
+    { id: 'mercury_account', label: 'Mercury account', type: 'text', index: true },
+    { id: 'mercury_note', label: 'Note', type: 'text' },
+  ]);
 
   /* NO CREDENTIAL ANYWHERE IN THE DOCUMENT. The label is the only thing about a key a pack holds,
      and `42 §5.3`'s `SECRET_IN_PACK` is what refuses the other kind at install. A `Bearer ` prefix,
@@ -611,20 +411,21 @@ const ledger = (doc: Record<string, unknown> = settled(template())): Script => {
   return s;
 };
 
-test('THE PACK CARRIES ledger.js AS ITS SOURCE, byte for byte, beside the pull, on the same host, key and clock', () => {
+test('THE PACK CARRIES ledger.js AS ITS SOURCE, byte for byte, on its host, key and clock', () => {
   const doc = template();
   const s = ledger(doc);
-  const pull = (doc.declarations as Pull[])[0]!;
+  const filled = ledger();
   assert.equal(s.source, LEDGER_SOURCE, 'mercury.pack.json and ledger.js disagree; copy ledger.js into the source');
-  assert.deepEqual(s.runs, { every: pull.every });
-  assert.deepEqual(s.egress, [pull.fetch.base]);
-  assert.deepEqual(s.keys, [pull.fetch.auth.grant]);
+  assert.deepEqual(filled.runs, { every: '1h' });
+  assert.deepEqual(filled.egress, ['https://api.mercury.com']);
+  assert.deepEqual(filled.keys, ['Mercury (read only)']);
   assert.deepEqual([...s.reads].sort(), ['accounts', 'categories', 'transactions']);
-  /* AND THE ACCOUNTS SINCE 1.3.0, which it files in the `book` setting's book because the pull that writes them cannot. */
+  /* AND THE ACCOUNTS, which it keeps itself since 1.2.0 and filed in the `book` setting's book since 1.3.0. */
   assert.deepEqual(s.writes, ['transactions', 'accounts']);
   /* THE SCRIPT STOPS QUEUING AT ITS OWN LIMIT, so the two numbers are one. A limit lower than the script's constant
      would refuse the whole run past it, and every row with it. */
   assert.ok(s.source.includes(`const WRITES = ${s.limits?.writes};`), `limits.writes is ${s.limits?.writes} and ledger.js stops at another number`);
+  assert.ok(s.source.includes(`const FETCHES = ${s.limits?.fetches};`), `limits.fetches is ${s.limits?.fetches} and ledger.js stops at another number`);
   /* AND IT LAYS THE ONE FIELD IT FINDS A TRANSACTION AGAIN BY, and not the payee it writes since 1.1.0: money-core 3.10.0
      declares `counterparty_text` itself, and every bank door laying it too made two fields under one id, or, in Money's
      own shape, a ledger staged as the record's own list that refused Money's next update. */
@@ -635,7 +436,9 @@ test('THE PACK CARRIES ledger.js AS ITS SOURCE, byte for byte, beside the pull, 
   ]);
   const cards = JSON.parse(readFileSync(new URL('../card-alerts/card-alerts.pack.json', import.meta.url), 'utf8')) as { extends?: unknown };
   assert.equal(cards.extends, undefined, 'another bank door lays the payee field again');
-  assert.deepEqual([doc.version, typeof doc.changes], ['1.1.0', 'string']);
+  assert.deepEqual([doc.version, typeof doc.changes], ['1.2.0', 'string']);
+  /* THE CHANGES LINE IS READ BY A PERSON ON THE ADD-ON'S PAGE: plain words, no dash for a comma, no id. */
+  assert.equal(/[—–]|mercury_|#\d/.test(String(doc.changes)), false, String(doc.changes));
 });
 
 type Row = { id: string; register: string; seq: number; fields: Record<string, Json>; version: number; updated_at: string; deleted_at?: string };
@@ -675,7 +478,17 @@ const OPS_TXNS = [
  * well, which is the record's own rule (`scriptReads` in `packages/host/src/script.ts`). A money `is` compares the
  * amount and the currency, as the record does, and `between` takes both ends.
  */
-function mercuryHost(state: { accounts: Row[]; transactions: Row[]; categories: Row[]; txns?: unknown[]; status?: number }): CtxHost & { asked: HostRequest[]; lists: [string, Json, Json][] } {
+function mercuryHost(state: {
+  accounts: Row[];
+  transactions: Row[];
+  categories: Row[];
+  /** What `/api/v1/accounts` answers; the checking account alone unless a test names more. */
+  mercury?: unknown[];
+  /** The checking account's transactions; every other account has none unless `more` names them. */
+  txns?: unknown[];
+  more?: Record<string, unknown[]>;
+  status?: number;
+}): CtxHost & { asked: HostRequest[]; lists: [string, Json, Json][] } {
   const asked: HostRequest[] = [];
   const lists: [string, Json, Json][] = [];
   const same = (a: Json | undefined, b: Json | undefined): boolean => {
@@ -702,12 +515,9 @@ function mercuryHost(state: { accounts: Row[]; transactions: Row[]; categories: 
     fetch: async (request) => {
       asked.push(request);
       const url = new URL(request.url);
-      const body =
-        url.pathname === '/api/v1/accounts'
-          ? { accounts: [{ ...OPS, id: 'acc_ops' }, { ...RESERVE, id: 'acc_res' }] }
-          : url.pathname === '/api/v1/account/acc_ops/transactions'
-            ? { total: (state.txns ?? OPS_TXNS).length, transactions: state.txns ?? OPS_TXNS }
-            : { total: 0, transactions: [] };
+      const at = /^\/api\/v1\/account\/([^/]+)\/transactions$/.exec(url.pathname);
+      const listed = at === null ? [] : at[1] === 'acc_ops' ? (state.txns ?? OPS_TXNS) : (state.more?.[at[1]!] ?? []);
+      const body = url.pathname === '/api/v1/accounts' ? { accounts: state.mercury ?? [OPS] } : { total: listed.length, transactions: listed };
       return { status: state.status ?? 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
     },
     list: async (register, where, options) => {
@@ -739,13 +549,148 @@ const writesOf = (a: ScriptAnswer): ScriptWrite[] => {
   return a.writes;
 };
 
-test('EACH TRANSACTION IS ONE LEDGER ROW, WITH ITS DIRECTION FROM THE SIGN, on the account the balances pull wrote', async () => {
-  /* ONLY THE CHECKING ACCOUNT IS IN THE RECORD, so the savings account is said and never asked about. */
-  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
-  const software = rowOf('categories', { name: 'Software', direction: 'out', state: 'live' });
-  const h = mercuryHost({ accounts: [ops], transactions: [], categories: [software] });
+/* ── the accounts, kept by Mercury's id ──────────────────────────────────────────────────────── */
+
+const TODAY = new Date(NOW).toISOString().slice(0, 10);
+const NOTE = 'Not yet matched to an account you typed';
+type Fixture = { id: string; name: string; currentBalance: number };
+/** An account the script already keeps: Mercury's id on it, and its balance as of today, in cents. */
+const keptRow = (a: Fixture, extra: Record<string, Json> = {}): Row =>
+  rowOf('accounts', { name: a.name, kind: 'bank', balance: { amount: Math.round(a.currentBalance * 100), currency: 'USD' }, as_of: TODAY, liquid: true, mercury_account: a.id, ...extra });
+const opsHeld = (): Row => keptRow(OPS);
+/** An account a person typed in, which no feed keeps. */
+const typedRow = (name: string, amount: number, currency = 'USD', extra: Record<string, Json> = {}): Row =>
+  rowOf('accounts', { name, kind: 'bank', balance: { amount, currency }, as_of: '2026-09-01', liquid: true, ...extra });
+/** The account as the script writes it when it meets a Mercury account it cannot pair. */
+const createdAccount = (a: Fixture, liquid: boolean, extra: Record<string, Json> = {}): ScriptWrite => ({
+  op: 'create',
+  register: 'accounts',
+  fields: { name: a.name, kind: 'bank', balance: { amount: Math.round(a.currentBalance * 100), currency: 'USD' }, as_of: TODAY, liquid, mercury_account: a.id, ...(liquid ? {} : { mercury_note: NOTE }), ...extra },
+});
+
+test('A FRESH RECORD: ONE ACCOUNT A MERCURY ACCOUNT, counted as cash, in cents, dated the hour it ran, carrying Mercury’s id', async () => {
+  /* NOTHING TYPED COULD BE THE SAME MONEY, so each counts as cash from the first hour. Their transactions wait for the
+     next hour, when the accounts they belong to have ids. */
+  const h = mercuryHost({ accounts: [], transactions: [], categories: [], mercury: [OPS, RESERVE] });
+  const a = await runInQuickJs(ledgerDecl(), h);
+  assert.deepEqual(writesOf(a), [createdAccount(OPS, true), createdAccount(RESERVE, true)]);
+  assert.deepEqual(h.asked.map((r) => new URL(r.url).pathname), ['/api/v1/accounts']);
+  assert.match(a.log, /"Mercury Savings ••9002" is new to the record this hour, so its transactions arrive next hour/);
+  assert.doesNotMatch(a.log, /not yet matched/);
+});
+
+test('THE NEXT HOUR KEEPS EACH ON ITS OWN ACCOUNT: renamed is still found, a moved balance moves, and one Mercury stopped listing is left', async () => {
+  /* RENAMED BY A PERSON, AND UNMOVED: nothing is written, the name least of all. */
+  const ops = keptRow(OPS, { name: 'Company checking' });
+  /* MOVED SINCE YESTERDAY, and set by a person not to count as cash, which stays theirs. */
+  const reserve = keptRow(RESERVE, { balance: { amount: 24_000_000, currency: 'USD' }, as_of: '2026-09-19', liquid: false });
+  /* AN ACCOUNT MERCURY NO LONGER LISTS keeps its last balance: an answer that left it out did not close it. */
+  const gone = keptRow(account('Mercury Treasury', 900, { id: 'acc_gone' }) as Fixture);
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops, reserve, gone], transactions: [], categories: [], mercury: [OPS, RESERVE], txns: [] }));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `accounts#${reserve.seq}`, patch: { balance: { amount: 25_000_000, currency: 'USD' }, as_of: TODAY }, version: 1 }]);
+});
+
+test('TWO MERCURY ACCOUNTS UNDER ONE NAME ARE TWO ACCOUNTS, where the pull keyed on the name wrote one over the other', async () => {
+  /* BEFORE 1.2.0 THE REGISTER HELD ONE, the company's cash short by the other's balance, and the run counted two
+     written. Mercury's own id is the key the pull wanted and the register could not hold. */
+  const one = account('Mercury Operating', 10_000, { id: 'acc_a' }) as Fixture;
+  const two = account('Mercury Operating', 250, { id: 'acc_b' }) as Fixture;
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [], transactions: [], categories: [], mercury: [one, two] }));
+  assert.deepEqual(writesOf(a), [createdAccount(one, true), createdAccount(two, true)]);
+});
+
+test('FIRST CONTACT TAKES THE ONE ACCOUNT A PERSON TYPED UNDER MERCURY’S NAME OR NICKNAME, case folded, keeping the name, and reads it the same hour', async () => {
+  const ops = { ...OPS, nickname: 'Ops' };
+  const reserve = { ...RESERVE, nickname: 'Reserve' };
+  /* MERCURY'S NAME, CASED AND SPACED BY HAND, as the 1.1.0 pull's own account is too, under the very name. */
+  const typedOps = typedRow('mercury checking  ••4417 ', 1_700_000, 'USD', { book: 'books#2' });
+  /* THE NICKNAME, in capitals. */
+  const typedReserve = typedRow('RESERVE', 24_000_000);
+  /* NOT CANDIDATES: the same name in pounds, and one Stripe keeps under the nickname. */
+  const pounds = typedRow('Mercury Checking ••4417', 50_000, 'GBP');
+  const stripes = typedRow('Reserve', 100, 'USD', { stripe_kind: 'available' });
+  const h = mercuryHost({ accounts: [typedOps, typedReserve, pounds, stripes], transactions: [], categories: [], mercury: [ops, reserve], txns: [] });
   const a = await runInQuickJs(ledgerDecl(), h);
   assert.deepEqual(writesOf(a), [
+    { op: 'update', spoken: `accounts#${typedOps.seq}`, patch: { mercury_account: 'acc_ops', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY }, version: 1 },
+    { op: 'update', spoken: `accounts#${typedReserve.seq}`, patch: { mercury_account: 'acc_res', balance: { amount: 25_000_000, currency: 'USD' }, as_of: TODAY }, version: 1 },
+  ]);
+  assert.match(a.log, /Took over "mercury checking {2}••4417 ": it is "Mercury Checking ••4417" at Mercury/);
+  assert.match(a.log, /Took over "RESERVE"/);
+  /* TAKEN, SO THEIR TRANSACTIONS ARE READ THIS HOUR: each account's id is the typed row's, which stood before the run. */
+  assert.deepEqual(h.asked.map((r) => new URL(r.url).pathname), ['/api/v1/accounts', '/api/v1/account/acc_ops/transactions', '/api/v1/account/acc_res/transactions']);
+});
+
+test('HIS CASE: COMPANY ACCOUNTS TYPED UNDER OTHER NAMES ARE NOT GUESSED: each Mercury account is its own account, not cash, noted, and counted in the log', async () => {
+  /* TYPED FOR PEOPLE AND FOR A BANK'S WELCOME LINE, which share no name with Mercury's. Either could be the same money,
+     so neither is taken, nothing is written over them, and Mercury's accounts count for nothing until a person says
+     which is which. Before 1.2.0 the pull wrote these two as cash beside them, and the company's cash counted twice. */
+  const people = typedRow('Wren and Ada', 1_842_050);
+  const welcome = typedRow('Welcome to Mercury', 25_000_000);
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [people, welcome], transactions: [], categories: [], mercury: [OPS, RESERVE] }));
+  assert.deepEqual(writesOf(a), [createdAccount(OPS, false), createdAccount(RESERVE, false)]);
+  assert.match(a.log, /2 Mercury accounts are not yet matched to an account you typed, so they do not count as cash until you say which ones they are, or that they are new\./);
+});
+
+test('TWO ACCOUNTS UNDER MERCURY’S NAME ARE NOT GUESSED BETWEEN: Mercury’s is its own account, not cash, and the log names both', async () => {
+  const first = typedRow('Mercury Checking ••4417', 1_800_000);
+  const second = typedRow('MERCURY CHECKING ••4417', 1_842_050);
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [first, second], transactions: [], categories: [] }));
+  assert.deepEqual(writesOf(a), [createdAccount(OPS, false)]);
+  assert.match(a.log, /"Mercury Checking ••4417" and "MERCURY CHECKING ••4417" could each be "Mercury Checking ••4417" at Mercury, so none was taken\./);
+  assert.match(a.log, /1 Mercury account is not yet matched to an account you typed, so it does not count as cash/);
+});
+
+test('ONE TYPED ACCOUNT TWO MERCURY ACCOUNTS BOTH NAME IS TAKEN BY NEITHER: taking it for the first listed would guess which money it is', async () => {
+  /* TWO MERCURY ACCOUNTS UNDER ONE NAME, and one account a person typed under it. Either could be the typed one, so both
+     are written, neither counts as cash, and the typed account is left as it was and said once. */
+  const one = account('Mercury Operating', 10_000, { id: 'acc_a' }) as Fixture;
+  const two = account('Mercury Operating', 250, { id: 'acc_b' }) as Fixture;
+  const typed = typedRow('mercury operating', 1_000_000);
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [typed], transactions: [], categories: [], mercury: [one, two] }));
+  assert.deepEqual(writesOf(a), [createdAccount(one, false), createdAccount(two, false)]);
+  assert.equal(a.log.split('"mercury operating" could be more than one Mercury account of that name, so none was taken.').length, 2, a.log);
+  assert.match(a.log, /2 Mercury accounts are not yet matched to an account you typed/);
+});
+
+test('THE CURRENCY IS MERCURY’S FOR THE ACCOUNT, on its balance and on each of its transactions, in that currency’s minor units', async () => {
+  /* A EURO ACCOUNT, said in Mercury's lower case; an account that names none is in dollars (the tests above). */
+  const euros = account('Mercury EUR', 1_200.5, { id: 'acc_eur', currency: 'eur' }) as Fixture;
+  const held = rowOf('accounts', { name: 'Company euros', kind: 'bank', balance: { amount: 100_000, currency: 'EUR' }, as_of: '2026-09-19', liquid: true, mercury_account: 'acc_eur' });
+  const more = { acc_eur: [txn('txn_e', -12.3, 'sent', 'Lisbon Cafe', '2026-09-19T08:00:00Z', '2026-09-19T09:00:00Z')] };
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [held], transactions: [], categories: [], mercury: [euros], more }));
+  assert.deepEqual(writesOf(a), [
+    { op: 'update', spoken: `accounts#${held.seq}`, patch: { balance: { amount: 120_050, currency: 'EUR' }, as_of: TODAY }, version: 1 },
+    {
+      op: 'create',
+      register: 'transactions',
+      fields: { what: 'Lisbon Cafe', on: '2026-09-19', direction: 'out', amount: { amount: 1_230, currency: 'EUR' }, account: held.id, state: 'cleared', counterparty_text: 'Lisbon Cafe', mercury_id: 'txn_e' },
+    },
+  ]);
+});
+
+test('AN ACCOUNT A PERSON SET TO COUNT AS CASH HAS BEEN ANSWERED: the note goes, and nothing they set moves', async () => {
+  const answered = keptRow(OPS, { mercury_note: NOTE });
+  /* STILL WAITING: not cash, so the note stays. */
+  const waiting = keptRow(RESERVE, { liquid: false, mercury_note: NOTE });
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [answered, waiting], transactions: [], categories: [], mercury: [OPS, RESERVE], txns: [] }));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `accounts#${answered.seq}`, patch: { mercury_note: null }, version: 1 }]);
+});
+
+test('THE NOTE IN THE SCRIPT IS THE ONE A PERSON READS, word for word', () => {
+  assert.ok(LEDGER_SOURCE.includes(`export const NOT_MATCHED = '${NOTE}';`), 'ledger.js notes an unmatched account in other words');
+});
+
+/* ── the transactions ────────────────────────────────────────────────────────────────────────── */
+test('EACH TRANSACTION IS ONE LEDGER ROW, WITH ITS DIRECTION FROM THE SIGN, on the account it keeps', async () => {
+  /* ONLY THE CHECKING ACCOUNT IS IN THE RECORD, so the savings account is written this hour, as cash because nothing
+     typed could be the same money, and its transactions are not asked about until it has an id. */
+  const ops = opsHeld();
+  const software = rowOf('categories', { name: 'Software', direction: 'out', state: 'live' });
+  const h = mercuryHost({ accounts: [ops], transactions: [], categories: [software], mercury: [OPS, RESERVE] });
+  const a = await runInQuickJs(ledgerDecl(), h);
+  assert.deepEqual(writesOf(a), [
+    createdAccount(RESERVE, true),
     {
       op: 'create',
       register: 'transactions',
@@ -768,11 +713,11 @@ test('EACH TRANSACTION IS ONE LEDGER ROW, WITH ITS DIRECTION FROM THE SIGN, on t
     ],
   );
   assert.equal(new URL(h.asked[1]!.url).searchParams.get('start'), '2026-08-21', 'thirty days back from the run');
-  assert.match(a.log, /Mercury Savings ••9002 is not in accounts yet/);
+  assert.match(a.log, /"Mercury Savings ••9002" is new to the record this hour/);
 });
 
 test('A CATEGORY SOMEBODY PINNED IS KEPT: the next hour moves the bank’s facts and nothing a person set', async () => {
-  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const ops = opsHeld();
   const software = rowOf('categories', { name: 'Software', direction: 'out', state: 'live' });
   /* FILED BY MERCURY'S CATEGORY WHILE PENDING, THEN REFILED BY HAND to a category Mercury has never heard of, with a
      description the person tidied. */
@@ -795,12 +740,12 @@ test('A CATEGORY SOMEBODY PINNED IS KEPT: the next hour moves the bank’s facts
 });
 
 test('A TRANSACTION MERCURY CANCELS AFTER IT WAS HELD IS VOID, and a status nobody has heard of is said, not guessed', async () => {
-  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const ops = opsHeld();
   const held = rowOf('transactions', { what: 'Coffee Stall', on: '2026-09-20', direction: 'out', amount: { amount: 6_000, currency: 'USD' }, account: ops.id, state: 'pending', counterparty_text: 'Coffee Stall', mercury_id: 'txn_3' }, 2);
   const txns = [OPS_TXNS[2], txn('txn_9', -10, 'blocked', 'Tollgate', '2026-09-21T09:00:00Z', null)];
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [held], categories: [], txns }));
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${held.seq}`, patch: { state: 'void' }, version: 2 }]);
-  assert.match(a.log, /Mercury says txn_9 is "blocked", which this pack does not know/);
+  assert.match(a.log, /Mercury calls a transaction of 2026-09-21 on "Mercury Checking ••4417" "blocked", which this pack does not know/);
 });
 
 test('A TRANSACTION A PERSON VOIDED STAYS VOID, because Mercury never sends one it cancelled and only a person voids a sent one', async () => {
@@ -810,7 +755,7 @@ test('A TRANSACTION A PERSON VOIDED STAYS VOID, because Mercury never sends one 
      `cancelled` and `failed` are the end of a Mercury transaction, so a held row that is void was made void either by
      this script, which Mercury will not contradict, or by a person, whom it must not. The rest of the bank's facts
      still move. */
-  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const ops = opsHeld();
   const voided = rowOf('transactions', { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: { amount: 124_000, currency: 'USD' }, account: ops.id, state: 'void', counterparty_text: 'Fenwick Cloud', mercury_id: 'txn_1' }, 3);
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [voided], categories: [], txns: [OPS_TXNS[0]] }));
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${voided.seq}`, patch: { amount: { amount: 124_075, currency: 'USD' } }, version: 3 }]);
@@ -831,7 +776,7 @@ const haldenOn = (account: string): Record<string, Json> => ({
 test('A TRANSACTION WHOSE ROW A PERSON DELETED IS NOT WRITTEN AGAIN, because the ledger is read with its deleted rows as well', async () => {
   /* THE BREAK: he deleted the Fenwick row, and the next hour wrote it back, because the list read live rows
      only. The ledger is asked again, deleted rows included, about the transactions it holds no live row for. */
-  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const ops = opsHeld();
   const deleted: Row = {
     ...rowOf('transactions', { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: { amount: 124_075, currency: 'USD' }, account: ops.id, state: 'cleared', mercury_id: 'txn_1' }),
     deleted_at: '2026-09-19T20:00:00.000Z',
@@ -839,7 +784,7 @@ test('A TRANSACTION WHOSE ROW A PERSON DELETED IS NOT WRITTEN AGAIN, because the
   const h = mercuryHost({ accounts: [ops], transactions: [deleted], categories: [], txns: [OPS_TXNS[0], OPS_TXNS[1]] });
   const a = await runInQuickJs(ledgerDecl(), h);
   assert.deepEqual(writesOf(a), [{ op: 'create', register: 'transactions', fields: haldenOn(ops.id) }]);
-  assert.match(a.log, /1 Mercury transaction whose row a person deleted was left out, as deleted/);
+  assert.match(a.log, /1 Mercury transaction that a person deleted was left out, as deleted/);
   assert.deepEqual(
     h.lists.filter(([, , options]) => options !== null),
     [['transactions', { field: 'mercury_id', in: ['txn_1', 'txn_2'] }, { includeDeleted: true }]],
@@ -847,7 +792,7 @@ test('A TRANSACTION WHOSE ROW A PERSON DELETED IS NOT WRITTEN AGAIN, because the
 });
 
 test('A ROW TYPED IN BY HAND BEFORE THE PACK IS TAKEN, NOT WRITTEN AGAIN: what the person set is kept, and the day moves to the bank’s', async () => {
-  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const ops = opsHeld();
   const money = { amount: 124_075, currency: 'USD' };
   /* TYPED THE DAY BEFORE IT POSTED, under a category and a description of the person's own, with no Mercury
      transaction. */
@@ -859,11 +804,11 @@ test('A ROW TYPED IN BY HAND BEFORE THE PACK IS TAKEN, NOT WRITTEN AGAIN: what t
   const voided = rowOf('transactions', { what: 'Fenwick', on: '2026-09-19', direction: 'out', amount: money, account: ops.id, state: 'void' });
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [typed, refund, early, voided], categories: [], txns: [OPS_TXNS[0]] }));
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${typed.seq}`, patch: { on: '2026-09-19', counterparty_text: 'Fenwick Cloud', mercury_id: 'txn_1' }, version: 2 }]);
-  assert.match(a.log, /1 row typed in by hand was the same money as a Mercury transaction/);
+  assert.match(a.log, /1 transaction typed in by hand was the same money as a Mercury transaction/);
 });
 
 test('TWO ROWS THAT COULD BE THE SAME MONEY ARE NOT GUESSED BETWEEN: the transaction is written as its own row, and the log names its day and amount', async () => {
-  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const ops = opsHeld();
   const money = { amount: 124_075, currency: 'USD' };
   const one = rowOf('transactions', { what: 'Fenwick', on: '2026-09-19', direction: 'out', amount: money, account: ops.id, state: 'cleared' });
   const two = rowOf('transactions', { what: 'Fenwick Cloud', on: '2026-09-20', direction: 'out', amount: money, account: ops.id, state: 'pending' });
@@ -871,13 +816,13 @@ test('TWO ROWS THAT COULD BE THE SAME MONEY ARE NOT GUESSED BETWEEN: the transac
   assert.deepEqual(writesOf(a), [
     { op: 'create', register: 'transactions', fields: { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: money, account: ops.id, state: 'cleared', counterparty_text: 'Fenwick Cloud', mercury_id: 'txn_1' } },
   ]);
-  assert.match(a.log, /2 rows typed in by hand could be Mercury's 1,240\.75 USD out on 2026-09-19, so none was taken/);
+  assert.match(a.log, /2 transactions typed in by hand could be Mercury's 1,240\.75 USD out on 2026-09-19, so none was taken/);
 });
 
 test('ONE ROW TYPED BY HAND IS TAKEN ONCE: two Mercury transactions of the same money on one day take it and write one', async () => {
   /* TWO COFFEES OF 60.00 ON THE 19TH, and one typed in. The first takes it; the second finds it taken, since the
      update is queued and the ledger still answers it as a row with no Mercury transaction, and is written. */
-  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const ops = opsHeld();
   const typed = rowOf('transactions', { what: 'Coffee', on: '2026-09-19', direction: 'out', amount: { amount: 6_000, currency: 'USD' }, account: ops.id, state: 'cleared' }, 1);
   const txns = [
     txn('txn_a', -60, 'sent', 'Coffee Stall', '2026-09-19T08:00:00Z', '2026-09-19T09:00:00Z'),
@@ -896,7 +841,7 @@ test('ONE ROW TYPED BY HAND IS TAKEN ONCE: two Mercury transactions of the same 
  * kernel's key to fold, so the text stays what the bank said and a person can see where a match came from.
  */
 test('THE PAYEE IS KEPT AS MERCURY NAMES IT, and a transaction that names nobody gets none, never the nickname or the bank line', async () => {
-  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const ops = opsHeld();
   const named = (id: string, counterpartyName: string | undefined, extra: Record<string, string> = {}) => {
     const t: Record<string, unknown> = { ...txn(id, -18.5, 'sent', counterpartyName ?? '', '2026-09-19T08:00:00Z', '2026-09-19T09:00:00Z'), ...extra };
     if (counterpartyName === undefined) delete t.counterpartyName;
@@ -926,7 +871,7 @@ test('THE PAYEE IS KEPT AS MERCURY NAMES IT, and a transaction that names nobody
 });
 
 test('A ROW HELD BEFORE 1.1.0 GAINS ITS PAYEE THE NEXT HOUR, and a payee a person corrected is kept', async () => {
-  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const ops = opsHeld();
   /* WRITTEN BY 1.0.x, with no payee, and nothing else to move: the payee is the whole patch. */
   const before = rowOf('transactions', { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: { amount: 124_075, currency: 'USD' }, account: ops.id, state: 'cleared', mercury_id: 'txn_1' }, 5);
   /* A PAYEE A PERSON PUT RIGHT, which the bank's own spelling does not undo. */
@@ -1000,16 +945,15 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, a
     await put(doc);
     const s = ledger(doc);
 
-    /* THE ACCOUNT, AS THE BALANCES PULL WRITES IT, and the pull itself held off so that this hour runs the ledger and
-       nothing else. The pull's own rows are the tests above. */
-    const opsRow = said<{ id: string }>(await api.create({ register: 'accounts', fields: { name: OPS.name, kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: '2026-09-20', liquid: true } }, owner));
+    /* THE ACCOUNT A PERSON TYPED, UNDER MERCURY'S NAME, at a balance a day old. The first hour takes it as the checking
+       account rather than writing one beside it, and reads its transactions the same hour. */
+    const opsRow = said<{ id: string }>(await api.create({ register: 'accounts', fields: { name: OPS.name, kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: '2026-09-19', liquid: true } }, owner));
     /* THE HALDEN PAYMENT, TYPED IN BY HAND BEFORE THE PACK, a day after Mercury dates it and under the person's own
        words. The first hour takes it rather than writing Mercury's copy beside it, which is the record's own `list`
        answering the question `twinsOf` in `ledger.js` asks. */
     said(await api.create({ register: 'transactions', fields: { what: 'Halden, September invoice', on: '2026-09-21', direction: 'in', amount: { amount: 500_000, currency: 'USD' }, account: opsRow.id, state: 'pending' } }, owner));
     said(await api.create({ register: 'categories', fields: { name: 'Software', direction: 'out' } }, owner));
     const hosting = said<{ id: string }>(await api.create({ register: 'categories', fields: { name: 'Hosting', direction: 'out' } }, owner));
-    running.sql.exec("UPDATE schedule SET due_at = '2099-01-01T00:00:00.000Z' WHERE kind = 'pull'");
     const hour = async () => {
       running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script' AND key = ?", new Date(Date.now() - 1_000).toISOString(), s.script);
       await running.poll();
@@ -1022,7 +966,17 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, a
     );
     const outcome = JSON.parse(event?.to_v ?? '{}') as { outcome?: string; log?: string };
     assert.equal(outcome.outcome, 'ok', `${event?.note ?? 'no run event'} ${outcome.log ?? ''}`);
-    assert.match(outcome.log ?? '', /1 row typed in by hand was the same money as a Mercury transaction/);
+    assert.match(outcome.log ?? '', /1 transaction typed in by hand was the same money as a Mercury transaction/);
+    assert.match(outcome.log ?? '', /Took over "Mercury Checking ••4417"/);
+    /* ONE ACCOUNT, THE ONE HE TYPED, now carrying Mercury's id and today's balance. */
+    assert.deepEqual(
+      running.sql
+        .all<{ id: string; mercury: string; amount: number }>(
+          "SELECT id, json_extract(fields, '$.mercury_account') AS mercury, json_extract(fields, '$.balance.amount') AS amount FROM entry WHERE register = 'accounts' AND deleted_at IS NULL",
+        )
+        .map((r) => [r.id, r.mercury, r.amount]),
+      [[opsRow.id, 'acc_ops', 1_842_050]],
+    );
     assert.ok(sent.length > 0 && sent.every((r) => r.auth === 'Bearer KEY-OF-mercury'), JSON.stringify(sent));
 
     type Txn = { seq: number; what: string; direction: string; amount: number; state: string; mercury_id: string; category: string | null };

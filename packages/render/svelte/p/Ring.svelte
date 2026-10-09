@@ -51,7 +51,7 @@
               data-step={a.step}
               data-intent={a.tone}
               {...RING_PAINT.arc}
-              style={a.tone === 'bad' ? `stroke:url(#${late})` : undefined}
+              style={a.tone === 'bad' ? `stroke:url(#${late}) var(--chart-late, currentColor)` : undefined}
               stroke-opacity={RING_STEP_OPACITY[a.step]}
               stroke-dasharray={a.dash}
               stroke-dashoffset={a.offset}

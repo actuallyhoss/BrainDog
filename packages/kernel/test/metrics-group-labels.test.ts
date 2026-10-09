@@ -196,3 +196,14 @@ test('THE LISTS A FIGURE READS NAME THE ONE ITS PARTS ARE NAMED FROM, so the rec
   assert.deepEqual(k.figureLists(figure('kind') as never), ['accounts']);
   sql.close();
 });
+
+/* A KEPT LINE NAMES THE LISTS ITS FIGURE READS (roll-ages, batch 40): `series.<figure>` named none, so the record showed
+   a member invited to Accounts alone how many nights Cash now missed, a line over lists she cannot read. A line of a
+   figure this record does not hold names the whole record. */
+test('A FIGURE OVER A KEPT LINE NAMES THE LISTS ITS FIGURE READS, and a line of no figure here names the whole record', async () => {
+  const { k, sql } = await record();
+  const missed = (of: string) => ({ metric: 'nights-missed', name: 'Nights missed', source: `series.${of}`, value: { count: 'missing' }, format: 'int', target: { lte: 2 }, window: '30d', compare: 'none' });
+  assert.deepEqual(k.figureLists(missed('cash-by-book') as never).sort(), ['accounts', 'books', 'transactions']);
+  assert.deepEqual(k.figureLists(missed('nowhere') as never), ['*']);
+  sql.close();
+});

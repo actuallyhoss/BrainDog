@@ -15,8 +15,8 @@
  * up here. A preset is a draft with some boxes filled; it installs nothing on its own.
  */
 
-import { fillRates, RATES_CURRENCIES_MOST, ratesSpecFor } from '../../../../../packs/rates-poll/fill.ts';
-import RATES_FILE from '../../../../../packs/rates-poll/rates-poll.pack.json' with { type: 'json' };
+import { fillRates, RATES_CURRENCIES_MOST, ratesSpecFor } from '@braindog/pack-rates-poll/fill';
+import RATES_FILE from '@braindog/pack-rates-poll/rates-poll.pack.json' with { type: 'json' };
 import type { Call } from '../ui/webhook-doors.ts';
 import { homeCurrency } from './api.ts';
 import { forget } from './boot-live.ts';

@@ -23,21 +23,28 @@
  * count of migrations the serving build carries, which must be the count of files in `packages/kernel/src/migrations/`
  * here, or the version answering is not the one this job built.
  *
- * AND ONE SIGNED-IN QUESTION, WHEN THE OPERATOR HAS MADE A CANARY RECORD FOR IT. With `SMOKE_TOKEN` (a read token) and
- * `SMOKE_SLUG` (its record) both in the environment, `GET /app/<slug>/api/boot` with that token must answer 200 JSON:
- * the only question here that opens a record, so the only one that sees a migration refusing real rows. Without both,
- * one line says the half was skipped. The token goes in the one request's header and in no line this prints.
+ * AND THE SIGNED-IN HALF, WHEN THE OPERATOR HAS MADE A CANARY RECORD FOR IT (LCH-C02). With `SMOKE_TOKEN` (a token at
+ * `propose`) and `SMOKE_SLUG` (its record) both in the environment, the canary is opened the way a first draw opens a
+ * record: `boot` 200; `version` 401 without the bearer and 200 with it; the same token at a second name no record
+ * holds refused, the answer naming nothing of the canary; and every read of the app's first screens 200, the list
+ * read from `apps/web/src/lib/record/first-draw.ts`, which the web app's own test holds to its route loaders, so the
+ * two cannot drift. A 500 on any is red, which arms the rollback. `/account/usage` is not asked: it opens for a
+ * browser session and never for a record's token, and its own line says so. Without both, one line says the half
+ * was skipped. The token goes in each signed-in request's header and in no line this prints.
  *
- * IT WRITES NOTHING. GETs with no cookie and, but for the canary's, no bearer; one GET that must be redirected; and one
- * empty POST to an `/in/` door no record has minted, which `serveIngest` refuses with a 404 before any record is named.
+ * IT WRITES NOTHING. GETs with no cookie and, but for the canary's, no bearer; one GET that must be redirected; one
+ * empty POST to an `/in/` door no record has minted, which `serveIngest` refuses with a 404 before any record is named;
+ * and the canary's `previewPage`, a POST because its body is long, which draws a page and installs nothing.
  *
  * EXIT CODES: 0 when every check answers as `checks` says, 1 when one does not, 2 when a host could not
  * be reached at all.
  */
 
+import { randomBytes } from 'node:crypto';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { FIRST_DRAW } from '../../web/src/lib/record/first-draw.ts';
 import { ROOT, hostOf, siteBinding, siteConfig, wranglerConfig } from './provision-check.mjs';
 
 const typeOf = (answer) => answer.headers.get('content-type') ?? '';
@@ -49,6 +56,16 @@ const bodyOf = (answer) => {
   } catch {
     return null;
   }
+};
+
+/**
+ * What a record's read answered: the `value` of the host's `{ ok: true, value }`, or `null`. THE HOST WRAPS EVERY
+ * ANSWER, as `packages/client` reads it (`answered`), so naming the next read from the bare body found no list, no
+ * add-on and no page on any real canary, and every read after the bare four was skipped while the step said ok.
+ */
+const valueOf = (answer) => {
+  const body = bodyOf(answer);
+  return body && typeof body === 'object' && body.ok === true && Object.hasOwn(body, 'value') ? body.value : null;
 };
 
 /**
@@ -222,6 +239,96 @@ export function canary(config, name, slug) {
   };
 }
 
+/** A name no record holds, for the refused question: `SLUG`-shaped, and random so nobody can have made it first. */
+export const nowhereSlug = () => `nobody-${randomBytes(8).toString('hex')}`;
+
+/**
+ * What a first-draw read is asked about on the canary, from what the bare reads answered (`said`, by method), or why
+ * it cannot be: `{ args }` or `{ skip }`. `said` holds every answer so far, so `get` opens the row `list` answered. A canary that holds no list, no add-on or no page has nothing to name, and
+ * that is said, not counted wrong; a canary in use holds all three.
+ */
+export function argsFor(read, said) {
+  const registers = Array.isArray(said.boot?.registers) ? said.boot.registers.filter((r) => typeof r?.id === 'string' && r.id !== 'session') : [];
+  const register = (registers.find((r) => Number(r.count) > 0) ?? registers[0])?.id ?? null;
+  if (read.ask === 'bare') return { args: {} };
+  if (read.ask === 'list' || read.ask === 'body') {
+    if (!register) return { skip: 'the canary holds no list to name' };
+    if (read.ask === 'body') return { args: { body: { page: 'smoke', title: 'Smoke', blocks: [{ kind: 'table', source: `register.${register}` }] } } };
+    return { args: read.method === 'list' ? { register, limit: 1 } : { register } };
+  }
+  if (read.ask === 'pack') {
+    const on = Array.isArray(said.packs) ? said.packs.find((p) => typeof p?.id === 'string' && p.disabled_at == null) : undefined;
+    return on ? { args: { id: on.id } } : { skip: 'the canary has no add-on switched on' };
+  }
+  if (read.ask === 'page') {
+    const first = Array.isArray(said.pages) ? said.pages.map((p) => p?.slug ?? p?.page).find((s) => typeof s === 'string') : undefined;
+    return first ? { args: { slug: first } } : { skip: 'the canary has no page' };
+  }
+  if (read.ask === 'row') {
+    const row = Array.isArray(said.list?.rows) ? said.list.rows.find((r) => Number.isInteger(r?.seq)) : undefined;
+    return row && register ? { args: { register, seq: row.seq } } : { skip: 'the canary has no row to open' };
+  }
+  return { skip: `${read.method} is asked as ${read.ask}, which this smoke does not know` };
+}
+
+/** One first-draw read on the canary, as the client sends it: a GET's arguments in the address, a POST's in its body. */
+export function readCheck(config, name, slug, read, args = {}) {
+  const host = String(config.env?.[name]?.vars?.PUBLIC_HOST ?? '').toLowerCase();
+  const url = new URL(`https://${host}/app/${slug}/api/${read.method}`);
+  if (!read.post) for (const [k, v] of Object.entries(args)) url.searchParams.set(k, typeof v === 'string' ? v : JSON.stringify(v));
+  return {
+    method: read.post ? 'POST' : 'GET',
+    url: url.toString(),
+    ...(read.post ? { body: JSON.stringify(args), headers: { 'content-type': 'application/json' } } : {}),
+    canary: true,
+    expects: `200 JSON, read by ${read.by}`,
+    judge: (a) => {
+      if (a.status === 200 && isJson(a)) return null;
+      if (a.status >= 500) return `answered ${a.status}: ${read.by} breaks on this build`;
+      if (a.status === 401 && isJson(a)) return `answered 401: SMOKE_TOKEN is not a live token on ${slug}, so mint one at propose and set it again`;
+      return `answered ${a.status}${isJson(a) ? ' in JSON' : ''} where 200 JSON was expected, so ${read.by} draws a refusal`;
+    },
+  };
+}
+
+/**
+ * The two questions about who may open what: `version` with no bearer is 401, and the canary's token at a second name
+ * no record holds is refused with nothing of the canary in the answer. `nowhere` is that name.
+ */
+export function refusals(config, name, slug, nowhere, token = '') {
+  const host = String(config.env?.[name]?.vars?.PUBLIC_HOST ?? '').toLowerCase();
+  if (!SLUG.test(String(nowhere ?? '')) || nowhere === slug) throw new Error(`the second name ${JSON.stringify(nowhere ?? '')} is not a record's name apart from the canary's`);
+  const minted = String(token).split('.')[0] ?? '';
+  return [
+    {
+      method: 'GET',
+      url: `https://${host}/app/${slug}/api/version`,
+      expects: '401 JSON without the bearer',
+      judge: (a) =>
+        a.status === 401 && isJson(a) ? null
+        : a.status === 200 ? "answered 200 with no token, so the record's version is told to a stranger"
+        : `answered ${a.status}${isJson(a) ? ' in JSON' : ''} where 401 JSON was expected`,
+    },
+    {
+      method: 'GET',
+      url: `https://${host}/app/${nowhere}/api/boot`,
+      canary: true,
+      expects: "refused at a second name, naming nothing of the canary's",
+      judge: (a) => {
+        if (a.status === 200) return "answered 200: the canary's token opened a record it was not minted for";
+        if (a.status >= 500) return `answered ${a.status} where a refusal was expected`;
+        if (!isJson(a) || a.status < 400) return `answered ${a.status}${isJson(a) ? ' in JSON' : ''} where a refusal in JSON was expected`;
+        const text = String(a.text ?? '').split(nowhere).join('');
+        const body = bodyOf(a);
+        if (text.includes(slug) || (minted.length > 3 && text.includes(minted))) return "the refusal names the canary's record";
+        const held = (o) => o !== null && typeof o === 'object' && ['rows', 'registers', 'record', 'pages'].some((k) => Object.hasOwn(o, k));
+        if (held(body) || held(body?.value)) return 'the refusal carries what a record holds';
+        return null;
+      },
+    },
+  ];
+}
+
 /** One check's verdict on one answer: `null` when it is the answer the table expects, or the sentence saying what it means. */
 export const judge = (check, answer) => check.judge(answer);
 
@@ -230,48 +337,88 @@ const ASK_MS = 20_000;
 
 /**
  * The whole smoke step. `signedIn` is `{ token, slug }` for the canary, read from `SMOKE_TOKEN` and `SMOKE_SLUG` by the
- * command line; with either missing the canary is skipped, and the step says so.
+ * command line; with either missing the canary is skipped, and the step says so. `io` is for a test: its `fetch`, its
+ * `log`, the second name (`nowhere`) and the reads (`reads`, the first-draw list by default).
+ *
+ * THE BARE READS GO FIRST, because what the others are about is read from their answers: the first list `boot` names,
+ * the first add-on `packs` answers, the first page `pages` answers.
  */
-export default async function smoke(name, config = wranglerConfig(), site = siteConfig(), signedIn = {}) {
+export default async function smoke(name, config = wranglerConfig(), site = siteConfig(), signedIn = {}, io = {}) {
+  const ask = io.fetch ?? fetch;
+  const log = io.log ?? console.log;
+  const reads = io.reads ?? FIRST_DRAW;
   const list = checks(config, name, site);
   let failed = 0;
   const { token, slug } = signedIn;
   let refused = null;
+  let first = [];
   if (token && slug) {
     try {
-      list.push(canary(config, name, slug));
+      first = [canary(config, name, slug), ...refusals(config, name, slug, io.nowhere ?? nowhereSlug(), token)];
     } catch (err) {
       refused = err instanceof Error ? err.message : String(err);
     }
   }
-  console.log('');
-  console.log(`  smoke: ${name}, ${list.length} check(s), read-only`);
+  log('');
+  log(`  smoke: ${name}, ${list.length + first.length} check(s)${first.length ? ` and ${reads.length - 1} more first-draw read(s) on the canary` : ''}, read-only`);
   if (!list.some((c) => c.url.endsWith('/pricing')))
-    console.log(`  ${name}'s site does not hand this Worker its doors, so the site is not asked: ${siteBinding(config, site, name).why ?? 'no name of the site is one this Worker is not already on'}`);
-  if (!token || !slug) console.log('  the signed-in half is skipped: SMOKE_TOKEN and SMOKE_SLUG are not both set, so no record is opened');
+    log(`  ${name}'s site does not hand this Worker its doors, so the site is not asked: ${siteBinding(config, site, name).why ?? 'no name of the site is one this Worker is not already on'}`);
+  /* A CANARY NAMED WITH NO KEY TO OPEN IT IS RED, NOT A SKIP: the canary exists, so a missing token is a mistake. */
+  if (slug && !token) {
+    failed += 1;
+    log(`  WRONG  SMOKE_SLUG names the canary ${slug} and SMOKE_TOKEN is not set, so the signed-in half cannot run; the canary exists, so this is red and not a skip`);
+  } else if (!token || !slug) log('  the signed-in half is skipped: SMOKE_TOKEN and SMOKE_SLUG are not both set, so no record is opened');
+  else log('  /account/usage is not asked: it opens for a browser session, never for a record\'s token');
   if (refused) {
     failed += 1;
-    console.log(`  WRONG  ${refused}`);
+    log(`  WRONG  ${refused}`);
   }
-  for (const check of list) {
+
+  /** Asks one check and prints its line: the answer, or `null` when the host could not be reached. */
+  async function run(check) {
     let answer;
     try {
-      const got = await fetch(check.url, {
+      const got = await ask(check.url, {
         method: check.method,
         headers: { 'cache-control': 'no-cache', ...(check.headers ?? {}), ...(check.canary ? { authorization: `Bearer ${token}` } : {}) },
+        ...(check.body === undefined ? {} : { body: check.body }),
         redirect: 'manual',
         signal: AbortSignal.timeout(ASK_MS),
       });
       answer = { status: got.status, headers: got.headers, text: await got.text() };
     } catch (err) {
-      console.log(`  UNREACHABLE  ${check.method} ${check.url}: ${err instanceof Error ? err.message : String(err)}`);
-      return 2;
+      log(`  UNREACHABLE  ${check.method} ${check.url}: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
     }
     const verdict = judge(check, answer);
     if (verdict) failed += 1;
-    console.log(`  ${verdict ? 'WRONG' : 'ok   '}  ${check.method} ${check.url}  expects ${check.expects}${verdict ? `\n         ${verdict}` : ''}`);
+    log(`  ${verdict ? 'WRONG' : 'ok   '}  ${check.method} ${check.url}  expects ${check.expects}${verdict ? `\n         ${verdict}` : ''}`);
+    return answer;
   }
-  console.log(`  smoke: ${name}, ${failed} wrong`);
+
+  for (const check of list) if ((await run(check)) === null) return 2;
+
+  if (first.length) {
+    /* `boot` IS `canary()`'s, whose sentences tell a lapsed token from a record that will not open, and its answer
+       names what the reads after it are about. */
+    const said = {};
+    const [boot, ...rest] = first;
+    const booted = await run(boot);
+    if (booted === null) return 2;
+    said.boot = booted.status === 200 ? valueOf(booted) : null;
+    for (const check of rest) if ((await run(check)) === null) return 2;
+    for (const read of reads.filter((r) => r.method !== 'boot')) {
+      const named = argsFor(read, said);
+      if (named.skip) {
+        log(`  skip   ${read.method}: ${named.skip}`);
+        continue;
+      }
+      const answer = await run(readCheck(config, name, slug, read, named.args));
+      if (answer === null) return 2;
+      said[read.method] = answer.status === 200 ? valueOf(answer) : null;
+    }
+  }
+  log(`  smoke: ${name}, ${failed} wrong`);
   return failed === 0 ? 0 : 1;
 }
 

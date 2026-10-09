@@ -261,6 +261,92 @@ function undeclared(value: unknown): string | null {
   return String(value);
 }
 
+/**
+ * A VALUE OF A COLUMN NO LIST DECLARES, said by the type the block answered for it (`BlockResult.types`).
+ *
+ * A computed source names no list, so `decl` finds nothing and every value went through `undeclared`: his project page's
+ * "Tools and servers" printed `2026-10-06T19:07:01.610Z` under Last used and `S731` under Last used by. An instant is a
+ * time in words, as a declared one is; a run is the words the page read for it ("Claude Code, 6 Oct", `runWords`), and
+ * a run the page could not read is an agent, never its handle.
+ */
+function answered(type: string, value: unknown, now: number, names?: Names): string | null {
+  if (type === 'instant' && typeof value === 'string') return since(value, now);
+  if (type === 'day' && typeof value === 'string') return fmtDay(value);
+  if (type === 'int' && typeof value === 'number') return integer(value);
+  if (type === 'run' && typeof value === 'string') return names?.get(value) || actor(value).name;
+  return undeclared(value);
+}
+
+/**
+ * A run as a person reads it: the app it ran in, else its agent's name, and the day it started. "Claude Code, 6 Oct".
+ * `null` for a row that holds neither, which the caller says as an agent.
+ */
+export function runWords(fields: Readonly<Record<string, unknown>>): string | null {
+  const who = runWho(fields);
+  if (who === null) return null;
+  const started = typeof fields.started === 'string' ? fields.started.slice(0, 10) : '';
+  return /^\d{4}-\d{2}-\d{2}$/u.test(started) ? `${who}, ${shortDay(started)}` : who;
+}
+
+/** Who a run is, as a person reads it: the app it ran in ("Claude Code"), else its agent's name, else `null`. */
+export function runWho(fields: Readonly<Record<string, unknown>>): string | null {
+  const app = typeof fields.client === 'string' && fields.client.trim() !== '' && !/[/\\:@]/u.test(fields.client) ? fields.client.trim() : null;
+  const agent = typeof fields.agent === 'string' && fields.agent !== '' && fields.agent !== 'other' ? actor(fields.agent).name : null;
+  return app ?? agent;
+}
+
+/** How long after one instant another came, said short: "5 min", "2h", "3 days". */
+function gapSaid(from: string, to: string): string | null {
+  const ms = Date.parse(to) - Date.parse(from);
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const mins = Math.round(ms / 60_000);
+  if (mins < 1) return null;
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  return `${days} days`;
+}
+
+/**
+ * WHAT A RUN LEFT AND WHAT BECAME OF IT (AGT-C05), off its own row: the next step it left, when, and whether another run
+ * took it, a person or an agent dropped it, or nobody took it in thirty days. `open` is a step still waiting, which a
+ * person may close. `taker` is the words for the run that took it (`runWho`), when the page could read that run.
+ * `null` for a run that left no step.
+ */
+export type StepLeft = { next: string; left: string | null; fate: string | null; open: boolean };
+
+export function stepLeft(fields: Readonly<Record<string, unknown>>, state: unknown, now: number = Date.now(), taker: string | null = null): StepLeft | null {
+  const next = typeof fields.next === 'string' ? fields.next.trim() : '';
+  if (next === '') return null;
+  const at = typeof fields.next_at === 'string' ? fields.next_at : null;
+  const closed = typeof fields.closed_at === 'string' ? fields.closed_at : null;
+  const left = at === null ? null : stepWords.left(since(at, now));
+  const later = at !== null && closed !== null ? gapSaid(at, closed) : null;
+  switch (fields.closed_as) {
+    case 'taken':
+      return { next, left, fate: stepWords.taken(taker ?? stepWords.anotherRun, later), open: false };
+    case 'dropped':
+      return { next, left, fate: stepWords.dropped(later), open: false };
+    case 'expired':
+      return { next, left, fate: stepWords.expired, open: false };
+    default:
+      /* A STEP ON A RUN NOT IN THE HANDOFF STATE was written before steps closed, or by a run still at work: it is said,
+         and nothing is claimed about what became of it. */
+      return state === 'handoff' ? { next, left, fate: stepWords.waiting, open: true } : { next, left, fate: null, open: false };
+  }
+}
+
+/** The words of a step a run left. */
+export const stepWords = {
+  left: (ago: string) => `Left this next step ${ago}`,
+  taken: (who: string, later: string | null) => (later === null ? `Taken by ${who}` : `Taken by ${who}, ${later} later`),
+  anotherRun: 'another run',
+  dropped: (later: string | null) => (later === null ? 'Closed without being taken' : `Closed without being taken, ${later} later`),
+  expired: 'Nobody took it in thirty days, so it closed',
+  waiting: 'Nobody has taken it yet',
+} as const;
+
 /** What a `duration`'s declared unit is worth in the seconds the record stores. */
 const SECONDS: Record<string, number> = { s: 1, m: 60, h: 3_600, d: 86_400, w: 604_800 };
 
@@ -276,6 +362,7 @@ export function display(
   value: unknown,
   now: number = Date.now(),
   names?: Names,
+  typed?: string,
 ): string | null {
   if (value === null || value === undefined || value === '') return null;
   /* A LIST READS AS ITS ELEMENTS, and never with the tags the record keeps for itself (`tags.ts`). A LIST OF LINKS reads
@@ -288,7 +375,7 @@ export function display(
      Claude". A lower-case word is said with its capital, on any list; anything else is left as it was typed. */
   if (field === 'agent' && typeof value === 'string' && /^[a-z][a-z0-9-]*$/u.test(value)) return value.charAt(0).toUpperCase() + value.slice(1);
   const f = decl(register, field);
-  if (!f) return undeclared(value);
+  if (!f) return typed === undefined ? undeclared(value) : answered(typed, value, now, names);
   switch (f.type) {
     case 'money': {
       /* THE VALUE CARRIES ITS OWN CURRENCY. A money field that came back as a bare number is a row
@@ -608,7 +695,24 @@ export function toneOf(register: string, e: Entry, now: number = Date.now()): Ta
   return undefined;
 }
 
-export function toRows(register: string, entries: Entry[], columns: Column[], now: number = Date.now(), names?: Names): TableRow[] {
+/** A cell typed as a run, as a link to the run's page: the words `display` said, never the handle. */
+const runLink = (said: string | null, value: unknown): string | null => {
+  const seq = typeof value === 'string' ? /^S([1-9][0-9]*)$/u.exec(value)?.[1] : undefined;
+  return said === null || seq === undefined || /[[\]]/u.test(said) ? said : `[${said}](/r/session/${seq})`;
+};
+
+/**
+ * `types` IS WHAT THE BLOCK ANSWERED for columns no list declares (a computed source's, `BlockResult.types`), which
+ * `display` falls back to. A column typed as a run links to the run.
+ */
+export function toRows(
+  register: string,
+  entries: Entry[],
+  columns: Column[],
+  now: number = Date.now(),
+  names?: Names,
+  types?: Readonly<Record<string, string>>,
+): TableRow[] {
   /* AN ENUM IN SENTENCE CASE, as the register's own grid draws it. The list says "Owed by me" through
      a first-letter rule on its own markup; a page block or a backlink table drawing the same row said
      "owed by me", so one row read two ways a click apart. */
@@ -618,7 +722,12 @@ export function toRows(register: string, entries: Entry[], columns: Column[], no
     key: `${register}#${e.seq}`,
     href: `/r/${register}/${e.seq}`,
     tone: toneOf(register, e, now),
-    cells: columns.map((c) => (c.field === 'seq' ? `#${e.seq}` : cased(c.field, display(register, c.field, e.fields[c.field], now, names)))),
+    cells: columns.map((c) => {
+      if (c.field === 'seq') return `#${e.seq}`;
+      const typed = types?.[c.field];
+      const said = cased(c.field, display(register, c.field, e.fields[c.field], now, names, typed));
+      return typed === 'run' && !decl(register, c.field) ? runLink(said, e.fields[c.field]) : said;
+    }),
   }));
 }
 

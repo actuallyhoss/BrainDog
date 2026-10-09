@@ -25,7 +25,7 @@ import { readFileSync } from 'node:fs';
 
 import type { Methods, Said } from '../../lib/auth.ts';
 import { stateOf, type Seen, type Ways } from '../../lib/signin.ts';
-import { actable, noDoorYet } from './first-door.ts';
+import { actable, firstDoor, mailHeld, noDoorYet } from './first-door.ts';
 
 /** What `https://app.brain.dog/auth/methods` answered, field for field, less `demo`: there is no demo left to read. */
 const LIVE: Methods = { passkey: true, magic: false, key: false, open: false, me: null, firstRun: true };
@@ -145,5 +145,28 @@ test("a host whose mail is down offers no link and the screen says so", () => {
   const down: Methods = { ...LIVE, firstRun: false, magic: 'down' };
   assert.equal(stateOf(seen(down)).name, 'signed-out');
   assert.deepEqual(waysFor(down), { passkey: true, magic: false, key: false, lead: 'passkey', keyOpen: false });
-  assert.match(PAGE, /host\?\.magic === 'down'[^}]*\}<p class="status" role="status">\{copy\.mailDown\}/);
+  assert.match(PAGE, /host\?\.magic === 'down'[^}]*\}<p class="status" role="status">\{noMail \? firstDoor\.mailDown : copy\.mailDown\}/);
+  assert.equal(mailHeld(down, actable(waysFor(down)), null), false, 'a passkey exists, so the shared line is right');
+});
+
+/**
+ * AUDIT 36-37, FINDING 8: A STRANGER WHO JUST SIGNED UP, ON A HOST WHOSE MAIL IS DOWN. `waysOf` counts `magic: 'down'`
+ * as no way, so the first run hands the screen the same empty `Ways` as a record nobody has claimed, and `noDoorYet`
+ * said "Open the link you were given when the record was set up" to somebody nobody gave a link. His way in is the
+ * letter. Measured red first: with the `magic !== 'down'` taken out of `noDoorYet`, the first assertion below fails.
+ */
+test('a first run whose mail is down says mail is down, never the claim link', () => {
+  const down: Methods = { ...LIVE, magic: 'down' };
+  const ways = actable(waysFor(down));
+  assert.equal(ways, null);
+  assert.equal(noDoorYet(down, ways, 'unsupported'), false);
+  assert.equal(mailHeld(down, ways, 'unsupported'), true);
+  /* THE BROWSER NOTE GOES TOO: the browser is not why nobody can get in. */
+  assert.match(PAGE, /view\.name !== 'signed-out' \|\| noDoor \|\| noMail/);
+  /* SIGNING OUT IS STILL ANSWERED BY THE SIGN OUT, and somebody signed in is told neither. */
+  assert.equal(mailHeld(down, ways, 'out'), false);
+  assert.equal(mailHeld({ ...down, me: { person: 'p_01', email: 'ada@example.com', record: 'studio', provedAt: 1 } }, null, null), false);
+  /* THE SENTENCE OFFERS NOTHING HE DOES NOT HAVE: no passkey, no link he was given, no em dash. */
+  assert.doesNotMatch(firstDoor.mailDown, /passkey|you were given|\u2014/u);
+  assert.match(firstDoor.mailDown, /Mail is not going out/);
 });

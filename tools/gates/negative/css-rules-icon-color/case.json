@@ -1,0 +1,6 @@
+{
+  "gate": "css-rules",
+  "rule": "an icon given a colour other than currentColor",
+  "expect": "currentColor only",
+  "findings": 1
+}

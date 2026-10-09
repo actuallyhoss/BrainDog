@@ -340,20 +340,109 @@ const QUIETEST_FIRST: Body[] = [
  * fingerprint released under each. Money-core 3.15.0's one figure, `ledger-rows-7d`, and 3.16.0's three signs are taken
  * off as well.
  */
-const SIGNS_ADDED = new Set(['ledger-rows-7d', 'ledger-newest-days', 'currencies-held', 'uncategorised-share-30d']);
+const SIGNS_ADDED = new Set(['ledger-rows-7d', 'ledger-newest-days', 'currencies-held', 'uncategorised-share-30d', 'statement-oldest-days', 'nights-missed-30d']);
+
+/**
+ * AND 3.16.0'S PAYDAYS (REC-B13), folded into the same unreleased step: Repeating's `day_of_month` and `weekend` and
+ * the sentence its `holds` gained, the leg's `days` and `weekend` that name them (on the figures and on the pages' blocks),
+ * and Money's `rest_days` setting.
+ */
+const PAYDAYS_FIELDS = new Set(['day_of_month', 'weekend']);
+const withoutPaydays = (doc: Body): Body => {
+  const { rest_days: _rest, ...config } = (doc.config ?? {}) as Body;
+  const legless = (leg: Body): Body => {
+    const { days: _days, weekend: _weekend, ...rest } = leg;
+    return rest;
+  };
+  return {
+    ...doc,
+    ...(doc.config === undefined ? {} : { config }),
+    declarations: (doc.declarations as Body[]).map((d) => {
+      if (d.register === 'recurring' && Array.isArray(d.fields))
+        return {
+          ...d,
+          holds: 'the money that comes in and goes out on a cadence, weekly to yearly, without anybody deciding again',
+          fields: (d.fields as Body[]).filter((f) => !PAYDAYS_FIELDS.has(String(f.id))),
+        };
+      if (Array.isArray(d.legs)) return { ...d, legs: (d.legs as Body[]).map(legless) };
+      /* A PAGE'S BLOCKS WALK THE SAME LEGS (`from`), so they lose the two keys there too. */
+      if (Array.isArray(d.blocks))
+        return { ...d, blocks: (d.blocks as Body[]).map((b) => (Array.isArray(b.from) ? { ...b, from: (b.from as Body[]).map(legless) } : b)) };
+      return d;
+    }),
+  };
+};
+/**
+ * AND 3.16.0'S AGES AND CURRENCIES (REC-B03, REC-B04), folded into the same unreleased step: `account-ages` goes,
+ * `cash-as-of` and `balances-stale` read the typed day again, the money fields lose `currency_from` and
+ * `currency_fixed`, Money loses Last confirmed and its box, a book's account cards read the typed day, and
+ * `rule.cash-stale` comes back after `invoice-late`.
+ */
+const CASH_STALE: Body = {
+  rule: 'cash-stale',
+  pack: 'money-core',
+  register: 'accounts',
+  when: 'as_of before -7d',
+  then: [{ notify: { say: 'The balance of {{name}} was last set {{ago:as_of}}.' } }],
+  once_per: ['entry', 'as_of'],
+};
+const CURRENCY_KEYS = new Set(['currency_from', 'currency_fixed']);
+const withoutAges = (doc: Body): Body => {
+  const out: Body[] = [];
+  for (const d of doc.declarations as Body[]) {
+    if (d.metric === 'account-ages') continue;
+    if (d.metric === 'cash-as-of') out.push({ ...d, value: { min: 'as_of' } });
+    else if (d.metric === 'balances-stale') out.push({ ...d, where: 'liquid is true, as_of before -7d', value: { count: 'id' } });
+    else if (Array.isArray(d.fields) && ['transactions', 'balances', 'installments', 'recurring'].includes(String(d.register)))
+      out.push({ ...d, fields: (d.fields as Body[]).map((f) => Object.fromEntries(Object.entries(f).filter(([k]) => !CURRENCY_KEYS.has(k)))) });
+    else if (d.page === 'money')
+      out.push({
+        ...d,
+        requires: (d.requires as string[]).filter((r) => r !== 'register.balances'),
+        blocks: (d.blocks as Body[])
+          .filter((b) => b.heading !== 'Last confirmed' && b.heading !== 'What it holds today')
+          .map((b) =>
+            b.when && (b.when as Body).metric === 'balances-stale' && b.kind === 'note'
+              ? { ...b, body: "The oldest balance in Cash now is from {{cash-as-of}}. Update it so this page starts from today's money." }
+              : b,
+          ),
+      });
+    else if (d.page === 'money-book')
+      out.push({
+        ...d,
+        blocks: (d.blocks as Body[]).map((b) =>
+          b.heading === 'Accounts'
+            ? { ...b, columns: (b.columns as Body[]).map((c) => (c.field === 'as_of' ? { field: 'as_of', label: 'As of', as: 'when' } : c)), stale: { field: 'as_of', after: '7d' } }
+            : b,
+        ),
+      });
+    else out.push(d);
+    if (d.rule === 'invoice-late') out.push(CASH_STALE);
+  }
+  return { ...doc, declarations: out };
+};
+/**
+ * A VERSION BEFORE 3.16.0 WITHOUT `cash-stale`, for the tests below that measure page fixes going in on their own: 3.16.0
+ * takes the rule away, which is a loss a record is asked about once (`TAKING CASH STALE AWAY IS ASKED`), and those tests
+ * measure the pages, not that question.
+ */
+const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
   'money-core': {
     version: '3.13.0',
     released: '2e09983b40aba73e',
-    undo: (doc) => ({
+    undo: (raw) => {
+      const doc = withoutPaydays(withoutAges(raw));
+      return {
       ...doc,
       declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric))).map((d) =>
         d.register === 'accounts' && Array.isArray(d.fields)
           ? { ...d, fields: (d.fields as Body[]).map((f) => (f.id === 'last4' ? { ...f, label: 'Last four digits' } : f)) }
           : d,
       ),
-    }),
+      };
+    },
   },
   /* A CARD NAMED ITS PROJECT, where it says its day and who holds it. A record without Projects had no third column. */
   work: {
@@ -367,11 +456,12 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     },
   },
   /* GONE QUIET AND LAST IN TOUCH STOOD OVER EVERYONE, two lists of the people on the cards under them. */
+  /* AND PEOPLE 3.3.0'S HEALTH PAGE, the record's vital signs, comes off first. */
   people: {
     version: '3.1.0',
     released: '36328d2fcaeb58f3',
-    undo: (doc) =>
-      withPage(doc, 'people', (now) =>
+    undo: (raw) =>
+      withPage({ ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.page !== 'health') }, 'people', (now) =>
         now.flatMap((b) =>
           b.heading !== 'Everyone'
             ? [b]
@@ -501,7 +591,7 @@ test('THE SECOND DESIGN REVIEW’S PAGE FIXES GO IN ON THEIR OWN over the versio
   const k = await openRecord(sql, fixedClock(NOW));
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {
     const doc = documentFor(k, m)!;
-    await put(k, sql, { ...BEFORE[m]!.undo(doc), version: BEFORE[m]!.version });
+    await put(k, sql, { ...withoutCashStale(BEFORE[m]!.undo(doc)), version: BEFORE[m]!.version });
     assert.equal(k.packs().find((p) => p.id === m)?.version, BEFORE[m]!.version);
   }
   assert.ok(!k.packClaims('people').includes('metric.people-in-touch-90d'), 'the record starts without the figure the update brings');
@@ -558,7 +648,7 @@ const DONE_BY_WEEK: Body = {
  * with no line asked for (`trend`).
  */
 const projectBefore = (doc: Body, id: string): Body =>
-  withPage(workingBefore(doc, id), 'project', (now) =>
+  withPage(workingBefore(numbersBefore(doc, id), id), 'project', (now) =>
     now.flatMap((b) => {
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
       if (b.heading !== 'At a glance') return [b];
@@ -583,6 +673,30 @@ const workingBefore = (doc: Body, id: string): Body =>
       return [Object.fromEntries(Object.entries(b).flatMap(([k, v]): [string, unknown][] => (k === 'when' ? [] : k === 'source' ? [['source', 'sessions.live'], ['where', RUNS_TODAY]] : [[k, v]])))];
     }),
   );
+
+/** Drops the Amount column from every list of columns that also has Value: the blocks and tables over Numbers. */
+const dropAmount = (v: unknown): unknown =>
+  Array.isArray(v)
+    ? (v.some((c) => (c as Body | null)?.field === 'value') ? v.filter((c) => (c as Body).field !== 'amount') : v).map(dropAmount)
+    : v !== null && typeof v === 'object'
+      ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, dropAmount(x)]))
+      : v;
+
+/**
+ * AND NUMBERS AS THEY WERE BEFORE FOUNDER 2.5.0: a reading's `value` required and no `amount`, so no Amount column on a
+ * block or a table over them. Undone with the two changes before it, so the version before is still the one released.
+ */
+const numbersBefore = (doc: Body, id: string): Body =>
+  id !== 'founder'
+    ? doc
+    : {
+        ...doc,
+        declarations: (doc.declarations as Body[]).map((d) =>
+          d.register === 'datapoints'
+            ? { ...d, fields: (d.fields as Body[]).flatMap((f) => (f.id === 'amount' ? [] : f.id === 'value' ? [{ ...f, required: true }] : [f])) }
+            : (dropAmount(d) as Body),
+        ),
+      };
 
 /** The version each use case was on, and what `usecase-versions.test.ts` records it declared. */
 const USECASE_BEFORE: Record<string, { version: string; released: string }> = {
@@ -638,7 +752,7 @@ test('THE BOARD’S CARDS AND PEOPLE SHOWN ONCE GO IN ON THEIR OWN over the vers
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {
     const doc = documentFor(k, m)!;
     const was = LATEST[m];
-    await put(k, sql, was ? { ...was.undo(doc), version: was.version } : doc);
+    await put(k, sql, was ? { ...withoutCashStale(was.undo(doc)), version: was.version } : doc);
   }
   const port = portOf(k, sql);
 
@@ -772,4 +886,21 @@ test('THE VERSION THIS BUILD SHIPS IS SAID FOR EVERYTHING THE NIGHT KEEPS CURREN
   assert.equal(shippedVersion('agents'), AGENTS_PACK.manifest.version);
   for (const id of ['founder', 'team']) assert.equal(shippedVersion(`usecase-${id}`), useCase(id)!.version);
   for (const id of ['usecase-nobody', 'bank-hsbc-eg', '']) assert.equal(shippedVersion(id), undefined, id);
+});
+
+test('TAKING CASH STALE AWAY IS ASKED: a record on money-core 3.13.0 that holds the rule is asked once, and nothing else of Money is lost', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  for (const m of ['portfolio', 'people', 'money-core', 'work']) {
+    const doc = documentFor(k, m)!;
+    const was = LATEST[m];
+    await put(k, sql, was ? { ...was.undo(doc), version: was.version } : doc);
+  }
+  const steps = await updateFirstParty(portOf(k, sql));
+  assert.deepEqual(
+    steps.find((s) => s.pack === 'money-core'),
+    { pack: 'money-core', from: '3.13.0', to: FIRST_PARTY_VERSIONS['money-core'], did: 'asked', lose: ['take away Cash stale'] },
+    JSON.stringify(steps),
+  );
+  sql.close();
 });

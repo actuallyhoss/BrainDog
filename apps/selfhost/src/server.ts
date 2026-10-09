@@ -47,7 +47,7 @@ import { createRecordApi, type CallContext } from '@braindog/record';
 import { cutOffReadable } from '@braindog/kernel';
 import { readFileSync as readWhole, existsSync as present, renameSync as moveFile, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
-import { catalogueAnswer, catalogueFolder, catalogueOffersFrom } from './catalogue.ts';
+import { catalogueAnswer, catalogueFolder, catalogueOffersFrom, catalogueShelfFrom } from './catalogue.ts';
 import { serveKennelTo, servesKennel } from './kennel.ts';
 import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, signCopies, type FileSnapshots } from './snapshots.ts';
@@ -1666,6 +1666,7 @@ export async function start(options: {
     engineHealth,
     /* NEWER VERSIONS IN THIS HOST'S CATALOGUE, for Slash to ask about on Decide. */
     ...(catalogueDir === undefined ? {} : { catalogueOffers: catalogueOffersFrom(catalogueDir) }),
+    ...(catalogueDir === undefined ? {} : { catalogueShelf: catalogueShelfFrom(catalogueDir) }),
     snapshots: kept,
     destroy,
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
