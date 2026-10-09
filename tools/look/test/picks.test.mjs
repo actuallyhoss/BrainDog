@@ -4,7 +4,7 @@
  * drawing is `board.mjs`'s and `capture.mjs`'s, tested there.
  */
 
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -104,8 +104,10 @@ test('dark.md is what the theme makes now, and every colour for words reads on t
   assert.doesNotMatch(read(DARK), /\u2014/u);
 });
 
-test("each of our sizes stands beside the kit's, both read from their files", () => {
-  const got = measuresOf(read('packages/skin/tokens.css'), read('loop/KIT-ENCORE.md'));
+// The reference kit is a local file under loop/, which is never pushed, so a checkout without it skips this one.
+const KIT = 'loop/KIT-REFERENCE.md';
+test("each of our sizes stands beside the kit's, both read from their files", { skip: !existsSync(join(ROOT, KIT)) && 'the reference kit is a local file' }, () => {
+  const got = measuresOf(read('packages/skin/tokens.css'), read(KIT));
   for (const m of got) assert.ok(m.ours !== null && m.kit !== null, `${m.name}: ours ${m.ours}, the kit's ${m.kit}`);
   assert.deepEqual(measuresOf('--rail: 240px;', ''), [{ name: 'Rail width', ours: 240, kit: null }, ...got.slice(1).map((m) => ({ ...m, ours: null, kit: null }))]);
 });

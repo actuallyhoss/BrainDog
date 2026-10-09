@@ -43,7 +43,7 @@ test('it takes a board and a source, and refuses live, a stray flag and a yes wi
   assert.deepEqual(parseArgs(['frame']), { board: 'frame', seen: false });
   assert.deepEqual(parseArgs(['--board', 'frame', '--source=file:/tmp/r.sqlite']).source, { name: 'file', arg: '/tmp/r.sqlite' });
   assert.deepEqual(parseArgs(['frame', '--yes', 'yes', '--from', 'x', '--seen', '--units', 'EXP-A01, EXP-A02']).units, ['EXP-A01', 'EXP-A02']);
-  assert.throws(() => parseArgs(['frame', '--source', 'live:sam']), /never draws live/u);
+  assert.throws(() => parseArgs(['frame', '--source', 'live:lanternfish']), /never draws live/u);
   assert.throws(() => parseArgs(['frame', '--set', 'six']), /not --set/u);
   assert.throws(() => parseArgs(['frame', '--yes', 'yes']), /add --from/u);
   assert.throws(() => parseArgs([]), /Name the board/u);

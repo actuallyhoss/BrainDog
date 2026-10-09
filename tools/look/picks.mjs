@@ -397,7 +397,7 @@ export async function writePage(out, root = ROOT) {
     drawn: drawing.drawn,
     record: RECORD_SAYS[drawing.source] ?? `the ${drawing.source} record`,
     dark: await darkRoles(),
-    measures: measuresOf(read('packages/skin/tokens.css'), read('loop/KIT-ENCORE.md')),
+    measures: measuresOf(read('packages/skin/tokens.css'), read('loop/KIT-REFERENCE.md')),
     colours: pageColours(read('packages/skin/house.css')),
   });
   const oct8 = drawing.oct8 ?? [];

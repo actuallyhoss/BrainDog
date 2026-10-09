@@ -550,7 +550,10 @@ async function receipt(results, lockFile) {
   for (const { m, records, rows } of [...ran.values()].sort((a, b) => a.m.version - b.m.version)) {
     const file = `${String(m.version).padStart(4, '0')}_${m.slug}.ts`;
     if (lock[file]?.applied === true) continue;
-    lock[file] = { checksum: await checksum(m.sql), applied: false, rehearsed: { at, records, rows, pass: true } };
+    const sum = await checksum(m.sql);
+    // An owner's waiver stays beside the receipt, as long as it was written for this same text.
+    const kept = lock[file]?.checksum === sum && lock[file]?.waived ? { waived: lock[file].waived } : {};
+    lock[file] = { checksum: sum, applied: false, rehearsed: { at, records, rows, pass: true }, ...kept };
     written.push(`migration ${m.version} ${m.slug}, ${records} ${records === 1 ? 'record' : 'records'} and ${rows} rows`);
   }
   if (written.length === 0) {
