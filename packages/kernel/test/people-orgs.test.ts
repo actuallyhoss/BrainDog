@@ -112,11 +112,11 @@ test(
   'A KEY SAYING "session in braindog" NEVER FOLDS A FORGED AUTHOR INTO A PERSON THE OWNER TYPED, and carries nothing onto them',
   async () => {
     const { k, sql } = await record();
-    const real = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
-    const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanmehta@evil.test', source: 'session in braindog' }, AGENT));
+    const real = value<Entry>(k.create('people', { name: 'Teodor Vance', email: 'teodorvance@lanternfish.example' }, OWNER));
+    const met = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodorvance@evil.test', source: 'session in braindog' }, AGENT));
     assert.notEqual(met.matched_by, 'strong', 'a key folded a forged author into the real person');
     assert.deepEqual(k.get(met.row!.id)!.fields.met, [`${DAY} · an agent said: session in braindog`]);
-    const hit = value<Met>(k.meet({ email: 'rohanmehta@encore.example', handle: 'github:attacker', source: 'session in braindog' }, AGENT));
+    const hit = value<Met>(k.meet({ email: 'teodorvance@lanternfish.example', handle: 'github:attacker', source: 'session in braindog' }, AGENT));
     assert.equal(hit.row?.id, real.id);
     assert.equal(k.get(real.id)!.fields.handles, undefined, 'a key carried a handle onto the real person');
     sql.close();
@@ -376,7 +376,7 @@ test(
     const { k, sql } = await record();
     const ada = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'ada@acme.example', where: 'commit 1 in braindog' }, AGENT));
     /* At a part of the domain: its own host, so neither counted nor named. */
-    const omar = value<Met>(k.meet({ name: 'Omar Said', email: 'omar@mail.acme.example', where: 'commit 2 in braindog' }, AGENT));
+    const joaquin = value<Met>(k.meet({ name: 'Joaquin Herrera', email: 'joaquin@mail.acme.example', where: 'commit 2 in braindog' }, AGENT));
     assert.deepEqual(open(sql), [], 'a subdomain address counted as a second person at the domain');
     /* Mail vouches for nobody. */
     const eve = value<Met>(k.meet({ name: 'Eve Mallory', email: 'eve@acme.example', source: 'mail from acme.example' }, AGENT));
@@ -392,7 +392,7 @@ test(
     assert.equal(k.get(grace.row!.id)!.fields.org, acme);
     assert.equal(k.get(linus.row!.id)!.fields.org, undefined, 'somebody who arrived after the question was put in it');
     assert.equal(k.get(eve.row!.id)!.fields.org, undefined, 'somebody only mail vouches for was put in it');
-    assert.equal(k.get(omar.row!.id)!.fields.org, undefined, 'a subdomain address was put in it');
+    assert.equal(k.get(joaquin.row!.id)!.fields.org, undefined, 'a subdomain address was put in it');
     sql.close();
   },
 );

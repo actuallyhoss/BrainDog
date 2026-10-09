@@ -1,0 +1,8 @@
+{
+  "gate": "passkey",
+  "rule": "a passkey whose authenticator is gone by the time it is asked for",
+  "seed": "passkey-left",
+  "expect": "signed nobody in",
+  "findings": 1,
+  "why": "THE CEREMONY HAD NEVER BEEN SEEN TO FAIL, and a comment in the gate said the self-test ran it with a fault when nothing did. The seed takes Chrome's virtual authenticator away after the passkey is made and the browser has been asked to hold it, so the device that comes back to sign in holds nothing and step five must say nobody was signed in. It is a seed and not a tree of files because the thing under test is a real browser over the repository's own build, so it runs against that build, is not run when the build is older than the source, and this folder holds only what the run must say."
+}

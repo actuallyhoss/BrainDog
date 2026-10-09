@@ -58,9 +58,9 @@ test('A PERSON KEPT BY AN ADDRESS IS ANSWERED BY NAME, NEVER THE ADDRESS', async
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 9, 7, 12)) });
   value(await api.kernel.install([THINGS, PEOPLE]));
-  value<Entry>(api.kernel.create('people', { name: 'rohan.mehta@encore.example', email: 'rohan.mehta@encore.example' }, { actor: 'p_1' }));
-  const met = value<Meeting>(await api.meet({ email: 'rohan.mehta@encore.example', source: 'note from Sam' }, owner));
-  assert.equal(met.row?.name, 'rohan.mehta');
+  value<Entry>(api.kernel.create('people', { name: 'ines.duarte@orchardline.example', email: 'ines.duarte@orchardline.example' }, { actor: 'p_1' }));
+  const met = value<Meeting>(await api.meet({ email: 'ines.duarte@orchardline.example', source: 'note from Mara' }, owner));
+  assert.equal(met.row?.name, 'ines.duarte');
   assert.doesNotMatch(JSON.stringify(met), /@/u);
   sql.close();
 });

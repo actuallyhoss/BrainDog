@@ -18,7 +18,7 @@
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
-  /* A ROW WITH NO VALUE IS NOT DRAWN (`drawnRows`), as `toHTML` leaves it out: "Keeping it alive: tamsin.me" over a dash
+  /* A ROW WITH NO VALUE IS NOT DRAWN (`drawnRows`), as `toHTML` leaves it out: "Keeping it alive: lanternfish.example" over a dash
      said a name and nothing. What is left with none says the host's `empty:` line, or nothing (`emptied`). */
   const rows = $derived(drawnRows(block, opts).map(({ row }) => row));
   const left = $derived(emptied(block, opts));

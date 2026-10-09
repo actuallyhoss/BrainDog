@@ -57,7 +57,7 @@ export const lookId = (page: string): string => `look.${page}`;
 /** Slash's pref keeping what Undo restores: the version Slash wrote and the body it replaced. Not `headline.`, so no page's line is it. */
 export const lookUndoKey = (page: string): string => `look.undo.${page}`;
 
-/** Slash's pref keeping who kept its look over a page and which version they kept, for the history line "Slash arranged · Sam kept". */
+/** Slash's pref keeping who kept its look over a page and which version they kept, for the history line "Slash arranged · Mara kept". */
 export const lookKeptKey = (page: string): string => `look.kept.${page}`;
 
 /** The next thing to do is a phrase under the headline, shorter than the line itself. */
@@ -170,7 +170,7 @@ export function lookInputOf(blocks: readonly unknown[], titleOf: (list: string) 
       const field = titleOf(row.register);
       const title = field === null ? undefined : (row.fields as Record<string, unknown>)[field];
       /* AND A TITLE IS SAID WITHOUT THEM: a person met with only an address is named by it, and a model reads "someone at
-         encore.example" in its place. A title that is nothing but a key is not handed at all. */
+         orchardline.example" in its place. A title that is nothing but a key is not handed at all. */
       const said = typeof title === 'string' ? scrubbed(title) : null;
       if (said === null) continue;
       const handle = `${row.register}#${row.seq}`;

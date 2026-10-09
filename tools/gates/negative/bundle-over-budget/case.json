@@ -1,0 +1,7 @@
+{
+  "gate": "bundle",
+  "rule": "an entry chunk over the entry script's debt",
+  "expect": "budget\\(s\\) exceeded",
+  "findings": 1,
+  "why": "THE NUMBER THE GATE IS NAMED FOR HAD NO PLANTED FAULT. Its two other trees are a shell and a missing chunk, and neither is about bytes, so a gate that stopped adding up the entry, or compared the sum with the wrong number, would have read green. The entry chunk here is 56,000 random letters and digits, which brotli cannot shrink below about 37 KB, over both the 30 KB budget and the debt `ledger.json` records, and the debt only falls, so the tree stays red. Everything else the gate reads is there and small, so the entry row is the one FAIL and the count of one proves the gate names that row rather than every row. The shell is under `apps/site/src/` and there is no `apps/web/src/`, for the staleness reason `bundle-missing-chunk/` gives. Git ignores `build/` and `_*`, so this tree needs the two lines beside the `.svelte-kit/` exception in `.gitignore` before it can be committed whole."
+}

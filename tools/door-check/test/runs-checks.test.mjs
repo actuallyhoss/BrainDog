@@ -252,7 +252,7 @@ function runner(only, extra = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'door-report-'));
   const env = { ...process.env };
   for (const name of ['ANTHROPIC_API_KEY', 'DOOR_TOKEN', 'DOOR_TOKEN_2', 'GITHUB_ACTIONS', 'CI']) delete env[name];
-  const got = spawnSync(process.execPath, [RUN, '--host', 'https://example.test', '--record', 'fresh', '--only', only, '--report', join(dir, 'report.json')], { env: { ...env, ...extra }, encoding: 'utf8' });
+  const got = spawnSync(process.execPath, [RUN, '--host', 'https://brain.dog', '--record', 'fresh', '--only', only, '--report', join(dir, 'report.json')], { env: { ...env, ...extra }, encoding: 'utf8' });
   const rows = JSON.parse(readFileSync(join(dir, 'report.json'), 'utf8')).rows;
   rmSync(dir, { recursive: true, force: true });
   return { code: got.status, out: got.stdout, rows };

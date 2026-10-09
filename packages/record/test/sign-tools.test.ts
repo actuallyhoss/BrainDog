@@ -26,6 +26,9 @@ async function record() {
     clock.set(NOW - minsAgo * MIN);
     assert.ok(api.kernel.heard({ actor: run } as never, { kind: 'hello', client, build: '0.9.1' }).ok);
     if (listed) assert.ok(api.kernel.heard({ actor: run } as never, { kind: 'listed', n: 16 }).ok);
+    /* BACK TO NOW: the door's counts read nothing marked after the record's clock, so a clock left in the past hides
+       every later session. */
+    clock.set(NOW);
   };
   const tools = () => {
     clock.set(NOW);

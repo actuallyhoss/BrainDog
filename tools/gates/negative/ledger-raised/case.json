@@ -1,0 +1,1 @@
+{"gate": "ledger", "rule": "a debt's newest line higher than the one before", "expect": "the debt rose from 33800 to 33900", "findings": 1, "total": 1, "why": "The entry script's recorded number set to 33900 with a dated line and a sentence, the way it was raised twelve times before. PRF-B03 says red with or without a new line; the case with no line is in test/ledger.test.mjs."}

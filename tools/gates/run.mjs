@@ -172,6 +172,13 @@ const GATES = [
   /* AND THE ONE CLOCK (AGT-C02): a run's `last_seen` compared with the time anywhere outside `presence.ts` is the
      rail, Today and Agents saying three numbers again. Today's hits are allowed by count, and the list only shrinks. */
   ['one-clock', call(join(here, 'one-clock.mjs'))],
+  /* AND AN APPLIED MIGRATION IS NEVER EDITED (LCH-C06): each migration's checksum, by the runner's own `checksum`, against
+     `packages/kernel/src/migrations/LOCK.json`, and a new one ships with a passing rehearsal's receipt. */
+  ['migration-lock', call(join(here, 'migration-lock.mjs'))],
+  /* AND ONE LEDGER FOR EVERY NUMBER A GATE IS HELD TO (PRF-B03): a budget never rises unless the owner is quoted, a debt
+     only falls, a held list only shrinks, and a number written in a gate file is a debt. Beside the other source gates
+     because it reads files and needs nothing built. */
+  ['ledger', call(join(here, 'ledger.mjs'))],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
   // Needs a build. It exits 3 when there is not one, which is a skip here and not a pass, so
   // `pnpm gates` is useful on a fresh checkout; CI builds first, and then it is a real gate.

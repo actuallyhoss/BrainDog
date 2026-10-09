@@ -75,10 +75,10 @@ test('THE FLOOR: money, keys, sharing, deletes and another person’s row always
   assert.equal(kindOfWrite({ list: 'tasks', op: 'create', patch: { title: 'x', project: 'things#2' }, shape: TASKS }).floor, null);
   assert.equal(kindOfWrite({ list: 'tasks', op: 'delete', shape: TASKS }).floor, 'delete');
   /* A ROW ANOTHER PERSON MADE, for every verb but making one. */
-  const theirs = { madeBy: 'p_ada', person: 'p_sam' };
+  const theirs = { madeBy: 'p_ada', person: 'p_mara' };
   assert.equal(kindOfWrite({ list: 'tasks', op: 'update', patch: { state: 'done' }, shape: TASKS, ...theirs }).floor, 'others');
   assert.equal(kindOfWrite({ list: 'tasks', op: 'note', shape: TASKS, ...theirs }).floor, 'others');
-  assert.equal(kindOfWrite({ list: 'tasks', op: 'update', patch: { state: 'done' }, shape: TASKS, madeBy: 'p_sam', person: 'p_sam' }).floor, null);
+  assert.equal(kindOfWrite({ list: 'tasks', op: 'update', patch: { state: 'done' }, shape: TASKS, madeBy: 'p_mara', person: 'p_mara' }).floor, null);
   /* A LIST THE RECORD DOES NOT HAVE IS OUTSIDE IT. */
   assert.equal(kindOfWrite({ list: 'nowhere', op: 'create', patch: {}, shape: null }).floor, 'outside');
 });
@@ -102,7 +102,7 @@ test('THE LOG READS BACK AS THE SAME KINDS the write was', () => {
 const reader = (made: Record<string, string> = {}): KindReader => ({
   shape: (list) => ({ tasks: TASKS, bills: BILLS, credentials: KEYS })[list] ?? null,
   madeBy: (_list, at) => made[at] ?? null,
-  person: 'p_sam',
+  person: 'p_mara',
 });
 
 test('A PROPOSAL BREAKS DOWN INTO THE SAME KINDS, plus shape, automation, add-ons and a call', () => {

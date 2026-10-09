@@ -5,7 +5,8 @@
  * DESCRIBE, THEN BUILD (DIRECTION §37). The page asks "Who are you?" first and draws the BrainDog from the answer, and
  * only then asks for one email. The record's name is chosen from what was heard (`namesHeard`, `recordNames`,
  * `chooseName`), and the sentence waits for the link in `localStorage` (`keepSaid`, `saidKept`), so the tab the link
- * opens builds the record from it.
+ * opens builds the record from it. It also rides in the link itself (`saidForLink`, read back by `arrivalOf`), so a link
+ * opened on another device builds from it too.
  *
  * FREE LEADS (DIRECTION §35). The site's buttons open `/signup` with no plan, and no plan is Free: checkout with
  * `plan: 'free'` makes the record there and then and answers its `/start`. `?plan=cloud` and `?plan=plus` are the
@@ -65,7 +66,7 @@ export type Billing = { records: Owned[]; open: boolean; price: string | null; p
  * Where somebody arrived from: their mail with a proof, an invitation with a sign-up code, Stripe with a payment, Stripe
  * without one, or nowhere.
  */
-export type Arrival = { kind: 'verify'; token: string } | { kind: 'code'; code: string } | { kind: 'paid' } | { kind: 'cancelled' } | null;
+export type Arrival = { kind: 'verify'; token: string; said?: Draft } | { kind: 'code'; code: string } | { kind: 'paid' } | { kind: 'cancelled' } | null;
 
 /** The plans a new record can start on: Free, which nothing sells, or one paid for on Stripe's page. */
 export type Plan = 'free' | 'cloud' | 'plus';
@@ -298,6 +299,8 @@ export type Draft = { said: string; currency: string | null; usecase: string | n
  * page calls this after `startSignup` answers, and with `null` after an `accept` that missed nothing.
  */
 export function keepSaid(storage: Pick<Storage, 'setItem' | 'removeItem'> | null | undefined, draft: Draft | null, now: number = Date.now()): void {
+  /* FORGOTTEN WITH THE DEVICE'S COPY: the build is in, and the sentence the link carried has no more use. */
+  if (draft === null) fromLink = null;
   try {
     if (draft === null || draft.said.trim() === '') storage?.removeItem(SAID_KEY);
     else storage?.setItem(SAID_KEY, JSON.stringify({ said: draft.said.slice(0, SAID_MOST), currency: draft.currency, usecase: draft.usecase, at: now }));
@@ -311,8 +314,15 @@ export function keepSaid(storage: Pick<Storage, 'setItem' | 'removeItem'> | null
  *
  * ONE THAT CANNOT BE BUILT IS REMOVED AS IT IS READ: an old, broken or future-dated sentence is somebody's own words
  * in plain text, and on a shared device it would sit there for the next person to find.
+ *
+ * THIS DEVICE'S COPY FIRST, THEN THE LINK'S (`link`, by default what `arrivalOf` read off the address): a link opened on
+ * a phone after the words were typed on a desk has no copy here, and builds from the one it carried.
  */
-export function saidKept(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | undefined, now: number = Date.now()): Draft | null {
+export function saidKept(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | undefined, now: number = Date.now(), link: Draft | null = fromLink): Draft | null {
+  return keptHere(storage, now) ?? link;
+}
+
+function keptHere(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | undefined, now: number): Draft | null {
   let raw: string | null | undefined;
   try {
     raw = storage?.getItem(SAID_KEY);
@@ -334,6 +344,68 @@ export function saidKept(storage: Pick<Storage, 'getItem' | 'removeItem'> | null
     }
     return null;
   }
+  return { said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase) };
+}
+
+/** The most of what was said that rides in the mailed link, packed: the host's own limit (`SAID_IN_LINK`). */
+export const SAID_LINK_MOST = 1000;
+
+/**
+ * What a letter must not carry, so a sentence holding one stays on this device and is not sent: a web address, by its
+ * scheme, `www.` or a common ending, and an email address. THE HOST'S RULES (`packages/record/src/identity.ts`,
+ * `NOT_IN_LINK`), which refuse the whole start; here they only leave the sentence out of the link.
+ */
+const CARRIES_NOT: readonly RegExp[] = [
+  /[a-z][a-z0-9+.-]*:\/\//i,
+  /\bwww\./i,
+  /[^\s@]+@[^\s@]+\.[^\s@]+/,
+  /\b[a-z0-9-]+\.(?:com|net|org|io|co|ai|app|dev|me|info|biz|xyz|ly|gl|gg|link|site|online|shop|store)\b/i,
+];
+
+/** The sentence that went with the link this page was opened from, read off its fragment by `arrivalOf`. */
+let fromLink: Draft | null = null;
+
+/**
+ * WHAT WAS SAID, PACKED FOR THE LINK: the sentence and its one answer (the currency, or the use case picked), and nothing
+ * else of the build. `null` when there is nothing to carry, or it holds an address the host would refuse.
+ *
+ * SHORTENED AT A WORD to fit `SAID_LINK_MOST`, so a long sentence still carries its start; the whole of it waits on
+ * this device as before (`keepSaid`).
+ */
+export function saidForLink(draft: Draft | null | undefined): string | null {
+  if (!draft) return null;
+  const pack = (said: string): string =>
+    JSON.stringify({ said, ...(draft.currency ? { currency: draft.currency } : {}), ...(draft.usecase ? { usecase: draft.usecase } : {}) });
+  let words = draft.said.trim();
+  if (pack(words).length > SAID_LINK_MOST) {
+    /* THE LONGEST START THAT FITS PACKED, found by halves, since a quote or a line break grows when packed. */
+    let fits = 0;
+    for (let lo = 0, hi = words.length; lo <= hi; ) {
+      const mid = (lo + hi) >> 1;
+      if (pack(words.slice(0, mid)).length <= SAID_LINK_MOST) {
+        fits = mid;
+        lo = mid + 1;
+      } else hi = mid - 1;
+    }
+    const cut = words.slice(0, fits);
+    const space = cut.search(/\s\S*$/);
+    /* NEVER HALF A CHARACTER: a lone surrogate is a character no link can carry. */
+    words = (space > 0 ? cut.slice(0, space) : cut).trimEnd().replace(/[\uD800-\uDBFF]$/, '');
+  }
+  const out = pack(words);
+  return words === '' || CARRIES_NOT.some((r) => r.test(out)) ? null : out;
+}
+
+/** What `saidForLink` packed, read back off a link, or `null` when it is not that. */
+export function saidFromLink(packed: string | null): Draft | null {
+  if (packed === null) return null;
+  let v: unknown = null;
+  try {
+    v = JSON.parse(packed);
+  } catch {
+    return null;
+  }
+  if (!isObj(v) || typeof v.said !== 'string' || v.said.trim() === '') return null;
   return { said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase) };
 }
 
@@ -374,12 +446,14 @@ export async function checkName(slug: string, io: Io = live()): Promise<Asked<Na
 
 /**
  * Ask for a record: the host always answers the same for an address, and the mail says the rest. By invitation, the
- * code this tab kept rides along, and a start without a usable one is refused `at: 'code'`.
+ * code this tab kept rides along, and a start without a usable one is refused `at: 'code'`. What was said rides along
+ * packed (`saidForLink`), and the host puts it in the mailed link's fragment.
  */
 export async function startSignup(
-  ask: { email: string; slug: string; name?: string; tz?: string | null; turnstile?: string | null; code?: string | null },
+  ask: { email: string; slug: string; name?: string; tz?: string | null; turnstile?: string | null; code?: string | null; said?: Draft | null },
   io: Io = live(),
 ): Promise<Asked<null>> {
+  const said = saidForLink(ask.said);
   const out = await call(io, '/auth/signup/start', {
     email: ask.email.trim(),
     slug: ask.slug.trim(),
@@ -387,6 +461,7 @@ export async function startSignup(
     ...(ask.tz ? { tz: ask.tz } : {}),
     ...(ask.turnstile ? { turnstile: ask.turnstile } : {}),
     ...(ask.code ? { code: ask.code } : {}),
+    ...(said !== null ? { said } : {}),
   });
   return out.ok ? { ok: true, value: null } : out;
 }
@@ -464,15 +539,22 @@ export function madeFor(records: readonly Owned[], slug: string): Owned | null {
  * `#paid=` or `#cancelled` from Stripe.
  *
  * `clear` RUNS ONLY WHEN THERE WAS SOMETHING TO TAKE, so a plain visit leaves the address alone.
+ *
+ * A PROOF MAY CARRY WHAT WAS SAID after it (`#verify=<proof>&said=<words>`, put there by the host). It is taken with the
+ * proof, wiped with it, and kept for this page only, where `saidKept` finds it when this device kept none.
  */
 export function arrivalOf(hash: string, clear: () => void): Arrival {
-  const h = hash.startsWith('#') ? hash.slice(1) : hash;
+  const whole = hash.startsWith('#') ? hash.slice(1) : hash;
+  const amp = whole.indexOf('&');
+  const h = amp === -1 ? whole : whole.slice(0, amp);
   const eq = h.indexOf('=');
   const word = eq === -1 ? h : h.slice(0, eq);
   const value = eq === -1 ? '' : h.slice(eq + 1);
   if (word === 'verify' && /^[A-Za-z0-9_-]{43}$/.test(value)) {
     clear();
-    return { kind: 'verify', token: value };
+    const said = amp === -1 ? null : saidFromLink(new URLSearchParams(whole.slice(amp + 1)).get('said'));
+    if (said !== null) fromLink = said;
+    return { kind: 'verify', token: value, ...(said !== null ? { said } : {}) };
   }
   if (word === 'code' && CODE.test(value)) {
     clear();

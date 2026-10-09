@@ -800,7 +800,7 @@ const orList = (names: readonly string[]): string => (names.length < 2 ? (names[
 
 /* ── 2. runs with no project ─────────────────────────────────────────── */
 
-/** The last name of a place, as it was written, with no `.git`: `Encore_PREPROD`. */
+/** The last name of a place, as it was written, with no `.git`: `Lanternfish_PREPROD`. */
 const lastSpelled = (said: string): string =>
   said.trim().replace(/[\\/]+$/u, '').replace(/\.git$/iu, '').split(/[\\/:]+/u).filter((part) => part !== '').at(-1) ?? '';
 

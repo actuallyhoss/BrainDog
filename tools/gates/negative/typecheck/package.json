@@ -1,0 +1,8 @@
+{
+  "name": "planted-type-error",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "node ../../../../node_modules/typescript/bin/tsc --noEmit -p ."
+  }
+}

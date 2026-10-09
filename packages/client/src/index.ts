@@ -742,6 +742,15 @@ export type Restored = { bookmark: string; at: string; kept: string | null };
 /** `erase`: what the cascade touched, store by store. The subject is never in it. */
 export type EraseReport = { id: string; at: string; subjects: number; rows: number; counts: Record<string, number>; keys: number };
 
+/** One entry a capture keeps: the list it goes into, and its fields. */
+export type CaptureRow = { register: string; fields: Record<string, unknown> };
+
+/**
+ * What `capture` answers: the batch that takes them all back, and each entry made, in the order sent. The record's own
+ * `Captured` once it answers the method (`AnswerOr`), and this until then.
+ */
+export type Captured = { batch: string; made: { register: string; seq: number | null; title: string }[] };
+
 /**
  * What `understand` answers, the shape the client names until the record's own type reaches it (`AnswerOr`): one slice
  * of the nightly walk. `kinds` counts what it looked at and linked, payments, runs and services; `writes` is the first
@@ -1272,10 +1281,18 @@ export function createClient(options: ClientOptions) {
     /** Drafts Slash makes from a description, each with the rows it is drawn over; it spends the month's asks. ADMIN. */
     slashDraft: (asked: string, page?: string) =>
       call<Answer<'slashDraft'>>('slashDraft', page === undefined ? { asked } : { asked, page }),
-    create: (args: { register: string; fields: Record<string, unknown>; note?: string }) =>
+    /* `op_id` IS THE CALLER'S KEY FOR ONE WRITE (AGT-B05): the same create or update sent again with it, after an answer
+       that never arrived, lands once, and the record answers the first answer. */
+    create: (args: { register: string; fields: Record<string, unknown>; note?: string; op_id?: string }) =>
       call<unknown>('create', args as Record<string, unknown>),
-    update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) =>
+    update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string; op_id?: string }) =>
       call<unknown>('update', args as Record<string, unknown>),
+    /**
+     * One sentence kept as the one to eight entries it became, across lists, all or none, under one batch: `undo({ batch })`
+     * takes every one of them back. A field may be `{ "$row": n }`, the n-th entry of the same call, counted from 0.
+     */
+    capture: (args: { rows: readonly CaptureRow[]; op_id?: string }) =>
+      call<AnswerOr<'capture', Captured>>('capture', args as unknown as Record<string, unknown>),
 
     /* THE READ+ METHODS THE APP NEEDS AND HAD NO NAME FOR.
        `call(name, args)` already reached all of these — it validates the name against the table and
@@ -1283,6 +1300,11 @@ export function createClient(options: ClientOptions) {
        written against `call('governance', { … })` gets no help with the argument name and no error
        when the route is renamed, which is the whole reason the table is typed at all. */
     pages: () => call<unknown[]>('pages'),
+    /** Each page the caller may open, counted: what it holds, what it could not show, each placeholder naming nothing. */
+    pagesCensus: () => call<AnswerOr<'pagesCensus', unknown>>('pagesCensus'),
+    /** Each placeholder a document holds, and whether the record has anything by that name. It changes nothing. */
+    checkPaths: (args: { document: string; register?: string }) =>
+      call<AnswerOr<'checkPaths', { paths: { path: string; named: boolean }[] }>>('checkPaths', args as Record<string, unknown>),
     /**
      * One page, narrowed by the reader's own filter choices (a field to the value chosen). An empty filter is no filter.
      * `walk` is how far a forecast looks past the two years walked unasked, in days or to the `last` bill; it goes as

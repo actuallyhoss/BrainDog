@@ -60,7 +60,7 @@ of four codes (§4.4).
 | `page pull <slug>` | `--out <file>` · `--host <host>` | `GET /api/context`, then `GET /api/arrangement { page }`: READ+, the page's stored declaration as the caller may read it; for a page made from a template, the template's. The answer is read with `storedOf` from `@braindog/dog`, the reader the app's source view shares | writes `dogText` of the stored body to `<page>.dog` (or `--out`), the same bytes the app's source view shows and downloads, and prints `<page> written to <file>.`, or for a template's page `<slug> is one of the pages <template> makes, one for each row, so <template>'s source was written to <file>.`; the value is `{ page, file, version }`, with `template` for a template's page. A refusal is the record's sentence | 0 · 1 · 3 |
 | `page push <file>` | `--host <host>` | reads the file with `parseDog`, then `POST /api/setDeclaration { body }` with the body exactly as read. ADMIN, and the record's `admin()` refuses every token before it reads the arguments (ADR-060), so from this command it answers `Open this from the app; a token cannot change what this record is.` A file the parser refuses is never sent | `<page> pushed to <host>.`; the value is `{ page, host }`. A parse failure prints `<file>, line <n>: <sentence>` | 0 · 1 · 3 |
 | `page check <file>` | none | nothing on the network. Reads the file with `parseDog`, then the kernel's `validateDeclaration` on `page.<page>` with no installed state, so a `requires` naming a list nobody installed is not asked about | `<page> reads as a page. Nothing was sent.`; the value is `{ page, blocks }`. A parse failure prints `<file>, line <n>: <sentence>`; a declaration the kernel refuses prints the kernel's sentence | 0 · 1 |
-| `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
+| `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and sends it to the host's own `POST /mcp` with the bearer and the session headers, inside a 20-second budget (`bridge.ts`, AGT-A03); with the host away, the cached list answers and a tool call refuses | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7. A `create` or `update` carries an `op_id`, the app's or one the bridge makes when the host lists the argument, and a lost answer sends it once more with the same id, so it is one entry (AGT-B05). A read is never sent twice | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
 | `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source` or `reason`; what each event sends is the measured table under "The session hooks") | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file, then on `startup` or `resume` runs `skills sync` and `tools scan` in what is left of the 8 seconds, and last writes how long it took into the session file. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/end { branch, head }` (`POST /api/handoff { state: 'idle', branch, head }` only where the host has no `end`), all as the run the session file names. The start hook's time is sent as `POST /api/heard { kind: 'hook', ms, build }` by the next hook of the same session, sent beside the call it makes anyway, the next `attach` or the `end`: a small request of its own in parallel with that call, never waited for before it, and never one the start hook makes | `start`: the card: Next, Waiting, Learned and More, each left out when empty, plus an Also line only when another run is working in the repository; three items a slot, 1,500 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
 | `install` | `--apply` · `--config-dir <folder>` (repeatable) | nothing on the network; reads `<profile>/settings.json`, where the profile is each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude` | each entry it would add, as `+ hooks.<Event>: <json>`, then the `claude mcp add-json` line that registers `mcp`. With `--apply` it writes them, after copying the file to `settings.json.bak`, or the first free `.bak<n>` | 0 · 1 when a settings file is not JSON or not the settings shape, and then nothing is written |
 | `init <slug>` | self-host only | spawns the self-host entry: `init <slug>` (§5.14) | the child's output | the child's |
@@ -602,6 +602,67 @@ bytes; T13 is the proof, and the interface-agreement audit reconciles any drift 
 3. `admin(host, 'import', lines, 'import', `import ${record_slug} (${rows} rows)`)` through `send()` — one body, `text/plain`. The host reads it whole and calls `importBrainl(lines, ctx)` (41 §5.11): `IMPORT_NOT_EMPTY`, `FORMAT_NEWER_THAN_READER`, `CHECKSUM_MISMATCH`, `SIGNATURE_INVALID`, `SCHEMA_NEWER` come back as refusals, and a refused or cut import writes nothing (41 §5.11 step 6).
 4. Print `imported <tables> tables, <rows> rows · event <id>`. The record rebuilds `entry_fts` and writes the one `import` event; the CLI does neither.
 
+### 5.8a · `import --map <map.json> <export.json>`, a map that is data (`adapter.ts`, REC-A12)
+
+Another tool's export comes in through `braindog import`, and an export that is one JSON object needs no code: a map
+file says which of its paths become which rows. `mapAdapter` reads the map as the adapter, so the command is
+`braindog import --map <map.json> <export.json> [--dry-run] [--strict] [--host <host>]`. A module beside a map
+(`braindog import <adapter> <export.json> --map <map.json>`) stays for what a map cannot say.
+
+**The map.** One JSON object:
+
+```json
+{
+  "source": "Tallybook",
+  "key": "tallybook:",
+  "taken": "saved",
+  "sections": {
+    "people": { "register": "people", "name": "People", "key": "id", "label": "name", "kind": "person", "fields": { "name": "name" } },
+    "book.accounts": {
+      "register": "accounts", "name": "Accounts", "key": "id", "label": "name", "kind": "account",
+      "fields": {
+        "name": "name",
+        "kind": { "from": "type", "as": "one of", "values": { "Cash": "cash", "Bank": "bank" }, "else": "bank" },
+        "balance": { "from": "balance", "as": "money", "currency": "cur" },
+        "as_of": { "from": "on", "as": "day" }
+      }
+    },
+    "items": {
+      "register": "tasks", "name": "Tasks", "key": "id", "label": "what",
+      "fields": { "what": "what", "by": { "from": "due", "as": "day" }, "owner": { "from": "who", "as": "link", "to": "people" } }
+    }
+  }
+}
+```
+
+- `source` is what the report calls the tool; `key` the prefix of every key the import plans (`import:` when left
+  out); `taken` the path of the day the export was taken, when it says.
+- Each key of `sections` is a path of one or two names (`items`, `book.accounts`). What sits there is a list of items,
+  or an object of items by their key. The lists are written in the order the sections name them, so a section that
+  others link to comes first.
+- A section names the list it fills (`register`, required) and what the report calls it (`name`); the field each item
+  is found again by (`key`, required, or `$key` for the name it sits under); the field the report names an item by
+  (`label`, the key when left out); and `kind`, one word in small letters between the prefix and the item's key (the
+  path's last name when left out). A second import finds each row again by that key, so nothing arrives twice.
+- `fields` maps each field of the list to how a value moves. A string is the export's field, carried as text. An
+  object names `from` and `as`, one of five words:
+  - `text`: carried as written.
+  - `day`: the first ten characters of a date.
+  - `money`: an amount and its currency, written in minor units. `currency` is the item's field holding the code, or
+    `in` the one currency the whole section is in; `minor: true` when the export already holds minor units. Two
+    currencies are never added.
+  - `link`: the key of an item in another section (`to`, its path). A key that section does not hold arrives without
+    the link, and the report says which.
+  - `one of`: the export's word turned into the list's by `values`. A word the table has not got is proposed to the
+    list and carried as `else` until it lands.
+
+**What it does.** The plan is the same as an adapter's: `--dry-run` prints it and writes nothing. A row deleted in the
+record is never written again, and the report says so. A value that cannot move is left out with its reason, one
+line per reason. Every part of the export no section read is named, one line each: "Not read: <section>, 14 items."
+With `--strict` an import that leaves any part unread writes nothing, so a map is finished before it is trusted. A map
+that is wrong is refused before anything is read, in one sentence naming the field (`sections.items in map.json names
+the list it fills ("register").`). A map with no `sections` needs an adapter beside it, and says so.
+
 ### 5.9 · `--mirror` (`mirror`)
 
 1. Read active register declarations: `SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0`; `body.title` names the title field; `body.fields[]` give ids and types in declared order.
@@ -988,7 +1049,7 @@ cover `mcp`. `brief.test.ts` covers the card with no host:
 - `ponytail:` one browser approval per ADMIN command on Cloud; unattended Cloud export or install is ADR-060's signed single-use plan hash, not a stored scope — add when a customer scripts it.
 - `ponytail:` `import` is one request body, so a record above the host's request ceiling (100 MB on the Worker) cannot move through the CLI until 41 pages `importBrainl`; a self-host has no such ceiling.
 - `ponytail:` a CLI-built `.brain` carries the kernel's indexes, not the declarations' (`entry_i_*`); `import` recreates them. Add `kernel.rebuildIndexes` here when someone opens such a file live.
-- `ponytail:` no HTTP retries outside the runner loop; add a bounded retry on `Unreachable` if flaky networks show up in bug reports.
+- `ponytail:` no HTTP retries outside the runner loop and the bridge's one retry of a write carrying an `op_id` (§2, `mcp`); add a bounded retry on `Unreachable` if flaky networks show up in bug reports.
 - `ponytail:` `export --with-grants` (03 §5) is not a v1 flag — a passphrase re-wrap is a Worker act; add when the vault passphrase ships.
 - `ponytail:` `pack install --force` for a downgrade that orphans rows (04 §5) is not a v1 flag; the record refuses the downgrade until the code exists.
 - `ponytail:` the paste source of 04 §3 is the app's; the CLI takes a path, a URL, a `git:` ref or a Kennel id.

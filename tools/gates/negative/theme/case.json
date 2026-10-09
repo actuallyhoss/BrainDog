@@ -1,0 +1,7 @@
+{
+  "gate": "theme",
+  "rule": "a primary button's label under 4.5 to 1 on its own colour",
+  "expect": "label on a primary button.*needs 4\\.5:1",
+  "findings": 1,
+  "why": "THE FIRST THING THE THEME GATE HAS EVER BEEN SHOWN TO REFUSE. `--check` validated only what the seed generates, and the generator solves every palette to pass before it is written, so a broken check would have read green on every run. `tokens.json` is the house theme with one value off: the light label on a primary button, `on-action`, moved from white to a light grey, which is 3.46 to 1 on `action` and still clears the darker hover. One pair under contrast, so one refusal, and the count proves the check names that pair and not every pair the label touches. Run as `packages/skin/scripts/theme.mjs --check --tokens tokens.json`, which `self-test.mjs` does for every tree whose gate lives outside this directory."
+}

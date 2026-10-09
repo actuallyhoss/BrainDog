@@ -47,9 +47,9 @@ test('A SESSION WITH NO RUN IS MARKED AGAINST ITS KEY, opens no run, and moves a
   const before = ok<{ said: string }>(await api.doorSigns({}, owner));
   assert.equal(before.said, 'Sessions that connected in the last 7 days: 0. Given the tools: 0. Made a call: 0.');
   const events = sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM event')!.n;
-  ok(await api.heard({ kind: 'hello', build: '0.9.2', client: 'claude-code 2.1.4' }, agent('c-1')));
-  ok(await api.heard({ kind: 'listed', n: 16 }, agent('c-1')));
-  ok(await api.heard({ kind: 'called', n: 2 }, agent('c-1')));
+  ok(await api.doorHeard({ kind: 'hello', build: '0.9.2', client: 'claude-code 2.1.4' }, agent('c-1')));
+  ok(await api.doorHeard({ kind: 'listed', n: 16 }, agent('c-1')));
+  ok(await api.doorHeard({ kind: 'called', n: 2 }, agent('c-1')));
   assert.equal(runs(sql), 0, 'a mark opened a run');
   assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM event')!.n, events, 'a mark wrote a line of history');
   assert.deepEqual(marks(sql), [
@@ -69,7 +69,7 @@ test('A SESSION WITH A RUN IS MARKED AGAINST THAT RUN, by its name, and a read-o
   ok(await api.attach({ source: 'startup' }, agent('c-2')));
   assert.equal(runs(sql), 1);
   ok(await api.heard({ kind: 'hook', ms: 420 }, agent('c-2')));
-  ok(await api.heard({ kind: 'hello' }, agent('c-3', 'read')));
+  ok(await api.doorHeard({ kind: 'hello' }, agent('c-3', 'read')));
   assert.equal(runs(sql), 1, 'the read-only session was given a run by its mark');
   const rows = marks(sql);
   assert.ok(rows.some((r) => /^S\d+$/.test(r.run) && r.kind === 'hook'), JSON.stringify(rows));
@@ -83,9 +83,9 @@ test('A WRONG KEY, KIND OR VALUE IS REFUSED IN ONE SENTENCE that names the fix, 
   assert.equal(stray.code, 'FIELD_UNKNOWN');
   assert.equal(stray.fix, 'count is not something heard takes. It takes kind, n, ms, build, client.');
   assert.equal(refused(await api.heard({ kind: 'listen' }, agent('c-1'))).code, 'ENUM_VALUE_UNKNOWN');
-  assert.equal(refused(await api.heard({ kind: 'called', n: -1 }, agent('c-1'))).code, 'VALUE_MALFORMED');
+  assert.equal(refused(await api.doorHeard({ kind: 'called', n: -1 }, agent('c-1'))).code, 'VALUE_MALFORMED');
   assert.equal(refused(await api.heard({ kind: 'hook', ms: 1.5 }, agent('c-1'))).code, 'VALUE_MALFORMED');
-  assert.equal(refused(await api.heard({ kind: 'hello', build: 'x'.repeat(81) }, agent('c-1'))).code, 'OUT_OF_BOUNDS');
+  assert.equal(refused(await api.doorHeard({ kind: 'hello', build: 'x'.repeat(81) }, agent('c-1'))).code, 'OUT_OF_BOUNDS');
   assert.equal(refused(await api.heard(undefined, agent('c-1'))).code, 'VALUE_MALFORMED');
   assert.deepEqual(marks(sql), []);
   sql.close();
@@ -98,7 +98,7 @@ test('THE SIGNS ARE THE WHOLE RECORD’S: one held to a list is told so, one who
   assert.equal(refused(await api.doorSigns({}, narrow)).code, 'FORBIDDEN');
   assert.equal(refused(await api.doorSigns({}, adder)).code, 'LEVEL_REQUIRED');
   /* An appender may still leave a mark about her own connection: a mark is not a read. */
-  ok(await api.heard({ kind: 'hello' }, adder));
+  ok(await api.doorHeard({ kind: 'hello' }, adder));
   /* The agent on the owner's key reads them, and days narrows the window, within the 30 the marks are kept. */
   assert.match(ok<{ said: string }>(await api.doorSigns({ days: 1 }, agent('c-1'))).said, /^Sessions that connected in the last day: 1\./);
   assert.match(ok<{ said: string }>(await api.doorSigns({ days: '30' }, owner)).said, /last 30 days/);

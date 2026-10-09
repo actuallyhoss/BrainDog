@@ -1,0 +1,7 @@
+{
+  "gate": "self-test",
+  "rule": "a registered gate with no planted fault",
+  "expect": "registered in run\\.mjs with no planted fault",
+  "findings": 1,
+  "why": "THE GUARD OF THE RULE EVERY OTHER TREE IS COUNTED BY (PRF-B02). This tree is a repository in miniature: a `tools/gates/run.mjs` registering three gates, and a `negative/` whose one tree plants a fault for one of them. `self-test` itself is excused, `em-dash` has its tree, and `unplanted` has none, so the rule must name `unplanted` and nothing else. It is asked in the same process rather than by spawning `self-test.mjs` on the tree, because a self-test that ran itself would run every gate's negative again from inside itself; the tree's inner case is read and never run."
+}

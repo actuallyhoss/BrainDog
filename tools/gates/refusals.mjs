@@ -14,17 +14,18 @@
  * teaches itself from a code that is stable across versions. With nothing closing the list, the first
  * audit counted **51 of the 99 emitted, 48 emitted by nothing, and 24 more outside the registry**.
  *
- * WHAT THIS GATE DOES, AND WHY IT IS A BUDGET RATHER THAN A RULE. Typing the field `RefusalCode`
+ * WHAT THIS GATE DOES, AND WHY IT IS A HELD LIST RATHER THAN A RULE. Typing the field `RefusalCode`
  * against a tree carrying codes the registry has never heard of does not compile, and the twenty-four
  * were three different things wearing one number: concepts `30 §6` was missing and should gain by
  * amendment (`ROUTE_UNKNOWN`, `PAGE_UNKNOWN`); codes that already existed under another name
  * (`RECORD_NOT_EMPTY`, `WHERE_UNSUPPORTED`); and placeholders that should not exist at all
  * (`UNIMPLEMENTED`, `INTERNAL`, `SOMETHING_NOBODY_MAPPED`). Telling those apart is a judgement per
- * site, not a rename. A budget that may only go down measures the drift, makes the next invented
- * code red today, and lets the type narrow the day it reaches zero.
+ * site, not a rename. A list that may only shrink measures the drift, makes the next invented
+ * code red today, and lets the type narrow the day it is empty. It was a budget of four until
+ * PRF-B03; it is now four deviations named in `ledger.json`, each by the code it stands for.
  *
- * The 2026-09-08 pass took it from twenty-four to seven, and the arithmetic is in the budget's own
- * comment below: eleven renames, thirteen amendments to `30 §6` (including a ninth family, `Host and
+ * The 2026-09-08 pass took it from twenty-four to seven, and the arithmetic is in the comment over
+ * the named deviations below: eleven renames, thirteen amendments to `30 §6` (including a ninth family, `Host and
  * client`, for the boundary a request arrives through) and three placeholders given the refusal
  * they were standing in front of. Two of the seven that remain are test fixtures that SHOULD stay,
  * so the honest floor is above zero and the comment says which two and why.
@@ -43,6 +44,52 @@ import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { skipDir } from './lib.mjs';
+
+/** `ledger.json` beside this file, the gate's own: a seeded tree `self-test` aims this gate at holds none. */
+export function readLedger(at = fileURLToPath(new URL('./ledger.json', import.meta.url))) {
+  try {
+    return JSON.parse(readFileSync(at, 'utf8'));
+  } catch (e) {
+    return new Error(`tools/gates/ledger.json could not be read: ${String(e?.message ?? e).split('\n')[0]}`);
+  }
+}
+
+/** The refusal codes the ledger names as deviations, each line's `id` the code it stands for. An Error says what is wrong. */
+export function refusalDeviations(book) {
+  if (book instanceof Error) return book;
+  const list = book?.deviations?.refusals;
+  if (!Array.isArray(list))
+    return new Error('ledger.json has no `deviations.refusals` list, so no code outside 30 §6 is named and the walk has nothing to hold to');
+  const nameless = list.filter((d) => typeof d?.id !== 'string' || !/^[A-Z][A-Z0-9_]*$/u.test(d.id));
+  if (nameless.length > 0)
+    return new Error(`ledger.json's deviations.refusals has ${nameless.length} line(s) with no code in \`id\`. A deviation is the code it stands for`);
+  return list;
+}
+
+/**
+ * The walk held to the named deviations, both ways. A code outside the registry with no line is red and names itself
+ * with its sites; a line whose code nothing raises any more is red until it leaves the ledger.
+ *
+ * @param {Map<string, string[]>} invented  each code outside `30 §6`, with the sites that raise it
+ * @param {{ id: string }[]} named          `deviations.refusals` from `ledger.json`
+ */
+export function outsideTheLedger(invented, named) {
+  const findings = [];
+  const ids = new Set(named.map((d) => d.id));
+  const unnamed = [...invented.keys()].filter((code) => !ids.has(code)).sort();
+  if (unnamed.length > 0) {
+    findings.push(`${invented.size} refusal codes are outside 30 §6's registry, and ledger.json names ${ids.size} deviation(s)`);
+    for (const code of unnamed)
+      findings.push(
+        `  \`${code}\` is outside the registry and is no named deviation: ${[...new Set(invented.get(code))].slice(0, 3).join(', ')}.` +
+          ' Raise a code of 30 §6, or amend 30 §6.',
+      );
+  }
+  for (const id of [...ids].sort())
+    if (!invented.has(id))
+      findings.push(`\`${id}\` is a named deviation in ledger.json, and nothing raises it outside the registry now. Delete its line there.`);
+  return findings;
+}
 
 /**
  * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned: `52 §5.1` step 3, argued in
@@ -429,60 +476,32 @@ export default function refusals(
   }
 
   /**
-   * The budget: four, and it may only go down.
+   * THE FOUR NAMED DEVIATIONS, AND NO NUMBER (PRF-B03 job 4). This was a budget of four written in this file, against
+   * the first line of `budgets.json`, which says every number a gate is held to lives there. And a count can stay four
+   * while what it counts changes: a fixture that left and a new invented code in its place read as the same four. So
+   * the four are lines in `ledger.json` under `deviations.refusals`, each the code it stands for, what it is, why it is
+   * left and the unit that ends it, and this gate holds the walk to that list by name (`outsideTheLedger` below):
    *
-   * IT SAID FIVE WHILE THE CONSTANT SAID FOUR. The ratchet below is enforced in both directions, so
-   * the number in the code cannot go slack, and the number in this sentence had gone slack anyway by
-   * being written twice. Four is the arithmetic of the list further down: seven remained after the
-   * 2026-09-08 pass, three of those are marked GONE, and the four rows with no such mark are the
-   * four the gate counts.
+   *   - a code outside `30 §6` that is no named deviation is red, and the finding names it and its sites;
+   *   - a named deviation that nothing raises any more is red too, until its line leaves the ledger, so the list only
+   *     shrinks and never goes slack.
    *
-   * Each of these is one of three things and the gate cannot tell which: a concept `30 §6` is missing
-   * and should gain by amendment; a code that already exists under another name; or a placeholder
-   * standing in for a refusal nobody has written. All three are fixed by a person reading the site.
-   * What a gate can do is stop the number growing while that happens.
-   *
-   * TWENTY-SIX WERE SORTED ON 2026-09-08 AND SEVEN ARE LEFT. Six were renames onto codes that already
-   * existed and five onto new codes whose old names were wrong about their own subject: `UNIMPLEMENTED`
-   * and `NOT_IMPLEMENTED` name nothing at all, and `SCHEMA_UNAVAILABLE` involved no schema. Thirteen
-   * concepts `30 §6` genuinely lacked were admitted by amendment, including a ninth family for the
-   * boundary a request arrives through, which this document had never had. The seven that remain, each
-   * for a stated reason rather than for want of a decision:
-   *
-   *   `DECLARATION_INVALID` (32)  the catch-all `declare.ts` leans on. A project of its own, and it is
-   *                               the one number here that measures how much validation has no word.
-   *   `INTERNAL` (3)              a handler that threw. NOT a refusal: it names no field and no
-   *                               expectation, and there is nothing a caller can fix, so `30 §6`
-   *                               deliberately does not carry it. It is emitted identically by both
-   *                               hosts and the Worker, and moving fewer than three of them would buy
-   *                               a lower number here and a product that answers differently
-   *                               depending on where a customer runs it.
-   *   `RECORD_NOT_EMPTY` GONE, 2026-09-10, in the one line this row said it would take. `seed`'s
-   *                               was the last site, the kernel's import had already moved, both map
-   *                               to 422, and nothing in this tree asserted on the old spelling.
-   *   `WHERE_OPERATOR_UNSUPPORTED` GONE, 2026-09-10, and it had TWO sites rather than the one
-   *                               recorded here: the rule linter's `each:` over a field that is
-   *                               neither list nor enum, now `MATCH_OP_UNSUPPORTED`; and a
-   *                               cursor-plus-order conflict in `list` that was not about a `where`
-   *                               operator at all, now `VALUE_MALFORMED` at `cursor`. The count in
-   *                               this table is of CODES and the drift is in SITES, which is how the
-   *                               second one stayed invisible to the gate that measures the first.
-   *   `SCOPE_INSUFFICIENT` GONE, 2026-09-10. `FORBIDDEN` with the remedy in the sentence, exactly as
-   *                               `PERSON_REQUIRED` now is. Its one site was a ternary in `record`'s
-   *                               `allows`, now two returns, and the assertions moved with it: one in
-   *                               `mcp`'s tests and three in `record`'s.
-   *   `NOPE` (2) · `SOMETHING_NOBODY_MAPPED` (1)  test fixtures, and both are LEFT ON PURPOSE. The
-   *                               first is a stub refusal in a transaction test where the code is not
-   *                               what is asserted; the second is the subject of its own test,
-   *                               *"a code nobody enumerated is still a 422"*, and replacing it with
-   *                               a real code would delete the assertion. These two are the honest
-   *                               floor: the budget cannot reach zero without making a test worse,
-   *                               which is worth knowing before somebody tries.
+   * THE HISTORY OF THE FOUR. Twenty-six were sorted on 2026-09-08 and seven were left. Six were renames onto codes that
+   * already existed and five onto new codes whose old names were wrong about their own subject (`UNIMPLEMENTED` and
+   * `NOT_IMPLEMENTED` name nothing; `SCHEMA_UNAVAILABLE` involved no schema). Thirteen concepts `30 §6` lacked were
+   * admitted by amendment, a ninth family for the boundary a request arrives through among them. Three of the seven went
+   * on 2026-09-10: `RECORD_NOT_EMPTY` (seed's was the last site); `WHERE_OPERATOR_UNSUPPORTED`, which had two sites and
+   * not the one recorded, now `MATCH_OP_UNSUPPORTED` and `VALUE_MALFORMED` at `cursor`, and which is how a count of
+   * CODES hid drift in SITES; and `SCOPE_INSUFFICIENT`, now `FORBIDDEN` with the remedy in the sentence. The four left
+   * are the ledger's: `DECLARATION_INVALID`, `INTERNAL`, and two test fixtures, `NOPE` and `SOMETHING_NOBODY_MAPPED`,
+   * which are the honest floor: the list cannot reach empty without making a test worse.
    */
-  const BUDGET = 4;
+  const deviations = refusalDeviations(readLedger());
+  if (deviations instanceof Error) findings.push(deviations.message);
+  const held = deviations instanceof Error ? [] : deviations;
   const codes = [...invented.keys()].sort();
   /**
-   * THE BUDGET IS A STATEMENT ABOUT THE WHOLE REPOSITORY, so it is measured when the whole
+   * THE DEVIATIONS ARE A STATEMENT ABOUT THE WHOLE REPOSITORY, so it is measured when the whole
    * repository was walked and not otherwise. A fixture root holds a document, an array and at most
    * one package, so counting emitted codes there measures nothing, and the slack rule below would
    * report every fixture as an improvement. A gate that is red on its own negatives for the wrong
@@ -493,7 +512,7 @@ export default function refusals(
    * week, so no real run has ever come near it, and the number was really asking "am I pointed at a
    * fixture?" in a
    * spelling that could also answer yes to a walk that had broken. A root with fifty-one source
-   * files measured the budget and went red; the same root with fifty went green and said nothing had
+   * files measured the deviations and went red; the same root with fifty went green and said nothing had
    * been dropped. One file decided whether two checks existed.
    *
    * THE TEST IS NOW WHAT IT MEANT: `packages`, `apps` and `tools` all present and all walked. Those
@@ -508,13 +527,10 @@ export default function refusals(
    * missing was the sentence.
    */
   const measured = walked.length === TREES.length;
-  if (measured && codes.length > BUDGET) {
-    findings.push(`${codes.length} refusal codes are outside 30 §6's registry; the budget is ${BUDGET}`);
-    for (const code of codes.slice(0, 30)) findings.push(`  \`${code}\`: ${[...new Set(invented.get(code))].slice(0, 3).join(', ')}`);
-  }
+  if (measured) findings.push(...outsideTheLedger(invented, held));
 
   /* AND THE TWO PREDICATES HAVE TO AGREE, measured only on a whole-tree walk for the same reason the
-     budget is: a fixture root holds one package and the question means nothing there. */
+     deviations are: a fixture root holds one package and the question means nothing there. */
   if (measured)
     for (const [code, where] of [...named].sort())
       if (!emitted.has(code))
@@ -523,11 +539,6 @@ export default function refusals(
             '        Either a refusal is raised by a shape the pattern above cannot see, or a test asserts on a code\n' +
             '        no line ever raises. Read the sites, then widen the pattern or delete the assertion.',
         );
-
-  /* AND THE BUDGET IS NOT ALLOWED TO BE SLACK EITHER. A budget nobody lowers is a budget that stops
-     meaning anything; when the count drops, this says so and asks for the number to come with it. */
-  if (measured && codes.length < BUDGET)
-    findings.push(`only ${codes.length} codes are outside the registry now. Lower the budget from ${BUDGET} to ${codes.length}`);
 
   if (findings.length === 0) {
     console.log(`  refusals: ${table.length} codes in ${FAMILIES.length} families, three sources agree`);
@@ -538,11 +549,11 @@ export default function refusals(
     if (measured)
       console.log(
         `  refusals: ${scanned} sources in ${TREES.join(', ')}; ${emitted.size} emitted, ` +
-          `${table.length - emitted.size} by nothing, ${codes.length} outside the list against a budget of ${BUDGET}`,
+          `${table.length - emitted.size} by nothing, ${codes.length} outside the list, each a named deviation in the ledger (${codes.join(', ')})`,
       );
     else
       console.log(
-        `  refusals: ${scanned} source(s) walked and ${emitted.size} emitted, and the ${BUDGET}-code budget was NOT measured, ` +
+        `  refusals: ${scanned} source(s) walked and ${emitted.size} emitted, and the ${held.length} named deviations were NOT measured, ` +
           `because this root has no ${TREES.filter((t) => !walked.includes(t)).join(' and no ')}`,
       );
   } else {

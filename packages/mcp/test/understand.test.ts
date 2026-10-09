@@ -19,16 +19,16 @@ import { stub } from './stub.ts';
 const NOW = Date.UTC(2026, 9, 6, 9);
 const FOLD = '01M345FTM0D4F495AW6K6NDA09';
 const KEPT = '01M345FTM0D4F495AW6K6NDA06';
-const ENCORE = '01M345FTM0D4F495AW6K6NDAF1';
-const LENS = '01M345FTM0D4F495AW6K6NDAC2';
+const LANTERNFISH = '01M345FTM0D4F495AW6K6NDAF1';
+const COPPERLEAF = '01M345FTM0D4F495AW6K6NDAC2';
 
 const TITLES = new Map([
-  ['O1', 'Encore'],
-  ['things#2', 'Prism'],
+  ['O1', 'Lanternfish'],
+  ['things#2', 'Copperleaf'],
   ['transactions#4', 'Chillout'],
   ['transactions#9', 'Talabat'],
 ]);
-const look: Look = { now: NOW, decl: () => undefined, title: (s) => TITLES.get(s), actor: (by) => by, decider: 'Sam' };
+const look: Look = { now: NOW, decl: () => undefined, title: (s) => TITLES.get(s), actor: (by) => by, decider: 'Mara' };
 
 /* ── the words of a question ────────────────────────────────────────────── */
 
@@ -83,47 +83,47 @@ test('A NEGATIVE HALF ROUNDS AWAY FROM ZERO, as a positive one does', () => {
 
 test('MEET SAYS WHAT HAPPENED IN NAMES, with how it matched and the handle last', () => {
   assert.equal(
-    metBrief({ person: 'P6', name: 'Priya Raman', created: false, how: 'email', with: ['Encore', 'Prism'] }, look),
-    'Matched Priya Raman (Encore, Prism) by email · P6',
+    metBrief({ person: 'P6', name: 'Teodor Vance', created: false, how: 'email', with: ['Lanternfish', 'Copperleaf'] }, look),
+    'Matched Teodor Vance (Lanternfish, Copperleaf) by email · P6',
   );
-  assert.equal(metBrief({ created: false, mention: true, said: 'Ahmed', on: 'Encore' }, look), 'Noted Ahmed on Encore; add an email or handle to add them');
+  assert.equal(metBrief({ created: false, mention: true, said: 'Priya', on: 'Lanternfish' }, look), 'Noted Priya on Lanternfish; add an email or handle to add them');
   assert.equal(
     metBrief({ created: false, mention: true, said: 'Chillout', kind: 'organisation' }, look),
     'Noted Chillout; add a domain or bank payee to add it',
   );
   assert.equal(
-    metBrief({ person: 'P7', name: 'Rohan Mehta', created: false, question: 'SG7', with: ['Encore'] }, look),
-    'Maybe Rohan Mehta (Encore): asked Sam on Decide · P7 · SG7',
+    metBrief({ person: 'P7', name: 'Joaquin Herrera', created: false, question: 'SG7', with: ['Lanternfish'] }, look),
+    'Maybe Joaquin Herrera (Lanternfish): asked Mara on Decide · P7 · SG7',
   );
-  assert.equal(metBrief({ person: 'P12', name: 'Dario', created: true, linked: true }, look), 'Added Dario to your project · P12');
+  assert.equal(metBrief({ person: 'P12', name: 'Wren', created: true, linked: true }, look), 'Added Wren to your project · P12');
   /* A ROW WITH NO WORDS IS SAID BY ITS HANDLE ONCE. */
   assert.equal(metBrief({ person: 'P6', created: false, how: 'email' }, look), 'Matched P6 by email');
   /* A QUESTION THE RECORD SENT AS WORDS ALONE, with no handle, is still said; and one with no words says what it asks. */
   assert.equal(
-    metBrief({ person: 'P7', name: 'Rohan Mehta', created: false, asked: 'Are Rohan Mehta and rohanmehta one person?' }, look),
-    'Maybe Rohan Mehta: asked Sam on Decide: Are Rohan Mehta and rohanmehta one person? · P7',
+    metBrief({ person: 'P7', name: 'Joaquin Herrera', created: false, asked: 'Are Joaquin Herrera and joaquinherrera one person?' }, look),
+    'Maybe Joaquin Herrera: asked Mara on Decide: Are Joaquin Herrera and joaquinherrera one person? · P7',
   );
   assert.equal(
     metBrief({ person: 'P9', name: 'Ann Lee', created: true, question: 'SG7' }, look),
-    'Added Ann Lee; asked Sam on Decide whether they are someone already met · P9 · SG7',
+    'Added Ann Lee; asked Mara on Decide whether they are someone already met · P9 · SG7',
   );
   assert.equal(
-    metBrief({ person: 'P6', name: 'Sam Avery', created: false, how: 'email', merged_from: 'P9', merged_name: 'Ahmed H.' }, look),
-    'Matched Sam Avery by email; Ahmed H. (P9) was merged into them · P6',
+    metBrief({ person: 'P6', name: 'Priya Raman', created: false, how: 'email', merged_from: 'P9', merged_name: 'Priya R.' }, look),
+    'Matched Priya Raman by email; Priya R. (P9) was merged into them · P6',
   );
   /* THE RECORD'S STRONG RULES FOLDED A NEW ROW INTO ONE KNOWN: said as the merge it is, with whose Undo it is. */
   assert.equal(
-    metBrief({ person: 'P7', name: 'Rohan Mehta', created: false, matched_by: 'strong', how: 'name and address or organisation', with: ['Encore'] }, look),
-    'Merged into Rohan Mehta (Encore) by name and address or organisation; Sam can undo it in BrainDog · P7',
+    metBrief({ person: 'P7', name: 'Joaquin Herrera', created: false, matched_by: 'strong', how: 'name and address or organisation', with: ['Lanternfish'] }, look),
+    'Merged into Joaquin Herrera (Lanternfish) by name and address or organisation; Mara can undo it in BrainDog · P7',
   );
 });
 
 test('HOW IT MATCHED IS THE KIND OF KEY, never the key', () => {
-  assert.equal(matchedHow({ created: false, matched_by: 'key' }, { email: 'priya@encore.example' }), 'email');
-  assert.equal(matchedHow({ created: false, matched_by: 'key' }, { handle: 'github:priya' }), 'GitHub handle');
+  assert.equal(matchedHow({ created: false, matched_by: 'key' }, { email: 'teo@lanternfish.example' }), 'email');
+  assert.equal(matchedHow({ created: false, matched_by: 'key' }, { handle: 'github:teo' }), 'GitHub handle');
   assert.equal(matchedHow({ created: false, matched_by: 'key' }, { kind: 'organisation', keys: ['bank:GEIDEA*CHILLOUT'] }), 'bank payee');
-  assert.equal(matchedHow({ created: false, matched_by: 'key', key: 'domain:encore.example' }, { email: 'x@encore.example' }), 'domain');
-  assert.equal(matchedHow({ created: false, matched_by: 'strong' }, { name: 'Rohan Mehta' }), 'name and address or organisation');
+  assert.equal(matchedHow({ created: false, matched_by: 'key', key: 'domain:lanternfish.example' }, { email: 'x@lanternfish.example' }), 'domain');
+  assert.equal(matchedHow({ created: false, matched_by: 'strong' }, { name: 'Joaquin Herrera' }), 'name and address or organisation');
   assert.equal(matchedHow({ created: true }, { email: 'a@b.co' }), null);
   /* THE OLDER ANSWER, `{ person, created }`, matched by the email the call sent. */
   assert.equal(matchedHow({ person: 'people#1', created: false }, { email: 'a@b.co', handle: 'github:a' }), 'email');
@@ -151,8 +151,8 @@ const PEOPLE_SCHEMA = {
   ],
 };
 const ROWS: Record<string, ReturnType<typeof entry>> = {
-  [FOLD]: entry(FOLD, 9, { name: 'Ahmed H.', merged_into: KEPT }),
-  [KEPT]: entry(KEPT, 6, { name: 'Sam Avery', org: ENCORE, projects: [LENS] }),
+  [FOLD]: entry(FOLD, 9, { name: 'Priya R.', merged_into: KEPT }),
+  [KEPT]: entry(KEPT, 6, { name: 'Priya Raman', org: LANTERNFISH, projects: [COPPERLEAF] }),
 };
 const surfaceOf = (met: Record<string, unknown>) =>
   stub({
@@ -164,32 +164,32 @@ const surfaceOf = (met: Record<string, unknown>) =>
       return { ok: true, value: (id && ROWS[id]) ?? null } as never;
     },
     list: async (args: { register: string; where?: { in?: string[] } }) => {
-      const names: Record<string, { name: string; seq: number }> = { [ENCORE]: { name: 'Encore', seq: 1 }, [LENS]: { name: 'Prism', seq: 2 } };
+      const names: Record<string, { name: string; seq: number }> = { [LANTERNFISH]: { name: 'Lanternfish', seq: 1 }, [COPPERLEAF]: { name: 'Copperleaf', seq: 2 } };
       const rows = (args.where?.in ?? []).filter((id) => names[id]).map((id) => ({ id, register: args.register, seq: names[id]!.seq, version: 1, fields: { name: names[id]!.name } }));
       return { ok: true, value: { rows } } as never;
     },
   }).surface;
 
 test('MEET FOLLOWS A MERGED ROW TO THE ONE KEPT and says them by name, from the contract\'s answer', async () => {
-  const mcp = tools(surfaceOf({ row: { register: 'people', id: FOLD, seq: 9, name: 'Ahmed H.' }, created: false, matched_by: 'key' }));
-  const said = await mcp.answer('meet', { name: 'Ahmed', email: 'ahmed@encore.example', where: 'commit 4464966 in braindog' }, { who: 'agent' });
+  const mcp = tools(surfaceOf({ row: { register: 'people', id: FOLD, seq: 9, name: 'Priya R.' }, created: false, matched_by: 'key' }));
+  const said = await mcp.answer('meet', { name: 'Priya', email: 'priya@lanternfish.example', where: 'commit 4464966 in braindog' }, { who: 'agent' });
   const value = said.result.ok ? (said.result.value as Record<string, unknown>) : {};
   assert.equal(value.person, 'P6');
-  assert.equal(value.name, 'Sam Avery');
+  assert.equal(value.name, 'Priya Raman');
   assert.equal(value.merged_from, 'P9');
   assert.doesNotMatch(JSON.stringify(value), /[0-9A-HJKMNP-TV-Z]{26}/u, 'the answer carried a row id');
-  assert.equal(said.text, 'Matched Sam Avery (Encore, Prism) by email; Ahmed H. (P9) was merged into them · P6');
+  assert.equal(said.text, 'Matched Priya Raman (Lanternfish, Copperleaf) by email; Priya R. (P9) was merged into them · P6');
 });
 
 test('A NAME ALONE IS NOTED, and the answer says what would add them', async () => {
   const mcp = tools(
     stub({
       meet: async () => ({ ok: true, value: { row: null, created: false, matched_by: 'none', mention: true } }),
-      context: async () => ({ ok: true, value: { project: { spoken: 'things#1', name: 'Encore' } } }) as never,
+      context: async () => ({ ok: true, value: { project: { spoken: 'things#1', name: 'Lanternfish' } } }) as never,
     }).surface,
   );
-  const said = await mcp.answer('meet', { name: 'Ahmed', where: 'a note in Encore' }, { who: 'agent' });
-  assert.equal(said.text, 'Noted Ahmed on Encore; add an email or handle to add them');
+  const said = await mcp.answer('meet', { name: 'Priya', where: 'a note in Lanternfish' }, { who: 'agent' });
+  assert.equal(said.text, 'Noted Priya on Lanternfish; add an email or handle to add them');
 });
 
 test('GET OF A MERGED ROW ANSWERS THE ROW KEPT, saying which it was asked for', async () => {
@@ -198,7 +198,7 @@ test('GET OF A MERGED ROW ANSWERS THE ROW KEPT, saying which it was asked for', 
   const value = said.result.ok ? (said.result.value as Record<string, unknown>) : {};
   assert.equal(value.spoken, 'P6');
   assert.equal(value.merged_from, 'P9');
-  assert.match(said.text, /^Ahmed H\. \(P9\) was merged into this one:\nSam Avery \(P6\)/u);
+  assert.match(said.text, /^Priya R\. \(P9\) was merged into this one:\nPriya Raman \(P6\)/u);
 });
 
 /* ── the card ───────────────────────────────────────────────────────────── */
@@ -207,23 +207,23 @@ const card = (context: Record<string, unknown>) => briefed({ context, look, home
 
 test('THE CARD SAYS WHO IS IN TOUCH HERE, most recent first, with role or organisation, then how many more and the project\'s organisation', () => {
   const people = [
-    { spoken: 'P1', name: 'Dario', in_touch: '2026-10-01T09:00:00Z' },
-    { spoken: 'P2', name: 'Priya Raman', role: 'client', in_touch: '2026-10-05T09:00:00Z' },
-    { spoken: 'P3', name: 'Sam', self: true, in_touch: '2026-10-06T09:00:00Z' },
-    { spoken: 'P4', name: 'Rohan Mehta', org: 'O1', in_touch: '2026-10-04T09:00:00Z' },
+    { spoken: 'P1', name: 'Wren', in_touch: '2026-10-01T09:00:00Z' },
+    { spoken: 'P2', name: 'Teodor Vance', role: 'client', in_touch: '2026-10-05T09:00:00Z' },
+    { spoken: 'P3', name: 'Mara', self: true, in_touch: '2026-10-06T09:00:00Z' },
+    { spoken: 'P4', name: 'Joaquin Herrera', org: 'O1', in_touch: '2026-10-04T09:00:00Z' },
     { spoken: 'P5', name: 'Ann', in_touch: '2026-09-01T09:00:00Z' },
     { spoken: 'P6', name: 'Bo', in_touch: '2026-09-02T09:00:00Z' },
   ];
   /* SOMEBODY WITH NO DATE IS NEVER PUT ABOVE SOMEBODY IN TOUCH, wherever the record sent them. */
   people.unshift({ spoken: 'P7', name: 'Undated' } as (typeof people)[number]);
-  const { card: said, value } = card({ project: { spoken: 'things#2', name: 'Prism', org: 'O1' }, people });
+  const { card: said, value } = card({ project: { spoken: 'things#2', name: 'Copperleaf', org: 'O1' }, people });
   const who = said.split('\n').find((l) => l.startsWith('Who'));
-  assert.equal(who, 'Who      Priya Raman (client), Rohan Mehta (Encore), Dario, +3 · for Encore');
+  assert.equal(who, 'Who      Teodor Vance (client), Joaquin Herrera (Lanternfish), Wren, +3 · for Lanternfish');
   assert.doesNotMatch(said, /people met here/u, 'the people were still a count under More');
   assert.ok(Array.isArray(value.people));
 });
 
 test('A FOLDER THAT MATCHES SEVERAL PROJECTS IS ONE QUESTION', () => {
   const { text } = card({ ambiguous: ['things#2', 'O1'] });
-  assert.match(text, /^Which project is this folder, Prism \(things#2\) or Encore \(O1\)\? Until one is set you work in no project\.$/mu);
+  assert.match(text, /^Which project is this folder, Copperleaf \(things#2\) or Lanternfish \(O1\)\? Until one is set you work in no project\.$/mu);
 });

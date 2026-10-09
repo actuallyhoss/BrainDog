@@ -1,0 +1,6 @@
+{
+  "src/entry.js": {
+    "file": "_app/immutable/entry/start.OVER.js",
+    "isEntry": true
+  }
+}

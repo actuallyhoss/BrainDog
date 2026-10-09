@@ -70,12 +70,12 @@ function meter(left = UNDERSTAND_ASKS_MONTH): ModelJobMeter {
 
 const PAIRS = [
   {
-    hash: 'h-rohan',
-    a: { name: 'Rohan Mehta', kind: 'person', domain: 'encore.example', masked: 's••••••••••a@encore.example', seen: ['6 commits in Encore', `token ${FAKE_KEY}`] },
-    b: { name: 'rohanmehta', kind: 'person', domain: 'gmail.com', masked: '12', seen: ['mail from rohan.mehta@gmail.com'] },
+    hash: 'h-mara',
+    a: { name: 'Mara Okafor', kind: 'person', domain: 'brightwell.example', masked: 'm•••••••••r@brightwell.example', seen: ['6 commits in Lanternfish', `token ${FAKE_KEY}`] },
+    b: { name: 'maraokafor', kind: 'person', domain: 'gmail.com', masked: '11', seen: ['mail from mara.okafor@gmail.com'] },
   },
-  { hash: 'h-priya', a: { name: 'Priya Raman', kind: 'person', seen: ['Prism'] }, b: { name: 'Priya B', kind: 'person', seen: ['Encore'] } },
-  { hash: 'h-org', a: { name: 'Talabat', kind: 'organisation', seen: ['bank text'] }, b: { name: 'Talabat Ahmed', kind: 'person', seen: [] } },
+  { hash: 'h-priya', a: { name: 'Priya Raman', kind: 'person', seen: ['Copperleaf'] }, b: { name: 'Priya R', kind: 'person', seen: ['Lanternfish'] } },
+  { hash: 'h-org', a: { name: 'Orchardline', kind: 'organisation', seen: ['bank text'] }, b: { name: 'Orchardline Duarte', kind: 'person', seen: [] } },
 ];
 
 test('A DOUBTFUL PAIR IS SHOWN BY NAME ALONE: no address, no public mail domain, no key, and the answer speaks only of what it was handed', async () => {
@@ -99,10 +99,10 @@ test('A DOUBTFUL PAIR IS SHOWN BY NAME ALONE: no address, no public mail domain,
   assert.ok(!sent.includes('@'), `an address went to the model: ${sent}`);
   assert.ok(!sent.includes('gmail'), 'a public mail domain went to the model');
   assert.ok(!sent.includes(FAKE_KEY), 'a key went to the model');
-  assert.ok(!sent.includes('h-rohan') && !sent.includes('h-priya'), "the record's hashes went to the model");
+  assert.ok(!sent.includes('h-mara') && !sent.includes('h-priya'), "the record's hashes went to the model");
   const [p1, p2] = asked[0]!.pairs;
-  assert.deepEqual(p1!.a, { name: 'Rohan Mehta', kind: 'person', domain: 'encore.example', local: 12, seen: ['6 commits in Encore', 'token [hidden]'] });
-  assert.deepEqual(p1!.b, { name: 'rohanmehta', kind: 'person', local: 12, seen: ['mail from [address]'] });
+  assert.deepEqual(p1!.a, { name: 'Mara Okafor', kind: 'person', domain: 'brightwell.example', local: 11, seen: ['6 commits in Lanternfish', 'token [hidden]'] });
+  assert.deepEqual(p1!.b, { name: 'maraokafor', kind: 'person', local: 11, seen: ['mail from [address]'] });
   assert.equal(p2!.a.name, 'Priya Raman');
   /* A PERSON BESIDE AN ORGANISATION IS NEVER ASKED ABOUT. */
   assert.equal(asked[0]!.pairs.length, 2);
@@ -112,7 +112,7 @@ test('A DOUBTFUL PAIR IS SHOWN BY NAME ALONE: no address, no public mail domain,
   assert.deepEqual(acked[0]!.result, {
     verdicts: [
       { hash: 'h-org', same: false, confidence: 0 },
-      { hash: 'h-rohan', same: true, confidence: 0.94 },
+      { hash: 'h-mara', same: true, confidence: 0.94 },
       { hash: 'h-priya', same: false, confidence: 0.31 },
     ],
   });
@@ -133,7 +133,7 @@ test('WHAT WAS SAID IS KEPT: the same pairs again are answered from the cache, "
   assert.equal(asks, 1);
   assert.deepEqual(again.acked[0]!.result, {
     verdicts: [
-      { hash: 'h-rohan', same: true, confidence: 0.94 },
+      { hash: 'h-mara', same: true, confidence: 0.94 },
       { hash: 'h-priya', same: false, confidence: 0.12 },
     ],
   });

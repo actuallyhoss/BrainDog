@@ -22,15 +22,21 @@
  * is `29 §3`'s T5: a field filled on at least 80% of at least 20 rows, offered to the page's first table over that
  * list. Each changes a page somebody already has, so each is the page's whole declaration with one thing added at the
  * end, and nothing on it moved.
+ *
+ * THE WEEK OFFER IS THE ONE DRAWN FROM USE (`weeksOffered`): a list with a day, four or more of its entries falling in
+ * this week, read on three different weeks, and no page that groups it by week, is offered a page of its week. It is
+ * never made in a record's first `PEN_YOUNG_DAYS` days (ENG-B17: "a fortnight of use is not a habit"), counted from the
+ * day the record was made and never from the oldest day its entries say, so an import does not make a record old.
  */
 
 import type { Declaration, Json, Kernel, RegisterDecl } from '@braindog/kernel';
+import type { Sql } from '@braindog/ports';
 
 /** One thing the pen offers, and the whole declaration accepting it would write. */
 export type PenItem = {
   /**
    * The dismissal signature, which is also how the item is told apart from every other: `page:<list>`,
-   * `block:<page>:<kind>:<list>` or `column:<page>:<block>:<field>`.
+   * `block:<page>:<kind>:<list>`, `column:<page>:<block>:<field>` or `week:<list>`.
    */
   id: string;
   kind: 'page' | 'block' | 'column';
@@ -42,6 +48,12 @@ export type PenItem = {
   why: string;
   /** What accepting it writes: a whole declaration, never a patch. */
   change: { to: { id: string; kind: string; body: Record<string, Json> } };
+  /**
+   * A page item's list, by id, and the page keeping it makes (`change.to`, the same declaration), which is what the card
+   * on that list's own screen reads: `offerFor(pen, list)` and the drawing of the draft. Absent on a block or a column.
+   */
+  list?: string;
+  draft?: { id: string; kind: string; body: Record<string, Json> };
 };
 
 /** The most items the pen answers, strongest first; the rest wait until one is kept or dismissed (`29 §4` (b) 3). */
@@ -79,6 +91,11 @@ export type PenDeps = {
   pages: readonly PenPage[];
   /** The person's `pen.dismissed`. */
   dismissed: ReadonlySet<string>;
+  /**
+   * What an offer drawn from use reads: the record's store, for the day the record was made and the days each list was
+   * read on (`observation`), and the record's clock. Absent, no offer drawn from use is made.
+   */
+  use?: { sql: Sql; nowMs: number } | undefined;
 };
 
 const bytes = (text: string): number => new TextEncoder().encode(text).length;
@@ -203,6 +220,8 @@ function pagesOffered(deps: PenDeps): PenItem[] {
       title: list.name,
       why: `${list.name} has ${list.rows.toLocaleString('en')} ${list.rows === 1 ? 'row' : 'rows'} and no page yet.`,
       change: { to: { id: `page.${slug}`, kind: 'page', body } },
+      list: list.id,
+      draft: { id: `page.${slug}`, kind: 'page', body },
     });
   }
 
@@ -213,11 +232,16 @@ function pagesOffered(deps: PenDeps): PenItem[] {
 }
 
 /**
- * The holding pen `boot` answers: the pages first, since a list no page draws is the strongest case there is (`29 §3`
- * T1), then the blocks and columns the record's own pages ask for, strongest first, at most `PEN_MOST` in all.
+ * The holding pen `boot` answers: a week page first, since it is what the person has been doing, then the pages, since a
+ * list no page draws is the strongest case there is (`29 §3` T1), then the blocks and columns the record's own pages ask
+ * for, strongest first, at most `PEN_MOST` in all.
+ *
+ * ONE PAGE OFFER A LIST. A list offered its week is not offered a plain page beside it, so its screen holds one offer.
  */
 export function penFor(deps: PenDeps): PenItem[] {
-  const pages = pagesOffered(deps);
+  const weeks = weeksOffered(deps);
+  const weekly = new Set(weeks.map((w) => w.register));
+  const pages = [...weeks, ...pagesOffered(deps).filter((p) => !weekly.has(p.register))].slice(0, PEN_MOST);
   return [...pages, ...shapesOffered(deps, PEN_MOST - pages.length)];
 }
 
@@ -517,4 +541,208 @@ function shapesOffered(deps: PenDeps, room: number): PenItem[] {
     if (kept) out.push(kept.item);
   }
   return out;
+}
+
+/* ── the week a list is read by ─────────────────────────────────────────────────────────────────────────────────── */
+
+/** The days a record is watched and offered nothing drawn from use: a fortnight of use is not a habit (ENG-B17). */
+export const PEN_YOUNG_DAYS = 14;
+/** The entries a list holds in this week before its week is worth a page of its own. */
+export const PEN_WEEK_FEWEST = 4;
+/** The different weeks a list is read on before reading it by the week is a habit. */
+export const PEN_WEEKS_READ = 3;
+/** How far back the reads are looked for, in weeks. */
+const WEEKS_BACK = 12;
+/** The most a running-low table draws. */
+const LOW_DRAWN = 5;
+const DAY_MS = 86_400_000;
+
+const dayOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+/** The Monday of the week `day` falls in, at noon in UTC, as `where`'s `bow` reads this week's. */
+const mondayOf = (day: string): string => {
+  const at = Date.parse(`${day}T12:00:00Z`);
+  return dayOf(at - ((new Date(at).getUTCDay() + 6) % 7) * DAY_MS);
+};
+/**
+ * This week on `field`, from this Monday until a week from today, in the words `where` resolves against the record's
+ * clock, so a page kept today still reads this week next month. `where` has no word for the end of a week, so late in
+ * a week the page reaches a few days into the next.
+ */
+const thisWeek = (field: string): Json => ({ all: [{ field, gte: 'bow' }, { field, lt: '+7d' }] });
+/**
+ * This week on `field` exactly, Monday to Sunday of `today`, which is what the offer counts and says. Counted with the
+ * page's own words, a Sunday's "4 due this week" was four due in the week after it.
+ */
+const weekOf = (field: string, today: string): Json => {
+  const monday = mondayOf(today);
+  return { all: [{ field, gte: monday }, { field, lte: dayOf(Date.parse(`${monday}T12:00:00Z`) + 6 * DAY_MS) }] };
+};
+
+/**
+ * When the record began: the day it was made, else the first line its log wrote, or `null` when it holds neither. Never
+ * the oldest day an entry says about itself, which an import of last year's orders would make a year ago.
+ */
+function bornOf(sql: Sql): number | null {
+  const at =
+    sql.one<{ ts: string }>('SELECT created_at AS ts FROM record WHERE singleton = 1')?.ts ??
+    sql.one<{ ts: string }>('SELECT ts FROM event ORDER BY rowid LIMIT 1')?.ts;
+  const ms = typeof at === 'string' ? Date.parse(at) : Number.NaN;
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** The different weeks since `since` that `list` was read on, by itself or through a page that draws it. */
+function weeksRead(sql: Sql, list: string, slugs: readonly string[], since: string): number {
+  const rendered = slugs.length === 0 ? '' : ` OR (kind = 'page.render' AND subject IN (${slugs.map(() => '?').join(', ')}))`;
+  const days = sql.all<{ day: string }>(
+    `SELECT DISTINCT day FROM observation WHERE day >= ? AND ((kind = 'register.read' AND subject = ?)${rendered})`,
+    since,
+    list,
+    ...slugs,
+  );
+  return new Set(days.map((d) => mondayOf(d.day))).size;
+}
+
+/** Whether `page` already reads `list` by the week: a calendar of it, a figure or a chart of it by week, or this week. */
+const byWeek = (page: HeldPage, list: string): boolean =>
+  page.blocks.some((b) => listOf(b) === list && (b.kind === 'calendar' || b.bucket === 'week' || JSON.stringify(b.where ?? null).includes('"bow"')));
+
+/**
+ * What is running low beside `list`: the first other list its pack installed that holds things on hand, its fewest
+ * first. A list somebody made by hand has no pack, so it has no neighbour to be sure of and is drawn no such table.
+ *
+ * THINGS ON HAND CARRY NO DAY. A whole number on a list of dated entries is an order, a hue, minutes or points, never
+ * stock: Milestones' order beside Steps or Projects' hue beside Tasks drew "Running low" over what cannot run out. So
+ * the neighbour holds no day field, and its count is a plain field, not one it is sorted or looked up by.
+ */
+function lowBeside(deps: PenDeps, list: string, packOf: ReadonlyMap<string, string | null>): { register: string; block: Block } | null {
+  const pack = packOf.get(list);
+  if (!pack) return null;
+  for (const [other, decl] of deps.kernel.registers()) {
+    if (other === list || packOf.get(other) !== pack || !deps.reads(other) || deps.kernel.count(other) === 0) continue;
+    const live = decl.fields.filter((f) => f.retired !== true);
+    if (live.some((f) => f.type === 'day' || f.type === 'instant')) continue;
+    const named = live.find((f) => f.id === decl.title && !NOT_A_COLUMN.has(f.type));
+    const count = live.find((f) => f.type === 'int' && f.id !== decl.title && (f as { index?: boolean }).index !== true && f.unique !== true);
+    if (!named || !count) continue;
+    return {
+      register: other,
+      block: {
+        kind: 'table',
+        heading: 'Running low',
+        source: `register.${other}`,
+        where: { field: count.id, present: true },
+        columns: [{ field: named.id, label: labelOf(named) }, { field: count.id, label: fit(labelOf(count), LABEL_BYTES) ?? count.id }],
+        order: [{ field: count.id, dir: 'asc' }],
+        limit: LOW_DRAWN,
+        empty: fit(`Nothing in ${decl.name} is counted yet.`, EMPTY_BYTES) ?? 'Nothing here yet.',
+      },
+    };
+  }
+  return null;
+}
+
+/**
+ * The week offers: for each list the caller reads with a day on its entries, at least `PEN_WEEK_FEWEST` of them in this
+ * week, read on at least `PEN_WEEKS_READ` different weeks, and no page that reads it by the week, one page of its week.
+ * The page holds the list's own figures, what falls this week, what is owed when the day is a due day and an unfinished
+ * entry's sum is left empty, and what is running low beside it. Its why says what was seen, in the list's own words.
+ *
+ * NEVER IN THE RECORD'S FIRST `PEN_YOUNG_DAYS` DAYS, never once its `week:<list>` is dismissed, and never when `boot`
+ * has the pen off, since `penFor` is then not asked at all. The cheap questions are asked first: the age once, then for
+ * each list its dismissal, its count and its pages, and only then its week and its reads.
+ */
+function weeksOffered(deps: PenDeps): PenItem[] {
+  const { kernel, reads, pages, dismissed, use } = deps;
+  if (!use) return [];
+  const born = bornOf(use.sql);
+  if (born === null || use.nowMs - born < PEN_YOUNG_DAYS * DAY_MS) return [];
+
+  const declared = kernel.declarations();
+  const held = heldPages(declared);
+  const taken = new Set([...pages.map((p) => p.slug), ...held.map((p) => p.slug)]);
+  const packOf = new Map(declared.filter((d) => d.kind === 'register').map((d) => [d.id.slice('register.'.length), d.pack_id]));
+  const since = dayOf(use.nowMs - WEEKS_BACK * 7 * DAY_MS);
+  const lastIn = new Map<string, number>();
+  for (const p of pages) if (p.nav) lastIn.set(p.nav.section, Math.max(lastIn.get(p.nav.section) ?? 0, p.nav.order));
+
+  const offers: Offer[] = [];
+  for (const [id, decl] of kernel.registers()) {
+    if (dismissed.has(`week:${id}`) || !reads(id) || kernel.count(id) < PEN_WEEK_FEWEST) continue;
+    const live = decl.fields.filter((f) => f.retired !== true);
+    const days = live.filter((f) => f.type === 'day');
+    const day =
+      days.find((f) => f.deadline === true) ?? days.find((f) => (f as { index?: boolean }).index === true || f.unique === true) ?? days[0];
+    const shown = live.filter((f) => !NOT_A_COLUMN.has(f.type)).slice(0, PEN_COLUMNS_MOST);
+    const slug = [`${id}-week`, `${id}-this-week`].find((s) => !taken.has(s));
+    if (!day || shown.length === 0 || slug === undefined || held.some((p) => byWeek(p, id))) continue;
+
+    const got = kernel.list({ register: id, where: weekOf(day.id, dayOf(use.nowMs)) as Where, limit: 1 });
+    const n = got.ok ? got.value.matched : 0;
+    const drawnBy = pages.filter((p) => p.registers.includes(id));
+    if (n < PEN_WEEK_FEWEST || weeksRead(use.sql, id, drawnBy.map((p) => p.slug), since) < PEN_WEEKS_READ) continue;
+
+    const due = day.deadline === true;
+    const source = `register.${id}`;
+    const columns = shown.map((f) => ({ field: f.id, label: fit(labelOf(f), LABEL_BYTES) ?? f.id }));
+    const order = [{ field: day.id, dir: 'asc' }];
+    const cells = figuresByList(declared, new Set([id])).get(id) ?? [];
+    /* AN EMPTY SUM IS ONLY OWED ON A LIST THAT SAYS WHEN AN ENTRY IS FINISHED: a renewal with no cost written is not owed,
+       an order neither paid nor marked paid is. So Owed asks for a due day, a done state, and a sum that may be empty. */
+    const finished = decl.state !== undefined && (decl.done?.length ?? 0) > 0 ? { field: decl.state, not_in: [...decl.done!] } : null;
+    const money = due && finished ? live.find((f) => f.type === 'money' && f.required !== true) : undefined;
+    const low = lowBeside(deps, id, packOf);
+    const blocks: Json[] = [
+      ...(cells.length > 0 ? [{ kind: 'stat', cells: cells.map((metric) => ({ metric })) }] : []),
+      {
+        kind: 'table',
+        heading: fit(due ? 'Due this week' : `${decl.name} this week`, HEADING_BYTES) ?? 'This week',
+        source,
+        where: thisWeek(day.id),
+        columns,
+        order,
+        limit: PEN_ROWS_DRAWN,
+        empty: fit(`Nothing in ${decl.name} falls in this week.`, EMPTY_BYTES) ?? 'Nothing this week.',
+      },
+      /* OWED IS A DUE DAY COME OR COMING, NOT FINISHED, WITH THE SUM LEFT EMPTY. */
+      ...(money
+        ? [
+            {
+              kind: 'table',
+              heading: 'Owed',
+              source,
+              where: { all: [{ field: day.id, lt: '+7d' }, finished!, { field: money.id, empty: true }] },
+              columns,
+              order,
+              limit: PEN_ROWS_DRAWN,
+              empty: fit(`Nothing in ${decl.name} is owed.`, EMPTY_BYTES) ?? 'Nothing is owed.',
+            },
+          ]
+        : []),
+      ...(low ? [low.block] : []),
+    ];
+    /* IN THE SECTION OF A PAGE THAT ALREADY DRAWS THE LIST, so the week sits beside it, else in one named after it. */
+    const section = drawnBy.find((p) => p.nav)?.nav?.section ?? fit(decl.name, SECTION_BYTES) ?? id;
+    const title = fit(`${decl.name} this week`, HEADING_BYTES) ?? decl.name;
+    const body: Record<string, Json> = {
+      page: slug,
+      title,
+      origin: 'derived',
+      derived_from: source,
+      requires: [source, ...(low ? [`register.${low.register}`] : [])],
+      nav: { section, order: Math.min((lastIn.get(section) ?? 0) + 10, ORDER_MOST) },
+      blocks,
+    };
+    if (kernel.lint([{ id: `page.${slug}`, kind: 'page', body }]) !== null) continue;
+    taken.add(slug);
+    const said = `${n.toLocaleString('en')}${due ? ' due' : ''} this week`;
+    const draft = { id: `page.${slug}`, kind: 'page', body };
+    offers.push({
+      rows: n,
+      item: { id: `week:${id}`, kind: 'page', register: id, title, why: `${decl.name} has ${said}. Give them a page of their own?`, change: { to: draft }, list: id, draft },
+    });
+  }
+  return offers
+    .sort((a, b) => b.rows - a.rows || a.item.id.localeCompare(b.item.id))
+    .slice(0, PEN_MOST)
+    .map((o) => o.item);
 }

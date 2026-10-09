@@ -1,0 +1,10 @@
+{
+  "gate": "deploy-parity",
+  "rule": "a host whose Worker names another build",
+  "serve": "host",
+  "env": { "BRAINDOG_BUILD": "planted-this-build" },
+  "expect": "live app tuple is planted-other-build, expected planted-this-build",
+  "findings": 1,
+  "total": 1,
+  "why": "THE ONE GATE THAT READS THE LIVE HOST HAD NEVER BEEN SHOWN A HOST THAT WAS WRONG. `self-test` serves `host/` on a loopback port and hands it to the gate as DEPLOY_HOST, with BRAINDOG_BUILD set to this run's build. The shell and the build id it serves are byte for byte the ones under `apps/web/build/`, so both hash comparisons agree, and only its `/.well-known/braindog-build` names another build: the deploy that half landed, assets current and the Worker last week's. One finding, and `total` says it is the only one. A host on this machine is asked once, with no settle window, because it has no edge to catch up."
+}

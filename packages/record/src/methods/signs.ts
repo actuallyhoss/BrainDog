@@ -15,38 +15,24 @@
  * what was asked ("Most say: <the message's own words>", a question as it was put), and those are the inbox's, which
  * `inbox` and `inboxPatterns` hold to an owner or a token its owner gave the `inbox` reach. Any other whole-record
  * caller is told each sign's state, number and last fourteen days, the sentence of the two signs that quote messages
- * or questions replaced by one in this file's words, and no facts, so a token for reading the lists cannot read the
- * inbox through its signs.
+ * or questions replaced by one in the kernel's words (`quietSign`), and no facts, so a token for reading the lists
+ * cannot read the inbox through its signs.
  */
 
+import { quietSign } from '@braindog/kernel';
 import type { Kernel } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
 type Signs = ReturnType<Kernel['signs']>;
-type Sign = Extract<Signs, { ok: true }>['value']['signs'][number];
-
-const count = (n: number | null, one: string, many: string): string => (n === 1 ? `1 ${one}` : `${String(n ?? 0)} ${many}`);
 
 /**
- * The sentence a caller without the inbox reach reads for a sign whose own sentence may quote a message or a question,
- * by its state and number alone. A sign not here keeps the kernel's sentence, which names lists, feeds, runs and
- * scripts, never what was sent in. A sign read `none` keeps its own too: that sentence says only what is missing ("This
- * sign could not be read.", "Nothing has been asked on this record yet."), and one written here could not tell those apart.
+ * A sign as a caller without the inbox reach reads it. The rule is the kernel's (`quietSign` in `kernel/src/signs.ts`),
+ * so a page's `signs` block holds the inbox's words back by the same one. Re-exported so the briefing's red signs
+ * (`redSigns` in `index.ts`) import it here.
  */
-const QUIET: Record<string, (s: Sign) => string> = {
-  'arrivals-filed': (s) =>
-    s.state === 'red' ? 'Messages wait to be filed.' : s.value ? `${count(s.value, 'message waits', 'messages wait')} to be filed, not yet too long.` : 'No message waits to be filed.',
-  'questions-by-cause': (s) =>
-    s.state === 'red' ? 'Open questions pile up on one cause, or carry none.' : s.value ? `${count(s.value, 'open question', 'open questions')}, no two with the same cause.` : 'No question is waiting.',
-};
-
-/**
- * A sign as a caller without the inbox reach reads it: no facts, and no message or question in its sentence. Exported so
- * the briefing's red signs (`redSigns` in `index.ts`) hold the inbox's words back by the same rule.
- */
-export const quietSign = (s: Sign): Sign => ({ ...s, said: s.state === 'none' ? s.said : (QUIET[s.sign]?.(s) ?? s.said), facts: [] });
+export { quietSign };
 
 export function methods(deps: RecordDeps) {
   const { kernel, scoped, guard, no } = deps;

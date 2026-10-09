@@ -1,0 +1,1 @@
+{"gate": "ledger", "rule": "a held list larger than its newest line", "expect": "holds 3, and its newest line says 2", "findings": 1, "total": 1, "why": "The tree's web-lists.mjs exports HELD with three files and its one ledger line says two, with no line recording the growth."}

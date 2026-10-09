@@ -91,6 +91,63 @@ const dataDir = (): string => env.BRAINDOG_DATA ?? '/data';
  */
 const BUILT = fileURLToPath(new URL('../../web/build/app', import.meta.url));
 
+/**
+ * The kernel's migration lock, beside the migrations it locks (LCH-C06): one line per migration file, its checksum.
+ * Found through the kernel package's own entry, so it is the lock of the kernel this process runs, wherever that is.
+ */
+const LOCK_FILE = fileURLToPath(new URL('./migrations/LOCK.json', import.meta.resolve('@braindog/kernel')));
+
+/**
+ * Whether the record's applied migrations are the ones this build's lock holds: null when they are, and otherwise the
+ * sentence that stops the server, with the fix.
+ *
+ * THE RUNNER WOULD REFUSE THE SAME RECORD, BUT ONLY ONCE SERVING, and then every request is a 503 with a code and the
+ * operator reads a refusal on a running server. A migration a record ran that this build holds as other text is never
+ * the operator's to fix by waiting: the build is wrong, and the way back is the build before it or the copy taken
+ * before the upgrade. So it is said before anything is served, and the server does not start.
+ *
+ * A VERSION PAST THE LOCK IS NOT THIS. It is a record a newer build moved on, which a rollback leaves, and the kernel
+ * serves it as `SCHEMA_NEWER` with `/healthz` at 503 so a container's health check sees why (`test/healthz.test.ts`).
+ * A record with no ledger yet is one the runner is about to migrate, and has nothing to disagree with.
+ */
+function lockRefusal(file: string): string | null {
+  let rows: { version: number; checksum: string }[];
+  try {
+    const sql = openSqlite(file);
+    try {
+      const ledger = sql.one<{ y: number }>("SELECT 1 AS y FROM sqlite_schema WHERE type = 'table' AND name = 'migration'");
+      rows = ledger ? sql.all<{ version: number; checksum: string }>('SELECT version, checksum FROM migration ORDER BY version') : [];
+    } finally {
+      sql.close();
+    }
+  } catch {
+    /* A FILE THAT WILL NOT OPEN IS SAID BY THE OPEN THAT FOLLOWS, in the driver's words, as it always was. */
+    return null;
+  }
+  if (rows.length === 0) return null;
+  let lock: Record<string, { checksum?: unknown } | null>;
+  try {
+    lock = JSON.parse(readFileSync(LOCK_FILE, 'utf8')) as typeof lock;
+  } catch {
+    return 'This build has no migration lock it can read, so it cannot tell whether the record ran the migrations it holds. Install the build again from its release, whole.';
+  }
+  const locked = new Map<number, { slug: string; checksum: unknown }>();
+  for (const [name, entry] of Object.entries(lock)) {
+    const m = /^(\d{4})_([a-z0-9_]+)\.ts$/u.exec(name);
+    if (m) locked.set(Number(m[1]), { slug: m[2]!, checksum: entry?.checksum });
+  }
+  for (const row of rows) {
+    const held = locked.get(Number(row.version));
+    if (held === undefined || held.checksum === row.checksum) continue;
+    return (
+      `This record ran migration ${row.version} (${held.slug}) as text this build does not hold, so this build would refuse every request to it and has not started. ` +
+      'Start the build that last served the record, or restore the copy taken before the upgrade with braindog init <slug> --from <copy>. ' +
+      'A migration a record has run is never edited, so the build is at fault: report it with the migration number.'
+    );
+  }
+  return null;
+}
+
 type SignIn = { origin: string; ways: string[]; off: 'open' | 'directory' | 'insecure' | 'key' | null };
 
 /** The boot line about signing in: the ways in, or the one reason there are none. Never a key or a token. */
@@ -552,6 +609,10 @@ async function serve(): Promise<void> {
     /* The filter above kept only the slugs that have one, so this is never null. */
     file = recordIn(join(data, slugs[0]!.slug))!;
   }
+
+  /* THE RECORD'S MIGRATIONS AGAINST THIS BUILD'S LOCK, before a key is opened or a port bound (`lockRefusal`). */
+  const disagrees = lockRefusal(file);
+  if (disagrees) return refuse(disagrees);
 
   /* AND THE KEY STORE, WHICH NO RUNNING PROCESS HELD. `init` wrote three `vault_key` rows from the
      first commit that made them and `serve` never opened the KEK — so the rows existed, nothing

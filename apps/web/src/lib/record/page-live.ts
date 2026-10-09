@@ -50,7 +50,7 @@ import { readBoot } from './boot-live.ts';
 import { format, fxNote, hrefFor, leadOf, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
 import { moneyInText } from './money.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
-import { REDUCES, SUMS, type PageBlock, type PageDecl } from './schema.ts';
+import { REDUCES, SUMS, type Entry, type PageBlock, type PageDecl } from './schema.ts';
 import { compile } from './where.ts';
 import { drawerOf } from '../page/kinds/index.ts';
 import { liveOf } from '../ui/face.ts';
@@ -785,7 +785,7 @@ function changeOf(changes: unknown, n: number): { by: string; at: string } | nul
 /**
  * Each card's group by name, aligned with the rows, or `null` when the record said none.
  *
- * ON THE ROW, as the record answers it now: `{ value: 'organisations#7', name: 'Encore' }`, and `value: ''` for a card
+ * ON THE ROW, as the record answers it now: `{ value: 'organisations#7', name: 'Brightwell' }`, and `value: ''` for a card
  * that points at nothing, which is no group. A record that put no group on any row is read through the names it sent
  * beside the rows, as an older build did; neither, and the page reads the names from `names` (`blocks.ts`).
  */
@@ -845,13 +845,23 @@ function latestOf(v: unknown): MeasureLatest[] {
 const RUNS_ON_TYPES: Readonly<Record<string, string>> = { used_by: 'run', used_at: 'instant' };
 
 /**
+ * WHAT THE OTHER COMPUTED SOURCES THIS BUILD DRAWS TYPE THEIR FIELDS AS (the kernel's `HANDOFFS` and `SIGNS` schemas),
+ * for a record that answered no `types` beside the rows. `signs` answers none on any record yet.
+ */
+const COMPUTED_TYPES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  runs_on: RUNS_ON_TYPES,
+  'handoffs.open': { run: 'run', agent: 'text', next: 'text', left_at: 'instant', mark: 'enum' },
+  signs: { sign: 'text', name: 'text', state: 'enum', value: 'decimal', said: 'text' },
+};
+
+/**
  * THE TYPE OF EACH COLUMN NO LIST DECLARES, as the block answered it (`BlockResult.types`), narrowed to words; a
- * `runs_on` block on an older record falls back to its source's own. `null` where neither says.
+ * computed source on an older record falls back to its source's own. `null` where neither says.
  */
 export function answeredTypes(b: { types?: unknown; source?: unknown }): Readonly<Record<string, string>> | null {
   const t = b.types;
   if (isObject(t) && Object.values(t).every((v) => typeof v === 'string')) return t as Record<string, string>;
-  return b.source === 'runs_on' ? RUNS_ON_TYPES : null;
+  return typeof b.source === 'string' && Object.hasOwn(COMPUTED_TYPES, b.source) ? COMPUTED_TYPES[b.source]! : null;
 }
 
 /** The paths of a block that name nothing of the record (`unnamed`), narrowed to words, or `undefined`. */
@@ -872,9 +882,9 @@ const RUN_HANDLE = /^S([1-9][0-9]*)$/u;
  * once and the cells say "Claude Code, 6 Oct" rather than `S731`.
  */
 export function runsNamed(b: Answered): string[] {
-  /* ONLY WHERE THE PAGE DRAWS THE RUN'S WORDS: `blockOf` reads them on what a project runs on alone, so a block it draws
-     another way asks the record for nothing. */
-  if (b.source !== 'runs_on') return [];
+  /* ONLY WHERE THE PAGE DRAWS THE RUN'S WORDS: `blockOf` reads them on what a project runs on and on the steps runs left,
+     so a block it draws another way asks the record for nothing. */
+  if (b.source !== 'runs_on' && b.source !== 'handoffs.open') return [];
   const types = answeredTypes(b);
   if (!types || (b.refusals?.length ?? 0) > 0) return [];
   const fields = Object.keys(types).filter((f) => types[f] === 'run');
@@ -886,6 +896,60 @@ export function runsNamed(b: Answered): string[] {
     }
   }
   return [...out];
+}
+
+/**
+ * THE WORDS FOR EACH RUN A BLOCK'S ROWS NAME: the app and day the page read, else the agent the record named beside the
+ * handle in `agentField`, else nothing, which `display` says as An agent. Never the handle.
+ */
+function runNames(
+  refs: ReadonlyMap<string, RefMap>,
+  runs: ReadonlyMap<string, Readonly<Record<string, unknown>>>,
+  entries: readonly Entry[],
+  runField: string,
+  agentField: string,
+): Map<string, string> {
+  const said = new Map(namesOf(refs));
+  for (const [handle, fields] of runs) {
+    const words = runWords(fields);
+    if (words !== null) said.set(handle, words);
+  }
+  for (const e of entries) {
+    const handle = e.fields[runField];
+    const agent = e.fields[agentField];
+    if (typeof handle === 'string' && !said.has(handle) && typeof agent === 'string' && agent.trim() !== '') said.set(handle, agent.trim());
+  }
+  return said;
+}
+
+/** THE RUN'S FACE ON EACH CARD, from the run the page read, for a block whose `who` column is typed as a run. */
+function runFacesOf(
+  b: Answered,
+  types: Readonly<Record<string, string>>,
+  entries: readonly Entry[],
+  runs: ReadonlyMap<string, Readonly<Record<string, unknown>>>,
+  now: number,
+): (RunCell | null)[] | undefined {
+  const whoAt = (b.columns ?? []).find((c) => c.as === 'who' && types[c.field] === 'run')?.field;
+  if (whoAt === undefined) return undefined;
+  const faces = entries.map((e): RunCell | null => {
+    const handle = e.fields[whoAt];
+    const run = typeof handle === 'string' ? runs.get(handle) : undefined;
+    if (run === undefined || typeof handle !== 'string') return null;
+    return { run: handle, agent: typeof run.agent === 'string' ? run.agent : null, live: liveOfRun(run, now) };
+  });
+  return faces.some((f) => f !== null) ? faces : undefined;
+}
+
+/** A step's mark and a sign's state as a person says them: the kernel hands the machine's word. */
+const MARK_WORDS: Readonly<Record<string, string>> = { next: 'Next', earlier: 'Left earlier' };
+const SIGN_WORDS: Readonly<Record<string, string>> = { red: 'Needs a look', green: 'Alive', none: 'Not read yet' };
+
+/** The cell for `field` said through `words` where the row holds one of its keys, else as `toRows` said it. */
+function wordsFor(columns: readonly { field: string }[], cells: (string | null)[], fields: Readonly<Record<string, unknown>>, field: string, words: Readonly<Record<string, string>>): (string | null)[] {
+  const v = fields[field];
+  const said = typeof v === 'string' && Object.hasOwn(words, v) ? words[v]! : null;
+  return said === null ? cells : cells.map((c, i) => (columns[i]?.field === field ? said : c));
 }
 
 export function blockOf(
@@ -1119,29 +1183,11 @@ export function blockOf(
     /* EACH COLUMN BY THE TYPE THE BLOCK ANSWERED: Last used is a time in words, and Last used by the run's app and day,
        linked to the run, where his project page printed `2026-10-06T19:07:01.610Z` and `S731`. */
     const types = answeredTypes(b) ?? {};
-    const said = new Map(namesOf(refs));
-    for (const [handle, fields] of runs) {
-      const words = runWords(fields);
-      if (words !== null) said.set(handle, words);
-    }
     /* A RUN THIS READER COULD NOT OPEN is said by the agent the record named beside it (`used_agent`), before An agent. */
-    for (const e of entries) {
-      const handle = e.fields.used_by;
-      const agent = e.fields.used_agent;
-      if (typeof handle === 'string' && !said.has(handle) && typeof agent === 'string' && agent.trim() !== '') said.set(handle, agent.trim());
-    }
+    const said = runNames(refs, runs, entries, 'used_by', 'used_agent');
     const rows = toRows(register, entries, shell.columns, now, said, types);
     /* THE RUN'S FACE ON THE CARD, from the run the page read, as a block of runs hands its own. */
-    const whoAt = (b.columns ?? []).find((c) => c.as === 'who' && types[c.field] === 'run')?.field;
-    const runFaces =
-      whoAt === undefined
-        ? undefined
-        : entries.map((e): RunCell | null => {
-            const handle = e.fields[whoAt];
-            const run = typeof handle === 'string' ? runs.get(handle) : undefined;
-            if (run === undefined || typeof handle !== 'string') return null;
-            return { run: handle, agent: typeof run.agent === 'string' ? run.agent : null, live: liveOfRun(run, now) };
-          });
+    const runFaces = runFacesOf(b, types, entries, runs, now);
     /* EACH ROW'S PROJECT IS A CHIP, as any block with a `scope` column draws one: the kernel's own
        `scopes`, the project's name for its own rows and none, drawn as Everywhere, for the ones beside it. */
     (b.columns ?? []).forEach((c, i) => {
@@ -1166,8 +1212,51 @@ export function blockOf(
          does not), so it is filled here rather than through a column an author wrote. */
       quiet: entries.map((e) => Boolean(e.fields.quiet)),
       ...(scopeCells ? { scopeCells } : {}),
-      ...(runFaces?.some((f) => f !== null) ? { runFaces } : {}),
+      ...(runFaces ? { runFaces } : {}),
     };
+  }
+  /* THE STEPS RUNS LEFT AND NOBODY HAS TAKEN (`packages/kernel/src/pages.ts` `handoffsBlock`) name no register either,
+     so the common path below drew the Agents page's "Left for the next run" as a block this build cannot draw. Each row
+     is a step, newest first: the run that left it said by its app and day, else the agent the record named beside it,
+     and linked to that run; when it was left in words; and its mark as words, Next or Left earlier. */
+  if (b.source === 'handoffs.open') {
+    const register = 'handoffs.open';
+    const entries = got.map((r) => entryOf(register, r, refs));
+    const types = answeredTypes(b) ?? {};
+    const said = runNames(refs, runs, entries, 'run', 'agent');
+    const rows = toRows(register, entries, shell.columns, now, said, types).map((row, n) => {
+      const e = entries[n]!;
+      const seq = typeof e.fields.run === 'string' ? RUN_HANDLE.exec(e.fields.run)?.[1] : undefined;
+      /* KEYED BY THE STEP AND OPENING THE RUN THAT LEFT IT, never `/r/handoffs.open/0`, which is no page. */
+      const { href: _href, ...rest } = row;
+      return {
+        ...rest,
+        key: `handoff:${e.id ?? n}`,
+        cells: wordsFor(shell.columns, row.cells, e.fields, 'mark', MARK_WORDS),
+        ...(seq === undefined ? {} : { href: `/r/session/${seq}` }),
+      };
+    });
+    const runFaces = runFacesOf(b, types, entries, runs, now);
+    return { ...shell, register, entries, matched: entries, rows, shown: entries.length, total: Math.max(matched, entries.length), names: namesOf(refs), ...(runFaces ? { runFaces } : {}) };
+  }
+  /* THE RECORD'S VITAL SIGNS (`packages/kernel/src/pages.ts` `signsBlock`), one row a sign in the record's own order,
+     which Health draws as cards grouped by state. `signs` names no register, so before this every sign card on Health
+     said it cannot be drawn. A sign is keyed by its id and opens nothing; its state is said in words, and a red one
+     carries the bad tone, which reaches the page with its glyph, so it is never told by colour alone. */
+  if (b.source === 'signs') {
+    const register = 'signs';
+    const entries = got.map((r) => entryOf(register, r, refs));
+    const types = answeredTypes(b) ?? {};
+    const rows = toRows(register, entries, shell.columns, now, namesOf(refs), types).map((row, n) => {
+      const e = entries[n]!;
+      const sign = typeof e.fields.sign === 'string' && e.fields.sign !== '' ? e.fields.sign : String(n);
+      return {
+        key: `sign:${sign}`,
+        cells: wordsFor(shell.columns, row.cells, e.fields, 'state', SIGN_WORDS),
+        ...(e.fields.state === 'red' ? { tone: 'bad' as const } : {}),
+      };
+    });
+    return { ...shell, register, entries, matched: entries, rows, shown: entries.length, total: Math.max(matched, entries.length), names: namesOf(refs) };
   }
   /* A `deadlines` BLOCK READS ACROSS EVERY LIST (`packages/kernel/src/pages.ts` `deadlinesBlock`), so its rows are
      the kernel's own fields, `list`, `row`, `title`, `day`, `amount`, `direction`, and not a register's: `deadlines`

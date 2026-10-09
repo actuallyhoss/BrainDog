@@ -32,7 +32,7 @@
 import { personName, type AccountDoor, type Provisioned } from '@braindog/host/auth';
 import { httpStatus } from '@braindog/host';
 import { verifyStripe } from '@braindog/host/stripe-sign';
-import { PLAN_TABLE } from '@braindog/record/plans';
+import { CURRENCY, PLAN_TABLE, priceOf as centsAsPrice } from '@braindog/record/plans';
 import { badSlug, type AccountUsage, type BillingAnswers, type BillingCall, type BillingRow, type BillingSet, type BillingState } from '@braindog/record/directory';
 import { no, ok, refused, type Refusal, type Result, type Who } from '@braindog/ports';
 
@@ -168,6 +168,38 @@ export const planOfPrice = (env: BillingEnv, price: string | null): HostedPlan |
 /** The plan the Directory meters a record under, as the list names it. Taken as text, so a plan it adds later reads as Cloud. */
 const planOfMeter = (plan: string): ListedPlan =>
   plan === FREE_PLAN.directory ? 'free' : plan === HOSTED_PLANS.plus.directory ? 'plus' : 'cloud';
+
+/**
+ * Whether the Stripe price a plan's setting names charges what the one table of plans says (audit-38-39 finding 9):
+ * `null` when it does, or the refusal that opens no payment page.
+ *
+ * READ AT EVERY CHECKOUT AND NOT TRUSTED FROM THE SETTING, because the list and the checkout say `planPrice`, from
+ * `PLAN_TABLE`, and Stripe charges whatever the price the setting names says. A price changed in Stripe and not in the
+ * table, or the other way, would charge a person a figure no screen showed them. One amount in `CURRENCY` agrees; any
+ * other answer, a tiered price with no one amount among them, is refused in one sentence before a session is made.
+ */
+async function priceRefused(stripe: Stripe, plan: HostedPlan, price: string): Promise<Result<never> | null> {
+  const got = await stripe.read(`/v1/prices/${encodeURIComponent(price)}`);
+  const name = planName(plan);
+  if (!got.ok) {
+    op({ op: 'billing', door: 'checkout', ok: false, why: 'price', status: got.status, code: got.code }, 'error');
+    if (got.status === 404)
+      return no('NOT_IN_THIS_BUILD', `${HOSTED_PLANS[plan].setting} names a price Stripe does not know, so ${name} is not sold on this host until it names one.`, { at: 'plan' });
+    return no('RECORD_UNAVAILABLE', STRIPE_DOWN);
+  }
+  const amount = got.body['unit_amount'];
+  const currency = typeof got.body['currency'] === 'string' ? got.body['currency'].toUpperCase() : '';
+  const cents = PLAN_TABLE[HOSTED_PLANS[plan].directory].cents.month;
+  if (currency === CURRENCY && amount === cents) return null;
+  op({ op: 'billing', door: 'checkout', ok: false, why: 'price_differs' }, 'error');
+  const charged =
+    currency !== CURRENCY
+      ? `Stripe's price for it is in ${currency === '' ? 'no currency' : currency}`
+      : typeof amount === 'number' && Number.isSafeInteger(amount) && amount >= 0
+        ? `Stripe charges ${centsAsPrice(amount)} a month`
+        : "Stripe's price for it has no one amount";
+  return no('NOT_IN_THIS_BUILD', `${name} is ${planPrice(plan)} here and ${charged}, so no payment page opens until the two agree.`, { at: 'plan' });
+}
 
 /** The plan a body asked to pay for: `cloud` when it named none. Free is never paid for, so it is refused here by name. */
 function planAsked(asked: unknown): Result<HostedPlan> {
@@ -474,6 +506,10 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
         retry_after: wait,
       });
     }
+
+    /* THE PRICE STRIPE CHARGES IS THE ONE THE PAGE SAID, or no session is made. */
+    const differs = await priceRefused(stripe, plan.value, price);
+    if (differs !== null) return differs;
 
     const started = await startCheckout(stripe, {
       customer,

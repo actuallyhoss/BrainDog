@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 
 import type { LiveBlock } from '../record/page-live.ts';
 import type { Entry } from '../record/schema.ts';
+import type { BlockResult, PageRow } from '@braindog/kernel';
 import { arranged, bare, emptyHidden, foldOf, FOLD_AT, holdsNothing, leadOf, markDrawn, openOf, optionOf, rowKeys, stepRow, unsaid, wholeKey, type Why } from './home.ts';
 
 /** A block as the record answers one, holding nothing unless the case says what. */
@@ -372,4 +373,135 @@ test('"N MORE" HANDS THE FOCUS TO THE FIRST ROW THAT OPENED, so a keyboard is no
 
 test('THE HEADLINE LINE DROPS A WHOLE AMOUNT’S .00', () => {
   assert.match(SLOT, /symbolText\(text, homeCurrency\(\), block\.kind === 'note' && block\.lead === true\)/);
+});
+
+/* ── the kernel's cases, through this file ─────────────────────────────────── */
+
+/* THE SAME CASES AS `packages/kernel/test/drawn.test.ts`, asked of `home.ts`, which hands the kernel's rule on. A home
+   that answered any of them otherwise would be drawing a page the record does not, so each one is held here too. The
+   blocks are the record's own shape (`BlockResult`), as the kernel's test builds them. */
+
+type Readings = NonNullable<BlockResult['readings']>;
+
+const rec = (over: Partial<BlockResult> & { kind: string }): BlockResult => ({ rows: [], matched: 0, refusals: [], ...over });
+
+const line = (fields: PageRow['fields']): PageRow => ({
+  id: 'r',
+  register: 'projects',
+  seq: 1,
+  fields,
+  state: null,
+  version: 1,
+  created_at: '2026-10-01T00:00:00Z',
+  updated_at: '2026-10-01T00:00:00Z',
+  deleted_at: null,
+});
+
+const recWhys = (blocks: readonly BlockResult[]): (Why | 'drawn' | 'no why')[] => blocks.map((b) => (b.drawn === false ? (whyOf(b) ?? 'no why') : 'drawn'));
+const oneRow = (): BlockResult => rec({ kind: 'table', rows: [line({ a: 1 })], matched: 1 });
+
+test('THE KERNEL: EACH WHY, a list of nothing is empty, a chart of a field nobody filled is unsaid, a when that said no is when', () => {
+  const blocks = [
+    rec({ kind: 'table', source: 'register.tasks', rows: [line({ title: 'Ship it' })], matched: 1 }),
+    rec({ kind: 'todo', source: 'register.tasks', empty: 'Nothing due today.' }),
+    rec({ kind: 'chips', source: 'register.projects', columns: [{ field: 'health' }], rows: [line({ health: null }), line({ health: '' })], matched: 2 }),
+    rec({ kind: 'note', heading: 'Heads up', drawn: false }),
+  ];
+  assert.deepEqual(recWhys(markDrawn(blocks)), ['drawn', 'empty', 'unsaid', 'when']);
+});
+
+test('THE KERNEL: CANNOT, a block the reader cannot draw goes, and one the record refused stays to say its fix', () => {
+  const cannot = { ...rec({ kind: 'table' }), cannot: 'This part of the page cannot be drawn from the record yet.' };
+  const refused = rec({ kind: 'table', refusals: [{ code: 'DECLARATION_INVALID', fix: 'Name a list.' }] });
+  const out = emptyHidden([rec({ kind: 'table', rows: [line({ title: 'a' })], matched: 1 }), cannot, refused]);
+  assert.deepEqual(out.map((b) => whyOf(b) ?? 'drawn'), ['drawn', 'cannot', 'drawn']);
+});
+
+test('THE KERNEL: THE LEAD KEEPS ITS ONE EMPTY LINE, and the empty blocks after it say nothing', () => {
+  const blocks = [
+    rec({ kind: 'section', heading: 'Today' }),
+    rec({ kind: 'todo', empty: 'Nothing due today.' }),
+    rec({ kind: 'timeline', empty: 'Nothing of yours is late.' }),
+    rec({ kind: 'table', rows: [line({ title: 'a' })], matched: 1 }),
+  ];
+  assert.equal(leadOf(blocks), 1);
+  assert.deepEqual(recWhys(markDrawn(blocks)), ['drawn', 'drawn', 'empty', 'drawn']);
+  assert.deepEqual(recWhys(markDrawn([blocks[3]!, blocks[1]!])), ['drawn', 'empty'], 'a lead that holds something leaves no empty line');
+});
+
+test('THE KERNEL: EMPTY: KEEP keeps a block that holds nothing, and its noughts', () => {
+  const idle = { metric: 'costs-year', reading: { value: 0, unit: 'GBP', rows: 0, held: 0, refusals: [], met: null } };
+  const ledger = rec({ kind: 'stat', cells: [{ metric: 'costs-year' }], readings: [idle] as unknown as Readings, empty: 'keep' });
+  assert.equal(bare(ledger), false);
+  const [kept] = markDrawn([oneRow(), ledger]).slice(1);
+  assert.equal(kept!.drawn, undefined);
+  assert.equal(kept!.readings?.length, 1, 'its nought is still there');
+  const out = markDrawn([oneRow(), { ...ledger, empty: 'Nothing costs a year yet.' }]);
+  assert.equal(whyOf(out[1]!), 'empty', 'without the key, the row that held nothing else goes');
+});
+
+test('THE KERNEL: A FIGURE THAT SAYS NOTHING GOES FROM ITS ROW, and the figure beside it stays', () => {
+  const read = (metric: string, n: number) => ({ metric, reading: { value: n, unit: null, rows: n, held: n, refusals: [], met: null } });
+  const stat = rec({ kind: 'stat', cells: [{ metric: 'a' }, { metric: 'b' }], readings: [read('a', 0), read('b', 3)] as unknown as Readings });
+  const [out] = markDrawn([stat]);
+  assert.deepEqual(out!.readings?.map((r) => r.metric), ['b']);
+});
+
+test("THE KERNEL: A FIGURE'S PARTS that no row sits in are unsaid; a figure that read no row at all holds nothing", () => {
+  const parts = (value: number, groups: unknown[]) =>
+    rec({ kind: 'split', source: 'metric.earning-by-project', readings: [{ metric: 'earning-by-project', reading: { value, unit: null, rows: 4, refusals: [], met: null, groups } }] as unknown as Readings });
+  assert.equal(unsaid(parts(0, [{ key: 'a', value: null }, { key: 'b', value: null }])), true);
+  assert.equal(unsaid(parts(5, [])), true);
+  assert.equal(unsaid(parts(5, [{ key: 'a', value: 5 }])), false);
+  assert.equal(bare(parts(0, [])), true);
+});
+
+test('THE KERNEL: A SECTION OVER NOTHING GOES WITH ITS BLOCKS, in its own column; one with a panel, or over nothing at all, stays', () => {
+  const blocks = [
+    rec({ kind: 'section', heading: 'Heads up', box: true }),
+    rec({ kind: 'note', heading: 'Rail note', area: 'rail' }),
+    rec({ kind: 'todo', drawn: false }),
+    rec({ kind: 'section', heading: 'Actions', panel: 'actions' }),
+    rec({ kind: 'todo' }),
+    oneRow(),
+    rec({ kind: 'section', heading: 'The end' }),
+  ];
+  assert.deepEqual(recWhys(markDrawn(blocks)), ['empty', 'drawn', 'when', 'drawn', 'empty', 'drawn', 'drawn']);
+});
+
+test('THE KERNEL: A PAGE AT ITS OWN ADDRESS IS NEVER EMPTIED, it keeps the first block, which says its one sentence', () => {
+  const blocks = [rec({ kind: 'section', heading: 'Tasks' }), rec({ kind: 'table', empty: 'Nothing in Tasks yet.' }), rec({ kind: 'todo' })];
+  assert.deepEqual(recWhys(markDrawn(blocks, true)), ['drawn', 'drawn', 'empty']);
+  assert.deepEqual(recWhys(emptyHidden([blocks[2]!], true)), ['drawn']);
+  assert.deepEqual(recWhys(emptyHidden([blocks[2]!], false)), ['empty']);
+});
+
+test('THE KERNEL: A REGISTERED KIND, A SENTENCE AND A FIELD TO TYPE INTO are never called empty', () => {
+  const out = markDrawn([rec({ kind: 'calendar' }), rec({ kind: 'note' }), rec({ kind: 'capture' }), oneRow()]);
+  assert.deepEqual(recWhys(out), ['drawn', 'drawn', 'drawn', 'drawn']);
+});
+
+test('THE KERNEL: ARRANGING STILL DRAWS EVERY BLOCK, but one whose when said no', () => {
+  const marked = markDrawn([oneRow(), rec({ kind: 'todo' }), rec({ kind: 'chips', columns: [{ field: 'h' }], rows: [line({ h: null })], matched: 1 }), rec({ kind: 'note', drawn: false })]);
+  const laid = arranged(marked);
+  assert.deepEqual(laid.map((b) => b.drawn !== false), [true, true, true, false]);
+  assert.equal(whyOf(laid[1]!), undefined);
+  assert.deepEqual(recWhys(emptyHidden(marked, true)), recWhys(marked), 'judging the marked answer again changes nothing');
+});
+
+test('THE KERNEL: A BLOCK WRITTEN OUT IN THE PAGE HOLDS WHAT ITS AUTHOR WROTE, and one with no cells written is still empty', () => {
+  const written = { ...rec({ kind: 'ring' }), authored: [{ cells: ['Done', '3', '5'] }] } as BlockResult;
+  const ring = { ...rec({ kind: 'ring' }), authored: [] } as BlockResult;
+  const lead = { ...rec({ kind: 'note' }), body: 'Lead' } as BlockResult;
+  assert.deepEqual(recWhys(markDrawn([lead, written, ring])), ['drawn', 'drawn', 'empty']);
+});
+
+test('THE RULE IS THE KERNEL’S, NOT A COPY: home.ts hands it on in one line and defines none of it', () => {
+  const src = readFileSync(new URL('./home.ts', import.meta.url), 'utf8');
+  assert.match(src, /^export \{[^}]*\bemptyHidden\b[^}]*\} from '@braindog\/kernel';$/m);
+  assert.doesNotMatch(
+    src,
+    /\b(function (emptyHidden|holdsNothing|unsaid|leadOf|markDrawn|arranged|goneWhy)\b|const (bare|gone|says|keeps|registered|KEEP|WHY|KEPT)\b|type (Drawable|Why) =)/,
+    'a second copy of the rule drifts from the record',
+  );
 });

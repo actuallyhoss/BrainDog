@@ -135,6 +135,19 @@ test('A SESSION GIVEN THE TOOLS THAT NEVER CALLED reads as such: the dead week, 
   assert.match(doorMarks(sql, NOW - WEEK, NOW).said, /Given the tools: 1\. Made a call: 0\./);
 });
 
+test('A READING AS OF A DAY PAST COUNTS NOTHING MARKED AFTER IT, so a figure read back in time is that day’s', async () => {
+  const sql = await migrated();
+  markDoor(sql, 'S1', { kind: 'hello', build: '0.9.1' }, NOW - 2 * DAY);
+  markDoor(sql, 'S2', { kind: 'hello', build: '0.9.2' }, NOW);
+  markDoor(sql, 'S2', { kind: 'called', n: 3 }, NOW);
+  const then = doorMarks(sql, NOW - 3 * DAY, NOW - DAY, '0.9.1');
+  assert.equal(then.hello, 1);
+  assert.equal(then.calls, 0);
+  assert.deepEqual(then.builds, [{ build: '0.9.1', n: 1 }]);
+  assert.equal(then.behind, 0);
+  assert.equal(doorMarks(sql, NOW - 3 * DAY, NOW).hello, 2);
+});
+
 test('THE SWEEP DELETES MARKS OLDER THAN 30 DAYS and keeps the rest', async () => {
   const sql = await migrated();
   markDoor(sql, 'S1', { kind: 'hello' }, NOW - 31 * DAY);

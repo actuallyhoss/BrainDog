@@ -102,3 +102,39 @@ test('the Sandbox smoke follows Smoke, cannot go unnoticed, and reads its canary
   assert.match(sandbox.body, /wranglerConfig\(\)/);
   assert.match(sandbox.body, /OPS_RECORD/);
 });
+
+test('a restore point is asked before Deploy, after what is live is recorded, behind the operator key', () => {
+  const point = step('Take a restore point');
+  assert.ok(at('Record what is live') < at('Take a restore point'), 'the restore point runs before LIVE_SHA is known');
+  assert.ok(at('Take a restore point') < at('Deploy'), 'the restore point is taken after the deploy, when it is too late');
+  assert.doesNotMatch(point.body, /continue-on-error/, 'a failed copy cannot stop the deploy');
+  assert.match(point.body, /PROVISION_KEY: \$\{\{ secrets\.PROVISION_KEY \}\}/);
+  assert.match(point.body, /DEPLOY_HOST: \$\{\{ vars\.DEPLOY_HOST \}\}/);
+  assert.match(point.body, /HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(point.body, /\/account\/ops\/restore-point/);
+  assert.match(point.body, /not run: no key/, 'no key fails the deploy instead of saying it did not run');
+});
+
+test('the restore point always checks, and copies for real only when a migration changed since the live sha', () => {
+  const body = step('Take a restore point').body;
+  const check = body.indexOf('restore-point.mjs" check');
+  const diff = body.indexOf(`git diff --name-only "$LIVE_SHA" HEAD -- 'packages/kernel/src/migrations/*.ts'`);
+  const take = body.indexOf('restore-point.mjs" take');
+  assert.ok(check !== -1 && diff !== -1 && take !== -1, 'the check, the migration diff or the real copy is missing');
+  assert.ok(check < diff && diff < take, 'the order is check, then the diff, then the copy');
+  assert.match(body, /no migration changed since \$LIVE_SHA, so nothing is copied\./);
+  /* AN UNKNOWN LIVE SHA COPIES: the diff is guarded by it, and a guard that exited would skip the copy a deploy needs most. */
+  assert.match(body, /if \[ -n "\$LIVE_SHA" \] && git cat-file -e/);
+  /* A FAILED CHECK OF THE LIVE BUILD WARNS, and a failed copy is red: the take is the step's last command. */
+  assert.match(body, /if ! node "\$RUNNER_TEMP\/restore-point\.mjs" check [^\n]*; then\n\s*echo "::warning::/);
+  assert.match(body.trimEnd().split('\n').filter((l) => !/^ {8}\S/.test(l) && !/^ {10}[A-Z_]+: /.test(l)).at(-1) ?? '', /restore-point\.mjs" take/);
+});
+
+test('after the deploy every record in use is opened once, and a red check is red', () => {
+  const check = step('Check the records open');
+  assert.ok(at('Check the records open') > at('Sandbox smoke'), 'the check runs before the deploy is smoked');
+  assert.ok(at('Check the records open') < at('Decide whether to roll back'));
+  assert.doesNotMatch(check.body, /continue-on-error/);
+  assert.match(check.body, /node "\$RUNNER_TEMP\/restore-point\.mjs" check "Check the records open"/);
+  assert.match(check.body, /PROVISION_KEY: \$\{\{ secrets\.PROVISION_KEY \}\}/);
+});

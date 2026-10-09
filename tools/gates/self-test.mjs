@@ -21,10 +21,11 @@
  *   node tools/gates/self-test.mjs
  */
 
-import { spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, existsSync, realpathSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { spawn, spawnSync } from 'node:child_process';
+import { readdirSync, readFileSync, existsSync, realpathSync, statSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { dirname, join, normalize } from 'node:path';
 
 import { keyPaths, webBuildUnmet } from './lib.mjs';
 
@@ -36,7 +37,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const negatives = join(here, 'negative');
 
 /** What a `case.json` may say, and nothing else. */
-const CASE_KEYS = new Set(['gate', 'rule', 'expect', 'findings', 'total', 'skip', 'why']);
+const CASE_KEYS = new Set(['gate', 'rule', 'expect', 'findings', 'total', 'skip', 'why', 'seed', 'serve', 'env']);
 
 /**
  * Each planted tree says, in its own `case.json`, which gate it is for and what that gate must say.
@@ -50,6 +51,11 @@ const CASE_KEYS = new Set(['gate', 'rule', 'expect', 'findings', 'total', 'skip'
  * regard to case. `findings` is how many lines name the tree's `expect.txt`; `total`, when given, is
  * the whole of what the gate reports; `skip` asks for exit 3 over a root that holds nothing. `why`
  * is the reason the tree is shaped the way it is, which is where the comments of the old list went.
+ *
+ * THREE MORE, FOR THE GATES A FOLDER OF FILES CANNOT HOLD A FAULT FOR (PRF-B02 jobs 4 and 6). `seed` runs the gate
+ * over the repository's own build with `BRAINDOG_GATE_SEED` set to it, the way the browser negatives below run, and
+ * not at all when that build is older than the source. `serve` names a folder of the tree served on a loopback port
+ * and handed to the gate as `DEPLOY_HOST`, a planted host. `env` is the variables the run is given besides.
  *
  * THE LIST USED TO LIVE HERE, AND IT COULD NOT SEE A GATE WITH NOTHING IN IT. Eighty-three rows in
  * this file and eighty-three trees beside it, and a check that every tree had a row; nothing asked
@@ -112,7 +118,30 @@ export function readCases(dir, registered) {
       refused.push(`negative/${tree}/case.json expects a pattern that does not compile: ${c.expect}`);
       continue;
     }
-    cases.push({ tree, gate: c.gate, rule: c.rule, expect, findings: c.findings, total: c.total, skip: c.skip === true });
+    if (c.seed !== undefined && (typeof c.seed !== 'string' || !c.seed.trim())) {
+      refused.push(`negative/${tree}/case.json says seed is ${JSON.stringify(c.seed)}, and a seed is a name.`);
+      continue;
+    }
+    if (c.serve !== undefined && (typeof c.serve !== 'string' || !existsSync(join(dir, tree, c.serve)))) {
+      refused.push(`negative/${tree}/case.json serves ${JSON.stringify(c.serve)}, and the tree holds no such folder.`);
+      continue;
+    }
+    if (c.env !== undefined && (typeof c.env !== 'object' || c.env === null || Object.values(c.env).some((v) => typeof v !== 'string'))) {
+      refused.push(`negative/${tree}/case.json gives env as ${JSON.stringify(c.env)}, and env is names and their words.`);
+      continue;
+    }
+    cases.push({
+      tree,
+      gate: c.gate,
+      rule: c.rule,
+      expect,
+      findings: c.findings,
+      total: c.total,
+      skip: c.skip === true,
+      seed: c.seed,
+      serve: c.serve,
+      env: c.env ?? {},
+    });
   }
   return { cases, refused };
 }
@@ -137,13 +166,10 @@ export function registeredGates(text) {
  * A name here is a gate that goes red on nothing the self-test has ever planted, said out loud on
  * every run rather than read green. A name that gains a tree or a browser negative is a failure until
  * it comes off, so the list cannot hold a gate that no longer needs it; and
- * `test/self-test-cases.test.mjs` holds it to today's six, so a gate added tomorrow cannot join it.
+ * `test/self-test-cases.test.mjs` holds it to the six it began with, so a gate added tomorrow cannot
+ * join it. Four came off with PRF-B02 jobs 4 to 6 (typecheck, theme, passkey, deploy-parity).
  */
 export const GAPS = new Map([
-  ['typecheck', 'one type error in negative/typecheck/ comes with PRF-B02 job 4'],
-  ['theme', 'a token file one value off, read by theme.mjs --tokens, comes with PRF-B02 job 5'],
-  ['passkey', 'a seed that takes the virtual authenticator away comes with PRF-B02 job 4'],
-  ['deploy-parity', 'a local host that names another build comes with PRF-B02 job 6'],
   ['rule-sheet', "batch 40's rule sheet on a proof record has no tree yet"],
   ['signin-live', "batch 43's planted tree: a self-host whose sign-in refuses the passkey"],
 ]);
@@ -218,7 +244,8 @@ const notRun = [];
 
 /**
  * The negatives that cannot be a fixture tree, because the thing under test is a real browser over
- * a real build. Five gates run that way, and each one is run again with one violation seeded.
+ * a real build. Three gates run that way, each run again with one violation seeded, and `layout`
+ * and `a11y` walk their `RULES` below (`WALKED`).
  *
  * THREE OUTCOMES, NOT TWO, AND THE THIRD IS THE ONE THAT COST AN EVENING. This was written as
  * `if (r.status === 0 || !said.includes(names))`, so a gate that went red for something else
@@ -233,38 +260,6 @@ const notRun = [];
  * why that branch slices the other end.
  */
 const BROWSER = [
-  /**
-   * `layout`: `BRAINDOG_GATE_SEED=1` puts a 2000px heading inside `#main`, the exact bug the gate
-   * is named after, and the one it could not see while it treated the app's own scroll container
-   * as an exemption.
-   *
-   * AND ONCE MORE WITH A PANEL DOCKED BESIDE THE WORK, which is its own pass with its own edge and
-   * had never been asked to go red (research-audit-16 L12). Both sentences, because the sweep's alone
-   * would hold the run red with the docked pass seeing nothing.
-   */
-  {
-    gate: 'layout',
-    seed: '1',
-    names: ['reaches 2000px', 'under the panel'],
-    blind: 'PASSED a 2000px heading inside #main. It is examining nothing.',
-    red: 'red on a 2000px heading inside #main, with the panel shut and with it docked',
-  },
-  /**
-   * `a11y`: `BRAINDOG_GATE_SEED=intent` prepends an `a[data-intent="bad"]` with no name for the
-   * intent. `13 §5.1`'s rule is about what reaches the DOM, so a rendered page is the only place it
-   * can be checked.
-   *
-   * AN ANCHOR BECAUSE A `div` PROVED NOTHING. The gate's exemption was written `button, a[href], …`,
-   * so every phone card, each one an anchor, was exempt, and the negative was seeding the one
-   * shape that could not slip through. The rule looked tested and covered a third of what it claimed.
-   */
-  {
-    gate: 'a11y',
-    seed: 'intent',
-    names: 'a.seeded[bad]',
-    blind: 'PASSED an intent with no glyph. Colour is carrying meaning alone and nothing sees it.',
-    red: 'red on an intent with no glyph',
-  },
   /**
    * `prefs`: `BRAINDOG_GATE_SEED=prefs` pins `--row-h`, `--t-ui` and `--text` to constants, which
    * is precisely what the build shipped for the life of the Text control, and the gate must notice
@@ -354,15 +349,143 @@ function seededBrowser({ gate, seed, names, blind, red }) {
 
 let ran = 0;
 
-/** One planted tree, run against the gate its `case.json` names. */
-function planted({ tree, gate, rule, expect, findings, total, skip }) {
-  const fixture = join(negatives, tree);
+/**
+ * THE BROWSER GATES THAT NAME THEIR OWN RULES, walked one browser launch per gate (PRF-B02 jobs 2 and 3, landed from
+ * batch 44's two builders as one walk).
+ *
+ * Each exports `RULES`, a list of `{ id, seed, expect }`, and plants every seed named in `BRAINDOG_GATE_SEED`, joined
+ * by commas, in one run of one browser. So one spawn answers for every rule, and each rule is red, unproved or blind
+ * on its own: a gate red on one seed can no longer carry another seed it never saw. Where a gate tags its findings
+ * `[id]` (`layout` does), a rule is judged on its own lines and `[id] not run:` is a seed this build could not plant;
+ * where it does not (`a11y`), every `expect` must appear in what the run said, and each is a name only its seed makes.
+ */
+export const WALKED = ['layout', 'a11y'];
+
+async function walkRules(gate) {
+  /* THE BUILD IS ASKED FIRST, BEFORE THE GATE IS EVEN IMPORTED, the same sentence `seededBrowser` says: a run with no
+     current build touches no browser gate at all. */
+  if (buildUnmet !== null) {
+    console.log(`  ${gate}: ${buildUnmet}, so its negative is not run`);
+    notRun.push(gate);
+    return;
+  }
+  const { RULES } = await import(pathToFileURL(join(here, `${gate}.mjs`)).href);
+  if (!Array.isArray(RULES) || RULES.length === 0) {
+    console.error(`  ${gate}: exports no RULES, so none of its rules has a planted fault.`);
+    failed.push(gate);
+    return;
+  }
   const r = spawnSync(process.execPath, [join(here, `${gate}.mjs`)], {
-    cwd: fixture,
+    cwd: join(here, '..', '..'),
     encoding: 'utf8',
-    env: { ...process.env, BRAINDOG_GATE_ROOT: fixture },
+    env: { ...process.env, BRAINDOG_GATE_SEED: RULES.map((rule) => rule.id).join(',') },
   });
-  const said = `${r.stdout}${r.stderr}`;
+  const lines = `${r.stdout}${r.stderr}`.split('\n').filter((l) => l.trim());
+  const tagged = lines.some((l) => RULES.some((rule) => l.includes(`[${rule.id}]`)));
+  for (const rule of RULES) {
+    const said = tagged ? lines.filter((l) => l.includes(`[${rule.id}]`)) : lines;
+    const skipped = said.find((l) => l.includes(`[${rule.id}] not run:`));
+    const unnamed = [rule.expect].flat().filter((n) => !said.some((l) => l.includes(n)));
+    if (skipped) {
+      console.log(`  ${rule.id}: ${skipped.trim().slice(`[${rule.id}] `.length)}`);
+      notRun.push(rule.id);
+    } else if (r.status === 0 || unnamed.length) {
+      console.error(`  ${rule.id}: PASSED ${rule.seed}, or went red without naming ${unnamed.join(' or ') || 'it'}.`);
+      if (tagged) console.error(said.map((l) => `      ${l.trim()}`).join('\n'));
+      failed.push(rule.id);
+    } else {
+      ran++;
+      console.log(`  ${rule.id}: red on ${rule.seed}`);
+    }
+  }
+}
+
+/**
+ * THE GATES THAT DO NOT LIVE HERE AS `<gate>.mjs`, run the way `run.mjs` runs them (PRF-B02 jobs 4 and 5).
+ * `typecheck` is `pnpm -r run typecheck` in the tree, which is a workspace of its own, and `theme` is the skin's
+ * script with `--check` and the tree's token file. `test/cases-45.test.mjs` holds these to `run.mjs`'s own two lines.
+ */
+export const ELSEWHERE = new Map([
+  ['typecheck', () => ['pnpm -r run typecheck', [], { shell: true }]],
+  [
+    'theme',
+    (fixture) => [process.execPath, [join(here, '..', '..', 'packages', 'skin', 'scripts', 'theme.mjs'), '--check', '--tokens', join(fixture, 'tokens.json')]],
+  ],
+]);
+
+/**
+ * A loopback server over one folder of a tree: `/x/` is `x/index.html` and a path is its file. A path the folder does
+ * not hold is not answered at all, which the gate reads as a fetch that failed; a status code would be one more number
+ * in this file for the ledger to hold.
+ */
+function host(folder) {
+  const server = createServer((req, res) => {
+    const path = normalize(decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)).replace(/^[/\\]+/u, '');
+    const file = join(folder, path === '' || /[/\\]$/u.test(path) ? join(path, 'index.html') : path);
+    if (path.includes('..') || !existsSync(file) || !statSync(file).isFile()) return req.socket.destroy();
+    res.end(readFileSync(file));
+  });
+  return new Promise((done) => server.listen(0, '127.0.0.1', () => done(server)));
+}
+
+/**
+ * `self-test` ON ITS OWN PLANTED TREE, asked in this process: the tree's runner read for its gates, its `negative/`
+ * read for its cases, and the gate-has-a-case rule over the two. Spawning this file on the tree would run every
+ * other negative again from inside itself, which is why `EXCUSED` holds it; the rule is what the tree proves.
+ */
+function selfOnTree(fixture) {
+  const gates = join(fixture, 'tools', 'gates');
+  try {
+    const registered = registeredGates(readFileSync(join(gates, 'run.mjs'), 'utf8'));
+    const { cases, refused } = readCases(join(gates, 'negative'), registered);
+    const lines = [...refused, ...caseRule(registered, new Set(cases.map((c) => c.gate))).red.map(([, line]) => line)];
+    return { status: lines.length ? 1 : 0, said: lines.join('\n') };
+  } catch (cause) {
+    return { status: 1, said: `the tree could not be read as a repository: ${cause.message}` };
+  }
+}
+
+/** One case's gate, run in the shape its `case.json` asks for, and everything it said. */
+export async function runCase({ tree, gate, seed, serve, env }) {
+  const fixture = join(negatives, tree);
+  if (gate === 'self-test') return selfOnTree(fixture);
+  const [command, args, opts = {}] = ELSEWHERE.get(gate)?.(fixture) ?? [process.execPath, [join(here, `${gate}.mjs`)]];
+  const cwd = seed ? join(here, '..', '..') : fixture;
+  const vars = { ...process.env, ...(seed ? { BRAINDOG_GATE_SEED: seed } : { BRAINDOG_GATE_ROOT: fixture }), ...env };
+  if (!serve) {
+    const r = spawnSync(command, args, { cwd, encoding: 'utf8', env: vars, ...opts });
+    return { status: r.status, said: `${r.stdout}${r.stderr}` };
+  }
+  /* SPAWNED WITHOUT WAITING, because the host is this process: a `spawnSync` would hold the one thread the planted
+     host answers on, and the gate would be asking a server that cannot speak. */
+  const server = await host(join(fixture, serve));
+  vars.DEPLOY_HOST = `http://127.0.0.1:${server.address().port}`;
+  try {
+    return await new Promise((done) => {
+      let said = '';
+      const child = spawn(command, args, { cwd, env: vars, ...opts });
+      child.stdout.on('data', (b) => (said += b));
+      child.stderr.on('data', (b) => (said += b));
+      child.on('error', (e) => done({ status: 1, said: `${said}${e.message}` }));
+      child.on('close', (status) => done({ status, said }));
+    });
+  } finally {
+    await new Promise((r) => server.close(() => r()));
+  }
+}
+
+/** One planted tree, run against the gate its `case.json` names. */
+async function planted(c) {
+  const { tree, gate, rule, expect, findings, total, skip, seed } = c;
+  const fixture = join(negatives, tree);
+  /* A SEED RUNS OVER THE REPOSITORY'S BUILD, and a build older than the source is not one (see `buildUnmet`). */
+  if (seed && buildUnmet !== null) {
+    console.log(`  ${gate} (${tree}): ${buildUnmet}, so its negative is not run`);
+    notRun.push(tree);
+    return;
+  }
+  const { status, said } = await runCase(c);
+  const r = { status };
 
   /* RED, AND ABOUT THE RIGHT THING. An exit code alone would be satisfied by a gate that crashed,
      which is a different failure wearing the same colour. */
@@ -425,20 +548,26 @@ function planted({ tree, gate, rule, expect, findings, total, skip }) {
 /**
  * EVERY REGISTERED GATE HAS A PLANTED FAULT, the rule the old list could not state. A gate with no
  * tree, no browser negative and no place on `GAPS` is red here and named; a gap that has gained one
- * is red too, until it comes off the list.
+ * is red too, until it comes off the list. It returns its red lines rather than printing them, so
+ * `negative/self-test-missing/` is asked the very same rule over a runner and a `negative/` of its own.
  */
-function everyGateHasACase(registered, cases) {
-  const covered = new Set([...cases.map((c) => c.gate), ...BROWSER.map((b) => b.gate)]);
+export function caseRule(registered, covered) {
   const { missing, closed, open } = uncovered(registered, covered);
-  for (const g of missing) {
-    console.error(`  ${g}: registered in run.mjs with no planted fault. A gate that has never failed may not work.`);
+  const red = [
+    ...missing.map((g) => [g, `${g}: registered in run.mjs with no planted fault. A gate that has never failed may not work.`]),
+    ...closed.map((g) => [g, `${g}: has a planted fault now and is still on GAPS. Take it off; the list only shrinks.`]),
+  ];
+  return { red, open };
+}
+
+function everyGateHasACase(registered, cases) {
+  const covered = new Set([...cases.map((c) => c.gate), ...BROWSER.map((b) => b.gate), ...WALKED]);
+  const { red, open } = caseRule(registered, covered);
+  for (const [g, line] of red) {
+    console.error(`  ${line}`);
     failed.push(g);
   }
-  for (const g of closed) {
-    console.error(`  ${g}: has a planted fault now and is still on GAPS. Take it off; the list only shrinks.`);
-    failed.push(g);
-  }
-  if (!missing.length && !closed.length) {
+  if (!red.length) {
     ran++;
     const planted = [...registered].filter((g) => covered.has(g)).length;
     console.log(`  every gate has a case: ${planted} of ${registered.size} registered gates planted, self-test excused, the rest named below`);
@@ -592,8 +721,9 @@ async function main() {
     failed.push(line.split('/')[1]);
   }
 
-  for (const c of cases) planted(c);
+  for (const c of cases) await planted(c);
   for (const b of BROWSER) seededBrowser(b);
+  for (const gate of WALKED) await walkRules(gate);
   everyGateHasACase(registered, cases);
 
   budgetsAreRead();

@@ -20,6 +20,7 @@
  *
  *   node scripts/theme.mjs           write them
  *   node scripts/theme.mjs --check   fail if a committed file is not what the generator emits
+ *   node scripts/theme.mjs --check --tokens <file>   fail if a token file breaks a check (see `readTokens`)
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
@@ -172,22 +173,76 @@ if (a11y === null) {
 const houseDoc = toCSS(HOUSE, HIGH_CONTRAST) + a11y;
 const alphaDoc = toCSS(ALPHA, ALPHA_HIGH_CONTRAST) + a11y;
 
+/**
+ * `--tokens <file>` VALIDATES A TOKEN FILE IN PLACE OF THE FOUR PALETTES, so the check can be pointed at one
+ * (PRF-B02 job 5). Until this the gate could only ever validate what the seed generates, which the generator had
+ * already solved to pass, so nothing had shown it refuse anything; `tools/gates/negative/theme/` is the file that does.
+ *
+ * The file is JSON: `{ "theme": "house", "light": { "<role>": "#rrggbb" }, "dark": { ... } }`. It names a shipped
+ * theme and only the values it changes, and those values replace the theme's own before the same checks run against
+ * the same document. A file that names no theme, a role the theme does not have or a value that is not six hex
+ * digits is refused here, because a misspelt role would otherwise be added beside the real one and validate nothing.
+ */
+const THEMES = {
+  house: [HOUSE, houseDoc],
+  'high-contrast': [HIGH_CONTRAST, houseDoc],
+  alpha: [ALPHA, alphaDoc],
+  'alpha-high-contrast': [ALPHA_HIGH_CONTRAST, alphaDoc],
+};
+
+async function readTokens(file) {
+  const refuse = (why) => {
+    console.error(`  --tokens ${file ?? ''}: ${why}`);
+    process.exit(1);
+  };
+  if (!file || file.startsWith('--')) refuse('names no token file to check.');
+  let body;
+  try {
+    body = JSON.parse(await readFile(file, 'utf8'));
+  } catch (cause) {
+    refuse(`could not be read as JSON: ${String(cause?.message ?? cause).split('\n')[0]}`);
+  }
+  const named = typeof body?.theme === 'string' && Object.hasOwn(THEMES, body.theme) ? THEMES[body.theme] : null;
+  if (!named) refuse(`names the theme ${JSON.stringify(body?.theme)}, and the themes are ${Object.keys(THEMES).join(', ')}.`);
+  const [built, doc] = named;
+  const schemes = { ...built.schemes };
+  for (const scheme of Object.keys(body).filter((k) => k !== 'theme')) {
+    if (!Object.hasOwn(built.schemes, scheme)) refuse(`says ${scheme}, and a theme has only ${Object.keys(built.schemes).join(' and ')}.`);
+    schemes[scheme] = { ...built.schemes[scheme] };
+    for (const [role, value] of Object.entries(body[scheme] ?? {})) {
+      if (!Object.hasOwn(built.schemes[scheme], role)) refuse(`changes ${role} in ${scheme}, and ${body.theme} has no token by that name.`);
+      if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/iu.test(value)) refuse(`gives ${role} in ${scheme} the value ${JSON.stringify(value)}, and a token is six hex digits.`);
+      schemes[scheme][role] = value;
+    }
+  }
+  return { built: { ...built, schemes }, doc, theme: body.theme };
+}
+
+const flag = process.argv.indexOf('--tokens');
+const tokens = flag < 0 ? null : await readTokens(process.argv[flag + 1]);
+
 /* EVERY PALETTE THAT SHIPS, NOT ONLY THE HOUSE ONE. An environment palette is a real palette a real
    person reads all day; validating the house theme and shipping a second unvalidated one would be
    the exact defect 28 section 4.5 refuses - "an auto-corrected theme is not portable" - one step
    further along, where nothing was even asked. */
-const bad = [
-  ...refusals(validate(HOUSE, houseDoc)),
-  ...refusals(validate(HIGH_CONTRAST, houseDoc)),
-  ...refusals(validate(ALPHA, alphaDoc)),
-  ...refusals(validate(ALPHA_HIGH_CONTRAST, alphaDoc)),
-];
+const bad = tokens
+  ? refusals(validate(tokens.built, tokens.doc))
+  : [
+      ...refusals(validate(HOUSE, houseDoc)),
+      ...refusals(validate(HIGH_CONTRAST, houseDoc)),
+      ...refusals(validate(ALPHA, alphaDoc)),
+      ...refusals(validate(ALPHA_HIGH_CONTRAST, alphaDoc)),
+    ];
 if (bad.length > 0) {
   for (const f of bad) console.error(`  REFUSED ${f.check}  ${f.fix}`);
   process.exit(1);
 }
 
-if (process.argv.includes('--check')) {
+/* A TOKEN FILE IS CHECKED AND NEVER WRITTEN, and the generated files are not compared against it: they are the
+   seed's, and a file of hand-picked values is not what they are generated from. */
+if (tokens) {
+  console.log(`  the token file passes every check ${tokens.theme} is held to.`);
+} else if (process.argv.includes('--check')) {
   let wrong = 0;
   for (const { path, text } of ARTEFACTS) {
     const on_disk = await readFile(path, 'utf8').catch(() => '');

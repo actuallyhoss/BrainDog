@@ -1,0 +1,8 @@
+{
+  "gate": "migration-lock",
+  "rule": "one byte of an applied migration changed",
+  "expect": "is not the text the lock holds",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE BYTE, IN THE SQL, AND NOTHING ELSE WRONG. Two planted migrations and their lock: the first is untouched, so a gate that went red on every file would count two; the second was locked as `name TEXT` and reads `nane TEXT`, the smallest edit a person makes by accident and the one the runner refuses on a live record. Both are `applied`, so no receipt is asked for, the numbers run 0001 and 0002 with no gap, and every file is in the lock: a red line about any of those would make the total two. The other rules (a skipped number, a number held twice, a file not in the lock, a locked file gone, a new file with no receipt, a trailing space that moves nothing) are planted one by one in temporary trees by `test/migration-lock.test.mjs`, because this folder holds one tree."
+}

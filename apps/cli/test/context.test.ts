@@ -90,7 +90,7 @@ async function stubRecord(t: After, answer: Answer) {
       seen.push({ method, authorization: req.headers.authorization, headers: req.headers });
       res.writeHead(200, { 'content-type': 'application/json' });
       const value = answer.of?.(req.headers) ?? answer.value ?? BARE;
-      const name = answer.name === undefined ? 'Sam' : answer.name;
+      const name = answer.name === undefined ? 'Mara' : answer.name;
       if (method === 'boot' && name !== null)
         return res.end(
           JSON.stringify({
@@ -182,7 +182,7 @@ test('braindog context prints the card, line by line, and exits 0', async (t) =>
     'BrainDog · run S7 · project Kiln · on MacBook',
     `Also     Money page (S6, Claude Code, 4m ago) is working in this repository too. ${TWO_SESSIONS}`,
     'Next     Wire the device routes into the self-host. (S5, 3h ago, check before acting)',
-    'Waiting  1 on Sam: Keep the address field?',
+    'Waiting  1 on Mara: Keep the address field?',
     'Learned  Run the gates after the build, never beside it.',
     'More     1 dead end · 1 key by name · 1 skill · call context',
   ]);
@@ -203,7 +203,7 @@ test('WHOSE THE QUESTIONS ARE is asked only when one waits, and a record that wi
   /* The same read counts them all, where `context` sends only the newest. */
   const counted = await setup(t, { value: FULL, decide: 12 });
   assert.equal(await counted.run(), 0, counted.stderr());
-  assert.ok(counted.out.includes('Waiting  12 on Sam: Keep the address field?'), counted.out.join('\n'));
+  assert.ok(counted.out.includes('Waiting  12 on Mara: Keep the address field?'), counted.out.join('\n'));
 });
 
 test('THE FIRST LINE CARRIES NO EVENT WORD: the run, its project, and the app and machine, and a state only once it has ended', () => {

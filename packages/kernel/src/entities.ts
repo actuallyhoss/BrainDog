@@ -135,9 +135,11 @@ export function rekey(sql: Pick<Sql, 'one' | 'all' | 'exec'>, list: KeyedList, b
   }
   if (was !== undefined && own.length > 0) {
     const chain = [was, ...foldChain(sql, field!, was)].filter((id) => id !== after.id);
-    const marks = chain.map(() => '?').join(', ');
+    /* THE CHAIN IS ONE BOUND JSON ARRAY, so the statement binds four parameters however long the chain, inside the
+       Durable Object's hundred (`DO_LIMITS.variableNumber`, `ports/src/sql.ts`). */
+    const ids = JSON.stringify(chain);
     for (const key of own)
-      sql.exec(`UPDATE entity_key SET row_id = ?, at = ? WHERE key = ? AND row_id IN (${marks})`, after.id, at, key, ...chain);
+      sql.exec('UPDATE entity_key SET row_id = ?, at = ? WHERE key = ? AND row_id IN (SELECT value FROM json_each(?))', after.id, at, key, ids);
   }
   const had = before === null || before.deleted_at !== null ? [] : rowKeys(list, before.fields);
   for (const key of had) if (!own.includes(key)) sql.exec('DELETE FROM entity_key WHERE key = ? AND row_id = ?', key, after.id);
@@ -199,14 +201,16 @@ function parsed(fields: string): Record<string, unknown> {
 /**
  * The live rows of `register` holding any of `keys`, oldest first, each with the keys it answered to. A key held by a
  * row of another list is not one of them: a person is never found by an organisation's key, nor the other way.
+ *
+ * THE KEYS ARE ONE BOUND JSON ARRAY, so a row carrying 250 handles asks in two parameters and not 251.
  */
 export function holders(sql: Pick<Sql, 'all'>, register: string, keys: readonly string[]): { id: string; keys: string[] }[] {
   if (keys.length === 0) return [];
   const rows = sql.all<{ key: string; row_id: string }>(
     `SELECT k.key, k.row_id FROM entity_key k JOIN entry e ON e.id = k.row_id
-      WHERE k.key IN (${keys.map(() => '?').join(', ')}) AND k.register = ? AND e.deleted_at IS NULL
+      WHERE k.key IN (SELECT value FROM json_each(?)) AND k.register = ? AND e.deleted_at IS NULL
       ORDER BY e.seq, e.id`,
-    ...keys,
+    JSON.stringify(keys),
     register,
   );
   const out = new Map<string, string[]>();

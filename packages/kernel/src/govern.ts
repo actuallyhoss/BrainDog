@@ -1676,7 +1676,20 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
         fix: `rows is a list of one to ${ARRANGE_ROWS} rows, each {"register":"<id>","fields":{...},"links":{"<field>":<position of an earlier row>}}.`,
         at: 'body.rows',
       };
+    /* OR A PATCH (REC-A06 step 4): `{ register, at, version, patch }` and the fields it was read as, checked as a
+       rowset's update is, list by list so each is counted in its place. */
+    const rows = body.rows as unknown[];
+    for (const register of new Set(rows.flatMap((r) => (isMap(r) && 'at' in r && typeof r.register === 'string' ? [r.register] : [])))) {
+      const updates = rows.map((r) => {
+        if (!isMap(r) || !('at' in r) || r.register !== register) return {};
+        const { register: _list, before: _read, part: _part, group: _group, ...update } = r;
+        return update;
+      });
+      const bad = checkUpdates(deps, register, updates);
+      if (bad) return bad;
+    }
     for (const [i, r] of body.rows.entries()) {
+      if (isMap(r) && 'at' in r && typeof r.register === 'string') continue;
       if (!isMap(r) || typeof r.register !== 'string' || !isMap(r.fields))
         return { code: 'VALUE_MALFORMED', fix: 'A row is {"register":"<id>","fields":{...}}.', at: `body.rows[${i}]` };
       if (r.links !== undefined) {
@@ -1705,6 +1718,252 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
       at: 'body_kind',
     };
   return null;
+}
+
+/* ── the parts of an arrangement (REC-A06 step 7) ────────────────────────── */
+
+/**
+ * One part of an arrangement, which an accept may take or leave: an install, a pack turned on or off, a page, a
+ * settings change, the entries for one list, a declaration, or a choice. `id` is the handle an accept names it by, `name`
+ * is what a person reads, and `needs` are the parts it cannot be taken without.
+ *
+ * THE IDS ARE THE ONES THE RECORD FILES on the body's `parts` (`arrange.ts` `partsOf`): `install:<pack>`,
+ * `enable:<pack>`, `disable:<pack>`, `setting:<pack>`, `rows:<list>`, `page:<page>` and `choice:<id>`, so the ids the
+ * owner's Decide reads off the question are the ones this accepts. Settings sent with an install fill that install, and
+ * are part of it.
+ */
+export type ArrangePart = {
+  id: string;
+  kind: 'install' | 'enable' | 'disable' | 'page' | 'setting' | 'rows' | 'declaration' | 'choice';
+  name: string;
+  needs: string[];
+};
+
+const PART_VERBS = ['install', 'enable', 'disable'] as const;
+
+const listOf = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const textsOf = (v: unknown): string[] => listOf(v).filter((x): x is string => typeof x === 'string');
+
+/** The first of `keys` an item carries as text, which is the part the record filed it under. */
+function filedPart(item: unknown, keys: readonly string[]): string | null {
+  if (!isMap(item)) return null;
+  for (const k of keys) if (typeof item[k] === 'string' && (item[k] as string).trim()) return item[k] as string;
+  return null;
+}
+
+/** A pack, a list or a declaration as a person reads it: the name the record filed, else its handle in plain words. */
+function spokenName(names: Record<string, unknown>, key: string, handle: string): string {
+  const filed = names[key];
+  if (typeof filed === 'string' && filed.trim()) return filed.trim();
+  const words = handle.replace(/^[a-z]+[.:]/u, '').replace(/[-_.]+/gu, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * What the record's own label for a part says a pack or a list is called, `Add Stripe` or `Additions to Bills`, so the
+ * kernel names it as Decide does. Null when the record filed no label of that shape.
+ */
+function labelled(body: Record<string, unknown>, by: 'pack' | 'register', id: string): string | null {
+  const shape = by === 'pack' ? /^(?:Add|Update|Turn on|Turn off|Settings of) (.+)$/u : /^(?:Additions and changes|Additions|Changes) to (.+)$/u;
+  for (const p of listOf(body.parts)) {
+    const said = isMap(p) && p[by] === id && typeof p.label === 'string' ? shape.exec(p.label.trim())?.[1] : undefined;
+    if (said) return said;
+  }
+  return null;
+}
+
+/**
+ * The part each plan step, page, setting, entry and declaration of a body belongs to, by its place in its list: the part
+ * the record filed on it (`part`, or a row's `group`), else the one the record's ids give it, so a body filed before
+ * parts existed still splits. Entries for one list are one part unless the record grouped them. A setting, or a plan
+ * step, for an add-on the same body installs is that install's.
+ */
+function placesOf(body: Record<string, unknown>) {
+  const installing = new Set(textsOf(isMap(body.packs) ? body.packs.install : undefined));
+  const ofPack = (pack: string) => (installing.has(pack) ? `install:${pack}` : `setting:${pack}`);
+  const plan = listOf(body.plan).map((e) => (isMap(e) && typeof e.pack === 'string' ? (e.replan === true ? ofPack(e.pack) : `install:${e.pack}`) : null));
+  const pages = listOf(body.pages).map((p) => filedPart(p, ['part']) ?? (isMap(p) && typeof p.id === 'string' ? `page:${p.id.replace(/^page\./u, '')}` : null));
+  const settings = listOf(body.settings).map((s) => filedPart(s, ['part']) ?? (isMap(s) && typeof s.pack === 'string' ? ofPack(s.pack) : null));
+  const declarations = listOf(body.declarations).map((d) => filedPart(d, ['part']) ?? (isMap(d) && typeof d.id === 'string' ? `declaration:${d.id}` : null));
+  const rows = listOf(body.rows).map((r) => filedPart(r, ['part', 'group']) ?? (isMap(r) && typeof r.register === 'string' ? `rows:${r.register}` : null));
+  return { plan, pages, settings, declarations, rows };
+}
+
+/** The settings a declaration reads, `{{config:<key>}}`, anywhere in it. */
+const settingsRead = (decl: unknown): string[] => [...JSON.stringify(decl ?? null).matchAll(/\{\{config:([a-z0-9_]+)\}\}/giu)].map((m) => m[1]!);
+
+/**
+ * The parts of an arrangement, in the order it applies them, each with what it needs.
+ *
+ * WHAT A PART NEEDS IS WORKED OUT HERE FROM THE BODY, and the record's own `parts` list (`requires`) can only add to it,
+ * so a proposer cannot loosen what goes together: a setting
+ * fills the install of its pack when the same arrangement installs it; a declaration or page that reads a setting needs
+ * the settings that set it; entries need the install or declaration that makes their list; an install needs the
+ * installs its plan says it requires. Entries that point at each other by place go together both ways, because a place
+ * means nothing once one side is gone.
+ */
+export function partsOf(body: Record<string, unknown>): ArrangePart[] {
+  const names = isMap(body.names) ? body.names : {};
+  const out = new Map<string, ArrangePart>();
+  const add = (id: string, kind: ArrangePart['kind'], name: string): ArrangePart => {
+    const had = out.get(id);
+    if (had) return had;
+    const part = { id, kind, name, needs: [] as string[] };
+    out.set(id, part);
+    return part;
+  };
+  const need = (part: ArrangePart, on: string) => {
+    if (on !== part.id && out.has(on) && !part.needs.includes(on)) part.needs.push(on);
+  };
+  const pack = (id: string) => (typeof names[`pack.${id}`] === 'string' ? null : labelled(body, 'pack', id)) ?? spokenName(names, `pack.${id}`, id);
+  const packs = isMap(body.packs) ? body.packs : {};
+  for (const verb of PART_VERBS)
+    for (const id of textsOf(packs[verb]))
+      add(`${verb}:${id}`, verb, verb === 'install' ? `the ${pack(id)} add-on` : `turning ${verb === 'enable' ? 'on' : 'off'} ${pack(id)}`);
+
+  const at = placesOf(body);
+  for (const [i, p] of listOf(body.pages).entries()) {
+    const id = at.pages[i];
+    if (!id || !isMap(p)) continue;
+    const title = isMap(p.body) && typeof p.body.title === 'string' && p.body.title.trim() ? p.body.title.trim() : null;
+    add(id, 'page', `the ${typeof p.id === 'string' && typeof names[p.id] === 'string' ? names[p.id] : (title ?? spokenName(names, id, id))} page`);
+  }
+  for (const [i, s] of listOf(body.settings).entries()) {
+    const id = at.settings[i];
+    if (id && isMap(s) && typeof s.pack === 'string') add(id, 'setting', `the settings for ${pack(s.pack)}`);
+  }
+  for (const [i, d] of listOf(body.declarations).entries()) {
+    const id = at.declarations[i];
+    if (!id || !isMap(d)) continue;
+    const own = isMap(d.body) ? (typeof d.body.name === 'string' ? d.body.name : typeof d.body.title === 'string' ? d.body.title : null) : null;
+    const handle = typeof d.id === 'string' ? d.id : id;
+    add(id, 'declaration', `the ${own?.trim() || `${spokenName(names, handle, handle)}${typeof d.kind === 'string' ? ` ${d.kind}` : ''}`}`);
+  }
+  for (const [i, r] of listOf(body.rows).entries()) {
+    const id = at.rows[i];
+    if (id && isMap(r) && typeof r.register === 'string')
+      add(id, 'rows', `the entries for ${(typeof names[`register.${r.register}`] === 'string' ? null : labelled(body, 'register', r.register)) ?? spokenName(names, `register.${r.register}`, r.register)}`);
+  }
+  /* A CHOICE THE RECORD FILED AS A PART, which travels with the half that takes it. */
+  for (const p of listOf(body.parts))
+    if (isMap(p) && p.kind === 'choice' && typeof p.id === 'string') add(p.id, 'choice', `the choice ${typeof p.label === 'string' && p.label.trim() ? `"${p.label.trim()}"` : 'left to you'}`);
+
+  /* WHAT EACH NEEDS, now that every part is known. */
+  const plan = listOf(body.plan).filter(isMap);
+  const installing = (declId: string) => plan.filter((e) => typeof e.pack === 'string' && textsOf(e.adds).includes(declId)).map((e) => `install:${String(e.pack)}`);
+  for (const e of plan) {
+    const part = out.get(`install:${String(e.pack)}`);
+    if (part) for (const q of textsOf(e.requires)) need(part, `install:${q}`);
+  }
+  const setters = listOf(body.settings).flatMap((s, i) => (isMap(s) && isMap(s.values) && at.settings[i] ? [{ id: at.settings[i]!, pack: String(s.pack), keys: Object.keys(s.values) }] : []));
+  for (const s of setters) {
+    const part = out.get(s.id);
+    if (part) for (const verb of ['install', 'enable']) need(part, `${verb}:${s.pack}`);
+  }
+  const reading = (part: ArrangePart, decl: Record<string, unknown>) => {
+    const keys = settingsRead(decl);
+    for (const s of setters) if ((typeof decl.pack !== 'string' || decl.pack === s.pack) && s.keys.some((k) => keys.includes(k))) need(part, s.id);
+    if (typeof decl.pack === 'string') need(part, `install:${decl.pack}`);
+  };
+  for (const [i, p] of listOf(body.pages).entries()) if (at.pages[i] && isMap(p)) reading(out.get(at.pages[i]!)!, p);
+  for (const [i, d] of listOf(body.declarations).entries()) if (at.declarations[i] && isMap(d)) reading(out.get(at.declarations[i]!)!, d);
+  const declaring = new Map(listOf(body.declarations).flatMap((d, i) => (isMap(d) && typeof d.id === 'string' && at.declarations[i] ? [[d.id, at.declarations[i]!] as const] : [])));
+  for (const [i, r] of listOf(body.rows).entries()) {
+    const id = at.rows[i];
+    if (!id || !isMap(r) || typeof r.register !== 'string') continue;
+    const part = out.get(id)!;
+    const list = `register.${r.register}`;
+    for (const by of installing(list)) need(part, by);
+    const decl = declaring.get(list);
+    if (decl) need(part, decl);
+    for (const to of Object.values(isMap(r.links) ? r.links : {})) {
+      const other = typeof to === 'number' ? at.rows[to] : undefined;
+      if (other && other !== id) {
+        need(part, other);
+        need(out.get(other)!, id);
+      }
+    }
+  }
+  for (const p of listOf(body.parts)) {
+    const part = isMap(p) && typeof p.id === 'string' ? out.get(p.id) : undefined;
+    if (part) for (const on of [...textsOf((p as Record<string, unknown>).requires), ...textsOf((p as Record<string, unknown>).needs)]) need(part, on);
+  }
+  return [...out.values()];
+}
+
+/**
+ * The arrangement holding only the parts in `keep`, with everything that says what it is kept on both halves: why, the
+ * names, the use case and the calls out it shows. A call out shown for an install not taken asks nothing of the record,
+ * because each install is armed with its own plan's lines (`arrange.ts` `apply`), never the body's.
+ *
+ * ENTRIES POINT AT EACH OTHER BY PLACE, so the places are counted again in what is kept. A link whose entry was left is
+ * never seen here: `partsOf` makes the two go together.
+ */
+function narrowArrangement(body: Record<string, unknown>, keep: ReadonlySet<string>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...body };
+  const at = placesOf(body);
+  const set = (key: string, items: unknown[]) => {
+    if (items.length === 0) delete out[key];
+    else out[key] = items;
+  };
+  if (isMap(body.packs)) {
+    const packs: Record<string, unknown> = {};
+    for (const verb of PART_VERBS) {
+      const ids = textsOf(body.packs[verb]).filter((id) => keep.has(`${verb}:${id}`));
+      if (ids.length > 0) packs[verb] = ids;
+    }
+    out.packs = packs;
+  }
+  for (const key of ['plan', 'pages', 'settings', 'declarations'] as const)
+    if (body[key] !== undefined) set(key, listOf(body[key]).filter((_, i) => keep.has(at[key][i] ?? '')));
+  if (body.rows !== undefined) {
+    const rows = listOf(body.rows);
+    const place = new Map<number, number>();
+    for (const i of rows.keys()) if (keep.has(at.rows[i] ?? '')) place.set(i, place.size);
+    set(
+      'rows',
+      [...place.keys()].map((i) => {
+        const r = rows[i] as Record<string, unknown>;
+        if (!isMap(r.links)) return r;
+        const links = Object.fromEntries(Object.entries(r.links).flatMap(([f, to]) => (typeof to === 'number' && place.has(to) ? [[f, place.get(to)!]] : [])));
+        return { ...r, links };
+      }),
+    );
+  }
+  if (Array.isArray(body.parts)) set('parts', body.parts.filter((p) => isMap(p) && typeof p.id === 'string' && keep.has(p.id)));
+  return out;
+}
+
+/**
+ * Parts taken and then not applied, laid back on the question that still holds the rest: what was taken first, as it
+ * applies first, and the rest after it, with the places the rest's entries point at moved past the taken ones.
+ */
+function mergeArrangement(rest: Record<string, unknown>, taken: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...rest };
+  const both = (key: string) => [...listOf(taken[key]), ...listOf(rest[key])];
+  const set = (key: string, items: unknown[]) => {
+    if (items.length > 0) out[key] = items;
+  };
+  const a = isMap(taken.packs) ? taken.packs : {};
+  const b = isMap(rest.packs) ? rest.packs : {};
+  const packs: Record<string, unknown> = {};
+  for (const verb of PART_VERBS) {
+    const ids = [...new Set([...textsOf(a[verb]), ...textsOf(b[verb])])];
+    if (ids.length > 0) packs[verb] = ids;
+  }
+  if (taken.packs !== undefined || rest.packs !== undefined) out.packs = packs;
+  for (const key of ['plan', 'pages', 'settings', 'declarations', 'parts']) set(key, both(key));
+  const first = listOf(taken.rows).length;
+  set('rows', [
+    ...listOf(taken.rows),
+    ...listOf(rest.rows).map((r) =>
+      isMap(r) && isMap(r.links) ? { ...r, links: Object.fromEntries(Object.entries(r.links).map(([f, to]) => [f, typeof to === 'number' ? to + first : to])) } : r,
+    ),
+  ]);
+  if (isMap(taken.names) || isMap(rest.names)) out.names = { ...(isMap(taken.names) ? taken.names : {}), ...(isMap(rest.names) ? rest.names : {}) };
+  const approve = [...new Set([...textsOf(taken.approve), ...textsOf(rest.approve)])];
+  if (approve.length > 0) out.approve = approve;
+  return out;
 }
 
 /** The keys a `rowset` row that updates carries, and nothing beside them. */
@@ -1856,8 +2115,11 @@ export type Verdict =
   /**
    * `rows`, on accepting a `rowset` only: the rows to write, by their place in the body from 0. The rest are declined
    * with the same decision, so a proposal of seven servers can take three. Leaving it out accepts every row.
+   *
+   * `parts`, on accepting an `arrange` only: the parts to take, by the ids `partsOf` gives. The rest stay open as the
+   * same question, with its cause and its history. Leaving it out, or naming none, takes every part.
    */
-  | { decide: { option: string; reason: string; rows?: number[] } }
+  | { decide: { option: string; reason: string; rows?: number[]; parts?: string[] } }
   | { defer: { until: string; why: string } }
   | { resolved_as: 'wont-fix' | 'incorrect'; reason?: string }
   /**
@@ -2084,6 +2346,39 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     only = new Set(picked);
   }
 
+  /* SOME OF AN ARRANGEMENT, BY PART (REC-A06 step 7). What is taken is applied as one, all or none, and the rest stays
+     open as the same question: its id, its cause and its history. A part another part needs is never taken alone, and
+     the refusal names both as the owner reads them. Every part named is every part, which is an accept as it always was. */
+  const naming = 'decide' in verdict ? verdict.decide.parts : undefined;
+  let taking: { taken: Record<string, unknown>; rest: Record<string, unknown>; parts: string[] } | null = null;
+  if (naming !== undefined && !(Array.isArray(naming) && naming.length === 0)) {
+    if (row.body_kind !== 'arrange' || option !== 'accept')
+      return no<Decided>('VALUE_MALFORMED', 'parts picks which parts of an arrangement to accept, so it goes only with accept on an arrangement.', { at: 'parts' });
+    const all = partsOf(body);
+    const ids = all.map((p) => p.id);
+    if (!Array.isArray(naming) || naming.some((p) => typeof p !== 'string' || !ids.includes(p)) || new Set(naming).size !== naming.length)
+      return no<Decided>('ENUM_VALUE_UNKNOWN', 'parts names the parts to accept, each once, from the ones this question holds. To accept none, reject it.', {
+        at: 'parts',
+        allowed: ids,
+      });
+    const keep = new Set(naming);
+    for (const p of all)
+      for (const on of keep.has(p.id) ? p.needs : [])
+        if (!keep.has(on)) {
+          const name = all.find((x) => x.id === on)?.name ?? on;
+          return no<Decided>('REQUIRED_MISSING', `${p.name.charAt(0).toUpperCase()}${p.name.slice(1)} cannot be taken without ${name}. Take both, or leave both for later.`, {
+            at: 'parts',
+            allowed: [p.id, on],
+          });
+        }
+    if (keep.size < all.length)
+      taking = {
+        taken: narrowArrangement(body, keep),
+        rest: narrowArrangement(body, new Set(ids.filter((x) => !keep.has(x)))),
+        parts: ids.filter((x) => keep.has(x)),
+      };
+  }
+
   const wrote: string[] = [];
   /* ONE BATCH FOR THE WHOLE DECISION, minted before anything is written: the rows an accepted rowset writes and the
      rules they start share it with the decision's own two events, so a decision is undone as one. */
@@ -2113,7 +2408,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         wrote.push(made.value.id);
       }
     } else if (arranging(row.body_kind)) {
-      apply = { kind: row.body_kind, body };
+      apply = { kind: row.body_kind, body: taking?.taken ?? body };
     } else if (row.body_kind === 'pattern' || row.body_kind === 'change') {
       install = (row.body_kind === 'pattern' ? body.ingest : body.to) as Record<string, unknown>;
       if (!install || typeof install !== 'object')
@@ -2231,18 +2526,27 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     at,
     id,
   );
-  deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'addressed' WHERE id = ?", id);
+  /* A QUESTION ACCEPTED IN PART STAYS OPEN, holding what was not taken, and keeps its cause, so the same ask filed again
+     still finds it. What was taken is kept on the decision's event, which is where `reopen` reads it back from. */
+  if (taking) deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify(taking.rest), id);
+  else deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'addressed' WHERE id = ?", id);
   /* AND THE LINES THAT PRESS APPROVED, word for word, so "what did I agree to send" has an answer that does not depend
      on the declaration staying as it was. */
   const approved = option === 'accept' && (row.body_kind === 'change' || row.body_kind === 'pattern') && Array.isArray(body.approve) ? { approved: body.approve } : {};
-  event(deps, at, actor, 'decide', `decision:${decision}`, 'decision', JSON.stringify({ question, answer: option, ...approved, ...(only === null ? {} : { rows: [...only].sort((a, b) => a - b) }) }), undefined, batch);
-  event(deps, at, actor, 'resolve', `suggestion:${id}`, 'suggestion', 'addressed', reason, batch);
+  const part = taking ? { suggestion: id, parts: taking.parts, taken: taking.taken } : {};
+  event(deps, at, actor, 'decide', `decision:${decision}`, 'decision', JSON.stringify({ question, answer: option, ...approved, ...(only === null ? {} : { rows: [...only].sort((a, b) => a - b) }), ...part }), undefined, batch);
+  if (taking) {
+    const n = taking.parts.length;
+    /* `taken:<n>`, NEVER A BARE COUNT: `joinersOf` reads a note whose value is a number as an agent widening the question,
+       and the owner who took part of it would then hold the opener's withdraw. */
+    event(deps, at, actor, 'note', `suggestion:${id}`, 'suggestion', `taken:${n}`, `${n === 1 ? 'One part of this was' : `${n} parts of this were`} accepted, and the rest still wait here.`, batch);
+  } else event(deps, at, actor, 'resolve', `suggestion:${id}`, 'suggestion', 'addressed', reason, batch);
 
   return ok({
     decision,
     batch,
     suggestion: id,
-    status: 'resolved',
+    status: taking ? 'open' : 'resolved',
     wrote,
     ...(install === undefined ? {} : { install }),
     ...(expect === undefined ? {} : { expect }),
@@ -2364,6 +2668,29 @@ export function reopen(deps: GovernDeps, id: string, why = 'What was accepted wo
     id,
   );
   if (!row) return no<null>('OUT_OF_BOUNDS', `There is no suggestion called ${id}.`, { at: 'id' });
+
+  /* PARTS TAKEN THAT WOULD NOT APPLY COME BACK TO THE QUESTION STILL HOLDING THE REST, all of them, so a part accepted is
+     applied with the others it was taken with or not at all. The take is the last one since this question last came
+     back, whose decision kept nothing as applied. The decision stands, as it does below. */
+  if (row.status === 'open' && row.body_kind === 'arrange') {
+    const took = deps.sql.one<{ v: string }>(
+      `SELECT e.to_v AS v FROM event e
+        WHERE e.kind = 'decide' AND e.target_kind = 'decision' AND json_valid(e.to_v) AND json_extract(e.to_v, '$.suggestion') = ?
+          AND e.rowid > coalesce((SELECT max(r.rowid) FROM event r WHERE r.target = ? AND r.kind = 'suggest' AND r.to_v = 'reopened'), 0)
+          AND NOT EXISTS (SELECT 1 FROM event k WHERE k.target = e.target AND k.kind = 'note')
+        ORDER BY e.rowid DESC LIMIT 1`,
+      id,
+      `suggestion:${id}`,
+    );
+    const taken = took ? (parse(took.v)?.taken ?? null) : null;
+    const rest = deps.sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', id);
+    const held = rest ? parse(rest.body) : null;
+    if (isMap(taken) && held) {
+      deps.sql.exec('UPDATE suggestion SET body = ?, defer_until = NULL, defer_why = NULL WHERE id = ?', JSON.stringify(mergeArrangement(held, taken)), id);
+      event(deps, instant(deps.nowMs), 'system', 'suggest', `suggestion:${id}`, 'suggestion', 'reopened', why);
+      return ok(null);
+    }
+  }
 
   /* ONLY WHAT WAS ACCEPTED. Reopening a `wont-fix` resurrects a question somebody answered, and
      nothing here undoes what an acceptance did. */

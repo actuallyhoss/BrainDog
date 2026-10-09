@@ -13,9 +13,9 @@
  * that does not declare the key costs one lookup in the list cache and nothing more.
  *
  * WHAT IT READS, AND ITS CEILING. One count per list that has a field pointing at this one, and never a row: the count
- * walks that list's live rows once, looking only at the fields that point here. The field ids are parameters, never
- * spliced into the statement, so one list's count binds at most `FIELD_CEILING` of them (`declare.ts`) plus four
- * others, inside the Durable Object's bound on parameters (`DO_LIMITS.variableNumber`, `ports/src/sql.ts`). The lists
+ * walks that list's live rows once, looking only at the fields that point here. The field ids are one bound JSON array,
+ * never spliced into the statement, so one list's count binds five parameters however many fields point here, inside
+ * the Durable Object's bound on parameters (`DO_LIMITS.variableNumber`, `ports/src/sql.ts`). The lists
  * walked are the record's own declarations, so the loop ends where they do. `41 §10` records the scan as a deliberate
  * ceiling: a referring field declared `index: true` is the upgrade.
  *
@@ -83,12 +83,12 @@ export function referencedBy(parts: KernelParts, register: string, entry: string
     const n = Number(
       parts.sql.one<{ n: number }>(
         `SELECT count(*) AS n FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND e.id <> ? AND EXISTS (
-           SELECT 1 FROM json_each(e.fields) AS f WHERE f.key IN (${keys.map(() => '?').join(', ')})
+           SELECT 1 FROM json_each(e.fields) AS f WHERE f.key IN (SELECT value FROM json_each(?))
              AND (f.value = ? OR (f.type = 'array' AND EXISTS (SELECT 1 FROM json_each(f.value) AS r WHERE r.value = ?)))
          )`,
         from.id,
         entry,
-        ...keys,
+        JSON.stringify(keys),
         entry,
         entry,
       )?.n ?? 0,

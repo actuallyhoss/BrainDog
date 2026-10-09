@@ -68,6 +68,54 @@ export const needs = ['web-build'];
 export const slices = 2;
 
 /**
+ * EVERY RULE IN THIS GATE, AND THE FAULT EACH ONE IS PROVED ON (PRF-B02, `loop/scope/area-proof-b.md`).
+ *
+ * It had one planted fault for five rules, a 2000px heading, which proves the overflow rule and nothing else: the target
+ * rule, the readiness wait, the full-width pass and the panel's arrival could each have stopped looking and the
+ * self-test would still have printed one red line. Now every rule has its own seed, and `self-test` walks this list.
+ *
+ * `id` is what `BRAINDOG_GATE_SEED` carries, one or several joined by commas, and what each finding of a seeded run is
+ * tagged with, `[layout-target]`, so one run in one browser answers for every seed separately. `seed` is the fault in a
+ * person's words, for the line that says it was caught. `expect` is the words a finding must hold to count as caught:
+ * red for some other reason is not the rule working. `passes` is where the fault is planted, and the overflow seed is
+ * planted in three because the sweep, the docked pass and the variant pass each measure overflow with their own edge.
+ *
+ * A SEED THAT CANNOT BE PLANTED ON THIS BUILD SAYS `[id] not run:` and why, so a run that proved less says so rather
+ * than reading as a pass.
+ */
+export const RULES = [
+  {
+    id: 'layout-overflow',
+    seed: 'a 2000px heading inside the work, with the panel shut and with it docked',
+    expect: ['reaches 2000px', 'under the panel'],
+    passes: ['sweep', 'dock', 'variant'],
+  },
+  { id: 'layout-target', seed: 'a 30 by 30 button on a phone', expect: ['is 30x30'], passes: ['sweep'] },
+  { id: 'layout-target-edge', seed: 'a 43 by 44 button on a phone, one pixel short', expect: ['is 43x44'], passes: ['sweep'] },
+  { id: 'layout-settle', seed: 'a screen whose mark of being drawn is taken away', expect: ['never settled'], passes: ['sweep'] },
+  { id: 'layout-full', seed: 'a main screen capped at 60 per cent of its room', expect: ['a cap or a centred column'], passes: ['full'] },
+  { id: 'layout-dock', seed: 'a panel that opens hidden', expect: ['opened no docked panel'], passes: ['dock'] },
+  { id: 'layout-site', seed: 'a 2000px heading on a page of the marketing site', expect: ['reaches 2000px'], passes: ['variant'] },
+];
+
+/**
+ * WHICH SEEDS A RUN PLANTS: `null` for a real run, else the rules named. `'1'` is `layout-overflow`, the value
+ * `self-test` sent while this gate had one seed, kept until its list walks `RULES`.
+ *
+ * A NAME NOTHING ANSWERS TO IS REFUSED, AND THROWN. A seed mistyped in `self-test` would otherwise plant nothing, the run
+ * would be a green real run under a name that promised a red one, and the self-test would read it as the rule failing
+ * to look. The caller says which.
+ */
+export function seedsOf(value = process.env.BRAINDOG_GATE_SEED) {
+  if (!value) return null;
+  const names = [...new Set(value.split(',').map((s) => s.trim()).filter(Boolean))].map((s) => (s === '1' ? 'layout-overflow' : s));
+  const unknown = names.filter((n) => !RULES.some((r) => r.id === n));
+  if (unknown.length || !names.length)
+    throw new Error(`layout: no seed is called ${unknown.map((n) => `"${n}"`).join(', ') || `"${value}"`}. The seeds are ${RULES.map((r) => r.id).join(', ')}.`);
+  return RULES.filter((r) => names.includes(r.id));
+}
+
+/**
  * THE WHOLE SWEEP, AS A FUNCTION THE RUNNER CALLS. `52 §5.1` step 3.
  *
  * IT OWNS A PORT, A RECORD AND A BROWSER, AND A CALLED GATE HAS TO GIVE THEM BACK, which a spawned
@@ -85,6 +133,23 @@ export const slices = 2;
  * rests on: a pass is the end of the function and never a statement inside it.
  */
 export default async function layout(root = join(import.meta.dirname, '..', '..'), { part = 1, of = 1 } = {}) {
+  /* THE SEEDS FIRST, BEFORE A ROUTE IS READ OR A PORT TAKEN, so a refused name costs nothing and opens nothing. It is
+     red, because a gate asked to plant a fault it does not have has proved nothing, and the line says which name. */
+  let seeds;
+  try {
+    seeds = seedsOf();
+  } catch (e) {
+    console.error(`  ${e.message}`);
+    return 1;
+  }
+  /** Whether this run plants `id`, and the rule when it does. */
+  const plants = (id) => seeds?.find((s) => s.id === id) ?? null;
+  /** The seeds planted in one pass, each on a page of its own; a real run is one unseeded page, `null`. */
+  const plantedIn = (pass) => (seeds ? seeds.filter((s) => s.passes.includes(pass)) : [null]);
+  /** A seeded finding carries its seed's name, so `self-test` can tell which seed a red line answers. */
+  const mark = (s, text) => (s ? `[${s.id}] ${text}` : text);
+  /** The seeds this run could not plant, and why, for the lines at the end. */
+  const unplanted = new Map();
   const ROOT = join(root, 'apps', 'web', 'build');
 
   /**
@@ -529,7 +594,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      * was nothing here". `self-test` reads that sentence and reports the variant half as unproved
      * rather than counting it.
      */
-    /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=1` a 2000px heading is put into `#main`
+    /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=layout-overflow` a 2000px heading is put into `#main`
        (the exact bug this gate is named after) and the run must go red. It is here rather than in a fixture tree because
        the thing under test is a real browser over a real build, and there is no smaller way to hold that. One function
        for every pass that seeds, so the heading the docked pass is proved on is the one the sweep is. */
@@ -541,83 +606,150 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
         document.getElementById('main')?.prepend(h);
       });
 
-    if (process.env.BRAINDOG_GATE_SEED) {
-      widths.length = 1;
-      ROUTES.length = 1;
-      present.length = Math.min(present.length, 1);
-      if (present.length === 0) console.log('  layout: no variant is built, so the variant pass is not under test on this run.');
-      else present[0] = { ...present[0], routes: present[0].routes.slice(0, 1) };
-    }
-
-    for (const width of widths) {
-      /**
-       * A COARSE POINTER AT PHONE WIDTHS, because that is the axis the target-size rule turns on.
-       *
-       * `05 §6` and `13 §7`: density follows the POINTER, never the width. `--ctl-h` is 44 on a coarse
-       * pointer and **36** on a fine one, measured in the built page. (Two comments in this repo say 32,
-       * including `controls.css`'s; the token is 36.) A gate that only ever emulated a mouse could
-       * measure every width this product has and never once see the size a thumb gets.
-       */
-      const context = await browser.newContext({
-        viewport: { width, height: L.viewportHeightPx },
-        reducedMotion: 'reduce',
-        hasTouch: width < 640,
-        isMobile: width < 640,
-        bypassCSP: true,
+    /* A CONTROL ONE OR TWO PIXELS SHORT OF THE RULE, for the two target seeds. Its own `::before` is put out, because the
+       rule counts a pseudo-element's box as the target and a skin that grows every button's would grow this one too. */
+    const seedTarget = async (page, w, h) => {
+      await page.addStyleTag({ content: '.seeded-target::before,.seeded-target::after{content:none !important}' });
+      await page.evaluate(
+        ([w, h]) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'seeded-target';
+          b.textContent = 'seeded';
+          b.style.cssText =
+            `all:unset;display:block;box-sizing:border-box;inline-size:${w};block-size:${h};` +
+            'min-inline-size:0;min-block-size:0;padding:0;border:0;overflow:hidden';
+          document.getElementById('main')?.prepend(b);
+        },
+        [w, h],
+      );
+    };
+    /* WHAT EACH SEED DOES TO A PAGE IT HAS OPENED. `layout-settle` is not here: its fault has to be in place before the
+       page loads, so it is planted on the context (`takeMark`). */
+    const PLANT = {
+      'layout-overflow': seedHeading,
+      'layout-site': seedHeading,
+      'layout-target': (page) => seedTarget(page, '30px', '30px'),
+      'layout-target-edge': (page) => seedTarget(page, '43px', '44px'),
+      'layout-full': (page) => page.addStyleTag({ content: '#main{max-inline-size:60% !important}' }),
+      'layout-dock': (page) => page.addStyleTag({ content: 'dialog.dock{display:none !important}' }),
+    };
+    const plant = async (page, s) => {
+      if (s && Object.hasOwn(PLANT, s.id)) await PLANT[s.id](page);
+    };
+    /* THE MARK TAKEN OFF `#main` EVERY TIME THE SCREEN PUTS IT ON, from before the first script runs, so the wait sees a
+       screen that never says it is drawn, and on the reload it is given as well. `data-screen` is `lib.mjs`'s `SCREEN`. */
+    const takeMark = (context) =>
+      context.addInitScript(() => {
+        new MutationObserver(() => document.getElementById('main')?.removeAttribute('data-screen')).observe(document, {
+          subtree: true,
+          childList: true,
+          attributes: true,
+          attributeFilter: ['data-screen'],
+        });
       });
-      const page = await context.newPage();
-      process.stdout.write(`    ${String(width).padStart(4)}px `);
 
-      for (const route of ROUTES) {
-        await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
-        /* `domcontentloaded` IS WORTH NOTHING ON ITS OWN HERE and never was: `ssr = false`, so the shell
-           served off disk is a script tag that imports the client, and `#main` does not exist until it
-           has run. This wait is the only thing between the gate and an empty document, which is why its
-           expiry is a finding and not a `catch`. */
-        const unmeasured = ready.check(`${route} @${width}`, route, await ready.settled(page));
-        if (unmeasured) {
-          findings.push(unmeasured);
-          process.stdout.write('!');
-          continue;
-        }
-        // An un-laid-out rowgroup has no geometry: it cannot overflow, and it cannot be measured.
-        await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-        if (process.env.BRAINDOG_GATE_SEED) await seedHeading(page);
-        await page.waitForTimeout(L.settleMs);
-
-        const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
-
-        checked++;
-        process.stdout.write(out.length ? '!' : '.');
-        for (const o of out) findings.push(`${route} @${width}  ${o}`);
-
-        /* AND THEN THE STATES, at the widths where the rule they break applies. `FLOOR` short of its
-           desktops is the phones and the tablet; above them the pointer is fine and a 34px control is the
-           density this product means. */
-        if (FLOOR.includes(width) && !desktop(width))
-          for (const act of ACTS[route] ?? []) {
-            try {
-              await act.run(page);
-            } catch (e) {
-              findings.push(`${route} @${width}  could not reach "${act.name}": ${String(e).split('\n')[0]}`);
-              process.stdout.write('!');
-              continue;
-            }
-            await page.waitForTimeout(L.settleMs);
-            const after = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
-            checked++;
-            process.stdout.write(after.length ? '!' : ':');
-            for (const o of after) findings.push(`${route} @${width} (${act.name})  ${o}`);
-            /* BACK TO REST, because the acts share one page and the next one must not open its sheet
-               over the last one's. A reload is cheaper to reason about than an undo per act. */
-            await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
-            await ready.settled(page);
-            await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-          }
+    /* UNDER THE SEEDS, ONE WIDTH AND ONE ROUTE, and each seed of the sweep on a page of its own at that width: the
+       narrowest of every part, which is the narrowest phone, where the pointer is coarse and the target rule applies.
+       Every seed is planted in the first part, as the docked and full-width passes already were, so a later part says
+       it planted nothing rather than reading as a seed nobody saw. */
+    if (seeds && part !== 1) for (const s of seeds) unplanted.set(s.id, `part ${part} of ${of} plants nothing, and part 1 plants every seed`);
+    const sweepSeeds = plantedIn('sweep').filter((s) => {
+      if (s === null) return true;
+      if (part !== 1) return false;
+      if (s.id === 'layout-settle' && !ready.contract) unplanted.set(s.id, 'this build carries no mark of being drawn to take away');
+      else return true;
+      return false;
+    });
+    /* AND THE VARIANT PASS: the overflow seed on the first record variant, the site seed on the marketing site. */
+    const variantRuns = seeds ? [] : present.map((v) => ({ v, planted: null }));
+    if (seeds) {
+      widths.splice(0, Infinity, ...every.slice(0, 1));
+      ROUTES.length = 1;
+      const first = (v) => ({ ...v, routes: v.routes.slice(0, 1) });
+      const records = present.filter((v) => v.name !== 'site');
+      const site = present.find((v) => v.name === 'site');
+      if (plants('layout-overflow')) {
+        if (records.length) variantRuns.push({ v: first(records[0]), planted: plants('layout-overflow') });
+        else console.log('  layout: no variant is built, so the variant pass is not under test on this run.');
       }
-      process.stdout.write('\n');
-      await context.close();
+      if (plants('layout-site')) {
+        if (site) variantRuns.push({ v: first(site), planted: plants('layout-site') });
+        else unplanted.set('layout-site', 'the marketing site is not built here, and `pnpm --filter @braindog/site build` builds it');
+      }
     }
+
+    for (const width of widths)
+      for (const planted of sweepSeeds) {
+        /**
+         * A COARSE POINTER AT PHONE WIDTHS, because that is the axis the target-size rule turns on.
+         *
+         * `05 §6` and `13 §7`: density follows the POINTER, never the width. `--ctl-h` is 44 on a coarse
+         * pointer and **36** on a fine one, measured in the built page. (Two comments in this repo say 32,
+         * including `controls.css`'s; the token is 36.) A gate that only ever emulated a mouse could
+         * measure every width this product has and never once see the size a thumb gets.
+         */
+        const context = await browser.newContext({
+          viewport: { width, height: L.viewportHeightPx },
+          reducedMotion: 'reduce',
+          hasTouch: width < 640,
+          isMobile: width < 640,
+          bypassCSP: true,
+        });
+        if (planted?.id === 'layout-settle') await takeMark(context);
+        const page = await context.newPage();
+        process.stdout.write(`    ${String(width).padStart(4)}px ${planted ? `${planted.id} ` : ''}`);
+
+        for (const route of ROUTES) {
+          await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
+          /* `domcontentloaded` IS WORTH NOTHING ON ITS OWN HERE and never was: `ssr = false`, so the shell
+             served off disk is a script tag that imports the client, and `#main` does not exist until it
+             has run. This wait is the only thing between the gate and an empty document, which is why its
+             expiry is a finding and not a `catch`. */
+          const unmeasured = ready.check(`${route} @${width}`, route, await ready.settled(page));
+          if (unmeasured) {
+            findings.push(mark(planted, unmeasured));
+            process.stdout.write('!');
+            continue;
+          }
+          // An un-laid-out rowgroup has no geometry: it cannot overflow, and it cannot be measured.
+          await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+          await plant(page, planted);
+          await page.waitForTimeout(L.settleMs);
+
+          const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
+
+          checked++;
+          process.stdout.write(out.length ? '!' : '.');
+          for (const o of out) findings.push(mark(planted, `${route} @${width}  ${o}`));
+
+          /* AND THEN THE STATES, at the widths where the rule they break applies. `FLOOR` short of its
+             desktops is the phones and the tablet; above them the pointer is fine and a 34px control is the
+             density this product means. */
+          if (FLOOR.includes(width) && !desktop(width))
+            for (const act of ACTS[route] ?? []) {
+              try {
+                await act.run(page);
+              } catch (e) {
+                findings.push(mark(planted, `${route} @${width}  could not reach "${act.name}": ${String(e).split('\n')[0]}`));
+                process.stdout.write('!');
+                continue;
+              }
+              await page.waitForTimeout(L.settleMs);
+              const after = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
+              checked++;
+              process.stdout.write(after.length ? '!' : ':');
+              for (const o of after) findings.push(mark(planted, `${route} @${width} (${act.name})  ${o}`));
+              /* BACK TO REST, because the acts share one page and the next one must not open its sheet
+                 over the last one's. A reload is cheaper to reason about than an undo per act. */
+              await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
+              await ready.settled(page);
+              await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+            }
+        }
+        process.stdout.write('\n');
+        await context.close();
+      }
 
     /**
      * AND THE MAIN SCREENS FILL THE WINDOW, which nothing above can say.
@@ -670,11 +802,11 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       return context;
     };
     /** Opens a screen and waits for it to settle; `false`, with the finding written, when it never did. */
-    const reach = async (page, route, where) => {
+    const reach = async (page, route, where, planted = null) => {
       await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
       const unmeasured = ready.check(where, route, await ready.settled(page));
       if (unmeasured) {
-        findings.push(unmeasured);
+        findings.push(mark(planted, unmeasured));
         process.stdout.write('!');
         return false;
       }
@@ -714,10 +846,11 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       return { widest: Math.round(widest), room: Math.round(room), dock: Math.round(dock), shape: shell?.getAttribute('data-shape') ?? null };
     };
     /* THE WIDTHS THIS PART DRAWS, AND ANY NO PART DRAWS, in the first part, so a width named in the budget is never
-       judged by nobody. NOT UNDER THE SEED for the full-width pass: the seeded heading is 2000px wide and proves nothing
-       about a narrow page. The docked pass takes one page under it (below). */
-    const ours = (list) => (process.env.BRAINDOG_GATE_SEED ? [] : list.filter((w) => widths.includes(w) || (part === 1 && !every.includes(w))));
-    const fullAt = ours(L.fullWidthAtPx);
+       judged by nobody. NOT UNDER THE OTHER SEEDS for the full-width pass: a 2000px heading proves nothing about a narrow
+       page. Its own seed caps `#main` on one page, the first width, the rail and Today, in the first part. */
+    const ours = (list) => (seeds ? [] : list.filter((w) => widths.includes(w) || (part === 1 && !every.includes(w))));
+    const fullSeed = plants('layout-full');
+    const fullAt = fullSeed ? (part === 1 ? L.fullWidthAtPx.slice(0, 1) : []) : ours(L.fullWidthAtPx);
     const pct = new Intl.NumberFormat('en', { style: 'percent' });
     /** What is wrong with a screen narrower than its room, or `null`. `beside` says what the room is. */
     const short = (span, beside) =>
@@ -729,18 +862,19 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     const misdrawn = (span, shape) =>
       span.shape === shape.drawn ? null : `asked for ${shape.name} and the shell drew ${span.shape ?? 'no shell'}, so ${shape.name} was not measured`;
     for (const width of fullAt)
-      for (const shape of SHAPES) {
+      for (const shape of fullSeed ? SHAPES.slice(0, 1) : SHAPES) {
         const context = await contextFor(width, shape);
         const page = await context.newPage();
         process.stdout.write(`    full @${String(width).padStart(4)} ${shape.drawn.padEnd(4)} `);
-        for (const screen of MAIN_SCREENS) {
+        for (const screen of fullSeed ? MAIN_SCREENS.slice(0, 1) : MAIN_SCREENS) {
           const where = `${screen.name} (${screen.route}) @${width} on ${shape.name}`;
-          if (!(await reach(page, screen.route, `${screen.route} @${width} on ${shape.name} (full width)`))) continue;
+          if (!(await reach(page, screen.route, `${screen.route} @${width} on ${shape.name} (full width)`, fullSeed))) continue;
+          await plant(page, fullSeed);
           const span = await page.evaluate(SPAN);
           checked++;
           const said = span === null ? 'drew no #main to measure for full width' : (misdrawn(span, shape) ?? short(span, 'the shell gives the work'));
           process.stdout.write(said ? '!' : '.');
-          if (said) findings.push(`${where}  ${said}`);
+          if (said) findings.push(mark(fullSeed, `${where}  ${said}`));
         }
         process.stdout.write('\n');
         await context.close();
@@ -802,7 +936,11 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
         const moving = (el) => el.getAnimations().some((a) => a.playState === 'running');
         const frame = () => {
           const main = document.getElementById('main');
-          const dock = document.querySelector('dialog.dock[open]:not(:modal)');
+          /* A PANEL WITH NO WIDTH HAS NOT ARRIVED, though the dialog is open: `display: none` or a column of 0 leaves the
+             work beside nothing, and read as docked it put the panel's edge at 0 and every element of the work under it
+             (the `layout-dock` seed). */
+          const shown = document.querySelector('dialog.dock[open]:not(:modal)');
+          const dock = shown && shown.getBoundingClientRect().width > 0 ? shown : null;
           if (dock && main) {
             const gap = dock.getBoundingClientRect().left - main.getBoundingClientRect().right;
             if (blank === null || gap > blank) blank = gap;
@@ -827,27 +965,31 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
           if (a !== b && Math.abs(a.top - b.top) < 1 && a.right <= b.left + 1) narrowest = Math.min(narrowest ?? a.width, a.width, b.width);
       return narrowest === null ? null : Math.round(narrowest);
     };
-    /* UNDER THE SEED, ONE PAGE WITH THE PANEL OPEN, AND NOT NONE (research-audit-16 L12: this pass skipped the seed, so
-       `self-test` had never once asked it to go red). The first width, the rail and Work: the seeded heading is 2000px
-       wide, so it reaches under the panel at every width on every shape, and `self-test` holds the run to naming that.
-       In the first part only, like every width no part draws. */
-    const seeded = Boolean(process.env.BRAINDOG_GATE_SEED);
-    const dockAt = seeded ? (part === 1 ? L.dockedAtPx.slice(0, 1) : []) : ours(L.dockedAtPx);
+    /* UNDER THE SEEDS, ONE PAGE WITH THE PANEL OPEN PER SEED, AND NOT NONE (research-audit-16 L12: this pass skipped the
+       seed, so `self-test` had never once asked it to go red). The first width, the rail and Work: the seeded heading is
+       2000px wide, so it reaches under the panel at every width on every shape, and `self-test` holds the run to naming
+       that; the panel hidden before the press is a panel that never arrives. In the first part only, like every width no
+       part draws. Each seed reaches the screen afresh, so the style one plants is gone before the next is planted. */
+    const seeded = seeds !== null;
+    const dockSeeds = plantedIn('dock');
+    const dockAt = seeded ? (part === 1 && dockSeeds.length ? L.dockedAtPx.slice(0, 1) : []) : ours(L.dockedAtPx);
+    const dockRuns = seeded ? dockSeeds.map((s) => ({ screen: DOCKED[0], planted: s })) : DOCKED.map((d) => ({ screen: d, planted: null }));
     for (const width of dockAt)
       for (const shape of seeded ? SHAPES.slice(0, 1) : SHAPES) {
         const context = await contextFor(width, shape, 'no-preference');
         const page = await context.newPage();
         process.stdout.write(`    dock @${String(width).padStart(4)} ${shape.drawn.padEnd(4)} `);
-        for (const screen of seeded ? DOCKED.slice(0, 1) : DOCKED) {
+        for (const { screen, planted } of dockRuns) {
           const where = `${screen.name} (${screen.route}) @${width} on ${shape.name}, panel open`;
-          if (!(await reach(page, screen.route, `${screen.route} @${width} on ${shape.name} (docked)`))) continue;
+          if (!(await reach(page, screen.route, `${screen.route} @${width} on ${shape.name} (docked)`, planted))) continue;
           await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+          if (planted?.id === 'layout-dock') await plant(page, planted);
           const watching = page.evaluate(ARRIVAL, L.dockArrivalMs);
           try {
             await screen.open(page);
           } catch (e) {
             await watching.catch(() => null);
-            findings.push(`${where}  could not open a panel: ${String(e).split('\n')[0]}`);
+            findings.push(mark(planted, `${where}  could not open a panel: ${String(e).split('\n')[0]}`));
             process.stdout.write('!');
             continue;
           }
@@ -856,12 +998,15 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
           checked++;
           if (arrival === null || !arrival.docked) {
             findings.push(
-              `${where}  ${arrival === null ? 'loaded the page again instead of opening a panel' : `opened no docked panel in ${L.dockArrivalMs}ms: a sheet over the screen, or nothing`}`,
+              mark(
+                planted,
+                `${where}  ${arrival === null ? 'loaded the page again instead of opening a panel' : `opened no docked panel in ${L.dockArrivalMs}ms: a sheet over the screen, or nothing`}`,
+              ),
             );
             process.stdout.write('!');
             continue;
           }
-          if (seeded) await seedHeading(page);
+          if (planted?.id === 'layout-overflow') await plant(page, planted);
           await page.waitForTimeout(L.settleMs);
           const said = [...(await page.evaluate(MEASURE, [width, L.widthTolerancePx, false, true]))];
           if (!arrival.settled) said.push(`was still moving ${L.dockArrivalMs}ms after the press, so how it arrived was not read`);
@@ -884,7 +1029,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
                 const alike = width - span.dock;
                 const other = await contextFor(alike, shape);
                 const bare = await other.newPage();
-                if (await reach(bare, screen.route, `${screen.route} @${alike} on ${shape.name} (the panel's room, shut)`)) {
+                if (await reach(bare, screen.route, `${screen.route} @${alike} on ${shape.name} (the panel's room, shut)`, planted)) {
                   await bare.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
                   const apart = await bare.evaluate(PAIRED);
                   const room = await bare.evaluate(SPAN);
@@ -900,7 +1045,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
             }
           }
           process.stdout.write(said.length ? '!' : '.');
-          for (const s of [...new Set(said)]) findings.push(`${where}  ${s}`);
+          for (const s of [...new Set(said)]) findings.push(mark(planted, `${where}  ${s}`));
         }
         process.stdout.write('\n');
         await context.close();
@@ -922,11 +1067,11 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     const variantWidths = FLOOR.some(desktop) ? [...FLOOR] : [...FLOOR, bps[bps.length - 1] ?? 1_200];
     /* AND ONE OF THEM UNDER THE SEED. The seeded heading is 2000px wide, so the narrowest width proves
        what every one of them proves, and the rest are browser contexts on every `pnpm gates`. */
-    if (process.env.BRAINDOG_GATE_SEED) variantWidths.length = 1;
+    if (seeds) variantWidths.length = 1;
 
     /* THE VARIANTS ONCE, IN THE FIRST PART, because they do not depend on the width list above. */
     if (part === 1)
-      for (const v of present) {
+      for (const { v, planted } of variantRuns) {
         serving = v.root;
         base = v.prerendered ? '' : APP_BASE;
         asking = v.record ?? null;
@@ -949,7 +1094,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
                over nothing. The site is prerendered and says so in `VARIANTS`. */
             const unmeasured = ready.check(`${v.name}${route} @${width}`, route, await ready.settled(page, v.prerendered));
             if (unmeasured) {
-              findings.push(unmeasured);
+              findings.push(mark(planted, unmeasured));
               process.stdout.write('!');
               continue;
             }
@@ -958,12 +1103,12 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
                `self-test`, which otherwise passes on the main loop alone however little the variant pass
                measures. */
             await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-            if (process.env.BRAINDOG_GATE_SEED) await seedHeading(page);
+            await plant(page, planted);
             await page.waitForTimeout(L.settleMs);
             const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
             checked++;
             process.stdout.write(out.length ? '!' : '.');
-            for (const o of out) findings.push(`${v.name}${route} @${width}  ${o}`);
+            for (const o of out) findings.push(mark(planted, `${v.name}${route} @${width}  ${o}`));
           }
           process.stdout.write('\n');
           await context.close();
@@ -977,8 +1122,17 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
         `(${of === 1 ? `${bps.join(', ')} + floor` : `${widths.join(', ')}, part ${part} of ${of}`}), ${findings.length} finding(s)`,
     );
 
-    for (const f of findings.slice(0, L.findingsShown)) console.error(`      ${f}`);
-    if (findings.length > L.findingsShown) console.error(`      ...and ${findings.length - L.findingsShown} more`);
+    /* EVERY FINDING OF A SEEDED RUN, because `self-test` reads them for each seed's name and a cut would hide a seed's. */
+    const shown = seeds ? findings.length : L.findingsShown;
+    for (const f of findings.slice(0, shown)) console.error(`      ${f}`);
+    if (findings.length > shown) console.error(`      ...and ${findings.length - shown} more`);
+
+    /* AND A LINE FOR EVERY SEED THAT HAS NONE ABOVE: planted and unseen, which is that rule looking at nothing, or not
+       planted at all on this build, which is a rule this run did not prove. Neither may read as caught. */
+    for (const s of seeds ?? []) {
+      if (unplanted.has(s.id)) console.log(`  [${s.id}] not run: ${unplanted.get(s.id)}`);
+      else if (!findings.some((f) => f.startsWith(`[${s.id}] `))) console.error(`  [${s.id}] saw nothing of ${s.seed}`);
+    }
 
     /**
      * AND A SWEEP THAT NEVER SAW THE RECORD IS RED, however clean every page in it was.
@@ -1018,6 +1172,6 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
   }
 }
 
-/* AND IT IS STILL A SCRIPT, because `self-test` spawns this file with `BRAINDOG_GATE_SEED=1` and the
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns this file with `BRAINDOG_GATE_SEED` set to its seeds and the
    header documents `node tools/gates/layout.mjs`. `?? 0` because a pass returns nothing. */
 if (import.meta.main) process.exitCode = (await layout()) ?? 0;

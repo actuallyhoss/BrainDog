@@ -1,0 +1,27 @@
+{
+  "//": "Planted for `ledger`: the debt's newest line is higher than the one before, with a sentence on it, which is how the number used to rise.",
+  "opened": "2026-10-09",
+  "budgets": {
+    "bundle.mainJsBrotli": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 30720, "on": "2026-09-03", "why": "The entry script's budget, 30 KB brotli.", "by": "22 section 9" },
+        { "at": 30720, "on": "2026-10-09", "why": "The day the ledger began, at the same number.", "by": "22 section 9" }
+      ]
+    }
+  },
+  "debts": {
+    "bundle.mainJsBrotli": {
+      "owes": "experience",
+      "key": "bundle.mainJsBaseline",
+      "lines": [
+        { "at": 33600, "on": "2026-09-30", "why": "Seven screens arrived together." },
+        { "at": 33800, "on": "2026-10-06", "why": "The route cross-fade and the top bar by a dynamic import." },
+        { "at": 33800, "on": "2026-10-09", "why": "The day the ledger began, at the same number." },
+        { "at": 33900, "on": "2026-10-10", "why": "Re-recorded with a reason, the way it was raised twelve times before." }
+      ]
+    }
+  },
+  "held": {},
+  "deviations": {}
+}

@@ -105,7 +105,8 @@ export function lease(sql: Sql, deps: AckDeps, kinds: readonly OutboxKind[], n: 
   if (wanted.length === 0 || n <= 0) return [];
   const limit = Math.min(Math.floor(n), 100);
   const nowMs = deps.nowMs;
-  const marks = wanted.map(() => '?').join(', ');
+  /* THE KINDS ARE ONE BOUND JSON ARRAY, so the claim binds six parameters whatever a caller hands it. */
+  const kindsJson = JSON.stringify(wanted);
 
   /* AN EXPIRED LEASE ON A QUESTION NO RUN IS WAITING ON IS FINISHED, AND NOT HANDED OUT AGAIN. `release()` leaves a
      leased Slash job to its ack, and the ack's failed branch reads the run; a host that never acked came through here
@@ -163,14 +164,14 @@ export function lease(sql: Sql, deps: AckDeps, kinds: readonly OutboxKind[], n: 
          ELSE ? END
      WHERE id IN (
        SELECT id FROM outbox
-       WHERE kind IN (${marks})
+       WHERE kind IN (SELECT value FROM json_each(?))
          AND (state = 'pending' OR (state = 'leased' AND leased_until < ? AND attempts + 1 < ${CEILING}))
        ORDER BY created LIMIT ?)
      RETURNING id, kind, payload, attempts, leased_until`,
     iso(nowMs + NOTIFY_LEASE_MS),
     iso(nowMs + INFER_LEASE_MS),
     iso(nowMs + LEASE_OTHER_MS),
-    ...wanted,
+    kindsJson,
     iso(nowMs),
     limit,
   );

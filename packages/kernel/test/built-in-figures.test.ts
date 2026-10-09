@@ -293,3 +293,85 @@ test('RUNS-WORKING COUNTS THE AGENTS AT WORK BY THE ONE CLOCK: 14 minutes is wor
   assert.equal(note.values?.['runs-working'], 2);
   sql.close();
 });
+
+/* ── where things apply (AGT-D01) ─────────────────────────────────────────── */
+
+const PROJECTS: Declaration = {
+  id: 'register.things',
+  kind: 'register',
+  body: {
+    id: 'things',
+    name: 'Projects',
+    title: 'name',
+    scopes: { repos: 'repos', folders: 'folders' },
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'repos', type: 'list', of: 'text' },
+      { id: 'folders', type: 'list', of: 'text' },
+    ],
+  },
+};
+
+test('PROJECTS-UNPLACED COUNTS THE PROJECTS WITH NO REPOSITORY AND NO FOLDER, read off the list that declares scopes', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const read = () => value<Reading>(k.metric(BUILT_IN_FIGURES['projects-unplaced']!));
+  assert.equal(read().value, null, 'a record with no projects said nought');
+
+  value(await k.install([PROJECTS]));
+  const project = (name: string, more: Record<string, unknown> = {}) => value<{ id: string }>(k.create('things', { name, ...more }, { actor: 'p_1' }));
+  project('BrainDog', { repos: ['braindog'] });
+  const placed = read();
+  assert.deepEqual([placed.value, placed.met], [0, true]);
+  /* A NOUGHT IS DRAWN, not taken for nothing to read. */
+  assert.equal(k.block({ kind: 'stat', cells: [{ metric: 'projects-unplaced' }] }).readings?.[0]?.reading?.held, 1);
+
+  project('Kiln', { folders: ['~/Developer/kiln'] });
+  project('Tallow');
+  const gone = project('Old thing');
+  sql.exec('UPDATE entry SET deleted_at = ? WHERE id = ?', new Date(NOW).toISOString(), gone.id);
+  const one = read();
+  assert.deepEqual([one.value, one.met], [1, false], 'Tallow names no place and was not counted, or a deleted project was');
+  sql.close();
+});
+
+const KEYS: Declaration = {
+  id: 'register.keys',
+  kind: 'register',
+  body: { id: 'keys', name: 'Keys', title: 'label', fields: [{ id: 'label', type: 'text', required: true }, { id: 'value', type: 'secret' }] },
+};
+
+test('KEYS-UNOPENABLE COUNTS THE KEYS WHOSE SEALED VALUE NAMES A GRANT REVOKED OR GONE, and not one that holds none', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const read = () => value<Reading>(k.metric(BUILT_IN_FIGURES['keys-unopenable']!));
+  assert.equal(read().value, null, 'a record that seals nothing said nought');
+
+  value(await k.install([KEYS]));
+  const grant = (id: string, revoked: string | null) =>
+    sql.exec(
+      "INSERT INTO grant (id, label, opens, kind, kdf, wrapped_by, kek_id, created_at, revoked_at) VALUES (?, ?, 'x', 'api_token', 'hkdf', 'kek', 'kek_1', ?, ?)",
+      id,
+      id,
+      new Date(NOW).toISOString(),
+      revoked,
+    );
+  grant('g_live', null);
+  grant('g_revoked', new Date(NOW).toISOString());
+  const key = (label: string, sealed: string | null) => {
+    const row = value<{ id: string }>(k.create('keys', { label }, { actor: 'p_1' }));
+    if (sealed !== null) sql.exec("UPDATE entry SET fields = json_set(fields, '$.value', ?) WHERE id = ?", sealed, row.id);
+    return row;
+  };
+  key('Stripe', 'g_live');
+  assert.deepEqual([read().value, read().held], [0, 1]);
+  key('Fly', 'g_revoked');
+  key('Resend', 'g_gone');
+  key('Nothing sealed', null);
+  const old = key('Deleted', 'g_gone');
+  sql.exec('UPDATE entry SET deleted_at = ? WHERE id = ?', new Date(NOW).toISOString(), old.id);
+  const two = read();
+  assert.deepEqual([two.value, two.met], [2, false]);
+  assert.doesNotMatch(two.why, /g_|grant:/u, 'the reading named a grant by its id');
+  sql.close();
+});

@@ -250,7 +250,10 @@ export function projectSuggestions(sql: Sql, registers: Holders, least = SUGGEST
   return suggestProjects(runs, projects, least);
 }
 
-/** The last name of a remote as it was written, with no `.git`: `Encore_PREPROD`, where `lastName` gives `encore_preprod`. */
+/**
+ * The last name of a remote as it was written, with no `.git`: `Lanternfish_PREPROD`, where `lastName` gives
+ * `lanternfish_preprod`.
+ */
 function lastSpelled(said: string): string {
   const parts = said.trim().replace(/[\\/]+$/u, '').replace(/\.git$/iu, '').split(/[\\/:]+/u).filter((part) => part !== '');
   return parts.at(-1) ?? '';

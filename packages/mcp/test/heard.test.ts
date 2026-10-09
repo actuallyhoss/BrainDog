@@ -106,3 +106,22 @@ test('OVER HTTP EACH BEARER IS ITS OWN CALLER, so two sessions on one record eac
   for (const [bearer, id] of [['one', 1], ['one', 2], ['two', 3]] as const) assert.equal((await post(bearer, id)).status, 200);
   assert.deepEqual(marks, [{ kind: 'called', n: 1 }, { kind: 'called', n: 1 }]);
 });
+
+test('THE DOOR MARKS THROUGH `doorHeard` WHEN THE SURFACE HAS IT, and `heard`, the routed one a key can post to, gets none', async () => {
+  const routed: Mark[] = [];
+  const own: Mark[] = [];
+  const { surface } = stub({ heard: ((m: Mark) => (routed.push(m), Promise.resolve({ ok: true, value: {} }))) as never });
+  const door = Object.assign(surface, { doorHeard: (m: Mark) => (own.push(m), Promise.resolve({ ok: true, value: {} })) });
+  await handle({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25' } }, door, ctx);
+  await handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, door, ctx);
+  await handle(call(3), door, ctx);
+  assert.deepEqual(own.map((m) => m.kind), ['hello', 'listed', 'called']);
+  assert.deepEqual(routed, [], 'the door handed its own marks to the routed heard, which refuses them');
+});
+
+test('A `doorHeard` THAT THROWS LEAVES THE CALL WHOLE, as a failing `heard` does', async () => {
+  const { surface } = stub();
+  const door = Object.assign(surface, { doorHeard: () => { throw new Error('no table'); } });
+  const called = (await handle(call(1), door, ctx)) as Reply;
+  assert.ok('result' in called && (called.result as { isError?: boolean }).isError === undefined);
+});

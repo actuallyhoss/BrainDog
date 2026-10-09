@@ -54,14 +54,14 @@ const value = <T>(r: unknown): T => {
 
 const as = (session: SessionHints): WriteContext => ({ actor: 'p_owner', principal: { kind: 'token', token: 't_1' }, session });
 
-/** The owner's rows as the Windows PC left them: BrainDog by its Windows folder alone, Encore by its remote. */
+/** The owner's rows as the Windows PC left them: BrainDog by its Windows folder alone, Lanternfish by its remote. */
 async function record() {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   value(await k.install([PROJECTS, TASKS]));
   const ids = [
     { name: 'BrainDog', folders: ['C:\\Repos\\braindog'] },
-    { name: 'Encore', repos: ['git@bitbucket.org:encore/Encore_PREPROD.git'] },
+    { name: 'Lanternfish', repos: ['git@bitbucket.org:lanternfish/Lanternfish_PREPROD.git'] },
   ].map((row) => value<Entry>(k.create('things', row, { actor: 'p_owner' })).id);
   return { k, sql, ids };
 }
@@ -75,7 +75,7 @@ test('THE OWNER’S BRAINDOG ROW, LISTING ONLY THE FOLDER WINDOWS WROTE, IS A QU
   const { k, sql } = await record();
   /* A last name alone ties the Mac's checkout to the row (batch 17, M1), so it is asked ("Is this BrainDog?") and the run
      stays global until the row lists its remote, which is DIRECTION 37's one-field fix. */
-  const mac = { remote: 'https://github.com/actuallyhoss/BrainDog.git', repo: 'braindog', cwd: '/Users/sam/Developer/braindog' };
+  const mac = { remote: 'https://github.com/actuallyhoss/BrainDog.git', repo: 'braindog', cwd: '/Users/mara/Developer/braindog' };
   assert.equal(placed(k, mac), 'between things#1');
   assert.equal(placed(k, { remote: 'git@github.com:actuallyhoss/BrainDog' }), 'between things#1', 'the remote alone does not find it');
   assert.equal(placed(k, { repo: 'BrainDog' }), 'between things#1');
@@ -91,19 +91,19 @@ test('A RUN IN A SUBFOLDER OR A WORKTREE IS FOUND BY THE NEAREST FOLDER THAT CAR
   const { k, sql } = await record();
   /* The hook in a subfolder, with git too slow to answer: no remote and no repository, only the folder. */
   /* Found by the name a folder carries, which is a question and not a placing (M1), the same as the checkout's own. */
-  assert.equal(placed(k, { cwd: '/Users/sam/Developer/braindog/loop' }), 'between things#1');
-  assert.equal(placed(k, { cwd: '/Users/sam/Developer/braindog/.claude/worktrees/agent-aad7846157cdaa3ef' }), 'between things#1');
+  assert.equal(placed(k, { cwd: '/Users/mara/Developer/braindog/loop' }), 'between things#1');
+  assert.equal(placed(k, { cwd: '/Users/mara/Developer/braindog/.claude/worktrees/agent-aad7846157cdaa3ef' }), 'between things#1');
   /* A worktree whose folder is its repository's name still has the remote it was cut from. */
   assert.equal(placed(k, { repo: 'agent-aad7846157cdaa3ef', remote: 'github.com/actuallyhoss/BrainDog' }), 'between things#1');
   /* A scratch folder carries no project's name, and a run there is global, as it was. */
-  assert.equal(placed(k, { cwd: '/private/tmp/claude-501/-Users-sam-Developer/044b77b1/scratchpad' }), null);
-  assert.equal(placed(k, { cwd: 'C:\\Users\\sam\\AppData\\Local\\Temp' }), null);
+  assert.equal(placed(k, { cwd: '/private/tmp/claude-501/-Users-mara-Developer/044b77b1/scratchpad' }), null);
+  assert.equal(placed(k, { cwd: 'C:\\Users\\mara\\AppData\\Local\\Temp' }), null);
   sql.close();
 });
 
 test('A REMOTE IS THE SAME REPOSITORY IN ANY CASE, and in any of the forms git writes it', async () => {
   const { k, sql } = await record();
-  for (const remote of ['https://bitbucket.org/encore/encore_preprod', 'git@BITBUCKET.org:Encore/Encore_PREPROD.git', 'ssh://git@bitbucket.org/encore/Encore_PREPROD'])
+  for (const remote of ['https://bitbucket.org/lanternfish/lanternfish_preprod', 'git@BITBUCKET.org:Lanternfish/Lanternfish_PREPROD.git', 'ssh://git@bitbucket.org/lanternfish/Lanternfish_PREPROD'])
     assert.equal(placed(k, { remote }), 'things#2 by remote', remote);
   sql.close();
 });

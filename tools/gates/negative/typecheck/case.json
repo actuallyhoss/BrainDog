@@ -1,0 +1,7 @@
+{
+  "gate": "typecheck",
+  "rule": "one type error in a workspace package",
+  "expect": "planted\\.ts\\(\\d+,\\d+\\): error TS2322",
+  "findings": 1,
+  "why": "THE GATE RUN FIRST HAD NEVER BEEN SEEN TO FAIL. `run.mjs` runs `pnpm -r run typecheck` and reads its exit code, so a workspace that stopped reaching its packages, or a script that stopped calling tsc, would read green. This tree is a workspace of one package whose `typecheck` script is tsc over one file holding one type error, and the gate is run here exactly as `run.mjs` runs it, with this tree as the directory. tsc is the repository's own, reached by path, because the tree installs nothing. `pnpm-lock.yaml` is committed so pnpm finds nothing to install; it still keeps its run state in a `node_modules/` here, which git ignores and every gate's walk skips."
+}

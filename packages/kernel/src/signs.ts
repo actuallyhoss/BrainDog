@@ -542,8 +542,11 @@ function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string): SignReadin
     NOT_FILED,
   );
   if (row === undefined) return reading('none', null, 'Nothing has been filed for this sign yet.');
-  if (nowMs - Date.parse(row.read_at) > FILED_STANDS_MS)
-    return reading('none', null, `Not read since ${dateSaid(row.read_at, tz, nowMs)}.`, [`It last read ${row.state === 'none' ? 'nothing to judge by' : row.state}: ${row.said}`.slice(0, 200)]);
+  /* NOT `> FILED_STANDS_MS`: a `read_at` that does not parse is NaN, and NaN is never more than a day, so the filing
+     would stand forever. Written so a time that cannot be read reads as old (audit 38-39, finding 8). */
+  const t = Date.parse(row.read_at);
+  if (!(nowMs - t <= FILED_STANDS_MS))
+    return reading('none', null, Number.isNaN(t) ? 'Not read on any day this record can tell.' : `Not read since ${dateSaid(t, tz, nowMs)}.`, [`It last read ${row.state === 'none' ? 'nothing to judge by' : row.state}: ${row.said}`.slice(0, 200)]);
   const facts = JSON.parse(row.facts) as unknown;
   return reading(row.state, row.value === null ? null : Number(row.value), row.said, Array.isArray(facts) ? facts.map(String) : []);
 }
@@ -633,3 +636,25 @@ export function runSignsNight(sql: Sql, nowMs: number, tz: string): number {
   });
   return wrote;
 }
+
+/* ── a sign without the inbox's words ──────────────────────────────────── */
+
+/**
+ * The sentence a reader without the inbox reach reads for a sign whose own sentence may quote a message or a question,
+ * by its state and number alone. A sign not here keeps its own sentence, which names lists, feeds, runs and scripts,
+ * never what was sent in. A sign read `none` keeps its own too: that sentence says only what is missing ("This sign
+ * could not be read.", "Nothing has been asked on this record yet."), and one written here could not tell those apart.
+ */
+export const QUIET: Readonly<Record<string, (s: VitalSign) => string>> = {
+  'arrivals-filed': (s) =>
+    s.state === 'red' ? 'Messages wait to be filed.' : s.value ? `${count(s.value, 'message waits', 'messages wait')} to be filed, not yet too long.` : 'No message waits to be filed.',
+  'questions-by-cause': (s) =>
+    s.state === 'red' ? 'Open questions pile up on one cause, or carry none.' : s.value ? `${count(s.value, 'open question')}, no two with the same cause.` : 'No question is waiting.',
+};
+
+/**
+ * A sign as a reader without the inbox reach reads it: no facts, and no message or question in its sentence. Pure, so
+ * the record's `signs` method, the briefing's red signs and a page's `signs` block hold the inbox's words back by one
+ * rule (audit 38-39, finding 1).
+ */
+export const quietSign = (s: VitalSign): VitalSign => ({ ...s, said: s.state === 'none' ? s.said : (QUIET[s.sign]?.(s) ?? s.said), facts: [] });

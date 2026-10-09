@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { daysLeft, healthSaid, lastCopy, leadFault, nearest, redSigns, type Engine, type Fault, type Part, type Sign } from './health.ts';
+import { daysLeft, healthSaid, lastCopy, leadFault, nearest, redSigns, unreadSigns, type Engine, type Fault, type Part, type Sign } from './health.ts';
 
 const text = (parts: Part[] | null): string => (parts ?? []).map((p) => p.text).join('');
 const needs = (parts: Part[] | null): string[] => (parts ?? []).filter((p) => p.needs).map((p) => p.text);
@@ -120,14 +120,13 @@ test('red signs are a count that links to where the signs are shown; all green j
   assert.deepEqual(needs(said), ['2 vital signs need a look']);
   assert.deepEqual(links(said), ['/p/health']);
   assert.deepEqual(links(healthSaid(null, null, { signs: signs('red') })), []);
-  assert.equal(text(healthSaid(null, null, { faults: [], signs: signs('green', 'none') })), 'All healthy: nothing is broken.');
-  assert.equal(healthSaid(null, null, { signs: signs('green', 'none') }), null);
+  assert.equal(text(healthSaid(null, null, { faults: [], signs: signs('green', 'green') })), 'All healthy: nothing is broken.');
+  assert.equal(healthSaid(null, null, { signs: signs('green', 'green') }), null);
   assert.equal(redSigns(signs('red', 'none', 'red')), 2);
 });
 
 test('a method the record does not have says nothing, and never healthy', () => {
   assert.equal(healthSaid(null, null, { faults: null, engine: null, signs: null }), null);
-  assert.equal(healthSaid(null, null, { signs: signs('none', 'none') }), null);
   assert.equal(redSigns(null), null);
   assert.equal(text(healthSaid('missing', null, { faults: null, engine: null })), 'No copy last night.');
   /* A member the record refuses the faults to, or a read that dropped: the good parts, never "All healthy". */
@@ -138,4 +137,30 @@ test('a missed copy after a fault is its own marked sentence', () => {
   const said = healthSaid('missing', MONTH, { faults: [MAIL] });
   assert.equal(text(said), 'One thing is not working: BrainDog could not send a mail. No copy last night, and nothing runs out before 1 October.');
   assert.deepEqual(needs(said), ['One thing is not working', 'No copy last night']);
+});
+
+test('every sign unread is said as unread, never all healthy', () => {
+  const said = healthSaid('in', MONTH, { faults: [], signs: signs('none', 'none', 'none'), signsAt: '/p/health' });
+  assert.equal(text(said), 'Last night’s copy is in, nothing runs out before 1 October, and nothing is broken. 3 vital signs have not been read yet.');
+  assert.doesNotMatch(text(said), /healthy/u);
+  assert.deepEqual(needs(said), [], 'unread is not wrong yet, so nothing is marked');
+  assert.deepEqual(links(said), ['/p/health']);
+  assert.equal(text(healthSaid(null, null, { signs: signs('none', 'none') })), '2 vital signs have not been read yet.');
+  assert.equal(unreadSigns(signs('none', 'red', 'none')), 2);
+  assert.equal(unreadSigns(null), null);
+});
+
+test('one green and the rest unread is never all healthy, and the unread are counted', () => {
+  const said = healthSaid(null, null, { faults: [], signs: signs('green', 'none', 'none', 'none') });
+  assert.equal(text(said), 'Nothing is broken. 3 vital signs have not been read yet.');
+  assert.doesNotMatch(text(said), /healthy/u);
+  assert.equal(text(healthSaid(null, null, { faults: [], signs: signs('green', 'none') })), 'Nothing is broken. One vital sign has not been read yet.');
+});
+
+test('one red with the rest unread: red leads and is marked, and the unread are said after it', () => {
+  const said = healthSaid('in', null, { faults: [], signs: signs('red', 'none', 'none'), signsAt: '/p/health' });
+  assert.equal(text(said), 'One vital sign needs a look. Last night’s copy is in. 2 vital signs have not been read yet.');
+  assert.deepEqual(needs(said), ['One vital sign needs a look']);
+  assert.deepEqual(links(said), ['/p/health', '/p/health']);
+  assert.doesNotMatch(text(said), /healthy/u);
 });

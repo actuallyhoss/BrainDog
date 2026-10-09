@@ -198,16 +198,16 @@ test('A MERGE KEEPS WHAT THE TWO DISAGREED ON: the kept row wins, the other name
 
 test('A STRONG MERGE KEEPS WHAT THE TWO DISAGREED ON TOO, in the batch its Undo takes back', async () => {
   const { k, sql } = await record();
-  const first = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanm@encore.example', job: 'CTO' }, OWNER));
-  value(k.create('people', { name: 'Rohan Mehta', email: 'rohanm@brightloom.com', job: 'Founder' }, OWNER));
+  const first = value<Entry>(k.create('people', { name: 'Teodor Vance', email: 'teodorv@lanternfish.example', job: 'CTO' }, OWNER));
+  value(k.create('people', { name: 'Teodor Vance', email: 'teodorv@pellucid.example', job: 'Founder' }, OWNER));
 
-  const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanm@brightloom.com', where: 'commit 1 in encore' }, AGENT));
-  /* Found by its address, then folded into the older Rohan by the strong rules. */
+  const met = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodorv@pellucid.example', where: 'commit 1 in lanternfish' }, AGENT));
+  /* Found by its address, then folded into the older Teodor by the strong rules. */
   assert.ok(met.undo, 'the strong rules did not merge them');
   assert.equal(met.row?.id, first.id);
   const kept = k.get(first.id)!;
   assert.equal(kept.fields.job, 'CTO');
-  assert.ok((kept.fields.met as string[]).includes(`${DAY} · Job: Founder, from Rohan Mehta`));
+  assert.ok((kept.fields.met as string[]).includes(`${DAY} · Job: Founder, from Teodor Vance`));
   assert.equal(Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM event WHERE batch = ? AND field = 'met'", met.undo!)?.n) > 0, true);
 
   value(k.undoMerge(met.undo!, OWNER));

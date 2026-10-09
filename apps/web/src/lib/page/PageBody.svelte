@@ -1457,22 +1457,9 @@
     position: static;
   }
 
-  /**
-   * A STAT IN A NARROW SLOT STACKS ITS FIGURES, because a slot on this page is narrower than a phone long before the
-   * window is, and every rule above this one is keyed to the VIEWPORT. Two figures side by side need their two cells and
-   * the gap between them; under 288px of block they take a row each, at the size every other figure on the page reads
-   * at, rather than a cut one. `record/figure-fit.test.ts` measures every stat a declared page draws against this and
-   * `blocks.css`'s own steps. px AND NOT rem: the figure it guards is px wide at any root size, so a rem threshold would
-   * be the only thing that moved when a reader sets her text smaller.
-   */
-  @container (inline-size < 288px) {
-    .block-slot :global(.grid:has(> .cell:nth-child(2))) {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
-
   /* A BOARD ON A PHONE STACKS ITS LANES. A stat is not restacked here: under 480px of block it is rows, label on the
-     left and figure on the right, drawn by blocks.css, and above that its own container steps decide. */
+     left and figure on the right, drawn by stat.css, and above that its own container steps decide. The page's own 288px
+     money step is gone: lifted out and measured, it cut no figure (`record/figure-fit.test.ts`). */
   @media (width < 640px) {
     .block-slot :global(.grid:not(:has(> .cell))) {
       grid-template-columns: minmax(0, 1fr);

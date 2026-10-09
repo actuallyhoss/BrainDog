@@ -160,6 +160,17 @@ export const pages = {
   pollNameHint: 'Monthly recurring revenue',
   pollUnit: 'Unit',
   pollUnitHint: 'GBP',
+  /* WHEN A NUMBER IS DATED, and whether it is money (live feed 2.0.0). A count for the 20th asked on the 21st is the
+     20th's, so a number can be dated from the answer; money is written as an amount in its currency, never as text. */
+  pollDated: 'Dated',
+  pollDatedLabels: { arrived: 'Dated when it arrives', day: 'Dated by a day in the answer', instant: 'Dated by a time in the answer' } as Record<string, string>,
+  pollDatePath: 'Where its date is',
+  pollDatePathHint: 'data.day',
+  pollMoney: 'Money',
+  pollMoneyLabels: { no: 'Not money', whole: 'Money, in whole units', minor: 'Money, in cents' } as Record<string, string>,
+  pollCurrency: 'Currency',
+  pollCurrencyHint: 'USD',
+  pollFaultDate: (name: string) => `Say where ${name}’s date is in the answer, such as data.day.`,
   pollAddRow: 'Add a number',
   pollRemoveRow: (n: number) => `Remove number ${n}`,
   pollFile: 'Propose this poll',

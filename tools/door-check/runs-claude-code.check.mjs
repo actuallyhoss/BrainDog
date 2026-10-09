@@ -90,7 +90,8 @@ export function run(cmd, args, { env, cwd, signal, ms, input, echo = false }) {
 export function envOf(home, address, extraPath, token) {
   const env = {};
   for (const [name, value] of Object.entries(process.env)) {
-    if (name.startsWith('BRAINDOG_') || name.startsWith('CLAUDE') || name === 'XDG_CONFIG_HOME' || name.startsWith('DOOR_TOKEN')) continue;
+    /* NO OTHER APP'S KEY, and no second key for the record: the night's environment holds Codex's and Cursor's too. */
+    if (name.startsWith('BRAINDOG_') || name.startsWith('CLAUDE') || name === 'XDG_CONFIG_HOME' || name.startsWith('DOOR_TOKEN') || /^(OPENAI|CODEX|CURSOR)_API_KEY$/.test(name)) continue;
     env[name] = value;
   }
   env.HOME = home;

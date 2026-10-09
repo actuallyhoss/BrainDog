@@ -76,7 +76,7 @@ const MODULES = [
  * The `why` is not decoration: it is the difference between a debt and a mistake, and the only
  * thing that lets the next reader tell them apart without re-deriving the whole surface.
  */
-const ALLOWED = new Map([
+export const ALLOWED = new Map([
   /* EIGHT LEFT THIS LIST ON 21 SEPTEMBER AND NOT ONE OF THEM GOT A SURFACE. A pass read every excuse
      against the code and found these eight wrong: the sentence was superseded or typed twice, so the
      key was deleted from `copy.ts` and the excuse went with it. An excuse that outlives its reason is

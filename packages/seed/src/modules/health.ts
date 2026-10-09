@@ -64,13 +64,19 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
     blocks: [
       /* THE PAGE'S ONE LINE, from `signs-red`. Three notes on the one figure, so exactly one of them draws, and the count
          reads as a person says it: "One thing ... needs", "3 things ... need". `signs-red` reads nothing at all while no
-         sign has anything to judge by, so a record nobody has read yet opens on no line rather than on "alive". */
+         sign has anything to judge by, so a record nobody has read yet opens on no line rather than on "alive".
+
+         NOUGHT IS "NOTHING NEEDS A LOOK", NEVER "ALIVE". `signs-red` reads 0 once one sign is green, however many of the
+         rest are still `none` (`readVitals`, `built-in-figures.ts`), so "Everything on this record is alive." was said of
+         a record with one sign read. What nought proves is that no sign read red, and the line says that and no more.
+         HOW MANY ARE UNREAD IS NOT SAID HERE: a `when:` and a `{{path}}` reach figures, lists and rows, and no figure
+         counts the signs that read `none`, so the Not read yet group below is what says it, sign by sign. */
       {
         kind: 'note',
         lead: true,
         span: 12,
         when: { metric: 'signs-red', is: 0 },
-        body: 'Everything on this record is alive.',
+        body: 'No vital sign needs a look.',
       },
       {
         kind: 'note',

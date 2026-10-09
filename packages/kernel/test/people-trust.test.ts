@@ -73,8 +73,8 @@ const open = (sql: NodeSql): string[] => sql.all<{ id: string }>("SELECT id FROM
 
 test('A FORGED SENDER WITH A KNOWN NAME MAKES NOBODY AND FOLDS NOTHING: a mention, and one question, asked once', async () => {
   const { k, sql } = await record();
-  const real = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
-  const forged = { email: '"Rohan Mehta" <rohanmehta@evil.test>', where: 'mail: Re: the invoice', source: 'mail from evil.test' };
+  const real = value<Entry>(k.create('people', { name: 'Teodor Vance', email: 'teodorvance@lanternfish.example' }, OWNER));
+  const forged = { email: '"Teodor Vance" <teodorvance@evil.test>', where: 'mail: Re: the invoice', source: 'mail from evil.test' };
 
   const met = value<Met>(k.meet(forged, AGENT));
   assert.equal(met.row, null, 'a forged sender made a row');
@@ -88,14 +88,14 @@ test('A FORGED SENDER WITH A KNOWN NAME MAKES NOBODY AND FOLDS NOTHING: a mentio
   /* One question, in names, offering the address and nothing else. */
   assert.ok(met.question);
   const question = k.question(met.question) ?? '';
-  assert.match(question, /^Is the Rohan Mehta met in mail from evil\.test the Rohan Mehta you already know \(an address at encore\.xyz\)\? Yes adds the new address to Rohan Mehta\./);
+  assert.match(question, /^Is the Teodor Vance met in mail from evil\.test the Teodor Vance you already know \(an address at lanternfish\.example\)\? Yes adds the new address to Teodor Vance\./);
   assert.doesNotMatch(question, /@|people#/);
   /* The sighting is kept, by its source and never by the mail's subject. */
   assert.deepEqual(sql.all<{ source: string }>("SELECT source FROM entity_mention WHERE kind = 'person'").map((m) => m.source), ['mail from evil.test']);
 
   /* Mailed again, and again from another forged address: no second question while the first waits. */
   assert.equal(value<Met>(k.meet(forged, AGENT)).question, undefined);
-  assert.equal(value<Met>(k.meet({ ...forged, email: '"Rohan Mehta" <rohan.mehta@evil2.test>' }, AGENT)).question, undefined);
+  assert.equal(value<Met>(k.meet({ ...forged, email: '"Teodor Vance" <teodor.vance@evil2.test>' }, AGENT)).question, undefined);
   assert.equal(questions(sql), 1);
 
   /* He says no: the address is never offered again, and still nobody is made. */
@@ -158,11 +158,11 @@ test('AN ARRIVAL MATCHED BY ITS KEY ADDS ITS LINE AND NOTHING ELSE: no handle, n
 
 test('A SENDER LIKE NOBODY KNOWN IS A PERSON OF THEIR OWN, and a forged one who came first never takes in the real one', async () => {
   const { k, sql } = await record();
-  const forged = value<Met>(k.meet({ email: '"Rohan Mehta" <rohanmehta@evil.test>', where: 'mail: hello', source: 'mail from evil.test' }, AGENT));
+  const forged = value<Met>(k.meet({ email: '"Teodor Vance" <teodorvance@evil.test>', where: 'mail: hello', source: 'mail from evil.test' }, AGENT));
   assert.equal(forged.created, true);
 
-  /* The real Rohan, in a commit: the same name and the same handle, and still asked, never folded. */
-  const real = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanmehta@encore.example', where: 'commit 1 in encore' }, AGENT));
+  /* The real Teodor, in a commit: the same name and the same handle, and still asked, never folded. */
+  const real = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodorvance@lanternfish.example', where: 'commit 1 in lanternfish' }, AGENT));
   assert.equal(real.matched_by, 'none');
   assert.equal(real.created, true);
   assert.ok(real.question, 'two people with one name and one handle were neither folded nor asked about');
@@ -172,10 +172,10 @@ test('A SENDER LIKE NOBODY KNOWN IS A PERSON OF THEIR OWN, and a forged one who 
 
 test('SAID TO BE UNTRUSTED, IT STAYS SO ON THE LINE: a forged sender met that way first still never takes in the real one', async () => {
   const { k, sql } = await record();
-  const forged = value<Met>(k.meet({ email: '"Rohan Mehta" <rohanmehta@evil.test>', source: 'a run reading the inbox', untrusted: true }, AGENT));
+  const forged = value<Met>(k.meet({ email: '"Teodor Vance" <teodorvance@evil.test>', source: 'a run reading the inbox', untrusted: true }, AGENT));
   assert.equal(forged.created, true);
   assert.deepEqual(k.get(forged.row!.id)!.fields.met, [`${DAY} · arrived in a run reading the inbox`]);
-  const real = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanmehta@encore.example', where: 'commit 1 in encore' }, AGENT));
+  const real = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodorvance@lanternfish.example', where: 'commit 1 in lanternfish' }, AGENT));
   assert.equal(real.matched_by, 'none', 'the real person was folded into a sender nobody vouched for');
   assert.ok(real.question);
   assert.equal(k.count('people'), 2);
@@ -184,9 +184,9 @@ test('SAID TO BE UNTRUSTED, IT STAYS SO ON THE LINE: a forged sender met that wa
 
 test('A PERSON THE OWNER TYPED IS STILL HIS AFTER THEIR MAIL IS READ: the same name and handle in a note fold into them', async () => {
   const { k, sql } = await record();
-  const typed = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
-  value(k.meet({ email: 'rohanmehta@encore.example', source: 'mail from encore.example' }, AGENT));
-  const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohan.mehta@gmail.com', where: 'a note about the launch' }, OWNER));
+  const typed = value<Entry>(k.create('people', { name: 'Teodor Vance', email: 'teodorvance@lanternfish.example' }, OWNER));
+  value(k.meet({ email: 'teodorvance@lanternfish.example', source: 'mail from lanternfish.example' }, AGENT));
+  const met = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodor.vance@gmail.com', where: 'a note about the launch' }, OWNER));
   assert.equal(met.matched_by, 'strong');
   assert.equal(met.row?.id, typed.id);
   assert.equal(k.count('people'), 1);
@@ -197,8 +197,8 @@ test('A PERSON THE OWNER TYPED IS STILL HIS AFTER THEIR MAIL IS READ: the same n
 
 test('A COMMIT BY AN ADDRESS NOBODY HOLDS NEVER FOLDS INTO A PERSON THE OWNER TYPED: a person of their own, and one question', async () => {
   const { k, sql } = await record();
-  const real = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
-  const forged = { name: 'Rohan Mehta', email: 'rohanmehta@evil.test', where: 'commit 1 in encore' };
+  const real = value<Entry>(k.create('people', { name: 'Teodor Vance', email: 'teodorvance@lanternfish.example' }, OWNER));
+  const forged = { name: 'Teodor Vance', email: 'teodorvance@evil.test', where: 'commit 1 in lanternfish' };
 
   const met = value<Met>(k.meet(forged, AGENT));
   assert.equal(met.matched_by, 'none', 'a forged author was folded into the real person');
@@ -209,7 +209,7 @@ test('A COMMIT BY AN ADDRESS NOBODY HOLDS NEVER FOLDS INTO A PERSON THE OWNER TY
   assert.equal(k.get(real.id)!.fields.handles, undefined, 'the forged address was carried onto the real person');
 
   /* A second commit from it is a key match on the forged row, and still asks nothing new and folds nothing. */
-  const again = value<Met>(k.meet({ ...forged, where: 'commit 2 in encore' }, AGENT));
+  const again = value<Met>(k.meet({ ...forged, where: 'commit 2 in lanternfish' }, AGENT));
   assert.equal(again.row?.id, met.row?.id);
   assert.equal(k.count('people'), 2);
   assert.equal(questions(sql), 1);
@@ -237,11 +237,11 @@ test('TWO COMMITS BY ONE AUTHOR UNDER TWO ADDRESSES STILL FOLD, and the real per
 
 test('A FORGED COMMIT AUTHOR WHO THEN MAILS IN FROM THE SAME ADDRESS IS STILL ONLY A COMMIT AUTHOR, and never folds into the real person', async () => {
   const { k, sql } = await record();
-  const real = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
-  const forged = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanmehta@evil.test', where: 'commit 1 in encore' }, AGENT));
+  const real = value<Entry>(k.create('people', { name: 'Teodor Vance', email: 'teodorvance@lanternfish.example' }, OWNER));
+  const forged = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodorvance@evil.test', where: 'commit 1 in lanternfish' }, AGENT));
   /* A mail from the forged address is a key match, and its line is one anybody could have written. */
-  value(k.meet({ email: 'rohanmehta@evil.test', source: 'mail from evil.test' }, AGENT));
-  const again = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanmehta@evil.test', where: 'commit 2 in encore' }, AGENT));
+  value(k.meet({ email: 'teodorvance@evil.test', source: 'mail from evil.test' }, AGENT));
+  const again = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodorvance@evil.test', where: 'commit 2 in lanternfish' }, AGENT));
   assert.equal(again.row?.id, forged.row?.id);
   assert.equal(k.get(forged.row!.id)!.fields.merged_into, undefined, 'a mail line let the forged author fold into the real person');
   assert.equal(k.get(real.id)!.fields.keys, undefined);
@@ -295,13 +295,13 @@ test('EVERY SOURCE BUT A NOTE, A SESSION’S OWN RUN AND A COMMIT IS TEXT ANYBOD
 
 test('UNTRUSTED IS SAID OR READ FROM THE SOURCE, and false never lifts a source that says so', async () => {
   const { k, sql } = await record();
-  value(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
+  value(k.create('people', { name: 'Teodor Vance', email: 'teodorvance@lanternfish.example' }, OWNER));
   for (const said of [
     { untrusted: true, where: 'a run reading the inbox' },
     { untrusted: false, source: 'bank text' },
     { source: 'import' },
   ]) {
-    const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: `rohanmehta@${Object.keys(said).join('')}.test`, ...said }, AGENT));
+    const met = value<Met>(k.meet({ name: 'Teodor Vance', email: `teodorvance@${Object.keys(said).join('')}.test`, ...said }, AGENT));
     assert.equal(met.row, null, `${JSON.stringify(said)} folded or made a person`);
   }
   assert.equal(k.count('people'), 1);
@@ -315,8 +315,8 @@ test('UNTRUSTED IS SAID OR READ FROM THE SOURCE, and false never lifts a source 
 
 test('TWO COLLEAGUES WITH ONE NAME AND ONE COMPANY ARE ASKED ABOUT, never folded', async () => {
   const { k, sql } = await record();
-  value(k.create('people', { name: 'Ahmed Hassan', email: 'ahmed@encore.example' }, OWNER));
-  const met = value<Met>(k.meet({ name: 'Ahmed Hassan', email: 'a.hassan@encore.example', where: 'commit 1 in encore' }, AGENT));
+  value(k.create('people', { name: 'Priya Raman', email: 'priya@lanternfish.example' }, OWNER));
+  const met = value<Met>(k.meet({ name: 'Priya Raman', email: 'p.raman@lanternfish.example', where: 'commit 1 in lanternfish' }, AGENT));
   assert.equal(met.matched_by, 'none');
   assert.ok(met.question);
   assert.equal(k.count('people'), 2);

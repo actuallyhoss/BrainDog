@@ -71,7 +71,7 @@ test('MIGRATION 25 KEEPS DO AND TELL FOR WHAT EACH WRITE TOKEN DID IN THE LAST T
   sql.exec('DELETE FROM migration WHERE version >= 25');
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result as never));
-  assert.deepEqual(result.value.applied, [25, 26, 27, 28, 29, 30, 31, 32, 33]);
+  assert.deepEqual(result.value.applied, [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);
 
   /* ADDING AND MARKING DONE CARRY ON; the costed task (money) and the delete ask, and so does every other token. */
   assert.deepEqual(ladder(sql), [
@@ -347,12 +347,12 @@ test('A RENAME, AND A CHANGE TO A DOMAIN, ALIASES OR AN ORGANISATION, IS WHO SOM
     names: ['name', 'aliases', 'org'],
   };
   const floor = (op: 'create' | 'update', patch: Record<string, unknown>) => Object.fromEntries(kindsOfWrite({ list: 'people', op, patch, shape: FULL }).map((x) => [x.key, x.floor]));
-  assert.deepEqual(floor('update', { aliases: ['Rohan Mehta'] }), { 'people:tag': 'identity' });
+  assert.deepEqual(floor('update', { aliases: ['Teodor Vance'] }), { 'people:tag': 'identity' });
   assert.deepEqual(floor('update', { org: 'organisations#1' }), { 'people:edit': 'identity' });
   assert.deepEqual(floor('update', { note: 'x' }), { 'people:edit': null });
   /* MADE WITH THEM, a person is only named: the add climbs. */
-  assert.deepEqual(floor('create', { name: 'Rohan', aliases: ['Rohan Mehta'], org: 'organisations#1' }), { 'people:add': null });
-  assert.deepEqual(floor('create', { name: 'Rohan', email: 'rohan@x.test' }), { 'people:add': 'identity' });
+  assert.deepEqual(floor('create', { name: 'Teodor', aliases: ['Teodor Vance'], org: 'organisations#1' }), { 'people:add': null });
+  assert.deepEqual(floor('create', { name: 'Teodor', email: 'teodor@x.test' }), { 'people:add': 'identity' });
   sql.close();
 });
 

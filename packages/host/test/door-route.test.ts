@@ -82,7 +82,8 @@ test('THROUGH THE REAL RECORD: an agent’s marks move the owner’s signs from 
   const said = async () => ((await call(handlers, owner, 'doorSigns')).body.value as { said: string }).said;
   assert.equal(await said(), 'Sessions that connected in the last 7 days: 0. Given the tools: 0. Made a call: 0.');
   for (const mark of [{ kind: 'hello', build: '0.9.2' }, { kind: 'listed', n: 16 }, { kind: 'called' }])
-    assert.equal((await call(handlers, agent, 'heard', mark)).body.ok, true);
+    assert.equal((await api.doorHeard(mark, agent)).ok, true);
+  assert.equal((await call(handlers, agent, 'heard', { kind: 'called' })).body.refusal?.code, 'FORBIDDEN');
   assert.equal(await said(), 'Sessions that connected in the last 7 days: 1. Given the tools: 1. Made a call: 1.');
   const stray = await call(handlers, agent, 'heard', { kind: 'called', count: 2 });
   assert.equal(stray.body.refusal?.code, 'FIELD_UNKNOWN');

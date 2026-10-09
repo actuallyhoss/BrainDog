@@ -390,7 +390,7 @@ function whoOf(sql: Sql, actor: string): string {
 /** The words `whoOf` answers that are not a name, and so take a small letter inside a sentence. */
 const GENERIC = new Set(['Someone', 'An agent', 'A rule', 'An import']);
 
-/** Who an actor is inside a sentence: "a rule has changed it since", beside "Sam has changed it since". */
+/** Who an actor is inside a sentence: "a rule has changed it since", beside "Mara has changed it since". */
 function whoIn(sql: Sql, actor: string): string {
   const said = whoOf(sql, actor);
   return GENERIC.has(said) ? said.charAt(0).toLowerCase() + said.slice(1) : said;

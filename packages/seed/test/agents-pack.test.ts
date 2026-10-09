@@ -10,6 +10,8 @@ import assert from 'node:assert/strict';
 import { normalise, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
+import { DOOR_FIGURE_SIGNS } from '../../kernel/src/built-in-figures.ts';
+import { markDoor } from '../../kernel/src/door.ts';
 
 import { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, NOW, ROWS, RUNS, agentsPackDocument, declarations, installAgentsPack, installSeed } from '../src/index.ts';
 import * as AGENTS_MODULE from '../src/packs/agents.ts';
@@ -45,15 +47,23 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.9.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.10.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.9.0');
+  assert.equal(pack.manifest.version, '1.10.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
 const PROVIDES = [
+  'metric.agent-card-words',
+  'metric.agent-door-builds-behind',
+  'metric.agent-door-called',
+  'metric.agent-door-internal',
+  'metric.agent-hook-slowest',
   'metric.keys-by-week',
+  'metric.keys-expired',
+  'metric.keys-nowhere',
+  'metric.keys-sealed',
   'metric.learnings-active',
   'metric.learnings-by-week',
   'metric.learnings-faded',
@@ -61,9 +71,11 @@ const PROVIDES = [
   'metric.runs-heard-today',
   'metric.runs-left-next',
   'metric.runs-today',
+  'metric.runs-unplaced',
   'metric.skill-learnings',
   'metric.skills-active',
   'metric.tools-by-week',
+  'metric.tools-unseen',
   'page.agents',
   'page.run',
   'page.skill',
@@ -76,7 +88,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.9.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.10.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -446,5 +458,151 @@ test('A RUN WORKING IN A DEMO PROJECT’S FOLDER IS PLACED IN THAT PROJECT', asy
   assert.equal(at({ remote: 'git@git.kiln.example:type/kiln-site.git' })?.spoken, 'things#1');
   assert.equal(at({ repo: 'portage' })?.spoken, 'things#3');
   assert.equal(at({ cwd: '/Users/studio/Downloads' }), null, 'a folder no project lists is global');
+  sql.close();
+});
+
+/* ── what to put right in the keys and tools, and the door's signs (1.10.0) ── */
+
+const reading = (k: Kernel, id: string): number | null => {
+  const decl = k.metricDecl(id);
+  assert.ok(decl, `${id} is not declared on the record`);
+  const r = k.metric(decl);
+  assert.ok(r.ok, JSON.stringify(r));
+  return r.value.value as number | null;
+};
+
+const DAY_MS = 86_400_000;
+const isoAgo = (days: number) => new Date(NOW - days * DAY_MS).toISOString();
+const dayOf = (days: number) => isoAgo(-days).slice(0, 10);
+
+/**
+ * EACH CLAUSE READ OVER THE SEED'S ROWS, then over rows planted to move it: a key sealed leaves the keys kept nowhere,
+ * a key past its day is counted only while live, a tool is unseen by its last sighting or, never seen, by when it was
+ * written, and a run in no project counts only inside two weeks.
+ */
+test('THE KEYS, TOOLS AND RUNS FIGURES COUNT WHAT EACH CLAUSE SAYS, over the seed and over planted rows', async () => {
+  const { k, sql } = await seeded();
+  const keys = ROWS.credentials ?? [];
+  const live = keys.filter((r) => r.state === 'live');
+  assert.equal(reading(k, 'keys-sealed'), 0, 'the seed seals nothing');
+  const nowhere = live.filter((r) => r.where === undefined).length;
+  assert.ok(nowhere > 0, 'the seed has no live key kept nowhere');
+  assert.equal(reading(k, 'keys-nowhere'), nowhere);
+  assert.equal(reading(k, 'keys-expired'), live.filter((r) => typeof r.expires === 'string' && r.expires < dayOf(0)).length);
+  const unseen = (ROWS.tools ?? []).filter((r) => r.state === 'active' && Date.parse(String(r.seen)) < NOW - 30 * DAY_MS).length;
+  assert.equal(reading(k, 'tools-unseen'), unseen);
+  assert.equal(reading(k, 'runs-unplaced'), RUNS.filter((r) => Date.parse(String(r.last_seen)) > NOW - 14 * DAY_MS && !r.project).length);
+
+  /* SEALED, AS THE VAULT DOOR LEAVES A ROW: its `value` names a grant. A live key sealed is no longer kept nowhere; a
+     stale one sealed is still sealed, as the Vault's "sealed here" counts every key but the retired; a retired one is
+     not. */
+  const rowOf = (label: string) => value<{ rows: { id: string }[] }>(k.list({ register: 'credentials', where: `label is "${label}"`, limit: 1 })).rows[0]!.id;
+  const seal = (id: string) => sql.exec("UPDATE entry SET fields = json_set(fields, '$.value', 'g_test') WHERE id = ?", id);
+  seal(rowOf('Ledger Post sending key'));
+  seal(rowOf('Fenwick deploy key'));
+  assert.equal(reading(k, 'keys-sealed'), 2, 'a stale or live key sealed was not counted');
+  const retired = value<{ id: string }>(k.create('credentials', { label: 'Retired sealed', opens: 'Nothing', kind: 'api_token', state: 'retired' }, AS));
+  seal(retired.id);
+  assert.equal(reading(k, 'keys-sealed'), 2, 'a retired key sealed was counted, which the Vault does not');
+  assert.equal(reading(k, 'keys-nowhere'), nowhere - 1, 'a sealed key is still counted as kept nowhere');
+
+  /* PAST ITS DAY: live and expired counts; retired and expired does not. */
+  value(k.create('credentials', { label: 'Old token', opens: 'Nothing now', kind: 'api_token', where: 'The studio safe', expires: dayOf(-3) }, AS));
+  value(k.create('credentials', { label: 'Retired token', opens: 'Nothing', kind: 'api_token', where: 'The studio safe', expires: dayOf(-3), state: 'retired' }, AS));
+  assert.equal(reading(k, 'keys-expired'), 1);
+
+  /* UNSEEN: seen forty days ago; never seen and written forty days ago; never seen and written today, which is not. */
+  value(k.create('tools', { name: 'old-cli', kind: 'cli', command: 'old', seen: isoAgo(40) }, AS));
+  const never = value<{ id: string }>(k.create('tools', { name: 'never-cli', kind: 'cli', command: 'never' }, AS));
+  value(k.create('tools', { name: 'new-cli', kind: 'cli', command: 'new' }, AS));
+  sql.exec('UPDATE entry SET created_at = ? WHERE id = ?', isoAgo(40), never.id);
+  assert.equal(reading(k, 'tools-unseen'), unseen + 2);
+
+  /* A RUN IN NO PROJECT: two days ago counts, twenty days ago does not. */
+  value(k.create('session', { doing: 'Outside every project', agent: 'claude', state: 'idle' } as never, { actor: 'p_seed', stamp: { last_seen: isoAgo(2) } }));
+  value(k.create('session', { doing: 'Long ago, outside', agent: 'claude', state: 'idle' } as never, { actor: 'p_seed', stamp: { last_seen: isoAgo(20) } }));
+  assert.equal(reading(k, 'runs-unplaced'), 1);
+  sql.close();
+});
+
+const NOTES = ['keys-nowhere', 'keys-expired', 'tools-unseen'] as const;
+
+type Note = Drawn & { drawn?: boolean; when?: { metric?: string }; values?: Record<string, unknown> };
+const noteOn = (blocks: Drawn[], metric: string): Note | undefined => (blocks as Note[]).find((b) => b.kind === 'note' && b.when?.metric === metric);
+
+/**
+ * NEEDS A LOOK, SINCE 1.10.0: one boxed tile under the runs, its three lines each drawn only while its figure is above
+ * nought, closed by the folded section over what the brain learned, so the page still shows six tiles before its fold.
+ */
+test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only while its figure is above nought', async () => {
+  const declared = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; box?: boolean; fold?: boolean; tone?: string; when?: { metric?: string }; body?: string }[];
+  const box = declared.findIndex((b) => b.kind === 'section' && b.heading === 'Needs a look');
+  assert.ok(box > 0 && declared[box]!.box === true, 'Needs a look is not a boxed section');
+  assert.ok(box > declared.findIndex((b) => b.heading === 'Earlier'), 'Needs a look is above the runs');
+  assert.deepEqual(declared.slice(box + 1, box + 4).map((b) => b.when?.metric), [...NOTES], 'the three lines are not in the box, or not in order');
+  const closer = declared[box + 4]!;
+  assert.deepEqual([closer.kind, closer.heading, closer.fold], ['section', 'What the brain learned', true], 'nothing closes the box, so it swallows what follows');
+  for (const metric of NOTES) {
+    const note = declared.find((b) => b.kind === 'note' && b.when?.metric === metric)!;
+    assert.deepEqual(note.when, { metric, gt: 0 });
+    assert.equal(note.tone, 'warn', `${metric}'s line is not toned`);
+    assert.ok(note.body?.startsWith(`{{${metric}}} `), `${metric}'s line does not say its number`);
+    assert.doesNotMatch(String(note.body), /—|credential|session|\brow\b/iu, `${metric}'s line reads as the machine`);
+  }
+
+  /* THE SEED HOLDS LIVE KEYS KEPT NOWHERE, so that line is drawn with its count, and the two quiet ones are not. */
+  const { k, sql } = await seeded();
+  const blocks = opened(k, 'agents');
+  const nowhere = noteOn(blocks, 'keys-nowhere');
+  assert.ok(nowhere && nowhere.drawn !== false, 'a record with keys kept nowhere does not say so');
+  assert.deepEqual(nowhere.refusals, []);
+  /* THE PAGE HANDS THE SENTENCE WITH THE FIGURE'S READING BESIDE IT, and the host fills one into the other. */
+  assert.deepEqual(nowhere.values, { 'keys-nowhere': reading(k, 'keys-nowhere') });
+  for (const quiet of ['keys-expired', 'tools-unseen']) assert.equal(noteOn(blocks, quiet)?.drawn, false, `${quiet} is drawn at nought`);
+  assert.ok(blocks.some((b) => b.kind === 'agents'), 'what the brain learned left the page rather than folding');
+  /* AS THE RECORD MARKS IT FOR EVERY READER (`markDrawn`): the box is drawn over the one true line, and a section over
+     nothing goes with its lines. */
+  const boxOf = (page: Drawn[]) => (page as Note[]).find((b) => b.kind === 'section' && b.heading === 'Needs a look');
+  assert.ok(boxOf(blocks) && boxOf(blocks)!.drawn !== false, 'Needs a look is hidden over a line that is true');
+  sql.close();
+
+  /* A RECORD WITH PROJECTS, THE ADD-ON AND ONE RUN draws none of them, and reads each red figure as nought. */
+  const fresh = await empty();
+  value(await fresh.k.install(declarations().filter((d) => d.id === 'register.things')));
+  value(await installAgentsPack(fresh.k));
+  value(fresh.k.create('session', { doing: 'One run', agent: 'claude', state: 'idle' } as never, { actor: 'p_seed', stamp: { last_seen: isoAgo(0) } }));
+  const quietPage = opened(fresh.k, 'agents');
+  for (const metric of NOTES) {
+    assert.equal(reading(fresh.k, metric), 0, `${metric} is not nought on a fresh record`);
+    assert.equal(noteOn(quietPage, metric)?.drawn, false, `${metric}'s line is drawn on a fresh record`);
+  }
+  assert.equal(boxOf(quietPage)?.drawn, false, 'Needs a look is drawn over nothing on a fresh record');
+  fresh.sql.close();
+});
+
+/**
+ * THE DOOR'S FIGURES, SINCE 1.10.0: each names one of the signs the kernel's `record.door` reads, by the reader's own
+ * list, so a sign renamed in the kernel turns this red rather than a figure that reads nothing. Over a week nobody
+ * reached the door they read nothing, never nought; one run that said hello and made a call reads one.
+ */
+test('THE DOOR’S FIGURES EACH READ ONE OF THE DOOR’S SIGNS, nothing over a quiet week and the count once marked', async () => {
+  const door = Object.values(AGENTS_MODULE.AGENTS_METRICS).filter((m) => m.source === 'record.door') as ((typeof AGENTS_MODULE.AGENTS_METRICS)[string] & { sign?: string })[];
+  assert.deepEqual(door.map((m) => m.metric).sort(), ['agent-card-words', 'agent-door-builds-behind', 'agent-door-called', 'agent-door-internal', 'agent-hook-slowest']);
+  for (const m of door) {
+    assert.ok((DOOR_FIGURE_SIGNS as readonly unknown[]).includes(m.sign), `${m.metric} names ${String(m.sign)}, which the door does not read`);
+    assert.deepEqual([m.format, m.window, m.compare], ['int', '7d', 'none'], m.metric);
+  }
+
+  const { k, sql } = await seeded();
+  assert.equal(reading(k, 'agent-door-called'), null, 'a door nobody reached read nought');
+  markDoor(sql, 'S1', { kind: 'hello', build: '1.0.0' }, NOW - 60_000);
+  markDoor(sql, 'S1', { kind: 'called', n: 2 }, NOW - 30_000);
+  markDoor(sql, 'S1', { kind: 'hook', ms: 420 }, NOW - 30_000);
+  assert.equal(reading(k, 'agent-door-called'), 1);
+  assert.equal(reading(k, 'agent-door-internal'), 0, 'a door reached with no failure is a true nought');
+  assert.equal(reading(k, 'agent-hook-slowest'), 420);
+  /* NO CARD MARK IS POSTED YET, AND THE KERNEL IS NOT HANDED ITS HOST'S BUILD, so both read nothing, never nought. */
+  assert.equal(reading(k, 'agent-card-words'), null);
+  assert.equal(reading(k, 'agent-door-builds-behind'), null);
   sql.close();
 });

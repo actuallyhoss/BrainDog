@@ -522,7 +522,54 @@ test('THE GRAMMAR\'S ask_person STEP INSTALLS AS WRITTEN, so an agent copying it
 
 /* ── and what it cost ──────────────────────────────────────────────────── */
 
-test('NO TOOL WAS ADDED FOR AUTOMATIONS: the seventeen are the seventeen, and the reads are resources', () => {
-  assert.equal(TOOLS.length, 17);
+test('NO TOOL WAS ADDED FOR AUTOMATIONS: the sixteen are the sixteen, and the reads are resources', () => {
+  assert.equal(TOOLS.length, 16);
   for (const name of ['automations', 'automation', 'dry_run', 'automationRun', 'cancelRun']) assert.equal(TOOLS.some((t) => t.name === name), false, name);
+});
+
+/* ── run an installed rule again, dry (SHL-D07) ─────────────────────────── */
+
+test('AN INSTALLED RULE RUN AGAIN IS DRY: won, lost, filled and left, said in words, and nothing is written or filed', async () => {
+  const { sql, api } = await record();
+  for (const what of ['Rent', 'Water', 'Phone']) assert.ok(api.kernel.create('obligations', { what, state: 'open' }, { actor: 'p_1' }).ok);
+  assert.ok(api.kernel.create('obligations', { what: 'Gas', state: 'paid' }, { actor: 'p_1' }).ok);
+  const before = sql.one<{ n: number }>('SELECT total_changes() AS n')!.n;
+  const ask = (body: Record<string, unknown>) =>
+    tools(api).answer('propose', { question: 'Run Tagger again?', body_kind: 'change', body }, agent);
+
+  const said = await ask({ to: { id: 'rule.tagger' }, try: { again: true } });
+  assert.ok(said.result.ok, said.text);
+  const v = (said.result.value as { rule_again: { matches: number; won: number; lost: number; filled: number; left: number } }).rule_again;
+  assert.equal((said.result.value as { proposed: boolean }).proposed, false);
+  assert.equal(v.matches, 3, 'the paid one is matched');
+  assert.equal(v.filled + v.left, v.matches, 'filled and left do not add up to what it matches');
+  assert.match(said.text, new RegExp(`run again: would fill ${String(v.filled)} and leave ${String(v.left)} of the 3 it matches\\.`, 'u'));
+  assert.match(said.text, new RegExp(`Won ${String(v.won)}, lost ${String(v.lost)}`, 'u'));
+  assert.doesNotMatch(said.text, /—|\brows?\b|rule\.tagger/u);
+  assert.equal(sql.one<{ n: number }>('SELECT total_changes() AS n')!.n, before, 'running again dry wrote something');
+
+  /* A BODY BESIDE THE ID, OR A RULE THAT IS NOT THERE, IS REFUSED IN WORDS. */
+  assert.equal(refusal((await ask({ to: { id: 'rule.tagger', body: TAGGER }, try: { again: true } })).result).code, 'VALUE_MALFORMED');
+  assert.equal(refusal((await ask({ to: { id: 'rule.nosuch' }, try: { again: true } })).result).code, 'DECLARATION_UNKNOWN');
+  sql.close();
+});
+
+test('A RULE RUN AGAIN SAYS WHICH RULES TOOK THE REST BY THEIR NAMES, with the id beside each as a handle', async () => {
+  const { surface } = stub({
+    automations: async (args) =>
+      ({
+        ok: true,
+        value:
+          args.rule === undefined
+            ? [{ id: 'rule.chase-late', rule: 'chase-late', name: 'Chase a late bill' }, { id: 'rule.tagger', rule: 'tagger', name: 'Tag what is open' }]
+            : { id: 'rule.tagger', rule: 'tagger', name: 'Tag what is open', body: TAGGER },
+      }) as never,
+    dryRun: async () => ({ ok: true, value: { matches: 5, rows: 5, won: 2, lost: 3, takenBy: { 'chase-late': 3 }, suppressed: 0, filled: 2, left: 3, sample: [] } }) as never,
+  });
+  const said = await tools(surface).answer('propose', { question: 'Run it again?', body_kind: 'change', body: { to: { id: 'rule.tagger' }, try: { again: true } } }, { who: 'agent' });
+  assert.ok(said.result.ok, said.text);
+  assert.match(said.text, /Won 2, lost 3 to Chase a late bill \(3\)\./u);
+  assert.doesNotMatch(said.text, /chase-late/u);
+  const v = (said.result.value as { rule_again: { taken_by: { rule: string; name: string; count: number }[] } }).rule_again;
+  assert.deepEqual(v.taken_by, [{ rule: 'rule.chase-late', name: 'Chase a late bill', count: 3 }]);
 });

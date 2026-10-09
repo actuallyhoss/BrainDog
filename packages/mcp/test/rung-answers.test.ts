@@ -18,14 +18,14 @@ import { stub } from './stub.ts';
 
 const ROW = '01M345FTM0D4F495AW6K6NDA09';
 const agent = { who: 'agent' };
-const boot = async () => ({ ok: true as const, value: { me: { level: 'owner', name: 'Sam' }, registers: [{ id: 'tasks', name: 'Tasks' }] } });
+const boot = async () => ({ ok: true as const, value: { me: { level: 'owner', name: 'Mara' }, registers: [{ id: 'tasks', name: 'Tasks' }] } });
 const schema = async () => ({ ok: true as const, value: { id: 'tasks', name: 'Tasks', title: 'title', seq_prefix: 'T', fields: [{ id: 'title', type: 'text' }] } });
 const entry = (extra: Record<string, unknown> = {}) => ({ id: ROW, register: 'tasks', seq: 4, version: 2, state: null, fields: { title: 'Ship the undo' }, ...extra });
 
 test('A WRITE ITS RUNG LET THROUGH SAYS DONE, in names, and who can undo it', async () => {
   const { surface } = stub({ boot: boot as never, schema: schema as never, create: (async () => ({ ok: true, value: entry({ rung: 'tell' }) })) as never });
   const said = await tools(surface).answer('create', { register: 'tasks', fields: { title: 'Ship the undo' } }, agent);
-  assert.equal(said.text, 'Added: Ship the undo (T4) · version 2\nDone, as you may on Tasks · Sam can undo it');
+  assert.equal(said.text, 'Added: Ship the undo (T4) · version 2\nDone, as you may on Tasks · Mara can undo it');
   assert.equal((said.result.ok && (said.result.value as Record<string, unknown>).rung) || null, 'tell');
   assert.doesNotMatch(said.text ?? '', /01M345/u, 'the answer carried a row id');
 });
@@ -34,17 +34,17 @@ test('A WRITE FILED AS A SUGGESTION SAYS NOTHING WAS WRITTEN, and names the ques
   const filed = { filed: { id: 'Q12', question: 'Mark Ship the undo done?' } };
   const { surface } = stub({ boot: boot as never, schema: schema as never, update: (async () => ({ ok: true, value: filed })) as never });
   const said = await tools(surface).answer('update', { spoken: 'tasks#4', patch: { state: 'done' }, version: 2 }, agent);
-  assert.equal(said.text, 'Filed for Sam to decide: Mark Ship the undo done? (Q12)\nNothing is written until Sam accepts it in BrainDog.');
+  assert.equal(said.text, 'Filed for Mara to decide: Mark Ship the undo done? (Q12)\nNothing is written until Mara accepts it in BrainDog.');
   assert.deepEqual(said.result.ok && said.result.value, filed);
 });
 
 test('A FILED WRITE LINKS THE QUESTION where the host serves the app', async () => {
   const { surface } = stub({
-    boot: (async () => ({ ok: true, value: { me: { level: 'owner', name: 'Sam' }, record: { slug: 'sam' } } })) as never,
+    boot: (async () => ({ ok: true, value: { me: { level: 'owner', name: 'Mara' }, record: { slug: 'mara' } } })) as never,
     create: (async () => ({ ok: true, value: { filed: { id: 'Q3', question: 'Add Renew brain.dog?' } } })) as never,
   });
   const said = await tools(surface, 'https://brain.dog').answer('create', { register: 'tasks', fields: {} }, agent);
-  assert.match(said.text ?? '', /^Filed for Sam to decide: Add Renew brain\.dog\? \(Q3\)\nNothing is written until Sam accepts it in BrainDog at https:\/\/brain\.dog\/app\/sam\/decide\/Q3\.$/u);
+  assert.match(said.text ?? '', /^Filed for Mara to decide: Add Renew brain\.dog\? \(Q3\)\nNothing is written until Mara accepts it in BrainDog at https:\/\/brain\.dog\/app\/mara\/decide\/Q3\.$/u);
 });
 
 test('A WRITE THE RECORD ANSWERS `asked` IS FILED, with its reason, and never said as written', async () => {
@@ -54,7 +54,7 @@ test('A WRITE THE RECORD ANSWERS `asked` IS FILED, with its reason, and never sa
   const said = await tools(surface).answer('create', { register: 'tasks', fields: { title: 'Ship the undo' } }, agent);
   assert.equal(
     said.text,
-    'Filed for Sam to decide: Add Ship the undo to Tasks? (Q14)\nChanges like this ask until 10 of them have been kept as they were. Nothing is written until Sam accepts it in BrainDog.',
+    'Filed for Mara to decide: Add Ship the undo to Tasks? (Q14)\nChanges like this ask until 10 of them have been kept as they were. Nothing is written until Mara accepts it in BrainDog.',
   );
   assert.doesNotMatch(said.text ?? '', /^Added/mu);
 });
@@ -63,19 +63,19 @@ test('A PROPOSAL THE RECORD SAYS LANDED BY THE LADDER IS DONE, NOT ASKED', async
   const landed = { id: 'Q8', landed: true, decision: 'D3', undo: { decision: 'D3' } };
   const { surface } = stub({ boot: boot as never, schema: schema as never, propose: (async () => ({ ok: true, value: landed })) as never });
   const said = await tools(surface).answer('propose', { question: 'Close two tasks?', body_kind: 'rowset', body: { register: 'tasks', rows: [] } }, agent);
-  assert.equal(said.text, 'Done, as you may on Tasks · Sam can undo it');
+  assert.equal(said.text, 'Done, as you may on Tasks · Mara can undo it');
 });
 
 test('A NOTE ON ITS RUNG SAYS DONE AFTER WHERE IT WENT', async () => {
   const { surface } = stub({ boot: boot as never, schema: schema as never, update: (async () => ({ ok: true, value: entry({ rung: 'quiet' }) })) as never });
   const said = await tools(surface).answer('log', { spoken: 'tasks#4', note: 'Started on it.' }, agent);
-  assert.equal(said.text, 'Noted on Ship the undo (T4) · version 2\nDone, as you may on Tasks · Sam can undo it');
+  assert.equal(said.text, 'Noted on Ship the undo (T4) · version 2\nDone, as you may on Tasks · Mara can undo it');
 });
 
 test('A PROPOSAL THE LADDER ACCEPTED IS DONE, NOT ASKED', async () => {
   const { surface } = stub({ boot: boot as never, schema: schema as never, propose: (async () => ({ ok: true, value: { id: 'Q7', rung: 'tell' } })) as never });
   const said = await tools(surface).answer('propose', { question: 'Close two tasks?', body_kind: 'rowset', body: { register: 'tasks', rows: [] } }, agent);
-  assert.equal(said.text, 'Done, as you may on Tasks · Sam can undo it');
+  assert.equal(said.text, 'Done, as you may on Tasks · Mara can undo it');
 });
 
 test('A WRITE WITH NO RUNG SAID IS ANSWERED AS IT ALWAYS WAS, as a person\'s is', async () => {
@@ -94,7 +94,7 @@ test('THE LINE NAMES EVERY LIST ONCE, and the owner in plain words where the rec
 
 /* ── the card's Who slot ─────────────────────────────────────────────────── */
 
-const look: Look = { now: Date.UTC(2026, 9, 6), decl: () => undefined, title: () => undefined, actor: (b) => b, decider: 'Sam' };
+const look: Look = { now: Date.UTC(2026, 9, 6), decl: () => undefined, title: () => undefined, actor: (b) => b, decider: 'Mara' };
 const whoOf = (context: Record<string, unknown>) =>
   briefed({ context, look, home: null })
     .card.split('\n')
@@ -102,18 +102,18 @@ const whoOf = (context: Record<string, unknown>) =>
 
 test('THE WHO SLOT SAYS AN ORGANISATION BY THE NAME CONTEXT SENT, never its handle', () => {
   const who = whoOf({
-    project: { spoken: 'things#2', name: 'Prism' },
-    people: [{ spoken: 'P4', name: 'Rohan Mehta', org: 'O1', in_touch: '2026-10-04' }],
-    organisations: [{ spoken: 'O1', name: 'Encore', kind: 'client' }],
+    project: { spoken: 'things#2', name: 'Copperleaf' },
+    people: [{ spoken: 'P4', name: 'Joaquin Herrera', org: 'O1', in_touch: '2026-10-04' }],
+    organisations: [{ spoken: 'O1', name: 'Lanternfish', kind: 'client' }],
   });
-  assert.equal(who, 'Who      Rohan Mehta (Encore) · for Encore');
+  assert.equal(who, 'Who      Joaquin Herrera (Lanternfish) · for Lanternfish');
 });
 
 test('THE PROJECT IS FOR ITS OWN ORGANISATION, and not one its people are only with', () => {
-  const people = [{ spoken: 'P4', name: 'Rohan Mehta', org: 'Acme', in_touch: '2026-10-04' }];
+  const people = [{ spoken: 'P4', name: 'Joaquin Herrera', org: 'Acme', in_touch: '2026-10-04' }];
   assert.equal(
-    whoOf({ people, organisations: [{ spoken: 'O2', name: 'Acme', kind: null, linked: false }, { spoken: 'O1', name: 'Encore', kind: 'client', linked: true }] }),
-    'Who      Rohan Mehta (Acme) · for Encore',
+    whoOf({ people, organisations: [{ spoken: 'O2', name: 'Acme', kind: null, linked: false }, { spoken: 'O1', name: 'Lanternfish', kind: 'client', linked: true }] }),
+    'Who      Joaquin Herrera (Acme) · for Lanternfish',
   );
-  assert.equal(whoOf({ people, organisations: [{ spoken: 'O2', name: 'Acme', kind: null, linked: false }] }), 'Who      Rohan Mehta (Acme)');
+  assert.equal(whoOf({ people, organisations: [{ spoken: 'O2', name: 'Acme', kind: null, linked: false }] }), 'Who      Joaquin Herrera (Acme)');
 });

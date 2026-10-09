@@ -33,6 +33,19 @@ type DoorSigns = ReturnType<Kernel['doorMarks']>;
 /** What `heard` takes, in the order its refusal names them. */
 export const HEARD_TAKES = ['kind', 'n', 'ms', 'build', 'client'] as const;
 
+/**
+ * The marks only the door leaves, through `doorHeard`: a session said hello, was given the tools, made calls, was answered
+ * INTERNAL. `heard`, the routed one, refuses them, since a key that could post `called` could turn `delivered`, the tool
+ * list's sign and `door_used` green on its own say (audit 38-39, finding 5).
+ */
+export const DOOR_ONLY = ['hello', 'listed', 'called', 'internal'] as const;
+
+/** The marks a caller may post with `heard`: the start hook's time, the one mark a command really sends (`hooks.ts`). */
+export const HEARD_KINDS = ['hook'] as const;
+
+/** What `doorHeard` takes: the door's own mark, never a time, since no door mark carries one. */
+export const DOOR_HEARD_TAKES = ['kind', 'n', 'build', 'client'] as const;
+
 /** What `doorSigns` takes: how many days back, 1 to 30, seven when it names none. */
 export const DOOR_SIGNS_TAKES = ['days'] as const;
 
@@ -131,16 +144,26 @@ export function methods(deps: RecordDeps) {
     return p.level !== null && p.level !== 'append' && (ctx.registers === undefined || ctx.registers === '*');
   };
 
-  /** A mark's five keys checked, each in the sentence a refusal is written in, or the mark the kernel keeps. */
-  const markOf = (args: unknown): { mark: DoorMark } | { refused: Heard } => {
+  /**
+   * A mark's keys checked, each in the sentence a refusal is written in, or the mark the kernel keeps. `heard` and
+   * `doorHeard` each name what they take and the kinds they keep; a door's kind posted to `heard` is told why.
+   */
+  const markOf = (
+    args: unknown,
+    method: 'heard' | 'doorHeard',
+    takes: readonly string[],
+    kinds: readonly string[],
+  ): { mark: DoorMark } | { refused: Heard } => {
     if (args === null || typeof args !== 'object' || Array.isArray(args))
-      return { refused: no('VALUE_MALFORMED', 'heard takes one mark, such as { "kind": "called", "n": 3 }.', { at: 'args' }) as Heard };
+      return { refused: no('VALUE_MALFORMED', `${method} takes one mark, such as { "kind": "${kinds[0] ?? 'hook'}" }.`, { at: 'args' }) as Heard };
     const a = args as Record<string, unknown>;
-    const stray = Object.keys(a).find((k) => !(HEARD_TAKES as readonly string[]).includes(k));
+    const stray = Object.keys(a).find((k) => !takes.includes(k));
     if (stray !== undefined)
-      return { refused: no('FIELD_UNKNOWN', `${stray} is not something heard takes. It takes ${HEARD_TAKES.join(', ')}.`, { at: stray, allowed: [...HEARD_TAKES] }) as Heard };
-    if (typeof a.kind !== 'string' || !(DOOR_KINDS as readonly string[]).includes(a.kind))
-      return { refused: no('ENUM_VALUE_UNKNOWN', `kind is one of ${DOOR_KINDS.join(', ')}.`, { at: 'kind', allowed: [...DOOR_KINDS] }) as Heard };
+      return { refused: no('FIELD_UNKNOWN', `${stray} is not something ${method} takes. It takes ${takes.join(', ')}.`, { at: stray, allowed: [...takes] }) as Heard };
+    if (method === 'heard' && typeof a.kind === 'string' && (DOOR_ONLY as readonly string[]).includes(a.kind))
+      return { refused: no('FORBIDDEN', `The agent door marks ${a.kind} itself when a session reaches it, so heard takes only hook.`, { at: 'kind', allowed: [...kinds] }) as Heard };
+    if (typeof a.kind !== 'string' || !kinds.includes(a.kind) || !(DOOR_KINDS as readonly string[]).includes(a.kind))
+      return { refused: no('ENUM_VALUE_UNKNOWN', `kind is ${kinds.length === 1 ? '' : 'one of '}${kinds.join(', ')}.`, { at: 'kind', allowed: [...kinds] }) as Heard };
     const mark: DoorMark = { kind: a.kind as DoorMark['kind'] };
     for (const key of ['n', 'ms'] as const) {
       const v = a[key];
@@ -270,24 +293,45 @@ export function methods(deps: RecordDeps) {
     return { host_build, min_cli, connections, signs };
   };
 
+  /** `heard` and `doorHeard`, one road: who may leave a mark, the mark checked, kept against the caller's run or key. */
+  const mark = (args: unknown, ctx: CallContext, method: 'heard' | 'doorHeard'): Heard => {
+    const p = ctx.principal;
+    if (p.kind !== 'token' && p.kind !== 'person')
+      return no('FORBIDDEN', `${method} is how an agent or a person says how they met the door, and this caller is neither.`, { at: 'principal' }) as Heard;
+    const checked = method === 'heard' ? markOf(args, method, HEARD_TAKES, HEARD_KINDS) : markOf(args, method, DOOR_HEARD_TAKES, DOOR_ONLY);
+    if ('refused' in checked) return checked.refused;
+    const w: WriteContext =
+      p.kind === 'token'
+        ? { actor: `agent:${ctx.session?.agent ?? 'other'}`, principal: { kind: 'token', token: p.id }, session: ctx.session ?? {} }
+        : { actor: p.id, principal: { kind: 'person' } };
+    const kept = kernel.heard(w, checked.mark);
+    if (kept.ok && checked.mark.kind === 'called' && p.kind === 'token') kernel.noteTool(p.id);
+    return kept;
+  };
+
   return {
     /**
-     * One mark of how this session met the agent door: it said hello, was given the tools, made calls, waited on its
-     * start hook. DATA. Kept against the caller's run, or its token when it has none; it opens no run and changes no row.
+     * How long this session's start hook took, the one mark a caller posts itself. DATA, the routed one (POST
+     * /api/heard). The door's own marks, hello, listed, called and internal, are refused here in one sentence and kept
+     * only through `doorHeard`, so no key moves a sign by saying it was served. It opens no run and changes no row.
      */
     async heard(args: unknown, ctx: CallContext): Promise<Heard> {
+      /* THE GUARD IN THE METHOD'S OWN BODY, where `guards` reads it for the DATA group (30 §10). */
       const stop = scoped(ctx, 'read') && scoped(ctx, 'propose');
       if (stop) return { ok: false, refusal: stop } as Heard;
-      const p = ctx.principal;
-      if (p.kind !== 'token' && p.kind !== 'person')
-        return no('FORBIDDEN', 'heard is how an agent or a person says how they met the door, and this caller is neither.', { at: 'principal' }) as Heard;
-      const checked = markOf(args);
-      if ('refused' in checked) return checked.refused;
-      const w: WriteContext =
-        p.kind === 'token'
-          ? { actor: `agent:${ctx.session?.agent ?? 'other'}`, principal: { kind: 'token', token: p.id }, session: ctx.session ?? {} }
-          : { actor: p.id, principal: { kind: 'person' } };
-      return kernel.heard(w, checked.mark);
+      return mark(args, ctx, 'heard');
+    },
+
+    /**
+     * One mark the agent door leaves as a session meets it: it said hello, was given the tools, made calls, was answered
+     * INTERNAL. NOT ROUTED: the host's route table has no row for it, so only the door, holding the record itself, calls
+     * it. A `called` from a key also moves that key's `last_tool_at` (`noteTool`, audit 38-39 finding 2); the door marks
+     * `called` at most once a minute a caller, so this is one more statement on that mark and none on most calls.
+     */
+    async doorHeard(args: unknown, ctx: CallContext): Promise<Heard> {
+      const stop = scoped(ctx, 'read') && scoped(ctx, 'propose');
+      if (stop) return { ok: false, refusal: stop } as Heard;
+      return mark(args, ctx, 'doorHeard');
     },
 
     /**

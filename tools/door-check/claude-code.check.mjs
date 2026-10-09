@@ -12,8 +12,9 @@
  * A SECOND ROW RUNS THE NEWEST RELEASE, unpinned, with the same profile. It warns and never fails the night: a new
  * release that breaks the door is news to act on, and the pin moves only by hand after a passing night.
  *
- * WHAT IT NEEDS FROM OUTSIDE, AND NEVER WRITES DOWN. `ANTHROPIC_API_KEY` for Claude Code: without it the row reads
- * "not run: no key" and the night exits 0 with that warning (DIRECTION 42 over the brief's exit 1). A sign-in for the
+ * WHAT IT NEEDS FROM OUTSIDE, AND NEVER WRITES DOWN. `ANTHROPIC_API_KEY` for Claude Code: without it the command is
+ * still installed, since that needs no key, and then the row reads "not run: no key" and the night exits 0 with that
+ * warning (DIRECTION 42 over the brief's exit 1); an install that fails is red either way. A sign-in for the
  * record: `DOOR_TOKEN`, a key for that record which a harness or a person made, handed to the command as
  * `BRAINDOG_TOKEN` in its environment and to nothing else; without one, `setup` prints six digits and waits for a
  * person to approve them in the app, which in CI nobody can, so CI without one reads "not run" as well.
@@ -82,7 +83,8 @@ function run(cmd, args, { env, cwd, signal, ms, input, echo = false }) {
 function envOf(home, address, extraPath) {
   const env = {};
   for (const [name, value] of Object.entries(process.env)) {
-    if (name.startsWith('BRAINDOG_') || name.startsWith('CLAUDE') || name === 'XDG_CONFIG_HOME' || name === 'DOOR_TOKEN') continue;
+    /* NO OTHER APP'S KEY, and no second key for the record: the night's environment holds Codex's and Cursor's too. */
+    if (name.startsWith('BRAINDOG_') || name.startsWith('CLAUDE') || name === 'XDG_CONFIG_HOME' || name.startsWith('DOOR_TOKEN') || /^(OPENAI|CODEX|CURSOR)_API_KEY$/.test(name)) continue;
     env[name] = value;
   }
   env.HOME = home;
@@ -263,15 +265,19 @@ export default async function claudeCode(ctx) {
 
 async function door({ host, record, home, signal }) {
   const pinned = { app: APP, version: PIN.pinned };
+
+  /* (a) THE COMMAND, AS A STRANGER INSTALLS IT, before any key is asked for: it needs none, and a host that serves no
+     door is then a red row on any night, never "not run" (the workflow's forced failure, which runs with no key). */
+  const install = await run('sh', ['-c', 'curl -fsSL "$DOOR_INSTALL" | sh'], { env: { ...keyless(envOf(home, host, [])), DOOR_INSTALL: `${host}/cli/install.sh` }, cwd: home, signal, ms: INSTALL_MS });
+  if (install.code !== 0 || !existsSync(join(home, '.braindog', 'bin', 'braindog'))) return { ...pinned, ok: false, saw: `install failed: ${lastLine(install.err || install.out)}` };
+
   if (!process.env.ANTHROPIC_API_KEY) return { ...pinned, ok: null, saw: 'no key' };
   if (!record) return { ...pinned, ok: null, saw: 'no record, pass --record' };
   if (process.env.CI && !process.env.DOOR_TOKEN) return { ...pinned, ok: null, saw: 'no key for the record, and no one here to approve six digits' };
   const address = /^https?:\/\//.test(record) ? record.replace(/\/+$/, '') : `${host}/app/${record}`;
 
-  /* (a) THE COMMAND, AS A STRANGER INSTALLS IT, then Claude Code at its pin, which `setup` needs on the PATH. */
+  /* Then Claude Code at its pin, which `setup` needs on the PATH. */
   const plain = keyless(envOf(home, address, []));
-  const install = await run('sh', ['-c', 'curl -fsSL "$DOOR_INSTALL" | sh'], { env: { ...plain, DOOR_INSTALL: `${host}/cli/install.sh` }, cwd: home, signal, ms: INSTALL_MS });
-  if (install.code !== 0 || !existsSync(join(home, '.braindog', 'bin', 'braindog'))) return { ...pinned, ok: false, saw: `install failed: ${lastLine(install.err || install.out)}` };
   const bin = await installClaude(PIN.pinned, home, plain, signal);
   const env = envOf(home, address, [bin]);
   pinned.version = (await versionOf(bin, env, signal)) || PIN.pinned;

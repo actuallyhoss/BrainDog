@@ -14,15 +14,17 @@ name: door-nightly
 # prints one warning annotation, `claude-code <version>: not run: no key`, and the run exits 0, so
 # the warning is on the run's page every night until `ANTHROPIC_API_KEY` is set. The same holds with
 # no record (`DOOR_RECORD`, a repository variable) or no key for it (`DOOR_TOKEN`, a secret made for
-# that record), because nobody is here at night to approve six digits. When the proof area's harness
-# makes a fresh record on demand, a step before the check asks it for both.
+# that record), because nobody is here at night to approve six digits. Codex and Cursor read
+# `OPENAI_API_KEY` and `CURSOR_API_KEY` the same way: without one, their rows read "not run: no key".
+# When the proof area's harness makes a fresh record on demand, a step before the check asks it for both.
 #
 # THE KEYS TRAVEL IN THE ENVIRONMENT AND NOWHERE ELSE. The check hands `DOOR_TOKEN` to the command
 # as `BRAINDOG_TOKEN` and writes neither key into any file; `report.json` holds what each app saw.
 #
-# A FORCED FAILURE: run it by hand with `host` set to an https site that serves no door. The command
-# does not install, the row reads FAIL and the run is red. (A `record` the key cannot open is no
-# test: with DOOR_TOKEN the key alone names the record, and the address only names the host.)
+# A FORCED FAILURE: run it by hand with `host` set to an https site that serves no door. It runs with
+# no key (below), the command does not install, the row reads FAIL and the run is red. (A `record` the
+# key cannot open is no test: with DOOR_TOKEN the key alone names the record, and the address only
+# names the host.)
 
 on:
   schedule:
@@ -56,9 +58,9 @@ jobs:
     # AFTER A DEPLOY ONLY WHEN IT DEPLOYED: `workflow_run` fires on a failed deploy too.
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    # THREE CHECKS ONE AFTER ANOTHER, each allowed twenty minutes (the runs scenario, the manners count and the door),
-    # so a slow night is not cut before any line is printed.
-    timeout-minutes: 75
+    # FIVE CHECKS ONE AFTER ANOTHER, each allowed twenty minutes (the door, the manners count, and the runs scenario for
+    # Claude Code, Codex and Cursor), so a slow night is not cut before any line is printed.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,9 +74,13 @@ jobs:
         env:
           DOOR_HOST: ${{ inputs.host || 'https://brain.dog' }}
           DOOR_RECORD: ${{ inputs.record || vars.DOOR_RECORD }}
-          DOOR_TOKEN: ${{ secrets.DOOR_TOKEN }}
-          DOOR_TOKEN_2: ${{ secrets.DOOR_TOKEN_2 }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # THE KEYS GO ONLY TO PRODUCTION. A dispatch that names another host, or a record by an address of its own,
+          # runs with none of them, so the host it names is never handed a key (`run.mjs` drops them as well).
+          DOOR_TOKEN: ${{ !inputs.host && !contains(inputs.record, '://') && secrets.DOOR_TOKEN || '' }}
+          DOOR_TOKEN_2: ${{ !inputs.host && !contains(inputs.record, '://') && secrets.DOOR_TOKEN_2 || '' }}
+          ANTHROPIC_API_KEY: ${{ !inputs.host && !contains(inputs.record, '://') && secrets.ANTHROPIC_API_KEY || '' }}
+          OPENAI_API_KEY: ${{ !inputs.host && !contains(inputs.record, '://') && secrets.OPENAI_API_KEY || '' }}
+          CURSOR_API_KEY: ${{ !inputs.host && !contains(inputs.record, '://') && secrets.CURSOR_API_KEY || '' }}
         run: node tools/door-check/run.mjs --report report.json
       - name: Keep the report
         if: always()

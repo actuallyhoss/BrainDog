@@ -226,6 +226,10 @@ const OUT = {
   },
 };
 
+/* THE EXEMPT PATHS, BY THE NAME THE LEDGER READS THEM UNDER (PRF-B03 step 3): `ledger.json` holds `shell-words.EXEMPT`
+   at its newest line, so this list only shrinks, and a fall is a line written there. */
+export { OUT as EXEMPT };
+
 /**
  * THE FILES A CORE PACKAGE SHIPS: its `src`, without tests.
  * `.svelte` is read too, with its HTML comments blanked first, because a component's markup is code

@@ -1,7 +1,7 @@
 /**
  * Who is here, by name (`loop/contract-17.md`, DIRECTION §38): `context` answers the people linked to the project with
  * their role, the organisation they are with and the last day anybody was in touch, the ones in touch latest first, and
- * the project's organisations, so the briefing card can say "Priya Raman (Encore, client)" rather than a count.
+ * the project's organisations, so the briefing card can say "Teodor Vance (Lanternfish, client)" rather than a count.
  *
  * Held to the caller: an organisation is named only to somebody who reads the organisations.
  */
@@ -71,10 +71,10 @@ const PEOPLE = {
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 
-/** An agent's run in the encore repository, held to `registers` when given. */
+/** An agent's run in the lanternfish repository, held to `registers` when given. */
 const agent = (registers?: readonly string[]): CallContext => ({
   principal: { kind: 'token', id: 'tok_1', scope: 'propose', person: 'p_1', level: 'owner' },
-  session: { host: 'dev-pc', repo: 'encore', agent: 'claude', client_id: 'c-1' },
+  session: { host: 'dev-pc', repo: 'lanternfish', agent: 'claude', client_id: 'c-1' },
   ...(registers === undefined ? {} : { registers }),
 });
 
@@ -88,39 +88,39 @@ async function record() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   value(await api.kernel.install([THINGS, ORGS, PEOPLE]));
-  const encore = value<Entry>(await api.create({ register: 'things', fields: { name: 'Encore', repos: ['encore'] } }, owner));
-  const elsewhere = value<Entry>(await api.create({ register: 'things', fields: { name: 'Bake', repos: ['bake'] } }, owner));
+  const lanternfish = value<Entry>(await api.create({ register: 'things', fields: { name: 'Lanternfish', repos: ['lanternfish'] } }, owner));
+  const elsewhere = value<Entry>(await api.create({ register: 'things', fields: { name: 'Tide', repos: ['tide'] } }, owner));
   const org = async (name: string, kind: string, projects: string[] = []) =>
     value<Entry>(await api.create({ register: 'organisations', fields: { name, kind, ...(projects.length ? { projects } : {}) } }, owner));
-  const company = await org('Encore', 'client', [encore.id]);
-  const brightloom = await org('Brightloom Infotech', 'company');
-  const old = await org('Brightloom', 'company');
+  const company = await org('Lanternfish', 'client', [lanternfish.id]);
+  const pellucid = await org('Pellucid Ltd', 'company');
+  const old = await org('Pellucid', 'company');
   /* A ROW FOLDED INTO ANOTHER IS NAMED AS THE ONE IT WAS FOLDED INTO. */
   /* FOLDED AS EVERY MERGE IS, BY A DECISION (`mergeShaped`): a plain update may not name `merged_into`. */
   {
-    const asked = value<{ id: string }>(await api.propose({ question: 'Are these the same?', body_kind: 'rowset', body: { register: 'organisations', rows: [{ at: `organisations#${old.seq}`, version: old.version, patch: { merged_into: brightloom.id } }] } }, owner));
+    const asked = value<{ id: string }>(await api.propose({ question: 'Are these the same?', body_kind: 'rowset', body: { register: 'organisations', rows: [{ at: `organisations#${old.seq}`, version: old.version, patch: { merged_into: pellucid.id } }] } }, owner));
     value(await api.decide({ id: asked.id, decide: { option: 'merge', reason: 'the same' } }, owner));
   }
-  const person = async (fields: Record<string, unknown>) => value<Entry>(await api.create({ register: 'people', fields: { projects: [encore.id], ...fields } }, owner));
-  await person({ name: 'Madan Neriyanur', role: 'contractor', org: brightloom.id, in_touch: '2026-09-20' });
-  await person({ name: 'Priya Raman', role: 'client', org: company.id, in_touch: '2026-10-05' });
-  await person({ name: 'Rohan Mehta', role: 'contractor', org: old.id });
-  await person({ name: 'Prasanthi Maddineni', org: brightloom.id, in_touch: '2026-10-01' });
-  await person({ name: 'Dario', projects: [elsewhere.id], in_touch: '2026-10-06' });
+  const person = async (fields: Record<string, unknown>) => value<Entry>(await api.create({ register: 'people', fields: { projects: [lanternfish.id], ...fields } }, owner));
+  await person({ name: 'Ines Duarte', role: 'contractor', org: pellucid.id, in_touch: '2026-09-20' });
+  await person({ name: 'Teodor Vance', role: 'client', org: company.id, in_touch: '2026-10-05' });
+  await person({ name: 'Joaquin Herrera', role: 'contractor', org: old.id });
+  await person({ name: 'Priya Raman', org: pellucid.id, in_touch: '2026-10-01' });
+  await person({ name: 'Wren', projects: [elsewhere.id], in_touch: '2026-10-06' });
   return { api, sql };
 }
 
 test('THE PEOPLE HERE ARE NAMED WITH THEIR ROLE, THEIR ORGANISATION AND THE DAY LAST IN TOUCH, the latest first', async () => {
   const { api, sql } = await record();
   const here = value<Context>(await api.context(undefined, agent()));
-  assert.equal(here.project?.name, 'Encore');
+  assert.equal(here.project?.name, 'Lanternfish');
   assert.deepEqual(
     here.people.map((p) => [p.name, p.role, p.org, p.in_touch]),
     [
-      ['Priya Raman', 'client', 'Encore', '2026-10-05'],
-      ['Prasanthi Maddineni', null, 'Brightloom Infotech', '2026-10-01'],
-      ['Madan Neriyanur', 'contractor', 'Brightloom Infotech', '2026-09-20'],
-      ['Rohan Mehta', 'contractor', 'Brightloom Infotech', null],
+      ['Teodor Vance', 'client', 'Lanternfish', '2026-10-05'],
+      ['Priya Raman', null, 'Pellucid Ltd', '2026-10-01'],
+      ['Ines Duarte', 'contractor', 'Pellucid Ltd', '2026-09-20'],
+      ['Joaquin Herrera', 'contractor', 'Pellucid Ltd', null],
     ],
   );
   assert.ok(here.people.every((p) => p.scope === 'project' && /^people#\d+$/u.test(p.spoken)));
@@ -133,12 +133,12 @@ test("THE PROJECT'S ORGANISATIONS: its own first, then the ones its people are w
   assert.deepEqual(
     here.organisations.map((o) => [o.name, o.kind, o.linked]),
     [
-      ['Encore', 'client', true],
-      ['Brightloom Infotech', 'company', false],
+      ['Lanternfish', 'client', true],
+      ['Pellucid Ltd', 'company', false],
     ],
   );
   /* AN ORGANISATION IS NOT A PERSON HERE, though its list links it to the project the same way. */
-  assert.ok(!here.people.some((p) => p.name === 'Encore'));
+  assert.ok(!here.people.some((p) => p.name === 'Lanternfish'));
   assert.ok(!here.registers.some((r) => r.id === 'organisations'));
   sql.close();
 });
@@ -149,7 +149,7 @@ test('A CALLER WHO DOES NOT READ THE ORGANISATIONS IS TOLD NO ORGANISATION, by n
   assert.equal(here.people.length, 4);
   assert.ok(here.people.every((p) => p.org === null));
   assert.deepEqual(here.organisations, []);
-  assert.doesNotMatch(JSON.stringify(here), /organisations#|Brightloom/u);
+  assert.doesNotMatch(JSON.stringify(here), /organisations#|Pellucid/u);
   sql.close();
 });
 

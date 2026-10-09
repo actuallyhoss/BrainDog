@@ -164,6 +164,82 @@ jobs:
           path: ${{ runner.temp }}/live-before/live-before.env
           retention-days: 7
 
+      # A RESTORE POINT BEFORE A DEPLOY THAT CHANGES THE STORED FORMAT (LCH-C06). The Worker's operator door
+      # `/account/ops/restore-point` (`apps/worker/src/restore-point.ts`) walks every record somebody wrote in the last
+      # seven days. In `check` mode it opens each one with the live build and copies nothing; for real, each takes a
+      # `before-deploy-<commit>` copy through the same port its own copies go through, kept seven days. This step always
+      # asks `check`, and asks for real only when a migration file changed between the live sha `Record what is live`
+      # wrote and this commit, or when that sha is unknown, which is the case a copy is for.
+      #
+      # A COPY THAT FAILED STOPS THE DEPLOY WITH NOTHING CHANGED: `failed` above zero is a 500 from the door and a red
+      # step here. A failed `check` before the deploy is a warning and not a stop, because it measures the build that is
+      # live, and a fix for a record that build cannot open has to be able to ship.
+      #
+      # NO KEY, NO RESTORE POINT, AND NOT A RED RUN. `PROVISION_KEY` is a secret of the `production` environment, set
+      # by hand; until it is, the step says "not run: no key" and the deploy goes on. A live build without the door
+      # (the deploy that first ships it) answers 404 and is said the same way. The answer is counts only, never a name.
+      #
+      # THE SCRIPT IS WRITTEN TO THE RUNNER ONCE and `Check the records open` asks it again after the deploy.
+      - name: Take a restore point
+        run: |
+          cat > "$RUNNER_TEMP/restore-point.mjs" <<'JS'
+          const [mode, title] = process.argv.slice(2);
+          const key = process.env.PROVISION_KEY ?? '';
+          const commit = (process.env.HEAD_SHA ?? '').toLowerCase();
+          if (key === '') {
+            console.log(`${title}: not run: no key. Set PROVISION_KEY in the production environment's secrets.`);
+            process.exit(0);
+          }
+          let cursor;
+          for (let page = 0; page < 500; page++) {
+            let status = 0;
+            let out = null;
+            try {
+              const res = await fetch(`https://${process.env.DEPLOY_HOST}/account/ops/restore-point`, {
+                method: 'POST',
+                headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+                body: JSON.stringify({ check: mode === 'check', ...(/^[0-9a-f]{7,40}$/.test(commit) ? { commit } : {}), ...(cursor ? { cursor } : {}) }),
+                signal: AbortSignal.timeout(120_000),
+              });
+              status = res.status;
+              out = await res.json().catch(() => null);
+            } catch (e) {
+              console.error(`${title}: the host did not answer: ${e instanceof Error ? e.message : String(e)}`);
+              process.exit(1);
+            }
+            if (status === 404) {
+              console.log(`${title}: not run: the live build has no restore-point door, or no operator key of its own.`);
+              process.exit(0);
+            }
+            const said = out?.value?.said ?? out?.refusal?.fix ?? 'no answer';
+            console.log(`${title}: ${said}`);
+            if (status !== 200) process.exit(1);
+            cursor = out?.value?.cursor;
+            if (!cursor) process.exit(0);
+          }
+          console.error(`${title}: the walk did not end after 500 pages.`);
+          process.exit(1);
+          JS
+          if [ -z "$PROVISION_KEY" ]; then
+            echo "Take a restore point: not run: no key. Set PROVISION_KEY in the production environment's secrets."
+            exit 0
+          fi
+          if ! node "$RUNNER_TEMP/restore-point.mjs" check "Take a restore point (check)"; then
+            echo "::warning::The live build could not open every record in use. The deploy goes on, since it may be the fix."
+          fi
+          if [ -n "$LIVE_SHA" ] && git cat-file -e "$LIVE_SHA^{commit}" 2>/dev/null; then
+            changed=$(git diff --name-only "$LIVE_SHA" HEAD -- 'packages/kernel/src/migrations/*.ts')
+            if [ -z "$changed" ]; then
+              echo "Take a restore point: no migration changed since $LIVE_SHA, so nothing is copied."
+              exit 0
+            fi
+          fi
+          node "$RUNNER_TEMP/restore-point.mjs" take "Take a restore point"
+        env:
+          PROVISION_KEY: ${{ secrets.PROVISION_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
       # `51`'s `assets` CARRIES `apps/web/build` INTO THE WORKER VERSION, so this one command ships
       # the shell and the code as one thing. That is what lets step 6 compare a live byte against a
       # local one and mean it: two deploys could differ for a minute and the gate would be
@@ -323,6 +399,19 @@ jobs:
         env:
           SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN }}
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+
+      # AND AFTER THE DEPLOY, EVERY RECORD IN USE OPENED ONCE WITH THE NEW BUILD (LCH-C06): the same door in `check`
+      # mode, so a build that cannot open a lived-in record turns the run red here instead of a person finding out.
+      # It copies nothing. Smoke opens one named record at most; this asks every record somebody wrote in the last
+      # seven days, the owner's among them only because he uses it. No key, it says "not run: no key".
+      #
+      # A RED CHECK HERE IS RED AND NOT A ROLLBACK: `Decide whether to roll back` reads Parity and Smoke only.
+      - name: Check the records open
+        run: node "$RUNNER_TEMP/restore-point.mjs" check "Check the records open"
+        env:
+          PROVISION_KEY: ${{ secrets.PROVISION_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
 
       # A RED PARITY OR SMOKE PUTS BACK WHAT WAS LIVE, UNLESS PUTTING IT BACK WOULD BREAK MORE. Before
       # this, a red step left the bad version serving every record. `rollback.mjs decide` reads what

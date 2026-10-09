@@ -76,14 +76,15 @@ const refusal = (r: unknown) => {
 
 /* ── the surface itself ──────────────────────────────────────────────────── */
 
-test('THE COUNT IS THE DESIGN: seventeen, and each is named by the plan', () => {
+test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
   /* The eight of `10-MCP` §3 less what no token can use, plus `context`,
      `handoff` and `meet`, which are what an agent does every session. `decide` is ABSENT because no
      token reaches that rung: a tool that could only ever refuse is a tool an agent spends its turns
      discovering. `activity` is the fifteenth, a record-wide log, the one thing agents coming from
      other records reach for and nowhere here: see `activity.test.ts` for the rest of that comparison.
-     `triage` is the sixteenth, the one tool the ceiling was raised for. `understand` is the seventeenth (DIRECTION
-     §38): what the record would link, read before an agent meets anyone, paid for out of the list's own words.
+     `triage` is the sixteenth, the one tool the ceiling was raised for. `understand` was a seventeenth (DIRECTION
+     §38) and is the resource `braindog:understand` now (AGT-B05, "keep the 16" of §37): it takes nothing and writes
+     nothing, and its words paid for `op_id` on `create` and `update`.
 
      `money` WAS ONCE THE SIXTEENTH, and it read seven of money-core's figure ids by name, so the
      core knew one use case. A pack's figures are named
@@ -91,7 +92,7 @@ test('THE COUNT IS THE DESIGN: seventeen, and each is named by the plan', () => 
      other pack's (`figures.test.ts`). */
   assert.deepEqual(
     TOOLS.map((t) => t.name),
-    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'understand', 'meet', 'triage'],
+    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage'],
   );
   for (const t of TOOLS) assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
 });
@@ -873,4 +874,47 @@ test('AND A NAME OFF `Object.prototype` IS NOT A TOOL, it is a refusal', async (
   }
   assert.ok((await mcp.call('record_index', {}, owner)).ok);
   sql.close();
+});
+
+/* ── what the record would link: a resource, once the seventeenth tool (AGT-B05) ── */
+
+test('UNDERSTAND IS A RESOURCE THAT READS THE PLAN IN NAMES, held a minute, and passes on nothing that acts', async () => {
+  const slice = {
+    dry: true,
+    kinds: [{ kind: 'payments', looked: 40, linked: 3, refused: 0, organisations: 1 }],
+    writes: ['Link LOWRY ST STUDIOS RENT AUG to Lowry St Studios'],
+    more: 0,
+    questions: ['Which project is Fly for?'],
+    asks: { 'service-project': 1 },
+    done: true,
+    undo: ['01M345FTM0D4F495AW6K6NDA06'],
+    filed: [{ id: 'SG4', question: 'Which project is Fly for?' }],
+  };
+  const { surface, calls } = stub({ understandPlan: async () => ({ ok: true, value: slice }) });
+  const mcp = tools(surface);
+  assert.equal(TOOLS.some((t) => t.name === 'understand'), false, 'understand is still a tool');
+  const listed = (await mcp.resources({ who: 'agent' })).find((r) => r.uri === 'braindog:understand');
+  assert.ok(listed, 'braindog:understand is not listed');
+  assert.match(listed.description, /\bmeet\b/u);
+  assert.equal(listed.ttlMs, 60_000);
+
+  const read = await mcp.read('braindog:understand', { who: 'agent' });
+  assert.ok(read.ok);
+  const v = read.value as Record<string, unknown>;
+  assert.equal(v.undo, undefined, 'an undo is a handle no tool takes');
+  assert.equal(v.filed, undefined, 'a dry slice files nothing');
+  assert.deepEqual(v.writes, slice.writes);
+  assert.match(String(v.said), /Would ask the owner: Which project is Fly for\?/u);
+  assert.doesNotMatch(String(v.said), /—|\brows?\b/u);
+  assert.ok(!calls.some((c) => ['meet', 'create', 'update', 'propose'].includes(c.method)), 'it wrote');
+
+  /* A SESSION OPENED BEFORE STILL CALLS THE TOOL, and is told where it is read now. */
+  const old = refusal(await mcp.call('understand', {}, { who: 'agent' }));
+  assert.equal(old.code, 'ROUTE_UNKNOWN');
+  assert.match(old.fix, /braindog:understand/u);
+
+  /* AND A SURFACE WITHOUT IT LISTS NO ADDRESS THAT WOULD REFUSE. */
+  const before = stub().surface;
+  delete before.understandPlan;
+  assert.ok(!(await tools(before).resources({ who: 'agent' })).some((r) => r.uri === 'braindog:understand'));
 });

@@ -98,7 +98,9 @@ const Wasm = (globalThis as unknown as {
 }).WebAssembly;
 
 export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<ScriptAnswer> {
-  const started = performance.now();
+  /* EVERY READING OF TIME GOES THROUGH THE HOST'S CLOCK, the machine's when it names none (`CtxHost.clock`). */
+  const clock = host.clock?.bind(host) ?? ((): number => performance.now());
+  const started = clock();
   const usage: ScriptUsage = { fetches: 0, bytes: 0, wall_ms: 0, cpu_ms: 0 };
   const writes: ScriptWrite[] = [];
   let log = '';
@@ -108,7 +110,7 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
 
   const answer = (refused: ScriptRefusal | null): ScriptAnswer => {
     done = true;
-    usage.wall_ms = Math.round(performance.now() - started);
+    usage.wall_ms = Math.round(clock() - started);
     usage.cpu_ms = Math.round(cpu);
     return refused === null ? { writes, log, usage } : { refused, log, usage };
   };
@@ -178,7 +180,7 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
    * and the end of the run all ask this same question.
    */
   const overBudget = (): ScriptRefusal | null => {
-    const now = performance.now();
+    const now = clock();
     if (now > deadline) return wallRefusal;
     if (cpu + (slice === null ? 0 : now - slice) > limits.cpu_ms) return cpuRefusal;
     return null;
@@ -201,12 +203,12 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
   /** Every entry into the interpreter goes through here, so the CPU budget sees all of it. */
   const inVm = <T>(fn: () => T): T => {
     const outer = slice === null;
-    if (outer) slice = performance.now();
+    if (outer) slice = clock();
     try {
       return fn();
     } finally {
       if (outer && slice !== null) {
-        cpu += performance.now() - slice;
+        cpu += clock() - slice;
         slice = null;
       }
     }
@@ -455,8 +457,16 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
     entered.value.dispose();
     pump();
 
+    /* THE TIMER ONLY WAKES THE RUN; THE CLOCK SAYS WHETHER wall_ms IS SPENT. On the machine's clock the two agree and
+       this fires once. On a host's clock that stands still the run is never refused for wall time the machine spent,
+       and on one the host has already moved past the deadline it is refused at once. */
     const timeout = new Promise<'timeout'>((resolve) => {
-      timer = setTimeout(() => resolve('timeout'), Math.max(0, deadline - performance.now()));
+      const arm = (): void => {
+        const left = deadline - clock();
+        if (left < 0) resolve('timeout');
+        else timer = setTimeout(arm, Math.max(1, left));
+      };
+      arm();
     });
     const outcome = await Promise.race([settled, timeout, stopped.then(() => 'stopped' as const)]);
 

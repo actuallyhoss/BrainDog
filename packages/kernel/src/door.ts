@@ -115,28 +115,33 @@ const median = (sorted: readonly number[]): number | null => {
  */
 export function doorMarks(sql: Sql, sinceMs: number, nowMs: number, current?: string): DoorSigns {
   const since = new Date(Math.min(sinceMs, nowMs)).toISOString();
+  /* AND NOTHING AFTER `nowMs`: a figure read as of a day past counted every mark since, later ones too (kernel-figures-43). */
+  const until = new Date(nowMs).toISOString();
   const days = Math.max(1, Math.round((nowMs - Math.min(sinceMs, nowMs)) / DAY));
   const counts = new Map(
     sql
       .all<{ kind: string; runs: number; n: number; slowest: number | null }>(
-        'SELECT kind, COUNT(*) AS runs, SUM(n) AS n, MAX(ms) AS slowest FROM door_mark WHERE at >= ? GROUP BY kind',
+        'SELECT kind, COUNT(*) AS runs, SUM(n) AS n, MAX(ms) AS slowest FROM door_mark WHERE at >= ? AND at <= ? GROUP BY kind',
         since,
+        until,
       )
       .map((r) => [r.kind, { runs: Number(r.runs), n: Number(r.n ?? 0), slowest: r.slowest === null ? null : Number(r.slowest) }]),
   );
   const of = (kind: DoorKind) => counts.get(kind) ?? { runs: 0, n: 0, slowest: null };
   const hooks = sql
-    .all<{ ms: number }>("SELECT ms FROM door_mark WHERE kind = 'hook' AND at >= ? AND ms IS NOT NULL ORDER BY ms", since)
+    .all<{ ms: number }>("SELECT ms FROM door_mark WHERE kind = 'hook' AND at >= ? AND at <= ? AND ms IS NOT NULL ORDER BY ms", since, until)
     .map((r) => Number(r.ms));
-  const card = sql.one<{ most: number | null }>("SELECT MAX(n) AS most FROM door_mark WHERE kind = 'card' AND at >= ?", since);
+  const card = sql.one<{ most: number | null }>("SELECT MAX(n) AS most FROM door_mark WHERE kind = 'card' AND at >= ? AND at <= ?", since, until);
   /* A SESSION'S BUILD IS THE LATEST ITS MARKS NAMED, across its kinds, so one session counts once on one build. */
   const builds = sql
     .all<{ build: string; n: number }>(
       `SELECT build, COUNT(*) AS n FROM (
-         SELECT run, (SELECT d.build FROM door_mark d WHERE d.run = m.run AND d.build IS NOT NULL ORDER BY d.at DESC LIMIT 1) AS build
-         FROM door_mark m WHERE m.at >= ? GROUP BY m.run
+         SELECT run, (SELECT d.build FROM door_mark d WHERE d.run = m.run AND d.build IS NOT NULL AND d.at <= ? ORDER BY d.at DESC LIMIT 1) AS build
+         FROM door_mark m WHERE m.at >= ? AND m.at <= ? GROUP BY m.run
        ) WHERE build IS NOT NULL GROUP BY build ORDER BY n DESC, build`,
+      until,
       since,
+      until,
     )
     .map((r) => ({ build: r.build, n: Number(r.n) }));
   const now = text(current);

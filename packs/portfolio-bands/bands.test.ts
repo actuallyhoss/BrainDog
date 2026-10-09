@@ -129,6 +129,13 @@ function recordOf(projects: Project[], now = 'Takings a month', base = 'Takings 
 }
 
 /**
+ * THE SANDBOX'S CLOCK, STANDING STILL (`CtxHost.clock`). None of these tests is about a script's limits, and on a loaded
+ * machine three of them once failed at ten times their usual duration, refused for time the machine spent and the
+ * script did not. The limits are tested in `packages/script/test`, on the machine's clock and on a held one.
+ */
+const STEADY = (): number => 0;
+
+/**
  * A host double holding the pack's settings as `config`. `where` is ignored, so the script's own filtering is what is
  * under test; the last test sends it.
  */
@@ -138,6 +145,7 @@ const hostOf = (rows: Record<string, Row[]>, config: Names | Record<string, Json
   },
   list: async (register) => (rows[register] ?? []) as unknown as Json[],
   now: () => NOW,
+  clock: STEADY,
   tz: 'UTC',
   input: null,
   config: config as Json,
@@ -428,14 +436,18 @@ test('THE WHOLE PATH ON A SELF-HOST: installed, its names set, due, run, applied
   const { useCaseDocument } = await import('../../packages/seed/src/usecases/index.ts');
 
   const dir = mkdtempSync(join(tmpdir(), 'braindog-bands-'));
-  const running = await start({
+  /* THE SELF-HOST'S SANDBOX ON THE SAME STEADY CLOCK, through `scriptClock` on `start`. Held in a variable so this file
+     typechecks before the server takes the option, and the option is only read once it does. */
+  const options = {
+    scriptClock: STEADY,
     file: join(dir, 'record.brain'),
     directory: join(dir, 'directory.sqlite'),
     port: 0,
     host: '127.0.0.1',
     pollMs: 0,
     actions: { openKey: async () => null, send: async () => new Response('{}'), resolve: async () => [] },
-  });
+  };
+  const running = await start(options);
   try {
     const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
     const person = running.directory.person$('ada@example.test', 'Ada');

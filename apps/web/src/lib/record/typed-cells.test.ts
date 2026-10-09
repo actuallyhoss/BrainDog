@@ -106,12 +106,13 @@ test('a record that answered no types still says what runs_on holds, by its own 
   assert.ok(!cells.some((c) => ISO.test(c) || /^S\d+$/u.test(c)), cells.join(' | '));
 });
 
-test('a run the reader could not open is said by the agent the record named beside it, and only runs_on asks for runs', () => {
+test('a run the reader could not open is said by the agent the record named beside it, and only runs_on and handoffs.open ask for runs', () => {
   const b = { ...runsOn({ used_by: 'run', used_at: 'instant' }), rows: [tool(1, { used_by: 'S731', used_agent: 'Claude Code', used_at: USED })] };
   const block = blockOf(b as never, new Map(), AT, null, new Map(), new Map());
   const cells = block.rows.flatMap((r) => r.cells);
   assert.ok(cells.includes('[Claude Code](/r/session/731)'), cells.join(' | '));
-  assert.deepEqual(runsNamed({ ...b, source: 'handoffs.open', types: { run: 'run' }, rows: [tool(1, { run: 'S731' })] } as never), []);
+  assert.deepEqual(runsNamed({ ...b, source: 'handoffs.open', types: { run: 'run' }, rows: [tool(1, { run: 'S731' })] } as never), ['S731']);
+  assert.deepEqual(runsNamed({ ...b, source: 'signs', types: { run: 'run' }, rows: [tool(1, { run: 'S731' })] } as never), []);
 });
 
 test('the reader asks the record for each run a block names, once', async () => {

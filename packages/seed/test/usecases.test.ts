@@ -11,7 +11,7 @@ import { MODULES, install, labelsOf, normalise, plan, voiceOf, type Host, type I
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
-import { FIRST_PARTY, NOW, firstPartyDocument } from '../src/index.ts';
+import { FIRST_PARTY, NOW, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
 import { MODULE_ORDER, USE_CASES, alongside, arrange, listsOf, modulesFor, pagesOf, useCase, useCaseDocument } from '../src/usecases/index.ts';
 
 const value = <T>(r: unknown): T => {
@@ -66,7 +66,14 @@ test('EACH CARRIED PACK INSTALLS ON AN EMPTY RECORD after its modules, with its 
       continue;
     }
     const { k, sql } = await record();
-    for (const id of modulesFor(u)) if (id !== 'agents') value(await put(k, firstPartyDocument(id)));
+    /* EACH MODULE FITTED TO THE LISTS THE RECORD HOLDS ONCE IT IS IN, as onboarding fits it (`moduleDocument`): Shop
+       stands on People alone, and People's link to Projects refused it. */
+    const holds = new Set<string>();
+    for (const id of modulesFor(u)) {
+      if (id === 'agents') continue;
+      for (const p of firstPartyManifest(id as never)?.provides ?? []) if (p.startsWith('register.')) holds.add(p.slice(9));
+      value(await put(k, firstPartyDocument(id, { holds: [...holds] })));
+    }
     value(await put(k, doc));
     /* PERSONAL AND STUDENT CARRY NO EXAMPLE ROW, so only a pack that seeds is counted. */
     const seeded = new Set(((doc.seeds ?? []) as { register: string }[]).map((s) => s.register));
@@ -102,6 +109,7 @@ test('THE PROPOSAL SAYS WHICH PAGES AND SECTIONS IT MAKES', () => {
   ]);
   assert.deepEqual(pagesOf(useCase('guide')!), [{ page: 'guide', title: 'Guide', section: 'Guide' }]);
   assert.deepEqual(pagesOf(useCase('personal')!), [{ page: 'goals', title: 'Goals', section: 'Goals' }]);
+  assert.deepEqual(pagesOf(useCase('shop')!), [{ page: 'orders', title: 'Orders', section: 'Shop' }]);
   assert.deepEqual(pagesOf(useCase('business')!), []);
   assert.deepEqual(modulesFor(useCase('student')!, ['people']), ['people']);
   assert.deepEqual(modulesFor(useCase('founder')!, ['estate']), ['portfolio', 'people', 'money-core', 'estate', 'work']);
@@ -132,7 +140,10 @@ const SENTENCES: [string, string | null][] = [
   ['I freelance and send invoices to clients', 'business'],
   ['a small business with domains and hosting', 'business'],
   ['consulting, with a retainer and an accountant', 'business'],
-  ['I run a shop and pay VAT', 'business'],
+  /* SHOP SINCE BUSINESS 1.7.0, which gave "shop" to Shop: the VAT is Small business's, and it goes beside. */
+  ['I run a shop and pay VAT', 'shop'],
+  ['I sell handmade candles at a market stall', 'shop'],
+  ['my online shop and its orders', 'shop'],
   ['agency work for customers', 'business'],
   ['bookkeeping for my business', 'business'],
   ['a type foundry', 'business'],
@@ -193,7 +204,7 @@ test('THE SAME WORDS ALWAYS RANK THE SAME, and each reason is a phrase of what w
   const mixed = arrange('a student who freelances for clients on the side');
   assert.deepEqual(
     mixed.ranked.map((r) => [r.usecase.usecase, r.score]),
-    [['student', 1], ['business', 1], ['personal', 0], ['founder', 0], ['team', 0], ['guide', 0]].sort((a, b) => (b[1] as number) - (a[1] as number)) as [string, number][],
+    [['student', 1], ['business', 1], ['personal', 0], ['founder', 0], ['team', 0], ['guide', 0], ['shop', 0]].sort((a, b) => (b[1] as number) - (a[1] as number)) as [string, number][],
   );
 });
 
@@ -230,4 +241,24 @@ test('STUDIES COME BESIDE A PERSONAL RECORD WHEN THE SENTENCE MENTIONS THEM, and
   assert.deepEqual(alongside(arrange('I want to get my money under control and keep track of my side projects and running'), personal), []);
   assert.deepEqual(alongside(arrange('a founder who is also a student'), useCase('founder')!), [], 'a founder is not an individual record');
   assert.deepEqual(alongside(a, null), []);
+});
+
+/**
+ * USE CASE 6 OF THE VISION, Mariam's sentence word for word (`loop/progress/planner-45.md`): the candle shop is Shop, which
+ * carries Orders and Products, and the freelance design is Small business beside it. Before Shop, "shop" was one of
+ * Small business's words and the sentence was proposed a business with no list to write an order in.
+ */
+test('A SMALL CANDLE SHOP IS A SHOP, and freelancing as a designer puts Small business beside it', () => {
+  const said = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer. I lose track of orders and who owes me.";
+  const a = arrange(said);
+  assert.equal(a.pick?.usecase, 'shop');
+  assert.deepEqual(a.ranked.filter((r) => r.score > 0).map((r) => r.usecase.usecase), ['shop', 'business']);
+  assert.deepEqual(a.ranked[0]!.why.map((w) => w.text), ['shop', 'orders']);
+  assert.deepEqual(alongside(a, a.pick).map((u) => u.usecase), ['business'], 'neither declares a list or page of the other, so both install');
+  assert.deepEqual(listsOf(useCase('shop')!).map((l) => l.name), ['Orders', 'Products']);
+  /* ONE SHOP WORD AND ONE BUSINESS WORD is still both: whichever is proposed, the other goes beside. */
+  const short = arrange('I run a small candle shop and freelance as a designer');
+  assert.deepEqual(alongside(short, short.pick).map((u) => u.usecase), ['shop']);
+  /* A SHOP NOT STARTED YET IS STILL THE GUIDE'S, by the longer phrase. */
+  assert.equal(arrange('I want to start an Etsy shop and have no idea where to begin').pick?.usecase, 'guide');
 });

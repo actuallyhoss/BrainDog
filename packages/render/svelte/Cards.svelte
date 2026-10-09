@@ -154,6 +154,8 @@
       {@const short = L.figure >= 0 ? headlineFigure(r.cells[L.figure] ?? '') : ''}
       {@const symbol = L.figure >= 0 ? symbolFigure(short) : null}
       {@const coded = L.figure >= 0 ? leadingCode(short) : null}
+      <!-- `.amount` holds the code and its first figure on one line; ` · US$21,300` after it wraps (`figureEnd`, html.ts). -->
+      {@const end = coded ? coded.rest.search(/\s|$/u) : 0}
       {@const t = L.trend >= 0 ? trendOf(said(r, L.trend)) : null}
       {@const m = L.ring >= 0 ? ringOf(said(r, L.ring)) : null}
       {@const whoFace = L.who >= 0 ? initialOf(said(r, L.who)) : null}
@@ -198,8 +200,10 @@
             {#if shows}
               <span class="cards-figure"
                 ><span class="cards-value num"
-                  >{#if !r.cells[L.figure]}{MISSING}{:else if symbol}{symbol}{:else if coded}{coded.sign}<span class="amount-code">{coded.currency}</span>
-                    <Text nodes={inline(coded.rest, opts)} {opts} />{:else}<Text nodes={inline(short, opts)} {opts} />{/if}</span
+                  >{#if !r.cells[L.figure]}{MISSING}{:else if symbol}{symbol}{:else if coded}<span class="amount"
+                    >{coded.sign}<span class="amount-code">{coded.currency}</span>
+                    <Text nodes={inline(coded.rest.slice(0, end), opts)} {opts} /></span
+                  ><Text nodes={inline(coded.rest.slice(end), opts)} {opts} />{:else}<Text nodes={inline(short, opts)} {opts} />{/if}</span
                 >{@render labelled(L.figure)}</span
               >
             {/if}

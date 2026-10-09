@@ -116,7 +116,7 @@ test('NO ADDRESS, LINK OR KEY GOES TO THE MODEL: a title or heading holding one 
       key: 'people',
       heading: 'Mail from ops@studio.example',
       rows: [
-        { register: 'people', seq: 1, fields: { name: 'rohan.mehta@encore.example' } },
+        { register: 'people', seq: 1, fields: { name: 'ines.duarte@orchardline.example' } },
         { register: 'people', seq: 2, fields: { name: 'Ada Lovelace' } },
         { register: 'people', seq: 3, fields: { name: 'sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789' } },
         { register: 'people', seq: 4, fields: { name: 'Notes at https://example.com/private/doc' } },
@@ -126,7 +126,7 @@ test('NO ADDRESS, LINK OR KEY GOES TO THE MODEL: a title or heading holding one 
   const got = lookInputOf(blocks, () => 'name');
   assert.equal(got.blocks[0]!.heading, 'Mail from someone at studio.example');
   assert.deepEqual(got.rows, [
-    { row: 'people#1', title: 'someone at encore.example' },
+    { row: 'people#1', title: 'someone at orchardline.example' },
     { row: 'people#2', title: 'Ada Lovelace' },
     { row: 'people#4', title: 'Notes at a link' },
   ]);

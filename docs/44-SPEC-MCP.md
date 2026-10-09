@@ -40,7 +40,7 @@ they say:
 | Authorise a call against scope, level or ceiling | the record, in one place (30 §10). The tools hand `ctx` on and never read it |
 | Touch a database, a port, a `node:` module or `process` | it holds `surface` and `ctx` and nothing else; the `stack` and `graph` gates hold it to that |
 | Speak the legacy HTTP+SSE transport | not carried (ADR-054) |
-| Reach VAULT, JOBS or ADMIN | no tool names one. Any other name is `ROUTE_UNKNOWN` with the fifteen in `allowed`, and the record refuses every token at those groups in any case (10 §8). The named refusals of §6.2 are not built |
+| Reach VAULT, JOBS or ADMIN | no tool names one. Any other name is `ROUTE_UNKNOWN` with the sixteen in `allowed`, and the record refuses every token at those groups in any case (10 §8). The named refusals of §6.2 are not built |
 | Decide | there is no `decide` tool, and no token holds `decide` (30 §10) |
 | Hand over a credential | there is no vault tool. `context` names a key by its label and what it opens, never its value (§8) |
 
@@ -100,7 +100,7 @@ export type McpSurface<C> = {
 export type Tool = { name: string; description: string; input: Record<string, unknown>; writes: boolean };
 export type Resource = { uri: string; name: string; description: string; ttlMs: number };
 
-export const TOOLS: readonly Tool[];                  // fifteen, §4.4
+export const TOOLS: readonly Tool[];                  // sixteen, §4.4
 export const TEMPLATES: readonly { uriTemplate: string; name: string; description: string }[];   // six, §4.7
 export const HOUR = 3_600_000;
 export const MINUTE = 60_000;
@@ -177,7 +177,7 @@ packages/mcp/
 │                        scripts: test = node --test test/*.test.ts · typecheck = tsc --noEmit -p tsconfig.json
 ├── tsconfig.json        extends ../../tsconfig.base.json; includes src/ and test/
 ├── src/
-│   ├── index.ts         McpSurface, TOOLS, TEMPLATES, ttlOf, compact, tools(): the fifteen, the resource list, the read
+│   ├── index.ts         McpSurface, TOOLS, TEMPLATES, ttlOf, compact, tools(): the sixteen, the resource list, the read
 │   ├── rpc.ts           handle(): framing, version negotiation, the result renderer
 │   ├── http.ts          serveMcp(), gate(), unauthorized(): POST /mcp, §5.1
 │   ├── instructions.ts  INSTRUCTIONS, §4.6
@@ -209,7 +209,7 @@ type-checked, because `tsc` follows the import from `src/index.ts`.
 The transports' own halves live with their hosts. The stdio loop is `apps/cli/src/stdio.ts`, over the surface
 `apps/cli/src/surface.ts` builds on `@braindog/client`, and each host's `/mcp` branch calls `serveMcp`
 (`apps/worker/src/index.ts`, `apps/selfhost/src/server.ts`). There is no `mcp-budget` gate and no generated schema
-file: the budget is `budget.test.ts` (§7), and the fifteen input schemas are written by hand in `index.ts` (§4.4).
+file: the budget is `budget.test.ts` (§7), and the sixteen input schemas are written by hand in `index.ts` (§4.4).
 
 ---
 
@@ -344,8 +344,8 @@ names pages, and a page appears when its row does.
 | `activity` | `recentHistory({ limit? })` | `limit?` | no |
 | `governance` | `governance(args)` | `register?`, `id?`, `status?`, `limit?`, `cursor?` | no |
 | `propose` | `propose(args)`; `dryRun` after a rule change is filed; `scriptTry` instead of filing, for a script change carrying `try`; `boot` after a filing, for the `decide` link | `question`, `body_kind`, `body` | yes |
-| `create` | `create({ register, fields, note? })` | the same | yes |
-| `update` | `update({ register, seq, patch, version?, note? })` | `spoken`, `patch`, `version?`, `note?` | yes |
+| `create` | `create({ register, fields, note?, op_id? })` | the same | yes |
+| `update` | `update({ register, seq, patch, version?, note?, op_id? })` | `spoken`, `patch`, `version?`, `note?`, `op_id?` | yes |
 | `log` | `update({ register, seq, patch: {}, note })`, or `handoff({ note })` when `spoken` is left out | `spoken?`, `note` | yes |
 | `handoff` | `handoff(args)` | `next?`, `tried?`, `note?`, `doing?`, `state?` (`idle`, `handoff` or `done`) | yes |
 | `meet` | `meet(args)` | `name?`, `email?`, `handle?`, `where` | yes |
@@ -369,6 +369,17 @@ of `src/index.ts`):
   sentence, relayed unchanged. The row it files comes back compact, as `create`'s would. It could not be paid for by
   cutting descriptions, so it is the one tool §7's ceiling was raised for, once, to 2,760. The command line routes it
   (`apps/cli/src/surface.ts`), so it answers over stdio as over `POST /mcp`.
+- **`understand`** joined on 6 October as a seventeenth and left the list again in AGT-B05, on his "Tools: keep the
+  16": what the record would link and ask next, in names, is the address `braindog:understand` (§4.7), answered by the
+  same method with the same text. What it freed pays for `op_id` on `create` and `update`.
+
+**`op_id`, a write that can be sent again.** `create` and `update` take an operation id and pass it to the record,
+which keeps it on the first line of the write and answers a second sending of the same id with the first one's row,
+writing nothing (`opId` in `packages/kernel/src/index.ts`). An id used for a different write is refused
+`VALUE_MALFORMED` at `op_id`. The command line's bridge (`apps/cli/src/bridge.ts`) makes one for a create or an update
+sent without one, when the host's listed `inputSchema` for that tool names the argument, and sends the call once more
+with the same id when the host's answer was lost. A read is never sent twice. Held by `apps/cli/test/op-id.test.ts`
+and `apps/worker/test/op-id-in-do.test.ts`.
 
 A second, **`money`** (`4da40586`), joined and then left in `48ac43a1`. It read the seven figures that money-core declares, by id, through `metric`, and when none answered it refused
 `METRIC_UNKNOWN` naming that pack. So the one server every record speaks carried one pack's vocabulary, and a record
@@ -557,6 +568,7 @@ ladder still decides who reads them and a surface of any age can serve them.
 | 17 | `braindog:skill/{name}` | `list({ register: 'skills', where: { field: 'name', is: name }, limit: 1 })` | 3,600,000 | the caller can read `skills` and the row is not retired |
 | 18 | `braindog:declaration/{slug}` | `arrangement({ page: slug })` | 60,000 | never one by one: a template only |
 | 19 | `braindog:automation/{id}` | `automations({ rule: id })`, the definition and its last ten runs | 60,000 | never one by one: a template only |
+| 20 | `braindog:understand` | `understandPlan({})`, what the record would link and ask next, in names | 60,000 | the surface has `understandPlan` and it reads |
 
 **Every address is asked before it is advertised.** A listing that names what the caller may not read tells them it
 exists, and one that names what then refuses sends an agent to a certain refusal. So the list is never ahead of the
@@ -646,7 +658,7 @@ nothing is streamed.
 
 1. Nothing is read from the record. The list is the same for every record and every caller, so it always arrives,
    and a caller who can read nothing still learns what it could call.
-2. `tools = TOOLS.map(listed)`: for each of the fifteen, in §4.4's order, `{ name, description, inputSchema }`, where
+2. `tools = TOOLS.map(listed)`: for each of the sixteen, in §4.4's order, `{ name, description, inputSchema }`, where
    `inputSchema` is the tool's `input`, plus `annotations: { readOnlyHint: true }` on the nine that never write.
 3. Result `{ tools, instructions: INSTRUCTIONS, ttlMs: 3_600_000, cacheScope: 'private' }`.
 
@@ -657,10 +669,10 @@ what `budget.test.ts` counts (§5.9).
 
 ### 5.3 · `tools/call`
 
-1. A `params.name` that is not a string is `-32602`, with the fifteen in `data.allowed`. `params.arguments`, `{}` when
+1. A `params.name` that is not a string is `-32602`, with the sixteen in `data.allowed`. `params.arguments`, `{}` when
    absent, that is not an object is `-32602`. Neither reaches a tool.
 2. `tools(surface).call(name, args, ctx)` looks the name up with `Object.hasOwn`. A name that is not one of the
-   fifteen is an error result, `ROUTE_UNKNOWN` with the fifteen in `allowed`, and nothing runs. That covers every
+   sixteen is an error result, `ROUTE_UNKNOWN` with the sixteen in `allowed`, and nothing runs. That covers every
    VAULT, JOBS and ADMIN method name, and every name on `Object.prototype` (§6.2).
 3. The tool addresses the call (§4.4). It parses `spoken` into `{ register, seq }`, or hands a prefixed id or a row id
    to the record, or hands a figure's id to `metric`, or refuses `VALUE_MALFORMED` at `spoken`; `log` refuses an empty note `REQUIRED_MISSING` at `note`;
@@ -731,7 +743,7 @@ drops its cursor.
 
 Neither notification is sent, and the capabilities declare `tools: {}` and `resources: {}` with no `listChanged`.
 The transport has no session and no server-initiated stream, and nothing is remembered between messages (§4.1), so
-there is nobody to tell. Nothing needs telling about the tools: the fifteen do not change on an install, and no
+there is nobody to tell. Nothing needs telling about the tools: the sixteen do not change on an install, and no
 description names a register (§4.5), so a client may hold `tools/list` for its hour without holding anything stale.
 
 What an install does change is read, never pushed:
@@ -845,13 +857,13 @@ code is relayed from the record unchanged.
 
 Plus the HTTP answers with an empty body: `405` (not `POST`), `403` (an `Origin`), `413` (over `maxBodyBytes`) and
 `415` (not JSON), and `202` for a notification. An unknown tool is not a protocol error. It is an error result
-carrying `ROUTE_UNKNOWN`, with the fifteen in `allowed` (§4.4), because a result is what the model reads to correct
+carrying `ROUTE_UNKNOWN`, with the sixteen in `allowed` (§4.4), because a result is what the model reads to correct
 the call.
 
 ### 6.2 · The corpus codes this package raises before any call
 
 **Not built.** There is no `REFUSED` table in `index.ts`. A VAULT, JOBS or ADMIN method name sent to `tools/call` is
-`ROUTE_UNKNOWN`, with the fifteen in `allowed` (§5.3), and the record refuses a token at those groups in any case
+`ROUTE_UNKNOWN`, with the sixteen in `allowed` (§5.3), and the record refuses a token at those groups in any case
 (30 §10). The table below is an earlier revision's design, kept as that.
 
 > **The ADMIN row is about a direct write, not about metadata (September 22nd 2026).** An agent never calls `setDeclaration`, and it does not need to: it adds a
@@ -958,13 +970,13 @@ level.
 | Arguments | the record's: it refuses a wrong field by name, with `allowed`. The tool layer checks addresses and nothing else (§4.4) |
 | Body size | 1 MB, on `Content-Length` and again on the bytes as they arrive (§5.1 step 5) |
 | Header agreement | a mirrored header must equal the body whenever it is sent, so a check an intermediary makes on the header is a check on the call (§5.1 step 7) |
-| Code generation | none. The fifteen input schemas are constants written by hand |
+| Code generation | none. The sixteen input schemas are constants written by hand |
 | A script trial | `propose` with `try` runs a draft in the host's sandbox, with the caller's reads and no key opened for a token (§4.4). It writes nothing and files nothing, and the record checks the draft as an install would before it runs |
 | Error text | a 401 is one word; a throw is `internal` and a UUID; a refusal carries the record's `code`, `fix`, `at` and `allowed`. No stack, no SQL and no path crosses the wire (12 §8) |
 | Logging | a throw writes one line to the host's log, or to standard error under stdio: the reference, the method and the error, and never an argument |
 | Credentials | no tool names a VAULT method, and the record refuses every token there. `context` names a key by its label and what it opens, and shows its secret field as `{ sealed, opened, last_opened, last_by }`: never the grant, the sealed bytes or a value (ADR-010). `braindog:actions` names a key by its vault label |
 | Deciding | there is no `decide` tool, and no token reaches `decide` (30 §10) |
-| Completeness | the tool list is fixed at fifteen, and any other name is `ROUTE_UNKNOWN`, looked up with `Object.hasOwn` |
+| Completeness | the tool list is fixed at sixteen, and any other name is `ROUTE_UNKNOWN`, looked up with `Object.hasOwn` |
 
 **What never travels:** a plaintext credential, a stack trace, an exception message, a SQL string, a file path, a
 principal identifier the client did not already hold.
@@ -978,13 +990,15 @@ and each case is named for what it holds.
 
 | File | Holds |
 |---|---|
-| `packages/mcp/test/rpc.test.ts` | `handle` over `stub.ts`. `initialize` negotiates, and an older client gets the newest version at or below its own. `server/discover` answers without reading the record, with `cacheScope: 'public'`. `ping`, and `prompts/list` as an empty list. `tools/list` is the fifteen, with the instructions and the read-only ones marked, and reads nothing. Each tool reaches its method with the transport's context. A value is compact JSON, a refusal is carried whole, and a conflict carries the current row and who changed it. An unknown tool, or a name off `Object.prototype`, runs nothing. A throw is `-32603` and a reference, with no exception text. A notification returns `null`, and the id is echoed exactly. A batch or a malformed message is `-32600`, an unknown method `-32601`, and parameters of the wrong shape `-32602`. Resources are listed, templated and read with their `ttlMs`, and an address that is not there, or is refused, is `-32002` |
-| `packages/mcp/test/mcp.test.ts` | the tools and resources over a real record. The count is `TOOLS`' own, sixteen with `triage`, and there is no vault tool. Each tool says whether it writes. A row is addressed as a person says it, by `register#number`, by a prefixed id or by the row id a ref holds, and `S1` is the run; `update`, `log` and `history` take a prefixed id. A row is compact. `record_index` is the registers and the version. `governance` lists without bodies. A change takes its `declaration_id` from `to`, and a rowset names its register from `at` and raises a skill's `rev`. A refusal names what to send instead, and a stale write comes back as a conflict. `context` and `handoff` answer through the record, and so does `meet`; what a host does not answer is `NOT_IN_THIS_BUILD`. The five tools that left answer as any unknown name does. A `read` token reads through every tool and writes through none. Every resource listed reads, and what a surface cannot answer is not listed. A page is withheld for the level held, no metric is advertised that the record says does not exist, and a skill is read by its name |
-| `packages/mcp/test/index.test.ts` | every advertised tool reaches a method, asked over the wire; a surface with nothing optional darkens exactly `context`, `activity`, `handoff` and `meet`, and the resources go the same way; `credentials` is not a tool; the refusal for a name that is not a tool lists the fifteen |
+| `packages/mcp/test/rpc.test.ts` | `handle` over `stub.ts`. `initialize` negotiates, and an older client gets the newest version at or below its own. `server/discover` answers without reading the record, with `cacheScope: 'public'`. `ping`, and `prompts/list` as an empty list. `tools/list` is the sixteen, with the instructions and the read-only ones marked, and reads nothing. Each tool reaches its method with the transport's context. A value is compact JSON, a refusal is carried whole, and a conflict carries the current row and who changed it. An unknown tool, or a name off `Object.prototype`, runs nothing. A throw is `-32603` and a reference, with no exception text. A notification returns `null`, and the id is echoed exactly. A batch or a malformed message is `-32600`, an unknown method `-32601`, and parameters of the wrong shape `-32602`. Resources are listed, templated and read with their `ttlMs`, and an address that is not there, or is refused, is `-32002` |
+| `packages/mcp/test/mcp.test.ts` | the tools and resources over a real record. The count is `TOOLS`' own, sixteen with `triage`, and `understand` is not among them: it is the address `braindog:understand`. There is no vault tool. Each tool says whether it writes. A row is addressed as a person says it, by `register#number`, by a prefixed id or by the row id a ref holds, and `S1` is the run; `update`, `log` and `history` take a prefixed id. A row is compact. `record_index` is the registers and the version. `governance` lists without bodies. A change takes its `declaration_id` from `to`, and a rowset names its register from `at` and raises a skill's `rev`. A refusal names what to send instead, and a stale write comes back as a conflict. `context` and `handoff` answer through the record, and so does `meet`; what a host does not answer is `NOT_IN_THIS_BUILD`. The five tools that left answer as any unknown name does. A `read` token reads through every tool and writes through none. Every resource listed reads, and what a surface cannot answer is not listed. A page is withheld for the level held, no metric is advertised that the record says does not exist, and a skill is read by its name |
+| `packages/mcp/test/index.test.ts` | every advertised tool reaches a method, asked over the wire; a surface with nothing optional darkens exactly `context`, `activity`, `handoff` and `meet`, and the resources go the same way; `credentials` is not a tool; the refusal for a name that is not a tool lists the sixteen |
 | `packages/mcp/test/activity.test.ts` | `activity` is a tool; its `limit` is the record's; a line's address replaces its parts and empty fields do not travel; a line about no row keeps `target`; a caller held to one register sees only its lines; a host without `recentHistory` says so |
-| `packages/mcp/test/money-out.test.ts` | there is no `money` tool: `TOOLS` holds sixteen, none of them `money`, no `MONEY_FIGURES` export, and a call by that name is refused `ROUTE_UNKNOWN` without reading the record; the source names no figure id of money-core, in code or in a comment; a pack's page and each figure it draws are offered as resources, and a figure over two currencies with no rate answers one amount per currency and no sum |
+| `packages/mcp/test/money-out.test.ts` | there is no `money` tool: `TOOLS` holds sixteen, none of them `money` and none `understand`, which is a resource now, no `MONEY_FIGURES` export, and a call by that name is refused `ROUTE_UNKNOWN` without reading the record; the source names no figure id of money-core, in code or in a comment; a pack's page and each figure it draws are offered as resources, and a figure over two currencies with no rate answers one amount per currency and no sum |
 | `packages/mcp/test/figures.test.ts` | money-core as it ships: `get` of a figure's id answers the record's reading, one amount per currency and no sum, for every figure the removed `money` tool read; `record_index` names figures and `get` answers each one it names; a figure's id goes to `metric` and a row to `get`; a figure the record refuses is `VALUE_MALFORMED` at `spoken` naming the row forms and `record_index`; a surface answering `figures` is listed whole, less what `metric` refuses; still sixteen tools, `TOOLS`' own count. One case is a `todo`: every declared figure named, which waits on the record's `figures` |
 | `packages/mcp/test/list-ref.test.ts` | `list` filtered by a ref reads the spoken id, the name and the row id alike; a ref that names nothing is refused |
+| `apps/cli/test/op-id.test.ts` | the bridge makes an `op_id` for a create or an update the host lists it for, and sends the call once more with the same id when the answer was lost: one entry, through a fake host and a real self-host, and an update at a version is not retried into a conflict. A read is sent once, an id the app sent is kept, and a host whose list does not name `op_id` is sent none |
+| `apps/worker/test/op-id-in-do.test.ts` | in a Durable Object, two creates with one `op_id` are one entry over `/api` and through the agent door, an update sent twice moves the version once and, sent at the version it read, is not answered `VERSION_STALE`, and two ids are two entries |
 | `packages/mcp/test/teaching.test.ts` | the three sentences `context` teaches, the same on the resource, and no example row outside a project |
 | `packages/mcp/test/actions.test.ts` | `braindog:actions` is listed on a real record with each key by label only; a surface without `actions` does not list it |
 | `packages/mcp/test/arrange.test.ts` | the arrangement, a declaration and the page and proposal grammars are resources, and a pack and a layout go back through `propose` |
@@ -1077,6 +1091,8 @@ until then.
 | `4da40586`, `ed4d421c` | the `money` tool, and `list_rows`: sixteen tools |
 | `48ac43a1` | the `money` tool leaves the core, and `MONEY_FIGURES` with it: fifteen tools again (§4.4) |
 | not a commit of its own | `triage` and `braindog:inbox`, `inbox/{state}`: sixteen tools |
+| not a commit of its own | `understand` (DIRECTION §38): seventeen tools |
+| AGT-B05 | `understand` becomes `braindog:understand`, and `op_id` on `create` and `update`: sixteen tools again |
 | `d7fb19bf` | the sentences `context` teaches |
 | `837b01c7`, `6ec8011d` | `braindog:automations`, `automation/{id}` and `grammar/automations`, and the dry run on a rule change |
 | `eafe8c20` | `braindog:grammar/script` |

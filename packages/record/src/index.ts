@@ -134,6 +134,7 @@ import {
   whereFor,
   type Wheres,
   REVIVED as KERNEL_REVIVED,
+  whollyWithheld,
 } from '@braindog/kernel';
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
@@ -2395,10 +2396,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       for (const r of sql.all<{ field: string; v: unknown; n: number; gone: number }>(
         `SELECT j.key AS field, k.value AS v, count(DISTINCT entry.id) AS n, count(DISTINCT CASE WHEN entry.deleted_at IS NOT NULL THEN entry.id END) AS gone
            FROM entry, json_each(entry.fields) AS j, json_each(CASE WHEN j.type = 'array' THEN j.value ELSE json_array(j.value) END) AS k
-          WHERE entry.register = ? AND j.key IN (${fields.map(() => '?').join(', ')}) AND k.type = 'text'
+          WHERE entry.register = ? AND j.key IN (SELECT value FROM json_each(?)) AND k.type = 'text'
           GROUP BY field, v`,
         list,
-        ...fields,
+        JSON.stringify(fields),
       ))
         (out[r.field] ??= {})[String(r.v)] = { held: Number(r.n), binned: Number(r.gone) };
       return out;
@@ -3345,8 +3346,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const understoodLines = (batches: readonly string[], dry: boolean): string[] => {
     if (batches.length === 0) return [];
     const events = sql.all<{ kind: string; target: string; field: string | null; to_v: string | null }>(
-      `SELECT kind, target, field, to_v FROM event WHERE batch IN (${batches.map(() => '?').join(', ')}) AND actor = ? AND target LIKE 'entry:%' ORDER BY rowid`,
-      ...batches,
+      `SELECT kind, target, field, to_v FROM event WHERE batch IN (SELECT value FROM json_each(?)) AND actor = ? AND target LIKE 'entry:%' ORDER BY rowid`,
+      JSON.stringify(batches),
       BACKFILL_ACTOR,
     );
     const titled = (ref: string | null | undefined): string | null => {
@@ -4189,6 +4190,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const seesPage = (ctx: CallContext, p: { registers: string[]; about: { register: string } | null }): boolean =>
     (p.registers.length === 0 || p.registers.some((id) => !readable(ctx, id))) && (p.about === null || !readable(ctx, p.about.register));
+
+  /**
+   * Who a page is drawn for (`kernel.page`'s `reader`), ONE READER FOR `page` AND `pages`: each block held as `heldBlock`
+   * holds it, her own read mark on a feed, and whether the inbox reaches her, the rule `redSigns` asks, so a page's signs
+   * block says an inbox sign quietly to a key the inbox does not reach and names no mail she cannot open.
+   */
+  const pageReader = (ctx: CallContext) => ({
+    hold: (b: ReturnType<Kernel['block']>) => heldBlock(ctx, b),
+    seen: markOf(readerOf(ctx)),
+    inbox: allows(ctx, 'owner') === null || inboxReached(ctx),
+  });
+
+  /**
+   * Whether every block of a page, drawn for this caller, is held from her (kernel `whollyWithheld`, the rule the agent
+   * door's resources ask), so `pages` does not list a page that would open onto nothing but held blocks.
+   */
+  const drawnWithheld = (ctx: CallContext, slug: string): boolean => {
+    const read = kernel.page(slug, undefined, { reader: pageReader(ctx) });
+    return read.ok && whollyWithheld(read.value.blocks as never);
+  };
 
   /** The pages a caller may open, as `pages` lists them. */
   const visiblePages = (ctx: CallContext) =>
@@ -5339,10 +5360,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (rows.length === 0) return out;
     const caller = callerOf(ctx);
     if (caller === null) return out;
+    /* THE IDS GO AS ONE JSON ARRAY (AGT-B03): one placeholder a row put a read of more than a hundred over the Durable
+       Object's limit on bound values, so an agent's `list` of 101 answered INTERNAL. Two values bound at any length. */
     const by = sql.one<{ actor: string }>(
-      `SELECT actor FROM event WHERE kind = 'create' AND target IN (${rows.map(() => '?').join(', ')})
+      `SELECT actor FROM event WHERE kind = 'create' AND target IN (SELECT value FROM json_each(?))
        AND (actor LIKE 'ingest:%' OR actor LIKE 'report:%' OR (actor LIKE 'p\\_%' ESCAPE '\\' AND actor <> ?)) LIMIT 1`,
-      ...rows.map((id) => `entry:${id}`),
+      JSON.stringify(rows.map((id) => `entry:${id}`)),
       caller.person,
     )?.actor;
     if (by !== undefined) trust.markUntrusted(caller, by.startsWith('p_') ? 'something another person wrote' : 'something that arrived from outside the record');
@@ -7390,9 +7413,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const ats = [kernel.nameOf(self.id), ...(self.seq === null ? [] : [`${self.register}#${self.seq}`])];
     const waiting = sql.one<{ id: string }>(
       `SELECT id FROM suggestion WHERE status = 'open' AND body_kind = 'rowset' AND json_valid(body)
-         AND json_extract(body, '$.register') = ? AND json_extract(body, '$.rows[0].at') IN (${ats.map(() => '?').join(', ')}) LIMIT 1`,
+         AND json_extract(body, '$.register') = ? AND json_extract(body, '$.rows[0].at') IN (SELECT value FROM json_each(?)) LIMIT 1`,
       asserted.register,
-      ...ats,
+      JSON.stringify(ats),
     );
     if (waiting) return ok(nameOf(ctx, 'suggestion', waiting.id) ?? null);
     const decl = kernel.register(asserted.register);
@@ -7980,6 +8003,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          is a page they can use. A page bound to no register at all is prose, and prose is for
          anybody who may read. */
       const { accentOf, hueOf } = pageHues();
+      /* HELD FROM NO BLOCK is `heldBy`'s own question asked whole: every list read, no grant narrowed to some rows
+         (`wheres` holds a feed and a figure), and a level that reads. A token held to some rows of one list was listed
+         a page of one feed it opened onto nothing (`test/record-wire-44.test.ts`). */
+      const everyList = readsEveryList(ctx) && allows(ctx, 'read') === null;
       return ok(
         kernel
           .pages()
@@ -7990,6 +8017,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
              was listed by its title to somebody invited to file rows into it and nothing else. */
           /* AND NEVER A PAGE ABOUT A ROW THEY CANNOT READ, which `seesPage` says why. */
           .filter((p) => seesPage(ctx, p))
+          /* AND NEVER A PAGE WHOSE BLOCKS ARE EVERY ONE HELD FROM THEM (PGS-A01): a page over three lists, one of them
+             hers, passes `seesPage`, and when each block it draws reads the other two it opened onto nothing. Somebody
+             who reads every list alike is held from no block, so her pages are not drawn to ask. */
+          .filter((p) => everyList || !drawnWithheld(ctx, p.slug))
           /* AND THE REGISTER LIST DOES NOT TRAVEL. It is what the filter is FOR, and shipping it
              would hand back the names the filter exists to withhold. */
           /* WHICH ROW A PAGE GREW OUT OF DOES, as `boot` sends it, so Settings > Pages can fold the pages made for each
@@ -8384,7 +8415,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       /* THE READER GOES DOWN WITH THE ASK, so the kernel lays the look over the blocks as this caller is shown them: held
          as `heldBlock` holds them, with her own read mark on a feed. */
-      const reader = { hold: (b: ReturnType<Kernel['block']>) => heldBlock(ctx, b), seen: markOf(readerOf(ctx)) };
+      const reader = pageReader(ctx);
       let out = kernel.page(args.slug, filter, { ...reach, reader });
       /* A FILTER IS HELD BY THE LISTS IT WAS COUNTED FROM, as a block is by the list it reads. The kernel counts every
          list the page's blocks read and names each link by its row's title, so a member invited to Tasks alone was handed
@@ -9631,7 +9662,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * An accepted `pattern` or `change` is installed here, after the gate has said yes and before
      * the suggestion is resolved — a decision that resolved before its change landed would be a lie.
      */
-    async decide(args: { id: string; decide?: { option: string; reason: string }; defer?: { until: string; why: string }; resolved_as?: 'wont-fix' | 'incorrect'; reason?: string }, ctx: CallContext) {
+    async decide(args: { id: string; decide?: { option: string; reason: string; parts?: string[] }; defer?: { until: string; why: string }; resolved_as?: 'wont-fix' | 'incorrect'; reason?: string }, ctx: CallContext) {
       const stop = guard(ctx, 'decide');
       if (stop) return { ok: false as const, refusal: decidesNot(ctx, stop) };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which suggestion?', { at: 'id' });
@@ -9680,6 +9711,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (merging !== null && 'code' in merging) return { ok: false as const, refusal: merging };
       if (merging === null && picking !== undefined && target && foldsOf(target as Record<string, unknown>) !== null)
         return no('VALUE_MALFORMED', 'A merge is answered as Merge all, Keep apart, or the ones that are the same picked by their rows.', { at: 'rows' });
+      /* AN ARRANGEMENT IS ACCEPTED IN PART BY THE PARTS IT NAMES (REC-A06), each by the id the question files on it; the
+         kernel takes those and keeps the rest open as the same question. None named is the whole of it, as before. */
+      const parts = (args.decide as { parts?: unknown } | undefined)?.parts;
+      if (parts !== undefined && (!Array.isArray(parts) || !parts.every((x) => typeof x === 'string' && x.length > 0)))
+        return no('VALUE_MALFORMED', 'parts are the parts of the change to take, each as the question lists it.', { at: 'parts' });
       const verdict = (
         merging !== null && !('code' in merging) && args.decide
           ? { decide: { option: merging.option, reason: args.decide.reason } }
@@ -10322,7 +10358,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which rule?', { at: 'id' });
-      const out = kernel.applyRule(args.id, { ...(args.dry === undefined ? {} : { dry: args.dry }), ...(args.limit === undefined ? {} : { limit: args.limit }) });
+      /* ONE PRESS IS ONE BATCH (SHL-D07): every row the rule fills is written under the one batch minted here, so one
+         undo puts the whole press back, where the kernel's default gave each row a batch of its own. */
+      const batch = ctx.batch ?? mintBatch();
+      const out = kernel.applyRule(args.id, { ...(args.dry === undefined ? {} : { dry: args.dry }), ...(args.limit === undefined ? {} : { limit: args.limit }), batch });
       return args.dry ? out : tail(out);
     },
 

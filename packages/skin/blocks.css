@@ -195,6 +195,12 @@
     letter-spacing: 0.02em;
   }
 
+  /* AN AMOUNT IS ONE WORD: its sign, code and figure stay on one line. At 390 a ledger's "EGP 1,350.00" could break after
+     the code and put the figure under it. The column that holds it takes its width from `data-truncate="never"`. */
+  .amount {
+    white-space: nowrap;
+  }
+
   /* WHERE A ROW APPLIES: drawn by `packages/render/svelte/p/Table.svelte` and `Cards.svelte` in a column `as: scope`,
      the render package's twin of `lib/ui/ScopeChip.svelte`. The project's mark in its own hue or the globe, then the
      name, and nothing round them (DIRECTION §39: a category is its small coloured mark and its name, not a chip). */

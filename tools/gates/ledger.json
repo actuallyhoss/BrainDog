@@ -1,0 +1,486 @@
+{
+  "//": "PRF-B03. Every number a gate is held to, with a dated line for each change. `tools/gates/ledger.mjs` reads it: a budget never rises unless `by` quotes the owner, a debt only falls, a held list only shrinks, and every deviation is named. Lines before `opened` are the history the old comment string held.",
+  "opened": "2026-10-09",
+  "budgets": {
+    "bundle.brotliQuality": {
+      "kind": "setting",
+      "lines": [
+        { "at": 11, "on": "2026-10-09", "why": "Brotli at its highest quality, because that is what a browser is served.", "by": "22 section 9" }
+      ]
+    },
+    "bundle.mainJsBrotli": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 30720, "on": "2026-09-03", "why": "The entry script's budget, 30 KB brotli. It does not move; what stands above it is the debt below.", "by": "22 section 9" },
+        { "at": 30720, "on": "2026-10-09", "why": "The day the ledger began, at the same number.", "by": "22 section 9" }
+      ]
+    },
+    "bundle.mainJsNoise": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 64, "on": "2026-09-07", "why": "Brotli over a chunk that is nearly all Svelte's runtime and Kit's client moves a few bytes on no change; 64 is one above that noise and far below a real regression.", "by": "budgets.json, 2026-09-07" },
+        { "at": 64, "on": "2026-10-09", "why": "The day the ledger began, at the same number.", "by": "budgets.json, 2026-09-07" }
+      ]
+    },
+    "bundle.mainCssBrotli": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 12288, "on": "2026-10-09", "why": "The entry stylesheet's budget, 12 KB brotli.", "by": "22 section 9" }
+      ]
+    },
+    "bundle.htmlBrotli": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 25600, "on": "2026-10-09", "why": "The largest page's HTML, 25 KB brotli.", "by": "22 section 9" }
+      ]
+    },
+    "bundle.uiFaceBytes": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 46080, "on": "2026-10-09", "why": "The workhorse face keeps the 45 KB that 22 section 9 gives the fonts.", "by": "22 section 9" }
+      ]
+    },
+    "bundle.displayFaceBytes": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 10240, "on": "2026-10-09", "why": "The display face, used only above 20px, has a number of its own: a recorded deviation, not a moved goalpost.", "by": "22 section 9" }
+      ]
+    },
+    "layout.fullWidthShare": {
+      "kind": "floor",
+      "lines": [
+        { "at": 0.85, "on": "2026-10-09", "why": "The least share of the work column a main screen fills at 1512 and 1728: room for fluid gutters and a scrollbar, not for a page held to a column.", "by": "DIRECTION 36 and 37" }
+      ]
+    },
+    "layout.dockArrivalMs": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 1500, "on": "2026-10-09", "why": "How long the docked pass waits for a panel to arrive: the panel's 240 step with room for a slow runner.", "by": "research-audit-16 L12" }
+      ]
+    },
+    "layout.dockBlankShare": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 0.25, "on": "2026-10-09", "why": "The most bare ground, as a share of the panel's column, that may show while a docked panel arrives.", "by": "research-audit-16 M1" }
+      ]
+    },
+    "layout.viewportHeightPx": {
+      "kind": "setting",
+      "lines": [
+        { "at": 900, "on": "2026-10-09", "why": "The height every page is drawn at.", "by": "13 section 8" }
+      ]
+    },
+    "layout.widthTolerancePx": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 1, "on": "2026-10-09", "why": "52 section 4 records 0; one pixel is sub-pixel rounding, the recorded deviation.", "by": "52 section 4" }
+      ]
+    },
+    "layout.settleMs": {
+      "kind": "setting",
+      "lines": [
+        { "at": 60, "on": "2026-10-09", "why": "The pause after a page says it settled, before it is measured.", "by": "13 section 8" }
+      ]
+    },
+    "layout.findingsShown": {
+      "kind": "setting",
+      "lines": [
+        { "at": 40, "on": "2026-10-09", "why": "How many findings the layout gate prints before it counts the rest.", "by": "13 section 8" }
+      ]
+    },
+    "record.port": {
+      "kind": "setting",
+      "lines": [
+        { "at": 8787, "on": "2026-10-09", "why": "The port the seed is served on for a dev server to proxy /api to, where wrangler dev listens.", "by": "record.mjs" }
+      ]
+    },
+    "ready.settleTimeoutMs": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 10000, "on": "2026-10-09", "why": "How long a screen has to say what it settled into; absence past it is a finding, never a skip.", "by": "52 section 5" }
+      ]
+    },
+    "cssRules.waiverLookbehindChars": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 240, "on": "2026-10-09", "why": "How far back a focus-ok waiver may sit from the rule it excuses.", "by": "13 section 8" }
+      ]
+    },
+    "cssRules.waiverLookaheadChars": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 120, "on": "2026-10-09", "why": "How far ahead a focus-ok waiver may sit from the rule it excuses.", "by": "13 section 8" }
+      ]
+    },
+    "colourGrep.excerptChars": {
+      "kind": "setting",
+      "lines": [
+        { "at": 100, "on": "2026-10-09", "why": "How much of an offending line is quoted.", "by": "13 section 2" }
+      ]
+    },
+    "emDash.excerptChars": {
+      "kind": "setting",
+      "lines": [
+        { "at": 60, "on": "2026-10-09", "why": "How much of an offending line is quoted on each side of the dash.", "by": "em-dash.mjs" }
+      ]
+    },
+    "report.rowsPerMinute": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 600, "on": "2026-09-17", "why": "The rows one report key may send in a minute, refused past it as RATE_LIMITED.", "by": "30 section 6" },
+        { "at": 600, "on": "2026-10-09", "why": "The day the ledger began, at the same number.", "by": "30 section 6" }
+      ]
+    },
+    "flags.maxDays": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 90, "on": "2026-10-09", "why": "Ninety days from since to until: past it a flag is the decision, not waiting for one.", "by": "flags.mjs" }
+      ]
+    },
+    "flags.maxCallSites": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 2, "on": "2026-10-09", "why": "A flag read in three places is a feature with three doors.", "by": "flags.mjs" }
+      ]
+    }
+  },
+  "debts": {
+    "bundle.mainJsBrotli": {
+      "owes": "experience",
+      "key": "bundle.mainJsBaseline",
+      "lines": [
+        { "at": 31744, "on": "2026-09-03", "why": "First measured at 31744 (SvelteKit 2.70.3, Svelte 5.57.0), above the 30 KB budget for reasons outside this repository. 50 section 10 records the path back under 30 KB." },
+        { "at": 31882, "on": "2026-09-07", "why": "+138: the phone's More sheet was given the registers, so a phone has a route to a list." },
+        { "at": 31961, "on": "2026-09-07", "why": "+79: the rail's saved order reaches the DOM, one ordering function shared by the rail, the More sheet and g 1 to 9." },
+        { "at": 32028, "on": "2026-09-08", "why": "+67: since() in format.ts, so an instant is formatted as a time and not a day." },
+        { "at": 32205, "on": "2026-09-10", "why": "+177: Vite's __vite__mapDeps preload table, one row per route chunk and stylesheet; two screens and one shared stylesheet." },
+        { "at": 32322, "on": "2026-09-10", "why": "+117: the keyboard writer for --kb, so a sheet's submit button is not under the phone keyboard, and the /signin row." },
+        { "at": 32392, "on": "2026-09-11", "why": "+70: the browser half of sign-in gets a chunk of its own, one more preload row." },
+        { "at": 32675, "on": "2026-09-17", "why": "+283: invalidateAll from Kit's client and Svelte's runtime for bind:group and attachments; the route table shrank by 150." },
+        { "at": 32760, "on": "2026-09-22", "why": "+85: the Automations canvas, two screens in Kit's route table, and the gap between a Windows build and CI's Linux one." },
+        { "at": 32827, "on": "2026-09-23", "why": "+67: the one-domain move, a reroute hook SvelteKit loads in its client entry." },
+        { "at": 32862, "on": "2026-09-27", "why": "+35: one screen, /connect, the OAuth consent screen; recorded on paper from the per-route figure, not measured." },
+        { "at": 33600, "on": "2026-09-30", "why": "+738: seven screens arrived together and the redesign gave its shared parts stylesheets of their own, each a row in the preload table." },
+        { "at": 33800, "on": "2026-10-06", "why": "Measured at 33655 on macOS (+55) with room for CI's Linux build: onNavigate from Kit's client for the route cross-fade (DIRECTION 38) and the top bar by a dynamic import. The 30 KB budget does not move." },
+        { "at": 33800, "on": "2026-10-09", "why": "The day the ledger began, at the same number. It only falls from here." }
+      ]
+    },
+    "tools/gates/a11y.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/a11y.mjs",
+      "lines": [
+        { "at": 25, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/bundle.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/bundle.mjs",
+      "lines": [
+        { "at": 7, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/closed-lists.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/closed-lists.mjs",
+      "lines": [
+        { "at": 6, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/css-rules.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/css-rules.mjs",
+      "lines": [
+        { "at": 3, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/dead-copy.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/dead-copy.mjs",
+      "lines": [
+        { "at": 2, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/deploy-parity.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/deploy-parity.mjs",
+      "lines": [
+        { "at": 8, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/docs-counts.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/docs-counts.mjs",
+      "lines": [
+        { "at": 15, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/em-dash.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/em-dash.mjs",
+      "lines": [
+        { "at": 1, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/event-kinds.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/event-kinds.mjs",
+      "lines": [
+        { "at": 4, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/flags.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/flags.mjs",
+      "lines": [
+        { "at": 4, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/graph.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/graph.mjs",
+      "lines": [
+        { "at": 4, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/keys.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/keys.mjs",
+      "lines": [
+        { "at": 23, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/layout.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/layout.mjs",
+      "lines": [
+        { "at": 30, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/lived.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/lived.mjs",
+      "lines": [
+        { "at": 69, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/no-declarations-in-kernel.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/no-declarations-in-kernel.mjs",
+      "lines": [
+        { "at": 3, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/no-fixtures.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/no-fixtures.mjs",
+      "lines": [
+        { "at": 7, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/no-sample.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/no-sample.mjs",
+      "lines": [
+        { "at": 2, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/nul-bytes.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/nul-bytes.mjs",
+      "lines": [
+        { "at": 15, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/one-clock.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/one-clock.mjs",
+      "lines": [
+        { "at": 7, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/orphan-tests.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/orphan-tests.mjs",
+      "lines": [
+        { "at": 7, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/passkey.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/passkey.mjs",
+      "lines": [
+        { "at": 7, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/prefs.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/prefs.mjs",
+      "lines": [
+        { "at": 10, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/public-clean.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/public-clean.mjs",
+      "lines": [
+        { "at": 56, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/queue.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/queue.mjs",
+      "lines": [
+        { "at": 6, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/record.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/record.mjs",
+      "lines": [
+        { "at": 9, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/refusal-fixtures.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/refusal-fixtures.mjs",
+      "lines": [
+        { "at": 6, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/refusals.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/refusals.mjs",
+      "lines": [
+        { "at": 48, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/rule-sheet.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/rule-sheet.mjs",
+      "lines": [
+        { "at": 7, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/run.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/run.mjs",
+      "lines": [
+        { "at": 17, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/secret-grep.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/secret-grep.mjs",
+      "lines": [
+        { "at": 3, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/self-test.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/self-test.mjs",
+      "lines": [
+        { "at": 8, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/shell-words.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/shell-words.mjs",
+      "lines": [
+        { "at": 7, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/signin-live.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/signin-live.mjs",
+      "lines": [
+        { "at": 9, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/slash-actor.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/slash-actor.mjs",
+      "lines": [
+        { "at": 1, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/telemetry-allowlist.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/telemetry-allowlist.mjs",
+      "lines": [
+        { "at": 5, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    },
+    "tools/gates/web-lists.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/web-lists.mjs",
+      "lines": [
+        { "at": 12, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+      ]
+    }
+  },
+  "held": {
+    "web-lists.HELD": {
+      "lines": [
+        { "count": 43, "on": "2026-10-09", "why": "Files of the web app that still name a first-party list, each with its ids and why. 43 on the day the ledger began; the brief counted 42." }
+      ]
+    },
+    "shell-words.EXEMPT": {
+      "lines": [
+        { "count": 6, "on": "2026-10-09", "why": "Paths the core may still name a pack word in, each for a stated reason." }
+      ]
+    },
+    "dead-copy.ALLOWED": {
+      "lines": [
+        { "count": 8, "on": "2026-10-09", "why": "Sentences in the copy file that nothing renders yet, each correct or unbuilt by its own reason." }
+      ]
+    },
+    "keys.SKIPPED": {
+      "lines": [
+        { "count": 37, "on": "2026-10-09", "why": "Bindings the keys gate does not press: not bare, or in the palette and nav scopes the a11y gate drives. 37 on master." }
+      ]
+    },
+    "prefs.UNCOVERED": {
+      "lines": [
+        { "count": 5, "on": "2026-10-09", "why": "Preference keys no page load can settle: theme, chars, seen, columns and defined." }
+      ]
+    },
+    "one-clock.ALLOWED": {
+      "lines": [
+        { "count": 5, "on": "2026-10-09", "why": "Files that still work out a run's state from last_seen and the clock, each still to move onto presence.ts." }
+      ]
+    },
+    "public-clean.ALLOWED": {
+      "lines": [
+        { "count": 81, "on": "2026-10-09", "why": "Files that still name one of the three private words, each with its count. The LCH-C11 sweep takes them off." }
+      ]
+    }
+  },
+  "deviations": {
+    "refusals": [
+      {
+        "id": "DECLARATION_INVALID",
+        "what": "The catch-all refusal declare.ts leans on, at 32 sites.",
+        "why": "It measures how much validation has no word of its own in 30 section 6. A project of its own.",
+        "until": "no unit yet"
+      },
+      {
+        "id": "INTERNAL",
+        "what": "A handler that threw, at 3 sites.",
+        "why": "Not a refusal: it names no field and nothing a caller can fix. Both hosts and the Worker emit it the same, and moving fewer than all three would make the product answer differently by host.",
+        "until": "never: kept on purpose"
+      },
+      {
+        "id": "NOPE",
+        "what": "A stub refusal in a transaction test, at 2 sites.",
+        "why": "The code is not what the test asserts.",
+        "until": "never: a test fixture"
+      },
+      {
+        "id": "SOMETHING_NOBODY_MAPPED",
+        "what": "The subject of its own test, at 1 site.",
+        "why": "The test asserts that a code nobody enumerated is still a 422; a real code would delete the assertion.",
+        "until": "never: a test fixture"
+      }
+    ]
+  }
+}

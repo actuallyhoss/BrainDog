@@ -42,16 +42,25 @@ const failed = (line) => {
  * line is left out only when every 403 the screen met was one the source counted as its own (`refused.blocked`, by
  * method name or by path), so a 403 the canary itself gave is still red.
  */
-export function productErrors(shot) {
+export function productErrors(shot, { selfHost = false } = {}) {
   const blocked = shot?.refused?.blocked ?? {};
   const own = (f) => Object.hasOwn(blocked, f.path) || Object.hasOwn(blocked, /^\/api\/([A-Za-z][A-Za-z0-9]*)$/u.exec(f.path)?.[1] ?? '');
-  const forbidden = (shot?.failedRequests ?? []).map(failed).filter((f) => f?.status === 403);
+  const failures = (shot?.failedRequests ?? []).map(failed);
+  const forbidden = failures.filter((f) => f?.status === 403);
   const allOwn = forbidden.length > 0 && forbidden.every(own);
-  return (shot?.consoleErrors ?? []).filter((e) => !(allOwn && /^Failed to load resource: .*status of 403\b/u.test(String(e))));
+  /* A SELF-HOST WITH NO COPIES ANSWERS `/api/snapshots` 501, and Backups already says so on screen, so on the self-host
+     that 501 is the host's word and not the product's error; anywhere else, or on any other path, a 501 is still red. */
+  const unbuilt = failures.filter((f) => f?.status === 501);
+  const allNotHere = selfHost && unbuilt.length > 0 && unbuilt.every((f) => f.path.replace(/\?.*$/u, '') === '/api/snapshots');
+  return (shot?.consoleErrors ?? []).filter(
+    (e) =>
+      !(allOwn && /^Failed to load resource: .*status of 403\b/u.test(String(e))) &&
+      !(allNotHere && /^Failed to load resource: .*status of 501\b/u.test(String(e))),
+  );
 }
 
 /** What in one look is red: a sentence for each kind, with the screens it was seen on. Empty is green. */
-export function judge(said) {
+export function judge(said, { selfHost = false } = {}) {
   const shots = Array.isArray(said?.shots) ? said.shots : [];
   if (shots.length === 0) return ['the look drew no screen at all.'];
   const on = (pick) => [...new Set(shots.filter(pick).map((s) => `${s.name ?? s.screen} at ${s.width}`))];
@@ -59,7 +68,7 @@ export function judge(said) {
   const red = [];
   const refused = on((s) => s.settled === 'refused' || s.settled === null || s.settled === undefined);
   if (refused.length > 0) red.push(`a screen refused or never settled: ${refused.slice(0, 6).join(', ')}${refused.length > 6 ? ` and ${refused.length - 6} more` : ''}.`);
-  const errors = on((s) => productErrors(s).length > 0);
+  const errors = on((s) => productErrors(s, { selfHost }).length > 0);
   if (errors.length > 0) red.push(`the console said an error on ${errors.slice(0, 6).join(', ')}${errors.length > 6 ? ` and ${errors.length - 6} more` : ''}.`);
   const lint = on(lintOf);
   if (lint.length > 0) red.push(`a lint finding on ${lint.slice(0, 6).join(', ')}${lint.length > 6 ? ` and ${lint.length - 6} more` : ''}.`);
@@ -93,7 +102,7 @@ async function main(env = process.env) {
       console.error(`  look: it left no said.json in ${out}, so nothing it drew can be judged.`);
       return 1;
     }
-    const red = judge(said);
+    const red = judge(said, { selfHost: !place.live });
     const named = place.live ? `the canary ${place.slug}` : `a fresh self-host, ${SELF_HOST_ONLY}`;
     if (red.length > 0 || run.status !== 0) {
       console.error(`  look, on ${named}: red.`);

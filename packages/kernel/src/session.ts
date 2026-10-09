@@ -237,8 +237,8 @@ export function findSession(sql: Sql, hints: SessionHints, nowMs: number, token?
      client that names no machine prefers the run that names none either.
 
      AND A DIFFERENCE IS A FILTER: another machine, another repository or another kind of agent, said by both, is
-     another host session. Taken as an order alone, a Codex write from the Encore checkout would join Claude's open run
-     in BrainDog: signed as that run, its task filed under BrainDog, and the same write naming Encore refused for
+     another host session. Taken as an order alone, a Codex write from the Lanternfish checkout would join Claude's open run
+     in BrainDog: signed as that run, its task filed under BrainDog, and the same write naming Lanternfish refused for
      leaving the run's project. `coalesce(... , 1)` lets a side that says nothing through. */
   if (typeof token === 'string') {
     const host = hints.host || null;

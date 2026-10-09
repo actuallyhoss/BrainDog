@@ -83,6 +83,7 @@ import {
   marker,
   onceKey,
   present,
+  raiseStat,
   runRules,
   sealedOf,
   type FlowDecl,
@@ -797,6 +798,8 @@ export function startRun(
     });
 
   const id = openRun(deps, rule, trigger, o);
+  /* COUNTED HERE AND NOT IN `openRun`, because a try opens its run there too and a try is not a firing. */
+  raiseStat(deps.sql, rule.id, trigger.entry ?? null, deps.nowMs);
   if (o.arm !== false) wake(deps, id, deps.nowMs);
   return ok({ run: id });
 }

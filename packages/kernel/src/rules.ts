@@ -575,6 +575,10 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     /* A FIRING IS COUNTED ONLY WHERE THE RULE DID SOMETHING, as the marker is kept only then: a rule that did nothing has
        not fired, and should not spend its day on it. */
     if (happened && perDay !== undefined) countFiring(deps, rule.rule, fired.batch);
+    /* AND THE STANDING COUNT, on the same condition: "how many rows a rule has filed, and never for one that has not".
+       A RUN'S STEP COMES THROUGH HERE TOO (`flow.ts`, with `run` set), and is not counted: the run was counted once
+       when it started, and a tried run's steps are not firings at all. */
+    if (happened && fired.run === undefined) raiseStat(deps.sql, rule.rule, fired.entry.id, deps.nowMs);
 
     if (did.length) out.fired.push({ rule: rule.rule, actions: did });
     if (stop) {
@@ -1186,6 +1190,24 @@ function countFiring(deps: RulesDeps, rule: string, batch: string): void {
   marker(deps.sql, deps.mint, deps.nowMs, `${firedFrom(rule)}${batch}:${deps.mint()}`, {}, false);
 }
 
+/**
+ * One more firing on a rule's standing count (`rule_stat`, migration 34), with when and on which row.
+ *
+ * NOT THE DAY'S MARKERS ABOVE. Those are kept only for a rule with a limit and pruned after a day; this is one row per
+ * rule, kept for ever, so the Automations page can say how many rows a rule has filed and the word "never" for one
+ * that has filed none. An inline firing raises it where the pass did something, and a run where `startRun` opens one;
+ * a tried run (`flow-try.ts`) goes through `openRun` alone and counts nothing.
+ */
+export function raiseStat(sql: Sql, rule: string, row: string | null, nowMs: number): void {
+  sql.exec(
+    `INSERT INTO rule_stat (rule, fired, last_at, last_row) VALUES (?, 1, ?, ?)
+     ON CONFLICT (rule) DO UPDATE SET fired = fired + 1, last_at = excluded.last_at, last_row = excluded.last_row`,
+    rule,
+    instant(nowMs),
+    row,
+  );
+}
+
 /** Every firing counted more than a day ago, which no limit reads any more. The hourly sweep calls it. */
 export function pruneFirings(sql: Sql, nowMs: number): void {
   sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key >= ? AND key < ? AND due_at <= ?", FIRED, 'flow.fired;', instant(nowMs - DAY_MS));
@@ -1206,6 +1228,13 @@ export type DryRun = {
   takenBy: Record<string, number>;
   /** Rows whose `once_per` marker already exists, so it would fire on none of them again. */
   suppressed: number;
+  /**
+   * Rows it would fill: not taken by an earlier rule, not already fired for, and with the field it sets still empty
+   * (every such row, for a rule that sets no field). What a "run again" sheet says before the press.
+   */
+  filled: number;
+  /** The rest of `matches`: taken by another rule, already fired for, or already holding a value. The two add up. */
+  left: number;
   /** The first twenty, with what it would do to each. */
   sample: { spoken: string; would: string[]; reason?: string }[];
 };
@@ -1266,7 +1295,7 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW, re
   };
   const mine = setField(candidate);
 
-  const out: DryRun = { matches: 0, rows: 0, won: 0, lost: 0, takenBy: {}, suppressed: 0, sample: [] };
+  const out: DryRun = { matches: 0, rows: 0, won: 0, lost: 0, takenBy: {}, suppressed: 0, filled: 0, left: 0, sample: [] };
   /* THE KEYS THIS WALK WOULD MINT, not only the ones already in the table. Three rows sharing a
      party is one notification, and a preview whose whole job is to say what will happen promised
      three — which is the preview being wrong about the feature it exists to explain. */
@@ -1326,6 +1355,10 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW, re
       if (suppressed) out.suppressed++;
       else minted.add(key);
     }
+    /* A ROW ALREADY HOLDING THE VALUE IS LEFT, as `applyRule` leaves it: somebody put it there. */
+    const held = mine !== null && entry.fields[mine] !== undefined && entry.fields[mine] !== null && entry.fields[mine] !== '';
+    if (taken || suppressed || held) out.left++;
+    else out.filled++;
 
     if (out.sample.length < 20)
       out.sample.push({
@@ -1386,6 +1419,10 @@ export type Applied = {
   refusals: Refusal[];
   /** Calls the rule would have run on these rows and did not, because a bulk apply sends nothing. Absent when none. */
   calls_skipped?: number;
+  /** Rows it filled, or would fill when `dry`. */
+  filled: number;
+  /** Every other row it matched: already holding a value, past the page, or refused. `filled + left` is `matched + kept`. */
+  left: number;
 };
 
 /** One page of a bulk apply. Past it, run it again — a `while` nobody can stop is not a feature. */
@@ -1413,11 +1450,13 @@ const PREVIEW = 5000;
  * may not overwrite what a person set, and a bulk apply that ignored it would be the one way round
  * it.
  *
- * AND THERE IS NO UNDO, BY DESIGN. Sixty writes is not a thing to reverse from a button; the DRY RUN
- * is the undo, and it is the same walk with nothing written. That is why `dry` is a parameter here
+ * THE DRY RUN COMES FIRST, and it is the same walk with nothing written. That is why `dry` is a parameter here
  * rather than a second method: two code paths would be two answers.
+ *
+ * `batch` IS ONE PRESS. Given, every row's write goes under it, so one Undo of that batch takes the lot back; without
+ * it each row is its own batch, as an install's walk over old rows has always been.
  */
-export function applyRule(deps: RulesDeps, rule: RuleDecl, opts: { dry?: boolean; limit?: number } = {}): Result<Applied> {
+export function applyRule(deps: RulesDeps, rule: RuleDecl, opts: { dry?: boolean; limit?: number; batch?: string } = {}): Result<Applied> {
   const schema = deps.schemaOf(rule.register);
   if (!schema)
     return { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${rule.register}.`, at: 'register' } };
@@ -1426,7 +1465,7 @@ export function applyRule(deps: RulesDeps, rule: RuleDecl, opts: { dry?: boolean
   if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
 
   const limit = Math.min(Math.max(1, Math.floor(opts.limit ?? PAGE)), MOST);
-  const out: Applied = { rule: rule.rule, matched: 0, applied: 0, kept: 0, remaining: 0, sample: [], refusals: [] };
+  const out: Applied = { rule: rule.rule, matched: 0, applied: 0, kept: 0, remaining: 0, sample: [], refusals: [], filled: 0, left: 0 };
 
   /* THE FIELD IT SETS, if it sets one. A rule that only tags or notifies has no gap to fill, so
      every row it matches is one it would act on. */
@@ -1466,14 +1505,17 @@ export function applyRule(deps: RulesDeps, rule: RuleDecl, opts: { dry?: boolean
     if (out.sample.length < 20) out.sample.push({ spoken, would: describe(deps, rule, entry) });
     if (opts.dry) {
       skipped += runsPerRow;
+      out.filled++;
       continue;
     }
 
-    const outcome = runRules(only, { entry, register: rule.register, batch: deps.mint(), actor: `rule:${rule.rule}` });
+    const outcome = runRules(only, { entry, register: rule.register, batch: opts.batch ?? deps.mint(), actor: `rule:${rule.rule}` });
     out.refusals.push(...outcome.refused);
     skipped += outcome.calls.filter((c) => c.outcome === 'skipped').length;
     if (outcome.fired.length) out.applied++;
   }
 
+  if (!opts.dry) out.filled = out.applied;
+  out.left = out.matched + out.kept - out.filled;
   return ok(skipped > 0 ? { ...out, calls_skipped: skipped } : out);
 }

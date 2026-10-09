@@ -107,7 +107,7 @@ export type ModelJobEmbed = { embed?: ((texts: readonly string[]) => Promise<Res
  * The kernel methods this pass calls, and not the kernel. The notes pass's and the offers' are optional, so a host or a
  * test that hands the queue alone still has its jobs served, and the notes are not read.
  */
-export type ModelJobsKernel = Pick<Kernel, 'leaseOutbox' | 'ackOutbox' | 'tail'> & Partial<OffersKernel>;
+export type ModelJobsKernel = Pick<Kernel, 'leaseOutbox' | 'ackOutbox' | 'tail'> & Partial<Pick<Kernel, 'outboxWaiting'>> & Partial<OffersKernel>;
 
 /** What the pass reads on the record: its kernel for the queue, and the inbox a draft's samples come from. */
 export type ModelJobsApi = Pick<RecordApi, 'inbox'> & { kernel: ModelJobsKernel };
@@ -146,15 +146,15 @@ export type ModelJobsDeps = {
   store?: UnderstandStore | undefined;
   /**
    * The engine's health (`engine-health.ts`, `engineHealthRead`), asked before anything is leased. `not_answering` holds
-   * the jobs `pending` with their attempts as they were, and one goes through every `MODEL_TEST_EVERY_MS` as its own test.
+   * the jobs `pending` with their attempts as they were, and the model is tried every `MODEL_TEST_EVERY_MS` by a call that is no job.
    * ABSENT, or a read that throws, and the pass leases as it always did.
    */
   health?: (() => Promise<Pick<EngineHealthRead, 'health'>>) | undefined;
 };
 
 /**
- * How often a silent model is tried with one job, as its own test (ENG-A04). Once that one is answered the ledger says
- * `answering` and the next pass runs as before; until then every other job waits off the ladder.
+ * How often a silent model is tried, by one call that leases no job (ENG-A04, `allowed`). Once that call is answered the
+ * pass runs as before; until then every job waits off the ladder with its attempts as they were.
  */
 export const MODEL_TEST_EVERY_MS = 30 * 60_000;
 
@@ -231,6 +231,9 @@ export function backgroundSpent(sql: Pick<Sql, 'one'>, since: string): { all: nu
 /** The months a meter has already said it is spent in, so the line is said once a month and not on every alarm. */
 const told = new WeakMap<ModelJobMeter, string>();
 
+/** What the silent model's test asks about: a digest of one line that is nobody's, so the test leases no job. */
+const TEST_DIGEST = { digest: 'model-test', name: 'A test', text: 'One task closed.' };
+
 /** The key the next test's time is kept under, in the host's store. */
 const TEST_MARK = 'model.test.next';
 
@@ -271,13 +274,25 @@ function setTestNext(deps: ModelJobsDeps, key: object, at: number | null): void 
 }
 
 /**
- * What the engine's health lets this pass lease: `all` as before, `one` job as the silent model's test, or `none`.
+ * What the engine's health lets this pass lease: `all` as before, or `none` while the model is silent.
  *
  * ONLY `not_answering` HOLDS THE JOBS. `never_asked` has to ask to learn anything, and `key_closed` and `off` are said on
  * Settings by the same read. The first silent pass opens the wait and says so in one line; it does not test at once, because
  * the call that just failed was the test. A read that throws is no news, and the pass runs as it always did.
+ *
+ * THE TEST IS ONE CALL AND NOT A JOB (audit-38-39 finding 7). A job leased as the test and acked `failed` spent one of its
+ * eight attempts every silent half hour, and the oldest job was leased each time, so it died in about four hours: the kernel
+ * hands this pass no verb that puts a lease back without an attempt (`unlease` is not on `Kernel`). A call over a digest of
+ * nobody's leases nothing, a model never reached costs nothing on the month (`backgroundMeter`), and one that answers is
+ * the wait's end: the pass runs as before at once, on the jobs it kept.
  */
-async function allowed(deps: ModelJobsDeps, now: number, log: (line: string) => void): Promise<'all' | 'one' | 'none'> {
+async function allowed(
+  deps: ModelJobsDeps,
+  kernel: ModelJobsKernel,
+  inference: ModelJobInference,
+  now: number,
+  log: (line: string) => void,
+): Promise<'all' | 'none'> {
   const read = deps.health;
   if (read === undefined) return 'all';
   let state: string;
@@ -294,13 +309,27 @@ async function allowed(deps: ModelJobsDeps, now: number, log: (line: string) => 
   }
   if (next === null) {
     setTestNext(deps, read, now + MODEL_TEST_EVERY_MS);
-    log(`Slash's model is not answering, so the record's model jobs wait with their attempts kept, and one is tried every ${MODEL_TEST_EVERY_MS / 60_000} minutes.`);
+    log(`Slash's model is not answering, so the record's model jobs wait with their attempts kept, and the model is tried again every ${MODEL_TEST_EVERY_MS / 60_000} minutes.`);
     return 'none';
   }
   if (now < next) return 'none';
   setTestNext(deps, read, now + MODEL_TEST_EVERY_MS);
-  log("Slash's model is still not answering, so one model job is tried as a test.");
-  return 'one';
+  /* NOTHING WAITING, NOTHING TO TEST FOR: the test is a model call, and one made every half hour over an empty queue is
+     spent on nobody. A job leased as the test (before) was only ever tried when one waited, and so is this call. */
+  const kinds: OutboxKind[] = ['infer.draft', 'infer.prose', ...(inference.resolve ? [RESOLVE] : []), ...(inference.embed ? (['infer.embed'] as const) : [])];
+  if (kernel.outboxWaiting?.(kinds) === false) return 'none';
+  let answered = false;
+  try {
+    answered = (await inference.prose(TEST_DIGEST)).ok;
+  } catch {
+    /* a test that throws is a model still silent */
+  }
+  if (!answered) {
+    log("Slash's model is still not answering, so the record's model jobs keep waiting with their attempts kept.");
+    return 'none';
+  }
+  setTestNext(deps, read, null);
+  return 'all';
 }
 
 /** The job's payload as an object, or `null` when it cannot be read. */
@@ -456,7 +485,7 @@ async function settle(
  * a model that reads notes. Its ask is understanding's too, so it is held to the same share and the work's month.
  *
  * A MODEL THAT IS NOT ANSWERING LEASES NOTHING, where the host hands its health (`allowed`): every job waits `pending`,
- * one goes through every `MODEL_TEST_EVERY_MS` as its own test, and the pass runs as before once that one is answered. A
+ * one call that is no job tests the model every `MODEL_TEST_EVERY_MS`, and the pass runs as before once it is answered. A
  * job that fails for any other cause, while the model answers, still climbs its own ladder.
  *
  * AN ACK THAT WILL NOT LAND IS LOGGED AND NOT A REASON TO ABANDON THE REST: the lease expires and the job is reclaimed.
@@ -492,10 +521,9 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
 
   /* A SILENT MODEL LEASES NOTHING (ENG-A04): an outage once spent each job's eight attempts in four hours and filed it
      as a question. Leasing nothing leaves them `pending` with their attempts as they were, and the notes wait too. */
-  const may = await allowed(deps, now, log);
-  if (may === 'none') return false;
+  if ((await allowed(deps, api.kernel, inference, now, log)) === 'none') return false;
 
-  const n = Math.min(may === 'one' ? 1 : MODEL_JOBS_PER_PASS, left);
+  const n = Math.min(MODEL_JOBS_PER_PASS, left);
   const asked = api.kernel.leaseOutbox(['infer.draft', 'infer.prose'], n);
   /* A PAIR IS ONE ASK AT MOST AND OFTEN NONE (the cache), and it is leased no further than understanding's month has left. */
   const understandLeft = meter.understand ? meter.understand.cap - meter.understand.spent(month) : 0;
@@ -521,7 +549,7 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
   if (acked > 0 && deps.scheduler) await api.kernel.tail(deps.scheduler);
 
   /* THE NOTES, AFTER THE JOBS AND ON WHAT THE MONTH STILL HAS: the understanding share, held under the work's. */
-  if (may === 'all' && inference.mentions && deps.store && meter.understand && registers && list && meetsList && propose) {
+  if (inference.mentions && deps.store && meter.understand && registers && list && meetsList && propose) {
     const work = meter;
     const understand = meter.understand;
     const held: ModelJobMeter = { cap: understand.cap, spent: (since) => Math.max(understand.spent(since), understand.cap - (work.cap - work.spent(since))) };

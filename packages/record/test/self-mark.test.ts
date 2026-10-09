@@ -44,7 +44,7 @@ async function record(people: Record<string, unknown>[]) {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   assert.ok(
-    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'sam@example.com', name: 'Sam Kamal' } }).ok,
+    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'mara@example.com', name: 'Mara Lindqvist' } }).ok,
   );
   value(await api.kernel.install([PEOPLE]));
   const rows: Entry[] = [];
@@ -56,15 +56,15 @@ const selfOf = (api: Awaited<ReturnType<typeof createRecordApi>>, id: string) =>
 const steps = (api: Awaited<ReturnType<typeof createRecordApi>>) => (api.kernel.prefsOf('braindog:updates')['first-party'] as { steps: string[] }).steps;
 
 test('THE PERSON HOLDING THE SIGN-IN ADDRESS IS MARKED AS YOU, as one decision with Undo', async () => {
-  const { api, sql, rows } = await record([{ name: 'Ada Vine', email: 'ada@kiln.example' }, { name: 'Sam', keys: ['email:Sam@Example.com', 'github:samdev'] }]);
+  const { api, sql, rows } = await record([{ name: 'Ada Vine', email: 'ada@kiln.example' }, { name: 'Mara', keys: ['email:Mara@Example.com', 'github:maradev'] }]);
   await api.slashTick();
   assert.equal(selfOf(api, rows[1]!.id), true);
   assert.equal(selfOf(api, rows[0]!.id), null);
-  assert.ok(steps(api).includes('Sam holds the address you sign in with, so they are marked as you. Undo is on Decide.'), steps(api).join(' / '));
+  assert.ok(steps(api).includes('Mara holds the address you sign in with, so they are marked as you. Undo is on Decide.'), steps(api).join(' / '));
   /* DONE ON DECIDE: the question is answered, by the record, and its decision puts the mark back. */
   const asked = sql.one<{ id: string; status: string }>("SELECT id, status FROM suggestion WHERE opened_by = 'system' AND body_kind = 'rowset'");
   assert.equal(asked?.status, 'resolved');
-  assert.equal(api.kernel.question(asked!.id), 'Mark Sam as you?');
+  assert.equal(api.kernel.question(asked!.id), 'Mark Mara as you?');
   const decision = sql.one<{ id: string }>("SELECT id FROM decision WHERE decided_by = 'system' ORDER BY rowid DESC LIMIT 1")!.id;
   const plan = value<{ hash: string }>(await api.undo({ decision, dry: true }, owner));
   value(await api.undo({ decision, hash: plan.hash }, owner));
@@ -79,7 +79,7 @@ test('THE PERSON HOLDING THE SIGN-IN ADDRESS IS MARKED AS YOU, as one decision w
 });
 
 test('NOBODY HOLDS THE ADDRESS: ONE QUESTION, AT MOST FIVE PEOPLE BY NAME, AND A NAME ALONE MARKS NOBODY', async () => {
-  const names = ['Ada Vine', 'Sam Lee', 'Sam Kamal', 'Jo Park', 'Kim Ito', 'Lu Wen', 'Mo Sato'];
+  const names = ['Ada Vine', 'Sam Lee', 'Mara Lindqvist', 'Jo Park', 'Kim Ito', 'Lu Wen', 'Mo Sato'];
   const { api, sql, rows } = await record(names.map((name) => ({ name })));
   await api.slashTick();
   /* THE OWNER'S OWN NAME ON A ROW IS NOT PROOF: nobody is marked. */
@@ -91,7 +91,7 @@ test('NOBODY HOLDS THE ADDRESS: ONE QUESTION, AT MOST FIVE PEOPLE BY NAME, AND A
   /* FIVE PEOPLE, the one sharing a word with the owner's name first, and a way to say none. */
   assert.deepEqual(
     options.map((o) => o.label),
-    ['Sam Kamal', 'Ada Vine', 'Sam Lee', 'Jo Park', 'Kim Ito', 'None of these'],
+    ['Mara Lindqvist', 'Ada Vine', 'Sam Lee', 'Jo Park', 'Kim Ito', 'None of these'],
   );
   assert.doesNotMatch(JSON.stringify(options), /[0-9A-HJKMNP-TV-Z]{26}|#\d/u);
   /* ASKED ONCE: the next night asks nothing more. */
@@ -105,7 +105,7 @@ test('NOBODY HOLDS THE ADDRESS: ONE QUESTION, AT MOST FIVE PEOPLE BY NAME, AND A
 });
 
 test('SOMEBODY OTHER THAN THE OWNER ANSWERING "Which of these is you?" MARKS NOBODY, and it is asked again', async () => {
-  const { api, sql, rows } = await record(['Ada Vine', 'Sam Kamal'].map((name) => ({ name })));
+  const { api, sql, rows } = await record(['Ada Vine', 'Mara Lindqvist'].map((name) => ({ name })));
   await api.slashTick();
   const asked = sql.one<{ id: string }>("SELECT id FROM suggestion WHERE opened_by = 'system' AND body_kind = 'options' AND status = 'open'")!;
   const member: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'decide' }, credentialed: true };
@@ -118,7 +118,7 @@ test('SOMEBODY OTHER THAN THE OWNER ANSWERING "Which of these is you?" MARKS NOB
 });
 
 test('A RECORD WHOSE PERSON IS MARKED ALREADY IS LEFT AS IT IS', async () => {
-  const { api, sql, rows } = await record([{ name: 'Sam', email: 'other@example.com', self: true }, { name: 'Sam Kamal', email: 'sam@example.com' }]);
+  const { api, sql, rows } = await record([{ name: 'Mara', email: 'other@example.com', self: true }, { name: 'Mara Lindqvist', email: 'mara@example.com' }]);
   await api.slashTick();
   assert.equal(selfOf(api, rows[1]!.id), null);
   assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE opened_by = 'system'")?.n, 0);
@@ -126,7 +126,7 @@ test('A RECORD WHOSE PERSON IS MARKED ALREADY IS LEFT AS IT IS', async () => {
 });
 
 test('"Mark X as you?" PUT BACK BY UNDO IS ANSWERED BY THE OWNER ALONE', async () => {
-  const { api, sql, rows } = await record([{ name: 'Sam', email: 'sam@example.com' }]);
+  const { api, sql, rows } = await record([{ name: 'Mara', email: 'mara@example.com' }]);
   await api.slashTick();
   const decision = sql.one<{ id: string }>("SELECT id FROM decision WHERE decided_by = 'system' ORDER BY rowid DESC LIMIT 1")!.id;
   const plan = value<{ hash: string }>(await api.undo({ decision, dry: true }, owner));
@@ -153,25 +153,25 @@ test('"Mark X as you?" PUT BACK BY UNDO IS ANSWERED BY THE OWNER ALONE', async (
 });
 
 test('markOwnRow MARKS THE ONE PERSON HOLDING THE SIGN-IN ADDRESS, for a host holding only a kernel', async () => {
-  const { api, sql, rows } = await record([{ name: 'Ada Vine', email: 'ada@kiln.example' }, { name: 'Sam', keys: ['email:Sam@Example.com'] }]);
-  const out = value<{ marked: boolean; said: string | null }>(await markOwnRow(api.kernel, 'sam@example.com'));
+  const { api, sql, rows } = await record([{ name: 'Ada Vine', email: 'ada@kiln.example' }, { name: 'Mara', keys: ['email:Mara@Example.com'] }]);
+  const out = value<{ marked: boolean; said: string | null }>(await markOwnRow(api.kernel, 'mara@example.com'));
   assert.equal(out.marked, true);
-  assert.equal(out.said, 'Sam holds the address you sign in with, so they are marked as you. Undo is on Decide.');
+  assert.equal(out.said, 'Mara holds the address you sign in with, so they are marked as you. Undo is on Decide.');
   assert.equal(selfOf(api, rows[1]!.id), true);
   /* ONCE: a second call does nothing, and nor does the night. */
-  assert.deepEqual(value(await markOwnRow(api.kernel, 'sam@example.com')), { marked: false, said: null });
+  assert.deepEqual(value(await markOwnRow(api.kernel, 'mara@example.com')), { marked: false, said: null });
   await api.slashTick();
   assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE opened_by = 'system'")?.n, 1);
   /* A NAME ALONE NEVER MARKS: nobody holds this address. */
-  const other = await record([{ name: 'Sam Kamal' }]);
-  assert.deepEqual(value(await markOwnRow(other.api.kernel, 'sam@example.com')), { marked: false, said: null });
+  const other = await record([{ name: 'Mara Lindqvist' }]);
+  assert.deepEqual(value(await markOwnRow(other.api.kernel, 'mara@example.com')), { marked: false, said: null });
   assert.notEqual(selfOf(other.api, other.rows[0]!.id), true);
   other.sql.close();
   sql.close();
 });
 
 test('"Mark X as you?" PUT BACK BY UNDO IS NOT ACCEPTED ONTO A SECOND PERSON once somebody else is marked', async () => {
-  const { api, sql, rows } = await record([{ name: 'Sam', email: 'sam@example.com' }, { name: 'Ada Vine', email: 'ada@kiln.example' }]);
+  const { api, sql, rows } = await record([{ name: 'Mara', email: 'mara@example.com' }, { name: 'Ada Vine', email: 'ada@kiln.example' }]);
   await api.slashTick();
   const decision = sql.one<{ id: string }>("SELECT id FROM decision WHERE decided_by = 'system' ORDER BY rowid DESC LIMIT 1")!.id;
   const plan = value<{ hash: string }>(await api.undo({ decision, dry: true }, owner));
@@ -189,8 +189,8 @@ test('"Mark X as you?" PUT BACK BY UNDO IS NOT ACCEPTED ONTO A SECOND PERSON onc
 });
 
 test('THE ONE HOLDING THE ADDRESS WHO WAS MET ONLY IN MAIL OR ONLY IN COMMITS IS ASKED ABOUT, never marked on its own', async () => {
-  for (const met of ['2026-10-01 · mail from sam@example.com', '2026-10-01 · commit in lantern']) {
-    const { api, sql, rows } = await record([{ name: 'Elon Musk', email: 'sam@example.com', met: [met] }, { name: 'Sam Kamal' }]);
+  for (const met of ['2026-10-01 · mail from mara@example.com', '2026-10-01 · commit in lantern']) {
+    const { api, sql, rows } = await record([{ name: 'Elon Musk', email: 'mara@example.com', met: [met] }, { name: 'Mara Lindqvist' }]);
     await api.slashTick();
     assert.ok(rows.every((r) => selfOf(api, r.id) !== true), met);
     const asked = sql.one<{ id: string; body: string }>("SELECT id, body FROM suggestion WHERE opened_by = 'system' AND body_kind = 'options' AND status = 'open'")!;
@@ -199,7 +199,7 @@ test('THE ONE HOLDING THE ADDRESS WHO WAS MET ONLY IN MAIL OR ONLY IN COMMITS IS
     const body = JSON.parse(asked.body) as { about: string; options: { label: string }[] };
     assert.deepEqual(
       body.options.map((o) => o.label),
-      ['Elon Musk', 'Sam Kamal', 'None of these'],
+      ['Elon Musk', 'Mara Lindqvist', 'None of these'],
     );
     assert.equal(body.about, 'The one holding your address was met only in mail or commits.');
     assert.ok(
@@ -209,13 +209,13 @@ test('THE ONE HOLDING THE ADDRESS WHO WAS MET ONLY IN MAIL OR ONLY IN COMMITS IS
       steps(api).join(' / '),
     );
     /* NOR DOES THE HOST'S STEP MARK THEM. */
-    assert.deepEqual(value(await markOwnRow(api.kernel, 'sam@example.com')), { marked: false, said: null });
+    assert.deepEqual(value(await markOwnRow(api.kernel, 'mara@example.com')), { marked: false, said: null });
     sql.close();
   }
 });
 
 test('ONE MET IN A NOTE OR A RUN AS WELL AS IN MAIL IS VOUCHED FOR, and marked', async () => {
-  const { api, sql, rows } = await record([{ name: 'Sam', email: 'sam@example.com', met: ['2026-10-01 · mail from sam@example.com', '2026-10-02 · note on Lantern'] }]);
+  const { api, sql, rows } = await record([{ name: 'Mara', email: 'mara@example.com', met: ['2026-10-01 · mail from mara@example.com', '2026-10-02 · note on Lantern'] }]);
   await api.slashTick();
   assert.equal(selfOf(api, rows[0]!.id), true);
   sql.close();
@@ -225,17 +225,17 @@ test('A SHARED SIGN-IN ADDRESS NO PERSON CAN HOLD GOES STRAIGHT TO THE QUESTION,
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   assert.ok(
-    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'admin@example.com', name: 'Sam Kamal' } }).ok,
+    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'admin@example.com', name: 'Mara Lindqvist' } }).ok,
   );
   value(await api.kernel.install([PEOPLE]));
   /* EVEN ONE TYPED IN HOLDING IT is not him on that alone. */
-  const rows = [value<Entry>(api.kernel.create('people', { name: 'Front desk', email: 'admin@example.com' } as never, { actor: 'p_1' })), value<Entry>(api.kernel.create('people', { name: 'Sam Kamal' } as never, { actor: 'p_1' }))];
+  const rows = [value<Entry>(api.kernel.create('people', { name: 'Front desk', email: 'admin@example.com' } as never, { actor: 'p_1' })), value<Entry>(api.kernel.create('people', { name: 'Mara Lindqvist' } as never, { actor: 'p_1' }))];
   await api.slashTick();
   assert.ok(rows.every((r) => selfOf(api, r.id) !== true));
   const asked = sql.one<{ id: string; body: string }>("SELECT id, body FROM suggestion WHERE opened_by = 'system' AND body_kind = 'options' AND status = 'open'")!;
   assert.equal(api.kernel.question(asked.id), 'Which of these is you?');
   assert.equal((JSON.parse(asked.body) as { about: string }).about, 'You sign in with a shared address, which no one person holds.');
-  assert.equal((JSON.parse(asked.body) as { options: { label: string }[] }).options[0]!.label, 'Sam Kamal');
+  assert.equal((JSON.parse(asked.body) as { options: { label: string }[] }).options[0]!.label, 'Mara Lindqvist');
   assert.ok(
     steps(api).includes('Which of these is you is asked on Decide, since you sign in with a shared address, such as an admin or info one, which no one person in People can hold.'),
     steps(api).join(' / '),
@@ -245,7 +245,7 @@ test('A SHARED SIGN-IN ADDRESS NO PERSON CAN HOLD GOES STRAIGHT TO THE QUESTION,
 });
 
 test('UNDO OF THE "Which of these is you?" PICK TAKES THE MARK BACK, AND A SECOND ANSWER MARKS AGAIN', async () => {
-  const { api, sql, rows } = await record(['Ada Vine', 'Sam Kamal'].map((name) => ({ name })));
+  const { api, sql, rows } = await record(['Ada Vine', 'Mara Lindqvist'].map((name) => ({ name })));
   await api.slashTick();
   const asked = sql.one<{ id: string }>("SELECT id FROM suggestion WHERE opened_by = 'system' AND body_kind = 'options' AND status = 'open'")!;
   value(await api.decide({ id: asked.id, decide: { option: 'p1', reason: 'That is me.' } }, owner));
@@ -268,13 +268,13 @@ test('UNDO OF THE "Which of these is you?" PICK TAKES THE MARK BACK, AND A SECON
 });
 
 test('THE ONE HOLDING THE ADDRESS, MET ONLY IN MAIL AND KNOWN BY IT ALONE, IS STILL OFFERED, by the part before the @', async () => {
-  const { api, sql, rows } = await record([{ name: 'sam@example.com', email: 'sam@example.com', met: ['2026-10-01 · mail from sam@example.com'] }, { name: 'Ada Vine' }]);
+  const { api, sql, rows } = await record([{ name: 'mara@example.com', email: 'mara@example.com', met: ['2026-10-01 · mail from mara@example.com'] }, { name: 'Ada Vine' }]);
   await api.slashTick();
   assert.ok(rows.every((r) => selfOf(api, r.id) !== true));
   const asked = sql.one<{ body: string }>("SELECT body FROM suggestion WHERE opened_by = 'system' AND body_kind = 'options' AND status = 'open'")!;
   assert.deepEqual(
     (JSON.parse(asked.body) as { options: { label: string }[] }).options.map((o) => o.label),
-    ['sam', 'Ada Vine', 'None of these'],
+    ['mara', 'Ada Vine', 'None of these'],
   );
   sql.close();
 });

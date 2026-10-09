@@ -2,7 +2,7 @@
  * `from-packs`: every pack in `packs/` published into the catalogue the web app ships, so Browse lists it and a host
  * resolves its id.
  *
- *   node tools/catalogue/from-packs.mjs [--packs <folder>] [--to <catalogue folder>] [--previews]
+ *   node tools/catalogue/from-packs.mjs [--packs <folder>] [--to <catalogue folder>] [--previews] [--check]
  *
  * With no flags it reads `packs/` and writes `apps/web/static/catalogue/`, the folder the Worker's static assets and a
  * self-host both serve under `/app/catalogue/`. Before this, that folder listed one add-on, `reading-list`, and none of
@@ -19,8 +19,10 @@
  * from taking a new date on every build and the committed index from churning.
  *
  * A PACK WITH NO TEST IS REFUSED, because `packs/README.md` holds each pack to a test that installs the file exactly as
- * it ships. Any `*.test.ts`, `.mjs` or `.js` beside the pack file counts: `packs/portfolio-bands` is tested by
- * `bands.test.ts`, not by a file named after its folder. A folder with no `<folder>.pack.json` is not a pack and is
+ * it ships. A `*.test.ts`, `.mjs` or `.js` beside the pack file counts when it calls `test(` and names
+ * `<folder>.pack.json`: `packs/portfolio-bands` is tested by `bands.test.ts`, not by a file named after its folder. AN
+ * EMPTY FILE IS NO TEST, and is refused in the sentence a missing one gets: before, any file with a test's name
+ * counted, and an empty `bands.test.ts` published a pack. A folder with no `<folder>.pack.json` is not a pack and is
  * passed over, since an import adapter with only a map and a script lives in `packs/` too.
  *
  * THE CATALOGUE ID IS THE ONE THE FILE GIVES ITSELF, not the folder's: `packs/mercury` publishes `mercury-company` and
@@ -45,6 +47,10 @@
  *
  * THE INDEX IS WRITTEN AS `readCatalogue` READS IT, and only when that text differs from the file's, so a run with nothing
  * new leaves the committed index byte for byte as it was.
+ *
+ * `--check` WORKS ALL OF IT OUT AND WRITES NOTHING. It exits 1 naming each file a run would write, or 0 saying every
+ * pack is already published, so a build in CI only verifies: a pack edited without a new version, or one whose test
+ * was emptied, fails the build step by name instead of showing up afterwards as a changed tracked file.
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -68,8 +74,13 @@ import { makePreview } from './previews.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TEST = /\.test\.(?:ts|mjs|js)$/u;
+/* `test(` on its own, not a method of that name: `/x/.test('shelf.pack.json')` holds no test. */
+const CALLS_TEST = /(?<![.\w$])test\(/u;
 
-const { values } = parseArgs({ options: { packs: { type: 'string' }, to: { type: 'string' }, previews: { type: 'boolean' } }, strict: true });
+const { values } = parseArgs({
+  options: { packs: { type: 'string' }, to: { type: 'string' }, previews: { type: 'boolean' }, check: { type: 'boolean' } },
+  strict: true,
+});
 const packsDir = resolve(values.packs ?? join(ROOT, 'packs'));
 const to = resolve(values.to ?? join(ROOT, 'apps', 'web', 'static', 'catalogue'));
 
@@ -101,7 +112,13 @@ for (const folder of readdirSync(packsDir, { withFileTypes: true }).filter((d) =
   const file = join(dir, `${folder}.pack.json`);
   if (!existsSync(file)) continue;
   const where = `packs/${folder}`;
-  if (!readdirSync(dir).some((f) => TEST.test(f))) fail(`${where} has no test. A pack ships with one that installs ${folder}.pack.json as it ships (packs/README.md).`);
+  const tested = readdirSync(dir)
+    .filter((f) => TEST.test(f))
+    .some((f) => {
+      const text = readFileSync(join(dir, f), 'utf8');
+      return CALLS_TEST.test(text) && text.includes(`${folder}.pack.json`);
+    });
+  if (!tested) fail(`${where} has no test. A pack ships with one that installs ${folder}.pack.json as it ships (packs/README.md).`);
   const text = readFileSync(file, 'utf8');
   let doc;
   try {
@@ -185,6 +202,21 @@ for (const [id, { where, doc }] of packs) {
 const canonical = readCatalogue(JSON.parse(JSON.stringify(index)));
 if (!canonical.ok) fail(`the index this run made does not read back: ${canonical.refusal.fix}`);
 const indexText = `${JSON.stringify(canonical.value, null, 2)}\n`;
+
+if (values.check) {
+  const onDisk = (path) => {
+    const target = join(to, ...path.split('/'));
+    return existsSync(target) ? readFileSync(target, 'utf8') : null;
+  };
+  const would = [...files].filter(([path, text]) => onDisk(path) !== text).map(([path]) => path);
+  if (indexText !== indexWas) would.push(CATALOGUE_INDEX);
+  if (would.length === 0) {
+    console.log(`from-packs --check: every pack in ${packsDir} is already in ${to}.`);
+    process.exit(0);
+  }
+  console.error(`from-packs --check: a run would write ${would.join(', ')} into ${to}${said.length === 0 ? '' : `: ${said.join('; ')}`}.`);
+  process.exit(1);
+}
 
 for (const [path, text] of files) {
   const target = join(to, ...path.split('/'));

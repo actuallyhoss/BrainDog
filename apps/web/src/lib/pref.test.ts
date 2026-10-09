@@ -459,3 +459,23 @@ test('an owed list or a stamp of the wrong shape is dropped, and the rest of the
   page(cookie({ unsent: { 'look.scheme': 'dark', 'look.contrast': false }, who: 'acme/p' }));
   assert.deepEqual(pref.read(), { unsent: { 'look.scheme': 'dark', 'look.contrast': false }, who: 'acme/p' });
 });
+
+test("TODAY'S NEXT STEPS: hidden survives a reload, and how work arrives is one of three words or nothing", () => {
+  /* `nextStepsHidden` is the Hide on "When you want more"; `arrivesBy` is the first run's one answer, which orders the
+     steps. Both are read on every Today, so a wrong type from an older build is dropped, never drawn. */
+  jar();
+  pref.write({ nextStepsHidden: true, arrivesBy: 'messages' });
+  assert.deepEqual(pref.read(), { nextStepsHidden: true, arrivesBy: 'messages' });
+  for (const word of ['app', 'in-person'] as const) {
+    pref.write({ arrivesBy: word });
+    assert.equal(pref.read().arrivesBy, word);
+  }
+  for (const [key, bad] of [
+    ['nextStepsHidden', '"yes"'],
+    ['arrivesBy', '"post"'],
+    ['arrivesBy', 'true'],
+  ] as const) {
+    jar(`bd_pref=${encodeURIComponent(`{"scheme":"dark","${key}":${bad}}`)}`);
+    assert.deepEqual(pref.read(), { scheme: 'dark' }, `${key} of the wrong shape reached a reader`);
+  }
+});

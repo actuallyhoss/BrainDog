@@ -17,6 +17,7 @@ import { dated, dayOf } from './dates.ts';
 import { FOUNDER } from './founder.ts';
 import { GUIDE, GUIDE_SETTINGS } from './guide.ts';
 import { PERSONAL } from './personal.ts';
+import { SHOP } from './shop.ts';
 import { STUDENT } from './student.ts';
 import { EARLIER_TICKETS, TEAM } from './team.ts';
 
@@ -44,8 +45,14 @@ function checked(doc: unknown): UseCase {
  * arguing for it. Raising a version there means giving the new one its
  * own entry in that file; rewording a label under a version nobody has released means appending a line that says which
  * change moved it, the way `test/pack-versions.test.ts` has asked of the first-party packs since `5ccb06ad`.
+ *
+ * SHOP COMES BEFORE SMALL BUSINESS, SINCE BUSINESS 1.7.0 gave it the words a shop says: "a small candle shop" is Shop,
+ * and "freelance as a designer" in the same sentence is Small business beside it (`alongside`), since neither declares
+ * a list or page of the other's.
  */
-export const USE_CASES: readonly UseCase[] = [checked(PERSONAL), checked(STUDENT), checked(FOUNDER), checked(TEAM), checked(GUIDE), checked(BUSINESS)];
+export const USE_CASES: readonly UseCase[] = [
+  checked(PERSONAL), checked(STUDENT), checked(FOUNDER), checked(TEAM), checked(GUIDE), checked(SHOP), checked(BUSINESS),
+];
 
 export const useCase = (id: string): UseCase | undefined => USE_CASES.find((u) => u.usecase === id);
 

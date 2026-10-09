@@ -649,9 +649,9 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
    * where it was seen and what is written about it. Only what the rows say, as a person's page.
    *
    * CALLED `relation` AND NOT `organisation`, BECAUSE THE NAME DECIDES WHO KEEPS A SHARED ADDRESS (`someone` above says
-   * how): a company and the project made for it are often called one thing, Encore and Encore, and the project is the
-   * page somebody opens most. `relation` sorts after `project` and before `someone`, so the project keeps the bare name,
-   * then the organisation, then a person. Founder's own `organisation` page went at Founder 2.0.0, and the numbers it
+   * how): a company and the project made for it are often called one thing, Brightwell and Brightwell, and the project
+   * is the page somebody opens most. `relation` sorts after `project` and before `someone`, so the project keeps the
+   * bare name, then the organisation, then a person. Founder's own `organisation` page went at Founder 2.0.0, and the numbers it
    * drew are added to this page by Founder (`adds` in `usecases/founder.ts`).
    *
    * ITS MONEY ONLY WHERE THE RECORD HOLDS MONEY, for the reason a person's page has none: a block over Money's lists

@@ -67,25 +67,25 @@ async function record() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   value(await api.kernel.install([ORGS, PEOPLE, TASKS]));
-  const encore = value<Entry>(await api.create({ register: 'organisations', fields: { name: 'Encore', domain: 'encore.example' } }, owner));
+  const lanternfish = value<Entry>(await api.create({ register: 'organisations', fields: { name: 'Lanternfish', domain: 'lanternfish.example' } }, owner));
   const commits = (n: number, repo: string) => Array.from({ length: n }, (_, i) => `2026-09-${String(10 + i).padStart(2, '0')} · commit ${String(4464966 + i)} in ${repo}`);
   const kept = value<Entry>(
     await api.create(
-      { register: 'people', fields: { name: 'Rohan Mehta', email: 'rohan.mehta@encore.example', org: encore.id, met: [...commits(6, 'encore'), '2026-10-01 · mail from encore.example'] } },
+      { register: 'people', fields: { name: 'Joaquin Herrera', email: 'joaquin.herrera@lanternfish.example', org: lanternfish.id, met: [...commits(6, 'lanternfish'), '2026-10-01 · mail from lanternfish.example'] } },
       owner,
     ),
   );
-  const login = value<Entry>(await api.create({ register: 'people', fields: { name: 'rohanmehta', handles: ['github:rohanmehta'], met: commits(1, 'encore-admin') } }, owner));
-  const other = value<Entry>(await api.create({ register: 'people', fields: { name: 'jherrerastudio', handles: ['github:jherrerastudio'], met: ['2026-09-30 · agent run S740'] } }, owner));
+  const login = value<Entry>(await api.create({ register: 'people', fields: { name: 'joaquinherrera', handles: ['github:joaquinherrera'], met: commits(1, 'lanternfish-admin') } }, owner));
+  const other = value<Entry>(await api.create({ register: 'people', fields: { name: 'joaquinpell', handles: ['github:joaquinpell'], met: ['2026-09-30 · agent run S740'] } }, owner));
   const asked = value<{ id: string }>(
     api.kernel.propose(
       {
-        question: 'Are Rohan Mehta, rohanmehta and jherrerastudio one person?',
+        question: 'Are Joaquin Herrera, joaquinherrera and joaquinpell one person?',
         body_kind: 'rowset',
         body: {
           register: 'people',
           rows: [
-            { at: 'people#1', version: kept.version, patch: { handles: ['github:rohanmehta', 'github:jherrerastudio'] } },
+            { at: 'people#1', version: kept.version, patch: { handles: ['github:joaquinherrera', 'github:joaquinpell'] } },
             { at: 'people#2', version: login.version, patch: { merged_into: 'people#1', deleted_at: new Date(NOW).toISOString() } },
             { at: 'people#3', version: other.version, patch: { merged_into: 'people#1', deleted_at: new Date(NOW).toISOString() } },
           ],
@@ -103,11 +103,11 @@ const question = async (api: Awaited<ReturnType<typeof record>>['api'], id: stri
 test('THE CLUSTER IS EVERY CANDIDATE BY NAME, the one kept first, each with where it was seen and how it is known', async () => {
   const { api, sql, asked } = await record();
   const q = await question(api, asked);
-  assert.equal(q.question, 'Are Rohan Mehta, rohanmehta and jherrerastudio one person?');
+  assert.equal(q.question, 'Are Joaquin Herrera, joaquinherrera and joaquinpell one person?');
   assert.deepEqual(q.merge?.candidates, [
-    { name: 'Rohan Mehta', row: 'people#1', keeps: true, org: 'Encore', seen: ['mail from encore.example', '6 commits in encore'], known_by: ['email'], rows: [] },
-    { name: 'rohanmehta', row: 'people#2', keeps: false, org: null, seen: ['a commit in encore-admin'], known_by: ['github'], rows: [1] },
-    { name: 'jherrerastudio', row: 'people#3', keeps: false, org: null, seen: ['agent run S740'], known_by: ['github'], rows: [2] },
+    { name: 'Joaquin Herrera', row: 'people#1', keeps: true, org: 'Lanternfish', seen: ['mail from lanternfish.example', '6 commits in lanternfish'], known_by: ['email'], rows: [] },
+    { name: 'joaquinherrera', row: 'people#2', keeps: false, org: null, seen: ['a commit in lanternfish-admin'], known_by: ['github'], rows: [1] },
+    { name: 'joaquinpell', row: 'people#3', keeps: false, org: null, seen: ['agent run S740'], known_by: ['github'], rows: [2] },
   ]);
   /* THE ANSWERS AS THE CARD NAMES THEM (`apps/web/src/routes/decide/merge.ts`): merge, apart, and a pick for each folded. */
   assert.deepEqual(
@@ -115,12 +115,12 @@ test('THE CLUSTER IS EVERY CANDIDATE BY NAME, the one kept first, each with wher
     [
       ['Merge all', 'merge'],
       ['Keep apart', 'apart'],
-      ['Pick rohanmehta', 'pick:people#2'],
-      ['Pick jherrerastudio', 'pick:people#3'],
+      ['Pick joaquinherrera', 'pick:people#2'],
+      ['Pick joaquinpell', 'pick:people#3'],
     ],
   );
   /* NO ADDRESS LEAVES, only that there is one. */
-  assert.doesNotMatch(JSON.stringify(q.merge), /@|rohan\.mehta/u);
+  assert.doesNotMatch(JSON.stringify(q.merge), /@|joaquin\.herrera/u);
   /* AND THE QUEUE CARRIES IT TOO. */
   const open = value<{ id: string; merge?: MergeCluster }[]>(await api.governance({ register: 'suggestion', status: 'open' }, owner));
   assert.equal(open.find((r) => r.id === asked)?.merge?.candidates.length, 3);
@@ -132,17 +132,17 @@ const people = async (api: Awaited<ReturnType<typeof record>>['api']) =>
 
 test('PICK MERGES THE ONE PICKED, carrying only what it brought, and the rest stay apart', async () => {
   const { api, sql, asked } = await record();
-  value(await api.decide({ id: asked, decide: { option: 'pick:people#3', reason: 'only the Herrera login is him' } }, owner));
+  value(await api.decide({ id: asked, decide: { option: 'pick:people#3', reason: 'only the pell login is him' } }, owner));
   const live = await people(api);
-  assert.deepEqual(live.map((r) => r.fields.name).sort(), ['Rohan Mehta', 'rohanmehta']);
+  assert.deepEqual(live.map((r) => r.fields.name).sort(), ['Joaquin Herrera', 'joaquinherrera']);
   /* THE KEPT ONE GAINS THE PICKED LOGIN AND NEVER THE ONE KEPT APART. */
-  assert.deepEqual(live.find((r) => r.fields.name === 'Rohan Mehta')?.fields.handles, ['github:jherrerastudio']);
-  assert.deepEqual(live.find((r) => r.fields.name === 'rohanmehta')?.fields.handles, ['github:rohanmehta']);
+  assert.deepEqual(live.find((r) => r.fields.name === 'Joaquin Herrera')?.fields.handles, ['github:joaquinpell']);
+  assert.deepEqual(live.find((r) => r.fields.name === 'joaquinherrera')?.fields.handles, ['github:joaquinherrera']);
   /* AND UNDO PUTS BOTH BACK: the folded one, and what the kept one was carried. */
   value(api.kernel.undoMerge('people#3', { actor: 'p_1' }));
   const back = await people(api);
-  assert.deepEqual(back.map((r) => r.fields.name).sort(), ['Rohan Mehta', 'rohanmehta', 'jherrerastudio']);
-  assert.equal(back.find((r) => r.fields.name === 'Rohan Mehta')?.fields.handles ?? null, null);
+  assert.deepEqual(back.map((r) => r.fields.name).sort(), ['Joaquin Herrera', 'joaquinherrera', 'joaquinpell']);
+  assert.equal(back.find((r) => r.fields.name === 'Joaquin Herrera')?.fields.handles ?? null, null);
   sql.close();
 });
 
@@ -153,8 +153,8 @@ test('MERGE ALL FOLDS EVERY ONE, KEEP APART FOLDS NONE, and a pick of a name it 
     assert.equal(wrong.refusal?.code, 'ENUM_VALUE_UNKNOWN');
     value(await api.decide({ id: asked, decide: { option: 'merge', reason: 'all him' } }, owner));
     const live = await people(api);
-    assert.deepEqual(live.map((r) => r.fields.name), ['Rohan Mehta']);
-    assert.deepEqual(live[0]?.fields.handles, ['github:rohanmehta', 'github:jherrerastudio']);
+    assert.deepEqual(live.map((r) => r.fields.name), ['Joaquin Herrera']);
+    assert.deepEqual(live[0]?.fields.handles, ['github:joaquinherrera', 'github:joaquinpell']);
     sql.close();
   }
   {
@@ -169,12 +169,12 @@ test('A MERGE TAKEN IN PART BY PLACE folds the ones picked and carries only what
   const { api, sql, asked } = await record();
   const q = await question(api, asked);
   /* THE PLACES OF ONE CANDIDATE'S ROWS, AND THE CARRY ROW BESIDE THEM, which is worked out again for the one picked. */
-  const rows = [0, ...q.merge!.candidates.filter((c) => c.name === 'jherrerastudio').flatMap((c) => c.rows)];
-  value(await api.decide({ id: asked, decide: { option: 'accept', reason: 'only the Herrera login is him', rows } } as never, owner));
+  const rows = [0, ...q.merge!.candidates.filter((c) => c.name === 'joaquinpell').flatMap((c) => c.rows)];
+  value(await api.decide({ id: asked, decide: { option: 'accept', reason: 'only the pell login is him', rows } } as never, owner));
   const live = await people(api);
-  assert.deepEqual(live.map((r) => r.fields.name).sort(), ['Rohan Mehta', 'rohanmehta']);
+  assert.deepEqual(live.map((r) => r.fields.name).sort(), ['Joaquin Herrera', 'joaquinherrera']);
   /* THE KEPT ONE GAINS THE PICKED LOGIN AND NEVER THE ONE KEPT APART. */
-  assert.deepEqual(live.find((r) => r.fields.name === 'Rohan Mehta')?.fields.handles, ['github:jherrerastudio']);
+  assert.deepEqual(live.find((r) => r.fields.name === 'Joaquin Herrera')?.fields.handles, ['github:joaquinpell']);
   assert.equal(sql.all("SELECT 1 FROM suggestion WHERE id = ? AND status = 'open'", asked).length, 0, 'the question is answered');
   sql.close();
 });
@@ -196,8 +196,8 @@ test('IN PART BY PLACE, NONE PICKED IS KEEP APART AND EVERY ONE IS MERGE ALL, an
     const { api, sql, asked } = await record();
     value(await api.decide({ id: asked, decide: { option: 'accept', reason: 'all him', rows: [1, 2] } } as never, owner));
     const live = await people(api);
-    assert.deepEqual(live.map((r) => r.fields.name), ['Rohan Mehta']);
-    assert.deepEqual(live[0]?.fields.handles, ['github:rohanmehta', 'github:jherrerastudio']);
+    assert.deepEqual(live.map((r) => r.fields.name), ['Joaquin Herrera']);
+    assert.deepEqual(live[0]?.fields.handles, ['github:joaquinherrera', 'github:joaquinpell']);
     sql.close();
   }
 });
@@ -229,7 +229,7 @@ test('A ROWSET THAT FOLDS NOTHING, OR IS ON ANOTHER LIST, IS NO MERGE', async ()
   const { api, sql } = await record();
   value(await api.create({ register: 'tasks', fields: { what: 'Ship' } }, owner));
   const plain = value<{ id: string }>(
-    api.kernel.propose({ question: 'Rename Rohan?', body_kind: 'rowset', body: { register: 'people', rows: [{ at: 'people#1', version: 1, patch: { name: 'Rohan M.' } }] } }, 'p_1'),
+    api.kernel.propose({ question: 'Rename Joaquin?', body_kind: 'rowset', body: { register: 'people', rows: [{ at: 'people#1', version: 1, patch: { name: 'Joaquin H.' } }] } }, 'p_1'),
   );
   const tasks = value<{ id: string }>(api.kernel.propose({ question: 'Two tasks?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ what: 'Ship again' }] } }, 'p_1'));
   assert.equal((await question(api, plain.id)).merge, undefined);
@@ -247,12 +247,12 @@ test('THE ORGANISATION IS NAMED ONLY TO SOMEBODY WHO READS THE ORGANISATIONS, as
   assert.deepEqual(
     q?.merge?.candidates.map((c) => [c.name, c.org]),
     [
-      ['Rohan Mehta', null],
-      ['rohanmehta', null],
-      ['jherrerastudio', null],
+      ['Joaquin Herrera', null],
+      ['joaquinherrera', null],
+      ['joaquinpell', null],
     ],
   );
-  assert.doesNotMatch(JSON.stringify(q), /Encore/u);
+  assert.doesNotMatch(JSON.stringify(q), /Lanternfish/u);
   sql.close();
 });
 

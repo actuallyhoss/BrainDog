@@ -145,7 +145,7 @@ export type RenderOptions = InlineOptions & {
    * the page's lead, `keep` (`EMPTY_KEEP`) where its author wrote `empty: keep`, or `null` for nothing at all. A READ.
    *
    * A CHIP, A `spec` ROW, A FIGURE CELL OR A STONE WHOSE VALUE IS MISSING IS NOT DRAWN (`unvalued`), in both drawers,
-   * for every reader: his project pages drew chips that were a name and a dash, and a row "Keeping it alive: tamsin.me"
+   * for every reader: his project pages drew chips that were a name and a dash, and a row "Keeping it alive: lanternfish.example"
    * over a dash (DIRECTION §35, "An empty or unused part is not drawn"). A block that has nothing left says this line
    * where there is one and is not drawn where there is none. Absent, which is a write-up, an export and the mirror,
    * there is never a line: the page's lead is the page's to name, never the renderer's.
@@ -513,7 +513,7 @@ function rows(b: Block, o: RenderOptions): string {
   if (b.kind === 'inputs') return inputs(b, o);
   /* A DAY THIS YEAR DROPS ITS YEAR, AND MONEY MOVING BY NOTHING IS NOT SAID (`rowsCell`). An empty value is still
      `MISSING`; a value said as nothing is a known nothing, and draws no mark at all. */
-  /* A ROW WITH NO VALUE IS NOT DRAWN (`drawnRows`): "Keeping it alive: tamsin.me" over a dash said a name and nothing.
+  /* A ROW WITH NO VALUE IS NOT DRAWN (`drawnRows`): "Keeping it alive: lanternfish.example" over a dash said a name and nothing.
      Where the block keeps its noughts, a blank value is `MISSING` again. */
   const body = drawnRows(b, o)
     .map(({ row: r }) => {
@@ -757,7 +757,7 @@ function table(b: Block, o: RenderOptions): string {
                 drawn.body.kind === 'missing'
                   ? `<span class="missing">${MISSING}</span>`
                   : drawn.body.kind === 'coded'
-                    ? `${escape(drawn.body.sign)}<span class="amount-code">${escape(drawn.body.currency)}</span> ${escape(drawn.body.rest)}`
+                    ? `<span class="amount">${escape(drawn.body.sign)}<span class="amount-code">${escape(drawn.body.currency)}</span> ${escape(drawn.body.rest.slice(0, figureEnd(drawn.body.rest)))}</span>${escape(drawn.body.rest.slice(figureEnd(drawn.body.rest)))}`
                     : escape(drawn.body.text);
               /* NO TONE GLYPH AND NO `data-tone` HERE, because a dialect table cannot carry either:
                  `comparisonPlan` builds its rows from cells and a block's tone belongs to the whole
@@ -923,13 +923,20 @@ function fitAttrs(value: string | null | undefined): string {
   return chars === null ? '' : ` data-fit="" style="--chars:${String(chars)}"`;
 }
 
+/**
+ * Where the figure after a code ends: at its first space. `.amount` holds the code and that figure on one line, and
+ * what follows (` · £24,800` in a figure in three currencies, or a note) stays outside it, free to wrap between its
+ * amounts as `stat.css` says a figure too long for its tile does.
+ */
+const figureEnd = (rest: string): number => rest.search(/\s|$/u);
+
 function amount(value: string, o: RenderOptions): string {
   const symbol = symbolFigure(value);
   if (symbol) return escape(symbol);
   const coded = leadingCode(value);
-  return coded
-    ? `${escape(coded.sign)}<span class="amount-code">${escape(coded.currency)}</span> ${renderInline(inline(coded.rest, o), o)}`
-    : renderInline(inline(value, o), o);
+  if (!coded) return renderInline(inline(value, o), o);
+  const end = figureEnd(coded.rest);
+  return `<span class="amount">${escape(coded.sign)}<span class="amount-code">${escape(coded.currency)}</span> ${renderInline(inline(coded.rest.slice(0, end), o), o)}</span>${renderInline(inline(coded.rest.slice(end), o), o)}`;
 }
 
 /**

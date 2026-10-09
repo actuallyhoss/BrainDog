@@ -37,6 +37,11 @@
  * read by `handoff.ts`'s `openHandoffs`, the read the briefing hands a new session its step from, so the Agents page
  * and the card count the same steps. With `about` filled, one project's.
  *
+ * AND WHERE THINGS APPLY (AGT-D01): `projects-unplaced`, the projects that name no repository and no folder, so no run
+ * can land in them, and `keys-unopenable`, the keys whose sealed value names a grant revoked or gone. The agents add-on
+ * cannot declare either, since it does not know another list's field names. AND `record.door`, the reader the add-on's
+ * figures over the agent door's signs read (AGT-B01).
+ *
  * `signs.ts` IS NOT IMPORTED, only its types. It reaches `flow.ts` and `digest.ts`, which import `metrics.ts`, which
  * imports this, and the loop that made broke the kernel's own load (`flow.ts` read a pattern before it was set). So the
  * signs now come in through the reader, `EvalContext.signs`, as the rates come in through `fx`; the kept readings are
@@ -44,8 +49,9 @@
  */
 
 import type { Result, Sql } from '@braindog/ports';
-import { ok } from '@braindog/ports';
+import { no, ok } from '@braindog/ports';
 
+import { DOOR_KEPT_DAYS, DOOR_WINDOW_DAYS, doorMarks } from './door.ts';
 import { openHandoffs, type OpenHandoff } from './handoff.ts';
 import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
 import { workingRuns } from './presence.ts';
@@ -149,13 +155,13 @@ export function openSteps(sql: Sql, nowMs: number, project?: string | null): Ope
   return clientsOf(sql, out.sort((a, b) => Date.parse(b.left_at) - Date.parse(a.left_at) || (a.spoken < b.spoken ? 1 : -1)));
 }
 
-/** Each step with its run's client, in one read over the runs that left them. */
+/** Each step with its run's client, in one read over the runs that left them, their ids bound as one array (AGT-B03). */
 function clientsOf(sql: Sql, steps: Omit<OpenStep, 'client'>[]): OpenStep[] {
   if (steps.length === 0) return [];
   const rows = sql.all<{ id: string; client: string | null }>(
-    `SELECT id, json_extract(fields, '$.client') AS client FROM entry WHERE register = ? AND id IN (${steps.map(() => '?').join(', ')})`,
+    `SELECT id, json_extract(fields, '$.client') AS client FROM entry WHERE register = ? AND id IN (SELECT value FROM json_each(?))`,
     SESSION,
-    ...steps.map((s) => s.id),
+    JSON.stringify(steps.map((s) => s.id)),
   );
   const client = new Map(rows.map((r) => [r.id, typeof r.client === 'string' && r.client !== '' ? r.client : null]));
   return steps.map((s) => ({ ...s, client: client.get(s.id) ?? null }));
@@ -247,6 +253,55 @@ const RATES_AGE_DAYS: MetricDecl = {
   format: 'days',
 };
 
+/* ── the agent door's signs (AGT-B01), and where things apply (AGT-D01) ─── */
+
+/**
+ * The source a figure over the agent door's own signs reads: what its marks add up to over the figure's window
+ * (`door.ts`), the count `doorSigns` answers. The figure names the one sign it is (`sign`). The agents add-on declares
+ * these, so no figure of this source is built in here.
+ */
+export const RECORD_DOOR = 'record.door';
+
+/** The door's signs a figure may name: the counts and times of `DoorSigns`, by their own names. */
+export const DOOR_FIGURE_SIGNS = ['hello', 'listed', 'called', 'calls', 'behind', 'internal', 'hookMedianMs', 'hookSlowestMs', 'resourceSlowestMs', 'cardWordsMost'] as const;
+export type DoorFigureSign = (typeof DOOR_FIGURE_SIGNS)[number];
+
+/** A figure over the door: which of its signs. */
+export type DoorDecl = MetricDecl & { sign: DoorFigureSign };
+
+/** The source of `projects-unplaced`: the list that declares `scopes:`, read by its two place fields. */
+export const RECORD_PLACES = 'record.places';
+
+/**
+ * Projects that name no repository and no folder. A run is placed in a project by where it works, so a project with
+ * neither is one no run can ever land in. Read off the list that declares `scopes:`, as the hourly rules read theirs.
+ */
+const PROJECTS_UNPLACED: MetricDecl = {
+  metric: 'projects-unplaced',
+  name: 'Projects with no repository or folder',
+  source: RECORD_PLACES,
+  value: { count: 'id' },
+  target: { lte: 0 },
+  window: '30d',
+  compare: 'none',
+  format: 'int',
+};
+
+/** The source of `keys-unopenable`: every list with a sealed field, against the vault's grants. */
+export const RECORD_KEYS = 'record.keys';
+
+/** Keys whose sealed value cannot be opened: the field names a grant that was revoked, or that is gone. */
+const KEYS_UNOPENABLE: MetricDecl = {
+  metric: 'keys-unopenable',
+  name: 'Keys whose sealed value cannot be opened',
+  source: RECORD_KEYS,
+  value: { count: 'id' },
+  target: { lte: 0 },
+  window: '30d',
+  compare: 'none',
+  format: 'int',
+};
+
 /** The figures the record answers by id when no declaration holds that id. */
 export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'questions-open': QUESTIONS_OPEN,
@@ -260,6 +315,8 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'green-days': GREEN_DAYS,
   'rates-age-days': RATES_AGE_DAYS,
   'handoffs-open': HANDOFFS,
+  'projects-unplaced': PROJECTS_UNPLACED,
+  'keys-unopenable': KEYS_UNOPENABLE,
 };
 
 /** The built-in figure called `id`, or `null`; never one `Object.prototype` lends. */
@@ -309,7 +366,7 @@ export function readSign(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'>, d
   const reading = (value: number | null, why: string): Result<Reading> => {
     const bound = decl.target && 'lte' in decl.target ? decl.target.lte : decl.target && 'gte' in decl.target ? decl.target.gte : null;
     const met = value === null || bound === null ? null : decl.target && 'lte' in decl.target ? value <= bound : value >= bound;
-    return ok({ value, unit: null, rows: value ?? 0, held: value ?? 0, delta: null, why, met, refusals: [] });
+    return ok({ value, unit: null, rows: value ?? 0, held: value === null ? 0 : 1, delta: null, why, met, refusals: [] });
   };
   switch (s.sign) {
     case 'arrivals-waiting':
@@ -365,7 +422,9 @@ export function readSign(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'>, d
 function judged(decl: MetricDecl, value: number | null, why: string): Result<Reading> {
   const t = decl.target;
   const met = value === null || t === undefined ? null : 'lte' in t ? value <= t.lte : value >= t.gte;
-  return ok({ value, unit: null, rows: value ?? 0, held: value ?? 0, delta: null, why, met, refusals: [] });
+  /* HELD IS WHETHER THERE WAS ANYTHING TO READ, NEVER THE VALUE (audit 38-39 #4): a tile hides a figure that held
+     nothing, so `held: value` hid `signs-red` at 0, the one reading Health exists to show. */
+  return ok({ value, unit: null, rows: value ?? 0, held: value === null ? 0 : 1, delta: null, why, met, refusals: [] });
 }
 
 /**
@@ -441,6 +500,98 @@ export function readRatesAge(ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz' | 
   if (newest === null) return judged(decl, null, 'no exchange rate on this record');
   const days = Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${newest}T00:00:00Z`)) / 86_400_000));
   return judged(decl, days, 'days since the newest exchange rate');
+}
+
+/**
+ * One of the agent door's signs over the figure's window, as `doorSigns` answers it (`door.ts`). The window is the
+ * figure's own, in days or weeks, and never longer than the 30 days the marks are kept.
+ *
+ * NOTHING, NEVER NOUGHT, with no session marked in the window: "no INTERNAL answers" over a door nobody reached would
+ * draw green over nothing. A time no session sent is nothing too, as `doorSigns` answers it. `behind` asks the build
+ * this host runs (`ctx.build`), and says nothing without it.
+ */
+export function readDoor(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'build'>, decl: MetricDecl): Result<Reading> {
+  const sign = (decl as DoorDecl).sign;
+  if (!(DOOR_FIGURE_SIGNS as readonly unknown[]).includes(sign))
+    return no<Reading>('VALUE_MALFORMED', `${decl.metric}: sign names which of the door's signs it reads, one of ${DOOR_FIGURE_SIGNS.join(', ')}.`, {
+      at: 'sign',
+      allowed: [...DOOR_FIGURE_SIGNS],
+    });
+  const nowMs = ctx.asOfMs ?? ctx.nowMs;
+  const said = /^(\d+)([dw])$/u.exec(decl.window ?? '');
+  const days = said ? Math.min(DOOR_KEPT_DAYS, Math.max(1, Number(said[1]) * (said[2] === 'w' ? 7 : 1))) : DOOR_WINDOW_DAYS;
+  const since = nowMs - days * 86_400_000;
+  const marked = sql.one<{ x: number }>('SELECT 1 AS x FROM door_mark WHERE at >= ? AND at <= ? LIMIT 1', new Date(since).toISOString(), new Date(nowMs).toISOString());
+  if (marked === undefined) return judged(decl, null, 'no session reached the agent door in this window');
+  const signs = doorMarks(sql, since, nowMs, typeof ctx.build === 'string' ? ctx.build : undefined);
+  const value = signs[sign];
+  return judged(decl, typeof value === 'number' ? value : null, sign === 'behind' && value === null ? 'the build this host runs is not known here' : signs.said);
+}
+
+/** The list that declares `scopes:`, with the place fields it names, or `null` with none. */
+function placesList(sql: Sql): { list: string; done: string[]; fields: string[] } | null {
+  const row = sql.one<{ body: string }>(
+    "SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body) AND json_extract(body, '$.scopes') IS NOT NULL ORDER BY id LIMIT 1",
+  );
+  if (row === undefined) return null;
+  const body = JSON.parse(row.body) as { id?: unknown; done?: unknown; scopes?: { repos?: unknown; folders?: unknown } };
+  if (typeof body.id !== 'string') return null;
+  const fields = [body.scopes?.repos, body.scopes?.folders].filter((f): f is string => typeof f === 'string' && f !== '');
+  const done = Array.isArray(body.done) ? body.done.filter((d): d is string => typeof d === 'string') : [];
+  return { list: body.id, done, fields };
+}
+
+/** A field read as empty: unset, blank, or a list with nothing in it. */
+const emptyField = (field: string): string =>
+  `coalesce(trim(CAST(json_extract(fields, '$."${field.replaceAll('"', '""').replaceAll("'", "''")}"') AS TEXT)), '') IN ('', '[]')`;
+
+/**
+ * `projects-unplaced`: the projects not deleted and not finished whose repositories and folders are both empty, on the
+ * list that declares `scopes:`. NOTHING, NEVER NOUGHT, on a record with no such list, or one that names no place field.
+ */
+export function readProjectsUnplaced(sql: Sql, _ctx: unknown, decl: MetricDecl): Result<Reading> {
+  const places = placesList(sql);
+  if (places === null) return judged(decl, null, 'no list on this record holds projects');
+  if (places.fields.length === 0) return judged(decl, null, 'the projects name no repository or folder field');
+  const n = sql.one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL
+       AND coalesce(state, '') NOT IN (SELECT value FROM json_each(?)) AND ${places.fields.map(emptyField).join(' AND ')}`,
+    places.list,
+    JSON.stringify(places.done),
+  )?.n;
+  return judged(decl, Number(n ?? 0), 'projects with no repository and no folder');
+}
+
+/**
+ * `keys-unopenable`: rows of any list with a sealed field, not deleted and not finished, whose sealed field names a
+ * grant that was revoked or is gone. An empty sealed field is not counted here: a key that holds no value says so in
+ * its own figure. NOTHING, NEVER NOUGHT, on a record where no list seals a value.
+ */
+export function readKeysUnopenable(sql: Sql, _ctx: unknown, decl: MetricDecl): Result<Reading> {
+  const lists = sql
+    .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body)")
+    .flatMap((r) => {
+      const body = JSON.parse(r.body) as { id?: unknown; done?: unknown; fields?: unknown };
+      const sealed = (Array.isArray(body.fields) ? (body.fields as { id?: unknown; type?: unknown; retired?: unknown }[]) : [])
+        .filter((f) => f?.type === 'secret' && f.retired !== true && typeof f.id === 'string')
+        .map((f) => f.id as string);
+      const done = Array.isArray(body.done) ? body.done.filter((d): d is string => typeof d === 'string') : [];
+      return typeof body.id === 'string' && sealed.length > 0 ? [{ list: body.id, sealed, done }] : [];
+    });
+  if (lists.length === 0) return judged(decl, null, 'no list on this record seals a value');
+  let n = 0;
+  for (const { list, sealed, done } of lists) {
+    const named = sealed.map((f) => `json_extract(fields, '$."${f.replaceAll('"', '""').replaceAll("'", "''")}"')`);
+    const broken = named.map((g) => `(coalesce(${g}, '') <> '' AND NOT EXISTS (SELECT 1 FROM grant WHERE id = ${g} AND revoked_at IS NULL))`);
+    n += Number(
+      sql.one<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND coalesce(state, '') NOT IN (SELECT value FROM json_each(?)) AND (${broken.join(' OR ')})`,
+        list,
+        JSON.stringify(done),
+      )?.n ?? 0,
+    );
+  }
+  return judged(decl, n, 'keys whose sealed value names a grant revoked or gone');
 }
 
 /** `ingest.ts`'s `UNVERIFIED`, the one reason an arrival nothing vouched for carries, written once more for the import rule above. */

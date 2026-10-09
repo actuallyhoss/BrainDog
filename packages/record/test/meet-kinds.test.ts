@@ -113,7 +113,7 @@ test('A KIND IS A PERSON OR AN ORGANISATION, and anything else is refused naming
 
 test('AN ORGANISATION ON A RECORD WITH NO ORGANISATIONS IS REGISTER_UNKNOWN, and nothing is written, a run included', async () => {
   const { api, sql } = await record({ orgs: false });
-  const r = refused(await api.meet({ name: 'Encore', kind: 'organisation', domain: 'encore.example', where: 'mail from encore.example' }, agent()));
+  const r = refused(await api.meet({ name: 'Lanternfish', kind: 'organisation', domain: 'lanternfish.example', where: 'mail from lanternfish.example' }, agent()));
   assert.equal(`${r.code} at ${r.at}`, 'REGISTER_UNKNOWN at kind');
   assert.equal(rows(sql), 0);
   sql.close();
@@ -123,12 +123,12 @@ test('AN ORGANISATION IS MET BY ITS OWN PARTS: it is with no organisation, and a
   const { api, sql } = await record();
   /* ORGS KEEPS A NAME, A KIND AND A DOMAIN, AND NO KEYS: so an address and a handle have nowhere to go. */
   for (const [part, said] of [
-    ['org', { org: 'Brightloom' }],
-    ['email', { email: 'hello@encore.example' }],
-    ['handle', { handle: 'github:encore' }],
-    ['keys', { keys: ['bank:encore'] }],
+    ['org', { org: 'Pellucid' }],
+    ['email', { email: 'hello@lanternfish.example' }],
+    ['handle', { handle: 'github:lanternfish' }],
+    ['keys', { keys: ['bank:lanternfish'] }],
   ] as const) {
-    const r = refused(await api.meet({ name: 'Encore', kind: 'organisation', where: 'mail from encore.example', ...said }, owner));
+    const r = refused(await api.meet({ name: 'Lanternfish', kind: 'organisation', where: 'mail from lanternfish.example', ...said }, owner));
     assert.equal(`${r.code} at ${r.at}`, `FIELD_UNKNOWN at ${part}`);
     assert.doesNotMatch(r.fix, /undefined/u);
   }
@@ -138,21 +138,21 @@ test('AN ORGANISATION IS MET BY ITS OWN PARTS: it is with no organisation, and a
 
 test('AN ORGANISATION IS GUARDED ON THE ORGANISATIONS, so a token held to People alone is refused it', async () => {
   const { api, sql } = await record();
-  assert.equal(refused(await api.meet({ name: 'Encore', kind: 'organisation', domain: 'encore.example', where: 'mail from encore.example' }, agent(['people']))).code, 'FORBIDDEN');
+  assert.equal(refused(await api.meet({ name: 'Lanternfish', kind: 'organisation', domain: 'lanternfish.example', where: 'mail from lanternfish.example' }, agent(['people']))).code, 'FORBIDDEN');
   assert.equal(rows(sql), 0);
   sql.close();
 });
 
 test('A PERSON MET WITH THEIR ORGANISATION REACHES THAT LIST TOO, and a People that keeps none is told to leave it out', async () => {
   const held = await record();
-  const r = refused(await held.api.meet({ name: 'Priya Raman', email: 'priya@encore.example', org: 'Encore', where: 'commit 4464966 in braindog' }, agent(['people'])));
+  const r = refused(await held.api.meet({ name: 'Teodor Vance', email: 'teo@lanternfish.example', org: 'Lanternfish', where: 'commit 4464966 in braindog' }, agent(['people'])));
   assert.equal(r.code, 'FORBIDDEN');
   assert.equal(rows(held.sql), 0);
   held.sql.close();
 
   const bare = await record({ org: false });
   for (const at of ['org', 'domain'] as const) {
-    const out = refused(await bare.api.meet({ name: 'Priya Raman', email: 'priya@encore.example', [at]: 'encore.example', where: 'commit 4464966 in braindog' }, owner));
+    const out = refused(await bare.api.meet({ name: 'Teodor Vance', email: 'teo@lanternfish.example', [at]: 'lanternfish.example', where: 'commit 4464966 in braindog' }, owner));
     assert.equal(`${out.code} at ${out.at}`, `FIELD_UNKNOWN at ${at}`);
     assert.match(out.fix, /names no org/u);
   }
@@ -161,7 +161,7 @@ test('A PERSON MET WITH THEIR ORGANISATION REACHES THAT LIST TOO, and a People t
 
 test('A ROLE GOES ONLY WHERE PEOPLE KEEPS ONE', async () => {
   const { api, sql } = await record({ role: false });
-  const r = refused(await api.meet({ name: 'Priya Raman', email: 'priya@encore.example', role: 'client', where: 'a call' }, owner));
+  const r = refused(await api.meet({ name: 'Teodor Vance', email: 'teo@lanternfish.example', role: 'client', where: 'a call' }, owner));
   assert.equal(`${r.code} at ${r.at}`, 'FIELD_UNKNOWN at role');
   assert.equal(rows(sql), 0);
   sql.close();

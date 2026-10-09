@@ -1,0 +1,6 @@
+{
+  "gate": "em-dash",
+  "rule": "a gate with a planted fault, beside one without",
+  "expect": "used as punctuation",
+  "findings": 1
+}

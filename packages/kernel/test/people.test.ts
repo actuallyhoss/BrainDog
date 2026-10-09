@@ -195,7 +195,7 @@ test('A NAME ALONE NEVER MAKES A PERSON: it is kept as a mention, however often 
   const { k, sql } = await record();
   const before = Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM entry WHERE register = 'people'")?.n);
   for (const where of ['commit 1 in braindog', 'commit 2 in braindog', 'commit 2 in braindog']) {
-    const met = value<Met>(k.meet({ name: 'Priya Raman', where }, AGENT));
+    const met = value<Met>(k.meet({ name: 'Samuel Achterberg', where }, AGENT));
     assert.deepEqual(met, { row: null, created: false, matched_by: 'none', mention: true, person: null, linked: false, merge: null });
   }
   assert.equal(Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM entry WHERE register = 'people'")?.n), before, 'a bare name made a row');
@@ -203,7 +203,7 @@ test('A NAME ALONE NEVER MAKES A PERSON: it is kept as a mention, however often 
   /* One line per source, so the same commit read twice is one mention. */
   assert.deepEqual(
     sql.all<{ name: string; source: string }>("SELECT name, source FROM entity_mention WHERE kind = 'person' ORDER BY source").map((m) => `${m.name} · ${m.source}`),
-    ['Priya Raman · commit 1 in braindog', 'Priya Raman · commit 2 in braindog'],
+    ['Samuel Achterberg · commit 1 in braindog', 'Samuel Achterberg · commit 2 in braindog'],
   );
   assert.equal(counts(sql).suggestions, 0);
   sql.close();
@@ -230,8 +230,8 @@ test('GMAIL’S DOTS AND +TAGS FOLD, and googlemail is gmail, so one mailbox is 
     assert.equal(met.matched_by, 'key');
   }
   /* Another host's dots are not folded: two colleagues stay two. */
-  value(k.create('people', { name: 'Bo Chen', email: 'bo.chen@encore.example' }, OWNER));
-  assert.equal(value<Met>(k.meet({ email: 'bochen@encore.example', name: 'Bob Chen', where: 'commit 1 in encore' }, AGENT)).created, true);
+  value(k.create('people', { name: 'Bo Chen', email: 'bo.chen@lanternfish.example' }, OWNER));
+  assert.equal(value<Met>(k.meet({ email: 'bochen@lanternfish.example', name: 'Bob Chen', where: 'commit 1 in lanternfish' }, AGENT)).created, true);
   assert.equal(k.count('people'), 3);
   sql.close();
 });
@@ -250,7 +250,7 @@ test('GITHUB’S PRIVATE ADDRESS IS THE LOGIN, kept as a handle and never as an 
 
 test('A SHARED INBOX OR A MACHINE NEVER MAKES A PERSON', async () => {
   const { k, sql } = await record();
-  for (const email of ['noreply@encore.example', 'Notifications <notifications@github.com>', 'billing@hetzner.com'])
+  for (const email of ['noreply@lanternfish.example', 'Notifications <notifications@github.com>', 'billing@hetzner.com'])
     assert.equal(value<Met>(k.meet({ email, where: 'mail' }, AGENT)).mention, true, `${email} met as a person`);
   assert.equal(k.count('people'), 0);
   sql.close();
@@ -301,14 +301,14 @@ test('A SHARED NAME OPENS ONE QUESTION, in names and evidence and never ids, and
 
 test('A CLUSTER IS ONE QUESTION: three spellings of one person are asked about together', async () => {
   const { k, sql } = await record();
-  value(k.create('people', { name: 'Rohan Mehta', email: 'sm@encore.example' }, OWNER));
-  value(k.create('people', { name: 'rohanmehta', handles: ['github:rohanmehta'] }, OWNER));
+  value(k.create('people', { name: 'Teodor Vance', email: 'tv@lanternfish.example' }, OWNER));
+  value(k.create('people', { name: 'teodorvance', handles: ['github:teodorvance'] }, OWNER));
 
-  const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohan@brightloom.com', where: 'commit 1 in encore' }, AGENT));
+  const met = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodor@pellucid.example', where: 'commit 1 in lanternfish' }, AGENT));
   assert.equal(met.created, true);
   assert.equal(counts(sql).suggestions, 1, 'one question per pair, not per cluster');
   const question = k.question(met.question!) ?? '';
-  assert.match(question, /^Are Rohan Mehta \(an address at encore\.xyz\), rohanmehta \(GitHub\) and Rohan Mehta \(BrainDog, met once, an address at brightloom\.com\) one person\?/);
+  assert.match(question, /^Are Teodor Vance \(an address at lanternfish\.example\), teodorvance \(GitHub\) and Teodor Vance \(BrainDog, met once, an address at pellucid\.example\) one person\?/);
   assert.doesNotMatch(question, /people#|#\d/);
   sql.close();
 });
@@ -379,22 +379,22 @@ test('A MERGE DRAWN BEFORE SOMEBODY EDITED THE ROW IS STALE, and accepting it ch
 test('THE STRONG RULES MERGE ON THEIR OWN, as one batch, and Undo puts both back and never merges them again', async () => {
   const { k, sql } = await record();
   /* Met in a commit first: a commit folds only into somebody met in commits alone (audit 19 H1). */
-  const first = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanm@encore.example', where: 'commit 0 in encore' }, AGENT)).row!;
+  const first = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodorv@lanternfish.example', where: 'commit 0 in lanternfish' }, AGENT)).row!;
 
-  const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanm@brightloom.com', where: 'commit 1 in encore' }, AGENT));
+  const met = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodorv@pellucid.example', where: 'commit 1 in lanternfish' }, AGENT));
   assert.equal(met.matched_by, 'strong');
   assert.equal(met.row?.id, first.id);
   assert.equal(met.created, false);
   assert.ok(met.undo, 'a merge the record made carried no undo');
   assert.equal(counts(sql).suggestions, 0, 'a certain merge was asked about');
   assert.equal(k.count('people'), 1);
-  assert.deepEqual(k.get(first.id)!.fields.handles, ['email:rohanm@brightloom.com']);
+  assert.deepEqual(k.get(first.id)!.fields.handles, ['email:teodorv@pellucid.example']);
   /* One batch: the fold's two lines and the kept row's. */
   assert.equal(Number(sql.one<{ n: number }>('SELECT count(DISTINCT target) AS n FROM event WHERE batch = ?', met.undo!)?.n), 2);
-  assert.equal(value<Met>(k.meet({ email: 'rohanm@brightloom.com', where: 'commit 2 in encore' }, AGENT)).row?.id, first.id);
+  assert.equal(value<Met>(k.meet({ email: 'teodorv@pellucid.example', where: 'commit 2 in lanternfish' }, AGENT)).row?.id, first.id);
 
   const undone = value<{ restored: string[] }>(k.undoMerge(met.undo!, OWNER));
-  assert.deepEqual(undone.restored, ['Rohan Mehta']);
+  assert.deepEqual(undone.restored, ['Teodor Vance']);
   /* THE LADDER IS TOLD: one line in `undone` for the merge's batch, by whoever met them, with the kinds it was. */
   const mark = sql.one<{ actor: string | null; kinds: string; undone_by: string }>('SELECT actor, kinds, undone_by FROM undone WHERE batch = ?', met.undo!);
   assert.match(mark?.actor ?? '', /^S\d+$/u, 'the run that met them, as its writes are signed');
@@ -404,11 +404,11 @@ test('THE STRONG RULES MERGE ON THEIR OWN, as one batch, and Undo puts both back
   assert.equal(k.count('people'), 2);
   const back = k.get('people#2')!;
   assert.equal(back.fields.merged_into, undefined);
-  assert.equal(back.fields.email, 'rohanm@brightloom.com');
+  assert.equal(back.fields.email, 'teodorv@pellucid.example');
   assert.equal(k.get(first.id)!.fields.handles, undefined, 'the kept row kept what the merge carried to it');
 
   /* Its address finds it again, and the pair is never merged again: an undo is a no. */
-  const again = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanm@brightloom.com', where: 'commit 3 in encore' }, AGENT));
+  const again = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodorv@pellucid.example', where: 'commit 3 in lanternfish' }, AGENT));
   assert.equal(again.row?.id, back.id);
   assert.equal(again.matched_by, 'key');
   assert.equal(again.merge, null);
@@ -426,15 +426,15 @@ test('A STRONG MERGE MOVES EVERY LINK TO THE KEPT ROW, so a list that refuses de
     body: { id: 'notes', name: 'Notes', title: 'heading', fields: [{ id: 'heading', type: 'text', required: true }, { id: 'about', type: 'list', of: 'ref', to: 'people' }] },
   };
   value(await k.install([PROJECTS, people, notes]));
-  const first = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanm@encore.example' }, OWNER));
-  const second = value<Entry>(k.create('people', { name: 'Rohan', email: 'rohanm@brightloom.com' }, OWNER));
-  const note = value<Entry>(k.create('notes', { heading: 'Call with Rohan', about: [second.id, first.id] }, OWNER));
+  const first = value<Entry>(k.create('people', { name: 'Teodor Vance', email: 'teodorv@lanternfish.example' }, OWNER));
+  const second = value<Entry>(k.create('people', { name: 'Teodor', email: 'teodorv@pellucid.example' }, OWNER));
+  const note = value<Entry>(k.create('notes', { heading: 'Call with Teodor', about: [second.id, first.id] }, OWNER));
   /* The second row learns its full name, and is folded the moment it is met. */
-  value(k.update('people', second.id, { name: 'Rohan Mehta' }, OWNER));
+  value(k.update('people', second.id, { name: 'Teodor Vance' }, OWNER));
 
-  const met = value<Met>(k.meet({ email: 'rohanm@brightloom.com', where: 'commit 1 in encore' }, AGENT));
+  const met = value<Met>(k.meet({ email: 'teodorv@pellucid.example', where: 'commit 1 in lanternfish' }, AGENT));
   assert.equal(met.matched_by, 'key');
-  assert.equal(met.row?.id, first.id, 'the strong rules did not fold the second Rohan');
+  assert.equal(met.row?.id, first.id, 'the strong rules did not fold the second Teodor');
   assert.deepEqual(k.get(note.id)!.fields.about, [first.id]);
 
   value(k.undoMerge(second.id, OWNER));
@@ -486,23 +486,23 @@ const KEYED_PEOPLE: Declaration = {
 
 test('AN ORGANISATION IS MET BY ITS DOMAIN, A SHARED INBOX IS ITS KEY, and a person is linked to it and never merged with it', async () => {
   const { k, sql } = await record([ORGS, KEYED_PEOPLE]);
-  const encore = value<Met>(k.meet({ email: '"Encore" <noreply@encore.example>', where: 'mail from encore.example' }, AGENT));
-  assert.equal(encore.row?.register, 'organisations');
-  assert.equal(encore.row?.name, 'Encore');
-  assert.equal(encore.created, true);
+  const lanternfish = value<Met>(k.meet({ email: '"Lanternfish" <noreply@lanternfish.example>', where: 'mail from lanternfish.example' }, AGENT));
+  assert.equal(lanternfish.row?.register, 'organisations');
+  assert.equal(lanternfish.row?.name, 'Lanternfish');
+  assert.equal(lanternfish.created, true);
   assert.equal(k.count('people'), 0, 'a no-reply sender became a person');
 
   /* Another inbox of the same domain is the same organisation. */
-  const billing = value<Met>(k.meet({ email: 'billing@encore.example', where: 'mail from encore.example' }, AGENT));
-  assert.equal(billing.row?.id, encore.row?.id);
+  const billing = value<Met>(k.meet({ email: 'billing@lanternfish.example', where: 'mail from lanternfish.example' }, AGENT));
+  assert.equal(billing.row?.id, lanternfish.row?.id);
   assert.equal(billing.matched_by, 'key');
   assert.equal(k.count('organisations'), 1);
 
-  /* A person at that domain is linked to it, and a person called Encore is still a person. */
-  const rohan = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohan@encore.example', where: 'commit 1 in encore' }, AGENT));
-  assert.equal(rohan.row?.register, 'people');
-  assert.equal(k.get(rohan.row!.id)!.fields.org, encore.row!.id);
-  const named = value<Met>(k.meet({ name: 'Encore', handle: 'github:encore', where: 'commit 2 in encore' }, AGENT));
+  /* A person at that domain is linked to it, and a person called Lanternfish is still a person. */
+  const teodor = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodor@lanternfish.example', where: 'commit 1 in lanternfish' }, AGENT));
+  assert.equal(teodor.row?.register, 'people');
+  assert.equal(k.get(teodor.row!.id)!.fields.org, lanternfish.row!.id);
+  const named = value<Met>(k.meet({ name: 'Lanternfish', handle: 'github:lanternfish', where: 'commit 2 in lanternfish' }, AGENT));
   assert.equal(named.row?.register, 'people');
   assert.equal(counts(sql).suggestions, 0, 'a person and an organisation were asked about as one');
 
@@ -523,7 +523,7 @@ test('A NOTIFICATION IS THE SERVICE’S, NOT THE NAME IT IS SIGNED WITH: GitHub 
   const gh = value<Met>(k.meet({ email: '"Ada Lovelace" <notifications@github.com>', where: 'mail from github.com' }, AGENT));
   assert.equal(gh.row?.register, 'organisations');
   assert.notEqual(gh.row?.name, 'Ada Lovelace');
-  assert.equal(value<Met>(k.meet({ email: '"Rohan (via Slack)" <notification@slack.com>', where: 'mail' }, AGENT)).row?.name, 'Slack');
+  assert.equal(value<Met>(k.meet({ email: '"Teodor (via Slack)" <notification@slack.com>', where: 'mail' }, AGENT)).row?.name, 'Slack');
   assert.equal(value<Met>(k.meet({ email: 'Stripe <receipts@stripe.com>', where: 'mail' }, AGENT)).row?.name, 'Stripe');
   sql.close();
 });
@@ -537,13 +537,13 @@ test('A STRONG MERGE THE RECORD REFUSES IS ASKED INSTEAD, and the meeting still 
     body: { id: 'desks', name: 'Desks', title: 'label', fields: [{ id: 'label', type: 'text', required: true }, { id: 'holder', type: 'ref', to: 'people', unique: true }] },
   };
   value(await k.install([PROJECTS, PEOPLE, desks]));
-  const first = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanm@encore.example' }, OWNER));
-  const second = value<Entry>(k.create('people', { name: 'Rohan', email: 'rohanm@brightloom.com' }, OWNER));
+  const first = value<Entry>(k.create('people', { name: 'Teodor Vance', email: 'teodorv@lanternfish.example' }, OWNER));
+  const second = value<Entry>(k.create('people', { name: 'Teodor', email: 'teodorv@pellucid.example' }, OWNER));
   value(k.create('desks', { label: 'One', holder: first.id }, OWNER));
   value(k.create('desks', { label: 'Two', holder: second.id }, OWNER));
-  value(k.update('people', second.id, { name: 'Rohan Mehta' }, OWNER));
+  value(k.update('people', second.id, { name: 'Teodor Vance' }, OWNER));
 
-  const met = value<Met>(k.meet({ email: 'rohanm@brightloom.com', where: 'commit 1 in encore' }, AGENT));
+  const met = value<Met>(k.meet({ email: 'teodorv@pellucid.example', where: 'commit 1 in lanternfish' }, AGENT));
   assert.equal(met.row?.id, second.id);
   assert.equal(met.matched_by, 'key');
   assert.ok(met.question, 'a merge the record refused was neither made nor asked');
@@ -558,7 +558,7 @@ test('WITH PEOPLE SWITCHED OFF, OR WITHOUT THE AGENTS PACK’S FIELDS, MEET REFU
   const off = await record([]);
   const before = counts(off.sql);
   assert.equal(said(off.k.meet({ name: 'Ada', email: 'ada@example.com', where: 'commit 4464966 in braindog' }, AGENT)), 'REGISTER_UNKNOWN at register');
-  assert.equal(said(off.k.meet({ kind: 'organisation', domain: 'encore.example', where: 'mail' }, AGENT)), 'REGISTER_UNKNOWN at kind');
+  assert.equal(said(off.k.meet({ kind: 'organisation', domain: 'lanternfish.example', where: 'mail' }, AGENT)), 'REGISTER_UNKNOWN at kind');
   assert.deepEqual(counts(off.sql), before, 'a refused meet wrote something, a run perhaps');
   off.sql.close();
 

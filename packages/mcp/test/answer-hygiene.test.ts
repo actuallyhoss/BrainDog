@@ -111,7 +111,14 @@ test('NO BRIEF ANSWER CARRIES A ROW ID, A PERSON OR TOKEN ID, OR A NULL, over ev
   await call('update', { spoken, patch: { state: 'doing' }, version });
   await call('update', { spoken, patch: { state: 'done' }, version });
   await call('log', { spoken, note: 'Every answer was read.' });
-  await call('understand', {});
+  /* WHAT THE RECORD WOULD LINK, A RESOURCE NOW (AGT-B05): its `said` is read with the same eyes as a tool's text. */
+  const understood = (await handle({ jsonrpc: '2.0', id: ++n, method: 'resources/read', params: { uri: 'braindog:understand' } }, api, { ...agent })) as Reply;
+  assert.ok('result' in understood, JSON.stringify(understood));
+  const plan = (understood.result as { contents: { text: string }[] }).contents[0]?.text ?? '';
+  for (const [pattern, what] of NEVER) {
+    const hit = pattern.exec(plan);
+    if (hit) found.push(`braindog:understand said ${what}, "${hit[0]}"`);
+  }
   await call('meet', { name: 'Ada Lovelace', where: 'commit 4464966 in kiln-type' });
   await call('propose', {
     question: 'Keep the brief answers?',

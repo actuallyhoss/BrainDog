@@ -31,13 +31,13 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 const line = (name: string, email: string, n: number) => [name, email, n.toString(16).padStart(40, '0'), '2026-10-01T10:00:00Z'].join('\x1f');
 
 test('A KEY IS THE KERNEL’S: every address is keyed as the record keys it, so a dotted GitHub login is never refused as malformed', () => {
-  const addresses = ['sam.avery+work@GoogleMail.com', 'sam.avery+work@encore.example', '49699333+Ada@users.noreply.github.com', 'ada@users.noreply.github.com', '12+a.b@users.noreply.github.com'];
+  const addresses = ['M.A.Ra+work@GoogleMail.com', 'm.a.ra+work@lanternfish.example', '49699333+Ada@users.noreply.github.com', 'ada@users.noreply.github.com', '12+a.b@users.noreply.github.com'];
   const authored = authoredIn(addresses.map((a, i) => line(`Person ${String(i)}`, a, i + 1)).join('\n'), NOBODY);
   assert.deepEqual(
     authored.map((a) => a.key),
     addresses.map((a) => keyOf('email', a)),
   );
-  assert.deepEqual(authored.slice(0, 3).map((a) => a.key), ['email:sam.avery@example.com', 'email:sam.avery+work@encore.example', 'github:ada']);
+  assert.deepEqual(authored.slice(0, 3).map((a) => a.key), ['email:mara@gmail.com', 'email:m.a.ra+work@lanternfish.example', 'github:ada']);
   /* No address, no author. */
   assert.deepEqual(authoredIn([line('Nobody', 'no address', 1), line('Empty', '', 2)].join('\n'), NOBODY), []);
 });
@@ -52,8 +52,8 @@ test('MACHINES ARE NOT PEOPLE: bots, CI users, a team’s jobs at an organisatio
     ['Acme CI', 'ci@acme.example'],
     ['GitLab Runner', 'gitlab-runner@acme.example'],
     ['Jenkins', 'jenkins@acme.example'],
-    ['Jenkins Schema Sync', 'jenkins@brightloomit.example'],
-    ['Brightloom Repos', 'repos@brightloomit.example'],
+    ['Jenkins Schema Sync', 'jenkins@pellucidit.example'],
+    ['Pellucid Repos', 'repos@pellucidit.example'],
     ['Docs Mirror', 'mirror@acme.example'],
     ['Ubuntu', 'ubuntu@ip-172-31-0-1.eu-west-1.compute.internal'],
     ['ec2-user', 'ec2-user@ip-10-0-0-1.example'],
@@ -67,12 +67,12 @@ test('MACHINES ARE NOT PEOPLE: bots, CI users, a team’s jobs at an organisatio
   ])
     assert.equal(isMachine(name!, email!), true, `${name!} <${email!}>`);
   for (const [name, email] of [
-    ['Rohan Mehta', 'rohan@encore.example'],
+    ['Joaquin Herrera', 'joaquin@lanternfish.example'],
     ['Ada Sync', 'ada.sync@gmail.com'],
     ['Sarah Jenkins', 'sarah.jenkins@acme.example'],
     ['Ada Talbot', 'talbot@acme.example'],
     ['Abbot Kinney', 'abbot@acme.example'],
-    ['Madan Neriyanur', 'madann@users.noreply.github.com'],
+    ['Ines Duarte', 'inesd@users.noreply.github.com'],
   ])
     assert.equal(isMachine(name!, email!), false, `${name!} <${email!}>`);
 });
@@ -143,26 +143,26 @@ test('MACHINES ARE NOT PEOPLE: a surname that is also a CI word is a person', ()
 
 test('AUTHORS GROUP BY KEY: one person under two spellings of one address is one, and the owner is left out by every key and every name he goes by', () => {
   const log = [
-    ['Rohan Mehta', 'Rohan@Encore.example', 'a'.repeat(40), '2026-10-01T10:00:00Z'],
-    ['rohanm', 'rohan@encore.example', 'b'.repeat(40), '2026-09-30T10:00:00Z'],
-    ['Sam', 'sam@avery.example', 'c'.repeat(40), '2026-09-29T10:00:00Z'],
-    ['Madan', '12+madann@users.noreply.github.com', 'd'.repeat(40), '2026-09-28T10:00:00Z'],
-    ['Jenkins Schema Sync', 'jenkins@encore.example', 'e'.repeat(40), '2026-09-27T10:00:00Z'],
+    ['Joaquin Herrera', 'Joaquin@Lanternfish.example', 'a'.repeat(40), '2026-10-01T10:00:00Z'],
+    ['joaquinh', 'joaquin@lanternfish.example', 'b'.repeat(40), '2026-09-30T10:00:00Z'],
+    ['Lind', 'lind@lindqvist.example', 'c'.repeat(40), '2026-09-29T10:00:00Z'],
+    ['Ines', '12+inesd@users.noreply.github.com', 'd'.repeat(40), '2026-09-28T10:00:00Z'],
+    ['Jenkins Schema Sync', 'jenkins@lanternfish.example', 'e'.repeat(40), '2026-09-27T10:00:00Z'],
     /* His alias, at an address his row does not hold yet. */
-    ['sam', 'ahmed@oldjob.example', 'f'.repeat(40), '2026-09-26T10:00:00Z'],
-    ['Ahmed  Avery', 'a.avery@contractor.example', '1'.repeat(40), '2026-09-25T10:00:00Z'],
+    ['lind', 'mara@oldjob.example', 'f'.repeat(40), '2026-09-26T10:00:00Z'],
+    ['Mara  Lindqvist', 'm.lindqvist@contractor.example', '1'.repeat(40), '2026-09-25T10:00:00Z'],
   ]
     .map((l) => l.join('\x1f'))
     .join('\n');
-  const own: Owner = { keys: new Set(['email:sam@avery.example']), names: new Set(['ahmed avery', 'sam']) };
-  const repo: LocalRepo = { dir: '/work/encore', name: 'encore', remote: 'github.com/brightloom/encore' };
-  const project = { name: 'Encore', repos: ['github.com/brightloom/encore'], folders: [] };
+  const own: Owner = { keys: new Set(['email:lind@lindqvist.example']), names: new Set(['mara lindqvist', 'lind']) };
+  const repo: LocalRepo = { dir: '/work/lanternfish', name: 'lanternfish', remote: 'github.com/pellucid/lanternfish' };
+  const project = { name: 'Lanternfish', repos: ['github.com/pellucid/lanternfish'], folders: [] };
   const clusters = clustersOf([{ repo, project, authored: authoredIn(log, own) }]);
   assert.deepEqual(
     clusters.map((c) => [[...c.keys], c.commits, [...c.names.keys()], [...c.projects.keys()]]),
     [
-      [['email:rohan@encore.example'], 2, ['Rohan Mehta', 'rohanm'], ['Encore']],
-      [['github:madann'], 1, ['Madan'], ['Encore']],
+      [['email:joaquin@lanternfish.example'], 2, ['Joaquin Herrera', 'joaquinh'], ['Lanternfish']],
+      [['github:inesd'], 1, ['Ines'], ['Lanternfish']],
     ],
   );
 });
@@ -170,29 +170,29 @@ test('AUTHORS GROUP BY KEY: one person under two spellings of one address is one
 test('ONLY A REPOSITORY A PROJECT LISTS IS READ: by its remote, or by its very folder, never by a name or a folder it sits under', () => {
   const projects = [
     { name: 'BrainDog', repos: ['https://github.com/actuallyhoss/BrainDog.git'], folders: [] },
-    { name: 'Nook', repos: [], folders: ['C:/Repos/nook', '/Users/sam/Developer/nook'] },
-    { name: 'Fernly', repos: ['inkwell'], folders: [] },
-    { name: 'Developer', repos: [], folders: ['/Users/sam/Developer'] },
+    { name: 'Quietcart', repos: [], folders: ['C:/Repos/quietcart', '/Users/mara/Developer/quietcart'] },
+    { name: 'Oxbow', repos: ['oxbow-tiles'], folders: [] },
+    { name: 'Developer', repos: [], folders: ['/Users/mara/Developer'] },
   ];
   const at = (dir: string, remote: string | null): LocalRepo => ({ dir, name: dir.split('/').at(-1)!, remote });
   assert.equal(listedBy(projects, at('/x/braindog', 'github.com/actuallyhoss/braindog'))?.name, 'BrainDog');
   assert.equal(listedBy(projects, at('/x/braindog', 'git@github.com:actuallyhoss/braindog.git'))?.name, 'BrainDog');
-  assert.equal(listedBy(projects, at('/Users/sam/Developer/nook/', null))?.name, 'Nook');
-  assert.equal(listedBy(projects, at('/x/inkwell', null)), null, 'a name a project lists is not a listing');
-  assert.equal(listedBy(projects, at('/Users/sam/Developer/linux', 'github.com/torvalds/linux')), null, 'a clone under a project’s folder is not the project’s');
+  assert.equal(listedBy(projects, at('/Users/mara/Developer/quietcart/', null))?.name, 'Quietcart');
+  assert.equal(listedBy(projects, at('/x/oxbow-tiles', null)), null, 'a name a project lists is not a listing');
+  assert.equal(listedBy(projects, at('/Users/mara/Developer/linux', 'github.com/torvalds/linux')), null, 'a clone under a project’s folder is not the project’s');
   assert.equal(listedBy(projects, at('/x/elsewhere', 'github.com/c/elsewhere')), null);
 });
 
 test('A BARE NAME A PROJECT LISTS IS ONLY A CANDIDATE: by its remote’s name, its folder’s, or its folder with the one above, and only with the owner’s own commits', () => {
   const projects = [
-    { name: 'Bake', repos: ['crumb-bot'], folders: [] },
-    { name: 'Buffs', repos: ['buffs-drafts'], folders: [] },
-    { name: 'Encore', repos: ['encore'], folders: [] },
+    { name: 'Tide', repos: ['tide-bot'], folders: [] },
+    { name: 'Gulls', repos: ['gulls-drafts'], folders: [] },
+    { name: 'Lanternfish', repos: ['lanternfish'], folders: [] },
     { name: 'Kiln', repos: ['github.com/acme/kiln'], folders: [] },
   ];
-  assert.equal(namedBy(projects, { dir: '/dev/bake/bot', name: 'bot', remote: 'github.com/bakegame/bot' })?.name, 'Bake');
-  assert.equal(namedBy(projects, { dir: '/dev/nhl-bot', name: 'nhl-bot', remote: 'github.com/ada/PuckDrafts' })?.name, 'Puck');
-  assert.equal(namedBy(projects, { dir: '/dev/encore/app', name: 'app', remote: 'github.com/brightloom/Encore' })?.name, 'Encore');
+  assert.equal(namedBy(projects, { dir: '/dev/tide/bot', name: 'bot', remote: 'github.com/tidegame/bot' })?.name, 'Tide');
+  assert.equal(namedBy(projects, { dir: '/dev/scores-bot', name: 'scores-bot', remote: 'github.com/ada/GullsDrafts' })?.name, 'Gulls');
+  assert.equal(namedBy(projects, { dir: '/dev/lanternfish/app', name: 'app', remote: 'github.com/pellucid/Lanternfish' })?.name, 'Lanternfish');
   assert.equal(namedBy(projects, { dir: '/dev/kiln', name: 'kiln', remote: null }), null, 'a remote a project lists is never matched by its name');
   assert.equal(namedBy(projects, { dir: '/dev/linux', name: 'linux', remote: 'github.com/torvalds/linux' }), null);
 
@@ -202,12 +202,12 @@ test('A BARE NAME A PROJECT LISTS IS ONLY A CANDIDATE: by its remote’s name, i
 });
 
 test('THE OWNER IS EVERY ADDRESS HE SIGNED WITH UNDER A NAME OF HIS, so his commits as another name from that address are his too', () => {
-  const own = ownerIn({ keys: new Set(), names: new Set(['sam']) }, [
-    [line('Sam', 'me@ahmed.example', 1), line('Sam Avery', 'me@ahmed.example', 2), line('Sam', 'noreply@acme.example', 3)].join('\n'),
+  const own = ownerIn({ keys: new Set(), names: new Set(['lind']) }, [
+    [line('Lind', 'me@mara.example', 1), line('Mara Lindqvist', 'me@mara.example', 2), line('Lind', 'noreply@acme.example', 3)].join('\n'),
     null,
   ]);
-  assert.deepEqual([...own.keys], ['email:me@ahmed.example'], 'a machine signing with his name does not make its address his');
-  assert.deepEqual(authoredIn(line('Sam Avery', 'me@ahmed.example', 2), own), []);
+  assert.deepEqual([...own.keys], ['email:me@mara.example'], 'a machine signing with his name does not make its address his');
+  assert.deepEqual(authoredIn(line('Mara Lindqvist', 'me@mara.example', 2), own), []);
 });
 
 test('ONE COMMIT IS COUNTED ONCE across checkouts of one repository, and a dry run says each project’s people, what folded, and who it leaves to the record', () => {
@@ -294,8 +294,8 @@ type Row = { id: string; seq: number; version: number; fields: Record<string, un
 /** A record holding one People list that plays `meets:`, with the owner's own row and one colleague in it. */
 function peopleDoor(o: { meet?: boolean } = {}) {
   const rows: Row[] = [
-    { id: 'e_self', seq: 1, version: 4, fields: { name: 'Sam Avery', aliases: ['Sam'], self: true, email: 'sam@avery.example', tags: [] } },
-    { id: 'e_sudip', seq: 2, version: 1, fields: { name: 'Priya Raman', email: 'priya@encore.example', tags: [] } },
+    { id: 'e_self', seq: 1, version: 4, fields: { name: 'Mara Lindqvist', aliases: ['Lind'], self: true, email: 'lind@lindqvist.example', tags: [] } },
+    { id: 'e_teo', seq: 2, version: 1, fields: { name: 'Teodor Vance', email: 'teo@lanternfish.example', tags: [] } },
   ];
   const calls: { method: string; args: Record<string, unknown> }[] = [];
   let seq = rows.length;
@@ -341,11 +341,11 @@ function peopleDoor(o: { meet?: boolean } = {}) {
 const person = (key: string, fields: Record<string, unknown>): PlannedRow => ({ register: 'people', key: `hb:person:${key}`, label: String(fields.name), fields });
 const planOf = (rows: PlannedRow[]): Plan => ({ key: 'hb:', taken: null, rev: null, rows, asks: [], polls: [], skipped: [], changed: [] });
 
-test('AN IMPORTED PERSON GOES THROUGH RESOLUTION: “Sam” folds into the owner’s own row, an address already known lands on its person, a new address is met, and a name alone is created', async () => {
+test('AN IMPORTED PERSON GOES THROUGH RESOLUTION: “Lind” folds into the owner’s own row, an address already known lands on its person, a new address is met, and a name alone is created', async () => {
   const { door, rows, calls } = peopleDoor();
   const plan = planOf([
-    person('1', { name: 'Sam', role: 'owner' }),
-    person('2', { name: 'Priya B', email: 'PRIYA@encore.example', role: 'colleague' }),
+    person('1', { name: 'Lind', role: 'owner' }),
+    person('2', { name: 'Teodor V', email: 'TEO@lanternfish.example', role: 'colleague' }),
     person('3', { name: 'Ada Lovelace', email: 'ada@example.com' }),
     person('4', { name: 'Bob' }),
   ]);
@@ -355,8 +355,8 @@ test('AN IMPORTED PERSON GOES THROUGH RESOLUTION: “Sam” folds into the owner
 
   const self = rows.find((r) => r.id === 'e_self')!;
   /* His own row keeps its name and gains the import's key and what it lacked. */
-  assert.deepEqual(self.fields, { name: 'Sam Avery', aliases: ['Sam'], self: true, email: 'sam@avery.example', tags: ['hb:person:1'], role: 'owner' });
-  assert.deepEqual(rows.find((r) => r.id === 'e_sudip')!.fields, { name: 'Priya Raman', email: 'priya@encore.example', tags: ['hb:person:2'], role: 'colleague' });
+  assert.deepEqual(self.fields, { name: 'Mara Lindqvist', aliases: ['Lind'], self: true, email: 'lind@lindqvist.example', tags: ['hb:person:1'], role: 'owner' });
+  assert.deepEqual(rows.find((r) => r.id === 'e_teo')!.fields, { name: 'Teodor Vance', email: 'teo@lanternfish.example', tags: ['hb:person:2'], role: 'colleague' });
   /* Only the person with an address the record had not seen was met; the one with a name alone was created. */
   assert.deepEqual(
     calls.filter((c) => c.method === 'meet').map((c) => c.args),
@@ -371,12 +371,12 @@ test('AN IMPORTED PERSON GOES THROUGH RESOLUTION: “Sam” folds into the owner
   const again = await applyPlan(plan, door, { dryRun: false });
   assert.deepEqual(again.outcomes, { 'hb:person:1': 'unchanged', 'hb:person:2': 'unchanged', 'hb:person:3': 'unchanged', 'hb:person:4': 'unchanged' });
   assert.equal(calls.length, 0);
-  assert.equal(self.fields.name, 'Sam Avery');
+  assert.equal(self.fields.name, 'Mara Lindqvist');
 });
 
 test('A DRY RUN FOLDS ON PAPER ONLY, and a door with no meet still folds by key and by the owner’s names', async () => {
   const { door, calls, rows } = peopleDoor({ meet: false });
-  const plan = planOf([person('1', { name: 'sam' }), person('3', { name: 'Ada Lovelace', email: 'ada@example.com' })]);
+  const plan = planOf([person('1', { name: 'lind' }), person('3', { name: 'Ada Lovelace', email: 'ada@example.com' })]);
   const dry = await applyPlan(plan, door, { dryRun: true });
   assert.deepEqual(dry.outcomes, { 'hb:person:1': 'updated', 'hb:person:3': 'added' });
   assert.equal(calls.length, 0);
@@ -396,7 +396,7 @@ test('A MEET THAT LANDS IN ANOTHER LIST, or on a row the import did not read, ne
     const report = await applyPlan(planOf([person('3', { name: 'Ada Lovelace', email: 'Ada.Lovelace@gmail.com' })]), door, { dryRun: false });
     assert.equal(calls.find((c) => c.method === 'meet')?.args.email, 'Ada.Lovelace@gmail.com', 'the address was sent folded');
     assert.deepEqual(calls.filter((c) => c.method === 'update'), [], 'a row the meet did not make here was patched');
-    assert.deepEqual(rows.find((r) => r.id === 'e_sudip')!.fields.name, 'Priya Raman');
+    assert.deepEqual(rows.find((r) => r.id === 'e_teo')!.fields.name, 'Teodor Vance');
     assert.equal(report.outcomes['hb:person:3'], 'added');
   }
 });
@@ -472,7 +472,7 @@ async function harvestHost(t: { after: (fn: () => Promise<void>) => void }, glaz
                 ).map((fields, i) => ({ id: `e_p${String(i)}`, seq: i + 1, version: 1, fields })),
                 cursor: null,
               }
-            : { rows: [{ id: 'e_self', seq: 1, version: 1, fields: { name: 'Sam Avery', aliases: ['Sam'], self: true, keys: ['email:sam@avery.example'] } }], cursor: null },
+            : { rows: [{ id: 'e_self', seq: 1, version: 1, fields: { name: 'Mara Lindqvist', aliases: ['Lind'], self: true, keys: ['email:lind@lindqvist.example'] } }], cursor: null },
         );
       if (method === 'history') {
         const i = Number(body.seq) - 1;
@@ -506,10 +506,10 @@ test('BRAINDOG PEOPLE HARVEST reads only the repositories a project lists, meets
   const commitLoose = repository(join(top, 'loose', 'sketch'));
   commitGlaze('Grace Hopper <grace@navy.example>');
   commitGlaze('Grace H <Grace@Navy.example>');
-  commitGlaze('Sam <sam@avery.example>');
+  commitGlaze('Lind <lind@lindqvist.example>');
   /* His alias, from an address his row does not hold. */
-  commitGlaze('Sam <sam@oldjob.example>');
-  commitGlaze('Sam <sam@oldjob.example>');
+  commitGlaze('Lind <lind@oldjob.example>');
+  commitGlaze('Lind <lind@oldjob.example>');
   commitGlaze();
   commitGlaze('dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>');
   commitGlaze('Renovate Bot <bot@renovateapp.com>');
@@ -615,7 +615,7 @@ test('BRAINDOG PEOPLE HARVEST ON AN OLDER RECORD reads a folder kept among a pro
   const top = join(scratch, 'older');
   const commitGlaze = repository(join(top, 'glaze'));
   const commitKiln = repository(join(top, 'kiln'));
-  const commitClone = repository(join(top, 'oss', 'inkwell'));
+  const commitClone = repository(join(top, 'oss', 'oxbow-tiles'));
   commitGlaze('Grace Hopper <grace@navy.example>');
   commitGlaze('Grace Hopper <grace@navy.example>');
   /* The owner signs as Owner, this machine's git name, from an address his row does not hold. */
@@ -627,7 +627,7 @@ test('BRAINDOG PEOPLE HARVEST ON AN OLDER RECORD reads a folder kept among a pro
   const host = await harvestHost(t, '', [
     { name: 'Glaze', repos: [join(top, 'glaze')], folders: [] },
     { name: 'Kiln', repos: ['kiln'], folders: [] },
-    { name: 'Fernly', repos: ['inkwell'], folders: [] },
+    { name: 'Oxbow', repos: ['oxbow-tiles'], folders: [] },
   ]);
   const out: string[] = [];
   const said: string[] = [];
@@ -649,7 +649,7 @@ test('BRAINDOG PEOPLE HARVEST ON AN OLDER RECORD reads a folder kept among a pro
     'Kiln: 1 person since 15 January 2026',
     '  Linus, 2 commits',
     '',
-    'Not read: inkwell, which a project names but you never committed to.',
+    'Not read: oxbow-tiles, which a project names but you never committed to.',
   ]);
   assert.equal(host.seen.filter((s) => s.method === 'meet').length, 0);
 });

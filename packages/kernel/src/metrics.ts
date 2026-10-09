@@ -28,7 +28,26 @@ import { fixOf, no, ok } from '@braindog/ports';
 import { KERNEL_FIELDS, compile, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
-import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_RATES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING, readHandoffsOpen, readOpenQuestions, readRatesAge, readRunsWorking, readSign, readVitals } from './built-in-figures.ts';
+import {
+  GOVERNANCE_OPEN,
+  HANDOFFS_OPEN,
+  RECORD_DOOR,
+  RECORD_KEYS,
+  RECORD_PLACES,
+  RECORD_RATES,
+  RECORD_SIGNS,
+  RECORD_VITALS,
+  SESSIONS_WORKING,
+  readDoor,
+  readHandoffsOpen,
+  readKeysUnopenable,
+  readOpenQuestions,
+  readProjectsUnplaced,
+  readRatesAge,
+  readRunsWorking,
+  readSign,
+  readVitals,
+} from './built-in-figures.ts';
 import { isCurrencyCode } from './coerce.ts';
 import type { Leg } from './forecast.ts';
 import type { VitalSign } from './signs.ts';
@@ -752,6 +771,11 @@ export type EvalContext = {
    * Absent, `signs-red` says nothing.
    */
   signs?: (() => readonly Pick<VitalSign, 'sign' | 'state'>[]) | undefined;
+  /**
+   * The build this host runs, for the door's `behind` (`record.door`): a session whose marks named another is behind.
+   * The kernel does not know its host's build, so the host hands it in. Absent, `behind` says nothing.
+   */
+  build?: string | null | undefined;
 };
 
 /** What a money sum needs to add across currencies: the currency, the rates, today, and the field that dates a row. */
@@ -994,6 +1018,37 @@ function resolveRelative(
   return { predicate: walk(where), bad };
 }
 
+/** A reader of a source no list holds: the record's database, the read's context, and the figure as declared. */
+export type SourceReader = (sql: Sql, ctx: EvalContext, decl: MetricDecl) => Result<Reading>;
+
+/**
+ * THE SOURCES THAT ARE NO LIST'S, BY THEIR WORD, each with its reader (`built-in-figures.ts`). A later source is one line
+ * here, and `evaluateMetric` asks this before it reads a list.
+ *
+ * `governance.open`: the open questions, which are not rows of a list; `questions-open:<what>` comes with its `about`
+ * filled and counts that one thing's. `record.signs`: what arrives and what runs (REC-A01). `sessions.working`: how many
+ * agents are working now, by the one clock (`presence.ts`). `handoffs.open`: the steps left for the next run.
+ * `record.vitals`: `signs-red` and `green-days` (PRF-A05). `record.rates`: how old the newest rate is (REC-B02).
+ * `record.door`: the agent door's own signs (AGT-B01). `record.places`: projects with no repository or folder, and
+ * `record.keys`: keys whose sealed value cannot be opened (AGT-D01). Each answers no value, never nought, with nothing
+ * to read.
+ *
+ * BUILT ON THE FIRST READ, NOT AS THE FILE LOADS: `built-in-figures.ts` reaches back here through `handoff.ts` and the
+ * rest, so a table built at load could meet its words before they were set, and break the kernel's own load.
+ */
+let readers: Readonly<Record<string, SourceReader>> | null = null;
+export const sourceReaders = (): Readonly<Record<string, SourceReader>> => (readers ??= {
+  [GOVERNANCE_OPEN]: readOpenQuestions,
+  [RECORD_SIGNS]: readSign,
+  [SESSIONS_WORKING]: (sql, ctx) => readRunsWorking(sql, ctx),
+  [HANDOFFS_OPEN]: readHandoffsOpen,
+  [RECORD_VITALS]: readVitals,
+  [RECORD_RATES]: (_sql, ctx, decl) => readRatesAge(ctx, decl),
+  [RECORD_DOOR]: readDoor,
+  [RECORD_PLACES]: readProjectsUnplaced,
+  [RECORD_KEYS]: readKeysUnopenable,
+});
+
 /**
  * Read one metric.
  *
@@ -1001,20 +1056,10 @@ function resolveRelative(
  * with it fixed one at a time is three round trips for whoever is writing it.
  */
 export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading> {
-  /* THE OPEN QUESTIONS ARE NOT ROWS OF A LIST, so the built-in figure over them is counted on its own
-     (`built-in-figures.ts`) and every caller of this reads it as it reads any other. `questions-open:<what>` comes here
-     with its `about` filled, and counts that one thing's. */
-  if (decl.source === GOVERNANCE_OPEN) return readOpenQuestions(sql, ctx, decl);
-  /* AND THE RECORD'S OWN SIGNS (REC-A01), which read what arrives and what runs, and answer no value, never nought, where
-     there is nothing to measure. */
-  if (decl.source === RECORD_SIGNS) return readSign(sql, ctx, decl);
-  /* AND HOW MANY AGENTS ARE WORKING NOW, by the one clock (`presence.ts`). */
-  if (decl.source === SESSIONS_WORKING) return readRunsWorking(sql, ctx);
-  if (decl.source === HANDOFFS_OPEN) return readHandoffsOpen(sql, ctx, decl);
-  /* AND THE RECORD'S HEALTH OVER ITS VITAL SIGNS, `signs-red` and `green-days` (PRF-A05), and how old its newest
-     exchange rate is, `rates-age-days` (REC-B02). Each answers no value, never nought, with nothing to read. */
-  if (decl.source === RECORD_VITALS) return readVitals(sql, ctx, decl);
-  if (decl.source === RECORD_RATES) return readRatesAge(ctx, decl);
+  /* A SOURCE THAT IS NO LIST'S IS READ BY ITS OWN READER, by its word (`sourceReaders`). */
+  const table = sourceReaders();
+  const reader = Object.hasOwn(table, decl.source) ? table[decl.source]! : null;
+  if (reader) return reader(sql, ctx, decl);
   const refusals: Refusal[] = [];
   const at = (code: string, fix: string, key?: string): void => {
     refusals.push({ code, fix: `${decl.metric}: ${fix}`, ...(key === undefined ? {} : { at: key }) });
@@ -1056,7 +1101,14 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   }
 
   const register = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
-  if (!register) at('SOURCE_UNKNOWN', `${decl.source} is not a register this build reads`, 'source');
+  /* A WORD NO READER HOLDS IS REFUSED BY NAME, with the words this build does read, so `record.dor` is told it is not a
+     source and which ones are, not that it is no register. */
+  if (!register)
+    at(
+      'SOURCE_UNKNOWN',
+      `${decl.source} is not a source this build reads. It reads register.<list>, series.<figure>, or one of ${Object.keys(sourceReaders()).join(', ')}`,
+      'source',
+    );
   const schema = register ? ctx.schemaOf(register) : null;
   if (register && !schema) at('REGISTER_UNKNOWN', `there is no register called ${register}`, 'source');
 
@@ -1334,8 +1386,6 @@ export const wordsOf = (id: string): string => {
 /** What one row a grouping points at says of itself: its title, and the currency it says it is kept in. */
 export type Pointed = { title: string | null; currency: string | null };
 
-/** How many ids one read of the rows a grouping points at names, so a figure over many links asks a page at a time. */
-const POINTED_READ = 500;
 
 /** A field id as a declaration may name one: the grammar `jsonPath` holds, asked first so a list's body cannot throw. */
 const FIELD_ID = /^[a-z][a-z0-9_]{0,31}$/u;
@@ -1354,7 +1404,7 @@ const NOT_A_NAME: ReadonlySet<unknown> = new Set(['ref', 'money', 'quantity', 'f
  * figure about the row is read in it (`groupsOf`, `scopeCurrency`, `readRolled`) rather than converted into the home
  * currency: Quartz says USD, and its part of Cash now by book was drawn in pounds Egyptian.
  *
- * READ FROM THE DECLARATION, because a context carries no list's title field, and one query a page of ids. A deleted row
+ * READ FROM THE DECLARATION, because a context carries no list's title field, and one query for every id. A deleted row
  * still names the rows that point at it, as `titleOfRow` in `index.ts` names one; a title field declared `secret`, or
  * one that holds no words (`NOT_A_NAME`), is never read into a name.
  */
@@ -1380,18 +1430,17 @@ export function pointedRows(sql: Sql, to: string, ids: readonly string[]): Map<s
   if (title === null && currency === null) return out;
   const said = (v: unknown): string | null =>
     typeof v === 'string' && v.trim() !== '' ? v.trim() : typeof v === 'number' || typeof v === 'boolean' ? String(v) : null;
-  for (let from = 0; from < asked.length; from += POINTED_READ) {
-    const page = asked.slice(from, from + POINTED_READ);
-    const rows = sql.all<{ id: string; t: unknown; c: unknown }>(
-      `SELECT id, ${title === null ? 'NULL' : `json_extract(fields, '${jsonPath(title)}')`} AS t, ${currency === null ? 'NULL' : `json_extract(fields, '${jsonPath(currency)}')`} AS c
-         FROM entry WHERE register = ? AND id IN (${page.map(() => '?').join(', ')})`,
-      to,
-      ...page,
-    );
-    for (const r of rows) {
-      const code = typeof r.c === 'string' ? r.c.trim().toUpperCase() : '';
-      out.set(String(r.id), { title: said(r.t), currency: isCurrencyCode(code) ? code : null });
-    }
+  /* THE IDS ARE ONE BOUND ARRAY (AGT-B03), so the statement binds two values at any number of ids: the Durable Object
+     refuses a statement over 100, and one value an id crashed a page of 101. */
+  const rows = sql.all<{ id: string; t: unknown; c: unknown }>(
+    `SELECT id, ${title === null ? 'NULL' : `json_extract(fields, '${jsonPath(title)}')`} AS t, ${currency === null ? 'NULL' : `json_extract(fields, '${jsonPath(currency)}')`} AS c
+       FROM entry WHERE register = ? AND id IN (SELECT value FROM json_each(?))`,
+    to,
+    JSON.stringify(asked),
+  );
+  for (const r of rows) {
+    const code = typeof r.c === 'string' ? r.c.trim().toUpperCase() : '';
+    out.set(String(r.id), { title: said(r.t), currency: isCurrencyCode(code) ? code : null });
   }
   return out;
 }
@@ -1998,12 +2047,15 @@ function one(
   if (product) {
     const table = lookups?.[product[1].lookup] ?? {};
     const byExpr = `json_extract(fields, '${jsonPath(product[1].by)}')`;
-    const marks = Object.keys(table).map(() => '?').join(', ') || 'NULL';
+    /* THE TABLE'S KEYS ARE ONE BOUND ARRAY (AGT-B03), not one value a key: a table of 101 broke the Durable Object's
+       limit. An empty table still excludes only the unset, as `NOT IN (NULL)` did. */
+    const known = Object.keys(table);
+    const marks = known.length === 0 ? 'NULL' : 'SELECT value FROM json_each(?)';
     const missing = sql
       .all<{ v: string | null }>(
         `SELECT DISTINCT ${byExpr} AS v FROM entry WHERE ${where} AND ${expr} IS NOT NULL AND (${byExpr} IS NULL OR ${byExpr} NOT IN (${marks}))`,
         ...params,
-        ...Object.keys(table),
+        ...(known.length === 0 ? [] : [JSON.stringify(known)]),
       )
       .map((r) => r.v ?? '(unset)');
     /* TWO LOOKUP CODES, AND `30 §6` NOW CARRIES BOTH, because they are two repairs rather than two

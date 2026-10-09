@@ -392,7 +392,7 @@ test("THE PROVIDER'S OWN WORDS RIDE THE REFUSAL AS `detail`, beside the phrase, 
 });
 
 test("A KEY OR A PERSON'S PROMPT IN THE PROVIDER'S MESSAGE NEVER REACHES `detail`, and nothing past 300 characters does", async () => {
-  const prompt = 'Sam wrote: my card ending 7731 was charged twice';
+  const prompt = 'Mara wrote: my card ending 0418 was charged twice';
   const said = `400 Bad Request: Authorization: Bearer cf-live-0a1b2c3d api_key="sk_live_abc" body {"messages":[{"role":"user","content":"${prompt}"}],"x":"${'pad '.repeat(120)}${prompt}"}`;
   const { env } = answering(() => { throw new Error(said); });
   const out = await aiInference(env).complete(ask);
@@ -402,6 +402,6 @@ test("A KEY OR A PERSON'S PROMPT IN THE PROVIDER'S MESSAGE NEVER REACHES `detail
   for (const secret of ['cf-live-0a1b2c3d', 'sk_live_abc', prompt]) assert.ok(!detail.includes(secret), secret);
   assert.match(detail, /^400 Bad Request/u);
   assert.equal(scrubRaw('a long token run ' + 'A1'.repeat(30)), 'a long token run [cut]');
-  assert.equal(scrubRaw('bad input {"text":["Ada 7731"]} key sk-proj-ab12cd'), 'bad input {"text":"[cut]"} key [cut]');
+  assert.equal(scrubRaw('bad input {"text":["Ada 0418"]} key sk-proj-ab12cd'), 'bad input {"text":"[cut]"} key [cut]');
   assert.equal(scrubRaw('API key invalid for this route'), 'API key invalid for this route', 'words that are no key stay');
 });

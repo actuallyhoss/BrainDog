@@ -125,6 +125,16 @@ export function redSigns(signs: readonly Sign[] | null | undefined): number | nu
   return signs ? signs.filter((s) => s.state === 'red').length : null;
 }
 
+/**
+ * How many vital signs have not been read yet, the ones that read `none`, or `null` when no sign was handed at all.
+ *
+ * A SIGN NOBODY HAS READ IS NOT WELL, IT IS UNREAD (the Health page's Not read yet). Counting red alone said "All healthy"
+ * of a record whose every sign was `none`, so the unread are counted too and said beside the good parts.
+ */
+export function unreadSigns(signs: readonly Sign[] | null | undefined): number | null {
+  return signs ? signs.filter((s) => s.state === 'none').length : null;
+}
+
 /** The sentence, in its parts, or `null` when nothing was read to say it from. */
 export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}): Part[] | null {
   /* ── what leads: each its own sentence, marked ─────────────────────────── */
@@ -169,8 +179,16 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
   const faultsClear = more.faults !== undefined && more.faults !== null && more.faults.length === 0;
   if (lead.length === 0 && faultsClear) good.push('nothing is broken');
 
-  if (lead.length === 0 && bad.length === 0 && good.length === 0) return null;
-  if (lead.length === 0 && bad.length === 0) return [{ text: faultsClear ? `All healthy: ${joined(good)}.` : `${upper(joined(good))}.` }];
+  /* UNREAD SIGNS ARE THEIR OWN SENTENCE, LAST, AND NEVER UNDER "ALL HEALTHY": not marked, since nothing is wrong yet, but
+     a link to where the signs are shown, as the red count is. */
+  const unread = unreadSigns(more.signs) ?? 0;
+  const unreadSaid: Part[] =
+    unread === 0
+      ? []
+      : [{ text: unread === 1 ? 'One vital sign has not been read yet' : `${unread} vital signs have not been read yet`, ...(more.signsAt ? { href: more.signsAt } : {}) }, { text: '.' }];
+
+  if (lead.length === 0 && bad.length === 0 && good.length === 0) return unreadSaid.length > 0 ? unreadSaid : null;
+  if (lead.length === 0 && bad.length === 0 && unreadSaid.length === 0) return [{ text: faultsClear ? `All healthy: ${joined(good)}.` : `${upper(joined(good))}.` }];
 
   const parts: Part[] = [];
   const space = (): void => {
@@ -191,6 +209,10 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
   } else if (good.length > 0) {
     space();
     parts.push({ text: `${upper(joined(good))}.` });
+  }
+  if (unreadSaid.length > 0) {
+    space();
+    parts.push(...unreadSaid);
   }
   return parts;
 }

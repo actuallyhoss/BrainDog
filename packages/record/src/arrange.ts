@@ -20,7 +20,7 @@
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import { conflictFault, installFault, installOrder, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, stagedBatch, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
-import { configValue, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
+import { configReads, configValue, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
 import { normaliseChecked } from './theme-check.ts';
 
@@ -207,6 +207,77 @@ const offered = (items: readonly { id: string; title: string }[]): string => {
   const more = items.length > shown.length ? `, and ${items.length - shown.length} more` : '';
   return `${shown.map((e) => e.title || e.id).join(', ')}${more} (by id: ${shown.map((e) => e.id).join(', ')})`;
 };
+
+/** A key an arrangement needs, worked out by the record (REC-A06 step 6): its label, the one host it opens, and whether a run by itself uses it. */
+export type ArrangeNeed = { label: string; opens: string; scheduled: boolean };
+
+/**
+ * THE KEYS IT NEEDS, FROM THE CALLS IT WOULD MAKE, as the kernel prints each (`CALLS OUT <host> · <cadence> · grant
+ * "<label>"`, or a script's `key "<a>" to <host>, ...`). Never from the proposer: a `needs` it sends is not read, so a key
+ * cannot be asked for that nothing in the arrangement opens, nor one left out that something does. A call with a cadence
+ * runs with nobody signed in, so its keys are a scheduled run's.
+ */
+export function needsOf(approve: readonly string[]): ArrangeNeed[] {
+  const out = new Map<string, ArrangeNeed>();
+  for (const line of approve) {
+    const m = /^CALLS OUT (.+?) · (.*)$/u.exec(line);
+    if (!m) continue;
+    const parts = m[2]!.split(' · ');
+    const scheduled = parts.some((p) => /^(every \d+[smhdw]|daily|weekly)\b/u.test(p));
+    const host = /^[\w-]+(\.[\w-]+)+(:\d+)?$/u.test(m[1]!) ? m[1]! : '';
+    const keys: [string, string][] = [];
+    for (const p of parts) {
+      const grant = /^grant "(.*)"$/u.exec(p);
+      if (grant && grant[1] !== 'none' && grant[1] !== '') keys.push([grant[1]!, host]);
+      if (p.startsWith('key "'))
+        for (const k of p.matchAll(/"([^"]+)" to (\S+)/gu)) {
+          const to = k[2]!.replace(/,$/u, '');
+          keys.push([k[1]!, /^[\w-]+(\.[\w-]+)+(:\d+)?$/u.test(to) ? to : '']);
+        }
+    }
+    for (const [label, opens] of keys) {
+      const was = out.get(label);
+      out.set(label, { label, opens: was?.opens || opens, scheduled: (was?.scheduled ?? false) || scheduled });
+    }
+  }
+  return [...out.values()];
+}
+
+/** A part's id: a handle the accept names, never shown. */
+const PART_ID = /^[a-z0-9][a-z0-9_-]{0,39}$/u;
+
+/**
+ * THE CHOICES A PROPOSER LEAVES TO THE OWNER, each `{ id, question, suggested, options: [{ id, label, does }] }`, as the
+ * page draws them (`arranged.ts` `choicesOf`). Two options or more, each with a name and a line of what it does, and the
+ * suggested one among them.
+ */
+function choicesIn(raw: unknown): Result<Body[]> {
+  if (raw === undefined) return ok([]);
+  const shape = 'A choice is {"id":"<handle>","question":"...","suggested":"<option id>","options":[{"id":"<handle>","label":"...","does":"..."}]}.';
+  if (!Array.isArray(raw) || raw.length > 12) return refuse('VALUE_MALFORMED', `choices is a list of at most 12. ${shape}`, 'body.choices');
+  const out: Body[] = [];
+  const seen = new Set<string>();
+  for (const [i, c] of raw.entries()) {
+    const at = `body.choices[${i}]`;
+    if (!isMap(c) || typeof c.id !== 'string' || !PART_ID.test(c.id) || typeof c.question !== 'string' || c.question.trim() === '' || !Array.isArray(c.options))
+      return refuse('VALUE_MALFORMED', shape, at);
+    if (seen.has(c.id)) return refuse('VALUE_MALFORMED', `Two choices share the handle ${c.id}. Give each its own.`, `${at}.id`);
+    seen.add(c.id);
+    if (c.options.length < 2 || c.options.length > 6) return refuse('VALUE_MALFORMED', 'A choice has two to six options.', `${at}.options`);
+    const options: Body[] = [];
+    for (const [j, o] of c.options.entries()) {
+      const words = (x: unknown) => typeof x === 'string' && x.trim() !== '';
+      if (!isMap(o) || typeof o.id !== 'string' || !PART_ID.test(o.id) || !words(o.label) || !words(o.does))
+        return refuse('VALUE_MALFORMED', 'An option is {"id":"<handle>","label":"its name","does":"one line of what it does"}.', `${at}.options[${j}]`);
+      if (options.some((x) => x.id === o.id)) return refuse('VALUE_MALFORMED', `Two options share the handle ${o.id}.`, `${at}.options[${j}].id`);
+      options.push({ id: o.id, label: String(o.label).trim(), does: String(o.does).trim() });
+    }
+    if (typeof c.suggested !== 'string' || !options.some((o) => o.id === c.suggested))
+      return refuse('VALUE_MALFORMED', 'suggested is the handle of one of its options, the one you would pick.', `${at}.suggested`);
+    out.push({ id: c.id, question: c.question.trim(), suggested: c.suggested, options });
+  }
+  return ok(out);
+}
 
 export function arranger(d: ArrangeDeps) {
   const { kernel, catalogue } = d;
@@ -696,6 +767,94 @@ export function arranger(d: ArrangeDeps) {
   }
 
   /**
+   * A SETTING A DECLARATION READS PLANS ITS ADD-ON AGAIN (REC-A06 step 2, second half). A setting is read when its add-on
+   * is planned and installed, and `setPackConfig` changes nothing installed, so a later change to the book every title of
+   * an add-on reads reached none of them until its next update. Such a change plans the add-on again at the version it
+   * holds with the new values in hand (`declare` `plan`), filed as one approved change: the plan step, marked `replan`, and
+   * what it calls out. `null` when no declaration reads the keys, or the host no longer holds the version this record
+   * does, and the setting is then written alone, as before.
+   */
+  async function replanned(pack: string, values: Body, sh: Shelving): Promise<Result<Planned> | null> {
+    const held = stateOf(pack);
+    if (!held || held.disabled_at !== null || held.version === null) return null;
+    if (!entryOf(pack) && d.shelf && !sh.docs.has(pack) && !(await shelved([pack], 'body.settings', sh)).ok) return null;
+    const read = await packOf(pack, sh.docs, heldBy(d.installed()), useCaseFor([], pack));
+    if (!read.ok || read.value.manifest.version !== held.version) return null;
+    const keys = new Set(Object.keys(values));
+    if (!read.value.declarations.some((decl) => configReads(decl.body).some((r) => keys.has(r.key)))) return null;
+    const planned = await planAll([pack], sh.docs, new Map([[pack, values]]));
+    if (planned.ok) for (const step of planned.value.plan) step.replan = true;
+    return planned;
+  }
+
+  /** One part of an arrangement an accept may take on its own (REC-A06 step 7). */
+  type Part = Body & { id: string; kind: string; label: string };
+
+  /**
+   * THE PARTS AN ACCEPT MAY TAKE ONE BY ONE (REC-A06 step 7). Every install, add-on turned on or off, add-on's settings,
+   * group of entries by list, page and choice has an id the accept names (`parts`), a label the owner reads, and what it
+   * covers in this body: `pack` for an install (its plan step, and the settings sent with it, which fill it), a turn on or
+   * off, and a settings part (its settings, and its `replan` step); `register` for a group of entries, new and changed;
+   * `page` for a page. `requires` names the parts it cannot be taken without: the add-ons an install needs, the install a
+   * page reads a new list from, and the group an entry links to. A setting a declaration reads is its add-on planned
+   * again inside the same part, so the two are never taken apart.
+   */
+  function partsOf(o: {
+    planned: Planned;
+    sent: ReadonlyMap<string, readonly string[]>;
+    enable: readonly string[];
+    disable: readonly string[];
+    settings: readonly Body[];
+    pages: readonly Body[];
+    rows: readonly Body[];
+    choices: readonly Body[];
+    names: Record<string, string>;
+  }): Part[] {
+    const out: Part[] = [];
+    const requires = (ids: readonly string[]) => (ids.length === 0 ? {} : { requires: [...new Set(ids)] });
+    const installing = new Set(o.planned.order);
+    const listWords = (register: string) => o.names[`register.${register}`] ?? kernel.register(register)?.name ?? register;
+    for (const id of o.planned.order) {
+      const pack = o.planned.packs.get(id);
+      const under = [...Object.keys(pack?.manifest.requires.packs ?? {}), ...(entryOf(id)?.modules ?? o.sent.get(id) ?? [])];
+      const updates = typeof o.planned.plan.find((s) => s.pack === id)?.from === 'string';
+      const label = `${updates ? 'Update' : 'Add'} ${titleOf(id)}`;
+      out.push({ id: `install:${id}`, kind: 'install', label, pack: id, ...requires(under.filter((q) => q !== id && installing.has(q)).map((q) => `install:${q}`)) });
+    }
+    for (const id of o.enable) out.push({ id: `enable:${id}`, kind: 'enable', label: `Turn on ${titleOf(id)}`, pack: id });
+    for (const id of o.disable) out.push({ id: `disable:${id}`, kind: 'disable', label: `Turn off ${titleOf(id)}`, pack: id });
+    for (const pack of new Set(o.settings.map((s) => String(s.pack))))
+      if (!installing.has(pack))
+        out.push({ id: `setting:${pack}`, kind: 'setting', label: `Settings of ${titleOf(pack)}`, pack, ...requires(o.enable.includes(pack) ? [`enable:${pack}`] : []) });
+    for (const register of new Set(o.rows.map((r) => String(r.register)))) {
+      const mine = o.rows.filter((r) => r.register === register);
+      const linked = mine.flatMap((r) => Object.values(isMap(r.links) ? r.links : {}).map((to) => String(o.rows[Number(to)]?.register)));
+      const adds = mine.some((r) => typeof r.at !== 'string');
+      const changes = mine.some((r) => typeof r.at === 'string');
+      const label = `${adds && changes ? 'Additions and changes' : adds ? 'Additions' : 'Changes'} to ${listWords(register)}`;
+      out.push({ id: `rows:${register}`, kind: 'rows', label, register, ...requires(linked.filter((x) => x !== register).map((x) => `rows:${x}`)) });
+    }
+    for (const page of o.pages) {
+      const slug = String(page.id).replace(/^page\./u, '');
+      const said = isMap(page.body) && typeof page.body.title === 'string' && page.body.title.trim() !== '' ? page.body.title.trim() : slug.replace(/[-_]/gu, ' ');
+      /* A PAGE OVER A LIST AN INSTALL HERE BRINGS cannot be taken without that install. */
+      const text = new Set<string>();
+      const walk = (x: unknown): void => {
+        if (typeof x === 'string') text.add(x.replace(/^register\./u, ''));
+        else if (Array.isArray(x)) x.forEach(walk);
+        else if (isMap(x)) Object.values(x).forEach(walk);
+      };
+      walk(page.body);
+      const from = o.planned.order.filter((q) =>
+        (o.planned.packs.get(q)?.declarations ?? []).some((decl) => decl.kind === 'register' && text.has(decl.id.slice('register.'.length)) && !kernel.register(decl.id.slice('register.'.length))),
+      );
+      out.push({ id: `page:${slug}`, kind: 'page', label: `The ${said} page`, page: String(page.id), ...requires(from.map((q) => `install:${q}`)) });
+    }
+    for (const c of o.choices) out.push({ ...c, id: `choice:${String(c.id)}`, kind: 'choice', label: String(c.question) });
+    return out;
+  }
+
+  /**
    * A `pack`, `settings` or `arrange` body as it is filed: what was asked, and what it would do.
    *
    * ONLY THE KEYS A PROPOSER MAY WRITE ARE READ. Everything the owner is shown about the consequences is
@@ -709,7 +868,19 @@ export function arranger(d: ArrangeDeps) {
         return settingsOf(said.value, 'body', new Map());
       }
       if (typeof body.pack !== 'string' || !isMap(body.values)) return ok(body);
-      return settingsOf(body, 'body', new Map());
+      const one = settingsOf(body, 'body', new Map());
+      if (!one.ok) return one;
+      /* AND ITS ADD-ON PLANNED AGAIN when a declaration reads it, so the change reaches what reads it on the same yes. */
+      const again = await replanned(body.pack, one.value.values as Body, shelving());
+      if (again === null) return one;
+      if (!again.ok) return again;
+      const needs = needsOf(again.value.approve);
+      return ok({
+        ...one.value,
+        plan: again.value.plan,
+        ...(again.value.approve.length === 0 ? {} : { approve: again.value.approve }),
+        ...(needs.length === 0 ? {} : { needs }),
+      });
     }
 
     if (kind === 'pack') {
@@ -722,7 +893,8 @@ export function arranger(d: ArrangeDeps) {
           return refuse('TRANSITION_ILLEGAL', `${id} is already ${verb === 'enable' ? 'on' : 'off'}.`, `body.${verb}`);
         /* TURNING A PACK ON ARMS WHAT IT CALLS OUT AGAIN, so the owner is shown those lines, as an install shows them. */
         const calls = verb === 'enable' ? kernel.callsWhenEnabled(id) : [];
-        return ok({ [verb]: id, registers: state.registers, ...(calls.length === 0 ? {} : { approve: calls }) });
+        const needs = needsOf(calls);
+        return ok({ [verb]: id, registers: state.registers, ...(calls.length === 0 ? {} : { approve: calls }), ...(needs.length === 0 ? {} : { needs }) });
       }
       /* A SHARED USE-CASE FILE, as `braindog usecase install` sends it. It is read through the door the app and `planUseCase`
          read one through (`readShared`: the size, a credential, a block kind nothing draws), and becomes the install of its
@@ -802,6 +974,7 @@ export function arranger(d: ArrangeDeps) {
         packs: { install: planned.value.order, ...(order.value.enable.length === 0 ? {} : { enable: order.value.enable }) },
         plan: planned.value.plan,
         approve: planned.value.approve,
+        ...((needs) => (needs.length === 0 ? {} : { needs }))(needsOf(planned.value.approve)),
         ...(Object.keys(names).length === 0 ? {} : { names }),
         ...(isMap(body.doc) ? { doc: body.doc } : {}),
       });
@@ -888,6 +1061,18 @@ export function arranger(d: ArrangeDeps) {
       if (!one.ok) return one;
       settings.push(one.value);
     }
+    /* A SETTING A DECLARATION READS, on an add-on this does not install, plans that add-on again (`replanned`). */
+    const again: Body[] = [];
+    const calls: string[] = [];
+    const sentFor = new Map<string, Body>();
+    for (const s of settings) if (!order.value.install.includes(String(s.pack))) sentFor.set(String(s.pack), { ...(sentFor.get(String(s.pack)) ?? {}), ...(s.values as Body) });
+    for (const [pack, values] of sentFor) {
+      const one = await replanned(pack, values, sh);
+      if (one === null) continue;
+      if (!one.ok) return { ok: false, refusal: { ...(one as { refusal: Refusal }).refusal, at: 'body.settings' } };
+      again.push(...one.value.plan);
+      calls.push(...one.value.approve);
+    }
     if (body.voice !== undefined) {
       const said = voiceOf(body.voice, 'body.voice', order.value.install);
       if (!said.ok) return said;
@@ -903,7 +1088,14 @@ export function arranger(d: ArrangeDeps) {
       rows.push(...checked.value);
     }
 
+    const choices = choicesIn(body.choices);
+    if (!choices.ok) return choices;
+
     const names = namesFor(planned.value, lead ?? speakerNow() ?? order.value.install.find((id) => id.startsWith(USE_CASE)) ?? null);
+    const approve = [...new Set([...planned.value.approve, ...enable.flatMap((id) => kernel.callsWhenEnabled(id)), ...calls])];
+    /* WHAT IT NEEDS IS THE RECORD'S TO SAY, from what it calls out; a `needs` the proposer sent is not read. */
+    const needs = needsOf(approve);
+    const parts = partsOf({ planned: planned.value, sent: sh.sent, enable, disable, settings, pages, rows, choices: choices.value, names });
     return ok({
       ...(typeof body.usecase === 'string' ? { usecase: body.usecase } : {}),
       ...(beside.length === 0 ? {} : { alongside: beside.map((id) => id.slice(USE_CASE.length)) }),
@@ -914,11 +1106,13 @@ export function arranger(d: ArrangeDeps) {
         ...(enable.length === 0 ? {} : { enable }),
         ...(disable.length === 0 ? {} : { disable }),
       },
-      ...(planned.value.plan.length === 0 ? {} : { plan: planned.value.plan }),
-      ...((approve) => (approve.length === 0 ? {} : { approve }))([...new Set([...planned.value.approve, ...enable.flatMap((id) => kernel.callsWhenEnabled(id))])]),
+      ...(planned.value.plan.length + again.length === 0 ? {} : { plan: [...planned.value.plan, ...again] }),
+      ...(approve.length === 0 ? {} : { approve }),
+      ...(needs.length === 0 ? {} : { needs }),
       ...(pages.length === 0 ? {} : { pages }),
       ...(settings.length === 0 ? {} : { settings }),
       ...(rows.length === 0 ? {} : { rows }),
+      ...(parts.length === 0 ? {} : { parts }),
       ...(Object.keys(names).length === 0 ? {} : { names }),
     });
   }
@@ -927,12 +1121,24 @@ export function arranger(d: ArrangeDeps) {
    * THE ROWS A PLAN IS MADE OF (`slash.ts` `formedRows`), checked against the lists as they are: each list is here, each field
    * is one it declares, and a link is a ref field pointing at the list of the earlier row it names. Whether a value is valid
    * is the write path's, when the arrangement is accepted, as it is for a rowset.
+   *
+   * A ROW MAY BE A PATCH (REC-A06 step 4): `{ register, at, version, patch }`, checked as a rowset's update is (govern
+   * `checkUpdates`), and filed with `before`, the entry's fields now, so Decide says what it changes from. A version gone
+   * stale refuses the whole question, naming the entry by its title.
    */
   function rowsOf(raw: unknown): Result<Body[]> {
-    if (!Array.isArray(raw)) return refuse('VALUE_MALFORMED', 'rows is a list of rows, each {"register":"<id>","fields":{...}}.', 'body.rows');
+    if (!Array.isArray(raw))
+      return refuse('VALUE_MALFORMED', 'rows is a list, each {"register":"<id>","fields":{...}} to add, or {"register":"<id>","at":"<id>","version":<n>,"patch":{...}} to change one.', 'body.rows');
     const out: Body[] = [];
+    const named = new Set<string>();
     for (const [i, r] of raw.entries()) {
       const at = `body.rows[${i}]`;
+      if (isMap(r) && typeof r.register === 'string' && ('at' in r || 'patch' in r)) {
+        const one = patchOf(r, at, named);
+        if (!one.ok) return one;
+        out.push(one.value);
+        continue;
+      }
       if (!isMap(r) || typeof r.register !== 'string' || !isMap(r.fields)) return refuse('VALUE_MALFORMED', 'A row is {"register":"<id>","fields":{...}}.', at);
       const decl = kernel.register(r.register);
       if (!decl) return refuse('REGISTER_UNKNOWN', `There is no list called ${r.register} here.`, `${at}.register`);
@@ -950,6 +1156,51 @@ export function arranger(d: ArrangeDeps) {
       out.push({ register: r.register, fields: { ...r.fields }, ...(Object.keys(links).length === 0 ? {} : { links }) });
     }
     return ok(out);
+  }
+
+  /** An entry as the owner knows it: its title in its list ("Kiln in Projects"), else "an entry in Projects". */
+  const entryWords = (register: string, fields: Record<string, unknown>): string => {
+    const decl = kernel.register(register);
+    const list = decl?.name ?? register;
+    const said = decl ? fields[decl.title] : undefined;
+    return typeof said === 'string' && said.trim() !== '' ? `${said.trim()} in ${list}` : `an entry in ${list}`;
+  };
+
+  /** The words a stale patch is refused in, the whole question with it. */
+  const staleSaid = (words: string, at: string): Result<never> =>
+    refuse('VERSION_STALE', `${words[0]!.toUpperCase()}${words.slice(1)} changed after this was read, so none of it is taken. Read it again and propose with what it says now.`, at);
+
+  /** One patch row, checked as a rowset's update is, with the entry's fields now as `before`. */
+  function patchOf(r: Body, at: string, named: Set<string>): Result<Body> {
+    const register = String(r.register);
+    const decl = kernel.register(register);
+    if (!decl) return refuse('REGISTER_UNKNOWN', `There is no list called ${register} here.`, `${at}.register`);
+    const extra = Object.keys(r).find((key) => !['register', 'at', 'version', 'patch', 'before'].includes(key));
+    if (extra !== undefined) return refuse('FIELD_UNKNOWN', 'A change to an entry carries register, at, version and patch, and nothing beside them.', `${at}.${extra}`);
+    const row = typeof r.at === 'string' ? kernel.get(r.at, { includeDeleted: true }) : null;
+    if (!row || row.register !== register || row.deleted_at !== null) return refuse('VALUE_MALFORMED', `There is no live entry there in ${decl.name}.`, `${at}.at`);
+    /* ONE CHANGE PER ENTRY: a second would be held to the version the first leaves, and could never apply. */
+    if (named.has(row.id)) return refuse('VALUE_MALFORMED', `${entryWords(register, row.fields)} is changed twice. Put both changes in one patch.`, `${at}.at`);
+    named.add(row.id);
+    if (r.version === undefined) return refuse('REQUIRED_MISSING', 'A change carries the version its entry was read at, so one changed since is not overwritten.', `${at}.version`);
+    if (typeof r.version !== 'number' || !Number.isInteger(r.version) || r.version < 1) return refuse('VALUE_MALFORMED', 'version is the whole number the entry was read at.', `${at}.version`);
+    if (!isMap(r.patch) || Object.keys(r.patch).length === 0) return refuse('VALUE_MALFORMED', 'A change carries a patch: the fields it changes, with their new values.', `${at}.patch`);
+    const fields = decl.fields.map((f) => f.id);
+    for (const id of Object.keys(r.patch))
+      if (id !== 'deleted_at' && !fields.includes(id)) return refuse('FIELD_UNKNOWN', `${decl.name} has no field ${id}.`, `${at}.patch.${id}`, fields);
+    if (row.version !== r.version) return staleSaid(entryWords(register, row.fields), `${at}.version`);
+    return ok({ register, at: kernel.nameOf(row.id), version: row.version, patch: { ...r.patch }, before: { ...row.fields } });
+  }
+
+  /** The first patch whose entry moved since the question was filed, refused before anything is applied. */
+  function staleOf(rows: readonly Body[]): Result<never> | null {
+    for (const [i, r] of rows.entries()) {
+      if (typeof r.at !== 'string') continue;
+      const row = kernel.get(r.at, { includeDeleted: true });
+      const words = entryWords(String(r.register), row?.fields ?? (isMap(r.before) ? r.before : {}));
+      if (!row || row.deleted_at !== null || row.version !== r.version) return staleSaid(words, `body.rows[${i}]`);
+    }
+    return null;
   }
 
   /* ── applying, after the owner's press ───────────────────────────────── */
@@ -989,9 +1240,15 @@ export function arranger(d: ArrangeDeps) {
     const docs = new Map<string, Body>(kind === 'pack' && typeof body.install === 'string' && isMap(body.doc) ? [[body.install, body.doc]] : []);
 
     const steps = Array.isArray(body.plan) ? (body.plan as Body[]) : [];
+    /* A PATCH WHOSE ENTRY MOVED SINCE THE QUESTION WAS FILED REFUSES ALL OF IT, before anything is installed, so the owner
+       is never left with the add-ons in and the changes they were for refused. */
+    const stale = kind === 'arrange' && Array.isArray(body.rows) ? staleOf(body.rows as Body[]) : null;
+    if (stale) return stopped(stale);
+    /* A SETTING A DECLARATION READS PLANS ITS ADD-ON AGAIN (`replan`), installed over itself at the version it holds. */
+    const replans = steps.filter((x) => x.replan === true && typeof x.pack === 'string').map((x) => String(x.pack));
     /* WHAT IS INSTALLED FROM THE HOST'S WHOLE CATALOGUE IS FETCHED AGAIN, held to its checksum again, and must be the version
        the owner was shown: a catalogue that moved since the question was filed is said, and nothing is installed. */
-    for (const id of packs.install ?? []) {
+    for (const id of [...(packs.install ?? []), ...replans]) {
       if (docs.has(id) || entryOf(id) || !d.shelf) continue;
       const fetched = await d.shelf.fetch(id);
       if (fetched === null) return stopped(notOffered(id, 'body.packs', await d.shelf.listed()));
@@ -1006,18 +1263,22 @@ export function arranger(d: ArrangeDeps) {
     }
     /* THE SETTINGS SENT FOR AN ADD-ON THIS PRESS INSTALLS GO IN WITH IT, as `prepare` planned them. */
     const given = new Map<string, Body>();
-    if (kind === 'arrange')
+    if (kind === 'arrange' || kind === 'settings')
       for (const s of settings)
-        if (typeof s.pack === 'string' && isMap(s.values) && (packs.install ?? []).includes(s.pack)) given.set(s.pack, { ...(given.get(s.pack) ?? {}), ...s.values });
+        if (typeof s.pack === 'string' && isMap(s.values) && [...(packs.install ?? []), ...replans].includes(s.pack)) given.set(s.pack, { ...(given.get(s.pack) ?? {}), ...s.values });
     const filled = new Set<string>();
     const spokeBefore = speakerNow();
-    for (const id of packs.install ?? []) {
+    for (const id of [...(packs.install ?? []), ...replans.filter((x) => !(packs.install ?? []).includes(x))]) {
       /* AN UPDATE THE OWNER ACCEPTED goes in over the pack that is on, unless that pack is already at the planned version. */
       const step = steps.find((s) => s.pack === id);
       const held = stateOf(id)?.version ?? null;
       const updating = on(id) && typeof step?.from === 'string' && typeof step.version === 'string' && held !== step.version && laterVersion(step.version, held) === step.version;
-      if (on(id) && !updating) continue;
-      if (stateOf(id) && !updating) {
+      /* PLANNED AGAIN FOR A SETTING, at the version it held when the question was filed; one moved since is said. */
+      const replanning = step?.replan === true;
+      if (replanning && (!on(id) || held !== step.version))
+        return stopped(refuse('PLAN_STALE', `${titleOf(id)} changed after this was proposed. Propose the setting again.`, 'body.settings'));
+      if (on(id) && !updating && !replanning) continue;
+      if (stateOf(id) && !updating && !replanning) {
         const unshown = kernel.callsWhenEnabled(id).filter((line) => !approved.includes(line));
         if (unshown.length > 0)
           return stopped(refuse('PLAN_STALE', `${id} would call out something this proposal did not show: ${unshown.join('; ')}. Propose it again.`, 'body.approve'));
@@ -1036,8 +1297,9 @@ export function arranger(d: ArrangeDeps) {
       const from = state.packs.find((p) => p.id === id)?.version ?? null;
       const put = await install(pack.value, diff, d.host(actor), diff.planHash, diff.approve);
       if (!put.ok) return stopped(put);
-      done.installed.push(id);
       if (given.has(id)) filled.add(id);
+      if (replanning) continue;
+      done.installed.push(id);
       await carryUpdate(d.catalogue, kernel, id, from, actor);
       await afterInstall(id, actor);
     }
@@ -1099,6 +1361,27 @@ export function arranger(d: ArrangeDeps) {
       kernel.transaction(() => {
         for (const [i, r] of rows.entries()) {
           const register = String(r.register);
+          /* A PATCH, COMPARE-AND-SET at the version the owner was shown, and a delete as its own write after the fields, as
+             a rowset's update is (govern `applyUpdate`). A version that moved refuses all of it, naming the entry. */
+          if (typeof r.at === 'string') {
+            const { deleted_at, ...patch } = (isMap(r.patch) ? r.patch : {}) as Body;
+            let version = Number(r.version);
+            let out: ReturnType<Kernel['update']> | null = null;
+            const by = { actor, batch, cascade: false, note: 'Changed by a plan accepted on Decide.' };
+            if (Object.keys(patch).length > 0) out = kernel.update(register, r.at, patch as never, { ...by, version });
+            if (out?.ok) version = out.value.version;
+            if (deleted_at !== undefined && (out === null || out.ok)) out = kernel.update(register, r.at, { deleted_at } as never, { ...by, version });
+            if (out && !out.ok) {
+              const refusal = 'refusal' in out ? out.refusal : null;
+              const stale = refusal === null || refusal.code === 'VERSION_STALE';
+              halted.refusal = stale
+                ? (staleSaid(entryWords(register, isMap(r.before) ? r.before : {}), `body.rows[${i}]`) as { refusal: Refusal }).refusal
+                : { ...refusal, at: `body.rows[${i}]${refusal.at ? `.${refusal.at}` : ''}` };
+              throw halted;
+            }
+            made.push({ spoken: r.at, id: r.at });
+            continue;
+          }
           const fields: Record<string, unknown> = { ...(r.fields as Body) };
           for (const [field, to] of Object.entries(isMap(r.links) ? r.links : {})) {
             const target = made[Number(to)];

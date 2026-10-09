@@ -1443,6 +1443,29 @@ const DECLARED: Record<string, Version> = {
       "`page.home-business`'s Working now reads the record's `sessions.working`, the runs heard from in the last fifteen minutes, where it read the Agents add-on's clause of today -> 070472676d3012ef",
     ],
   },
+  /** "SHOP" AND "STORE" WENT TO SHOP: signals are not declared, so `page.home-business` is word for word 1.6.0's. */
+  'business@1.7.0': {
+    holds: `
+      page.home-business setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with
+      setting.voice_nothing_due
+    `,
+    declares: '070472676d3012ef',
+    history: [
+      "`page.home-business` is 1.6.0's word for word; the version stepped because shop and store are Shop's words now, so a shop is proposed Shop -> 070472676d3012ef",
+    ],
+  },
+  /** SHOP IS NEW (use case 6 of the vision): its first entry, Orders, Products and the Orders page. */
+  'shop@1.0.0': {
+    holds: `
+      metric.orders-due-7d metric.orders-owed page.orders register.orders register.products setting.label_orders
+      setting.label_people setting.label_products setting.one_orders setting.one_people setting.one_products
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_nothing_due
+    `,
+    declares: 'a61271223d41a338',
+    history: [
+      "Shop carries a pack from its first version: `register.orders`, `register.products` and `page.orders`, which draws Due this week and Owed to you only while something is in them -> a61271223d41a338",
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

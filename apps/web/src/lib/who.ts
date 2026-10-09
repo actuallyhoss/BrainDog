@@ -19,8 +19,11 @@ const CAP = "\\p{Lu}[\\p{L}\\p{M}'’.-]*";
 /* Any word, for the one place a lowercase name is taken: before a comma at the very start. */
 const WORD = "\\p{L}[\\p{L}\\p{M}'’.-]*";
 
+/* A word before another word of the name has no full stop in it, unless it is an initial: "S. Marchetti" is one name,
+   and "I'm Tom. We run a shop" is Tom, not "Tom. We". */
+const LEADING = "(?:\\p{Lu}\\.|\\p{Lu}[\\p{L}\\p{M}'’-]*)";
 /* Up to three words, and never the pronoun `I` as the second or third: "I'm Sami I freelance". */
-const NAME = `${CAP}(?:\\s+(?!I\\b)${CAP}){0,2}`;
+const NAME = `(?:${LEADING}\\s+(?!I\\b)){0,2}${CAP}`;
 
 const GREETING = /^(?:hi|hello|hey)\b[\s,.!]*/iu;
 /* Case spelled out rather than the `i` flag, which would let `\p{Lu}` match lowercase letters and
@@ -37,16 +40,58 @@ const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim();
 const lead = (s: string): string => s.replace(/^[\s,.;:!–-]+/u, '');
 const named = (name: string): boolean => !NOT_A_NAME.has((name.split(' ')[0] ?? '').toLowerCase().replace('’', "'"));
 
-/** A name, if the sentence gives one, and the rest of it as a one-line bio. */
-export function hear(sentence: string): Heard {
+/** A stretch of the sentence as it was typed: where it starts, and where it ends (after its last character). */
+export type Span = [number, number];
+
+/** The sentence read: the name and the bio, with where each starts in the sentence made one line. */
+function read(sentence: string): Heard & { nameAt: number; bioAt: number } {
   const said = oneLine(sentence);
   const body = said.replace(GREETING, '');
+  const greeting = said.length - body.length;
 
   const m = SAYS_NAME.exec(body) ?? BEFORE_COMMA.exec(body) ?? BEFORE_I.exec(body) ?? ALONE.exec(body);
   /* A word may hold a dot for an initial, `S. Marchetti`, so the full stop ending the sentence is taken off. */
   const name = m?.[1]?.replace(/[.'’-]+$/u, '');
-  if (m && name && named(name)) return { name, bio: lead(body.slice(m[0].length)) };
-  return { name: null, bio: said };
+  if (m && name && named(name)) {
+    const bio = lead(body.slice(m[0].length));
+    return { name, bio, nameAt: greeting + m[0].indexOf(m[1] ?? ''), bioAt: said.length - bio.length };
+  }
+  return { name: null, bio: said, nameAt: -1, bioAt: 0 };
+}
+
+/** A name, if the sentence gives one, and the rest of it as a one-line bio. */
+export function hear(sentence: string): Heard {
+  const { name, bio } = read(sentence);
+  return { name, bio };
+}
+
+/**
+ * WHERE WHAT WAS HEARD SITS IN THE SENTENCE AS TYPED, so the screen can light the very words: the name, and any phrase
+ * of the bio given where it sits in the bio (`at`, `length`), which is how `shape.ts` and the use cases say a phrase.
+ *
+ * THE BIO IS READ AS ONE LINE (`hear`), and a person may have typed two spaces or a line break, so every place is
+ * counted back to the typed sentence a character at a time rather than added up.
+ */
+export function heardAt(sentence: string): { name: Span | null; bio: (at: number, length: number) => Span } {
+  const r = read(sentence);
+  /* EACH CHARACTER OF THE ONE LINE, BY WHERE IT WAS TYPED: a run of spaces is its first space, and the ends are trimmed. */
+  const typed: number[] = [];
+  let space = false;
+  for (let i = 0; i < sentence.length; i += 1) {
+    const blank = /\s/u.test(sentence.charAt(i));
+    if (blank && (space || typed.length === 0)) continue;
+    space = blank;
+    typed.push(i);
+  }
+  const span = (at: number, length: number): Span => {
+    const from = typed[at] ?? sentence.length;
+    const last = typed[at + Math.max(length, 1) - 1];
+    return [from, last === undefined ? sentence.length : length === 0 ? from : last + 1];
+  };
+  return {
+    name: r.name === null ? null : span(r.nameAt, r.name.length),
+    bio: (at, length) => span(r.bioAt + at, length),
+  };
 }
 
 /** What a chip appends: its words after what is there, as a new clause. */
@@ -57,17 +102,42 @@ export function withChip(text: string, chip: string): string {
 }
 
 /**
+ * THE NAME IN AN ADDRESS, for a person who typed none and skipped the question: `mariam.saleh+shop@example.com` is
+ * Mariam Saleh. The part before `@` and any `+`, cut at dots, dashes and underscores, digits left out, each word with a
+ * capital. `null` where nothing of a name is left (`1987@example.com`).
+ */
+export function nameFromAddress(email: string | null): string | null {
+  const local = (email ?? '').trim().split('@')[0]?.split('+')[0] ?? '';
+  const words = local
+    .split(/[._-]+/u)
+    .map((w) => w.replace(/\p{N}+/gu, ''))
+    .filter((w) => /^\p{L}+$/u.test(w));
+  return words.length === 0 ? null : words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+/**
  * The `meet` call onboarding makes, or `null` when it makes none.
  *
- * NONE WITHOUT A NAME, because a People row needs one. NONE WHEN PEOPLE IS OFF OR ABSENT: the turn
- * still ran and the name was still shown back, and the identity the person signed in with is
- * kernel's, not the pack's, so there is nothing to report as missing.
+ * FOR EVERY PERSON WHO SETS UP (USE-B06): the name they typed, else the one they answered when asked "What should I
+ * call you?" (`answered`), else, where the caller says so (`address`), the name in their address, so People always
+ * opens on them. NONE WHEN PEOPLE IS OFF OR ABSENT: the identity the person signed in with is kernel's, not the
+ * pack's, and People is never turned back on behind somebody who turned it off. None, too, where no name is found at
+ * all, since a People entry needs one.
+ *
+ * THE ADDRESS IS ASKED FOR, NOT ASSUMED, so a caller that has not yet offered the one question keeps meeting nobody
+ * without a name until it does (`start/accept.ts`).
  */
-export function introduce(heard: Heard, email: string | null, packs: readonly { id: string; disabled_at: string | null }[] | null): Introduction | null {
-  if (!heard.name) return null;
+export function introduce(
+  heard: Heard,
+  email: string | null,
+  packs: readonly { id: string; disabled_at: string | null }[] | null,
+  also: { answered?: string | null; address?: boolean } = {},
+): Introduction | null {
+  const name = heard.name ?? (also.answered?.trim() || null) ?? (also.address === true ? nameFromAddress(email) : null);
+  if (!name) return null;
   const people = packs?.find((p) => p.id === PEOPLE);
   if (!people || people.disabled_at !== null) return null;
-  return { name: heard.name, ...(email ? { email } : {}), where: 'onboarding' };
+  return { name, ...(email ? { email } : {}), where: 'onboarding' };
 }
 
 /**

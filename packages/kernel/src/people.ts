@@ -92,7 +92,7 @@ const STRONG_HOPS = 3;
 
 /**
  * What `meet` is told: at least one of a name, an email, a handle, keys or a domain, and always the source (or where,
- * which says the same: `commit 4464966 in braindog`, `mail from encore.example`, `bank text`). The source wins when both
+ * which says the same: `commit 4464966 in braindog`, `mail from brightwell.example`, `bank text`). The source wins when both
  * are said, since `where` is often a mail's subject.
  *
  * `email` MAY BE A RAW `From` HEADER, `"Ada" <ada@x.com>`, and is read into its name and address.
@@ -227,7 +227,7 @@ const metLines = (...lists: string[][]): string[] =>
  */
 const orgNameKey = (name: string): string => orgWords(name, NAME_ENDINGS).join(' ');
 
-/** A name with its spaces and punctuation gone, as a login or a local part spells the same person: `rohanmehta`. */
+/** A name with its spaces and punctuation gone, as a login or a local part spells the same person: `teodorvance`. */
 const compact = (name: string): string => nameKey(name).replace(/[^\p{L}\p{N}]/gu, '');
 
 /**
@@ -410,7 +410,7 @@ function normalise(args: MeetArgs, typed = false, token = false): Result<Said> {
   if (read.domain !== undefined) {
     domain = registrable(read.domain) ?? undefined;
     if (domain === undefined && !isPublicMail(read.domain.toLowerCase()))
-      return no('VALUE_MALFORMED', 'domain takes a domain an organisation registered, as encore.example.', { at: 'domain' });
+      return no('VALUE_MALFORMED', 'domain takes a domain an organisation registered, as brightwell.example.', { at: 'domain' });
   }
 
   if (name === undefined && email === undefined && handle === undefined && keys.length === 0 && domain === undefined)
@@ -524,8 +524,8 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
     noteMention(deps.sql, { name: s.name ?? nameFromKeys(keys), kind: 'person', project, source: s.source, at: instant(deps.nowMs) });
     return ok(mention());
   }
-  /* AN ARRIVAL NOBODY ANSWERS TO THAT LOOKS LIKE SOMEBODY KNOWN (H1): `From: "Rohan Mehta" <rohanmehta@evil.test>`
-     made a row the strong rules folded into the real Rohan, and his keys then answered for whoever sent it. */
+  /* AN ARRIVAL NOBODY ANSWERS TO THAT LOOKS LIKE SOMEBODY KNOWN (H1): `From: "Teodor Vance" <teodorvance@evil.test>`
+     made a row the strong rules folded into the real Teodor, and his keys then answered for whoever sent it. */
   if (!hit && s.untrusted) {
     const offered = offerArrival(deps, list, s, keys, project);
     if (offered !== null) return offered;
@@ -579,7 +579,7 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
      joined on its own, since one wrong key would fold two people; asked. */
   const bridged = found.slice(1).map((h) => rowById(deps.sql, h.id)).filter((r): r is Row => r !== null);
   /* A COMMIT FOLDS ONLY SOMEBODY MET IN COMMITS ALONE INTO SOMEBODY MET IN COMMITS ALONE (audit 19 H1): two commits as
-     `Rohan Mehta` are one author's spellings, but one forged as him beside the Rohan the owner typed is asked about.
+     `Teodor Vance` are one author's spellings, but one forged as him beside the Teodor the owner typed is asked about.
      A key the other row already holds would have been a key match, never a fold. */
   const folds: Folds = s.untrusted ? 'none' : s.commit ? 'commits' : 'any';
   const settled = settle(deps, list, person, bridged, folds);
@@ -825,7 +825,7 @@ const orgMet = (deps: PeopleDeps, register: string, row: Row, created: boolean):
  * The organisation's name in a machine's `From`, or `undefined` when the name there is not the organisation's.
  *
  * A NOTIFICATION IS SIGNED BY WHOEVER ACTED, NOT BY THE SENDER: GitHub writes `"Ada Lovelace" <notifications@github.com>`
- * and Slack `"Rohan (via Slack)"`. So the name is the organisation's only when one of its words is in the domain
+ * and Slack `"Teodor (via Slack)"`. So the name is the organisation's only when one of its words is in the domain
  * (`Stripe` at stripe.com, `HSBC UK` at hsbc.co.uk), and the part after "via" is read first.
  */
 function senderName(name: string | undefined, domain: string | undefined): string | undefined {
@@ -1417,8 +1417,8 @@ function strong(list: DeclaredList<MeetsFields>, a: Row, b: Row): boolean {
 
 /**
  * Whether two names may be one person's: the same, the same run together, one the other's handle form (`farahq` and
- * Farah Qureshi), or the same first and last word with an initial or a middle name between ("Ahmed H." and "Ahmed
- * Avery", "Anand K Murthy" and "Anand Murthy").
+ * Farah Qureshi), or the same first and last word with an initial or a middle name between ("Mara L." and "Mara
+ * Lindqvist", "Samuel J Achterberg" and "Samuel Achterberg").
  */
 function alike(x: string, y: string): boolean {
   if (x === y) return true;
@@ -1440,8 +1440,8 @@ const spelled = (handles: ReadonlySet<string>, name: string): boolean => {
 
 /**
  * Whether two people may be one, worth a question: names that are `alike`, by name or alias; one handle held by both
- * under two names; or one's handle spelling the other's name, whole or in its short form ("rohanmehta" and Rohan
- * Mehta, "karimassaf91" and Karim Assaf).
+ * under two names; or one's handle spelling the other's name, whole or in its short form ("teodorvance" and Teodor
+ * Vance, "karimassaf91" and Karim Assaf).
  */
 function similar(list: DeclaredList<MeetsFields>, a: Row, b: Row): boolean {
   const [xs, ys] = [namesOf(list, a), namesOf(list, b)];
@@ -1562,7 +1562,7 @@ function settle(deps: PeopleDeps, list: DeclaredList<MeetsFields>, person: Row, 
  * Whether the strong rules may fold these two as far as where each was met goes (audit 19 H1). Two people met in commits
  * alone may be one author's spellings, and so may two met anywhere else. Somebody met in commits alone beside somebody
  * met otherwise is a commit author anybody could have signed as: a commit never folds the two, by a key nobody held or
- * by one its own author's row already held (two commits as `Rohan Mehta <rohanmehta@evil.test>` are the same forger
+ * by one its own author's row already held (two commits as `Teodor Vance <teodorvance@evil.test>` are the same forger
  * twice). A believed source folds them only when the commit-made row is the one this very meeting found by its key,
  * never a step later down the chain, where a forged author would be folded in on the real person's next meeting.
  *
@@ -1707,8 +1707,8 @@ function clusterBody(deps: Pick<PeopleDeps, 'nameOf' | 'titleOf' | 'nowMs'>, lis
 }
 
 /**
- * One question for a cluster of people who may be one, in names and evidence: "Are Rohan Mehta (Encore, met 6 times)
- * and rohanmehta (GitHub) one person?" Accepting it folds every other into the one kept, carrying what they hold.
+ * One question for a cluster of people who may be one, in names and evidence: "Are Teodor Vance (Brightwell, met 6 times)
+ * and teodorvance (GitHub) one person?" Accepting it folds every other into the one kept, carrying what they hold.
  */
 function askCluster(deps: PeopleDeps, list: DeclaredList<MeetsFields>, rows: readonly Row[], confidence?: number): Result<string | null> {
   const drawn = clusterBody(deps, list, rows);

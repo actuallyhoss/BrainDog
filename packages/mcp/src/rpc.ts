@@ -179,8 +179,12 @@ const DECIDES_NOT = {
   },
 } as const satisfies Result<never>;
 
-/** One mark `handle` leaves with the surface's `heard`. */
-type Mark = Parameters<NonNullable<McpSurface<unknown>['heard']>>[0];
+/**
+ * One mark `handle` leaves with the surface's `doorHeard`, the record's unrouted twin of `heard` that keeps the door's own
+ * marks and moves a key's last tool call (audit 38-39, findings 2 and 5). A surface without it is handed the mark through
+ * `heard`, as before.
+ */
+type Mark = Parameters<NonNullable<McpSurface<unknown>['doorHeard']>>[0];
 
 /**
  * Leave a mark, and never wait on it or let it fail the call (AGT-B01, "the agent door lists its tools").
@@ -190,9 +194,11 @@ type Mark = Parameters<NonNullable<McpSurface<unknown>['heard']>>[0];
  * the record could count it. The record writes a mark before its first `await`, so nothing is lost by not waiting.
  */
 function hear<C>(surface: McpSurface<C>, ctx: C, mark: Mark): void {
-  if (typeof surface.heard !== 'function') return;
+  const s = surface;
+  const leave = typeof s.doorHeard === 'function' ? s.doorHeard.bind(s) : typeof s.heard === 'function' ? s.heard.bind(s) : undefined;
+  if (leave === undefined) return;
   try {
-    const p: unknown = surface.heard(mark, ctx);
+    const p: unknown = leave(mark, ctx);
     /* ANY THENABLE, not only this realm's Promise, so a rejection from a surface built elsewhere is caught too. */
     if (p !== null && typeof p === 'object' && typeof (p as { then?: unknown }).then === 'function') Promise.resolve(p).catch(() => undefined);
   } catch {
@@ -262,8 +268,9 @@ export function negotiate(asked: unknown): (typeof VERSIONS)[number] | null {
  * `version` IS THE REVISION THE TRANSPORT KNOWS this request speaks (`revisionOf`), and it decides only whether a
  * result carries `resultType`. `initialize` is answered under the revision it negotiates, whatever is passed.
  *
- * AND IT MARKS HOW THE SESSION MET THE DOOR, through the surface's optional `heard` (AGT-B01): `hello` for an
- * `initialize` it answered, with the client and this server's build; `listed` for a tool list it gave, with how many;
+ * AND IT MARKS HOW THE SESSION MET THE DOOR, through the surface's optional `doorHeard`, or `heard` on a surface without
+ * it (AGT-B01): `hello` for an `initialize` it answered, with the client and this server's build; `listed` for a tool list
+ * it gave, with how many;
  * `called` on a caller's first tool call and at most once a minute after; `internal` for an answer whose code is
  * INTERNAL. None is waited on and none can fail the call (`hear`). `caller` is the transport's key for who is calling,
  * which only the minute between `called` marks reads; a stdio pipe is one caller and passes none.

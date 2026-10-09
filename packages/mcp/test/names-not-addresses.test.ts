@@ -36,15 +36,15 @@ const clean = (said: string, where: string) => {
 const look: Look = {
   now: Date.UTC(2026, 9, 6),
   decl: (r) => (r === 'people' ? ({ id: 'people', name: 'People', one: 'person', fields: [] } as never) : undefined),
-  title: (h) => ({ 'people#3': 'Rohan Mehta', 'people#9': 'rohan@encore.example', [ROW]: 'Rohan Mehta (people#3)', P6: 'Priya Raman' })[h],
-  actor: (by) => (by === 'p_1' ? 'Sam' : 'Someone'),
-  decider: 'Sam',
+  title: (h) => ({ 'people#3': 'Joaquin Herrera', 'people#9': 'joaquin@lanternfish.example', [ROW]: 'Joaquin Herrera (people#3)', P6: 'Teodor Vance' })[h],
+  actor: (by) => (by === 'p_1' ? 'Mara' : 'Someone'),
+  decider: 'Mara',
 };
 
 test('AN ADDRESS BESIDE A NAME GOES AND THE NAME STAYS; ONE ALONE IS SOMEONE, and names nobody', () => {
   assert.equal(unaddressed('Reply to Jo <jo@kiln.example> about the proof'), 'Reply to Jo about the proof');
   assert.equal(unaddressed('Reply to jo@kiln.example about the proof'), 'Reply to someone about the proof');
-  assert.equal(unaddressed('Brightloom Repos (101799195+BrightloomGit@users.noreply.github.com) pushed'), 'Brightloom Repos pushed');
+  assert.equal(unaddressed('Pellucid Repos (58213407+PellucidGit@users.noreply.github.com) pushed'), 'Pellucid Repos pushed');
   assert.equal(unaddressed('write to mailto:jo@kiln.example'), 'write to someone');
   assert.equal(unaddressed('Due on 6 Oct at 10:00 @ the studio'), 'Due on 6 Oct at 10:00 @ the studio', 'an at sign alone is not an address');
   for (const step of ['Pin node@24.13.0 before the tests', 'Bump @braindog/mcp@0.3.1', 'Meet at 3@4.5pm'])
@@ -56,29 +56,29 @@ test('AN ADDRESS BESIDE A NAME GOES AND THE NAME STAYS; ONE ALONE IS SOMEONE, an
 });
 
 test('A QUESTION IS SAID IN NAMES, each handle beside its words, and a row whose words are an address by its kind', () => {
-  const said = plainOf(`Merge people#9 into ${ROW}? Asked by p_1 on Maras-MacBook-Pro.local about rohan@encore.example, from ~/.claude.json`, look);
-  assert.equal(said, 'Merge the person people#9 into Rohan Mehta (people#3)? Asked by Sam on MacBook about someone, from .claude.json');
+  const said = plainOf(`Merge people#9 into ${ROW}? Asked by p_1 on Maras-MacBook-Pro.local about joaquin@lanternfish.example, from ~/.claude.json`, look);
+  assert.equal(said, 'Merge the person people#9 into Joaquin Herrera (people#3)? Asked by Mara on MacBook about someone, from .claude.json');
   clean(said, 'the question');
 });
 
 test("PROPOSE'S ANSWER SAYS THE QUESTION IN NAMES, with its own handle to act on", async () => {
-  const proposal = { question: `Is rohan@encore.example the same person as ${ROW}?`, body_kind: 'note', body: {} };
+  const proposal = { question: `Is joaquin@lanternfish.example the same person as ${ROW}?`, body_kind: 'note', body: {} };
   const { surface } = stub({
-    boot: (async () => ({ ok: true, value: { me: { level: 'owner', name: 'Sam' }, registers: [{ id: 'people', name: 'People' }] } })) as never,
-    get: (async () => ({ ok: true, value: { id: ROW, register: 'people', seq: 3, version: 1, state: null, fields: { name: 'Rohan Mehta' } } })) as never,
+    boot: (async () => ({ ok: true, value: { me: { level: 'owner', name: 'Mara' }, registers: [{ id: 'people', name: 'People' }] } })) as never,
+    get: (async () => ({ ok: true, value: { id: ROW, register: 'people', seq: 3, version: 1, state: null, fields: { name: 'Joaquin Herrera' } } })) as never,
     schema: (async () => ({ ok: true, value: { id: 'people', name: 'People', title: 'name', seq_prefix: 'P', fields: [{ id: 'name', type: 'text' }] } })) as never,
     propose: (async () => ({ ok: true, value: { id: 'SG7', question: proposal.question } })) as never,
   });
   const said = await tools(surface).answer('propose', proposal, agent);
-  assert.match(said.text ?? '', /^Asked Sam: Is someone the same person as Rohan Mehta \(P3\)\? \(SG7\)\nSam decides in BrainDog\.$/u);
+  assert.match(said.text ?? '', /^Asked Mara: Is someone the same person as Joaquin Herrera \(P3\)\? \(SG7\)\nMara decides in BrainDog\.$/u);
   clean(said.text ?? '', 'the propose answer');
 });
 
 test('A FILED OR LANDED ANSWER IS IN NAMES TOO', () => {
   const filed = ruledBrief({ filed: { id: 'SG8', question: `Add jo@kiln.example to people as ${OTHER}?`, why: 'Asked by p_1.' } }, ['people'], look);
-  assert.match(filed, /^Filed for Sam to decide: Add someone to people as an entry you cannot open\? \(SG8\)\nAsked by Sam\./u);
+  assert.match(filed, /^Filed for Mara to decide: Add someone to people as an entry you cannot open\? \(SG8\)\nAsked by Mara\./u);
   clean(filed, 'a filed answer');
-  clean(proposedBrief({ id: 'SG9', decide: 'https://brain.dog/app/sam/decide/SG9' }, 'Link Jo <jo@kiln.example> to people#3?', look), 'a proposal');
+  clean(proposedBrief({ id: 'SG9', decide: 'https://brain.dog/app/mara/decide/SG9' }, 'Link Jo <jo@kiln.example> to people#3?', look), 'a proposal');
 });
 
 test('THE BRIEFING SAYS PEOPLE BY NAME, and a step, a question or a learning never carries an address or an id', () => {
@@ -87,22 +87,22 @@ test('THE BRIEFING SAYS PEOPLE BY NAME, and a step, a question or a learning nev
     home: null,
     context: {
       session: { spoken: 'S6' },
-      project: { spoken: 'things#1', name: 'Encore' },
-      handoff: { from: 'S5', next: `Write to rohan@encore.example about ${ROW}`, age_s: 3_600, tried: ['Mailed jo@kiln.example'] },
-      waiting: [{ id: 'SG7', question: 'Is Rohan Mehta <rohan@encore.example> the same person as people#3?' }],
+      project: { spoken: 'things#1', name: 'Lanternfish' },
+      handoff: { from: 'S5', next: `Write to joaquin@lanternfish.example about ${ROW}`, age_s: 3_600, tried: ['Mailed jo@kiln.example'] },
+      waiting: [{ id: 'SG7', question: 'Is Joaquin Herrera <joaquin@lanternfish.example> the same person as people#3?' }],
       people: [
-        { spoken: 'P6', name: 'Priya Raman <priya@encore.example>', role: 'client' },
+        { spoken: 'P6', name: 'Teodor Vance <teo@lanternfish.example>', role: 'client' },
         { spoken: 'P7', name: 'jo@kiln.example' },
-        { spoken: 'P8', name: 'Dario', org: 'P6' },
+        { spoken: 'P8', name: 'Wren', org: 'P6' },
       ],
-      live: { same_repo: [{ spoken: 'S4', agent: 'claude', doing: 'Mailing jo@kiln.example from /Users/sam/Developer', age_s: 60 }] },
+      live: { same_repo: [{ spoken: 'S4', agent: 'claude', doing: 'Mailing jo@kiln.example from /Users/mara/Developer', age_s: 60 }] },
     },
   });
   const who = card.split('\n').find((l) => l.startsWith('Who')) ?? '';
-  assert.match(who, /Priya Raman \(client\), Dario \(Priya Raman\)/u);
+  assert.match(who, /Teodor Vance \(client\), Wren \(Teodor Vance\)/u);
   assert.doesNotMatch(who, /someone|kiln/iu, 'a person known only by an address was named');
-  assert.match(card, /^Next {5}Write to someone about Rohan Mehta \(people#3\) \(S5, /mu);
-  assert.match(card, /^Waiting {2}1 on Sam: Is Rohan Mehta the same person as Rohan Mehta \(people#3\)\?/mu);
+  assert.match(card, /^Next {5}Write to someone about Joaquin Herrera \(people#3\) \(S5, /mu);
+  assert.match(card, /^Waiting {2}1 on Mara: Is Joaquin Herrera the same person as Joaquin Herrera \(people#3\)\?/mu);
   clean(text, 'the briefing');
   const kept = value as { handoff: { next: string; tried: string[] }; waiting: { shown: { question: string }[] } };
   for (const s of [kept.handoff.next, ...kept.handoff.tried, ...kept.waiting.shown.map((q) => q.question)]) assert.doesNotMatch(s, NEVER[0]![0], `the briefing's value carried an address: ${s}`);

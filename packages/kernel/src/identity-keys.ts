@@ -7,8 +7,9 @@
  * mailbox, the same login, the same payee", and nothing wider.
  *
  * FOLDING IS NARROW ON PURPOSE. Gmail ignores dots and `+tags`, so `ada.l+work@gmail.com` and `adal@gmail.com` are one
- * mailbox there and one key here. Most mail hosts do not, and folding `a.b@encore.example` into `ab@encore.example` would make
- * two colleagues one person. So only gmail.com and googlemail.com fold, and googlemail.com becomes gmail.com.
+ * mailbox there and one key here. Most mail hosts do not, and folding `a.b@lanternfish.example` into
+ * `ab@lanternfish.example` would make two colleagues one person. So only gmail.com and googlemail.com fold, and
+ * googlemail.com becomes gmail.com.
  *
  * A KEY IS NEVER SHOWN TO A PERSON. It is a handle the record joins on; what a person reads is the row's name. A model
  * never sees one either (`entities.ts`'s `resolveJob` masks them).
@@ -68,8 +69,8 @@ const PLATFORMS = new Set([
 ]);
 
 /**
- * Second-level suffixes under which the registrable domain is three labels, not two: `encore.co.uk` and not `co.uk`.
- * Not the whole public suffix list, which is 200 KB; the suffixes a record of a business actually meets.
+ * Second-level suffixes under which the registrable domain is three labels, not two: `lanternfish.co.uk` and not
+ * `co.uk`. Not the whole public suffix list, which is 200 KB; the suffixes a record of a business actually meets.
  */
 const SECOND_LEVEL = new Set([
   'co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'ltd.uk', 'plc.uk', 'me.uk', 'net.uk', 'sch.uk', 'nhs.uk', 'police.uk',

@@ -25,7 +25,7 @@ import { no, ok } from '@braindog/ports';
 import { compile, jsonPath, type Schema } from '@braindog/where';
 
 import { GROUP_CAP } from './buckets.ts';
-import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_SIGNS, SESSIONS_WORKING } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_DOOR, RECORD_KEYS, RECORD_PLACES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING } from './built-in-figures.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { across, type Amount, type Part } from './fx.ts';
 import type { Entry } from './index.ts';
@@ -625,6 +625,9 @@ export function figureLists(
   /* THE COUNT OF RUNS WORKING NOW READS THE RUNS, so it is named by Session, as a page over `sessions.working` is. */
   if (decl.source === SESSIONS_WORKING) return ['session'];
   if (decl.source === HANDOFFS_OPEN) return ['session'];
+  /* THE DOOR'S MARKS, THE KEYS AND THE PLACES, AND THE VITAL SIGNS read the whole record, so they name `*`: named by no
+     list, a member held to one list could read the key and door counts (kernel-figures-43). */
+  if (decl.source === RECORD_DOOR || decl.source === RECORD_KEYS || decl.source === RECORD_PLACES || decl.source === RECORD_VITALS) return ['*'];
   /* A KEPT LINE (`series.<figure>`) IS READ BY WHOEVER READS ITS FIGURE: how many nights Cash now missed says something
      about the lists Cash now reads, so it names them. A line of a figure this record does not hold, or a line of a line,
      names the whole record, so nobody held to part of it is shown it. */

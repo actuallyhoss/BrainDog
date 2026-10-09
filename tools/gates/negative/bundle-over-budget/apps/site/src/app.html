@@ -1,0 +1,15 @@
+<!doctype html>
+<!--
+  A CORRECT SHELL, because the seeded violation here is the size of the entry chunk. Each placeholder
+  is spelt once so the gate gets past its shell check, and there is no `apps/web/src/` so the build
+  never reads as stale (see `bundle-missing-chunk/` for why a shell there would).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

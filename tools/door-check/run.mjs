@@ -62,6 +62,27 @@ const SECRETS = Object.entries(process.env)
   .sort((a, b) => b.length - a.length);
 const withheld = (s) => SECRETS.reduce((text, secret) => text.split(secret).join('[withheld]'), String(s));
 
+/**
+ * THE KEYS GO TO PRODUCTION AND NOWHERE ELSE. A check hands the record's key to the host's `/mcp` and runs the host's
+ * install script with the model's key beside it, so a run pointed at another host, or at a record by an address on
+ * another host, is run with none of them: its rows read "not run", or fail where they need no key. Taken out of this
+ * process's environment after `SECRETS` read them, so a value echoed back is still withheld.
+ */
+const PRODUCTION = 'https://brain.dog';
+const KEYS = ['DOOR_TOKEN', 'DOOR_TOKEN_2', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'CODEX_API_KEY', 'CURSOR_API_KEY'];
+const originOf = (s) => {
+  try {
+    return new URL(s).origin;
+  } catch {
+    return '';
+  }
+};
+const elsewhere = [args.host, /^https?:\/\//.test(args.record) ? args.record : PRODUCTION].map(originOf).find((o) => o !== PRODUCTION);
+if (elsewhere !== undefined) {
+  for (const name of KEYS) delete process.env[name];
+  console.error(`No key is handed to ${elsewhere || args.host}: only ${PRODUCTION} gets them, so this run has none.`);
+}
+
 /** Every `*.check.mjs` in the folder, by name, narrowed to `--only`. */
 const dir = resolve(args.dir);
 const found = readdirSync(dir)

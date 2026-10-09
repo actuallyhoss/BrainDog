@@ -1,0 +1,14 @@
+{
+  "app": "cursor",
+  "pinned": "2026.10.01-e373342",
+  "why": "The build Cursor's install script (https://cursor.com/install) fetched when the check was written (October 2026). A pin moves by hand, and only with a passing night on the new build.",
+  "key": "CURSOR_API_KEY, a repository secret. Without it the row reads not run: no key.",
+  "download": "https://downloads.cursor.com/lab/<version>/<os>/<arch>/agent-cli-package.tar.gz",
+  "install": ["curl -fsSL <download> | tar --strip-components=1 -xzf - -C <home>/apps/cursor-<version>"],
+  "config": "<home>/.cursor/mcp.json: { mcpServers: { braindog: { command: <home>/.braindog/bin/braindog, args: [mcp, --agent, cursor] } } }",
+  "flags": ["--output-format", "stream-json", "--force", "--approve-mcps"],
+  "env": {
+    "HOME": "<home>",
+    "XDG_CONFIG_HOME": "<home>/.config"
+  }
+}

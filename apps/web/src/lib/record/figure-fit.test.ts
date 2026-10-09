@@ -228,22 +228,13 @@ const EDGES = [
 const BANDS = [FLOOR, ...EDGES].map((from, i) => ({ from, to: (EDGES[i] ?? CEIL + 1) - 1 }));
 
 /**
- * The widths a stat grid's own container queries change their mind at, read the same way. The
- * route's money threshold is one of these and is not named here, so moving it from 280 to 288 moved
- * every width probed below without an edit to this list.
+ * The widths a stat grid's own container queries change their mind at, read the same way. A step the
+ * page writes itself is read here too and named nowhere, so one added tomorrow is probed without an
+ * edit to this list (and must earn its place, the test after the first says).
  */
 const STEPS = [...new Set([...guards(blocksCss, '@container (inline-size < '), ...guards(blocksCss, '@container stat (inline-size < '), ...guards(routeCss, '@container (inline-size < ')].map((g) => g.px))].sort(
   (a, b) => a - b,
 );
-
-/**
- * THE ROUTE'S MONEY STEP, NAMED ONLY WHERE A TEST HAS TO FIND THAT ONE RULE: the first test checks it
- * is still in the cascade. It was 280 until the first Linux run cut
- * `£22,600.00` in the 124px cell it left, and it is 288 because two cells of the Linux face's 125.2px
- * ink with two per cent to spare need 287.4px, while a 320px phone's slot is exactly 288px and must
- * not stack. 286 passed here and would have failed on the runner: 127px cells leave 1.4 per cent.
- */
-const MONEY = 288;
 
 type Seen = {
   readonly where: string;
@@ -422,7 +413,6 @@ async function measured(view: Page, body: string, css = CASCADE): Promise<Verdic
 test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT IT IN', async (t) => {
   assert.ok(!routeCss.includes(':global('), 'a `:global(` survived the scan, so the rules under test are invalid CSS a browser drops');
   assert.ok(GRIDS.length > 0, 'no declared page draws a stat, so this whole file would pass over nothing');
-  assert.ok(STEPS.includes(MONEY), `the stat stylesheets step at ${STEPS.join(', ')} and none of them is the money threshold this file was written for`);
   /* THE BANDS ARE REPORTED AND NOT PINNED TO A LIST. Asserting that the cascade breaks at exactly
      400, 640 and 900 would make a breakpoint added upstairs a failure here instead of a width this
      file starts probing, which is the opposite of reading them out of the stylesheets. What has to
@@ -468,7 +458,7 @@ test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT
   /* AND A PIXEL AT A TIME ACROSS THE WHOLE RANGE OF THE ONE BLOCK THAT LIVES IN A NARROW SLOT, at
      the narrowest window that draws it at full size, which is where the defect was found and
      where the 0.8px is. `/p/portfolio`'s `Earning` is the only `span: 4` stat on the declared pages;
-     every other one is `span: 12` and never sees a slot under 288px. */
+     every other one is `span: 12` and never sees a slot under a phone's. */
   const narrow = Math.min(...SPANS);
   const narrowGrids = GRIDS.filter((g) => g.span === narrow);
   const widest = BANDS[BANDS.length - 1]!;
@@ -502,6 +492,104 @@ test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT
   const closest = tight.reduce((a, b) => (b.room < a.room ? b : a));
   t.diagnostic(`the closest call on the shipped record: ${say(closest)}`);
   assert.ok(closest.room >= -SLACK, `the closest call is past the ${SLACK}px of slack: ${say(closest)}`);
+});
+
+/**
+ * NO STEP ON THE PAGE RESTACKS A STAT, BECAUSE NONE IS NEEDED, AND THIS IS THE MEASUREMENT THAT SAYS SO (PRF-B21).
+ *
+ * The page carried its own money step, `@container (inline-size < 288px)` in `PageBody.svelte`, which put a stat's
+ * figures one to a row under 288px of slot. Then `stat.css` began drawing every stat as rows under 480px of block, and
+ * the history called the 288 step dead without anybody measuring it. Measured on 9 October 2026, with the step lifted
+ * out of the cascade: 5,958 readings at both ends of every band and both sides of every step, and a pixel at a time
+ * across the narrow block's whole range, and not one figure cut or short of its margin. The narrowest slot the app gives
+ * a stat is 288px, the 320px phone's, so the step never fired at all. So it is gone, and with it the constant this file
+ * named it by.
+ *
+ * SO THIS TEST HOLDS BOTH HALVES. Every step the page itself writes over a stat's grid is lifted out and the figures
+ * measured again: a step that cuts nothing when lifted is dead weight, and the test fails naming it, which is how a 288
+ * step put back is caught. And with no such step, the shipped cascade is swept a pixel at a time BELOW the narrowest slot
+ * the app gives, down to `UNDER`, so the rows `stat.css` draws are shown to hold where a page step would have acted.
+ * The run prints the narrowest slot and the widest figure.
+ */
+const UNDER = 240;
+
+/** Every `@container` step the page's own components write over a grid, as byte ranges in `routeCss`. */
+const pageSteps = (): Guard[] => guards(routeCss, '@container (inline-size < ').filter((g) => routeCss.slice(g.start, g.end).includes('.grid'));
+
+/** The cascade with one of the page's steps taken out, everything else as shipped. */
+const without = (g: Guard): string => [...SHEETS.slice(0, -1), routeCss.slice(0, g.start) + routeCss.slice(g.end)].join('\n');
+
+/**
+ * EVERY FIGURE WHOSE INK RUNS PAST ITS OWN SLOT, by more than the slack. A stat drawn as rows sizes its figure's box by
+ * the figure, so `room` is about nought there and says nothing; what cuts a figure in a row is the row running past
+ * the block. A grid that squeezed five figures into a 240px slot read as whole without this.
+ */
+function spilled(slack: number): string[] {
+  const out: string[] = [];
+  for (const slot of document.querySelectorAll('.block-slot')) {
+    const edge = slot.getBoundingClientRect();
+    for (const el of slot.querySelectorAll('.cell-figure')) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      for (const r of range.getClientRects()) {
+        if (r.right > edge.right + slack || r.left < edge.left - slack) {
+          out.push(`${el.textContent ?? ''} runs past a ${(slot as HTMLElement).dataset.slot}px slot (${(slot as HTMLElement).dataset.where})`);
+          break;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** Every probe the first test takes, in one cascade: the band probes, and the narrow block a pixel at a time. */
+async function everyStep(view: Page, css: string): Promise<{ wrong: string[]; seen: Seen[] }> {
+  const wrong: string[] = [];
+  const seen: Seen[] = [];
+  const take = async (label: string, body: string): Promise<void> => {
+    const v = await measured(view, body, css);
+    seen.push(...(await view.evaluate(reading)));
+    wrong.push(...[...v.cut, ...v.short].map((s) => `${label}: ${say(s)}`));
+    wrong.push(...(await view.evaluate(spilled, SLACK)).map((s) => `${label}: ${s}`));
+  };
+  for (const band of BANDS) await take(`${band.from}-${band.to}`, await bandProbes(view, band));
+  const narrow = Math.min(...SPANS);
+  const widest = BANDS[BANDS.length - 1]!;
+  const from = Math.ceil((await geometry(view, widest.from)).get(narrow) ?? 0);
+  const to = Math.floor((await geometry(view, widest.to)).get(narrow) ?? 0);
+  await view.setViewportSize({ width: widest.from, height: 900 });
+  const grids = GRIDS.filter((g) => g.span === narrow);
+  await take('the narrow sweep', Array.from({ length: to - from + 1 }, (_, i) => grids.map((g) => pinned(g, from + i)).join('')).join(''));
+  return { wrong, seen };
+}
+
+test('NO STEP ON THE PAGE RESTACKS A STAT: lifted out, the 288px money step cut no figure at any step, so it is gone', async (t) => {
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const view = await browser.newPage({ viewport: { width: 1180, height: 900 } });
+
+  for (const g of pageSteps()) {
+    const { wrong, seen } = await everyStep(view, without(g));
+    assert.ok(
+      wrong.length > 0,
+      `the page's own ${g.px}px step over a stat's grid was lifted out and none of ${seen.length} figures is cut or short at any step, ` +
+        `the narrowest slot being ${Math.min(...seen.map((s) => s.slot))}px: stat.css draws a stat as rows there already, so the step is dead weight and goes`,
+    );
+  }
+
+  const { wrong, seen } = await everyStep(view, CASCADE);
+  assert.deepEqual(wrong, [], `${wrong.length} figures are cut or short of their margin with no page step over a stat`);
+  const narrowest = Math.min(...seen.map((s) => s.slot));
+  const widest = seen.reduce((a, b) => (b.ink > a.ink ? b : a));
+  assert.ok(narrowest > UNDER, `the app gives a stat a ${narrowest}px slot, under the ${UNDER}px this test sweeps down to`);
+
+  /* AND UNDER THE NARROWEST SLOT, where a page step would have acted: every stat, a pixel at a time, at the narrowest phone. */
+  await view.setViewportSize({ width: FLOOR, height: 900 });
+  const below = await measured(view, Array.from({ length: narrowest - UNDER }, (_, i) => GRIDS.map((g) => pinned(g, UNDER + i)).join('')).join(''));
+  const cut = [...below.cut, ...below.short].map(say).concat(await view.evaluate(spilled, SLACK));
+  assert.deepEqual(cut, [], `${cut.length} figures are cut or short between a ${UNDER}px and a ${narrowest}px slot, where the rows stat.css draws should hold`);
+  t.diagnostic(`${seen.length} figures; the narrowest slot the app gives a stat is ${narrowest}px; the widest figure: ${say(widest)}`);
+  t.diagnostic(`${below.figures} more from ${UNDER}px to ${narrowest - 1}px, none cut`);
 });
 
 /**

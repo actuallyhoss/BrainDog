@@ -46,7 +46,7 @@ const signer = (sql: NodeSql, row: Entry): string | undefined =>
   sql.one<{ actor: string }>('SELECT actor FROM event WHERE target = ? ORDER BY rowid LIMIT 1', `entry:${row.id}`)?.actor;
 
 /** Where Claude Code's start hook says it is, with the host session's own id. */
-const HOOK = { client_id: 'cc-1', host: 'mbp', repo: 'braindog', cwd: '/Users/sam/Developer/braindog', agent: 'claude' };
+const HOOK = { client_id: 'cc-1', host: 'mbp', repo: 'braindog', cwd: '/Users/mara/Developer/braindog', agent: 'claude' };
 
 test('A WRITE THAT NAMES NO RUN JOINS ITS TOKEN’S OPEN RUN: thirty deletes from a scratch folder are one run, not thirty', async () => {
   const { k, sql, clock } = await record();
@@ -100,7 +100,7 @@ test('OF TWO OPEN RUNS THE ONE WHERE THE CALLER IS WINS: the same machine and re
   const { k, sql, clock } = await record();
   value(k.runFor(as('t_1', { client_id: 'a', host: 'mbp', repo: 'braindog' })));
   clock.advance(MIN);
-  value(k.runFor(as('t_1', { client_id: 'b', host: 'mbp', repo: 'encore' })));
+  value(k.runFor(as('t_1', { client_id: 'b', host: 'mbp', repo: 'lanternfish' })));
   clock.advance(MIN);
   value(k.runFor(as('t_1', { client_id: 'c', host: 'pc' })));
   clock.advance(MIN);
@@ -111,7 +111,7 @@ test('OF TWO OPEN RUNS THE ONE WHERE THE CALLER IS WINS: the same machine and re
   };
   assert.equal(by({ host: 'mbp', repo: 'braindog' }), 'S1', 'the newest run won over the one in this checkout');
   assert.equal(by({ host: 'pc', repo: 'site' }), 'S3', 'a run on another machine won over the one on this machine');
-  assert.equal(by({ host: 'mbp', repo: 'encore' }), 'S2');
+  assert.equal(by({ host: 'mbp', repo: 'lanternfish' }), 'S2');
   /* A command from a scratch folder names the machine and no repository: the run heard from last on it. */
   assert.equal(by({ host: 'mbp', cwd: '/private/tmp/scratch' }), 'S2');
   /* A remote client says nothing of where it is: it joins the run heard from last. */
@@ -135,17 +135,17 @@ test('ANOTHER MACHINE, ANOTHER REPOSITORY OR ANOTHER AGENT IS ANOTHER HOST SESSI
     body: { id: 'tasks', name: 'Tasks', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'thing', type: 'ref', to: 'things', scope: { widen: 'person' } }] },
   };
   value(await k.install([projects, tasks]));
-  const [braindog, encore] = ['braindog', 'encore'].map((repo) => value<Entry>(k.create('things', { name: repo, repos: [repo] }, { actor: 'p_owner' })).id);
+  const [braindog, lanternfish] = ['braindog', 'lanternfish'].map((repo) => value<Entry>(k.create('things', { name: repo, repos: [repo] }, { actor: 'p_owner' })).id);
   /* Claude's session in BrainDog, opened by its start hook. */
   value(k.runFor(as('t_1', HOOK), 'opened: startup'));
   assert.equal(k.get('S1')?.fields.project, 'things#1');
 
-  /* Codex in the Encore checkout on the same machine and key, naming no run: not Claude's, and its task is Encore's. */
+  /* Codex in the Lanternfish checkout on the same machine and key, naming no run: not Claude's, and its task is Lanternfish's. */
   clock.advance(MIN);
-  const codex = value<Entry>(k.create('tasks', { what: 'Fix the checkout' }, as('t_1', { host: 'mbp', repo: 'encore', agent: 'codex' })));
-  assert.equal(signer(sql, codex), 'S2', 'a Codex write in Encore was signed as Claude’s BrainDog run');
-  assert.deepEqual([codex.fields.thing, k.get('S2')?.fields.project], [encore, 'things#2'], 'the Encore task was filed under BrainDog');
-  value(k.create('tasks', { what: 'Naming Encore', thing: encore }, as('t_1', { host: 'mbp', repo: 'encore', agent: 'codex' })));
+  const codex = value<Entry>(k.create('tasks', { what: 'Fix the checkout' }, as('t_1', { host: 'mbp', repo: 'lanternfish', agent: 'codex' })));
+  assert.equal(signer(sql, codex), 'S2', 'a Codex write in Lanternfish was signed as Claude’s BrainDog run');
+  assert.deepEqual([codex.fields.thing, k.get('S2')?.fields.project], [lanternfish, 'things#2'], 'the Lanternfish task was filed under BrainDog');
+  value(k.create('tasks', { what: 'Naming Lanternfish', thing: lanternfish }, as('t_1', { host: 'mbp', repo: 'lanternfish', agent: 'codex' })));
 
   /* The same key on the PC, and Codex in the BrainDog checkout, are host sessions of their own too. */
   clock.advance(MIN);

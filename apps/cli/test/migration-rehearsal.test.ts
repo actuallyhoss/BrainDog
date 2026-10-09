@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -47,11 +47,22 @@ const register = (id: string, name: string) => ({
 
 type Ran = { code: number | null; stdout: string; stderr: string };
 
-/** The rehearsal as he runs it, with the temp directory it may write to pointed at `temp`. */
+/**
+ * The rehearsal as he runs it, with the temp directory it may write to pointed at `temp`.
+ *
+ * A RUN THAT NAMES NO LOCK IS GIVEN A COPY OF THE KERNEL'S, beside `temp`, and never the tracked one: a PASS here is
+ * over a record a test built, and its receipt in `LOCK.json` would let a migration that is not yet applied anywhere ship
+ * unrehearsed the day one is.
+ */
 const rehearsal = (args: string[], temp: string): Promise<Ran> =>
   new Promise((done) => {
     const env: NodeJS.ProcessEnv = { ...process.env, TEMP: temp, TMP: temp, TMPDIR: temp };
-    const child = spawn(process.execPath, [SCRIPT, ...args], { env, cwd: temp, stdio: ['ignore', 'pipe', 'pipe'] });
+    let lock: string[] = [];
+    if (!args.includes('--lock')) {
+      lock = ['--lock', join(temp, '..', 'kernel-lock.json')];
+      copyFileSync(join(REPO, 'packages', 'kernel', 'src', 'migrations', 'LOCK.json'), lock[1]!);
+    }
+    const child = spawn(process.execPath, [SCRIPT, ...args, ...lock], { env, cwd: temp, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (d) => (stdout += String(d)));
@@ -183,5 +194,98 @@ test('A NIGHT NEEDS THE LIVE BUILD NAMED, AND AN IDENTITY INSIDE THE REPOSITORY 
   const unsealed = await rehearsal([night, '--deployed', 'HEAD'], temp);
   assert.equal(unsealed.code, 1);
   assert.match(unsealed.stderr, /--identity/);
+  assert.deepEqual(leftIn(temp), []);
+});
+
+// ─── --record, --identity-cmd and the receipt (LCH-C06) ───────────────────────────────────────────────────────────
+
+const LOCK = join(REPO, 'packages', 'kernel', 'src', 'migrations', 'LOCK.json');
+type Entry = { checksum: string; applied: boolean; rehearsed: { at: string; records: number; rows: number; pass: boolean } | null };
+
+/** The kernel's lock, copied into `dir` with the last migration not yet applied anywhere, as a new one stands. */
+function lockWithNewLast(dir: string) {
+  const last = MIGRATIONS[MIGRATIONS.length - 1];
+  assert.ok(last);
+  const name = `${String(last.version).padStart(4, '0')}_${last.slug}.ts`;
+  const lock = JSON.parse(readFileSync(LOCK, 'utf8')) as Record<string, Entry>;
+  assert.ok(lock[name], `${name} is not in the kernel's lock`);
+  lock[name] = { ...lock[name], applied: false, rehearsed: null };
+  const file = join(dir, 'LOCK.json');
+  writeFileSync(file, JSON.stringify(lock));
+  return { last, name, lock, file };
+}
+
+test('EVERY --record IS REHEARSED ON ITS OWN COPY, AND A PASS WRITES A RECEIPT OF COUNTS INTO THE LOCK, never a name', async (t) => {
+  const a = await older(t);
+  const b = await older(t);
+  const l = lockWithNewLast(a.dir);
+  /* A BARE FILE AND A --record TOGETHER, because a bare file is one --record. */
+  const out = await rehearsal([a.file, '--record', b.file, '--lock', l.file], a.temp);
+  assert.equal(out.code, 0, `${out.stdout}\n${out.stderr}`);
+
+  assert.match(out.stdout, /^record 1 of 2 · /m);
+  assert.match(out.stdout, /^record 2 of 2 · /m);
+  assert.equal(out.stdout.match(new RegExp(`^PASS ${REC} · `, 'gm'))?.length, 2, 'each record is rehearsed');
+  assert.match(out.stdout, /^PASS · all 2 records came through every migration$/m);
+  assert.match(out.stdout, new RegExp(`receipt\\s+migration ${l.last.version} ${l.last.slug}, 2 records and 10 rows, PASS, written to the lock`));
+
+  const text = readFileSync(l.file, 'utf8');
+  const after = JSON.parse(text) as Record<string, Entry>;
+  const got = after[l.name];
+  assert.ok(got?.rehearsed);
+  assert.deepEqual({ ...got.rehearsed, at: '' }, { at: '', records: 2, rows: 10, pass: true });
+  assert.ok(!Number.isNaN(Date.parse(got.rehearsed.at)), 'the receipt has its date');
+  assert.equal(got.checksum, await checksum(l.last.sql), 'the receipt is for the text that ran');
+  assert.equal(got.applied, false);
+  for (const [file, entry] of Object.entries(l.lock)) if (file !== l.name) assert.deepEqual(after[file], entry, `${file} changed`);
+  /* THE LOCK IS TRACKED, SO IT HOLDS COUNTS AND NOTHING OF A RECORD: not its id, its name, its address or a row. */
+  for (const word of [REC, OWNER, 'The Studio', 'the-studio', 'Kiln', 'ada@example.com']) assert.ok(!text.includes(word), `the lock holds ${word}`);
+  /* AND IT IS WRITTEN AS THE GATE WRITES IT, one line per migration, though it was handed one long line. */
+  for (const line of text.trimEnd().split('\n').slice(1, -1)) assert.match(line, /^ {2}"\d{4}_[a-z0-9_]+\.ts": \{.*\},?$/);
+
+  assert.deepEqual(leftIn(a.temp), [], 'each copy is removed');
+  assert.deepEqual(new Uint8Array(readFileSync(a.file)), a.bytes);
+  assert.deepEqual(new Uint8Array(readFileSync(b.file)), b.bytes);
+});
+
+test('A FAIL WRITES NOTHING TO THE LOCK, so the gate stays red until a rehearsal passes', async (t) => {
+  const last = MIGRATIONS[MIGRATIONS.length - 1];
+  assert.ok(last);
+  const n = await older(t, { refuse: last.version });
+  const l = lockWithNewLast(n.dir);
+  const before = readFileSync(l.file, 'utf8');
+  const out = await rehearsal(['--record', n.file, '--lock', l.file], n.temp);
+  assert.equal(out.code, 1, `${out.stdout}\n${out.stderr}`);
+  assert.match(out.stdout, /^FAIL /m);
+  assert.doesNotMatch(out.stdout, /receipt/);
+  assert.equal(readFileSync(l.file, 'utf8'), before, 'a FAIL wrote to the lock');
+  assert.deepEqual(leftIn(n.temp), []);
+});
+
+test('--identity-cmd READS THE KEY FROM A COMMAND AND NEVER SAYS IT; with --identity too, or a record by its address, it is refused', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-rehearsal-test-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const temp = join(dir, 'temp');
+  mkdirSync(temp);
+  const night = join(dir, 'latest.brainl.age');
+  writeFileSync(night, 'age-encryption.org/v1\n');
+
+  const twice = await rehearsal(['--record', night, '--identity', join(dir, 'backup.key'), '--identity-cmd', 'true', '--deployed', 'HEAD'], temp);
+  assert.equal(twice.code, 1);
+  assert.match(twice.stderr, /not both/);
+
+  const failing = await rehearsal(['--record', night, '--identity-cmd', 'exit 7', '--deployed', 'HEAD'], temp);
+  assert.equal(failing.code, 1);
+  assert.match(failing.stderr, /The identity command exited 7, so no identity was read/);
+
+  const wrong = await rehearsal(['--record', night, '--identity-cmd', "printf 'AGE-SECRET-KEY-1NOTAKEYATALL\\n'", '--deployed', 'HEAD'], temp);
+  assert.equal(wrong.code, 1);
+  assert.match(wrong.stderr, /What the identity command printed holds a line that is not an age identity/);
+  assert.ok(!`${wrong.stdout}${wrong.stderr}`.includes('NOTAKEYATALL'), 'the command output was said');
+  assert.doesNotMatch(wrong.stdout, /deployed\s/, 'the live build was checked out before the key was read');
+
+  const address = await rehearsal(['--record', 'https://brain.dog/the-studio'], temp);
+  assert.equal(address.code, 1);
+  assert.match(address.stderr, /names a record and not a file/);
   assert.deepEqual(leftIn(temp), []);
 });

@@ -133,6 +133,17 @@ export interface CtxHost {
   get?(spoken: string, reads: readonly string[]): Promise<Json>;
   /** The run's instant, from the host clock. The sandbox's own `Date` is not what a row is stamped with. */
   now(): string;
+  /**
+   * THE CLOCK BOTH METERS READ, wall_ms AND cpu_ms, in milliseconds from any fixed start. Absent, it is the machine's
+   * (`performance.now()`), and that is what a real run gets. A NAME OF ITS OWN BECAUSE `now` IS TAKEN: that is the
+   * instant a row is stamped with, an ISO string, and this is a meter's reading.
+   *
+   * A test that is not about limits hands a clock that does not move, so a busy machine cannot trip a limit the test
+   * is not about: one run of the bands add-on's tests on a loaded machine failed three of them at ten times the usual
+   * duration. A test of the limits keeps the machine's clock, or holds one it moves itself
+   * (`packages/script/test/clock.test.ts`).
+   */
+  clock?(): number;
   tz: string;
   /** A door's body and headers, a rule's copied fields, or `null` on a schedule. */
   input: Json;

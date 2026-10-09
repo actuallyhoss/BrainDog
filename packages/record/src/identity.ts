@@ -307,12 +307,51 @@ export async function codeHash(code: string): Promise<string> {
 
 /**
  * `signup.start` as the Worker sends it: `checked`, whether a bot check ran in front of it (`SIGNUP_UNCHECKED` applies
- * when it did not), and, while sign-up is by invitation, `invite` with the `code` the page carried.
+ * when it did not), while sign-up is by invitation, `invite` with the `code` the page carried, and `said`, what was
+ * said, for the mailed link's fragment only.
  *
- * HERE AND NOT IN `@braindog/ports`, as `SessionAsk` is, because only this file and the Worker read the three fields;
+ * HERE AND NOT IN `@braindog/ports`, as `SessionAsk` is, because only this file and the Worker read the four fields;
  * the port's arm is where they belong the day that file is next opened. Assignable to `SignupCall`, so `auth` takes it.
  */
-export type SignupStart = Extract<SignupCall, { flow: 'signup.start' }> & { checked?: boolean; invite?: boolean; code?: string };
+export type SignupStart = Extract<SignupCall, { flow: 'signup.start' }> & { checked?: boolean; invite?: boolean; code?: string; said?: string };
+
+/**
+ * The most of what was said that rides in a sign-up link: the sentence and its one answer, as the page packs them.
+ *
+ * IN THE LINK'S FRAGMENT AND NOWHERE ELSE (`signup.start`), so a link opened on another device still builds from it.
+ * A fragment never reaches a server, and this file never writes it to a table or a log.
+ */
+export const SAID_IN_LINK = 1000;
+
+/**
+ * What in a sentence a letter must not carry: a web address, by its scheme, `www.` or a common ending, and an email
+ * address. The link is printed in the letter as well as under its button, and a sign-up that let anybody put a link
+ * into a letter to anybody else would be a way to send one.
+ *
+ * THE SAME RULES AS THE PAGE'S (`apps/web/src/lib/signup.ts`, `CARRIES_NOT`), which leaves such a sentence on the device
+ * rather than be refused.
+ */
+const NOT_IN_LINK: readonly RegExp[] = [
+  /[a-z][a-z0-9+.-]*:\/\//i,
+  /\bwww\./i,
+  /[^\s@]+@[^\s@]+\.[^\s@]+/,
+  /\b[a-z0-9-]+\.(?:com|net|org|io|co|ai|app|dev|me|info|biz|xyz|ly|gl|gg|link|site|online|shop|store)\b/i,
+];
+
+/**
+ * Why a sentence cannot ride in a sign-up link, or `null` when it can. Called before any strike, as a malformed address
+ * is: nothing about it says who is here.
+ */
+export function saidRefused(said: string): string | null {
+  if (said.length > SAID_IN_LINK) return 'The link carries at most 1,000 characters of what you said. Shorten it, or leave the rest for later.';
+  if (NOT_IN_LINK.some((r) => r.test(said))) return 'The link cannot carry a web or email address. Take it out of what you said, and add it once your record is made.';
+  try {
+    encodeURIComponent(said);
+  } catch {
+    return 'What you said has a character a link cannot carry. Type it again.';
+  }
+  return null;
+}
 
 /** What `signup.start` answers while sign-up is by invitation and no code could be held: the Worker turns it into a 403. */
 export type SignupNeeds = { needs: 'code' };
@@ -1241,6 +1280,11 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         const rule = asked.checked === true ? SIGN_IN : SIGNUP_UNCHECKED;
         const email = text(call.email).trim().toLowerCase();
         if (!ADDRESS.test(email)) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'That is not an email address.', at: 'email' } };
+        /* WHAT WAS SAID RIDES IN THE LINK, NEVER IN A TABLE OR A LOG: checked here, before any strike, and read again
+           only where the mail is made. None, or only spaces, is a link as it always was. */
+        const said = text(asked.said).trim();
+        const unsaid = said === '' ? null : saidRefused(said);
+        if (unsaid !== null) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: unsaid, at: 'said' } };
         const stop = reserve(flow, `signup:${ipBucket(text(call.ip))}`, now, rule);
         if (stop) return stop;
         const slug = signupSlug(call.slug);
@@ -1317,7 +1361,11 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           return true;
         });
         if (!held) return { status: 200, body: { needs: 'code' } satisfies SignupNeeds };
-        return { status: 200, body: {}, mail: { kind: 'signup.verify', to: email, link: token } };
+        /* THE SENTENCE AFTER THE PROOF, in the fragment the Worker puts the proof in (`#verify=<proof>&said=<words>`),
+           so the tab the link opens, on any device, builds from it. Only the letter that makes a record carries it: a
+           known address is sent a sign-in link, which builds nothing. */
+        const link = said === '' ? token : `${token}&said=${encodeURIComponent(said)}`;
+        return { status: 200, body: {}, mail: { kind: 'signup.verify', to: email, link } };
       }
 
       /**

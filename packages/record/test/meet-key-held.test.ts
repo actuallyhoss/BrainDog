@@ -59,7 +59,7 @@ const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'own
 /* AN AGENT, which is sent to `meet` and handed the row's handle beside its name. */
 const agent: CallContext = {
   principal: { kind: 'token', id: 'tok_1', scope: 'write', person: 'p_1', level: 'owner' },
-  session: { host: 'dev-pc', repo: 'encore', agent: 'claude', client_id: 'c-1' },
+  session: { host: 'dev-pc', repo: 'lanternfish', agent: 'claude', client_id: 'c-1' },
 };
 
 async function record() {
@@ -67,7 +67,7 @@ async function record() {
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   value(await api.kernel.install([PEOPLE, ORGS, NOTES]));
   value<Entry>(await api.create({ register: 'people', fields: { name: 'Ada Lovelace', email: 'ada@example.com', handles: ['github:ada'] } }, owner));
-  value<Entry>(await api.create({ register: 'organisations', fields: { name: 'Encore', domain: 'encore.example', keys: ['bank:encore'] } }, owner));
+  value<Entry>(await api.create({ register: 'organisations', fields: { name: 'Lanternfish', domain: 'lanternfish.example', keys: ['bank:lanternfish'] } }, owner));
   return { api, sql };
 }
 
@@ -140,12 +140,12 @@ test('A ROW THAT IS GONE HOLDS NO KEY, so its address may be written again', asy
 
 test("AN ORGANISATION'S DOMAIN AND KEYS ARE HELD THE SAME WAY", async () => {
   const { api, sql } = await record();
-  const d = refused(await api.create({ register: 'organisations', fields: { name: 'Encore Inc', domain: 'Encore.xyz' } }, agent));
+  const d = refused(await api.create({ register: 'organisations', fields: { name: 'Lanternfish Inc', domain: 'Lanternfish.example' } }, agent));
   assert.equal(`${d.code} at ${d.at}`, 'ALREADY_KNOWN at domain');
-  assert.match(d.fix, /domain:encore\.xyz already belongs to Encore \(organisations#1\)\. Call meet/u);
-  const k = refused(await api.create({ register: 'organisations', fields: { name: 'ENCORE', keys: ['bank:encore'] } }, owner));
+  assert.match(d.fix, /domain:lanternfish\.example already belongs to Lanternfish \(organisations#1\)\. Call meet/u);
+  const k = refused(await api.create({ register: 'organisations', fields: { name: 'LANTERNFISH', keys: ['bank:lanternfish'] } }, owner));
   assert.equal(`${k.code} at ${k.at}`, 'ALREADY_KNOWN at keys');
-  assert.equal(k.fix, 'Encore already has encore on bank. Add what you know to it rather than adding it twice.');
+  assert.equal(k.fix, 'Lanternfish already has lanternfish on bank. Add what you know to it rather than adding it twice.');
   assert.equal(count(sql, 'organisations'), 1);
   sql.close();
 });

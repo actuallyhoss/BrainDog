@@ -95,12 +95,23 @@ test('NOTHING THE GRAMMAR REFUSES: the page installs as a declaration', () => {
 });
 
 test('THE LINE IS SAID FROM signs-red, exactly one of three, and none at all while nothing has been read', () => {
-  assert.deepEqual(leads(read([GREEN], { 'signs-red': 0 })), ['Everything on this record is alive.']);
+  assert.deepEqual(leads(read([GREEN], { 'signs-red': 0 })), ['No vital sign needs a look.']);
   assert.deepEqual(leads(read([RED, GREEN], { 'signs-red': 1 })), ['One thing on this record needs a look.']);
   const three = leads(read([RED, RED, RED], { 'signs-red': 3 }));
   assert.equal(three.length, 1);
   assert.match(three[0]!, /^\{\{signs-red\}\} things on this record need a look\.$|^3 things on this record need a look\.$/u);
   assert.deepEqual(leads(read([NONE], { 'signs-red': null })), [], 'a record nobody has read is not told it is alive');
+});
+
+test('ONE GREEN AND THE REST UNREAD IS NEVER CALLED ALIVE: the line says only that nothing needs a look', () => {
+  const unread = [NONE, { ...NONE, sign: 'tools-listed', name: 'The tools list' }, { ...NONE, sign: 'rules-ran', name: 'Rules ran this week' }];
+  /* `signs-red` reads 0 here, as the kernel reads it once one sign is green (`readVitals`). */
+  const blocks = read([GREEN, ...unread], { 'signs-red': 0 });
+  assert.deepEqual(leads(blocks), ['No vital sign needs a look.']);
+  for (const line of leads(blocks)) assert.doesNotMatch(line, /alive|healthy|everything/iu, line);
+  assert.deepEqual(under(blocks, 'Alive'), [GREEN.name]);
+  assert.deepEqual(under(blocks, 'Not read yet'), unread.map((u) => u.name), 'every unread sign is said, by its name');
+  for (const b of BLOCKS) if (b.kind === 'note') assert.doesNotMatch(String(b.body), /alive/iu, 'no line says alive of the record');
 });
 
 test('HOW LONG IT HAS HELD is said from green-days in whole words, and not at all at nought or unread', () => {

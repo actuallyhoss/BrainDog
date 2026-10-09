@@ -54,7 +54,7 @@ const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'own
 
 const agent = (registers?: readonly string[]): CallContext => ({
   principal: { kind: 'token', id: 'tok_1', scope: 'propose', person: 'p_1', level: 'owner' },
-  session: { host: 'dev-pc', repo: 'encore', agent: 'claude', client_id: 'c-1' },
+  session: { host: 'dev-pc', repo: 'lanternfish', agent: 'claude', client_id: 'c-1' },
   ...(registers === undefined ? {} : { registers }),
 });
 
@@ -68,9 +68,9 @@ async function record(others: number) {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   value(await api.kernel.install([THINGS, PEOPLE]));
-  const encore = value<Entry>(await api.create({ register: 'things', fields: { name: 'Encore', repos: ['encore'] } }, owner));
-  const person = async (fields: Record<string, unknown>) => value<Entry>(await api.create({ register: 'people', fields: { projects: [encore.id], ...fields } }, owner));
-  const me = await person({ name: 'Sam', email: 'Sam@Example.com', keys: ['github:samdev'], self: true, in_touch: '2026-10-06' });
+  const lanternfish = value<Entry>(await api.create({ register: 'things', fields: { name: 'Lanternfish', repos: ['lanternfish'] } }, owner));
+  const person = async (fields: Record<string, unknown>) => value<Entry>(await api.create({ register: 'people', fields: { projects: [lanternfish.id], ...fields } }, owner));
+  const me = await person({ name: 'Mara', email: 'Mara@Example.com', keys: ['github:maradev'], self: true, in_touch: '2026-10-06' });
   for (let i = 1; i <= others; i += 1) await person({ name: `Person ${i}`, in_touch: `2026-09-${String(((i - 1) % 28) + 1).padStart(2, '0')}` });
   return { api, sql, me };
 }
@@ -81,12 +81,12 @@ test("THE RECORD'S OWN PERSON IS MARKED self, AND context SAYS THE KEYS THEY ARE
   assert.deepEqual(
     here.people.map((p) => [p.name, p.self]),
     [
-      ['Sam', true],
+      ['Mara', true],
       ['Person 2', false],
       ['Person 1', false],
     ],
   );
-  assert.deepEqual(new Set(here.self?.keys), new Set(['email:sam@example.com', 'github:samdev']));
+  assert.deepEqual(new Set(here.self?.keys), new Set(['email:mara@example.com', 'github:maradev']));
   /* NOT MORE THAN ARE SHOWN, SO NO COUNT. */
   assert.equal(here.people_total, undefined);
   sql.close();
@@ -118,7 +118,7 @@ test('PAST THE FIFTY READ TO CHOOSE FROM, EVERYBODY HERE IS STILL COUNTED', asyn
 
 test('A PERSON FOLDED INTO ANOTHER IS STILL READ BY THE HANDLE THEY HAD, saying who they were folded into', async () => {
   const { api, sql, me } = await record(1);
-  const twin = value<Entry>(await api.create({ register: 'people', fields: { name: 'samdev' } }, owner));
+  const twin = value<Entry>(await api.create({ register: 'people', fields: { name: 'maradev' } }, owner));
   /* FOLDED AS EVERY MERGE IS, BY A DECISION (`mergeShaped`): a plain update may not name `merged_into`. */
   {
     const asked = value<{ id: string }>(await api.propose({ question: 'Are these the same?', body_kind: 'rowset', body: { register: 'people', rows: [{ at: `people#${twin.seq}`, version: twin.version, patch: { merged_into: me.id, deleted_at: new Date(NOW).toISOString() } }] } }, owner));

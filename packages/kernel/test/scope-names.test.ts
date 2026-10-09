@@ -79,10 +79,10 @@ test('A RUN IS PLACED ONCE: the first hint that resolves places it, and a placed
 test('AN UNKNOWN REPOSITORY IN THREE RUNS IS ONE "START A PROJECT?", with its remote and folder; two runs are a visit', () => {
   const seen = (at: string, more: Partial<SeenRun>): SeenRun => ({ at, ...more });
   const runs: SeenRun[] = [
-    seen('2026-10-01T09:00:00Z', { remote: 'git@bitbucket.org:encore/Encore_PREPROD.git', repo: 'Encore_PREPROD', cwd: '/Users/sam/Code/Encore_PREPROD' }),
-    seen('2026-10-02T09:00:00Z', { remote: 'https://bitbucket.org/encore/encore_preprod', cwd: '/Users/sam/Code/Encore_PREPROD' }),
+    seen('2026-10-01T09:00:00Z', { remote: 'git@bitbucket.org:lanternfish/Lanternfish_PREPROD.git', repo: 'Lanternfish_PREPROD', cwd: '/Users/sam/Code/Lanternfish_PREPROD' }),
+    seen('2026-10-02T09:00:00Z', { remote: 'https://bitbucket.org/lanternfish/lanternfish_preprod', cwd: '/Users/sam/Code/Lanternfish_PREPROD' }),
     /* A hook that could not read git: the repository's folder name alone, counted with the one remote of that name. */
-    seen('2026-10-03T09:00:00Z', { repo: 'encore_preprod', cwd: '/Users/sam/Code/Encore_PREPROD/apps/web' }),
+    seen('2026-10-03T09:00:00Z', { repo: 'lanternfish_preprod', cwd: '/Users/sam/Code/Lanternfish_PREPROD/apps/web' }),
     /* Placed runs, runs with only a folder, and a repository seen twice are not asked about. */
     seen('2026-10-03T10:00:00Z', { remote: 'github.com/me/app', project: 'things#1' }),
     seen('2026-10-03T11:00:00Z', { remote: 'github.com/me/app', project: 'things#1' }),
@@ -99,10 +99,10 @@ test('AN UNKNOWN REPOSITORY IN THREE RUNS IS ONE "START A PROJECT?", with its re
   ];
   assert.deepEqual(suggestProjects(runs, PROJECTS), [
     {
-      key: 'bitbucket.org/encore/encore_preprod',
-      name: 'encore_preprod',
-      remote: 'https://bitbucket.org/encore/encore_preprod',
-      folder: '/Users/sam/Code/Encore_PREPROD',
+      key: 'bitbucket.org/lanternfish/lanternfish_preprod',
+      name: 'lanternfish_preprod',
+      remote: 'https://bitbucket.org/lanternfish/lanternfish_preprod',
+      folder: '/Users/sam/Code/Lanternfish_PREPROD',
       runs: 3,
     },
   ]);

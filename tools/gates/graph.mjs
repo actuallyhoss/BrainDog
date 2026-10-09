@@ -560,6 +560,8 @@ export default function graph(
       "the new-action sheet's rates preset fills `packs/rates-poll/rates-poll.pack.json` with the pack's `fillRates`, as the rates form did (M3 B7).",
     'cli pack-live-feed':
       "`braindog feed propose` builds each feed in a person's setup file with the add-on's own `fillFeed` over `packs/live-feed/live-feed.pack.json` (REC-C01).",
+    'web pack-live-feed':
+      "the poll form on a project's or an organisation's page fills `packs/live-feed/live-feed.pack.json` with the add-on's own `fillFeed`, the one builder every feed is made by (REC-C01).",
   };
   const held = new Set();
 

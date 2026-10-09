@@ -1,0 +1,14 @@
+{
+  "//": "Planted for `ledger`: the web-lists gate holds three files and the newest line says two.",
+  "opened": "2026-10-09",
+  "budgets": {},
+  "debts": {},
+  "held": {
+    "web-lists.HELD": {
+      "lines": [
+        { "count": 2, "on": "2026-10-09", "why": "Two files still name a first-party list." }
+      ]
+    }
+  },
+  "deviations": {}
+}

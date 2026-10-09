@@ -376,7 +376,7 @@ test('A ROW THAT DIFFERS IS NOT OVERWRITTEN: a rowset update is proposed, once p
   h.mcp({ 'kiln-deploy': { command: 'npx', args: ['-y', 'kiln-mcp@2'], env: { KILN_API_TOKEN: token } } });
 
   assert.deepEqual(await h.scan(), [`Tool kiln-deploy in .mcp.json differs from the one in the record, so that was left as it is, and the change was asked on Decide: Update the kiln-deploy tool to match ${thisMachine()}?`]);
-  /* THE QUESTION IN WORDS. It read "Change tools#8 to how fly-prism is set up in ~/.claude.json on
+  /* THE QUESTION IN WORDS. It read "Change tools#8 to how fly-lanternfish is set up in ~/.claude.json on
      Maras-MacBook-Pro.local?"; the file, the machine and the handle are now the details. */
   assert.equal(h.of('propose')[0]?.args.question, `Update the kiln-deploy tool to match ${thisMachine()}?`);
   assert.deepEqual(h.of('propose')[0]?.args.body, {

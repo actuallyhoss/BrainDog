@@ -118,6 +118,22 @@ export type Pref = {
    */
   suggestPages?: boolean | undefined;
   /**
+   * Whether this person has hidden Today's "When you want more" (`WantMore.svelte`), the next steps the first run used
+   * to offer only once, at `/start#made` (planner-45, the onboarding target, step 6).
+   *
+   * `undefined` IS SHOWN. A first Today offers the next steps until the person says no, and Hide is the one word that
+   * says it. Per device, like the rest of this cookie: a hidden offer comes back on a new laptop, which is a nudge, not
+   * a loss.
+   */
+  nextStepsHidden?: boolean | undefined;
+  /**
+   * How this person's work mostly arrives, the one answer the first run asks when it cannot guess (planner-45, step 3),
+   * kept by sign-up's accept. `messages` puts forwarding first among the next steps (`madeSteps` in `start/made.ts`).
+   *
+   * `undefined` IS UNASKED, and the next steps keep the first run's own order.
+   */
+  arrivesBy?: 'messages' | 'app' | 'in-person' | undefined;
+  /**
    * The instant you last marked the activity feed read.
    *
    * "SINCE YOU WERE AWAY" NEVER ADVANCED. Home's feed reads a module constant and nothing anywhere
@@ -236,6 +252,8 @@ const SHAPE: Record<string, (v: unknown) => boolean> = {
   shape: (v) => v === 'rail' || v === 'bar' || v === 'menu',
   chars: (v) => typeof v === 'boolean',
   suggestPages: (v) => typeof v === 'boolean',
+  nextStepsHidden: (v) => typeof v === 'boolean',
+  arrivesBy: (v) => v === 'messages' || v === 'app' || v === 'in-person',
   seen: (v) => typeof v === 'string',
   nav: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
   defined: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),

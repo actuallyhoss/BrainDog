@@ -63,7 +63,7 @@ const CURRENCY_TABLES = new Set(['apps/web/src/lib/record/currencies.ts', 'apps/
  * AN ENTRY IS NOT A PERMISSION FOR THE FILE, only for the ids it lists: a new id written in a held file is a finding
  * like anywhere else.
  */
-const HELD = {
+export const HELD = {
   /* The first run hears packs by the catalogue's signals; what is left is the rows a sentence fills, which
      are Projects', People's and Money's, and the Projects every other list points at. */
   'apps/web/src/lib/shape.ts': {

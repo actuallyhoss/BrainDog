@@ -75,9 +75,9 @@ async function record() {
   const took = k.decide(merge.value.id, { decide: { option: 'accept', reason: 'the same' } }, 'p_1');
   assert.ok(took.ok, JSON.stringify(took));
   /* MET ONLY BY AN ADDRESS: the reading goes to a model whole, so it is not read (`scrub.ts`). */
-  make('people', { name: 'rohan.mehta@encore.example', met: lines(8) });
+  make('people', { name: 'ines.duarte@orchardline.example', met: lines(8) });
   /* THE RECORD'S OWN PERSON is in every commit, and is not somebody met. */
-  make('people', { name: 'Sam', self: true, met: lines(12) });
+  make('people', { name: 'Mara Lindqvist', self: true, met: lines(12) });
   /* AN EXAMPLE A PACK SEEDED is nobody anyone met. */
   make('people', { name: 'Sample Client', met: lines(9), tags: ['example'] });
   for (const what of ['Fix the gutter', 'Quote the roof']) make('tasks', { what, who: bo.id });

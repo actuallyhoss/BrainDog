@@ -65,6 +65,14 @@ const COPY = /^([a-z][a-z0-9-]*?)-(\d{4}-\d{2}-\d{2})(?:-\d+)?\.brainl(?:\.age)?
    before `-2`, and a prune that read the names as text deleted a newer copy and kept an older one. */
 const NATURAL = new Intl.Collator('en', { numeric: true });
 
+/** The label a deploy's restore point is taken under, alone or with the commit after it: `before-deploy-1a2b3c4`. */
+export const BEFORE_DEPLOY = 'before-deploy';
+
+/** How long a deploy's restore point is kept: seven days, enough to go back past a bad week of pushes. */
+export const BEFORE_DEPLOY_KEPT = 7 * 86_400_000;
+
+const isBeforeDeploy = (label: string): boolean => label === BEFORE_DEPLOY || label.startsWith(`${BEFORE_DEPLOY}-`);
+
 const said = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /**
@@ -119,12 +127,19 @@ export function cloudSnapshots(
     return all.sort((a, b) => (a.at === b.at ? NATURAL.compare(b.id, a.id) : a.at < b.at ? 1 : -1));
   };
 
-  /** Copies not taken by the night: the newest `keep` stay, and the rest go. */
+  /**
+   * Copies not taken by the night: the newest `keep` stay, and the rest go.
+   *
+   * A RESTORE POINT A DEPLOY TOOK IS KEPT BY AGE AND NOT BY COUNT (`restore-point.ts`, LCH-C06): seven days, and it is
+   * left out of the `keep` the other labels share, so a week of pushes never pushes out a copy somebody took on purpose.
+   */
   const pruneOthers = async (keep: number): Promise<void> => {
-    const doomed = (await held())
-      .filter((c) => c.label !== 'nightly')
-      .slice(keep)
-      .map((c) => c.key);
+    const others = (await held()).filter((c) => c.label !== 'nightly');
+    const now = o.now();
+    const doomed = [
+      ...others.filter((c) => isBeforeDeploy(c.label) && !(now - Date.parse(c.at) <= BEFORE_DEPLOY_KEPT)),
+      ...others.filter((c) => !isBeforeDeploy(c.label)).slice(keep),
+    ].map((c) => c.key);
     if (doomed.length > 0) await blobs.delete(doomed);
   };
 
@@ -146,7 +161,8 @@ export function cloudSnapshots(
      * label is kept apart, thirty of its own, as the self-host keeps them (`apps/selfhost/src/
      * snapshots.ts` `KEEP`): a month of nights never pushes out a copy somebody took on purpose,
      * and a copy taken by hand never pushes out a night. A `before-restore` copy prunes nothing, so
-     * the copy about to be gone back to cannot be the one it pushes out.
+     * the copy about to be gone back to cannot be the one it pushes out. A deploy's `before-deploy` copy is kept seven
+     * days and never counts as a night or among the thirty (`pruneOthers`).
      *
      * A SECOND COPY WITH ONE LABEL ON ONE DAY IS NUMBERED, `-2`, and never put over the first. The
      * key has only the day in it, and two restores in one afternoon would otherwise leave one

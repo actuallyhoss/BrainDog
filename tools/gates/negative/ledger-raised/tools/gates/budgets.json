@@ -1,0 +1,7 @@
+{
+  "//": "Planted for `ledger`: the entry script's recorded number set to 33900, the edit PRF-B03 says must be red.",
+  "bundle": {
+    "mainJsBrotli": 30720,
+    "mainJsBaseline": 33900
+  }
+}

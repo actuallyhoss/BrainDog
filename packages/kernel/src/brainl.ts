@@ -204,6 +204,12 @@ const SEALED_TABLES: ReadonlySet<string> = new Set(['vault_key']);
 
 const HEX = Array.from({ length: 256 }, (_, n) => n.toString(16).padStart(2, '0'));
 
+/**
+ * The longest text an import carries inside a row's one JSON array; a longer one binds on its own. At six bytes a
+ * character escaped, a full row of `DO_LIMITS.column` such texts is about 600 KB, well inside `DO_LIMITS.length`.
+ */
+const INLINE_TEXT = 1024;
+
 async function sha256(text: string): Promise<string> {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   let out = '';
@@ -820,10 +826,21 @@ export function importBrainl(
          reading it positionally against today's list would put a value in the wrong column —
          silently, and in a record of what somebody is owed. */
       const known = header.filter((c) => table!.columns.includes(c));
-      const placeholders = known.map(() => '?').join(', ');
+      const cells = known.map((c) => decode(values[header.indexOf(c)], `${table!.name}.${c}`));
+      /* THE ROW'S SHORT VALUES ARE ONE BOUND JSON ARRAY, each column read out of it by its place, so a wide table binds
+         one parameter and not one per column, inside the Durable Object's hundred (`DO_LIMITS.variableNumber`). JSON has
+         no bytes, so a BLOB keeps its own parameter. So does a long text: one bound value is held to `DO_LIMITS.length`,
+         and a row's long texts escaped into one array could pass it where each alone did not. A table has at most
+         `DO_LIMITS.column` columns, so a row of only those binds no more than that. They come first because their marks
+         stand before the one the subquery binds. */
+      const own = (v: unknown): boolean => v instanceof Uint8Array || (typeof v === 'string' && v.length > INLINE_TEXT);
+      const bound = cells.filter(own);
+      const inline = bound.length < cells.length;
+      const reads = cells.map((v, i) => (own(v) ? '?' : `json_extract(r, '$[${i}]')`));
       sql.exec(
-        `INSERT INTO ${table.name} (${known.join(', ')}) VALUES (${placeholders})`,
-        ...known.map((c) => decode(values[header.indexOf(c)], `${table!.name}.${c}`) as never),
+        `INSERT INTO ${table.name} (${known.join(', ')}) SELECT ${reads.join(', ')}${inline ? ' FROM (SELECT ? AS r)' : ''}`,
+        ...bound,
+        ...(inline ? [JSON.stringify(cells.map((v) => (own(v) ? null : v)))] : []),
       );
       touched.add(table.name);
       rows++;

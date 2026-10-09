@@ -82,10 +82,13 @@ test('THE MODEL IS ASKED FIRST, with the words and the catalogue this build ship
   assert.equal(p.currency, 'GBP');
   assert.deepEqual(
     p.heard.map((h) => h.phrase),
-    ['three Etsy shops', 'owe my supplier'],
-    'phrases are in the order they were typed, and one never typed is gone',
+    ['Mona', 'three Etsy shops', 'owe my supplier'],
+    'the name first, then phrases in the order they were typed, and one never typed is gone',
   );
+  assert.deepEqual(p.heard[0], { phrase: 'Mona', became: 'you', at: [0, 4], you: true }, 'the name heard becomes them');
+  for (const h of p.heard) assert.equal(said.slice(...h.at!), h.phrase, `${h.phrase} is lit where it was typed`);
   assert.deepEqual(p.names, { things: 'Shops' }, 'a list is named in their own word only');
+  assert.ok(p.places.some((x) => x.id === 'portfolio' && x.name === 'Shops' && x.phrase === 'three Etsy shops'), 'a place renamed is said in their word');
   assert.equal(p.rows.length, 1, 'an entry in another currency with what it requires missing is not kept');
   assert.deepEqual(p.rows[0]?.fields.amount, { amount: 40000, currency: 'GBP' });
   assert.equal(p.summary, 'Your three Etsy shops and what you owe.');
@@ -97,7 +100,7 @@ test('THE MODEL READS WHAT THE RULES CANNOT, in any language', async () => {
   assert.equal(propose(said, CTX).usecase, null, 'the rules read English alone');
   const p = await proposeFirst(said, CTX, fake(reply({ usecase: 'student', heard: [{ phrase: 'mes devoirs', became: 'Student' }] })).ask);
   assert.equal(p.usecase, 'student');
-  assert.deepEqual(p.heard, [{ phrase: 'mes devoirs', became: 'Student' }]);
+  assert.deepEqual(p.heard, [{ phrase: 'mes devoirs', became: 'Student', at: [36, 47] }]);
 });
 
 test('A CURRENCY IS ONE THAT WAS TYPED, whatever the model guessed', async () => {
@@ -160,4 +163,74 @@ test('A MODEL THAT CHOSE NOTHING AND DRAFTED NOTHING IS THE RULES, and words the
   assert.equal(p.by, 'rules');
   assert.equal(outsideCatalogue(p), true, 'the screen is never left with nothing to make');
   assert.equal(draftBrief(p, said), said);
+});
+
+/* ── use case 6: the first reading, lit, named and placed ──────────────── */
+
+const MARIAM = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer. I lose track of orders and who owes me.";
+
+test("MARIAM'S SENTENCE: her as you, her words lit where she typed them, the shop's and the business's places, and a title", () => {
+  const p = propose(MARIAM, CTX);
+  assert.equal(p.name, 'Mariam');
+  assert.deepEqual(p.heard[0], { phrase: 'Mariam', became: 'you', at: [4, 10], you: true }, 'her name is the first line, and it becomes her');
+  for (const h of p.heard) assert.equal(MARIAM.slice(...h.at!), h.phrase, `${h.phrase} is lit where she typed it`);
+  const shop = p.heard.find((h) => h.phrase === 'a small candle shop');
+  assert.equal(shop?.became, 'Shop', 'the trade is lit whole, and it is the shop, not Projects');
+
+  assert.equal(p.usecase, 'shop');
+  assert.ok(p.also.includes('business'), 'freelancing is a business beside the shop');
+  assert.equal(p.title, "Mariam's Candles");
+
+  assert.deepEqual(p.places[0], { kind: 'today', id: 'today', name: 'Today', phrase: null, at: null }, 'Today first');
+  const named = p.places.map((x) => x.name);
+  for (const place of ['Orders', 'Products', 'People', 'Money']) assert.ok(named.includes(place), `${place} is not among her places`);
+  assert.ok(named.indexOf('Orders') < named.indexOf('Money'), "the shop's lists come before the parts");
+  assert.equal(p.places.find((x) => x.name === 'Orders')?.phrase, 'a small candle shop');
+  assert.equal(p.places.find((x) => x.name === 'People')?.phrase, 'Mariam', 'People is there because she is');
+  assert.equal(p.places.find((x) => x.name === 'Money')?.phrase, 'freelance');
+  /* NO COUNT AND NO ENTRY SHE DID NOT TYPE: a place is its name and the words that turned it on, and nothing is filled. */
+  for (const x of p.places) assert.deepEqual(Object.keys(x).sort(), ['at', 'id', 'kind', 'name', 'phrase']);
+  assert.deepEqual(p.rows, []);
+});
+
+test('THE TITLE IS THE BUSINESS FIRST, in the words heard, and none where nothing names one', () => {
+  const title = (s: string): string | null => propose(s, CTX).title;
+  assert.equal(title('Élodie, I run a bakery in Lyon'), "Élodie's Bakery");
+  assert.equal(title("Hi, I'm Tom. We run a little coffee shop"), "Tom's Coffee", 'coffee is not counted');
+  assert.equal(title("I'm Ana and I have a design business"), "Ana's Design Business");
+  assert.equal(title("I'm Ana and I run a business"), null, 'a business alone says nothing of which one');
+  assert.equal(title('Sami, I run Kiln Studio and we bill Fenwick'), 'Kiln Studio', 'a project named is the business');
+  assert.equal(title('I run a small candle shop'), null, 'a trade with no name is anybody’s, and the sign-up chooses');
+  assert.equal(title("I'm a student"), null);
+  assert.equal(title("I'm Tom. I have a cat and a store"), null, 'a joining word is never part of a trade');
+  assert.equal(title("I'm Tom. I run a design and print shop"), null);
+});
+
+test('EVERY PLACE SAYS THE WORDS THAT TURNED IT ON, and a part that only comes with another says none', () => {
+  const said = 'I charge 500 a month for coaching';
+  const p = propose(said, CTX);
+  assert.equal(p.places[0]?.name, 'Today');
+  const money = p.places.find((x) => x.id === 'money-core');
+  assert.equal(money?.phrase, 'charge');
+  assert.deepEqual(money?.at, [2, 8]);
+  const projects = p.places.find((x) => x.id === 'portfolio');
+  assert.equal(projects?.phrase, null, 'Projects comes because Money stands on it');
+  assert.equal(p.places.at(-1)?.id, 'portfolio', 'and it comes last');
+  assert.deepEqual(p.heard.find((h) => h.loose)?.at, [9, 12], 'the amount with no currency is lit too');
+});
+
+test("A MODEL'S READING IS LIT AND PLACED THE SAME WAY, and an amount the rules heard with no currency is still said", () => {
+  const said = 'Mariam here, I make candles and charge 900 a jar';
+  const p = fromModel(
+    reply({ name: 'Mariam', usecase: 'shop', heard: [{ phrase: 'make candles', became: 'Orders, Products' }, { phrase: 'Mariam', became: 'People' }], names: [{ list: 'people', name: 'Clients' }] }),
+    said,
+    CTX,
+    propose(said, CTX),
+  );
+  assert.deepEqual(p.heard[0], { phrase: 'Mariam', became: 'you', at: [0, 6], you: true }, 'the name is not one of the model’s phrases, it is them');
+  assert.equal(p.heard.filter((h) => h.phrase === 'Mariam').length, 1);
+  for (const h of p.heard) assert.equal(said.slice(...h.at!), h.phrase);
+  assert.ok(p.heard.some((h) => h.loose && h.phrase === '900'), 'the amount the rules heard is kept for the one question');
+  assert.equal(p.places.find((x) => x.id === 'orders')?.phrase, 'make candles');
+  assert.equal(p.title, null, 'nothing names a business');
 });

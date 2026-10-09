@@ -45,3 +45,27 @@ export function madeOffers(lists: readonly string[]): { agent: AgentOffer; sourc
       : { kind: 'file', name: firstRun.sourceFile, finds: firstRun.sourceFileFinds, go: firstRun.sourceFileGo, href: '/start' };
   return { agent, source };
 }
+
+/** How a person's work mostly arrives: the first run's one answer, kept as pref `arrivesBy` (`pref.ts`). */
+export type ArrivesBy = 'messages' | 'app' | 'in-person';
+
+/** One next step, the agent or the source, as Today's "When you want more" draws it (`home/WantMore.svelte`). */
+export type MadeStep = { kind: 'agent'; agent: AgentOffer } | { kind: 'source'; source: SourceOffer };
+
+/**
+ * The same two offers as next steps, in the order this person's answer puts them (planner-45, the onboarding target,
+ * step 6). The agent leads, as at `/start#made`, unless work arrives by messages: then forwarding leads, because the
+ * next message she gets is the next thing that fills the record.
+ *
+ * WORK THAT ARRIVES BY MESSAGES IS FORWARDED, never brought in as a file. Where the lists alone would offer a file, the
+ * answer says the source is her mail; a bank's mail stays a bank's, since it is mail too.
+ */
+export function madeSteps(lists: readonly string[], arrivesBy?: ArrivesBy): MadeStep[] {
+  const { agent, source } = madeOffers(lists);
+  if (arrivesBy !== 'messages') return [{ kind: 'agent', agent }, { kind: 'source', source }];
+  const forward: SourceOffer =
+    source.kind === 'file'
+      ? { kind: 'mail', name: firstRun.sourceMail, finds: firstRun.sourceMailFinds, go: firstRun.sourceGo, href: '/settings/ingest' }
+      : source;
+  return [{ kind: 'source', source: forward }, { kind: 'agent', agent }];
+}

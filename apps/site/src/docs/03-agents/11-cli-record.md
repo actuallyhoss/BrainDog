@@ -35,6 +35,43 @@ braindog import <adapter> export.json
 
 `import` with an adapter moves another tool's export into your record: the adapter is a pack that knows that tool's shape. Running it again updates what it added rather than adding it twice, and no key's value is ever read from the export. `--dry-run` says what it would do and writes nothing.
 
+## A map instead of an adapter
+
+When the export is one JSON file, you can bring it in with no adapter at all: write a map that says which part of the export fills which of your lists.
+
+```code | sh
+braindog import --map map.json export.json --dry-run
+braindog import --map map.json export.json
+```
+
+```code | map.json
+{
+  "source": "Tallybook",
+  "sections": {
+    "items": {
+      "register": "tasks",
+      "name": "Tasks",
+      "key": "id",
+      "label": "what",
+      "fields": { "what": "what", "by": { "from": "due", "as": "day" } }
+    }
+  }
+}
+```
+
+Each part of `sections` is a place in the export, such as `items` or `book.accounts`, and says the list it fills, the field each thing is found again by (`key`), and how each field moves. A field written as a plain name is carried as text. Any other field names where it comes `from` and moves `as` one of five words:
+
+```comparison | How a value moves
+Word | What it does
+text | Carried as it is written
+day | The date, kept as a day
+money | An amount and its currency, from the field `currency` names or the one currency `in` says. Two currencies are never added together
+link | Points at a thing in another part of the same export, named by `to`. One that is not there arrives without the link, and the report says so
+one of | Turns the export's word into your list's through `values`. A word it has not got is offered to the list, and carried as `else` until you accept it
+```
+
+Running it again finds each thing by its key and updates it, so nothing arrives twice, and a thing you deleted here stays deleted. Every part of the export the map does not read is named in the report, such as "Not read: holdings, 14 items." Add `--strict` and an import that leaves anything unread writes nothing, so you know the map is finished.
+
 ## Set up a machine
 
 ```code | sh

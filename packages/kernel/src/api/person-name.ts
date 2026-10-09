@@ -43,12 +43,12 @@ const MERGE = /\{\{[^{}]*\}\}|\[\[[^[\]]*\]\]|\$\{[^}]*\}|\*\|[^|]*\|\*|%[\p{L}_
 
 /**
  * The whole name inside one bracketed span, however many brackets deep: a run of opening brackets, no closing bracket,
- * a run of closing ones (`[Sam]`, `{{ owner }}`, `【山田】`). The Worker's provisioning rule, so a name sign-up takes is
- * a name a rename takes. THE RUNS KEEP `((Name))` REFUSED and the one span keeps `(Sam) [work]`, two notes, a name.
+ * a run of closing ones (`[Mara]`, `{{ owner }}`, `【山田】`). The Worker's provisioning rule, so a name sign-up takes is
+ * a name a rename takes. THE RUNS KEEP `((Name))` REFUSED and the one span keeps `(Mara) [work]`, two notes, a name.
  */
 const WHOLE = /^\p{Ps}+[^\p{Pe}]*\p{Pe}+$/u;
 
-/** A bracketed part: square, braced, or round. A round one is a note (`Sam (work)`), so its words are not read. */
+/** A bracketed part: square, braced, or round. A round one is a note (`Mara (work)`), so its words are not read. */
 const PART = /\[([^[\]]*)\]|\{([^{}]*)\}|\(([^()]*)\)/gu;
 
 /** A form's field word, which a square bracket or a brace around it makes a field nobody filled: `[First] [Last]`. */
@@ -87,7 +87,7 @@ const spellingOf = (name: string): string =>
  * Whether a name is a placeholder nobody filled in rather than a name. Exported so the Worker's provisioning and a
  * screen can ask the same question the record asks.
  *
- * A BRACKET IS NOT A PLACEHOLDER BY ITSELF. Any `[...]` part was refused, so `(Sam) [work]` and `Zoë [Z] O’Brien`
+ * A BRACKET IS NOT A PLACEHOLDER BY ITSELF. Any `[...]` part was refused, so `(Mara) [work]` and `Zoë [Z] O’Brien`
  * were refused at rename while sign-up stored them. A bracketed or braced part is refused only when it is the whole
  * name or holds a field word; the spellings are a short list compared whole, because a list of spellings has no end
  * and the person it wrongly refuses is told how to reach a person.

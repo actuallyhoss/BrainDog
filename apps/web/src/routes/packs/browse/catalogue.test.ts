@@ -388,16 +388,19 @@ test('the catalogue this app ships lists every pack in packs/, at its version, b
 });
 
 /** The tool run over a folder of packs into a catalogue folder: its exit code and everything it said. */
-function run(packs: string, to: string): { code: number; said: string } {
+function run(packs: string, to: string, ...flags: string[]): { code: number; said: string } {
   try {
-    return { code: 0, said: execFileSync(process.execPath, [TOOL, '--packs', packs, '--to', to], { encoding: 'utf8', stdio: 'pipe' }) };
+    return { code: 0, said: execFileSync(process.execPath, [TOOL, '--packs', packs, '--to', to, ...flags], { encoding: 'utf8', stdio: 'pipe' }) };
   } catch (e) {
     const x = e as { status?: number; stdout?: string; stderr?: string };
     return { code: x.status ?? 1, said: `${x.stdout ?? ''}${x.stderr ?? ''}` };
   }
 }
 
-test('from-packs publishes a pack once, leaves it alone after, and refuses one with no test or one changed under its version', (t) => {
+/** The least a test file must be for the tool to count it: a call to `test(` that names the pack's own file. */
+const testOf = (folder: string) => `import { test } from 'node:test';\n\ntest('${folder}.pack.json installs as it ships', () => {});\n`;
+
+test('from-packs publishes a pack once, leaves it alone after, and refuses one with no test, an empty test or one changed under its version', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-from-packs-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const packs = join(dir, 'packs');
@@ -406,7 +409,7 @@ test('from-packs publishes a pack once, leaves it alone after, and refuses one w
     `${JSON.stringify({ pack: 'shelf', version, title: 'Shelf', summary, author: 'Halden', license: 'MIT', requires: { format: 1, primitives: 1, packs: {} }, declarations: [READING] }, null, 2)}\n`;
   mkdirSync(join(packs, 'shelf'), { recursive: true });
   writeFileSync(join(packs, 'shelf', 'shelf.pack.json'), shelf('1.0.0', 'Books.'));
-  writeFileSync(join(packs, 'shelf', 'shelf.test.ts'), '');
+  writeFileSync(join(packs, 'shelf', 'shelf.test.ts'), testOf('shelf'));
   /* A FOLDER WITH NO PACK FILE IN IT is not a pack, and is passed over: an import adapter lives in `packs/` too. */
   mkdirSync(join(packs, 'adapter'));
 
@@ -434,7 +437,24 @@ test('from-packs publishes a pack once, leaves it alone after, and refuses one w
   assert.match(untested.said, /packs\/shelf has no test/u);
   assert.equal(readFileSync(join(to, 'index.json'), 'utf8'), index);
 
+  /* AN EMPTY FILE WITH A TEST'S NAME IS NO TEST, and is refused in the sentence a missing one gets. It used to publish. */
   writeFileSync(join(packs, 'shelf', 'bands.test.ts'), '');
+  const empty = run(packs, to);
+  assert.equal(empty.code, 1, empty.said);
+  assert.match(empty.said, /packs\/shelf has no test/u);
+  assert.equal(readFileSync(join(to, 'index.json'), 'utf8'), index);
+
+  /* NOR IS ONE THAT NAMES THE PACK AND CALLS NO TEST (a regex's `.test(` is not one), or one that calls a test and
+     never names the pack. */
+  writeFileSync(join(packs, 'shelf', 'bands.test.ts'), "// shelf.pack.json is tested elsewhere\n");
+  assert.match(run(packs, to).said, /packs\/shelf has no test/u);
+  writeFileSync(join(packs, 'shelf', 'bands.test.ts'), "/shelf/.test('shelf.pack.json');\n");
+  assert.match(run(packs, to).said, /packs\/shelf has no test/u);
+  writeFileSync(join(packs, 'shelf', 'bands.test.ts'), testOf('aisle'));
+  assert.match(run(packs, to).said, /packs\/shelf has no test/u);
+  assert.equal(readFileSync(join(to, 'index.json'), 'utf8'), index);
+
+  writeFileSync(join(packs, 'shelf', 'bands.test.ts'), testOf('shelf'));
   const later = run(packs, to);
   assert.equal(later.code, 0, later.said);
   assert.match(readFileSync(join(to, 'index.json'), 'utf8'), /"latest": "1\.0\.1"/u);
@@ -456,10 +476,50 @@ test('from-packs writes nothing when a later pack is refused, not even the good 
     mkdirSync(join(packs, id), { recursive: true });
     writeFileSync(join(packs, id, `${id}.pack.json`), pack(id));
   }
-  writeFileSync(join(packs, 'aisle', 'aisle.test.ts'), '');
+  writeFileSync(join(packs, 'aisle', 'aisle.test.ts'), testOf('aisle'));
 
   const refused = run(packs, to);
   assert.equal(refused.code, 1, refused.said);
   assert.match(refused.said, /packs\/shelf has no test/u);
   assert.equal(existsSync(to), false, 'the refused run wrote into the catalogue');
+});
+
+/*
+ * `--check` WRITES NOTHING AND SAYS WHAT A RUN WOULD. The build in CI runs the tool this way, so a pack edited without a
+ * new version, or one whose test was emptied, fails the build step by name rather than leaving a changed tracked file.
+ */
+test('from-packs --check writes nothing, exits 1 naming an unpublished change, and 0 once it is published', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-from-packs-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const packs = join(dir, 'packs');
+  const to = join(dir, 'catalogue');
+  const shelf = (version: string) =>
+    `${JSON.stringify({ pack: 'shelf', version, title: 'Shelf', summary: 'Books.', author: 'Halden', license: 'MIT', requires: { format: 1, primitives: 1, packs: {} }, declarations: [READING] }, null, 2)}\n`;
+  mkdirSync(join(packs, 'shelf'), { recursive: true });
+  writeFileSync(join(packs, 'shelf', 'shelf.pack.json'), shelf('1.0.0'));
+  writeFileSync(join(packs, 'shelf', 'shelf.test.ts'), testOf('shelf'));
+
+  const unpublished = run(packs, to, '--check');
+  assert.equal(unpublished.code, 1, unpublished.said);
+  assert.match(unpublished.said, /a run would write packs\/shelf\/1\.0\.0\.pack\.json, index\.json/u);
+  assert.equal(existsSync(to), false, '--check wrote into the catalogue');
+
+  assert.equal(run(packs, to).code, 0);
+  const index = readFileSync(join(to, 'index.json'), 'utf8');
+  const clean = run(packs, to, '--check');
+  assert.equal(clean.code, 0, clean.said);
+  assert.match(clean.said, /every pack in .* is already in/u);
+
+  writeFileSync(join(packs, 'shelf', 'shelf.pack.json'), shelf('1.0.1'));
+  const bumped = run(packs, to, '--check');
+  assert.equal(bumped.code, 1, bumped.said);
+  assert.match(bumped.said, /packs\/shelf\/1\.0\.1\.pack\.json/u);
+  assert.equal(existsSync(join(to, 'packs', 'shelf', '1.0.1.pack.json')), false);
+  assert.equal(readFileSync(join(to, 'index.json'), 'utf8'), index);
+
+  /* AND THE REFUSALS ARE THE SAME UNDER --check: an emptied test fails it by the pack's name. */
+  writeFileSync(join(packs, 'shelf', 'shelf.test.ts'), '');
+  const emptied = run(packs, to, '--check');
+  assert.equal(emptied.code, 1);
+  assert.match(emptied.said, /packs\/shelf has no test/u);
 });

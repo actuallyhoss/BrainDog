@@ -1,0 +1,15 @@
+{
+  "app": "codex",
+  "package": "@openai/codex",
+  "pinned": "0.162.0",
+  "why": "The newest Codex on npm when the check was written (October 2026). A pin moves by hand, and only with a passing night on the new version.",
+  "key": "OPENAI_API_KEY, a repository secret; Codex reads it as CODEX_API_KEY. Without it the row reads not run: no key.",
+  "install": ["npm", "install", "--prefix", "<home>/apps/codex-<version>", "--no-save", "--no-audit", "--no-fund", "@openai/codex@<version>"],
+  "config": "<home>/.codex/config.toml: [mcp_servers.braindog] command = <home>/.braindog/bin/braindog, args = [mcp, --agent, codex], env_vars = [BRAINDOG_TOKEN, BRAINDOG_HOST, XDG_CONFIG_HOME]",
+  "exec": ["exec", "--json", "--skip-git-repo-check", "--full-auto"],
+  "env": {
+    "HOME": "<home>",
+    "CODEX_HOME": "<home>/.codex",
+    "XDG_CONFIG_HOME": "<home>/.config"
+  }
+}

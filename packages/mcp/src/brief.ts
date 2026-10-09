@@ -8,7 +8,7 @@
  * back into names or repeats the ids to a person. The illustrative answer the agent research drew is the target:
  *
  *     Tasks · open · 3 of 41
- *     Renew crumb.gg domain (tasks#41) · due Fri 4 Oct · Sam
+ *     Renew lanternfish.example domain (tasks#41) · due Fri 4 Oct · Mara
  *     38 more: list {"register":"tasks","where":{...},"cursor":"c_7Q..."}
  *
  * PURE. Everything a line needs that the answer does not carry, a list's declaration, a ref's words, who an actor is,
@@ -228,9 +228,10 @@ export function nameOnly(said: string): string | null {
  * machine it is, a file's path becomes the file's name, a mail address goes (`unaddressed`), a person's id becomes their
  * name, and a row's handle or id becomes its words with the handle beside them, where this answer read them.
  *
- * THE QUESTIONS ARE WRITTEN BY THE RECORD'S OWN AUTOMATIONS, and one on the owner's record read "Change tools#8 to how
- * fly-prism is set up in ~/.claude.json on Maras-MacBook-Pro.local?", the machine's name, a path in his home
- * folder and a handle where its name was known. Where they are written is not this package; where they are read is.
+ * THE QUESTIONS ARE WRITTEN BY THE RECORD'S OWN AUTOMATIONS, and one on the owner's record read, with its names
+ * changed here, "Change tools#8 to how fly-lanternfish is set up in ~/.claude.json on Maras-MacBook-Pro.local?", the
+ * machine's name, a path in the owner's home folder and a handle where its name was known. Where they are written is
+ * not this package; where they are read is.
  *
  * THE HANDLE STAYS BESIDE THE WORDS. The kernel asks "Are people#3 and people#9 the same person, Ann Lee?" when two
  * people may be one, and said in words alone that was "Are Ann Lee and Ann Lee the same person", which no agent can
@@ -846,8 +847,8 @@ export function ruledOf(value: unknown): Ruled | null {
 /**
  * The line a write ends with when its rung decided it:
  *
- *     Done, as you may on Tasks · Sam can undo it
- *     Filed for Sam to decide: Mark the invoice to Acme paid? (Q12)
+ *     Done, as you may on Tasks · Mara can undo it
+ *     Filed for Mara to decide: Mark the invoice to Acme paid? (Q12)
  *
  * IN NAMES: the lists by the names their declarations give, and the person by the name the record has for them, so the
  * agent can say it on as it is. A filed write tells the agent nothing was written, which is the one thing it must not
@@ -920,12 +921,12 @@ export type MetSaid = {
 /**
  * `meet`, in names, with how it matched: who, what they are with, and the handle to act on last.
  *
- *     Matched Priya Raman (Encore, Prism) by email · P6
- *     Added Dario (Crumb.gg) · P12
- *     Noted Ahmed on Encore; add an email or handle to add them
- *     Maybe Rohan Mehta (Encore): asked Sam on Decide: Are Rohan Mehta and rohanmehta one person? · P6 · SG7
- *     Matched Sam Avery by email; Ahmed H. (P9) was merged into them · P6
- *     Merged into Rohan Mehta (Encore) by name and address or organisation; Sam can undo it in BrainDog · P7
+ *     Matched Priya Raman (Lanternfish, Copperleaf) by email · P6
+ *     Added Wren (Quietcart) · P12
+ *     Noted Joaquin on Lanternfish; add an email or handle to add them
+ *     Maybe Teodor Vance (Lanternfish): asked Mara on Decide: Are Teodor Vance and teodorvance one person? · P6 · SG7
+ *     Matched Joaquin Herrera by email; Joaquin H. (P9) was merged into them · P6
+ *     Merged into Teodor Vance (Lanternfish) by name and address or organisation; Mara can undo it in BrainDog · P7
  *
  * THE FIRST WORD SAYS WHAT HAPPENED, because the three outcomes ask three different things of the agent: nothing, to
  * carry on, or to find an address. A name with no address is never a person in the record (`loop/contract-17.md`), so
@@ -977,7 +978,7 @@ export function triagedBrief(settled: Record<string, unknown>, entry: Shaped | n
  * question itself when the host serves the app somewhere.
  *
  * THE QUESTION IN NAMES (`plainOf`, audit 19 M11): it is the agent's own sentence, and an agent writes the ids and
- * addresses it was handed ("Merge 01M3… into rohan@encore.example?"). Said back as written, the agent reads its own
+ * addresses it was handed ("Merge 01M3… into teo@lanternfish.example?"). Said back as written, the agent reads its own
  * ids as the way to name things and passes them on. Its handle stays beside it, the one thing to act on.
  */
 export function proposedBrief(filed: Record<string, unknown>, question: string, look: Look): string {
@@ -1092,7 +1093,7 @@ const sentencesOf = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): 
  *     Link LOWRY ST STUDIOS RENT AUG to Lowry St Studios
  *     Add Lowry St Studios to Organisations
  *     and 1 more change
- *     Would ask Sam: Which project is Fly for?
+ *     Would ask Mara: Which project is Fly for?
  *     Nothing was changed. The rest is read on later nights.
  *
  * READ AS `unknown`, a part the record leaves out read as none of it, as the command line reads the same answer

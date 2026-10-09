@@ -63,6 +63,13 @@ import { forward, forwards, serverKeyFor, startRecord } from './record.mjs';
    function. */
 export const needs = ['web-build'];
 
+/**
+ * The seeds a run may plant. `passkey-left` takes the virtual authenticator away once the passkey is made and checked,
+ * so the device that comes back holds no passkey and step five must go red: the fault a lost or wiped device is, and
+ * the one the ceremony exists to tell apart from a passkey that works.
+ */
+export const SEEDS = ['passkey-left'];
+
 /** The one person `startRecord` puts in the Directory, and so the email the door must come back with. */
 const OWNER = 'owner@the-studio.example';
 
@@ -100,6 +107,15 @@ const TYPES = {
  */
 export default async function passkey(root = join(import.meta.dirname, '..', '..')) {
   const ROOT = join(root, 'apps', 'web', 'build');
+
+  /* THE ONE PLANTED FAULT, NAMED IN `BRAINDOG_GATE_SEED` (PRF-B02 job 4, `negative/passkey-left/`). A seed this gate
+     does not know is refused before anything is started, so a misspelt seed cannot run the ceremony clean and pass. */
+  const seeds = new Set((process.env.BRAINDOG_GATE_SEED ?? '').split(',').map((s) => s.trim()).filter(Boolean));
+  const unknown = [...seeds].filter((s) => !SEEDS.includes(s));
+  if (unknown.length > 0) {
+    console.error(`  passkey: no seed is called ${unknown.map((s) => `"${s}"`).join(', ')}. The seeds are ${SEEDS.join(', ')}.`);
+    return 1;
+  }
 
   /* EXIT 3 IS A SKIP, NOT A PASS. This exited 0 with no build, and 0 is what `run.mjs` counts as a
      gate that passed: a fresh checkout reported the passkey ceremony green having never opened a
@@ -228,6 +244,12 @@ export default async function passkey(root = join(import.meta.dirname, '..', '..
       const made = await cdp.send('WebAuthn.getCredentials', { authenticatorId });
       if (made.credentials.length !== 1) findings.push(`the browser holds ${made.credentials.length} credential(s) after adding one, so the ceremony did not complete on the device.`);
 
+      /* `passkey-left`: THE AUTHENTICATOR GOES, AND ITS HANDLE WITH IT, so the `finally` below does not remove it twice. */
+      if (seeds.has('passkey-left')) {
+        await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
+        authenticatorId = null;
+      }
+
       /* FOUR · SIGNS OUT, through the product's own door rather than by clearing a cookie, because the
          sentence being proved is that a person can leave and come back. */
       await button(copy.signOut).click();
@@ -240,16 +262,21 @@ export default async function passkey(root = join(import.meta.dirname, '..', '..
         findings.push(`a record that holds a passkey does not offer ${copy.withPasskey}, so the passkey that was just added is unreachable.`);
       } else {
         await button(copy.withPasskey).click();
-        await page.locator('.calm-who').first().waitFor();
-        const back = await signedInAs();
-        if (back !== OWNER) findings.push(`the passkey signed somebody in as ${back}, not ${OWNER}.`);
+        /* A PASSKEY THAT SIGNS NOBODY IN IS ITS OWN SENTENCE, and it was a timeout's: the wait for the signed-in name
+           threw, and the run said only that the ceremony stopped. Nobody signed in also ends the step, because the
+           record's list below is asked as the person who came back and there is none. */
+        const back = await page.locator('.calm-who').first().waitFor().then(signedInAs, () => null);
+        if (back === null) findings.push('the passkey signed nobody in, so the person who just added one cannot come back with it.');
+        else {
+          if (back !== OWNER) findings.push(`the passkey signed somebody in as ${back}, not ${OWNER}.`);
 
-        /* AND THE RECORD SAYS IT WAS USED. A ceremony that verifies and leaves `lastUsed` empty is the half
-           of the write path the screen would never show, and Settings lists exactly this. */
-        const kept = await page.evaluate(() => fetch('/auth/passkeys').then((r) => r.json()));
-        const list = kept?.ok === true ? kept.value : null;
-        if (!Array.isArray(list) || list.length !== 1) findings.push(`the record lists ${Array.isArray(list) ? list.length : 'no'} passkey(s) for the person who just signed in with one.`);
-        else if (list[0].lastUsed === null || list[0].lastUsed === undefined) findings.push('the passkey that just signed somebody in is still recorded as never used.');
+          /* AND THE RECORD SAYS IT WAS USED. A ceremony that verifies and leaves `lastUsed` empty is the half
+             of the write path the screen would never show, and Settings lists exactly this. */
+          const kept = await page.evaluate(() => fetch('/auth/passkeys').then((r) => r.json()));
+          const list = kept?.ok === true ? kept.value : null;
+          if (!Array.isArray(list) || list.length !== 1) findings.push(`the record lists ${Array.isArray(list) ? list.length : 'no'} passkey(s) for the person who just signed in with one.`);
+          else if (list[0].lastUsed === null || list[0].lastUsed === undefined) findings.push('the passkey that just signed somebody in is still recorded as never used.');
+        }
       }
     } catch (e) {
       /* A THROW IN THE FIVE STEPS IS A FINDING AND NOT A CRASH, which is what this block was always for.
@@ -285,6 +312,7 @@ export default async function passkey(root = join(import.meta.dirname, '..', '..
   }
 }
 
-/* AND IT IS STILL A SCRIPT, because `self-test` spawns this file with `BRAINDOG_GATE_SEED` and the
-   header documents `node tools/gates/passkey.mjs`. `?? 0` because a pass returns nothing. */
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns this file with `BRAINDOG_GATE_SEED=passkey-left` for the tree
+   `negative/passkey-left/`, and the header documents `node tools/gates/passkey.mjs`. `?? 0` because a pass returns
+   nothing. */
 if (import.meta.main) process.exitCode = (await passkey()) ?? 0;

@@ -446,6 +446,8 @@
       {@const figure = headlineFigure(row.cells[1] ?? '')}
       {@const symbol = symbolFigure(figure)}
       {@const coded = leadingCode(figure)}
+      <!-- `.amount` holds the code and its first figure on one line; ` · £24,800` after it wraps (`figureEnd`, html.ts). -->
+      {@const end = coded ? coded.rest.search(/\s|$/u) : 0}
       {@const chars = figureChars(figure)}
       <svelte:element
         this={href ? 'a' : 'div'}
@@ -456,8 +458,10 @@
       >
         <span class="cell-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
         <span class="cell-figure num" data-fit={chars === null ? undefined : ''} style={chars === null ? undefined : `--chars:${chars}`}>
-          {#if !row.cells[1]}{MISSING}{:else if symbol}{symbol}{:else if coded}{coded.sign}<span class="amount-code">{coded.currency}</span>
-            <Text nodes={inline(coded.rest, opts)} {opts} />{:else}<Text
+          {#if !row.cells[1]}{MISSING}{:else if symbol}{symbol}{:else if coded}<span class="amount"
+              >{coded.sign}<span class="amount-code">{coded.currency}</span>
+              <Text nodes={inline(coded.rest.slice(0, end), opts)} {opts} /></span
+            ><Text nodes={inline(coded.rest.slice(end), opts)} {opts} />{:else}<Text
               nodes={inline(figure, opts)}
               {opts}
             />{/if}

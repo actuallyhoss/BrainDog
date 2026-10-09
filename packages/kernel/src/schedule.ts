@@ -351,8 +351,8 @@ export const pendingWork = (
     ? delivers.length > 0 &&
       Boolean(
         sql.one(
-          `SELECT 1 AS x FROM outbox WHERE state = 'pending' AND kind IN (${delivers.map(() => '?').join(', ')}) LIMIT 1`,
-          ...delivers,
+          "SELECT 1 AS x FROM outbox WHERE state = 'pending' AND kind IN (SELECT value FROM json_each(?)) LIMIT 1",
+          JSON.stringify(delivers),
         ),
       )
     : queued;
@@ -435,13 +435,14 @@ export function drainSchedule(
    */
   kinds?: readonly ScheduleKind[],
 ): Drained {
-  const only = kinds === undefined ? '' : ` AND kind IN (${kinds.map(() => '?').join(', ') || "''"})`;
+  /* THE KINDS ARE ONE BOUND JSON ARRAY, and an empty one matches nothing, as the empty `IN ('')` it replaced did. */
+  const only = kinds === undefined ? '' : ' AND kind IN (SELECT value FROM json_each(?))';
   const claimed = sql.all<Claimed>(
     `UPDATE schedule SET state = 'firing'
      WHERE id IN (SELECT id FROM schedule WHERE state = 'pending' AND due_at <= ?${only} ORDER BY due_at LIMIT ?)
      RETURNING id, kind, key, payload, attempts, due_at`,
     new Date(deps.nowMs).toISOString(),
-    ...(kinds ?? []),
+    ...(kinds === undefined ? [] : [JSON.stringify(kinds)]),
     Math.max(0, Math.floor(limit)),
   );
 

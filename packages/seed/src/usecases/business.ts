@@ -49,8 +49,11 @@ export const BUSINESS = {
      step.
      1.6.0: Working now reads the record's working runs (`sessions.working`, agents 1.9.0), active and heard from in the
      last fifteen minutes, where its own clause said today and a run quiet for hours read as working. A source changed
-     under a block that is already there, so a minor step. 1.5.0 is live. */
-  version: '1.6.0',
+     under a block that is already there, so a minor step. 1.5.0 is live.
+     1.7.0: "shop" and "store" are Shop's words now (`shop.ts`), which carries Orders and Products where a business
+     carries no list, so a shop is proposed the lists it writes in. A business that also sells is still Small business,
+     with Shop beside it. The use case a sentence proposes changed, so a minor step. */
+  version: '1.7.0',
   title: 'Small business',
   summary: 'What your clients owe you and what you owe, the hosting and subscriptions you run on, the people involved and the work.',
   author: 'BrainDog',
@@ -58,7 +61,7 @@ export const BUSINESS = {
   audience: 'individual',
   tone: 'plain, the house voice',
   signals: [
-    'business', 'small business', 'my business', 'studio', 'agency', 'shop', 'store', 'freelance', 'freelancer', 'freelancing',
+    'business', 'small business', 'my business', 'studio', 'agency', 'freelance', 'freelancer', 'freelancing',
     'consultancy', 'consulting', 'clients', 'client', 'customers', 'invoice', 'invoices', 'invoicing', 'domains',
     'hosting', 'subscriptions', 'contractors', 'accountant', 'vat', 'bookkeeping', 'retainer', 'foundry',
   ],

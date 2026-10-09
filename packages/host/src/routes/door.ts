@@ -14,7 +14,7 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'heard', group: 'DATA', writes: true, what: 'Say how this session met the agent door: it said hello, was given the tools, made calls, or how long its start hook took. It opens no run.',
+  { name: 'heard', group: 'DATA', writes: true, what: 'Say how long this session\'s start hook took. The agent door marks hello, the tool list and calls itself. It opens no run.',
     takes: {} },
   { name: 'doorSigns', group: 'READ+', writes: false, what: 'How many sessions connected, were given the tools and made a call, over the last 7 days unless days says otherwise. It changes nothing.',
     takes: { days: 'integer' } },

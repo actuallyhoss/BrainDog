@@ -13,7 +13,7 @@ import { changesSaid, movesSaid, proposedBrief, understoodBrief, type Look } fro
 import { TOOLS, tools } from '../src/index.ts';
 import { stub } from './stub.ts';
 
-const look: Look = { now: Date.UTC(2026, 9, 7, 9), decl: () => undefined, title: () => undefined, actor: (by) => by, decider: 'Sam' };
+const look: Look = { now: Date.UTC(2026, 9, 7, 9), decl: () => undefined, title: () => undefined, actor: (by) => by, decider: 'Mara' };
 
 /** One dry slice, as the record answers it, with what a dry slice never carries beside it. */
 const SLICE = {
@@ -152,20 +152,20 @@ test('CHANGES IS SAID BY LABEL, from what it holds to what it will, the first th
 test('A PROPOSAL\'S ANSWER SAYS WHAT IT MOVES AND CHANGES between the question and who decides, and neither when the record sends none', () => {
   const filed = {
     id: 'SG9',
-    decide: 'https://brain.dog/app/sam/decide/SG9',
+    decide: 'https://brain.dog/app/mara/decide/SG9',
     money: [{ amount: -1798, currency: 'GBP' }],
     changes: [{ field: 'status', label: 'Status', before: 'open', after: 'paid' }],
   };
   assert.equal(
     proposedBrief(filed, 'Pay the studio rent?', look),
     [
-      'Asked Sam: Pay the studio rent? (SG9)',
+      'Asked Mara: Pay the studio rent? (SG9)',
       'Moves GBP -17.98',
       'Changes Status from open to paid',
-      'Sam decides in BrainDog at https://brain.dog/app/sam/decide/SG9.',
+      'Mara decides in BrainDog at https://brain.dog/app/mara/decide/SG9.',
     ].join('\n'),
   );
-  assert.equal(proposedBrief({ id: 'SG9' }, 'Pay the studio rent?', look), 'Asked Sam: Pay the studio rent? (SG9)\nSam decides in BrainDog.');
+  assert.equal(proposedBrief({ id: 'SG9' }, 'Pay the studio rent?', look), 'Asked Mara: Pay the studio rent? (SG9)\nMara decides in BrainDog.');
 });
 
 test('A CHANGE THAT MOVES A REF IS SAID BY ITS WORDS, the rows read before the answer is, with the handle beside them', async () => {
@@ -176,15 +176,15 @@ test('A CHANGE THAT MOVES A REF IS SAID BY ITS WORDS, the rows read before the a
     }),
     list: async (args) => {
       const seqs = (args.where as { in: number[] } | undefined)?.in ?? [];
-      const titles: Record<number, string> = { 2: 'Kiln', 5: 'Roomy' };
+      const titles: Record<number, string> = { 2: 'Kiln', 5: 'Quietcart' };
       return { ok: true, value: { rows: seqs.map((seq) => ({ id: `r${String(seq)}`, register: 'projects', seq, version: 1, fields: { title: titles[seq] } })) } };
     },
   });
-  const said = await tools(surface).answer('propose', { question: 'Move the task to Nook?' }, { who: 'agent' });
+  const said = await tools(surface).answer('propose', { question: 'Move the task to Quietcart?' }, { who: 'agent' });
   assert.ok(said.result.ok);
   const line = said.text.split('\n').find((l) => l.startsWith('Changes '));
   assert.ok(line, `no Changes line in ${said.text}`);
   assert.match(line, /Kiln/u);
-  assert.match(line, /Roomy/u);
+  assert.match(line, /Quietcart/u);
   plain(said.text);
 });

@@ -120,9 +120,9 @@ test('AN ERASED PERSON TAKES THEIR KEYS AND THEIR MENTIONS WITH THEM', async () 
 
 test('THE NIGHT’S DOUBTFUL PAIRS GO TO A MODEL AS NAMES, and its answer opens one question per pair, never a merge', async () => {
   const { k, sql } = await record();
-  const brain = value<Entry>(k.create('things', { name: 'Encore' }, OWNER));
-  const a = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohan.m@encore.example', projects: [brain.id] }, OWNER));
-  const b = value<Entry>(k.create('people', { name: 'rohanmehta', handles: ['github:rohanmehta'] }, OWNER));
+  const brain = value<Entry>(k.create('things', { name: 'Lanternfish' }, OWNER));
+  const a = value<Entry>(k.create('people', { name: 'Teodor Vance', email: 'teodor.v@lanternfish.example', projects: [brain.id] }, OWNER));
+  const b = value<Entry>(k.create('people', { name: 'teodorvance', handles: ['github:teodorvance'] }, OWNER));
   value(k.create('people', { name: 'Grace Hopper', email: 'grace@navy.mil' }, OWNER));
 
   k.purge();
@@ -134,10 +134,10 @@ test('THE NIGHT’S DOUBTFUL PAIRS GO TO A MODEL AS NAMES, and its answer opens 
   assert.deepEqual(job.rows[pair!.hash]!.slice().sort(), [a.id, b.id].sort());
   const sides = [pair!.a, pair!.b].sort((x, y) => x.name.localeCompare(y.name));
   assert.deepEqual(sides, [
-    { name: 'Rohan Mehta', kind: 'person', domain: 'encore.example', masked: 's*******m', seen: ['Encore'] },
-    { name: 'rohanmehta', kind: 'person', masked: 's**********a', seen: [] },
+    { name: 'Teodor Vance', kind: 'person', domain: 'lanternfish.example', masked: 't******v', seen: ['Lanternfish'] },
+    { name: 'teodorvance', kind: 'person', masked: 't*********e', seen: [] },
   ]);
-  assert.doesNotMatch(JSON.stringify(job.pairs), /rohan\.m@|@encore/, 'a full address went to the model');
+  assert.doesNotMatch(JSON.stringify(job.pairs), /teodor\.v@|@lanternfish/, 'a full address went to the model');
 
   /* A second sweep the same night queues nothing. */
   k.purge();
@@ -148,7 +148,7 @@ test('THE NIGHT’S DOUBTFUL PAIRS GO TO A MODEL AS NAMES, and its answer opens 
   value(k.ackOutbox({ id: jobs[0]!.id, state: 'done', result: { verdicts: [{ hash: pair!.hash, same: true, confidence: 0.82 }, { hash: 'ffffffff', same: true, confidence: 1 }] } }));
   const open = sql.all<{ id: string }>('SELECT id FROM suggestion');
   assert.equal(open.length, 1);
-  assert.match(k.question(open[0]!.id) ?? '', /^Are Rohan Mehta \(Encore, an address at encore\.xyz\) and rohanmehta \(GitHub\) one person\? They look likely to be\./);
+  assert.match(k.question(open[0]!.id) ?? '', /^Are Teodor Vance \(Lanternfish, an address at lanternfish\.example\) and teodorvance \(GitHub\) one person\? They look likely to be\./);
   assert.equal(k.count('people'), 3, 'a model’s word merged two people');
   sql.close();
 });
@@ -171,11 +171,11 @@ test('A ROW A MEMBER’S AGENT MADE IS THAT MEMBER’S: a stranger who looks lik
   sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
   sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_ana', '*', 'write')");
   sql.exec("INSERT INTO token (id, person_id, hash, scope, created_at) VALUES ('t_ana', 'p_ana', 'h', 'write', '2026-10-01T00:00:00.000Z')");
-  const ana: WriteContext = { actor: 'p_ana', principal: { kind: 'token', token: 't_ana' }, session: { client_id: 'cc', host: 'h', repo: 'encore' } };
-  const made = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohan.m@encore.example' }, ana));
+  const ana: WriteContext = { actor: 'p_ana', principal: { kind: 'token', token: 't_ana' }, session: { client_id: 'cc', host: 'h', repo: 'lanternfish' } };
+  const made = value<Entry>(k.create('people', { name: 'Teodor Vance', email: 'teodor.v@lanternfish.example' }, ana));
   assert.match(sql.one<{ a: string }>("SELECT actor AS a FROM event WHERE target = ? AND kind = 'create'", `entry:${made.id}`)?.a ?? '', /^S\d+$/, 'her agent’s run made it');
-  value(k.meet({ name: 'Rohan Mehta', email: 'rohan@elsewhere.example', where: 'a mail', untrusted: true }, OWNER));
+  value(k.meet({ name: 'Teodor Vance', email: 'teodor@elsewhere.example', where: 'a mail', untrusted: true }, OWNER));
   assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open'")?.n, 0, 'her row is hers, as one she made by hand would be');
-  assert.deepEqual(k.get(made.id)?.fields.email, 'rohan.m@encore.example', 'and nothing is carried onto it');
+  assert.deepEqual(k.get(made.id)?.fields.email, 'teodor.v@lanternfish.example', 'and nothing is carried onto it');
   sql.close();
 });

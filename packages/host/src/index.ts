@@ -228,6 +228,13 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'digestToday', group: 'READ+', writes: false, what: 'What the digest would say if it went now. It sends nothing.',
     takes: { digest: 'text' } },
   { name: 'pages', group: 'READ+', writes: false, what: 'Every page this record can draw, templates expanded.' },
+  /* THE PAGES CENSUS AND THE PATHS CHECK (PGS-A01, REC-A12): two reads beside `pages`, writing nothing. `checkPaths` takes a
+     whole document, so a caller sends it as a POST body; a read may arrive either way. `register` is the list the document
+     is written into, whose fields a page made for its rows fills. */
+  { name: 'pagesCensus', group: 'READ+', writes: false, what: 'Each page you can open, counted: what it holds, what it could not show you, each placeholder that names nothing and each dash where a value goes. It changes nothing.',
+    takes: {} },
+  { name: 'checkPaths', group: 'READ+', writes: false, what: 'Each placeholder a document holds, and whether your record has anything by that name. It changes nothing.',
+    takes: { document: 'text', register: 'text' } },
   /* `filter` IS THE READER'S OWN CHOICE over the page's declared filters, a field to the value chosen, so it is JSON: on a
      GET it is `?filter={"project":"bake"}`. What it may name is the record's question (`kernel.page`), not this table's.
      `walk` IS HOW FAR A FORECAST LOOKS when the reader asks past the two years walked unasked: `?walk=1825` or
@@ -543,6 +550,9 @@ export type RecordSurface = {
   inbox(args: never, ctx: never): Promise<Result<unknown>>;
   search(args: never, ctx: never): Promise<Result<unknown>>;
   pages(ctx: never): Promise<Result<unknown>>;
+  /** OPTIONAL as `scriptTry` is, for the same reason: the routes land before the record registers the methods. */
+  pagesCensus?(args: never, ctx: never): Promise<Result<unknown>>;
+  checkPaths?(args: never, ctx: never): Promise<Result<unknown>>;
   page(args: never, ctx: never): Promise<Result<unknown>>;
   metric(args: never, ctx: never): Promise<Result<unknown>>;
   figures(ctx: never): Promise<Result<unknown>>;
@@ -550,7 +560,7 @@ export type RecordSurface = {
   revokeGrant(args: never, ctx: never): Promise<Result<unknown>>;
   dryRun(args: never, ctx: never): Promise<Result<unknown>>;
   /**
-   * OPTIONAL, AND THE ONLY ONE THAT IS. The route lands before the record's method does, and a required member here
+   * OPTIONAL, as `pagesCensus` and `checkPaths` are. The route lands before the record's method does, and a required member here
    * would stop both hosts compiling until it did; `handlersFor` answers `NOT_IN_THIS_BUILD` meanwhile, which is the
    * truth, where calling a method that is not there would be a 500.
    */
@@ -651,6 +661,14 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     inbox: (a, ctx) => api.inbox(a as never, ctx as never),
     search: (a, ctx) => api.search(a as never, ctx as never),
     pages: (_a, ctx) => api.pages(ctx as never),
+    pagesCensus: async (a, ctx) =>
+      api.pagesCensus
+        ? api.pagesCensus(a as never, ctx as never)
+        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot count its pages yet, so nothing was read.' } },
+    checkPaths: async (a, ctx) =>
+      api.checkPaths
+        ? api.checkPaths(a as never, ctx as never)
+        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot check a document’s placeholders yet, so nothing was read.' } },
     page: (a, ctx) => api.page(a as never, ctx as never),
     metric: (a, ctx) => api.metric(a as never, ctx as never),
     figures: (_a, ctx) => api.figures(ctx as never),

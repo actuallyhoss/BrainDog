@@ -165,7 +165,7 @@ test('A NAME SETTLES ONLY AS A BARE NAME A PROJECT LISTS; the last name of a rem
   /* BrainDog lists `braindog` bare among its repositories: every checkout of that name is the project's. */
   assert.deepEqual(placed(k, { repo: 'BrainDog' }), { project: 'things#1 by repo', ambiguous: [] });
   assert.deepEqual(placed(k, { repo: 'braindog', cwd: 'D:\\elsewhere' }), { project: 'things#1 by repo', ambiguous: [] });
-  assert.deepEqual(placed(k, { remote: 'https://github.com/actuallyhoss/BrainDog.git', cwd: '/Users/sam/Developer/braindog' }), {
+  assert.deepEqual(placed(k, { remote: 'https://github.com/actuallyhoss/BrainDog.git', cwd: '/Users/mara/Developer/braindog' }), {
     project: 'things#1 by repo',
     ambiguous: [],
   });

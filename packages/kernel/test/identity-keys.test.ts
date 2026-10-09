@@ -16,7 +16,7 @@ test('AN EMAIL IS LOWER-CASED, AND ONLY GMAIL FOLDS its dots and +tags, with goo
   assert.equal(keyOf('email', ' Ada@Example.COM '), 'email:ada@example.com');
   assert.equal(keyOf('email', 'Ada.Lovelace+work@gmail.com'), 'email:adalovelace@gmail.com');
   assert.equal(keyOf('email', 'ada.lovelace@googlemail.com'), 'email:adalovelace@gmail.com');
-  assert.equal(keyOf('email', 'ada.lovelace+x@encore.example'), 'email:ada.lovelace+x@encore.example');
+  assert.equal(keyOf('email', 'ada.lovelace+x@lanternfish.example'), 'email:ada.lovelace+x@lanternfish.example');
   assert.equal(keyOf('email', '"Ada" <ada@x.io>'), 'email:ada@x.io');
   assert.equal(keyOf('email', 'not an address'), null);
   assert.equal(keyOf('email', 'ada@localhost'), null);
@@ -32,7 +32,7 @@ test('GITHUB’S PRIVATE ADDRESS IS THE LOGIN, and a login is read from a handle
 });
 
 test('A PAYEE FOLDS ITS PROCESSOR, TOWN, NUMBERS, WEB SUFFIX AND SPACES, and keeps its name', () => {
-  for (const said of ['GEIDEA*CHILLOUT 0423 CAIRO EG', 'Chill Out', 'CHILLOUT', 'PAYMOB-Chillout New Cairo', 'POS CHILLOUT 12', 'FAWRY*Chillout*'])
+  for (const said of ['GEIDEA*CHILLOUT 0418 CAIRO EG', 'Chill Out', 'CHILLOUT', 'PAYMOB-Chillout New Cairo', 'POS CHILLOUT 12', 'FAWRY*Chillout*'])
     assert.equal(keyOf('bank', said), 'bank:chillout', said);
   assert.equal(keyOf('bank', 'talabat.com'), 'bank:talabat');
   assert.equal(keyOf('bank', 'TALABAT'), 'bank:talabat');
@@ -42,14 +42,14 @@ test('A PAYEE FOLDS ITS PROCESSOR, TOWN, NUMBERS, WEB SUFFIX AND SPACES, and kee
 });
 
 test('A DOMAIN IS THE REGISTRABLE ONE, AND NEVER A PUBLIC MAIL HOST', () => {
-  assert.equal(registrable('https://www.Encore.xyz/about'), 'encore.example');
-  assert.equal(registrable('mail.brightloomit.com'), 'brightloomit.com');
+  assert.equal(registrable('https://www.Lanternfish.example/about'), 'lanternfish.example');
+  assert.equal(registrable('mail.example.com'), 'example.com');
   assert.equal(registrable('shop.example.co.uk'), 'example.co.uk');
   assert.equal(registrable('cib.com.eg'), 'cib.com.eg');
   assert.equal(registrable('ada@gmail.com'), null);
   assert.equal(keyOf('domain', 'proton.me'), null);
   assert.equal(keyOf('domain', 'outlook.com'), null);
-  assert.equal(keyOf('domain', 'encore.example'), 'domain:encore.example');
+  assert.equal(keyOf('domain', 'lanternfish.example'), 'domain:lanternfish.example');
 });
 
 test('A REMOTE IS host/owner/name, A FOLDER AN ABSOLUTE PATH, A PHONE E.164', () => {
@@ -57,7 +57,7 @@ test('A REMOTE IS host/owner/name, A FOLDER AN ABSOLUTE PATH, A PHONE E.164', ()
   assert.equal(keyOf('remote', 'https://github.com/bakegame/bot'), 'remote:github.com/bakegame/bot');
   assert.equal(keyOf('remote', 'bot'), null);
   assert.equal(keyOf('folder', 'C:\\Repos\\roomy\\'), 'folder:c:/Repos/nook');
-  assert.equal(keyOf('folder', '/Users/sam/Developer/braindog/'), 'folder:/Users/sam/Developer/braindog');
+  assert.equal(keyOf('folder', '/Users/mara/Developer/braindog/'), 'folder:/Users/mara/Developer/braindog');
   assert.equal(keyOf('folder', 'braindog'), null);
   assert.equal(keyOf('phone', '+20 100 123 4567'), 'phone:+201001234567');
   assert.equal(keyOf('phone', '0020 100 123 4567'), 'phone:+201001234567');
@@ -79,9 +79,9 @@ test('A From HEADER READS AS A NAME, AN ADDRESS AND A DOMAIN, and a shared inbox
   assert.deepEqual(parseFrom('ada@x.io (Ada L)'), { name: 'Ada L', address: 'ada@x.io', domain: 'x.io' });
   assert.deepEqual(parseFrom('ada@x.io <ada@x.io>'), { name: null, address: 'ada@x.io', domain: 'x.io' });
   assert.equal(parseFrom('Ada'), null);
-  for (const a of ['noreply@encore.example', 'no-reply@accounts.google.com', 'notifications@github.com', 'billing@hetzner.com', 'info@quartz.gg', 'noreply-1234@mail.x.io'])
+  for (const a of ['noreply@lanternfish.example', 'no-reply@accounts.google.com', 'notifications@github.com', 'billing@hetzner.com', 'info@quartz.gg', 'noreply-1234@mail.x.io'])
     assert.equal(isOrganisationAddress(a), true, a);
-  for (const a of ['ada@encore.example', '583231+octo@users.noreply.github.com', 'information.ada@x.io']) assert.equal(isOrganisationAddress(a), false, a);
+  for (const a of ['ada@lanternfish.example', '583231+octo@users.noreply.github.com', 'information.ada@x.io']) assert.equal(isOrganisationAddress(a), false, a);
 });
 
 test('A PAYEE KEEPS A WORD THAT NAMES IT: two cafés or two pharmacies are never one key', () => {
@@ -109,7 +109,7 @@ test('A PUBLIC MAIL HOST IN ANY COUNTRY, A BROADBAND PROVIDER’S MAIL OR A BARE
   for (const host of ['github.io', 'vercel.app', 'pages.dev', 'co.uk', 'com.eg', 'com.au', '192.168.1.10', 'nas.local', 'printer.lan'])
     assert.equal(registrable(host), null, host);
   assert.equal(registrable('ada.github.io'), 'ada.github.io');
-  assert.equal(registrable('https://encore-git-main-sam.vercel.app/login'), 'encore-git-main-sam.vercel.app');
+  assert.equal(registrable('https://lanternfish-git-main-mara.vercel.app/login'), 'lanternfish-git-main-mara.vercel.app');
   assert.equal(registrable('api.svc.up.railway.app'), 'svc.up.railway.app');
   assert.equal(registrable('mail.cibeg.com.eg'), 'cibeg.com.eg');
   assert.equal(registrable('portal.unsw.edu.au'), 'unsw.edu.au');
@@ -119,19 +119,19 @@ test('A PUBLIC MAIL HOST IN ANY COUNTRY, A BROADBAND PROVIDER’S MAIL OR A BARE
   assert.equal(registrable('vercel.com'), 'vercel.com');
   assert.equal(isPublicMail('Yahoo.com.eg'), true);
   assert.equal(isPublicMail('vercel.app'), true);
-  assert.equal(isPublicMail('encore.example'), false);
+  assert.equal(isPublicMail('lanternfish.example'), false);
   assert.equal(keyOf('domain', 'btinternet.com'), null);
 });
 
 test('A SHARED INBOX OR A MACHINE IS AN ORGANISATION SPEAKING, and its address is the organisation’s key', () => {
   for (const a of [
-    'support@vodafone.com.eg', 'Support+EG@talabat.com', 'customer.service@cibeg.com', 'sales-team@encore.example', 'info2@hetzner.com',
+    'support@vodafone.com.eg', 'Support+EG@talabat.com', 'customer.service@cibeg.com', 'sales-team@lanternfish.example', 'info2@hetzner.com',
     'enquiries@bridgestreetcoffee.co.uk', 'no_reply@instapay.eg', 'do.not.reply@hsbc.com.eg', 'MAILER-DAEMON@googlemail.com',
     'bounce-mc.us5_123.456-ada=x.io@mail189.suw121.mcdlv.net', 'bounces+12345-abcd@em.stripe.com', 'renovate-bot@whitesourcesoftware.com',
-    'notifications+abc123@github.com', 'alerts@hsbc.example', 'postmaster@encore.example', '49699333+dependabot[bot]@users.noreply.github.com',
+    'notifications+abc123@github.com', 'alerts@hsbc.example', 'postmaster@lanternfish.example', '49699333+dependabot[bot]@users.noreply.github.com',
   ])
     assert.equal(isOrganisationAddress(a), true, a);
-  for (const a of ['ada@encore.example', 'abbot@x.io', 'botond.nagy@x.hu', 'ada.support@x.io', 'information.ada@x.io', '583231+octo@users.noreply.github.com', 'ada_acme@users.noreply.github.com'])
+  for (const a of ['ada@lanternfish.example', 'abbot@x.io', 'botond.nagy@x.hu', 'ada.support@x.io', 'information.ada@x.io', '583231+octo@users.noreply.github.com', 'ada_acme@users.noreply.github.com'])
     assert.equal(isOrganisationAddress(a), false, a);
   assert.equal(keyOf('email', 'Support@Vodafone.com.eg'), 'email:support@vodafone.com.eg');
 });
@@ -146,8 +146,8 @@ test('A MACHINE IS NOBODY: bots, no-reply senders, CI and a laptop’s own host 
     { name: 'Ubuntu', email: 'ubuntu@ip-172-31-5-12.eu-west-1.compute.internal' },
     { name: 'root', email: 'root@localhost' },
     { name: 'Ada Lovelace', email: 'ada@Adas-MacBook-Pro.local' },
-    { name: 'Jenkins Schema Sync', email: 'jenkins-sync@brightloomit.com' },
-    { name: 'Brightloom Repos', email: 'repos@brightloomit.com' },
+    { name: 'Jenkins Schema Sync', email: 'jenkins-sync@pellucid.example' },
+    { name: 'Pellucid Repos', email: 'repos@pellucid.example' },
     { name: 'Mail Delivery Subsystem', email: 'mailer-daemon@googlemail.com' },
     { handle: 'github:vercel[bot]' },
     { handle: '@renovate-bot' },
@@ -155,11 +155,11 @@ test('A MACHINE IS NOBODY: bots, no-reply senders, CI and a laptop’s own host 
   ];
   for (const m of machines) assert.equal(isMachineIdentity(m), true, JSON.stringify(m));
   const people: Parameters<typeof isMachineIdentity>[0][] = [
-    { name: 'Ada Lovelace', email: 'ada@encore.example' },
+    { name: 'Ada Lovelace', email: 'ada@lanternfish.example' },
     { name: 'Octo Cat', email: '583231+octo-cat@users.noreply.github.com' },
     { name: 'Abbot Kinney', email: 'abbot@kinney.io' },
     { name: 'Support', email: 'support@hetzner.com' },
-    { name: 'Avery Sync', email: 'avery.sync@gmail.com' },
+    { name: 'Mara Sync', email: 'mara.sync@gmail.com' },
     { handle: 'github:ada' },
     {},
   ];
@@ -168,7 +168,7 @@ test('A MACHINE IS NOBODY: bots, no-reply senders, CI and a laptop’s own host 
 
 test('keyOfAny READS AN ADDRESS, A KEY OR A HANDLE the way the record does, for a door outside the kernel', () => {
   assert.equal(keyOfAny('Ada.Lovelace+cli@gmail.com'), 'email:adalovelace@gmail.com');
-  assert.equal(keyOfAny('mailto:Ada@Encore.xyz'), 'email:ada@encore.example');
+  assert.equal(keyOfAny('mailto:Ada@Lanternfish.example'), 'email:ada@lanternfish.example');
   assert.equal(keyOfAny('"Ada" <ada@x.io>'), 'email:ada@x.io');
   assert.equal(keyOfAny('email:Ada@X.io'), 'email:ada@x.io');
   assert.equal(keyOfAny('github:@Octo-Cat'), 'github:octo-cat');
@@ -176,7 +176,7 @@ test('keyOfAny READS AN ADDRESS, A KEY OR A HANDLE the way the record does, for 
   assert.equal(keyOfAny('ada_acme@users.noreply.github.com'), 'github:ada_acme');
   assert.equal(keyOfAny('49699333+dependabot[bot]@users.noreply.github.com'), 'github:dependabot[bot]');
   assert.equal(keyOfAny('discord:Ada'), 'discord:ada');
-  assert.equal(keyOfAny('bank:GEIDEA*CHILLOUT 0423 CAIRO EG'), 'bank:chillout');
+  assert.equal(keyOfAny('bank:GEIDEA*CHILLOUT 0418 CAIRO EG'), 'bank:chillout');
   assert.equal(keyOfAny('Ada Lovelace'), null);
   assert.equal(keyOfAny(''), null);
   /* A DOTTED LOGIN IS NO LOGIN, so the address it came in stays an address and is never sent as a malformed handle. */
@@ -188,13 +188,13 @@ test('AN EXAMPLE DOMAIN STANDS FOR A REAL ONE, a +tag is the person’s own fili
   assert.equal(registrable('sara@acme.example'), 'acme.example');
   assert.equal(keyOf('domain', 'quill.test'), 'domain:quill.test');
   assert.equal(isMachineIdentity({ name: 'Sara Okafor', email: 'sara@acme.example' }), false);
-  for (const a of ['ada+alerts@gmail.com', 'sam+bot@gmail.com', 'ada+notifications@encore.example']) {
+  for (const a of ['ada+alerts@gmail.com', 'mara+bot@gmail.com', 'ada+notifications@lanternfish.example']) {
     assert.equal(isOrganisationAddress(a), false, a);
     assert.equal(isMachineIdentity({ name: 'Ada', email: a }), false, a);
   }
   assert.equal(isMachineIdentity({ name: 'Renovate Homes', email: 'jo@renovatehomes.co.uk' }), false);
   assert.equal(isMachineIdentity({ name: 'renovate', email: 'renovate@whitesourcesoftware.com' }), true);
-  assert.equal(keyOfAny('Ada: Founder <ada@encore.example>'), 'email:ada@encore.example');
+  assert.equal(keyOfAny('Ada: Founder <ada@lanternfish.example>'), 'email:ada@lanternfish.example');
 });
 
 test('isMachineIdentity KNOWS EVERY MACHINE THE CLI’S HARVEST LEAVES OUT, so the harvest can use it in place of its own', () => {
@@ -204,7 +204,7 @@ test('isMachineIdentity KNOWS EVERY MACHINE THE CLI’S HARVEST LEAVES OUT, so t
     ['Acme CI', 'ci@acme.example'],
     ['GitLab Runner', 'gitlab-runner@acme.example'],
     ['Jenkins', 'jenkins@acme.example'],
-    ['Jenkins Schema Sync', 'jenkins@brightloomit.example'],
+    ['Jenkins Schema Sync', 'jenkins@pellucid.example'],
     ['Docs Mirror', 'mirror@acme.example'],
     ['ec2-user', 'ec2-user@ip-10-0-0-1.example'],
     ['root', 'root@build.example'],
@@ -215,19 +215,19 @@ test('isMachineIdentity KNOWS EVERY MACHINE THE CLI’S HARVEST LEAVES OUT, so t
   ])
     assert.equal(isMachineIdentity({ name, email }), true, `${name!} <${email!}>`);
   for (const [name, email] of [
-    ['Rohan Mehta', 'rohan@encore.example'],
+    ['Teodor Vance', 'teodor@lanternfish.example'],
     ['Ada Sync', 'ada.sync@gmail.com'],
     ['Sarah Jenkins', 'sarah.jenkins@acme.example'],
     ['Ada Talbot', 'talbot@acme.example'],
     ['Travis Okoye', 'travis@acme.example'],
-    ['Madan Neriyanur', 'madann@users.noreply.github.com'],
+    ['Ines Duarte', 'inesd@users.noreply.github.com'],
   ])
     assert.equal(isMachineIdentity({ name, email }), false, `${name!} <${email!}>`);
 });
 
 test('A TEAM’S JOB ON GITHUB’S PRIVATE ADDRESS IS A MACHINE, a coding agent is one, and the surnames Ci and Runner are people', () => {
   for (const [name, email] of [
-    ['Brightloom Repos', '101799195+BrightloomGit@users.noreply.github.com'],
+    ['Pellucid Repos', '204816377+PellucidGit@users.noreply.github.com'],
     ['Docs Sync', 'docs-sync@users.noreply.github.com'],
     ['Claude', 'claude@acme.example'],
     ['Claude Opus 5.5 (1M context)', 'claude@acme.example'],
@@ -236,7 +236,7 @@ test('A TEAM’S JOB ON GITHUB’S PRIVATE ADDRESS IS A MACHINE, a coding agent 
     ['Codex', 'codex@openai.example'],
     ['Gemini Code Assist', 'gemini@acme.example'],
     ['Devin AI', 'devin@cognition.example'],
-    ['Ada Lovelace (aider)', 'ada@encore.example'],
+    ['Ada Lovelace (aider)', 'ada@lanternfish.example'],
     ['Acme CI', 'ci@acme.example'],
     ['Acme CI/CD', 'jobs@acme.example'],
     ['GitLab Runner', 'gitlab-runner@acme.example'],

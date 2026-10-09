@@ -120,12 +120,12 @@ test('A KEY SOMEBODY HOLDS IS MET AS EVER: the line, and nothing the mail says',
 
 test('AN ADDRESS AT AN ORGANISATION THE RECORD KEEPS IS SOMEBODY TO KNOW', async () => {
   const { k, sql } = await record();
-  const encore = value<Entry>(k.create('organisations', { name: 'Encore', domain: 'encore.example' }, OWNER));
-  const met = value<Met>(k.meet(sender('rohan@encore.example', 'Rohan Mehta'), RULE));
+  const lanternfish = value<Entry>(k.create('organisations', { name: 'Lanternfish', domain: 'lanternfish.example' }, OWNER));
+  const met = value<Met>(k.meet(sender('teodor@lanternfish.example', 'Teodor Vance'), RULE));
   assert.equal(met.created, true);
-  assert.equal(k.get(met.row!.id)!.fields.org, encore.id);
+  assert.equal(k.get(met.row!.id)!.fields.org, lanternfish.id);
   /* A subdomain's address is the same organisation's. */
-  assert.equal(value<Met>(k.meet(sender('ops@mail.encore.example', 'Omar Said'), RULE)).created, true);
+  assert.equal(value<Met>(k.meet(sender('ops@mail.lanternfish.example', 'Joaquin Herrera'), RULE)).created, true);
   /* A public mail host says nothing, whichever organisation the record files it under (it is never a domain key). */
   value(k.create('organisations', { name: 'Google', domain: 'gmail.com' }, OWNER));
   assert.equal(value<Met>(k.meet(sender('stranger@gmail.com', 'Stranger'), RULE)).mention, true);

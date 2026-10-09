@@ -182,6 +182,27 @@ const WEEKLY = { value: { count: 'id' }, group_by: 'created_at', bucket: 'week',
 /** A count of rows now, with no good or bad number, as the weekly figures are. */
 const COUNT = { value: { count: 'id' }, format: 'int', target: { gte: 0 }, window: '30d', compare: 'none' } as const;
 
+/** A count of rows that should be none, SINCE 1.10.0: each one is something to put right, so above nought misses. */
+const FIX = { ...COUNT, target: { lte: 0 } } as const;
+
+/**
+ * THE AGENT DOOR'S OWN SIGNS, SINCE 1.10.0 (AGT-B01): what the door's marks add up to over the last week, read by the
+ * kernel's `record.door` (`readDoor` in `packages/kernel/src/built-in-figures.ts`), each naming the one sign it is.
+ * Declared here so a page and the vital signs draw them with no new code. Nothing is read over a week nobody reached
+ * the door, never nought. `value` is a count only because every figure carries one; the reader reads the sign.
+ *
+ * `called` is a count with no verdict: the guard of fewer than half the last ten runs making a call is the proof
+ * area's daily reader, not a target. `behind` needs the build the host runs, and `card` a mark nothing posts yet.
+ */
+const DOOR = { source: 'record.door', value: { count: 'id' }, format: 'int', window: '7d', compare: 'none' } as const;
+const DOOR_METRICS: Record<string, SeedMetric & { sign: string }> = {
+  'agent-door-called': { metric: 'agent-door-called', name: 'Agent runs that made a call', sign: 'called', target: { gte: 0 }, ...DOOR },
+  'agent-door-builds-behind': { metric: 'agent-door-builds-behind', name: 'Agent runs on an older build', sign: 'behind', target: { lte: 0 }, ...DOOR },
+  'agent-door-internal': { metric: 'agent-door-internal', name: 'Agent door answers that failed inside', sign: 'internal', target: { lte: 0 }, ...DOOR },
+  'agent-hook-slowest': { metric: 'agent-hook-slowest', name: 'Slowest start hook, in milliseconds', sign: 'hookSlowestMs', target: { gte: 0 }, ...DOOR },
+  'agent-card-words': { metric: 'agent-card-words', name: 'Most words on one agent card', sign: 'cardWordsMost', target: { gte: 0 }, ...DOOR },
+};
+
 /**
  * THE RUNS WORKING NOW ARE THE KERNEL'S, SINCE 1.9.0: active and heard from inside fifteen minutes, its working runs
  * with no working parent (`sessions.working`, counted as the built-in `runs-working`, both over `workingRuns` in
@@ -278,6 +299,39 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
   'skills-active': { metric: 'skills-active', name: 'Skills in use', source: 'register.skills', where: 'state is active', ...COUNT },
   /* ONE SKILL'S LESSONS, `{{it}}` filled from the skill page's own `{{name}}`, the clauses of the tile drawn on it. */
   'skill-learnings': { metric: 'skill-learnings', name: 'Learnings that bear on a skill', source: 'register.learnings', where: 'topic is {{it}}, state is active', ...COUNT },
+  /* THE KEYS, SINCE 1.10.0 (AGT-D01): how many keys not retired the vault holds a value for, a number with no verdict
+     to read beside the Vault's own "sealed here", which counts every key but the retired ones (`keysOf` in
+     `apps/web/src/lib/record/vault.ts`), so a key gone stale still counts as sealed; how many live keys hold no value
+     and do not say where they are kept, so nobody could find them again; and how many are past their day. A sealed
+     field answers only `is set` and `is empty` (`packages/where/src/sentence.ts`), never what it holds. */
+  'keys-sealed': { metric: 'keys-sealed', name: 'Keys sealed in the vault', source: 'register.credentials', where: 'state is not retired, value is set', ...COUNT },
+  'keys-nowhere': { metric: 'keys-nowhere', name: 'Keys with no value and nowhere they are kept', source: 'register.credentials', where: 'state is live, value is empty, where is empty', ...FIX },
+  'keys-expired': { metric: 'keys-expired', name: 'Keys past their day', source: 'register.credentials', where: 'state is live, expires before today', ...FIX },
+  /**
+   * THE TOOLS NOT SEEN IN A MONTH, SINCE 1.10.0: active, and last seen more than thirty days ago, or never seen and
+   * written more than thirty days ago. A tree for the reason `learnings-faded` is one: an `and` around an `or`.
+   */
+  'tools-unseen': {
+    metric: 'tools-unseen',
+    name: 'Tools not seen in a month',
+    source: 'register.tools',
+    where: {
+      all: [
+        { field: 'state', is: 'active' },
+        {
+          any: [
+            { field: 'seen', before: '-30d' },
+            { all: [{ field: 'seen', empty: true }, { field: 'created_at', before: '-30d' }] },
+          ],
+        },
+      ],
+    },
+    ...FIX,
+  },
+  /* THE RUNS OF THE LAST TWO WEEKS PLACED IN NO PROJECT, SINCE 1.10.0. A run outside every project is allowed, so it has
+     no verdict: it is the number to read beside the count of runs. */
+  'runs-unplaced': { metric: 'runs-unplaced', name: 'Runs in no project, last two weeks', source: 'register.session', where: 'last_seen after -14d, project is empty', ...COUNT },
+  ...DOOR_METRICS,
 };
 
 /**
@@ -404,6 +458,33 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         limit: 6,
         when: { metric: 'runs-earlier', gt: 0 },
       },
+      /* WHAT TO PUT RIGHT IN THE KEYS AND TOOLS, SINCE 1.10.0 (AGT-D01), as one tile of up to three lines, as Money's Heads
+         up is: a boxed section draws the blocks after it, up to the next section, on one surface, and each line is drawn
+         only while its figure is above nought, so a record with nothing wrong draws no tile at all (a section over
+         nothing goes with its blocks). The heading is the word and the tone the mark, never the colour alone.
+
+         UNDER THE RUNS AND NOT UNDER THE LINE, where the scope first put it: the page is the runs (DIRECTION §37), and
+         a page shows at most six tiles before the rest is folded (`test/calm-pages.test.ts`), so the lanes and the four
+         groups keep the top and this is the sixth. */
+      {
+        kind: 'section',
+        heading: 'Needs a look',
+        icon: 'circle-alert',
+        span: 12,
+        box: true,
+      },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', gt: 0 }, body: '{{keys-nowhere}} key(s) hold no value and do not say where they are kept' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', gt: 0 }, body: '{{keys-expired}} key(s) are past their day' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'tools-unseen', gt: 0 }, body: '{{tools-unseen}} tool(s) were not seen in a month' },
+      /* WHAT THE BRAIN LEARNED, FOLDED SHUT SINCE 1.10.0: a log looked up, not read each time the page opens, and the
+         section that folds it is what closes Needs a look above it. */
+      {
+        kind: 'section',
+        heading: 'What the brain learned',
+        icon: 'learning',
+        span: 12,
+        fold: true,
+      },
       /* WHAT THE AGENTS ADDED AND CHANGED IN WHAT THE BRAIN HOLDS, one group per run, from the record's own log. An
          `agents` block and not a `feed`, because a feed groups by the kind of actor and would put every run under one
          head; this groups by who, and `first:` folds each run's rest into one line with its count, so a busy run
@@ -416,8 +497,6 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          not drawn. */
       {
         kind: 'agents',
-        heading: 'What the brain learned',
-        icon: 'learning',
         span: 12,
         source: 'activity',
         where: 'list is learnings or skills or credentials or tools',
@@ -528,8 +607,12 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      1.9.0 NARROWS WHO IS WORKING TO THE KERNEL'S CLOCK, SO IT IS MINOR: Working draws `sessions.working` and the line
      reads the built-in `runs-working`, an agent heard from in the last fifteen minutes, where both read this pack's own
      clause of active and heard from today. `agents-working` goes, the one figure taken away, because the record answers
-     the same question once for every page; no list or field goes. 1.8.0 is live. */
-  manifest: { id: 'agents', version: '1.9.0', requires: ['register.things'] },
+     the same question once for every page; no list or field goes. 1.8.0 is live.
+     1.10.0 ONLY ADDS, SO IT IS MINOR: the figures `keys-sealed`, `keys-nowhere`, `keys-expired`, `tools-unseen` and
+     `runs-unplaced` (AGT-D01); Needs a look on the agents home under the runs, one tile of three lines each drawn only
+     while a key or tool needs putting right; What the brain learned folded shut under its own section; and five
+     figures over the agent door's own signs (`record.door`, AGT-B01). No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.10.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

@@ -11,12 +11,52 @@
  *   node tools/gates/bundle.mjs [--report]
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { brotliCompressSync, constants } from 'node:zlib';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { budget, newestSource } from './lib.mjs';
+
+/**
+ * THE ENTRY SCRIPT'S DEBT, OFF THE LEDGER (PRF-B03 job 3). The number this gate fails above used to be `mainJsBaseline`
+ * in `budgets.json`, raised eleven times with a sentence added to one comment string each time and nothing checking that
+ * a change carried one. It is now the newest line of `debts["bundle.mainJsBrotli"]` in `ledger.json`, where every line
+ * is dated with its reason and the `ledger` gate is red on a line higher than the one before. This reads it and nothing
+ * more: the budget stays `mainJsBrotli` in `budgets.json` and still prints.
+ *
+ * The reason is the line that SET the number, not a later line that only restates it, which is how `ledger.mjs` reads
+ * it too: the line the ledger opened with says the same number and would otherwise hide the reason of 6 October.
+ *
+ * It returns an Error rather than throwing, so a ledger with no such debt is a finding in this gate's own words.
+ */
+export function entryDebt(book) {
+  const debt = book?.debts?.['bundle.mainJsBrotli'];
+  const lines = Array.isArray(debt?.lines) ? debt.lines.filter((l) => Number.isInteger(l?.at)) : [];
+  if (lines.length === 0 || lines.length !== debt.lines.length)
+    return new Error('ledger.json holds no debt for the entry script, `debts["bundle.mainJsBrotli"]`, with a number on every line');
+  const set = lines.findLast((l, i) => i === 0 || lines[i - 1].at !== l.at);
+  return { at: lines.at(-1).at, owes: debt.owes ?? 'nobody named', on: set.on, why: set.why };
+}
+
+/** The line this gate prints for the debt: the budget, what is owed and by whom, where it fails, and the newest reason. */
+export function debtLine(B, debt) {
+  const bytes = (n) => n.toLocaleString('en-US');
+  return (
+    `entry JS: a budget of ${bytes(B.mainJsBrotli)} with ${bytes(debt.at - B.mainJsBrotli)} owed by ${debt.owes},` +
+    ` failing above ${bytes(debt.at + B.mainJsNoise)}. Newest reason, ${debt.on}: ${debt.why}`
+  );
+}
+
+/** `ledger.json` beside this file, as `budgets.json` is read: the gate's own numbers, never the seeded tree's. */
+export function readLedger(at = fileURLToPath(new URL('./ledger.json', import.meta.url))) {
+  try {
+    return JSON.parse(readFileSync(at, 'utf8'));
+  } catch (e) {
+    return new Error(`tools/gates/ledger.json could not be read: ${String(e?.message ?? e).split('\n')[0]}`);
+  }
+}
 
 /**
  * THE PREREQUISITE, FOR THE RUNNER TO CHECK RATHER THAN THIS FILE (`52 §5.1` step 2). `run.mjs`
@@ -347,6 +387,24 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
    * Arabic is not in either row: `unicode-range` is evaluated per page, so an English-only session
    * never fetches it.
    */
+  /* THE RECORDED NUMBER IS THE LEDGER'S DEBT, with every move dated and its reason on the line (`entryDebt` above). */
+  const book = readLedger();
+  const debt = book instanceof Error ? book : entryDebt(book);
+  if (debt instanceof Error) {
+    console.error(`\n  bundle: ${debt.message}. The entry script fails above that debt, so without it nothing is measured.\n`);
+    return 1;
+  }
+  /* `mainJsBaseline` IS READ UNTIL ITS LINE LEAVES `budgets.json` (batch 42's file, sent as blocked), so the two cannot
+     say different numbers in the meantime and the whole-path dead-key check in `self-test` stays green. When the key is
+     gone this reads `undefined` and says nothing; delete these lines then. */
+  if (B.mainJsBaseline !== undefined && B.mainJsBaseline !== debt.at) {
+    console.error(
+      `\n  bundle: budgets.json records the entry script at ${B.mainJsBaseline} and the ledger's debt says ${debt.at}.` +
+        ' The ledger is the number; a debt only falls.\n',
+    );
+    return 1;
+  }
+
   /**
    * A row may carry a BASELINE: a recorded number the gate fails above, when the budget is already
    * exceeded by something outside this repository's control.
@@ -360,12 +418,9 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
       name: 'entry JS, brotli',
       size: js,
       budget: B.mainJsBrotli,
-      // The measurement and the argument are in `budgets.json` beside the number, which is where a
-      // reviewer widening it would have to read them.
-      /* THE BAND IS ON THE RECORDED NUMBER, NOT ON THE BUDGET. Its argument, and the measurement it
-         rests on, are in `budgets.json` beside the number, which is where a reviewer widening either
-         would have to read them. */
-      baseline: B.mainJsBaseline + B.mainJsNoise,
+      /* THE BAND IS ON THE RECORDED NUMBER, NOT ON THE BUDGET. Its argument is in `budgets.json` beside `mainJsNoise`,
+         and the number it sits on is the debt, whose every line and reason are in `ledger.json`. */
+      baseline: debt.at + B.mainJsNoise,
       note: "Kit's runtime alone; the interpreter is 19.3 of it",
     },
     { name: 'entry CSS, brotli', size: css, budget: B.mainCssBrotli, note: 'tokens, a11y, blocks, rows and the shell' },
@@ -386,6 +441,7 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
     const tail = within ? note : `RECORDED, fails above ${KB(baseline ?? budget)}. ${note}`;
     console.log(`  ${mark}  ${name.padEnd(22)} ${KB(size).padStart(9)} / ${KB(budget).padStart(9)}   ${tail}`);
   }
+  console.log(`\n  ${debtLine(B, debt)}`);
   console.log(
     `\n  ${entries.length} entry chunks, ${reachable.size} statically reachable.` +
       ` ${KB(routeCss)} more CSS arrives with the routes that need it.\n`,

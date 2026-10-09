@@ -35,7 +35,7 @@
  * already. `bare: false` rows are skipped, and skipped rows are counted so the number is honest.
  */
 
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
@@ -54,6 +54,28 @@ import { answers, forward, forwards, startRecord } from './record.mjs';
    this file and reads `mod.needs` before it calls the gate, so the value the gate holds is the value
    the runner acts on. */
 export const needs = ['web-build'];
+
+/** The registry's rows, read out of `bindings.ts` as text: the registry uses runes, so it is never imported. */
+export function bindingsIn(source) {
+  return [
+    ...source.matchAll(/\{\s*id:\s*'([^']+)',\s*scope:\s*'([^']+)',\s*key:\s*'([^']+)',[^}]*?bare:\s*(true|false)/g),
+  ].map((m) => ({ id: m[1], scope: m[2], key: m[3], bare: m[4] === 'true' }));
+}
+
+/** A row this gate does not press: a chord (`bare: false`), or a row in the two scopes that need a layer open first. */
+export const skips = (row) => !row.bare || row.scope === 'palette' || row.scope === 'nav';
+
+/* THE BINDINGS SKIPPED, BY ID, OFF THIS REPOSITORY'S REGISTRY, so `ledger.mjs` reads how many without a browser or a
+   build (PRF-B03 step 3). The run counts the same rows by the same `skips`, so the two cannot disagree. `ledger.json`
+   holds `keys.SKIPPED` at its newest line: the list only shrinks, and a fall is a line written there. A registry that
+   is not there is `null`, which the ledger names as not a list, rather than a throw that would stop `run.mjs` reading
+   `needs`. */
+const BINDINGS = join(import.meta.dirname, '..', '..', 'apps', 'web', 'src', 'lib', 'a11y', 'bindings.ts');
+export const SKIPPED = existsSync(BINDINGS)
+  ? bindingsIn(readFileSync(BINDINGS, 'utf8'))
+      .filter(skips)
+      .map((row) => row.id)
+  : null;
 
 /**
  * EVERY KEY, PRESSED, AS A FUNCTION THE RUNNER CALLS. `52 §5.1` step 3.
@@ -145,9 +167,7 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
     /* Read as text, not imported: the registry uses runes, so anything reaching it cannot load outside
        a Svelte build. That is the same reason `silenced` lives next door in a plain `.ts`. */
     const source = await readFile(REGISTRY, 'utf8');
-    const rows = [
-      ...source.matchAll(/\{\s*id:\s*'([^']+)',\s*scope:\s*'([^']+)',\s*key:\s*'([^']+)',[^}]*?bare:\s*(true|false)/g),
-    ].map((m) => ({ id: m[1], scope: m[2], key: m[3], bare: m[4] === 'true' }));
+    const rows = bindingsIn(source);
 
     if (rows.length < 20) {
       console.error(`  keys: read ${rows.length} bindings from the registry, which cannot be right.`);
@@ -524,13 +544,10 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
     let skipped = 0;
 
     for (const row of rows) {
-      if (!row.bare) {
-        skipped++;
-        continue;
-      }
-      /* THE TWO SCOPES THAT NEED A LAYER OPEN FIRST. The a11y gate drives both by keystroke already, so
-         covering them here would be a second, weaker copy of a check that exists. */
-      if (row.scope === 'palette' || row.scope === 'nav') {
+      /* CHORDS, AND THE TWO SCOPES THAT NEED A LAYER OPEN FIRST. The a11y gate drives both scopes by keystroke
+         already, so covering them here would be a second, weaker copy of a check that exists. `SKIPPED` above is
+         these same rows, counted by the same `skips`. */
+      if (skips(row)) {
         skipped++;
         continue;
       }

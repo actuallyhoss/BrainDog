@@ -83,8 +83,8 @@ async function onPeople2(): Promise<{ k: Kernel; sql: NodeSql }> {
     await put(k, sql, m === 'people' ? peopleBefore3(doc) : doc);
   }
   for (const [name, email] of [
-    ['Sam', 'admin@person.example'],
-    ['sam', 'sam@laptop.example'],
+    ['Wren', 'admin@person.example'],
+    ['wren', 'wren@laptop.example'],
     ['Mara Lindqvist', 'mara@halden.example'],
     ['Tom Ashby', 'tom@ravensworth.example'],
     ['Ada Vine', 'ada@pellvine.example'],

@@ -19,7 +19,16 @@
  *
  * WHAT COMES BACK. 200 with a body: written as one line. 202: nothing. 401: the sign-in ended while the session was open,
  * so this answer and every later one come from the refusing server (`signed-out.ts`). A network failure, a 5xx or the
- * budget: the refusal `UNREACHABLE` with its sentence (`surface.ts`), and a tool call is never sent twice.
+ * budget: the refusal `UNREACHABLE` with its sentence (`surface.ts`).
+ *
+ * A WRITE WHOSE ANSWER WAS LOST IS SENT ONCE MORE, AND IS STILL ONE ENTRY (AGT-B05). A timeout does not say whether the
+ * host wrote: before this the call was never sent twice, so the agent was told it failed and wrote it again itself, two
+ * tasks for one "add a task". Now a `create` or an `update` carries an operation id, the app's own or one made here, and
+ * an answer that never came sends the same call with the same id once more. The record keeps the id on the first line of
+ * the write and answers a second sending with the first one's entry (`packages/kernel/src/index.ts`, `opId`), so the
+ * retry is one entry however many times it lands. Only when the host's listed `inputSchema` for that tool names
+ * `op_id`: a host that predates it refuses an argument it does not list, and every write would fail. A read is never
+ * sent twice, and nothing else is.
  *
  * A DEPLOY MID-SESSION IS SEEN. Every answer carries `braindog-build` (AGT-A02). When it differs from the one seen at the
  * handshake, the bridge writes one `notifications/tools/list_changed` and refreshes its cache, and the handshake told
@@ -137,6 +146,36 @@ function unreachableSurface(): McpSurface<Ctx> {
   return Object.fromEntries(Object.keys(signedOutSurface('')).map((name) => [name, no])) as unknown as McpSurface<Ctx>;
 }
 
+/** The tools a lost answer is sent again for: the two that write and take an operation id (AGT-B05). */
+const RETRIED: ReadonlySet<string> = new Set(['create', 'update']);
+
+/** The names of the tools a `tools/list` result says take `op_id`, read from each one's `inputSchema`. */
+export function opTools(list: unknown): Set<string> {
+  const out = new Set<string>();
+  for (const tool of isObject(list) && Array.isArray(list.tools) ? list.tools : []) {
+    if (!isObject(tool) || typeof tool.name !== 'string' || !isObject(tool.inputSchema)) continue;
+    const props = tool.inputSchema.properties;
+    if (isObject(props) && Object.hasOwn(props, 'op_id')) out.add(tool.name);
+  }
+  return out;
+}
+
+/**
+ * The call as it is sent, and whether a lost answer may send it again: a `create` or an `update` carrying the app's own
+ * `op_id`, or one made here when the host lists the argument for that tool (`takes`). Anything else goes as the app
+ * wrote it, and once.
+ */
+export function withOpId(message: Message, takes: ReadonlySet<string>, mint: () => string = () => `op_${crypto.randomUUID()}`): { message: Message; again: boolean } {
+  const params = isObject(message.params) ? message.params : undefined;
+  if (message.method !== 'tools/call' || params === undefined || typeof params.name !== 'string' || !RETRIED.has(params.name)) return { message, again: false };
+  const args = params.arguments ?? {};
+  if (!isObject(args)) return { message, again: false };
+  if (typeof args.op_id === 'string' && args.op_id !== '') return { message, again: true };
+  /* AN ID THE APP SENT IN ANOTHER SHAPE is the host's to refuse, and is never replaced by one made here. */
+  if (args.op_id !== undefined || !takes.has(params.name)) return { message, again: false };
+  return { message: { ...message, params: { ...params, arguments: { ...args, op_id: mint() } } }, again: true };
+}
+
 /** What one POST came to. */
 type Outcome =
   | { kind: 'answer'; reply: Reply | null; build: string | null }
@@ -168,6 +207,8 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
   let refusing: McpSurface<Ctx> | null = null;
   let cache: DoorCache | null = readDoorCache(home, target.key);
   let refreshes = 0;
+  /* THE TOOLS THE HOST SAYS TAKE `op_id`, from the last list it answered, or the cache's while it has answered none. */
+  let takes = opTools(cache?.tools);
 
   const open = new Map<Id, AbortController>();
   const inFlight = new Set<Promise<void>>();
@@ -229,6 +270,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     void post(message, AbortSignal.timeout(ms)).then((got) => {
       if (got.kind !== 'answer' || got.reply === null || !('result' in got.reply) || !isObject(got.reply.result)) return;
       writeDoorCache(home, target.key, { build: got.build ?? undefined, tools: got.reply.result });
+      takes = opTools(got.reply.result);
       cache = readDoorCache(home, target.key);
     });
   };
@@ -292,7 +334,14 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     if (id !== null) open.set(id, stop);
     let reply: Reply | null;
     try {
-      const got = await post(message, AbortSignal.any([stop.signal, AbortSignal.timeout(ms)])).catch((): Outcome => ({ kind: 'away' }));
+      const sent = withOpId(message, takes);
+      const once = () => post(sent.message, AbortSignal.any([stop.signal, AbortSignal.timeout(ms)])).catch((): Outcome => ({ kind: 'away' }));
+      let got = await once();
+      /* SENT ONCE MORE WITH THE SAME ID, and only once: a host away twice is away, and the agent is told so. */
+      if (got.kind === 'away' && sent.again && !stop.signal.aborted) {
+        say('A write got no answer from the host, so it was sent once more with the same operation id.');
+        got = await once();
+      }
       /* CANCELLED BY THE APP: it has said it will not read the answer, so none is written. */
       if (stop.signal.aborted) return;
       if (got.kind === 'signed-out') {
@@ -314,8 +363,10 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
           writeDoorCache(home, target.key, { build: got.build ?? undefined, initialize: reply.result });
           cache = readDoorCache(home, target.key);
         } else heard(got.build);
-        if (method === 'tools/list' && reply !== null && 'result' in reply && isObject(reply.result) && !(isObject(message.params) && message.params.cursor !== undefined))
+        if (method === 'tools/list' && reply !== null && 'result' in reply && isObject(reply.result) && !(isObject(message.params) && message.params.cursor !== undefined)) {
           writeDoorCache(home, target.key, { build: got.build ?? undefined, tools: reply.result });
+          takes = opTools(reply.result);
+        }
       }
     } finally {
       if (id !== null) open.delete(id);

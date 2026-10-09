@@ -258,7 +258,7 @@
   Rendering it once is also the only form of the fix that stays fixed. The two arms are two hundred
   lines apart and the next change to a cell will be made in whichever one the author is reading.
 -->
-{#snippet cellBody(row: TableRow, column: Column, value: string | null)}{#if cellSnippet}{@render cellSnippet(row, column, value)}{:else if scope && value && scoped.has(column.field)}{@render scopeChip(scope, value)}{:else}{@const drawn = tableCellBody(value)}{#if drawn.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if drawn.body.kind === 'missing'}<span class="missing">{MISSING}</span>{:else if drawn.body.kind === 'coded'}{drawn.body.sign}<span class="amount-code">{drawn.body.currency}</span> {drawn.body.rest}{:else}{drawn.body.text}{/if}{/if}{/snippet}
+{#snippet cellBody(row: TableRow, column: Column, value: string | null)}{#if cellSnippet}{@render cellSnippet(row, column, value)}{:else if scope && value && scoped.has(column.field)}{@render scopeChip(scope, value)}{:else}{@const drawn = tableCellBody(value)}{#if drawn.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if drawn.body.kind === 'missing'}<span class="missing">{MISSING}</span>{:else if drawn.body.kind === 'coded'}{@const end = drawn.body.rest.search(/\s|$/u)}<span class="amount">{drawn.body.sign}<span class="amount-code">{drawn.body.currency}</span> {drawn.body.rest.slice(0, end)}</span>{drawn.body.rest.slice(end)}{:else}{drawn.body.text}{/if}{/if}{/snippet}
 
 {#snippet pair(row: TableRow, cell: CardCell)}
   <span class="table-card-pair" data-truncate={cell.column.truncate ?? 'end'}>

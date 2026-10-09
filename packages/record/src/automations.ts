@@ -456,6 +456,22 @@ export type AutomationRow = {
   lastFired: string | null;
   /** This calendar month so far, UTC, from the runs themselves. An inline rule's firings are events, not runs. */
   month: { runs: number; done: number; failed: number; cancelled: number };
+  /**
+   * How many times its work has landed, ever: an inline rule's patch on one row, or a run opened. The kernel's
+   * `rule_stat` (migration 34), raised where the work lands and back-filled once from the log, so it is the whole count
+   * and not a page of history. 0 is the page's "never".
+   */
+  fired: number;
+  /** When it last did, from the same row, or `null` when `fired` is 0. */
+  last_at: string | null;
+  /** One sentence on why it has not fired, when `fired` is 0, and `null` otherwise (`idleSaid`). */
+  why_idle: string | null;
+  /**
+   * The same key for every rule that does the same thing to the same list: the list, the path, and each action with
+   * the field it acts on (`familyOf`). The page draws "Category by payee, 57 rules" as one line by it. A handle, never
+   * words, and `null` for a body with no list or nothing to do.
+   */
+  family: string | null;
 };
 
 export type AutomationRun = {
@@ -491,6 +507,88 @@ export type RunsPage = { before?: string | undefined; limit?: number | undefined
 
 type Declared = { id: string; version: number; body: string; pack_id: string | null };
 
+/** The most entries one idle sentence counts. Past it the sentence says "1,000 or more", and the read stays one page. */
+export const IDLE_COUNTED_MOST = 1_000;
+
+/** What a person calls a list: the name its declaration gives it, or its id with `_` as a space. `ingest.ts`'s `listName`. */
+function listName(sql: Sql, register: string): string {
+  let name: unknown;
+  try {
+    const d = sql.one<{ body: string }>(`SELECT body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0`, `register.${register}`);
+    name = d ? (JSON.parse(d.body) as Body).name : undefined;
+  } catch {
+    name = undefined;
+  }
+  if (typeof name === 'string' && name.trim() !== '') return name.trim();
+  const said = register.replace(/_/g, ' ');
+  return said.charAt(0).toUpperCase() + said.slice(1);
+}
+
+/**
+ * Why a rule that has never fired has not, in one sentence a person reads.
+ *
+ * THE COUNT READS THE LIST, NEVER THE LOG. A record whose history was pruned would say "34 were added" of a list that
+ * holds fewer, so what was added is the list's own entries made since the rule's first version was installed, the ones
+ * still there, counted no further than `IDLE_COUNTED_MOST`. A rule woken by a change and not by an addition counts the
+ * entries changed since instead. A rule about no list says what it waits for.
+ */
+function idleSaid(sql: Sql, id: string, body: Body): string {
+  if (body.enabled === false) return 'It is turned off.';
+  const register = subjectOf(body);
+  const trigger = triggerOf(body);
+  if (register === null) {
+    if (trigger === 'every') return 'Its time has not come round since it was turned on.';
+    if (trigger === 'manual') return 'Nobody has started it since it was turned on.';
+    if (trigger === 'arrival') return 'Nothing it waits for has arrived since it was turned on.';
+    if (trigger === 'metric') return 'The number it watches has not crossed its mark since it was turned on.';
+    if (trigger === 'decided') return 'No decision has woken it since it was turned on.';
+    return 'Nothing has started it since it was turned on.';
+  }
+  const since = sql.one<{ at: string | null }>('SELECT min(created_at) AS at FROM declaration WHERE id = ?', id)?.at ?? '';
+  const written = isObject(body.on) && isObject(body.on.written) ? body.on.written : null;
+  const changed = Array.isArray(written?.op) && !written.op.includes('create');
+  const n =
+    sql.one<{ n: number }>(
+      `SELECT count(*) AS n FROM (SELECT 1 FROM entry WHERE register = ? AND deleted_at IS NULL AND ${changed ? 'updated_at' : 'created_at'} >= ? LIMIT ?)`,
+      register,
+      since,
+      IDLE_COUNTED_MOST,
+    )?.n ?? 0;
+  const list = listName(sql, register);
+  const verb = changed ? 'changed in' : 'added to';
+  if (n === 0) return `No entry has been ${verb} ${list} since it was turned on.`;
+  if (n === 1) return `One entry was ${verb} ${list} and it did not match.`;
+  const many = n >= IDLE_COUNTED_MOST ? `${IDLE_COUNTED_MOST.toLocaleString('en-US')} or more` : String(n);
+  return `${many} were ${verb} ${list} and none matched.`;
+}
+
+/**
+ * The key every rule that does the same thing to the same list shares: its list, its path, and each action it takes
+ * with the field that action acts on, sorted, so the order a body lists them in does not split a family.
+ *
+ * READ FROM THE BODY'S SHAPE AND NOTHING ELSE. No list and no add-on is named here: fifty-seven rules that each set
+ * Category on Ledger for one payee share a key because their bodies have one shape, and a pack that ships the same
+ * shape on another list gets its own family by the same sum. What a rule matches (`when`) and the value it writes are
+ * what differ inside a family, so neither is in the key.
+ */
+export function familyOf(body: Body): string | null {
+  const register = subjectOf(body);
+  const did = Array.isArray(body.then) ? body.then : Array.isArray(body.steps) ? body.steps : null;
+  if (register === null || did === null) return null;
+  const parts = new Set<string>();
+  for (const step of did) {
+    if (!isObject(step)) continue;
+    /* AN ACTION OR A STEP IS NAMED BY ITS ONE KEY, and a branch by `if` whatever else it carries. */
+    const verb = 'if' in step ? 'if' : Object.keys(step)[0];
+    if (verb === undefined) continue;
+    const arg = step[verb];
+    const field = verb !== 'if' && isObject(arg) && typeof arg.field === 'string' ? arg.field : null;
+    parts.add(field === null ? verb : `${verb}:${field}`);
+  }
+  if (parts.size === 0) return null;
+  return `${register}/${pathOf(body)}/${[...parts].sort().join('+')}`;
+}
+
 const OPEN = "state IN ('pending', 'running', 'waiting')";
 
 function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: Body } {
@@ -511,6 +609,12 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
      run started, since the lines after that are the same firing's steps. */
   const signed = sql.one<{ ts: string | null }>('SELECT max(ts) AS ts FROM event WHERE actor = ?', `rule:${bare}`)?.ts ?? null;
   const lastFired = last ? (signed !== null && pathOf(body) === 'inline' && signed > last.started_at ? signed : last.started_at) : signed;
+  /* KEYED BY THE BODY'S OWN NAME, as `rules.ts` raises it and `rule:<name>` signs the log; the bare id is the same name
+     on every rule this build installs. */
+  const stat = sql.one<{ fired: number; last_at: string | null }>(
+    'SELECT fired, last_at FROM rule_stat WHERE rule = ?',
+    typeof body.rule === 'string' && body.rule !== '' ? body.rule : bare,
+  );
   const month = { runs: 0, done: 0, failed: 0, cancelled: 0 };
   for (const r of sql.all<{ state: string; n: number }>(
     'SELECT state, count(*) AS n FROM automation_run WHERE rule = ? AND started_at >= ? GROUP BY state',
@@ -538,6 +642,10 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
       last: last ? { run: last.id, state: last.state, at: last.finished_at ?? last.started_at, say: last.say } : null,
       lastFired,
       month,
+      fired: stat?.fired ?? 0,
+      last_at: stat?.fired ? stat.last_at : null,
+      why_idle: stat?.fired ? null : idleSaid(sql, d.id, body),
+      family: familyOf(body),
     },
   };
 }

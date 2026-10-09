@@ -50,7 +50,7 @@ const PROJECTS: Declaration = {
   body: { id: 'projects', name: 'Projects', one: 'project', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } as never,
 };
 
-const SAM: WriteContext = { actor: 'p_sam' };
+const MARA: WriteContext = { actor: 'p_mara' };
 const AGENT: WriteContext = { actor: 'p_agent' };
 
 type Rec = { k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock>; parts: UndoParts };
@@ -60,7 +60,7 @@ async function record(): Promise<Rec> {
   const clock = fixedClock(NOW);
   const k = await openRecord(sql, clock);
   value(await k.install([PROJECTS, TASKS]));
-  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_sam', 'sam@example.com', 'Sam'), ('p_agent', NULL, 'Robin')");
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_mara', 'mara@example.com', 'Mara'), ('p_agent', NULL, 'Robin')");
   return { k, sql, clock, parts: { sql, clock, mint: ulids(clock.now), transaction: k.transaction, write: k.write } };
 }
 
@@ -95,7 +95,7 @@ test('A CREATE IS UNDONE AS A DELETE, in names, and a second look says it was un
   assert.equal(p.steps[0]!.do, 'remove');
   readable([p.say, ...p.lines]);
 
-  const done = value(undoApply(r.parts, scope, p.hash, 'p_sam'));
+  const done = value(undoApply(r.parts, scope, p.hash, 'p_mara'));
   assert.equal(done.put, 1);
   assert.equal(done.say, 'Put back one change.');
   assert.ok(r.k.get(made.id, { includeDeleted: true })!.deleted_at, 'the task is deleted');
@@ -104,7 +104,7 @@ test('A CREATE IS UNDONE AS A DELETE, in names, and a second look says it was un
   const mark = r.sql.one<{ actor: string; kinds: string; undone_by: string; by_batch: string }>('SELECT actor, kinds, undone_by, by_batch FROM undone WHERE batch = ?', scope.batch);
   assert.equal(mark?.actor, 'p_agent');
   assert.deepEqual(JSON.parse(mark!.kinds), ['tasks:add']);
-  assert.equal(mark?.undone_by, 'p_sam');
+  assert.equal(mark?.undone_by, 'p_mara');
   assert.equal(mark?.by_batch, done.batch);
   assert.deepEqual(done.undone, [{ batch: scope.batch, actor: 'p_agent', agent: null, kinds: ['tasks:add'] }]);
 
@@ -117,15 +117,15 @@ test('A CREATE IS UNDONE AS A DELETE, in names, and a second look says it was un
 
 test('AN EDIT GOES BACK TO ITS FROM ONLY WHILE THE ROW STILL HOLDS ITS TO, and a value changed since stays, naming who', async () => {
   const r = await record();
-  const made = value<Entry>(r.k.create('tasks', { name: 'Fix login', due: '2026-10-08' }, SAM));
+  const made = value<Entry>(r.k.create('tasks', { name: 'Fix login', due: '2026-10-08' }, MARA));
   r.clock.advance(10 * MIN);
   const moved = value<Entry>(r.k.update('tasks', made.id, { state: 'doing', due: '2026-10-20' }, AGENT));
   const scope = { batch: lastBatch(r.sql, made.id) };
   r.clock.advance(10 * MIN);
-  value(r.k.update('tasks', made.id, { due: '2026-10-22' }, { ...SAM, version: moved.version }));
+  value(r.k.update('tasks', made.id, { due: '2026-10-22' }, { ...MARA, version: moved.version }));
 
   const p = plan(r, scope);
-  assert.deepEqual(p.lines, ['Moves "Fix login" back to Open (now Doing).', 'Leaves "Fix login" as it is: Sam has changed due since.']);
+  assert.deepEqual(p.lines, ['Moves "Fix login" back to Open (now Doing).', 'Leaves "Fix login" as it is: Mara has changed due since.']);
   assert.equal(p.say, 'Puts back one change. Leaves one as it is.');
   assert.deepEqual(
     p.steps.map((s) => [s.do, s.label, s.from, s.to]),
@@ -133,7 +133,7 @@ test('AN EDIT GOES BACK TO ITS FROM ONLY WHILE THE ROW STILL HOLDS ITS TO, and a
   );
   readable(p.lines);
 
-  const done = value(undoApply(r.parts, scope, p.hash, 'p_sam'));
+  const done = value(undoApply(r.parts, scope, p.hash, 'p_mara'));
   assert.equal(done.put, 1);
   const now = r.k.get(made.id)!;
   assert.equal(now.fields.state, 'open');
@@ -144,52 +144,52 @@ test('AN EDIT GOES BACK TO ITS FROM ONLY WHILE THE ROW STILL HOLDS ITS TO, and a
     `entry:${made.id}`,
   );
   assert.equal(line?.kind, 'state');
-  assert.equal(line?.actor, 'p_sam');
+  assert.equal(line?.actor, 'p_mara');
   assert.equal(line?.batch, done.batch);
   r.sql.close();
 });
 
 test('A VALUE CHANGED AND CHANGED BACK IN BETWEEN BY SOMEBODY ELSE is left, since the earliest from is no longer what it was before', async () => {
   const r = await record();
-  const made = value<Entry>(r.k.create('tasks', { name: 'Draft', due: '2026-10-08' }, SAM));
+  const made = value<Entry>(r.k.create('tasks', { name: 'Draft', due: '2026-10-08' }, MARA));
   r.clock.advance(10 * MIN);
-  /* A RUN'S TWO WRITES, with Sam's between them, are one scope only for a run; one batch is one write. */
+  /* A RUN'S TWO WRITES, with Mara's between them, are one scope only for a run; one batch is one write. */
   const one = value<Entry>(r.k.update('tasks', made.id, { due: '2026-10-09' }, { actor: 'S7' }));
   r.clock.advance(MIN);
-  const two = value<Entry>(r.k.update('tasks', made.id, { due: '2026-10-10' }, { ...SAM, version: one.version }));
+  const two = value<Entry>(r.k.update('tasks', made.id, { due: '2026-10-10' }, { ...MARA, version: one.version }));
   r.clock.advance(MIN);
   value(r.k.update('tasks', made.id, { due: '2026-10-11' }, { actor: 'S7', version: two.version }));
 
   const p = plan(r, { run: 'S7' });
-  assert.deepEqual(p.lines, ['Leaves "Draft" as it is: Sam changed due in between.']);
+  assert.deepEqual(p.lines, ['Leaves "Draft" as it is: Mara changed due in between.']);
   assert.equal(p.say, 'Nothing can be put back. One change is left as it is.');
   r.sql.close();
 });
 
 test('TAG AND UNTAG SWAP, element by element', async () => {
   const r = await record();
-  const made = value<Entry>(r.k.create('tasks', { name: 'Tidy', tags: ['home', 'later'] }, SAM));
+  const made = value<Entry>(r.k.create('tasks', { name: 'Tidy', tags: ['home', 'later'] }, MARA));
   r.clock.advance(10 * MIN);
   value(r.k.update('tasks', made.id, { tags: ['home', 'urgent'] }, AGENT));
   const scope = { batch: lastBatch(r.sql, made.id) };
 
   const p = plan(r, scope);
   assert.deepEqual(p.lines.sort(), ['Puts the "later" tag back on "Tidy".', 'Takes the "urgent" tag off "Tidy".']);
-  value(undoApply(r.parts, scope, p.hash, 'p_sam'));
+  value(undoApply(r.parts, scope, p.hash, 'p_mara'));
   assert.deepEqual([...(r.k.get(made.id)!.fields.tags as string[])].sort(), ['home', 'later']);
   r.sql.close();
 });
 
 test('A DELETE IS UNDONE AS A RESTORE, and a restore already made is left alone', async () => {
   const r = await record();
-  const made = value<Entry>(r.k.create('tasks', { name: 'Old idea' }, SAM));
+  const made = value<Entry>(r.k.create('tasks', { name: 'Old idea' }, MARA));
   r.clock.advance(10 * MIN);
   value(r.k.update('tasks', made.id, { deleted_at: true }, { ...AGENT, version: made.version }));
   const scope = { batch: lastBatch(r.sql, made.id) };
 
   const p = plan(r, scope);
   assert.deepEqual(p.lines, ['Brings back "Old idea" in Tasks.']);
-  value(undoApply(r.parts, scope, p.hash, 'p_sam'));
+  value(undoApply(r.parts, scope, p.hash, 'p_mara'));
   assert.equal(r.k.get(made.id)!.deleted_at, null);
 
   const again = plan(r, scope);
@@ -202,17 +202,17 @@ test('A ROW THE UNDONE WRITE MADE STAYS WHEN SOMEBODY HAS WORKED ON IT SINCE', a
   const made = value<Entry>(r.k.create('tasks', { name: 'Call the bank' }, AGENT));
   const scope = { batch: lastBatch(r.sql, made.id) };
   r.clock.advance(10 * MIN);
-  value(r.k.update('tasks', made.id, { due: '2026-10-09' }, SAM));
+  value(r.k.update('tasks', made.id, { due: '2026-10-09' }, MARA));
 
   const p = plan(r, scope);
-  assert.deepEqual(p.lines, ['Leaves "Call the bank" as it is: Sam has changed it since.']);
+  assert.deepEqual(p.lines, ['Leaves "Call the bank" as it is: Mara has changed it since.']);
   assert.equal(p.steps.length, 0);
   r.sql.close();
 });
 
 test('AN AMOUNT THE LOG WITHHELD IS NEVER GUESSED AT, and a move the list does not allow back is not promised', async () => {
   const r = await record();
-  const made = value<Entry>(r.k.create('tasks', { name: 'Pay rent', cost: { amount: 120_000, currency: 'GBP' } }, SAM));
+  const made = value<Entry>(r.k.create('tasks', { name: 'Pay rent', cost: { amount: 120_000, currency: 'GBP' } }, MARA));
   r.clock.advance(10 * MIN);
   value(r.k.update('tasks', made.id, { cost: { amount: 130_000, currency: 'GBP' } }, AGENT));
   const money = plan(r, { batch: lastBatch(r.sql, made.id) });
@@ -228,9 +228,9 @@ test('AN AMOUNT THE LOG WITHHELD IS NEVER GUESSED AT, and a move the list does n
 
 test('NOTES STAY, and a link back to a row deleted since is left', async () => {
   const r = await record();
-  const kiln = value<Entry>(r.k.create('projects', { name: 'Kiln' }, SAM));
-  const launch = value<Entry>(r.k.create('projects', { name: 'Launch' }, SAM));
-  const made = value<Entry>(r.k.create('tasks', { name: 'Glaze', project: kiln.id }, SAM));
+  const kiln = value<Entry>(r.k.create('projects', { name: 'Kiln' }, MARA));
+  const launch = value<Entry>(r.k.create('projects', { name: 'Launch' }, MARA));
+  const made = value<Entry>(r.k.create('tasks', { name: 'Glaze', project: kiln.id }, MARA));
   r.clock.advance(10 * MIN);
   value(r.k.update('tasks', made.id, { project: launch.id }, AGENT));
   const batch = lastBatch(r.sql, made.id);
@@ -245,7 +245,7 @@ test('NOTES STAY, and a link back to a row deleted since is left', async () => {
   assert.deepEqual(p.lines, ['Sets project on "Glaze" back to Kiln (now Launch).', 'The note stays.']);
   assert.equal(p.notes, 1);
 
-  value(r.k.update('projects', kiln.id, { deleted_at: true }, SAM));
+  value(r.k.update('projects', kiln.id, { deleted_at: true }, MARA));
   const later = plan(r, { batch });
   assert.deepEqual(later.lines, ['Leaves "Glaze" as it is: "Kiln" has been deleted since.', 'The note stays.']);
   r.sql.close();
@@ -253,7 +253,7 @@ test('NOTES STAY, and a link back to a row deleted since is left', async () => {
 
 test('A PLAN THAT WENT STALE IS REFUSED, and the plan read again applies', async () => {
   const r = await record();
-  const made = value<Entry>(r.k.create('tasks', { name: 'Write docs', due: '2026-10-08' }, SAM));
+  const made = value<Entry>(r.k.create('tasks', { name: 'Write docs', due: '2026-10-08' }, MARA));
   r.clock.advance(10 * MIN);
   value(r.k.update('tasks', made.id, { name: 'Write the docs', due: '2026-10-09' }, AGENT));
   const scope = { batch: lastBatch(r.sql, made.id) };
@@ -261,15 +261,15 @@ test('A PLAN THAT WENT STALE IS REFUSED, and the plan read again applies', async
   assert.equal(seen.steps.length, 2);
 
   r.clock.advance(MIN);
-  value(r.k.update('tasks', made.id, { due: '2026-10-12' }, SAM));
-  const stale = undoApply(r.parts, scope, seen.hash, 'p_sam');
+  value(r.k.update('tasks', made.id, { due: '2026-10-12' }, MARA));
+  const stale = undoApply(r.parts, scope, seen.hash, 'p_mara');
   assert.equal(stale.ok, false);
   assert.equal(!stale.ok && 'refusal' in stale ? stale.refusal.code : '', 'PLAN_STALE');
   assert.equal(r.k.get(made.id)!.fields.name, 'Write the docs', 'nothing was written');
 
   const fresh = plan(r, scope);
-  assert.deepEqual(fresh.lines, ['Sets name on "Write the docs" back to "Write docs" (now "Write the docs").', 'Leaves "Write the docs" as it is: Sam has changed due since.']);
-  value(undoApply(r.parts, scope, fresh.hash, 'p_sam'));
+  assert.deepEqual(fresh.lines, ['Sets name on "Write the docs" back to "Write docs" (now "Write the docs").', 'Leaves "Write the docs" as it is: Mara has changed due since.']);
+  value(undoApply(r.parts, scope, fresh.hash, 'p_mara'));
   assert.equal(r.k.get(made.id)!.fields.name, 'Write docs');
   r.sql.close();
 });
@@ -293,7 +293,7 @@ test('AN UNSENT MESSAGE THE WRITE QUEUED IS STOPPED, and one already gone is nam
     'Stops a call to another app before it goes out.',
     'Leaves a call to another app: it has already gone out.',
   ]);
-  value(undoApply(r.parts, scope, p.hash, 'p_sam'));
+  value(undoApply(r.parts, scope, p.hash, 'p_mara'));
   const ob = r.sql.one<{ state: string; payload: string }>("SELECT state, payload FROM outbox WHERE id = 'ob1'");
   assert.equal(ob?.state, 'done');
   assert.ok((JSON.parse(ob!.payload) as { cancelled?: string }).cancelled, 'it says when it was stopped');
@@ -308,19 +308,19 @@ test('A DECISION IS UNDONE BY THE BATCH ITS ACCEPT WROTE, with a note on the dec
     "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES ('Q1', 'rowset', '{}', 'resolved', 'S3', ?)",
     at,
   );
-  const a = value<Entry>(r.k.create('tasks', { name: 'Book venue' }, { actor: 'p_sam', batch: B }));
-  const b = value<Entry>(r.k.create('tasks', { name: 'Send invites' }, { actor: 'p_sam', batch: B }));
-  r.sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, batch) VALUES ('01JDECIDE00000000000000000', ?, 'p_sam', 'decide', 'decision:D4', 'decision', '{}', ?)", at, B);
-  r.sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, batch) VALUES ('01JRESOLVE0000000000000000', ?, 'p_sam', 'resolve', 'suggestion:Q1', 'suggestion', 'addressed', ?)", at, B);
+  const a = value<Entry>(r.k.create('tasks', { name: 'Book venue' }, { actor: 'p_mara', batch: B }));
+  const b = value<Entry>(r.k.create('tasks', { name: 'Send invites' }, { actor: 'p_mara', batch: B }));
+  r.sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, batch) VALUES ('01JDECIDE00000000000000000', ?, 'p_mara', 'decide', 'decision:D4', 'decision', '{}', ?)", at, B);
+  r.sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, batch) VALUES ('01JRESOLVE0000000000000000', ?, 'p_mara', 'resolve', 'suggestion:Q1', 'suggestion', 'addressed', ?)", at, B);
 
   const p = plan(r, { decision: 'D4' });
   assert.deepEqual(p.lines.sort(), ['Removes "Book venue" from Tasks.', 'Removes "Send invites" from Tasks.']);
-  const done = value(undoApply(r.parts, { decision: 'D4' }, p.hash, 'p_sam'));
+  const done = value(undoApply(r.parts, { decision: 'D4' }, p.hash, 'p_mara'));
   assert.equal(done.put, 2);
   assert.ok(r.k.get(a.id, { includeDeleted: true })!.deleted_at && r.k.get(b.id, { includeDeleted: true })!.deleted_at);
   assert.deepEqual(done.undone, [{ batch: B, actor: 'S3', agent: null, kinds: ['tasks:add'] }]);
   const note = r.sql.one<{ note: string }>("SELECT note FROM event WHERE target = 'decision:D4' AND kind = 'note'");
-  assert.equal(note?.note, 'Sam undid this. Put back 2 changes.');
+  assert.equal(note?.note, 'Mara undid this. Put back 2 changes.');
 
   const unknown = undoPlan(r.sql, { decision: 'D99' });
   assert.equal(!unknown.ok && 'refusal' in unknown ? unknown.refusal.code : '', 'ROW_UNKNOWN');
@@ -329,11 +329,11 @@ test('A DECISION IS UNDONE BY THE BATCH ITS ACCEPT WROTE, with a note on the dec
 
 test("A RUN IS UNDONE WHOLE: its writes, the run's own row left alone, a note on it, and the ladder told its agent", async () => {
   const r = await record();
-  r.sql.exec("INSERT INTO token (id, person_id, hash, scope, created_at) VALUES ('t_cc', 'p_sam', 'h', 'write', '2026-10-01T00:00:00.000Z')");
-  const as: WriteContext = { actor: 'p_sam', principal: { kind: 'token', token: 't_cc' }, session: { client_id: 'cc', host: 'h', repo: 'braindog' } };
+  r.sql.exec("INSERT INTO token (id, person_id, hash, scope, created_at) VALUES ('t_cc', 'p_mara', 'h', 'write', '2026-10-01T00:00:00.000Z')");
+  const as: WriteContext = { actor: 'p_mara', principal: { kind: 'token', token: 't_cc' }, session: { client_id: 'cc', host: 'h', repo: 'braindog' } };
   const one = value<Entry>(r.k.create('tasks', { name: 'Refactor auth' }, as));
   r.clock.advance(10 * MIN);
-  const kept = value<Entry>(r.k.create('tasks', { name: 'Keep me' }, SAM));
+  const kept = value<Entry>(r.k.create('tasks', { name: 'Keep me' }, MARA));
   r.clock.advance(10 * MIN);
   value(r.k.update('tasks', kept.id, { state: 'doing' }, as));
   const run = r.sql.one<{ a: string }>("SELECT actor AS a FROM event WHERE target = ? AND kind = 'create'", `entry:${one.id}`)!.a;
@@ -342,7 +342,7 @@ test("A RUN IS UNDONE WHOLE: its writes, the run's own row left alone, a note on
   const p = plan(r, { run });
   assert.deepEqual(p.lines, ['Moves "Keep me" back to Open (now Doing).', 'Removes "Refactor auth" from Tasks.']);
   readable(p.lines);
-  const done = value(undoApply(r.parts, { run }, p.hash, 'p_sam'));
+  const done = value(undoApply(r.parts, { run }, p.hash, 'p_mara'));
   assert.equal(done.put, 2);
   assert.equal(r.k.get(kept.id)!.fields.state, 'open');
   assert.ok(r.k.get(one.id, { includeDeleted: true })!.deleted_at);
@@ -352,7 +352,7 @@ test("A RUN IS UNDONE WHOLE: its writes, the run's own row left alone, a note on
   const session = r.sql.one<{ id: string }>("SELECT id FROM entry WHERE register = 'session' AND seq = ?", Number(run.slice(1)))!;
   assert.equal(r.k.get(session.id)!.deleted_at, null, "the run's own row is not touched");
   const note = r.sql.one<{ note: string; batch: string }>("SELECT note, batch FROM event WHERE target = ? AND kind = 'note'", `entry:${session.id}`);
-  assert.equal(note?.note, 'Sam undid this. Put back 2 changes.');
+  assert.equal(note?.note, 'Mara undid this. Put back 2 changes.');
   assert.equal(note?.batch, done.batch);
 
   /* AND THE UNDO IS ITSELF ONE BATCH, so it can be undone in turn. */
@@ -374,18 +374,18 @@ test('A STEP THE WRITE PATH REFUSES WHEN IT COMES TO IT is left with its own sen
       },
     ]),
   );
-  const a = value<Entry>(r.k.create('codes', { code: 'Spring' }, SAM));
-  const b = value<Entry>(r.k.create('codes', { code: 'Autumn' }, SAM));
+  const a = value<Entry>(r.k.create('codes', { code: 'Spring' }, MARA));
+  const b = value<Entry>(r.k.create('codes', { code: 'Autumn' }, MARA));
   r.clock.advance(10 * MIN);
   const B = '01JRUNBATCH000000000000000';
   value(r.k.update('codes', a.id, { deleted_at: true }, { ...AGENT, batch: B, version: a.version }));
   value(r.k.update('codes', b.id, { note: 'old' }, { ...AGENT, batch: B }));
   /* SOMEBODY TAKES THE CODE while the first is deleted, so bringing it back would hold one code twice. */
-  value(r.k.create('codes', { code: 'Spring' }, SAM));
+  value(r.k.create('codes', { code: 'Spring' }, MARA));
 
   const p = plan(r, { batch: B });
   assert.equal(p.steps.length, 2);
-  const done = value(undoApply(r.parts, { batch: B }, p.hash, 'p_sam'));
+  const done = value(undoApply(r.parts, { batch: B }, p.hash, 'p_mara'));
   assert.equal(done.put, 1);
   assert.equal(done.skipped.length, 1);
   assert.equal(done.skipped[0]!.line, 'Leaves "Spring" as it is: another one already has that code.');
@@ -409,7 +409,7 @@ test('A ROW LEFT AS SOMEBODY MADE IT KEEPS ITS MESSAGE, a rule since is "a rule"
 
   const p = plan(r, scope);
   assert.deepEqual(p.lines, ['Leaves "Chase Acme" as it is: a rule has changed it since.']);
-  value(undoApply(r.parts, scope, p.hash, 'p_sam'));
+  value(undoApply(r.parts, scope, p.hash, 'p_mara'));
   assert.equal(r.sql.one<{ state: string }>("SELECT state FROM outbox WHERE id = 'ob1'")?.state, 'pending', 'its message still goes');
 
   /* A PERSON WHO CANNOT READ TASKS is told nothing of the task, its message or its notes. */

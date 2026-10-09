@@ -3,8 +3,8 @@
  *
  *     BrainDog · run S731 · project BrainDog · Claude Code on MacBook
  *     Next     Cut page answers to block summaries. (S729, Claude Code, 5h ago, check before acting)
- *     Waiting  2 on Sam: Update prism to match this Mac? · 3 bank texts the pattern couldn't read
- *     Who      Priya Raman (client), Rohan Mehta (Prism), Dario, +4 · for Encore
+ *     Waiting  2 on Mara: Update copperleaf to match this Mac? · 3 bank texts the pattern couldn't read
+ *     Who      Priya Raman (client), Teodor Vance (Copperleaf), Wren, +4 · for Brightwell
  *     Learned  Money is minor units plus currency. Never add two currencies.
  *     More     3 dead ends, 5 learnings and 41 keys by name · call context {"format":"full"}
  *
@@ -200,7 +200,7 @@ const touched = (p: Record<string, unknown>): number | null => {
  * The Who slot: the three people most recently in touch on this project, each with their role or organisation, how many
  * more, and the organisation the project is for.
  *
- *     Who      Priya Raman (client), Rohan Mehta (Prism), Dario, +4 · for Encore
+ *     Who      Priya Raman (client), Teodor Vance (Copperleaf), Wren, +4 · for Brightwell
  *
  * IT REPLACED "6 people met here" UNDER MORE. An agent about to write to somebody, or told "ask Priya", read a count and
  * had to list People to learn who that was. The record sends up to ten people linked to the project, the most recently

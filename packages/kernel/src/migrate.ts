@@ -53,6 +53,8 @@ import faults0030 from './migrations/0030_faults.ts';
 import cause0031, { causeSteps } from './migrations/0031_cause.ts';
 import tokenBuild0032 from './migrations/0032_token_build.ts';
 import shapeReach0033 from './migrations/0033_shape_reach.ts';
+import ruleStat0034 from './migrations/0034_rule_stat.ts';
+import repeatMarks0035, { repeatMarks } from './migrations/0035_repeat_marks.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -91,6 +93,8 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 31, slug: 'cause', sql: cause0031 },
   { version: 32, slug: 'token_build', sql: tokenBuild0032 },
   { version: 33, slug: 'shape_reach', sql: shapeReach0033 },
+  { version: 34, slug: 'rule_stat', sql: ruleStat0034 },
+  { version: 35, slug: 'repeat_marks', sql: repeatMarks0035 },
 ];
 
 /**
@@ -138,6 +142,8 @@ export const MIGRATIONS: readonly Migration[] = [
  * is still 1.
  * Migration 32 rebuilds `token` with `last_build` and `last_tool_at`, `local` as every key is, so no file carries it.
  * Migration 33 rebuilds `device_grant` with an eighth reach, `shape`, `local` for migration 4's reason, so no file carries it.
+ * Migration 34 adds `rule_stat`, `local` as `fault` is, so no file carries it.
+ * Migration 35 adds no table and no column: it writes `match` lines in history, which every file already carries.
  */
 export const FORMAT_VERSION = 1 as const;
 
@@ -394,6 +400,9 @@ export async function applyMigrations(
        is a hash code works out, a merge writes a line whose id is minted, and a trigger's body holds a `;` the script
        runner would cut (`causeSteps`). */
     if (m.slug === 'cause') sql.transactionSync(() => causeSteps(sql, ulids(() => clock.now()), instant(clock.now())));
+    /* AND THE REPEATS HELD BEFORE A SKIP KEPT ITS MARK, once, in the run that brings this: each line's id is minted and the
+       old reason is read by a pattern, so it is code and not the migration's text (`repeatMarks`). */
+    if (m.slug === 'repeat_marks') sql.transactionSync(() => repeatMarks(sql, ulids(() => clock.now()), instant(clock.now())));
   }
 
   /* HALF TWO: a read of `entry_fts` that returns nothing, once the schema is whole. A file whose migrations were

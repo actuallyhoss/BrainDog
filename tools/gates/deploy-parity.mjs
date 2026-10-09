@@ -125,9 +125,27 @@ export default async function deployParity(root = join(dirname(fileURLToPath(imp
     return 3;
   }
 
+  /**
+   * A HOST ON THIS MACHINE MAY BE NAMED WITH ITS SCHEME, which is how `self-test` plants one (PRF-B02 job 6):
+   * `negative/deploy-parity/` is served on a loopback port that names another build, and this gate must go red on it.
+   * A bare name is `https://` as it always was. Plain `http://` is taken only for loopback, because a deploy compared
+   * over plain http is a comparison anybody on the path could answer.
+   */
+  const named = URL.parse(/^https?:\/\//u.test(host) ? host : `https://${host}`);
+  if (named === null) {
+    console.log(`  deploy-parity: DEPLOY_HOST is ${JSON.stringify(host)}, which is not a host name.`);
+    return 1;
+  }
+  const onThisMachine = ['localhost', '127.0.0.1', '[::1]'].includes(named.hostname);
+  if (named.protocol === 'http:' && !onThisMachine) {
+    console.log(`  deploy-parity: DEPLOY_HOST names ${named.origin}, plain http to a host that is not this machine. Name it without the scheme.`);
+    return 1;
+  }
+  const origin = named.origin;
+
   /** One fetch, uncached, with the budget's own ceiling rather than the runtime's default of none. */
   const fetchOnce = (path) =>
-    fetch(`https://${host}${path}`, {
+    fetch(`${origin}${path}`, {
       headers: { 'Cache-Control': 'no-cache' },
       signal: AbortSignal.timeout(20_000),
       redirect: 'manual',
@@ -136,7 +154,7 @@ export default async function deployParity(root = join(dirname(fileURLToPath(imp
   /** The two byte comparisons want the body or nothing, so anything but a 2xx is the finding itself. */
   const get = async (path) => {
     const out = await fetchOnce(path);
-    if (!out.ok) throw new Error(`${out.status} from https://${host}${path}`);
+    if (!out.ok) throw new Error(`${out.status} from ${origin}${path}`);
     return out;
   };
 
@@ -176,7 +194,7 @@ export default async function deployParity(root = join(dirname(fileURLToPath(imp
          than one asking for a bearer, and the two are told apart by the code the host itself names. */
       const refused = typeof said?.refusal?.code === 'string' ? said.refusal.code : '';
       if (refused) seen.push(`live app tuple went unread: the host refused ${BUILD} with ${refused}, so this check never got in. That is not evidence either way about the deploy`);
-      else if (!out.ok) seen.push(`live app tuple is unreadable: ${out.status} from https://${host}${BUILD}`);
+      else if (!out.ok) seen.push(`live app tuple is unreadable: ${out.status} from ${origin}${BUILD}`);
       else if (!expected) seen.push(`live app tuple is ${app || 'absent'}, and BRAINDOG_BUILD was not set to compare it against`);
       else if (app !== expected) seen.push(`live app tuple is ${app || 'absent'}, expected ${expected}`);
     } catch (err) {
@@ -197,8 +215,11 @@ export default async function deployParity(root = join(dirname(fileURLToPath(imp
      tells them apart is elapsed time. So the gate asks until the answer settles or the window closes.
      It still goes red if the host never catches up, which is the entire point of it, and a deploy that
      needed the wait says so in its output rather than passing silently, because a host that takes a
-     minute to serve what it was given is worth knowing about even when it gets there. */
-  const WINDOW_MS = 120_000;
+     minute to serve what it was given is worth knowing about even when it gets there.
+
+     A HOST ON THIS MACHINE HAS NO EDGE TO CATCH UP, so it is asked once: what it serves first is all it will serve,
+     and two minutes of asking would only make the planted host in `self-test` slow. */
+  const WINDOW_MS = onThisMachine ? 0 : 120_000;
   const GAP_MS = 10_000;
 
   const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -216,7 +237,7 @@ export default async function deployParity(root = join(dirname(fileURLToPath(imp
   for (const what of findings) console.log(`  ${what}`);
 
   if (findings.length > 0) {
-    console.log(`  none of this settled in the ${Math.round(WINDOW_MS / 1000)}s allowed, so it is the deploy rather than propagation`);
+    if (WINDOW_MS > 0) console.log(`  none of this settled in the ${Math.round(WINDOW_MS / 1000)}s allowed, so it is the deploy rather than propagation`);
   } else if (settled > 0) {
     console.log(`  the host needed ${settled}s to serve what it was given, which is slow but correct`);
   }
@@ -226,5 +247,6 @@ export default async function deployParity(root = join(dirname(fileURLToPath(imp
 }
 
 /* AND IT IS STILL A SCRIPT, because the header documents `node tools/gates/deploy-parity.mjs` and
-   `deploy.yml` is entitled to run the file directly. `?? 0` because a pass returns nothing. */
-if (import.meta.main) process.exitCode = (await deployParity()) ?? 0;
+   `deploy.yml` is entitled to run the file directly. `?? 0` because a pass returns nothing. `BRAINDOG_GATE_ROOT` is
+   the root `self-test` points it at, the planted tree's own build, and unset it is this file's two directories up. */
+if (import.meta.main) process.exitCode = (await deployParity(process.env.BRAINDOG_GATE_ROOT || undefined)) ?? 0;

@@ -1036,8 +1036,8 @@ test('A BAR OVER A LIST OF LINKS FINDS THE ROWS IT NAMES, whether the element ar
  * the parts, and `display` read the ULID as a row number.
  */
 test('A FIGURE GROUPED BY A REF NAMES EACH PART BY ITS ROW, the record’s own label first, and never by its id', async () => {
-  const SAM = '01M3VMPSHV07AM4S51WDTFM5XG';
-  const QUARTZ = '01M3VMPSHV07AM4S51WDTFM5XH';
+  const MARA = '01M3VMPSHV07AM4S51WDTFM5XG';
+  const ORCHARD = '01M3VMPSHV07AM4S51WDTFM5XH';
   const GONE = '01M3VMPSHV07AM4S51WDTFM5XJ';
   const bar = (groups: unknown[]) => ({
     kind: 'bar',
@@ -1053,7 +1053,7 @@ test('A FIGURE GROUPED BY A REF NAMES EACH PART BY ITS ROW, the record’s own l
     const { io, sent } = host((method, url) => {
       if (method === 'page') return json(200, { ok: true, value: { page: 'today', title: 'Today', blocks: [bar(groups)] } });
       if (method === 'list' && url.searchParams.get('register') === 'books')
-        return json(200, { ok: true, value: { rows: [{ id: SAM, seq: 1, fields: { name: 'Sam' } }, { id: QUARTZ, seq: 2, fields: { name: 'Quartz' } }], cursor: null } });
+        return json(200, { ok: true, value: { rows: [{ id: MARA, seq: 1, fields: { name: 'Mara Lindqvist' } }, { id: ORCHARD, seq: 2, fields: { name: 'Orchardline' } }], cursor: null } });
       if (method === 'list') return json(200, { ok: true, value: { rows: [], cursor: null } });
       return refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.');
     });
@@ -1065,19 +1065,19 @@ test('A FIGURE GROUPED BY A REF NAMES EACH PART BY ITS ROW, the record’s own l
     return { block: block!, cells, sent };
   };
 
-  const walked = await read([{ key: SAM, value: 108_621_341 }, { key: QUARTZ, value: 12_000_000 }, { key: GONE, value: 938_259 }]);
-  assert.deepEqual(walked.block.parts?.groups.map((g) => g.label), ['Sam', 'Quartz', 'Unnamed book'], 'a book the walk did not reach is the kind alone');
-  assert.deepEqual(walked.cells, ['Sam', 'Quartz', 'Unnamed book']);
+  const walked = await read([{ key: MARA, value: 108_621_341 }, { key: ORCHARD, value: 12_000_000 }, { key: GONE, value: 938_259 }]);
+  assert.deepEqual(walked.block.parts?.groups.map((g) => g.label), ['Mara Lindqvist', 'Orchardline', 'Unnamed book'], 'a book the walk did not reach is the kind alone');
+  assert.deepEqual(walked.cells, ['Mara Lindqvist', 'Orchardline', 'Unnamed book']);
   assert.ok(walked.sent.includes('list'), 'the books were walked to name the parts');
   for (const cell of walked.cells) assert.doesNotMatch(cell, /[0-9A-HJKMNP-TV-Z]{26}|#/u, `an id was drawn: ${cell}`);
-  assert.deepEqual(walked.block.parts?.groups.map((g) => g.key), [SAM, QUARTZ, GONE], 'the key stays the stored value, which a part’s tone is read by');
+  assert.deepEqual(walked.block.parts?.groups.map((g) => g.key), [MARA, ORCHARD, GONE], 'the key stays the stored value, which a part’s tone is read by');
 
   /* THE RECORD'S OWN NAME FOR A PART WINS, and where it named every one nothing is walked for them. */
   const named = await read([
-    { key: SAM, value: 108_621_341, label: 'Sam (personal)' },
-    { key: QUARTZ, value: 12_000_000, label: 'Quartz' },
+    { key: MARA, value: 108_621_341, label: 'Mara Lindqvist (personal)' },
+    { key: ORCHARD, value: 12_000_000, label: 'Orchardline' },
   ]);
-  assert.deepEqual(named.cells.slice(0, 2), ['Sam (personal)', 'Quartz']);
+  assert.deepEqual(named.cells.slice(0, 2), ['Mara Lindqvist (personal)', 'Orchardline']);
   assert.ok(!named.sent.includes('list'), 'a list was walked for names the record had already said');
 
   /* AND DRAWN WHOLE, A BAR'S VALUE IS A FIGURE, EXACT IN THE RECORD'S OWN SIGN: E£1,086,213.41, never EGP 1,086,213.41,
@@ -1094,8 +1094,8 @@ test('A FIGURE GROUPED BY A REF NAMES EACH PART BY ITS ROW, the record’s own l
 });
 
 test('A BOOK KEPT IN ITS OWN CURRENCY IS A FIGURE IN IT, beside the others, and not a chart of one bar a currency', () => {
-  const SAM = '01M3VMPSHV07AM4S51WDTFM5XG';
-  const QUARTZ = '01M3VMPSHV07AM4S51WDTFM5XH';
+  const MARA = '01M3VMPSHV07AM4S51WDTFM5XG';
+  const ORCHARD = '01M3VMPSHV07AM4S51WDTFM5XH';
   const block = blockOf(
     {
       kind: 'bar',
@@ -1113,8 +1113,8 @@ test('A BOOK KEPT IN ITS OWN CURRENCY IS A FIGURE IN IT, beside the others, and 
             refusals: [],
             more: 0,
             groups: [
-              { key: SAM, value: null, label: 'Sam', parts: [{ currency: 'EGP', amount: 108_621_341 }] },
-              { key: QUARTZ, value: null, label: 'Quartz', parts: [{ currency: 'USD', amount: 1_200_000 }] },
+              { key: MARA, value: null, label: 'Mara Lindqvist', parts: [{ currency: 'EGP', amount: 108_621_341 }] },
+              { key: ORCHARD, value: null, label: 'Orchardline', parts: [{ currency: 'USD', amount: 1_200_000 }] },
             ],
           },
         },
@@ -1128,7 +1128,7 @@ test('A BOOK KEPT IN ITS OWN CURRENCY IS A FIGURE IN IT, beside the others, and 
   );
   const segments = toSegments(block).filter((s) => s.type === 'block') as { kind: string; rows: { cells: string[] }[] }[];
   assert.deepEqual(segments.map((s) => s.kind), ['stat'], 'one figure a book, not a chart a currency');
-  assert.deepEqual(segments[0]!.rows.map((r) => r.cells.slice(0, 2).join(' | ')), ['Sam | EGP 1,086,213.41', 'Quartz | USD 12,000.00']);
+  assert.deepEqual(segments[0]!.rows.map((r) => r.cells.slice(0, 2).join(' | ')), ['Mara Lindqvist | EGP 1,086,213.41', 'Orchardline | USD 12,000.00']);
 
   /* TWO BOOKS IN POUNDS AND ONE IN DOLLARS: the pounds are a chart under their code, and the dollars one figure after it,
      never a chart of one bar under "In USD". */
@@ -1150,9 +1150,9 @@ test('A BOOK KEPT IN ITS OWN CURRENCY IS A FIGURE IN IT, beside the others, and 
             refusals: [],
             more: 0,
             groups: [
-              { key: SAM, value: null, label: 'Sam', parts: [{ currency: 'EGP', amount: 108_621_341 }] },
+              { key: MARA, value: null, label: 'Mara Lindqvist', parts: [{ currency: 'EGP', amount: 108_621_341 }] },
               { key: PERSONAL, value: null, label: 'Personal', parts: [{ currency: 'EGP', amount: 938_259 }] },
-              { key: QUARTZ, value: null, label: 'Quartz', parts: [{ currency: 'USD', amount: 1_200_000 }] },
+              { key: ORCHARD, value: null, label: 'Orchardline', parts: [{ currency: 'USD', amount: 1_200_000 }] },
             ],
           },
         },
@@ -1171,8 +1171,8 @@ test('A BOOK KEPT IN ITS OWN CURRENCY IS A FIGURE IN IT, beside the others, and 
     'the pounds under their code, then the dollars as a figure',
   );
   const [, bar, stat] = drawn as { rows: { cells: string[] }[] }[];
-  assert.deepEqual(bar!.rows.map((r) => r.cells[0]), ['Sam', 'Personal']);
-  assert.deepEqual(stat!.rows.map((r) => r.cells.slice(0, 2).join(' | ')), ['Quartz | USD 12,000.00']);
+  assert.deepEqual(bar!.rows.map((r) => r.cells[0]), ['Mara Lindqvist', 'Personal']);
+  assert.deepEqual(stat!.rows.map((r) => r.cells.slice(0, 2).join(' | ')), ['Orchardline | USD 12,000.00']);
 });
 
 test('A FIGURE OVER A LIST THAT HOLDS NOTHING SAYS SO, and a zero over rows that exist does not', () => {

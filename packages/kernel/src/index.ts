@@ -300,7 +300,7 @@ export { SHAPE_MARK, Scrambler, isShape, shapeBrainl, type Published, type Shape
 export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
 export { KERNEL_WRITTEN, REVIVED, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
 /* THE RECORD'S VITAL SIGNS (`signs.ts`): the closed list, and what a sign and a reading are. */
-export { VITAL_SIGNS, type SignReading, type VitalSign } from './signs.ts';
+export { VITAL_SIGNS, quietSign, type SignReading, type VitalSign } from './signs.ts';
 export { DOOR_KINDS, type DoorMark, type DoorSigns } from './door.ts';
 /* A HANDOFF THAT CLOSES (`handoff.ts`, AGT-C05): the open steps in a place, and taken, dropped or expired. */
 export {
@@ -404,7 +404,9 @@ export { ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLis
 export type { Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
-export { RAIL_PAGES, REDUCES, ROW_TEXT_MOST, SEED_ACTOR, byOf, fill, railRoom, readBlock, readPage, resolvePages, slugify } from './pages.ts';
+export { RAIL_PAGES, REDUCES, ROW_TEXT_MOST, SEED_ACTOR, WITHHELD_CODES, byOf, fill, pathsOf, railRoom, readBlock, readPage, resolvePages, slugify, whollyWithheld } from './pages.ts';
+/* THE PAGES CENSUS (`census.ts`, PGS-A01): what one page's answer says about itself, refused blocks, paths that named nothing, dashes. */
+export { censusOf, type Census, type CensusAlso, type Held } from './census.ts';
 /* WHAT EVERY READER DRAWS (`drawn.ts`), one rule for the record, the web and an agent's read of a page. */
 export { KEEP, WHY, arranged, bare, emptyHidden, gone, holdsNothing, keeps, leadOf, markDrawn, says, unsaid, type Drawable, type Why } from './drawn.ts';
 /* WHAT A READ ANSWERS ON A BLOCK, which the record takes off a block it holds from a reader (`packages/record` `DRAWN`). */
@@ -432,7 +434,8 @@ export { runway } from './forecast.ts';
 export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
 export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
-export { ARRANGING, BODY_KINDS, GOVERNANCE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, ladderFault, pressedOnly } from './govern.ts';
+/* An arrangement's parts (govern-parts-43), by their ids and needs; `partsOf` is fx.ts's name here, so it goes out as arrangePartsOf. */
+export { ARRANGING, BODY_KINDS, GOVERNANCE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, ladderFault, partsOf as arrangePartsOf, pressedOnly } from './govern.ts';
 /* THE LADDER OF TRUST'S NAMES (`change-kind.ts`): what kind of change a write or a question is, and which rung an agent
    stands on for it, so the record, the web and the CLI read one table of kinds rather than each keeping a copy. Its
    `agentOf` goes out as `ladderAgentOf`, since `session.ts`'s `agentOf` (the kind of agent a run is) already has the name. */
@@ -483,7 +486,7 @@ export type {
   PostJobEventArgs,
   Posted,
 } from './jobs.ts';
-export type { Arranging, Decision, Decided, Filed, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
+export type { ArrangePart, Arranging, Decision, Decided, Filed, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 /* `exponentOf` IS EXPORTED SO THE RECORD'S CURRENCY TABLE IS NOT A SECOND EXPONENT READER. It is
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, fileAsSecond, patternReport, resolve as extractOutcome, senderOf, shapeOf, tailCause } from './ingest.ts';
@@ -1368,8 +1371,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   function heldRows(kinds: readonly string[]): { id: string; kind: string; body: string; pack_id: string | null }[] {
     if (planned === null)
       return sql.all<{ id: string; kind: string; body: string; pack_id: string | null }>(
-        `SELECT id, kind, body, pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0 AND kind IN (${kinds.map(() => '?').join(', ')}) ORDER BY id`,
-        ...kinds,
+        `SELECT id, kind, body, pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0 AND kind IN (SELECT value FROM json_each(?)) ORDER BY id`,
+        JSON.stringify(kinds),
       );
     return [...planned.known.keys()]
       .filter((id) => kinds.includes(id.slice(0, id.indexOf('.'))))
@@ -2391,17 +2394,19 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
         if ((f.type === 'enum' || (f.type === 'list' && f.of === 'enum')) && Array.isArray(f.values)) {
           const values = f.values.map(String);
-          const kept = values.map(() => '?').join(', ') || "''";
+          /* ONE JSON ARRAY, NEVER A PARAMETER PER VALUE: a Durable Object refuses more than 100, and an enum may hold more.
+             An empty list keeps the old `''`, so a row with no value is still not counted. */
+          const kept = JSON.stringify(values.length ? values : ['']);
           const out = f.type === 'enum'
             ? sql.all<{ v: string; n: number }>(
-                `SELECT json_extract(fields, '${path}') AS v, count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${held} AND json_extract(fields, '${path}') NOT IN (${kept}) GROUP BY v ORDER BY n DESC, v`,
+                `SELECT json_extract(fields, '${path}') AS v, count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${held} AND json_extract(fields, '${path}') NOT IN (SELECT value FROM json_each(?)) GROUP BY v ORDER BY n DESC, v`,
                 register,
-                ...values,
+                kept,
               )
             : sql.all<{ v: string; n: number }>(
-                `SELECT j.value AS v, count(DISTINCT entry.id) AS n FROM entry, json_each(entry.fields, '${path}') AS j WHERE entry.register = ? AND entry.deleted_at IS NULL AND j.value NOT IN (${kept}) GROUP BY v ORDER BY n DESC, v`,
+                `SELECT j.value AS v, count(DISTINCT entry.id) AS n FROM entry, json_each(entry.fields, '${path}') AS j WHERE entry.register = ? AND entry.deleted_at IS NULL AND j.value NOT IN (SELECT value FROM json_each(?)) GROUP BY v ORDER BY n DESC, v`,
                 register,
-                ...values,
+                kept,
               );
           /* ONLY A VALUE THE LIST TAKES NOW AND WOULD STOP TAKING. Counted against the new list alone, a record the
              narrowing above already reached (`state` at `[paid]` over two `open` rows) refused every later change to
@@ -7599,7 +7604,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * A RULE FIRES ON A WRITE, so a rule written today has never seen the four hundred rows written
      * before it. Without this, turning one on means editing every one of those rows by hand.
      */
-    applyRule: (id: string, opts: { dry?: boolean; limit?: number } = {}): Result<RuleApplied> => {
+    /* ONE PRESS IS ONE BATCH: `batch` goes through to every write the rule makes, so one undo takes back the lot. */
+    applyRule: (id: string, opts: { dry?: boolean; limit?: number; batch?: string } = {}): Result<RuleApplied> => {
       const row = sql.one<{ body: string }>(
         "SELECT body FROM declaration WHERE id = ? AND kind = 'rule' AND superseded_at IS NULL AND retired = 0",
         id.startsWith('rule.') ? id : `rule.${id}`,
@@ -8769,6 +8775,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** Claim up to `n` jobs of these kinds. One statement, so a double drain finds nothing. */
     leaseOutbox: (kinds: readonly OutboxKind[], n = 10) => transaction(() => lease(sql, ackDeps(), kinds, n)),
+
+    /** Whether a job of these kinds waits `pending`, leasing nothing: the host tests a silent model only when one does. */
+    outboxWaiting: (kinds: readonly OutboxKind[]): boolean =>
+      sql.one("SELECT 1 AS x FROM outbox WHERE state = 'pending' AND kind IN (SELECT value FROM json_each(?)) LIMIT 1", JSON.stringify(kinds)) !== undefined,
 
     /**
      * Finish one. `failed` walks the ladder; the eighth failure is `dead` and raises a fault for its kind, never a

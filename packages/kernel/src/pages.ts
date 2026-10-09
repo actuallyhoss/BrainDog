@@ -44,7 +44,7 @@ import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isBucket } from './buckets.ts';
 import { isQuiet, presenceOf, WORKING_MS } from './presence.ts';
 import { SESSION_PREFIX, agentOf } from './session.ts';
-import type { SignState, VitalSign } from './signs.ts';
+import { quietSign, type SignState, type VitalSign } from './signs.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost } from './weigh.ts';
 import { MEASURES_MOST, MEASURE_BUCKETS, measureBucket, measureLines, measureSeries, measureWindow, readableZone, type MeasureLatest, type MeasureSeries, type RawReading } from './measures.ts';
@@ -617,6 +617,26 @@ export type RowEvent = { ts: string; actor: string; kind: string; field: string 
  */
 export type PageResult = { page: string; title: string; blocks: BlockResult[]; read_at?: string; look?: LookBody; [key: string]: unknown };
 
+/**
+ * The refusals that hold a block back from its reader rather than ask its author to fix it: outside the caller's
+ * ceiling is `FORBIDDEN`, inside it with a level that does not reach `read` is `LEVEL_REQUIRED`.
+ *
+ * A LIST OF CODES RATHER THAN "ANY REFUSAL AT ALL". A block refused for a misspelt key is a block somebody has to be
+ * able to see in order to fix (PGS-A01, H.366).
+ */
+export const WITHHELD_CODES: readonly string[] = ['FORBIDDEN', 'LEVEL_REQUIRED'];
+
+const WITHHELD: ReadonlySet<string> = new Set(WITHHELD_CODES);
+
+/**
+ * Whether a page's blocks are every one withheld from their reader: at least one block, and each carries a refusal whose
+ * code is in `WITHHELD_CODES`. ONE RULE FOR EVERY READ OF A PAGE, so the record's list of pages and an agent's list of
+ * resources never disagree on whether a page is there for this caller. A page of no blocks is not withheld: it is empty.
+ */
+export function whollyWithheld(blocks: readonly { refusals?: readonly { code: string }[] | undefined }[]): boolean {
+  return blocks.length > 0 && blocks.every((b) => (b.refusals ?? []).some((r) => WITHHELD.has(r.code)));
+}
+
 export type PageDeps = {
   /** Every live page declaration. */
   pages: () => PageDecl[];
@@ -767,7 +787,16 @@ export type PageDeps = {
    * and laid, so the rules weigh only what the reader may see, and a look Slash wrote from blocks she is held from is
    * not laid for her (`lookedAt`). The answer carries the held blocks. Absent, every block is read as the record's.
    */
-  reader?: { hold: (block: BlockResult) => BlockResult; seen?: string | null };
+  reader?: {
+    hold: (block: BlockResult) => BlockResult;
+    seen?: string | null;
+    /**
+     * Whether this reader may read the inbox. `false` has each vital sign a `signs` block draws told in the kernel's
+     * words with no facts (`quietSign`), BEFORE its `where:` is read, so a filter cannot search a message's text either.
+     * Absent is the record's own reader, who reads every sign as it was filed.
+     */
+    inbox?: boolean;
+  };
 };
 
 /**
@@ -3849,7 +3878,12 @@ function signsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (
   const said = predicateOf(block.where, SIGNS, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
   const at = new Date(deps.ctx.nowMs).toISOString();
-  const kept = deps.signs().map((s) => signEntry(s, at)).filter((r) => evaluate(said.predicate, r.fields, SIGNS));
+  /* QUIETED BEFORE IT IS A ROW, so neither a column nor a `where:` reads the inbox's words for a reader held from it. */
+  const quiet = deps.reader?.inbox === false;
+  const kept = deps
+    .signs()
+    .map((s) => signEntry(quiet ? quietSign(s) : s, at))
+    .filter((r) => evaluate(said.predicate, r.fields, SIGNS));
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   return { ...base, rows: kept.slice(0, limit), matched: kept.length };
 }

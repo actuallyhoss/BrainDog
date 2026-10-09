@@ -68,6 +68,7 @@ import { serveKennel, servesKennel, writeCounts } from './kennel.ts';
 import { fileKeeper, takeMail } from './email.ts';
 import { fileKey, serveFiles, servesFiles } from './files.ts';
 import { cloudSnapshots, type Pitr } from './copies.ts';
+import { readAsk as readRestorePoint, restorePoint, sayTally, type PointAnswer } from './restore-point.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
 import { directoryCopies } from './directory-copy.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
@@ -1340,6 +1341,30 @@ export class Record$ extends DurableObject<Env> {
     /* THE COPY'S OWN NAME, the last part of its key: the record's prefix is this record, and a path is not a name. */
     if ('kept' in outcome) api.kernel.copyKept(outcome.kept.key.split('/').at(-1) ?? outcome.kept.key, outcome.kept.bytes);
     else api.kernel.copyFailed(outcome.failed);
+  }
+
+  /**
+   * A deploy's restore point, for this record (LCH-C06, `restore-point.ts`): whether somebody wrote here since `since`,
+   * and in a real run a copy under `label`, through the same port the record's own copies go through (`copies.ts`).
+   * `check` opens the record with this build and copies nothing. AN RPC AND NEVER A ROUTE: the operator's door is its
+   * one caller.
+   *
+   * WRITTEN BY SOMEBODY, NOT BY `system`: the night tells every record about its copy with a system `export` event, and
+   * counting that would call every record in use. `event_ts` answers the question from the newest rows without a scan.
+   *
+   * IT THROWS RATHER THAN ANSWERS, as `nightCopy` does, so a record this build refuses is a `failed` with its reason.
+   */
+  async restorePoint(ask: { since: string; label: string; check: boolean }): Promise<PointAnswer> {
+    if (this.#gone) return { written: false };
+    const api = await this.#record();
+    if (api.kernel.refused()) throw new Error('This build cannot open the record.');
+    if (!api.kernel.identity()) return { written: false };
+    const used = guardedSql(this.ctx.storage).all<{ one: number }>("SELECT 1 AS one FROM event WHERE ts >= ? AND actor <> 'system' LIMIT 1", ask.since);
+    if (used.length === 0) return { written: false };
+    if (ask.check) return { written: true };
+    if (!this.#copies) throw new Error('This deployment has no bucket, so there is nowhere to put a copy.');
+    const copy = await this.#copies.take(ask.label);
+    return { written: true, copied: copy.id };
   }
 
   /**
@@ -3596,6 +3621,7 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
   }
   if (OPS_INVITE.test(new URL(request.url).pathname)) return opsInvite(request, env);
   if (OPS_ALERT.test(new URL(request.url).pathname)) return opsAlertDoor(request, env);
+  if (OPS_RESTORE_POINT.test(new URL(request.url).pathname)) return opsRestorePoint(request, env);
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const billing: BillingDeps = {
     clock: () => Date.now(),
@@ -3767,6 +3793,51 @@ async function opsAlertDoor(request: Request, env: Env): Promise<Response> {
   return json({ ok: true, value: { sent } }, 200);
 }
 
+/** The operator's door to a deploy's restore point, with the slashes every other door here forgives. */
+const OPS_RESTORE_POINT = /^\/+account\/+ops\/+restore-point\/*$/;
+
+/**
+ * `/account/ops/restore-point`: the deploy workflow's restore point (LCH-C06, `restore-point.ts`). `POST { commit?,
+ * check?, cursor? }`. With `check: true` it opens every record written in the last seven days once and copies nothing,
+ * which is what the workflow asks on every deploy; without it each of those records takes a `before-deploy-<commit>`
+ * copy, which the workflow asks only when a migration changed. It answers counts, never a record's name, and `cursor`
+ * while there is more to walk. ANY `failed` IS A 500, so the step that asked turns red.
+ *
+ * Guarded as `/account/ops/invite` is: 404 with no `PROVISION_KEY`, 401 on a wrong key or none, a session cookie
+ * included, because the operator key is the one thing it reads. A copy needs `BLOBS`; check mode does not.
+ */
+async function opsRestorePoint(request: Request, env: Env): Promise<Response> {
+  const key = (env.PROVISION_KEY ?? '').trim();
+  if (key === '') return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This BrainDog has no operator key, so it has no operator doors.' } }, 404);
+  if (request.method !== 'POST')
+    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/account/ops/restore-point is asked with POST.' } }, 405, [['allow', 'POST']]);
+  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
+  if (bearer === '' || !(await sameKey(bearer, key)))
+    return json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This route takes the operator key.', at: 'authorization' } }, 401);
+  let body: unknown = null;
+  try {
+    body = JSON.parse((await request.text()).slice(0, SIGNUP_BODY_MAX));
+  } catch {
+    body = null;
+  }
+  const ask = readRestorePoint(body);
+  if (!ask.ok) return json({ ok: false, refusal: { code: 'BODY_MALFORMED', fix: ask.fix, at: ask.at } }, 400);
+  if (!ask.value.check && !env.BLOBS)
+    return json({ ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This deployment has no bucket, so there is nowhere to put a restore point. Check mode still runs.' } }, 503);
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const tally = await restorePoint(
+    {
+      records: async (cursor) => directory.listRecords(cursor, 60),
+      point: async (record, asked) => (await env.RECORD.get(env.RECORD.idFromName(record)).restorePoint(asked)) as PointAnswer,
+      failed: (record, why) => op({ op: 'restore-point', rec: record, check: ask.value.check, why }, 'error'),
+      now: () => Date.now(),
+    },
+    ask.value,
+  );
+  op({ op: 'restore-point', mode: tally.mode, label: tally.label, asked: tally.asked, records: tally.records, copied: tally.copied, failed: tally.failed, more: tally.cursor !== undefined });
+  return json({ ok: tally.failed === 0, value: { ...tally, said: sayTally(tally) } }, tally.failed === 0 ? 200 : 500);
+}
+
 /**
  * `/auth/*`, through the same `serveAuth` the self-host runs, and shipped switched off.
  *
@@ -3858,6 +3929,14 @@ const SIGNUP_ROUTES = { '/auth/signup/start': 'POST', '/auth/signup/verify': 'PO
 /** The most a sign-up body may be: an address, a name, a person's name, a zone and a Turnstile answer fit many times over. */
 const SIGNUP_BODY_MAX = 8_192;
 
+/**
+ * The most of what a person said that a sign-up carries (`said`), in characters: the sentence and its one answer, as the
+ * page packs them, so a link opened on another device keeps it. The Directory's own rule (`SAID_IN_LINK` in
+ * `packages/record/src/identity.ts`) says the same number and is the one that also refuses an address in it; this is the
+ * door's, so a longer one is refused before the Directory is asked or anything is mailed.
+ */
+const SIGNUP_SAID_MOST = 1_000;
+
 /** Where Turnstile's answer is checked (developers.cloudflare.com/turnstile/get-started/server-side-validation). */
 const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
@@ -3948,6 +4027,14 @@ async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: k
   let call: SignupCall | SignupStart;
   if (path === '/auth/signup/start') {
     if (!open) return signupRefused(403, { code: 'NOT_IN_THIS_BUILD', fix: SIGNUP_CLOSED });
+    /* WHAT SHE SAID GOES THROUGH UNTOUCHED, not trimmed and not read: the Directory puts it in the mailed link's
+       fragment and nowhere else (link-carry-45). Only its type and its length are the door's to refuse, and before the
+       Turnstile answer is spent, so a sentence too long costs her no second check. */
+    const sentence = body['said'];
+    if (sentence !== undefined && typeof sentence !== 'string')
+      return signupRefused(400, { code: 'BODY_MALFORMED', fix: 'What you said is sent as text.', at: 'said' });
+    if (typeof sentence === 'string' && sentence.length > SIGNUP_SAID_MOST)
+      return signupRefused(400, { code: 'BODY_MALFORMED', fix: 'The link carries at most 1,000 characters of what you said. Shorten it, or leave the rest for later.', at: 'said' });
     if (!(await turnstilePassed(env, body['turnstile'], ip)))
       return signupRefused(403, { code: 'FORBIDDEN', fix: 'The check that you are a person did not pass. Try it again, then send the form.', at: 'turnstile' });
     const name = said('name').trim();
@@ -3962,6 +4049,7 @@ async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: k
       ...(allowed === 'invite' ? { invite: true, ...(code !== '' ? { code } : {}) } : {}),
       ...(name !== '' ? { name } : {}),
       ...(tz !== '' ? { tz } : {}),
+      ...(typeof sentence === 'string' && sentence !== '' ? { said: sentence } : {}),
     };
   } else {
     const presented = readSid(request, mode);

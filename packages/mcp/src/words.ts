@@ -148,9 +148,10 @@ export function when(iso: string, now: number): string {
 /**
  * The device a run is on, as a person names it, from the host name the machine gives itself, or `null`.
  *
- * NEVER THE HOST NAME. `Maras-MacBook-Pro.local` carries the owner's own name and the machine's, and it reached the
- * owner's questions word for word ("set up in ~/.claude.json on Maras-MacBook-Pro.local"). What a person says is the
- * kind of machine, so that is all that is read out of it, and a name that says no kind says nothing at all.
+ * NEVER THE HOST NAME. One like `Maras-MacBook-Pro.local` carries the owner's own name and the machine's, and the
+ * owner's own reached the owner's questions word for word ("set up in ~/.claude.json on Maras-MacBook-Pro.local", its
+ * names changed here). What a person says is the kind of machine, so that is all that is read out of it, and a name
+ * that says no kind says nothing at all.
  */
 export function deviceOf(host: unknown): string | null {
   if (typeof host !== 'string' || host === '') return null;

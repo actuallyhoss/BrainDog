@@ -1,7 +1,8 @@
 /**
  * The model jobs wait while the model is silent (ENG-A04): a pass whose engine health says `not_answering` leases nothing
- * and leaves every job `pending` with its attempts as they were, lets one through every thirty minutes as its own test, and
- * runs as before once the model answers. Over a real record's outbox, so the attempts read are the kernel's own.
+ * and leaves every job `pending` with its attempts as they were, tries the model every thirty minutes with a call that
+ * leases no job, and runs as before once the model answers. Over a real record's outbox, so the attempts read are the
+ * kernel's own.
  */
 
 import { test } from 'node:test';
@@ -68,8 +69,8 @@ test('EVERY THIRTY MINUTES ONE JOB GOES THROUGH AS A TEST, and the rest keep wai
   await r.pass(T0);
   await r.pass(T0 + MODEL_TEST_EVERY_MS);
   assert.equal(r.asked.length, 1, 'the test is one job');
-  assert.deepEqual(r.rows(), [{ state: 'failed', attempts: 1 }, { state: 'pending', attempts: 0 }]);
-  /* AND NOT AGAIN UNTIL THE NEXT HALF HOUR: the job it tried is on its own ladder, the other still untouched. */
+  assert.deepEqual(r.rows(), [{ state: 'pending', attempts: 0 }, { state: 'pending', attempts: 0 }]);
+  /* AND NOT AGAIN UNTIL THE NEXT HALF HOUR: the test is a call that leases no job, so both are still untouched. */
   await r.pass(T0 + MODEL_TEST_EVERY_MS + 10 * MIN);
   assert.equal(r.asked.length, 1);
   assert.deepEqual(r.rows()[1], { state: 'pending', attempts: 0 });

@@ -33,7 +33,7 @@ const TASKS: Declaration = {
   } as never,
 };
 
-const SAM: WriteContext = { actor: 'p_sam' };
+const MARA: WriteContext = { actor: 'p_mara' };
 const AGENT: WriteContext = { actor: 'p_agent' };
 const B = '01JRUNBATCH000000000000000';
 
@@ -50,10 +50,10 @@ async function record() {
   const clock = fixedClock(NOW);
   const k = await openRecord(sql, clock);
   value(await k.install([TASKS]));
-  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_sam', 'sam@example.com', 'Sam'), ('p_agent', NULL, 'Robin')");
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_mara', 'mara@example.com', 'Mara'), ('p_agent', NULL, 'Robin')");
   const parts: UndoParts = { sql, clock, mint: ulids(clock.now), transaction: k.transaction, write: k.write };
-  const a = value<Entry>(k.create('tasks', { name: 'Fix login', due: '2026-10-08' }, SAM)) as Entry & { seq: number };
-  const b = value<Entry>(k.create('tasks', { name: 'Ship the beta', due: '2026-10-09' }, SAM)) as Entry & { seq: number };
+  const a = value<Entry>(k.create('tasks', { name: 'Fix login', due: '2026-10-08' }, MARA)) as Entry & { seq: number };
+  const b = value<Entry>(k.create('tasks', { name: 'Ship the beta', due: '2026-10-09' }, MARA)) as Entry & { seq: number };
   clock.advance(10 * MIN);
   /* ONE WRITE BY AN AGENT that moved both. */
   value(k.update('tasks', a.id, { due: '2026-10-20' }, { ...AGENT, batch: B, version: a.version }));
@@ -79,12 +79,12 @@ test('every step says its list and number, and only this one takes back that row
   assert.notEqual(one.hash, whole.hash, "the row's hash is its own");
 
   /* THE WHOLE PLAN'S HASH DOES NOT TAKE BACK ONE ROW, nor one row's the whole. */
-  const stale = undoApply(r.parts, { batch: B, row: { register: 'tasks', seq: r.b.seq } }, whole.hash, 'p_sam');
+  const stale = undoApply(r.parts, { batch: B, row: { register: 'tasks', seq: r.b.seq } }, whole.hash, 'p_mara');
   assert.equal(refused(stale)?.code, 'PLAN_STALE');
-  const stale2 = undoApply(r.parts, { batch: B }, one.hash, 'p_sam');
+  const stale2 = undoApply(r.parts, { batch: B }, one.hash, 'p_mara');
   assert.equal(refused(stale2)?.code, 'PLAN_STALE');
 
-  const done = value(undoApply(r.parts, { batch: B, row: { register: 'tasks', seq: r.b.seq } }, one.hash, 'p_sam'));
+  const done = value(undoApply(r.parts, { batch: B, row: { register: 'tasks', seq: r.b.seq } }, one.hash, 'p_mara'));
   assert.equal(done.put, 1);
   assert.equal(r.k.get(r.b.id)!.fields.due, '2026-10-09');
   assert.equal(r.k.get(r.a.id)!.fields.due, '2026-10-20', 'the other row is left as the agent left it');
@@ -107,9 +107,9 @@ test('a row of a list she cannot read is not in the record, and the other row is
   assert.match(fixOf(hidden as never), /not in this record/);
 
   const b = value(undoPlan(r.sql, { batch: B, row: { register: 'tasks', seq: r.b.seq } }));
-  value(undoApply(r.parts, { batch: B, row: { register: 'tasks', seq: r.b.seq } }, b.hash, 'p_sam'));
+  value(undoApply(r.parts, { batch: B, row: { register: 'tasks', seq: r.b.seq } }, b.hash, 'p_mara'));
   /* SOMEBODY PUTS THE OTHER BACK BY HAND, so nothing of it is left to undo, and no undo did it. */
-  value(r.k.update('tasks', r.a.id, { due: '2026-10-08' }, SAM));
+  value(r.k.update('tasks', r.a.id, { due: '2026-10-08' }, MARA));
   const a = value(undoPlan(r.sql, { batch: B, row: { register: 'tasks', seq: r.a.seq } }));
   assert.equal(a.steps.length, 0);
   assert.equal(a.already, false, 'the batch was undone for the other row, not this one');
@@ -127,7 +127,7 @@ test('a row that is not a list and a number, not in the record, or not touched b
   assert.equal(refused(missing)?.code, 'ROW_UNKNOWN');
   assert.equal(refused(missing)?.at, 'row');
 
-  const c = value<Entry>(r.k.create('tasks', { name: 'Elsewhere' }, SAM));
+  const c = value<Entry>(r.k.create('tasks', { name: 'Elsewhere' }, MARA));
   const untouched = undoPlan(r.sql, { batch: B, row: { register: 'tasks', seq: c.seq! } });
   assert.equal(refused(untouched)?.code, 'ROW_UNKNOWN');
   assert.equal(refused(untouched)?.at, 'row');
@@ -150,7 +150,7 @@ test("only this one stops the message that row queued, and leaves the rest of th
   const one = value(undoPlan(r.sql, { batch: B, row: { register: 'tasks', seq: r.b.seq } }));
   assert.deepEqual(one.lines, ['Sets due on "Ship the beta" back to 9 Oct 2026 (now 21 Oct 2026).', 'Stops a call to another app before it goes out.']);
   assert.equal(one.steps[1]!.register, undefined, 'a stopped message is no row');
-  value(undoApply(r.parts, { batch: B, row: { register: 'tasks', seq: r.b.seq } }, one.hash, 'p_sam'));
+  value(undoApply(r.parts, { batch: B, row: { register: 'tasks', seq: r.b.seq } }, one.hash, 'p_mara'));
   const state = (id: string): string | undefined => r.sql.one<{ state: string }>('SELECT state FROM outbox WHERE id = ?', id)?.state;
   assert.equal(state('ob_b'), 'done');
   assert.equal(state('ob_a'), 'pending');

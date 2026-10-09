@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { firstRun } from '../first-run.ts';
-import { madeOffers } from './made.ts';
+import { madeOffers, madeSteps } from './made.ts';
 import { listsOfModules, listsOn, playedBy } from './parts.ts';
 
 /** The lists a record made from these modules holds. */
@@ -59,4 +59,20 @@ test('THE LISTS A RECORD HOLDS are the lists of the packs that are on', () => {
     ]),
     ['people', 'organisations', 'things'],
   );
+});
+
+test('THE NEXT STEPS KEEP THE FIRST RUN\'S ORDER, and work that arrives by messages puts forwarding first', () => {
+  const lists = of('portfolio', 'people', 'money-core');
+  const kinds = (steps: ReturnType<typeof madeSteps>) => steps.map((s) => (s.kind === 'agent' ? 'agent' : s.source.kind));
+  /* UNASKED, OR ANSWERED WITH AN APP OR IN PERSON: the agent first, as at /start#made. */
+  for (const by of [undefined, 'app', 'in-person'] as const) assert.deepEqual(kinds(madeSteps(lists, by)), ['agent', 'bank'], `${by}`);
+  /* MESSAGES: the bank's mail is forwarded, so it leads, and it is the same offer the first run made. */
+  const steps = madeSteps(lists, 'messages');
+  assert.deepEqual(kinds(steps), ['bank', 'agent']);
+  assert.deepEqual(steps[0], { kind: 'source', source: madeOffers(lists).source });
+  /* AND A RECORD THE LISTS ALONE WOULD OFFER A FILE: messages are forwarded, so the source is her mail, set up in Settings. */
+  const fileOnly = madeSteps(of('portfolio'), 'messages');
+  assert.deepEqual(kinds(fileOnly), ['mail', 'agent']);
+  assert.equal(fileOnly[0]?.kind === 'source' && fileOnly[0].source.href, '/settings/ingest');
+  assert.deepEqual(kinds(madeSteps(of('portfolio'))), ['agent', 'file'], 'without the answer a file is still a file');
 });

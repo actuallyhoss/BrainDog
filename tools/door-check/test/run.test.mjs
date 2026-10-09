@@ -1,12 +1,13 @@
 /**
  * The door check's runner, held with two planted checks (one passes, one fails), and Claude Code's check where it
  * must say "not run" rather than read as green. No network: the planted checks touch nothing, and Claude Code's
- * check stops at the missing key before it installs anything.
+ * check installs the command from a planted host on this disk (`file://`, which curl reads) and stops at the missing
+ * key, or fails at a host that serves no door.
  */
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, test } from 'node:test';
@@ -17,7 +18,17 @@ import { readSession } from '../claude-code.check.mjs';
 const RUN = join(dirname(fileURLToPath(import.meta.url)), '..', 'run.mjs');
 
 let planted;
+/** A host on this disk whose `/cli/install.sh` puts a `braindog` where a stranger's install puts it, and one with no door. */
+let door;
+let noDoor;
+let hosts;
 before(() => {
+  hosts = mkdtempSync(join(tmpdir(), 'door-hosts-'));
+  door = `file://${join(hosts, 'door')}`;
+  noDoor = `file://${join(hosts, 'none')}`;
+  mkdirSync(join(hosts, 'door', 'cli'), { recursive: true });
+  mkdirSync(join(hosts, 'none'));
+  writeFileSync(join(hosts, 'door', 'cli', 'install.sh'), 'mkdir -p "$HOME/.braindog/bin" && printf \'#!/bin/sh\\n\' > "$HOME/.braindog/bin/braindog" && chmod +x "$HOME/.braindog/bin/braindog"\n');
   planted = mkdtempSync(join(tmpdir(), 'door-planted-'));
   /* PASS answers two rows: its own, and a newest release that failed and only warns. */
   writeFileSync(
@@ -31,14 +42,18 @@ export default async ({ host, record, home }) => [
   );
   writeFileSync(join(planted, 'fail.check.mjs'), `export default async () => ({ app: 'fail-app', version: '9.9.9', ok: false, saw: 'connected, 0 tools' });\n`);
 });
-after(() => rmSync(planted, { recursive: true, force: true }));
+after(() => {
+  rmSync(planted, { recursive: true, force: true });
+  rmSync(hosts, { recursive: true, force: true });
+});
 
 /** The runner, with no model key and no record key, so no check can reach anything real. */
-function runner(args, extraEnv = {}) {
+function runner(args, extraEnv = {}, host = 'https://example.test') {
   const report = join(mkdtempSync(join(tmpdir(), 'door-report-')), 'report.json');
-  const env = { ...process.env, ...extraEnv };
+  const env = { ...process.env };
   for (const name of ['ANTHROPIC_API_KEY', 'DOOR_TOKEN', 'GITHUB_ACTIONS', 'CI']) delete env[name];
-  const got = spawnSync(process.execPath, [RUN, '--host', 'https://example.test', '--record', 'fresh', '--report', report, ...args], { env, encoding: 'utf8' });
+  Object.assign(env, extraEnv);
+  const got = spawnSync(process.execPath, [RUN, '--host', host, '--record', 'fresh', '--report', report, ...args], { env, encoding: 'utf8' });
   let rows = null;
   try {
     rows = JSON.parse(readFileSync(report, 'utf8')).rows;
@@ -125,8 +140,8 @@ test('a key in the environment never reaches a line or the report, whatever a ch
   assert.equal(JSON.parse(written).rows[0].first.echoed, '[withheld]');
 });
 
-test('Claude Code with no key prints "not run: no key", one line, and exits 0', () => {
-  const r = runner(['--only', 'claude-code']);
+test('Claude Code with no key installs the command, prints "not run: no key", one line, and exits 0', () => {
+  const r = runner(['--only', 'claude-code'], {}, door);
   assert.equal(r.code, 0);
   assert.equal(r.out.trim().split('\n').length, 1);
   assert.match(r.out, /^warn\s+claude-code \d+\.\d+\.\d+: not run: no key$/m);
@@ -135,13 +150,59 @@ test('Claude Code with no key prints "not run: no key", one line, and exits 0', 
 
 test('in CI the same line is one warning annotation', () => {
   const dir = mkdtempSync(join(tmpdir(), 'door-ci-'));
-  const ci = spawnSync(process.execPath, [RUN, '--only', 'claude-code', '--report', join(dir, 'report.json')], {
+  const ci = spawnSync(process.execPath, [RUN, '--only', 'claude-code', '--host', door, '--report', join(dir, 'report.json')], {
     env: { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'ANTHROPIC_API_KEY')), GITHUB_ACTIONS: 'true', CI: 'true' },
     encoding: 'utf8',
   });
   rmSync(dir, { recursive: true, force: true });
   assert.equal(ci.status, 0);
   assert.match(ci.stdout.trim(), /^::warning title=door-check::claude-code \S+: not run: no key$/);
+});
+
+test('a host that serves no door is a red row with no key at all, never "not run"', () => {
+  const r = runner(['--only', 'claude-code'], {}, noDoor);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /^FAIL\s+claude-code \S+: install failed: /m);
+  assert.equal(r.rows[0].ok, false);
+});
+
+/* ── a dispatched host is handed no key ─────────────────────────────────────── */
+
+const KEYS = ['DOOR_TOKEN', 'DOOR_TOKEN_2', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'CURSOR_API_KEY'];
+const keyed = Object.fromEntries(KEYS.map((k) => [k, `sk-planted-${k.toLowerCase()}-0123456789`]));
+/** A check that says which keys it was handed, by name only. */
+const SEES = `export default async () => ({ app: 'sees', ok: true, saw: 'keys: ' + (${JSON.stringify(KEYS)}.filter((k) => process.env[k]).join(' ') || 'none') });\n`;
+
+test('a dispatched host runs with no key, and says so in one line', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'door-sees-'));
+  writeFileSync(join(dir, 'sees.check.mjs'), SEES);
+  const r = runner(['--dir', dir], keyed, 'https://other.example');
+  rmSync(dir, { recursive: true, force: true });
+  assert.equal(r.code, 0);
+  assert.match(r.out, /^ok\s+sees: keys: none$/m);
+  assert.equal(r.err.split('\n').filter((l) => /No key is handed/.test(l)).length, 1);
+  assert.match(r.err, /No key is handed to https:\/\/other\.example: only https:\/\/brain\.dog gets them, so this run has none\./);
+});
+
+test('a record named by an address on another host is handed no key either', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'door-sees-'));
+  writeFileSync(join(dir, 'sees.check.mjs'), SEES);
+  const report = join(dir, 'report.json');
+  const env = { ...process.env, ...keyed };
+  for (const name of ['GITHUB_ACTIONS', 'CI', 'DOOR_HOST']) delete env[name];
+  const got = spawnSync(process.execPath, [RUN, '--dir', dir, '--record', 'https://other.example/app/x', '--report', report], { env, encoding: 'utf8' });
+  rmSync(dir, { recursive: true, force: true });
+  assert.match(got.stdout, /^ok\s+sees: keys: none$/m);
+  assert.match(got.stderr, /No key is handed to https:\/\/other\.example/);
+});
+
+test('production keeps its keys, and says nothing about them', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'door-sees-'));
+  writeFileSync(join(dir, 'sees.check.mjs'), SEES);
+  const r = runner(['--dir', dir], keyed, 'https://brain.dog');
+  rmSync(dir, { recursive: true, force: true });
+  assert.match(r.out, new RegExp(`^ok\\s+sees: keys: ${KEYS.join(' ')}$`, 'm'));
+  assert.doesNotMatch(r.err, /No key is handed/);
 });
 
 /* ── what a session printed, read ─────────────────────────────────────────── */

@@ -67,6 +67,40 @@ import { routesOf } from './routes.mjs';
 export const needs = ['builds'];
 
 /**
+ * EVERY RULE THIS GATE HOLDS, EACH WITH THE FAULT THAT PROVES IT CAN GO RED (PRF-B02). "Every gate must
+ * prove it can fail (self-test with seeded violations)." One planted fault for all of axe proved that
+ * axe ran, and nothing about the three things this gate exists to see: a word on the board nobody can
+ * read, a state that opens with no name, and the marketing site, which is a surface of its own.
+ *
+ * The same shape as `layout.mjs`'s, so `self-test` walks both with one loop: `id` is what
+ * `BRAINDOG_GATE_SEED` carries to plant it (several joined by commas, one browser launch), `seed` says
+ * the fault in words, and `expect` is what the red run must print for the plant to count as seen.
+ */
+export const RULES = [
+  { id: 'a11y-contrast', seed: 'a line of text at 2 to 1 on the board', expect: ['color-contrast', '#seeded-contrast'] },
+  { id: 'a11y-state', seed: 'a sheet that opens as a dialog with no name', expect: ['aria-dialog-name', '#seeded-dialog'] },
+  { id: 'a11y-site', seed: 'a button with no name on the marketing site', expect: ['button-name', '#seeded-site'] },
+  { id: 'a11y-intent', seed: 'an intent with no glyph', expect: ['a.seeded[bad]'] },
+];
+
+/**
+ * WHICH SEEDS A RUN PLANTS: `null` for a real run, else the rules named. `'intent'` is `a11y-intent`, the
+ * value `self-test` sent while this gate had one seed, kept until its list walks `RULES`.
+ *
+ * A NAME NOTHING ANSWERS TO IS REFUSED, AND THROWN, never ignored: a misspelt seed would plant nothing,
+ * the run would be a green real run under a name that promised a red one, and the self-test would read
+ * that as the rule failing to look when it was the self-test that was wrong. The caller says which.
+ */
+export function seedsOf(value = process.env.BRAINDOG_GATE_SEED) {
+  if (!value) return null;
+  const names = [...new Set(value.split(',').map((s) => s.trim()).filter(Boolean))].map((s) => (s === 'intent' ? 'a11y-intent' : s));
+  const unknown = names.filter((n) => !RULES.some((r) => r.id === n));
+  if (unknown.length || !names.length)
+    throw new Error(`a11y: no seed is called ${unknown.map((n) => `"${n}"`).join(', ') || `"${value}"`}. The seeds are ${RULES.map((r) => r.id).join(', ')}.`);
+  return RULES.filter((r) => names.includes(r.id));
+}
+
+/**
  * Addresses a surface names by hand that the derivation for its app does not yield.
  *
  * A HAND-WRITTEN LIST NAMING A ROUTE THAT NO LONGER EXISTS IS THE SAME DECAY AS A LIST THAT NEVER
@@ -220,9 +254,29 @@ export async function surfaces(root = join(import.meta.dirname, '..', '..')) {
  * rests on: a pass is the end of the function and never a statement inside it.
  */
 export default async function a11y(root = join(import.meta.dirname, '..', '..')) {
+  /* AN UNKNOWN SEED IS REFUSED FIRST, before a route is derived or a browser launched: it plants nothing,
+     so the run that follows would be a clean one wearing a negative's name. See `seedsOf`. Red, and
+     never 3: a skip is a run that had nothing to measure, and this one was asked to measure nothing real.
+     `layout` returns 2 here; nothing reads the difference, and a 2 would be one more number above 1 in a
+     gate whose ledger debt allows none. */
+  let SEEDS;
+  try {
+    SEEDS = new Set((seedsOf() ?? []).map((r) => r.id));
+  } catch (e) {
+    console.error(`  ${e.message}`);
+    return 1;
+  }
   const { apps: APPS, unsampled, strays } = await surfaces(root);
   const AXE = join(root, 'node_modules', 'axe-core', 'axe.min.js');
   const A = budget('a11y');
+  /* THE CONTRAST PLANT'S RATIO IS A NUMBER IN `budgets.json`, as every number this gate holds is to be. A
+     tree without it plants nothing for that seed and says so, and the run is red for it at the end: the
+     other seeds still prove their rules, and this one is never a green line that planted nothing. */
+  const unplanted = SEEDS.has('a11y-contrast') && typeof A.seedContrastRatio !== 'number';
+  if (unplanted) {
+    console.error('  a11y: a11y-contrast plants nothing, because budgets.json gives a11y no seedContrastRatio to plant it at.');
+    SEEDS.delete('a11y-contrast');
+  }
 
   /**
    * WHAT THIS GATE IS ALLOWED TO AUDIT.
@@ -464,9 +518,10 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
 
     /**
      * A SEEDED RUN IS A NEGATIVE, AND A NEGATIVE NEEDS ONE PAGE. The same argument as `layout.mjs`'s:
-     * `self-test` runs this gate again with `BRAINDOG_GATE_SEED=intent` to prove it goes red on an
-     * intent with no glyph, and it was proving that over 356 page-runs. The seeded anchor is prepended
-     * to every page, so one scheme at one width says it. Only when the seed is set.
+     * `self-test` runs this gate again with `BRAINDOG_GATE_SEED` set to the seeds in `RULES` to prove each
+     * one goes red, and when the seed was `intent` alone it was proving that over 356 page-runs. Every
+     * plant lands on every page or state its surface has, so one scheme at one width says it. Only when
+     * a seed is set.
      *
      * THE THREE OF THEM ARE OUT HERE NOW, AND THAT IS THE SUMMARY'S DOING. `SEEDED` was declared inside
      * the per-app loop and the two matrices were spelt inline in the `for` headers, so the only place
@@ -474,7 +529,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
      * has to say `dark and light, at 1512 and 390`, and a summary that recomputed those from the budget
      * would print the full matrix for a seeded run that drove a quarter of it.
      */
-    const SEEDED = Boolean(process.env.BRAINDOG_GATE_SEED);
+    const SEEDED = SEEDS.size > 0 || unplanted;
     const SCHEMES = SEEDED ? ['dark'] : ['dark', 'light'];
     const WIDTHS = SEEDED ? A.widths.slice(0, 1) : A.widths;
 
@@ -535,11 +590,11 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
                 '.rowgroup{content-visibility:visible !important}' +
                 '*,*::before,*::after{transition:none !important;animation:none !important}',
             });
-            /* THE GATE'S OWN PROOF THAT ITS NEW RULE LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=intent`
+            /* THE GATE'S OWN PROOF THAT ITS NEW RULE LOOKS AT ANYTHING. With `a11y-intent` (or `intent`)
                a row wearing an intent and carrying no name for it is put into `#main` (the exact bug the
                rule is for), and the run must go red. Here rather than in a fixture tree for the same
                reason the layout gate's is: the thing under test is a real browser over a real build. */
-            if (process.env.BRAINDOG_GATE_SEED === 'intent')
+            if (SEEDS.has('a11y-intent'))
               await page.evaluate(() => {
                 /* AN ANCHOR, NOT A `div`, and that is the whole of what the negative is worth.
                
@@ -554,7 +609,65 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
                 el.textContent = 'a meaning carried by colour and nothing else';
                 document.getElementById('main')?.prepend(el);
               });
+            /* `a11y-site`: A BUTTON WITH NO NAME ON THE MARKETING SITE, and only there, so the red can only
+               come from the surface the seed is about. One of `button-name`'s plain cases on purpose: the
+               rule is axe's, and what is under test is that the shop window is in front of it at all. */
+            if (SEEDS.has('a11y-site') && app.name === 'site')
+              await page.evaluate(() => {
+                const el = document.createElement('button');
+                el.id = 'seeded-site';
+                el.type = 'button';
+                el.style.cssText = 'width:44px;height:44px;position:relative;z-index:2147483647';
+                (document.querySelector('main') ?? document.body).prepend(el);
+              });
             await page.addScriptTag({ content: axeSource });
+            /* `a11y-contrast`: A LINE AT `seedContrastRatio` TO 1 ON THE BOARD ITSELF, worked out from the
+               colour the board is in this scheme rather than written down, so a retuned token cannot make
+               the plant pass. Measured with axe's own `getContrast`, the arithmetic the rule then judges it
+               by, which is why it comes after axe is in the page; the ink is the board walked towards white,
+               or towards black where white cannot reach the ratio, until it stands at it. The board's colour
+               goes through a canvas because a computed `oklch()` is not an `rgb()` axe can parse. Its own
+               background is the board's, opaque and on top, so axe can measure it rather than file it under
+               "needs review", which this gate does not ask for and would read as a pass. */
+            if (SEEDS.has('a11y-contrast') && app.spa)
+              await page.evaluate((ratio) => {
+                const main = document.getElementById('main');
+                if (!main) return;
+                let at = main;
+                while (at && getComputedStyle(at).backgroundColor.replace(/\s/g, '').match(/^(transparent|rgba\(0,0,0,0\))$/)) at = at.parentElement;
+                const ctx = document.createElement('canvas').getContext('2d');
+                const pixel = (css) => {
+                  ctx.fillStyle = css;
+                  ctx.fillRect(0, 0, 1, 1);
+                  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+                  return [r, g, b];
+                };
+                // @ts-expect-error injected
+                const { Color, getContrast } = window.axe.commons.color;
+                const color = (rgb) => {
+                  const c = new Color();
+                  c.parseString(`rgb(${rgb.map(Math.round).join(', ')})`);
+                  return c;
+                };
+                const board = pixel(at ? getComputedStyle(at).backgroundColor : 'white');
+                const white = pixel('white');
+                const end = getContrast(color(board), color(white)) >= ratio ? white : pixel('black');
+                const towards = (t) => board.map((v, i) => v + (end[i] - v) * t);
+                let lo = 0;
+                let hi = 1;
+                while (hi - lo > 1e-4) {
+                  const mid = lo + (hi - lo) * 0.5;
+                  if (getContrast(color(board), color(towards(mid))) < ratio) lo = mid;
+                  else hi = mid;
+                }
+                const el = document.createElement('p');
+                el.id = 'seeded-contrast';
+                el.textContent = 'a line nobody can read on the board';
+                el.style.cssText =
+                  `color:rgb(${towards(lo).map(Math.round).join(',')});background:rgb(${board.join(',')});` +
+                  'font-size:15px;position:relative;z-index:2147483647';
+                main.prepend(el);
+              }, A.seedContrastRatio);
             return state;
           };
 
@@ -714,6 +827,18 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
               process.stdout.write('?');
               continue;
             }
+            /* `a11y-state`: THE SHEET THAT OPENED LOSES ITS NAME, in the state it can only be in after a key.
+               `role="dialog"` is written out because axe's `aria-dialog-name` reads the explicit role and not
+               the element, and every name a dialog can carry is taken away. Only on a scenario that opened
+               one, so the red names a state this pass reached rather than a page at rest. */
+            if (SEEDS.has('a11y-state'))
+              await page.evaluate(() => {
+                const el = document.querySelector('dialog[open]');
+                if (!el) return;
+                el.setAttribute('role', 'dialog');
+                el.id = 'seeded-dialog';
+                for (const a of ['aria-label', 'aria-labelledby', 'title']) el.removeAttribute(a);
+              });
             await audit(st.name);
           }
           process.stdout.write('\n');
@@ -813,7 +938,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
     const blind = ready.nothingDrawn();
     if (blind) console.error(`\n  ${blind}`);
 
-    if (found.size || contrast || broken.length || mute.size || unsettled.length || blind) return 1;
+    if (found.size || contrast || broken.length || mute.size || unsettled.length || blind || unplanted) return 1;
     /* AND A RUN THAT LOOKED AT NOTHING IS A SKIP: 3, not the green line it used to print. */
     if (skipped.length) {
       console.log(`  a11y: skipped ${skipped.join(', ')}. No build.`);
@@ -841,6 +966,6 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
   }
 }
 
-/* AND IT IS STILL A SCRIPT, because `self-test` spawns this file with `BRAINDOG_GATE_SEED=intent` and
-   the header documents `node tools/gates/a11y.mjs`. `?? 0` because a pass returns nothing. */
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns this file with `BRAINDOG_GATE_SEED` set to the
+   seeds in `RULES` and the header documents `node tools/gates/a11y.mjs`. `?? 0` because a pass returns nothing. */
 if (import.meta.main) process.exitCode = (await a11y()) ?? 0;

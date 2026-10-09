@@ -111,10 +111,10 @@ test('ELSE ITS FIRST PROPOSAL’S TITLE: it names a run the record had named, an
 test('ELSE THE AGENT AND WHERE IT WORKS: its project by name and never by number, its repository, or the agent alone', async () => {
   const { k, sql } = await record();
   value(k.create('tasks', { what: 'a' }, as({ ...BRAINDOG, client_id: 'cc-1' })));
-  value(k.create('tasks', { what: 'b' }, as({ host: 'mbp', repo: 'encore', agent: 'codex', client_id: 'cc-2' })));
+  value(k.create('tasks', { what: 'b' }, as({ host: 'mbp', repo: 'lanternfish', agent: 'codex', client_id: 'cc-2' })));
   value(k.create('tasks', { what: 'c' }, as({ client_id: 'cc-3', agent: 'cursor' })));
   value(k.create('tasks', { what: 'd' }, as({ client_id: 'cc-4' })));
-  assert.deepEqual(['S1', 'S2', 'S3', 'S4'].map((s) => doing(k, s)), ['Claude in BrainDog', 'Codex in encore', 'Cursor run', 'Agent run']);
+  assert.deepEqual(['S1', 'S2', 'S3', 'S4'].map((s) => doing(k, s)), ['Claude in BrainDog', 'Codex in lanternfish', 'Cursor run', 'Agent run']);
   for (const s of ['S1', 'S2', 'S3', 'S4']) assert.doesNotMatch(String(doing(k, s)), /\d|things#/u, `${s} is named with a number`);
   sql.close();
 });
@@ -128,7 +128,7 @@ test('A NAME THE RECORD GAVE FOLLOWS WHAT IT LEARNS: placed again by its host se
 
   /* A tool call of the same session from the checkout: the run is placed in BrainDog, and named for it. */
   clock.advance(MIN);
-  value(k.create('tasks', { what: 'From the checkout' }, as({ client_id: 'cc-1', remote: BRAINDOG.remote, cwd: '/Users/sam/Developer/braindog' })));
+  value(k.create('tasks', { what: 'From the checkout' }, as({ client_id: 'cc-1', remote: BRAINDOG.remote, cwd: '/Users/mara/Developer/braindog' })));
   const placed = k.get('S1')!;
   assert.deepEqual([placed.fields.project, placed.fields.doing], ['things#1', 'Claude in BrainDog']);
   assert.deepEqual([placed.version, placed.updated_at, lines(sql, opened.id)], [opened.version, opened.updated_at, 1], 'the record noting where the run is was an edit');

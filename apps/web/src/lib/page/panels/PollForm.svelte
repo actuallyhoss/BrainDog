@@ -1,9 +1,12 @@
 <!--
-  Or let BrainDog fetch them: a poll of one address, set up on an organisation's page.
+  Or let BrainDog fetch them: a poll of one address, set up on a project's or an organisation's page.
 
   IT FILES A PROPOSAL AND INSTALLS NOTHING. A poll calls out on a clock, so the pack this makes goes in front of the
   owner on Decide, with the host and how often printed, and runs only once it is approved (`lib/record/poll-form.ts`).
   One address is one request an interval however many numbers it names, and a key is sent only when one is named.
+
+  EACH NUMBER SAYS WHEN IT IS DATED AND WHETHER IT IS MONEY. Dated when it arrives unless the answer carries the date,
+  a day or a time, at a path; money is written as an amount in the currency its unit names.
 
   Imported by `Reporting.svelte` only, which the page reader draws, so nothing here reaches the entry chunk.
 -->
@@ -12,11 +15,19 @@
   import { createClient } from '@braindog/client';
   import { copy } from '$lib/copy.ts';
   import Button from '$lib/ui/Button.svelte';
-  import { POLL_EVERY, POLL_ROWS_MOST, pollFault, pollProposal, type PollEvery, type PollRow } from '$lib/record/poll-form.ts';
+  import {
+    POLL_DATED,
+    POLL_EVERY,
+    POLL_MONEY,
+    POLL_ROWS_MOST,
+    pollFault,
+    pollProposal,
+    pollRow as blank,
+    type PollEvery,
+    type PollRow,
+  } from '$lib/record/poll-form.ts';
 
-  let { seq, title }: { seq: number; title: string } = $props();
-
-  const blank = (): PollRow => ({ path: '', name: '', unit: '' });
+  let { register, seq, title, organisation = null }: { register: string; seq: number; title: string; organisation?: string | null } = $props();
 
   let url = $state('');
   let every = $state<PollEvery>('1h');
@@ -26,16 +37,17 @@
   let fault = $state<{ at: string; fix: string } | null>(null);
   let filed = $state<string | null>(null);
 
-  const id = $derived(`poll-${seq}`);
+  const id = $derived(`poll-${register}-${seq}`);
+  const entry = $derived({ register, seq, title, organisation });
 
   async function file(e: SubmitEvent) {
     e.preventDefault();
     if (busy) return;
     const draft = { url, every, grant, rows };
-    fault = pollFault(draft);
+    fault = pollFault(draft, entry);
     if (fault) return;
     busy = true;
-    const out = await createClient({ base: apiBase() }).call<{ id?: unknown }>('propose', pollProposal(draft, { title, seq }));
+    const out = await createClient({ base: apiBase() }).call<{ id?: unknown }>('propose', pollProposal(draft, entry));
     busy = false;
     if (!out.ok) {
       fault = { at: 'file', fix: 'refusal' in out ? out.refusal.fix : copy.reportUnread };
@@ -99,19 +111,50 @@
     <fieldset class="poll-rows">
       <legend class="poll-label">{copy.pollNumbers}</legend>
       {#each rows as row, i (i)}
-        <div class="poll-row">
-          <div class="field poll-path">
-            <input class="field-input" type="text" spellcheck="false" autocomplete="off" aria-label="{copy.pollPath} {i + 1}" placeholder={copy.pollPathHint} bind:value={row.path} />
+        {@const unit = row.money === 'no' ? copy.pollUnit : copy.pollCurrency}
+        <div class="poll-measure">
+          <div class="poll-row">
+            <div class="field poll-path">
+              <input class="field-input" type="text" spellcheck="false" autocomplete="off" aria-label="{copy.pollPath} {i + 1}" placeholder={copy.pollPathHint} bind:value={row.path} />
+            </div>
+            <div class="field poll-name">
+              <input class="field-input" type="text" autocomplete="off" aria-label="{copy.pollName} {i + 1}" placeholder={copy.pollNameHint} bind:value={row.name} />
+            </div>
+            <div class="field poll-unit">
+              <input
+                class="field-input"
+                type="text"
+                autocomplete="off"
+                aria-label="{unit} {i + 1}"
+                placeholder={row.money === 'no' ? copy.pollUnitHint : copy.pollCurrencyHint}
+                bind:value={row.unit}
+              />
+            </div>
+            {#if rows.length > 1}
+              <Button weight="bare" aria-label={copy.pollRemoveRow(i + 1)} onclick={() => (rows = rows.filter((_, j) => j !== i))}>{copy.pollRemoveRow(i + 1)}</Button>
+            {/if}
           </div>
-          <div class="field poll-name">
-            <input class="field-input" type="text" autocomplete="off" aria-label="{copy.pollName} {i + 1}" placeholder={copy.pollNameHint} bind:value={row.name} />
+          <div class="poll-row poll-how">
+            <select class="poll-select" aria-label="{copy.pollMoney} {i + 1}" bind:value={row.money}>
+              {#each POLL_MONEY as m (m)}<option value={m}>{copy.pollMoneyLabels[m] ?? m}</option>{/each}
+            </select>
+            <select class="poll-select" aria-label="{copy.pollDated} {i + 1}" bind:value={row.dated}>
+              {#each POLL_DATED as d (d)}<option value={d}>{copy.pollDatedLabels[d] ?? d}</option>{/each}
+            </select>
+            {#if row.dated !== 'arrived'}
+              <div class="field poll-date">
+                <input
+                  class="field-input"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  aria-label="{copy.pollDatePath} {i + 1}"
+                  placeholder={copy.pollDatePathHint}
+                  bind:value={row.datePath}
+                />
+              </div>
+            {/if}
           </div>
-          <div class="field poll-unit">
-            <input class="field-input" type="text" autocomplete="off" aria-label="{copy.pollUnit} {i + 1}" placeholder={copy.pollUnitHint} bind:value={row.unit} />
-          </div>
-          {#if rows.length > 1}
-            <Button weight="bare" aria-label={copy.pollRemoveRow(i + 1)} onclick={() => (rows = rows.filter((_, j) => j !== i))}>{copy.pollRemoveRow(i + 1)}</Button>
-          {/if}
         </div>
       {/each}
       {#if rows.length < POLL_ROWS_MOST}
@@ -196,9 +239,28 @@
     gap: var(--sp-2);
   }
 
+  .poll-measure {
+    display: grid;
+    gap: var(--sp-2);
+    padding-block-end: var(--sp-2);
+  }
+
+  .poll-how {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .poll-how .poll-select {
+    justify-self: stretch;
+    min-inline-size: 0;
+  }
+
   @media (max-width: 40rem) {
     .poll-row {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .poll-how {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .poll-name {

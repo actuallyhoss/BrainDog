@@ -88,6 +88,11 @@ import { answers, bootWith, forward, forwards, RECORD_PREFS, recordPrefsOf, star
    job that builds, rather than in `--unbuilt`, where it would exit 3 for want of a build. */
 export const needs = ['builds'];
 
+/* THE PREFERENCES NO PAGE LOAD CAN SETTLE, `EXCUSED` below, held at module scope so `ledger.mjs` reads how many there
+   are without a browser (PRF-B03 step 3). `ledger.json` holds `prefs.UNCOVERED` at its newest line: the list only
+   shrinks, and a fall is a line written there. */
+export const UNCOVERED = new Set(['theme', 'chars', 'seen', 'columns', 'defined']);
+
 /**
  * EVERY PREFERENCE, SET AND MEASURED, AS A FUNCTION THE RUNNER CALLS. `52 §5.1` step 3.
  *
@@ -495,7 +500,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    * that returns an empty list is a gate that goes green having read no declarations at all, which is
    * the one failure mode this directory exists to stop."
    */
-  const EXCUSED = new Set(['theme', 'chars', 'seen', 'columns', 'defined']);
+  const EXCUSED = UNCOVERED;
 
   const prefSrc = (await readFile(join(root, 'apps', 'web', 'src', 'lib', 'pref.ts'), 'utf8')).replace(/\r\n/g, '\n');
   const prefOpens = prefSrc.indexOf('export type Pref = {');

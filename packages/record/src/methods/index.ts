@@ -42,6 +42,7 @@ import { methods as faults } from './faults.ts';
 import { methods as withdraw } from './withdraw.ts';
 import { methods as door } from './door.ts';
 import { methods as engine } from './engine.ts';
+import { methods as pagesCensus } from './pages-census.ts';
 /* END METHODS */
 
 /**
@@ -133,6 +134,7 @@ export function methods(deps: RecordDeps) {
     ...withdraw(deps),
     ...door(deps),
     ...engine(deps),
+    ...pagesCensus(deps),
     /* END METHODS */
   };
 }

@@ -102,7 +102,7 @@ without one gets `403 NEEDS_BROWSER_SESSION`; over MCP every token is refused (�
 
 A customer's registers come from *their* installed packs and from what they and their agents added
 at run time. A freelancer with `money-core` and `freelancer-uk` has
-different registers from a studio with `products` and `people`, and the same seventeen tools reach all of them.
+different registers from a studio with `products` and `people`, and the same sixteen tools reach all of them.
 
 ### The generation rule
 
@@ -118,17 +118,16 @@ Instead:
 | `list` | a register plus a `where:` tree, a limit and a cursor | 1 |
 | `search` | FTS5 over everything the token can read, with how many matched, and a sentence when fewer came back than that | 1 |
 | `activity` | the record's whole log lately, newest first: each write, the row it touched and who made it, for a session picking up after another | 1 |
-| `money` | how money stands, from seven figures the money pack declares: cash now, what moved in 30 days, what is due each way and what is late. One amount per currency, never a sum across two | 1 |
 | `governance` | what was proposed, decided and predicted | 1 |
 | `propose` | open a suggestion with options. **The only way an agent affects a decision**, and the way it asks to change what it may not change itself. A rule change comes back with its dry run, and a script change sent with `"try"` is run once and filed nowhere | 1 |
-| `create` / `update` | typed writes against a named register; `update` carries the row's `version` | 2 |
+| `create` / `update` | typed writes against a named register; `update` carries the row's `version`, and either may carry an `op_id`, so a write sent again after a lost answer is one entry | 2 |
 | `log` | one note on a row, changing nothing about it | 1 |
 | `handoff` | keep the session's next step and its dead ends true | 1 |
-| `understand` | what the record would link to who and what each thing is about, and what it would ask, in names, read before meeting anyone | 1 |
 | `meet` | a person met in the work, matched or added, with where they were met | 1 |
+| `triage` | one arrival from the inbox filed as a row, or set aside | 1 |
 | **Per-register schemas, pages, figures, skills** | delivered as **resources**, not tools | *n* |
 
-**Seventeen tools, fixed, regardless of how many registers a customer has.** The variability lives in the
+**Sixteen tools, fixed, regardless of how many registers a customer has.** The variability lives in the
 *arguments*, as in `list(register: "obligations", where: {...})`, and in the resources, which are fetched when
 needed. Fourteen and not the eight an earlier revision named, because the agent path added three things every
 session does: `context`, `handoff` and `meet`. Five went to pay for them: `pages`, `page` and
@@ -137,7 +136,11 @@ session does: `context`, `handoff` and `meet`. Five went to pay for them: `pages
 descriptions that said twice what their schema or the instructions already say: `activity`, because `history` takes a
 row and an agent picking up after another session does not yet know which row, and `money`, because "how am I doing
 this month" had no verb, and an agent adding rows up itself is an agent that will add two currencies together
-([44-SPEC-MCP](44-SPEC-MCP.md) §4.4).
+([44-SPEC-MCP](44-SPEC-MCP.md) §4.4). `money` left again, its figures read through `get` and `record_index` for any
+pack, and `triage` joined, the one tool the ceiling was raised for. `understand` joined as a seventeenth and is the
+address `braindog:understand` now (§6), so the list stays at sixteen and what it freed pays for `op_id` on the two
+writes. The command line sends a create or an update once more, with the same `op_id`, when the host's answer was
+lost, and the record answers the second sending with the first one's row.
 
 **What was asked for as a tool and went elsewhere.** A dry run of an automation and a trial of a draft script both
 cost more tokens than the ceiling had left (the smallest `script_try` tool measured 102 against 3). So both ride on
@@ -157,7 +160,7 @@ change that brings its own lists are seen holding rows before anything is filed.
 costs what it did.
 
 **What each reaches, said once:** `record_index` reads `boot()` and `version()`, `log` is `update` with an empty
-patch, `activity` reads `recentHistory()`, `money` reads seven figures through `metric()` at once, `propose` may add
+patch, `activity` reads `recentHistory()`, `propose` may add
 `dryRun()` or, with `try`, call `previewPage()`, `scriptTry()`, `tryAutomation()` or `previewChange()` instead, and
 every other tool shares its method's name
 ([30-BLUEPRINT](30-BLUEPRINT.md) §5). The tools reshape an answer only to address it: a row comes back compact, as
@@ -172,7 +175,7 @@ This is the central design decision of the MCP surface and it exists because of 
 
 ### `tools/list_changed`
 
-Not pushed, and not needed for the tools: the server is stateless, the seventeen do not change on an install, and no
+Not pushed, and not needed for the tools: the server is stateless, the sixteen do not change on an install, and no
 tool description names a register. A register added or removed is seen through `record_index`, `context` and
 `resources/list`, and a client holding a stale register name is answered `REGISTER_UNKNOWN` with the registers there
 are in `allowed` ([44-SPEC-MCP](44-SPEC-MCP.md) §5.6).
@@ -193,7 +196,7 @@ session, with no loss of capability, because the index says what to ask for next
 Three rules follow, and they are the difference between an MCP server agents keep and one they
 disable.
 
-**1 · Seventeen tools, not forty.** A tool per register would put every customer's entire schema in
+**1 · Sixteen tools, not forty.** A tool per register would put every customer's entire schema in
 every context window. Registers are arguments; schemas are resources fetched on demand.
 
 **2 · Progressive disclosure, by contract.** Every response ends with what to ask for next. This is the design:
@@ -227,7 +230,7 @@ record's answer ends.
 
 **3 · `ttlMs` on every list.** `tools/list` gets `ttlMs: 3600000` and `cacheScope: "private"`, the scope for
 anything a record answers; `server/discover` alone is `"public"`, because it reads nothing and is the same for every
-caller ([44-SPEC-MCP](44-SPEC-MCP.md) §4.3). The seventeen do not change on an install and no tool description names a
+caller ([44-SPEC-MCP](44-SPEC-MCP.md) §4.3). The sixteen do not change on an install and no tool description names a
 register (§3), so a client holds the list for its hour without holding anything stale. This also keeps the client's
 *upstream prompt cache* stable across reconnects, which the 2026-07-28 spec calls out explicitly as a goal of the
 field.
@@ -353,6 +356,7 @@ lists: the fixed addresses of `RESOURCES` and the templates of `TEMPLATES`, whic
 | **`sessions/live`** | who else is working, on what, and **`same_repo`**: the list the SessionStart hook prints with *"two sessions in one working tree overwrite each other. Coordinate or stop."* |
 | **`context`** | where the session stands, in one call: its run and project, the last handoff there, who else is live, what waits on the person, and every register with a scope field, the project's rows first and then the global ones the nearer scope leaves. Learnings, skills and keys arrive this way, keys by name only, and `truncated` is set honestly. It is the briefing `attach` returns and the start hook prints, with the same `teach` sentences the tool adds; `ttlMs` 0 |
 | **`boot`** | the first-screen read: the registers the caller may read with their row counts, the record's `now`, the live runs and the open suggestions, in one call |
+| **`understand`** | what the record would link to who and what each thing is about, and what it would ask, in names. Read before meeting anyone; `ttlMs` a minute. It was a tool until AGT-B05 |
 | **`whoami`** | who this token is, its scope and its record, which is what a new session reads first; `ttlMs` 0 |
 | **`skill/<name>`** | the text of one skill, listed with when to use it |
 | **`actions`** | every scheduled action (`pull`, `call`, `poll`): what it calls, how often, its key by label only, whether it is paused and why, its last run and this month so far; `ttlMs` a minute. Starting a paused one again is `resumeAction`, which is ADMIN and a person's |
@@ -367,7 +371,7 @@ lists: the fixed addresses of `RESOURCES` and the templates of `TEMPLATES`, whic
 construction: `schema` `digest/today` `page` `metric` `sessions/live` `context` `boot` `whoami` `actions` and
 `automations` are the methods `schema({ register })` `digestToday()` `page({ slug })` `metric({ metric })`
 `sessionsLive()` `context()` `boot()` `whoami()` `actions()` and `automations()` of [30-BLUEPRINT](30-BLUEPRINT.md)
-§5, and `automation/<id>` is `automations({ rule })`. `inbox` and `inbox/<state>` are `inbox()`, asked for every
+§5, `automation/<id>` is `automations({ rule })`, and `understand` is `understandPlan()`. `inbox` and `inbox/<state>` are `inbox()`, asked for every
 state or one. `arrangement`, `declaration/<slug>` and the grammars of pages, lists, figures, proposals and doors are
 one method, `arrangement()`, asked for the whole, a page or a grammar. `decisions` is
 `governance({ register: 'suggestion' })`, the open suggestions, and `skill/<name>` is `list` over the skills register
@@ -469,7 +473,7 @@ the sixty-six methods, each refused to every MCP token **with a reason**, plus `
 transitions that need a person. `markRead`, alone in DATA, answers a person principal only.
 
 Over MCP none of these methods is a tool, so an agent that names one to `tools/call` is answered `ROUTE_UNKNOWN` with
-the seventeen tools in `allowed`, and nothing runs. The reason in the table is what the record answers a token at that
+the sixteen tools in `allowed`, and nothing runs. The reason in the table is what the record answers a token at that
 route over `/api`. A refusal list at the MCP layer, one named refusal per method as the predecessor has, is not built
 ([44-SPEC-MCP](44-SPEC-MCP.md) §6.2).
 

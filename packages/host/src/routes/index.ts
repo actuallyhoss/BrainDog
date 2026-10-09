@@ -32,6 +32,7 @@ import { ROUTES as faults } from './faults.ts';
 import { ROUTES as withdraw } from './withdraw.ts';
 import { ROUTES as door } from './door.ts';
 import { ROUTES as engine } from './engine.ts';
+import { ROUTES as capture } from './capture.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -55,5 +56,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...withdraw,
   ...door,
   ...engine,
+  ...capture,
   /* END ROUTES */
 ];

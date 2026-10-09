@@ -6,7 +6,8 @@
   Revoke. A record with no list of readings draws nothing here at all, and a reader who cannot make keys still sees
   the line, with the record's own sentence about why there is no button.
 
-  POLLING IS A FORM THAT FILES A PROPOSAL, on an organisation's page (`PollForm.svelte`). A poll calls out and costs
+  POLLING IS A FORM THAT FILES A PROPOSAL, on a project's or an organisation's page (`PollForm.svelte`), the two
+  places the live feed add-on can land a reading (`pollBindsTo`). A poll calls out and costs
   money, so nothing is fetched until the owner approves the address and the interval once, on Decide.
 
   THE KEYS ARE READ AGAIN when the reader comes back to the tab and every half minute while it is in view, so a key
@@ -25,6 +26,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import PollForm from './PollForm.svelte';
+  import { pollBindsTo } from '$lib/record/poll-form.ts';
   import { READINGS, bindable, bindingOf, curlLine, keyFor, organisationOf, type Binding } from '$lib/record/reporting.ts';
 
   let { register, seq, title }: { register: string; seq: number; title: string } = $props();
@@ -38,6 +40,8 @@
   let minted = $state<string | null>(null);
   let busy = $state(false);
   let origin = $state('');
+  /** The organisation that lists this project, which its readings name too, or null. */
+  let listedBy = $state<string | null>(null);
 
   const spoken = $derived(`${register}#${seq}`);
   const line = $derived(curlLine(origin, minted, copy.reportPlaceholder));
@@ -61,6 +65,7 @@
       const id = row.ok ? (row.value as { id?: unknown }).id : null;
       if (typeof id === 'string' && orgs.ok) organisation = organisationOf(orgs.value.rows as never, id);
     }
+    listedBy = bound.links.includes('organisation') ? organisation : null;
     binding = bindingOf(bound.field, spoken, { source: bound.source, organisation, links: bound.links });
     await list(client);
     from = 'ready';
@@ -161,7 +166,7 @@
       </ul>
     {/if}
 
-    {#if register === 'organisations'}<PollForm {seq} {title} />{/if}
+    {#if pollBindsTo(register, field)}<PollForm {register} {seq} {title} organisation={listedBy} />{/if}
   </section>
 {/if}
 
