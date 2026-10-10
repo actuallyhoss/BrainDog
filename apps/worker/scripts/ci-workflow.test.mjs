@@ -174,9 +174,9 @@ test('the legs are the four the workflow was drawn with', () => {
   for (const leg of found) assert.deepEqual(legDirs(leg), [...drawn[leg.leg]].sort(), `the ${leg.leg} leg`);
 });
 
-test('each leg typechecks and then tests its own workspaces, under its own 25-minute ceiling', () => {
+test('each leg typechecks and then tests its own workspaces, under its own 45-minute ceiling', () => {
   const lines = job(ci, 'test');
-  assert.equal(key(lines, 4, 'timeout-minutes'), '25');
+  assert.equal(key(lines, 4, 'timeout-minutes'), '45');
   assert.equal(key(lines, 6, 'fail-fast'), 'false', 'a red leg cancels the others and hides what they would have found');
   const all = steps(lines);
 
@@ -249,7 +249,7 @@ test('every gate a workflow names is one the registry knows', () => {
    check stops the deploy. Any other name in a run line of ci.yml is red here. */
 test('the gates job runs every gate that needs nothing built, and names none', () => {
   const gatesJob = job(ci, 'gates');
-  assert.equal(key(gatesJob, 4, 'timeout-minutes'), '25');
+  assert.equal(key(gatesJob, 4, 'timeout-minutes'), '45');
   const runs = steps(gatesJob).filter((step) => /pnpm gates|run\.mjs/.test(step.body));
   assert.equal(runs.length, 1, 'the gates job runs the gate runner more than once, or not at all');
   assert.equal(runs[0].run, 'node tools/gates/run.mjs --unbuilt');
