@@ -777,6 +777,14 @@ const OPS_FIELDS = ['ref', 'where', 'rec', 'code', 'model', 'why', 'records', 'b
 /** One mail per kind in this long, however many lines a burst writes. */
 export const OPS_QUIET_MS = 15 * 60 * 1000;
 
+/**
+ * A MODEL THAT DOES NOT ANSWER IS MAILED ONCE A DAY: it is the provider's weather more than an outage of ours, Health's
+ * model sign shows it, and the owner asked on 11 October not to be mailed through every failure.
+ */
+export const OPS_QUIET_BY_KIND: Partial<Record<OpsKind, number>> = { model: 24 * 60 * 60 * 1000 };
+const quietOf = (kind: OpsKind): number => OPS_QUIET_BY_KIND[kind] ?? OPS_QUIET_MS;
+const quietWords = (ms: number): string => (ms >= 86_400_000 ? 'day' : `${Math.round(ms / 60_000)} minutes`);
+
 /* PER ISOLATE FIRST, so a burst in one isolate asks the shared gate once and not once a line. */
 const opsSent = new Map<OpsKind, number>();
 
@@ -806,12 +814,13 @@ export async function opsAlert(
     if (to === '') return false;
     const kind = fields.op;
     const last = opsSent.get(kind);
-    if (last !== undefined && now - last < OPS_QUIET_MS) return false;
+    const quiet = quietOf(kind);
+    if (last !== undefined && now - last < quiet) return false;
     opsSent.set(kind, now);
     if (claim) {
       let due = true;
       try {
-        due = await claim(kind, OPS_QUIET_MS);
+        due = await claim(kind, quiet);
       } catch {
         /* See the header: the isolate's window is the one left. */
       }
@@ -832,7 +841,7 @@ export async function opsAlert(
       '',
       `Runbook: ${RUNBOOK[kind]}`,
       '',
-      `More ${kind} lines in the next 15 minutes are not mailed. Workers Logs has every one.`,
+      `More ${kind} lines in the next ${quietWords(quiet)} are not mailed. Workers Logs has every one.`,
     ].join('\n');
     try {
       await binding.send({ from: { email: from, name: SENDER_NAME }, to, subject: `BrainDog ${kind}`, text });

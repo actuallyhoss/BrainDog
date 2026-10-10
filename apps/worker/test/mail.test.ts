@@ -309,10 +309,11 @@ test('A MODEL THAT DID NOT ANSWER MAILS "BrainDog model" WITH THE RECORD, THE MO
   const line = { op: 'model', rec: 'rec_1', model: 'glm-5.3-flash', why: 'the provider did not answer', raw: `5016: account 1234 said no to ${ADDRESS}` } as const;
   await logged(async () => {
     assert.equal(await opsAlert(env, line, undefined, 30 * HOUR), true);
-    assert.equal(await opsAlert(env, line, undefined, 30 * HOUR + OPS_QUIET_MS - 1), false, 'one a quarter hour');
+    assert.equal(await opsAlert(env, line, undefined, 30 * HOUR + 24 * HOUR - 1), false, 'one a day');
   });
   assert.equal(email.sent.length, 1);
   assert.equal(email.sent[0]?.subject, 'BrainDog model');
+  assert.match(String(email.sent[0]?.text), /next day are not mailed/u);
   const text = String(email.sent[0]?.text);
   for (const said of ['op: model', 'rec: rec_1', 'model: glm-5.3-flash', 'why: the provider did not answer', 'route table', "provider's console"]) assert.ok(text.includes(said), said);
   assert.ok(!text.includes('5016') && !text.includes(ADDRESS), 'raw stays in the log');
