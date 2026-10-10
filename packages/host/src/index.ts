@@ -147,6 +147,11 @@ export type Route = {
   group: Group;
   /** Whether it changes anything. A read is safe to retry; a write is not. */
   writes: boolean;
+  /**
+   * A read sent as a write: it changes nothing, but its arguments are too large for an address, so it goes as a POST.
+   * Only `previewPage` is one. The looks that cannot press hand it on, and nothing else reads this mark.
+   */
+  postRead?: true;
   /** One line, for the CLI's help and the MCP tool description. */
   what: string;
   /**
@@ -266,7 +271,7 @@ const CORE_ROUTES: readonly Route[] = [
      `scriptTry`'s reasons: a page body of up to twenty blocks is no query string. It also kept a caller-written body
      that walks a list off the Cloud's public demo, which answered any GET to anybody; that door is gone,
      and the flag stays for the first reason. */
-  { name: 'previewPage', group: 'READ+', writes: true, what: 'Draw a page body nobody has installed, as page would draw it, each block held to what you may read. It installs nothing and writes nothing.' },
+  { name: 'previewPage', group: 'READ+', writes: true, postRead: true, what: 'Draw a page body nobody has installed, as page would draw it, each block held to what you may read. It installs nothing and writes nothing.' },
   { name: 'governance', group: 'READ+', writes: false, what: 'What has been proposed, what was decided, and what was predicted.',
     takes: { register: 'text', id: 'text', status: 'text', limit: 'integer', cursor: 'text' } },
   { name: 'propose', group: 'DATA', writes: true, what: 'Put a question in front of a person. It changes nothing by itself.' },

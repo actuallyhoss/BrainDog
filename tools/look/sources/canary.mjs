@@ -15,7 +15,7 @@
  * refuses to start, in one sentence. On a self-host, before his sitting, the session is the self-host's own key spent
  * at its sign-in door, and the record's reads go with that key, since the gates' record's one person is on no record.
  *
- * IT CANNOT PRESS. A read goes on: a route the host's table marks `writes: false`, any GET under `/account`, and the
+ * IT CANNOT PRESS. A read goes on: a route the host's table marks `writes: false` or `postRead`, any GET under `/account`, and the
  * four reads under `/auth` the shell asks. Every other request is refused here and counted, as the live look counts
  * them, so a screen that writes while it only draws shows "writes blocked" above 0. Signing out is a write and is never
  * sent, so a look can never end the session the rest of the lane reads with.
@@ -85,7 +85,7 @@ export async function open(arg, { env = process.env, send = fetch, read, routes 
     if (name !== undefined) {
       const route = byName.get(name);
       if (route === undefined) return { kind: 'outside', what: name, fix: `The record has no read called ${name}.` };
-      if (route.writes || !['GET', 'HEAD', 'POST'].includes(method))
+      if ((route.writes && !route.postRead) || !['GET', 'HEAD', 'POST'].includes(method))
         return { kind: 'writes', what: name, fix: `The canary look reads and never writes, so ${name} was not sent.` };
       return { url: `${target.base}${target.api}/api/${name}${at.search}` };
     }

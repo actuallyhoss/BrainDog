@@ -2,10 +2,10 @@
  * `live:<record>`: a real record, read through the command's own sign-in, and nothing pressed.
  *
  * A FORWARDER THAT CANNOT PRESS (`loop/scope/area-proof-a.md` 2.4). The allow-list is the host's own route table:
- * a route goes on only when its row says `writes: false` and it sits in one of the two reading groups, DATA and
- * READ+. Every other request is answered here with a refusal and counted, so a screen that tries to write while it
- * only draws shows up as "writes blocked" above 0 and never reaches his record. When a read is marked as a write
- * (`previewPage` is), the fix is the route's mark, never this list.
+ * a route goes on only when its row says `writes: false` (or `postRead`, a read sent as a POST) and it sits in one of
+ * the two reading groups, DATA and READ+. Every other request is answered here with a refusal and counted, so a screen
+ * that tries to write while it only draws shows up as "writes blocked" above 0 and never reaches his record. When a
+ * read is marked as a write, the fix is the route's mark, never this list.
  *
  * THE TOKEN IS THE COMMAND'S, READ THROUGH `readHosts`, and it leaves only as `Authorization: Bearer` on a request
  * to the host the sign-in names. Nothing else the headless browser holds goes with it: no cookie, no `Origin`, no
@@ -27,7 +27,7 @@ import { hostKey, hostsPath, inTheClear, readHosts, sameHost } from '../../../ap
 export const READING = new Set(['DATA', 'READ+']);
 
 /** Every route this forwarder hands on: reads, in a reading group. Built once from the table, never written by hand. */
-export const allowed = (routes = ROUTES) => new Set(routes.filter((r) => !r.writes && READING.has(r.group)).map((r) => r.name));
+export const allowed = (routes = ROUTES) => new Set(routes.filter((r) => (!r.writes || r.postRead) && READING.has(r.group)).map((r) => r.name));
 
 /** What this source cannot draw, and why, for the capture's `said.json` to carry as screens not seen. */
 export const CANNOT = [
@@ -108,7 +108,7 @@ export async function open(record, { env = process.env, now = Date.now(), send =
       const where = at.pathname.startsWith('/account') ? ' A screen that reads /account/* (Usage, Billing) cannot be drawn by the live look.' : '';
       return refuse(res, 'outside', at.pathname, `The live look hands on the record's reads under /api and nothing else, so ${at.pathname} was not sent.${where}`);
     }
-    if (route.writes || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+    if ((route.writes && !route.postRead) || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
       for await (const _ of req);
       return refuse(res, 'writes', name, `The live look reads and never writes, so ${name} was not sent. The host's route table marks it as a write.`);
     }

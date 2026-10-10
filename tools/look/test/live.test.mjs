@@ -56,7 +56,7 @@ const ask = (path, init = {}) => fetch(`${look.origin}${path}`, init).then(async
 
 test('every route the table marks as a write is refused before it leaves', async () => {
   const before = heard.length;
-  const writes = ROUTES.filter((r) => r.writes);
+  const writes = ROUTES.filter((r) => r.writes && !r.postRead);
   assert.ok(writes.length > 0);
   for (const r of writes) {
     const said = await ask(`/api/${r.name}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
@@ -82,7 +82,7 @@ test('a read outside the reading groups, and a path outside the record\'s reads,
 
 test('no write gets through by another spelling of its address, or by a verb or override header on a read', async () => {
   const before = heard.length;
-  const writes = ROUTES.filter((r) => r.writes).map((r) => r.name);
+  const writes = ROUTES.filter((r) => r.writes && !r.postRead).map((r) => r.name);
   const spellings = (w) => [
     `/api/${w}/`,
     `/api//${w}`,
@@ -149,4 +149,10 @@ test('the token is in no answer and no count', async () => {
 test('a live look writes only under loop/proof/looks', () => {
   assert.ok(outFor(source, undefined).startsWith(join(ROOT, LOOKS)));
   assert.throws(() => outFor(source, join(tmpdir(), 'elsewhere')), /writes only under loop\/proof\/looks/u);
+});
+
+test('a read sent as a POST goes on, and it is the only write-marked route that does', () => {
+  const posts = ROUTES.filter((r) => r.writes && r.postRead).map((r) => r.name);
+  assert.deepEqual(posts, ['previewPage']);
+  assert.ok(allowed().has('previewPage'));
 });

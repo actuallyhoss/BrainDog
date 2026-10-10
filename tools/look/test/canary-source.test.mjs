@@ -92,7 +92,7 @@ test('a read goes to the canary under its name, with the session and the Origin 
 
 test('every write, sign-out included, is refused before it leaves', async () => {
   const before = heard.length;
-  const writes = ROUTES.filter((r) => r.writes);
+  const writes = ROUTES.filter((r) => r.writes && !r.postRead);
   assert.ok(writes.length > 0);
   for (const r of writes) {
     const said = await ask(`/app/ops/api/${r.name}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
