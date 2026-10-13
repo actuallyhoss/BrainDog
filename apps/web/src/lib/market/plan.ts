@@ -126,10 +126,12 @@ export type Call = {
   per_day: number | null;
   /** The key by its label, never the key. */
   grant: string | null;
+  /** The fields that leave with a call a rule runs, each `<list>.<field>`, as the plan names them. */
+  sends: string[];
 };
 
 /** One call of a plan as a `Call`. `fallback` is said only when the kernel has no sentence for it. */
-function callOf(c: Record<string, unknown>, change: Call['change'], note: string | null, fallback: () => string): Call {
+function callOf(c: Record<string, unknown>, change: Call['change'], note: string | null, fallback: () => string, names: Parameters<typeof doesOf>[2] = {}): Call {
   const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
   const made = {
     host: str(c.host),
@@ -137,10 +139,12 @@ function callOf(c: Record<string, unknown>, change: Call['change'], note: string
     trigger: (c.trigger === 'rule' || c.trigger === 'both' ? c.trigger : 'schedule') as Call['trigger'],
     per_day: typeof c.per_day === 'number' && c.per_day > 0 ? c.per_day : null,
     grant: str(c.grant) ?? str(c.key),
+    /* WHAT LEAVES WITH IT. Dropped here, the sheet could not say the fields a rule's call sends, and Decide could. */
+    sends: Array.isArray(c.sends) ? c.sends.filter((s): s is string => typeof s === 'string') : [],
   };
   /* THE KERNEL LEAVES OUT A CALL MARKED `same`, since on Decide it is nothing new. Here it is still drawn, so it is
      asked without the mark and reads as the same sentence. */
-  return { line: doesOf('install', { calls_out: [made] }) || fallback(), note, change, ...made };
+  return { line: doesOf('install', { calls_out: [made] }, names) || fallback(), note, change, ...made };
 }
 
 /** One pack's part of the plan. A single add-on is one part; a use case is one part per pack, in the order they go in. */
@@ -242,7 +246,7 @@ function diffPart(d: Body, name: (id: string) => string): { part: Part; stops: s
       ...section('worth', words.worth, worth),
     ],
     calls: list(d.calls_out).map((c) =>
-      callOf(c, c.change === 'changed' ? 'changed' : c.change === 'same' ? 'same' : 'new', typeof c.key_line === 'string' && c.key_line !== '' ? c.key_line : null, () => callsOutOf([c]).map(callLine)[0] || text(c.line) || text(c.ingest)),
+      callOf(c, c.change === 'changed' ? 'changed' : c.change === 'same' ? 'same' : 'new', typeof c.key_line === 'string' && c.key_line !== '' ? c.key_line : null, () => callsOutOf([c]).map(callLine)[0] || text(c.line) || text(c.ingest), { list: (id) => name(`register.${id}`) }),
     ),
   };
   return { part, stops, title, summary: text(pack.summary), direction, version, installed };

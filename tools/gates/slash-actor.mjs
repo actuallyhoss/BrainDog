@@ -42,8 +42,12 @@
  *      Each would write an event if it were accepted, and each is refused by `slashMayWrite` at one
  *      of the two guard sites a `Result`-shaped API cannot hide (it throws: no caller can ASK to be
  *      `slash`, so reaching it is a defect here rather than an event in somebody's business).
- *   3. Only then does it run `30 §3`'s query. Zero rows, over a record that holds `slash` events
- *      and has been offered four it must not hold.
+ *   3. It installs the one declaration `30 §3` lets a model sign (ENG-A16): a look on a page the seed
+ *      came with, whose body says it is Slash's. Then it offers an install of a page and of a rule as
+ *      `slash`, which the install's own `declare` line must refuse before anything of them lands.
+ *   4. Only then does it run `30 §3`'s query, with the one exception the document states. Zero rows,
+ *      over a record that holds `slash` events, a `declare` among them, and has been offered six
+ *      writes it must not hold.
  *
  * SO THE INPUT THAT MAKES THIS GATE REPORT IS A WRITER THAT SKIPS THE GUARD, which is the one thing
  * a gate can catch that the guard cannot. `packages/kernel/src/slash.ts` says it in its own header:
@@ -199,6 +203,8 @@ export default async function slashActor(
   let mine = 0;
   let guarded = 0;
   let offered = 0;
+  let looked = 0;
+  let installs = 0;
 
   /* ── The line ───────────────────────────────────────────────────────────────────────────────────── */
 
@@ -223,8 +229,9 @@ export default async function slashActor(
     if (findings.length === 0) {
       console.log(
         `  slash-actor: ${rows} rows and ${events} events materialised through the write path; ` +
-          `${mine} ${actor} event(s) in the record, ${guarded} of ${offered} writes 30 §3 forbids refused ` +
-          `at the write path, and the query returns 0, in ${ms}ms`,
+          `${mine} ${actor} event(s) in the record, ${looked} of them the declare of its own look, ` +
+          `${guarded} of ${offered} writes 30 §3 forbids refused at the write path, ${installs} of them installs, ` +
+          `and the query returns 0, in ${ms}ms`,
       );
       return undefined;
     }
@@ -263,7 +270,12 @@ export default async function slashActor(
     /* THE SENTENCE WRAPS, AND IT WRAPS INSIDE THE BACKTICKS. `30 §3` breaks the line between `NOT IN`
        and its list, so a pattern anchored on a single line matches nothing and the gate would report
        that the invariant is missing from the document that states it. Whitespace is collapsed first. */
-    const stated = /actor\s*=\s*'([a-z]+)'\s+AND\s+kind\s+NOT\s+IN\s*\(([^)]*)\)/.exec(section.replace(/\s+/g, ' '));
+    const flat = section.replace(/\s+/g, ' ');
+    const stated = /actor\s*=\s*'([a-z]+)'\s+AND\s+kind\s+NOT\s+IN\s*\(([^)]*)\)/.exec(flat);
+    /* THE ONE EXCEPTION, READ FROM THE SAME SENTENCE (ENG-A16): a `declare` of a look. A document that does not state
+       it leaves the query as it was, and the look planted below is then a row the query finds, which is the honest
+       answer for a tree whose document and write path disagree. */
+    const excepted = /AND\s+NOT\s*\(\s*kind\s*=\s*'([a-z]+)'\s+AND\s+target\s+LIKE\s+'([a-z.:%_]+)'\s*\)/.exec(flat);
 
     if (!stated) {
       findings.push("30 §3's query is not where this gate looks for it, so the invariant was read from nothing");
@@ -283,7 +295,8 @@ export default async function slashActor(
      */
     const QUERY =
       `SELECT id, kind FROM event WHERE actor = '${actor}' ` +
-      `AND kind NOT IN (${allowed.map((kind) => `'${kind}'`).join(',')})`;
+      `AND kind NOT IN (${allowed.map((kind) => `'${kind}'`).join(',')})` +
+      (excepted ? ` AND NOT (kind = '${excepted[1]}' AND target LIKE '${excepted[2]}')` : '');
 
     const kernel = await load(...KERNEL);
 
@@ -379,6 +392,38 @@ export default async function slashActor(
         () => record.decide(opened.value.id, { decide: { option: PROPOSAL.body.options[0].id, reason: 'the invoice names two lines' } }, actor),
       ]);
 
+    /**
+     * AND THE DECLARATIONS (ENG-A16). A model arranges a page with a look of its own, and the install signs that
+     * line `slash`; a page, a list, a rule, a script and an add-on are a person's to install.
+     *
+     * THE LOOK IS PLANTED FIRST, THROUGH THE INSTALL, on a page the seed came with, for the reason the proposal is
+     * made first: the exception in the query has to pass over a row that is there. THEN A PAGE AND A RULE ARE OFFERED
+     * AS SLASH. Each would write a `declare` line if it were accepted, and a line whose target is no look is one the
+     * query finds.
+     */
+    const page = sql.one("SELECT id FROM declaration WHERE kind = 'page' AND retired = 0 AND superseded_at IS NULL ORDER BY id LIMIT 1")?.id;
+    const titled = register === undefined ? undefined : (record.registers().get(register)?.title ?? Object.keys(row?.fields ?? {})[0]);
+    if (typeof page !== 'string' || !page.startsWith('page.')) {
+      findings.push('the materialised record holds no page, so there was nothing for a look of Slash\'s to arrange');
+    } else {
+      const on = page.slice('page.'.length);
+      try {
+        const put = await record.install([{ id: `look.${on}`, kind: 'look', body: { look: on, basis: 'gate', by: actor } }], undefined, { actor });
+        if (put?.ok) looked = 1;
+        else findings.push(`the record refused the one declaration 30 §3 lets ${actor} sign, a look of its own (${put?.refusal?.code ?? 'no code'}: ${put?.refusal?.fix ?? 'no reason given'})`);
+      } catch (e) {
+        findings.push(`installing ${actor}'s own look threw: ${e.message}`);
+      }
+      const declares = [
+        { id: 'page.gate-slash', kind: 'page', body: { page: 'gate-slash', title: 'Gate', blocks: [{ kind: 'table', source: `register.${register}`, heading: 'All', columns: [{ field: titled }] }] } },
+        { id: 'rule.gate-slash', kind: 'rule', body: { rule: 'gate-slash', on: { written: { register, op: ['create'] } }, once_per: ['entry'], steps: [{ notify: { say: 'A rule no model may install.' } }] } },
+      ];
+      for (const one of declares) {
+        offers.push(['declare', () => record.install([one], undefined, { actor }), one.kind]);
+        installs++;
+      }
+    }
+
     offered = offers.length;
 
     const accepted = [];
@@ -387,10 +432,13 @@ export default async function slashActor(
     if (row === undefined) {
       findings.push('the materialised record holds no row, so there was nothing to offer a write against');
     } else {
-      for (const [kind, offer] of offers) {
+      for (const [kind, offer, of] of offers) {
         try {
-          const out = offer();
+          const out = await offer();
           if (out?.ok) accepted.push(kind);
+          /* A DECLARATION REFUSED FOR ANOTHER REASON NEVER REACHED THE GUARD, and that is this gate's own offer gone
+             stale, said out loud: the page or the rule it hands over has to be one a person could install. */
+          else if (of !== undefined) findings.push(`offering ${actor} an install of a ${of} was refused before 30 §3's guard (${out?.refusal?.code ?? 'no code'}: ${out?.refusal?.fix ?? 'no reason given'})`);
           else elsewhere.push(`${kind} (${out?.refusal?.code ?? 'no code'})`);
         } catch (e) {
           /* AND THE THROW HAS TO BE THE RIGHT THROW. `catch {}` counting as a refusal is how a gate

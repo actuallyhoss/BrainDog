@@ -1664,5 +1664,34 @@ and the two documents in the same change, or `plans.test.ts` and `plans-docs.tes
 
 ---
 
+## ADR-072 · Slash signs the declare of its own look, and no other declaration
+
+**Decided.** Slash signs `suggest`, `propose` and `predict`, and one thing more: the `declare` line of a look
+whose body says `by: slash` and which no add-on carries. A look arranges a page that already exists. It adds no
+page, no list, no rule and no script, and it is versioned, so Undo puts back the one before. A page, a list, a
+rule, a script and an add-on are a person's to install and to retire, and an install or a retire signed `slash`
+of any of them is refused before its line is written, inside the transaction, so nothing of it lands
+(`slashMayWrite` in `packages/kernel/src/slash.ts`, called by the install and the retire).
+
+**A fold is never Slash's.** A fold of two entries made in the top band of understanding, where the model's
+score says the two are certain, is signed by the record itself, as a fold by the strong rules is, and names the
+model's score in its note. Slash signs no fold.
+
+[30-BLUEPRINT](30-BLUEPRINT.md) §3 states the invariant as a query with this one exception, the `slash-actor`
+gate reads the query from there, and [46-SPEC-SLASH](46-SPEC-SLASH.md) says the same list.
+
+**Why.** The owner's words: "Model (spark) may only write suggest/propose/predict events; enforced in kernel."
+A model arranges a page, and that install was signed `slash` with a plain insert the guard never saw, so the
+first look a model wrote broke the invariant with nothing saying so, and a page installed as Slash would have
+been written the same way.
+
+**Rejected:** signing a look as `system`, because the feed would then not say a model arranged the page;
+letting Slash sign any look, because the body's `by:` is what stops it signing the owner's arrangement.
+
+**Would reverse it:** the owner's word. A new kind Slash may sign is one line in `SLASH_MAY`, this decision and
+the query in 30 §3, in the same change.
+
+---
+
 *Next: [17-OPEN-QUESTIONS](17-OPEN-QUESTIONS.md).*
 

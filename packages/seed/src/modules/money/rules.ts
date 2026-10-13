@@ -2,6 +2,7 @@
 
 import type { SeedRule } from '../base.ts';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
+import { SETTLE_SCRIPT } from './scripts/settle.js';
 
 /**
  * WHICH FILING RULES MAY FILE AN ENTRY, as `link.to.where` over `filing_rules`, filled from the entry being filed: the
@@ -205,4 +206,33 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
      automation here acts on it. It fetches nothing, so the record does not count it as a feed (`feedsOn` in
      `packages/kernel/src/signs.ts`). */
   LAST_DAY_SCRIPT,
+  /**
+   * PAID IS WHAT A PAYMENT DID (REC-B11 step 4): a Ledger entry that names a bill in "Settles" starts `script.settle`,
+   * which counts every payment naming that bill and writes "Paid so far", part or paid, and the day (`scripts/settle.js`).
+   * Until this rule the script was in no pack document, and the four fields it fills were filled by a person.
+   *
+   * A RULE AND A SCRIPT, NOT A `set`, because the sum is over other entries and the grammar a rule fills a field with has
+   * no arithmetic. Both halves arrive together, as Work's do: a rule whose script is missing fails every run it starts.
+   *
+   * ON A WRITE TO "Settles" OR TO THE STATUS, AND ONLY FOR MONEY THAT HAS CLEARED. A pending entry has paid nothing yet
+   * and starts the script the day it clears; an edit to an entry's words starts nothing. No `once_per`, since an entry
+   * moved from one bill to another is a new thing to count, and a second run for the same entry writes nothing twice:
+   * the script counts, it does not add.
+   *
+   * BOTH THINGS ARE HANDED BY THEIR IDS, the only name a step can fill in: an entry holds the bill it settles as an id,
+   * and nothing a run fills says a handle ("obligations#4").
+   *
+   * NO `next`, BECAUSE A BILL HAS NONE. It is the day a repeating line moves to, and nothing links a payment to a
+   * repeating line or an instalment yet: "Settles" points at Bills alone. So "Paid by", "Last paid" and "Last amount"
+   * are still filled by nobody, and when a link to a repeating line lands its rule hands `next` from the walk.
+   */
+  {
+    rule: 'payment-settles',
+    name: 'Mark a bill paid by its payment',
+    pack: 'money-core',
+    on: { written: { register: 'transactions', op: ['create', 'update'], fields: ['settles', 'state'] } },
+    when: 'settles is set, state is cleared',
+    steps: [{ script: { id: 'settle', as: 'settling', input: { payment: '{{trigger.entry}}', item: '{{trigger.row.settles}}' } } }],
+  },
+  SETTLE_SCRIPT,
 ];

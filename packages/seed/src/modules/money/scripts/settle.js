@@ -130,18 +130,26 @@ export function settle(item, payment, opts) {
 }
 
 /**
- * The script: `input.payment` and `input.item` are the two things as a rule names them ("transactions#12",
- * "recurring#7"), and `input.next` the day a repeating line moves to. It reads both, asks `settle`, and either makes the
+ * The script: `input.payment` and `input.item` are the two things as a person names them ("transactions#12",
+ * "recurring#7") or as a rule hands them, by id, since a rule's step can fill in an id and no handle; and `input.next`
+ * the day a repeating line moves to. It reads both, asks `settle`, and either makes the
  * changes at the versions it read or ends its run with the one question.
  *
  * A BILL'S "PAID SO FAR" IS COUNTED, NOT ADDED TO. Every payment that names the bill in "Settles" is read and summed,
  * this one left out and then put in, so a run started twice for one payment, or for a payment a person linked by hand
- * before the rule fired, writes the same sum and never the sum plus one more.
+ * before the rule fired, writes the same sum and never the sum plus one more. ONLY MONEY THAT HAS CLEARED IS COUNTED:
+ * a pending or void entry that names the bill has paid nothing yet.
  */
 export default async function run(ctx) {
   const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
-  const named = (spoken) => (typeof spoken === 'string' && /^[a-z_]+#\d+$/.test(spoken) ? spoken : null);
-  const [paymentAt, itemAt] = [named(input.payment), named(input.item)];
+  const named = async (said) => {
+    if (typeof said !== 'string' || said === '') return null;
+    if (/^[a-z_]+#\d+$/.test(said)) return said;
+    if (!/^[0-9A-Za-z_-]+$/.test(said)) return null;
+    const row = await ctx.record.get(said);
+    return row && typeof row.register === 'string' && Number.isSafeInteger(row.seq) ? `${row.register}#${row.seq}` : null;
+  };
+  const [paymentAt, itemAt] = [await named(input.payment), await named(input.item)];
   if (!paymentAt || !itemAt || !paymentAt.startsWith('transactions#')) {
     ctx.log('The script was handed no payment or nothing for it to pay, so nothing was marked paid.');
     return null;
@@ -167,7 +175,7 @@ export default async function run(ctx) {
     for (const other of others) {
       const m = other.fields.amount;
       /* ONE CURRENCY ONLY: a payment in another is left out of the sum rather than added to it. */
-      if (other.id === payment.id || !m || m.currency !== currency || !Number.isSafeInteger(m.amount)) continue;
+      if (other.id === payment.id || other.fields.state !== 'cleared' || !m || m.currency !== currency || !Number.isSafeInteger(m.amount)) continue;
       opts.before += m.amount;
     }
   }

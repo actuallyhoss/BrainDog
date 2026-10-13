@@ -230,4 +230,8 @@ test('a list’s first look is its baseline, a row that arrives after it is mark
   assert.equal(a.next(), null);
   a.forget();
   assert.deepEqual([...a.see('tasks', ['9'])], [], 'forgotten, the next look is a baseline again');
+  /* A FIRST LOOK WITH NO ROWS IS NOT THE BASELINE (look-left-60): the answer that fills it marks nothing, and a row after it is marked. */
+  assert.deepEqual([...a.see('ledger', [])], []);
+  assert.deepEqual([...a.see('ledger', ['1', '2', '3'])], [], 'a list filled after an empty first look is not a list of arrivals');
+  assert.deepEqual([...a.see('ledger', ['4', '1', '2', '3'])], ['4']);
 });

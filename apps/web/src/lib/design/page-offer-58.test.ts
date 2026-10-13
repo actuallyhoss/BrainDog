@@ -126,7 +126,7 @@ test('THE COMPACT FORM IS ONE LINE: the sentence and a way to open it, and nothi
   assert.doesNotMatch(css, /box-shadow|gradient|backdrop-filter/u);
 });
 
-test("THE CARD ON A LIST'S OWN SCREEN IS UNCHANGED: whole, with its drawing and its two presses", () => {
+test('THE CARD WITHOUT compact IS DRAWN WHOLE: with its drawing and its two presses', () => {
   assert.ok(ledger);
   const html = render(OfferCard, { props: { item: ledger, acts } }).body;
   for (const said of [offerWords.noticed, ledger.why, offerWords.make, offerWords.notNow, 'offer-mini']) assert.ok(html.includes(said), said);

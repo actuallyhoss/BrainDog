@@ -42,6 +42,8 @@ const CASES: [string, unknown][] = [
 test('COST_SQL GIVES costOf’S BAND FOR EVERY BODY, a body that is not an object included', () => {
   const sql = openSqlite();
   sql.exec('CREATE TABLE suggestion (body_kind TEXT, body TEXT)');
+  /* COST_SQL READS WHICH FIELDS THE HISTORY WITHHOLDS off the lists' declarations, so the table has to be there. */
+  sql.exec('CREATE TABLE declaration (id TEXT, version INTEGER, kind TEXT, body TEXT, retired INTEGER, superseded_at TEXT)');
   const bodies: [string, string][] = [
     ...CASES.map(([kind, body]): [string, string] => [kind, JSON.stringify(body)]),
     ...['rowset', 'change', 'pack', 'settings', 'arrange', 'pattern', 'options'].flatMap((kind): [string, string][] => [

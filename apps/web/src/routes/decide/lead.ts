@@ -105,7 +105,7 @@ export const suggestedOf = (q: Pick<Question, 'options'> | undefined): string | 
  * "Eight questions wait on you. The first one is hard to undo." How many wait, and then the one thing worth knowing
  * before reading them: which are hard to undo, or else what the first suggests, with who asked it when that is known.
  * RED IS ONLY FOR WHAT IS LATE, a question that has waited past the record's `lateDays` ("two of them for over two weeks"); a count is
- * never the trouble, and the queue keeps no quota to be over. Questions come dearest first, so the hard ones lead.
+ * never the trouble, and the queue keeps no quota to be over. The queue ranks by wait, then band: the hard ones need not lead.
  * NOTHING WAITING IS NOT A SENTENCE: the screen's cleared state already says it, with when the last one was decided.
  */
 export function sentenceOf(

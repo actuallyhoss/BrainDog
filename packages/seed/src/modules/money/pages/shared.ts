@@ -89,5 +89,9 @@ export const DUE_30D = `${OPEN}, due after yesterday, due before +31d`;
  * by its own direction, newest first. It was a table of five columns, which is a spreadsheet on the one page everybody
  * reads; which account and what it was for are on the row, a tap away. THE AMOUNT KEEPS EVERY MINOR UNIT, because this
  * is the ledger and a ledger is exact: only a headline drops `.00`.
+ *
+ * THE SIGN IS HOW A ROW SAYS ITS WAY, AND IT IS THE ONLY PLACE IT CAN. A timeline draws three cells, the day, the name
+ * and one detail, so a fourth column for the word would never be drawn: money out reads `−` before its amount and money
+ * in reads `+`, from the Ledger's own Which way. `test/money-moved-way.test.ts` holds it on Money and on a book.
  */
 export const MOVED_COLUMNS = [{ field: 'on' }, { field: 'what' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }];

@@ -434,6 +434,19 @@ export type Diff = {
    */
   kept: { id: string; adds?: string[]; rebased?: string }[];
   /**
+   * What this version adds to a page the owner changed, which the install keeps as the owner left it: the title, when
+   * the update gives the page another one, and each block the update's page has that the page the edit started from
+   * and the owner's page both lack. Absent when no kept page misses anything.
+   *
+   * SAID, BECAUSE A KEPT PAGE WAS KEPT SILENTLY. Founder 2.6.0 over a Home somebody had rearranged installed, and the
+   * Late table and the title Today, the two things the version was written for, reached nobody: Decide said the page
+   * was kept and not what it went without. One question for the whole update (`keptQuestion`), never one a page.
+   *
+   * ONLY WHAT IS ADDED. A block the update rewrites in place is on the owner's page already, in the shape they kept,
+   * and one the owner took off before is not offered back: it was in the body the edit started from.
+   */
+  brings?: Brought[];
+  /**
    * The enum values this version takes off a list that holds rows, which stay on it: `values` names each as
    * `<field>.<value>`, laid after the update's own values with the label the list had for it.
    *
@@ -584,6 +597,12 @@ export type Diff = {
 /** `handed` is how many declarations this install gave to another pack, and is absent when it gave none. */
 /** `refreshed` is how many rows it planted before this update went over, when it went over any. */
 export type Applied = { pack: string; version: string; declarations: number; seeds: number; retired: number; handed?: number; refreshed?: number };
+/** One kept page and what this version adds that it lacks (`Diff.brings`): a block by its kind and its heading. */
+export type Brought = { id: string; title?: string; blocks: { kind: string; heading?: string }[] };
+
+/** The one question an update asks about the pages it kept: `pages` are the ids, and `line` is what Decide says. */
+export type KeptQuestion = { about: string; line: string; pages: string[] };
+
 export type Retired = { pack: string; declarations: number; rows_kept: Record<string, number> };
 
 /**
@@ -1616,6 +1635,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
   const changes: Diff['changes'] = [];
   const conflicts: Diff['conflicts'] = [];
   const kept: Diff['kept'] = [];
+  const brings: Brought[] = [];
   const stays: Diff['stays'] = [];
   const retypes: Diff['retypes'] = [];
   const newlyRequired: Diff['newly_required'] = [];
@@ -1656,6 +1676,10 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
          as well. One comparison with the body the edit started from closes it. */
       if (decl.kind !== 'register' || edited.body === decl.canonical) {
         kept.push({ id: decl.id });
+        /* AND WHAT THE OWNER'S PAGE GOES WITHOUT IS NAMED (`Diff.brings`), so Decide asks once instead of keeping
+           the page and saying nothing of the table the update was written for. */
+        const more = decl.kind === 'page' ? broughtTo(decl.id, edited.body, already.body, decl.body) : null;
+        if (more !== null) brings.push(more);
         continue;
       }
       /* UNLESS ALL THE OWNER DID WAS ADD. The arm above locked a list against its pack for good the moment somebody added
@@ -1968,6 +1992,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     retires,
     conflicts,
     kept,
+    ...(brings.length === 0 ? {} : { brings }),
     stays,
     extends: extensions,
     ...(pageAdds === undefined ? {} : { page_adds: pageAdds }),
@@ -2327,6 +2352,80 @@ export function conflictFault(diff: Pick<Diff, 'pack' | 'installed_version' | 'c
       ? `${pack} ${diff.pack.version} adds a field called ${first.field} to ${who}, and you added one with that id already. Two fields cannot share an id, so for now, ${stay}.`
       : `${pack} ${diff.pack.version} changes ${names(first.id)}, which you changed: kept as you left it, it would lack what the update adds to it. For now, ${stay}.`;
   return { code: 'PROVIDES_CONFLICT', fix, at: first.id };
+}
+
+/**
+ * What `next`, the update's page, adds that the owner's page lacks, or `null` when it adds nothing they miss.
+ *
+ * AGAINST BOTH THE BODY THE EDIT STARTED FROM AND THE OWNER'S OWN. The first says what the update added, and without it
+ * a block the owner took off would be offered back at every update. The second leaves out what the owner has already,
+ * since somebody who wrote their own Late table is not told they lack one. A block is known by its kind and heading,
+ * and one with no heading by all it says. Bodies are JSON text as the record holds them; one that does not parse
+ * brings nothing, because a plan never throws over what it was handed.
+ */
+function broughtTo(id: string, before: string, owner: string, next: Readonly<Record<string, Json>>): Brought | null {
+  const read = (text: string): Record<string, Json> | null => {
+    try {
+      const body = JSON.parse(text) as Json;
+      return typeof body === 'object' && body !== null && !Array.isArray(body) ? body : null;
+    } catch {
+      return null;
+    }
+  };
+  const was = read(before);
+  const theirs = read(owner);
+  if (was === null || theirs === null) return null;
+  const blocksOf = (body: Readonly<Record<string, Json>>): Record<string, Json>[] =>
+    Array.isArray(body.blocks) ? body.blocks.filter((b): b is Record<string, Json> => typeof b === 'object' && b !== null && !Array.isArray(b)) : [];
+  const keyOf = (b: Record<string, Json>): string => (typeof b.heading === 'string' && b.heading !== '' ? `${String(b.kind)} ${b.heading}` : jcs(b));
+  const had = new Set([...blocksOf(was), ...blocksOf(theirs)].map(keyOf));
+  const blocks = blocksOf(next)
+    .filter((b) => !had.has(keyOf(b)))
+    .map((b) => ({ kind: String(b.kind), ...(typeof b.heading === 'string' && b.heading !== '' ? { heading: b.heading } : {}) }));
+  const title = typeof next.title === 'string' && next.title !== was.title && next.title !== theirs.title ? next.title : undefined;
+  return title === undefined && blocks.length === 0 ? null : { id, ...(title === undefined ? {} : { title }), blocks };
+}
+
+/** A block's kind as a person says it. The rest are "block": `bar` and `lines` are the format's words, not theirs. */
+const BLOCK_WORDS: Readonly<Record<string, string>> = { table: 'table', note: 'note', link: 'link', cards: 'cards', stat: 'figures' };
+/** The words above that are already many, and so take no "a" when a block has no heading: "adds cards", never "a cards". */
+const BLOCK_MANY: ReadonlySet<string> = new Set(['cards', 'figures']);
+/** The most blocks one page's sentence names before it counts the rest. The title is always said. */
+const BROUGHT_NAMED = 3;
+
+/** One block as the sentence says it: "the Late table", "a table" with no heading, and never "the Late table table". */
+function broughtWord(block: { kind: string; heading?: string }): string {
+  const word = BLOCK_WORDS[block.kind] ?? 'block';
+  if (block.heading === undefined) return BLOCK_MANY.has(word) ? word : an(word);
+  return block.heading.toLowerCase().endsWith(` ${word}`) ? `the ${block.heading}` : `the ${block.heading} ${word}`;
+}
+
+/**
+ * The one question an update raises about the pages it kept as the owner changed them, or `null` when none of them
+ * lacks anything this version adds.
+ *
+ * ONE FOR THE UPDATE, HOWEVER MANY PAGES. It says what each kept page goes without, by the block's heading and the
+ * title's own word, and that the page is kept either way, so the choice is the owner's and never made for them:
+ * "Founder 2.6.0 adds the Late table and the title Today to Home, which you changed." `names` says a pack and a
+ * page as the reader knows them, as it does for `conflictFault`.
+ */
+export function keptQuestion(diff: Pick<Diff, 'pack' | 'brings'>, names: (id: string) => string = (id) => id): KeptQuestion | null {
+  const brings = diff.brings ?? [];
+  if (brings.length === 0) return null;
+  const pack = `${names(diff.pack.id)} ${diff.pack.version}`;
+  const said = brings.map((b) => {
+    /* THE TITLE IS NEVER COUNTED AWAY. Folded into "3 more" with the blocks, the one thing that renames the page in the
+       rail was the thing the sentence dropped, and "more" said more of nothing. */
+    const blocks = [...new Set(b.blocks.map(broughtWord))];
+    const named = blocks.length > BROUGHT_NAMED ? [...blocks.slice(0, BROUGHT_NAMED - 1), `${blocks.length - (BROUGHT_NAMED - 1)} more blocks`] : blocks;
+    return `${joined([...named, ...(b.title === undefined ? [] : [`the title ${b.title}`])])} to ${names(b.id)}`;
+  });
+  const one = brings.length === 1;
+  return {
+    about: `${pack} adds to ${one ? 'a page' : 'pages'} you changed`,
+    line: `${pack} adds ${said.join(', and ')}, which you changed. ${one ? 'Your page is' : 'Your pages are'} kept as you left ${one ? 'it' : 'them'}. Take the update's ${one ? 'page' : 'pages'}, or keep yours.`,
+    pages: brings.map((b) => b.id),
+  };
 }
 
 const joined = (items: readonly string[]): string =>

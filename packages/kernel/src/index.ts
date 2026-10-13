@@ -147,7 +147,7 @@ import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provis
 import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
-import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, waitParams, waitRank, type Cost } from './weigh.ts';
+import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts } from './pages.ts';
@@ -414,7 +414,7 @@ export { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 /* THE COST BAND, exported because `/decide` computes it in the browser off the same raw rows: it
    reads `governance` directly rather than through `governance.open`, and two rankings of one queue
    that disagreed would be worse than no ranking at all. */
-export { COSTS, MANY_ROWS, WAITS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, waitOf, waitParams, waitRank, waitRows, worseCost, type Cost, type Wait } from './weigh.ts';
+export { COSTS, MANY_ROWS, WAITS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, waitOf, waitParams, waitRank, waitRows, worseCost, type Cost, type CostRows, type Wait } from './weigh.ts';
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
 export { clockOf, isMoneyFormat, verdictOf } from './metrics.ts';
 export { readDeclaredSigns, vitalOf } from './metrics.ts';
@@ -2814,7 +2814,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     for (const one of installed) {
       if (!one.changed) continue;
-      const now = sql.one<{ kind: string; body: string }>('SELECT kind, body FROM declaration WHERE id = ? AND version = ?', one.id, one.version);
+      const now = sql.one<{ kind: string; body: string; pack: string | null }>('SELECT kind, body, pack_id AS pack FROM declaration WHERE id = ? AND version = ?', one.id, one.version);
+      /* SLASH SIGNS THE DECLARE OF ITS OWN LOOK AND NO OTHER (ENG-A16). Inside the install's transaction, so the throw
+         takes the version with it. */
+      slashMayWrite(by.actor, 'declare', now);
       const was = sql.one<{ version: number; body: string }>(
         'SELECT version, body FROM declaration WHERE id = ? AND version < ? ORDER BY version DESC LIMIT 1',
         one.id,
@@ -5854,7 +5857,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const shows = showsOf(one.shows);
       return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true, ...(shows ? { shows } : {}) }];
     });
-    const does = doesOf(kind, body, { list: (id) => registers.get(id)?.name ?? null, pack: packName, row: titleOfRow });
+    const does = doesOf(kind, body, {
+      list: (id) => registers.get(id)?.name ?? null,
+      pack: packName,
+      row: titleOfRow,
+      /* A FIELD BY THE LABEL THE RECORD SHOWS, so what leaves with a call reads "Due on" from the list and not from its id. */
+      field: (list, field) => registers.get(list)?.fields.find((f) => f.id === field)?.label ?? null,
+    });
     /* THE NAMES A MERGE QUESTION IS ABOUT, each checked on the way out as an option is: a handle, a name, and at most a
        few words of where they were seen. */
     const candidates: QueueCandidate[] = (Array.isArray(body.candidates) ? (body.candidates as unknown[]) : []).flatMap((c) => {
@@ -5874,7 +5883,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       why: typeof body.context === 'string' ? body.context : '',
       /* MONEY IS ALWAYS HARD TO UNDO, so a card that moves it is never accepted with Enter (`BAND_SQL` ranks it so, as
          `costOf` does). The floor is asked as well, since it reads a money field cleared, which no body spells. */
-      cost: facts.money !== undefined || movesMoney(r, kind, body) ? 'undo' : costOf(kind, body),
+      cost: facts.money !== undefined || movesMoney(r, kind, body) ? 'undo' : costOf(kind, body, costRows(sql)),
       options,
       ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),
       body_kind: kind,
@@ -9555,7 +9564,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (refused) return refused;
       const out = transaction(() => {
         const live = [...new Set(ids)].flatMap((id) => {
-          const hit = sql.one<{ version: number }>('SELECT version FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', id);
+          const hit = sql.one<{ version: number; kind: string; body: string; pack: string | null }>(
+            'SELECT version, kind, body, pack_id AS pack FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0',
+            id,
+          );
+          /* A RETIRE IS A DECLARE LINE TOO, so Slash takes off its own look and nothing else, before anything is retired. */
+          if (hit && by?.actor !== undefined) slashMayWrite(by.actor, 'declare', hit);
           return hit ? [{ id, version: hit.version }] : [];
         });
         const done = retireDeclarations(sql, ids, transaction);

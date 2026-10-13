@@ -17,7 +17,7 @@ Eleventh in the build order of [31-STACK](31-STACK.md) §2. Mode: ponytail. Clea
 | Answers the palette's fallback row | `read` then `propose`: one predicate, one projection, one proposal with verbs. Never a transcript (ADR-051) |
 | Validates every output before it exists | schema, then citations: a proposal that types a digit is refused (23 §5) |
 | Dispatches tier C | the runner's WebSocket, the claim, the lease, the `seq` high-water mark, the cancel flag — bridged to the record's JOBS group (30 §5, 33 §11) |
-| **Refuses to write a row** | its only write RPC is `record.propose(…)`, and its actor is `slash`. `event WHERE actor='slash' AND kind NOT IN ('suggest','propose','predict')` is empty, always (30 §3) |
+| **Refuses to write a row** | its only write RPC is `record.propose(…)`, and its actor is `slash`. `event WHERE actor='slash' AND kind NOT IN ('suggest','propose','predict') AND NOT (kind = 'declare' AND target LIKE 'declaration:look.%')` is empty, always (30 §3). The one declaration it signs is a look that says it is its own; a page, a list, a rule, a script and an add-on are never Slash's, and it signs no fold (ADR-072) |
 
 Three boundaries, each structural rather than policed:
 
@@ -1162,7 +1162,7 @@ and not this package's:
 
 | Gate | This package's obligation |
 |---|---|
-| `slash-actor` | `event WHERE actor = 'slash' AND kind NOT IN ('suggest','propose','predict')` is empty over every fixture after every job and palette test has run |
+| `slash-actor` | `event WHERE actor = 'slash' AND kind NOT IN ('suggest','propose','predict') AND NOT (kind = 'declare' AND target LIKE 'declaration:look.%')` is empty over every fixture after every job and palette test has run: a look that says it is Slash's is the one declaration it signs, and an install of a page or a rule as Slash is refused |
 | `secret-grep` | no string in `prompts.ts` or a log line matches a `grant` plaintext pattern |
 | `refusal-fixtures` | `fixtures/refusals/{proposal-uncited,proposal-no-rows,proposal-schema,prediction-unmeasurable,slash-budget-spent}.yaml` produce their codes |
 | the no-model e2e row | `SLASH_ENDPOINT` unset: every Playwright suite passes; `/api/version` says `slash: false`; no palette row, no *Propose a pattern*, no *Ask Slash*; deterministic pages byte-identical to the loaded build |

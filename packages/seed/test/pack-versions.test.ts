@@ -887,9 +887,10 @@ const DECLARED: Record<string, Version> = {
       rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
       setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
     `,
-    declares: '7cccb015ec1bb242',
+    declares: 'a593ca243fd01b37',
     history: [
       "`register.services`'s `kind` gains `server`, `database`, `storage` and `network` with their labels -> 7cccb015ec1bb242",
+      "Folded into the unreleased 2.2.0 (sketchpad-60; integrate 60): `project-cost` reads only services whose cost is set, so a project whose services say no cost draws no Costs a year where it drew 0; no id added or taken away -> a593ca243fd01b37",
     ],
   },
   /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
@@ -1446,13 +1447,13 @@ const DECLARED: Record<string, Version> = {
       register.accounts register.balances register.books register.categories register.filing_rules register.fx register.installments register.obligations
       register.recurring register.snapshots register.transactions
       rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
-      rule.recurring-stopped rule.txn-categorise
-      script.last_day
+      rule.recurring-stopped rule.txn-categorise rule.payment-settles
+      script.last_day script.settle
       setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '741a7d2695f49170',
+    declares: '037bb14f0cdae30f',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1461,6 +1462,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (filedby-use-57-58; integrate 58): `txn-categorise` files by each text in one link step that writes the rule's category and, with it, the rule into `filed_by` (`also`), so a rule whose category is retired or gone writes neither -> ccdc10025b479aee",
       "Folded into the unreleased 3.17.0 (seed-58, the look of 13 October, fault F; integrate 58): `page.money` gains a lead line for a record with two books or more, how many books and accounts the money is kept in, and loses the line for no balance typed, which was added in this same unreleased step, so the page still declares 24 blocks; no id added or taken away -> 24bb2fb8ce5c5a98",
       "Folded into the unreleased 3.17.0 (ledger-tile-59, REC-B15; bad-phrase-59; integrate 59): the Ledger tile on Money, six newest entries open on the page before Heads up, drawn once `ledger-newest-days` has a value, and History gives up What moved, so the page still declares 24 blocks; the two late lines on Heads up say `{{bad:past their due date}}`, the same words in the danger colour; no id added or taken away -> 741a7d2695f49170",
+      "Folded into the unreleased 3.17.0 (settle-rule-60, REC-B11; integrate 60): a payment marks the bill it pays. `script.settle` is registered and `rule.payment-settles` starts it when a Ledger entry that names a bill in Settles has cleared, handing both by their ids, which the script now reads as well as a handle; the sum counts cleared entries alone. A rule and a script added -> 037bb14f0cdae30f",
     ],
   },
   'work@1.17.0': {

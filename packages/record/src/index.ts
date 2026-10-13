@@ -21,8 +21,12 @@ import { lintRound, pagesCleanReading } from './page-lint.ts';
 import { fileRecordSigns } from './signs.ts';
 import {
   handedOf,
+  keptQuestion,
+  labelsOf,
   plan,
+  stagedBatch,
   uninstall,
+  type Brought,
   type Host,
   type Installed,
   type PackSource,
@@ -34,7 +38,7 @@ import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
-import { rememberedLine, type Remembered } from '@braindog/kernel';
+import { costRows, rememberedLine, type Remembered } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
 import type { ViewRow } from '@braindog/kernel';
@@ -2518,6 +2522,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     installed: () => installedState(),
     host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
     shelf: deps.catalogueShelf,
+    kept: (pack, diff, packSaid) => void keptAsk(pack, diff, packSaid),
   });
 
   /** The caller's own read of each list, which is all of the record Slash is handed for her (`readUsage`). */
@@ -3241,6 +3246,100 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * AN UPDATE THAT KEPT A PAGE THE OWNER CHANGED ASKS ONE QUESTION ABOUT WHAT THE PAGE GOES WITHOUT (declare-edited-page-60).
+   *
+   * THE NIGHT PUTS SUCH AN UPDATE IN UNASKED, since a kept page loses nothing (`@braindog/seed` `losses`), and the page
+   * stayed as the owner left it with nothing said: Founder 2.6.0 over a Home somebody had rearranged went in, and the
+   * Late table and the title Today reached nobody. So once the update is in, what `declare`'s plan says the kept pages
+   * lack (`Diff.brings`) is asked about, once for the whole update (`keptQuestion`), with two answers: keep mine, or
+   * take the update's page.
+   *
+   * THE UPDATE'S OWN PAGE IS KEPT BESIDE THE QUESTION, as the install would have staged it, because a kept page is never
+   * staged and nothing else in the record holds this version's body of it. A take stages it under the add-on, signed by
+   * whoever answered, so the page is the add-on's again and its next update reaches it. A KEEP IS REMEMBERED BY WHAT WAS
+   * OFFERED, each block and title by page, so the next version does not ask about the same table under its own name.
+   */
+  const KEPT_HOLDER = 'braindog:updates:kept';
+  const KEPT_DECLINED = 'declined';
+  type KeptAsked = { pack: string; version: string; pages: { id: string; body: unknown }[]; brings: Brought[] };
+  const broughtKeys = (b: Brought): string[] => [...b.blocks.map((k) => `block:${k.kind}:${k.heading ?? ''}`), ...(b.title === undefined ? [] : [`title:${b.title}`])];
+  const keptDeclined = (): Record<string, string[]> => {
+    const held = kernel.prefsOf(KEPT_HOLDER)[KEPT_DECLINED];
+    if (held === null || typeof held !== 'object' || Array.isArray(held)) return {};
+    return Object.fromEntries(Object.entries(held as Record<string, unknown>).map(([id, keys]) => [id, Array.isArray(keys) ? keys.filter((k): k is string => typeof k === 'string') : []]));
+  };
+  /** A page as its owner knows it, "your Overview page", from the body the record holds now. */
+  const ownPageSaid = (id: string): string => {
+    const held = kernel.declarations().find((d) => d.id === id)?.body as unknown;
+    let body: unknown = held;
+    try {
+      if (typeof held === 'string') body = JSON.parse(held);
+    } catch {
+      body = null;
+    }
+    const title = (body as { title?: unknown } | null)?.title;
+    return typeof title === 'string' && title !== '' && !title.includes('{{') ? `your ${title} page` : 'a page of yours';
+  };
+  /** File the one question for an update that is in, and answer its sentence for the night's log, or `null` for none. */
+  const keptAsk = (pack: Parameters<typeof plan>[0], diff: Awaited<ReturnType<typeof plan>>, packSaid: (id: string) => string): string | null => {
+    const declined = keptDeclined();
+    const brings = (diff.brings ?? []).flatMap((b): Brought[] => {
+      const left = new Set(declined[b.id] ?? []);
+      const blocks = b.blocks.filter((k) => !left.has(`block:${k.kind}:${k.heading ?? ''}`));
+      const title = b.title !== undefined && !left.has(`title:${b.title}`) ? b.title : undefined;
+      return blocks.length === 0 && title === undefined ? [] : [{ id: b.id, ...(title === undefined ? {} : { title }), blocks }];
+    });
+    const id = pack.manifest.pack;
+    const q = keptQuestion({ pack: diff.pack, brings }, (x) => (x === id ? packSaid(x) : ownPageSaid(x)));
+    if (q === null) return null;
+    /* THE PAGE AS THIS VERSION WOULD HAVE STAGED IT, settings filled in: the plan's own batch with the page not kept. */
+    const staged = stagedBatch(pack, { ...diff, kept: diff.kept.filter((k) => !q.pages.includes(k.id)) });
+    const pages = q.pages.flatMap((page) => staged.filter((d) => d.id === page && d.pack === id).slice(0, 1).map((d) => ({ id: d.id, body: d.body as unknown })));
+    if (pages.length === 0) return null;
+    const one = pages.length === 1;
+    const put = kernel.propose(
+      {
+        question: q.line,
+        body_kind: 'options',
+        body: {
+          about: aboutOf(q.about),
+          options: [
+            { id: 'keep', label: one ? 'Keep my page' : 'Keep my pages', because: `${one ? 'Your page stays' : 'Your pages stay'} as you left ${one ? 'it' : 'them'}, and what this version adds is not asked about again.` },
+            { id: 'take', label: one ? "Take the update's page" : "Take the update's pages", because: `${one ? 'Your page is' : 'Your pages are'} replaced by the update's, and your own arrangement of ${one ? 'it' : 'them'} is not put back by Undo.` },
+          ],
+        },
+      },
+      'system',
+    );
+    if (!put.ok) return null;
+    kernel.setPref(KEPT_HOLDER, put.value.id, { pack: id, version: diff.pack.version, pages, brings } satisfies KeptAsked);
+    return `${q.about}, and that is asked about on Decide.`;
+  };
+  /**
+   * The question answered. `take` stages the update's page under its add-on, for each page still the owner's own edit of
+   * that add-on's page; anything else, a dismissal too, keeps the pages and remembers what was offered. A take the record
+   * refuses answers its refusal, and `decide` opens the question again with it.
+   */
+  const keptAnswered = async (id: string, option: string | null, actor: string): Promise<Result<null>> => {
+    const asked = kernel.prefsOf(KEPT_HOLDER)[id] as KeptAsked | undefined;
+    if (asked === undefined || typeof asked.pack !== 'string' || !Array.isArray(asked.pages)) return ok(null);
+    if (option === 'take') {
+      const theirs = new Map(kernel.detached().map((d) => [d.id, d.was]));
+      const batch = asked.pages.filter((page) => theirs.get(page.id) === asked.pack).map((page) => ({ id: page.id, kind: 'page', body: page.body, pack: asked.pack }));
+      if (batch.length > 0) {
+        const put = await kernel.install(batch as never, undefined, { actor, suggestion: id });
+        if (!put.ok) return 'refusal' in put ? { ok: false, refusal: put.refusal } : no('VERSION_STALE', 'The record moved while the page was taken. Answer it again.', { at: 'id' });
+      }
+    } else {
+      const declined = keptDeclined();
+      for (const b of Array.isArray(asked.brings) ? asked.brings : []) declined[b.id] = [...new Set([...(declined[b.id] ?? []), ...broughtKeys(b)])];
+      kernel.setPref(KEPT_HOLDER, KEPT_DECLINED, declined);
+    }
+    kernel.setPref(KEPT_HOLDER, id, null);
+    return ok(null);
+  };
+
+  /**
    * THE DECLARATIONS A PERSON TOOK OFF AND NOBODY PUT BACK, read from the declaration log: the live version of each is
    * retired, and the line that retired it (`kernel.retire` writes a `declare` line naming the same version as from and
    * to) is signed by somebody, never the record's own housekeeping. A pack turned off retires its declarations with no
@@ -3293,6 +3392,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     let stopped = false;
     /* A MODULE WHOSE CARRY STOPPED PARTWAY, said as one line of its own and never the end of the night's updates. */
     const carryStopped = new Set<string>();
+    /* AND WHAT A PAGE THE OWNER CHANGED GOES WITHOUT, asked once for each update that kept one (`keptAsk`). */
+    const keptSaid: string[] = [];
     /* A NO HOLDS FOR THAT VERSION (research-audit-21 item 6): a module the owner said no to at the version this build
        ships is left out of what the record holds for this check, so it is neither asked again nor put in on a later
        night whose plan happens to lose nothing. A newer version than the one declined is asked about afresh. THE AGENTS
@@ -3326,6 +3427,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               await carryUpdate(deps.catalogue ?? [], kernel, id, from, actor);
             } catch {
               carryStopped.add(id);
+            }
+          /* THE UPDATE IS IN AND A PAGE WAS KEPT: what the page goes without is asked about, never dropped (`keptAsk`). A
+             question that will not file leaves the update in, as it was before there was one. */
+          if (put.ok)
+            try {
+              const line = keptAsk(got.value.pack, got.value.diff, (x) => moduleName(x));
+              if (line !== null) keptSaid.push(line);
+            } catch {
+              /* The page is kept either way. */
             }
           return put;
         },
@@ -3368,6 +3478,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             : `${name(st.pack)} ${st.to} could not go in yet: ${st.why ?? 'its plan was refused'}`,
     );
     for (const id of carryStopped) said.push(`${name(id)} was updated, and moving what it kept from before stopped partway.`);
+    said.push(...keptSaid);
     if (stopped) said.push("The check for BrainDog's own updates stopped partway, and runs again tomorrow.");
     /* AND THEN WHO THE RECORD'S OWN PERSON IS, once People can say it (`selfTick`), on this tick and each night until it is known. */
     try {
@@ -5581,6 +5692,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       questions: rows.map((row) => ({ opened_at: String(row.opened_at ?? ''), body_kind: String(row.body_kind ?? ''), body: row.body })),
       inbox: told ? kernel.inboxWaiting() : null,
       runs: ctx !== null && readable(ctx, SESSION) ? [] : activeRuns(),
+      /* THE QUEUE'S OWN RULE FOR A WITHHELD FIELD (`BAND_SQL`), so `waits.hard` and the queue's count are one number. */
+      withheld: costRows(sql).withheld,
     });
   };
 
@@ -6898,6 +7011,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               pages: every,
               dismissed: new Set(Array.isArray(prefs['pen.dismissed']) ? prefs['pen.dismissed'] : []),
               use: { sql, nowMs: clock.now() },
+              /* THE WORDS THE SPEAKING USE CASE GIVES A LIST, so the week offer says Jobs where the rail does (offer-labels-60). */
+              labels: ((v) => labelsOf(v.values, Object.fromEntries(Object.entries(v.labels).map(([k, label]) => [k, { label }]))))(voiceFor(ctx)),
             })
           : [],
       whatsNew: newsFor(ctx),
@@ -9995,6 +10110,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (out.ok && !('defer' in verdict)) {
         firstPartyAnswered(String(args.id), 'decide' in verdict ? verdict.decide.option : null);
         selfAnswered(String(args.id), 'decide' in verdict ? verdict.decide.option : 'none', actorOf(ctx), out.value.batch);
+        /* AND THE UPDATE'S PAGE IS TAKEN OR LEFT (`keptAnswered`). A take the record refuses opens the question again. */
+        const taken = await keptAnswered(String(args.id), 'decide' in verdict ? verdict.decide.option : null, actorOf(ctx));
+        if (!taken.ok) {
+          kernel.reopen(out.value.suggestion, 'refusal' in taken ? taken.refusal.fix : undefined);
+          return tail(taken);
+        }
       }
       /* AN ACCEPTED RETYPE OR NARROWING LANDS HERE, when the owner accepts it rather than the caller who filed it
          `govern.decide` hands back `retype` in place of `install`, since it stages the list's next version
@@ -10078,6 +10199,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const spoke = speakingNow(kernel);
       const put = await installHeld(kernel, pack.value, diff, packHost(ctx), args.planHash, (approve ?? []) as string[]);
       if (put.ok) await carryUpdate(deps.catalogue ?? [], kernel, pack.value.manifest.pack, from, actorOf(ctx));
+      /* AND WHAT A PAGE THIS UPDATE KEPT GOES WITHOUT IS ASKED ABOUT (`keptAsk`), as the night's update asks it. */
+      if (put.ok)
+        try {
+          keptAsk(pack.value, diff, (x) => (deps.catalogue ?? []).find((e) => e.id === x)?.title ?? pack.value.manifest.title ?? x);
+        } catch {
+          /* The page is kept either way. */
+        }
       /* A USE CASE INSTALLED BESIDE THE ONE SPEAKING NEVER TAKES ITS VOICE (`declare` `voiceWhenAdding`), whichever way the ids
          sort: the answer is written down. A person who chose the new one to speak says so with its setting after. */
       if (put.ok && from === null && spoke !== null && pack.value.manifest.pack.startsWith('usecase-')) writeVoice(kernel, spoke, actorOf(ctx));

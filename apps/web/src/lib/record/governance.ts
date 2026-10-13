@@ -16,7 +16,7 @@ import { money } from 'braindog-render';
    `governance.open`: it reads `governance` raw and builds its own `Question`, so a band computed only
    inside the kernel's page source would never reach this screen, and two rankings of one queue that
    disagreed would be worse than no ranking at all. */
-import { costOf, costRank } from '@braindog/kernel';
+import { COSTS, costOf, costRank } from '@braindog/kernel';
 
 import { copy } from '../copy.ts';
 import { citedWords, figuresIn } from '../cite.ts';
@@ -149,7 +149,9 @@ export function questionOf(row: Row, asked: string | undefined, rank: number): Q
         ];
   /* THE REASONING IS THE QUESTION'S, written by whoever opened it (`body.context`), and it is drawn above the options. */
   const context = said(body.context).trim();
-  const band = costOf(text(row.body_kind), row.body);
+  /* THE RECORD'S OWN BAND WHERE IT SENDS ONE (`cost`): it has read which fields the history withholds, and a browser
+     weighing the body alone cannot. Without one the body is weighed here, as before. */
+  const band = (COSTS as readonly string[]).includes(text(row.cost)) ? (text(row.cost) as ReturnType<typeof costOf>) : costOf(text(row.body_kind), row.body);
   const title = moneyInText(asked?.trim() ?? '');
   /* A MERGE THE RECORD READ AS ONE (`merge`), carried to the card as it came, once it is the shape the card reads. */
   const merge = mergeOf(row.merge);

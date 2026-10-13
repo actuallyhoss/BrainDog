@@ -40,7 +40,7 @@ import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence } from './split.ts';
-import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
+import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesOnly, linesPlan } from './lines.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
@@ -895,11 +895,14 @@ function split(b: Block, o: RenderOptions): string {
  * container hides it and draws each row's bar inline, so both are in the markup and neither is text.
  */
 function bridge(b: Block, o: RenderOptions): string {
-  const values = b.rows.map((r) => signedOf(plain(inline(r.cells[1] ?? '', o))));
-  const plan = bridgePlan(values);
+  /* Each step's amount as text. Told the record's home (`o.home`), a whole amount is the one writer's, as a table cell's
+     is, and steps in two currencies are never added: `Bridge.svelte`'s twin, line for line (bridge-home-60). */
+  const said = b.rows.map((r) => plain(inline(r.cells[1] ?? '', o)));
+  const written = said.map((s) => bridgeWritten(s, o.home));
+  const plan = bridgePlanOf(said, o.home);
   const chart = plan.bars
     ? `<svg class="bridge-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(
-        bridgeSentence(b.rows.map((r) => ({ label: plain(inline(r.cells[0] ?? '', o)), value: plain(inline(r.cells[1] ?? '', o)) }))),
+        bridgeSentence(b.rows.map((r, i) => ({ label: plain(inline(r.cells[0] ?? '', o)), value: written[i] ?? said[i] ?? '' }))),
       )}">${plan.zero === null ? '' : `<path class="bridge-zero" d="M0 ${plan.zero}H1000" vector-effect="non-scaling-stroke"></path>`}${plan.bars
         .map((bar) => `<rect class="bridge-bar" data-move="${bar.move}" x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}"></rect>`)
         .join('')}</svg>`
@@ -910,7 +913,7 @@ function bridge(b: Block, o: RenderOptions): string {
       const inline_ = bar
         ? `<svg class="bridge-inline" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><rect class="bridge-bar" data-move="${bar.move}" x="${bar.from}" y="0" width="${bar.span}" height="100"></rect></svg>`
         : '';
-      return `<li class="bridge-row"${bar ? ` data-move="${bar.move}"` : ''}>${cell('bridge-label', r.cells[0], o)}${inline_}<span class="bridge-value num">${renderInline(inline(r.cells[1] || MISSING, o), o)}</span>${cell('bridge-note', r.cells[2], o)}</li>`;
+      return `<li class="bridge-row"${bar ? ` data-move="${bar.move}"` : ''}>${cell('bridge-label', r.cells[0], o)}${inline_}<span class="bridge-value num">${renderInline(inline(written[i] ?? (r.cells[1] || MISSING), o), o)}</span>${cell('bridge-note', r.cells[2], o)}</li>`;
     })
     .join('');
   const warn = plan.warn ? `<p class="bridge-warn" data-intent="warn">${toneGlyph('warn')}${escape(plan.warn)}</p>` : '';
@@ -918,7 +921,7 @@ function bridge(b: Block, o: RenderOptions): string {
     ? numbersFold(
         'bridge',
         [BRIDGE_STEP, BRIDGE_AMOUNT],
-        b.rows.map((r) => [plain(inline(r.cells[0] ?? '', o)), plain(inline(r.cells[1] ?? '', o)) || MISSING]),
+        b.rows.map((r, i) => [plain(inline(r.cells[0] ?? '', o)), (written[i] ?? said[i]) || MISSING]),
       )
     : '';
   return `<div class="prop bridge" style="--cells:${b.rows.length}">${chart}<ol class="bridge-rows">${rows}</ol>${warn}${numbers}</div>`;

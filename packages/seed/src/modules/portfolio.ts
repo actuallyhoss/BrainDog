@@ -548,11 +548,15 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
 
   /* A SETTING OF SERVICES, SINCE portfolio 1.5.0 (`ESTATE_TARGET_SETTINGS` in `estate.ts`), because the figure reads
      services and is filed with them; empty, so no verdict until somebody sets the most a project may cost a year. */
+  /* ONLY OVER WHAT SAYS A COST: `cost is set` is no narrower a sum, since a service with no cost adds nothing, and it
+     is what lets the record tell "costs nothing" from "nobody filed a cost". A live product whose domain was imported
+     with no cost read "Costs a year 0"; now no row matches over rows that are held, the reading is `unsaid`, and At a
+     glance leaves the figure out (`told` in the kernel's `drawn.ts`). A cost typed as 0 is a cost, and is still said. */
   'project-cost': {
     metric: 'project-cost',
     name: 'Costs a year',
     source: 'register.services',
-    where: 'thing is {{it}}, state is not cancelled',
+    where: 'thing is {{it}}, state is not cancelled, cost is set',
     value: { sum: { product: ['cost', { lookup: 'per_year', by: 'cycle' }] } },
     lookups: { per_year: LOOKUPS.per_year! },
     format: MONEY,
@@ -1373,7 +1377,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         span: 6,
         source: 'runs_on',
         about: '{{spoken}}',
-        where: 'kind is tool',
+        /* THE PROJECT'S OWN ALONE: the kernel answers what applies everywhere after a project's
+           own, so a project with no tool of its own listed three of everybody's under its name, and they were not
+           its. A tool that applies everywhere is on Agents, said once. With none of its own the card is not drawn. */
+        where: 'kind is tool, scope is project',
         columns: [
           { field: 'name', as: 'title' },
           { field: 'scope', label: 'Applies to', as: 'scope' },

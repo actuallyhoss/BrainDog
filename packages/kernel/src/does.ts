@@ -18,9 +18,14 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
 /**
  * How the line names the person's things: a list by its id, a pack by its id, and a row by where it is (`things#1`), as
- * its title. `null` when the record holds none.
+ * its title, and a field of a list by the label the record shows for it. `null` when the record holds none.
  */
-export type DoesNames = { list?: (id: string) => string | null; pack?: (id: string) => string | null; row?: (at: string) => string | null };
+export type DoesNames = {
+  list?: (id: string) => string | null;
+  pack?: (id: string) => string | null;
+  row?: (at: string) => string | null;
+  field?: (list: string, field: string) => string | null;
+};
 
 /** An id read as words: `usecase-student` is "Usecase student". */
 const spoken = (id: string): string => {
@@ -102,6 +107,32 @@ function everySaid(every: string): string {
   return Number(m[1]) === 1 ? `every ${unit}` : `every ${Number(m[1])} ${unit}s`;
 }
 
+/** Every name said, none counted: "Amount", "Amount and Status", "Amount, Due on and Status". What leaves is never "2 more". */
+const listed = (names: readonly string[]): string => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`);
+
+/**
+ * "It sends Amount and Status of invoices.", the fields that leave with a call a rule runs, from the plan's `sends`
+ * (each `<list>.<field>`), or `null` when it sends none. A field is said by the label the record shows and its list by
+ * its name; one the record cannot name is its id read as words. Each list is said once, with every field of it.
+ */
+function fieldsSaid(sends: unknown, names: DoesNames): string | null {
+  const by = new Map<string, string[]>();
+  for (const s of arr(sends)) {
+    if (typeof s !== 'string' || s.trim() === '') continue;
+    const dot = s.indexOf('.');
+    const list = dot < 0 ? '' : s.slice(0, dot).trim();
+    const field = s.slice(dot + 1).trim();
+    if (field === '') continue;
+    const label = (list === '' ? null : names.field?.(list, field)) ?? spoken(field);
+    const of = by.get(list) ?? [];
+    if (!of.includes(label)) of.push(label);
+    by.set(list, of);
+  }
+  if (by.size === 0) return null;
+  const parts = [...by].map(([list, fields]) => (list === '' ? listed(fields) : `${listed(fields)} of ${names.list?.(list) ?? list.replace(/[-_]+/gu, ' ')}`));
+  return `It sends ${parts.length === 2 ? parts.join(', and ') : listed(parts)}.`;
+}
+
 /**
  * "Sends your key 'stripe' to api.stripe.com every hour.", one sentence for each action an install would arm, from the
  * plan's `calls_out` (`@braindog/declare`'s `Diff`) or a proposal's `egress` (`actions.ts` `Egress`).
@@ -111,10 +142,14 @@ function everySaid(every: string): string {
  * goes where and how often. The label is the plan's `grant` or the proposal's `key`, and a script's is its labels
  * joined with ", " (`scriptEgress`), which are said one by one. An action with no key sends none, and says "Calls".
  *
+ * WHAT GOES WITH IT, AND THE CEILING. A call a rule runs carries fields of the entry that fired it (`sends`), and they
+ * are said in one sentence after its own (`fieldsSaid`): the key and the host do not say that the amounts go too. Its
+ * ceiling for a day is said whenever the body has one, with a clock or without.
+ *
  * ONLY WHAT THE PRESS ARMS. An action the record already runs unchanged (`change: 'same'`) was approved before and is
  * left out, so a plan that calls nothing new says nothing. Two actions that read the same are said once.
  */
-function callsSaid(calls: readonly unknown[]): string[] {
+function callsSaid(calls: readonly unknown[], names: DoesNames = {}): string[] {
   const out: string[] = [];
   for (const c of calls) {
     const call = obj(c);
@@ -129,9 +164,10 @@ function callsSaid(calls: readonly unknown[]): string[] {
     const often =
       every === ''
         ? `when a rule runs it${day ? `, ${day}` : ''}`
-        : `${everySaid(every)}${ruled ? `, and ${day ? `${day} ` : ''}when a rule runs it` : ''}`;
+        : `${everySaid(every)}${ruled ? `, and ${day ? `${day} ` : ''}when a rule runs it` : day ? `, ${day}` : ''}`;
     const what = labels.length === 0 ? `Calls ${host}` : `Sends your ${labels.length === 1 ? 'key' : 'keys'} ${joined(labels.map((l) => `'${l}'`))} to ${host}`;
-    const line = `${what} ${often}.`;
+    const fields = fieldsSaid(call.sends, names);
+    const line = `${what} ${often}.${fields ? ` ${fields}` : ''}`;
     if (!out.includes(line)) out.push(line);
   }
   return out;
@@ -166,12 +202,12 @@ export function doesOf(kind: string, body: unknown, names: DoesNames = {}): stri
       const verb = ['install', 'enable', 'disable'].find((v) => typeof b[v] === 'string');
       if (verb === undefined) return '';
       /* AN INSTALL THAT CALLS OUT SAYS SO AFTER WHAT IT ADDS, key by label and host. Turning a pack on or off arms nothing new. */
-      const sends = verb === 'install' ? callsSaid(callsIn(b)) : [];
+      const sends = verb === 'install' ? callsSaid(callsIn(b), names) : [];
       return [`${capital(packsSaid({ [verb]: [b[verb]] }, names).join(', '))}.`, ...sends].join(' ');
     }
     /* A PLAN, as `planPack` answers it: only what it sends, since the sheet it is drawn on already says what it adds. */
     case 'install':
-      return callsSaid(callsIn(b)).join(' ');
+      return callsSaid(callsIn(b), names).join(' ');
     case 'settings': {
       const values = Object.keys(obj(b.values));
       const pack = typeof b.pack === 'string' ? (names.pack?.(b.pack) ?? spoken(b.pack)) : null;

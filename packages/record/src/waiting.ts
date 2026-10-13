@@ -60,6 +60,11 @@ export type WaitingReader = {
   questions: readonly WaitingQuestion[];
   inbox: number | null;
   runs: readonly WaitingRun[];
+  /**
+   * The fields of a list the history withholds (the kernel's `costRows`), so a question that patches one counts as
+   * hard to undo here as it does in the queue's own count. Left out, a body is weighed alone.
+   */
+  withheld?: (register: string) => readonly string[];
 };
 
 /** Whether a question opened at `at` has waited past `LATE_DAYS` by `nowMs`. An instant that cannot be read has not. */
@@ -99,7 +104,7 @@ export function waiting(r: WaitingReader): WaitingNow {
   let hard = 0;
   for (const q of r.questions) {
     if (lateAt(q.opened_at, r.nowMs)) late++;
-    if (costOf(q.body_kind, q.body) === 'undo') hard++;
+    if (costOf(q.body_kind, q.body, r.withheld === undefined ? undefined : { withheld: r.withheld }) === 'undo') hard++;
   }
   return {
     questions: r.questions.length,

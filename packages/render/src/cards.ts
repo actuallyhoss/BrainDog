@@ -215,13 +215,19 @@ export function trendOf(value: string): { d: string; end: string; said: string[]
  * name (`trend: Done per week`) and more than one of its points is above or below nought;
  * a run of noughts with one count in it is a single fact, and a figure says a single fact better. When it is drawn
  * it carries `last`, the newest value as its cell wrote it, and both drawers print that and the name beside the line.
+ *
+ * AND IT HAS THREE KNOWN POINTS (`TREND_POINTS`): two are a slope between two facts, which the card's figure says
+ * better, so a card with fewer keeps its figure alone. A gap is not a point.
  */
+export const TREND_POINTS = 3;
+
 export function cardTrend(value: string, label: string): (NonNullable<ReturnType<typeof trendOf>> & { last: string; label: string }) | null {
   const name = label.trim();
   if (!name) return null;
   const t = trendOf(value);
   if (!t) return null;
   const known = t.said.filter((s) => s !== NO_VALUE);
+  if (known.length < TREND_POINTS) return null;
   if (known.filter((s) => Number(s.replace(/−/gu, '-').replace(/,/gu, '')) !== 0).length < 2) return null;
   return { ...t, last: known[known.length - 1]!, label: name };
 }

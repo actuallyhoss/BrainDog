@@ -56,4 +56,14 @@
   .list[data-kind='timeline'][data-days] > .item > .item-marker {
     display: none;
   }
+
+  /* A DATED ROW NEVER WEARS THE ARRIVAL TINT (`[data-arrived]` in `blocks.css`). A timeline is history in date order,
+     and the host marks a row "arrived" whenever it was not in the answer before: the first full answer after a short
+     one marked every row of Money's What moved, and a tile of lavender rows read as a tile of selected ones. So a
+     timeline row sits on the tile's own surface, and the only tints it takes are the ones `blocks.css` gives every
+     list: the wash under the pointer, the band under the row cursor, and a selection. No fill is written here, so
+     none of those three is outranked. */
+  .list[data-kind='timeline'] > .item[data-arrived] {
+    animation: none;
+  }
 }

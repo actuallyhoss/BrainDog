@@ -52,9 +52,11 @@ test('enough rows arriving at once is itself the event', () => {
   assert.equal(costOf('rowset', many), 'shape');
 });
 
-test('a declaration that replaces one weighs what a new one does: the one it replaces is kept as a prior version', () => {
+test('a declaration that replaces one is hard to undo until Put back can restore one: a new one is the shape', () => {
   assert.equal(costOf('change', { declaration_id: 'page.work', to: { kind: 'page' } }), 'shape');
-  assert.equal(costOf('change', { declaration_id: 'page.work', to: { kind: 'page' }, from: { kind: 'page' } }), 'shape');
+  /* THE ONE IT REPLACES IS KEPT AS A PRIOR VERSION, AND NOTHING PUTS IT BACK: undo walks entry lines alone and no
+     write clears `superseded_at`. Batch 58 read this as 'shape'; batch 60 took that back on purpose. */
+  assert.equal(costOf('change', { declaration_id: 'page.work', to: { kind: 'page' }, from: { kind: 'page' } }), 'undo');
 });
 
 test('turning a pack off is the dearest thing a pack proposal can ask for', () => {

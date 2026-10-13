@@ -139,8 +139,8 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
   const titleOf = new Map<number, string>();
   const markOf = new Map<number, Identity>();
   const title = REGISTERS[register]?.title;
-  /* WHICH OF THEM ARE FINISHED, by the list's own `state:` and `done:`, for the picker to leave out (`held.ts`): none
-     where a new row starts finished, as a ledger entry starts cleared (`leftOut`). */
+  /* WHICH OF THEM ARE FINISHED, by the list's own `state:` and `done:`, for the picker to leave out (`held.ts`): never
+     for the state a new row starts in, so a cleared ledger entry stays and a void one goes (`leftOut`). */
   const state = REGISTERS[register]?.state;
   const done = leftOut(REGISTERS[register]);
   const over = new Set<number>();

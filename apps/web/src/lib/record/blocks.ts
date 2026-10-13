@@ -132,6 +132,31 @@ function cutTotals(groups: (readonly [string, Total])[], limit: number | undefin
   return [...kept, [REST, merge(groups.slice(kept.length).map(([, t]) => t))] as const];
 }
 
+/**
+ * THE CURRENCY AN AMOUNT WAS IN BEFORE IT WAS CONVERTED, kept beside the converted amount and not in place of it.
+ *
+ * `charted` writes a row's money into the home currency so one chart can add it up, and the amount it writes is a new
+ * value, so that value is the key: the bar that adds it up reads here what it was kept in and says so in its note. An
+ * account kept in dollars read in the home currency with no word on its bar. Nothing is written onto the row itself,
+ * which is the record's.
+ */
+const convertedFrom = new WeakMap<object, string>();
+
+/** `amount` in `home`, remembered as converted from `from`. */
+function intoHome(amount: number, from: string, home: string, rate: number): { amount: number; currency: string } {
+  const into = { amount: convertMinor(amount, from, home, rate), currency: home };
+  convertedFrom.set(into, from);
+  return into;
+}
+
+/** The currencies the amounts were converted from, in order, each once. */
+const fromOf = (values: readonly unknown[]): string[] =>
+  [...new Set(values.flatMap((v) => (typeof v === 'object' && v !== null && convertedFrom.has(v) ? [convertedFrom.get(v)!] : [])))].sort();
+
+/** A bar's note: `converted from USD`, or nothing when every amount in it was in the home currency all along. */
+const convertedNote = (from: readonly string[]): string =>
+  from.length === 0 ? '' : copy.convertedFrom(from.length === 1 ? from[0]! : `${from.slice(0, -1).join(', ')} and ${from.at(-1)!}`);
+
 /** A bar over a register groups its rows and sums them — the one place a page does arithmetic. */
 function barRows(block: BlockResult): string[] {
   const by = block.columns[0]?.field ?? 'party';
@@ -177,6 +202,9 @@ function barRows(block: BlockResult): string[] {
      bar whose length is a number about nothing — and it sits in a chart beside bars that are real,
      which is the version of this nobody catches. */
   const totals = [...grouped].map(([key, values]) => [key, total(values)] as const);
+  /* WHAT A BAR WAS CONVERTED FROM, and the rest is every bar the cut folded into it and what the record added up past them. */
+  const from = (key: string, kept: ReadonlySet<string>): string[] =>
+    key === REST && !grouped.has(REST) ? fromOf([...[...grouped].flatMap(([k, values]) => (kept.has(k) ? [] : values)), ...past]) : fromOf(grouped.get(key) ?? []);
   const cutTo = cutTotals(
     totals.sort((a, b) => b[1].amount - a[1].amount),
     block.limit,
@@ -185,6 +213,7 @@ function barRows(block: BlockResult): string[] {
   const wasCut = block.limit !== undefined && totals.length > block.limit;
   const bars =
     past.length === 0 ? cutTo : wasCut ? [...cutTo.slice(0, -1), [REST, merge([cutTo.at(-1)![1], total(past)])] as const] : [...cutTo, [REST, total(past)] as const];
+  const kept = new Set(bars.map(([key]) => key));
   const drawn = bars.map(([key, sum]) => {
     /* The SUM is formatted through the summed field's own type, not always as money. A bar over
        `effort` in days printed `GBP 0.02` — the total was 2.4 days, run through a money formatter
@@ -193,12 +222,12 @@ function barRows(block: BlockResult): string[] {
     const shown = sum.mixed.length
       ? mixedFix(sum.mixed)
       : (written(sum) ?? String(sum.amount));
-    return `${escapeCell(key)} | ${escapeCell(shown)} | `;
+    return `${escapeCell(key)} | ${escapeCell(shown)} | ${convertedNote(from(key, kept))}`;
   });
   if (!block.unset || unset.length === 0 || !block.register) return drawn;
   const sum = total(unset);
   const shown = sum.mixed.length ? mixedFix(sum.mixed) : (written(sum) ?? String(sum.amount));
-  return [...drawn, unsetRow(block.unset, registerHref(block.register, joined(block.where, `${by} is empty`)), shown)];
+  return [...drawn, unsetRow(block.unset, registerHref(block.register, joined(block.where, `${by} is empty`)), shown) + convertedNote(fromOf(unset))];
 }
 
 /**
@@ -668,6 +697,10 @@ function projectRows(block: BlockResult, cells: number, markAt?: (i: number) => 
          `display()` has no field to ask about; this saying it again from the raw fields drew Today's Overdue as
          `2026-07-01` over `[object Object]` while the rows it was handed read `1 Jul 2026` and `−£9,190.00`. */
       if (!REGISTERS[block.register ?? '']) return row.cells[n] ?? '';
+      /* A SIGNED AMOUNT IS SAID BY ITS READER (`markColumns`), which read the way the money went from a second field
+         `display()` is never handed. Said again from the raw amount, every timeline lost its minus and its plus. */
+      const signed = row.cells[n];
+      if (signed && /^[−+]/u.test(signed) && REGISTERS[block.register ?? '']?.fields.find((f) => f.id === field)?.type === 'money') return signed;
       return display(block.register ?? '', field, entry.fields[field]) ?? '';
     });
     /**
@@ -1052,7 +1085,7 @@ function charted(block: BlockResult): { charts: Charted; converted: string | nul
         const c = currencyOf(v);
         if (c === null || c === home) return e;
         const r = rateFor(fx.rates as Rate[], c, home, dayOf(e))!;
-        return { ...e, fields: { ...e.fields, [of]: { amount: convertMinor((v as { amount: number }).amount, c, home, r.rate), currency: home } } };
+        return { ...e, fields: { ...e.fields, [of]: intoHome((v as { amount: number }).amount, c, home, r.rate) } };
       });
       return { charts: [{ currency: null, block: { ...block, matched, fx: undefined } }], converted: got.asOf };
     }
@@ -1098,7 +1131,7 @@ function linkedCharted(block: BlockResult, of: string): { charts: Charted; conve
     const got = across(held.map((h) => ({ currency: h.currency, amount: h.amount, day: today })), home, fx.rates, today);
     if (got.kind === 'converted') {
       const into = Object.fromEntries(
-        held.map((h) => [h.id, { amount: convertMinor(h.amount, h.currency, home, rateFor(fx.rates as Rate[], h.currency, home, today)!.rate), currency: home }]),
+        held.map((h) => [h.id, h.currency === home ? linked[h.id] : intoHome(h.amount, h.currency, home, rateFor(fx.rates as Rate[], h.currency, home, today)!.rate)]),
       );
       return { charts: [{ currency: null, block: { ...block, linked: { ...linked, ...into }, fx: undefined } }], converted: got.asOf };
     }

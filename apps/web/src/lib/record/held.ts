@@ -64,18 +64,21 @@ export function seqTitled(register: string, said: string, same: (a: string, b: s
 export const FINISHED = new Map<string, ReadonlySet<number>>();
 
 /**
- * The states of a list that keep a row out of a picker: its `done:`, unless the list's state field starts a new row in
- * one of them, and then none.
+ * The states of a list that keep a row out of a picker: its `done:`, less the one its state field starts a new row in.
  *
- * A LIST WHOSE ROWS ARE BORN FINISHED HAS NO ROW TO HIDE. A ledger entry is `cleared` the moment it is written, so
- * leaving the finished ones out emptied Installments' "Paid by" of every payment that could have paid the part, and
- * the one entry it was for was never offered. Finished means "no longer offered" only where a row starts unfinished
- * and somebody closes it: an account, a category, a project.
+ * THE STATE A ROW IS BORN IN HIDES NOTHING. A ledger entry is `cleared` the moment it is written, so leaving every
+ * finished one out emptied Installments' "Paid by" of every payment that could have paid the part, and the one entry
+ * it was for was never offered. Finished means "no longer offered" only for a state somebody moves a row into: a
+ * closed account, a retired category, and a ledger entry made `void`.
+ *
+ * ONLY THE STARTING STATE IS LET BACK IN, not the whole of `done:`. The rule was all or none for a list, so a void
+ * entry, one sent twice and struck out, was offered as the payment of a part beside the cleared ones. A void entry
+ * moved no money and pays nothing.
  */
 export function leftOut(decl: Pick<RegisterDecl, 'state' | 'done' | 'fields'> | undefined): readonly string[] {
   const done = decl?.done ?? [];
   const starts = decl?.fields?.find((f) => f.id === decl.state)?.default;
-  return typeof starts === 'string' && done.includes(starts) ? [] : done;
+  return typeof starts === 'string' && done.includes(starts) ? done.filter((s) => s !== starts) : done;
 }
 
 /**
@@ -88,8 +91,8 @@ export function leftOut(decl: Pick<RegisterDecl, 'state' | 'done' | 'fields'> | 
  * Portage and a fourth project the record never held, and the number sent was a real row of the record's.
  *
  * A ROW ITS OWN LIST CALLS FINISHED IS LEFT OUT (`FINISHED`), except `keep`, the row the form already points at, so
- * an entry on an account closed since still shows where it is. A list whose new rows start finished leaves none out
- * (`leftOut`).
+ * an entry on an account closed since still shows where it is. The state a list starts a new row in is never a reason
+ * to leave one out (`leftOut`): a cleared ledger entry is offered, a void one is not.
  */
 export const refOptions = (register: string, keep?: number | null): { value: number; label: string }[] => {
   const kind = REGISTERS[register]?.one ?? register.replace(/_/g, ' ');

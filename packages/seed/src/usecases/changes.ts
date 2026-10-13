@@ -24,7 +24,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   founder: [
     {
       version: '2.6.0',
-      notes: 'Home is called Today. What is already late has its own table, Late, ahead of Due this week, which now starts today. Lapsing no longer has a Cost column.',
+      notes: "Home is called Today. What is already late has its own table, Late, ahead of Due this week, which now starts today. Lapsing no longer has a Cost column. Tools and servers on a project page lists the project's own tools only.",
     },
     {
       version: '2.5.0',
@@ -40,7 +40,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   team: [
     {
       version: '2.20.0',
-      notes: 'A project page says where the project stands from what happened on it this week until somebody says how it is going.',
+      notes: "A project page says where the project stands from what happened on it this week until somebody says how it is going. Tools and servers on a project page lists the project's own tools only.",
     },
     {
       version: '2.19.0',

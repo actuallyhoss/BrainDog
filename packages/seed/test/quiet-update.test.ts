@@ -547,7 +547,8 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
       const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(raw)))))));
       return {
       ...doc,
-      declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day').map((d) =>
+      /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */
+      declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day' && d.script !== 'settle' && d.rule !== 'payment-settles').map((d) =>
         d.register === 'accounts' && Array.isArray(d.fields)
           ? { ...d, fields: (d.fields as Body[]).map((f) => (f.id === 'last4' ? { ...f, label: 'Last four digits' } : f)) }
           : d,
@@ -780,6 +781,8 @@ const projectBefore = (doc: Body, id: string): Body =>
   withPage(workingBefore(numbersBefore(standsBefore(lookBefore(doc, id)), id), id), 'project', (now) =>
     now.flatMap((b) => {
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
+      /* TOOLS AND SERVERS LISTED EVERYBODY'S TOOLS until batch 60 (sketchpad-60), where it now reads the project's own. */
+      if (b.heading === 'Tools and servers') return [{ ...b, where: 'kind is tool' }];
       if (b.heading !== 'At a glance') return [b];
       const cells = (b.cells as Body[]).flatMap((c) => (c.metric !== 'project-done-7d:{{name}}' ? [c] : id === 'founder' ? [] : [(({ trend: _trend, ...cell }) => cell)(c)]));
       return [{ ...b, cells }];

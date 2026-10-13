@@ -215,7 +215,8 @@ test('run as a sandbox runs it, the script writes the line at the version it rea
 });
 
 test('run on a bill, the script counts every payment that names it, so a second run adds nothing twice', async () => {
-  const first = row('transactions', 11, { what: 'NORTHGATE', direction: 'out', amount: gbp(150_000), on: '2026-09-20', settles: 'e_obligations_4' });
+  /* CLEARED, as the Ledger writes an entry: the sum counts money that has moved and nothing pending or void (settle-rule-60). */
+  const first = row('transactions', 11, { what: 'NORTHGATE', direction: 'out', amount: gbp(150_000), on: '2026-09-20', settles: 'e_obligations_4', state: 'cleared' });
   const second = payment(250_000, '2026-10-01', { settles: 'e_obligations_4' });
   const open = bill({ state: 'part', paid_so_far: gbp(150_000) });
   const { writes } = await ran([open, first, second], { payment: 'transactions#12', item: 'obligations#4' });

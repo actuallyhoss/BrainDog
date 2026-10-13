@@ -260,24 +260,51 @@
   /* THE EDGE CUE: a rail that scrolls says so. The foot fades while there is more below, and the head while there is
      more above (`edgeCue`), measured on every scroll and whenever the rail's height or what is in it changes (a group
      folding, a project arriving). It was a scrollbar drawn only under the pointer, so the last group was cut off
-     mid-row with nothing to say it went on. */
+     mid-row with nothing to say it went on. THE FOOT ALSO DRAWS A HAIRLINE AND A SMALL CHEVRON (`.more-below`): a fade
+     over the gap between two groups fades nothing, and a mark that is painted is seen whatever sits under it. */
   let edges = $state({ above: false, below: false });
   function measure() {
     if (!scroller) return;
     const next = edgeCue(scroller.scrollTop, scroller.clientHeight, scroller.scrollHeight);
     if (next.above !== edges.above || next.below !== edges.below) edges = next;
   }
+  /* IT IS MEASURED BEFORE ANYBODY SCROLLS, AND AGAIN WHENEVER THE ROWS CHANGE HEIGHT. The first build watched the
+     scroller's own box and its children coming and going, and on a real record the cue never drew on first paint: the
+     rail is `100dvh`, so its box does not change when the rows under it grow (the tokens' sheet or the face landing
+     after the first measure, a group's rows filling in), and no row was added or taken away to say so. So the size
+     watch is on every group as well as the scroller, and the measure runs once more on the frame after mount, when
+     the faces are in, and when the window has loaded or been resized. `untrack`, so writing `edges` does not tear
+     these watches down and build them again. */
   $effect(() => {
     const el = scroller;
     if (!el) return;
-    measure();
     const size = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : undefined;
-    size?.observe(el);
-    const kids = typeof MutationObserver === 'function' ? new MutationObserver(measure) : undefined;
+    const watch = () => {
+      size?.observe(el);
+      for (const group of el.children) size?.observe(group);
+    };
+    const kids =
+      typeof MutationObserver === 'function'
+        ? new MutationObserver(() => {
+            watch();
+            measure();
+          })
+        : undefined;
+    untrack(() => {
+      watch();
+      measure();
+    });
     kids?.observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-shut'] });
+    const frame = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(measure) : undefined;
+    void document.fonts?.ready.then(measure);
+    window.addEventListener('resize', measure);
+    window.addEventListener('load', measure);
     return () => {
       size?.disconnect();
       kids?.disconnect();
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('load', measure);
     };
   });
 
@@ -556,6 +583,13 @@
       </ul>
     </section>
   </div>
+
+  <!-- THE FOOT'S CUE, PAINTED: a hairline across the rail and a small chevron on it while rows wait below, outside the
+       scroller so its fade does not take the mark with it. No height of its own, so nothing moves when it comes and
+       goes. `aria-hidden`: the rows themselves are all there for a screen reader. -->
+  <span class="more-below" aria-hidden="true" data-on={edges.below ? '' : undefined}>
+    <span class="more-mark"><Icon name="chevronDown" size="s" /></span>
+  </span>
 
   <!-- WHO IS WORKING, AS ONE TILE AT THE FOOT: their makers' marks, how many, what the first is doing, and a dot that
        breathes while they are at it. It opens Agents. Nothing while nobody is. -->
@@ -869,6 +903,72 @@
   .scroll[data-more-above],
   .scroll[data-more-below] {
     mask-image: linear-gradient(to bottom, transparent, var(--ink) var(--edge-above), var(--ink) calc(100% - var(--edge-below)), transparent);
+  }
+
+  /* THE FOOT'S PAINTED CUE: a hairline the rail's width where the rows are cut, and a chevron sitting on it over a
+     notch of the board's own colour, so it reads over whatever row is fading under it. Nothing tall: it lies over
+     the scroller's last 16px and takes no room. Drawn by `data-on` (`edgeCue`'s `below`). */
+  .more-below {
+    position: relative;
+    display: flex;
+    flex: none;
+    justify-content: center;
+    block-size: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .more-below[data-on] {
+    opacity: 1;
+  }
+
+  .more-below::before {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    border-block-start: 1px solid var(--rule);
+    content: '';
+  }
+
+  .more-mark {
+    position: absolute;
+    inset-block-end: 0;
+    display: grid;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 16px;
+    background: var(--board);
+    border-radius: var(--r-ctl) var(--r-ctl) 0 0;
+    color: var(--ink2);
+  }
+
+  /* WHERE THE BROWSER CAN READ THE SCROLLER'S PLACE ITSELF, IT DRAWS THE MARK WITH NO SCRIPT AT ALL: there from the
+     first paint, gone over the last of the way down, and no timeline (so only `data-on`, which is off) when everything
+     fits. The measure above is still what a browser without scroll timelines has, and what fades the rows. */
+  @supports (animation-timeline: scroll()) and (timeline-scope: none) {
+    .rail {
+      timeline-scope: --rail-scroll;
+    }
+
+    .scroll {
+      scroll-timeline: --rail-scroll block;
+    }
+
+    .more-below {
+      animation: foot-cue linear both;
+      animation-timeline: --rail-scroll;
+    }
+  }
+
+  @keyframes foot-cue {
+    from,
+    97% {
+      opacity: 1;
+    }
+
+    to {
+      opacity: 0;
+    }
   }
 
   /* AN AUTHOR RULE, because `hidden` is a user-agent one and loses to any `display` written here. */

@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { conflictFault, installFault, installOrder, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, labelSetting, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { conflictFault, installFault, installOrder, keptQuestion, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, labelSetting, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { KEYS_REACH_ALL, approvalLines, configReads, configValue, egressChanged, egressOf, personNameOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
 import { normaliseChecked } from './theme-check.ts';
@@ -289,6 +289,11 @@ export type ArrangeDeps = {
   host: (actor: string) => Host;
   /** The host's whole catalogue. Absent, only the short list is offered. */
   shelf?: CatalogueShelf | undefined;
+  /**
+   * An install that is in and kept a page the owner changed: the record asks its one question about what the page goes
+   * without (declare-edited-page-60, `keptAsk` in `index.ts`). `packSaid` is the add-on by the name the catalogue gives it.
+   */
+  kept?: ((pack: Pack, diff: Diff, packSaid: (id: string) => string) => void) | undefined;
 };
 
 /** What a proposal found in the host's whole catalogue: each document by pack id, the modules under it, and its entry. */
@@ -871,6 +876,10 @@ export function arranger(d: ArrangeDeps) {
             }),
         /* WHAT IT LEAVES AS THE OWNER CHANGED IT, so Decide says the update's version of it is not taken. */
         ...(kept.size === 0 ? {} : { keeps: [...kept] }),
+        /* AND WHAT A KEPT PAGE GOES WITHOUT (`Diff.brings`), with the sentence that says it (`keptQuestion`), so Decide
+           says the Late table by name where it said only that the page was kept. The choice itself is asked once the
+           update is in (`ArrangeDeps.kept`), since this card is a yes or a no to the whole update. */
+        ...((asks) => (asks === null ? {} : { brings: diff.brings, brings_line: asks.line.split(' Take the update')[0] }))(keptQuestion(diff, (x) => (x === id ? titleOf(id) : spokenOf(x)))),
         /* WHAT IT LAYS ON A LIST ANOTHER PACK OWNS, by list, as `field` or `field.value`. Without it Personal's step named
            only its own lists and pages, and the five roles it lays on People reached Decide as nothing: measured on the
            seed catalogue, the step was `["pack","version","adds","examples"]`. A list that has everything already lays
@@ -1955,6 +1964,12 @@ export function arranger(d: ArrangeDeps) {
       const fresh = from === null && running(id) === undefined;
       const put = await installHeld(kernel, pack.value, diff, d.host(actor), diff.planHash, diff.approve);
       if (!put.ok) return stopped(put);
+      /* AND WHAT A PAGE IT KEPT GOES WITHOUT IS ASKED ABOUT, once it is in. A question that will not file leaves it in. */
+      try {
+        d.kept?.(pack.value, diff, titleOf);
+      } catch {
+        /* The page is kept either way. */
+      }
       if (given.has(id)) filled.add(id);
       if (replanning) {
         undo.push({ said: id, back: () => again(id, before ?? {}) });

@@ -1439,9 +1439,10 @@ const DECLARED: Record<string, Version> = {
       adds.page.relation.1 adds.page.relation.2 adds.page.relation.3 hands.register.organisations.people
       metric.project-numbers-7d metric.projects-earning-silent adds.page.portfolio.4
     `,
-    declares: '1a6e6f8b5a7311cc',
+    declares: '11f22bd8f6e3f8d2',
     history: [
       "`setting.voice_home` and the title of `page.home-founder` say Today where both said Overview; `due-this-week` and Due this week start today; `late-money` is added with a Late table ahead of the week, oldest first; Lapsing loses its Cost column -> 1a6e6f8b5a7311cc",
+      "Folded into the unreleased 2.6.0 (sketchpad-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), so a project with none of its own draws no card where it listed everybody's -> 11f22bd8f6e3f8d2",
     ],
   },
   'team@2.19.0': {
@@ -1482,10 +1483,11 @@ const DECLARED: Record<string, Version> = {
       setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
       setting.voice_working_now
     `,
-    declares: '358cad7996106324',
+    declares: '11f9e7507ab3a446',
     history: [
       "`page.project` takes portfolio 1.16.0's Where it stands: the typed card only while `project-said` counts one, else a stat of `project-moved-7d` under the same heading -> 6810be8ff85d154d",
       "`page.project`'s Where it stands takes Last worked (`project-last-worked`) -> 358cad7996106324",
+      "Folded into 2.20.0, which is on `origin/master` and not live (2.19.0 is, by `team.ts`) (sketchpad-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`) -> 11f9e7507ab3a446",
     ],
   },
   'business@1.6.0': {

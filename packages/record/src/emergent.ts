@@ -127,6 +127,11 @@ export type PenDeps = {
    * read on (`observation`), and the record's clock. Absent, no offer drawn from use is made.
    */
   use?: { sql: Sql; nowMs: number } | undefined;
+  /**
+   * The words the record speaks for its lists, by label key as `declare`'s `labelsOf` answers them: `orders` for the
+   * list's name (Settings, Words), `orders:one` for one of its entries. Absent, every list is said as it is declared.
+   */
+  labels?: Readonly<Record<string, string>> | undefined;
 };
 
 const bytes = (text: string): number => new TextEncoder().encode(text).length;
@@ -823,8 +828,26 @@ function lowBeside(deps: PenDeps, list: string, packOf: ReadonlyMap<string, stri
   return null;
 }
 
-/** A name as it reads inside a sentence: a word that is only capitalised in lower case, every other as typed (`slash.ts`). */
-const inSentence = (name: string): string => name.trim().replace(/\p{L}+/gu, (w) => (/^\p{Lu}\p{Ll}*$/u.test(w) ? w.toLowerCase() : w));
+const NO_WORDS: ReadonlySet<string> = new Set();
+const CAPITALISED = /^\p{Lu}\p{Ll}*$/u;
+
+/**
+ * A name as it reads inside a sentence: the capital a name starts with goes, every other word stays as typed (`slash.ts`).
+ *
+ * A PROPER NOUN KEEPS ITS CAPITAL WHERE IT CAN BE TOLD FROM THAT ONE: a word after the first (Orders from Etsy, "orders
+ * from Etsy"), a word typed in capitals (HSBC cards), and a word in `proper`, which the person's own singular wrote with
+ * a capital (`saidWords`). A name with a capital on every word is a title (Client Work), and reads in lower case.
+ */
+const inSentence = (name: string, proper: ReadonlySet<string> = NO_WORDS): string => {
+  const words = name.match(/\p{L}+/gu) ?? [];
+  const title = words.length > 1 && words.every((w) => CAPITALISED.test(w));
+  let first = true;
+  return name.trim().replace(/\p{L}+/gu, (w) => {
+    const lead = first;
+    first = false;
+    return (lead || title) && CAPITALISED.test(w) && !proper.has(w.toLowerCase()) ? w.toLowerCase() : w;
+  });
+};
 
 /** Names ending in s that are not a count of things, so "6 savings this week" is never said of them. */
 const NOT_MANY = /(?:ss|us|is|ics|news|series|species|savings|earnings|goods|clothes|canvas|atlas|alias|gas)$/iu;
@@ -881,19 +904,46 @@ function onesOf(declared: readonly { id: string; kind: string; body: string }[])
  * THE DECLARED SINGULAR WINS OVER A NAME THAT ONLY LOOKS LIKE MANY: Finances declaring "transaction" holds
  * transactions, never "6 finances". The name is kept where it ends in many of that singular (HSBC cards, "card").
  */
-export const manySaid = (name: string, one: string | undefined): string => {
-  if (one === undefined) return saysMany(name) ? inSentence(name) : `${inSentence(name)} entries`;
-  const many = manyOf(inSentence(one));
+export const manySaid = (name: string, one: string | undefined, proper: ReadonlySet<string> = NO_WORDS): string => {
+  if (one === undefined) return saysMany(name) ? inSentence(name, proper) : `${inSentence(name, proper)} entries`;
+  const many = manyOf(inSentence(one, proper));
   const last = (said: string): string => (/\p{L}+$/u.exec(said.trim())?.[0] ?? '').toLowerCase();
-  return saysMany(name) && last(name) === last(many) ? inSentence(name) : many;
+  return saysMany(name) && last(name) === last(many) ? inSentence(name, proper) : many;
+};
+
+/** A list's words as a sentence says them: its name, one of its entries, and the words that keep their capital. */
+export type SaidWords = { name: string; one: string | undefined; proper: ReadonlySet<string> };
+
+/**
+ * The words a list is said by: the record's own (`labels`, by label key: `orders`, `orders:one`) where it speaks them,
+ * else the words the list declares. So a list declared as Orders and shown as Jobs is offered its jobs.
+ *
+ * A RENAMED LIST LETS ITS DECLARED SINGULAR GO, unless the record says one of its own: "order" names the old word, and
+ * many of Jobs is then read off Jobs. A label that is empty, or the declared name again, renames nothing.
+ *
+ * `proper` IS READ OFF THE PERSON'S OWN SINGULAR ONLY, where a capitalised word stands beside a lower case one (Etsy
+ * order): the declared singular is lower case, so a capital typed over it is meant. One capitalised word alone (Job) is
+ * the capital a line starts with.
+ */
+export const saidWords = (list: string, name: string, one: string | undefined, labels: Readonly<Record<string, string>> | undefined): SaidWords => {
+  const word = (key: string): string | undefined => {
+    const said = labels?.[key];
+    return typeof said === 'string' && said.trim() !== '' ? said.trim() : undefined;
+  };
+  const shown = word(list);
+  const renamed = shown !== undefined && shown !== name.trim();
+  const mine = word(`${list}:one`);
+  const typed = mine?.match(/\p{L}+/gu) ?? [];
+  const proper = typed.some((w) => /^\p{Ll}+$/u.test(w)) ? new Set(typed.filter((w) => CAPITALISED.test(w)).map((w) => w.toLowerCase())) : NO_WORDS;
+  return { name: renamed ? shown : name, one: mine ?? (renamed ? undefined : one), proper: new Set(proper) };
 };
 
 /**
  * The week offer's sentence: what was seen, then the question, as a person would put it. "4 orders due this week. Want
  * a page of their own for them?" The count leads because it is the news; the list is named by its entries.
  */
-export const weekSaid = (n: number, name: string, one: string | undefined, due: boolean): string =>
-  `${n.toLocaleString('en')} ${n === 1 ? (one !== undefined ? inSentence(one) : `${inSentence(name)} entry`) : manySaid(name, one)}${due ? ' due' : ''} this week. Want a page of their own for them?`;
+export const weekSaid = (n: number, name: string, one: string | undefined, due: boolean, proper: ReadonlySet<string> = NO_WORDS): string =>
+  `${n.toLocaleString('en')} ${n === 1 ? (one !== undefined ? inSentence(one, proper) : `${inSentence(name, proper)} entry`) : manySaid(name, one, proper)}${due ? ' due' : ''} this week. Want a page of their own for them?`;
 
 /**
  * The week offers: for each list the caller reads with a day on its entries, at least `PEN_WEEK_FEWEST` of them in this
@@ -906,7 +956,7 @@ export const weekSaid = (n: number, name: string, one: string | undefined, due: 
  * each list its dismissal, its count and its pages, and only then its week and its reads.
  */
 function weeksOffered(deps: PenDeps): PenItem[] {
-  const { kernel, reads, pages, dismissed, use } = deps;
+  const { kernel, reads, pages, dismissed, use, labels } = deps;
   if (!use) return [];
   const born = bornOf(use.sql);
   if (born === null || use.nowMs - born < PEN_YOUNG_DAYS * DAY_MS) return [];
@@ -993,9 +1043,11 @@ function weeksOffered(deps: PenDeps): PenItem[] {
     if (kernel.lint([{ id: `page.${slug}`, kind: 'page', body }]) !== null) continue;
     taken.add(slug);
     const draft = { id: `page.${slug}`, kind: 'page', body };
+    /* THE SENTENCE NAMES THE LIST AS THE RECORD SPEAKS OF IT (Settings, Words), so Orders shown as Jobs is "4 jobs". */
+    const said = saidWords(id, decl.name, ones.get(id), labels);
     offers.push({
       rows: n,
-      item: { id: signatureOf('week', id), kind: 'page', register: id, title, why: weekSaid(n, decl.name, ones.get(id), due), change: { to: draft }, list: id, draft },
+      item: { id: signatureOf('week', id), kind: 'page', register: id, title, why: weekSaid(n, said.name, said.one, due, said.proper), change: { to: draft }, list: id, draft },
     });
   }
   return offers

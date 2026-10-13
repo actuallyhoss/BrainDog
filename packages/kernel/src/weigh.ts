@@ -32,11 +32,12 @@
 /**
  * The four, worst first — which is the order they are ranked in, and the order they are compared in.
  *
- * - `undo`  — accepting it is hard to take back, because the record keeps nothing to go back to: it
- *             turns a pack off, or it moves money. The other button tomorrow does not return the
- *             record to where it was.
+ * - `undo`  — accepting it is hard to take back, because Put back has nothing to go back to: it
+ *             turns a pack off, it moves money, it replaces a declaration that exists, or it changes
+ *             a value the history withholds. The other button tomorrow does not return the record
+ *             to where it was.
  * - `shape` — accepting it changes what everyone sees: a pack installed or turned on, a pack's
- *             settings, a page, a declaration new or replaced. Reversible, and not quietly: everyone
+ *             settings, a page, a declaration that is new. Reversible, and not quietly: everyone
  *             who opens the record meets it.
  * - `rows`  — accepting it adds rows, changes or removes rows that exist, or adds a rule that will
  *             add them. Deletable, put back or restored, one at a time.
@@ -81,9 +82,15 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
  * number the moment it lands, and putting the row back does not un-tell them. `movesMoney` is the rule `waitOf` reads
  * below, on a new row or a patch alike, and one such row is enough: `decide` applies a rowset all-or-nothing
  * (`govern.ts`), so it cannot be taken separately.
+ *
+ * AND SO IS A VALUE THE HISTORY WITHHOLDS (batch 60). A field any version of its list has typed `secret` or `money`,
+ * or marked `redact: true`, is written to the history as `--redacted--`, and Put back says of such a line that it
+ * cannot put the value back (`undo.ts`). So an update that patches one is `undo`, whatever it writes there. It is read
+ * from the list's declarations, which a body alone does not carry: `rows` hands them in, and without it only what the
+ * body says is weighed, as `waitOf` does without its own.
  */
-function rowsetCost(body: Record<string, unknown>): Cost {
-  if (movesMoney(body)) return 'undo';
+function rowsetCost(body: Record<string, unknown>, rows?: CostRows): Cost {
+  if (movesMoney(body) || patchesWithheld(body, rows)) return 'undo';
   return arr(body.rows).length >= MANY_ROWS ? 'shape' : 'rows';
 }
 
@@ -112,19 +119,21 @@ function arrangeCost(body: Record<string, unknown>): Cost {
  * band, because the one thing that is certainly true of a proposal this build cannot read is that
  * this build is not going to apply it.
  */
-export function costOf(bodyKind: string, body: unknown): Cost {
+export function costOf(bodyKind: string, body: unknown, rows?: CostRows): Cost {
   const b = obj(body);
   switch (bodyKind) {
     case 'rowset':
-      return rowsetCost(b);
-    /* A DECLARATION THAT EXISTS IS REPLACED, AND THE ONE IT REPLACES IS KEPT. The `declaration` table is never edited:
-       the new version goes in beside the old one, which is stamped `superseded_at` and stays (`declare.ts`). That
-       holds for a whole body with a `from` under it, an addition, a retire, and a retype, whose rows are ordinary
-       edits in one batch that Put back undoes as one (`api/retype.ts`). So a skill's wording changed is the band a new
-       declaration is, and `from` no longer raises it: read as "nothing is kept" it made every such card hard to undo
-       (batch 58). */
+      return rowsetCost(b, rows);
+    /* A DECLARATION THAT EXISTS IS REPLACED, AND PUT BACK CANNOT RESTORE THE ONE IT REPLACES. The old version is kept:
+       the new one goes in beside it and the old is stamped `superseded_at` (`declare.ts`). But keeping it is not a way
+       back. Put back walks the lines the history holds about rows and nothing else (`undo.ts`), no line is written
+       for a declaration, and nothing clears `superseded_at`, so a plan for such a decision has no step in it. Batch
+       58 read "the old one is kept" as "it can be undone" and lowered this to `shape`; the card then promised a way
+       back the record does not have (audit 58, claim 2). `from` present is what says one is being replaced, and it
+       is `undo` again UNTIL PUT BACK CAN RESTORE A SUPERSEDED DECLARATION, which is the day this goes back to
+       `shape`. `test/weigh-skill-58.test.ts` holds the plan to having no step, so that day shows there first. */
     case 'change':
-      return 'shape';
+      return b.from === undefined || b.from === null ? 'shape' : 'undo';
     /* `disable` TAKES A REGISTER OFF EVERY SCREEN IT IS ON. Install and enable add one. */
     case 'pack':
       return typeof b.disable === 'string' ? 'undo' : 'shape';
@@ -155,10 +164,54 @@ const MOVES_MONEY_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r, j
     WHERE f.type = 'object' AND json_type(f.value, '$.amount') = 'integer' AND json_type(f.value, '$.currency') = 'text'
       AND json_extract(f.value, '$.currency') GLOB '[A-Z][A-Z][A-Z]' AND length(json_extract(f.value, '$.currency')) = 3)`;
 
+/** What `costOf` reads of the record: the fields of a list whose values the history withholds. */
+export type CostRows = { withheld: (register: string) => readonly string[] };
+
+/**
+ * The fields of the list named by `register` (an SQL expression) that the history withholds: typed `secret` or `money`,
+ * as a value or as a list of them, or marked `redact: true`, by ANY version of the list's declaration and not the live
+ * one alone. That is the rule the write path redacts by (`index.ts`, `redactedFields`): once withheld, always, since a
+ * row written under an older version holds the value still. `costRows` and `COST_SQL` both read through it.
+ */
+const withheldIdsSql = (register: string): string =>
+  `SELECT json_extract(df.value, '$.id') AS id FROM declaration d,
+      json_each(CASE WHEN json_valid(d.body) THEN (CASE WHEN json_type(d.body, '$.fields') = 'array' THEN d.body END) END, '$.fields') AS df
+    WHERE d.id = 'register.' || ${register} AND d.kind = 'register' AND df.type = 'object' AND json_type(df.value, '$.id') = 'text'
+      AND (json_type(df.value, '$.redact') = 'true' OR (CASE WHEN json_type(df.value, '$.type') = 'text' AND json_extract(df.value, '$.type') = 'list'
+        THEN json_extract(df.value, '$.of') ELSE json_extract(df.value, '$.type') END) IN ('secret', 'money'))`;
+
+/** `CostRows` over the record, through the very SQL `COST_SQL` reads, so the two cannot drift apart. */
+export function costRows(sql: WaitSql): CostRows {
+  return { withheld: (register) => sql.all<{ id: string }>(withheldIdsSql('?'), register).map((r) => r.id) };
+}
+
+/** An update in this rowset patches a field whose value the history withholds, so Put back cannot write it in again. */
+function patchesWithheld(body: Record<string, unknown>, rows?: CostRows): boolean {
+  if (rows === undefined || typeof body.register !== 'string') return false;
+  let withheld: readonly string[] | null = null;
+  return arr(body.rows).some((r) => {
+    if (r === null || typeof r !== 'object' || Array.isArray(r)) return false;
+    const row = r as Record<string, unknown>;
+    if (row.at === undefined) return false;
+    const patch = writeOf(row);
+    if (patch === null) return false;
+    withheld ??= rows.withheld(body.register as string);
+    return Object.keys(patch).some((f) => (withheld as readonly string[]).includes(f));
+  });
+}
+
+/** `patchesWithheld` as SQL over a `suggestion` row; its caller has already seen that `$.rows` is an array. */
+const PATCHES_WITHHELD_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.register') AS g, json_each(body, '$.rows') AS r, json_each(CASE
+      WHEN r.type = 'object' AND json_type(r.value, '$.at') IS NOT NULL AND json_type(r.value, '$.patch') = 'object' THEN json_extract(r.value, '$.patch') END) AS f
+    WHERE json_type(body, '$.register') = 'text' AND f.key IN (${withheldIdsSql('g.value')}))`;
+
 /**
  * `costOf` as SQL over a `suggestion` row's `body_kind` and `body` columns, so a queue counts and ranks every open
  * question without reading one body into this process (audit 16, M5). Each arm is `costOf`'s own, in its order, and
  * `test/weigh-sql.test.ts` holds the two to the same answer over every shape `costOf` reads.
+ *
+ * IT READS THE `declaration` TABLE AS WELL (batch 60), for the fields a list's history withholds, so it is `costOf`
+ * handed `costRows`: a caller that weighs in this process and wants the queue's own answer hands `costOf` the same.
  *
  * A BODY THAT IS NOT A JSON OBJECT IS READ AS `{}`, as `obj` reads it, and never handed to `json_extract`, which throws
  * on text that is not JSON. `json_array_length` answers 0 for a value that is not an array, which is `arr`'s `[]`.
@@ -166,10 +219,10 @@ const MOVES_MONEY_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r, j
 export const COST_SQL = `(CASE
   WHEN json_valid(body) AND json_type(body) = 'object' THEN (CASE body_kind
     WHEN 'rowset' THEN (CASE
-      WHEN json_type(body, '$.rows') = 'array' AND ${MOVES_MONEY_SQL} THEN 'undo'
+      WHEN json_type(body, '$.rows') = 'array' AND (${MOVES_MONEY_SQL} OR ${PATCHES_WITHHELD_SQL}) THEN 'undo'
       WHEN COALESCE(json_array_length(body, '$.rows'), 0) >= ${MANY_ROWS} THEN 'shape'
       ELSE 'rows' END)
-    WHEN 'change' THEN 'shape'
+    WHEN 'change' THEN (CASE WHEN COALESCE(json_type(body, '$.from'), 'null') = 'null' THEN 'shape' ELSE 'undo' END)
     WHEN 'pack' THEN (CASE WHEN json_type(body, '$.disable') = 'text' THEN 'undo' ELSE 'shape' END)
     WHEN 'settings' THEN 'shape'
     WHEN 'arrange' THEN (CASE

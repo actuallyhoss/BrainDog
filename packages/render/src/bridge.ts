@@ -7,7 +7,8 @@
  * is wrong, and the reader is owed the sentence rather than a tidy picture.
  */
 
-import { MISSING, magnitudeOf, quantity } from './format.ts';
+import { MISSING, exponentOf, magnitudeOf, quantity } from './format.ts';
+import { readFigure, writeFigure } from './money.ts';
 
 /** Two decimals at most, and no trailing zeros, so an attribute stays short and exact. */
 const at = (n: number): string => String(Math.round(n * 100) / 100);
@@ -103,6 +104,36 @@ export function bridgePlan(values: readonly number[]): BridgePlan {
   return { bars, zero: lo < 0 && hi > 0 ? at(100 - s(0)) : null, warn };
 }
 
+/**
+ * A step's amount as the one writer writes it (`money.ts`), or null when the caller was never told the record's home
+ * or the cell is not one whole amount, and then the cell is drawn the way it always was. A bridge is `exact`, every
+ * minor unit, as a table cell is: its rows are a sum the reader can check.
+ */
+export const bridgeWritten = (text: string, home?: string | null): string | null =>
+  home === undefined ? null : (writeFigure(text, home ?? null, 'exact')?.text ?? null);
+
+/** The figure a row shows, in its text, in the chart's name and in the fold: the writer's, or the cell as written. */
+export const bridgeFigure = (text: string, home?: string | null): string => bridgeWritten(text, home) ?? text;
+
+/**
+ * The plan from the cells as text. Told the home, an amount is read whole from its own digits (`readFigure`), so
+ * `−$12.50 USD` and `USD −12.50` are one movement, and what is not an amount is read as it always was.
+ *
+ * TWO CURRENCIES ARE NEVER ADDED. A walk from pounds through dollars has no levels to float a bar from, so nothing
+ * is drawn and the warn line says why; the rows still print every figure.
+ */
+export function bridgePlanOf(cells: readonly string[], home?: string | null): BridgePlan {
+  if (home === undefined) return bridgePlan(cells.map(signedOf));
+  const currencies = new Set<string>();
+  const values = cells.map((c) => {
+    const figure = readFigure(c.trim());
+    if (!figure) return signedOf(c);
+    currencies.add(figure.currency);
+    return Number(figure.minor) / 10 ** exponentOf(figure.currency);
+  });
+  return currencies.size > 1 ? { bars: null, zero: null, warn: BRIDGE_MIXED } : bridgePlan(values);
+}
+
 /** The chart's accessible name: every row, its label and its amount as drawn. */
 export const bridgeSentence = (rows: readonly { label: string; value: string }[]): string =>
   rows.map((r) => `${r.label} ${r.value || MISSING}`.trim()).join(', ');
@@ -112,5 +143,6 @@ export const bridgeSentence = (rows: readonly { label: string; value: string }[]
 export const BRIDGE_STEP = 'Step';
 export const BRIDGE_AMOUNT = 'Amount';
 export const BRIDGE_UNKNOWN = 'One step has no number, so the bars are not drawn.';
+export const BRIDGE_MIXED = 'These steps are in more than one currency, so the bars are not drawn.';
 export const bridgeOff = (sum: number, end: number): string =>
   `These steps do not add up: the start and the movements come to ${said(sum)}, and the end says ${said(end)}.`;

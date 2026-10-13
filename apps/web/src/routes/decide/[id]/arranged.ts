@@ -298,9 +298,19 @@ function planned(
       retired.set(label, [...(retired.get(label) ?? []), rows]);
     }
     /* WHAT AN UPDATE LEAVES AS THE OWNER CHANGED IT, by the name the record filed for it, which is the owner's. */
+    /* AND WHAT A KEPT PAGE GOES WITHOUT, IN THE RECORD'S OWN SENTENCE (`brings_line`, one for the whole update): said
+       once, in place of each such page's "is not taken", so the Late table an update was written for is named. */
+    const brought = new Set((Array.isArray(step.brings) ? step.brings.filter(isRow) : []).map((b) => text(b.id)));
+    const broughtLine = text(step.brings_line);
+    let broughtSaid = false;
     for (const id of strings(step.keeps)) {
       const kind = id.split('.')[0] ?? '';
       const title = kind === 'register' ? listName(id, ctx) : (ctx.names?.[id] ?? words(id));
+      if (kind === 'page' && broughtLine !== '' && brought.has(id)) {
+        if (!broughtSaid) kept.push({ kind: copy.arrangeKept, title: copy.arrangeKeepsPageBrings(broughtLine), lines: [] });
+        broughtSaid = true;
+        continue;
+      }
       kept.push({ kind: copy.arrangeKept, title: kind === 'page' ? copy.arrangeKeepsPage(title) : copy.arrangeKeeps(title), lines: [] });
     }
     /* WHAT A PACK LAYS ON A LIST ANOTHER PACK OWNS, one sentence for its fields and one for each field it adds choices to.

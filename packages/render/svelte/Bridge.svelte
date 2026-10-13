@@ -9,15 +9,16 @@
 -->
 <script lang="ts">
   import { inline, text, TONES, MISSING, type Block, type RenderOptions } from '../src/index.ts';
-  import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from '../src/bridge.ts';
+  import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten } from '../src/bridge.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
-  const plan = $derived(bridgePlan(block.rows.map((r) => signedOf(text(inline(r.cells[1] ?? '', opts))))));
-  const name = $derived(
-    bridgeSentence(block.rows.map((r) => ({ label: text(inline(r.cells[0] ?? '', opts)), value: text(inline(r.cells[1] ?? '', opts)) }))),
-  );
+  /* Each step's amount as text. Told the record's home (`opts.home`), a whole amount is the one writer's, as a table cell's is. */
+  const said = $derived(block.rows.map((r) => text(inline(r.cells[1] ?? '', opts))));
+  const written = $derived(said.map((s) => bridgeWritten(s, opts.home)));
+  const plan = $derived(bridgePlanOf(said, opts.home));
+  const name = $derived(bridgeSentence(block.rows.map((r, i) => ({ label: text(inline(r.cells[0] ?? '', opts)), value: written[i] ?? said[i] ?? '' }))));
 </script>
 
 <div class="prop bridge" style="--cells:{block.rows.length}">
@@ -39,7 +40,7 @@
             <rect class="bridge-bar" data-move={bar.move} x={bar.from} y="0" width={bar.span} height="100"></rect>
           </svg>
         {/if}
-        <span class="bridge-value num"><Text nodes={inline(row.cells[1] || MISSING, opts)} {opts} /></span>
+        <span class="bridge-value num"><Text nodes={inline(written[i] ?? (row.cells[1] || MISSING), opts)} {opts} /></span>
         <span class="bridge-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
       </li>
     {/each}
@@ -55,8 +56,8 @@
           <tr><th scope="col">{BRIDGE_STEP}</th><th scope="col">{BRIDGE_AMOUNT}</th></tr>
         </thead>
         <tbody>
-          {#each block.rows as row}
-            <tr><th scope="row">{text(inline(row.cells[0] ?? '', opts))}</th><td class="num">{text(inline(row.cells[1] ?? '', opts)) || MISSING}</td></tr>
+          {#each block.rows as row, i}
+            <tr><th scope="row">{text(inline(row.cells[0] ?? '', opts))}</th><td class="num">{(written[i] ?? said[i]) || MISSING}</td></tr>
           {/each}
         </tbody>
       </table>

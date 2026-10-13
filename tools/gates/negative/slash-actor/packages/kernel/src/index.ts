@@ -2,9 +2,10 @@
  * THE SEEDED VIOLATION: a writer that does not call the guard.
  *
  * `packages/kernel/src/slash.ts` says there are five calls to `slashMayWrite` and that "a sixth
- * would be a sixth call". This kernel has four writers and only three of them call it. `create`
+ * would be a sixth call". This kernel has five writers and only three of them always call it. `create`
  * appends the event itself, which is exactly the bypass the gate exists to catch and exactly what
- * the guard cannot: the guard is not on that path any more.
+ * the guard cannot: the guard is not on that path any more. And `install` writes a page's `declare`
+ * line without asking, so a page installed as Slash lands and is signed.
  *
  * Everything else here is the smallest thing that is still a record: an `entry` table, an `event`
  * table, and writers whose kinds are the ones the real kernel's are.
@@ -13,14 +14,17 @@
 export const SLASH = 'slash';
 export const SLASH_KINDS = new Set(['suggest', 'propose', 'predict']);
 
-export function slashMayWrite(actor, kind) {
-  if (actor === SLASH && !SLASH_KINDS.has(kind))
-    throw new Error(`slash wrote ${kind}. A model suggests, proposes and predicts; everything else is a person's or the record's own (30 §3).`);
+/* THE ONE DECLARATION SLASH SIGNS, as the real guard has it: a look whose body says it is Slash's. */
+export function slashMayWrite(actor, kind, what) {
+  if (actor !== SLASH || SLASH_KINDS.has(kind)) return;
+  if (kind === 'declare' && what?.kind === 'look' && what.body?.by === SLASH) return;
+  throw new Error(`slash wrote ${kind}. A model suggests, proposes and predicts; everything else is a person's or the record's own (30 §3).`);
 }
 
 export async function openRecord(sql, clock) {
   sql.exec('CREATE TABLE entry (id TEXT PRIMARY KEY, register TEXT, seq INTEGER, fields TEXT)');
   sql.exec('CREATE TABLE event (id TEXT PRIMARY KEY, ts TEXT, actor TEXT, kind TEXT, target TEXT, note TEXT)');
+  sql.exec('CREATE TABLE declaration (id TEXT PRIMARY KEY, kind TEXT, body TEXT, retired INTEGER DEFAULT 0, superseded_at TEXT)');
 
   const registers = new Map();
   let n = 0;
@@ -34,7 +38,20 @@ export async function openRecord(sql, clock) {
 
   return {
     registers: () => registers,
-    declare: (id) => registers.set(id, { id }),
+    declare: (id) => registers.set(id, { id, title: 'what' }),
+
+    /* THE SECOND BYPASS, A DECLARE (ENG-A16). A look and a rule ask the guard before their line, as the real install
+       does. A page does not: its line is written with the actor it was handed, which is the plain insert the real
+       install had until batch 60. An unsigned install is setup and writes no line. */
+    install: async (batch, _known, by) => {
+      for (const one of batch) {
+        if (by?.actor !== undefined && one.kind !== 'page') slashMayWrite(by.actor, 'declare', one);
+        sql.exec('INSERT INTO declaration (id, kind, body) VALUES (?, ?, ?)', one.id, one.kind, JSON.stringify(one.body ?? {}));
+        if (by?.actor !== undefined)
+          sql.exec('INSERT INTO event (id, ts, actor, kind, target, note) VALUES (?, ?, ?, ?, ?, ?)', mint(), at(), by.actor, 'declare', `declaration:${one.id}`, null);
+      }
+      return { ok: true, value: batch.map((one) => ({ id: one.id, version: 1, changed: true })) };
+    },
 
     list: ({ register, limit }) => ({
       ok: true,

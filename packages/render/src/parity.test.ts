@@ -25,6 +25,7 @@ import { toHTML } from './html.ts';
 import { UNNAMED } from './inline.ts';
 import { forecastFigure, forecastModel, forecastPerMonth, inCurrency, largest } from './forecast.ts';
 import { writeAmount } from './money.ts';
+import { BRIDGE_MIXED } from './bridge.ts';
 
 registerHooks({
   load(url, context, next) {
@@ -229,8 +230,10 @@ const SHAPES: Record<string, string> = {
   /* A LEDGER NEWEST FIRST, its days said once over their rows (`timeline.ts`), and one whose days never repeat. */
   'a timeline grouped by day': '```timeline\n1 Oct | Tesco | GBP −42.10\n1 Oct | Salary | GBP 3,100.00 | good\n30 Sep | Rent | GBP −1,200.00\n```',
   'a timeline whose days do not repeat': '```timeline\n1 Oct | Tesco\n30 Sep | Rent\n```',
-  /* A CARD'S TREND FILLED BY THE RECORD, said as an array with a gap in it, beside a figure. */
-  'cards whose trend the record filled': '```cards\ntitle | figure: Done | trend: By week\nBake | 12 | [3,null,5,4]\nNook |2 | 1,,2\nQuiet | 0 | \n```',
+  /* A CARD'S TREND FILLED BY THE RECORD, said as an array with a gap in it, beside a figure. Three known points draw
+     the line (Bake, and Nook as `String()` says an array); two are not a chart and Twice keeps its figure alone. */
+  'cards whose trend the record filled':
+    '```cards\ntitle | figure: Done | trend: By week\nBake | 12 | [3,null,5,4]\nNook |2 | 1,,2,2\nTwice | 3 | 1,,2\nQuiet | 0 | \n```',
   /* A STAT'S FIGURE IS A HEADLINE, with no `.00` (`headlineFigure`), in a currency with a symbol and one without. */
   'a stat whose figures are headlines': '```stat\nCash now | GBP 33,850.00 | in 3 accounts · GBP 1,200.00 out\nIn Cairo | EGP 412,300.00 | \nSpent | GBP 12.50 | \nCame in | +EGP 850.00 | \n```',
   'sparklines, with one point and none':'```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```',
@@ -378,6 +381,25 @@ test('A FORECAST WRITES EVERY AMOUNT WITH THE ONE WRITER: the table reads the sa
   const usd = tableFigures(tree(toHTML([page(walkIn('USD', 'EGP'))])));
   assert.ok(usd.every((f) => f.includes('USD')), 'a dollar on a pound record says it is a dollar');
   assert.ok(usd[3]!.startsWith('−'), 'and what goes out has a true minus in front');
+});
+
+test('A BRIDGE TOLD THE HOME IS ONE TREE IN BOTH DRAWERS: the one writer spells every step, and two currencies are never added', () => {
+  const Homed = Block as unknown as Component<{ block: BlockSegment; opts: { home: string } }>;
+  const one = page('```bridge | This month\nStart | EGP 9,000.00\nComing in | EGP 2,000.00 | 5 invoices\nGoing out | EGP −1,600.00\nEnd of month | EGP 9,400.00\n```');
+  const two = page('```bridge | This month\nStart | EGP 9,000.00\nComing in | USD 200.00\nEnd of month | EGP 9,200.00\n```');
+  for (const [name, block] of [['one currency', one], ['two currencies', two]] as const) {
+    const html = tree(toHTML([block], { home: 'EGP' }));
+    const svelte = tree(render(Homed, { props: { block, opts: { home: 'EGP' } } }).body);
+    assert.equal(svelte, html, `${name}: the two drawers are one tree`);
+  }
+  const said = (minor: number, currency: string): string => writeAmount({ minor, currency }, 'EGP', 'exact')!.text.replaceAll('\u00a0', ' ');
+  const homed = tree(toHTML([one], { home: 'EGP' }));
+  assert.ok(decode(homed).includes(`>${said(900_000, 'EGP')}<`), `the string drawer writes a step as the writer does: ${homed}`);
+  assert.match(homed, /class="bridge-chart"/u, 'steps in one currency are drawn');
+  const mixed = tree(toHTML([two], { home: 'EGP' }));
+  assert.doesNotMatch(mixed, /class="bridge-chart"/u, 'steps in two currencies are not added into bars');
+  assert.ok(decode(mixed).includes(BRIDGE_MIXED), 'and the warn line says why');
+  assert.ok(decode(mixed).includes(said(20_000, 'USD')), 'the dollar step keeps its code on a pound record');
 });
 
 test('a walk shown in another currency is written by the same writer, and the model holds a currency and numbers', () => {
@@ -678,7 +700,7 @@ test('A CARD DRAWS A SMALL LINE FROM A TREND THE RECORD FILLED, named by its num
   const block = page(SHAPES['cards whose trend the record filled']!);
   for (const drawn of [toHTML([block]), render(Block, { props: { block } }).body].map(tree)) {
     const names = [...drawn.matchAll(/<svg aria-label="([^"]*)" class="cards-trend"/gu)].map((m) => m[1]);
-    assert.deepEqual(names, ['By week: 3, no value, 5, 4', 'By week: 1, no value, 2'], 'an empty trend draws no line');
+    assert.deepEqual(names, ['By week: 3, no value, 5, 4', 'By week: 1, no value, 2, 2'], 'two points are not a chart, and an empty trend draws no line');
   }
 });
 

@@ -210,7 +210,11 @@ export function arrivals(now: () => number = Date.now, ms = ARRIVED_MS) {
     see(list: string, keys: readonly string[]): ReadonlySet<string> {
       const t = now();
       const was = seen.get(list);
-      if (was) for (const key of keys) if (!was.has(key)) until.set(at(list, key), t + ms);
+      /* A LOOK THAT DREW NOTHING IS NO BASELINE (look-left-60). A block is drawn once before its live answer is in, with
+         no rows, and the answer after it then marked every row on the page: Money's What moved stood lavender on load.
+         So the first look that holds a row is the baseline. The cost, said: the first row to arrive in a list that
+         was truly empty is not tinted. */
+      if (was && was.size > 0) for (const key of keys) if (!was.has(key)) until.set(at(list, key), t + ms);
       seen.set(list, new Set(keys));
       const out = new Set<string>();
       for (const key of keys) {

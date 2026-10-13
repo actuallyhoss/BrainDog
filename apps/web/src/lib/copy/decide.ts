@@ -233,6 +233,9 @@ export const decide = {
   arrangeKept: 'Kept',
   arrangeKeeps: (name: string) => `Keeps ${name} as you changed it. This update's version of it is not taken.`,
   arrangeKeepsPage: (name: string) => `Keeps your ${name} page as you arranged it. This update's version of it is not taken.`,
+  /* A KEPT PAGE THE UPDATE ADDS TO: the record's own sentence for what the page goes without (`brings_line`), and that
+     the choice comes after, as its own question, since this card is a yes or a no to the whole update. */
+  arrangeKeepsPageBrings: (line: string) => `${line} Once this update is in, you are asked whether to take its page.`,
   /* A CHOICE AN UPDATE TAKES OFF A LIST WHOSE ROWS HOLD IT, which stays: said beside what it keeps, because the list the
      owner sees after accepting still offers it. `holding` is how many of the list's `rows` hold it, and both are said:
      the list's count alone read "it holds 3 rows that may use it" on a record where none of the three did (audit

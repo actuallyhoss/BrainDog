@@ -454,10 +454,13 @@ One string, three shapes, parsed by prefix:
 | `agent:<name>` | `agent:claude` · `agent:codex` | a token, named at creation — the fallback, never the norm |
 | `<mechanism>:<id>` | `rule:renewal-30d` · `ingest:hsbc-sms` · `ingest:npm-downloads` · `runner:rnr_9k2` | something declared. A pull connector is an `ingest` declaration, so its run is `ingest:<id>` — there is no `pull:` prefix; *an earlier draft had one* |
 | `system` | `system` | migrations, purges, the scheduler itself, the dead-letter suggestion |
-| `slash` | `slash` | the assistant — **only ever on `suggest`, `propose` or `predict`, never on a row write** |
+| `slash` | `slash` | the assistant — **only ever on `suggest`, `propose` or `predict`, and on the `declare` of a look that says it is its own; never on a row write** |
 
 That last row is an invariant with a test: **`event WHERE actor='slash' AND kind NOT IN
-('suggest','propose','predict')` must always be empty.** It is the architectural claim in
+('suggest','propose','predict') AND NOT (kind = 'declare' AND target LIKE 'declaration:look.%')` must always be
+empty.** The one exception is a look: an arrangement of a page that already exists, whose body says `by: slash` and
+which no add-on carries. A page, a list, a rule, a script and an add-on are never Slash's to install or retire, and the
+write path refuses each before its `declare` line (`slashMayWrite`, [ADR-072](16-DECISIONS.md)). It is the architectural claim in
 [11-ASSISTANT](11-ASSISTANT.md) §2, expressed as a query anyone can run against a real record. Two refusals the
 grammar implies, named so no spec invents a code for them (41): a row write from a `slash` principal is `FORBIDDEN`
 at step 1, and a bare `#7` with no register before it is `REGISTER_UNKNOWN`.

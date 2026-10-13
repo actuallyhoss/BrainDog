@@ -473,8 +473,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   A payment marks what it paid (pay-links-57, REC-B11): a bill gains Paid so far, an instalment Paid by, a link to
  *   the Ledger entry that paid it, and a repeating line Last paid and Last amount. The Ledger declares
  *   `delete: refuse_while_referenced`, so a payment an instalment names is not deleted out from under it. Fields and a
- *   delete rule added, nothing taken away, still minor. The script that writes them (`scripts/settle.js`) is not
- *   registered yet, so a person fills them until it is, and the note a person reads says nothing of them until then.
+ *   delete rule added, nothing taken away, still minor. The script that writes them (`scripts/settle.js`) is
+ *   registered since batch 60, for a bill (below); an instalment's Paid by and a repeating line's Last paid and Last
+ *   amount are still filled by a person, and the note a person reads says nothing of those two.
  *   A lead for two books (the look of 13 October, fault F): with two books or more Money's first line says how many
  *   books and accounts the money is kept in, two counts and no sum, where no block was the lead and the app said its
  *   own filler. Money is at the most blocks a page declares, so it took the place of the line for no balance typed,
@@ -485,6 +486,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   twelve lines folded shut, so the page still declares twenty-four blocks and says what moved once. And the two late
  *   lines on Heads up say "past their due date" in the danger colour (bad-phrase-59), the words unchanged. Blocks
  *   swapped and two sentences marked inside the unreleased step, so no version of its own.
+ *   A payment marks the bill it pays (settle-rule-60, REC-B11): `script.settle` is registered, and `rule.payment-settles`
+ *   starts it when a Ledger entry that names a bill in Settles has cleared, handing the entry and the bill by their
+ *   ids, which the script reads as well as a handle. The bill is part paid with the sum so far, or paid with the day;
+ *   only cleared money is counted. Nothing starts it for an instalment or a repeating line: Settles points at Bills
+ *   alone. A rule and a script added inside the unreleased step, so no version of its own.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
  *   declares `delete: refuse_while_referenced`, as Accounts does, so a project a task, a bill, a service or a person names
  *   is not deleted out from under them, and the refusal names the lists and how many. Under What each one earns, one
@@ -500,7 +506,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - estate 2.2.0: a service's type gains server, database, storage and network, said Server, Database, Storage and
  *   Network. A record that came in from a cloud account brought its own values for these with no label, and the month
  *   by type read a key. Four values added after the eight and nothing taken away, so the step is a minor one; a value a
- *   record added itself stays (laidBack).
+ *   record added itself stays (laidBack). And a project's Costs a year is left out until a cost is recorded
+ *   (sketchpad-60): `project-cost` reads only services whose cost is set, so a project whose services say no cost draws
+ *   no figure where it drew 0. One `where` narrowed inside the unreleased step, so no version of its own.
  * - portfolio 1.17.0 (seed-58, the look of 13 October, fault J): the line under What each one earns is drawn only while
  *   one project in play says what it earned (`projects-earning-said` above nought), where it was drawn while any was in
  *   play and read "0 of 11 projects in play say what they earned in a year" on a record that never meant to say. The

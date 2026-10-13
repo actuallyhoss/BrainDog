@@ -111,17 +111,25 @@ test('a picker leaves out a row its own list calls finished, and keeps the one a
   refMapOf('accounts', []);
 });
 
-test('a list whose new rows start finished leaves none out of a picker: a cleared entry is offered in Paid by', () => {
+test('the state a list starts a new row in keeps none out of a picker: Paid by offers a cleared entry and leaves a void one out', () => {
   const paidBy = held.REGISTERS.installments!.fields.find((f) => f.id === 'paid_by')!;
   assert.equal(paidBy.to, 'transactions');
   const ledger = held.REGISTERS.transactions!;
   const starts = ledger.fields.find((f) => f.id === ledger.state)?.default;
   assert.ok(typeof starts === 'string' && ledger.done?.includes(starts), 'a ledger entry no longer starts finished, so this test holds nothing');
-  assert.deepEqual(held.leftOut(ledger), []);
+  assert.equal(starts, 'cleared');
+  assert.ok(ledger.done?.includes('void'), 'the ledger has no void state to leave out');
+  /* ONLY THE STARTING STATE IS LET BACK IN: every other finished state still keeps its rows out. */
+  assert.deepEqual(held.leftOut(ledger), ledger.done!.filter((s) => s !== starts));
+  assert.ok(held.leftOut(ledger).includes('void'));
   const title = ledger.title!;
-  const row = (seq: number, name: string, state?: string): RecordRow => ({ id: `01JLIVELEDGER000000000000${seq}`, seq, fields: { [title]: name, ...(state ? { state } : {}) }, version: 1, created_at: '2026-09-20T10:00:00Z' });
-  refMapOf('transactions', [row(1, 'Deposit', 'cleared'), row(2, 'Second part', 'pending'), row(3, 'Sent twice', 'void')]);
-  assert.deepEqual(held.refOptions(paidBy.to!).map((o) => o.label), ['Deposit', 'Second part', 'Sent twice']);
+  const state = ledger.state!;
+  const row = (seq: number, name: string, now?: string): RecordRow => ({ id: `01JLIVELEDGER000000000000${seq}`, seq, fields: { [title]: name, ...(now ? { [state]: now } : {}) }, version: 1, created_at: '2026-09-20T10:00:00Z' });
+  refMapOf('transactions', [row(1, 'Deposit', 'cleared'), row(2, 'Second part', 'pending'), row(3, 'Sent twice', 'void'), row(4, 'Balance')]);
+  assert.deepEqual(held.refOptions(paidBy.to!).map((o) => o.label), ['Deposit', 'Second part', 'Balance']);
+  /* A PART ALREADY POINTING AT THE VOID ENTRY STILL SHOWS IT, and its name is still known wherever it is drawn. */
+  assert.deepEqual(held.refOptions(paidBy.to!, 3).map((o) => o.label), ['Deposit', 'Second part', 'Sent twice', 'Balance']);
+  assert.equal(held.TITLES.get('transactions')?.get(3), 'Sent twice');
   refMapOf('transactions', []);
   /* AND A LIST WHOSE ROWS START OPEN STILL LEAVES ITS CLOSED ONES OUT. */
   assert.deepEqual(held.leftOut(held.REGISTERS.accounts), held.REGISTERS.accounts!.done);

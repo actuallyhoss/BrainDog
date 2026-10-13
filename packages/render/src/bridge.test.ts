@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BRIDGE_UNKNOWN, bridgePlan, bridgeSentence, moveOf, signedOf } from './bridge.ts';
+import { BRIDGE_MIXED, BRIDGE_UNKNOWN, bridgeFigure, bridgePlan, bridgePlanOf, bridgeSentence, bridgeWritten, moveOf, signedOf } from './bridge.ts';
+import { AMOUNT_SPACE, writeFigure } from './money.ts';
+import { tableCellBody } from './table.ts';
 import { parse } from './parse.ts';
 import { toHTML } from './html.ts';
 
@@ -63,4 +65,37 @@ test('A BRIDGE PUTS ITS NUMBERS IN A FOLD, a row for each step with its amount a
     html,
     /<div class="bridge-numbers"><table class="bridge-table"><thead><tr><th scope="col">Step<\/th><th scope="col">Amount<\/th><\/tr><\/thead><tbody><tr><th scope="row">Start<\/th><td class="num">100<\/td><\/tr><tr><th scope="row">Something<\/th><td class="num">soon<\/td><\/tr><tr><th scope="row">End<\/th><td class="num">—<\/td><\/tr><\/tbody><\/table><\/div><\/div>/u,
   );
+});
+
+test('TOLD THE HOME, A BRIDGE WRITES EVERY FIGURE AS A TABLE CELL DOES, and not told it changes nothing', () => {
+  const cells = ['EGP 9,000.00', '+USD 40.00', 'EGP −1,600.00', 'US$3.63', 'soon', ''];
+  assert.deepEqual(
+    cells.map((c) => bridgeFigure(c, 'EGP')),
+    cells.map((c) => writeFigure(c, 'EGP', 'exact')?.text ?? c),
+  );
+  for (const c of cells) {
+    const body = tableCellBody(c, 'EGP').body;
+    if ('amount' in body && body.amount) assert.equal(bridgeFigure(c, 'EGP'), body.amount.text, `${c} is spelled as its table cell`);
+  }
+  assert.deepEqual(
+    cells.map((c) => bridgeFigure(c, 'EGP')),
+    [`EGP${AMOUNT_SPACE}9,000.00`, `+$40.00${AMOUNT_SPACE}USD`, `−EGP${AMOUNT_SPACE}1,600.00`, 'US$3.63', 'soon', ''],
+  );
+  assert.equal(bridgeFigure('USD 40.00', 'USD'), '$40.00', 'the home currency is said by its sign');
+  assert.equal(bridgeFigure('USD 40.00', null), `$40.00${AMOUNT_SPACE}USD`, 'a record with no home says every code');
+  assert.deepEqual(cells.map((c) => bridgeFigure(c)), cells, 'not told a home, every figure is as its cell wrote it');
+  assert.equal(bridgeWritten('soon', 'EGP'), null);
+});
+
+test('TOLD THE HOME, THE BARS ARE READ FROM THE AMOUNT ITSELF, and two currencies are never added', () => {
+  const one = ['EGP 9,000.00', '+EGP 2,000.00', 'EGP −1,600.00', 'EGP 9,400.00'];
+  assert.deepEqual(bridgePlanOf(one, 'EGP'), bridgePlan([9000, 2000, -1600, 9400]));
+  assert.deepEqual(bridgePlanOf(one.map((c) => bridgeFigure(c, 'EGP')), 'EGP'), bridgePlan([9000, 2000, -1600, 9400]), 'and from the figure as written');
+  assert.deepEqual(bridgePlanOf(['$40.00 USD', '−$12.50 USD', '$27.50 USD'], 'EGP'), bridgePlan([40, -12.5, 27.5]));
+
+  const two = ['EGP 9,000.00', '+USD 40.00', 'EGP −1,600.00', 'EGP 7,440.00'];
+  assert.deepEqual(bridgePlanOf(two, 'EGP'), { bars: null, zero: null, warn: BRIDGE_MIXED });
+  assert.deepEqual(bridgePlanOf(two), bridgePlan(two.map(signedOf)), 'not told a home, the plan is the one it always was');
+  assert.deepEqual(bridgePlanOf(['Start 100', '20', '120'], 'EGP'), bridgePlan([100, 20, 120]), 'a cell that is not an amount is read as before');
+  assert.deepEqual(bridgePlanOf(['EGP 100.00', '20', 'EGP 120.00'], 'EGP'), bridgePlan([100, 20, 120]), 'a bare number beside one currency is a step in it');
 });

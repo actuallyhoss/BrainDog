@@ -2502,10 +2502,12 @@
       </p>
     {/if}
 
-    <!-- THE OFFER, WHERE SHE IS: one card at most, above the list's figures and its entries, and none while the list is
-         still arriving, since an offer is drawn from use and a list being made has none yet. -->
+    <!-- THE OFFER, WHERE SHE IS: one at most, above the list's figures and its entries, and none while the list is
+         still arriving, since an offer is drawn from use and a list being made has none yet. FOLDED TO ONE LINE
+         (`compact`, DIRECTION 39): she opened the list to read it, so the offer is a sentence over it and a press
+         opens the card whole, with Make it and Not now where they were. -->
     {#if offer && !arriving}
-      <OfferCard item={offer} acts={offerActions} busy={offerBusy} />
+      <OfferCard item={offer} acts={offerActions} busy={offerBusy} compact />
     {/if}
 
     <!-- THE LIST'S FIGURES, over the whole list only (`ListSummary` says why): one tile above the list's own, 12 from it.

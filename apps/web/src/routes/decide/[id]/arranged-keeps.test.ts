@@ -38,3 +38,17 @@ test('an update that keeps nothing says nothing about keeping', () => {
   const appears = arrangedOf('pack', update([], {}))?.parts.find((p) => p.part === 'appears');
   assert.doesNotMatch(JSON.stringify(appears), /Keeps/u);
 });
+
+/* WHAT A KEPT PAGE GOES WITHOUT (declare-edited-page-60). The record files `brings` and the sentence for the whole update
+   (`brings_line`), and Decide says it once in place of "is not taken", with the choice that follows the update. */
+test('an update that adds to a page the owner changed says what the page goes without, once', () => {
+  const line = 'Solo founder 2.6.0 adds the Late table and the title Today to your Overview page, which you changed. Your page is kept as you left it.';
+  const body = {
+    ...update(['page.home-founder', 'metric.spent-30d'], { 'page.home-founder': 'Overview', 'metric.spent-30d': 'Spent, last month' }),
+  };
+  body.plan[0] = { ...body.plan[0]!, brings: [{ id: 'page.home-founder', title: 'Today', blocks: [{ kind: 'table', heading: 'Late' }] }], brings_line: line } as never;
+  const said = JSON.stringify(arrangedOf('pack', body)?.parts.find((p) => p.part === 'appears'));
+  assert.ok(said.includes(`${line} Once this update is in, you are asked whether to take its page.`), said);
+  assert.doesNotMatch(said, /Keeps your Overview page as you arranged it/u, 'the page is said twice');
+  assert.match(said, /Keeps Spent, last month as you changed it\./u, 'what else it keeps is still said');
+});

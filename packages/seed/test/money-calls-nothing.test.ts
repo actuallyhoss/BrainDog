@@ -65,6 +65,11 @@ const closedScript = (d: Record<string, unknown>): boolean =>
 /** Every way `doc` reaches outside the record, each as a sentence naming where. Nothing, for a document that does not. */
 export function callsOut(doc: Doc): string[] {
   const out: string[] = [];
+  /* A STEP THAT STARTS A CLOSED SCRIPT OF THIS DOCUMENT LEAVES NOTHING (settle-rule-60): `payment-settles` starts
+     `settle`, code over the record's own rows with no host and no key. A step naming any other script is still said. */
+  const closed = new Set(doc.declarations.filter(closedScript).map((d) => String(d.script)));
+  const staysIn = (verb: string, node: Record<string, unknown>): boolean =>
+    verb === 'script' && closed.has(String((node.script as { id?: unknown } | null)?.id));
   for (const d of doc.declarations) {
     const kind = kindOf(d);
     const e = egressOf(d);
@@ -75,7 +80,7 @@ export function callsOut(doc: Doc): string[] {
     if (kind === 'ingest' && FETCHES.has(String(d.channel))) out.push(`${nameOf(d)} fetches by ${String(d.channel)}`);
     if (kind === 'rule')
       for (const w of walk(d, nameOf(d)))
-        if (w.node) for (const verb of Object.keys(w.node).filter((k) => LEAVES.has(k))) out.push(`${w.at} has a step that says ${verb}`);
+        if (w.node) for (const verb of Object.keys(w.node).filter((k) => LEAVES.has(k) && !staysIn(k, w.node as Record<string, unknown>))) out.push(`${w.at} has a step that says ${verb}`);
     if (kind === 'register')
       for (const f of Array.isArray(d.fields) ? (d.fields as { id?: string; type?: string }[]) : [])
         if (SECRET_TYPES.has(String(f.type))) out.push(`${nameOf(d)} keeps a key in ${String(f.id)}`);
